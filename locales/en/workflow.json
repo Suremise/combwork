@@ -381,7 +381,7 @@
   },
   "workflow.notOffered.later": {
     "defaultMessage": "Some of these options aren’t available in this version yet: leave them as they are.",
-    "description": "Why workflow options cannot be saved: an option set (merge checks, up to date before merging, slots kept up to date) comes in a later version of Hive."
+    "description": "Why workflow options cannot be saved: an option set (up to date before merging, slots kept up to date) comes in a later version of Hive."
   },
   "workflow.option.commands.desc": {
     "defaultMessage": "The command each named check runs. A run counts as the check only when it runs that command.",

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import type { CheckWhyNot, ProgressRun, ProgressSource, ProviderId, RunCheck } from '../shared/types'
+import type { CheckWhyNot, ProgressRun, ProgressSource, ProviderId, RunCheck, TransientCause, TransientFailure } from '../shared/types'
 import { MAX_COMMAND, MAX_ESTIMATE_MS, MAX_LOG_PATH, MAX_OPEN_PER_OWNER, MAX_OPEN_PER_WORKSPACE, MAX_STEP_NAME, MAX_SUMMARY, MAX_TITLE, MAX_TOTAL, RECENT_KEPT, isOpenRun, isOverdue, timeLeft } from '../shared/progress'
 import { PROVIDERS } from '../shared/providers'
 
@@ -166,7 +166,8 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
       ...(source === 'hive' && r.noInstall === true ? { noInstall: true as const } : {}),
       ...(source === 'hive' && r.installAsWritten === true ? { installAsWritten: true as const } : {}),
       ...runFor(keptFor(r)),
-      ...keptCounts(r.counts)
+      ...keptCounts(r.counts),
+      ...(source === 'hive' ? keptTransient(r.transient) : {})
     })
   }
   return out
@@ -187,6 +188,17 @@ function runFor(f: RunFor): Pick<ProgressRun, 'card' | 'revision' | 'testedCheck
 }
 
 const WHY_NOT = new Set<string>(['notCheck', 'notContained', 'dirty', 'changed', 'moved', 'revisionChanged'])
+
+const CAUSES = new Set<string>(['spawn', 'notFound', 'timeout', 'killed', 'exit75', 'network'])
+
+/** Why Hive's own failed run counts as temporary (#1362), checked: a known cause, and a network error code (letters, digits, _). */
+export function keptTransient(v: unknown): Pick<ProgressRun, 'transient'> {
+  if (!v || typeof v !== 'object') return {}
+  const t = v as Record<string, unknown>
+  if (typeof t.cause !== 'string' || !CAUSES.has(t.cause)) return {}
+  const code = typeof t.code === 'string' && /^\w{1,64}$/.test(t.code) ? { code: t.code } : {}
+  return { transient: { cause: t.cause as TransientCause, ...code } satisfies TransientFailure }
+}
 
 /** How a kept run counted as a check (#1222), checked: a check's name, counted or a known reason. */
 function keptCounts(v: unknown): Pick<ProgressRun, 'counts'> {
@@ -452,6 +464,8 @@ export class ProgressStore {
     run.seenAt = null
     if (exitCode !== undefined) run.exitCode = exitCode
     if (logPath) run.logPath = logPath
+    // Why Hive's own failed run counts as temporary (#1362): only Hive's runs say it.
+    if (caller.source === 'hive' && run.state === 'failed') Object.assign(run, keptTransient(body.transient))
     if (run.state === 'passed' && run.total !== null) run.step = run.total
     if (run.state === 'failed') this.unseenFailure.add(key(run.workspacePath))
     this.ended(run.workspacePath)

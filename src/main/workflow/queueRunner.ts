@@ -274,10 +274,30 @@ export class QueueRunner {
    * nothing run, when the runner no longer holds (LeaseLost), its job has gone, or the launcher couldn't be put in the
    * job or recorded. The child is the launcher: its output and exit code are the command's.
    */
-  async spawn(what: Exclude<QueueProcKind, 'job'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell'> & { input?: string } = {}): Promise<ChildProcess> {
-    const job = this.job
-    if (!job || this.released) throw new LeaseLost(this.target)
-    const { child, after, before } = startLauncher({ command, args, shell: !!opts.shell }, { cwd: opts.cwd as string | undefined, env: opts.env })
+  async spawn(what: Exclude<QueueProcKind, 'job'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments'> & { input?: string } = {}): Promise<ChildProcess> {
+    const { child, failed } = this.launch(what, command, args, opts)
+    // Not started: nothing to record or end; the start's own error (it is told on the next tick).
+    if (!child.pid) throw await failed
+    await this.letGo(what, child, command, opts.input)
+    return child
+  }
+
+  /**
+   * `spawn` in Node's own shape (#1349's checks start their processes so, `QueueConfig.runCheck`): the launcher is given
+   * back at once, and told to run the command once it is in the job and recorded, as `spawn` does; until then it runs
+   * nothing, and one that can't be put there or recorded ends having run nothing (its exit code is not 0). Throws LeaseLost
+   * at once once the runner no longer holds.
+   */
+  spawnNow(what: Exclude<QueueProcKind, 'job'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments'> = {}): ChildProcess {
+    const { child } = this.launch(what, command, args, opts)
+    if (child.pid) void this.letGo(what, child, command).catch((e) => log.warn(`starting the merge queue's ${what}`, e))
+    return child
+  }
+
+  /** Starts a command's launcher, waiting for its go-ahead, with its errors handled from the start. */
+  private launch(what: Exclude<QueueProcKind, 'job'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments'>): { child: ChildProcess; failed: Promise<Error>; after: number; before: number } {
+    if (!this.job || this.released) throw new LeaseLost(this.target)
+    const { child, after, before } = startLauncher({ command, args, shell: !!opts.shell, verbatim: !!opts.windowsVerbatimArguments }, { cwd: opts.cwd as string | undefined, env: opts.env })
     // Its errors are handled here from the start (a start that failed: a folder gone, no executable; a pipe that broke),
     // never left to the process's: the first is the start's error, later ones are logged.
     let startError: Error | null = null
@@ -287,11 +307,25 @@ export class QueueRunner {
         else log.warn(`the merge queue's ${what} process`, e)
       })
     )
-    for (const s of [child.stdin, child.stdout, child.stderr]) s?.on('error', (e) => log.warn(`the merge queue's ${what} process's pipe`, e))
+    for (const st of [child.stdin, child.stdout, child.stderr]) st?.on('error', (e) => log.warn(`the merge queue's ${what} process's pipe`, e))
+    this.started.set(child, { after, before })
+    return { child, failed, after, before }
+  }
+
+  /** Clock readings around each launcher's start, until it is let go. */
+  private readonly started = new WeakMap<ChildProcess, { after: number; before: number }>()
+
+  /**
+   * A launcher put in the job and recorded (a write that checks the lease), then told to run its command; one that can't
+   * be is given up (it ends having run nothing) and the error thrown.
+   */
+  private async letGo(what: Exclude<QueueProcKind, 'job'>, child: ChildProcess, command: string, input?: string): Promise<void> {
+    const pid = child.pid!
+    const { after, before } = this.started.get(child)!
     const giveUp = (): void => {
       // Never told to run: ending its input ends it, and one that started is ended too in case it is slow to see that.
       child.stdin?.end()
-      if (child.pid && child.exitCode === null && child.signalCode === null) {
+      if (child.exitCode === null && child.signalCode === null) {
         try {
           child.kill()
         } catch (e) {
@@ -299,10 +333,9 @@ export class QueueRunner {
         }
       }
     }
-    const pid = child.pid
-    // Not started: nothing to record or end; the start's own error (it is told on the next tick).
-    if (!pid) throw startError ?? (await failed)
     try {
+      const job = this.job
+      if (!job || this.released) throw new LeaseLost(this.target)
       if (!(await job.assign(pid, after, before))) throw new Error(`${command} couldn't be put in the merge queue's job`) // i18n-ignore: as above
       await this.change(() => this.cfg.store.addQueueProc({ lease: this.lease, target: this.target, pid, startAfter: after, startBefore: before, what }))
     } catch (e) {
@@ -313,9 +346,8 @@ export class QueueRunner {
       // The launcher's tree may live on (a detached server), in the job: the job, the lease's own duty, owns it.
       void locked(this.cfg, () => this.cfg.store.dropQueueProc(this.lease, pid)).catch((e) => log.warn('forgetting a merge queue process that ended', e))
     })
-    child.stdin!.write(`go\n${opts.input ?? ''}`) // i18n-ignore: the launcher's go-ahead (queueJobs.ts), not text
+    child.stdin!.write(`go\n${input ?? ''}`) // i18n-ignore: the launcher's go-ahead (queueJobs.ts), not text
     child.stdin!.end()
-    return child
   }
 
   /** Runs a command (spawn) to its end: its output and exit code. */

@@ -50,6 +50,7 @@ import { startBranchWatch } from './branchWatch'
 import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { releaseQueueRunners } from './workflow/queueRunner'
+import { startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
 import { setRunsGoing } from './workflow/service'
 import { isOpenRun } from '../shared/progress'
@@ -978,6 +979,8 @@ app.whenReady().then(async () => {
   startReconciling()
   // A workspace closing gives up its merge queues' leases (#1360): their processes ended, then their rows deleted.
   WorkspaceService.closingTasks.add((path) => releaseQueueRunners((r) => !!r.cfg.workspace && r.cfg.workspace.toLowerCase() === path.toLowerCase()))
+  // The merge queue (#1348): a host per project and target, started by enqueue actions and as workspaces open.
+  startQueueHosts()
   // An agent's branch brought up to date between a lane's cards after a squash merge (#1271, SPEC §16.19.2), once the
   // agent is idle: in a turn (working, starting, asking a permission, its background tasks running) or given a prompt
   // its CLI hasn't taken yet, it is busy.
@@ -1106,6 +1109,7 @@ app.on('will-quit', () => {
   unwatchAll()
   stopObserving()
   stopReconciling()
+  stopQueueHosts()
   flightRecorder.stop()
   advanced.stop()
   destroyTray()

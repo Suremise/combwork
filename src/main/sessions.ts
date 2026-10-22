@@ -103,7 +103,8 @@ import { usageHistory, type StoredUsage } from './usageHistory'
 import { journalSettingsOf } from './journalService'
 import { endAgentToken, newAgentToken } from './agentTokens'
 import { endHookToken, hooksRefused, newHookToken } from './hookTokens'
-import { hookSeen, hooksMissing, newHooksWatch, noteHooksMissing, promptSent, turnHeard, type HooksWatch } from './hooksHealth'
+import { lookAtTurns, type TurnsReading } from './turnsReader'
+import { hookSeen, hookTurn, hooksMissing, newHooksWatch, noteHooksMissing, promptSent, transcriptReset, transcriptTurns, turnHeard, type HooksWatch } from './hooksHealth'
 import { beingRead, viewingWindows } from './transcriptReads'
 import { trash } from './trash'
 import { attachmentsDir, freeName, ownAttachmentsFolder } from './attachmentsFolder'
@@ -282,6 +283,13 @@ interface LiveSession {
   hooksSeen?: number
   /** Whether its hooks are reaching Hive (#1336, hooksHealth.ts): what the check reads of the launch. */
   hooksWatch?: HooksWatch
+  /**
+   * Reading its transcript's turns (#1371, readTurns): which conversation and file, how far (a line's end), its first
+   * bytes as they were (a file replaced under the same name has others), and the adapter's memo.
+   */
+  turnsRead?: TurnsReading
+  /** Its transcript's turns were read for this launch already: a later file or conversation is read from its end. */
+  turnsBegun?: boolean
   /** For the check's why: where its CLI's settings turn hooks off now, and whether it is newer than Hive was tested with. */
   hooksOffIn?: () => string | null
   newerThanTested?: boolean
@@ -1633,7 +1641,7 @@ class SessionManager {
     l.turnScreen = adapter.turnScreen?.(info.version) ?? undefined
     l.ledger = newLedger()
     // Whether its hooks reach Hive (#1336), and what can say why they don't.
-    l.hooksWatch = newHooksWatch(Date.now(), !!adapter.descriptor.capabilities.startHook)
+    l.hooksWatch = newHooksWatch(Date.now(), !!adapter.descriptor.capabilities.startHook, adapter.transcriptTurns ? (adapter.turnsJoin ?? 'id') : null)
     l.hooksOffIn = adapter.hooksOffIn ? () => adapter.hooksOffIn!(ctx) : undefined
     l.newerThanTested = info.tested?.installed === 'newer'
     // What it was given: Hive's guidance revision and each skill as delivered (the Agent API's project status shows
@@ -2316,6 +2324,9 @@ class SessionManager {
       const w = l.hooksWatch
       const st = l.state
       if (this.live.get(id) !== l || !w || st.hooksMissing || st.runtime?.lifecycle === 'stopped' || st.runtime?.lifecycle === 'signin') return
+      // Tests hold the check while a file is there (#1371), to let a turn finish before any check looks (unpackaged only).
+      const hold = !app.isPackaged ? process.env.HIVE_TEST_HOOKS_HOLD : undefined
+      if (hold && existsSync(hold)) return
       // A question at its start (its folder's trust) waits for the user while it is on its screen.
       const text = l.screen?.text() ?? null
       const startWaits = st.status === 'waiting' || (!!l.askedAtStart && (text === null || !l.adapter.startupQuestion || l.adapter.startupQuestion.test(text.replace(/\s+/g, ' '))))
@@ -2325,7 +2336,7 @@ class SessionManager {
   }
 
   /** Its hooks aren't arriving (#1336): why if Hive can tell, its state unknown, its lanes paused, the user told once. */
-  private hooksGone(l: LiveSession, after: 'start' | 'prompt'): void {
+  private hooksGone(l: LiveSession, after: 'start' | 'prompt' | 'transcript'): void {
     const st = l.state
     const offIn = (() => {
       try {
@@ -2335,11 +2346,12 @@ class SessionManager {
       }
     })()
     const why = hooksRefused(st.runId) ? 'refused' : offIn ? 'off' : l.newerThanTested ? 'newer' : undefined
-    st.hooksMissing = { since: new Date().toISOString(), after, ...(why ? { why } : {}), ...(why === 'off' ? { offIn: offIn! } : {}) }
+    const turn = after === 'transcript' ? l.hooksWatch?.flagged : null
+    st.hooksMissing = { since: new Date().toISOString(), after, ...(turn ? { turn } : {}), ...(why ? { why } : {}), ...(why === 'off' ? { offIn: offIn! } : {}) }
     this.emitState(st)
     noteHooksMissing(st.projectPath, st.agentId, true)
     const label = this.label(st)
-    log.warn(`${userText(label)}: no hooks from ${st.provider} ${after === 'start' ? 'since it started' : 'after a prompt it went to work on'}${why ? ` (${why})` : ''}: its status may be wrong, and nothing is typed into it until they come`)
+    log.warn(`${userText(label)}: no hooks from ${st.provider} ${after === 'start' ? 'since it started' : after === 'transcript' ? 'for a turn its transcript shows it took' : 'after a prompt it went to work on'}${why ? ` (${why})` : ''}: its status may be wrong, and nothing is typed into it until they come`)
     hookJournal(`run=${st.runId} (no hook) hooks missing after ${after}${why ? ` (${why})` : ''}`)
     // Once a conversation (a restart with the same hooks problem says it again only in its pane).
     const told = `${st.agentId}\n${st.sessionId || st.runId}`
@@ -3114,6 +3126,7 @@ class SessionManager {
     }
     emit({ type: 'usage-changed', projectPath, sessionId })
     await this.readDetails(l, src, size, hooks)
+    await this.readTurns(l, src, size).catch((e) => log.warn(`${userText(this.label(l.state))}: reading its transcript's turns`, e))
     this.settleBackground(l, await this.readBackground(l, src, size))
     await this.readSafeguards(l, src)
     if (l.compacting) {
@@ -3196,6 +3209,38 @@ class SessionManager {
     const d = l.adapter.transcriptDetails(chunk, (l.detailsMemo ??= {}))
     devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => transcriptEvent(l.state.provider, chunk, d))
     this.applyDetails(l, d, hooks)
+  }
+
+  /**
+   * Turns the transcript identifies (#1371, hooks health), from what it gained since the last look, for the check to wait
+   * on those no hook names. One reading per conversation and file: this launch's new conversation from its start, any
+   * other (resumed, or switched to, or found later) from its end as it is then, so history never counts (nor does a
+   * turn whose prompt came before the launch began). Another file (its path, a shrink, its first bytes changed) or
+   * conversation starts the reading again, and what it found is let go. Whole lines only; a gap of more than 4 MB
+   * forgets what it knew of the turns (one whose prompt it didn't read is unknown, never a turn). What a read found is
+   * kept only if the launch, conversation and reading are still the ones it read for.
+   */
+  private async readTurns(l: LiveSession, path: string, size: number): Promise<void> {
+    const w = l.hooksWatch
+    const turnsOf = l.adapter.transcriptTurns?.bind(l.adapter)
+    // Still its transcript (a hook may have named another file while the look before this read waited): else it isn't read.
+    if (!w || !turnsOf || l.transcriptPath !== path) return
+    const sessionId = l.state.sessionId
+    const prev = l.turnsRead
+    const look = await lookAtTurns(prev, { path, sessionId, size, fresh: !l.turnsBegun && !l.resumed }, (start, end) => readSpan(path, start, end))
+    // Still this launch, conversation, file and reading (not restarted, switched or read again meanwhile): else what it found goes.
+    if (!look || this.live.get(liveId(l.state.projectPath, l.state.agentId)) !== l || l.state.sessionId !== sessionId || l.transcriptPath !== path || l.turnsRead !== prev) return
+    l.turnsRead = look.reading
+    if (look.restarted) {
+      l.turnsBegun = true
+      this.turnsReset(l, w)
+    }
+    if (look.lines && transcriptTurns(w, turnsOf(look.lines, look.reading.memo), Date.now(), Date.parse(l.state.startedAt)) && l.state.hooksMissing?.after === 'transcript') this.hooksBack(l)
+  }
+
+  /** What its transcript showed of its turns is let go (#1371), and an alarm that evidence raised goes with it. */
+  private turnsReset(l: LiveSession, w: HooksWatch): void {
+    if (transcriptReset(w) && l.state.hooksMissing?.after === 'transcript') this.hooksBack(l)
   }
 
   /**
@@ -4150,6 +4195,9 @@ class SessionManager {
     // The turn ledger first (#648): a hook about a turn that is over is old news, and a Stop Hive carried on isn't an end.
     const ledger = (l.ledger ??= newLedger())
     const ids = hook.ids
+    // The transcript turn it names is heard (#1371), whatever the ledger makes of it and whether or not an alarm stands:
+    // it answers that turn and those placed before it (the one transition, hooksHealth's hookTurn).
+    const answered = !!l.hooksWatch && hookTurn(l.hooksWatch, at, ids.turn, hook.event.kind === 'prompt' ? (hook.event.text ?? null) : null)
     const before = st.status
     // A CLI that wakes when its background tasks end begins that turn itself: while its transcript says one just ended
     // (never merely because one runs), a tool call it never saw may open that turn should its prompt hook be lost
@@ -4170,9 +4218,12 @@ class SessionManager {
     if (ledger.active !== was) l.woke = false
     // A current turn's hook (#1336): the prompt watched is answered, and missing hooks are back. A late hook of a turn
     // that is over says nothing of a prompt sent since.
-    if (took.verdict !== 'stale' && l.hooksWatch) {
-      turnHeard(l.hooksWatch)
-      if (st.hooksMissing) this.hooksBack(l)
+    if (l.hooksWatch) {
+      if (took.verdict !== 'stale') turnHeard(l.hooksWatch)
+      // A flag a transcript turn raised (#1371) is answered only by that turn's hooks or a newer turn's, by identity (above):
+      // the ledger's current turn may be older than it (its hooks are what went missing), so the ledger's verdict doesn't count.
+      const back = st.hooksMissing?.after === 'transcript' ? answered : !!st.hooksMissing && took.verdict !== 'stale'
+      if (back) this.hooksBack(l)
     }
     let actions: readonly string[] = [took.verdict === 'stale' ? 'stale' : 'continued']
     // A prompt about a safeguard stop says why (#606): told so now if the screen shows it, else when it draws it.
@@ -4558,6 +4609,9 @@ class SessionManager {
       // What the old conversation's records said of its turns is no record of the new one's (#648).
       l.turnRecord = undefined
       l.stopsAnswered = undefined
+      // Its turns are read from the new conversation's file (#1371): the old one's are let go.
+      l.turnsRead = undefined
+      if (l.hooksWatch) this.turnsReset(l, l.hooksWatch)
       st.transcriptBytes = undefined
       this.clearTasks(l)
       l.lastBackupAt = undefined

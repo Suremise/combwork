@@ -28,7 +28,7 @@ import { boardFile, boardRead, boardReadOnly, boardWrite, boardWriteOp, dbGenera
 import { createLogger } from '../logger'
 import type { WorkspaceService } from '../workspace'
 import type { DatabaseSync } from 'node:sqlite'
-import { pendingActionsOf, type ActionRow } from './factStore'
+import { pendingActionsOf, withoutWriteFence, type ActionRow } from './factStore'
 
 const log = createLogger('workflow')
 
@@ -125,7 +125,8 @@ export function runActions(ws: WorkspaceService): Promise<void> {
     return running.done
   }
   const run = { again: false, by: [at], done: Promise.resolve() }
-  run.done = (async () => {
+  // Its own course, outside any write fence of the change that set it going (a merge queue's: #1348).
+  run.done = withoutWriteFence(async () => {
     try {
       for (;;) {
         run.by = run.by.filter((x) => x.alive())
@@ -148,7 +149,7 @@ export function runActions(ws: WorkspaceService): Promise<void> {
     } finally {
       runs.delete(key)
     }
-  })()
+  })
   runs.set(key, run)
   return run.done
 }

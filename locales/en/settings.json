@@ -707,6 +707,14 @@
     "defaultMessage": "Merge queue: longest a merge check runs",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"90 min\"). A merge check is a command (tests, a build) Hive runs on a card's merged result before it moves the target."
   },
+  "settings.advanced.hive.queue.networkCodes.desc": {
+    "defaultMessage": "A failed merge check whose last 40 lines of output this regular expression finds failed for the network, not the work: the card is returned to its builder marked temporary, and the builder may submit the same revision again (at most twice in a row) instead of a new one. The default finds Node's and npm's network error codes (ENOTFOUND, EAI_AGAIN, ECONNRESET, ECONNREFUSED, ETIMEDOUT). A project's check can also say so itself by exiting with code 75. (?!) finds nothing: then only a check that couldn't start, ran out of time or was ended counts as temporary.",
+    "description": "What the advanced setting \"Merge queue: network errors that count as temporary\" does (Settings → Advanced). The error codes, (?!) and 75 are literal: keep them."
+  },
+  "settings.advanced.hive.queue.networkCodes.title": {
+    "defaultMessage": "Merge queue: network errors that count as temporary",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. The merge queue tests a card's work before merging it; a check that fails for the network, not the work, lets the card's builder submit the same revision again."
+  },
   "settings.advanced.hive.recorder.afterSeconds.desc": {
     "defaultMessage": "How long a capture waits after its trigger before it is saved, so it holds what followed too: what the CLI did next.",
     "description": "What the advanced setting \"Flight recorder: wait after a trigger\" does (Settings → Advanced)."
