@@ -154,7 +154,7 @@ const KEPT_HEAD = 800
 export function keptLog(log: string, max = KEPT_LOG): string {
   if (log.length <= max) return log
   const head = Math.min(KEPT_HEAD, Math.floor(max / 5))
-  const mark = (left: number): string => `\n… (${left} characters left out) …\n`
+  const mark = (left: number): string => `\n… (${left} characters left out) …\n` // i18n-ignore: inside a command's stored output, which agents read
   // The mark's own length decides the tail's, and the count it gives: settled in two steps (its digits barely change).
   let tail = max - head - mark(log.length).length
   tail = max - head - mark(log.length - head - tail).length
