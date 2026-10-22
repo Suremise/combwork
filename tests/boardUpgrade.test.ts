@@ -2,12 +2,13 @@
 // connection, a copy kept for good, one transaction), and the board's side of it: read-only until the user says yes,
 // refused while another Hive has the workspace open (SQLite's lock, or a fresh presence marker), and Restore the 0.9
 // Board Backup putting the copy back.
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
+import { junction } from './pathAliases'
 import { as09 } from './boardDb'
 
 const base = tempDir('hive-board-upgrade-')
@@ -486,6 +487,28 @@ describe("what services read before the database was replaced is read again (#12
       await delivery.forgetDeliveriesForTests()
       delivery.setReadsInboxForTests(null)
       await close(w)
+    }
+  })
+
+  it('deliveries loaded through a junction to the workspace are read again too: by the place recorded, not the spelling (#1395)', async () => {
+    const delivery = await import('../src/main/deliveries')
+    delivery.setReadsInboxForTests(() => true)
+    const ws = await board09()
+    const via = junction(ws, `${ws}-via`)
+    const host = join(via, 'p')
+    const w = await open(ws)
+    try {
+      // Loaded (cached) under the junction's spelling while the upgrade waits; the window has the real one.
+      expect(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1'))).toEqual([])
+      const { scope } = await inWorkspace(w, () => w.sessionScope(join(ws, 'p')))
+      writtenBy09(ws, scope, 'm1', 2, 'Written by 0.9 while the upgrade waited')
+      await inWorkspace(w, () => store.upgradeBoard(w))
+      expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 Written by 0.9 while the upgrade waited'])
+    } finally {
+      await delivery.forgetDeliveriesForTests()
+      delivery.setReadsInboxForTests(null)
+      await close(w)
+      unlinkSync(via)
     }
   })
 

@@ -1,10 +1,13 @@
-// The fence at the databases' open (#1379): a workspace a window started closing has its databases (in its .hive) refused,
-// with the fence.s reason, until a window opens it again; other workspaces' files and files outside its .hive never are.
-// By real paths: a junction or an 8.3 short name is the same workspace, whichever spelling closes, opens or asks.
+// Admission to a workspace's databases (#1395, replacing #1379's fence and #1381's closed list): a workspace's databases
+// (in its .hive) are kept open only while a window holds it, admitted by the place the window recorded and dismissed as it
+// closes; any other workspace's, closed or never opened, is refused with the workspace's reason, told apart from other
+// failures. By real paths: a junction or an 8.3 short name is the same workspace, whichever spelling asks. Only the nearest
+// .hive owns a file. Nothing about closed workspaces is kept.
 import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { assertNotFencedOut, closedCount, fencedOut, markClosed, markOpen, setFenceReason } from '../src/main/openingFence'
+import { placeKey } from '../src/main/fsutil'
+import { admit, admittedCount, assertAdmitted, dismiss, isRefusal, ownerOf, refusal, setFenceReason } from '../src/main/openingFence'
 import { junction, shortPath } from './pathAliases'
 import { tempDir } from './tempDir'
 
@@ -19,78 +22,60 @@ function aliased(): { real: string; via: string; short: string | null } {
 const ws = join('C:\\', 'fence', 'alpha')
 const db = join(ws, '.hive', 'hive.db')
 /** What a refused open throws here (the workspace's own message in the app: setFenceReason). */
-const reason = new Error('The workspace was closed')
-setFenceReason(() => reason)
+setFenceReason(() => new Error('The workspace was closed'))
 
-describe('the opening fence', () => {
-  it("refuses a closed workspace's databases with the fence's reason, until it is opened again", () => {
-    expect(fencedOut(db)).toBeNull()
-    markClosed(ws)
-    expect(fencedOut(db)).toBe(reason)
-    expect(fencedOut(join(ws, '.hive', 'assistant', 'journal.db'))).toBe(reason)
-    expect(fencedOut(join(ws.toUpperCase(), '.HIVE', 'usage.db'))).toBe(reason)
-    expect(() => assertNotFencedOut(db)).toThrow(reason)
-    markOpen(ws)
-    expect(fencedOut(db)).toBeNull()
-    expect(() => assertNotFencedOut(db)).not.toThrow()
+describe('admission to a workspace’s databases', () => {
+  it('refuses a workspace no window holds (never opened, or closed) as a refusal; admitted, refuses none of its files', () => {
+    expect(isRefusal(refusal(db))).toBe(true)
+    expect(() => assertAdmitted(db)).toThrow(/closed/)
+    admit(placeKey(ws))
+    try {
+      expect(refusal(db)).toBeNull()
+      expect(refusal(join(ws, '.hive', 'assistant', 'journal.db'))).toBeNull()
+      expect(refusal(join(ws.toUpperCase(), '.HIVE', 'usage.db'))).toBeNull()
+      expect(() => assertAdmitted(db)).not.toThrow()
+    } finally {
+      dismiss(placeKey(ws))
+    }
+    expect(isRefusal(refusal(db))).toBe(true)
+    // Another failure isn't one.
+    expect(isRefusal(new Error('The workspace was closed'))).toBe(false)
   })
 
-  it("never refuses another workspace's files, one beside it, or files outside its .hive", () => {
-    markClosed(ws)
+  it("admits only its own files: not one beside it, a project's .hive inside it, a file in no .hive, or a .hive under its Assistant's home (HR6)", () => {
+    admit(placeKey(ws))
     try {
-      expect(fencedOut(join('C:\\', 'fence', 'beta', '.hive', 'hive.db'))).toBeNull()
-      expect(fencedOut(join('C:\\', 'fence', 'alphabet', '.hive', 'hive.db'))).toBeNull()
-      expect(fencedOut(join(ws, 'proj', '.hive', 'notes.db'))).toBeNull()
-      expect(fencedOut(join(ws, 'notes.db'))).toBeNull()
+      for (const f of [join('C:\\', 'fence', 'beta', '.hive', 'hive.db'), join('C:\\', 'fence', 'alphabet', '.hive', 'hive.db'), join(ws, 'proj', '.hive', 'notes.db'), join(ws, 'notes.db'), join(ws, '.hive', 'assistant', '.hive', 'other.db')]) expect({ f, refused: isRefusal(refusal(f)) }).toEqual({ f, refused: true })
+      // Only the nearest .hive owns a file.
+      expect(ownerOf(join(ws, '.hive', 'assistant', '.hive', 'other.db'))).toBe(placeKey(join(ws, '.hive', 'assistant')))
+      expect(ownerOf(join(ws, '.hive', 'assistant', 'journal.db'))).toBe(placeKey(ws))
+      expect(ownerOf(join(ws, 'notes.db'))).toBeNull()
     } finally {
-      markOpen(ws)
+      dismiss(placeKey(ws))
     }
   })
 
-  it('closed by its real name, refuses its files by a junction, an 8.3 name, and a file not made yet', () => {
+  it('admitted by its real place, takes its files by a junction, an 8.3 name, and a file not made yet', () => {
     const p = aliased()
-    markClosed(p.real)
+    admit(placeKey(p.via))
     try {
-      expect(fencedOut(join(p.via, '.hive', 'hive.db'))).toBe(reason)
-      expect(fencedOut(join(p.via.toUpperCase(), '.hive', 'not-made-yet', 'journal.db'))).toBe(reason)
-      if (p.short) expect(fencedOut(join(p.short, '.hive', 'usage.db'))).toBe(reason)
-      expect(fencedOut(join(p.via, 'proj', 'notes.db'))).toBeNull()
+      expect(refusal(join(p.real, '.hive', 'hive.db'))).toBeNull()
+      expect(refusal(join(p.via.toUpperCase(), '.hive', 'not-made-yet', 'journal.db'))).toBeNull()
+      if (p.short) expect(refusal(join(p.short, '.hive', 'usage.db'))).toBeNull()
+      expect(isRefusal(refusal(join(p.via, 'proj', 'notes.db')))).toBe(true)
     } finally {
-      markOpen(p.real)
+      dismiss(placeKey(p.via))
     }
+    expect(isRefusal(refusal(join(p.real, '.hive', 'hive.db')))).toBe(true)
   })
 
-  it('closed through a junction, refuses its files by the real name; opened again by either name, refuses none', () => {
-    const p = aliased()
-    markClosed(p.via)
-    expect(fencedOut(join(p.real, '.hive', 'hive.db'))).toBe(reason)
-    markOpen(p.real)
-    expect(fencedOut(join(p.via, '.hive', 'hive.db'))).toBeNull()
-    markClosed(p.real)
-    expect(fencedOut(join(p.via, '.hive', 'hive.db'))).toBe(reason)
-    markOpen(p.short ?? p.via)
-    expect(fencedOut(join(p.real, '.hive', 'hive.db'))).toBeNull()
-  })
-
-  it('keeps a workspace fenced however many close after it, one entry per workspace however often it closes (#1381)', () => {
-    const before = closedCount()
-    const many = Array.from({ length: 300 }, (_, i) => join('C:\\', 'fence', 'many', `ws-${i}`))
-    const fileOf = (at: string): string => join(at, '.hive', 'hive.db')
-    try {
-      for (const at of many) markClosed(at)
-      // Closed again (by another spelling too): still one entry.
-      markClosed(many[0])
-      markClosed(many[0].toUpperCase())
-      expect(closedCount()).toBe(before + many.length)
-      expect(fencedOut(fileOf(many[0]))).toBe(reason)
-      for (const at of many) expect(fencedOut(fileOf(at))).not.toBeNull()
-      // Opened again: its entry goes.
-      markOpen(many[1])
-      expect(closedCount()).toBe(before + many.length - 1)
-      expect(fencedOut(fileOf(many[1]))).toBeNull()
-    } finally {
-      for (const at of many) markOpen(at)
-    }
-    expect(closedCount()).toBe(before)
+  it('keeps nothing of the workspaces closed: however many open and close, the count is back where it was (#1395)', () => {
+    const before = admittedCount()
+    const many = Array.from({ length: 300 }, (_, i) => placeKey(join('C:\\', 'fence', 'many', `ws-${i}`)))
+    for (const at of many) admit(at)
+    expect(admittedCount()).toBe(before + many.length)
+    for (const at of many) dismiss(at)
+    expect(admittedCount()).toBe(before)
+    for (const at of many) expect(isRefusal(refusal(join(at, '.hive', 'hive.db')))).toBe(true)
   })
 })

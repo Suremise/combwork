@@ -1,11 +1,12 @@
 // The board in SQLite (#1017): the database layer (settings, migrations, a file from a newer Hive), the move of the cards'
 // files into it (once, checked, the folder kept as a backup and a stub left for older versions), cards an older Hive saved
 // meanwhile, Export Board to JSON (an export read back is the same board), and the window's board with archived cards in short.
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { join, sep } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
+import { junction, shortPath } from './pathAliases'
 import { tempDir } from './tempDir'
 import type { BoardNotice } from '../src/main/boardStore'
 
@@ -18,6 +19,8 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { backupTo, openDb, schemaVersion } = await import('../src/main/db')
+const { renameRetrying } = await import('../src/main/fsutil')
+const { refusal } = await import('../src/main/openingFence')
 
 const user = { kind: 'user' } as const
 let n = 0
@@ -470,6 +473,153 @@ describe("the window's board (#1017)", () => {
     // The Agent API's reads (listTasks, getTask) never carry the window's short form.
     expect((await inWorkspace(w, () => tasks.listTasks({ archived: true })))[0].summary).toBeUndefined()
     expect(JSON.stringify(await inWorkspace(w, () => tasks.getTask(2, w)))).toBe(JSON.stringify(full.find((c) => c.number === 2)))
+  })
+})
+
+describe('a board opened under another name for its folder (#1402)', () => {
+  /** Another name for `ws`: a junction (removed by `drop`), or its 8.3 short name (null where the volume makes none). */
+  const aliasOf = (kind: 'junction' | '8.3', ws: string): { path: string; drop: () => void } | null => {
+    if (kind === '8.3') {
+      const s = shortPath(ws)
+      return s ? { path: s, drop: () => undefined } : null
+    }
+    const path = junction(ws, join(base, `alias-${++n}`))
+    return { path, drop: () => unlinkSync(path) }
+  }
+  /** The window's board, opened as it is first used (by its window's spelling). */
+  const useBoard = (w: WS) => inWorkspace(w, () => tasks.listTasks({}))
+  const fenced = (ws: string): boolean => refusal(join(ws, '.hive', 'hive.db')) !== null
+  /** The next number in the stub older versions read, and the profiles' presence markers there. */
+  const stubNext = (ws: string): number => JSON.parse(readFileSync(join(ws, '.hive', 'tasks', 'board.json'), 'utf8')).next
+  const markers = (ws: string): string[] => (existsSync(join(ws, '.hive', 'open')) ? readdirSync(join(ws, '.hive', 'open')) : [])
+  /** Nothing holds the folder: it can be moved (Windows refuses while a connection has its database open). */
+  async function moves(ws: string): Promise<void> {
+    await renameRetrying(ws, `${ws}-moved`)
+    expect(existsSync(join(`${ws}-moved`, '.hive', 'hive.db'))).toBe(true)
+  }
+
+  for (const kind of ['junction', '8.3'] as const) {
+    it(`${kind}: the window opened by the real path, a board opened only by the other name (as deliveries can), closed with the window`, async ({ skip }) => {
+      const ws = workspaceWith()
+      const alias = aliasOf(kind, ws)
+      if (!alias) return skip('this volume makes no 8.3 names')
+      try {
+        const w = await open(ws)
+        store.workspaceDb(alias.path)
+        expect(store.boardOpen(alias.path)).toBe(true)
+        await w.close()
+        expect(store.boardOpen(alias.path)).toBe(false)
+      } finally {
+        alias.drop()
+      }
+      await moves(ws)
+    })
+
+    it(`${kind}: the window opened by the other name, a board opened by the real path, both closed with the window`, async ({ skip }) => {
+      const ws = workspaceWith()
+      const alias = aliasOf(kind, ws)
+      if (!alias) return skip('this volume makes no 8.3 names')
+      try {
+        const w = await open(alias.path)
+        await useBoard(w)
+        store.workspaceDb(ws)
+        expect([store.boardOpen(alias.path), store.boardOpen(ws)]).toEqual([true, true])
+        await w.close()
+        expect([store.boardOpen(alias.path), store.boardOpen(ws)]).toEqual([false, false])
+      } finally {
+        alias.drop()
+      }
+      await moves(ws)
+    })
+  }
+
+  it('the junction the window opened by removed before it closes: its other boards close all the same (HR6 round 1)', async () => {
+    const ws = workspaceWith()
+    const alias = aliasOf('junction', ws)!
+    const w = await open(alias.path)
+    await useBoard(w)
+    store.workspaceDb(ws)
+    alias.drop()
+    await w.close()
+    expect([store.boardOpen(alias.path), store.boardOpen(ws)]).toEqual([false, false])
+    expect(fenced(ws)).toBe(true)
+    await moves(ws)
+  })
+
+  it("the junction the window opened by pointed at another window's workspace before it closes: that one keeps its board and stays unfenced (HR6 round 1)", async () => {
+    const [ws, other] = [workspaceWith(), workspaceWith()]
+    const alias = aliasOf('junction', ws)!
+    try {
+      const w = await open(alias.path)
+      await useBoard(w)
+      store.workspaceDb(ws)
+      const w2 = await open(other)
+      await useBoard(w2)
+      alias.drop()
+      junction(other, alias.path)
+      await w.close()
+      expect([store.boardOpen(alias.path), store.boardOpen(ws), store.boardOpen(other)]).toEqual([false, false, true])
+      expect([fenced(ws), fenced(other)]).toEqual([true, false])
+      await w2.close()
+    } finally {
+      unlinkSync(alias.path)
+    }
+    await moves(ws)
+  })
+
+  it("the junction the window opened by pointed at another window's workspace: the close writes nothing there and leaves its presence marker (HR6 round 2)", async () => {
+    const [ws, other] = [workspaceWith(), workspaceWith()]
+    const alias = aliasOf('junction', ws)!
+    try {
+      const w = await open(alias.path)
+      for (const t of ['One', 'Two', 'Three']) await inWorkspace(w, () => tasks.createTask({ title: t, project: 'p' }, user))
+      const w2 = await open(other)
+      await useBoard(w2)
+      const before = { stub: stubNext(other), markers: markers(other) }
+      expect(before.markers).toHaveLength(1)
+      expect(stubNext(ws)).toBe(4)
+      alias.drop()
+      junction(other, alias.path)
+      await w.close()
+      expect({ stub: stubNext(other), markers: markers(other) }).toEqual(before)
+      expect(markers(ws)).toEqual([])
+      expect(store.boardOpen(other)).toBe(true)
+      await w2.close()
+    } finally {
+      unlinkSync(alias.path)
+    }
+  })
+
+  it("a lease's board under another name of a workspace a window holds is the window's (#1395: by its place), kept as the lease ends with the presence marker, and closed with the window (HR6 round 2)", async () => {
+    const ws = workspaceWith()
+    const w = await open(ws)
+    await useBoard(w)
+    expect(markers(ws)).toHaveLength(1)
+    const alias = aliasOf('junction', ws)!
+    try {
+      store.leaseDb(alias.path).release()
+      expect([store.boardOpen(ws), store.boardOpen(alias.path)]).toEqual([true, true])
+      expect(markers(ws)).toHaveLength(1)
+      await w.close()
+      expect([store.boardOpen(ws), store.boardOpen(alias.path)]).toEqual([false, false])
+      expect(markers(ws)).toEqual([])
+    } finally {
+      alias.drop()
+    }
+  })
+
+  it("a lease's board under another name of a workspace no window holds closes as the lease ends, leaving no presence marker (#1395)", () => {
+    const ws = workspaceWith()
+    const alias = aliasOf('junction', ws)!
+    try {
+      const lease = store.leaseDb(alias.path)
+      expect(markers(ws)).toHaveLength(1)
+      lease.release()
+      expect([store.boardOpen(ws), store.boardOpen(alias.path)]).toEqual([false, false])
+      expect(markers(ws)).toEqual([])
+    } finally {
+      alias.drop()
+    }
   })
 })
 

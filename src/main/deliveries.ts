@@ -32,9 +32,10 @@ import type { TaskCard } from '../shared/types'
 import * as assistant from './assistantControl'
 import { config } from './config'
 import { onHiveEvent } from './events'
-import { placeKey, readCapped, readJson, renameRetrying } from './fsutil'
+import { placeKey, readCapped, readJson, realPath, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readStore, saveTable, storeValue } from './storeRows'
-import { dbGeneration, onDbReplaced, upgradeWaiting, workspaceDb } from './boardStore'
+import { boardLock, dbGenerationAt, onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
+import { transaction } from './db'
 import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, readDeliveriesWithBases, saveDeliveryChanges, StaleDeliveries } from './schema/sessionDeliveryTables'
 import { canTypeLine, typeLine, whyNoLine } from './lineWriter'
 import { createLogger, userText } from './logger'
@@ -43,7 +44,7 @@ import { sessions } from './sessions'
 import { folderChanging, folderSteady, inFolder, onFolderSteady } from './folderFence'
 import { getTask } from './tasks'
 import { workspaceFor, WorkspaceService } from './workspace'
-import { fencedOut } from './openingFence'
+import { isAdmitted, refusedOpen } from './openingFence'
 import { cardRef } from '../shared/projectKeys'
 import { scopeOfHost, withCardNames } from './projectKeys'
 
@@ -140,8 +141,12 @@ const AGAIN_LAUNCH = 'its session ended or restarted before it was read'
 
 interface Store {
   host: string
-  /** Where its deliveries are kept (#1018): its workspace's database, under its host's scope (hostPlace). */
-  place: { workspace: string; scope: string }
+  /**
+   * Where its deliveries are kept (#1018): its workspace's database, under its host's scope (hostPlace); `key` its
+   * workspace's real location (`placeKey`), recorded as its load entered, before anything was awaited (#1395): what every
+   * decision about which workspace it is matches by, never the spelling resolved again.
+   */
+  place: HostPlace
   /** What is published: saved, and what every read sees. Never changed in place: a transaction replaces it. */
   records: readonly DeliveryRecord[]
   next: number
@@ -186,6 +191,15 @@ interface Draft {
 
 const stores = new Map<string, Store>()
 const loading = new Map<string, Promise<Store>>()
+/** Each load under way's workspace place, recorded as it entered (Store.place.key's, before its store exists). */
+const loadingKeys = new Map<string, string>()
+/**
+ * A host's identity, resolved once as it entered (#1395): `host` the host's folder where it really was then (every read,
+ * write and file of its deliveries goes there, never through the spelling it came by, which a junction removed or pointed
+ * elsewhere since would send to another folder), `workspace` its workspace folder from that, `key` that folder's real
+ * location (what decisions match by), `scope` its scope there.
+ */
+type HostPlace = { host: string; workspace: string; scope: string; key: string }
 const keyOf = (host: string): string => host.toLowerCase()
 /** A host's deliveries file before #1018: moved into its workspace's database the first time, then kept as a backup. */
 const fileOf = (host: string): string => join(host, HIVE_DIR, 'deliveries.json')
@@ -210,8 +224,13 @@ function hostWorkspace(host: string): string {
   const parent = dirname(h)
   return basename(h).toLowerCase() === 'assistant' && basename(parent).toLowerCase() === HIVE_DIR ? dirname(parent) : parent
 }
-/** Why a host's workspace is closed (#1391: a window closed it and none has opened it again, #1379's fence); null while open. */
-const hostFenced = (host: string): Error | null => fencedOut(join(hostWorkspace(host), HIVE_DIR))
+/** A host's workspace's real location, as the host's path enters here (recorded by what it starts: #1395). */
+const workspaceKeyOf = (host: string): string => placeKey(hostWorkspace(host))
+/**
+ * Why a host's deliveries aren't kept (#1395: no window holds its workspace, closed or never opened); null while one does.
+ * A loaded host is judged by the place its store recorded, else by its path as it enters now.
+ */
+const hostFenced = (host: string): Error | null => (isAdmitted(stores.get(keyOf(host))?.place.key ?? workspaceKeyOf(host)) ? null : refusedOpen())
 const hostClosed = (host: string): boolean => !!hostFenced(host)
 const nowIso = (): string => new Date().toISOString()
 
@@ -315,7 +334,7 @@ const STALE_TRIES = 4
 
 /** A host's deliveries read again from its workspace's database (another Hive saved since): what the store has is replaced. */
 async function reread(store: Store): Promise<void> {
-  const read = await readSaved(store.host, store.place)
+  const read = await readSaved(store.place)
   store.records = read.records
   store.next = read.next
   store.invalid = read.invalid
@@ -362,18 +381,21 @@ function transactSoon(store: Store, what: string, plan: (d: Draft) => unknown): 
 export function load(host: string): Promise<Store> {
   const k = keyOf(host)
   const had = stores.get(k)
-  if (had) return Promise.resolve(had)
+  if (had) return isAdmitted(had.place.key) ? Promise.resolve(had) : Promise.reject(refusedOpen())
   const going = loading.get(k)
   if (going) return going
-  // A closed workspace's deliveries aren't read (#1391): restored when a window opens it again.
-  const shut = hostFenced(host)
-  if (shut) return Promise.reject(shut)
+  // The host where it really is, and its workspace's place, resolved now, before anything is awaited (#1395): what the
+  // load reads and its store keeps reading and writing, whatever the spelling points at later. A closed workspace's
+  // deliveries aren't read (#1391): restored when a window opens it again.
+  const real = realPath(host)
+  const key = workspaceKeyOf(real)
+  if (!isAdmitted(key)) return Promise.reject(refusedOpen())
   const p = (async () => {
     await beforeRead?.()
-    const place = await hostPlace(host)
+    const place: HostPlace = { ...(await hostPlace(real)), host: real, key }
     for (let tries = 1; ; tries++) {
-      const gen = dbGeneration(place.workspace)
-      const read = await readSaved(host, place)
+      const gen = dbGenerationAt(key)
+      const read = await readSaved(place)
       if (stores.has(k)) return stores.get(k)!
       const store: Store = { host, place, records: read.records, next: read.next, invalid: read.invalid, lock: Promise.resolve(), offering: new Set(), confirming: new Map(), rungAgain: new Set(), launches: new Map(), hooks: new Map(), gen, base: read.base }
       // Restored before anything else sees it (a second load waits for this one).
@@ -382,14 +404,14 @@ export function load(host: string): Promise<Store> {
         recheck(store, d)
       }).catch((e) => log.warn('restoring deliveries', e))
       if (stores.has(k)) return stores.get(k)!
-      if (gen !== dbGeneration(place.workspace)) {
+      if (gen !== dbGenerationAt(key)) {
         // The database replaced meanwhile (the upgrade to 1.0, a restore): read again, from the file as it is now, while
         // its workspace is still open; closed meanwhile, the stale read is kept by nobody (its saves are refused anyway).
         if (!workspaceFor(host)) return store
         if (tries < 3) continue
       }
       // Its workspace closed while it was read (#1391): kept by nobody, so no tick works on it.
-      if (hostClosed(host)) return store
+      if (!isAdmitted(key)) return store
       stores.set(k, store)
       showAll(store)
       // A card that moved on while Hive was closed: what was tied to its round is stale now (#652).
@@ -397,9 +419,12 @@ export function load(host: string): Promise<Store> {
       return store
     }
   })().finally(() => {
-    if (loading.get(k) === p) loading.delete(k)
+    if (loading.get(k) !== p) return
+    loading.delete(k)
+    loadingKeys.delete(k)
   })
   loading.set(k, p)
+  loadingKeys.set(k, key)
   return p
 }
 
@@ -407,8 +432,8 @@ export function load(host: string): Promise<Store> {
  * A host's deliveries as saved in its workspace's database (#1018), moved in from its deliveries.json the first time:
  * each checked as it is read back; one that isn't valid is kept aside, not used.
  */
-async function readSaved(host: string, place: Store['place']): Promise<{ records: DeliveryRecord[]; next: number; invalid: unknown[]; base: Map<string, string> }> {
-  const file = fileOf(host)
+async function readSaved(place: HostPlace): Promise<{ records: DeliveryRecord[]; next: number; invalid: unknown[]; base: Map<string, string> }> {
+  const file = fileOf(place.host)
   let raw: unknown[]
   let value: (key: string) => string | null
   // The rows' texts as read (none while the upgrade waits: nothing is saved then).
@@ -420,22 +445,30 @@ async function readSaved(host: string, place: Store['place']): Promise<{ records
     value = (key) => data.meta.get(key) ?? null
   } else {
     // In their own table since 1.0 (#1211), deliveries.json moved in the first time (its next id and entries kept aside with it).
-    await openTable(place.workspace, 'deliveries', place.scope, file, () => readFileOf(host), DELIVERIES_TABLE)
+    await openTable(place.workspace, 'deliveries', place.scope, file, () => readFileOf(place.host), DELIVERIES_TABLE)
     // The rows, their bases and the values beside them, read in one read transaction (one snapshot, #1266 round 3): a
     // record and its base are the same row's, never two reads another Hive committed between.
     const db = workspaceDb(place.workspace).reader
-    const values = new Map<string, string | null>()
     db.exec('BEGIN')
     try {
-      const read = readDeliveriesWithBases(db, place.scope)
-      raw = read.records
-      base = read.bases
-      for (const key of ['invalid', 'next']) values.set(key, storeValue(db, 'deliveries', place.scope, key))
+      ;({ raw, base, value } = readRows(db, place.scope))
     } finally {
       db.exec('COMMIT')
     }
-    value = (key) => values.get(key) ?? null
   }
+  return parsedRows({ raw, base, value })
+}
+
+/** A host's delivery rows, their bases and the values beside them, on the connection given (in the caller's transaction). */
+function readRows(db: Parameters<typeof readDeliveriesWithBases>[0], scope: string): { raw: unknown[]; base: Map<string, string>; value: (key: string) => string | null } {
+  const read = readDeliveriesWithBases(db, scope)
+  const values = new Map<string, string | null>()
+  for (const key of ['invalid', 'next']) values.set(key, storeValue(db, 'deliveries', scope, key))
+  return { raw: read.records, base: read.bases, value: (key) => values.get(key) ?? null }
+}
+
+/** Saved delivery rows as records, each checked as it is read back (one that isn't valid kept aside), and the next id. */
+function parsedRows({ raw, base, value }: { raw: unknown[]; base: Map<string, string>; value: (key: string) => string | null }): { records: DeliveryRecord[]; next: number; invalid: unknown[]; base: Map<string, string> } {
   const kept = value('invalid')
   const savedNext = value('next') !== null ? (JSON.parse(value('next')!) as unknown) : undefined
   const records: DeliveryRecord[] = []
@@ -519,7 +552,7 @@ export const setBeforeSaveForTests = (fn: (() => Promise<void> | void) | null): 
 async function save(store: Store, d: Draft): Promise<void> {
   await beforeSave?.()
   prune(store, d)
-  const file = fileOf(store.host)
+  const file = fileOf(store.place.host)
   // Entries kept aside that would push it over: moved to a file of their own (never lost), not kept in this one.
   if (!makeRoom(d) && d.invalid.length) {
     const aside = `${file}.kept-aside-${Date.now()}-${randomBytes(3).toString('hex')}`
@@ -534,7 +567,7 @@ async function save(store: Store, d: Draft): Promise<void> {
   if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw new Error('too many deliveries to keep in this project')
   // Read from a database since replaced (the upgrade to 1.0, a restore): never saved over what the file has now.
   const guard = (): void => {
-    if (store.gen !== dbGeneration(store.place.workspace)) throw new Error("the workspace's database was replaced since these deliveries were read") // i18n-ignore: a save refused for the log; the transaction's NotSaved says it
+    if (store.gen !== dbGenerationAt(store.place.key)) throw new Error("the workspace's database was replaced since these deliveries were read") // i18n-ignore: a save refused for the log; the transaction's NotSaved says it
   }
   // Only what this transaction changed (#1211's rows), the next id and the entries kept aside beside them, in one
   // transaction, against the rows as they are committed (#1266): a row another Hive changed since this store read it
@@ -779,13 +812,7 @@ export const waitingCount = (host: string, agentId: string, kind: DeliveryKind):
  * One already waiting with the same source and ref is returned instead (made again from this one with `replace`).
  */
 export async function createDelivery(host: string, nd: NewDelivery, hooks?: DeliveryHooks): Promise<DeliveryRecord> {
-  // Only what reads back is saved (readDelivery's limits): a longer text is refused here, never lost on a restart.
-  if (nd.body.length > DELIVERY_BODY_MAX_CHARS) throw new Error(`It is too long to give an agent (${nd.body.length} characters, at most ${DELIVERY_BODY_MAX_CHARS}).`)
-  if ((nd.ref?.length ?? 0) > 300 || (nd.source?.length ?? 0) > 40) throw new Error('Not a delivery Hive can keep: its source or key is too long.')
-  const meta = nd.meta && Object.fromEntries(Object.entries(nd.meta).slice(0, 20).map(([k, v]) => [k.slice(0, 40), typeof v === 'string' ? v.slice(0, 500) : v]))
-  const agentName = nd.agentName?.slice(0, 300)
-  // An agent that can't read an inbox is given none (#650's decision): refused now, with the reason its sender sees.
-  if (!readsInbox(host, nd.agentId)) throw new NoInbox(noInbox(agentName ?? nd.agentId))
+  const { meta, agentName } = checkedNew(host, nd)
   const store = await load(host)
   const r = await transact(store, (d) => {
     const why = senderRefusal(nd.from)
@@ -805,35 +832,7 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
       put(d, had, again)
       return again
     }
-    if (nd.maxWaiting !== undefined && d.records.filter((x) => x.agentId === nd.agentId && x.kind === nd.kind && isWaiting(x)).length >= nd.maxWaiting) throw new TooManyWaiting(`${nd.maxWaiting} already wait`)
-    if (d.records.filter(isLive).length >= MAX_LIVE_PER_HOST) throw new DeliveriesFull(`This project already has ${MAX_LIVE_PER_HOST} deliveries waiting or not acked, the most Hive keeps.`)
-    const seq = d.next++
-    const rec: DeliveryRecord = {
-      id: `m${seq}`,
-      seq,
-      agentId: nd.agentId,
-      ...(agentName ? { agentName } : {}),
-      conversation: nd.conversation || null,
-      kind: nd.kind,
-      from: nd.from,
-      ...(nd.card ? { card: nd.card, ...(nd.round ? { round: nd.round } : {}) } : {}),
-      body: nd.body,
-      state: 'queued',
-      created: nowIso(),
-      expires: new Date(Date.now() + (nd.expiresMs ?? DELIVERY_EXPIRY_HOURS * 60 * 60_000)).toISOString(),
-      ...(nd.source ? { source: nd.source, ...(nd.ref !== undefined ? { ref: nd.ref } : {}) } : {}),
-      ...(meta ? { meta } : {}),
-      ...(nd.need && nd.need !== 'idle' ? { need: nd.need } : {}),
-      ...(nd.forRun ? { forRun: nd.forRun } : {}),
-      ...(nd.again ? { again: nd.again } : {}),
-      ...(nd.action ? { action: nd.action } : {}),
-      // Made offered, into a launch about to start (launchWith): saved before the launch, never offered by the scheduler.
-      ...(nd.launching ? { state: 'offered' as const, offered: nowIso(), offers: 1, offerRun: LAUNCHING } : {})
-    }
-    d.records.push(rec)
-    d.dirty = true
-    // Within the file's budget (ended ones' history makes room first), or not made at all.
-    if (!makeRoom(d)) throw new DeliveriesFull("This project's deliveries are full (what waits for its agents and isn't acked): wait until they are received and acked, or cancel some.")
+    const rec = addNew(d, nd, meta, agentName)
     d.after.push(() => log.info(`Delivery ${rec.id} (${rec.kind}) for ${userText(nd.agentName ?? nd.agentId)} queued`))
     return rec
   })
@@ -841,6 +840,129 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
   if (hooks && isUnread(r)) store.hooks.set(r.id, hooks)
   show(store, nd.agentId)
   return r
+}
+
+/** A new delivery's checks before anything is read: refused (an Error) as createDelivery says; its meta and name as kept. */
+function checkedNew(host: string, nd: NewDelivery): { meta: DeliveryRecord['meta']; agentName: string | undefined } {
+  // Only what reads back is saved (readDelivery's limits): a longer text is refused here, never lost on a restart.
+  if (nd.body.length > DELIVERY_BODY_MAX_CHARS) throw new Error(`It is too long to give an agent (${nd.body.length} characters, at most ${DELIVERY_BODY_MAX_CHARS}).`)
+  if ((nd.ref?.length ?? 0) > 300 || (nd.source?.length ?? 0) > 40) throw new Error('Not a delivery Hive can keep: its source or key is too long.')
+  const meta = nd.meta && Object.fromEntries(Object.entries(nd.meta).slice(0, 20).map(([k, v]) => [k.slice(0, 40), typeof v === 'string' ? v.slice(0, 500) : v]))
+  const agentName = nd.agentName?.slice(0, 300)
+  // An agent that can't read an inbox is given none (#650's decision): refused now, with the reason its sender sees.
+  if (!readsInbox(host, nd.agentId)) throw new NoInbox(noInbox(agentName ?? nd.agentId))
+  return { meta, agentName }
+}
+
+/** A new delivery added to a draft, within its limits (how many wait, how many are live, the file's budget), or refused. */
+function addNew(d: Draft, nd: NewDelivery, meta: DeliveryRecord['meta'], agentName: string | undefined): DeliveryRecord {
+  if (nd.maxWaiting !== undefined && d.records.filter((x) => x.agentId === nd.agentId && x.kind === nd.kind && isWaiting(x)).length >= nd.maxWaiting) throw new TooManyWaiting(`${nd.maxWaiting} already wait`)
+  if (d.records.filter(isLive).length >= MAX_LIVE_PER_HOST) throw new DeliveriesFull(`This project already has ${MAX_LIVE_PER_HOST} deliveries waiting or not acked, the most Hive keeps.`)
+  const seq = d.next++
+  const rec: DeliveryRecord = {
+    id: `m${seq}`,
+    seq,
+    agentId: nd.agentId,
+    ...(agentName ? { agentName } : {}),
+    conversation: nd.conversation || null,
+    kind: nd.kind,
+    from: nd.from,
+    ...(nd.card ? { card: nd.card, ...(nd.round ? { round: nd.round } : {}) } : {}),
+    body: nd.body,
+    state: 'queued',
+    created: nowIso(),
+    expires: new Date(Date.now() + (nd.expiresMs ?? DELIVERY_EXPIRY_HOURS * 60 * 60_000)).toISOString(),
+    ...(nd.source ? { source: nd.source, ...(nd.ref !== undefined ? { ref: nd.ref } : {}) } : {}),
+    ...(meta ? { meta } : {}),
+    ...(nd.need && nd.need !== 'idle' ? { need: nd.need } : {}),
+    ...(nd.forRun ? { forRun: nd.forRun } : {}),
+    ...(nd.again ? { again: nd.again } : {}),
+    ...(nd.action ? { action: nd.action } : {}),
+    // Made offered, into a launch about to start (launchWith): saved before the launch, never offered by the scheduler.
+    ...(nd.launching ? { state: 'offered' as const, offered: nowIso(), offers: 1, offerRun: LAUNCHING } : {})
+  }
+  d.records.push(rec)
+  d.dirty = true
+  // Within the file's budget (ended ones' history makes room first), or not made at all.
+  if (!makeRoom(d)) throw new DeliveriesFull("This project's deliveries are full (what waits for its agents and isn't acked): wait until they are received and acked, or cancel some.")
+  return rec
+}
+
+/** For tests: run inside leaveDelivery's lease, before it reads (to fail it, or to open the workspace meanwhile). */
+let inLeave: (() => Promise<void> | void) | null = null
+export const setInLeaveForTests = (fn: (() => Promise<void> | void) | null): void => {
+  inLeave = fn
+}
+
+/**
+ * A delivery left for an agent of a host whose workspace no window may hold now (#1395: the Assistant told of an
+ * unexpected close Hive finds as it starts, for each workspace of the last run): made as createDelivery makes one while
+ * a window holds it. Else one read and one write, in one transaction, on a lease's connection under the board's lock (the
+ * deliveries moved in first, as a load does, on that connection), with the saves' row checks: published nowhere and kept
+ * by nobody (no store, no load under way), so its workspace's next open loads it. The workspace isn't admitted for it.
+ * A window that opened it and loaded the host meanwhile read the host before this write: its store is read again once the
+ * write has landed (loaded: reconcileLeft), so the delivery is offered from it as any other. Only a new delivery (no
+ * replace, action, launch or hooks). Null: nothing saved, the workspace's upgrade to 1.0 waiting.
+ */
+export async function leaveDelivery(host: string, nd: NewDelivery): Promise<DeliveryRecord | null> {
+  if (nd.replace || nd.action || nd.launching) throw new Error('A delivery left this way is a new one only') // i18n-ignore: a mistake in Hive's code, never shown
+  // The host where it really is now, and its workspace's place, recorded as it enters, before anything is awaited: a
+  // junction removed or pointed elsewhere meanwhile redirects neither the write nor its reconciliation (#1395).
+  const real = realPath(host)
+  const key = workspaceKeyOf(real)
+  if (isAdmitted(key)) return createDelivery(host, nd)
+  const { meta, agentName } = checkedNew(host, nd)
+  const place: HostPlace = { ...(await hostPlace(real)), host: real, key }
+  const rec = await leftOnLease(real, place, nd, meta, agentName)
+  if (rec) await reconcileLeft(place)
+  return rec
+}
+
+/**
+ * The host whose deliveries a lease's write left, loaded meanwhile (HR6's #1395 rounds 1 and 2: a window opened its
+ * workspace, by whatever spelling, and loaded it). A host's deliveries are one (workspace place, scope): its real
+ * location and its scope, never the spelling a store is kept under. Each load under way of that workspace is awaited (its
+ * scope known once it resolves; one starting after the write reads it anyway), then every store of that identity read
+ * again from what is committed, under its lock (after its transactions before, as a save that found another Hive's change
+ * does: reread; what it holds in memory alone, offers and confirmations, is kept), and its agents shown what waits. A
+ * store of another scope, or another workspace, isn't touched.
+ */
+async function reconcileLeft(place: HostPlace): Promise<void> {
+  await Promise.allSettled([...loading].filter(([k]) => loadingKeys.get(k) === place.key).map(([, p]) => p))
+  for (const store of [...stores.values()]) {
+    if (store.place.scope !== place.scope || store.place.key !== place.key) continue
+    try {
+      await locked(store, () => reread(store))
+      showAll(store)
+    } catch (e) {
+      log.warn('reading the deliveries again after one was left for them', e)
+    }
+  }
+}
+
+/** leaveDelivery's write: one transaction on a lease's connection, under the board's lock. */
+function leftOnLease(host: string, place: HostPlace, nd: NewDelivery, meta: DeliveryRecord['meta'], agentName: string | undefined): Promise<DeliveryRecord | null> {
+  return withLeasedDb(place.workspace, async (db) => {
+    await inLeave?.()
+    if (db.pending) return null
+    await openTable(place.workspace, 'deliveries', place.scope, fileOf(place.host), () => readFileOf(place.host), DELIVERIES_TABLE, { db })
+    return withFileLock(boardLock(place.workspace), async () =>
+      transaction(db.writer, () => {
+        const w = db.writer
+        const read = parsedRows(readRows(w, place.scope))
+        const d: Draft = { records: [...read.records], next: read.next, invalid: [...read.invalid], dirty: false, after: [] }
+        const rec = addNew(d, nd, meta, agentName)
+        const now = new Set(d.records.map((r) => r.id))
+        const saved = saveDeliveryChanges(w, place.scope, { put: [rec as unknown as Record<string, unknown>], removed: read.records.filter((r) => !now.has(r.id)).map((r) => r.id), base: read.base })
+        const to = saved.renamed.get(rec.id)
+        if (to) Object.assign(rec, to)
+        const value = w.prepare("INSERT INTO store_meta (store, scope, key, value) VALUES ('deliveries', ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value") // i18n-ignore: SQL
+        value.run(place.scope, 'next', JSON.stringify(Math.max(d.next, rec.seq + 1)))
+        log.info(`Delivery ${rec.id} (${rec.kind}) for ${userText(nd.agentName ?? nd.agentId)} left for when its workspace opens`)
+        return rec
+      })
+    )
+  })
 }
 
 /** A delivery as it is now (null when it is gone, or its host isn't loaded). */
@@ -1574,8 +1696,8 @@ export function initDeliveries(): void {
 // status, the workspace opening) reads it again from the file as it is then, with what another Hive saved meanwhile;
 // nothing reads it for a workspace closed meanwhile, which would open its database again (#1207 round 3). While the upgrade
 // waited no agent could start, so none waits for an offer.
-onDbReplaced((workspacePath) => {
-  for (const [k, store] of stores) if (store.place.workspace.toLowerCase() === workspacePath.toLowerCase()) stores.delete(k)
+onDbReplaced((_path, place) => {
+  for (const [k, store] of stores) if (store.place.key === place) stores.delete(k)
 })
 
 // A window closes its workspace (#1391): its hosts' deliveries go from memory, so the tick no longer rechecks them, which
@@ -1587,14 +1709,15 @@ let followingCloses = false
 export function followWorkspaceCloses(): void {
   if (followingCloses) return
   followingCloses = true
-  WorkspaceService.closingListeners.add((workspacePath) => {
-    const ws = placeKey(workspacePath)
-    for (const [k, store] of stores) if (placeKey(store.place.workspace) === ws) stores.delete(k)
-    for (const [k, t] of retrying)
-      if (placeKey(hostWorkspace(k.slice(0, k.lastIndexOf('#')))) === ws) {
-        clearTimeout(t)
-        retrying.delete(k)
-      }
+  WorkspaceService.closingListeners.add((_path, place) => {
+    // By the place the window recorded and each store's own (#1395); a retry's host by its store's, else as it enters.
+    for (const [k, t] of retrying) {
+      const host = k.slice(0, k.lastIndexOf('#'))
+      if ((stores.get(host)?.place.key ?? workspaceKeyOf(host)) !== place) continue
+      clearTimeout(t)
+      retrying.delete(k)
+    }
+    for (const [k, store] of stores) if (store.place.key === place) stores.delete(k)
   })
 }
 

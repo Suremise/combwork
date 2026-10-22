@@ -4,7 +4,7 @@ import { ASSISTANT_AGENT_ID, ASSISTANT_DIR } from '../shared/assistant'
 import { HIVE_DIR } from '../shared/defaults'
 import { readKeptJson } from './fsutil'
 import { journalSettings, inScope, type JournalEdit, type JournalFilter, type JournalForgetPreview, type JournalForgetResult, type JournalSettings, type LinkType } from '../shared/journal'
-import { browseEntry, closeJournal, deleteEntry, deleteJournal, forgetJournal, forgetPreview, journalFile, journalFileBytes, journalSize, onJournalChange, pruneJournal, updateEntry, writeEntry } from './journal'
+import { browseEntry, closeJournal, deleteEntry, deleteJournal, forgetJournal, forgetPreview, journalFile, journalFileBytes, journalSize, leaveEntry, onJournalChange, pruneJournal, updateEntry, writeEntry } from './journal'
 import { emit } from './events'
 import { createLogger } from './logger'
 import type { WorkspaceService } from './workspace'
@@ -120,14 +120,15 @@ export interface Fact {
 
 /**
  * A fact for a workspace by its folder, open or not (an unexpected close is found before its workspace opens): its
- * settings read from its workspace.json.
+ * settings read from its workspace.json. One no window holds is written on a transient open (#1395: leaveEntry), never
+ * admitted for it.
  */
 export async function journalFactAt(workspacePath: string, fact: Fact): Promise<void> {
   const saved = await readKeptJson<{ journal?: unknown }>(join(workspacePath, HIVE_DIR, 'workspace.json'), {})
   const s = journalSettings(saved.journal)
   if (!s.enabled || !inScope(s, 'event')) return
   try {
-    writeEntry(join(workspacePath, HIVE_DIR, ASSISTANT_DIR), s, { kind: 'event', ...fact, tags: ['hive', ...(fact.tags ?? [])] }, 'hive')
+    leaveEntry(join(workspacePath, HIVE_DIR, ASSISTANT_DIR), s, { kind: 'event', ...fact, tags: ['hive', ...(fact.tags ?? [])] }, 'hive')
   } catch (e) {
     log.warn('recording a fact in the journal', e)
   }

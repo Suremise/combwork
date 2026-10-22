@@ -10,6 +10,7 @@ import { DELIVERY_BODY_MAX_CHARS, DELIVERY_STATES, ackText, canMove, inboxItems,
 import { taskPrompt } from '../src/shared/tasks'
 import type { TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { admitted } from './admitted'
 import { putStoreDocs } from './storeDocs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -99,7 +100,10 @@ describe('delivery records (#647)', () => {
 describe('the delivery service (#647)', async () => {
   const base = tempDir('hive-deliveries-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
+  // The hosts' workspace (each host a folder in it), as a window holding it would admit it (#1395).
+  const dismiss = admitted(base)
   afterAll(async () => {
+    dismiss()
     // The workspace database (#1018) is open until its board closes.
     ;(await import('../src/main/boardStore')).closeAllBoards()
     rmSync(base, { recursive: true, force: true })

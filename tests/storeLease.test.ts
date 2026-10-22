@@ -32,8 +32,10 @@ vi.mock('../src/main/storeRows', async (orig) => {
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const board = await import('../src/main/boardStore')
 const { withStoreLock, storeValue } = await import('../src/main/storeRows')
-const { readTable, saveTable } = await import('../src/main/storeTables')
-const { markClosed, markOpen } = await import('../src/main/openingFence')
+const { saveTable } = await import('../src/main/storeTables')
+const { readMeta } = await import('../src/main/schema/storeCodec')
+const { admit, admittedCount, dismiss } = await import('../src/main/openingFence')
+const { placeKey } = await import('../src/main/fsutil')
 
 const at = '2026-10-22T00:00:00.000Z'
 let n = 0
@@ -202,10 +204,10 @@ describe("a store's save holds its own connection (#1383)", () => {
     ).rejects.toThrow('the save failed')
     expect(board.boardOpen(ws)).toBe(false)
     expect(nothingOpen(ws)).toBe(true)
-    // What it saved, read with a lease of a test's own.
+    // What it saved, read on a lease of a test's own (its connection: a persistent read is refused, #1395).
     const lease = board.leaseDb(ws)
     try {
-      expect(readTable(ws, 'lanes').meta.get('last')).toBe('"1"')
+      expect(readMeta(lease.db.reader, 'lanes').get('last')).toBe('"1"')
     } finally {
       lease.release()
       lease.release()
@@ -260,7 +262,7 @@ describe("a store's save holds its own connection (#1383)", () => {
     await w.open(elsewhere)
   })
 
-  it("a background read held across its workspace's close stays fenced however many workspaces close after it (#1381)", async () => {
+  it("a background read held across its workspace's close is refused however many workspaces open and close after it, with nothing of them kept (#1381, #1395)", async () => {
     const ws = workspace()
     await w.open(ws)
     const g = gate()
@@ -269,19 +271,41 @@ describe("a store's save holds its own connection (#1383)", () => {
       return board.workspaceDb(ws)
     })()
     await w.open(elsewhere)
-    const others = Array.from({ length: 100 }, (_, i) => join(base, 'closed-after', `ws-${i}`))
-    try {
-      for (const o of others) markClosed(o)
-      g.release()
-      await expect(reader).rejects.toThrow('The workspace was closed')
-      expect(board.boardOpen(ws)).toBe(false)
-      expect(nothingOpen(ws)).toBe(true)
-    } finally {
-      for (const o of others) markOpen(o)
-    }
+    const count = admittedCount()
+    const others = Array.from({ length: 100 }, (_, i) => placeKey(join(base, 'closed-after', `ws-${i}`)))
+    for (const o of others) admit(o)
+    for (const o of others) dismiss(o)
+    expect(admittedCount()).toBe(count)
+    g.release()
+    await expect(reader).rejects.toThrow('The workspace was closed')
+    expect(board.boardOpen(ws)).toBe(false)
+    expect(nothingOpen(ws)).toBe(true)
   })
 
   it("a lease on a window's board leaves it open, and ends once however often it is released", () => {
+    const ws = workspace()
+    // The window's: admitted as a window opening it would.
+    admit(placeKey(ws))
+    const a = board.leaseDb(ws)
+    const b = board.leaseDb(ws)
+    expect(a.db).toBe(b.db)
+    expect(a.kept).toBe(true)
+    a.release()
+    a.release()
+    expect(board.boardOpen(ws)).toBe(true)
+    b.release()
+    // Admitted: the board the leases opened is the window's, kept as they end.
+    expect(board.boardOpen(ws)).toBe(true)
+    const live = board.workspaceDb(ws)
+    const c = board.leaseDb(ws)
+    expect(c.kept).toBe(true)
+    c.release()
+    expect(board.workspaceDb(ws)).toBe(live)
+    dismiss(placeKey(ws))
+    board.closeBoard(ws)
+  })
+
+  it('a lease on a workspace no window holds leaves no handle as it ends, however often it is released (#1395)', () => {
     const ws = workspace()
     const a = board.leaseDb(ws)
     const b = board.leaseDb(ws)
@@ -293,11 +317,34 @@ describe("a store's save holds its own connection (#1383)", () => {
     expect(board.boardOpen(ws)).toBe(true)
     b.release()
     expect(board.boardOpen(ws)).toBe(false)
-    const live = board.workspaceDb(ws)
-    const c = board.leaseDb(ws)
-    expect(c.kept).toBe(true)
-    c.release()
-    expect(board.workspaceDb(ws)).toBe(live)
-    board.closeBoard(ws)
+    expect(nothingOpen(ws)).toBe(true)
+    // Not kept open for anyone: a persistent open is refused.
+    expect(() => board.workspaceDb(ws)).toThrow('The workspace was closed')
+    expect(board.boardOpen(ws)).toBe(false)
+  })
+
+  it("a persistent read while a closed workspace's last save holds its lease is refused: it neither borrows the lease's connection nor comes to own it (HR6)", async () => {
+    const ws = workspace()
+    await w.open(ws)
+    board.workspaceDb(ws)
+    const lease = board.leaseDb(ws)
+    try {
+      await w.open(elsewhere)
+      // The close left the lease its connection, open.
+      expect(lease.kept).toBe(false)
+      expect(() => board.workspaceDb(ws)).toThrow('The workspace was closed')
+    } finally {
+      lease.release()
+    }
+    expect(board.boardOpen(ws)).toBe(false)
+    expect(nothingOpen(ws)).toBe(true)
+  })
+
+  it('a workspace never opened by a window: a persistent read is refused and leaves nothing open (#1395)', () => {
+    const ws = workspace()
+    expect(() => board.workspaceDb(ws)).toThrow('The workspace was closed')
+    expect(() => board.upgradeWaiting(ws)).toThrow('The workspace was closed')
+    expect(board.boardOpen(ws)).toBe(false)
+    expect(nothingOpen(ws)).toBe(true)
   })
 })
