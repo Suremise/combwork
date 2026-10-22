@@ -83,6 +83,11 @@ const M = {
   nothingToPush: msg({ id: 'service.gitRepo.nothingToPush', defaultMessage: 'The repository has no commits yet: nothing to push.', description: 'An error pushing in the Git view: the repository has no commit yet.' }),
   pushFailed: msg({ id: 'service.gitRepo.pushFailed', defaultMessage: "Couldn't push to {to}: {why}", description: "An error pushing to the remote branch {to} in the Git view; {why} is git's own words." }),
   pushed: msg({ id: 'service.gitRepo.pushed', defaultMessage: 'Pushed {branch} to {to}.', description: 'After pushing in the Git view: the branch {branch} went to the remote branch {to}.' }),
+  pushedAll: msg({ id: 'service.gitRepo.pushedAll', defaultMessage: 'Pushed every branch and tag to {remote}:', description: "After Push to… with all branches and tags in the Git view: the first line, what went to the remote {remote}; a line for each outcome follows (service.gitRepo.pushOutcome)." }),
+  pushAllRefused: msg({ id: 'service.gitRepo.pushAllRefused', defaultMessage: "{remote} refused {n, plural, one {# branch or tag} other {# branches and tags}} (Hive never forces a push): it has commits they haven't, so pull or merge them first. What happened to each:", description: "An error after Push to… with all branches and tags in the Git view: the first line, the remote {remote} refused {n} of them; a line for each outcome follows (service.gitRepo.pushOutcome)." }),
+  pushOutcome: msg({ id: 'service.gitRepo.pushOutcome', defaultMessage: '{result, select, pushed {Pushed: {refs}.} upToDate {Already up to date: {refs}.} refused {Refused: {refs}.} other {Tags pushed: {refs}.}}', description: "A line after Push to… with all branches and tags in the Git view: the branches pushed, already up to date, refused (branches or tags), or the tags pushed. {refs} lists them by name (at most 25, then \"N more\")." }),
+  more: msg({ id: 'service.gitRepo.more', defaultMessage: '{n, plural, one {# more} other {# more}}', description: 'The last item of a long list of branch or tag names in the Git view, after the first ones: how many more there are.' }),
+  remoteTrackingChanged: msg({ id: 'service.gitRepo.remoteTrackingChanged', defaultMessage: "The branches tracking {remote} changed since you were asked, so nothing was removed: look at them again.", description: 'An error removing a remote in the Git view: the local branches tracking it are not the ones the confirmation listed (one started or stopped tracking it meanwhile).' }),
   notOnRemote: msg({ id: 'service.gitRepo.notOnRemote', defaultMessage: '{remote} has no {branch} (as of the last fetch): push it there first, or fetch.', description: 'An error choosing what a branch tracks in the Git view: the remote {remote} has no branch {branch} that Hive knows of.' }),
   badName: msg({ id: 'service.gitRepo.badName', defaultMessage: "{kind, select, tag {{hasName, select, yes {{name} isn't a valid tag name.} other {That isn't a valid tag name.}}} other {{hasName, select, yes {{name} isn't a valid branch name.} other {That isn't a valid branch name.}}}}", description: "An error creating a branch or a tag ({kind}): its name {name} is one git refuses. {hasName} is no when no name was given (then it says That)." })
 }
@@ -552,22 +557,25 @@ export async function push(projectPath: string, remote?: string): Promise<string
  * branch tracks (no --set-upstream) and never forced. Each ref's outcome is read from git's porcelain output: with all
  * branches, one the remote refuses is named with the others' counts, as a failure.
  */
-export async function pushToRemote(projectPath: string, remote: string, scope: PushScope): Promise<string> {
+export async function pushToRemote(projectPath: string, remote: string, scope: PushScope, branch?: string): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
   return oneAtATime(projectPath, async () => {
     const s = await summaryOf(projectPath)
     if (!s.remotes.includes(remote)) throw refusal(M.noRemote, { remote })
     if (!s.head) throw refusal(M.nothingToPush)
     if (scope === 'branch') {
-      if (!s.branch) throw refusal(M.detachedPush)
-      const to = `${remote}/${s.branch}`
-      const r = await net(projectPath, ['push', '--porcelain', '--', remote, `refs/heads/${s.branch}:refs/heads/${s.branch}`])
-      const ref = parsePushPorcelain(r.out).find((x) => x.kind === 'branch' && x.name === s.branch)
-      if (ref?.result === 'refused') throw rejected(to, s.branch)
+      // The branch the user confirmed, by name (HR5's #1385 round 1): never whichever is checked out by the time it runs.
+      const b = branch ?? s.branch
+      if (!b) throw refusal(M.detachedPush)
+      if (b.startsWith('-') || !(await git(projectPath, ['show-ref', '--verify', '-q', `refs/heads/${b}`])).ok) throw refusal(M.noBranch, { branch: b })
+      const to = `${remote}/${b}`
+      const r = await net(projectPath, ['push', '--porcelain', '--', remote, `refs/heads/${b}:refs/heads/${b}`])
+      const ref = parsePushPorcelain(r.out).find((x) => x.kind === 'branch' && x.name === b)
+      if (ref?.result === 'refused') throw rejected(to, b)
       if (!r.ok) throw failed(M.pushFailed, { to }, r)
-      log.info(`Pushed ${userText(projectPath)}'s ${userText(s.branch)} to ${userText(remote)}`)
+      log.info(`Pushed ${userText(projectPath)}'s ${userText(b)} to ${userText(remote)}`)
       void checkProject(projectPath)
-      return ref?.result === 'upToDate' ? tr(msg({ id: 'service.gitRepo.pushUpToDate', defaultMessage: '{to} already has {branch}: nothing to push.', description: 'After Push to… in the Git view: the remote branch {to} already had every commit of the branch {branch}.' }), { to, branch: s.branch }) : tr(M.pushed, { branch: s.branch, to })
+      return ref?.result === 'upToDate' ? tr(msg({ id: 'service.gitRepo.pushUpToDate', defaultMessage: '{to} already has {branch}: nothing to push.', description: 'After Push to… in the Git view: the remote branch {to} already had every commit of the branch {branch}.' }), { to, branch: b }) : tr(M.pushed, { branch: b, to })
     }
     const refs: PushedRef[] = []
     for (const what of ['--all', '--tags']) {
@@ -579,15 +587,47 @@ export async function pushToRemote(projectPath: string, remote: string, scope: P
     }
     log.info(`Pushed every branch and tag of ${userText(projectPath)} to ${userText(remote)}`)
     void checkProject(projectPath)
-    const count = (kind: PushedRef['kind'], result: PushedRef['result']): number => refs.filter((x) => x.kind === kind && x.result === result).length
-    const counts = { remote, pushed: count('branch', 'pushed'), same: count('branch', 'upToDate'), tags: count('tag', 'pushed') }
-    const refused = refs.filter((x) => x.result === 'refused').map((x) => x.name)
-    if (refused.length) throw refusal(msg({ id: 'service.gitRepo.pushAllRefused', defaultMessage: "{remote} refused {n, plural, one {#} other {#}} (Hive never forces a push): {refs}. It has commits they haven't: pull or merge them first. The rest: {pushed, plural, one {# branch} other {# branches}} pushed, {same, number} already up to date, {tags, plural, one {# tag} other {# tags}} pushed.", description: "An error after Push to… with all branches and tags in the Git view: the remote {remote} refused {n} branches or tags, listed in {refs} by name; the others' counts follow." }), { ...counts, n: refused.length, refs: listOf(refused) })
-    return tr(msg({ id: 'service.gitRepo.pushedAll', defaultMessage: 'Pushed every branch and tag to {remote}: {pushed, plural, one {# branch} other {# branches}} pushed, {same, number} already up to date, {tags, plural, one {# tag} other {# tags}} pushed.', description: 'After Push to… with all branches and tags in the Git view: what went to the remote {remote}.' }), counts)
+    const refused = refs.filter((x) => x.result === 'refused')
+    const lines = [withValues(refused.length ? M.pushAllRefused : M.pushedAll, { remote, n: refused.length }), ...pushOutcomes(refs)]
+    if (refused.length) throw new HiveError(linesOf(lines))
+    return shownText(linesOf(lines))
   })
 }
 
-/** The local branches tracking a remote's branches, by name. */
+/** How many names an outcome's line lists before "and N more". */
+const OUTCOME_NAMES = 25
+
+/**
+ * All branches and tags' outcomes (#1385, HR5's round 1: each branch by name), a line each: the branches pushed, those
+ * already up to date, the refs refused (branches and tags), the tags pushed. Tags already there aren't listed.
+ */
+function pushOutcomes(refs: PushedRef[]): Text[] {
+  const names = (refs_: PushedRef[]): Text => {
+    const list = [...refs_].sort((a, b) => a.name.localeCompare(b.name, 'en'))
+    return listOf([...list.slice(0, OUTCOME_NAMES).map((x) => x.name), ...(list.length > OUTCOME_NAMES ? [withValues(M.more, { n: list.length - OUTCOME_NAMES })] : [])], 'unit')
+  }
+  const out: Text[] = []
+  const branches = refs.filter((x) => x.kind === 'branch')
+  for (const result of ['pushed', 'upToDate'] as const) {
+    const list = branches.filter((x) => x.result === result)
+    if (list.length) out.push(withValues(M.pushOutcome, { result, refs: names(list) }))
+  }
+  const refused = refs.filter((x) => x.result === 'refused')
+  if (refused.length) out.push(withValues(M.pushOutcome, { result: 'refused', refs: names(refused) }))
+  const tags = refs.filter((x) => x.kind === 'tag' && x.result === 'pushed')
+  if (tags.length) out.push(withValues(M.pushOutcome, { result: 'tags', refs: names(tags) }))
+  return out
+}
+
+/**
+ * The local branches tracking a remote's branches, by name, all of them (#1385, HR5's round 1: never the view's capped
+ * list): what Remove's confirmation lists.
+ */
+export async function remoteTracking(projectPath: string, remote: string): Promise<string[]> {
+  projectPath = workspace.assertProject(projectPath)
+  return trackingRemote(projectPath, remote)
+}
+
 async function trackingRemote(projectPath: string, remote: string): Promise<string[]> {
   const r = await git(projectPath, ['for-each-ref', '--format=%(refname:short)%00%(upstream:remotename)', 'refs/heads'])
   if (!r.ok) throw commandFailed('git for-each-ref', r) // i18n-ignore: a git command, as it is
@@ -596,14 +636,16 @@ async function trackingRemote(projectPath: string, remote: string): Promise<stri
 
 /**
  * Removes a remote (#1385, `git remote remove`): its remote-tracking branches and the upstream of every local branch
- * tracking it go with it. Nothing on the remote server changes.
+ * tracking it go with it. Nothing on the remote server changes. `expected`, the branches the user was shown: refused when
+ * those tracking it now differ (one started or stopped tracking it meanwhile).
  */
-export async function removeRemote(projectPath: string, name: string): Promise<string> {
+export async function removeRemote(projectPath: string, name: string, expected?: string[]): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
   return oneAtATime(projectPath, async () => {
     const s = await summaryOf(projectPath)
     if (!s.remotes.includes(name)) throw refusal(M.noRemote, { remote: name })
     const branches = await trackingRemote(projectPath, name)
+    if (expected && (expected.length !== branches.length || branches.some((b) => !expected.includes(b)))) throw refusal(M.remoteTrackingChanged, { remote: name })
     const r = await git(projectPath, ['remote', 'remove', '--', name])
     if (!r.ok) throw failed(msg({ id: 'service.gitRepo.removeRemoteFailed', defaultMessage: "Couldn't remove {remote}: {why}", description: "An error removing the remote {remote} in the Git view; {why} is git's own words." }), { remote: name }, r)
     log.info(`Removed remote ${userText(name)} from ${userText(projectPath)}`)

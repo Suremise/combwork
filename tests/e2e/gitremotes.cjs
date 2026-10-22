@@ -72,6 +72,21 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
         await lib.until(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t), HUNG_MS)
       }
 
+      // --- Push to… this branch (main), the folder switched to feature/x in a terminal before Push is clicked: main goes,
+      // as the form named it, never the branch checked out by then (HR5's round 1).
+      await branches.locator('[data-action="push-to"]').click()
+      const pushOne = page.locator('.dialog', { hasText: 'Push to a remote' })
+      await lib.until(async () => (await pushOne.count()) === 1, HUNG_MS)
+      check('Push to… names this branch: main', /This branch \(main\)/.test(await text(pushOne.locator('#git-form-scope'))), await text(pushOne))
+      g(alpha, 'checkout', '-q', 'feature/x')
+      await pushOne.getByRole('button', { name: 'Push', exact: true }).click()
+      check('…pushes main, as it named, even with feature/x checked out meanwhile', !!(await lib.until(async () => (await pushOne.count()) === 0, HUNG_MS)) && has(backup, 'main') === has(alpha, 'main') && !has(backup, 'feature/x'), JSON.stringify({ main: has(backup, 'main'), x: has(backup, 'feature/x') }))
+      // The view reads git again after the push (feature/x, as the terminal left it); back on main, read again.
+      await lib.until(async () => (await text(branches.locator('[data-git-head]'))) === 'feature/x', HUNG_MS)
+      g(alpha, 'checkout', '-q', 'main')
+      await branches.locator('[data-action="reload-branches"]').click()
+      await lib.until(async () => (await text(branches.locator('[data-git-head]'))) === 'main', HUNG_MS)
+
       // --- Push to… backup, all branches and tags; main's upstream stays origin/main.
       await branches.locator('[data-action="push-to"]').click()
       const pushTo = page.locator('.dialog', { hasText: 'Push to a remote' })
@@ -85,6 +100,9 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
       await pushTo.getByRole('button', { name: 'Push', exact: true }).click()
       const pushed = await lib.until(async () => (await pushTo.count()) === 0, HUNG_MS)
       check('…pushes every branch and tag to backup', !!pushed && has(backup, 'main') === has(alpha, 'main') && has(backup, 'feature/x') === has(alpha, 'feature/x') && has(backup, 'refs/tags/v1') === has(alpha, 'refs/tags/v1'))
+      const notice = page.locator('.toast', { hasText: 'Pushed every branch and tag to backup' })
+      check('…and the notice says what happened to each branch, by name', !!(await lib.until(async () => /Pushed: feature\/x\.\s+Already up to date: main\.\s+Tags pushed: v1\./.test(await text(notice)), HUNG_MS)), await text(notice))
+      await shot(page, '1-pushed-all-dark')
       check('…and main still tracks origin/main', upstreamOf('main') === 'origin/main' && (await text(branches.locator('[data-git-upstream]'))).includes('origin/main'), upstreamOf('main'))
 
       // --- Track… main to backup/main: Push goes there from now on.

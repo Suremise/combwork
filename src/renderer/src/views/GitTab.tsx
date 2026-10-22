@@ -174,6 +174,7 @@ const M = {
   rename: msg({ id: 'git.remote.renameButton', defaultMessage: 'Rename', description: 'The button of the dialog that renames a remote.' }),
   remoteTaken: msg({ id: 'git.remote.taken', defaultMessage: 'There is a remote called {remote} already', description: "Under the rename dialog's box: another remote has that name." }),
   renameRemoteFailed: msg({ id: 'git.remote.renameFailed', defaultMessage: "Couldn't rename {remote}", description: 'Title of an error notification.' }),
+  removeRemoteFailed: msg({ id: 'git.remote.removeFailed', defaultMessage: "Couldn't remove {remote}", description: 'Title of an error notification.' }),
   removeRemoteTip: msg({ id: 'git.remote.removeTip', defaultMessage: 'Remove {remote}…', description: "Tooltip on a remote's remove button. {remote} is its name." }),
   removeRemoteTitle: msg({ id: 'git.remote.removeTitle', defaultMessage: 'Remove the remote {remote}?', description: 'Title of the confirmation before removing a remote.' }),
   removeRemoteMessage: msg({ id: 'git.remote.removeMessage', defaultMessage: '{n, plural, =0 {Hive forgets {remote} and its remote branches here. No branch tracks it.} one {Hive forgets {remote} and its remote branches here, and this branch stops tracking it:} other {Hive forgets {remote} and its remote branches here, and these # branches stop tracking it:}}', description: 'The confirmation before removing the remote {remote}; the branches that track it ({n}) follow, one per line.' }),
@@ -483,8 +484,13 @@ function BranchesSection({ project }: { project: ProjectInfo }) {
     if (next && next.trim() !== name) act(`remote:${name}`, tr(M.renameRemoteFailed, { remote: name }), () => call('git:renameRemote', project.path, name, next.trim()))
   }
 
-  /** Removes a remote after a confirm naming the branches that stop tracking it; run with the dialog open, a failure stays in it. */
-  const removeRemote = async (name: string, tracking: string[]): Promise<void> => {
+  /**
+   * Removes a remote after a confirm naming every branch that stops tracking it (read from main, never the view's capped
+   * list); main refuses it if that set changed meanwhile. Run with the dialog open: a failure stays in it.
+   */
+  const removeRemote = async (name: string): Promise<void> => {
+    const tracking = await attempt(tr(M.removeRemoteFailed, { remote: name }), () => call('git:remoteTracking', project.path, name))
+    if (!tracking) return
     await confirm({
       title: tr(M.removeRemoteTitle, { remote: name }),
       message: tr(M.removeRemoteMessage, { remote: name, n: tracking.length }),
@@ -495,7 +501,7 @@ function BranchesSection({ project }: { project: ProjectInfo }) {
       danger: true,
       run: async () => {
         try {
-          notify('success', await call('git:removeRemote', project.path, name))
+          notify('success', await call('git:removeRemote', project.path, name, tracking))
         } finally {
           bumpGit(project.path)
         }
@@ -690,7 +696,7 @@ function BranchesSection({ project }: { project: ProjectInfo }) {
                     </span>
                     <IconButton icon="edit" title={tr(M.changeUrlTitle, { remote: r.name })} disabled={off} onClick={() => void editRemote(r.name, r.fetchUrl)} />
                     <IconButton icon="whole-word" title={tr(M.renameRemoteTip, { remote: r.name })} action="rename-remote" disabled={off} onClick={() => void renameRemote(r.name, info.remotes.map((x) => x.name))} />
-                    <IconButton icon="trash" title={tr(M.removeRemoteTip, { remote: r.name })} action="remove-remote" disabled={off} onClick={() => void removeRemote(r.name, info.branches.filter((b) => b.upstreamRemote === r.name).map((b) => b.name))} />
+                    <IconButton icon="trash" title={tr(M.removeRemoteTip, { remote: r.name })} action="remove-remote" disabled={off} onClick={() => void removeRemote(r.name)} />
                   </div>
                 ))}
               </div>
@@ -816,7 +822,9 @@ function GitForm({ make, onClose }: { make: () => FormSpec; onClose: () => void 
     const r = await run('submit', () => spec.submit(values))
     bumpGit(spec.project.path)
     if (!r) return
-    notify('success', r.value)
+    // A reply of several lines (Push to…'s outcomes) is a notice with its first line as the title.
+    const [head, ...rest] = r.value.split('\n')
+    notify('success', head, rest.length ? rest.join('\n') : undefined)
     onClose()
   }
   return (
@@ -915,7 +923,8 @@ function pushToForm(project: ProjectInfo, s: GitRepoSummary): FormSpec {
     confirm: tr(M.push),
     busyLabel: tr(M.pushing),
     validate: (v) => (v.remote ? null : tr(M.pushNoRemote)),
-    submit: (v) => call('git:pushTo', project.path, v.remote, v.scope === 'all' ? 'all' : 'branch')
+    // The branch the form names, as it named it when opened: never whichever is checked out when Push runs.
+    submit: (v) => call('git:pushTo', project.path, v.remote, v.scope === 'all' ? 'all' : 'branch', v.scope === 'all' ? undefined : (s.branch ?? undefined))
   }
 }
 

@@ -149,6 +149,7 @@
   "git.remote.changeTitle": "Cambiar la URL de {remote}",
   "git.remote.removeButton": "Eliminar",
   "git.remote.removeDetail": "Nada cambia en el propio {remote}: sus ramas siguen allí, y puedes volver a agregarlo.",
+  "git.remote.removeFailed": "No se pudo eliminar {remote}",
   "git.remote.removeMessage": "{n, plural, =0 {Hive olvida aquí {remote} y sus ramas remotas. Ninguna rama lo sigue.} one {Hive olvida aquí {remote} y sus ramas remotas, y esta rama deja de seguirlo:} many {Hive olvida aquí {remote} y sus ramas remotas, y estas # ramas dejan de seguirlo:} other {Hive olvida aquí {remote} y sus ramas remotas, y estas # ramas dejan de seguirlo:}}",
   "git.remote.removeTip": "Eliminar {remote}…",
   "git.remote.removeTitle": "¿Eliminar el remoto {remote}?",

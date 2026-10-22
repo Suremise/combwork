@@ -25,7 +25,7 @@ import { presentWindow } from './testQuiet'
 import { insideArchive, insideReal, isFile, samePlace, writeTextAtomic, writeTextUnlessChanged } from './fsutil'
 import { gitDiff, gitStatus } from './git'
 import { initCheck, initRepo } from './gitInit'
-import { addRemote, createBranch, createTag, fetchAll, pull, push, pushToRemote, removeRemote, renameRemote, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch } from './gitRepo'
+import { addRemote, createBranch, createTag, fetchAll, pull, push, pushToRemote, remoteTracking, removeRemote, renameRemote, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch } from './gitRepo'
 import { checkGit, gitTool } from './gitTool'
 import { refreshPath, refreshPathBeforeStart } from './freshPath'
 import { openExternalTerminal } from './externalTerminal'
@@ -1256,8 +1256,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'git:fetch': (p) => fetchAll(p),
     'git:pull': (p) => pull(p),
     'git:push': (p, remote) => push(p, remote ? String(remote) : undefined),
-    'git:pushTo': (p, remote, scope) => pushToRemote(p, String(remote ?? ''), scope === 'all' ? 'all' : 'branch'),
-    'git:removeRemote': (p, name) => removeRemote(p, String(name ?? '')),
+    'git:pushTo': (p, remote, scope, branch) => pushToRemote(p, String(remote ?? ''), scope === 'all' ? 'all' : 'branch', branch ? String(branch) : undefined),
+    'git:remoteTracking': (p, remote) => remoteTracking(p, String(remote ?? '')),
+    'git:removeRemote': (p, name, expected) => removeRemote(p, String(name ?? ''), Array.isArray(expected) ? expected.map(String) : undefined),
     'git:renameRemote': (p, from, to) => renameRemote(p, String(from ?? ''), String(to ?? '')),
     'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst) => setUpstream(p, String(branch ?? ''), remote == null ? null : String(remote), String(remoteBranch ?? ''), !!pushFirst),
     'git:createTag': (p, name, message, pushTo) => createTag(p, String(name ?? ''), String(message ?? ''), pushTo ? String(pushTo) : undefined),

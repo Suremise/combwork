@@ -149,6 +149,7 @@
   "git.remote.changeTitle": "Modifier l’URL du dépôt distant {remote}",
   "git.remote.removeButton": "Supprimer",
   "git.remote.removeDetail": "Rien ne change sur {remote} lui-même : ses branches y restent, et tu peux l’ajouter à nouveau.",
+  "git.remote.removeFailed": "Impossible de supprimer {remote}",
   "git.remote.removeMessage": "{n, plural, =0 {Hive oublie ici {remote} et ses branches distantes. Aucune branche ne le suit.} one {Hive oublie ici {remote} et ses branches distantes, et cette branche cesse de le suivre :} many {Hive oublie ici {remote} et ses branches distantes, et ces # branches cessent de le suivre :} other {Hive oublie ici {remote} et ses branches distantes, et ces # branches cessent de le suivre :}}",
   "git.remote.removeTip": "Supprimer {remote}…",
   "git.remote.removeTitle": "Supprimer le dépôt distant {remote} ?",

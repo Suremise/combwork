@@ -599,6 +599,10 @@
     "defaultMessage": "Nothing on {remote} itself changes: its branches stay there, and you can add it again.",
     "description": "The confirmation before removing a remote, under its list."
   },
+  "git.remote.removeFailed": {
+    "defaultMessage": "Couldn't remove {remote}",
+    "description": "Title of an error notification."
+  },
   "git.remote.removeMessage": {
     "defaultMessage": "{n, plural, =0 {Hive forgets {remote} and its remote branches here. No branch tracks it.} one {Hive forgets {remote} and its remote branches here, and this branch stops tracking it:} other {Hive forgets {remote} and its remote branches here, and these # branches stop tracking it:}}",
     "description": "The confirmation before removing the remote {remote}; the branches that track it ({n}) follow, one per line."

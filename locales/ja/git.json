@@ -149,6 +149,7 @@
   "git.remote.changeTitle": "{remote}のURLを変更",
   "git.remote.removeButton": "削除",
   "git.remote.removeDetail": "{remote}自体は何も変わりません。そのブランチは残り、また追加することもできます。",
+  "git.remote.removeFailed": "{remote}を削除できませんでした",
   "git.remote.removeMessage": "{n, plural, =0 {Hiveはここで{remote}とそのリモートブランチを忘れます。これを追跡しているブランチはありません。} other {Hiveはここで{remote}とそのリモートブランチを忘れ、次のブランチ（#個）はその追跡をやめます：}}",
   "git.remote.removeTip": "{remote}を削除…",
   "git.remote.removeTitle": "リモート{remote}を削除しますか？",

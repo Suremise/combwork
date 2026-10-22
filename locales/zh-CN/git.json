@@ -149,6 +149,7 @@
   "git.remote.changeTitle": "更改 {remote} 的 URL",
   "git.remote.removeButton": "删除",
   "git.remote.removeDetail": "{remote} 本身不会有任何变化：它的分支仍在那里，你也可以再次添加它。",
+  "git.remote.removeFailed": "无法删除 {remote}",
   "git.remote.removeMessage": "{n, plural, =0 {Hive 会在此处忘记 {remote} 及其远程分支。没有分支跟踪它。} other {Hive 会在此处忘记 {remote} 及其远程分支，以下 # 个分支将不再跟踪它：}}",
   "git.remote.removeTip": "删除 {remote}…",
   "git.remote.removeTitle": "删除远程仓库 {remote}？",

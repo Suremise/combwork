@@ -149,6 +149,7 @@
   "git.remote.changeTitle": "Zmień adres URL repozytorium {remote}",
   "git.remote.removeButton": "Usuń",
   "git.remote.removeDetail": "W samym repozytorium {remote} nic się nie zmienia: jego gałęzie tam zostają i możesz je dodać ponownie.",
+  "git.remote.removeFailed": "Nie udało się usunąć {remote}",
   "git.remote.removeMessage": "{n, plural, =0 {Hive zapomina tutaj repozytorium {remote} i jego gałęzie zdalne. Żadna gałąź go nie śledzi.} one {Hive zapomina tutaj repozytorium {remote} i jego gałęzie zdalne, a ta gałąź przestaje je śledzić:} few {Hive zapomina tutaj repozytorium {remote} i jego gałęzie zdalne, a te # gałęzie przestają je śledzić:} many {Hive zapomina tutaj repozytorium {remote} i jego gałęzie zdalne, a tych # gałęzi przestaje je śledzić:} other {Hive zapomina tutaj repozytorium {remote} i jego gałęzie zdalne, a te gałęzie (#) przestają je śledzić:}}",
   "git.remote.removeTip": "Usuń {remote}…",
   "git.remote.removeTitle": "Usunąć zdalne repozytorium {remote}?",

@@ -151,6 +151,7 @@ interface HiveMessageValues {
   'git.remote.changeTitle': { remote: string | number }
   'git.remote.removeButton': undefined
   'git.remote.removeDetail': { remote: string | number }
+  'git.remote.removeFailed': { remote: string | number }
   'git.remote.removeMessage': { n: number; remote: string | number }
   'git.remote.removeTip': { remote: string | number }
   'git.remote.removeTitle': { remote: string | number }

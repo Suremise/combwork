@@ -149,6 +149,7 @@
   "git.remote.changeTitle": "URL von {remote} ändern",
   "git.remote.removeButton": "Entfernen",
   "git.remote.removeDetail": "Auf {remote} selbst ändert sich nichts: Seine Branches bleiben dort, und du kannst es wieder hinzufügen.",
+  "git.remote.removeFailed": "{remote} konnte nicht entfernt werden",
   "git.remote.removeMessage": "{n, plural, =0 {Hive vergisst {remote} und seine Remote-Branches hier. Kein Branch verfolgt es.} one {Hive vergisst {remote} und seine Remote-Branches hier, und dieser Branch verfolgt es nicht mehr:} other {Hive vergisst {remote} und seine Remote-Branches hier, und diese # Branches verfolgen es nicht mehr:}}",
   "git.remote.removeTip": "{remote} entfernen…",
   "git.remote.removeTitle": "Das Remote {remote} entfernen?",

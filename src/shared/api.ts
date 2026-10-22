@@ -755,8 +755,11 @@ export interface HiveRequests {
   /** To the upstream, or to `remote` (setting it as the upstream) when the branch has none. Never forced. */
   'git:push': (projectPath: string, remote?: string) => string
   /** Push to… (#1385): the branch checked out, or every branch and tag, to any remote; never changes what a branch tracks. */
-  'git:pushTo': (projectPath: string, remote: string, scope: PushScope) => string
-  'git:removeRemote': (projectPath: string, name: string) => string
+  'git:pushTo': (projectPath: string, remote: string, scope: PushScope, branch?: string) => string
+  /** The local branches tracking a remote, all of them: what Remove's confirmation lists (#1385). */
+  'git:remoteTracking': (projectPath: string, remote: string) => string[]
+  /** `expected`: the branches the confirmation listed; refused when those tracking it now differ. */
+  'git:removeRemote': (projectPath: string, name: string, expected?: string[]) => string
   'git:renameRemote': (projectPath: string, from: string, to: string) => string
   /** What a local branch tracks (#1385): `remote`'s `remoteBranch`, or nothing (`remote` null); `pushFirst` makes it there first. */
   'git:setUpstream': (projectPath: string, branch: string, remote: string | null, remoteBranch?: string, pushFirst?: boolean) => string

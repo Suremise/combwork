@@ -73,6 +73,7 @@ interface HiveMessageValues {
   'service.gitRepo.identitySet': undefined
   'service.gitRepo.inWorktree': { branch: string | number; folder: string | number }
   'service.gitRepo.midOperation': { state: string | number }
+  'service.gitRepo.more': { n: number }
   'service.gitRepo.noBranch': { branch: string | number }
   'service.gitRepo.noCommits': undefined
   'service.gitRepo.noRemote': { remote: string | number }
@@ -85,16 +86,18 @@ interface HiveMessageValues {
   'service.gitRepo.nothingToTag': undefined
   'service.gitRepo.pullFailed': { why: string | number }
   'service.gitRepo.pulled': { n: number; upstream: string | number }
-  'service.gitRepo.pushAllRefused': { remote: string | number; n: number; refs: string | number; pushed: number; same: number; tags: number }
+  'service.gitRepo.pushAllRefused': { remote: string | number; n: number }
   'service.gitRepo.pushFailed': { to: string | number; why: string | number }
+  'service.gitRepo.pushOutcome': { result: string; refs: string | number }
   'service.gitRepo.pushUpToDate': { to: string | number; branch: string | number }
   'service.gitRepo.pushed': { branch: string | number; to: string | number }
-  'service.gitRepo.pushedAll': { remote: string | number; pushed: number; same: number; tags: number }
+  'service.gitRepo.pushedAll': { remote: string | number }
   'service.gitRepo.rejected': { to: string | number; branch: string | number }
   'service.gitRepo.remoteRemoved': { n: number; remote: string | number; branches: string | number }
   'service.gitRepo.remoteRenamed': { n: number; from: string | number; to: string | number; branches: string | number }
   'service.gitRepo.remoteSameName': { remote: string | number }
   'service.gitRepo.remoteTaken': { remote: string | number }
+  'service.gitRepo.remoteTrackingChanged': { remote: string | number }
   'service.gitRepo.removeRemoteFailed': { remote: string | number; why: string | number }
   'service.gitRepo.renameRemoteFailed': { remote: string | number; why: string | number }
   'service.gitRepo.setFailed': { key: string | number; why: string | number }

@@ -215,7 +215,8 @@ describe('Push to…, remotes and tracking (#1385)', () => {
     git(proj, 'tag', 'v1')
     expect(await repo.pushToRemote(proj, 'backup', 'branch')).toBe('Pushed main to backup/main.')
     expect(await repo.pushToRemote(proj, 'backup', 'branch')).toBe('backup/main already has main: nothing to push.')
-    expect(await repo.pushToRemote(proj, 'backup', 'all')).toBe('Pushed every branch and tag to backup: 1 branch pushed, 1 already up to date, 1 tag pushed.')
+    // Each branch by its outcome, then the tags.
+    expect(await repo.pushToRemote(proj, 'backup', 'all')).toBe('Pushed every branch and tag to backup:\nPushed: feature/a.\nAlready up to date: main.\nTags pushed: v1.')
     expect([git(backup, 'rev-parse', 'feature/a'), git(backup, 'rev-parse', 'v1')]).toEqual([git(proj, 'rev-parse', 'feature/a'), git(proj, 'rev-parse', 'v1')])
     // Push still goes where it went: no branch tracks backup.
     expect([upstreamOf('main'), upstreamOf('feature/a')]).toEqual(['origin/main', ''])
@@ -234,7 +235,10 @@ describe('Push to…, remotes and tracking (#1385)', () => {
     const theirs = git(backup, 'rev-parse', 'feature/a')
     commit(proj, 'mine.txt')
     git(proj, 'branch', 'feature/b')
-    await expect(repo.pushToRemote(proj, 'backup', 'all')).rejects.toThrow('backup refused 1 (Hive never forces a push): feature/a. It has commits they haven\'t: pull or merge them first. The rest: 2 branches pushed, 0 already up to date, 0 tags pushed.')
+    git(proj, 'branch', 'feature/same', git(backup, 'rev-parse', 'main'))
+    git(proj, 'push', '-q', 'backup', 'feature/same')
+    // Each branch by name with its outcome: pushed, already up to date, refused.
+    await expect(repo.pushToRemote(proj, 'backup', 'all')).rejects.toThrow("backup refused 1 branch or tag (Hive never forces a push): it has commits they haven't, so pull or merge them first. What happened to each:\nPushed: feature/b, main.\nAlready up to date: feature/same.\nRefused: feature/a.")
     expect(git(backup, 'rev-parse', 'feature/a')).toBe(theirs)
     expect(git(backup, 'rev-parse', 'feature/b')).toBe(git(proj, 'rev-parse', 'HEAD'))
     // This branch alone: named as Push names it.
@@ -254,11 +258,36 @@ describe('Push to…, remotes and tracking (#1385)', () => {
     await expect(repo.renameRemote(proj, 'nas', 'Origin')).rejects.toThrow('There is a remote called Origin already.')
     await expect(repo.renameRemote(proj, 'nas', '-x')).rejects.toThrow(/letters, digits/)
     await expect(repo.renameRemote(proj, 'gone', 'x')).rejects.toThrow("There's no remote gone.")
-    expect(await repo.removeRemote(proj, 'nas')).toBe('Removed nas: feature/a no longer tracks a remote branch.')
+    // The confirmation's set: refused when it differs from the branches tracking it now.
+    expect(await repo.remoteTracking(proj, 'nas')).toEqual(['feature/a'])
+    await expect(repo.removeRemote(proj, 'nas', [])).rejects.toThrow('The branches tracking nas changed since you were asked, so nothing was removed: look at them again.')
+    expect(upstreamOf('feature/a')).toBe('nas/main')
+    expect(await repo.removeRemote(proj, 'nas', ['feature/a'])).toBe('Removed nas: feature/a no longer tracks a remote branch.')
     expect([upstreamOf('feature/a'), upstreamOf('main')]).toEqual(['', 'origin/main'])
     expect(git(proj, 'remote')).toBe('origin')
     expect(git(proj, 'for-each-ref', 'refs/remotes/nas')).toBe('')
     await expect(repo.removeRemote(proj, 'nas')).rejects.toThrow("There's no remote nas.")
+  })
+
+  it('pushes the branch the user confirmed, by name, whichever is checked out by the time it runs', async () => {
+    const backup = addBackup()
+    git(proj, 'checkout', '-q', '-b', 'private')
+    commit(proj, 'private.txt')
+    expect(await repo.pushToRemote(proj, 'backup', 'branch', 'main')).toBe('Pushed main to backup/main.')
+    expect(git(backup, 'for-each-ref', '--format=%(refname:short)', 'refs/heads')).toBe('main')
+    await expect(repo.pushToRemote(proj, 'backup', 'branch', 'gone')).rejects.toThrow("There's no branch gone.")
+  })
+
+  it('lists every branch tracking a remote, past the view’s cap of branches shown', async () => {
+    addBackup()
+    await repo.pushToRemote(proj, 'backup', 'branch')
+    const head = git(proj, 'rev-parse', 'HEAD')
+    // More branches than the view shows (BRANCHES_SHOWN), with the one tracking backup made last, so listed last.
+    execFileSync('git', ['update-ref', '--stdin'], { cwd: proj, input: Array.from({ length: 210 }, (_, i) => `create refs/heads/b${String(i).padStart(3, '0')} ${head}\n`).join('') })
+    git(proj, 'branch', 'zzz-hidden')
+    git(proj, 'branch', '--set-upstream-to=backup/main', '--', 'zzz-hidden')
+    expect((await repo.repoInfo(proj)).branches.some((b) => b.name === 'zzz-hidden')).toBe(false)
+    expect(await repo.remoteTracking(proj, 'backup')).toEqual(['zzz-hidden'])
   })
 
   it('changes what a branch tracks: another remote’s branch (Push goes there then), a new one pushed first only when asked, or nothing', async () => {
