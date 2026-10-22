@@ -2,7 +2,7 @@
 // as #1402 for hive.db): a junction or an 8.3 short name is another connection to the same file, which the window's close
 // closes too, by the place the window recorded as it opened, never by what a spelling resolves to at the close. So a
 // junction removed or pointed at another workspace before the close neither keeps this one's open nor closes another's.
-import { mkdirSync, rmSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -58,7 +58,10 @@ const useJournal = (ws: string): number => journal.writeEntry(home(ws), all, { k
 const journalOpen = (ws: string): boolean => journal.journalOpen(home(ws))
 /** The usage history of the workspace at `ws` (by that spelling), opened by reading it. */
 const useUsage = (ws: string): Promise<unknown> => usageHistory.storedSessions(ws, null)
+/** Whether the worker has the usage.db of the workspace really at `ws` open: it is only ever sent where a file really is. */
 const usageOpen = (ws: string): boolean => worker.openFiles().includes(usageFile(ws).toLowerCase())
+/** Whether the worker was sent a spelling under `alias` (never: the file where it really is). */
+const usageByAlias = (alias: string): boolean => worker.openFiles().some((f) => f.startsWith(join(alias, '.hive').toLowerCase()))
 
 /** Nothing holds the folder: it can be moved (Windows refuses while a connection has a file in it open). */
 async function moves(ws: string): Promise<void> {
@@ -98,10 +101,10 @@ describe("the Assistant's journal and usage.db under another name for their work
         const w = await open(ws)
         useJournal(alias.path)
         await useUsage(alias.path)
-        expect([journalOpen(alias.path), usageOpen(alias.path)]).toEqual([true, true])
+        expect([journalOpen(alias.path), usageOpen(ws), usageByAlias(alias.path)]).toEqual([true, true, false])
         await w.close()
         expect(journalOpen(alias.path)).toBe(false)
-        await vi.waitFor(() => expect(usageOpen(alias.path)).toBe(false), { timeout: HUNG_MS })
+        await vi.waitFor(() => expect(usageOpen(ws)).toBe(false), { timeout: HUNG_MS })
       } finally {
         alias.drop()
       }
@@ -118,10 +121,10 @@ describe("the Assistant's journal and usage.db under another name for their work
           useJournal(p)
           await useUsage(p)
         }
-        expect([journalOpen(alias.path), journalOpen(ws), usageOpen(alias.path), usageOpen(ws)]).toEqual([true, true, true, true])
+        expect([journalOpen(alias.path), journalOpen(ws), usageOpen(ws), usageByAlias(alias.path)]).toEqual([true, true, true, false])
         await w.close()
         expect([journalOpen(alias.path), journalOpen(ws)]).toEqual([false, false])
-        await vi.waitFor(() => expect([usageOpen(alias.path), usageOpen(ws)]).toEqual([false, false]), { timeout: HUNG_MS })
+        await vi.waitFor(() => expect(usageOpen(ws)).toBe(false), { timeout: HUNG_MS })
       } finally {
         alias.drop()
       }
@@ -140,7 +143,7 @@ describe("the Assistant's journal and usage.db under another name for their work
     alias.drop()
     await w.close()
     expect([journalOpen(alias.path), journalOpen(ws)]).toEqual([false, false])
-    await vi.waitFor(() => expect([usageOpen(alias.path), usageOpen(ws)]).toEqual([false, false]), { timeout: HUNG_MS })
+    await vi.waitFor(() => expect(usageOpen(ws)).toBe(false), { timeout: HUNG_MS })
     await moves(ws)
   })
 
@@ -160,7 +163,7 @@ describe("the Assistant's journal and usage.db under another name for their work
       junction(other, alias.path)
       await w.close()
       expect([journalOpen(alias.path), journalOpen(ws), journalOpen(other)]).toEqual([false, false, true])
-      await vi.waitFor(() => expect([usageOpen(alias.path), usageOpen(ws)]).toEqual([false, false]), { timeout: HUNG_MS })
+      await vi.waitFor(() => expect(usageOpen(ws)).toBe(false), { timeout: HUNG_MS })
       expect(usageOpen(other)).toBe(true)
       // The other window's still work.
       expect(useJournal(other)).toBeGreaterThan(0)
@@ -191,4 +194,55 @@ describe("the Assistant's journal and usage.db under another name for their work
       alias.drop()
     }
   })
+
+  it("a usage request keeps the file it resolved as it entered: a junction pointed at another window's workspace while it waits for the worker (HR6 round 1)", async () => {
+    const [a, b] = [workspace(), workspace()]
+    const via = aliasOf('junction', a)!
+    const wa = await open(a)
+    const wb = await open(b)
+    const hist = usageHistory as unknown as { transport: () => Promise<unknown> }
+    const transport = hist.transport.bind(hist)
+    const spy = vi.spyOn(hist, 'transport').mockImplementationOnce(async () => {
+      via.drop()
+      junction(b, via.path)
+      return transport()
+    })
+    try {
+      await useUsage(via.path)
+      expect({ a: existsSync(usageFile(a)), b: existsSync(usageFile(b)) }).toEqual({ a: true, b: false })
+      expect([usageOpen(a), usageOpen(b)]).toEqual([true, false])
+      // Recorded as a's: its window's close closes it.
+      await wa.close()
+      await vi.waitFor(() => expect(usageOpen(a)).toBe(false), { timeout: HUNG_MS })
+      await wb.close()
+    } finally {
+      spy.mockRestore()
+      via.drop()
+    }
+    await moves(a)
+  })
+
+  for (const bOpen of [false, true]) {
+    it(`deleting a journal opened through a junction since pointed at another workspace deletes the one it opened${bOpen ? ", leaving the other's open connection be" : ''} (HR6 round 1)`, async () => {
+      const [a, b] = [workspace(), workspace()]
+      const via = aliasOf('junction', a)!
+      const wa = await open(a)
+      const wb = await open(b)
+      try {
+        useJournal(via.path)
+        useJournal(b)
+        if (!bOpen) journal.closeJournal(home(b))
+        via.drop()
+        junction(b, via.path)
+        await journal.deleteJournal(home(via.path))
+        expect({ a: existsSync(journal.journalFile(home(a))), b: existsSync(journal.journalFile(home(b))) }).toEqual({ a: false, b: true })
+        expect(journalOpen(b)).toBe(bOpen)
+        expect(useJournal(b)).toBeGreaterThan(0)
+        await wa.close()
+        await wb.close()
+      } finally {
+        via.drop()
+      }
+    })
+  }
 })

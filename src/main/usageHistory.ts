@@ -19,6 +19,7 @@ import { usageFile, type SessionId, type SessionMeta, type StoredSession } from 
 import type { IngestJob, IngestResult, KeptJob, ReadResult, ReadSeed, WorkerReply, WorkerRequest } from './usageWorker'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
 import { isAdmitted, ownerOf, refusedOpen } from './openingFence'
+import { realPath } from './fsutil'
 
 const log = createLogger('usage')
 
@@ -244,10 +245,14 @@ class UsageHistory {
     // A workspace's usage.db is opened only while a window holds it (#1395: the worker keeps it open); a read goes on
     // without the session's saved state in one no window holds. Asked again once the worker is there, with nothing
     // awaited from then to the request: a close meanwhile refuses it.
-    // The file it opens: its own, or the one a read takes a session's saved state from; its workspace's place resolved
-    // once, as the request enters (#1456), and what admits it, records the spelling and closes it.
-    const file = body.type === 'close' ? null : 'file' in body ? body.file : body.type === 'read' ? (body.seed?.file ?? null) : null
+    // The file it opens: its own, or the one a read takes a session's saved state from. Where it really is and its
+    // workspace's place are resolved once, as the request enters (#1456): the worker is sent that file, never the
+    // spelling (a junction pointed elsewhere while this waits for the worker would take it to another workspace's), and
+    // the place admits it, records the file and closes it. A close is sent a file recorded so, resolved again never.
+    const spelt = body.type === 'close' ? null : 'file' in body ? body.file : body.type === 'read' ? (body.seed?.file ?? null) : null
+    const file = spelt ? realPath(spelt) : null
     const place = file ? ownerOf(file) : null
+    if (file) body = body.type === 'read' && body.seed ? { ...body, seed: { ...body.seed, file } } : ({ ...body, file } as Body)
     const admitted = (b: Body): Body => {
       const ok = place !== null && isAdmitted(place)
       if (b.type !== 'close' && 'file' in b && !ok) throw refusedOpen()
@@ -264,33 +269,33 @@ class UsageHistory {
     const answer = this.post(send, body) as Promise<T>
     const opens = body.type === 'read' ? (body.seed?.file ?? null) : file
     if (opens && place !== null) {
-      const known = this.spellings.get(place) ?? new Map<string, string>()
+      const known = this.sent.get(place) ?? new Map<string, string>()
       known.set(wsKey(opens), opens)
-      this.spellings.set(place, known)
+      this.sent.set(place, known)
       void answer.finally(() => this.closeIfUnused(opens, place)).catch(() => undefined)
     }
     return answer
   }
 
   /**
-   * The spellings of each workspace's usage.db the worker was sent (it keeps a file open by its spelling), by the place
-   * each request's file resolved to as it entered (#1456): the workspace's close closes every one, so one opened through
-   * a junction or an 8.3 name doesn't hold the folder until Hive quits. Only admitted workspaces' (a request for another
-   * is refused), forgotten as each closes: bounded by the windows open.
+   * The usage.db files the worker was sent (where each really was as its request entered: the worker keeps a file open
+   * by the name it is sent), by their workspace's place then (#1456): the workspace's close closes every one, so none
+   * holds the folder until Hive quits. Only admitted workspaces' (a request for another is refused), forgotten as each
+   * closes: bounded by the windows open.
    */
-  private spellings = new Map<string, Map<string, string>>()
+  private sent = new Map<string, Map<string, string>>()
 
-  /** Closes the workspace at `place`'s usage.db under every spelling it was sent with (and `file`'s), after what was queued. */
+  /** Closes the workspace at `place`'s usage.db as each file was sent (and `file`), after what was queued. */
   private closeAt(place: string, file?: string): void {
-    const files = new Map(this.spellings.get(place))
-    this.spellings.delete(place)
+    const files = new Map(this.sent.get(place))
+    this.sent.delete(place)
     if (file) files.set(wsKey(file), file)
     for (const [k, f] of files) void this.enqueue(`close|${k}`, 2, async () => ({ type: 'close', file: f })).catch(() => undefined)
   }
 
   /**
    * A file of a workspace no window has open, used by a request that came after its close (one under way as it closed):
-   * closed again, under every spelling, so the worker doesn't hold the folder (#1379: the user can't move or delete it).
+   * closed again, every file of its place sent, so the worker doesn't hold the folder (#1379: the user can't move or delete it).
    * By the place it resolved to as it entered: a window closing the workspace has dismissed it already.
    */
   private closeIfUnused(file: string, place: string): void {
@@ -707,9 +712,9 @@ class UsageHistory {
   }
 
   /**
-   * A workspace closed: its file closed after what was queued for it, under every spelling it was opened with, by the
-   * place its window recorded (#1456: never what a spelling resolves to now, so the window's own spelling, a junction
-   * pointed at another workspace since, closes nothing of that one's).
+   * A workspace closed: its file closed after what was queued for it, as each was sent, by the place its window
+   * recorded (#1456: never what a spelling resolves to now, so the window's own spelling, a junction pointed at another
+   * workspace since, closes nothing of that one's).
    */
   private closeWorkspace(path: string, place: string): void {
     this.cards.delete(wsKey(path))
