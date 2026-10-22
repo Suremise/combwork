@@ -88,6 +88,16 @@ const until = async (fn, ms = 10000) => {
   call = await run('boardmove 1 doing')
   check('an agent moves a card back out of Done', call?.status === 200 && (await card(1)).column === 'doing', JSON.stringify(call))
   check('every move is in its history', JSON.stringify((await moves(1)).slice(-2)) === JSON.stringify(['Mover (alpha): Moved to Done', 'Mover (alpha): Moved to Doing']), JSON.stringify(await moves(1)))
+  // The card dialog says the window's column names (#1458): Active, where agents' English says Doing.
+  await tile.click()
+  const dialog = page.locator('.dialog', { hasText: '(#1)' })
+  await dialog.waitFor({ timeout: 5000 })
+  await dialog.locator('.task-section-h[data-section="history"]').click()
+  const history = dialog.locator('.task-history')
+  const shownMoves = async () => (await history.innerText().catch(() => '')).split('\n').filter((l) => / Moved to /.test(l))
+  check("the card's history in the window says Active", !!(await until(async () => (await shownMoves()).some((l) => l.endsWith('Mover (alpha) Moved to Active')), 5000)) && !(await shownMoves()).some((l) => / Moved to (Doing|Passed)$/.test(l)), JSON.stringify(await shownMoves()))
+  await page.keyboard.press('Escape')
+  await dialog.waitFor({ state: 'detached', timeout: 5000 })
 
   // --- The card's prompt still asks for Review when the work is done (and Done only once merged, or when the user asks).
   const n = (await inv('tasks:create', { title: 'Docs', project: 'alpha' })).number
