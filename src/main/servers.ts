@@ -1787,10 +1787,10 @@ async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promi
 }
 
 /** A queue as the Agent API gives it: no folder (a stuck advance's neither), and whether an outcome has a log rather than the log itself (lean). */
-const publicQueue = ({ projectPath: _p, paused, ...v }: QueueView): QueuePublic => ({
+const publicQueue = ({ projectPath: _p, paused, hiveMerges: _h, inFlight: _i, returns: _r, returnsMore: _more, ...v }: QueueView): QueuePublic => ({
   ...v,
-  paused: paused ? (({ stuck, ...p }) => (stuck ? { ...p, stuck: (({ folder: _f, ...s }) => s)(stuck) } : p))(paused) : null,
-  recent: v.recent.map(({ log: output, ...r }) => (output ? { ...r, hasLog: true as const } : r))
+  paused: paused ? (({ stuck, message: _m, ...p }) => (stuck ? { ...p, stuck: (({ folder: _f, ...s }) => s)(stuck) } : p))(paused) : null,
+  recent: v.recent.map(({ log: output, seen: _s, ...r }) => (output ? { ...r, hasLog: true as const } : r))
 })
 
 /** A project agent asking to change a queue: refused, saying whose controls these are. */

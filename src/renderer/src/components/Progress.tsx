@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { ALL_PROJECTS, PASSED_SHOWN_MS, SHOW_ALL, activeFilter, onPulse, agentChoices, ProgressSync, barLook, shortRevision, filterChoices, filterMergeSlots, filterRuns, fractionDone, inStrip, isOpenRun, runDetails, runAgentName, runDetailsText, runStateWord, runStatusLine, stripRuns, stripSummary, unseenTrouble } from '@shared/progress'
 import { durationText } from '@shared/tasks'
 import type { MergeSlotInfo, ProgressRun, ProgressTelling } from '@shared/types'
+import type { QueueView } from '@shared/workflow/queue'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { attempt, selectProject } from '../actions'
 import { call } from '../api'
@@ -15,8 +16,11 @@ import { PaneResizer, usePaneSize } from './Resizer'
 import { useMergeSlots } from './MergeSlots'
 import { LanesSection } from './ProgressLanes'
 import { MergeCards } from './ProgressMerge'
+import { MergesList, QueueAnnouncer, QueueLines } from './ProgressQueue'
 import { useLanes } from '../laneSource'
-import { NO_RUNS_FILTER, PROGRESS_TABS, runDayLabel, runDays, runGroupLabel, runMatches, tabAt, tabBadges, unresolvedFailures, type ProgressTab, type RunGroup, type RunsFilter } from '@shared/progressTabs'
+import { keepShown, useQueuesKept } from '../queueSource'
+import { justMerged, onPulseLine, queuedCount, shownQueues, shownReturns, unseenReturns } from '@shared/progressQueue'
+import { NO_RUNS_FILTER, PROGRESS_TABS, runAgentKey, runDayLabel, runDays, runGroupLabel, runMatches, tabAt, tabBadges, unresolvedFailures, type ProgressTab, type RunGroup, type RunsFilter } from '@shared/progressTabs'
 import type { Lane } from '../laneSource'
 import { Icon, IconButton, SearchInput, Tooltip } from './ui'
 
@@ -103,6 +107,7 @@ export function ProgressPanel() {
   const open = useProgressOpen()
   const runs = useProgressRuns()
   const slots = useMergeSlots()
+  const queues = useQueuesKept()
   const lanes = useLanes()
   const chosen = useProgressFilter()
   const workspace = useStore((s) => s.workspace)
@@ -128,21 +133,51 @@ export function ProgressPanel() {
   // Once a second while something runs or is about to fold into Recent (a passed run, a failure just seen), else now
   // and then.
   const folding = runs.some((r) => !r.dismissed && (r.state === 'passed' || r.state === 'stopped' || r.seenAt !== null || (r.finishedAt !== null && Date.now() - r.finishedAt < PASSED_SHOWN_MS)))
-  const now = useNow(anyOpen || folding ? 1000 : 30000)
+  // A queue testing (its time so far), a merge shown for a few seconds, a return seen and about to leave (#1356).
+  const queueTicking = queues.some((v) => !!v.testing || justMerged(v, Date.now()).length > 0 || shownReturns(v, Date.now()).some((r) => !!r.seen))
+  const now = useNow(anyOpen || folding || queueTicking ? 1000 : 30000)
   const unseen = runs.some(unseenTrouble)
   // Looking at the open panel counts as seeing what failed or went stale: the taskbar's and the strip's red clear,
   // and those runs fold into Recent a few seconds later.
   useEffect(() => {
     if (on && open && focused && unseen) void call('progress:seen')
   }, [on, open, focused, unseen, runs])
+  // The merge queues that show (#1356 item 0: by their state), of the filtered project; their projects are choices too.
+  const allQueues = shownQueues(queues, now)
+  const queueProjects = allQueues.map((v) => v.projectPath)
+  const filter = activeFilter(runs, chosen, queueProjects)
+  const shownQueue = filter.project === ALL_PROJECTS ? allQueues : allQueues.filter((v) => v.projectPath.toLowerCase() === filter.project)
+  // Looking at the Merges tab counts as seeing the returns it shows (#1356; HR3's round 1 finding 1): the filtered
+  // project's only, and not while a dialog covers the panel. Each leaves its queue's card a few seconds later.
+  const covered = useStore((s) => s.dialog !== null || s.taskOpen !== null)
+  const toSee = on && open && focused && !covered && tab === 'merges' ? shownQueue.flatMap((v) => unseenReturns(v, now).map((r) => ({ v, entry: r.entry, row: r }))) : []
+  const seeKey = toSee.map((x) => x.entry).join('\n')
+  useEffect(() => {
+    const by = new Map<string, { v: QueueView; entries: string[] }>()
+    for (const x of toSee) {
+      const k = `${x.v.projectPath.toLowerCase()}\n${x.v.target}`
+      by.set(k, { v: x.v, entries: [...(by.get(k)?.entries ?? []), x.entry] })
+    }
+    // Kept here for their own 10 s, whatever main's list says meanwhile (another window's marks), then marked in main.
+    keepShown(toSee)
+    for (const { v, entries } of by.values()) void call('queue:seen', v.projectPath, v.target, entries).catch(() => undefined)
+    // seeKey names what toSee holds: the same returns aren't asked for again on every tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seeKey])
   if (!on) return null
+  const announcer = <QueueAnnouncer views={queues} runs={runs} />
   // The filter (#251): one project's runs (and one agent's), or all; offered when the runs span more than one project.
   const nameOf = (p: string): string => workspace?.projects.find((x) => x.path.toLowerCase() === p.toLowerCase())?.name ?? p.split(/[\\/]/).pop() ?? p
-  const choices = filterChoices(runs, nameOf, tr)
-  const filter = activeFilter(runs, chosen)
+  const choices = filterChoices(runs, nameOf, tr, queueProjects)
   const shown = filterRuns(runs, filter)
   const filterName = filter === SHOW_ALL ? null : `${choices.find((c) => c.value === filter.project)?.label ?? ''}${filter.agent ? ` · ${(shown[0] ? runAgentName(shown[0], tr) : '')}` : ''}`
-  if (!open) return <ProgressRail runs={shown.filter((r) => inStrip(r, now))} filtered={filterName ? { name: filterName, all: runs.filter((r) => inStrip(r, now)).length } : null} />
+  if (!open)
+    return (
+      <>
+        {announcer}
+        <ProgressRail runs={shown.filter((r) => inStrip(r, now))} filtered={filterName ? { name: filterName, all: runs.filter((r) => inStrip(r, now)).length } : null} />
+      </>
+    )
   // Pulse holds the runs in progress, and one just ended for a few seconds (#1309): finished runs live in Runs.
   const listed = shown.filter((r) => onPulse(r, now))
   // The merges and lanes of the project (and agent) the runs are filtered to, or of every project (#810).
@@ -158,10 +193,14 @@ export function ProgressPanel() {
   }
   const agents = filter.project !== ALL_PROJECTS ? agentChoices(runs, filter.project, tr) : []
   const kb = commandKeybinding('progress.toggle')
-  const badges = tabBadges(merging, shown, shownLanes.length)
+  const badges = tabBadges(merging, shown, shownLanes.length, queuedCount(shownQueue))
   const failures = unresolvedFailures(shown)
+  const multi = (workspace?.projects.length ?? 0) > 1
+  const pulseQueues = shownQueue.filter(onPulseLine)
 
   return (
+    <>
+    {announcer}
     <div
       className="progress-panel"
       style={{ width }}
@@ -209,10 +248,11 @@ export function ProgressPanel() {
       <div className={cx('progress-tab-body', `progress-tab-${tab}`)} role="tabpanel" id={`progress-tabpanel-${tab}`} aria-labelledby={`progress-tab-${tab}`}>
         {tab === 'pulse' && (
           <>
-            <MergeCards slots={merging} projectName={nameOf} showProject={(workspace?.projects.length ?? 0) > 1} stepOf={stepOf} now={now} />
-            {merging.length > 0 && <div className="progress-divider" role="separator" />}
+            <MergeCards slots={merging} projectName={nameOf} showProject={multi} stepOf={stepOf} now={now} />
+            <QueueLines views={pulseQueues} showProject={multi} onOpen={() => setTab('merges')} />
+            {(merging.length > 0 || pulseQueues.length > 0) && <div className="progress-divider" role="separator" />}
             <div className="progress-body">
-              {listed.length === 0 && !merging.length && !failures.length && (
+              {listed.length === 0 && !merging.length && !pulseQueues.length && !failures.length && (
                 <div className="pane-empty progress-empty">
                   {tr(msg({ id: 'board.progress.empty', defaultMessage: 'Nothing is running. When an agent runs tests or a build with progress reporting, it shows here with how far along it is and the time left.', description: 'The Progress panel when it has no runs.' }))}
                 </div>
@@ -240,15 +280,16 @@ export function ProgressPanel() {
           </>
         )}
         {tab === 'merges' &&
-          (merging.length ? (
-            <MergeCards slots={merging} projectName={nameOf} showProject={(workspace?.projects.length ?? 0) > 1} stepOf={stepOf} now={now} />
+          (merging.length || shownQueue.length ? (
+            <MergesList queues={shownQueue} slots={merging} runs={runs} now={now} projectName={nameOf} showProject={multi} stepOf={stepOf} />
           ) : (
-            <div className="pane-empty progress-empty">{tr(msg({ id: 'board.progress.noMerges', defaultMessage: 'No merge is going on. While an agent merges its branch, it shows here with its cards, its checks and who waits.', description: "The Progress panel's Merges tab when no agent is merging." }))}</div>
+            <div className="pane-empty progress-empty">{tr(msg({ id: 'board.progress.noMerges', defaultMessage: "No merge is going on. While Hive's merge queue merges a card, or an agent merges its branch, it shows here with its cards, its checks and what waits.", description: "The Progress panel's Merges tab when nothing is merging: no merge queue shows, and no agent holds the merge slot. Glossary 2.5: merge queue." }))}</div>
           ))}
         {tab === 'runs' && <RunsTab runs={shown} lanes={shownLanes} now={now} detail={detail} toggle={toggle} filter={runsFilter} setFilter={setRunsFilter} />}
         {tab === 'lanes' && <LanesSection lanes={shownLanes} all={lanes} width={width} runs={shown} full />}
       </div>
     </div>
+    </>
   )
 }
 
@@ -263,7 +304,7 @@ function ProgressTabs({ tab, badges, onChange }: { tab: ProgressTab; badges: Rec
   const badge = (t: ProgressTab): string | null => {
     const n = badges[t]
     if (!n) return null
-    if (t === 'merges') return tr(msg({ id: 'board.progress.badgeMerges', defaultMessage: '{n, plural, one {# merge waiting} other {# merges waiting}}', description: "What the badge on the Progress panel's Merges tab means: how many agents wait for the merge slot." }), { n })
+    if (t === 'merges') return tr(msg({ id: 'board.progress.badgeMerges', defaultMessage: '{n, plural, one {# merge waiting} other {# merges waiting}}', description: "What the badge on the Progress panel's Merges tab means: how many cards wait in the merge queues and agents wait for the merge slot." }), { n })
     if (t === 'runs') return tr(msg({ id: 'board.progress.badgeRuns', defaultMessage: '{n, plural, one {# failure nothing has passed since} other {# failures nothing has passed since}}', description: "What the red badge on the Progress panel's Runs tab means: runs that failed with no later run of the same thing passing." }), { n })
     return tr(msg({ id: 'board.progress.badgeLanes', defaultMessage: '{n, plural, one {# lane} other {# lanes}}', description: "What the badge on the Progress panel's Lanes tab means: how many lanes there are." }), { n })
   }
@@ -305,7 +346,8 @@ function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs
   const words = (r: ProgressRun): string => [runAgentName(r, tr), r.title, r.command ?? '', r.card ? cardName(r.card) : ''].join('\n')
   // The lane chosen, as it is now (its cards change between cards, #1270); one no longer shown leaves the filter.
   const lane = filter.lane ? lanes.find((l) => l.id === filter.lane) : undefined
-  const agents = [...new Map(runs.filter((r) => r.agentId).map((r) => [r.agentId!, runAgentName(r, tr)])).entries()].sort((a, b) => a[1].localeCompare(b[1]))
+  // Agents by their runs' names; Hive's own runs as "Hive (merge queue)" (#1356 item 5).
+  const agents = [...new Map(runs.filter((r) => runAgentKey(r)).map((r) => [runAgentKey(r)!, runAgentName(r, tr)])).entries()].sort((a, b) => a[1].localeCompare(b[1]))
   const goneLane = !!filter.lane && !lane
   const goneAgent = !!filter.agent && !agents.some(([id]) => id === filter.agent)
   useEffect(() => {
