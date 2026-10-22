@@ -233,6 +233,54 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await fetch(`http://127.0.0.1:${PORT}/v1/projects/alpha/merge-slot/release`, { method: 'POST', headers: { Authorization: `Bearer ${five.builder.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ branch: TARGET }) })
     for (const c of [zero, two, three]) await inv('tasks:archive', c.n, true)
     check('once none is, and its outcomes are seen, the queue\'s card goes', !!(await until(async () => (await card.count()) === 0, HUNG_MS)), await panel.locator('.progress-tab-merges').innerText().catch(() => ''))
+
+    // --- Many returns (HR3's rounds 2 and 3): a page at a time with the count of the rest, a card queued again taking no
+    // place on it, and seeing the page brings the next while the queue is paused. The window's model is made small (the
+    // seam: the latest outcome and a page of one), so four cards reach the page's end.
+    await h.app.evaluate(() => {
+      process.env.HIVE_TEST_QUEUE_RECENT = '1'
+      process.env.HIVE_TEST_QUEUE_PAGE = '1'
+    })
+    await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
+    // Not seen meanwhile: the window counts as not focused.
+    await h.app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows()[0]
+      w.isFocused = () => false
+      w.emit('blur')
+    })
+    q.steer(fx, 'fail', 'many')
+    const reds = []
+    for (const title of ['P1', 'P2', 'P3', 'P4']) {
+      const c = await q.approve(fx, h, reviewer, title, { [`${title.toLowerCase()}.txt`]: `${title}\n` })
+      reds.push({ ...c, key: await keyOf(c.n) })
+      check(`${title} is returned`, !!(await until(async () => (await column(c.n)) === 'doing', HUNG_MS)), JSON.stringify(await h.kinds(c.n)))
+    }
+    const [p1, p2, p3, p4] = reds
+    await inv('queue:pause', fx.alpha, TARGET)
+    await inv('queue:retry', p2.n, 'again')
+    const paged = await until(async () => {
+      const v = await view()
+      return v && v.queued.some((e) => e.card === p2.n) && v.pending.length === 1 ? v : null
+    }, HUNG_MS)
+    check('the model: the latest return, a page of one (P3), one more (P1); P2, queued again, takes no place', paged?.recent[0]?.card === p4.n && paged.pending[0]?.card === p3.n && paged.pendingMore === 1, JSON.stringify({ recent: paged?.recent.map((r) => r.key), pending: paged?.pending.map((r) => r.key), more: paged?.pendingMore }))
+    await showTab('merges')
+    const more = card.locator('[data-more-returns]')
+    check('the card shows P4 and P3, and says one more is waiting', !!(await until(async () => (await more.count()) === 1 && /1 more returned card/.test(await more.innerText()) && (await cardText()).includes(`${p4.key} returned`) && (await cardText()).includes(`${p3.key} returned`), HUNG_MS)), await cardText())
+    check("…not P2's return (it is queued again)", !(await cardText()).includes(`${p2.key} returned`) && (await cardText()).includes(`${p2.key} waiting`), await cardText())
+    await shoot('merges-more')
+    // Focused again: the rows shown are seen, and the next page brings P1, the queue still paused.
+    await h.app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows()[0]
+      w.isFocused = () => true
+      w.emit('focus')
+    })
+    check('seeing them brings the next page: P1, with Open card and Show log; no more waiting', !!(await until(async () => (await cardText()).includes(`${p1.key} returned`) && (await more.count()) === 0, HUNG_MS)) && (await card.locator(`.progress-queue-returned[data-entry^="${p1.key}/"] [data-action="show-log"]`).count()) === 1, await cardText())
+    const last = await view()
+    check('…still paused, P2 still queued, never shown as returned', last?.paused?.reason === 'user' && last.queued.some((e) => e.card === p2.n) && !(await cardText()).includes(`${p2.key} returned`), JSON.stringify({ paused: last?.paused, queued: last?.queued.map((e) => e.key) }))
+    await h.app.evaluate(() => {
+      delete process.env.HIVE_TEST_QUEUE_RECENT
+      delete process.env.HIVE_TEST_QUEUE_PAGE
+    })
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

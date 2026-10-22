@@ -10,6 +10,7 @@
 // whose cause Hive can see (§16.9.2's conditions, the rules off, a process or folder of an earlier runner) is checked
 // first, and paused again, saying so, when it still holds.
 
+import { app } from 'electron'
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
 import { runCardIntent } from '../cardIntents'
@@ -135,7 +136,10 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
       const d = o.f.data as FactData['IntegrationRequested']
       return { ...named(o.card), entry: d.entry, revision: d.revision, at: o.f.at }
     })
-  const { recent, pending, pendingMore, pendingSeen } = recentOutcomes(wf, target, entries, cards, (id) => of(id).card, store.queueSeen())
+  // The cards in the queue again (queued or testing): their older returns aren't the panel's to show (HR3's #1356 round 3).
+  const again = new Set([...open.map((o) => o.card.id), ...(testing ? [testing.card] : [])])
+  const sizes = scope ? { recent: testSize('HIVE_TEST_QUEUE_RECENT', RECENT_MAX), page: testSize('HIVE_TEST_QUEUE_PAGE', PENDING_MAX) } : { recent: RECENT_MAX, page: PENDING_MAX }
+  const { recent, pending, pendingMore, pendingSeen } = recentOutcomes(wf, target, entries, cards, (id) => of(id).card, store.queueSeen(), again, sizes)
   const p = store.queuePause(target)
   return {
     project: basename(projectPath),
@@ -163,7 +167,7 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
  * next, since a seen return leaves the page at once), and up to PENDING_MAX seen in the last minute (`pendingSeen`, so
  * a row just seen still folds in the panel).
  */
-function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, cards: Set<number>, card: (id: number) => CardRecord, seen: Map<string, string>): Pick<QueueView, 'recent' | 'pending' | 'pendingMore' | 'pendingSeen'> {
+function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, cards: Set<number>, card: (id: number) => CardRecord, seen: Map<string, string>, again: Set<number>, sizes: { recent: number; page: number }): Pick<QueueView, 'recent' | 'pending' | 'pendingMore' | 'pendingSeen'> {
   const out: (QueueRecent & { seq: number })[] = []
   const named = (f: Fact) => {
     const c = card(f.card)
@@ -198,13 +202,26 @@ function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, card
   out.forEach((r, i) => {
     const first = !newest.has(r.card)
     newest.add(r.card)
-    if (i < RECENT_MAX || !first || r.outcome !== 'returned') return
+    // Only returns the panel shows: its card's newest outcome, and the card not in the queue again (queued or testing),
+    // so the page and the count hold exactly the returns that showing marks seen.
+    if (i < sizes.recent || !first || r.outcome !== 'returned' || again.has(r.card)) return
     if (!r.seen) {
-      if (pending.length < PENDING_MAX) pending.push(strip(r))
+      if (pending.length < sizes.page) pending.push(strip(r))
       else pendingMore++
-    } else if (Date.parse(r.seen) > since && pendingSeen.length < PENDING_MAX) pendingSeen.push(strip(r))
+    } else if (Date.parse(r.seen) > since && pendingSeen.length < sizes.page) pendingSeen.push(strip(r))
   })
-  return { recent: out.slice(0, RECENT_MAX).map(strip), pending, pendingMore, pendingSeen }
+  return { recent: out.slice(0, sizes.recent).map(strip), pending, pendingMore, pendingSeen }
+}
+
+/**
+ * A test seam (unpackaged builds only, as HIVE_TEST_SLOW_IPC): the window model's latest outcomes and page of returns
+ * made smaller, so an e2e reaches the page's end with a few cards. Read at each listing (a suite sets it in main as it
+ * goes); a packaged build, or no value, has the real sizes.
+ */
+function testSize(name: string, real: number): number {
+  if (app.isPackaged) return real
+  const n = Number(process.env[name])
+  return Number.isInteger(n) && n > 0 && n < real ? n : real
 }
 
 /**

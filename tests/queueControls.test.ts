@@ -387,4 +387,60 @@ describe('a return waits to be seen however many outcomes come after it (#1356, 
     expect([v3.pending.length, v3.pendingMore]).toEqual([0, 0])
     expect(shownReturns(v3, Date.now() + 60_000)).toEqual([])
   })
+
+  it("cards in the queue again never take the page (HR3's round 3 probe): the page and the count hold only returns the panel shows, and paging goes on while paused", async () => {
+    const { w, wt, repo } = await workspace()
+    const { markQueueSeen } = await import('../src/main/workflow/queueControls')
+    const { unseenReturns } = await import('../src/shared/progressQueue')
+    const card = await approved(w, wt)
+    await drain(w, repo, false)
+    const wf = (await service.workflowFor(w, repo))!
+    await inWorkspace(w, () => pauseQueue(w, repo, 'main', 'user'))
+    // 71 newer returns of other cards (o0 oldest); o20…o69 queued again (o69's advance begun: testing), o0…o19 and o70 not.
+    for (let i = 0; i < 71; i++) {
+      const other = await inWorkspace(w, async () => (await tasks.createTask({ title: `Other ${i}`, project: 'p' }, user)).number)
+      await wf.locked(() =>
+        wf.store.tx((tx) => {
+          tx.append(other, { kind: 'IntegrationRequested', actor: 'hive', source: 'recorded', data: { entry: `o${i}/e1`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge' } })
+          tx.append(other, { kind: 'IntegrationFailed', actor: 'hive', source: 'recorded', data: { entry: `o${i}/e1`, revision: 'f'.repeat(40), target: 'main', reason: 'checks', transient: false, log: `red ${i}` } })
+        })
+      )
+    }
+    const cards = (await inWorkspace(w, () => tasks.listTasks())).filter((c) => c.title.startsWith('Other ')).sort((a, b) => a.number - b.number).map((c) => c.number)
+    await wf.locked(() =>
+      wf.store.tx((tx) => {
+        for (let i = 20; i < 70; i++) tx.append(cards[i], { kind: 'IntegrationRequested', actor: 'hive', source: 'recorded', data: { entry: `o${i}/e2`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge', requeue: 'retry' } })
+        tx.append(cards[69], { kind: 'IntegrationStarted', actor: 'hive', source: 'recorded', data: { entry: 'o69/e2', expected: 'e'.repeat(40), result: 'd'.repeat(40) } })
+      })
+    )
+    const view = async () => (await inWorkspace(w, () => queueViews(w, repo, 'main', true)))[0]
+    const all = await view()
+    expect(all.testing?.card).toBe(cards[69])
+    expect(all.queued).toHaveLength(49)
+    // Shown: o70 among the latest 20; beyond them o19…o0 and the original (21), on one page; nothing requeued among them.
+    const again = new Set([...all.queued.map((q) => q.card), cards[69]])
+    expect([...all.pending, ...all.pendingSeen].some((r) => again.has(r.card))).toBe(false)
+    expect([all.pending.length, all.pendingMore]).toEqual([21, 0])
+    expect(all.pending.at(-1)).toMatchObject({ card, outcome: 'returned', log: expect.stringContaining('red') })
+    expect(unseenReturns(all, Date.now()).map((r) => r.card).sort((a, b) => a - b)).toEqual([card, ...cards.slice(0, 20), cards[70]].sort((a, b) => a - b))
+    // A small page (the e2e seam): exact count of the rest, and seeing the shown rows pages on, still paused.
+    process.env.HIVE_TEST_QUEUE_PAGE = '5'
+    try {
+      let v = await view()
+      expect([v.pending.length, v.pendingMore]).toEqual([5, 16])
+      for (let pages = 0; v.pending.length && pages < 10; pages++) {
+        expect(v.paused?.reason).toBe('user')
+        await inWorkspace(w, () => markQueueSeen(w, repo, 'main', unseenReturns(v, Date.now()).map((r) => r.entry)))
+        v = await view()
+        if (v.pending.some((r) => r.card === card)) break
+      }
+      expect(v.pending.find((r) => r.card === card)).toMatchObject({ outcome: 'returned', log: expect.stringContaining('red') })
+      expect(v.pendingMore).toBe(0)
+      // The requeued cards' returns were never shown, so never marked.
+      const seen = FactStore.forBoard(w, { project: 'p', key: 'p' }).queueSeen()
+      expect([...seen.keys()].some((e) => /^o(2\d|[3-6]\d)\/e1$/.test(e))).toBe(false)
+    } finally {
+      delete process.env.HIVE_TEST_QUEUE_PAGE
+    }
+  })
 })
