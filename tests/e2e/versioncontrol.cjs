@@ -220,6 +220,13 @@ function board(sql, ...args) {
     check('the workflow link shows there too, at the end of the header’s one row', !!(await lib.until(async () => (await text(link)).trim().startsWith('Workflow: Git · '), HUNG_MS)), await text(head))
     check('subfolder: the workflow link at the end of the header row', await linkInPlace())
     await shots('subfolder', page.locator('.vc-view'))
+
+    // A narrow tab: the fact line takes a row of its own under None · Git and the link, never a sliver (unusedwt's narrow
+    // window with Progress open caught one).
+    await lib.fitWindow(app, page, { width: 760, height: 860 })
+    const factBox = async () => (await fact.boundingBox())?.width ?? 0
+    check('narrow: the fact line has a row of its own, the link still level with the choice', !!(await lib.until(async () => (await factBox()) > (await page.locator('.vc-view').boundingBox()).width * 0.6 && (await linkInPlace()), HUNG_MS)), String(await factBox()))
+    await shots('subfolder-narrow', page.locator('.vc-view'))
   } finally {
     await app.close()
   }
