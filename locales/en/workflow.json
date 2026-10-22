@@ -699,6 +699,38 @@
     "defaultMessage": "The question is on the card (For you): once it is answered, Hive wakes the agents waiting on it.",
     "description": "The next step while a card waits at its round limit for its question (For you, a label: use it as Hive shows it) to be answered. Read by agents and shown in the window alike: it names no one (never \"the user\"); Hive then wakes the agents that wait on the card."
   },
+  "workflow.refused.merge.hiveMerges.change": {
+    "defaultMessage": "This rule is set in Version Control → Who merges. A card keeps the rules it started with.",
+    "description": "Where the rule that Hive merges cards is changed; a card keeps the rules it started under unless the change is applied to it."
+  },
+  "workflow.refused.merge.hiveMerges.message": {
+    "defaultMessage": "Hive merges {card}: agents don't merge it or report its merge.",
+    "description": "A refused report of a merge, or a claim of the merge slot, for a card whose rules say Hive merges it (the merge queue). {card} is a card key like AM-12."
+  },
+  "workflow.refused.merge.hiveMerges.next": {
+    "defaultMessage": "Once it is approved, the merge queue merges it and moves it to Done: wait for that, or for it to come back.",
+    "description": "The next step after a refused merge of a card Hive merges, when it isn't in the merge queue yet."
+  },
+  "workflow.refused.merge.hiveMerges.nextMerged": {
+    "defaultMessage": "The merge queue has merged it already: nothing is left to do.",
+    "description": "The next step after a refused merge of a card Hive has already merged."
+  },
+  "workflow.refused.merge.hiveMerges.nextPaused": {
+    "defaultMessage": "It is in the merge queue for {target}, which is paused until it is resumed: wait for Done, or for it to come back.",
+    "description": "The next step after a refused merge of a card in a paused merge queue. {target} is a branch name."
+  },
+  "workflow.refused.merge.hiveMerges.nextQueued": {
+    "defaultMessage": "It is in the merge queue for {target} (position {n, number}) and moves to Done once merged: wait for that, or for it to come back.",
+    "description": "The next step after a refused merge of a card Hive merges, waiting in the merge queue. {target} is a branch name; {n} its place in the queue (1 is next)."
+  },
+  "workflow.refused.merge.hiveMerges.nextReturned": {
+    "defaultMessage": "It came back from the merge queue: fix it in your worktree, commit and submit again.",
+    "description": "The next step after a refused merge of a card the merge queue returned to its builder (a conflict, failed checks, a hook)."
+  },
+  "workflow.refused.merge.hiveMerges.nextTesting": {
+    "defaultMessage": "The merge queue is merging it into {target} now and moves it to Done once merged: wait for that, or for it to come back.",
+    "description": "The next step after a refused merge of a card the merge queue is testing or merging now. {target} is a branch name."
+  },
   "workflow.refused.move.needsOverride.change": {
     "defaultMessage": "These rules are set in Version Control, where the user can change them.",
     "description": "Where the rules a move would skip are changed: the project's Version Control tab (a tab name: use it as Hive shows it)."

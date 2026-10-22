@@ -196,8 +196,9 @@ describe('workflow scenarios, Git', () => {
   it('S16: an agent moving a card to Done is refused with the intent; the user drags it with no merge → asked, override recorded', async () => {
     const e = pair()
     const { card } = await started(e)
-    const r = refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done'), 'move.useIntent')
-    expect(r.next).toBe('Use the report merge intent instead.')
+    // Pair: Hive merges it, so the refusal names the queue (#1354) rather than an intent the agent can't use.
+    const r = refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done'), 'merge.hiveMerges')
+    expect(r.next).toBe('Once it is approved, the merge queue merges it and moves it to Done: wait for that, or for it to come back.')
     const ask = await e.wf.move(card.key, 'done', 'user')
     expect(ask).toMatchObject({ ask: true })
     expect((ask as { rules: string[] }).rules).toEqual(expect.arrayContaining(['submit.clean', 'integrate.approved', 'done.contained']))

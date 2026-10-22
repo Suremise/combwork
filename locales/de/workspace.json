@@ -45,6 +45,8 @@
   "workspace.antivirus.devUntrustedTip": "Ein Dev Drive, das nicht vertrauenswürdig ist: Defender prüft es wie jedes andere Laufwerk.",
   "workspace.antivirus.dontAsk": "Nicht mehr fragen",
   "workspace.antivirus.folder": "Ordner",
+  "workspace.antivirus.goneHint": "{n, plural, one {Hive hat diesen Ordner ausgeschlossen, den es nicht mehr gibt (verschoben oder gelöscht). „Ausschlüsse von Hive entfernen…“ entfernt auch ihn.} other {Hive hat diese Ordner ausgeschlossen, die es nicht mehr gibt (verschoben oder gelöscht). „Ausschlüsse von Hive entfernen…“ entfernt auch sie.}}",
+  "workspace.antivirus.goneTitle": "Ausschlüsse von Hive für Ordner, die es nicht mehr gibt",
   "workspace.antivirus.hidden": "Defender zeigt seine Ausschlüsse nur Administratoren, daher sieht Hive sie nicht, ohne zu fragen.",
   "workspace.antivirus.holdsHome": "er ist oder enthält deinen Benutzerordner, dein Profil oder einen Systemordner",
   "workspace.antivirus.kindTests": "Testbereich von Hive (Entwicklung von Hive)",

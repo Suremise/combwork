@@ -10,7 +10,9 @@
 // no elevated run. Moved again with Defender ignoring local changes (an organisation's policy): the report says so and
 // nothing is remembered as Hive's. Last, moved inside its old folder: with the list hidden the states are what Hive
 // knows and an unknown folder is never called scanned; with it shown the new workspace is Excluded only through Hive's
-// old entry, and Repair still excludes it. Screenshots in both themes, and the plan in German and Polish.
+// old entry, and Repair still excludes it. Then (#1389) moved again with Repair's prompt declined: Repair finishes,
+// and the Antivirus panel lists Hive's exclusions of folders that are gone, which Remove Hive's Exclusions… takes away.
+// Screenshots in both themes, the plan in German and Polish, the gone exclusions in German.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -246,6 +248,83 @@ const check = (name, ok, extra = '') => {
       await dialog.getByRole('button', { name: 'Repair', exact: true }).click()
       check('Repair removes the old entry and excludes the new workspace, no longer covered', !!(await lib.until(async () => /Moved Hive's exclusions to the new folders: 1 removed, 1 added\./.test(await textOf(dialog)), HUNG_MS)), await textOf(dialog))
       check('…in one elevated run', JSON.stringify(changes('move-requested').slice(before).map((c) => [c.remove, c.paths])) === JSON.stringify([[[fourth.ws], [inner.ws]]]), JSON.stringify(changes().slice(-4)))
+    } finally {
+      await app.close()
+    }
+  }
+
+  // #1389: moved again (Inner → Fifth) with Repair's administrator prompt declined. Repair finishes and doesn't offer
+  // the move again; Hive's exclusion of Inner, a folder that is gone now, stays in Defender's list. The Antivirus panel
+  // lists Hive's exclusions of folders that are gone (Inner's, and Tools', left when its move was unticked), and
+  // Remove Hive's Exclusions… takes them away. Defender's list hidden, Hive's administrator read forgotten: every one
+  // Hive recorded is shown, unconfirmed, until its Remove reads the list.
+  forgetTests()
+  forgetAdmin()
+  const fifth = at('Fifth')
+  fs.renameSync(inner.ws, fifth.ws)
+  const ours = (p) => (JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).antivirus?.added ?? []).some((x) => path.resolve(x).toLowerCase() === path.resolve(p).toLowerCase())
+  setFixture({ exclusions: [scratch.trees, tools.ws, inner.ws, fourth.trees], cancelled: true })
+  const command = (app, id) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args: [] })
+  {
+    const { app, page, inv } = await launch()
+    try {
+      await lib.openWorkspace(inv, page, fifth.ws)
+      check('before: Hive’s exclusions of Inner and Tools are recorded, both folders gone', ours(inner.ws) && ours(tools.ws) && !fs.existsSync(inner.ws) && !fs.existsSync(tools.ws))
+      const report = await inv('workspace:moveRepair', { defender: true })
+      check('Repair with its prompt declined: said, the rest done', report.skipped.some((l) => /prompt was declined/.test(l)) && report.failed.length === 0, JSON.stringify(report))
+      check('…and the move is recorded as repaired: Repair offers no Defender move again', !(await inv('workspace:movePlan')), JSON.stringify(await inv('workspace:movePlan')))
+      const s = await inv('antivirus:status', true)
+      const gone = (s.gone ?? []).map((g) => g.path)
+      check('the status lists Hive’s exclusions of folders that are gone, unconfirmed (the list hidden)', gone.includes(inner.ws) && gone.includes(tools.ws) && (s.gone ?? []).every((g) => g.state === 'added') && !gone.includes(scratch.trees) && !gone.includes(fifth.ws), JSON.stringify(s.gone))
+    } finally {
+      await app.close()
+    }
+  }
+  // The panel in German, looked at only.
+  {
+    const { app, page, inv } = await launch('de')
+    try {
+      await lib.openWorkspace(inv, page, fifth.ws)
+      await command(app, 'antivirus.show')
+      const gonePanel = page.locator('.antivirus-gone')
+      await lib.until(async () => (await gonePanel.count()) === 1, HUNG_MS)
+      await gonePanel.scrollIntoViewIfNeeded()
+      await page.screenshot({ path: path.join(lib.WORK, 'repairdefender-gone-de.png') })
+    } finally {
+      await app.close()
+    }
+  }
+  setFixture({ exclusions: [scratch.trees, tools.ws, inner.ws, fourth.trees] })
+  {
+    const { app, page, inv } = await launch()
+    page.on('pageerror', (e) => check('no page errors', false, e.message))
+    try {
+      await lib.openWorkspace(inv, page, fifth.ws)
+      await command(app, 'antivirus.show')
+      const panel = page.locator('.antivirus')
+      const gonePanel = panel.locator('.antivirus-gone')
+      const goneText = async () => (await gonePanel.innerText().catch(() => '')).replace(/\s+/g, ' ')
+      check('Settings → Workspace → Antivirus scanning lists them under their own heading, each Added by Hive', !!(await lib.until(async () => /Hive’s exclusions of folders that are gone/.test(await goneText()), HUNG_MS)) && (await goneText()).includes(`${inner.ws} Added by Hive`) && (await goneText()).includes(`${tools.ws} Added by Hive`) && /no longer exist \(moved or deleted\)/.test(await goneText()), await goneText())
+      await gonePanel.scrollIntoViewIfNeeded()
+      await page.screenshot({ path: path.join(lib.WORK, 'repairdefender-gone-dark.png') })
+      await inv('settings:update', { appearance: { theme: 'light' } })
+      await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'light'), HUNG_MS)
+      await page.screenshot({ path: path.join(lib.WORK, 'repairdefender-gone-light.png') })
+      await inv('settings:update', { appearance: { theme: 'dark' } })
+
+      // Remove Hive's Exclusions… covers them (the workspace has none of Hive's: the button is there for them alone).
+      await panel.getByRole('button', { name: 'Remove Hive’s Exclusions…' }).click()
+      const removeDialog = page.locator('.dialog', { hasText: 'Remove the exclusions Hive added?' })
+      await lib.until(async () => (await removeDialog.count()) === 1, HUNG_MS)
+      const listedNow = await removeDialog.locator('.dialog-list li').allInnerTexts()
+      check('Remove lists them, Hive’s alone', listedNow.includes(inner.ws) && listedNow.includes(tools.ws) && !listedNow.includes(scratch.trees) && !listedNow.includes(fourth.trees), JSON.stringify(listedNow))
+      const before = changes('remove-requested').length
+      await removeDialog.locator('.btn.primary').click()
+      check('…one elevated run asks Defender to remove exactly the entries it lists', !!(await lib.until(async () => changes('remove-requested').length === before + 1, HUNG_MS)) && JSON.stringify([...changes('remove-requested').at(-1).paths].sort()) === JSON.stringify([inner.ws, tools.ws].sort()), JSON.stringify(changes().slice(-2)))
+      // config.json is saved a moment after a change: waited for.
+      check('…then the panel lists none, and Hive no longer records them', !!(await lib.until(async () => (await gonePanel.count()) === 0 && !ours(inner.ws) && !ours(tools.ws), HUNG_MS)), await panel.innerText())
+      const after = await inv('antivirus:status', true)
+      check('…nor Hive’s other gone ones Defender no longer lists (forgotten once the list is read)', !(after.gone ?? []).length && !!(await lib.until(() => !ours(third.ws), HUNG_MS)), JSON.stringify({ gone: after.gone, added: JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).antivirus?.added }))
     } finally {
       await app.close()
     }

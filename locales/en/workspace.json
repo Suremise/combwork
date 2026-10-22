@@ -183,6 +183,14 @@
     "defaultMessage": "Folder",
     "description": "Settings → Workspace's antivirus table: a column."
   },
+  "workspace.antivirus.goneHint": {
+    "defaultMessage": "{n, plural, one {Hive excluded this folder, which no longer exists (moved or deleted). Remove Hive’s Exclusions… takes it away too.} other {Hive excluded these folders, which no longer exist (moved or deleted). Remove Hive’s Exclusions… takes them away too.}}",
+    "description": "Settings → Workspace's antivirus, under the heading for exclusions of folders that are gone. {n}: how many. Remove Hive’s Exclusions… is the button below: use its name as shown."
+  },
+  "workspace.antivirus.goneTitle": {
+    "defaultMessage": "Hive’s exclusions of folders that are gone",
+    "description": "Settings → Workspace's antivirus: a heading over a list of exclusions Hive added for folders that no longer exist (moved or deleted)."
+  },
   "workspace.antivirus.hidden": {
     "defaultMessage": "Defender shows its exclusions only to administrators, so Hive can’t see them without asking.",
     "description": "Settings → Workspace's antivirus: why the states are unknown."

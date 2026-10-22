@@ -5,7 +5,7 @@ import type { MoveBranch, MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MoveP
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { fmt, msg, tr } from '../shared/i18n'
 import { moveHasWork, rebase, rebaseAny, samePath, worktreeCandidates, type PathMove } from '../shared/movePaths'
-import { PruneBlocked, recreateWorktree } from './agentWorktree'
+import { moveCardFolders, PruneBlocked, recreateWorktree } from './agentWorktree'
 import { config } from './config'
 import { realPath, samePlace } from './fsutil'
 import { git } from './git'
@@ -580,6 +580,14 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
               : tr(msg({ id: 'main.move.notRepairedWhy', defaultMessage: "{host}: {agent}'s worktree at {path} couldn't be repaired ({why}).", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the worktree, {why} git's message." }), { host: h.name, agent: w.agentName, path: w.to!, why }),
             { host: h.name, what: { kind: 'worktree', agent: w.agentName }, was: w.from, now: w.to!, result: tr(R.notRepaired, { hasWhy: why ? 'yes' : 'no', why }) }
           )
+          continue
+        }
+        // Its cards' work follows it first (#1343), so a Repair cut short before the record below writes it again.
+        try {
+          await moveCardFolders(h.path, w.from, w.to!)
+        } catch (e) {
+          const why = e instanceof Error ? e.message : String(e)
+          say(report, 'failed', tr(msg({ id: 'main.move.cardsNotMoved', defaultMessage: "{host}: the cards {agent} works on couldn't be told its worktree is now at {path} ({why}). Repair tries again.", description: "A line of Repair's report, after a workspace or project moved to another folder: the board's record of the cards worked on in an agent's worktree couldn't be updated to its new place. {host} is the project; {agent} an agent; {path} the worktree's new folder; {why} the system's message." }), { host: h.name, agent: w.agentName, path: w.to!, why }), { host: h.name, what: { kind: 'worktree', agent: w.agentName }, was: w.from, now: w.to!, result: tr(R.failedWhy, { why }) })
           continue
         }
         // The new path, and the move its data follows until that is copied, in one locked change.

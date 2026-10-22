@@ -179,6 +179,9 @@ interface HiveMessageValues {
   'shell.compact.title': { several: string; project: string | number; agent: string | number }
   'shell.compact.typed': undefined
   'shell.compact.what': undefined
+  'shell.copyCode.copied': undefined
+  'shell.copyCode.copy': { code: string | number }
+  'shell.copyCode.label': undefined
   'shell.diagnostics.attach': { when: string | number; n: number }
   'shell.diagnostics.collecting': undefined
   'shell.diagnostics.copied': undefined
