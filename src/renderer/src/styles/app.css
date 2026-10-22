@@ -2959,6 +2959,9 @@ p.hint {
   border: 1px solid color-mix(in srgb, var(--error) 35%, transparent);
   white-space: pre-line;
   user-select: text;
+  /* A long one (Push to…'s every branch by name, #1385) scrolls in its own box, the buttons staying in view. */
+  max-height: 40vh;
+  overflow: auto;
 }
 .field-error {
   color: var(--error);
@@ -3208,6 +3211,9 @@ p.hint {
   margin-top: 2px;
   word-break: break-word;
   white-space: pre-line;
+  /* A long message (Push to…'s every branch by name, #1385) scrolls rather than run off the screen. */
+  max-height: 40vh;
+  overflow: auto;
 }
 .toast-actions {
   display: flex;

@@ -269,6 +269,20 @@ describe('Push to…, remotes and tracking (#1385)', () => {
     await expect(repo.removeRemote(proj, 'nas')).rejects.toThrow("There's no remote nas.")
   })
 
+  it('names every branch the remote refuses, however many (HR5’s round 2: none left out past the first few)', async () => {
+    const backup = addBackup()
+    const head = git(proj, 'rev-parse', 'HEAD')
+    const names = Array.from({ length: 30 }, (_, i) => `a${String(i).padStart(3, '0')}`)
+    execFileSync('git', ['update-ref', '--stdin'], { cwd: proj, input: names.map((n) => `create refs/heads/${n} ${head}\n`).join('') })
+    // The remote's a000–a026 have a commit these branches haven't.
+    const newer = git(proj, 'commit-tree', '-p', head, '-m', 'theirs', `${head}^{tree}`)
+    git(proj, 'push', '-q', 'backup', ...names.slice(0, 27).map((n) => `${newer}:refs/heads/${n}`))
+    const err = await repo.pushToRemote(proj, 'backup', 'all').then(() => '', (e: Error) => e.message)
+    expect(err).toContain(`Refused: ${names.slice(0, 27).join(', ')}.`)
+    expect(err).toContain(`Pushed: ${[...names.slice(27), 'main'].join(', ')}.`)
+    expect(git(backup, 'rev-parse', 'a026')).toBe(newer)
+  })
+
   it('pushes the branch the user confirmed, by name, whichever is checked out by the time it runs', async () => {
     const backup = addBackup()
     git(proj, 'checkout', '-q', '-b', 'private')

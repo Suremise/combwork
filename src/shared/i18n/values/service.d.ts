@@ -73,7 +73,6 @@ interface HiveMessageValues {
   'service.gitRepo.identitySet': undefined
   'service.gitRepo.inWorktree': { branch: string | number; folder: string | number }
   'service.gitRepo.midOperation': { state: string | number }
-  'service.gitRepo.more': { n: number }
   'service.gitRepo.noBranch': { branch: string | number }
   'service.gitRepo.noCommits': undefined
   'service.gitRepo.noRemote': { remote: string | number }

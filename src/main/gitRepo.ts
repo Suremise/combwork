@@ -85,8 +85,7 @@ const M = {
   pushed: msg({ id: 'service.gitRepo.pushed', defaultMessage: 'Pushed {branch} to {to}.', description: 'After pushing in the Git view: the branch {branch} went to the remote branch {to}.' }),
   pushedAll: msg({ id: 'service.gitRepo.pushedAll', defaultMessage: 'Pushed every branch and tag to {remote}:', description: "After Push to… with all branches and tags in the Git view: the first line, what went to the remote {remote}; a line for each outcome follows (service.gitRepo.pushOutcome)." }),
   pushAllRefused: msg({ id: 'service.gitRepo.pushAllRefused', defaultMessage: "{remote} refused {n, plural, one {# branch or tag} other {# branches and tags}} (Hive never forces a push): it has commits they haven't, so pull or merge them first. What happened to each:", description: "An error after Push to… with all branches and tags in the Git view: the first line, the remote {remote} refused {n} of them; a line for each outcome follows (service.gitRepo.pushOutcome)." }),
-  pushOutcome: msg({ id: 'service.gitRepo.pushOutcome', defaultMessage: '{result, select, pushed {Pushed: {refs}.} upToDate {Already up to date: {refs}.} refused {Refused: {refs}.} other {Tags pushed: {refs}.}}', description: "A line after Push to… with all branches and tags in the Git view: the branches pushed, already up to date, refused (branches or tags), or the tags pushed. {refs} lists them by name (at most 25, then \"N more\")." }),
-  more: msg({ id: 'service.gitRepo.more', defaultMessage: '{n, plural, one {# more} other {# more}}', description: 'The last item of a long list of branch or tag names in the Git view, after the first ones: how many more there are.' }),
+  pushOutcome: msg({ id: 'service.gitRepo.pushOutcome', defaultMessage: '{result, select, pushed {Pushed: {refs}.} upToDate {Already up to date: {refs}.} refused {Refused: {refs}.} other {Tags pushed: {refs}.}}', description: "A line after Push to… with all branches and tags in the Git view: the branches pushed, already up to date, refused (branches or tags), or the tags pushed. {refs} lists them all by name." }),
   remoteTrackingChanged: msg({ id: 'service.gitRepo.remoteTrackingChanged', defaultMessage: "The branches tracking {remote} changed since you were asked, so nothing was removed: look at them again.", description: 'An error removing a remote in the Git view: the local branches tracking it are not the ones the confirmation listed (one started or stopped tracking it meanwhile).' }),
   notOnRemote: msg({ id: 'service.gitRepo.notOnRemote', defaultMessage: '{remote} has no {branch} (as of the last fetch): push it there first, or fetch.', description: 'An error choosing what a branch tracks in the Git view: the remote {remote} has no branch {branch} that Hive knows of.' }),
   badName: msg({ id: 'service.gitRepo.badName', defaultMessage: "{kind, select, tag {{hasName, select, yes {{name} isn't a valid tag name.} other {That isn't a valid tag name.}}} other {{hasName, select, yes {{name} isn't a valid branch name.} other {That isn't a valid branch name.}}}}", description: "An error creating a branch or a tag ({kind}): its name {name} is one git refuses. {hasName} is no when no name was given (then it says That)." })
@@ -594,18 +593,13 @@ export async function pushToRemote(projectPath: string, remote: string, scope: P
   })
 }
 
-/** How many names an outcome's line lists before "and N more". */
-const OUTCOME_NAMES = 25
-
 /**
  * All branches and tags' outcomes (#1385, HR5's round 1: each branch by name), a line each: the branches pushed, those
- * already up to date, the refs refused (branches and tags), the tags pushed. Tags already there aren't listed.
+ * already up to date, the refs refused (branches and tags), the tags pushed, every one by name (HR5's round 2: none left out). Tags already
+ * there aren't listed.
  */
 function pushOutcomes(refs: PushedRef[]): Text[] {
-  const names = (refs_: PushedRef[]): Text => {
-    const list = [...refs_].sort((a, b) => a.name.localeCompare(b.name, 'en'))
-    return listOf([...list.slice(0, OUTCOME_NAMES).map((x) => x.name), ...(list.length > OUTCOME_NAMES ? [withValues(M.more, { n: list.length - OUTCOME_NAMES })] : [])], 'unit')
-  }
+  const names = (list: PushedRef[]): Text => listOf([...list].sort((a, b) => a.name.localeCompare(b.name, 'en')).map((x) => x.name), 'unit')
   const out: Text[] = []
   const branches = refs.filter((x) => x.kind === 'branch')
   for (const result of ['pushed', 'upToDate'] as const) {

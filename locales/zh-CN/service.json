@@ -71,7 +71,6 @@
   "service.gitRepo.identitySet": "已设置此仓库的提交身份。",
   "service.gitRepo.inWorktree": "{branch} 已在另一个工作树（{folder}）中检出：一个分支同一时间只能在一个文件夹中。",
   "service.gitRepo.midOperation": "Git 正在进行 {state}：请先完成或中止它。",
-  "service.gitRepo.more": "{n, plural, other {另外 # 个}}",
   "service.gitRepo.noBranch": "没有分支 {branch}。",
   "service.gitRepo.noCommits": "仓库还没有提交：请先提交一些内容。",
   "service.gitRepo.noRemote": "没有远程仓库 {remote}。",

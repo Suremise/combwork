@@ -71,7 +71,6 @@
   "service.gitRepo.identitySet": "このリポジトリのコミット者情報を設定しました。",
   "service.gitRepo.inWorktree": "{branch}は別のワークツリー（{folder}）でチェックアウトされています。ブランチは一度に1つのフォルダーでしか使えません。",
   "service.gitRepo.midOperation": "gitは{state}の途中です。先に完了するか中止してください。",
-  "service.gitRepo.more": "{n, plural, other {ほか#個}}",
   "service.gitRepo.noBranch": "ブランチ{branch}はありません。",
   "service.gitRepo.noCommits": "リポジトリにまだコミットがありません。先に何かコミットしてください。",
   "service.gitRepo.noRemote": "リモート{remote}はありません。",

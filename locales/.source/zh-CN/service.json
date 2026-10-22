@@ -71,7 +71,6 @@
   "service.gitRepo.identitySet": "Set this repository's commit identity.",
   "service.gitRepo.inWorktree": "{branch} is checked out in another worktree ({folder}): a branch can be in only one folder at a time.",
   "service.gitRepo.midOperation": "Git is in the middle of a {state}: finish or abort it first.",
-  "service.gitRepo.more": "{n, plural, one {# more} other {# more}}",
   "service.gitRepo.noBranch": "There's no branch {branch}.",
   "service.gitRepo.noCommits": "The repository has no commits yet: commit something first.",
   "service.gitRepo.noRemote": "There's no remote {remote}.",

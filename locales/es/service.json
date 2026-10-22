@@ -71,7 +71,6 @@
   "service.gitRepo.identitySet": "Se configuró la identidad de commit de este repositorio.",
   "service.gitRepo.inWorktree": "{branch} está activa en otro worktree ({folder}): una rama solo puede estar en una carpeta a la vez.",
   "service.gitRepo.midOperation": "Git está en medio de un {state}: termínalo o cancélalo primero.",
-  "service.gitRepo.more": "{n, plural, one {# más} many {# más} other {# más}}",
   "service.gitRepo.noBranch": "No existe la rama {branch}.",
   "service.gitRepo.noCommits": "El repositorio todavía no tiene commits: haz un commit primero.",
   "service.gitRepo.noRemote": "No existe el remoto {remote}.",

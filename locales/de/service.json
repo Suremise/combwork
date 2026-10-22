@@ -71,7 +71,6 @@
   "service.gitRepo.identitySet": "Commit-Identität dieses Repositorys festgelegt.",
   "service.gitRepo.inWorktree": "{branch} ist in einem anderen Worktree ausgecheckt ({folder}): Ein Branch kann immer nur in einem Ordner sein.",
   "service.gitRepo.midOperation": "Git ist mitten in einem Vorgang ({state}): Schließe ihn zuerst ab oder brich ihn ab.",
-  "service.gitRepo.more": "{n, plural, one {# weiterer} other {# weitere}}",
   "service.gitRepo.noBranch": "Es gibt keinen Branch {branch}.",
   "service.gitRepo.noCommits": "Das Repository hat noch keine Commits: Committe zuerst etwas.",
   "service.gitRepo.noRemote": "Es gibt kein Remote {remote}.",

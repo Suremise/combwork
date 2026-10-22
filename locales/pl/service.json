@@ -71,7 +71,6 @@
   "service.gitRepo.identitySet": "Ustawiono tożsamość commitów tego repozytorium.",
   "service.gitRepo.inWorktree": "Gałąź {branch} jest używana w innym worktree ({folder}): gałąź może być naraz tylko w jednym folderze.",
   "service.gitRepo.midOperation": "Git jest w trakcie operacji {state}: najpierw ją dokończ lub przerwij.",
-  "service.gitRepo.more": "{n, plural, one {# więcej} few {# więcej} many {# więcej} other {# więcej}}",
   "service.gitRepo.noBranch": "Nie ma gałęzi {branch}.",
   "service.gitRepo.noCommits": "Repozytorium nie ma jeszcze commitów: najpierw utwórz commit.",
   "service.gitRepo.noRemote": "Nie ma zdalnego repozytorium {remote}.",

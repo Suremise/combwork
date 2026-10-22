@@ -71,7 +71,6 @@
   "service.gitRepo.identitySet": "Identité des commits de ce dépôt définie.",
   "service.gitRepo.inWorktree": "La branche {branch} est extraite dans un autre worktree ({folder}) : une branche ne peut être que dans un seul dossier à la fois.",
   "service.gitRepo.midOperation": "Une opération {state} est en cours dans Git : termine-la ou annule-la d’abord.",
-  "service.gitRepo.more": "{n, plural, one {# de plus} many {# de plus} other {# de plus}}",
   "service.gitRepo.noBranch": "Il n’y a pas de branche {branch}.",
   "service.gitRepo.noCommits": "Le dépôt n’a encore aucun commit : fais d’abord un commit.",
   "service.gitRepo.noRemote": "Il n’y a pas de dépôt distant {remote}.",

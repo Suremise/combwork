@@ -287,10 +287,6 @@
     "defaultMessage": "Git is in the middle of a {state}: finish or abort it first.",
     "description": "An error pulling in the Git view: a git operation is under way in the project folder; {state} is git's word for it (merge, rebase, cherry-pick, revert or bisect: keep it as it is)."
   },
-  "service.gitRepo.more": {
-    "defaultMessage": "{n, plural, one {# more} other {# more}}",
-    "description": "The last item of a long list of branch or tag names in the Git view, after the first ones: how many more there are."
-  },
   "service.gitRepo.noBranch": {
     "defaultMessage": "There's no branch {branch}.",
     "description": "An error in the Git view (switching branch, choosing what a branch tracks): the repository has no branch called {branch}."
@@ -349,7 +345,7 @@
   },
   "service.gitRepo.pushOutcome": {
     "defaultMessage": "{result, select, pushed {Pushed: {refs}.} upToDate {Already up to date: {refs}.} refused {Refused: {refs}.} other {Tags pushed: {refs}.}}",
-    "description": "A line after Push to… with all branches and tags in the Git view: the branches pushed, already up to date, refused (branches or tags), or the tags pushed. {refs} lists them by name (at most 25, then \"N more\")."
+    "description": "A line after Push to… with all branches and tags in the Git view: the branches pushed, already up to date, refused (branches or tags), or the tags pushed. {refs} lists them all by name."
   },
   "service.gitRepo.pushUpToDate": {
     "defaultMessage": "{to} already has {branch}: nothing to push.",
