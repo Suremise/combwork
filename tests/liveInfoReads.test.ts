@@ -174,6 +174,60 @@ describe("a refresh's running agents share the workspace's reads (#1002)", () =>
     }
   })
 
+  it("closing waits for a scheduled refresh already running, which reads the projects' files (#1341)", async () => {
+    // A workspace of its own, closed here.
+    const other = join(base, 'closing')
+    mkdirSync(join(other, 'gamma', '.hive'), { recursive: true })
+    const w2 = createWorkspaceService()
+    await w2.open(other)
+    await w2.refreshesSettled()
+    const real = w2.refresh.bind(w2)
+    let open: () => void = () => undefined
+    const gate = new Promise<void>((r) => (open = r))
+    let started = 0
+    let ended = false
+    const spy = vi.spyOn(w2, 'refresh').mockImplementation(async () => {
+      started++
+      await gate
+      try {
+        return await real()
+      } finally {
+        ended = true
+      }
+    })
+    const state = w2 as unknown as { scheduledRuns: Set<unknown>; refreshTimer: unknown; scheduled: unknown }
+    try {
+      w2.scheduleRefresh()
+      await vi.waitFor(() => expect(started).toBe(1), { timeout: 10_000 })
+      const closing = w2.close()
+      expect(await pending(closing)).toBe(true)
+      expect(w2.lifetime.aborted).toBe(true)
+      // While it waits, nothing schedules another: a folder made in the workspace root (its watch), a write's ask.
+      mkdirSync(join(other, 'made-while-closing'))
+      w2.scheduleRefresh()
+      expect([state.refreshTimer, state.scheduled]).toEqual([null, null])
+      expect(await pending(closing)).toBe(true)
+      open()
+      await closing
+      // Ended (it found the workspace closed) before the close did, and none started or waits after it: nothing reads the
+      // folders once it has closed.
+      expect(ended).toBe(true)
+      expect(w2.path).toBeNull()
+      expect([started, state.scheduledRuns.size, state.refreshTimer, state.scheduled]).toEqual([1, 0, null, null])
+      // Opened again, it schedules and runs its refreshes as before.
+      await w2.open(other)
+      await w2.refreshesSettled()
+      const before = started
+      w2.scheduleRefresh()
+      await w2.refreshesSettled()
+      expect(started).toBe(before + 1)
+    } finally {
+      open()
+      spy.mockRestore()
+      await disposeWorkspaceService(w2)
+    }
+  })
+
   it('a project read on its own (not in a refresh) reads them once for its agents too', async () => {
     await run(async () => sessions.liveInfo(projects[1], await workspace.projectConfig(projects[1])))
     expect(calls.hiveSkills).toBe(1)

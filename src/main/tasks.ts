@@ -32,7 +32,7 @@ import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
-import { workspace, type WorkspaceService } from './workspace'
+import { workspace, workspaceFor, type WorkspaceService } from './workspace'
 import { trash } from './trash'
 import { journalFact } from './journalService'
 
@@ -1874,6 +1874,17 @@ const REVIEW_END: Record<ReviewEnd, string> = { 'its session ended': 'sessionEnd
  */
 export function endReviews(project: string, agentId: string, why: ReviewEnd, ws: WorkspaceService = workspace): Promise<number[]> {
   return cardBatch(ws, () => endReviewsUnbatched(project, agentId, why, ws))
+}
+
+/**
+ * A session ended: the reviews its agent had going end, on its own workspace's board (#1381). None when no window has
+ * that workspace open now (closed as its agents stopped: its board isn't opened again, and workspaceOf's fallback, another
+ * window's board, has other cards under the same project name), nor for the Assistant. Null when there is nothing to do.
+ */
+export function endExitedReviews(projectPath: string, agentId: string): Promise<number[]> | null {
+  const ws = workspaceFor(projectPath)
+  if (!ws || ws.isAssistantHome(projectPath)) return null
+  return endReviews(basename(projectPath), agentId, 'its session ended', ws) // i18n-ignore: the reason's key (ReviewEnd)
 }
 
 async function endReviewsUnbatched(project: string, agentId: string, why: ReviewEnd, ws: WorkspaceService): Promise<number[]> {

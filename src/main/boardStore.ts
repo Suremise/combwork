@@ -282,6 +282,12 @@ interface Board {
   presence: NodeJS.Timeout
   /** This process's changes of the board committed since it was opened (boardRevision): its cards' and lanes'. */
   revision: number
+  /** Opened for a lease (leaseDb) and not used since by anything that keeps it open: closed as its last lease ends. */
+  transient: boolean
+  /** The leases on this connection not ended yet (#1383): while any is, closing the board leaves its connection open for them. */
+  leases: number
+  /** Closed while leased (closeBoard): no longer the workspace's board, its connection closed as its last lease ends. */
+  detached: boolean
 }
 
 const boards = new Map<string, Board>()
@@ -617,7 +623,9 @@ function boardOf(path: string, transient = false): Board {
   const failed = failures.get(key)
   if (failed) throw hiveError(M.unavailable, { error: failed.message }, { kind: 'conflict' })
   try {
-    return openBoard(path, false)
+    const b = openBoard(path, false)
+    b.transient = transient
+    return b
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e))
     failures.set(key, err)
@@ -654,6 +662,9 @@ function openBoard(path: string, upgrade: boolean): Board {
       version: w.prepare('PRAGMA data_version'), // i18n-ignore: SQL
       dataVersion: 0,
       revision: 0,
+      transient: false,
+      leases: 0,
+      detached: false,
       poll: setInterval(() => pollOther(key), POLL_MS),
       presence: setInterval(() => markPresent(hive), HEARTBEAT_MS)
     }
@@ -803,7 +814,9 @@ export function closeBoard(path: string): void {
   } catch (e) {
     log.warn('bringing the board folder up to date', e)
   }
-  b.db.close()
+  // A save holding a lease on it goes on with this connection (#1383): closed as the save's lease ends.
+  if (b.leases > 0) b.detached = true
+  else b.db.close()
 }
 
 /** Closes every board (Hive quits). */
@@ -1480,11 +1493,65 @@ export function setArchiveBatches(ws: WorkspaceService, batches: ArchiveBatch[])
  * from files) as the board is. Their changes take the board's lock, so they never run inside one of its transactions.
  */
 export const workspaceDb = (workspacePath: string): Db => boardOf(workspacePath).db
+/** A lease on a workspace's database connection (leaseDb). */
+export interface DbLease {
+  db: Db
+  /** Whether the connection stays open once the lease ends (the workspace's board, not opened for leases alone). */
+  readonly kept: boolean
+  /** Ends the lease (once; again does nothing): the connection is closed if it was opened for leases, or closed while leased. */
+  release(): void
+}
+
 /**
- * workspaceDb for a save that closes the board again when it wasn't open before (`boardOpen` first): not fenced (#1379),
- * so a store's last save as its workspace closes still lands, leaving nothing open.
+ * The workspace database's connection for a save that may come as its workspace closes (a store's last save): not fenced
+ * (#1379), so it still lands, leaving nothing open. The lease owns that exact connection (#1383): a board opened for it
+ * is closed as its last lease ends unless a window has the workspace open by then (keepBoard), and a board closed meanwhile (its
+ * window closed, or closed and opened again) keeps this connection open for the lease, so its writer is never closed
+ * under it, and the lease never closes another opening's board.
  */
-export const transientDb = (workspacePath: string): Db => boardOf(workspacePath, true).db
+export function leaseDb(workspacePath: string): DbLease {
+  const b = boardOf(workspacePath, true)
+  b.leases++
+  let ended = false
+  return {
+    db: b.db,
+    get kept() {
+      return !b.detached && (!b.transient || held.has(keyOf(b.path)))
+    },
+    release() {
+      if (ended) return
+      ended = true
+      if (--b.leases > 0) return
+      if (b.detached) b.db.close()
+      // Whether a window has the workspace open is asked now, not when the lease began: one may have opened it since,
+      // before or after this board was opened, and uses this connection as its board.
+      else if (b.transient && !held.has(keyOf(b.path)) && boards.get(keyOf(b.path)) === b) closeBoard(b.path)
+    }
+  }
+}
+
+/** The workspaces a window has open (keepBoard): their boards are theirs, whoever opened them, and stay open as leases end. */
+const held = new Set<string>()
+
+/** A window opens the workspace (#1383): its board, open now or opened later by a lease, stays open as leases end. */
+export function keepBoard(workspacePath: string): void {
+  held.add(keyOf(workspacePath))
+}
+
+/** The window closes the workspace: its board is closed (closeBoard), and a lease from now on closes what it opens. */
+export function letGoBoard(workspacePath: string): void {
+  held.delete(keyOf(workspacePath))
+}
+
+/** Runs `fn` with a lease on the workspace database (leaseDb), ended after it, however it ends. */
+export async function withLeasedDb<T>(workspacePath: string, fn: (db: Db, lease: DbLease) => Promise<T> | T): Promise<T> {
+  const lease = leaseDb(workspacePath)
+  try {
+    return await fn(lease.db, lease)
+  } finally {
+    lease.release()
+  }
+}
 /** The lock the board's changes take, which the stores beside it take too. */
 export const boardLock = (workspacePath: string): string => `board-lock:${workspacePath}`
 /** Whether a workspace's database is open now (its workspace is, or something used it since). */
