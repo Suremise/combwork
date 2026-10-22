@@ -315,16 +315,18 @@ export function readCommitStream(err: string): CommitStream {
     if (open) open.text += t
     else own += t
   }
+  // The top git's session starts with its `version` event (trace2's first) and has no parent's prefix; a git a hook runs
+  // is `<parent>/<own>`. Only their records are events: any other record (a hook's own structured log, #1397) is text.
+  const ours = (ev: TraceEvent): boolean => (top === null ? ev.event === 'version' && !ev.sid.includes('/') : ev.sid === top || ev.sid.startsWith(`${top}/`))
   const lines = err.split('\n')
   lines.forEach((line, i) => {
     const nl = i < lines.length - 1 ? '\n' : ''
     const { text: t, ev } = splitTraceLine(line)
-    if (!ev) return add(t + nl)
+    if (!ev || !ours(ev)) return add(line + nl)
     // Text cut by an event (no newline of its own) keeps a line of its own.
     add(t ? `${t}\n` : '')
-    // The top git's session id has no parent's prefix; a git a hook runs is `<parent>/<own>`: its events are only
-    // dropped from the text, never a source.
-    if (top === null && !ev.sid.includes('/')) top = ev.sid
+    // A descendant's events are only dropped from the text, never a source.
+    top ??= ev.sid
     if (ev.sid !== top || ev.child_id === undefined) return
     if (ev.event === 'child_start') {
       const argv = ev.argv ?? []

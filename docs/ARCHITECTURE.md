@@ -296,7 +296,8 @@ with `commitEnv()` (no prompt: `GIT_TERMINAL_PROMPT=0` and the like) and, when t
 bound (`QueueConfig.signTimeoutMs`, Advanced `hive.queue.signSeconds`). The runner's `run`/`git` take `env` and
 `timeoutMs` and end the launcher's whole tree at the bound (`endTree`); without a config git, `gitTree` does the same.
 `commitEnv` sets `GIT_TRACE2_EVENT=2`, so git's trace2 events are in its stderr, in order with its hooks' and signer's
-text. `readCommitStream` splits that stream into validated events and text, and gives each piece of text to the top
+text. `readCommitStream` splits that stream into validated events of git's own session (the top git's, from its
+`version` record, and its descendants' `<top>/…`; any other record is text, #1397) and text, and gives each piece of text to the top
 git's child running then (a hook, the signer) or to git. `commitFailed` decides from the source each decision is about,
 never from the whole output:
 - at the bound, a pause by what ran then (`errAtTimeout`, the stream as of the timeout): `hookTimedOut` or
