@@ -570,9 +570,13 @@ export class Workflow {
     const builder = builderOpt ?? agentOf(actor) ?? 'user'
     const warnings: string[] = []
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(`${card.key} is blocked: ${s.blocked}`) // i18n-ignore: agent-facing warning in the spike's reply
-    const before = await this.evidenceOf(card, s, o)
+    // Its target's ref included, resolved as the plan resolves it (#1401: the default branch, when G7 is empty).
+    const before = await this.evidenceOf(card, s, o, builder)
     const plan = await this.platform(o).start(card, o, builder)
     if (isUnknown(plan)) return { rule: 'platform.unknown', values: { card: card.key, what: plan.whatText ?? plan.what, rule: 'start' } }
+    // Its target resolved again as it was planned (the builder worktree's base moved meanwhile): not what the evidence
+    // covers, so a change to it before the write would go unseen (#1401 round 2).
+    if (!this.platform(o).planCovered(before.primed, plan)) return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
     const { existing, ...planned } = plan
     const data: FactData['Started'] = { ...planned, builder, cardKind: card.kind }
     // Dependencies Done by facts, in this card's target (§16.7.4).
@@ -630,8 +634,8 @@ export class Workflow {
    * None's paths' hash) and the facts of the cards it waits for. Taken before the slow reads and again inside the
    * transaction (`evidenceChanged`), so nothing is written on evidence that changed meanwhile.
    */
-  async evidenceOf(card: CardRecord, s: CardState, o: WorkflowOptions): Promise<Evidence> {
-    const primed = await this.platform(o).prime(card, s, o)
+  async evidenceOf(card: CardRecord, s: CardState, o: WorkflowOptions, builder?: string): Promise<Evidence> {
+    const primed = await this.platform(o).prime(card, s, o, builder)
     const content = await this.platform(o).content(card, s, o, primed)
     return { primed, value: this.evidenceNow(card, s, o, primed), content }
   }

@@ -30,7 +30,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
+const until = (fn, ms) => lib.until(fn, ms, 150)
 const jsonl = (file) => {
   try {
     return fs.readFileSync(file, 'utf8').split('\n').flatMap((l) => {
@@ -93,25 +93,25 @@ const jsonl = (file) => {
     const quickTurn = async (text) => {
       fs.writeFileSync(hold, '')
       await inv('pty:write', key, text)
-      await until(async () => lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '').includes(text))
+      await until(async () => lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '').includes(text), HUNG_MS)
       await inv('pty:write', key, '\r')
-      const id = await until(() => turnOver(text))
+      const id = await until(() => turnOver(text), HUNG_MS)
       fs.rmSync(hold, { force: true })
       return id
     }
 
     const healthy = await quickTurn('say Healthy turn.')
-    check('a healthy quick turn, over before any check (held)', !!healthy && !!(await until(async () => (await live())?.status === 'finished')), (await live())?.status)
+    check('a healthy quick turn, over before any check (held)', !!healthy && !!(await until(async () => (await live())?.status === 'finished', HUNG_MS)), (await live())?.status)
     fs.writeFileSync(drop, '')
     const deaf = await quickTurn('say Deaf turn.')
     check('with its hooks lost, a quick marked turn, over before any check (held)', !!deaf)
-    const flagged = await until(async () => (await live())?.hooksMissing)
+    const flagged = await until(async () => (await live())?.hooksMissing, HUNG_MS)
     check("released, its events show the turn no hook came after: hooks missing by the transcript, naming that turn's interactionId", flagged?.after === 'transcript' && flagged?.turn === deaf && deaf !== healthy, JSON.stringify({ flagged, deaf, healthy }))
     fs.rmSync(drop, { force: true })
     await inv('pty:write', key, 'say Back again.')
-    await until(async () => lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '').includes('say Back again.'))
+    await until(async () => lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '').includes('say Back again.'), HUNG_MS)
     await inv('pty:write', key, '\r')
-    check('its hooks back, the next turn’s hook clears it', !!(await until(async () => !(await live())?.hooksMissing)), JSON.stringify((await live())?.hooksMissing))
+    check('its hooks back, the next turn’s hook clears it', !!(await until(async () => !(await live())?.hooksMissing, HUNG_MS)), JSON.stringify((await live())?.hooksMissing))
   } catch (e) {
     check('suite ran', false, e?.stack ?? String(e))
   } finally {
