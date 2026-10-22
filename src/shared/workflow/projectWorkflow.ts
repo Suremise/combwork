@@ -1,10 +1,11 @@
 // The one writer of project.json's `workflow` (SPEC §16.6.6, #1417): the form's Save, presets and Paste and the
 // Assistant's settings tool set a project's platform, preset and options through it, and every other field of `workflow`
 // (`kept` for the other platforms, #1419; `presetAsked`, #1423; a field a later Hive adds) stays as it was. Those fields
-// are written by helpers beside this one (`setKept`, the switch of platform), never by replacing the object.
+// are written by helpers beside this one (`setKept` for a switch of platform, `setPresetAsked` for the answer), never by
+// replacing the object.
 
 import type { PlatformId } from '../platform/descriptors'
-import type { ProjectWorkflow } from '../types'
+import type { PresetAsked, ProjectWorkflow } from '../types'
 
 /** What a save sets: the platform in force, the preset the options started from, and the options the project sets. */
 export type WorkflowWrite = Pick<ProjectWorkflow, 'platform' | 'preset' | 'options'>
@@ -39,4 +40,14 @@ export function setKept(current: ProjectWorkflow, to: PlatformId): ProjectWorkfl
     ...(back?.presetAsked ? { presetAsked: back.presetAsked } : {}),
     ...(Object.keys(others).length ? { kept: others } : {})
   }
+}
+
+/**
+ * `workflow` with the answer to "How do you work?" for the platform in force (#1423): `chosen` (a preset or options
+ * saved from the Workflow section) or `notNow`. Every other field is kept; a project with no `workflow` yet gets one with
+ * no preset and no options of its own, so it goes on inheriting.
+ */
+export function setPresetAsked(current: ProjectWorkflow | null | undefined, platform: PlatformId, answer: PresetAsked): ProjectWorkflow {
+  if (!current || current.platform !== platform) return { ...current, platform, preset: null, options: {}, presetAsked: answer }
+  return { ...current, presetAsked: answer }
 }

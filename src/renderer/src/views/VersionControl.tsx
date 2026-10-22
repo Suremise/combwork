@@ -11,7 +11,8 @@ import { WorkflowOptionsForm } from '../components/WorkflowOptions'
 import { ChangesTab } from './ProjectTabs'
 import { at, GitProblem, GitSetupNotes, HistorySection, useGitRead } from './GitTab'
 import { BranchesSection } from './GitBranches'
-import { VersionControlHeader } from './VersionControlHeader'
+import { useWorkflowForm, VersionControlHeader } from './VersionControlHeader'
+import { PresetStep } from '../components/PresetStep'
 
 /**
  * The project's Version Control tab (#1416, SPEC §16.6; the Git tab before 1.0, its id still `changes`): the header
@@ -36,17 +37,20 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
   const queues = useProjectQueues(project.path)
   const shown = vcSections(platform, queues ?? NO_QUEUES, Date.now())
   const section = vcSectionShown(useStore((st) => st.vcSection[project.path]), shown)
+  // The project's workflow form, read once: the header's preset, and "How do you work?" while it asks (#1423).
+  const form = useWorkflowForm(project)
   // None's page offers Initialise repository… while the folder has no repository of its own (none, or one around it).
   const noRepo = platform === 'none' && !!s && (!s.isRepo || !!s.parentRepo) && !s.gitProblem && !project.platform?.detected.other
   return (
     <div className="git-view vc-view" data-platform={platform}>
-      <VersionControlHeader project={project} platform={platform} />
+      <VersionControlHeader project={project} platform={platform} form={form} />
       {noRepo && (
         <div className="vc-init" data-vc-init="" {...(s?.parentRepo ? { 'data-git-parent': '' } : {})}>
           <InitRepoButton project={project} small {...(s?.parentRepo ? { label: tr(INIT_TEXT.ownRepoButton) } : {})} />
           <span className="hint">{tr(M.initHint)}</span>
         </div>
       )}
+      <PresetStep project={project} platform={platform} form={form} />
       <div className="git-head">
         <div className="segmented git-sections" role="tablist" aria-label={tr(M.tabs)}>
           {VC_SECTIONS.filter((x) => shown.includes(x.id)).map((x) => (

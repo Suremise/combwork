@@ -187,7 +187,7 @@ export function presetState(f: WorkflowForm): { state: 'preset' | 'custom' | 'no
 }
 
 /** The project's workflow form, read again when its saved options change (here, or by the Assistant's tool). */
-function useWorkflowForm(project: ProjectInfo): WorkflowForm | null {
+export function useWorkflowForm(project: ProjectInfo): WorkflowForm | null {
   const saved = JSON.stringify(project.config.workflow ?? null)
   const [form, setForm] = useState<{ for: string; form: WorkflowForm } | null>(null)
   useEffect(() => {
@@ -203,9 +203,9 @@ function useWorkflowForm(project: ProjectInfo): WorkflowForm | null {
   return form?.for === project.path ? form.form : null
 }
 
-export function VersionControlHeader({ project, platform }: { project: ProjectInfo; platform: PlatformId }) {
+/** `form`: the project's workflow form (useWorkflowForm), read once for the tab: its header and the preset step. */
+export function VersionControlHeader({ project, platform, form }: { project: ProjectInfo; platform: PlatformId; form: WorkflowForm | null }) {
   useLanguage()
-  const form = useWorkflowForm(project)
   const preset = form ? presetState(form) : null
   const [, redraw] = useState(0)
   // The offer says what Hive found, with its action: the fact line beside the choice waits until it's hidden (Not now).

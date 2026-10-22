@@ -176,6 +176,8 @@
   "tips.hiveSkills.title": "用于配合 Hive 工作的技能",
   "tips.hooksMissing.text": "如果 CLI 更新或策略使智能体的钩子无法到达 Hive，它的窗格会显示“状态未知”，而不是可能有误的状态，Hive 不会向它输入任何内容，它的通道会暂停。Hive 能判断原因时，窗格上方的横幅会说明原因。",
   "tips.hooksMissing.title": "当智能体的钩子不再到达时",
+  "tips.howDoYouWork.text": "新项目的“版本控制”标签页会询问“你如何工作？”：单人、结对或团队，并推荐适合其智能体的那个。选择即可一键设置；“暂不”则保留你的默认值。",
+  "tips.howDoYouWork.title": "用预设开始新项目",
   "tips.imagesTab.text": "“附件”标签页保存粘贴或拖入项目会话中的每张截图和每个文件，按会话分组，提供预览和按类型筛选，随时可以再次插入。",
   "tips.imagesTab.title": "你附加过的一切，集中在一处",
   "tips.improveTranslation.text": "发现你的语言中有生硬或错误的用词？“帮助”→“改进此翻译”会说明如何在 GitHub 上通过拉取请求修正它，或添加一种语言。",

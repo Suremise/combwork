@@ -22,6 +22,7 @@ import type { ProgressFilter } from '@shared/progress'
 import type { TemplateAgent, TemplateRef } from '@shared/templates'
 import type { GitTool } from '@shared/gitTool'
 import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, QuitScope, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkspaceUsage, RecentWorkspace } from '@shared/types'
+import type { PresetId } from '@shared/workflow/options'
 import type {
   AgentApiInfo,
   AgentInfo,
@@ -393,6 +394,10 @@ interface State {
   changesRoot: Record<string, string>
   /** Per project: the Version Control tab's section shown (#607, #1416; none: Changes for Git, Workflow for None). */
   vcSection: Record<string, VcSection>
+  /** "How do you work?"'s Customise… (#1423): the Workflow section opens with this preset filled in, not saved. */
+  workflowPrefill: { path: string; preset: PresetId } | null
+  /** Projects added from this window (Add Project, New Project): their Version Control tab shows the step, so no notice (#1423). */
+  presetStepShown: string[]
   /** Per project: bumped after a Git action in this window, so the Version Control tab and the status bar read git again. */
   gitVersion: Record<string, number>
   /** Per project: bumped when its unused worktrees change outside the list (a merge of one, #400): the list reloads. */
@@ -568,6 +573,8 @@ export const useStore = create<State>(() => ({
   tilePage: {},
   changesRoot: {},
   vcSection: {},
+  workflowPrefill: null,
+  presetStepShown: [],
   gitVersion: {},
   unusedVersion: {},
   filesRoot: {},
