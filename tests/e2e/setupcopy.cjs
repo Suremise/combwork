@@ -43,8 +43,8 @@ const codex = (lang) => ({
     {
       id: 'store-pwsh',
       level: 'warning',
-      message: words(lang, 'providers', 'providers.codex.storePwsh.warning'),
-      detail: [words(lang, 'providers', 'providers.codex.storePwsh.symptom'), words(lang, 'providers', 'providers.codex.storePwsh.fix')]
+      message: words(lang, 'providers', 'providers.codex.storePwsh.label'),
+      detail: [words(lang, 'providers', 'providers.codex.storePwsh.warning'), words(lang, 'providers', 'providers.codex.storePwsh.symptom'), words(lang, 'providers', 'providers.codex.storePwsh.fix')]
     }
   ]
 })

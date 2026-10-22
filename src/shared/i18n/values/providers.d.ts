@@ -47,6 +47,7 @@ interface HiveMessageValues {
   'providers.codex.sandbox.upgrade': undefined
   'providers.codex.sandbox.upgradeAction': undefined
   'providers.codex.storePwsh.fix': undefined
+  'providers.codex.storePwsh.label': undefined
   'providers.codex.storePwsh.symptom': undefined
   'providers.codex.storePwsh.warning': undefined
   'providers.codex.stray.message': { folder: string | number; files: string | number }
