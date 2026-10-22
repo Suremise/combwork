@@ -45,6 +45,7 @@
   "providers.codex.sandbox.upgrade": "**アップグレード**を押すと、Codexが既定のサンドボックスに切り替わり、自分のアカウントではなく別のWindowsアカウントでコマンドを実行します。Windowsが一度だけ管理者権限を求めます。実行中のCodexエージェントは、再起動するまで今のサンドボックスを使います。",
   "providers.codex.sandbox.upgradeAction": "アップグレード",
   "providers.codex.storePwsh.fix": "避けるには、PowerShell 7をStoreではなくインストーラーからインストールし（`winget install --id Microsoft.PowerShell --source winget`）、Store版をアンインストールしてから、HiveとそのCodexエージェントを再起動してください。Hiveがシェルを変更することはありません。",
+  "providers.codex.storePwsh.label": "Microsoft StoreのPowerShell 7がインストールされています",
   "providers.codex.storePwsh.symptom": "症状：Codexのコマンドが `CreateProcessAsUserW failed: 5`（アクセス拒否）ですぐに失敗し、PowerShell 7のウィンドウとコマンドをすべて閉じると再び動くようになります。",
   "providers.codex.storePwsh.warning": "Microsoft StoreのPowerShell 7が開いている間は、Codexエージェントのコマンドが失敗することがあります。CodexのWindowsサンドボックスは、そのPowerShellの別のコピーが実行中だと起動できません。",
   "providers.codex.stray.message": "{folder}には{files}があります。これはCodexの設定（config.toml、agents、rules）でも、設定が指すファイルでもありません。Codexはこのフォルダーを自分のものとして扱うため、関係のないファイル（エージェントの作業用ファイルやログ）があると、すべてのCodexエージェントのコマンドが失敗することがあります（「setup refresh had errors」）。それらのファイルをフォルダーの外に移動してください（作業用ファイルはプロジェクトの外に置きます）。Codexの設定はそのままにしてください。",

@@ -9,7 +9,7 @@ import { TerminalView } from './TerminalView'
 import { UpdateStatusRow } from './Updates'
 import { discardDrafts, saveAllDrafts, unsavedFiles } from './FileView'
 import type { ProviderId, ProviderTask, QuitChoice, QuitSession, SessionStatus, TestedCli } from '@shared/types'
-import { PROVIDERS, enabledProviders, installSourceText, isProviderEnabled, providerDescriptor } from '@shared/providers'
+import { PROVIDERS, enabledProviders, installSourceText, isProviderEnabled, providerDescriptor, shownText } from '@shared/providers'
 import { distinguishingParents } from '@shared/folderLabels'
 import { GIT_DOWNLOAD, GIT_MIN, gitFixText, gitOldText, gitProblemText } from '@shared/gitTool'
 import { testedNote, testedSummary } from '@shared/testedClis'
@@ -991,12 +991,12 @@ export function AgentSetupDialog() {
           {info.editorExtensionOnly && p.extensionNote && (
             <div className="banner info" style={{ borderRadius: 6, marginBottom: 10 }}>
               <Icon name="info" />
-              <span>{p.extensionNote}</span>
+              <span>{shownText(p.extensionNote, p.text?.extensionNote, tr)}</span>
             </div>
           )}
           {p.installNote && (
-            <p className="hint">
-              <CodeText text={p.installNote} />
+            <p className="hint" data-install-note>
+              <CodeText text={shownText(p.installNote, p.text?.installNote, tr)} />
             </p>
           )}
         </>
