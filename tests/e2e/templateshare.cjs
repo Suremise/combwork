@@ -111,7 +111,7 @@ const check = (name, ok, extra = '') => {
   await dialog.getByRole('button', { name: 'Continue' }).click()
   const confirmLoad = page.locator('.dialog', { hasText: 'Load "Team"?' })
   await confirmLoad.waitFor({ timeout: 5000 })
-  check("…then loading's confirmation, for the chosen project", (await confirmLoad.locator('.template-plan-removed li').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Old')
+  check("…then loading's confirmation, for the chosen project", (await confirmLoad.locator('.template-plan-table tbody tr[data-state="removed"]').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Old')
   // Its names are alpha's agents' (#702): marked, Load template greyed out until they are changed.
   const nameBoxes = (d) => d.locator('.template-plan-name-input')
   const loadOf = (d) => d.getByRole('button', { name: 'Load template' })

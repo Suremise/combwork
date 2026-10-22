@@ -51,7 +51,8 @@ function pathWithoutGit() {
   const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `unusedwt-${name}.png`) })
   const theme = async (t) => {
     await inv('settings:update', { appearance: { theme: t } })
-    await lib.sleep(300)
+    // The window shows it before a screenshot is taken (a condition, never a fixed wait).
+    if (!(await lib.until(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t), HUNG_MS))) throw new Error(`the window didn't show the ${t} theme`)
   }
   const toasts = async (re) => (await page.locator('.toast').allInnerTexts()).filter((t) => re.test(t)).length
   const branches = () => lib.git(repo, ['branch', '--format=%(refname:short)']).split(/\r?\n/).filter(Boolean)
@@ -93,6 +94,20 @@ function pathWithoutGit() {
   check('…Give to an agent… and Remove anyway…', (await aheadRow.getByRole('button', { name: 'Give to an agent…' }).count()) === 1 && (await aheadRow.getByRole('button', { name: 'Remove anyway…' }).count()) === 1)
   check('sizes are measured', !!(await lib.until(async () => /\d+(\.\d+)? (B|KB|MB)/.test(await mergedRow.innerText()), 15000)), await mergedRow.innerText())
   check('Remove all merged (1)…', (await section.getByRole('button', { name: 'Remove all merged (1)…' }).count()) === 1)
+  // No badge is ever cut (the Assistant's OK on #1314): each shows its whole text inside its cell, at every width.
+  const badgesWhole = () =>
+    page.evaluate(() => {
+      const badges = [...document.querySelectorAll('.unused-wt .unused-wt-badges .badge')]
+      return (
+        badges.length > 0 &&
+        badges.every((b) => {
+          const cell = b.closest('td').getBoundingClientRect()
+          const r = b.getBoundingClientRect()
+          return b.scrollWidth <= b.clientWidth + 1 && r.left >= cell.left - 0.5 && r.right <= cell.right + 0.5
+        })
+      )
+    })
+  check('…every state badge whole, none cut (1400 px)', !!(await lib.until(badgesWhole, HUNG_MS)))
   await shot('changes-list-dark')
   await theme('light')
   await shot('changes-list-light')
@@ -116,11 +131,50 @@ function pathWithoutGit() {
   let narrow = null
   check('a narrow window with Progress open: the list above the detail, which keeps the tab\'s width inside it (#906)', !!(await lib.until(async () => (narrow = await layout()) !== null && (await progressShown()) === 1 && narrow.split < 520 && narrow.stacked && narrow.inside && narrow.heading > 150 && !narrow.scrolls, HUNG_MS)), JSON.stringify(narrow))
   check('…its rows\' buttons can be clicked (none under Progress)', await aheadRow.getByRole('button', { name: 'Remove anyway…' }).click({ trial: true, timeout: HUNG_MS }).then(() => true, () => false))
+  // Each row stacks in the narrow pane (#1314), its buttons wrapping inside it, none cut off at either edge.
+  const buttonsInside = () =>
+    page.evaluate(() => {
+      const pane = document.querySelector('.unused-worktrees')?.getBoundingClientRect()
+      const buttons = [...document.querySelectorAll('.unused-wt .item-table-actions button')].map((b) => b.getBoundingClientRect())
+      return !!pane && buttons.length > 0 && buttons.every((b) => b.left >= pane.left - 0.5 && b.right <= pane.right + 0.5)
+    })
+  check('…every row’s buttons inside the pane', !!(await lib.until(buttonsInside, HUNG_MS)))
+  check('…every state badge whole there too', !!(await lib.until(badgesWhole, HUNG_MS)))
   await shot('changes-list-narrow')
   await command('progress.toggle')
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   let wide = null
   check('…a wide window: the list beside the detail again, at its own width', !!(await lib.until(async () => (wide = await layout()) !== null && (await progressShown()) === 0 && wide.beside && wide.list === 280 && wide.inside && !wide.scrolls, HUNG_MS)), JSON.stringify(wide))
+  // A very wide one (#1314): a line a worktree, its columns headed, its actions at the right edge, aligned.
+  await lib.fitWindow(app, page, { width: 1900, height: 900 })
+  const oneLine = () =>
+    page.evaluate(() => {
+      const rows = [...document.querySelectorAll('.unused-wt')].map((r) => r.getBoundingClientRect())
+      const head = document.querySelector('.unused-wt-table thead')
+      const actions = [...document.querySelectorAll('.unused-wt .item-table-actions')].map((a) => Math.round(a.getBoundingClientRect().right))
+      return rows.length === 2 && rows.every((r) => r.height < 36) && !!head && getComputedStyle(head).display !== 'none' && new Set(actions).size === 1
+    })
+  check('…wider still: a line a worktree under the column headings, actions aligned at the right', !!(await lib.until(oneLine, HUNG_MS)))
+  check('…every state badge whole there too', !!(await lib.until(badgesWhole, HUNG_MS)))
+  await shot('changes-list-wide-dark')
+  await theme('light')
+  await shot('changes-list-wide-light')
+  await theme('dark')
+  await lib.fitWindow(app, page, { width: 1400, height: 900 })
+
+  // Remove all merged's confirmation (#1314): the worktrees as a table, Branch · Folder (the folder's name, its path in full on hover).
+  await section.getByRole('button', { name: 'Remove all merged (1)…' }).click()
+  const mergedDialog = page.locator('.dialog', { hasText: 'Remove 1 merged worktree?' })
+  check('Remove all merged asks first, its worktrees as a table: Branch · Folder', !!(await lib.until(async () => (await mergedDialog.locator('.unused-merged-table').count()) === 1, HUNG_MS)) && (await mergedDialog.locator('.unused-merged-table thead th').allInnerTexts()).slice(0, 2).join('|') === 'BRANCH|FOLDER' && (await mergedDialog.locator('.unused-merged-table .short-path[data-path]').getAttribute('data-path')).toLowerCase() === merged.worktree.path.toLowerCase(), await mergedDialog.innerText().catch(() => ''))
+  // A long branch is cut in its cell: its full name is on hover (title), and the cell's text is the whole name (copy, screen readers).
+  const branchCell = mergedDialog.locator('.unused-merged-table tbody td:first-child strong')
+  check('…each branch whole on hover and in its text, however its cell cuts it', (await branchCell.getAttribute('title')) === merged.worktree.branch && (await branchCell.textContent()) === merged.worktree.branch, JSON.stringify({ title: await branchCell.getAttribute('title'), text: await branchCell.textContent(), branch: merged.worktree.branch }))
+  await shot('remove-merged-dark')
+  await theme('light')
+  await shot('remove-merged-light')
+  await theme('dark')
+  await mergedDialog.getByRole('button', { name: 'Cancel' }).click()
+  await lib.until(async () => (await mergedDialog.count()) === 0, HUNG_MS)
 
   // --- Open the unmerged one: its changes since it left main, and Merge (#400).
   await aheadRow.getByRole('button', { name: 'Open' }).click()

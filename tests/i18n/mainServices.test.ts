@@ -47,7 +47,7 @@ const { closedNotice, routeAppNotice, setFocusedHive } = await import('../../src
 const { apiEventFor } = await import('../../src/main/apiEvents')
 const { finishedApiTitle, finishedNotice } = await import('../../src/shared/bursts')
 const { DEFAULT_SETTINGS } = await import('../../src/shared/defaults')
-const { copyReport, moveOwner, owned } = await import('../../src/main/workspaceMove')
+const { blockerNames, copyReport, moveOwner, owned } = await import('../../src/main/workspaceMove')
 const { initRepo } = await import('../../src/main/gitInit')
 
 /** A German translation of the messages these tests show (the rest stays English). */
@@ -154,6 +154,19 @@ describe("Repair's report of a copy: whose it is, kept as data", () => {
       skipped: ["site: 1 file of Claude Code's for the Assistant already in D:/new/b1 with other content, not overwritten: a.jsonl."],
       failed: ["site: 1 file of Claude Code's for the Assistant couldn't be copied to D:/new/b1: b.jsonl. Repair tries them again."]
     })
+  })
+})
+
+describe("Repair's report of a recreate git's prune refused (#1313)", () => {
+  it('names the worktrees git would forget: an agent’s by its name, one Hive has no agent for by its folder', () => {
+    const trees = [
+      { agentName: 'Second', from: 'D:\\old\\ws.worktrees\\alpha\\second', to: null },
+      { agentName: 'Third', from: 'D:\\old\\ws.worktrees\\alpha\\third', to: 'D:\\new\\ws.worktrees\\alpha\\third' }
+    ]
+    expect(blockerNames(['d:\\old\\ws.worktrees\\alpha\\second'], trees)).toEqual(["Second's worktree"])
+    // git names only an unmanaged worktree (Second's registration is gone): never Second, whatever the plan says of it.
+    expect(blockerNames(['D:\\old\\external-blocker'], trees)).toEqual(['external-blocker'])
+    expect(blockerNames(['D:\\new\\ws.worktrees\\alpha\\third', '(lost)'], trees)).toEqual(["Third's worktree", '(lost)'])
   })
 })
 
