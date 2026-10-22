@@ -876,13 +876,40 @@ export const setInLeaveForTests = (fn: (() => Promise<void> | void) | null): voi
  * a window holds it. Else one read and one write, in one transaction, on a lease's connection under the board's lock (the
  * deliveries moved in first, as a load does, on that connection), with the saves' row checks: published nowhere and kept
  * by nobody (no store, no load under way), so its workspace's next open loads it. The workspace isn't admitted for it.
- * Only a new delivery (no replace, action, launch or hooks). Null: nothing saved, the workspace's upgrade to 1.0 waiting.
+ * A window that opened it and loaded the host meanwhile read the host before this write: its store is read again once the
+ * write has landed (loaded: reconcileLeft), so the delivery is offered from it as any other. Only a new delivery (no
+ * replace, action, launch or hooks). Null: nothing saved, the workspace's upgrade to 1.0 waiting.
  */
 export async function leaveDelivery(host: string, nd: NewDelivery): Promise<DeliveryRecord | null> {
   if (nd.replace || nd.action || nd.launching) throw new Error('A delivery left this way is a new one only') // i18n-ignore: a mistake in Hive's code, never shown
   if (!hostFenced(host)) return createDelivery(host, nd)
   const { meta, agentName } = checkedNew(host, nd)
   const place = await hostPlace(host)
+  const rec = await leftOnLease(host, place, nd, meta, agentName)
+  if (rec) await reconcileLeft(host)
+  return rec
+}
+
+/**
+ * A host loaded while a delivery was left on a lease (HR6's #1395 round 1: a window opened its workspace meanwhile): a
+ * load under way is awaited, then the store read again from what is committed, under its lock (after its transactions
+ * before, as a save that found another Hive's change does: reread), and its agents shown what waits. Not loaded: nothing.
+ */
+async function reconcileLeft(host: string): Promise<void> {
+  const k = keyOf(host)
+  await loading.get(k)?.catch(() => undefined)
+  const store = stores.get(k)
+  if (!store) return
+  try {
+    await locked(store, () => reread(store))
+    showAll(store)
+  } catch (e) {
+    log.warn('reading the deliveries again after one was left for them', e)
+  }
+}
+
+/** leaveDelivery's write: one transaction on a lease's connection, under the board's lock. */
+function leftOnLease(host: string, place: { workspace: string; scope: string }, nd: NewDelivery, meta: DeliveryRecord['meta'], agentName: string | undefined): Promise<DeliveryRecord | null> {
   return withLeasedDb(place.workspace, async (db) => {
     await inLeave?.()
     if (db.pending) return null

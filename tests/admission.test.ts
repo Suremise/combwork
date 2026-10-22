@@ -187,21 +187,34 @@ describe('deliveries (#1395)', () => {
     await w.close()
   })
 
-  it("a window opening the workspace while a delivery is left: the lease doesn't close the window's board, and the window has the delivery", async () => {
-    const ws = workspace()
-    const host = join(ws, 'proj')
-    deliveries.setInLeaveForTests(async () => {
-      deliveries.setInLeaveForTests(null)
-      await w.open(ws)
+  // HR6's round 1: the window's store read the host before the lease's write; once it lands the store has it too.
+  for (const how of ['loaded', 'loading'] as const) {
+    it(`a window opening the workspace and ${how === 'loaded' ? 'loading' : 'starting to load'} the host while a delivery is left: saved, and live in the window's store; the lease doesn't close the window's board`, async () => {
+      const ws = workspace()
+      const host = join(ws, 'proj')
+      let early: ReturnType<typeof deliveries.load> | null = null
+      deliveries.setInLeaveForTests(async () => {
+        deliveries.setInLeaveForTests(null)
+        await w.open(ws)
+        early = deliveries.load(host)
+        if (how === 'loaded') expect((await early).records).toEqual([])
+      })
+      const r = (await deliveries.leaveDelivery(host, delivery('while opening')))!
+      await early
+      expect(board.boardOpen(ws)).toBe(true)
+      expect(nothingOpen(ws)).toBe(false)
+      // Persisted, and in the store the window loaded (the same one, not a fresh load), waiting for its agent.
+      expect((await deliveries.savedForTests(host)).deliveries.map((x) => x.id)).toEqual([r.id])
+      expect(deliveries.deliveryNow(host, r.id)).toMatchObject({ state: 'queued', body: 'while opening' })
+      expect(await deliveries.load(host)).toBe(await early)
+      // A delivery made the ordinary way next takes the next id, beside it.
+      const next = await deliveries.createDelivery(host, delivery('after'))
+      expect(next.seq).toBe(r.seq + 1)
+      expect((await deliveries.deliveriesOf(host, 'b1')).map((x) => x.id)).toEqual([r.id, next.id])
+      await w.close()
+      expect(nothingOpen(ws)).toBe(true)
     })
-    const r = (await deliveries.leaveDelivery(host, delivery('while opening')))!
-    expect(board.boardOpen(ws)).toBe(true)
-    expect(nothingOpen(ws)).toBe(false)
-    // Nothing here loads the host's deliveries until asked (no initDeliveries): read once the lease has saved.
-    expect((await deliveries.deliveriesOf(host, 'b1')).map((x) => x.id)).toContain(r.id)
-    await w.close()
-    expect(nothingOpen(ws)).toBe(true)
-  })
+  }
 })
 
 describe('the usage worker (#1395)', () => {
