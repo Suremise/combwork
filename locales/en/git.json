@@ -547,6 +547,34 @@
     "defaultMessage": "Push {branch}",
     "description": "Title of the dialog that pushes a branch that tracks no remote branch yet."
   },
+  "git.pushTo.about": {
+    "defaultMessage": "{onBranch, select, yes {Pushes to the remote you choose, without changing what {branch} tracks: Push still goes where it went. Never forced: a branch the remote has newer commits on is refused, and named.} other {Pushes to the remote you choose, without changing what any branch tracks. Never forced: a branch the remote has newer commits on is refused, and named.}}",
+    "description": "The Push to form. {branch} is the branch checked out ({onBranch} is no when HEAD is detached). Push is the button of that name."
+  },
+  "git.pushTo.all": {
+    "defaultMessage": "All branches and tags",
+    "description": "A choice of the Push to form's drop-down: every local branch, then every tag."
+  },
+  "git.pushTo.button": {
+    "defaultMessage": "Push to…",
+    "description": "Button beside Push in Git → Branches & remotes: opens the Push to form (any remote, this branch or everything)."
+  },
+  "git.pushTo.thisBranch": {
+    "defaultMessage": "This branch ({branch})",
+    "description": "A choice of the Push to form's drop-down. {branch} is the branch checked out."
+  },
+  "git.pushTo.tip": {
+    "defaultMessage": "Push to any remote, {branch} or every branch and tag, without changing what {branch} tracks",
+    "description": "Tooltip on Push to…. {branch} is the branch checked out."
+  },
+  "git.pushTo.title": {
+    "defaultMessage": "Push to a remote",
+    "description": "Title of the Push to form."
+  },
+  "git.pushTo.what": {
+    "defaultMessage": "Push",
+    "description": "Label of the Push to form's drop-down: what to push (this branch, or every branch and tag)."
+  },
   "git.reading": {
     "defaultMessage": "Reading git…",
     "description": "A Git tab section while it reads git for the first time."
@@ -562,6 +590,58 @@
   "git.remote.changeTitle": {
     "defaultMessage": "Change {remote}'s URL",
     "description": "Title of the form that changes a remote's URL, and the tooltip of its button. {remote} is its name, such as origin."
+  },
+  "git.remote.removeButton": {
+    "defaultMessage": "Remove",
+    "description": "The button of the confirmation before removing a remote."
+  },
+  "git.remote.removeDetail": {
+    "defaultMessage": "Nothing on {remote} itself changes: its branches stay there, and you can add it again.",
+    "description": "The confirmation before removing a remote, under its list."
+  },
+  "git.remote.removeFailed": {
+    "defaultMessage": "Couldn't remove {remote}",
+    "description": "Title of an error notification."
+  },
+  "git.remote.removeMessage": {
+    "defaultMessage": "{n, plural, =0 {Hive forgets {remote} and its remote branches here. No branch tracks it.} one {Hive forgets {remote} and its remote branches here, and this branch stops tracking it:} other {Hive forgets {remote} and its remote branches here, and these # branches stop tracking it:}}",
+    "description": "The confirmation before removing the remote {remote}; the branches that track it ({n}) follow, one per line."
+  },
+  "git.remote.removeTip": {
+    "defaultMessage": "Remove {remote}…",
+    "description": "Tooltip on a remote's remove button. {remote} is its name."
+  },
+  "git.remote.removeTitle": {
+    "defaultMessage": "Remove the remote {remote}?",
+    "description": "Title of the confirmation before removing a remote."
+  },
+  "git.remote.removing": {
+    "defaultMessage": "Removing…",
+    "description": "The Remove button while it runs."
+  },
+  "git.remote.renameButton": {
+    "defaultMessage": "Rename",
+    "description": "The button of the dialog that renames a remote."
+  },
+  "git.remote.renameFailed": {
+    "defaultMessage": "Couldn't rename {remote}",
+    "description": "Title of an error notification."
+  },
+  "git.remote.renameMessage": {
+    "defaultMessage": "Branches tracking it follow the new name. Nothing changes on the remote itself.",
+    "description": "The dialog that renames a remote."
+  },
+  "git.remote.renameTip": {
+    "defaultMessage": "Rename {remote}…",
+    "description": "Tooltip on a remote's rename button. {remote} is its name, such as origin."
+  },
+  "git.remote.renameTitle": {
+    "defaultMessage": "Rename {remote}",
+    "description": "Title of the dialog that renames a remote. {remote} is its name now."
+  },
+  "git.remote.taken": {
+    "defaultMessage": "There is a remote called {remote} already",
+    "description": "Under the rename dialog's box: another remote has that name."
   },
   "git.remotes.add": {
     "defaultMessage": "Add remote…",
@@ -826,6 +906,50 @@
   "git.tool.tooOldToRun": {
     "defaultMessage": "Hive's git commands fail with Git {version}: worktrees, merging, the Git tab and the unmerged counts don't work.",
     "description": "Agent Setup, for a git too old for any of Hive's git commands. {version} is its version."
+  },
+  "git.track.about": {
+    "defaultMessage": "{tracks, select, yes {{branch} tracks {upstream} now. Pull and Push use the remote branch it tracks; other remotes stay as they are, and Push to… still pushes there.} other {{branch} tracks no remote branch now. Pull and Push use the remote branch it tracks; other remotes stay as they are, and Push to… still pushes there.}}",
+    "description": "The Track form. {branch} is the local branch; {upstream} the remote branch it tracks now ({tracks} is no when none). Pull, Push and Push to… are buttons: keep their names."
+  },
+  "git.track.button": {
+    "defaultMessage": "Track",
+    "description": "The Track form's button."
+  },
+  "git.track.pushFirst": {
+    "defaultMessage": "{remote} has no {branch} yet, as of the last fetch: Track pushes {local} there first (never forced).",
+    "description": "Under the Track form when the chosen remote branch isn't known to exist. {remote} the remote, {branch} the branch name there, {local} the local branch."
+  },
+  "git.track.remoteBranch": {
+    "defaultMessage": "Remote branch",
+    "description": "Field of the Track form: the branch's name on the remote."
+  },
+  "git.track.tip": {
+    "defaultMessage": "Track…: choose the remote branch {branch} pulls from and pushes to",
+    "description": "Tooltip on a branch's Track… button. {branch} is the local branch."
+  },
+  "git.track.title": {
+    "defaultMessage": "What {branch} tracks",
+    "description": "Title of the Track form. {branch} is the local branch."
+  },
+  "git.untrack.button": {
+    "defaultMessage": "Stop tracking",
+    "description": "The button of the confirmation before a branch stops tracking its remote branch."
+  },
+  "git.untrack.failed": {
+    "defaultMessage": "Couldn't stop {branch} tracking {upstream}",
+    "description": "Title of an error notification."
+  },
+  "git.untrack.message": {
+    "defaultMessage": "{branch} no longer tracks a remote branch: Pull has nothing to pull from, and Push asks where to push it. Nothing changes on the remote.",
+    "description": "The confirmation before a branch stops tracking its remote branch. Pull and Push are buttons: keep their names."
+  },
+  "git.untrack.tip": {
+    "defaultMessage": "Stop tracking {upstream}…",
+    "description": "Tooltip on a branch's stop-tracking button. {upstream} is the remote branch it tracks."
+  },
+  "git.untrack.title": {
+    "defaultMessage": "Stop {branch} tracking {upstream}?",
+    "description": "Title of the confirmation before a branch stops tracking its remote branch."
   },
   "git.upstream.gone": {
     "defaultMessage": "upstream gone",

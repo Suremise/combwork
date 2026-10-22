@@ -45,6 +45,8 @@
   "workspace.antivirus.devUntrustedTip": "Un Dev Drive que no es de confianza: Defender lo analiza como cualquier otra unidad.",
   "workspace.antivirus.dontAsk": "No volver a preguntar",
   "workspace.antivirus.folder": "Carpeta",
+  "workspace.antivirus.goneHint": "{n, plural, one {Hive excluyó esta carpeta, que ya no existe (se movió o se eliminó). «Quitar las exclusiones de Hive…» también la quita.} other {Hive excluyó estas carpetas, que ya no existen (se movieron o se eliminaron). «Quitar las exclusiones de Hive…» también las quita.}}",
+  "workspace.antivirus.goneTitle": "Exclusiones de Hive de carpetas que ya no existen",
   "workspace.antivirus.hidden": "Defender solo muestra sus exclusiones a los administradores, así que Hive no puede verlas sin pedirlo.",
   "workspace.antivirus.holdsHome": "es o contiene tu carpeta personal, tu perfil o una carpeta del sistema",
   "workspace.antivirus.kindTests": "El área de pruebas de Hive (para desarrollar Hive)",

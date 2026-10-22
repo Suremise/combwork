@@ -61,7 +61,36 @@ export interface GitBranchRow {
   /** Its last commit's time (ms). */
   date: number
   subject: string
+  /** The remote its upstream is on (#1385: Remove remote names the branches tracking it), or null: none, or a local branch. */
+  upstreamRemote?: string | null
 }
+
+/** What a push did to one ref (#1385), from `git push --porcelain`. */
+export interface PushedRef {
+  /** The branch or tag as the remote has it (refs/heads/ and refs/tags/ left off). */
+  name: string
+  kind: 'branch' | 'tag' | 'other'
+  result: 'pushed' | 'upToDate' | 'refused'
+}
+
+/**
+ * `git push --porcelain`'s lines, one per ref (`<flag>\t<from>:<to>\t<summary>`): `=` up to date, `!` refused (rejected
+ * by the remote, or not a fast-forward: Hive never forces), anything else pushed. Other lines (To …, Done) are skipped.
+ */
+export function parsePushPorcelain(out: string): PushedRef[] {
+  const refs: PushedRef[] = []
+  for (const line of out.split(/\r?\n/)) {
+    const m = /^([ +\-*!=])\t[^\t]*:([^\t]+)\t/.exec(line)
+    if (!m) continue
+    const to = m[2]
+    const kind = to.startsWith('refs/heads/') ? 'branch' : to.startsWith('refs/tags/') ? 'tag' : 'other'
+    refs.push({ name: to.replace(/^refs\/(heads|tags)\//, ''), kind, result: m[1] === '=' ? 'upToDate' : m[1] === '!' ? 'refused' : 'pushed' })
+  }
+  return refs
+}
+
+/** What Push to… pushes (#1385): the branch checked out, or every branch and tag. */
+export type PushScope = 'branch' | 'all'
 
 export interface GitWorktreeRow {
   path: string

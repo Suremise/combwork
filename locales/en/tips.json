@@ -595,6 +595,14 @@
     "defaultMessage": "Make a project a git repository in one click",
     "description": "A tip's title."
   },
+  "tips.gitRemotes.text": {
+    "defaultMessage": "Git → Branches & remotes: Push to… sends this branch, or every branch and tag, to any remote without changing what the branch tracks. A remote can be renamed or removed there, and a branch's Track… chooses what Pull and Push use.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.gitRemotes.title": {
+    "defaultMessage": "Push to a backup remote",
+    "description": "A tip's title."
+  },
   "tips.gitView.text": {
     "defaultMessage": "The Git tab shows its branch, remotes, history and tags, and lets you switch or create a branch, fetch, pull, push, tag and set its commit identity. The status bar shows \"{example}\": click it to get there.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {example} is the status bar's git item as Hive shows it (\"main · origin · ↑2 ↓0\": the branch, its remote, and how many commits it is ahead and behind)."

@@ -1,4 +1,4 @@
-import { Children, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Children, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 import {
@@ -16,6 +16,7 @@ import {
   parentRepoText,
   remoteNameProblem,
   remoteUrlProblem,
+  type GitBranchRow,
   type GitFolderAction,
   type GitHistory,
   type GitRepoInfo,
@@ -159,6 +160,38 @@ const M = {
   namePlaceholder: msg({ id: 'git.identity.namePlaceholder', defaultMessage: 'Your Name', description: "Placeholder in the commit identity form's name box: an example name." }),
   save: msg({ id: 'git.identity.save', defaultMessage: 'Save', description: "The commit identity form's button." }),
   saving: msg({ id: 'git.identity.saving', defaultMessage: 'Saving…', description: "The commit identity form's button while it runs." }),
+  // Push to…, remotes' Rename and Remove, a branch's Track… and Stop tracking (#1385).
+  pushToButton: msg({ id: 'git.pushTo.button', defaultMessage: 'Push to…', description: 'Button beside Push in Git → Branches & remotes: opens the Push to form (any remote, this branch or everything).' }),
+  pushToTip: msg({ id: 'git.pushTo.tip', defaultMessage: 'Push to any remote, {branch} or every branch and tag, without changing what {branch} tracks', description: 'Tooltip on Push to…. {branch} is the branch checked out.' }),
+  pushToTitle: msg({ id: 'git.pushTo.title', defaultMessage: 'Push to a remote', description: 'Title of the Push to form.' }),
+  pushToAbout: msg({ id: 'git.pushTo.about', defaultMessage: '{onBranch, select, yes {Pushes to the remote you choose, without changing what {branch} tracks: Push still goes where it went. Never forced: a branch the remote has newer commits on is refused, and named.} other {Pushes to the remote you choose, without changing what any branch tracks. Never forced: a branch the remote has newer commits on is refused, and named.}}', description: 'The Push to form. {branch} is the branch checked out ({onBranch} is no when HEAD is detached). Push is the button of that name.' }),
+  pushWhat: msg({ id: 'git.pushTo.what', defaultMessage: 'Push', description: "Label of the Push to form's drop-down: what to push (this branch, or every branch and tag)." }),
+  pushThisBranch: msg({ id: 'git.pushTo.thisBranch', defaultMessage: 'This branch ({branch})', description: "A choice of the Push to form's drop-down. {branch} is the branch checked out." }),
+  pushAll: msg({ id: 'git.pushTo.all', defaultMessage: 'All branches and tags', description: "A choice of the Push to form's drop-down: every local branch, then every tag." }),
+  renameRemoteTip: msg({ id: 'git.remote.renameTip', defaultMessage: 'Rename {remote}…', description: "Tooltip on a remote's rename button. {remote} is its name, such as origin." }),
+  renameRemoteTitle: msg({ id: 'git.remote.renameTitle', defaultMessage: 'Rename {remote}', description: 'Title of the dialog that renames a remote. {remote} is its name now.' }),
+  renameRemoteMessage: msg({ id: 'git.remote.renameMessage', defaultMessage: 'Branches tracking it follow the new name. Nothing changes on the remote itself.', description: 'The dialog that renames a remote.' }),
+  rename: msg({ id: 'git.remote.renameButton', defaultMessage: 'Rename', description: 'The button of the dialog that renames a remote.' }),
+  remoteTaken: msg({ id: 'git.remote.taken', defaultMessage: 'There is a remote called {remote} already', description: "Under the rename dialog's box: another remote has that name." }),
+  renameRemoteFailed: msg({ id: 'git.remote.renameFailed', defaultMessage: "Couldn't rename {remote}", description: 'Title of an error notification.' }),
+  removeRemoteFailed: msg({ id: 'git.remote.removeFailed', defaultMessage: "Couldn't remove {remote}", description: 'Title of an error notification.' }),
+  removeRemoteTip: msg({ id: 'git.remote.removeTip', defaultMessage: 'Remove {remote}…', description: "Tooltip on a remote's remove button. {remote} is its name." }),
+  removeRemoteTitle: msg({ id: 'git.remote.removeTitle', defaultMessage: 'Remove the remote {remote}?', description: 'Title of the confirmation before removing a remote.' }),
+  removeRemoteMessage: msg({ id: 'git.remote.removeMessage', defaultMessage: '{n, plural, =0 {Hive forgets {remote} and its remote branches here. No branch tracks it.} one {Hive forgets {remote} and its remote branches here, and this branch stops tracking it:} other {Hive forgets {remote} and its remote branches here, and these # branches stop tracking it:}}', description: 'The confirmation before removing the remote {remote}; the branches that track it ({n}) follow, one per line.' }),
+  removeRemoteDetail: msg({ id: 'git.remote.removeDetail', defaultMessage: 'Nothing on {remote} itself changes: its branches stay there, and you can add it again.', description: 'The confirmation before removing a remote, under its list.' }),
+  remove: msg({ id: 'git.remote.removeButton', defaultMessage: 'Remove', description: 'The button of the confirmation before removing a remote.' }),
+  removing: msg({ id: 'git.remote.removing', defaultMessage: 'Removing…', description: 'The Remove button while it runs.' }),
+  trackTip: msg({ id: 'git.track.tip', defaultMessage: 'Track…: choose the remote branch {branch} pulls from and pushes to', description: "Tooltip on a branch's Track… button. {branch} is the local branch." }),
+  trackTitle: msg({ id: 'git.track.title', defaultMessage: 'What {branch} tracks', description: 'Title of the Track form. {branch} is the local branch.' }),
+  trackAbout: msg({ id: 'git.track.about', defaultMessage: '{tracks, select, yes {{branch} tracks {upstream} now. Pull and Push use the remote branch it tracks; other remotes stay as they are, and Push to… still pushes there.} other {{branch} tracks no remote branch now. Pull and Push use the remote branch it tracks; other remotes stay as they are, and Push to… still pushes there.}}', description: 'The Track form. {branch} is the local branch; {upstream} the remote branch it tracks now ({tracks} is no when none). Pull, Push and Push to… are buttons: keep their names.' }),
+  remoteBranch: msg({ id: 'git.track.remoteBranch', defaultMessage: 'Remote branch', description: "Field of the Track form: the branch's name on the remote." }),
+  trackPushFirst: msg({ id: 'git.track.pushFirst', defaultMessage: '{remote} has no {branch} yet, as of the last fetch: Track pushes {local} there first (never forced).', description: "Under the Track form when the chosen remote branch isn't known to exist. {remote} the remote, {branch} the branch name there, {local} the local branch." }),
+  track: msg({ id: 'git.track.button', defaultMessage: 'Track', description: "The Track form's button." }),
+  untrackTip: msg({ id: 'git.untrack.tip', defaultMessage: 'Stop tracking {upstream}…', description: "Tooltip on a branch's stop-tracking button. {upstream} is the remote branch it tracks." }),
+  untrackTitle: msg({ id: 'git.untrack.title', defaultMessage: 'Stop {branch} tracking {upstream}?', description: 'Title of the confirmation before a branch stops tracking its remote branch.' }),
+  untrackFailed: msg({ id: 'git.untrack.failed', defaultMessage: "Couldn't stop {branch} tracking {upstream}", description: 'Title of an error notification.' }),
+  untrackMessage: msg({ id: 'git.untrack.message', defaultMessage: '{branch} no longer tracks a remote branch: Pull has nothing to pull from, and Push asks where to push it. Nothing changes on the remote.', description: 'The confirmation before a branch stops tracking its remote branch. Pull and Push are buttons: keep their names.' }),
+  untrack: msg({ id: 'git.untrack.button', defaultMessage: 'Stop tracking', description: 'The button of the confirmation before a branch stops tracking its remote branch.' }),
   statusBarTip: msg({ id: 'git.statusBar.tip', defaultMessage: 'Git branch of the selected project', description: "Tooltip on the status bar's git item before git has been read." })
 }
 
@@ -393,6 +426,8 @@ function BranchesSection({ project }: { project: ProjectInfo }) {
   const { busy, run } = useBusy()
   const [form, setForm] = useState<OpenForm | null>(null)
   const [showRemote, setShowRemote] = useState(false)
+  // The info as last read: an open form (Track…'s note) reads it, not what was read when it opened (#1385).
+  const latest = useRef<GitRepoInfo | null>(null)
   useNow(60000)
 
   const act = (name: string, title: string, fn: () => Promise<string>): void => void run(name, () => gitAction(project, title, fn))
@@ -438,6 +473,47 @@ function BranchesSection({ project }: { project: ProjectInfo }) {
     if (go === 'push') act('push', tr(M.pushFailed, { branch: s.branch ?? '' }), () => call('git:push', project.path, remote))
   }
 
+  const renameRemote = async (name: string, remotes: string[]): Promise<void> => {
+    const next = await prompt({
+      title: tr(M.renameRemoteTitle, { remote: name }),
+      message: tr(M.renameRemoteMessage),
+      initial: name,
+      confirmLabel: tr(M.rename),
+      validate: (v) => remoteNameProblem(v) ?? (remotes.some((x) => x !== name && x.toLowerCase() === v.trim().toLowerCase()) ? tr(M.remoteTaken, { remote: v.trim() }) : null)
+    })
+    if (next && next.trim() !== name) act(`remote:${name}`, tr(M.renameRemoteFailed, { remote: name }), () => call('git:renameRemote', project.path, name, next.trim()))
+  }
+
+  /**
+   * Removes a remote after a confirm naming every branch that stops tracking it (read from main, never the view's capped
+   * list); main refuses it if that set changed meanwhile. Run with the dialog open: a failure stays in it.
+   */
+  const removeRemote = async (name: string): Promise<void> => {
+    const tracking = await attempt(tr(M.removeRemoteFailed, { remote: name }), () => call('git:remoteTracking', project.path, name))
+    if (!tracking) return
+    await confirm({
+      title: tr(M.removeRemoteTitle, { remote: name }),
+      message: tr(M.removeRemoteMessage, { remote: name, n: tracking.length }),
+      ...(tracking.length ? { list: tracking, listMono: true } : {}),
+      detail: tr(M.removeRemoteDetail, { remote: name }),
+      confirmLabel: tr(M.remove),
+      busyLabel: tr(M.removing),
+      danger: true,
+      run: async () => {
+        try {
+          notify('success', await call('git:removeRemote', project.path, name, tracking))
+        } finally {
+          bumpGit(project.path)
+        }
+      }
+    })
+  }
+
+  const untrack = async (branch: string, upstream: string): Promise<void> => {
+    const ok = await confirm({ title: tr(M.untrackTitle, { branch, upstream }), message: tr(M.untrackMessage, { branch }), confirmLabel: tr(M.untrack) })
+    if (ok) act(`track:${branch}`, tr(M.untrackFailed, { branch, upstream }), () => call('git:setUpstream', project.path, branch, null))
+  }
+
   const editRemote = async (name: string, url: string): Promise<void> => {
     const next = await prompt({ title: tr(M.changeUrlTitle, { remote: name }), initial: url, confirmLabel: tr(M.change), validate: remoteUrlProblem })
     // An https URL shows with its password hidden: unchanged, nothing to save.
@@ -447,6 +523,7 @@ function BranchesSection({ project }: { project: ProjectInfo }) {
   return (
     <Loading read={read} what={tr(M.branchesLoad)}>
       {(info: GitRepoInfo) => {
+        latest.current = info
         const s = info.summary
         // Inside another repository (a workspace kept in git): shown, never changed here.
         const ro = parentRepoText(s)
@@ -520,6 +597,15 @@ function BranchesSection({ project }: { project: ProjectInfo }) {
                     </BusyButton>
                   </span>
                 </Tooltip>
+                {s.remotes.length > 0 && (
+                  <Tooltip content={ro ?? (!s.head ? tr(M.pushNoCommits) : tr(M.pushToTip, { branch: s.branch ?? '' }))}>
+                    <span>
+                      <button className="btn small" data-action="push-to" disabled={!s.head || off} onClick={() => setForm({ make: () => pushToForm(project, s) })}>
+                        <Icon name="repo-push" /> {tr(M.pushToButton)}
+                      </button>
+                    </span>
+                  </Tooltip>
+                )}
                 <Tooltip content={!s.head ? tr(M.commitFirst) : tr(M.branchAt, { commit: s.head })}>
                   <span>
                     <button className="btn small" data-action="new-branch" disabled={!s.head || off} onClick={() => void newBranch(s)}>
@@ -549,6 +635,12 @@ function BranchesSection({ project }: { project: ProjectInfo }) {
                     )}
                     <span className="git-subject faint">{b.subject}</span>
                     <span className="git-meta faint">{at(b.date)}</span>
+                    {info.remotes.length > 0 && (
+                      <span className="git-row-actions">
+                        <IconButton icon={busy === `track:${b.name}` ? 'loading' : 'link'} spin={busy === `track:${b.name}`} title={tr(M.trackTip, { branch: b.name })} action="track" disabled={off} onClick={() => setForm({ make: () => trackForm(project, latest.current ?? info, b) })} />
+                        {b.upstream && <IconButton icon="debug-disconnect" title={tr(M.untrackTip, { upstream: b.upstream })} action="untrack" disabled={off} onClick={() => void untrack(b.name, b.upstream!)} />}
+                      </span>
+                    )}
                     {!b.current && (
                       <Tooltip content={why ?? tr(M.switchTip, { branch: b.name })}>
                         <span>
@@ -603,6 +695,8 @@ function BranchesSection({ project }: { project: ProjectInfo }) {
                       {r.pushUrl && r.pushUrl !== r.fetchUrl && <span className="faint"> {tr(M.pushesTo, { url: r.pushUrl })}</span>}
                     </span>
                     <IconButton icon="edit" title={tr(M.changeUrlTitle, { remote: r.name })} disabled={off} onClick={() => void editRemote(r.name, r.fetchUrl)} />
+                    <IconButton icon="whole-word" title={tr(M.renameRemoteTip, { remote: r.name })} action="rename-remote" disabled={off} onClick={() => void renameRemote(r.name, info.remotes.map((x) => x.name))} />
+                    <IconButton icon="trash" title={tr(M.removeRemoteTip, { remote: r.name })} action="remove-remote" disabled={off} onClick={() => void removeRemote(r.name)} />
                   </div>
                 ))}
               </div>
@@ -704,6 +798,8 @@ interface FormSpec {
   confirm: string
   busyLabel: string
   validate: (v: Record<string, string>) => string | null
+  /** What to know about the values as they are (Track…'s push first, #1385), under the fields; null for nothing. */
+  note?: (v: Record<string, string>) => string | null
   submit: (v: Record<string, string>) => Promise<string>
   project: ProjectInfo
 }
@@ -726,7 +822,9 @@ function GitForm({ make, onClose }: { make: () => FormSpec; onClose: () => void 
     const r = await run('submit', () => spec.submit(values))
     bumpGit(spec.project.path)
     if (!r) return
-    notify('success', r.value)
+    // A reply of several lines (Push to…'s outcomes) is a notice with its first line as the title.
+    const [head, ...rest] = r.value.split('\n')
+    notify('success', head, rest.length ? rest.join('\n') : undefined)
     onClose()
   }
   return (
@@ -754,6 +852,7 @@ function GitForm({ make, onClose }: { make: () => FormSpec; onClose: () => void 
         ))}
       </div>
       {problem && Object.values(values).some((v) => v.trim()) && <div className="field-error">{problem}</div>}
+      {!problem && spec.note?.(values) && <p className="hint git-form-note">{spec.note(values)}</p>}
     </Modal>
   )
 }
@@ -806,6 +905,49 @@ function remoteForm(project: ProjectInfo): FormSpec {
     busyLabel: tr(M.adding),
     validate: (v) => remoteNameProblem(v.name) ?? remoteUrlProblem(v.url),
     submit: (v) => call('git:addRemote', project.path, v.name.trim(), v.url.trim())
+  }
+}
+
+/** Push to… (#1385): a remote (another than the branch's own first) and what: this branch, or every branch and tag. */
+function pushToForm(project: ProjectInfo, s: GitRepoSummary): FormSpec {
+  const first = s.remotes.find((r) => r !== s.upstream?.remote) ?? s.remotes[0] ?? ''
+  return {
+    project,
+    title: tr(M.pushToTitle),
+    icon: 'repo-push',
+    about: tr(M.pushToAbout, { onBranch: s.branch ? 'yes' : 'no', branch: s.branch ?? '' }),
+    fields: [
+      { key: 'remote', label: tr(M.remote), initial: first, options: s.remotes.map((r) => ({ label: r, value: r })) },
+      { key: 'scope', label: tr(M.pushWhat), initial: s.branch ? 'branch' : 'all', options: [...(s.branch ? [{ label: tr(M.pushThisBranch, { branch: s.branch }), value: 'branch' }] : []), { label: tr(M.pushAll), value: 'all' }] }
+    ],
+    confirm: tr(M.push),
+    busyLabel: tr(M.pushing),
+    validate: (v) => (v.remote ? null : tr(M.pushNoRemote)),
+    // The branch the form names, as it named it when opened: never whichever is checked out when Push runs.
+    submit: (v) => call('git:pushTo', project.path, v.remote, v.scope === 'all' ? 'all' : 'branch', v.scope === 'all' ? undefined : (s.branch ?? undefined))
+  }
+}
+
+/** Track… (#1385): the remote and its branch (the same name by default); one not known there is pushed there first, said. */
+function trackForm(project: ProjectInfo, info: GitRepoInfo, b: GitBranchRow): FormSpec {
+  const remotes = info.remotes.map((r) => r.name)
+  const initial = b.upstreamRemote && remotes.includes(b.upstreamRemote) ? b.upstreamRemote : remotes.includes('origin') ? 'origin' : (remotes[0] ?? '')
+  const onRemote = b.upstream && b.upstreamRemote ? b.upstream.slice(b.upstreamRemote.length + 1) : b.name
+  const known = (v: Record<string, string>): boolean => info.remoteBranches.includes(`${v.remote}/${v.branch.trim()}`)
+  return {
+    project,
+    title: tr(M.trackTitle, { branch: b.name }),
+    icon: 'link',
+    about: tr(M.trackAbout, { branch: b.name, tracks: b.upstream ? 'yes' : 'no', upstream: b.upstream ?? '' }),
+    fields: [
+      { key: 'remote', label: tr(M.remote), initial, options: remotes.map((r) => ({ label: r, value: r })) },
+      { key: 'branch', label: tr(M.remoteBranch), initial: onRemote, placeholder: b.name }
+    ],
+    confirm: tr(M.track),
+    busyLabel: tr(M.saving),
+    validate: (v) => (!v.branch.trim() ? tr(M.enterName) : /\s/.test(v.branch.trim()) ? tr(M.branchNoSpaces) : null),
+    note: (v) => (known(v) ? null : tr(M.trackPushFirst, { remote: v.remote, branch: v.branch.trim(), local: b.name })),
+    submit: (v) => call('git:setUpstream', project.path, b.name, v.remote, v.branch.trim(), !known(v))
   }
 }
 
