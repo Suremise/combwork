@@ -41,7 +41,7 @@
   "main.gitInit.failed.staged": ".hive was staged, so nothing was committed",
   "main.gitInit.fix.commit": "{git}. Commit in a terminal, or ask an agent to",
   "main.gitInit.fix.identity": "{which, select, name {enter it and choose Make first commit} email {enter it and choose Make first commit} other {enter them and choose Make first commit}}",
-  "main.gitInit.fix.ignored": "fix that, then choose Make first commit on the Git tab",
+  "main.gitInit.fix.ignored": "fix that, then choose Make first commit in the Version Control tab",
   "main.gitInit.fix.staged": "check the .gitignore for a rule that brings .hive back",
   "main.gitInit.nested": "This folder is inside the git repository in {root}. Confirm that you want a repository of its own inside it.",
   "main.gitInit.noEmail": "Git has no email to make the first commit as: enter one.",

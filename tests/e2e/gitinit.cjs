@@ -1,8 +1,10 @@
-// Initialise repository (#701): a project that isn't a git repository becomes one from its Git tab, then gets an agent
-// with a worktree straight away, an empty project (an empty first commit) too. The Git tab's "isn't a git repository" page has an Initialise repository… button; its
+// Initialise repository (#701): a project that isn't a git repository becomes one from its Version Control tab (#1416:
+// None's page, under the header), then gets an agent with a worktree straight away, an empty project (an empty first
+// commit) too. None's page says the folder has no version control and has an Initialise repository… button; its
 // dialog offers a starter .gitignore and, as git has no identity here, asks for the name and email; Initialise makes the
 // repository on main with a first commit (the .gitignore and the project's files, never .hive) and saves the identity to
-// that repository's config only, not the global one. The Git tab then shows the branch, and an agent added in a new
+// that repository's config only, not the global one. Git then reads the branch (the project stays None until it is
+// switched, #1419), and an agent added in a new
 // worktree gets its folder and branch. Git's global config is the suite's own, with no identity (GIT_CONFIG_GLOBAL), and
 // no system config (GIT_CONFIG_NOSYSTEM). Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
@@ -54,11 +56,11 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitini
     // Hive made the project's .hive when it opened the workspace: it must stay out of the first commit.
     check('the project has a .hive', !!(await lib.until(() => fs.existsSync(path.join(proj, '.hive')), HUNG_MS)))
 
-    // --- The Git tab of a project without git: the setup notes and the button.
+    // --- The Version Control tab of a project without git: None's page, its fact line and the button.
     await page.getByText('fresh', { exact: true }).first().click()
-    await page.locator('.tabs .tab', { hasText: 'Git' }).click()
-    const notes = page.locator('[data-git-setup]')
-    check("the Git tab says it isn't a repository", !!(await lib.until(async () => /fresh isn't a git repository/.test(await text(notes)), HUNG_MS)), await text(notes))
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    const notes = page.locator('[data-vc-init]')
+    check('the tab says the folder has no version control, with Initialise repository…', !!(await lib.until(async () => /has no version control/.test(await text(page.locator('[data-vc-fact]'))) && (await notes.locator('[data-git-init]').count()) === 1, HUNG_MS)), await text(page.locator('.vc-view')))
     await notes.locator('[data-git-init]').click()
     const dialog = page.locator('.dialog', { hasText: 'Initialise fresh as a git repository' })
     const form = dialog.locator('[data-git-init-form]')
@@ -73,7 +75,6 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitini
     await initialise.click()
 
     // --- The repository: main, one commit with the files and the .gitignore, never .hive or node_modules.
-    const head = page.locator('[data-git-branches] [data-git-head]')
     check('the dialog closes', !!(await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)), await text(dialog))
     check('the folder is a repository on main with a first commit', !!(await lib.until(() => fs.existsSync(path.join(proj, '.git')), HUNG_MS)) && g(proj, 'symbolic-ref', '--short', 'HEAD') === 'main' && g(proj, 'rev-list', '--count', 'HEAD') === '1')
     const files = g(proj, 'ls-tree', '-r', '--name-only', 'HEAD').split('\n').sort()
@@ -82,9 +83,10 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitini
     check('and not to the global config', fs.readFileSync(globalConfig, 'utf8') === GLOBAL)
     check('git ignores .hive', g(proj, 'status', '--porcelain', '--untracked-files=all') === '')
 
-    // --- The Git tab works at once.
-    await page.locator('.git-sections button', { hasText: 'Branches' }).click()
-    check('the Git tab shows the branch', !!(await lib.until(async () => (await text(head)) === 'main', HUNG_MS)), await text(head))
+    // --- Git works at once: it reads the branch, and None's page no longer offers Initialise (the Git sections come
+    // with the switch to Git, #1419).
+    check('git reads the branch', !!(await lib.until(async () => (await inv('git:summary', proj))?.branch === 'main', HUNG_MS)))
+    check("None's page no longer offers Initialise", !!(await lib.until(async () => (await notes.count()) === 0, HUNG_MS)), await text(notes))
     await shot(page, '2-initialised')
 
     // --- An agent in a new worktree works straight away.
@@ -98,9 +100,9 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitini
 
     // --- An empty project: no starter .gitignore, an empty first commit, and a worktree from it.
     await page.getByText('blank', { exact: true }).first().click()
-    await page.locator('.tabs .tab', { hasText: 'Git' }).click()
-    const blankNotes = page.locator('[data-git-setup]')
-    check("the empty project's Git tab offers Initialise", !!(await lib.until(async () => /blank isn't a git repository/.test(await text(blankNotes)) && (await blankNotes.locator('[data-git-init]').count()) === 1, HUNG_MS)), await text(blankNotes))
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    const blankNotes = page.locator('[data-vc-init]')
+    check("the empty project's Version Control tab offers Initialise", !!(await lib.until(async () => (await blankNotes.locator('[data-git-init]').count()) === 1, HUNG_MS)), await text(page.locator('.vc-view')))
     await blankNotes.locator('[data-git-init]').click()
     const blankDialog = page.locator('.dialog', { hasText: 'Initialise blank as a git repository' })
     check('it says the first commit is an empty one', !!(await lib.until(async () => /an empty first commit/.test(await text(blankDialog.locator('[data-git-init-form]'))), HUNG_MS)), await text(blankDialog))
@@ -120,8 +122,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitini
     fs.writeFileSync(globalConfig, `${GLOBAL}[includeIf "gitdir/i:${ws.replace(/\\/g, '/')}/.git"]\n\tpath = ${outerId.replace(/\\/g, '/')}\n`)
     g(ws, 'init', '-q', '-b', 'main')
     await page.getByText('late', { exact: true }).first().click()
-    await page.locator('.tabs .tab', { hasText: 'Git' }).click()
-    await page.locator('.git-sections button', { hasText: 'Branches' }).click()
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
     const parent = page.locator('[data-git-parent]')
     check('a project inside the workspace repository offers its own', !!(await lib.until(async () => (await parent.locator('[data-git-init]').count()) === 1, HUNG_MS)), await text(parent))
     await parent.locator('[data-git-init]').click()

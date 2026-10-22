@@ -715,15 +715,15 @@ function projectProviderRows(p: ProviderDescriptor): Row[] {
 export const PROJECT_KEY_DESC = msg({ id: 'settings.project.key.desc', defaultMessage: 'The 2 to 4 letters this project’s cards are named by, as in {example}. If you change it, the old key still finds them.', description: 'What the setting "Project key" does, under its title (Project Settings → Agents & Worktrees). {example} is a card name with the project\'s own key, such as WB-12.' })
 
 /**
- * Project Settings → Workflow (#1278): the form is one row (the section draws it), and each option a row of its own for
- * the Assistant's settings tool (`project.workflow.<option>`), not drawn apart. Values the version doesn't offer yet are
+ * Project Settings → Workflow (#1278): one row, a link to the form in the Version Control tab (#1416), and each option a
+ * row of its own for the Assistant's settings tool (`project.workflow.<option>`), not drawn apart. Values the version doesn't offer yet are
  * refused when saved (options.ts `notOffered`), as contradictions are.
  */
 function workflowRows(): Row[] {
   const option = (key: OptionKey, type: SettingControl, options?: [string, TextPart][]): Row => ({ section: 'workflow', key: `workflow.${key}`, workflow: key, title: OPTION_TEXT[key]!.title, desc: OPTION_TEXT[key]!.desc, type, ...(options ? { options: [INHERIT, ...options.map(([value, label]) => ({ value, label }))] } : {}), hidden: true })
   const V = VALUE_TEXT
   return [
-    { section: 'workflow', key: 'workflow', title: msg({ id: 'settings.project.workflow.title', defaultMessage: 'Workflow options', description: "A setting's title (Project Settings → Workflow): the project's workflow options (glossary 2.1), a form of their own." }), desc: msg({ id: 'settings.project.workflow.desc', defaultMessage: 'Pick a preset, or set each option. Each shows where its value comes from.', description: 'What the setting "Workflow options" is, under its title (Project Settings → Workflow).' }), type: 'custom', wide: true },
+    { section: 'workflow', key: 'workflow', title: msg({ id: 'settings.project.workflow.title', defaultMessage: 'Workflow options', description: "A setting's title (Project Settings → Workflow): the project's workflow options (glossary 2.1), a form of their own." }), desc: msg({ id: 'settings.project.workflow.moved', defaultMessage: 'Who reviews, which checks pass first and who merges: they are set in the project’s Version Control tab, under Workflow.', description: 'What the setting "Workflow options" is, under its title (Project Settings → Workflow), beside its Open Version Control button. Version Control (the tab) and Workflow (its section): glossary 2.1.' }), type: 'custom' },
     option('review', 'select', [['none', V.review.none], ['agent', V.review.agent], ['agentThenYou', V.review.agentThenYou], ['you', V.review.you]]),
     option('reviewers', 'select', [['1', '1'], ['2', '2']]),
     option('noSelfReview', 'boolean'),

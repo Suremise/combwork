@@ -44,11 +44,11 @@ const who = ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.ident
     const facts = async (n, kind) => (await h.facts(n)).filter((x) => x.kind === kind)
 
     // --- The form: G8 beside G9 while Hive merges; saved through the form.
-    await lib.openProjectSettings(h.page)
-    await h.page.locator('.settings-nav .row', { hasText: 'Workflow' }).click()
+    await h.page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    await h.page.locator('.git-sections [data-section="workflow"]').click()
     const section = h.page.locator('.workflow-form')
     const row = section.locator('.workflow-option[data-option="strict"]')
-    check('Project Settings → Workflow offers G8 while Hive merges', !!(await waitHung(async () => (await row.count()) === 1)) && (await row.innerText()).includes('Work is up to date with its target branch before it merges'), await section.innerText().catch(() => ''))
+    check('Version Control → Workflow offers G8 while Hive merges', !!(await waitHung(async () => (await row.count()) === 1)) && (await row.innerText()).includes('Work is up to date with its target branch before it merges'), await section.innerText().catch(() => ''))
     await row.scrollIntoViewIfNeeded()
     await row.locator('[role="switch"], input[type="checkbox"]').first().click()
     await section.getByRole('button', { name: 'Save…' }).click()

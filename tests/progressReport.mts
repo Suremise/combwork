@@ -1,12 +1,12 @@
 // Hive's own test runners show in the Progress panel of the Hive that launched the agent running them (#137): the e2e
-// runner (tests/e2e/run.mjs) one step per suite, the unit tests (a Vitest reporter, vitest.config.ts) one per file, each
+// runner (tests/e2e/run.mjs) one step per suite, the scenarios runner (tests/scenarios/run.mjs) one per trial, the unit tests (a Vitest reporter, vitest.config.ts) one per file, each
 // with an estimate from how long they took before (kept under %LOCALAPPDATA%\hive-test, never in the repo). Only when the
 // Hive variables are set and Hive answers; never changes a result. Run under hive-progress, they print step lines for its
 // run instead of reporting their own (one row). Off with --no-progress (e2e) or HIVE_PROGRESS=0. To remove it: delete this
 // file and its two hooks.
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { estimateFor, ProgressRun, progressTarget, recordTiming, wrappedLines } from '../src/main/progressReporters/report.mts'
+import { estimateFor, ProgressRun, progressTarget, recordTiming, wrappedLines, type ProgressTarget } from '../src/main/progressReporters/report.mts'
 
 // Only the parts of Vitest's reporter API used here (no import from vitest: plain Node loads this file for run.mjs).
 interface TestModule {
@@ -55,6 +55,47 @@ export function e2eProgress(names: string[], argv: string[] = process.argv): { s
       if (ok) recordTiming(timings(), `e2e:${name}`, ms)
     },
     /** logPath: the run's record or logs, for its details in the panel. */
+    finish: (ok: boolean, summary?: string, logPath?: string) => run.finish(ok, summary, undefined, logPath ? { logPath } : {})
+  }
+}
+
+/** What a scenarios run reports to: the Hive's Agent API, or step lines for the hive-progress it runs under. */
+export interface ProgressIo {
+  target: ProgressTarget | null
+  lines?: (line: string) => void
+}
+
+/**
+ * The scenarios runner's run (tests/scenarios/run.mjs, #1457): one step per trial (a scenario, or one sample of it),
+ * named with the results so far ("work-on-card · 11 ok, 1 failed"), so a run of an hour shows it moving and never goes
+ * stale. `start(i, name)` as each begins, `done(id, ms, outcome)` as each ends (an ok trial's time kept for the next
+ * run's estimate, by provider), `finish(ok, summary, logPath)`.
+ */
+export function scenariosProgress(names: string[], provider: string, argv: string[] = process.argv, io: ProgressIo = { target: progressTarget(), lines: wrappedLines() }): { start(i: number, name: string): void; done(id: string, ms: number, outcome: 'ok' | 'failed' | 'skipped'): void; finish(ok: boolean, summary?: string, logPath?: string): Promise<void> } {
+  if (!names.length || argv.includes('--no-progress') || (!io.target && !io.lines)) return { start() {}, done() {}, finish: async () => {} }
+  const key = (id: string): string => `scenario:${provider}:${id}`
+  const estimates = names.map((n) => estimateFor(timings(), key(n)))
+  const counts = { ok: 0, failed: 0, skipped: 0 }
+  const so = (): string => {
+    const parts = [...(counts.ok ? [`${counts.ok} ok`] : []), ...(counts.failed ? [`${counts.failed} failed`] : []), ...(counts.skipped ? [`${counts.skipped} skipped`] : [])]
+    return parts.length ? ` · ${parts.join(', ')}` : ''
+  }
+  const run = new ProgressRun(io.target, {
+    title: `scenarios: ${names.length} (${provider})`,
+    total: names.length,
+    step: 0,
+    estimateMs: remaining(estimates, 0),
+    command: `npm run scenarios${argv.length ? ` -- ${argv.join(' ')}` : ''}`
+  }, { lines: io.lines })
+  return {
+    start(i: number, name: string) {
+      const left = remaining(estimates, i)
+      run.update({ step: i, stepName: `${name}${so()}`, ...(left !== undefined ? { estimateMs: left } : {}) })
+    },
+    done(id: string, ms: number, outcome: 'ok' | 'failed' | 'skipped') {
+      counts[outcome]++
+      if (outcome === 'ok') recordTiming(timings(), key(id), ms)
+    },
     finish: (ok: boolean, summary?: string, logPath?: string) => run.finish(ok, summary, undefined, logPath ? { logPath } : {})
   }
 }

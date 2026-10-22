@@ -97,6 +97,9 @@ function dbOf(file: string): Db {
   return db
 }
 
+/** The files it has open, by spelling, lower-cased (its code run in main's thread, in unit tests). */
+export const openFiles = (): string[] => [...dbs.keys()]
+
 /** Closes every file it has open (its code run in main's thread, in unit tests: so a test can delete its folder). */
 export function closeAll(): void {
   for (const db of dbs.values()) db.close()

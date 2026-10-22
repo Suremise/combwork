@@ -193,6 +193,7 @@ interface HiveMessageValues {
   'git.section.changes': undefined
   'git.section.history': undefined
   'git.section.queue': undefined
+  'git.section.workflow': undefined
   'git.setup.howTo': undefined
   'git.setup.learnMore': undefined
   'git.setup.notRepo': { project: string | number }
@@ -208,7 +209,6 @@ interface HiveMessageValues {
   'git.switch.message': { current: string | number; branch: string | number }
   'git.switch.tip': { branch: string | number }
   'git.switch.title': { project: string | number; branch: string | number }
-  'git.tab.sections': undefined
   'git.tags.about': { onBranch: string; branch: string | number }
   'git.tags.busy': undefined
   'git.tags.create': undefined
@@ -260,6 +260,19 @@ interface HiveMessageValues {
   'git.validate.notUrl': undefined
   'git.validate.remoteName': undefined
   'git.validate.wholeUrl': undefined
+  'git.vc.choice': undefined
+  'git.vc.fact.gone': undefined
+  'git.vc.fact.none': undefined
+  'git.vc.fact.other': { vcs: string | number }
+  'git.vc.fact.repo': { root: string | number }
+  'git.vc.fact.subfolder': { root: string | number }
+  'git.vc.git': undefined
+  'git.vc.initHint': undefined
+  'git.vc.none': undefined
+  'git.vc.otherTip': undefined
+  'git.vc.sections': undefined
+  'git.vc.workflow': { platform: string | number; state: string; preset: string | number }
+  'git.vc.workflowTip': undefined
   'git.worktree.agent': { agent: string | number }
   'git.worktree.badge': undefined
   'git.worktree.unused': undefined

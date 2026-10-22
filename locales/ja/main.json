@@ -41,7 +41,7 @@
   "main.gitInit.failed.staged": ".hiveがステージされていたため、何もコミットしていません",
   "main.gitInit.fix.commit": "{git}。ターミナルでコミットするか、エージェントに依頼してください",
   "main.gitInit.fix.identity": "{which, select, name {名前を入力して「最初のコミットを作成」を選んでください} email {メールアドレスを入力して「最初のコミットを作成」を選んでください} other {名前とメールアドレスを入力して「最初のコミットを作成」を選んでください}}",
-  "main.gitInit.fix.ignored": "修正してから、「Git」タブで「最初のコミットを作成」を選んでください",
+  "main.gitInit.fix.ignored": "修正してから、「バージョン管理」タブで「最初のコミットを作成」を選んでください",
   "main.gitInit.fix.staged": ".hiveを対象に戻すルールがないか、.gitignoreを確認してください",
   "main.gitInit.nested": "このフォルダーは{root}のgitリポジトリの中にあります。その中に別のリポジトリを作成する場合は、確認してください。",
   "main.gitInit.noEmail": "最初のコミットに使うメールアドレスがgitに設定されていません。入力してください。",

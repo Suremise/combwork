@@ -102,7 +102,7 @@ describe('git missing or too old', () => {
     expect(gitOldText('2.37.0')).toBe(`With Git 2.37.0: ${base}.`)
     expect(gitOldText('2.29.0')).toBe(`With Git 2.29.0: ${base}; moving a workspace can't repair its worktrees.`)
     expect(gitOldText('2.26.0')).toBe(`With Git 2.26.0: ${base}; Remove All and loading a template keep the branches of the worktrees they remove; moving a workspace can't repair its worktrees.`)
-    expect(gitOldText('2.16.0')).toBe("Hive's git commands fail with Git 2.16.0: worktrees, merging, the Git tab and the unmerged counts don't work.")
+    expect(gitOldText('2.16.0')).toBe("Hive's git commands fail with Git 2.16.0: worktrees, merging, the Version Control tab's Git sections and the unmerged counts don't work.")
   })
 
   it("stays English for the main process's errors, whatever the window's language", () => {

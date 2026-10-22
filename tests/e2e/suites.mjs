@@ -261,6 +261,7 @@ export const SUITES = [
   { name: 'unusedwt' },
   { name: 'update' },
   { name: 'upgradelane' },
+  { name: 'versioncontrol' },
   { name: 'viewer' },
   { name: 'wakepaste' },
   { name: 'wakepaste-codex', needs: ['codex'] },

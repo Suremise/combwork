@@ -588,7 +588,7 @@
     "description": "A tip's title (glossary: For you)."
   },
   "tips.gitCheck.text": {
-    "defaultMessage": "Help → Agent Setup… shows the git Hive found and its version. Worktree agents, merging and the Git tab need Git for Windows 2.38 or later.",
+    "defaultMessage": "Help → Agent Setup… shows the git Hive found and its version. Worktree agents, merging and the Version Control tab’s Git sections need Git for Windows 2.38 or later.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.gitCheck.title": {
@@ -596,7 +596,7 @@
     "description": "A tip's title."
   },
   "tips.gitInit.text": {
-    "defaultMessage": "A project without git? Its Git tab's Initialise repository… makes it one on main, keeps .hive out, adds a starter .gitignore if you like and makes the first commit, so agents can work in worktrees at once.",
+    "defaultMessage": "A project without git? Its Version Control tab's Initialise repository… makes it one on main, keeps .hive out, adds a starter .gitignore if you like and makes the first commit, so agents can work in worktrees at once.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.gitInit.title": {
@@ -612,7 +612,7 @@
     "description": "A tip's title."
   },
   "tips.gitView.text": {
-    "defaultMessage": "The Git tab shows its branch, remotes, history and tags, and lets you switch or create a branch, fetch, pull, push, tag and set its commit identity. The status bar shows \"{example}\": click it to get there.",
+    "defaultMessage": "In a Git project, the Version Control tab shows its branch, remotes, history and tags, and lets you switch or create a branch, fetch, pull, push, tag and set its commit identity. The status bar shows \"{example}\": click it to get there.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {example} is the status bar's git item as Hive shows it (\"main · origin · ↑2 ↓0\": the branch, its remote, and how many commits it is ahead and behind)."
   },
   "tips.gitView.title": {
@@ -676,7 +676,7 @@
     "description": "A tip's title."
   },
   "tips.hiveMerges.text": {
-    "defaultMessage": "In Project Settings → Workflow, choose Pair, or set Who merges to Hive merges: Hive’s merge queue merges each approved card once its checks pass on the merged result, so red work never reaches the target branch.",
+    "defaultMessage": "In Version Control → Workflow, choose Pair, or set Who merges to Hive merges: Hive’s merge queue merges each approved card once its checks pass on the merged result, so red work never reaches the target branch.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: merge queue)."
   },
   "tips.hiveMerges.title": {
@@ -868,7 +868,7 @@
     "description": "A tip's title."
   },
   "tips.mergeStrict.text": {
-    "defaultMessage": "With Hive merging, Project Settings → Workflow can have work up to date with its target before it merges: the merge queue updates a card in its own folder, never on the builder’s branch, and the review still counts if it’s the same change.",
+    "defaultMessage": "With Hive merging, Version Control → Workflow can have work up to date with its target before it merges: the merge queue updates a card in its own folder, never on the builder’s branch, and the review still counts if it’s the same change.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: merge queue, builder, review."
   },
   "tips.mergeStrict.title": {
@@ -1308,7 +1308,7 @@
     "description": "A tip's title."
   },
   "tips.teamPreset.text": {
-    "defaultMessage": "Team, in Project Settings → Workflow, is Pair with stricter checks: the unit tests pass before review and on the merged result, dependencies are installed from scratch before every merge, and cards labelled ui or release wait for your OK.",
+    "defaultMessage": "Team, in Version Control → Workflow, is Pair with stricter checks: the unit tests pass before review and on the merged result, dependencies are installed from scratch before every merge, and cards labelled ui or release wait for your OK.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Team, Pair)."
   },
   "tips.teamPreset.title": {
@@ -1439,6 +1439,14 @@
     "defaultMessage": "Tidy kept worktrees",
     "description": "A tip's title."
   },
+  "tips.versionControlTab.text": {
+    "defaultMessage": "A project’s Version Control tab says what Hive found in its folder, and starts with Workflow: who reviews, which checks pass first and who merges. Its header names the preset, and a click on it opens them.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Version Control, Workflow, preset)."
+  },
+  "tips.versionControlTab.title": {
+    "defaultMessage": "One tab for version control and workflow",
+    "description": "A tip's title (glossary 2.1: version control, workflow)."
+  },
   "tips.viewerTokens.text": {
     "defaultMessage": "An app that shows what your agents are doing, such as Apiary, needs only a viewer token: Settings → Agent API → Viewer tokens makes one that can read everything and change nothing, and revokes it again.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1448,7 +1456,7 @@
     "description": "A tip's title."
   },
   "tips.workflowOptions.text": {
-    "defaultMessage": "Project Settings → Workflow sets who reviews a card’s work, which checks pass first and who merges it. Pick a preset, or set each option: a change applies from the next card that starts.",
+    "defaultMessage": "Version Control → Workflow sets who reviews a card’s work, which checks pass first and who merges it. Pick a preset, or set each option: a change applies from the next card that starts.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.workflowOptions.title": {

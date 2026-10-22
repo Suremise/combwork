@@ -690,7 +690,7 @@
   "settings.project.transcriptWarnMB.off": "Nie",
   "settings.project.transcriptWarnMB.tip": "Eine lange Unterhaltung verlangsamt die CLI und Hive; die Arbeit an eine neue Unterhaltung zu übergeben macht sie wieder kurz.",
   "settings.project.transcriptWarnMB.title": "Warnen, wenn ein Transkript größer ist als",
-  "settings.project.workflow.desc": "Wähle eine Voreinstellung oder lege jede Option einzeln fest. Jede zeigt, woher ihr Wert kommt.",
+  "settings.project.workflow.moved": "Wer reviewt, welche Checks vorher bestehen und wer mergt, legst du im Tab „Versionsverwaltung“ des Projekts unter „Workflow“ fest.",
   "settings.project.workflow.title": "Workflow-Optionen",
   "settings.project.worktreeCopy.desc": "Von Git ignorierte Dateien, die aus dem Projektordner in einen neuen Worktree kopiert werden, etwa .env-Dateien. Ein Muster pro Zeile; leer übernimmt Einstellungen → Agenten & Worktrees → In neue Worktrees kopieren.",
   "settings.project.worktreeCopy.tip": "Ein neuer Worktree bekommt nur die Dateien, die Git verfolgt. Muster ohne Schrägstrich passen überall auf einen Datei- oder Ordnernamen (z. B. .env*), mit Schrägstrich auf einen Pfad ab dem Projektstamm (z. B. config/local.json). Große Ordner wie node_modules erzeugt besser der Einrichtungsbefehl neu.",

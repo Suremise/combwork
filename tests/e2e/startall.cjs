@@ -257,7 +257,7 @@ const check = (name, ok, extra = '') => {
   }
   const project = await menuItems('Project')
   const tabs = project.filter((t) => t.startsWith('Go to '))
-  check('the Project menu lists the 12 tabs in the strip order, and Project Settings', JSON.stringify(tabs) === JSON.stringify(['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'Files', 'Attachments', 'Git', 'Memory', 'Skills', 'Templates', 'MCP', 'Project Settings'].map((t) => `Go to ${t}`)), JSON.stringify(tabs))
+  check('the Project menu lists the 12 tabs in the strip order, and Project Settings', JSON.stringify(tabs) === JSON.stringify(['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'Files', 'Attachments', 'Version Control', 'Memory', 'Skills', 'Templates', 'MCP', 'Project Settings'].map((t) => `Go to ${t}`)), JSON.stringify(tabs))
   check('and Explorer and Terminal', project.some((t) => /Explorer/.test(t)) && project.some((t) => /Terminal/.test(t)), JSON.stringify(project))
   const session = await menuItems('Session')
   check('the Session menu has Start New (3)… and Archive and Start New (3)…', session.includes('Start New (3)…') && session.includes('Archive and Start New (3)…') && session.includes('Archive Session and Start New…'), JSON.stringify(session))

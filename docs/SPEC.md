@@ -1573,6 +1573,22 @@ options, this section), then for Git the platform's own sections: Changes, Histo
 next to its card and the revision under review), and the **merge queue** (§16.9) [#1122]. The whole page changes
 with the selection [#1112 down].
 
+**Built [#1416], the tab's shell:** the tab (id `changes`, Alt+8, "Go to Version Control") is `VersionControl.tsx`:
+its header (`VersionControlHeader.tsx`) shows the recorded platform as a **None · Git** choice (the other value
+disabled, its tooltip saying Hive offers a switch when it detects one: switching is #1419's), §16.3.5's fact line
+(a Git repository at its root; a subfolder, whose branch and merge actions affect the whole repository; no version
+control; another system found, so None; the repository gone), and **Workflow: Git · Team** (· Custom (from Team), ·
+no preset chosen, from `workflow:form`), which opens Workflow. The sections (`VC_SECTIONS`, `vcSections` in
+`gitRepo.ts`, kept per project while Hive runs) are Workflow, then Git's Changes, History, Branches & remotes
+(`GitBranches.tsx`) and Merge queue (#1357's section, placed as it was); a project opens at Changes for Git and at
+Workflow for None. **None's page:** Workflow, with Initialise repository… under the header while the folder has no
+repository; and **Merge queue while an old Git ruleset's queue is still there**, by #1356's actual-state rule
+(`queueShown`: an entry testing or queued, a pause, a return not seen yet, a runner, or a card in flight whose own
+ruleset has Hive merge), with its controls and the links to it, until that state is clear. The section list is a pure
+function of the platform and that state. Workflow hosts P4's form (§16.6.6's Built note) unchanged until #1418;
+Project Settings → Workflow keeps one row, **Open Version Control**, and the hidden `project.workflow.*` rows stay for
+`hive_update_setting`. The presets notice's **Choose…** opens the first project's tab at Workflow.
+
 **Labels below are the agreed English** [#1117 c "outcome wording first"; OP-2, agreed 20 Oct], translated once
 into the 7 locales per `locales/glossary-1.0.md` §2.6.
 
@@ -1691,7 +1707,8 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
 - The resolved options and their origins are readable by agents (`hive_project_status`) and settable by the user, and
   by the Assistant within Control (as settings are, `hive_update_setting`), never by project agents [note §3].
 - **Export**: a project's options can be copied as JSON from the tab and pasted into another project (OP-5).
-- **Built [#1278], P4's plain form** (§16.19), until the Version Control tab replaces it:
+- **Built [#1278], P4's plain form** (§16.19), until the Version Control tab replaces it (since #1416 it is the tab's
+  Workflow section, and Project Settings → Workflow links to it):
   - **Project Settings → Workflow** shows the version control (detected, read-only), a preset choice and a row per
     option this version offers (§16.19.1): Git's G1–G7, G9 and G10–G14 and G16 (G11's own folder is the builder's
     worktree), None's N1–N4 and N6. N7 (file locks) and the Card loops rounds and wait are shown read-only with a link

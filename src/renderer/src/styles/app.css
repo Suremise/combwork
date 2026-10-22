@@ -11301,6 +11301,87 @@ button.progress-run-show:focus-visible {
   flex-shrink: 0;
   min-width: 0;
 }
+/* The Version Control tab's header (#1416): None · Git, what Hive finds in the folder, and "Workflow: Git · Team". */
+/*
+ * None · Git, the fact line and the workflow link: one row, the fact line taking the room left and wrapping inside it,
+ * so the link stays top right on every page; in a narrow tab the fact line has a row of its own under them.
+ */
+.vc-view {
+  container-type: inline-size;
+}
+.vc-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'choice fact link';
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 14px 6px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.vc-choice {
+  grid-area: choice;
+}
+@container (max-width: 560px) {
+  .vc-head {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: 'choice link' 'fact fact';
+  }
+}
+.vc-choice .vc-choice-off {
+  opacity: 0.55;
+  cursor: default;
+}
+.vc-choice .vc-choice-off:hover {
+  background: transparent;
+  color: var(--fg-muted);
+}
+.vc-fact {
+  grid-area: fact;
+  font-size: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.vc-fact.caution {
+  color: var(--warning);
+}
+/* The link's tooltip wrapper is the grid's item. */
+.vc-head > .tip-wrap {
+  grid-area: link;
+  justify-self: end;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+}
+.vc-workflow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--info);
+  cursor: pointer;
+}
+.vc-workflow:hover {
+  text-decoration: underline;
+}
+.vc-init {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 0 14px 8px;
+  flex-shrink: 0;
+}
+.vc-init .hint {
+  margin: 0;
+}
 .git-head-status {
   font-size: 12px;
   white-space: nowrap;

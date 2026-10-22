@@ -41,7 +41,7 @@
   "main.gitInit.failed.staged": ".hive wurde bereitgestellt, daher wurde nichts committet",
   "main.gitInit.fix.commit": "{git}. Committe in einem Terminal oder bitte einen Agenten darum",
   "main.gitInit.fix.identity": "{which, select, name {gib ihn ein und wähle „Ersten Commit erstellen“} email {gib sie ein und wähle „Ersten Commit erstellen“} other {gib beide ein und wähle „Ersten Commit erstellen“}}",
-  "main.gitInit.fix.ignored": "behebe das und wähle dann im Git-Tab „Ersten Commit erstellen“",
+  "main.gitInit.fix.ignored": "behebe das und wähle dann im Tab „Versionsverwaltung“ „Ersten Commit erstellen“",
   "main.gitInit.fix.staged": "prüfe die .gitignore auf eine Regel, die .hive zurückholt",
   "main.gitInit.nested": "Dieser Ordner liegt im Git-Repository in {root}. Bestätige, dass du darin ein eigenes Repository willst.",
   "main.gitInit.noEmail": "Git hat keine E-Mail-Adresse für den ersten Commit: Gib eine ein.",

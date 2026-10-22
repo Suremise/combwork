@@ -276,6 +276,7 @@
   "project.settings.on": "オン",
   "project.settings.onLower": "オン",
   "project.settings.openHive": ".hiveフォルダーを開く",
+  "project.settings.openVersionControl": "バージョン管理を開く",
   "project.settings.overrides": "全体の既定値を上書きしています",
   "project.settings.providerDefault": "{provider}の既定",
   "project.settings.reset": "リセット",
@@ -310,7 +311,6 @@
   "project.skills.user": "ユーザー",
   "project.tab.attachments": "添付ファイル",
   "project.tab.files": "ファイル",
-  "project.tab.git": "Git",
   "project.tab.mcp": "MCP",
   "project.tab.memory": "メモリ",
   "project.tab.overview": "概要",
@@ -321,6 +321,7 @@
   "project.tab.skills": "スキル",
   "project.tab.tasks": "タスク",
   "project.tab.templates": "テンプレート",
+  "project.tab.versionControl": "バージョン管理",
   "project.tabs.more": "その他",
   "project.tabs.moreTip": "プロジェクトの{tabs}",
   "project.tabs.tip": "{tab}（{key}）"

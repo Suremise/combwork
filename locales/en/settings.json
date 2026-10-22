@@ -2763,9 +2763,9 @@
     "defaultMessage": "Warn when a transcript is over",
     "description": "A setting's title (Project Settings → Sessions)."
   },
-  "settings.project.workflow.desc": {
-    "defaultMessage": "Pick a preset, or set each option. Each shows where its value comes from.",
-    "description": "What the setting \"Workflow options\" is, under its title (Project Settings → Workflow)."
+  "settings.project.workflow.moved": {
+    "defaultMessage": "Who reviews, which checks pass first and who merges: they are set in the project’s Version Control tab, under Workflow.",
+    "description": "What the setting \"Workflow options\" is, under its title (Project Settings → Workflow), beside its Open Version Control button. Version Control (the tab) and Workflow (its section): glossary 2.1."
   },
   "settings.project.workflow.title": {
     "defaultMessage": "Workflow options",

@@ -690,7 +690,7 @@
   "settings.project.transcriptWarnMB.off": "Nigdy",
   "settings.project.transcriptWarnMB.tip": "Długa rozmowa spowalnia CLI i Hive; przekazanie pracy do nowej rozmowy znów ją skraca.",
   "settings.project.transcriptWarnMB.title": "Ostrzegaj, gdy transkrypcja przekroczy",
-  "settings.project.workflow.desc": "Wybierz ustawienie wstępne albo ustaw każdą opcję. Przy każdej widać, skąd pochodzi jej wartość.",
+  "settings.project.workflow.moved": "Kto recenzuje, jakie sprawdzenia muszą przejść najpierw i kto scala: ustawia się to w zakładce Kontrola wersji projektu, w sekcji Przepływ pracy.",
   "settings.project.workflow.title": "Opcje przepływu pracy",
   "settings.project.worktreeCopy.desc": "Pliki ignorowane przez git, kopiowane z folderu projektu do nowego worktree, np. pliki .env. Jeden wzorzec w wierszu; puste pole dziedziczy wartość z Ustawienia → Agenci i worktree → Kopiuj do nowych worktree.",
   "settings.project.worktreeCopy.tip": "Nowy worktree dostaje tylko pliki śledzone przez git. Wzorce bez ukośnika pasują do nazwy pliku lub folderu w dowolnym miejscu (np. .env*); z ukośnikiem pasują do ścieżki od katalogu głównego projektu (np. config/local.json). Duże foldery, takie jak node_modules, lepiej odtworzyć poleceniem konfiguracji.",

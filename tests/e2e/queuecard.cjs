@@ -100,7 +100,7 @@ const f = q.folderHelpers(fx)
     const toGit = async () => {
       await page.getByRole('button', { name: 'Projects' }).click()
       await page.getByText('alpha', { exact: true }).first().click()
-      await page.locator('.tabs .tab', { hasText: 'Git' }).first().click()
+      await page.locator('.tabs .tab', { hasText: 'Version Control' }).first().click()
     }
     await toGit()
     await page.locator('.git-sections [data-section="queue"]').click()

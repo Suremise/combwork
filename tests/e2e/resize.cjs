@@ -32,7 +32,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   }
   const width = (sel) => page.locator(sel).first().evaluate((e) => Math.round(e.getBoundingClientRect().width))
 
-  for (const [tab, key, def] of [['Sessions', 'sessions', 320], ['Files', 'files', 360], ['Git', 'changes', 280], ['Memory', 'memory', 280]]) {
+  for (const [tab, key, def] of [['Sessions', 'sessions', 320], ['Files', 'files', 360], ['Version Control', 'changes', 280], ['Memory', 'memory', 280]]) {
     if (tab === 'Memory') await lib.openMoreTab(page, tab)
     else await page.locator('.tabs .tab', { hasText: tab }).first().click()
     const list = '.tab-body:visible .split-list'
@@ -77,14 +77,14 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   // Persistence across a reload (#717: under load it failed once, with nothing to say why). Each step waits for what the
   // next needs: the Git tab's divider drawn before the drag, the width saved before the reload, the list at its width after.
   const gitList = '.tab-body:visible .split-list'
-  await page.locator('.tabs .tab', { hasText: 'Git' }).first().click()
+  await page.locator('.tabs .tab', { hasText: 'Version Control' }).first().click()
   await lib.until(async () => (await page.locator(`${gitList} > .pane-resizer`).count()) > 0, HUNG_MS)
   await drag(page.locator(`${gitList} > .pane-resizer`).first(), 60)
   const savedGit = await lib.until(async () => (await inv('ui:get')).panes?.changes ?? null, HUNG_MS)
   check('Git width saved before the reload', Math.abs(savedGit - 340) <= 3, `(${savedGit})`)
   await page.reload(); await lib.appReady(page)
   await page.getByText('demo', { exact: true }).first().click()
-  await page.locator('.tabs .tab', { hasText: 'Git' }).first().click()
+  await page.locator('.tabs .tab', { hasText: 'Version Control' }).first().click()
   const gitWidth = async () => ((await page.locator(gitList).count()) > 0 ? width(gitList) : null)
   const kept = await lib.until(async () => { const w = await gitWidth(); return w !== null && Math.abs(w - 340) <= 3 ? w : null }, HUNG_MS)
   check('width kept after reload', !!kept, `(${kept ?? await gitWidth()})`)
