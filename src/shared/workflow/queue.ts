@@ -45,6 +45,8 @@ export interface QueueRecent {
   entry: string
   outcome: 'merged' | 'returned' | 'cancelled'
   at: string
+  /** merged, returned: the card's revision the entry was for (#1357, the Git tab's history; the window's model only). */
+  revision?: string
   /** merged: the target's new head. */
   result?: string
   /** merged: Hive's merge or one seen done outside it. */
@@ -155,11 +157,29 @@ export interface QueueView {
  */
 export type QueuePublic = Omit<QueueView, 'projectPath' | 'recent' | 'returns' | 'returnsMore' | 'paused' | 'hiveMerges' | 'inFlight'> & {
   paused: (Omit<QueuePauseInfo, 'stuck' | 'message'> & { stuck?: Omit<QueueStuck, 'folder'> }) | null
-  recent: (Omit<QueueRecent, 'log' | 'seen'> & { hasLog?: true })[]
+  recent: (Omit<QueueRecent, 'log' | 'seen' | 'revision'> & { hasLog?: true })[]
 }
 
 /** How many outcomes a queue's model keeps for the panel. */
 export const RECENT_MAX = 20
+/** How many outcomes a target's history keeps for the Git tab's Merge queue section (#1357). */
+export const HISTORY_MAX = 50
+
+/**
+ * The card an agent's worktree branch is for, when Hive merges it (#1357, the Merge dialog): its key and title, its
+ * target, and where it stands: testing now, queued (its place, counting the one testing), or not in the queue yet (in
+ * review, say); whether the target's queue is paused.
+ */
+export interface BranchQueueCard {
+  card: number
+  key: string
+  title: string
+  target: string
+  where: 'testing' | 'queued' | 'notYet'
+  position?: number
+  paused: boolean
+}
+
 /** How many returns a queue's window model holds (those just seen, then those not seen; the count of the rest beside them). */
 export const RETURNS_MAX = 50
 /** A return the user has seen stays this long, then leaves the queue's card (as a failed run folds once seen). */

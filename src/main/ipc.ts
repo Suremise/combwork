@@ -102,7 +102,7 @@ import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
 import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
-import { markQueueSeen, pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
+import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
@@ -112,6 +112,7 @@ import { msg, tr } from '../shared/i18n'
  * and anything else that calls these services reads English. The native dialogs' text is the window's too.
  */
 const M = {
+  queueMerges: msg({ id: 'errors.merge.queueMerges', defaultMessage: "Hive merges {card} through the merge queue. Merge it there, or choose Merge anyway in the Merge dialog.", description: "Refusal of a Merge of an agent's branch whose card Hive's merge queue merges (the dialog's state was out of date). {card} is the card's key. Merge anyway is a button: keep it as Hive shows it. Glossary 2.5: merge queue." }),
   unknownProvider: msg({ id: 'errors.provider.unknown', defaultMessage: 'Unknown provider "{provider}".', description: "A call named a coding-agent CLI this version of Hive doesn't know. {provider} is the id it gave." }),
   insideArchive: msg({ id: 'errors.file.insideArchive', defaultMessage: 'Hive opens no files inside .asar archives.', description: 'Refusal to open a file inside an Electron .asar archive. Keep ".asar" as it is.' }),
   outsideWorkspace: msg({ id: 'errors.file.outsideWorkspace', defaultMessage: "Hive can only read and write files inside the workspace, and the agents' instruction, memory and skill files.", description: 'Refusal to open or save a file outside what Hive may touch.' }),
@@ -736,6 +737,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workflow:presetsNotice': () => presetsNotice(workspace),
     'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),
     'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined, true),
+    'queue:history': (p, target) => queueHistory(workspace, workspace.assertProject(p), queueTarget(target)),
+    'queue:branchCard': async (p, agentId) => {
+      const path = workspace.assertProject(p)
+      const agent = agentsOf(await workspace.projectConfig(path)).find((a) => a.id === agentId)
+      return agent?.worktree?.branch ? branchQueueCard(workspace, path, agent.worktree.branch) : null
+    },
     'queue:seen': (p, target, entries) => markQueueSeen(workspace, workspace.assertProject(p), queueTarget(target), Array.isArray(entries) ? entries.filter((e): e is string => typeof e === 'string').slice(0, 100) : []),
     'queue:pause': (p, target) => pauseQueue(workspace, workspace.assertProject(p), queueTarget(target), 'user'),
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
@@ -877,7 +884,19 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return st
     },
     'agents:branchStatuses': () => branchWatch.statuses(),
-    'agents:merge': (p, id, opts) => projectAgents.merge(p, id, opts),
+    'agents:merge': async (p, id, opts) => {
+      // A branch whose card Hive merges (#1357, OP-13; HR3's round 1 finding 1): merged only as Merge anyway, for that
+      // card, decided now, so a dialog whose lookup was pending, failed or is out of date never merges it plainly.
+      const path = workspace.assertProject(p)
+      const branch = agentsOf(await workspace.projectConfig(path)).find((a) => a.id === id)?.worktree?.branch
+      const card = branch ? await branchQueueCard(workspace, path, branch) : null
+      const out = opts?.outsideQueue
+      if (card && (!out || out.card !== card.card)) throw hiveError(M.queueMerges, { card: card.key }, { kind: 'conflict' })
+      const r = await projectAgents.merge(p, id, opts)
+      // Merged anyway, outside the merge queue: an override on the card, with the user's reason.
+      if (r.ok && card && out) await mergedOutsideQueue(workspace, path, card.card, typeof out.reason === 'string' ? out.reason.slice(0, 2000) : '').catch((e) => log.warn('recording a merge outside the queue', e))
+      return r
+    },
     'worktrees:unused': (p) => unusedWorktrees(p),
     'worktrees:unusedBranchStatus': (p, path) => unusedBranchStatus(p, path),
     'worktrees:mergeUnused': async (p, path, opts) => {

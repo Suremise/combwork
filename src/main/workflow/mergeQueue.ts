@@ -479,7 +479,7 @@ export class MergeQueue {
       const finish = stuck.commands.find((c) => c.purpose === 'finish')
       const undo = stuck.commands.find((c) => c.purpose === 'undo')
       const how = finish && undo ? 'both' : finish ? 'finish' : undo ? 'undo' : 'none'
-      const text = workflowText(FOR_YOU.queueStuck, { card: card.key, target, folder: stuck.folder, project: this.project, how, finish: finish?.command ?? '', undo: undo?.command ?? '' })
+      const text = workflowText(FOR_YOU.queueStuck, { card: card.key, target, folder: stuck.folder, files: stuck.files.length, project: this.project, how, finish: finish?.command ?? '', undo: undo?.command ?? '' })
       await this.write(card, (w) => this.wf.askUser(w, 'decide', QUEUE_STUCK_GATE, text, { unbound: true, entry: entry.id, result: stuck.result, revision: stuck.expected }))
     }
     return { card: card.key, entry: entry.id, outcome: 'paused', reason, ...(named?.length ? { files: named } : {}), ...(m ? { message: m } : {}) }

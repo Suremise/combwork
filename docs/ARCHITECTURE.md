@@ -301,6 +301,14 @@ the announcements); `ProgressQueue.tsx` draws the queue's card (reused by #1357)
 slot's cards (`ProgressMerge.tsx`), Pulse's lines and the polite live region. A return is marked seen with `queue:seen`
 (`workflow_queue_seen` in hive.db) when the Merges tab shows it in a focused window.
 
+**The queue on the card, in the Git tab and in the Merge dialog** (#1357): the card dialog's Work section adds
+`CardQueue.tsx` (the work view's `queue`, with a return's details, beside its target's `queue:list` for the place, step,
+pause and a stuck advance's state); the Git tab's `queue` section is `GitQueueSection.tsx` (the panel's `QueueCard` and
+`queue:history`); the Merge dialog asks `queue:branchCard` (queueControls.ts: a card in flight on the agent's line under
+a Hive-merges ruleset), and `agents:merge`'s `outsideQueue` records Merge anyway's override after the merge
+(`Workflow.mergedOutsideQueue`). Both read again on each `queue-changed` (the store's `queueVersion`), the Progress
+panel on or off.
+
 **Hive's queue commits** (#1350, SPEC §16.9.1 step 4): `MergeQueue.testMerge` runs the merge (and a squash's commit)
 with `commitEnv()` (no prompt: `GIT_TERMINAL_PROMPT=0` and the like) and, when the repository has `commit.gpgsign`, a
 bound (`QueueConfig.signTimeoutMs`, Advanced `hive.queue.signSeconds`). The runner's `run`/`git` take `env` and

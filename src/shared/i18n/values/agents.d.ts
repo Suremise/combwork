@@ -176,6 +176,10 @@ interface HiveMessageValues {
   'agents.merge.commits': { n: number; into: string | number }
   'agents.merge.nothing': { into: string | number }
   'agents.merge.uncommitted': { n: number }
+  'agents.mergeDialog.anyway': undefined
+  'agents.mergeDialog.anywayConfirm': undefined
+  'agents.mergeDialog.anywayMessage': undefined
+  'agents.mergeDialog.anywayTitle': { card: string | number }
   'agents.mergeDialog.cantRead': undefined
   'agents.mergeDialog.close': undefined
   'agents.mergeDialog.conflict': undefined
@@ -196,6 +200,15 @@ interface HiveMessageValues {
   'agents.mergeDialog.nothing': { branch: string | number; into: string | number }
   'agents.mergeDialog.onlyUncommitted': { branch: string | number }
   'agents.mergeDialog.otherBase': { agent: string | number; base: string | number; into: string | number }
+  'agents.mergeDialog.queueLookup': undefined
+  'agents.mergeDialog.queueLookupFailed': { why: string | number }
+  'agents.mergeDialog.queueMerges': { card: string | number }
+  'agents.mergeDialog.queueNotYet': { target: string | number }
+  'agents.mergeDialog.queuePaused': undefined
+  'agents.mergeDialog.queueQueued': { target: string | number; position: number }
+  'agents.mergeDialog.queueQueuedNoPlace': { target: string | number }
+  'agents.mergeDialog.queueRetry': undefined
+  'agents.mergeDialog.queueTesting': { target: string | number }
   'agents.mergeDialog.reading': { branch: string | number }
   'agents.mergeDialog.remove': undefined
   'agents.mergeDialog.removeUnused': undefined

@@ -188,6 +188,7 @@ export const SUITES = [
   { name: 'providers' },
   { name: 'purge' },
   { name: 'queueagents' },
+  { name: 'queuecard' },
   { name: 'queuecontrols' },
   { name: 'quit' },
   { name: 'quitwait' },

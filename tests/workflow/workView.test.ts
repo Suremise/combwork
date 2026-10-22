@@ -154,8 +154,15 @@ describe("a card's work view (#1223)", () => {
     const v = workView({ ...card, stage: 'done' }, [...queued, fact('Integrated', { entry: 'e1', revision: 'rev2222bbbb', target: 'main', result: 'merge5555', method: 'merge', by: 'hive' })])
     expect(v.integration).toEqual({ revision: 'rev2222bbbb', target: 'main', result: 'merge5555', method: 'merge', by: 'hive', mergeCommit: 'merge5555', at: expect.any(String) })
     expect(v.queue!.state).toBe('integrated')
-    const failed = workView(card, [...queued, fact('IntegrationFailed', { entry: 'e1', revision: 'rev2222bbbb', target: 'main', reason: 'conflict', transient: false })])
-    expect(failed.queue).toMatchObject({ state: 'failed', failure: 'conflict' })
+    const failed = workView(card, [...queued, fact('IntegrationFailed', { entry: 'e1', revision: 'rev2222bbbb', target: 'main', reason: 'conflict', transient: false, files: ['tasks.ts', 'b.ts'], log: 'CONFLICT (content): Merge conflict in tasks.ts' })])
+    // #1357: a return's details for the Work section: the files, the output, whether temporary, when.
+    expect(failed.queue).toEqual({ entry: 'e1', revision: 'rev2222bbbb', target: 'main', state: 'failed', failure: 'conflict', transient: false, files: ['tasks.ts', 'b.ts'], log: 'CONFLICT (content): Merge conflict in tasks.ts', at: failed.queue!.at })
+    expect(failed.queue!.at).toMatch(/^2026-10-20T10:00:/)
+    // A red check's return, then the user's Retry merge: the new entry, queued again unchanged.
+    const red = [...queued.slice(0, -1), fact('IntegrationFailed', { entry: 'e1', revision: 'rev2222bbbb', target: 'main', reason: 'checks', transient: true, log: 'unit\nfailed: 2' })]
+    expect(workView(card, red).queue).toMatchObject({ state: 'failed', failure: 'checks', transient: true, log: 'unit\nfailed: 2' })
+    const retried = workView(card, [...red, fact('IntegrationRequested', { entry: 'e2', revision: 'rev2222bbbb', key: null, target: 'main', style: 'merge', requeue: 'retry' })])
+    expect(retried.queue).toEqual({ entry: 'e2', revision: 'rev2222bbbb', target: 'main', state: 'open', requeue: 'retry' })
     // Merged by hand before its rules passed: a squash has no merge commit, and the mark says which rules.
     const outside = workView({ ...card, stage: 'done' }, [...facts, fact('Integrated', { revision: 'rev2222bbbb', target: 'main', result: 'sq6666', method: 'squash', by: 'outside', outsideRules: ['review.passed'] }, 'outside', 'observed')])
     expect(outside.integration).toMatchObject({ method: 'squash', by: 'outside', mergeCommit: null })
