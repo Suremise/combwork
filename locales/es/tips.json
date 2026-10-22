@@ -363,6 +363,8 @@
   "tips.versionControlTab.title": "Una pestaña para el control de versiones y el flujo de trabajo",
   "tips.viewerTokens.text": "Una aplicación que muestra lo que hacen tus agentes, como Apiary, solo necesita un token de lectura: Configuración → Agent API → Tokens de lectura crea uno que puede leerlo todo y no cambiar nada, y lo revoca después.",
   "tips.viewerTokens.title": "Deja que otra aplicación observe Hive",
+  "tips.workflowDefaults.text": "Configuración → Flujo de trabajo predeterminado fija las opciones de las que parte cada proyecto, y Configuración → Espacio de trabajo las del espacio de trabajo abierto. Las opciones propias de un proyecto siguen teniendo prioridad, y al guardar se muestran los proyectos que heredan el cambio.",
+  "tips.workflowDefaults.title": "Define un flujo de trabajo una vez para todos los proyectos",
   "tips.workflowOptions.text": "Control de versiones → Flujo de trabajo define quién revisa el trabajo de una tarjeta, qué comprobaciones pasan antes y quién lo fusiona. Elige un ajuste predefinido o configura cada opción: un cambio se aplica desde la siguiente tarjeta que empiece.",
   "tips.workflowOptions.title": "Elige cómo llegan las tarjetas a Hecho",
   "tips.workflowPresetsWhy.text": "En Control de versiones → Flujo de trabajo, haz clic en Individual, Pareja o Equipo: el ajuste predefinido enumera cada opción que fija y por qué, y marca lo que cambiaría. Nada cambia hasta que lo uses y guardes.",

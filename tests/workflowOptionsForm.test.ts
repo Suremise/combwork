@@ -3,7 +3,7 @@
 // the warning's lanes and cards in flight, applying a change to a card in flight (an Override carrying the new ruleset,
 // which the card then works under), the Assistant's settings tool within its Control, and the one-time presets notice.
 import { execFileSync } from 'child_process'
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -20,6 +20,7 @@ const store = await import('../src/main/boardStore')
 const lanes = await import('../src/main/lanes')
 const { config } = await import('../src/main/config')
 const form = await import('../src/main/workflow/optionsForm')
+const levels = await import('../src/main/workflow/levels')
 const { workflowFor } = await import('../src/main/workflow/service')
 const { checkOptions } = await import('../src/main/workflow/rulesets')
 const { allOff, CONTRADICTION_ROWS, CONTRADICTIONS, FORM_GROUPS, FORM_OPTIONS, formShows, liveContradictions, notOffered, preset, PRESETS } = await import('../src/shared/workflow/options')
@@ -415,5 +416,86 @@ describe('the one-time presets notice (#1278, §16.17)', () => {
     const { w } = await workspace({ project: preset('git', 'solo'), preset: 'solo' })
     await store.boardWrite(w, async () => store.setBoardValue(w, store.ADOPTION_UPTO, '3'))
     expect(await form.presetsNotice(w)).toBeNull()
+  })
+})
+
+describe("workflow defaults at Hive's and the workspace's level (#1422)", () => {
+  const read = (file: string): Record<string, unknown> => JSON.parse(readFileSync(file, 'utf8'))
+
+  it("saves the workspace's defaults: its projects inherit them, with the workspace as their origin; Inherit takes one back", async () => {
+    const { ws, w, repo } = await workspace()
+    expect(levels.levelForm(w, 'workspace', 'git')).toMatchObject({ level: 'workspace', own: {}, preset: null })
+    const f = await levels.setLevelOptions(w, 'workspace', 'git', { preset: null, options: { style: 'squash', dependenciesDone: true } })
+    expect(f.own).toEqual({ style: 'squash', dependenciesDone: true })
+    expect(f.origins).toMatchObject({ style: 'workspace', review: 'platform' })
+    expect(read(join(ws, '.hive', 'workspace.json')).workflow).toEqual({ git: { style: 'squash', dependenciesDone: true } })
+    // The project sets neither: it inherits them, the workspace named as where they come from.
+    expect((await form.workflowForm(w, repo)).origins).toMatchObject({ style: 'workspace', dependenciesDone: 'workspace' })
+    // Inherit: the option left out goes back to the level below (here, every rule off).
+    const back = await levels.setLevelOptions(w, 'workspace', 'git', { preset: null, options: { dependenciesDone: true } })
+    expect(back.own).toEqual({ dependenciesDone: true })
+    expect(back.origins.style).toBe('platform')
+    expect((await form.workflowForm(w, repo)).options.style).toBe('merge')
+  })
+
+  it("saves Hive's defaults, under the workspace's: each level inherits the one below it", async () => {
+    const { w } = await workspace()
+    const g = await levels.setLevelOptions(w, 'global', 'none', { preset: null, options: { dependenciesDone: true } })
+    expect(config.settings.workflow?.none).toEqual({ dependenciesDone: true })
+    expect(g.origins.dependenciesDone).toBe('global')
+    const wsForm = levels.levelForm(w, 'workspace', 'none')
+    expect(wsForm.inherited.dependenciesDone).toBe(true)
+    expect(wsForm.inheritedOrigins.dependenciesDone).toBe('global')
+    // The workspace's own value wins over Hive's.
+    expect((await levels.setLevelOptions(w, 'workspace', 'none', { preset: null, options: { dependenciesDone: false } })).origins.dependenciesDone).toBe('workspace')
+  })
+
+  it('lists the projects inheriting what changes, with their running lanes and cards in flight; one setting it itself is left out', async () => {
+    const { w, repo } = await workspace({ project: allOff('git') })
+    const card = await inWorkspace(w, () => tasks.createTask({ title: 'In flight', project: 'p' }, user))
+    const wf = (await workflowFor(w, repo))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${card.number}`, agentActor('b1')))).toMatchObject({ ok: true })
+    const todo = await inWorkspace(w, () => tasks.createTask({ title: 'Next', project: 'p' }, user))
+    await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [todo.number], name: 'next', by: 'B1 (p)' })
+    // p sets every option itself (the upgrade's way): nothing it inherits changes.
+    expect((await levels.checkLevelChange(w, 'workspace', 'git', { preset: null, options: { style: 'squash' } })).projects).toEqual([])
+    await form.setWorkflowOptions(w, repo, { preset: null, options: { review: 'none' } })
+    const check = await levels.checkLevelChange(w, 'workspace', 'git', { preset: null, options: { style: 'squash' } })
+    expect(check).toMatchObject({ problems: [], changed: ['style'] })
+    expect(check.projects).toEqual([{ name: 'p', path: repo, changed: ['style'], lanes: [expect.objectContaining({ name: 'next', builder: 'B1' })], inFlight: [{ number: card.number, title: 'In flight' }] }])
+  })
+
+  it('refuses a level that would make an inheriting project contradictory, naming it; nothing is written', async () => {
+    const { ws, w, repo } = await workspace({ project: { finish: 'committed' } })
+    const change = { preset: null, options: { folder: 'slots' as const } }
+    const check = await levels.checkLevelChange(w, 'workspace', 'git', change)
+    expect(check.problems).toEqual([{ kind: 'inheritor', project: 'p', problem: { kind: 'contradiction', id: 'committedNeedsFolder' } }])
+    await expect(levels.setLevelOptions(w, 'workspace', 'git', change)).rejects.toThrow(/Project p inherits these options[\s\S]*needs everyone in the project folder/)
+    expect(read(join(ws, '.hive', 'workspace.json')).workflow).toBeUndefined()
+    expect((await form.workflowForm(w, repo)).options.folder).toBe('project')
+    // The level's own contradictions are refused as a project's are.
+    await expect(levels.setLevelOptions(w, 'workspace', 'git', { preset: null, options: { finish: 'hiveMerges', folder: 'project' } })).rejects.toThrow(/each card needs its own folder/)
+  })
+
+  it('refuses a save read before another change, never writing over it', async () => {
+    const { w } = await workspace()
+    const readWith = { preset: null, options: levels.levelForm(w, 'workspace', 'git').own }
+    await levels.setLevelOptions(w, 'workspace', 'git', { preset: null, options: { style: 'squash' } })
+    await expect(levels.setLevelOptions(w, 'workspace', 'git', { preset: null, options: { strict: false }, base: readWith })).rejects.toThrow(/changed meanwhile/)
+    expect(w.config.workflow?.git).toEqual({ style: 'squash' })
+  })
+
+  it("the Assistant's settings tool sets one at each level, checked as the editor's save is", async () => {
+    const { w } = await workspace({ project: { finish: 'committed' } })
+    const wsStyle = settingEntry('workspace.workflow.git.style')!
+    expect(wsStyle).toMatchObject({ scope: 'workspace', workflow: 'style', workflowLevel: { level: 'workspace', platform: 'git' } })
+    expect(settingEntry('workflow.git.style')).toMatchObject({ scope: 'app', workflowLevel: { level: 'global', platform: 'git' } })
+    expect(settingEntry('workflow.none.finish')).toBeUndefined()
+    await inWorkspace(w, async () => {
+      expect(await settingsTools.applySetting(wsStyle, 'squash', null)).toEqual({ old: 'inherit', new: 'squash' })
+      await expect(settingsTools.applySetting(settingEntry('workspace.workflow.git.folder')!, 'slots', null)).rejects.toThrow(/Project p inherits these options/)
+      expect(await settingsTools.applySetting(wsStyle, null, null)).toEqual({ old: 'squash', new: 'inherit' })
+    })
+    expect(w.config.workflow?.git).toEqual({})
   })
 })

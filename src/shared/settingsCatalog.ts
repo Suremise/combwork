@@ -11,15 +11,16 @@
  * checks and the paths they name keep the English (an entry's title, desc and tip), whatever the user chose. Text only
  * the Assistant reads (when a setting helps, why it is read-only, what a value takes) stays English.
  */
-import type { AppSettings, ProjectConfig, ProviderId, WorkspaceConfig } from './types'
+import type { AppSettings, ProjectConfig, ProviderId, WorkflowLevel, WorkspaceConfig } from './types'
+import type { PlatformId } from './platform/descriptors'
 import { LANE_MAX_ROUNDS, LOOP_ROUNDS, LOOP_WAIT_HOURS, LOOP_WAIT_MAX_HOURS, loopDefaults } from './lanes'
 import { DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, FILE_LOCK_MODES } from './defaults'
 import { PRICES_CHECKED } from './prices'
 import { isCliOwnMode } from './cliOwnMode'
 import { ADVANCED_DEFS, advancedDef, advancedTakesText, advancedText, checkAdvanced, cliFacing, englishText, groupName, linesOf, listOf, shownText, withValues, type Text, type TextPart } from './advanced'
 import { language, msg } from './i18n'
-import { takesOption, type OptionKey } from './workflow/options'
-import { OPTION_TEXT, VALUE_TEXT } from './workflow/optionTexts'
+import { FORM_GROUPS, takesOption, type OptionKey } from './workflow/options'
+import { OPTION_TEXT, optionTitle, VALUE_TEXT } from './workflow/optionTexts'
 import { writeWorkflow } from './workflow/projectWorkflow'
 import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
@@ -74,6 +75,8 @@ interface Row {
   advanced?: { id: string; scope: 'app' | 'workspace' }
   /** A workflow option of the project's (#1278): project.json's `workflow.options[<this>]`, checked with the others in main. */
   workflow?: OptionKey
+  /** A workflow option's default at a level (#1422): Hive's (`global`) or the workspace's, for a platform. */
+  workflowLevel?: { level: WorkflowLevel; platform: PlatformId }
 }
 
 /** A permission mode's name and what it does, as text: the window's words where the descriptor has them (#885). */
@@ -231,6 +234,7 @@ export const SETTINGS_SECTIONS: SettingsSectionInfo<SettingsSection>[] = [
   sectionInfo('assistant', msg({ id: 'settings.section.assistant.label', defaultMessage: 'Assistant', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.assistant.desc', defaultMessage: "The Hive Assistant's defaults: the side panel's overseer of each workspace (Ctrl+Alt+I). Each workspace can change them in the panel's Assistant Settings.", description: 'Under the heading of the section "Assistant" of Settings: what it holds.' })),
   sectionInfo('workspace', msg({ id: 'settings.section.workspace.label', defaultMessage: 'Workspace', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.workspace.desc', defaultMessage: "The open workspace's card loops, its projects that Hive leaves out (hidden, or removed from Hive with their handovers and cards packed into the folder), and how much Hive keeps for each project.", description: 'Under the heading of the section "Workspace" of Settings: what it holds.' })),
   sectionInfo('board', msg({ id: 'settings.section.board.label', defaultMessage: 'Board', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.board.desc', defaultMessage: "The task board's colours and housekeeping, the same in every workspace.", description: 'Under the heading of the section "Board" of Settings: what it holds.' })),
+  sectionInfo('workflow', msg({ id: 'settings.section.workflow.label', defaultMessage: 'Workflow defaults', description: 'A section of Settings, in its list on the left: the workflow options every project inherits unless its workspace or itself sets them (glossary 2.1: workflow).' }), msg({ id: 'settings.section.workflow.desc', defaultMessage: 'The workflow options every project starts from, in every workspace. A workspace’s defaults (Settings → Workspace) and a project’s own options (its Version Control tab) win over them.', description: 'Under the heading of the section "Workflow defaults" of Settings: what it holds. Version Control is the tab’s name (glossary 2.1).' })),
   sectionInfo('agents', msg({ id: 'settings.section.agents.label', defaultMessage: 'Agents & Worktrees', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.agents.desc', defaultMessage: 'Defaults for projects running several agents: file locks, new worktrees and merging (projects can override them), and how long background tasks count.', description: 'Under the heading of the section "Agents & Worktrees" of Settings: what it holds.' })),
   sectionInfo('keybindings', msg({ id: 'settings.section.keybindings.label', defaultMessage: 'Keyboard Shortcuts', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.keybindings.desc', defaultMessage: 'Change, remove or add shortcuts for any command. Projects can set their own for project and session commands (Project Settings → Keyboard Shortcuts).', description: 'Under the heading of the section "Keyboard Shortcuts" of Settings: what it holds.' })),
   sectionInfo('agentApi', msg({ id: 'settings.section.agentApi.label', defaultMessage: 'Agent API', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.agentApi.desc', defaultMessage: 'Local API and built-in MCP server that let agents interact with Hive.', description: 'Under the heading of the section "Agent API" of Settings: what it holds.' })),
@@ -364,6 +368,22 @@ const APP_ROWS: Row[] = [
     title: msg({ id: 'settings.workspace.antivirus.title', defaultMessage: 'Antivirus scanning', description: "A setting's title (Settings → Workspace)." }),
     desc: msg({ id: 'settings.workspace.antivirus.desc', defaultMessage: "Whether Microsoft Defender scans the workspace's folders as Hive's work changes them (builds, tests, git, worktrees), and the exclusions Hive can add for them, with your consent.", description: 'What the setting "Antivirus scanning" does, under its title (Settings → Workspace).' }),
     tip: msg({ id: 'settings.workspace.antivirus.tip', defaultMessage: 'Hive checks without administrator rights, so Defender may not show its exclusions (unknown). Adding or removing exclusions asks for administrator rights once. Hive only ever offers these folders: the workspace, its worktrees folder once it exists, and its test area for people developing Hive. It never changes other antivirus products.', description: 'The info tip of the setting "Antivirus scanning" (Settings → Workspace): more on what it does and when it applies.' }),
+    type: 'custom',
+    wide: true
+  },
+  {
+    section: 'workspace',
+    key: 'workflowDefaults',
+    title: msg({ id: 'settings.workspace.workflowDefaults.title', defaultMessage: 'Workflow defaults', description: "A setting's title (Settings → Workspace): the workflow options this workspace's projects inherit (glossary 2.1: workflow)." }),
+    desc: msg({ id: 'settings.workspace.workflowDefaults.desc', defaultMessage: 'The workflow options this workspace’s projects start from, over Hive’s (Settings → Workflow defaults). A project’s own options win over them.', description: 'What the setting "Workflow defaults" does, under its title (Settings → Workspace).' }),
+    type: 'custom',
+    wide: true
+  },
+  {
+    section: 'workflow',
+    key: 'defaults',
+    title: msg({ id: 'settings.workflow.defaults.title', defaultMessage: 'Hive’s workflow defaults', description: "A setting's title (Settings → Workflow defaults): the workflow options every project inherits (glossary 2.1: workflow)." }),
+    desc: msg({ id: 'settings.workflow.defaults.desc', defaultMessage: 'Pick a preset, or set each option, for None or for Git. Each shows where its value comes from.', description: 'What the setting "Hive’s workflow defaults" does, under its title (Settings → Workflow defaults). None and Git: glossary 2.1.' }),
     type: 'custom',
     wide: true
   },
@@ -714,16 +734,11 @@ function projectProviderRows(p: ProviderDescriptor): Row[] {
 /** What Project Settings → Project key does (#1221): Project Settings gives its example in the project's own key. */
 export const PROJECT_KEY_DESC = msg({ id: 'settings.project.key.desc', defaultMessage: 'The 2 to 4 letters this project’s cards are named by, as in {example}. If you change it, the old key still finds them.', description: 'What the setting "Project key" does, under its title (Project Settings → Agents & Worktrees). {example} is a card name with the project\'s own key, such as WB-12.' })
 
-/**
- * Project Settings → Workflow (#1278): one row, a link to the form in the Version Control tab (#1416), and each option a
- * row of its own for the Assistant's settings tool (`project.workflow.<option>`), not drawn apart. Values the version doesn't offer yet are
- * refused when saved (options.ts `notOffered`), as contradictions are.
- */
-function workflowRows(): Row[] {
-  const option = (key: OptionKey, type: SettingControl, options?: [string, TextPart][]): Row => ({ section: 'workflow', key: `workflow.${key}`, workflow: key, title: OPTION_TEXT[key]!.title, desc: OPTION_TEXT[key]!.desc, type, ...(options ? { options: [INHERIT, ...options.map(([value, label]) => ({ value, label }))] } : {}), hidden: true })
+/** Each workflow option as a hidden row the Assistant's settings tool sets it by, placed by `at` (its section and key). */
+function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Partial<Pick<Row, 'workflowLevel'>>, platform?: PlatformId): Row[] {
+  const option = (key: OptionKey, type: SettingControl, options?: [string, TextPart][]): Row => ({ ...at(key), workflow: key, title: (platform ? optionTitle(key, platform) : null) ?? OPTION_TEXT[key]!.title, desc: OPTION_TEXT[key]!.desc, type, ...(options ? { options: [INHERIT, ...options.map(([value, label]) => ({ value, label }))] } : {}), hidden: true })
   const V = VALUE_TEXT
-  return [
-    { section: 'workflow', key: 'workflow', title: msg({ id: 'settings.project.workflow.title', defaultMessage: 'Workflow options', description: "A setting's title (Project Settings → Workflow): the project's workflow options (glossary 2.1), a form of their own." }), desc: msg({ id: 'settings.project.workflow.moved', defaultMessage: 'Who reviews, which checks pass first and who merges: they are set in the project’s Version Control tab, under Workflow.', description: 'What the setting "Workflow options" is, under its title (Project Settings → Workflow), beside its Open Version Control button. Version Control (the tab) and Workflow (its section): glossary 2.1.' }), type: 'custom' },
+  const rows: Row[] = [
     option('review', 'select', [['none', V.review.none], ['agent', V.review.agent], ['agentThenYou', V.review.agentThenYou], ['you', V.review.you]]),
     option('reviewers', 'select', [['1', '1'], ['2', '2']]),
     option('noSelfReview', 'boolean'),
@@ -744,6 +759,34 @@ function workflowRows(): Row[] {
     option('sharedFolderWarning', 'boolean'),
     option('excluded', 'custom'),
     option('stageNames', 'custom')
+  ]
+  // A level's rows are its platform's options (and their check commands), never another platform's.
+  return platform ? rows.filter((r) => r.workflow === 'commands' || FORM_GROUPS[platform].some((g) => g.options.includes(r.workflow!))) : rows
+}
+
+/**
+ * Hive's and the workspace's workflow defaults (#1422): each option for each platform a hidden row of the Assistant's
+ * settings tool, `workflow.<platform>.<option>` (Settings → Workflow defaults) and `workspace.workflow.<platform>.<option>`
+ * (Settings → Workspace), set as the editor saves them: checked against the level and the projects inheriting it.
+ */
+function levelRows(): Row[] {
+  const platforms: PlatformId[] = ['git', 'none']
+  // G12 is a project's own (its git identity): no level sets it.
+  return platforms.flatMap((platform) => [
+    ...optionRows((key) => ({ section: 'workflow', key: `${platform}.${key}`, workflowLevel: { level: 'global', platform } }), platform),
+    ...optionRows((key) => ({ section: 'workspace', key: `workflow.${platform}.${key}`, workflowLevel: { level: 'workspace', platform } }), platform)
+  ].filter((r) => r.workflow !== 'identity'))
+}
+
+/**
+ * Project Settings → Workflow (#1278): one row, a link to the form in the Version Control tab (#1416), and each option a
+ * row of its own for the Assistant's settings tool (`project.workflow.<option>`), not drawn apart. Values the version doesn't offer yet are
+ * refused when saved (options.ts `notOffered`), as contradictions are.
+ */
+function workflowRows(): Row[] {
+  return [
+    { section: 'workflow', key: 'workflow', title: msg({ id: 'settings.project.workflow.title', defaultMessage: 'Workflow options', description: "A setting's title (Project Settings → Workflow): the project's workflow options (glossary 2.1), a form of their own." }), desc: msg({ id: 'settings.project.workflow.moved', defaultMessage: 'Who reviews, which checks pass first and who merges: they are set in the project’s Version Control tab, under Workflow.', description: 'What the setting "Workflow options" is, under its title (Project Settings → Workflow), beside its Open Version Control button. Version Control (the tab) and Workflow (its section): glossary 2.1.' }), type: 'custom' },
+    ...optionRows((key) => ({ section: 'workflow', key: `workflow.${key}` }))
   ]
 }
 
@@ -800,6 +843,8 @@ const ACTIONS = new Set([
   'sessions.resetPerformance',
   'workspace.hiddenProjects',
   'project.workflow',
+  'workflow.defaults',
+  'workspace.workflowDefaults',
   'workspace.storage',
   'workspace.antivirus',
   'agentApi.status',
@@ -929,6 +974,8 @@ const DOCS: Record<string, string> = {
 const DOCS_BY_ID: Record<string, string> = {
   'project.key': 'Project keys', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'project.workflow': 'Workflow options', // i18n-ignore: a heading of the user guide, which stays English (D2)
+  'workflow.defaults': 'Workflow defaults', // i18n-ignore: a heading of the user guide, which stays English (D2)
+  'workspace.workflowDefaults': 'Workflow defaults', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'project.loopWakes': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'project.loopRounds': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'project.loopWaitHours': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
@@ -992,7 +1039,7 @@ function entry(row: Row, id: string, scope: SettingScope, docs: string): Setting
     ...(off ? { off: englishText(off) } : {}),
     ...(confirmOn ? { confirmOn: { title: englishText(confirmOn.title), message: englishText(confirmOn.message), ...(confirmOn.detail ? { detail: englishText(confirmOn.detail) } : {}) } } : {}),
     text,
-    docs: row.advanced || id === 'advanced.values' ? 'Advanced settings' : row.workflow ? 'Workflow options' : (DOCS_BY_ID[id] ?? docs), // i18n-ignore: a heading of the user guide, which stays English (D2)
+    docs: row.advanced || id === 'advanced.values' ? 'Advanced settings' : row.workflowLevel ? 'Workflow defaults' : row.workflow ? 'Workflow options' : (DOCS_BY_ID[id] ?? docs), // i18n-ignore: a heading of the user guide, which stays English (D2)
     ...(HELPS[id] ? { helps: HELPS[id] } : {}),
     ...(action ? { action: true } : {}),
     ...(value ? { value } : {}),
@@ -1009,7 +1056,7 @@ export const settingPath = (e: SettingEntry): string => settingPathOf(e, e.scope
 export const shownSettingPath = (e: SettingEntry): string => settingPathOf(e, e.scope, shownText)
 
 /** Settings' entries (Hive's and the providers' pages), in their order. */
-export const APP_SETTINGS_CATALOG: readonly SettingEntry[] = APP_ROWS.map((r) =>
+export const APP_SETTINGS_CATALOG: readonly SettingEntry[] = [...APP_ROWS, ...levelRows()].map((r) =>
   r.provider ? entry(r, `${r.provider}.${r.key}`, 'provider', 'Coding agents: Claude Code, Codex and GitHub Copilot') : entry(r, `${r.section}.${r.key}`, r.section === 'workspace' ? 'workspace' : 'app', DOCS[r.section] ?? 'Getting started') // i18n-ignore: a heading of the user guide, which stays English (D2)
 )
 
@@ -1032,9 +1079,11 @@ export function settingEntry(id: string): SettingEntry | undefined {
  * advanced value (#367) is advanced.json's override (`advanced`: its values) or the default, or the workspace's own (null:
  * Settings → Advanced's).
  */
-export function settingValue(e: SettingEntry, settings: AppSettings, project?: ProjectConfig | null, ws?: Pick<WorkspaceConfig, 'loops' | 'advanced'> | null, advanced?: Record<string, unknown> | null): unknown {
+export function settingValue(e: SettingEntry, settings: AppSettings, project?: ProjectConfig | null, ws?: Pick<WorkspaceConfig, 'loops' | 'advanced' | 'workflow'> | null, advanced?: Record<string, unknown> | null): unknown {
   if (e.action) return undefined
   if (e.advanced) return e.advanced.scope === 'workspace' ? (ws?.advanced?.[e.advanced.id] ?? null) : (advanced?.[e.advanced.id] ?? advancedDef(e.advanced.id)?.default)
+  // A level's workflow default (#1422): its own value, or inherit.
+  if (e.workflowLevel && e.workflow) return (e.workflowLevel.level === 'global' ? settings.workflow : ws?.workflow)?.[e.workflowLevel.platform]?.[e.workflow] ?? 'inherit'
   // A workspace's own (workspace.json): its card loops' rounds and wait (#412).
   if (e.scope === 'workspace') return loopDefaults(ws)[e.key === 'loopRounds' ? 'rounds' : 'waitHours']
   if (e.scope === 'project') {
@@ -1058,6 +1107,7 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
 export function settingDefault(e: SettingEntry): unknown {
   if (e.action) return undefined
   if (e.advanced) return e.advanced.scope === 'workspace' ? null : advancedDef(e.advanced.id)?.default
+  if (e.workflowLevel) return 'inherit'
   if (e.scope === 'workspace') return e.key === 'loopRounds' ? LOOP_ROUNDS : LOOP_WAIT_HOURS
   if (e.scope === 'project') return e.provider || e.workflow ? 'inherit' : (DEFAULT_PROJECT_CONFIG as unknown as Record<string, unknown>)[e.key]
   if (e.assistantProvider) return ''
@@ -1255,8 +1305,10 @@ export function effortTakes(e: SettingEntry, levels: { value: string }[]): strin
 export function settingPatch(
   e: SettingEntry,
   value: unknown
-): { settings: Record<string, unknown> } | { project: (cfg: ProjectConfig) => Partial<ProjectConfig> } | { workspace: { rounds?: number; waitHours?: number } } | { advanced: { id: string; scope: 'app' | 'workspace'; value: unknown } } | { prices: { provider: ProviderId; value: Record<string, unknown> } } | { fallback: { provider: ProviderId; kind: 'models' | 'efforts'; list: unknown[] | null } } {
+): { settings: Record<string, unknown> } | { project: (cfg: ProjectConfig) => Partial<ProjectConfig> } | { workspace: { rounds?: number; waitHours?: number } } | { workflowLevel: { level: WorkflowLevel; platform: PlatformId; key: OptionKey; value: unknown } } | { advanced: { id: string; scope: 'app' | 'workspace'; value: unknown } } | { prices: { provider: ProviderId; value: Record<string, unknown> } } | { fallback: { provider: ProviderId; kind: 'models' | 'efforts'; list: unknown[] | null } } {
   if (e.advanced) return { advanced: { ...e.advanced, value } }
+  // A level's default (#1422): one option (null: inherit), saved as the editor saves the level.
+  if (e.workflowLevel && e.workflow) return { workflowLevel: { ...e.workflowLevel, key: e.workflow, value } }
   if (e.scope === 'project' && e.workflow) {
     // One option of the project's own (null: inherit), its preset kept as the one they started from (#1278).
     const key = e.workflow

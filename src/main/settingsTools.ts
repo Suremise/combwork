@@ -6,6 +6,8 @@ import { advancedDef, advancedTakes } from '../shared/advanced'
 import { projectProviderConfig, providerSettings } from '../shared/providers'
 import { SETTINGS_CATALOG, checkSettingValue, effortTakes, settingDefault, settingEntry, settingKind, settingOptions, settingPatch, settingPath, settingValue, settingValueText, shownSettingPath, workflowTakes, type SettingContext, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
 import { checkOptions, problemText, workflowChanged } from './workflow/rulesets'
+import { levelOwn, setLevelOptions } from './workflow/levels'
+import { problemEnglish, WorkflowRefused } from './workflow/optionsForm'
 import type { SettingDetail, SettingRow } from '../shared/toolReplies'
 import { language } from '../shared/i18n'
 import { SOURCE_LANGUAGE } from '../shared/i18n/languages'
@@ -125,13 +127,16 @@ export function settingRows(opts: { query?: string; scope?: SettingScope; projec
       const value = settingValue(e, config.settings, opts.project?.config, workspace.config, advanced.overrides())
       const def = settingDefault(e)
       const changed = JSON.stringify(value) !== JSON.stringify(def)
-      return { row: { id: e.id, title: e.title, value: settingValueText(e, value), ...(changed ? { default: settingValueText(e, def) } : {}), desc: firstSentence(e.desc), ...(e.readOnly ? { readOnly: true as const } : {}) }, advanced: !!e.advanced, changed }
+      return { row: { id: e.id, title: e.title, value: settingValueText(e, value), ...(changed ? { default: settingValueText(e, def) } : {}), desc: firstSentence(e.desc), ...(e.readOnly ? { readOnly: true as const } : {}) }, advanced: !!e.advanced, level: !!e.workflowLevel, changed }
     })
-  // Advanced settings (#367) only when a query asks or one was changed: the rest are one line, so a plain listing stays lean.
+  // Advanced settings (#367) and the workflow defaults at Hive's and the workspace's level (#1422) only when a query asks
+  // or one was changed: the rest are one line each, so a plain listing stays lean.
   if (words.length) return rows.map((r) => r.row)
   const atDefault = rows.filter((r) => r.advanced && !r.changed).length
+  const levelsAtDefault = rows.filter((r) => r.level && !r.changed).length
   return [
-    ...rows.filter((r) => !r.advanced || r.changed).map((r) => r.row),
+    ...rows.filter((r) => !(r.advanced || r.level) || r.changed).map((r) => r.row),
+    ...(levelsAtDefault ? [{ id: 'workflow.*', title: 'query "workflow" lists them', value: `${levelsAtDefault} more`, desc: "Hive's and the workspace's workflow defaults, per version control (inherit)." }] : []), // i18n-ignore: the Assistant's tools (English)
     ...(atDefault ? [{ id: 'advanced.*', title: 'query "advanced" lists them', value: `${atDefault} more`, desc: 'Advanced settings.' }] : [])
   ]
 }
@@ -233,6 +238,24 @@ export async function applySetting(
       await advanced.set(change.advanced.id, change.advanced.value, capture)
     }
     return { old, new: next }
+  }
+  if ('workflowLevel' in change) {
+    // A level's workflow default (#1422): saved as Settings saves the level (checked against the level and every project
+    // inheriting it), from the options it has as the guard checks them (a change meanwhile refuses it).
+    const { level, platform, key, value: v } = change.workflowLevel
+    const old = settingValue(e, config.settings, null, workspace.config)
+    guard?.(old)
+    const own: Record<string, unknown> = { ...levelOwn(workspace, level, platform) }
+    const base = { ...own }
+    if (v === null) delete own[key]
+    else own[key] = v
+    try {
+      await setLevelOptions(workspace, level, platform, { preset: null, options: own, base: { preset: null, options: base } })
+    } catch (err) {
+      if (err instanceof WorkflowRefused) throw new SettingRefused(400, `These workflow defaults can't be saved: ${err.problems.map(problemEnglish).join(' ')} Change the other options first, or tell the user.`)
+      throw err
+    }
+    return { old, new: settingValue(e, config.settings, null, workspace.config) }
   }
   if ('workspace' in change) {
     // The workspace's own (workspace.json), with nothing awaited between the guard and the change.

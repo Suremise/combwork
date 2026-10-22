@@ -167,6 +167,10 @@
     "defaultMessage": "From Hive’s settings",
     "description": "Where a workflow option’s value comes from: Hive’s own default."
   },
+  "workflow.form.from.here": {
+    "defaultMessage": "Set here",
+    "description": "Where a workflow default’s value comes from, in Settings → Workflow defaults or Settings → Workspace: set at this level."
+  },
   "workflow.form.from.platform": {
     "defaultMessage": "Default",
     "description": "Where a workflow option’s value comes from: nobody set it (every rule off)."
@@ -182,6 +186,22 @@
   "workflow.form.from.workspace": {
     "defaultMessage": "From the workspace",
     "description": "Where a workflow option’s value comes from: the workspace’s default."
+  },
+  "workflow.form.heir": {
+    "defaultMessage": "Project {project}: {options}",
+    "description": "A project inheriting a change of workflow defaults, in the dialog before saving them: its name, then the options that change for it, as a list."
+  },
+  "workflow.form.heirCards": {
+    "defaultMessage": "{n, plural, one {Its card in flight keeps the old rules.} other {Its # cards in flight keep the old rules.}}",
+    "description": "Under a project inheriting a change of workflow defaults, in the dialog before saving them: its cards already started (glossary 2.1: old rules)."
+  },
+  "workflow.form.heirLanes": {
+    "defaultMessage": "{n, plural, one {Its running lane keeps the old rules until it ends.} other {Its # running lanes keep the old rules until they end.}}",
+    "description": "Under a project inheriting a change of workflow defaults, in the dialog before saving them (glossary 2.1: old rules)."
+  },
+  "workflow.form.heirs": {
+    "defaultMessage": "{n, plural, one {This project inherits the change:} other {These # projects inherit the change:}}",
+    "description": "In the dialog before saving workflow defaults, above the projects that use them (they don’t set the changed options themselves)."
   },
   "workflow.form.identity": {
     "defaultMessage": "Commits as {name} <{email}>.",
@@ -202,6 +222,10 @@
   "workflow.form.inheritTip": {
     "defaultMessage": "Use the inherited value: {value}",
     "description": "The tooltip of the Inherit button of a workflow option. {value} is the value it would have."
+  },
+  "workflow.form.inheritor": {
+    "defaultMessage": "Project {project} inherits these options, and the change would make its options contradict each other:",
+    "description": "Why saving workflow defaults was refused: a project inheriting them would have contradictory options. Its reason follows on its own line. {project} is its name."
   },
   "workflow.form.invalid": {
     "defaultMessage": "These options can’t be used, so every rule is off in this project:",
@@ -226,6 +250,30 @@
   "workflow.form.lanes": {
     "defaultMessage": "{n, plural, one {This running lane keeps the old rules until it ends:} other {These running lanes keep the old rules until they end:}}",
     "description": "In the dialog before saving workflow options, above a list of lanes (glossary 2.1: old rules)."
+  },
+  "workflow.form.levelConfirm": {
+    "defaultMessage": "Projects that don’t set these options themselves use the new defaults from their next card.",
+    "description": "The message of the dialog before saving workflow defaults (Settings → Workflow defaults or Settings → Workspace)."
+  },
+  "workflow.form.levelForGit": {
+    "defaultMessage": "The defaults of Git projects.",
+    "description": "Beside the None · Git choice above workflow defaults, while Git is chosen."
+  },
+  "workflow.form.levelForNone": {
+    "defaultMessage": "The defaults of projects without version control.",
+    "description": "Beside the None · Git choice above workflow defaults, while None is chosen."
+  },
+  "workflow.form.levelGit": {
+    "defaultMessage": "Git",
+    "description": "The choice of the defaults for Git projects (glossary 2.1: keep)."
+  },
+  "workflow.form.levelNone": {
+    "defaultMessage": "None",
+    "description": "The choice of the defaults for projects without version control (glossary 2.1: None)."
+  },
+  "workflow.form.levelPlatform": {
+    "defaultMessage": "Version control",
+    "description": "Accessible name of the None · Git choice above workflow defaults: which version control’s defaults are shown (glossary 2.1)."
   },
   "workflow.form.loadFailed": {
     "defaultMessage": "Couldn’t read the workflow options: {error}",
@@ -270,6 +318,10 @@
   "workflow.form.noChecks": {
     "defaultMessage": "No checks.",
     "description": "Under “Checks pass before review” when it has none."
+  },
+  "workflow.form.noHeirs": {
+    "defaultMessage": "No project inherits the change now: each sets these options itself, or none uses this version control.",
+    "description": "In the dialog before saving workflow defaults, when no open project uses the changed options."
   },
   "workflow.form.noIdentity": {
     "defaultMessage": "No name and email are set in git config yet.",

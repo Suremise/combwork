@@ -14,7 +14,7 @@ import { HiveError } from '../hiveError'
 import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
 import * as G from '../platform/git'
-import type { Text } from '../../shared/advanced'
+import { englishText, linesOf, withValues, type Text } from '../../shared/advanced'
 import { msg } from '../../shared/i18n/msg'
 import { allOff, NAME_OPTIONS, PRESETS, preset, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
 import { writeWorkflow } from '../../shared/workflow/projectWorkflow'
@@ -131,11 +131,15 @@ export async function projectStages(ws: WorkspaceService, projectPath: string): 
   return { stages: compiled.ok ? compiled.ruleset.stages : mustCompile(allOff(p.platform.id)).stages, names: r.options.stageNames ?? {} }
 }
 
-/** A problem in English (the Assistant's tools, the log). */
-export const problemEnglish = (p: WorkflowProblem): string => problemText(p)
+const IM = {
+  inheritor: msg({ id: 'service.workflow.inheritor', defaultMessage: 'Project {project} inherits these options, and the change would make its options contradict each other:', description: 'Why saving workflow defaults (Settings → Workflow defaults or Settings → Workspace) was refused: a project that inherits them would have contradictory options. The reason follows on its own line. {project} is its name.' })
+}
 
-/** A problem as text for the window (its message, in the user's language), or its English reason. */
-export const problemShown = (p: WorkflowProblem): Text => problemShownOf(p)
+/** A problem in English (the Assistant's tools, the log); an inheriting project's names it (#1422). */
+export const problemEnglish = (p: WorkflowProblem): string => (p.kind === 'inheritor' ? `${englishText(withValues(IM.inheritor, { project: p.project }))} ${problemText(p.problem)}` : problemText(p))
+
+/** A problem as text for the window (its message, in the user's language), or its English reason; an inheriting project's on two lines. */
+export const problemShown = (p: WorkflowProblem): Text => (p.kind === 'inheritor' ? linesOf([withValues(IM.inheritor, { project: p.project }), problemShownOf(p.problem)]) : problemShownOf(p))
 
 const PRESET_IDS: (PresetId | null)[] = ['solo', 'pair', 'team', 'pairAgent', null]
 const isOptions = (v: unknown): v is Partial<WorkflowOptions> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -188,7 +192,7 @@ function changeOf(ws: WorkspaceService, platform: PlatformId, current: Partial<W
 }
 
 /** The project's cards in flight now: started this cycle and not Done. */
-async function cardsInFlight(ws: WorkspaceService, project: { path: string; name: string }): Promise<{ number: number; title: string }[]> {
+export async function cardsInFlight(ws: WorkspaceService, project: { path: string; name: string }): Promise<{ number: number; title: string }[]> {
   const wf = await workflowFor(ws, project.path)
   if (!wf) return []
   const store = FactStore.forBoard(ws, { project: project.name, key: project.name })

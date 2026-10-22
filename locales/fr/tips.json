@@ -363,6 +363,8 @@
   "tips.versionControlTab.title": "Un onglet pour la gestion de versions et le flux de travail",
   "tips.viewerTokens.text": "Une application qui montre ce que font tes agents, comme Apiary, n’a besoin que d’un jeton de lecture : Paramètres → Agent API → Jetons de lecture en crée un qui peut tout lire et ne rien modifier, et le révoque ensuite.",
   "tips.viewerTokens.title": "Laisser une autre application observer Hive",
+  "tips.workflowDefaults.text": "Paramètres → Flux de travail par défaut règle les options dont part chaque projet, et Paramètres → Espace de travail celles de l’espace de travail ouvert. Les options propres d’un projet l’emportent toujours, et l’enregistrement liste les projets qui héritent de la modification.",
+  "tips.workflowDefaults.title": "Définis un flux de travail une fois pour tous les projets",
   "tips.workflowOptions.text": "Gestion de versions → Flux de travail définit qui relit le travail d’une carte, quelles vérifications passent d’abord et qui le fusionne. Choisis un préréglage ou règle chaque option : un changement s’applique à partir de la prochaine carte qui démarre.",
   "tips.workflowOptions.title": "Choisis comment les cartes arrivent à Terminé",
   "tips.workflowPresetsWhy.text": "Dans Gestion de versions → Flux de travail, clique sur Solo, Binôme ou Équipe : le préréglage liste chaque option qu’il règle et pourquoi, et marque ce qu’il changerait. Rien ne change tant que tu ne l’utilises pas et n’enregistres pas.",

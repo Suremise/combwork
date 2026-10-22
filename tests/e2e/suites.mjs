@@ -270,6 +270,7 @@ export const SUITES = [
   { name: 'watchrelease' },
   { name: 'welcomefit' },
   { name: 'windows' },
+  { name: 'workflowdefaults' },
   { name: 'workflowoptions' },
   { name: 'wsmove' },
   { name: 'wsoverview' },

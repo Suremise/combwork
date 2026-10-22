@@ -1,3 +1,4 @@
+import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
 import { useEffect, useMemo, useState } from 'react'
 import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, ModelPrice, PermissionMode, ProviderId, TaskColumn, WorkspaceConfig } from '@shared/types'
@@ -38,7 +39,7 @@ interface SettingDef extends SettingEntry {
   render?: () => React.ReactNode
 }
 
-const SECTION_ICONS: Record<string, string> = { general: 'settings-gear', updates: 'cloud-download', appearance: 'symbol-color', providers: 'hubot', notifications: 'bell', sessions: 'history', assistant: 'person', workspace: 'root-folder', board: 'project', agents: 'organization', keybindings: 'keyboard', agentApi: 'broadcast', advanced: 'tools' }
+const SECTION_ICONS: Record<string, string> = { general: 'settings-gear', updates: 'cloud-download', appearance: 'symbol-color', providers: 'hubot', notifications: 'bell', sessions: 'history', assistant: 'person', workspace: 'root-folder', board: 'project', workflow: 'git-pull-request', agents: 'organization', keybindings: 'keyboard', agentApi: 'broadcast', advanced: 'tools' }
 
 const SECTIONS: (SettingsSectionInfo<Section> & { icon: string })[] = SETTINGS_SECTIONS.map((s) => ({ ...s, icon: SECTION_ICONS[s.id] ?? 'blank' }))
 
@@ -55,6 +56,8 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'workspace.hiddenProjects': () => <HiddenProjectsList />,
   'workspace.storage': () => <WorkspaceStorageList />,
   'workspace.antivirus': () => <AntivirusPanel />,
+  'workspace.workflowDefaults': () => <WorkflowLevelForm level="workspace" />,
+  'workflow.defaults': () => <WorkflowLevelForm level="global" />,
   'board.colors': () => <ColumnColors />,
   'assistant.provider': () => <AssistantProviderPicker />,
   'assistant.mode': () => <AssistantModePicker />,

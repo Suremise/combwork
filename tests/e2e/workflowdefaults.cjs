@@ -1,0 +1,140 @@
+// Workflow defaults at Hive's and the workspace's level (#1422, SPEC §16.6.6): the Workflow section's editor in a level
+// mode, in Settings → Workspace (the workspace's) and Settings → Workflow defaults (Hive's), each for None or for Git.
+// A workspace default set there: Save… lists the project inheriting it, the project's options show "From the workspace"
+// and its next card starts under them (a card started before keeps its rules). A project's own value still wins. Hive's
+// default sits under the workspace's (From Hive's settings). A level that would make an inheriting project contradictory
+// is refused, naming the project, and nothing is written. Screenshots in both themes. Dev build, throwaway profile and
+// workspace; no CLI is started, and the Assistant is off.
+const lib = require('./lib.cjs')
+const fs = require('fs')
+const path = require('path')
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
+const HUNG_MS = 15000
+
+const userData = path.join(lib.WORK, 'workflowdefaults-profile')
+const ws = path.join(lib.WORK, 'workflowdefaults-ws')
+const alpha = path.join(ws, 'alpha')
+let failed = 0
+const check = (name, ok, extra = '') => {
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
+}
+
+;(async () => {
+  for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
+  lib.gitProject(alpha)
+  // A Git project that sets no workflow option itself: it inherits every one.
+  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }], workflow: { platform: 'git', preset: null, options: {} } }))
+
+  const { app, page } = await lib.launch({ userData, viewport: { width: 1400, height: 950 } })
+  try {
+    page.on('pageerror', (e) => check('no page errors', false, e.message))
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const text = (loc) => loc.innerText().catch(() => '')
+    await lib.openWorkspace(inv, page, ws)
+    const wsJson = () => JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'workspace.json'), 'utf8'))
+    const shots = async (name, target) => {
+      // The toasts of earlier saves dismissed, and the pointer off the rows.
+      while ((await page.locator('.toast').count()) > 0) await page.locator('.toast').first().locator('button').last().click()
+      await page.mouse.move(5, 5)
+      for (const theme of ['dark', 'light']) {
+        await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+        if (target) await target.scrollIntoViewIfNeeded()
+        await page.screenshot({ path: path.join(lib.WORK, `workflowdefaults-${name}-${theme}.png`) })
+      }
+      await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    }
+    const settingsSection = async (label) => {
+      await page.keyboard.press('Control+,')
+      const nav = page.locator('.settings-nav .row', { hasText: label }).first()
+      await nav.waitFor({ timeout: HUNG_MS })
+      await nav.click()
+    }
+    const startCard = async (title) => {
+      const c = await inv('tasks:create', { title, project: 'alpha' })
+      await inv('tasks:move', c.number, 'doing', { agent: 'b1' })
+      const started = await lib.until(async () => (await inv('tasks:facts', c.number)).find((f) => f.kind === 'Started') ?? null, HUNG_MS)
+      return started?.ruleset ?? null
+    }
+    const before = await startCard('Before the default')
+    check('a card started before the change has its ruleset', !!before)
+
+    // --- The workspace's defaults: Settings → Workspace → Workflow defaults, Git.
+    await settingsSection('Workspace')
+    const level = page.locator('.workflow-level[data-level="workspace"]')
+    check('Settings → Workspace has the workspace’s workflow defaults, None · Git', !!(await lib.until(async () => (await level.count()) === 1 && (await level.locator('[data-platform="git"][aria-checked="true"]').count()) === 1, HUNG_MS)))
+    const form = level.locator('.workflow-form')
+    const row = (option) => form.locator(`.workflow-option[data-option="${option}"]`)
+    check('the editor’s groups, Inherit relative to Hive’s level (every option Default here)', !!(await lib.until(async () => (await row('style').count()) === 1, HUNG_MS)) && (await row('style').innerText()).includes('Default') && (await form.locator('.workflow-group[data-group="elsewhere"]').count()) === 0)
+    await row('style').locator('select').selectOption('squash')
+    check('a value set at this level says so', (await row('style').innerText()).includes('Set here'))
+    await form.locator('[data-action="save"]').click()
+    const dialog = page.locator('.dialog', { hasText: 'Save Workflow Options' })
+    await dialog.waitFor({ timeout: HUNG_MS })
+    const said = await text(dialog)
+    check('Save… lists the project inheriting the change, and what changes for it', said.includes('Project alpha: Merge style') && said.includes('from their next card'), said)
+    check('…and that alpha’s card in flight keeps the old rules', said.includes('Its card in flight keeps the old rules'), said)
+    await shots('save', dialog)
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+    check('saved in workspace.json', !!(await lib.until(async () => wsJson().workflow?.git?.style === 'squash', HUNG_MS)), JSON.stringify(wsJson().workflow))
+    await shots('workspace', level.locator('.workflow-level-head'))
+
+    // --- The project: inherits it, its origin the workspace; its next card starts under it.
+    await page.keyboard.press('Escape')
+    await page.getByText('alpha', { exact: true }).first().click()
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    await page.locator('.git-sections [data-section="workflow"]').click()
+    const project = page.locator('.workflow-form')
+    const projectRow = (option) => project.locator(`.workflow-option[data-option="${option}"]`)
+    check('the project shows the workspace’s value, From the workspace', !!(await lib.until(async () => (await projectRow('style').locator('select').inputValue().catch(() => '')) === 'squash' && (await projectRow('style').innerText()).includes('From the workspace'), HUNG_MS)), await text(projectRow('style')))
+    const after = await startCard('After the default')
+    check('its next card starts under the new options (another ruleset)', !!after && after !== before, `${before} → ${after}`)
+    check('the card started before keeps its ruleset', (await inv('tasks:facts', 1)).find((f) => f.kind === 'Started')?.ruleset === before)
+
+    // --- A project's own value still wins.
+    await projectRow('style').locator('select').selectOption('merge')
+    await project.locator('[data-action="save"]').click()
+    await dialog.waitFor({ timeout: HUNG_MS })
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+    check('the project’s own value wins: Merge commit, Set for this project', !!(await lib.until(async () => (await projectRow('style').locator('select').inputValue()) === 'merge' && (await projectRow('style').innerText()).includes('Set for this project'), HUNG_MS)))
+
+    // --- Hive's defaults, under the workspace's: Settings → Workflow defaults.
+    await settingsSection('Workflow defaults')
+    const hive = page.locator('.workflow-level[data-level="global"]')
+    const hiveRow = (option) => hive.locator(`.workflow-option[data-option="${option}"]`)
+    check('Settings → Workflow defaults has Hive’s', !!(await lib.until(async () => (await hiveRow('dependenciesDone').count()) === 1, HUNG_MS)))
+    await hiveRow('dependenciesDone').locator('[role="switch"], input[type="checkbox"]').first().click()
+    await hive.locator('[data-action="save"]').click()
+    await dialog.waitFor({ timeout: HUNG_MS })
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+    const form2 = await lib.until(async () => {
+      const f = await inv('workflow:form', alpha)
+      return f.origins.dependenciesDone === 'global' ? f : null
+    }, HUNG_MS)
+    check('the project inherits Hive’s default, under the workspace’s (style still its own)', !!form2 && form2.options.dependenciesDone === true && form2.origins.style === 'project', JSON.stringify(form2?.origins))
+    await shots('hive', hive.locator('.workflow-level-head'))
+    // The workspace's level shows Hive's as what it inherits.
+    await page.locator('.settings-nav .row', { hasText: 'Workspace' }).first().click()
+    check('the workspace’s level inherits it: From Hive’s settings', !!(await lib.until(async () => (await row('dependenciesDone').innerText().catch(() => '')).includes('From Hive’s settings'), HUNG_MS)))
+
+    // --- A level that would make an inheriting project contradictory is refused, naming it.
+    await inv('workflow:setOptions', alpha, { preset: null, options: { style: 'merge', finish: 'committed' } })
+    await row('folder').locator('select').selectOption('slots')
+    await form.locator('[data-action="save"]').click()
+    const problems = form.locator('.workflow-problems')
+    check('refused: alpha inherits it and would contradict, with the reason', !!(await lib.until(async () => (await text(problems)).includes('Project alpha inherits these options') && (await text(problems)).includes('needs everyone in the project folder'), HUNG_MS)), await text(problems))
+    check('…nothing written', wsJson().workflow?.git?.folder === undefined)
+    await shots('refused', problems)
+  } catch (e) {
+    check('the suite ran to the end', false, e.stack ?? String(e))
+    await page.screenshot({ path: path.join(lib.WORK, 'workflowdefaults-failed.png') }).catch(() => {})
+  } finally {
+    await app.close().catch(() => {})
+  }
+  console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
+  process.exit(failed ? 1 : 0)
+})()

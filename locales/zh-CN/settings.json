@@ -841,6 +841,8 @@
   "settings.section.sessions.label": "会话",
   "settings.section.updates.desc": "让 Hive 自身保持最新。新版本来自 Hive 的 GitHub Releases，安装前会经过验证。",
   "settings.section.updates.label": "更新",
+  "settings.section.workflow.desc": "每个项目在所有工作区中的起始工作流程选项。工作区的默认设置（“设置”→“工作区”）和项目自己的选项（其“版本控制”选项卡）优先于它们。",
+  "settings.section.workflow.label": "默认工作流程",
   "settings.section.workspace.desc": "当前工作区的卡片循环、Hive 不显示的项目（已隐藏，或已从 Hive 中移除并将其交接和卡片打包进文件夹），以及 Hive 为每个项目保存多少内容。",
   "settings.section.workspace.label": "工作区",
   "settings.sessions.backupRetention.desc": "Hive 为 CLI 仍保有的会话保留备份的时长。超过这么多天没有活动后，备份会移到回收站。如果某个会话唯一的副本是 Hive 的备份，则始终不会动它。",
@@ -946,6 +948,8 @@
   "settings.viewers.revokeTitle": "撤销“{name}”？",
   "settings.viewers.token": "令牌",
   "settings.viewers.tokenOf": "{name} 的令牌",
+  "settings.workflow.defaults.desc": "为“无”或 Git 选择一个预设，或逐项设置选项。每个选项都会显示其值的来源。",
+  "settings.workflow.defaults.title": "Hive 的默认工作流程",
   "settings.workspace.antivirus.desc": "Hive 的工作（构建、测试、Git、工作树）更改工作区文件夹时，Microsoft Defender 是否会扫描它们，以及经你同意后 Hive 可以为其添加的排除项。",
   "settings.workspace.antivirus.tip": "Hive 在没有管理员权限的情况下检查，因此 Defender 可能不会显示其排除项（未知）。添加或删除排除项时会请求一次管理员权限。Hive 只会提供这些文件夹：工作区、工作区的工作树文件夹（存在后），以及供 Hive 开发者使用的测试区域。它从不更改其他防病毒软件。",
   "settings.workspace.antivirus.title": "防病毒扫描",
@@ -960,5 +964,7 @@
   "settings.workspace.loopWaitHours.title": "卡片循环等待时间",
   "settings.workspace.storage.desc": "Hive 为工作区的每个项目（从最大的开始）和 Hive Assistant 保存的内容：会话记录备份、已归档的会话、附件和工作树。点“存储”会打开项目的页面，其中有“清理…”和“彻底清除…”；这里的“彻底清除…”会删除 Hive 为整个工作区的会话保存的所有内容。",
   "settings.workspace.storage.tip": "在后台逐个项目测量。编程智能体自己的会话记录（位于 ~/.claude、~/.codex 和 ~/.copilot）不计入。已隐藏的项目不包括在内。",
-  "settings.workspace.storage.title": "存储"
+  "settings.workspace.storage.title": "存储",
+  "settings.workspace.workflowDefaults.desc": "此工作区的项目的起始工作流程选项，优先于 Hive 的选项（“设置”→“默认工作流程”）。项目自己的选项优先于它们。",
+  "settings.workspace.workflowDefaults.title": "默认工作流程"
 }

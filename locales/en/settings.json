@@ -3367,6 +3367,14 @@
     "defaultMessage": "Updates",
     "description": "A section of Settings, in its list on the left."
   },
+  "settings.section.workflow.desc": {
+    "defaultMessage": "The workflow options every project starts from, in every workspace. A workspace’s defaults (Settings → Workspace) and a project’s own options (its Version Control tab) win over them.",
+    "description": "Under the heading of the section \"Workflow defaults\" of Settings: what it holds. Version Control is the tab’s name (glossary 2.1)."
+  },
+  "settings.section.workflow.label": {
+    "defaultMessage": "Workflow defaults",
+    "description": "A section of Settings, in its list on the left: the workflow options every project inherits unless its workspace or itself sets them (glossary 2.1: workflow)."
+  },
   "settings.section.workspace.desc": {
     "defaultMessage": "The open workspace's card loops, its projects that Hive leaves out (hidden, or removed from Hive with their handovers and cards packed into the folder), and how much Hive keeps for each project.",
     "description": "Under the heading of the section \"Workspace\" of Settings: what it holds."
@@ -3787,6 +3795,14 @@
     "defaultMessage": "{name}'s token",
     "description": "The name, for screen readers, of a viewer token's box. {name} is the token's name."
   },
+  "settings.workflow.defaults.desc": {
+    "defaultMessage": "Pick a preset, or set each option, for None or for Git. Each shows where its value comes from.",
+    "description": "What the setting \"Hive’s workflow defaults\" does, under its title (Settings → Workflow defaults). None and Git: glossary 2.1."
+  },
+  "settings.workflow.defaults.title": {
+    "defaultMessage": "Hive’s workflow defaults",
+    "description": "A setting's title (Settings → Workflow defaults): the workflow options every project inherits (glossary 2.1: workflow)."
+  },
   "settings.workspace.antivirus.desc": {
     "defaultMessage": "Whether Microsoft Defender scans the workspace's folders as Hive's work changes them (builds, tests, git, worktrees), and the exclusions Hive can add for them, with your consent.",
     "description": "What the setting \"Antivirus scanning\" does, under its title (Settings → Workspace)."
@@ -3846,5 +3862,13 @@
   "settings.workspace.storage.title": {
     "defaultMessage": "Storage",
     "description": "A setting's title (Settings → Workspace)."
+  },
+  "settings.workspace.workflowDefaults.desc": {
+    "defaultMessage": "The workflow options this workspace’s projects start from, over Hive’s (Settings → Workflow defaults). A project’s own options win over them.",
+    "description": "What the setting \"Workflow defaults\" does, under its title (Settings → Workspace)."
+  },
+  "settings.workspace.workflowDefaults.title": {
+    "defaultMessage": "Workflow defaults",
+    "description": "A setting's title (Settings → Workspace): the workflow options this workspace's projects inherit (glossary 2.1: workflow)."
   }
 }

@@ -11796,6 +11796,23 @@ button.progress-run-show:focus-visible {
   margin-block: 4px 0;
   padding-inline-start: 18px;
 }
+/* A level's workflow defaults (#1422): None · Git, then the editor. */
+.workflow-level {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.workflow-level-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-block-end: 10px;
+}
+.workflow-heirs ul {
+  margin-block: 4px 8px;
+  padding-inline-start: 20px;
+}
 .workflow-stages {
   display: flex;
   flex-direction: column;
