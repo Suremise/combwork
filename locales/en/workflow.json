@@ -375,10 +375,6 @@
     "defaultMessage": "Verdict",
     "description": "A move on a card, named in a refused move: a reviewer passing or failing it (glossary 2.3: verdict)."
   },
-  "workflow.notOffered.hiveMerges": {
-    "defaultMessage": "“Hive merges” isn’t available in this version yet: choose “The agent merges, Hive checks”.",
-    "description": "Why workflow options cannot be saved: Hive merging cards itself comes in a later version of Hive."
-  },
   "workflow.notOffered.later": {
     "defaultMessage": "Some of these options aren’t available in this version yet: leave them as they are.",
     "description": "Why workflow options cannot be saved: an option set (up to date before merging, slots kept up to date) comes in a later version of Hive."
@@ -412,8 +408,8 @@
     "description": "A workflow option for a project without version control (glossary 2.6, N4)."
   },
   "workflow.option.finish.desc": {
-    "defaultMessage": "When a card is done: once its agent has merged it and Hive finds the work in the target branch, once it is committed, or whenever it is moved there.",
-    "description": "What the workflow option “Who merges” does."
+    "defaultMessage": "When a card is done: once Hive’s merge queue has merged it, once its agent has merged it and Hive finds the work in the target branch, once it is committed, or whenever it is moved there.",
+    "description": "What the workflow option “Who merges” does (glossary 2.1: merge queue)."
   },
   "workflow.option.finish.title": {
     "defaultMessage": "Who merges",
@@ -434,6 +430,22 @@
   "workflow.option.identity.title": {
     "defaultMessage": "Commits use the project’s identity",
     "description": "A workflow option (glossary 2.6, G12)."
+  },
+  "workflow.option.mergeChecks.desc": {
+    "defaultMessage": "Each check is a named command. Hive’s merge queue runs them on the card’s work merged with the target branch, and moves the target only once each one has passed.",
+    "description": "What the workflow option “Checks pass on the merged result” does (glossary 2.1: merge queue)."
+  },
+  "workflow.option.mergeChecks.title": {
+    "defaultMessage": "Checks pass on the merged result",
+    "description": "A workflow option (glossary 2.6, G9): named commands Hive’s merge queue runs on a card’s work merged with the target branch."
+  },
+  "workflow.option.mergeInstall.desc": {
+    "defaultMessage": "Before the checks on the merged result. A change to the lock file or the manifests always installs from scratch, whichever you choose.",
+    "description": "What the workflow option “Install dependencies from scratch” does. Lock file: as in the glossary (G15 value)."
+  },
+  "workflow.option.mergeInstall.title": {
+    "defaultMessage": "Install dependencies from scratch",
+    "description": "A workflow option (G9’s install): when the merge queue installs the project’s dependencies afresh before the merge checks."
   },
   "workflow.option.noSelfReview.desc": {
     "defaultMessage": "Always on while a reviewer agent checks the work.",
@@ -523,13 +535,13 @@
     "defaultMessage": "Custom",
     "description": "The workflow preset shown when the options no longer match a preset (glossary 2.1)."
   },
-  "workflow.preset.needs.hiveMerges": {
-    "defaultMessage": "Needs Hive to merge cards, which comes in a later version.",
-    "description": "Why a workflow preset can’t be chosen yet."
-  },
   "workflow.preset.needs.slots": {
     "defaultMessage": "Needs a folder of its own for every card, which comes in a later version.",
     "description": "Why a workflow preset can’t be chosen yet."
+  },
+  "workflow.preset.note.team": {
+    "defaultMessage": "Team checks the merged result with the quick checks and the unit tests. Running each card’s own focused tests there too comes in a later version.",
+    "description": "Under the preset choice of Project Settings → Workflow while Team is chosen (glossary 2.1: Team; G9: the merged result)."
   },
   "workflow.preset.pair": {
     "defaultMessage": "Pair",
@@ -1190,6 +1202,14 @@
   "workflow.value.folder.slots": {
     "defaultMessage": "Each card in its own folder",
     "description": "A value of the workflow option “Where cards are built” (glossary 2.6, G11). In this version the folder is the builder’s worktree."
+  },
+  "workflow.value.mergeInstall.always": {
+    "defaultMessage": "Before every merge",
+    "description": "A value of the workflow option “Install dependencies from scratch”: before each card’s merge checks."
+  },
+  "workflow.value.mergeInstall.onManifestChange": {
+    "defaultMessage": "When the lock file or manifests change",
+    "description": "A value of the workflow option “Install dependencies from scratch”: only when the project’s lock file or package manifests changed (glossary: lock file, as in the G15 value)."
   },
   "workflow.value.okBefore.every": {
     "defaultMessage": "Every card",
