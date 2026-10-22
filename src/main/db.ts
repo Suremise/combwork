@@ -321,6 +321,10 @@ export function openDb(file: string, opts: OpenOptions): Db {
       newer,
       pending,
       close: () => {
+        // The reader first (#1324): while it has the file mapped, Windows refuses the checkpoint's truncation of a file
+        // that shrank (incremental vacuum), silently, and the close after it has nothing left to copy, so the file kept
+        // its biggest size for good.
+        r.close()
         try {
           if (writer.isTransaction) writer.exec('ROLLBACK')
           if (newer === null && !pending) {
@@ -330,7 +334,6 @@ export function openDb(file: string, opts: OpenOptions): Db {
         } catch {
           // Closing anyway.
         }
-        r.close()
         writer.close()
       }
     }

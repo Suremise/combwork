@@ -5,7 +5,7 @@
 import { readCard } from './boardDb'
 import { moveFolder } from './moveFolder'
 import { closeAllBoards } from '../src/main/boardStore'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -1481,7 +1481,7 @@ describe('watches (main/watches.ts)', async () => {
     // Renamed while Hive was closed: read back, the watch is the project's under its new name.
     await disposeWorkspaceService(w)
     const gamma = join(path, 'gamma')
-    renameSync(alpha, gamma)
+    await moveFolder(alpha, gamma)
     fake(gamma)
     const w2 = createWorkspaceService()
     await w2.open(path)
@@ -1510,7 +1510,7 @@ describe('watches (main/watches.ts)', async () => {
     const before = savedOf(path)[0]
     await disposeWorkspaceService(w)
     // alpha leaves the workspace, and a new alpha comes, with an agent of the same id.
-    renameSync(alpha, join(path, '..', `${basename(path)}-alpha-elsewhere`))
+    await moveFolder(alpha, join(path, '..', `${basename(path)}-alpha-elsewhere`))
     mkdirSync(join(alpha, '.hive'), { recursive: true })
     writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Someone else' }] }))
     fake(alpha)
@@ -1533,7 +1533,7 @@ describe('watches (main/watches.ts)', async () => {
     await putSaved(path, saved)
     await disposeWorkspaceService(w)
     const gamma = join(path, 'gamma')
-    renameSync(alpha, gamma)
+    await moveFolder(alpha, gamma)
     fake(gamma)
     const w2 = createWorkspaceService()
     await w2.open(path)
@@ -1581,9 +1581,11 @@ describe('watches (main/watches.ts)', async () => {
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha' }, user))
     await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['comment'] })
     const gamma = join(path, 'gamma')
-    renameSync(alpha, gamma)
+    // Tried again while Windows holds the folder a moment (#1365: EPERM under load, Hive's own watchers or a scanner).
+    await moveFolder(alpha, gamma)
     const st = fake(gamma)
-    await new Promise((r) => setTimeout(r, 1100))
+    // Once Hive's project ids have the folder by its new name (they're read again a second on, #508), not after a time.
+    await vi.waitFor(async () => expect((await w.projectIds()).byPath.has(gamma.toLowerCase())).toBe(true), { timeout: HUNG_MS })
     await inWorkspace(w, () => tasks.commentTask(c.number, 'Ready', user))
     await evaluated(w)
     expect(st.told).toEqual([expect.stringContaining(`#${c.number}`)])

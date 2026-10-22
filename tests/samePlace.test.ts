@@ -153,7 +153,9 @@ describe('places by real path (#455)', () => {
       process.env.HIVE_TEST_TRASH_DIR = trashDir
       try {
         const agents = [agent('z', alias(q, 'q-delete')), agent('y', alias(outer, 'outer-delete')), agent('x', alias(q2, 'q2-delete')), agent('s', alias(spare, 'spare-delete'))]
-        writeFileSync(join(q, '.hive', 'project.json'), JSON.stringify({ version: 2, agents }))
+        // Under project.json's lock, as Hive writes it (#1238): written beside it, a write the opened workspace began
+        // before (its project ids, 250 ms on) put back the config from before, and Delete found no agents.
+        await w2.mutateProjectConfig(q, () => ({ agents }))
         const { warnings } = await inWorkspace(w2, () => removeProject(q, 'delete'))
         expect(warnings).toEqual([expect.stringMatching(/^Left alone: Z's worktree .*contains the project/), expect.stringMatching(/^Left alone: Y's worktree .*contains the project/), expect.stringMatching(/^Left alone: X's worktree .*another project/)])
         // What went: the project, and the one worktree that was safe (by the name the agent had for it).
