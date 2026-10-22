@@ -557,7 +557,8 @@ export class Workflow {
     const builder = builderOpt ?? agentOf(actor) ?? 'user'
     const warnings: string[] = []
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(`${card.key} is blocked: ${s.blocked}`) // i18n-ignore: agent-facing warning in the spike's reply
-    const before = await this.evidenceOf(card, s, o)
+    // Its target's ref included, resolved as the plan resolves it (#1401: the default branch, when G7 is empty).
+    const before = await this.evidenceOf(card, s, o, builder)
     const plan = await this.platform(o).start(card, o, builder)
     if (isUnknown(plan)) return { rule: 'platform.unknown', values: { card: card.key, what: plan.whatText ?? plan.what, rule: 'start' } }
     const { existing, ...planned } = plan
@@ -617,8 +618,8 @@ export class Workflow {
    * None's paths' hash) and the facts of the cards it waits for. Taken before the slow reads and again inside the
    * transaction (`evidenceChanged`), so nothing is written on evidence that changed meanwhile.
    */
-  async evidenceOf(card: CardRecord, s: CardState, o: WorkflowOptions): Promise<Evidence> {
-    const primed = await this.platform(o).prime(card, s, o)
+  async evidenceOf(card: CardRecord, s: CardState, o: WorkflowOptions, builder?: string): Promise<Evidence> {
+    const primed = await this.platform(o).prime(card, s, o, builder)
     const content = await this.platform(o).content(card, s, o, primed)
     return { primed, value: this.evidenceNow(card, s, o, primed), content }
   }
