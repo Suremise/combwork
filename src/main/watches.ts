@@ -18,7 +18,7 @@ import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
 import { listLanes } from './lanes'
 import { LANE_CARD_CHANGES, laneCardMark, laneHits, laneLimitLine, laneWakeLine, laneWatchLabel, mergeDue, mergeStallReason, newLaneBase, readSavedLaneCondition, readSavedLaneMark, verdictsOf, type LaneHit, type LaneMark, type LaneNow, type LaneWatchCards, type LaneWatchCondition, type WaitHit } from '../shared/laneWatch'
-import { cardStallIn } from './cardStall'
+import { cardStallIn, laneOrderView } from './cardStall'
 import { noteLoopWatch } from './loopCheck'
 import { sessions } from './sessions'
 import { allTasks, getTask, inScope, noteOnCard, unknownTask } from './tasks'
@@ -1291,11 +1291,13 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
     const marks: LaneMark['cards'] = {}
     const cards: LaneNow['cards'] = []
     const changed: { mark: LaneMark['cards'][string]; updatedAt?: string }[] = []
+    // A running lane's deadlock (#1410): its reviewer waiting for one of its cards while its builder waits on another.
+    const order = l.state === 'active' || l.state === 'paused' ? laneOrderView(l, (n) => byNumber.get(n)?.key) : null
     for (const lc of l.cards) {
       const found = byNumber.get(lc.number)
       // A card moved to another project is gone from the lane.
       const card = found && same(found.project, l.project) ? found : null
-      const stalled = card && !card.archived ? await cardStallIn(ws, card, agents) : null
+      const stalled = card && !card.archived ? await cardStallIn(ws, card, agents, order) : null
       marks[lc.number] = laneCardMark(card, stalled)
       changed.push({ mark: marks[lc.number], updatedAt: card?.updatedAt })
       const v = card ? verdictsOf(card) : null

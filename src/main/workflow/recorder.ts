@@ -386,7 +386,11 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
     const now = new Map((after.decisions ?? []).map((d) => [d.id, d.text]))
     for (const [id, text] of now) if (!had.has(id) || had.get(id) !== text) decision({ id, text })
     for (const [id, text] of had) if (!now.has(id)) decision({ id, text }, true)
-    if (inLoop(ws, after)) loopWakes(tx, n, actor, after, { submitted, verdict, moved: moved !== null && (to === 'approved' || to === 'done') ? moved : null, decided }, STAGE_OF[after.column])
+    // A lane reviewer's comment taken as its request to the builder (#1410, tasks.ts' laneReviewerAsks): the runtime's
+    // ReviewerRequest, made on the board (hive_request_builder's own is the runtime's, made there).
+    const asked = moves && history.some((h) => h.whatText?.id === HISTORY.reviewerRequest.id) ? after.comments.find((c) => c.id === comment)?.text : undefined
+    const requested = asked !== undefined ? tx.append(n, { kind: 'ReviewerRequest', actor, source: 'recorded', ...ruleset(), data: { text: asked } }).seq : null // i18n-ignore: a fact's kind and codes, not text
+    if (inLoop(ws, after)) loopWakes(tx, n, actor, after, { submitted, verdict, moved: moved !== null && (to === 'approved' || to === 'done') ? moved : null, decided, requested }, STAGE_OF[after.column])
   })
 }
 
@@ -430,13 +434,15 @@ function inLoop(ws: WorkspaceService, card: TaskCard): boolean {
  * reviewer too while the card is in Review or Passed (#587, S5): one action per agent woken, each carrying who made the
  * change (never woken by its own) and the history entry the handoff left.
  */
-function loopWakes(tx: Tx, n: number, by: Actor, after: TaskCard, f: { submitted: number | null; verdict: number | null; moved: number | null; decided: number | null }, stage: StageId): void {
+function loopWakes(tx: Tx, n: number, by: Actor, after: TaskCard, f: { submitted: number | null; verdict: number | null; moved: number | null; decided: number | null; requested: number | null }, stage: StageId): void {
   const last = after.history.at(-1)
   const since = last ? { at: last.at, ...(last.id ? { id: last.id } : {}) } : null
   const common = { by, ...(since ? { since } : {}) }
   if (f.verdict !== null) tx.action(n, 'wake', { agent: 'builder', about: 'verdict', ...common }, f.verdict)
   else if (f.submitted !== null) tx.action(n, 'wake', { agent: 'reviewers', about: 'review', ...common }, f.submitted)
   else if (f.moved !== null) tx.action(n, 'wake', { agent: 'builder', about: stage === 'done' ? 'done' : 'approved', ...common }, f.moved)
+  // Its text from the fact (loopWakes.ts' aboutOf), as the runtime's request's.
+  else if (f.requested !== null) tx.action(n, 'wake', { agent: 'builder', ...common }, f.requested)
   if (f.decided !== null) {
     tx.action(n, 'wakeOnDecision', { to: 'builder', by }, f.decided)
     if (stage === 'review' || stage === 'approved') tx.action(n, 'wakeOnDecision', { to: 'reviewer', by }, f.decided)

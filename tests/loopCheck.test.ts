@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { cardsInPlay, unwatched } from '../src/main/loopCheck'
 import { providerDescriptor } from '../src/shared/providers'
-import { notWatchingAgent, notWatchingReason, REVIEW_WAIT_STALL_MS, reviewVerdictWaitReason, reviewWaitReason } from '../src/shared/tasks'
+import { laneOrderWait, laneOrderWaitReason, notWatchingAgent, notWatchingReason, REVIEW_WAIT_STALL_MS, reviewVerdictWaitReason, reviewWaitReason } from '../src/shared/tasks'
 import type { TaskCard } from '../src/shared/types'
 
 const card = (number: number, over: Partial<TaskCard> = {}): TaskCard => ({ number, title: `Card ${number}`, project: 'alpha', column: 'todo', agent: null, archived: false, labels: [], blockedBy: [], links: [], comments: [], history: [], ...over }) as unknown as TaskCard
@@ -136,5 +136,38 @@ describe('a card in Review whose reviewer started, gave no verdict and only watc
     expect(reviewVerdictWaitReason(started(), [], late)).toBeNull()
     // The other review stall (#521) is for a review not started: the two never both apply.
     expect(reviewWaitReason(started({ history: [{ at: at(-1), by: 'HB3 (alpha)', what: 'Moved to Review' }] }), watching, late)).toBeNull()
+  })
+})
+
+describe("a lane's deadlock: its reviewer waits for one card while its builder waits on another's review (#1410)", () => {
+  // 22 Oct: HB2 sent #1364 to Review ahead of #1344 (Todo); HR2 kept the lane's order and watched #1344; HB2 watched #1364.
+  const t0 = Date.parse('2026-10-22T02:08:07.437Z')
+  const sent = (over: Partial<TaskCard> = {}) => card(1364, { column: 'review', agent: 'b2', history: [{ at: '2026-10-22T02:08:07.437Z', by: 'HB2 (alpha)', what: 'Moved to Review' }], ...over })
+  const lane = { builder: 'b2', reviewer: 'r2', cards: [{ number: 1384, column: 'passed' }, { number: 1344, column: 'todo' }, { number: 1364, column: 'review' }] }
+  const hr2 = { name: 'HR2', project: 'alpha', agentId: 'r2', cards: [1344], status: 'watching' }
+  const hb2 = { name: 'HB2', project: 'alpha', agentId: 'b2', cards: [1364], status: 'watching' }
+  it('stalled once the card has waited the limit, naming the card the reviewer waits for', () => {
+    expect(laneOrderWaitReason(sent(), lane, [hr2, hb2], t0 + REVIEW_WAIT_STALL_MS - 1000)).toBeNull()
+    expect(laneOrderWaitReason(sent(), lane, [hr2, hb2], t0 + REVIEW_WAIT_STALL_MS)).toBe('HR2 is waiting for #1344, not #1364, while HB2 waits on the review of #1364: each waits on the other. In Review for 15 min.')
+    expect(laneOrderWaitReason(sent(), lane, [hr2, hb2], t0 + 5 * 3600_000)).toMatch(/In Review for 5 h\.$/)
+    // The reviewer watching both: it waits for the one still to come, not the one it passed.
+    expect(laneOrderWait(sent(), lane, [{ ...hr2, cards: [1384, 1344] }, hb2], t0 + 3600_000)?.waitsFor.number).toBe(1344)
+  })
+  it('not while the reviewer watches the card, works, or only watches cards in Review; nor without the builder\'s watch, a lane, or a review not yet due', () => {
+    const late = t0 + 3600_000
+    expect(laneOrderWaitReason(sent(), lane, [{ ...hr2, cards: [1344, 1364] }, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), lane, [{ ...hr2, status: 'working' }, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), { ...lane, cards: [...lane.cards.slice(0, 1), { number: 1344, column: 'review' }, lane.cards[2]] }, [hr2, hb2], late)).toBeNull()
+    // The builder at work on the card the reviewer waits for: no deadlock.
+    expect(laneOrderWaitReason(sent(), lane, [hr2, { ...hb2, cards: [1344] }], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), lane, [hr2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), null, [hr2, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), { ...lane, reviewer: null }, [hr2, hb2], late)).toBeNull()
+    // Reviewed, blocked, archived, in another column, or another project's agents.
+    expect(laneOrderWaitReason(sent({ review: { agent: 'r2', agentName: 'HR2', since: '' } as never }), lane, [hr2, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent({ blocked: 'Asked the user' }), lane, [hr2, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent({ archived: true }), lane, [hr2, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent({ column: 'doing' }), lane, [hr2, hb2], late)).toBeNull()
+    expect(laneOrderWaitReason(sent(), lane, [{ ...hr2, project: 'beta' }, hb2], late)).toBeNull()
   })
 })
