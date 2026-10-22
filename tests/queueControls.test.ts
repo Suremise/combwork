@@ -4,7 +4,7 @@
 // user's and the Assistant's, never an agent's or a script's. A real workspace and repository; the queue's host is a
 // stand-in (nothing runs by itself), its runs driven here.
 import { execFileSync } from 'child_process'
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -32,6 +32,8 @@ const { MergeQueue } = await import('../src/main/workflow/mergeQueue')
 const { pauseQueue, queueCardChange, queueViews, resumeQueue } = await import('../src/main/workflow/queueControls')
 const { runCardIntent } = await import('../src/main/cardIntents')
 const { allOff } = await import('../src/shared/workflow/options')
+const control = await import('../src/main/assistantControl')
+const { config } = await import('../src/main/config')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -150,6 +152,60 @@ describe("a card's Remove from queue and Retry merge (#1353, OP-9)", () => {
     expect(facts(w, card).filter((f) => f.kind === 'IntegrationRequested').at(-1)?.data).toMatchObject({ requeue: 'retry' })
     expect(await drain(w, repo, false)).toMatchObject([{ outcome: 'returned' }])
     expect(await refusedWith(inWorkspace(w, () => queueCardChange(w, card, user, 'retryMerge', 'once more')))).toBe('move.notFromHere')
+  })
+})
+
+describe("the Assistant's authority, checked again at each write (HR3's round 1 finding 2)", () => {
+  const setControl = (level: 'look' | 'agents' | 'projects'): void => {
+    config.settings.assistant = { ...config.settings.assistant, control: level } as typeof config.settings.assistant
+  }
+  afterEach(() => setControl('projects'))
+
+  it('Control turned down, or the session ended, while a pause, resume, remove or retry is pending: nothing written, nothing run', async () => {
+    const { w, wt, repo, ws } = await workspace()
+    const card = await approved(w, wt)
+    const wf = (await service.workflowFor(w, repo))!
+    /** The change boundary as the Agent API admits a change (assistantControl.admit): its guard, with a calls count. */
+    const admitted = async () => {
+      setControl('agents')
+      await control.newAssistantToken(ws)
+      const token = JSON.parse(readFileSync(control.assistantTokenFile(ws), 'utf8')).token as string
+      const guard = control.admit(ws, token, 'agents', 'change the merge queue', { kind: 'queue-pause', project: 'p' })
+      const b = { calls: 0, guard: () => (b.calls++, guard()) }
+      return b
+    }
+    // Each call starts (it awaits the workflow, the card) and is admitted; then Control is turned down to Look and
+    // advise, or the Assistant's session ends, before its write.
+    let turn = 0
+    const pending = async (call: (guard: () => void) => Promise<unknown>) => {
+      const b = await admitted()
+      const p = inWorkspace(w, () => call(b.guard))
+      const how = turn++ % 2 === 0 ? 'control' : 'session'
+      if (how === 'control') setControl('look')
+      else control.endAssistant(ws)
+      await expect(p).rejects.toThrow(how === 'control' ? /Control down/ : /session that asked for this ended/)
+      expect(b.calls).toBeGreaterThan(0)
+    }
+    await pending((g) => pauseQueue(w, repo, 'main', 'assistant', g))
+    expect(wf.store.queuePause('main')).toBeNull()
+    await pending((g) => queueCardChange(w, card, assistant, 'removeFromQueue', 'later', g))
+    expect(facts(w, card).some((f) => f.kind === 'IntegrationCancelled' || f.kind === 'Override')).toBe(false)
+    expect(wf.state(wf.store.card(card)).stage).toBe('merging')
+    await wf.locked(() => wf.store.setQueuePause('main', { reason: 'user', card: '', by: 'user' }))
+    await pending((g) => resumeQueue(w, repo, 'main', g))
+    expect(wf.store.queuePause('main')).toMatchObject({ reason: 'user' })
+    expect(host.kicked).toEqual([])
+    // A returned card's Retry merge: not queued again.
+    await wf.locked(() => wf.store.setQueuePause('main', null))
+    await drain(w, repo, false)
+    const requested = facts(w, card).filter((f) => f.kind === 'IntegrationRequested').length
+    await pending((g) => queueCardChange(w, card, assistant, 'retryMerge', 'flaky', g))
+    expect(facts(w, card).filter((f) => f.kind === 'IntegrationRequested')).toHaveLength(requested)
+    // Still allowed: the guard is asked in the write, and the change is made.
+    const ok = await admitted()
+    await inWorkspace(w, () => queueCardChange(w, card, assistant, 'retryMerge', 'flaky', ok.guard))
+    expect(ok.calls).toBe(1)
+    expect(facts(w, card).filter((f) => f.kind === 'IntegrationRequested')).toHaveLength(requested + 1)
   })
 })
 

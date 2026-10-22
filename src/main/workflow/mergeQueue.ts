@@ -344,6 +344,16 @@ export class MergeQueue {
     }
   }
 
+  /**
+   * Whether the entry is still open (or begun) in this write's state: an outcome the queue writes late (a red check, a
+   * stale pass, a moved target) is written only then, so one removed from the queue meanwhile (Remove from queue, a
+   * decision) keeps its cancellation and the card where that put it (#1353).
+   */
+  private isOpen(w: Write, entry: QueueEntry): boolean {
+    const e = w.state().entries.find((x) => x.id === entry.id)
+    return !!e && (e.state === 'open' || e.state === 'started')
+  }
+
   /** Paused by someone while the entry ran (Pause queue): it stays open, and the pause as it is. */
   private held(card: CardRecord, entry: QueueEntry, reason: string): QueueOutcome {
     return { card: card.key, entry: entry.id, outcome: 'paused', reason: reason as PauseReason }
@@ -356,11 +366,15 @@ export class MergeQueue {
    */
   private async skip(card: CardRecord, entry: QueueEntry, cancelled: boolean): Promise<QueueOutcome> {
     if (!cancelled) {
-      await this.write(card, (w) => {
+      const wrote = await this.write(card, (w) => {
+        if (!this.isOpen(w, entry)) return false
         w.fact('IntegrationCancelled', { entry: entry.id, reason: 'stale' }) // i18n-ignore: a fact's kind and codes, not text
         w.move(w.ruleset && hasStage(w.ruleset, 'review') ? 'review' : 'active', 'derived')
         this.wf.wake(w, w.state().started?.builder, `${card.key} left the merge queue: it isn't approved any more`) // i18n-ignore: a wake, agent-facing
+        return true
       })
+      // Cancelled meanwhile: that cancellation is its outcome.
+      if (!wrote) cancelled = true
     }
     return { card: card.key, entry: entry.id, outcome: 'skipped', why: cancelled ? 'cancelled' : 'notApproved' } // i18n-ignore: a reason's key, not text
   }
@@ -488,6 +502,8 @@ export class MergeQueue {
   /** The swap found the target moved: this entry failed (transient) and the card is queued again, to be tested again. */
   private async moved(card: CardRecord, entry: QueueEntry, target: string): Promise<void> {
     await this.write(card, (w) => {
+      // Cancelled meanwhile: not queued again (the queue's next look skips it as cancelled).
+      if (!this.isOpen(w, entry)) return
       w.fact('IntegrationFailed', { entry: entry.id, revision: entry.revision, target, reason: 'targetMoved', transient: true }) // i18n-ignore: a fact's kind and codes, not text
       const s = w.state()
       w.fact('IntegrationRequested', { entry: `${card.key}/e${s.lastSeq + 1}`, revision: entry.revision, key: s.latest?.key ?? null, target, style: w.ruleset!.options.style })
@@ -561,11 +577,16 @@ export class MergeQueue {
 
   /** A conflict, red checks or a hook: `IntegrationFailed`, the card back to its builder with the output (§16.9.1 step 8). */
   private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string): Promise<QueueOutcome> {
-    await this.write(card, (w) => {
+    // Removed from the queue (or cancelled by a decision) while its test merge or checks ran: its cancellation stands,
+    // the card where that left it (Approved), and the late failure isn't written.
+    const wrote = await this.write(card, (w) => {
+      if (!this.isOpen(w, entry)) return false
       w.fact('IntegrationFailed', { entry: entry.id, revision, target, reason, transient, ...(files ? { files } : {}), ...(log ? { log: log.slice(0, 4000) } : {}) })
       w.move('active', 'derived')
       this.wf.wake(w, w.state().started?.builder, `${card.key} came back from the merge queue: ${reason}`) // i18n-ignore: a wake, agent-facing
+      return true
     })
+    if (!wrote) return { card: card.key, entry: entry.id, outcome: 'skipped', why: 'cancelled' }
     return { card: card.key, entry: entry.id, outcome: 'returned', reason, transient }
   }
 

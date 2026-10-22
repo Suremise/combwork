@@ -105,6 +105,37 @@ describe('Remove from queue (#1353, S33a)', () => {
     expect(head(e)).toBe(before)
   })
 
+  // HR3's round 1 finding 1: a check that ends red (or couldn't start) after the removal never returns the card.
+  for (const transient of [false, true]) {
+    it(`during a check that then ends ${transient ? "as one that couldn't start" : 'red'}: the removal stands, Approved, no failure written`, async () => {
+      const e = team()
+      const card = await queued(e)
+      const q = e.queue({
+        runCheck: async () => {
+          moved(await e.wf.removeFromQueue(card.key, 'not now'))
+          expect(e.wf.state(card).stage).toBe('approved')
+          return { ok: false, transient, output: 'red: broken' }
+        }
+      })
+      expect(await q.drain('main')).toMatchObject([{ outcome: 'skipped', why: 'cancelled' }])
+      const s = e.wf.state(card)
+      expect(s.stage).toBe('approved')
+      expect(s.entries.at(-1)).toMatchObject({ state: 'cancelled', cancelled: 'removed' })
+      expect(e.kinds(card.id)).not.toContain('IntegrationFailed')
+      // Its builder heard of the removal, not of a return.
+      expect(e.wakes.some((w) => w.why.includes('came back from the merge queue'))).toBe(false)
+    })
+  }
+
+  it('during its test merge, when the card is no longer approved after it: the removal stands, no stale cancellation over it', async () => {
+    const e = team()
+    const card = await queued(e)
+    const q = e.queue({ hooks: { afterTest: async () => moved(await e.wf.removeFromQueue(card.key, 'not now')) } })
+    expect(await q.drain('main')).toMatchObject([{ outcome: 'skipped', why: 'cancelled' }])
+    expect(e.store.facts(card.id).filter((f) => f.kind === 'IntegrationCancelled').map((f) => (f.data as { reason: string }).reason)).toEqual(['removed'])
+    expect(e.wf.state(card).stage).toBe('approved')
+  })
+
   it('once its advance has begun: refused (it is being merged), and the merge finishes', async () => {
     const e = team(true)
     const card = await queued(e)

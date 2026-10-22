@@ -140,9 +140,11 @@ function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, card
  * Pause queue: the target's queue stops before its next entry (one mid-check finishes its checks and waits). Saved, with
  * who; a queue paused already (by Hive, for its reason) keeps that pause, which says more.
  */
-export async function pauseQueue(ws: WorkspaceService, projectPath: string, target: string, by: 'user' | 'assistant'): Promise<QueueView> {
+export async function pauseQueue(ws: WorkspaceService, projectPath: string, target: string, by: 'user' | 'assistant', guard?: () => void): Promise<QueueView> {
   const wf = await needWorkflow(ws, projectPath)
   await wf.locked(() => {
+    // The caller's authority as it is now, in the write (the Assistant's change boundary: Control, its session).
+    guard?.()
     if (!wf.store.queuePause(target)) wf.store.setQueuePause(target, { reason: 'user', card: '', by }) // i18n-ignore: a pause reason's code, not text
   })
   queueChanged(ws, projectPath, target)
@@ -153,11 +155,13 @@ export async function pauseQueue(ws: WorkspaceService, projectPath: string, targ
  * Resume: the pause cleared and the queue run, once its cause, where Hive can see it, is gone; else paused again, as
  * it is now (`resumed` false). A queue not paused is just run.
  */
-export async function resumeQueue(ws: WorkspaceService, projectPath: string, target: string): Promise<QueueResumed> {
+export async function resumeQueue(ws: WorkspaceService, projectPath: string, target: string, guard?: () => void): Promise<QueueResumed> {
   const wf = await needWorkflow(ws, projectPath)
   const p = wf.store.queuePause(target)
   const still = p ? await stillPaused(wf, projectPath, target, p) : null
   await wf.locked(() => {
+    // The caller's authority as it is now, in the write: refused, nothing is cleared and the queue isn't run.
+    guard?.()
     const now = wf.store.queuePause(target)
     // Changed meanwhile (another Resume, the queue pausing for something else): left as it is, said as it is.
     if (!now || !p || now.reason !== p.reason || now.at !== p.at) return
@@ -172,8 +176,8 @@ export async function resumeQueue(ws: WorkspaceService, projectPath: string, tar
  * A card's Remove from queue or Retry merge, by the user or the Assistant (an agent is refused by the intent path),
  * with its reason: the card's intent (cardIntents.ts), then its target's queue told of it (Retry's requeue runs it).
  */
-export async function queueCardChange(ws: WorkspaceService, n: number, actor: TaskActor, kind: 'removeFromQueue' | 'retryMerge', reason: string): Promise<{ done: IntentDone; card: TaskCard }> {
-  const r = await runCardIntent({ n, plain: false }, actor, { kind, reason })
+export async function queueCardChange(ws: WorkspaceService, n: number, actor: TaskActor, kind: 'removeFromQueue' | 'retryMerge', reason: string, guard?: () => void): Promise<{ done: IntentDone; card: TaskCard }> {
+  const r = await runCardIntent({ n, plain: false }, actor, { kind, reason, ...(guard ? { guard } : {}) })
   const projectPath = ws.path && r.card.project ? join(ws.path, r.card.project) : null
   const wf = projectPath ? await workflowFor(ws, projectPath).catch(() => null) : null
   const target = wf ? wf.state(wf.store.card(n)).entries.at(-1)?.target : undefined

@@ -1528,15 +1528,17 @@ export class Workflow {
   /**
    * Remove from queue (the user's, or the Assistant's within Control with a reason: OP-9): `IntegrationCancelled`,
    * recorded as an override; a rebuilt queue skips it; the card back to Approved and its builder woken. An entry whose
-   * advance has begun is being merged: refused (its recovery finishes it).
+   * advance has begun is being merged: refused (its recovery finishes it). `guard`: the caller's authority, checked again
+   * inside the write (the Assistant's change boundary: it throws, and nothing is written, once it no longer holds).
    */
-  async removeFromQueue(ref: unknown, reason = '', by: 'user' | 'assistant' = 'user'): Promise<Reply> {
+  async removeFromQueue(ref: unknown, reason = '', by: 'user' | 'assistant' = 'user', guard?: () => void): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
     const r = this.rulesetOf(card, s)
     await this.cfg.hooks?.beforeWrite?.('remove from queue') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const out = await this.write(card, r, by, (w) => {
+      guard?.()
       const changed = this.stillAt(w, s, 'remove from queue') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (changed) return changed
       const e = openEntry(w.state())
@@ -1554,12 +1556,13 @@ export class Workflow {
   }
 
   /** Retry merge (the user's override, or the Assistant's with a reason): requeues an unchanged revision once, even after a red check (§16.8.1). */
-  async retryMerge(ref: unknown, reason = '', by: 'user' | 'assistant' = 'user'): Promise<Reply> {
+  async retryMerge(ref: unknown, reason = '', by: 'user' | 'assistant' = 'user', guard?: () => void): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
     const r = this.rulesetOf(card, s)
     const out = await this.write(card, r, by, (w) => {
+      guard?.()
       // Only for a card the queue returned (Active, its last entry failed), approved and unstale, once per revision.
       const st = w.state()
       const last = st.entries.at(-1)

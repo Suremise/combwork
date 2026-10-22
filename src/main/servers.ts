@@ -1776,9 +1776,9 @@ route('POST', '/v1/queue/pause', async ({ body }) => {
   notAgents('pause a merge queue')
   const ws = requireWorkspace()
   const p = queueProject(body?.project)
-  return assistantChange('agents', `pause the merge queue of ${basename(p)}`, { kind: 'queue-pause', project: basename(p) }, async () => {
+  return assistantChange('agents', `pause the merge queue of ${basename(p)}`, { kind: 'queue-pause', project: basename(p) }, async (guard) => {
     const target = await queueTargetOf(ws, p, body?.target)
-    const v = await pauseQueue(ws, p, target, 'assistant')
+    const v = await pauseQueue(ws, p, target, 'assistant', guard)
     return { done: `Paused the merge queue for ${target} in ${basename(p)}`, result: publicQueue(v) }
   })
 })
@@ -1787,9 +1787,9 @@ route('POST', '/v1/queue/resume', async ({ body }) => {
   notAgents('resume a merge queue')
   const ws = requireWorkspace()
   const p = queueProject(body?.project)
-  return assistantChange('agents', `resume the merge queue of ${basename(p)}`, { kind: 'queue-resume', project: basename(p) }, async () => {
+  return assistantChange('agents', `resume the merge queue of ${basename(p)}`, { kind: 'queue-resume', project: basename(p) }, async (guard) => {
     const target = await queueTargetOf(ws, p, body?.target)
-    const r = await resumeQueue(ws, p, target)
+    const r = await resumeQueue(ws, p, target, guard)
     return { done: r.resumed ? `Resumed the merge queue for ${target} in ${basename(p)}` : `The merge queue for ${target} in ${basename(p)} is still paused (${r.view.paused?.reason ?? 'paused'})`, result: { resumed: r.resumed, queue: publicQueue(r.view) } }
   })
 })
@@ -1801,8 +1801,8 @@ async function queueCard(body: any, kind: 'removeFromQueue' | 'retryMerge'): Pro
   const ref = intentRef(String(body?.card ?? ''))
   const reason = textField(body, 'reason', true)
   const was = await tasks.getTask(ref.n).catch(() => null)
-  return assistantChange('agents', `${INTENT_WORDS[kind]} ${cardRef(ref.n)}`, { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async () => {
-    const { done, card } = await queueCardChange(ws, ref.n, await taskActor(), kind, reason)
+  return assistantChange('agents', `${INTENT_WORDS[kind]} ${cardRef(ref.n)}`, { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async (guard) => {
+    const { done, card } = await queueCardChange(ws, ref.n, await taskActor(), kind, reason, guard)
     const moved = done.from && done.to && done.from !== done.to ? `, ${done.from} → ${done.to}` : ''
     return { done: `${cardName(card)} ${clip(card.title, 60)}: ${INTENT_DONE[kind]}${moved}`, act: { column: card.column, agent: await cardAgent(card) }, result: done, stays: INTENT_STAYS[kind] }
   })

@@ -124,6 +124,33 @@ const TARGET = 'integration'
     check('…listed in its actions', actions.some((x) => x.ok && x.kind === 'queue-pause' && x.project === 'alpha'), JSON.stringify(actions.map((x) => [x.kind, x.text])))
     const back = await api(assistant, 'POST', '/v1/queue/resume', { project: 'alpha', target: TARGET })
     check('…and resumes it', back.status === 200 && back.body?.resumed === true && (await view()).paused === null, JSON.stringify(back.body))
+    // Its panel's "Done by the Assistant": the pause and the resume, each saying why undo can't take it back (both themes).
+    await lib.fitWindow(h.app, h.page, { width: 1500, height: 900 })
+    const panel = () => h.page.locator('.assistant-panel')
+    await h.page.evaluate(() => document.activeElement?.blur())
+    await h.page.keyboard.press('Control+Alt+I')
+    const link = panel().locator('.assistant-done-link')
+    await until(async () => (await link.count()) === 1, HUNG_MS)
+    await link.click()
+    const rows = panel().locator('.assistant-change-group').first().locator('.assistant-action[data-status="final"]')
+    const inPanel = await until(async () => {
+      const t = await panel().locator('.assistant-change-group').first().innerText().catch(() => '')
+      return (await rows.count()) === 2 && /Paused the merge queue for integration in alpha/.test(t) && /Resumed the merge queue for integration in alpha/.test(t) ? t : null
+    }, HUNG_MS)
+    check("its panel lists the pause and the resume, each Can't be undone", !!inPanel, await panel().innerText().catch(() => ''))
+    // Each row's tooltip says why (the newest first: the resume, then the pause), in both themes for the screenshots.
+    for (const [i, why, name] of [[0, /A merge queue it resumed isn.t paused again/, 'resume'], [1, /A merge queue it paused stays paused/, 'pause']]) {
+      for (const theme of ['dark', 'light']) {
+        await h.inv('settings:update', { appearance: { theme } })
+        await until(async () => (await h.page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+        await h.page.mouse.move(5, 5)
+        const tip = await lib.hoverTip(h.page, rows.nth(i), (t) => why.test(t), HUNG_MS)
+        check(`…the ${name}'s tooltip says why undo leaves it (${theme})`, why.test(tip), tip)
+        await h.page.screenshot({ path: path.join(fx.shots, `queuecontrols-assistant-${name}-${theme}.png`) })
+      }
+    }
+    await h.page.mouse.move(5, 5)
+    await h.inv('settings:update', { appearance: { theme: 'dark' } })
     const noReason = await api(assistant, 'POST', '/v1/queue/retry', { card: `#${three.n}` })
     check("its Retry merge needs a reason (400)", noReason.status === 400, JSON.stringify(noReason.body))
     await h.inv('session:stop', home, 'assistant')
