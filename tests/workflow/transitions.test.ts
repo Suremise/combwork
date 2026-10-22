@@ -2,11 +2,13 @@
 // their intents and ask only for the rules that refuse, intents racing each other, requests bound to their submission,
 // dependencies in the dependent target, and a decided no-review card's way back.
 import { afterEach, describe, expect, it } from 'vitest'
+import { AsyncLocalStorage } from 'async_hooks'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { B1, B2, commit, moved, R1, R2, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { reconcile } from '../../src/main/workflow/reconcile'
+import type { Reply } from '../../src/main/workflow/runtime'
 import { attributeFolder } from '../../src/main/workflow/reconcile'
 
 let env: Env | null = null
@@ -119,9 +121,15 @@ describe('intents racing each other', () => {
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
     moved(await e.wf.startReview(card.key, R1))
     moved(await e.wf.startReview(card.key, R2))
-    const [a, b] = await Promise.all([e.wf.verdict(card.key, R1, { pass: true, comment: 'yes' }), e.wf.verdict(card.key, R2, { pass: false, comment: 'no' })])
-    const results = [a, b].map((x) => ('refused' in x ? 'refused' : 'ok'))
-    expect(results.sort()).toEqual(['ok', 'refused'])
+    // Both gather at once; the pass's write waits for the fail's (#1364: under load the pass, whose gather is longer,
+    // could write first and queue its entry, the race going the other way than the one this test is about).
+    const which = new AsyncLocalStorage<'pass' | 'fail'>()
+    let failing: Promise<Reply> | null = null
+    e.wf.cfg.hooks = { beforeWrite: async (move) => void (move === 'verdict' && which.getStore() === 'pass' && (await failing)) }
+    failing = which.run('fail', () => e.wf.verdict(card.key, R2, { pass: false, comment: 'no' }))
+    const passing = which.run('pass', () => e.wf.verdict(card.key, R1, { pass: true, comment: 'yes' }))
+    const [a, b] = await Promise.all([passing, failing])
+    expect(['refused' in a ? 'refused' : 'ok', 'refused' in b ? 'refused' : 'ok']).toEqual(['refused', 'ok'])
     const s = e.wf.state(card)
     expect(s.verdicts).toHaveLength(1)
     expect(s.entries).toEqual([])

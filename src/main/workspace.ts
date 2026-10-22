@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'crypto'
 import { basename, dirname, join, resolve, sep } from 'path'
 import { mkdir, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, statSync, watch, type FSWatcher as RootWatcher } from 'original-fs'
-import { closeBoard } from './boardStore'
+import { closeBoard, keepBoard, letGoBoard } from './boardStore'
 import { closeJournal } from './journal'
 import { AsyncLocalStorage } from 'async_hooks'
 import type { BrowserWindow } from 'electron'
@@ -19,7 +19,7 @@ import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSess
 import { config } from './config'
 import { emit, emitTo } from './events'
 import { containsPlace, insideReal, isDir, readJson, readKeptJson, removePath, samePlace, withFileLock, writeKeptJson } from './fsutil'
-import { markClosed, markOpen } from './openingFence'
+import { markClosed, markOpen, setFenceReason } from './openingFence'
 import { createLogger, userText } from './logger'
 import { changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
@@ -47,6 +47,8 @@ const M = {
   platformInvalid: msg({ id: 'service.workspace.platformInvalid', defaultMessage: "{project}'s project.json names a version control Hive doesn't know (platform: {value}). Until it says \"git\" or \"none\", Hive uses what it finds in the folder.", description: 'A notice: the platform setting in the project {project}\'s .hive/project.json is {value}, which is not one Hive has (only "git" and "none" are: keep them as they are, they are setting values).' }),
   otherFound: msg({ id: 'service.workspace.platformOtherFound', defaultMessage: "{vcs} was found in {project}. Hive doesn't support it yet, so it goes on treating the project as a Git project.", description: 'A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Hive treats as a Git project. Hive does not switch it.' })
 }
+// What a closed workspace's refused open throws (#1381: made when refused, not kept per workspace).
+setFenceReason(() => hiveError(M.closed, undefined, { kind: 'conflict' }))
 
 /** The notice that a project's folder no longer has the version control Hive recorded for it (SPEC §16.3.5). */
 function platformNotice(project: string, p: ProjectPlatform): { title: string; message: string } {
@@ -285,6 +287,8 @@ export class WorkspaceService {
       this.generation++
       this.path = abs
       markOpen(abs)
+      // A save's lease doesn't close the database now it is this window's, opened before or after (#1383).
+      keepBoard(abs)
     })
     admission = admit.catch(() => undefined)
     await admit
@@ -338,7 +342,7 @@ export class WorkspaceService {
     this.life.abort(reason)
     const closing = this.path
     // First: from here, nothing opens its databases again until a window opens it again (#1379), whoever asks.
-    if (closing) markClosed(closing, reason)
+    if (closing) markClosed(closing)
     if (closing) {
       for (const l of WorkspaceService.closingListeners) {
         try {
@@ -358,6 +362,11 @@ export class WorkspaceService {
     this.rootRetry = null
     this.rootWatcher?.close()
     this.rootWatcher = null
+    // A scheduled refresh already running reads the projects' files until it sees the close (at the next project): closed
+    // only once it has, so a project's folder can be moved as soon as its window lets it go (#1341: EPERM renaming it). No
+    // new one is scheduled from the abort on (scheduleRefresh).
+    while (this.scheduledRuns.size) await Promise.allSettled([...this.scheduledRuns])
+    if (closing) letGoBoard(closing)
     if (closing) closeBoard(closing)
     if (closing) closeJournal(join(closing, HIVE_DIR, ASSISTANT_DIR))
     await this.watcher?.close()
@@ -589,6 +598,9 @@ export class WorkspaceService {
   }
 
   scheduleRefresh(): void {
+    // Closing (or closed): nothing more is read of it (#1341: close waits for the refreshes under way, not new ones).
+    const life = this.life.signal
+    if (life.aborted) return
     if (this.refreshTimer) clearTimeout(this.refreshTimer)
     if (!this.scheduled) {
       let tell = (): void => undefined
@@ -601,7 +613,7 @@ export class WorkspaceService {
       this.refreshTimer = null
       if (this.scheduled === scheduled) this.scheduled = null
       // Running, it is still the scheduled one's until it has finished: a refreshesSettled from now on waits for it.
-      const run = (this.path ? this.refresh().then(() => undefined, (e) => log.warn('refresh failed', e)) : Promise.resolve()).finally(() => {
+      const run = (this.path && !life.aborted ? this.refresh().then(() => undefined, (e) => log.warn('refresh failed', e)) : Promise.resolve()).finally(() => {
         this.scheduledRuns.delete(run)
         scheduled.tell()
       })
@@ -1103,6 +1115,9 @@ export class WorkspaceService {
 
   async refresh(): Promise<WorkspaceInfo> {
     if (!this.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+    // Closing: its generation is already the next one's, so the lifetime says it (#1341).
+    const life = this.life.signal
+    if (life.aborted) throw hiveError(M.closed, undefined, { kind: 'conflict' })
     const gen = this.generation
     const seq = ++this.refreshes
     // Before the folders are listed: a project the listing misses was gone by then.
@@ -1110,7 +1125,7 @@ export class WorkspaceService {
     const projects: ProjectInfo[] = []
     // Closed or switched meanwhile: the new workspace's own refresh reports it. Each read is the refresh's lifetime's
     // (#784): one begun after a switch would otherwise record the old workspace's worktrees in the new one.
-    const closed = (): boolean => gen !== this.generation || !this.path
+    const closed = (): boolean => gen !== this.generation || !this.path || life.aborted
     // What the projects' running agents' settings need of the workspace (its skills and servers), read once (#1002).
     const scope = {}
     for (const p of await this.listProjectPaths()) {

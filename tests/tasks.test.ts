@@ -1762,13 +1762,23 @@ describe('removal and board under faults', () => {
     const original = s.start
     for (const decision of ['done', 'review'] as const) {
       const c = await run(() => tasks.createTask({ title: `Decide ${decision}`, project: 'decider' }, user))
+      // The launch, once called: failed by `release`. The card is Doing before then, but the Start saves its delivery
+      // before it launches (#1252: released before the launch was called, it was never failed).
       let release: () => void = () => undefined
-      s.start = () => new Promise((_, reject) => (release = () => reject(new Error('launch failed'))))
+      let launched: () => void = () => undefined
+      const launching = new Promise<void>((r) => (launched = r))
+      s.start = () =>
+        new Promise((_, reject) => {
+          release = () => reject(new Error('launch failed'))
+          launched()
+        })
       try {
         const starting = run(() => startTask(c.number, { kind: 'agent', agentId: 'd1' }, user))
         const handled = expect(starting).rejects.toThrow(/launch failed/)
         // Taken (Doing, the agent's) before the launch; the user decides meanwhile; then the launch fails.
-        await expect.poll(async () => (await run(() => tasks.getTask(c.number))).column, { timeout: HUNG_MS }).toBe('doing')
+        // (A Start that fails before it launches fails the test here, with its own error.)
+        await Promise.race([launching, handled])
+        expect((await run(() => tasks.getTask(c.number))).column).toBe('doing')
         await run(() => tasks.updateTask(c.number, { column: decision }, user))
         release()
         await handled

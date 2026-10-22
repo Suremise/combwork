@@ -269,6 +269,9 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
     const { w, repo, wt } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Folder', project: 'p' }, user))).number
     await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
+    // The refresh the open scheduled reads the projects' files (the worktree is one): Windows won't move a folder with a
+    // file open in it (#1341: EPERM).
+    await w.refreshesSettled()
     renameSync(wt, `${wt}-away`)
     await reconcileNow(w, repo)
     await reconcileNow(w, repo)
@@ -277,6 +280,7 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
     const other = await workspace()
     const c2 = (await inWorkspace(other.w, () => tasks.createTask({ title: 'Repository', project: 'p' }, user))).number
     await inWorkspace(other.w, () => tasks.updateTask(c2, { column: 'doing', agent: 'a1' }, user))
+    await other.w.refreshesSettled()
     renameSync(join(other.repo, '.git'), join(other.repo, '.git-away'))
     await reconcileNow(other.w, other.repo)
     expect(factsOf(other.w, c2).filter((f) => f.kind === 'Gone').map((f) => f.data)).toEqual([{ what: 'repository' }])

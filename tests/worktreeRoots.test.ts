@@ -66,6 +66,9 @@ describe("agents' worktrees follow the newest config read, in whatever order rea
     project(wsPath, 'gamma', tree('gamma'))
     w = createWorkspaceService()
     await w.open(wsPath)
+    // The refresh the open scheduled reads the projects' files: Windows won't rename gamma with one open (#1375: EPERM),
+    // and each case's reads are its own.
+    await w.refreshesSettled()
   })
   afterEach(async () => disposeWorkspaceService(w))
 
