@@ -51,7 +51,8 @@ function pathWithoutGit() {
   const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `unusedwt-${name}.png`) })
   const theme = async (t) => {
     await inv('settings:update', { appearance: { theme: t } })
-    await lib.sleep(300)
+    // The window shows it before a screenshot is taken (a condition, never a fixed wait).
+    if (!(await lib.until(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t), HUNG_MS))) throw new Error(`the window didn't show the ${t} theme`)
   }
   const toasts = async (re) => (await page.locator('.toast').allInnerTexts()).filter((t) => re.test(t)).length
   const branches = () => lib.git(repo, ['branch', '--format=%(refname:short)']).split(/\r?\n/).filter(Boolean)
@@ -149,6 +150,9 @@ function pathWithoutGit() {
   await section.getByRole('button', { name: 'Remove all merged (1)…' }).click()
   const mergedDialog = page.locator('.dialog', { hasText: 'Remove 1 merged worktree?' })
   check('Remove all merged asks first, its worktrees as a table: Branch · Folder', !!(await lib.until(async () => (await mergedDialog.locator('.unused-merged-table').count()) === 1, HUNG_MS)) && (await mergedDialog.locator('.unused-merged-table thead th').allInnerTexts()).slice(0, 2).join('|') === 'BRANCH|FOLDER' && (await mergedDialog.locator('.unused-merged-table .short-path[data-path]').getAttribute('data-path')).toLowerCase() === merged.worktree.path.toLowerCase(), await mergedDialog.innerText().catch(() => ''))
+  // A long branch is cut in its cell: its full name is on hover (title), and the cell's text is the whole name (copy, screen readers).
+  const branchCell = mergedDialog.locator('.unused-merged-table tbody td:first-child strong')
+  check('…each branch whole on hover and in its text, however its cell cuts it', (await branchCell.getAttribute('title')) === merged.worktree.branch && (await branchCell.textContent()) === merged.worktree.branch, JSON.stringify({ title: await branchCell.getAttribute('title'), text: await branchCell.textContent(), branch: merged.worktree.branch }))
   await shot('remove-merged-dark')
   await theme('light')
   await shot('remove-merged-light')

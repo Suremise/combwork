@@ -165,7 +165,7 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
     const ok = await confirm({
       title: tr(M.removeMergedTitle, { count: merged.length }),
       message: tr(M.removeMergedMessage, { into }),
-      content: <ItemTable first={M.colBranch} columns={[{ label: M.colFolder }]} rows={merged.map((w) => ({ key: w.path, item: <strong>{w.branch ?? tr(M.detached)}</strong>, text: w.branch ?? tr(M.detached), cells: [{ content: <ShortPath path={w.path} />, text: w.path }] }))} className="fill unused-merged-table" />,
+      content: <ItemTable first={M.colBranch} columns={[{ label: M.colFolder }]} rows={merged.map((w) => ({ key: w.path, item: <strong title={w.branch ?? undefined}>{w.branch ?? tr(M.detached)}</strong>, text: w.branch ?? tr(M.detached), cells: [{ content: <ShortPath path={w.path} />, text: w.path }] }))} className="fill unused-merged-table" />,
       confirmLabel: tr(M.remove),
       busyLabel: tr(M.removing),
       run: async () => {
