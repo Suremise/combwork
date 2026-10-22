@@ -145,14 +145,35 @@ const READ_LINES = 15
 const WAKE_LINES = 5
 /** Files named before "and n more". */
 const FILES_NAMED = 8
+/** A branch, check or code name in a return's text, at most (a longer one is cut, marked with "…"). */
+const NAME_MAX = 80
+/** The last lines are shown only with at least this much room. */
+const LINES_MIN = 20
 
-const listed = (files: string[]): string => (files.length > FILES_NAMED ? `${files.slice(0, FILES_NAMED).join(', ')} and ${files.length - FILES_NAMED} more` : files.join(', '))
+const clip = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
-/** What came back, in a few words: the reason, and the files or the check. */
-function failureText(f: FactData['IntegrationFailed']): string {
+/**
+ * The files of a conflict in at most `room` characters: as many of the first FILES_NAMED as fit, then "and n more";
+ * none fitting, how many.
+ */
+function listed(files: string[], room: number): string {
+  const all = files.join(', ')
+  if (files.length <= FILES_NAMED && all.length <= room) return all
+  const shown: string[] = []
+  for (const f of files.slice(0, FILES_NAMED)) {
+    if (`${[...shown, f].join(', ')} and ${files.length - shown.length - 1} more`.length > room) break
+    shown.push(f)
+  }
+  return shown.length ? `${shown.join(', ')} and ${files.length - shown.length} more` : `${files.length} files`
+}
+
+/** What came back, in a few words: the reason, and the files (in `room` characters) or the check. Names already clipped. */
+function failureText(f: FactData['IntegrationFailed'], room: number): string {
   switch (f.reason) {
-    case 'conflict':
-      return f.files?.length ? `a conflict with ${f.target} in ${listed(f.files)}` : `a conflict with ${f.target}`
+    case 'conflict': {
+      const head = `a conflict with ${f.target}`
+      return f.files?.length ? `${head} in ${listed(f.files, room - head.length - ' in '.length)}` : head
+    }
     case 'checks': {
       const what = f.check === 'install' ? 'the install before the merge checks' : f.check ? `the merge check ${f.check}` : 'a merge check'
       return f.transient ? `${what} failed for the environment, not the work (${f.cause ?? 'temporary'}${f.code ? `: ${f.code}` : ''})` : `${what} failed on the merged result`
@@ -186,17 +207,31 @@ function lastLines(log: string, n: number): string {
 }
 
 /**
- * A returned card in a few sentences (`subject`: its key, or "It"): what came back, its log's path, the output's last
- * lines (the part that gives way, cut from its start so the end shows), and the next step; at most `max` characters.
+ * A returned card in a few sentences (`subject`: its key, or "It"), at most `max` characters: what came back and the
+ * next step always whole (names in them cut to NAME_MAX), fitted first; then, in the room left, the files (as many as
+ * fit, "and n more"), its log's path (whole, or a pointer to the card), and the output's last lines (cut from their
+ * start so the end shows, "…").
  */
 export function returnedText(subject: string, f: FactData['IntegrationFailed'], max = WAKE_NOTE_MAX, lines = WAKE_LINES): string {
-  const head = `${subject} came back from the merge queue: ${failureText(f)}.`
-  const path = f.logPath ? ` Its log: ${f.logPath}.` : ''
-  const next = ` ${nextStep(f)}`
+  const named: FactData['IntegrationFailed'] = { ...f, target: clip(f.target, NAME_MAX), ...(f.check ? { check: clip(f.check, NAME_MAX) } : {}), ...(f.code ? { code: clip(f.code, NAME_MAX) } : {}) }
+  const lead = `${clip(subject, NAME_MAX)} came back from the merge queue: `
+  const next = ` ${nextStep(named)}`
+  // The reason and the next step are fixed; the files take what's left, keeping LINES_MIN for the rest.
+  const fixed = lead.length + '.'.length + next.length
+  const head = `${lead}${failureText(named, max - fixed - LINES_MIN)}.`
+  let room = max - head.length - next.length
+  let path = ''
+  if (f.logPath) {
+    const whole = ` Its log: ${f.logPath}.`
+    const pointer = ' Its log path: hive_read_task.'
+    path = whole.length <= room ? whole : pointer.length <= room ? pointer : ''
+    room -= path.length
+  }
   const tail = f.log ? lastLines(f.log, lines) : ''
-  const room = max - head.length - path.length - next.length - ' Its last lines: "".'.length
-  const shown = tail && room > 20 ? (tail.length > room ? `…${tail.slice(tail.length - room + 1)}` : tail) : ''
-  return `${head}${path}${shown ? ` Its last lines: "${shown}".` : ''}${next}`.slice(0, max)
+  const frame = ' Its last lines: "".'.length
+  const fit = room - frame
+  const shown = tail && fit >= LINES_MIN ? (tail.length > fit ? `…${tail.slice(tail.length - fit + 1)}` : tail) : ''
+  return `${head}${path}${shown ? ` Its last lines: "${shown}".` : ''}${next}`
 }
 
 /** A returned card's wake (#1354): its key, what came back, and what to do next. */

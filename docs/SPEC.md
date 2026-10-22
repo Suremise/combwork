@@ -2313,11 +2313,16 @@ switches to "The agent merges", and one started afterwards reports its merge.
   merged; otherwise "once it is approved"), and "set in Version Control → Who merges. A card keeps the rules it started
   with." The claim is refused before the slot is touched; one naming no card, or cards the agent merges, is unchanged,
   and so is the Merge dialog's. Each is a `Refused` fact; `override` is none.
-- **Wakes**: a returned card's (`returnCard`) says what came back (a conflict: its files, the first 8 and how many more;
-  checks: which check, `install` for the install before them, its log's path and the output's last lines; a hook) and
-  the next step (merge the target in and resolve; fix, commit and submit; for a transient failure, submit the same
-  revision again, at most twice in a row), within 600 characters: a wake line quotes Hive's own note up to 600, a
-  reviewer's request still 200. `IntegrationFailed` keeps `check` and `logPath`. A card that left the queue (`skip`)
+- **Wakes**: a returned card's (`returnCard`) says what came back (a conflict: its files; checks: which check, `install`
+  for the install before them, its log's path and the output's last lines; a hook) and the next step (merge the target
+  in and resolve; fix, commit and submit; for a transient failure, submit the same revision again, at most twice in a
+  row), within 600 characters: a wake line quotes Hive's own note up to 600, a reviewer's request still 200. What came
+  back and the next step are always whole (a branch, check or code name in them cut at 80 characters, marked "…"),
+  fitted first; the rest takes the room left: the files, as many of the first 8 as fit and how many more; the log's
+  path whole, or else "Its log path: hive_read_task" (a card read has room for it); the output's last lines, cut from
+  their start ("…"). `IntegrationFailed` keeps `check` and `logPath`, and of the output (`log`) its start and its end
+  within 4,000 characters, the middle replaced by a line saying how many characters were left out, so the last lines
+  quoted are the output's own. A card that left the queue (`skip`)
   says why: its pass stale (`IntegrationCancelled` reason `stale`), or a decision since its approval (`decision`, no
   pass at the current generation).
 - **Card reads**: the Agent API's card has `merge`, a sentence from `queueState.ts` (where a card is with the queue,

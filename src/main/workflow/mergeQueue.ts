@@ -142,6 +142,25 @@ export type QueueOutcome =
   | { card: string; entry: string; outcome: 'skipped'; why: 'notApproved' | 'cancelled' }
   | { card: string; entry: string; outcome: 'integratedOutside' }
 
+/** How much of a failure's output its card keeps (`IntegrationFailed.log`), and how much of that is its start. */
+export const KEPT_LOG = 4000
+const KEPT_HEAD = 800
+
+/**
+ * A failure's output as its card keeps it (#1354): whole up to KEPT_LOG characters, else its start and its end (where
+ * the error is, which the wake and card reads quote as its last lines), the middle replaced by a line saying how much
+ * was left out.
+ */
+export function keptLog(log: string, max = KEPT_LOG): string {
+  if (log.length <= max) return log
+  const head = Math.min(KEPT_HEAD, Math.floor(max / 5))
+  const mark = (left: number): string => `\n… (${left} characters left out) …\n`
+  // The mark's own length decides the tail's, and the count it gives: settled in two steps (its digits barely change).
+  let tail = max - head - mark(log.length).length
+  tail = max - head - mark(log.length - head - tail).length
+  return `${log.slice(0, head)}${mark(log.length - head - tail)}${log.slice(log.length - tail)}`
+}
+
 /** The entry a queue is taking through its steps now: its card, revision, the target's head it tests on, since when. */
 export interface QueueStepInfo {
   card: string
@@ -832,7 +851,7 @@ export class MergeQueue {
       if (!this.isOpen(w, entry)) return false
       // Why a transient failure was one, as codes (#1362): its cause, and the network error code that said so.
       const why = transient && cause ? { cause: cause.cause, ...(cause.code ? { code: cause.code } : {}) } : {}
-      const failed: FactData['IntegrationFailed'] = { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: log.slice(0, 4000) } : {}), ...check }
+      const failed: FactData['IntegrationFailed'] = { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: keptLog(log) } : {}), ...check }
       w.fact('IntegrationFailed', failed)
       w.move('active', 'derived')
       // What came back and what to do next (#1354): the files, the check, its log and last lines, bounded.

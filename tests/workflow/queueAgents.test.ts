@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { leftWake, NOT_RUN_HERE, queueLine, queueOrder, queueStateOf, returnedText, WAKE_NOTE_MAX, type QueueLive } from '../../src/main/workflow/queueState'
+import { keptLog, KEPT_LOG } from '../../src/main/workflow/mergeQueue'
 import { refusalLines } from '../../src/shared/workflow/refusals'
 import { laneNextText } from '../../src/shared/lanes'
 import { cardChange, loopWakeLine } from '../../src/shared/watch'
@@ -164,6 +165,75 @@ describe('wakes at each queue outcome (what came back and what to do)', () => {
     const change = cardChange(5, { number: 5, title: 'T', column: 'doing', comments: [], history: [] } as unknown as TaskCard, ['column'])
     expect(loopWakeLine(change, 'note', t)).toContain(t.slice(-60))
     expect(loopWakeLine(change, 'request', t)).not.toContain(t.slice(-60))
+  })
+
+  it('long names: what came back and the next step always whole, in the note and the wake line; what is left out is said', () => {
+    const nested = (i: number) => `packages/feature-${i}/src/components/deeply/nested/folder/structure/Component${i}.test.tsx`.padEnd(92, 'x')
+    const files = Array.from({ length: 8 }, (_, i) => nested(i))
+    const longPath = `C:\\Users\\someone\\AppData\\Local\\hive\\queue-logs\\${'very-long-folder-name\\'.repeat(14)}check.log`
+    const longName = 'release/' + 'a-very-long-branch-name-'.repeat(8)
+    const longCheck = 'npm run ' + 'check:'.repeat(30)
+    const base = { entry: 'AM-1/e1', revision: 'a', transient: false } as const
+    const log = Array.from({ length: 30 }, (_, i) => `line ${i} ${'y'.repeat(120)}`).join('\n')
+    const cases: [string, FactData['IntegrationFailed']][] = [
+      ['eight long files', { ...base, target: 'main', reason: 'conflict', files }],
+      ['long files and a long target', { ...base, target: longName, reason: 'conflict', files, log }],
+      ['a long log path', { ...base, target: 'main', reason: 'checks', check: 'tests', logPath: longPath, log }],
+      ['a long check, path and target', { ...base, target: longName, reason: 'checks', check: longCheck, logPath: longPath, log }],
+      ['transient, a long code', { ...base, transient: true, target: longName, reason: 'checks', check: longCheck, cause: 'network', code: 'E'.repeat(200), logPath: longPath, log }],
+      ['a hook, long everything', { ...base, target: longName, reason: 'hook', logPath: longPath, log }]
+    ]
+    const change = cardChange(5, { number: 5, title: 'T', column: 'doing', comments: [], history: [] } as unknown as TaskCard, ['column'])
+    for (const [what, f] of cases) {
+      const t = returnedText('AM-1', f)
+      const next = f.transient ? 'Submit the same revision again (hive_submit): it goes straight back into the queue, at most twice in a row.' : f.reason === 'conflict' ? 'resolve the conflict, commit and submit again (hive_submit).' : 'Fix it in your worktree, commit and submit again (hive_submit).'
+      expect(t.length, what).toBeLessThanOrEqual(WAKE_NOTE_MAX)
+      expect(t.endsWith(next), `${what}: ${t}`).toBe(true)
+      expect(t.startsWith('AM-1 came back from the merge queue: '), what).toBe(true)
+      expect(loopWakeLine(change, 'note', t), what).toContain(next)
+      // The reason is said whole, before anything that gives way.
+      expect(t, what).toMatch(f.reason === 'conflict' ? /: a conflict with \S+ in / : f.reason === 'hook' ? /: a git hook refused its merge commit\./ : /: the merge check .+ failed /)
+    }
+    // Files that don't all fit: as many as fit, then how many more, never a name cut in two.
+    const conflict = returnedText('AM-1', cases[0][1])
+    expect(conflict).toMatch(/ and \d+ more\. Merge main/)
+    for (const f of files) if (conflict.includes(f.slice(0, 20))) expect(conflict).toContain(f)
+    // A log path that doesn't fit whole points to the card instead of a cut path.
+    const pathless = returnedText('AM-1', cases[3][1])
+    expect(pathless).not.toContain('check.log')
+    expect(pathless).toContain('Its log path: hive_read_task.')
+    // A card read has the room for it.
+    expect(returnedText('It', cases[2][1], 1500, 15)).toContain(`Its log: ${longPath}.`)
+  })
+
+  it("the output's real ending is kept and quoted, past KEPT_LOG characters (through the queue's return)", async () => {
+    const e = team()
+    const { card } = await queued(e)
+    const output = `${Array.from({ length: 400 }, (_, i) => `ok ${i} passing step`).join('\n')}\nFINAL_FAILURE_MARKER: 1 failing`
+    expect(output.length).toBeGreaterThan(KEPT_LOG)
+    await e.queue({ runCheck: async () => ({ ok: false, output }) }).drain('main')
+    const kept = e.wf.state(card).entries.at(-1)!.failure!.log!
+    expect(kept.length).toBeLessThanOrEqual(KEPT_LOG)
+    expect(kept.endsWith('FINAL_FAILURE_MARKER: 1 failing')).toBe(true)
+    expect(kept.startsWith('ok 0 passing step')).toBe(true)
+    expect(kept).toMatch(/\n… \(\d+ characters left out\) …\n/)
+    const wake = e.wakes.find((w) => w.card === card.key && w.why.includes('merge queue'))!.why
+    expect(wake).toContain('FINAL_FAILURE_MARKER: 1 failing". Fix it in your worktree')
+    expect(e.wf.queueLineOf(card.key)).toContain('FINAL_FAILURE_MARKER: 1 failing')
+  })
+
+  it('keptLog: whole when short; else its start, a line saying exactly how much was left out, and its end', () => {
+    expect(keptLog('short')).toBe('short')
+    for (const n of [4001, 9999, 10_000, 123_456]) {
+      const log = Array.from({ length: n }, (_, i) => String.fromCharCode(97 + (i % 26))).join('')
+      const k = keptLog(log)
+      expect(k.length).toBeLessThanOrEqual(KEPT_LOG)
+      const m = /\n… \((\d+) characters left out\) …\n/.exec(k)!
+      const head = k.slice(0, m.index)
+      const tail = k.slice(m.index + m[0].length)
+      expect(log.startsWith(head) && log.endsWith(tail)).toBe(true)
+      expect(head.length + Number(m[1]) + tail.length).toBe(n)
+    }
   })
 
   it('left the queue: why (its pass stale, or a decision since) and what to do', async () => {
