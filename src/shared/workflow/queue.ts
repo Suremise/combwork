@@ -59,6 +59,47 @@ export interface QueueRecent {
   log?: string
 }
 
+/** Where a listed file of a begun advance stands (#1351): its index and working copy at the expected revision, at the result, or neither. */
+export type QueueFileSide = 'expected' | 'result' | 'other'
+
+/**
+ * A command that finishes or undoes an advance left part way (#1351), generated from its journal: its arguments as they
+ * are (`args`, `git` first; only revisions and a ref name, no paths), run in the project folder (`project`) or the folder
+ * the target is checked out in (`folder`), and `command`, the line to type in PowerShell (shellLine).
+ */
+export interface QueueCommand {
+  purpose: 'finish' | 'undo'
+  place: 'project' | 'folder'
+  args: string[]
+  command: string
+}
+
+/**
+ * Arguments as a PowerShell command line that gives the program exactly these arguments (HR4's #1351 round 1: a ref
+ * with `$` in it must reach git as written): an argument of anything but letters, digits and `._/:=+-` is single-quoted,
+ * its `'` doubled. Plain otherwise, so a revision or a usual ref reads as typed.
+ */
+export function shellLine(args: string[]): string {
+  return args.map((a) => (/^[A-Za-z0-9._/:=+-]+$/.test(a) ? a : `'${a.replace(/'/g, "''")}'`)).join(' ')
+}
+
+/**
+ * The state an advance into a checked-out target was left in (§16.9.2's terminal state, #1351): the folder, the branch
+ * its HEAD named (null: none, a detached HEAD) and the target's ref (null: unreadable) as Hive found them, the advance's
+ * revisions, the journal's last phase (`done`: the ref moved, but the folder was on another branch by then, so the merged
+ * files are in that branch's working copy), each listed file's side, and the commands that finish or undo it.
+ */
+export interface QueueStuck {
+  folder: string
+  branch: string | null
+  ref: string | null
+  expected: string
+  result: string
+  phase: 'started' | 'files' | 'ref' | 'rollback' | 'done'
+  files: { path: string; side: QueueFileSide }[]
+  commands: QueueCommand[]
+}
+
 /** Why a queue is paused: `user` (Pause queue), or Hive's own reason (needsYou, checkedOut, rulesOff, …: mergeQueue.ts). */
 export interface QueuePauseInfo {
   reason: string
@@ -68,6 +109,8 @@ export interface QueuePauseInfo {
   /** Who paused it: the user or the Assistant (null: Hive, for its reason). */
   by: 'user' | 'assistant' | null
   at: string | null
+  /** An advance into a checked-out target left part way (needsYou, #1351): the state it is in and how to settle it. */
+  stuck?: QueueStuck
 }
 
 /** A project's queue for one target. */
@@ -87,8 +130,14 @@ export interface QueueView {
   recent: QueueRecent[]
 }
 
-/** A queue as the Agent API gives it (GET /v1/queue, hive_queue): no folder, and whether an outcome has a log, not the log. */
-export type QueuePublic = Omit<QueueView, 'projectPath' | 'recent'> & { recent: (Omit<QueueRecent, 'log'> & { hasLog?: true })[] }
+/**
+ * A queue as the Agent API gives it (GET /v1/queue, hive_queue): no folder (a stuck advance's folder neither), and whether
+ * an outcome has a log, not the log.
+ */
+export type QueuePublic = Omit<QueueView, 'projectPath' | 'recent' | 'paused'> & {
+  paused: (Omit<QueuePauseInfo, 'stuck'> & { stuck?: Omit<QueueStuck, 'folder'> }) | null
+  recent: (Omit<QueueRecent, 'log'> & { hasLog?: true })[]
+}
 
 /** How many outcomes a queue's model keeps for the panel. */
 export const RECENT_MAX = 20

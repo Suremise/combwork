@@ -827,6 +827,14 @@
     "defaultMessage": "Hive closed running out of memory?",
     "description": "A tip's title."
   },
+  "tips.mergeQueueFolder.text": {
+    "defaultMessage": "When the merge queue merges into a branch checked out in a folder (main in the project folder), it updates the folder too, but pauses rather than touch a file you are changing. Settings → Advanced can have it ask you under For you first.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. For you is the board's list of what waits for the user."
+  },
+  "tips.mergeQueueFolder.title": {
+    "defaultMessage": "Merging into the folder you work in",
+    "description": "A tip's title: the merge queue merging into a branch (main) that is checked out in the project folder."
+  },
   "tips.mergeSlot.text": {
     "defaultMessage": "When several agents finish at once, each claims the project's merge slot before it merges main in, checks and merges, so nobody's checks have to run twice. Who holds it and who waits shows in the Overview and the Progress panel.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

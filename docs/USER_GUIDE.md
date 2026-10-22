@@ -756,7 +756,7 @@ When a project's workflow says Hive merges, each approved card goes into its tar
 You stay in charge of each queue:
 
 - **Pause queue** stops a target's queue before its next card; a card whose checks are running finishes them and waits, unmerged. The pause is saved, so it holds after a restart and in every Hive on the workspace, with who paused it.
-- **Resume** runs it again, starting the waiting card from a fresh test merge. When Hive paused the queue itself (the target is checked out in a folder, workflow rules are off, a merge was interrupted with files changed since), Resume first looks again, and if the cause is still there the queue stays paused and says why.
+- **Resume** runs it again, starting the waiting card from a fresh test merge. When Hive paused the queue itself (workflow rules are off, you have changes in a file the merge changes, a merge was interrupted with files changed since), Resume first looks again, and if the cause is still there the queue stays paused and says why.
 - **Remove from queue** takes a card out: it goes back to Passed, is never merged (after a restart too), and its builder is told. Once its merge has begun it can't be taken out; it finishes.
 - **Retry merge** puts a card the queue sent back (a failed check you know is flaky, say) into the queue again, as it was approved, once.
 
@@ -774,6 +774,16 @@ Anything else that stops a merge is something to fix on this computer, not in th
 - **A hook didn't finish**: the repository signs its commits, and one of its commit hooks was still running at that same limit. Hive ended it. Make the hook quicker, or raise the setting.
 - **Signing failed**: the signer refused, with its message (no secret key, a key that can't be loaded). Fix the signing setup (`user.signingkey`, `gpg.program`, `gpg.format`), or turn signing off for the repository.
 - **Needs you**: git couldn't merge for another reason, with git's message: another git command holding the repository's index (`index.lock`), a damaged repository, a folder it couldn't check out. Let the other command finish, or fix what git says.
+
+### Merging into a branch checked out in a folder
+
+The branch a card merges into is often checked out somewhere, usually `main` in the project folder. Merging then changes that folder's files as well as the branch, so Hive takes more care:
+
+- **It merges there by itself, or asks first.** **Settings → Advanced → Merge queue: merge into a checked-out branch** is **Automatically**: once a card is tested and its merge checks pass, Hive updates the folder. Choose **Ask each time** to approve each one: the card then waits under **For you** with *"AL-12 is tested and ready to merge: update main in D:\work\alpha now?"*. **Approve** merges it at once. If `main` moved meanwhile, the card is tested again and asked again. **Decline** takes it out of the queue, back to Approved, as Remove from queue does. Switching back to **Automatically** lets a card that waits go ahead. A branch that isn't checked out anywhere is always merged at once.
+- **It never merges over your work.** Before it touches the folder, Hive checks that no agent is working there (one editing files in it, or running a command there; an idle agent, or a reviewer reviewing in its own review copy, doesn't count), that the folder is on that branch, that nothing is staged, and that you have no changes in the files the merge changes. If any of these fails, the queue pauses, saying why and naming the files, and the card stays queued. Your other edits are left alone. Put it right (commit or stash the change, say) and resume the queue. While it updates the folder, Hive types nothing into the agents working there.
+- **Your work isn't held up.** Hive tests the merge and runs its checks in its own folder, without locking anything. If you commit in the project folder while the checks run, the merge is tested again on your commit.
+- **If something interrupts it.** Hive keeps a record of each step of the update, so if Hive or the computer stops halfway, the next start finishes the update or undoes it, and never merges a card twice. If it finds the folder in a state it can't be sure about (a file in the merge edited since, or the folder switched to another branch), it stops, changes nothing more, and pauses the queue with **Needs you**. The card asks you under **For you** to settle it, and says what to run in PowerShell: a `git update-ref` that finishes the merge, a `git read-tree` that undoes it, or, when the files are neither as they were nor as merged, to put them right by hand. Answer it once that's done, and Hive looks again. Until you do, Hive leaves that branch alone, even when another card is queued for it or Hive restarts; **Resume** looks again too.
+- **One rare case.** If another program switches the folder's branch in the very instant Hive updates it, the merged files can end up as uncommitted changes in that other branch. Hive notices at once, records the card as merged (it is, into its branch), pauses the queue and lists the files, with the `git read-tree` command that puts them back.
 
 ### Card loops
 

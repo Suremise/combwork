@@ -206,6 +206,8 @@
   "tips.mcpPerProject.title": "Servidores MCP só onde são necessários",
   "tips.memorySnapshot.text": "Ative Configurações → Avançado → Salvar um snapshot da memória se o Hive estiver prestes a ficar sem memória para descobrir o que a encheu. Snapshots podem ter gigabytes, contêm o que o Hive tinha na memória (texto de cartões, transcrições, possivelmente tokens) e ficam neste PC.",
   "tips.memorySnapshot.title": "O Hive fechou por falta de memória?",
+  "tips.mergeQueueFolder.text": "Quando a fila de merge faz o merge em um branch em checkout numa pasta (o main na pasta do projeto), ela também atualiza a pasta, mas pausa em vez de mexer num arquivo que você está mudando. Em Configurações → Avançado ela pode perguntar antes em Para você.",
+  "tips.mergeQueueFolder.title": "Merge na pasta em que você trabalha",
   "tips.mergeSlot.text": "Quando vários agentes terminam ao mesmo tempo, cada um pega a vez de merge do projeto antes de trazer a main, verificar e fazer merge, para que ninguém precise rodar as verificações duas vezes. Quem está com a vez e quem espera aparecem na Visão geral e no painel Progresso.",
   "tips.mergeSlot.title": "Os agentes se revezam para fazer merge",
   "tips.messageReceipts.text": "Cada mensagem que o Assistente deixa para um agente tem um id e é guardada, mesmo depois de reiniciar: ela é recebida quando o agente lê a caixa de entrada, e confirmada quando o agente age sobre ela. Uma não confirmada em {minutes, plural, one {# minuto} other {# minutos}} aparece como em atraso (✉) no painel do agente.",

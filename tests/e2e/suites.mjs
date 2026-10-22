@@ -150,6 +150,8 @@ export const SUITES = [
   { name: 'mcpagents' },
   { name: 'mcpfile' },
   { name: 'mergequeue' },
+  { name: 'mergequeuecrash' },
+  { name: 'mergequeuefolder' },
   { name: 'mergeslot' },
   { name: 'mode', needs: ['claude'], claudeHome: 'own' },
   { name: 'models' },
