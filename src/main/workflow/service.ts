@@ -24,6 +24,7 @@ import { FactStore } from './factStore'
 import { resolvedOf, type ResolvedOptions } from './rulesets'
 import { lastActionId, noteRequestsSince } from '../workflowNotices'
 import { Workflow } from './runtime'
+import { NOT_RUN_HERE, type QueueLive } from './queueState'
 
 /** The Advanced switch every gate answers to at once (#1120's table): off, nothing is refused and reconciliation records only. */
 export const ENFORCE = 'hive.workflow.enforce'
@@ -39,6 +40,15 @@ const M = {
 let runsGoing: ((project: string, agent: string) => string[]) | null = null
 export function setRunsGoing(fn: ((project: string, agent: string) => string[]) | null): void {
   runsGoing = fn
+}
+
+/**
+ * What runs a target's queue in this Hive now (queueHost's queueLive: the queue's order, which card reads and refusals
+ * give agents, #1354). Given by the app as it starts (none in unit tests: nothing runs a queue here).
+ */
+let queueLiveOf: ((ws: WorkspaceService, project: string, target: string) => QueueLive) | null = null
+export function setQueueLive(fn: ((ws: WorkspaceService, project: string, target: string) => QueueLive) | null): void {
+  queueLiveOf = fn
 }
 
 /** Whether workflow rules are enforced (Settings → Advanced): read at each use, so a change applies at once. */
@@ -175,6 +185,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
         { alive }
       )
     },
-    enforced: workflowEnforced
+    enforced: workflowEnforced,
+    queueLive: (target) => queueLiveOf?.(ws, project.path, target) ?? NOT_RUN_HERE
   })
 }

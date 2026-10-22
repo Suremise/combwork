@@ -184,6 +184,7 @@ export const SUITES = [
   { name: 'providerdetect' },
   { name: 'providers' },
   { name: 'purge' },
+  { name: 'queueagents' },
   { name: 'queuecontrols' },
   { name: 'quit' },
   { name: 'quitwait' },
