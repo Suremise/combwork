@@ -15,6 +15,9 @@
 //
 // Each host keeps the step its entry is at and the check running now (#1353), for the queue's model
 // (queueControls.ts), and tells the window of each change (`queue-changed`).
+//
+// A host that finds another Hive running its target watches that runner's process (#1455, S50): once it is gone, with
+// entries still open, the host runs again here and takes the lease over (the runner's own rule: only a gone process).
 
 import { basename, join } from 'path'
 import { app } from 'electron'
@@ -35,6 +38,7 @@ import { sessions } from '../sessions'
 import { progress } from '../progressService'
 import { appQueueChecks } from './queueChecksApp'
 import { queueFolderNeeded, QueueRunner, releaseQueueRunners } from './queueRunner'
+import { defaultProbe, type ProcessProbe } from './queueProcs'
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import { openEntry, type FactData } from '../../shared/workflow/facts'
@@ -60,6 +64,28 @@ interface Host {
 }
 
 const hosts = new Map<string, Host>()
+
+/** How often a host whose target another Hive runs looks at that runner's process: the runners' renewal period. */
+let holderMs = 30_000
+let holderProbe: ProcessProbe | null = null
+/** The targets another Hive runs that this Hive watches, by host key: one watch each, its next look. */
+const holderWatches = new Map<string, NodeJS.Timeout>()
+
+/** Whether a pid names a process now (whoever's: EPERM is one this process may not signal). */
+function pidThere(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
+/** Tests: how often a watch looks and how it tells a process is gone (null: as the app does). */
+export function setHolderWatch(opts: { ms?: number; probe?: ProcessProbe } | null): void {
+  holderMs = opts?.ms ?? 30_000
+  holderProbe = opts?.probe ?? null
+}
 const hostKey = (wsPath: string, projectPath: string, target: string): string => `${wsPath.toLowerCase()}\n${projectPath.toLowerCase()}\n${target}`
 const alive = (h: Host): boolean => !h.life.aborted && h.ws.lifetime === h.life && h.ws.path === h.wsPath
 
@@ -134,8 +160,10 @@ async function runHost(h: Host): Promise<void> {
           needed: async () => queueFolderNeeded(wf, h.target)
         })
         if (!got.ok) {
-          if (got.heldBy) log.info(`The merge queue for ${userText(h.target)} in ${userText(basename(h.projectPath))} is run by ${userText(got.heldBy.profile)}`)
-          else log.warn(`The merge queue for ${userText(h.target)} can't run: ${userText(got.problem ?? 'its runner could not start')}`)
+          if (got.heldBy) {
+            log.info(`The merge queue for ${userText(h.target)} in ${userText(basename(h.projectPath))} is run by ${userText(got.heldBy.profile)}`)
+            watchHolder(h, wf)
+          } else log.warn(`The merge queue for ${userText(h.target)} can't run: ${userText(got.problem ?? 'its runner could not start')}`)
           return
         }
         runner = got.runner
@@ -160,6 +188,38 @@ async function runHost(h: Host): Promise<void> {
     // The queue is empty, paused or its workspace is going: the lease goes (its folder kept while the queue needs it).
     await runner?.release().catch((e) => log.warn(`releasing the merge queue for ${userText(h.target)}`, e))
   }
+}
+
+/**
+ * Watches the runner another Hive has of a host's target (#1455, S50), by the process its lease names: once that is
+ * gone (`alive` false: a reused pid counts as gone), or the lease is no one's, the host runs again here, which takes the
+ * lease over. A runner whose process can't be checked counts as running, as acquire takes it. One watch per target;
+ * it ends with the workspace and once the target has nothing open, and a run here (which watches again if it finds the
+ * lease held) replaces it.
+ */
+function watchHolder(h: Host, wf: Workflow): void {
+  const key = hostKey(h.wsPath, h.projectPath, h.target)
+  if (holderWatches.has(key)) return
+  const look = async (): Promise<void> => {
+    holderWatches.delete(key)
+    if (!alive(h) || h.running || !openTargets(wf).includes(h.target)) return
+    const lease = wf.store.queueLease(h.target)
+    // A pid that isn't there is gone at once; one that is, by its start time too (the probe: PowerShell on Windows).
+    const gone = !lease || !pidThere(lease.pid) || (await (holderProbe ?? defaultProbe()).alive(lease.pid, lease.started)) === false
+    if (!alive(h) || h.running) return
+    if (gone) {
+      log.info(`The merge queue for ${userText(h.target)} in ${userText(basename(h.projectPath))}: its runner${lease ? ` (${userText(lease.profile)}, process ${lease.pid})` : ''} has gone, so this Hive runs it`)
+      void kickQueue(h.ws, h.projectPath, h.target)
+      return
+    }
+    schedule()
+  }
+  const schedule = (): void => {
+    const t = setTimeout(() => void look().catch((e) => log.warn(`watching the runner of the merge queue for ${userText(h.target)}`, e)), holderMs)
+    t.unref?.()
+    holderWatches.set(key, t)
+  }
+  schedule()
 }
 
 /** The queue's config for a host's run: the runner's folder, lease, git and spawn; the repository lock; Hive's checks. */

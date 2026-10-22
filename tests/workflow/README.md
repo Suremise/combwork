@@ -3,8 +3,8 @@
 The acceptance scenarios of SPEC §16.18 (and §16.19's release candidates), each against the test that covers it. Here
 `tests/workflow` is P2's core suite, run with the app's runtime settings (`reconcileActs` on, `harness.ts`). App-level
 unit tests run Hive's main process on a real board (a temporary `hive.db`), and e2e suites (`tests/e2e/*.cjs`) run the
-built app. Written for #1287, P4's acceptance check. A part that a later phase builds is marked with that phase rather
-than left out.
+built app. Written for #1287, P4's acceptance check, and extended for #1358, P5's. A part that a later phase builds is
+marked with that phase rather than left out.
 
 ## P4's scenarios
 
@@ -59,11 +59,41 @@ run uncounted by a later edit (the core's `declarePaths` and check runs in `scen
 declare-paths route's arguments in `cardIntents.test.ts` and counted runs in `progressgates`). No test exercises a
 hooks-free session, and none should.
 
+## P5's scenarios (Hive merges, the queue)
+
+Written for #1358, P5's acceptance check. Each scenario's app-level proof is the e2e suite of the card that built it;
+S4, S13, S14 (Hive merges), S47 and S57(e) were proven at core level by their cards and in the app first here
+(`p5scenarios`), S50's queue runner and S55 too (`queuelease`, `p5lane`).
+
+| Scenario | What it checks | e2e (the app) | Unit (app level, or the core where the card says so) |
+|---|---|---|---|
+| S4 | Two approved changes, each fine alone and broken together: the second's merge checks fail, the target doesn't move, the card is returned with the output | `p5scenarios` (S4: the Merges tab and the card's Work section) | `workflow/queueChecks.test.ts` "S4's core: …"; `workflow/queue.test.ts` "S4: …" |
+| S7 (the queue) | A hand merge during the queue's check is observed: Done (outside), the entry dropped, never merged twice | `mergequeue` (S7) | `workflow/queue.test.ts` "S7: …"; `reconciler.test.ts` "S7: …" |
+| S8 (the queue) | A new revision after the pass: Stale, its entry cancelled, nothing for the queue, Retry merge refused | — (P4's `progressgates` for the stale mark) | `workflow/scenarios.git.test.ts` "S8: …"; `workflow/queueRecovery.test.ts` "an entry that is no longer approved is cancelled with an outcome; …" |
+| S10 (the queue) | A rebase whose resolution changes the change goes stale, so the queue never merges it; one resolving to the replay carries over | — | `workflow/scenarios.git.test.ts` "S10: …" (both); `workflow/gitAdapter.test.ts` (S10); the queue's side as S8's: `workflow/queueRecovery.test.ts` (a pass gone stale is cancelled) |
+| S13 | The warm queue worktree has a package installed; a change uses it undeclared: the install runs from scratch, the check fails, the target doesn't move | `p5scenarios` (S13: the project's setup command, the same worktree) | `workflow/queueChecks.test.ts` "S13's core: …"; `workflow/queue.test.ts` "S13: …" |
+| S14 (Hive merges) | Your OK before merging (G10): the approved card waits on For you (Approve), unqueued; approved → merged | `p5scenarios` (S14) | `workflow/queue.test.ts` "S14: …" |
+| S27 | The target moves during the checks: tested again on the new head, never an untested advance | `mergequeue` (S27); `mergequeuefolder` (S27, checked out in the project folder) | `workflow/queue.test.ts` "S27: …" (both forms) |
+| S28 | Two Hives merge into one repository at once: one waits on the repository lock, naming the other | `repolock` | `repoLock.test.ts` "two processes take it in turn: …" and the dead-holder cases |
+| S32 (the queue) | A transient check failure: the same revision requeued (at most twice); a red one needs a new revision or the user's Retry merge | `mergequeue` (the transient requeue); `queuecontrols` (Retry merge) | `workflow/queue.test.ts` "S32: …" (both) |
+| S33(a) | A card removed from the queue during its check never merges, after a restart too | `queuecontrols` (S33a) | `workflow/queue.test.ts` "S33: …"; `workflow/queuePause.test.ts` "during its checks: never merged, after a restart too; …" |
+| S33(c) | Hive ends right after the target moved, before `Integrated`: the next start records it, once | `mergequeue` (S33c); `mergequeuecrash` (each journal point) | `workflow/queueHost.test.ts` "the target moved before Hive ended (S33c): …" |
+| S34 | A target checked out in a folder: (a) moved just before the swap, (b) the folder on another branch, (c) changes or staged files there, (d) a crash at each point of the journal | `mergequeuefolder` (S34a–c); `mergequeuecrash` (S34d) | `workflow/queueFolder.test.ts` "S34a: …", "… (S34b) …", "… (S34c) …"; `workflow/queueRecovery.test.ts` (the journal's recovery) |
+| S42 | The merge checks run without the repository lock; an idle session in the folder doesn't hold the queue up | `mergequeuefolder` (S42) | `workflow/queueFolder.test.ts` "S42: the checks run without the lock" |
+| S43 (the queue) | The next card waits while the one before merges ("waiting: … merging"); a returned card is fixed in the same clean worktree; the next starts from a target that contains it | `p5lane` (lane A: Two waits for One merging, Three returned and fixed in B1's worktree, each next card's base the new merge base) | `workflow/queueAgents.test.ts` "hive_lane next: a passed card Hive merges is named …" |
+| S47 | Hive's merge commit: no identity → paused, said in the panel; a `commit-msg` hook rejecting it → returned with its output; a signer that waits → paused "signing waits for you" | `p5scenarios` (S47) | `workflow/queueCommits.test.ts` |
+| S50 (the queue) | One runner across Hives: the other says "Run by …"; the runner's process gone mid-check, the other takes over, ends its check, runs in a new folder, merges once | `queuelease` | `queueRunner.test.ts` "one runner per target across Hives (#1360)" |
+| S52 | The target moves during every test: after the retests the entry pauses with its reason; a hand merge during a test is observed, no empty merge commit | `mergequeue` (S7: the hand merge observed) | `workflow/queue.test.ts` "S52: …" (both) |
+| S55 | P5's RC: Pair (Hive merges), agent worktrees, the Assistant off; merged at the approved revision, the next card on the new merge base; two squashes in a row, the branch brought to the target between them; strict: updated on the queue's ref, the builder's worktree untouched, resumed cleanly after a return | `p5lane`; `mergestrict` (the strict part) | `lineUpdates.test.ts` "after a squash, the next card waits; …"; `workflow/queueStrict.test.ts` |
+| S57(e) | A decision after the checks and before the advance: no advance; after `IntegrationStarted`: merged, then For you | `p5scenarios` (S57(e): a decision recorded in the card while its checks run) | `workflow/queue.test.ts` "S57 (e, f): …" |
+
+S21's queue part (a lane started and answered from the window, the Assistant off, through to its verified end) is
+`p5lane` (both lanes end verified, their merge commits the queue's results).
+
 ## Later phases (named here so nothing is missed)
 
 | Phase | Scenarios | Tests so far |
 |---|---|---|
-| P5 (Hive merges, the queue) | S4, S13, S27, S28, S34, S42, S47, S52, S55; and S8's queue refusal, S10's queue side, S32's requeue, S57(e) | `workflow/queue.test.ts` and `workflow/queueRecovery.test.ts` cover S4, S13, S27, S32, S34, S42 and S57(e, f) at core level; S28, S47 and S52 have none yet (P5's cards) |
 | P6 | S20 | `workflow/scenarios.none.test.ts` "S20: …" (core) |
 | P7 (slots) | S35, S51, S56 | none yet (P7's cards) |
 

@@ -2350,7 +2350,10 @@ moved meanwhile. A paused entry holds no lock. One queue per target still runs o
 the installed one share its hive.db, S50). It holds the target's **lease** (a row in hive.db: the holder's profile,
 pid and process start time, when it was taken and last renewed). Another Hive takes the lease over **only once the
 holder process is gone** (its pid gone, or given to a process that started at another time), never because its
-renewals stopped: a stalled but living Hive keeps its queue, and the panel says "run by <profile>".
+renewals stopped: a stalled but living Hive keeps its queue, and the panel says "run by <profile>". A Hive that finds
+the lease held **watches the holder's process** while the target has open entries (every 30 s, the renewal period: the
+pid first, then its start time) and, once it is gone, runs the queue itself, taking the lease over with no other
+prompt [#1455, built in #1358: before it, the queue waited for a new entry, Resume or a reopened workspace].
 
 Each lease has a **Windows job object** that owns every process the runner starts for the life of its whole tree (a
 check's detached server too: nothing may break away from it), held by Hive's process supervisor (the one agents'
