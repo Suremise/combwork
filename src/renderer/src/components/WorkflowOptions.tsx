@@ -5,7 +5,7 @@ import { optionTitle, OPTION_TEXT, PRESET_NEEDS_TEXT, PRESET_NOTE_TEXT, PRESET_T
 import { LOOP_ROUNDS, loopDefaults } from '@shared/lanes'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { cardLabelOf, confirm, notify, openProjectSettings, set as setStore, setActivity, useStore } from '../store'
+import { cardLabelOf, confirm, notify, openProjectSettings, openVersionControl, set as setStore, setActivity, useStore } from '../store'
 import { Icon, Switch, Tooltip } from './ui'
 
 /**
@@ -545,7 +545,7 @@ function SaveDetails({ changes, check, picked }: { changes: string[]; check: { l
 
 const N = {
   text: msg({ id: 'workflow.presetsNotice.text', defaultMessage: '{n, plural, one {{projects} works} other {{projects} work}} as before this version. A preset sets up a workflow in one click: who reviews the work, which checks pass first and who merges.', description: 'The one-time notice after the upgrade to 1.0 (glossary 2.1: preset, workflow). {projects} is a list of project names; {n} how many.' }),
-  choose: msg({ id: 'workflow.presetsNotice.choose', defaultMessage: 'Choose…', description: 'A button of the one-time presets notice: opens Project Settings → Workflow.' }),
+  choose: msg({ id: 'workflow.presetsNotice.choose', defaultMessage: 'Choose…', description: 'A button of the one-time presets notice: opens the first project’s Version Control tab at Workflow.' }),
   notNow: msg({ id: 'workflow.presetsNotice.notNow', defaultMessage: 'Not Now', description: 'A button of the one-time presets notice: dismisses it for good.' })
 }
 
@@ -569,7 +569,7 @@ export function PresetsNotice() {
   }, [workspace, readOnly])
   if (!projects?.length) return null
   const answer = (choose: boolean): void => {
-    if (choose) openProjectSettings(projects[0].path, 'workflow')
+    if (choose) openVersionControl(projects[0].path, 'workflow')
     setProjects(null)
     void call('workflow:presetsNoticeSaid').catch((e) => notify('error', errorMessage(e)))
   }

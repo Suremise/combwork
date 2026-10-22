@@ -78,6 +78,7 @@ module.exports = { languagesFrom, loadCases, LANG_TAG }
 // Loaded by tests/i18nshots.test.ts for the two helpers above; run, it is the suite.
 if (require.main === module) {
   const lib = require('./lib.cjs')
+  const { execFileSync } = require('child_process')
   const layout = require('./layoutReport.cjs')
   const { _electron } = require('playwright-core')
   const shots = path.join(lib.WORK, 'i18nshots-shots')
@@ -98,6 +99,9 @@ if (require.main === module) {
     const claudeHome = path.join(lib.WORK, `i18nshots-${lang}-claude-home`)
     for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
     for (const d of [dir, alpha]) fs.mkdirSync(d, { recursive: true })
+    // A Git project from the start (#1416: Hive records the version control it finds, and shows Git's sections for Git
+    // only); the cases add its commits.
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: alpha, env: lib.baseEnv(), stdio: 'pipe' })
     const cenv = lib.fakeClaude(userData, claudeHome, [alpha])
     const cfgFile = path.join(userData, 'config.json')
     const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))

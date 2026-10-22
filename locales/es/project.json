@@ -276,6 +276,7 @@
   "project.settings.on": "Activado",
   "project.settings.onLower": "activado",
   "project.settings.openHive": "Abrir la carpeta .hive",
+  "project.settings.openVersionControl": "Abrir Control de versiones",
   "project.settings.overrides": "Reemplaza el valor global predeterminado",
   "project.settings.providerDefault": "predeterminado de {provider}",
   "project.settings.reset": "Restablecer",
@@ -310,7 +311,6 @@
   "project.skills.user": "Usuario",
   "project.tab.attachments": "Adjuntos",
   "project.tab.files": "Archivos",
-  "project.tab.git": "Git",
   "project.tab.mcp": "MCP",
   "project.tab.memory": "Memoria",
   "project.tab.overview": "Resumen",
@@ -321,6 +321,7 @@
   "project.tab.skills": "Habilidades",
   "project.tab.tasks": "Tareas",
   "project.tab.templates": "Plantillas",
+  "project.tab.versionControl": "Control de versiones",
   "project.tabs.more": "Más",
   "project.tabs.moreTip": "{tabs} del proyecto",
   "project.tabs.tip": "{tab} ({key})"

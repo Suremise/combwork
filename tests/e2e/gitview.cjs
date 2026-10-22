@@ -3,7 +3,7 @@
 // clone's push shows nothing until Fetch); Pull fast-forwards; New branch… switches to it and Push sets its upstream;
 // a branch's Switch is disabled, with why, while an agent works in the project folder; History lists the commits and
 // Create tag… tags the commit; Add remote… adds one, and a GitHub remote with a personal email warns; a project without
-// git shows the setup notes. Remotes are local bare repositories in the suite's folder (never a real remote), git's
+// git (None, #1416) says so under the header, with Initialise repository…. Remotes are local bare repositories in the suite's folder (never a real remote), git's
 // global config is the suite's own (GIT_CONFIG_GLOBAL), and the agent is the fake Claude Code. Dev build, throwaway
 // profile and workspace.
 const lib = require('./lib.cjs')
@@ -57,7 +57,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   check('the status bar shows branch · remote · ahead/behind', !!(await lib.until(async () => (await text(item)).includes('main · origin · ↑0 ↓0'), HUNG_MS)), await text(item))
   await item.click()
   const branches = page.locator('[data-git-branches]')
-  check('it opens Git → Branches & remotes', !!(await lib.until(async () => (await branches.count()) === 1, HUNG_MS)) && (await page.locator('.tab.active', { hasText: 'Git' }).count()) === 1)
+  check('it opens Git → Branches & remotes', !!(await lib.until(async () => (await branches.count()) === 1, HUNG_MS)) && (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1)
   check('the current branch and its upstream', !!(await lib.until(async () => (await text(branches.locator('[data-git-head]'))) === 'main' && (await text(branches.locator('[data-git-upstream]'))).includes('origin/main · ↑0 ↓0'), HUNG_MS)))
   check("it says it's never fetched (Hive never fetches by itself)", /Never fetched\. Hive never fetches by itself/.test(await text(branches.locator('[data-git-fetched]'))), await text(branches.locator('[data-git-fetched]')))
   await shot(page, '1-branches')
@@ -148,9 +148,9 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
 
   // --- A project without git.
   await page.getByText('beta', { exact: true }).first().click()
-  await page.locator('.tabs .tab', { hasText: 'Git' }).click()
-  const notes = page.locator('[data-git-setup]')
-  check('a project without git says so, with the setup notes and Initialise repository…', !!(await lib.until(async () => /beta isn't a git repository/.test(await text(notes)) && (await notes.locator('[data-git-init]').count()) === 1, HUNG_MS)), await text(notes))
+  await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+  const notes = page.locator('[data-vc-init]')
+  check('a project without git (None) says so, with Initialise repository… under the header and only Workflow', !!(await lib.until(async () => /has no version control/.test(await text(page.locator('[data-vc-fact]'))) && (await notes.locator('[data-git-init]').count()) === 1 && JSON.stringify(await page.locator('.git-sections [role="tab"]').evaluateAll((b) => b.map((x) => x.getAttribute('data-section')))) === '["workflow"]', HUNG_MS)), await text(page.locator('.vc-view')))
   check('and has no status bar item', (await item.count()) === 0)
   await shot(page, '5-no-git')
 

@@ -464,8 +464,8 @@
     "description": "Title of the form that creates a branch."
   },
   "git.parentRepo": {
-    "defaultMessage": "This project is inside the git repository in {folder}, so the Git view only shows it: Hive changes only a project's own repository.",
-    "description": "Banner in the Git tab of a project whose folder is inside another repository (a workspace kept in git). {folder} is that repository's folder."
+    "defaultMessage": "This project is inside the git repository in {folder}, so the Version Control tab only shows it: Hive changes only a project's own repository.",
+    "description": "Banner in the Version Control tab of a project whose folder is inside another repository (a workspace kept in git). {folder} is that repository's folder."
   },
   "git.problem.agentSetup": {
     "defaultMessage": "Agent Setup",
@@ -596,8 +596,8 @@
     "description": "The Git tab's Merge queue section, under a queue's history heading, when it has none yet."
   },
   "git.queue.none": {
-    "defaultMessage": "No merge queue. When the project's workflow has Hive merge its cards (Project Settings → Workflow: Who merges), each target branch's queue shows here, with its history.",
-    "description": "The Git tab's Merge queue section when the project has no queue. Project Settings → Workflow and Who merges are Hive's names: keep them as Hive shows them. Glossary 2.5: merge queue."
+    "defaultMessage": "No merge queue. When the project's workflow has Hive merge its cards (Version Control → Workflow: Who merges), each target branch's queue shows here, with its history.",
+    "description": "The Version Control tab's Merge queue section when the project has no queue. Version Control → Workflow and Who merges are Hive's names: keep them as Hive shows them. Glossary 2.5: merge queue."
   },
   "git.queue.open": {
     "defaultMessage": "Open {card}",
@@ -767,6 +767,10 @@
     "defaultMessage": "Merge queue",
     "description": "The Git tab's section with the project's merge queues (#1357): each target's queue now, its history, Pause and Resume. Glossary 2.5: merge queue."
   },
+  "git.section.workflow": {
+    "defaultMessage": "Workflow",
+    "description": "The Version Control tab's section with the project's workflow options (glossary 2.1: workflow)."
+  },
   "git.setup.howTo": {
     "defaultMessage": "To use them, make it a repository: Initialise makes it one on a branch called main, keeps its .hive out of git, and commits its files, so agents can work in worktrees at once. Then add a remote under Branches & remotes to push it.",
     "description": "The Git tab of a project that isn't a git repository. Initialise and Branches & remotes are a button and a section: keep them as they are named there. Keep main (the branch name)."
@@ -780,8 +784,8 @@
     "description": "Heading on the Git tab of a project that isn't a git repository. {project} is its name."
   },
   "git.setup.withoutGit": {
-    "defaultMessage": "Without git, agents work in the project folder, and Hive has no worktrees, merging or Git view for it.",
-    "description": "The Git tab of a project that isn't a git repository."
+    "defaultMessage": "Without a repository, agents work in the project folder, and Hive has no worktrees or merging for it.",
+    "description": "The Version Control tab of a Git project whose folder isn't a git repository."
   },
   "git.state": {
     "defaultMessage": "{state, select, merge {merging} rebase {rebasing} cherrypick {cherry-picking} revert {reverting} other {bisecting}}",
@@ -826,10 +830,6 @@
   "git.switch.title": {
     "defaultMessage": "Switch {project} to {branch}?",
     "description": "Title of the confirmation before switching the project folder's branch."
-  },
-  "git.tab.sections": {
-    "defaultMessage": "Git",
-    "description": "Accessible name of the Git tab's row of sections (Changes, History, Branches & remotes)."
   },
   "git.tags.about": {
     "defaultMessage": "{onBranch, select, yes {Tags the commit the project folder has checked out ({branch}). With a message, it's an annotated tag.} other {Tags the commit the project folder has checked out. With a message, it's an annotated tag.}}",
@@ -956,7 +956,7 @@
     "description": "Said wherever git is needed when the installed git is too old to run. {version} and {min} are git versions. No full stop: some places add more after it."
   },
   "git.tool.tooOldToRun": {
-    "defaultMessage": "Hive's git commands fail with Git {version}: worktrees, merging, the Git tab and the unmerged counts don't work.",
+    "defaultMessage": "Hive's git commands fail with Git {version}: worktrees, merging, the Version Control tab's Git sections and the unmerged counts don't work.",
     "description": "Agent Setup, for a git too old for any of Hive's git commands. {version} is its version."
   },
   "git.track.about": {
@@ -1034,6 +1034,58 @@
   "git.validate.wholeUrl": {
     "defaultMessage": "Type the whole URL: its password or token is hidden here",
     "description": "Under a remote's URL box when it still has ••• for a hidden password."
+  },
+  "git.vc.choice": {
+    "defaultMessage": "Version control",
+    "description": "Accessible name of the None · Git choice atop the Version Control tab (glossary 2.1: version control)."
+  },
+  "git.vc.fact.gone": {
+    "defaultMessage": "The Git repository is gone from this folder. Until it’s back, what needs Git can’t be read.",
+    "description": "Atop the Version Control tab of a Git project whose .git was removed or moved."
+  },
+  "git.vc.fact.none": {
+    "defaultMessage": "This folder has no version control.",
+    "description": "Atop the Version Control tab, when the project folder has no repository."
+  },
+  "git.vc.fact.other": {
+    "defaultMessage": "{vcs} found: not supported yet, so this project uses None.",
+    "description": "Atop the Version Control tab: another version control was found in the folder. {vcs} is its name (Mercurial, Jujutsu). None: glossary 2.1."
+  },
+  "git.vc.fact.repo": {
+    "defaultMessage": "This folder is a Git repository at {root}.",
+    "description": "Atop the Version Control tab: what Hive found in the project folder. {root} is the repository root (glossary 2.1: repository root)."
+  },
+  "git.vc.fact.subfolder": {
+    "defaultMessage": "This folder is inside a Git repository at {root}: branch and merge actions affect that whole repository.",
+    "description": "Atop the Version Control tab, when the project is a subfolder of a larger repository. {root} is that repository’s root."
+  },
+  "git.vc.git": {
+    "defaultMessage": "Git",
+    "description": "A version control system’s name, in the choice atop the Version Control tab (glossary 2.1: keep)."
+  },
+  "git.vc.initHint": {
+    "defaultMessage": "Initialise repository… makes this folder a Git repository on a branch called main, keeps its .hive out of git and commits its files.",
+    "description": "Under the header of the Version Control tab of a project whose folder has no repository, beside the button. Initialise repository… is the button’s name: keep it as translated there. Keep main (the branch name)."
+  },
+  "git.vc.none": {
+    "defaultMessage": "None",
+    "description": "The version control of a project without any, in the choice atop the Version Control tab and in \"Workflow: None · Solo\" (glossary 2.1: None)."
+  },
+  "git.vc.otherTip": {
+    "defaultMessage": "Hive detects the version control in this folder. When it finds a different one, it offers to switch.",
+    "description": "Tooltip of the version control not in use, in the None · Git choice atop the Version Control tab (disabled: Hive offers the switch itself)."
+  },
+  "git.vc.sections": {
+    "defaultMessage": "Version Control",
+    "description": "Accessible name of the Version Control tab's row of sections (Workflow, Changes, History…). Glossary 2.1: Version Control (the tab)."
+  },
+  "git.vc.workflow": {
+    "defaultMessage": "Workflow: {platform} · {state, select, preset {{preset}} custom {Custom (from {preset})} other {no preset chosen}}",
+    "description": "A link atop the Version Control tab: the project’s workflow, its version control ({platform}: None or Git) and its preset ({preset}: Solo, Pair, Team); Custom when the options were changed after it. Opens the Workflow section. Glossary 2.1: workflow, preset, Custom."
+  },
+  "git.vc.workflowTip": {
+    "defaultMessage": "Show the workflow options",
+    "description": "Tooltip of the \"Workflow: Git · Team\" link atop the Version Control tab."
   },
   "git.worktree.agent": {
     "defaultMessage": "{agent}'s worktree",

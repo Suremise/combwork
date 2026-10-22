@@ -41,7 +41,7 @@
   "main.gitInit.failed.staged": ".hive a été indexé, donc aucun commit n’a été fait",
   "main.gitInit.fix.commit": "{git}. Fais le commit dans un terminal, ou demande-le à un agent",
   "main.gitInit.fix.identity": "{which, select, name {saisis-le et choisis Faire le premier commit} email {saisis-la et choisis Faire le premier commit} other {saisis-les et choisis Faire le premier commit}}",
-  "main.gitInit.fix.ignored": "corrige cela, puis choisis Faire le premier commit dans l’onglet Git",
+  "main.gitInit.fix.ignored": "corrige cela, puis choisis Faire le premier commit dans l’onglet Gestion de versions",
   "main.gitInit.fix.staged": "cherche dans le .gitignore une règle qui réintègre .hive",
   "main.gitInit.nested": "Ce dossier se trouve dans le dépôt git situé dans {root}. Confirme que tu veux un dépôt distinct à l’intérieur.",
   "main.gitInit.noEmail": "Git n’a pas d’adresse e-mail pour faire le premier commit : saisis-en une.",

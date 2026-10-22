@@ -758,7 +758,7 @@ function GitSetupRow() {
         <Icon name="pass-filled" />
         <div className="grow">
           <div>
-            {tRich(msg({ id: 'shell.setup.gitOk', defaultMessage: '<b>Git {version}</b> <muted>— for worktrees, merging and the Git tab</muted>', description: 'Agent Setup: the git Hive found. {version} is its version; <b> is bold, <muted> greyed. Git is a name: keep it.' }), { version: git.version ?? '', b: bold, muted })}
+            {tRich(msg({ id: 'shell.setup.gitOk', defaultMessage: '<b>Git {version}</b> <muted>— for worktrees, merging and the Version Control tab</muted>', description: 'Agent Setup: the git Hive found. {version} is its version; <b> is bold, <muted> greyed. Git is a name: keep it.' }), { version: git.version ?? '', b: bold, muted })}
           </div>
           {git.path && <div className="muted mono" style={{ fontSize: 11 }}>{git.path}</div>}
         </div>
@@ -770,8 +770,8 @@ function GitSetupRow() {
     git.state === 'old' && !problem
       ? tr(msg({ id: 'shell.setup.gitOldDetail', defaultMessage: '{why} Update Git for Windows to {min} or later, then Check again.', description: "Agent Setup, under a too old git. {why} says why (in English for now); Git for Windows is a product's name; Check again is the dialog's button." }), { why: gitOldText(git.version!), min: GIT_MIN })
       : git.state === 'unknown'
-        ? tr(msg({ id: 'shell.setup.gitUnknownDetail', defaultMessage: '{error}. Hive needs Git {min} or later for worktrees, merging and the Git tab.', description: "Agent Setup when git couldn't be checked. {error} is the error, as given." }), { error: git.error ?? '', min: GIT_MIN })
-        : tr(msg({ id: 'shell.setup.gitProblemDetail', defaultMessage: "{problem}: worktree agents, merging, the Git tab and the unmerged counts don't work. {fix}", description: 'Agent Setup under a git problem. {problem} and {fix} say what is wrong and what to do (in English for now).' }), { problem: problem ?? '', fix: gitFixText(git) })
+        ? tr(msg({ id: 'shell.setup.gitUnknownDetail', defaultMessage: '{error}. Hive needs Git {min} or later for worktrees, merging and the Version Control tab.', description: "Agent Setup when git couldn't be checked. {error} is the error, as given." }), { error: git.error ?? '', min: GIT_MIN })
+        : tr(msg({ id: 'shell.setup.gitProblemDetail', defaultMessage: "{problem}: worktree agents, merging, the Version Control tab's Git sections and the unmerged counts don't work. {fix}", description: 'Agent Setup under a git problem. {problem} and {fix} say what is wrong and what to do (in English for now).' }), { problem: problem ?? '', fix: gitFixText(git) })
   return (
     <div className="setup-status setup-git" data-git={git.state}>
       <Icon name="warning" />

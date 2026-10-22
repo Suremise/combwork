@@ -690,7 +690,7 @@
   "settings.project.transcriptWarnMB.off": "しない",
   "settings.project.transcriptWarnMB.tip": "長い会話はCLIとHiveを遅くします。作業を新しい会話に引き継ぐと、再び短くなります。",
   "settings.project.transcriptWarnMB.title": "トランスクリプトが超えたら警告",
-  "settings.project.workflow.desc": "プリセットを選ぶか、各オプションを設定します。各オプションには、値がどこから来ているかが表示されます。",
+  "settings.project.workflow.moved": "レビューする人、事前に合格すべきチェック、マージする人は、プロジェクトの「バージョン管理」タブの「ワークフロー」で設定します。",
   "settings.project.workflow.title": "ワークフローのオプション",
   "settings.project.worktreeCopy.desc": "新しいワークツリーに、プロジェクトフォルダーからコピーするGitで無視されたファイル（.envファイルなど）です。1行に1パターンを指定します。空の場合は「設定」→「エージェントとワークツリー」→「新しいワークツリーにコピー」を継承します。",
   "settings.project.worktreeCopy.tip": "新しいワークツリーには、Gitが追跡するファイルしか入りません。スラッシュのないパターンは、どこにあるファイル名やフォルダー名にも一致します（例：.env*）。スラッシュのあるパターンは、プロジェクトのルートからのパスに一致します（例：config/local.json）。node_modulesのような大きなフォルダーは、セットアップコマンドで作り直すほうが適しています。",

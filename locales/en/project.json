@@ -1107,6 +1107,10 @@
     "defaultMessage": "Open .hive folder",
     "description": "Button: opens the project's .hive folder. Keep .hive."
   },
+  "project.settings.openVersionControl": {
+    "defaultMessage": "Open Version Control",
+    "description": "A button in Project Settings → Workflow: shows the project’s Version Control tab at its Workflow section, where the workflow options are (glossary 2.1: Version Control)."
+  },
   "project.settings.overrides": {
     "defaultMessage": "Overrides the global default",
     "description": "Tooltip on the mark beside a project setting that is not Inherit."
@@ -1243,10 +1247,6 @@
     "defaultMessage": "Files",
     "description": "A project's tab: its files."
   },
-  "project.tab.git": {
-    "defaultMessage": "Git",
-    "description": "A project's tab: its git changes, history and branches. Usually kept as Git."
-  },
   "project.tab.mcp": {
     "defaultMessage": "MCP",
     "description": "A project's tab: the MCP servers its agents get. Keep MCP."
@@ -1286,6 +1286,10 @@
   "project.tab.templates": {
     "defaultMessage": "Templates",
     "description": "A project's tab: templates of agents and cards."
+  },
+  "project.tab.versionControl": {
+    "defaultMessage": "Version Control",
+    "description": "A project's tab (renamed from Git): its version control, workflow options, changes, history and branches. Glossary 2.1: Version Control (the tab)."
   },
   "project.tabs.more": {
     "defaultMessage": "More",

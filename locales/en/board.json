@@ -2105,7 +2105,7 @@
   },
   "board.queue.inVersionControl": {
     "defaultMessage": "Queue in Version Control",
-    "description": "A link on a merge queue's card in the Progress panel: shows the project's Git tab, where its queue and history are."
+    "description": "A link on a merge queue's card in the Progress panel: shows the project's Version Control tab at its Merge queue section, with its history."
   },
   "board.queue.merged": {
     "defaultMessage": "{card} merged as {result}",

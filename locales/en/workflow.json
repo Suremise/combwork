@@ -577,7 +577,7 @@
   },
   "workflow.presetsNotice.choose": {
     "defaultMessage": "Choose…",
-    "description": "A button of the one-time presets notice: opens Project Settings → Workflow."
+    "description": "A button of the one-time presets notice: opens the first project’s Version Control tab at Workflow."
   },
   "workflow.presetsNotice.notNow": {
     "defaultMessage": "Not Now",

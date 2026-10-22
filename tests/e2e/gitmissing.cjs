@@ -95,7 +95,7 @@ function pathWithoutGit() {
   // --- The Changes tab.
   const status = await inv('git:status', repo)
   check('git:status: git missing, not "not a repository"', status.gitProblem === MISSING, JSON.stringify(status))
-  await page.locator('.tab', { hasText: 'Git' }).click()
+  await page.locator('.tab', { hasText: 'Version Control' }).click()
   const view = page.locator('.changes-git-missing')
   check('the Changes tab says git is missing, with the fix', !!(await lib.until(async () => (await view.count()) === 1, 8000)) && (await view.innerText()).includes(MISSING) && (await page.getByText('is not a git repository').count()) === 0, await view.innerText().catch(() => ''))
   await shot('changes-dark')

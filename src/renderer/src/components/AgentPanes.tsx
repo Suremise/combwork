@@ -20,7 +20,7 @@ import { formatDateTime, formatWhen } from '@shared/dates'
 import * as actions from '../actions'
 import { HAND_OVER_TEXT, handOverNow, onRunningLane } from '@shared/handOver'
 import { call, errorMessage } from '../api'
-import { NO_IDS, NO_PROJECTS, agentPage, get, agentProviderOf, clearStartFailure, closeTile, focusAgent, focusedAgentId, isAssistantPath, notify, openInSessionsTab, paneAssignment, paneCells, projectKey, prompt, revealAgent, seenAgents, set, setProjectTab, showAgent, showGit, showInOverview, showPage, shownLayout, startingKey, startingLabel, useLanguage, useStarting, useStore } from '../store'
+import { NO_IDS, NO_PROJECTS, agentPage, get, agentProviderOf, clearStartFailure, closeTile, focusAgent, focusedAgentId, isAssistantPath, notify, openInSessionsTab, paneAssignment, paneCells, projectKey, prompt, revealAgent, seenAgents, set, setProjectTab, showAgent, openVersionControl, showInOverview, showPage, shownLayout, startingKey, startingLabel, useLanguage, useStarting, useStore } from '../store'
 import { useLiveUsage, useLiveUsageState } from '../usage'
 import { commandKeybinding } from '../commands'
 import { cx, formatKeybinding, formatTokens, sessionLabel, timeAgo } from '../util'
@@ -530,7 +530,7 @@ export function AddAgentButton({ project, className, label, iconOnly }: { projec
 
 function reviewChanges(project: ProjectInfo, a: AgentInfo): void {
   set((s) => ({ changesRoot: { ...s.changesRoot, [project.path]: a.id } }))
-  showGit(project.path, 'changes')
+  openVersionControl(project.path, 'changes')
 }
 
 /** A worktree agent's work not merged into the project folder yet (null: not a worktree agent, or not checked yet). */

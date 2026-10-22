@@ -81,7 +81,7 @@ function pathWithoutGit() {
   // --- Review: the Changes tab's list of them (#400).
   await page.locator('.toast', { hasText: keptToast }).getByRole('button', { name: 'Review unused worktrees' }).click()
   const section = page.locator('.unused-worktrees-pane .unused-worktrees')
-  check('Review opens Changes at Unused worktrees (2)', !!(await lib.until(async () => (await section.count()) === 1 && /Unused worktrees\s*2/.test(await section.locator('h2').innerText()), 10000)) && (await page.locator('.tab.active, .tab[aria-selected="true"]', { hasText: 'Git' }).count()) >= 1, await section.innerText().catch(() => ''))
+  check('Review opens Changes at Unused worktrees (2)', !!(await lib.until(async () => (await section.count()) === 1 && /Unused worktrees\s*2/.test(await section.locator('h2').innerText()), 10000)) && (await page.locator('.tab.active, .tab[aria-selected="true"]', { hasText: 'Version Control' }).count()) >= 1, await section.innerText().catch(() => ''))
   const picker = page.locator('.split-list .root-select')
   check('…the folder picker shows "Unused worktrees (2)", first, in its group (#476)', (await picker.inputValue()) === 'unused' && (await picker.locator('optgroup[label^="Unused worktrees"] option').allInnerTexts()).join('|').includes('Unused worktrees (2)') && (await picker.locator('option').first().getAttribute('value')) === 'unused', (await picker.locator('option').allInnerTexts()).join('|'))
   check('…each made by Hive (its agent never ran a session there)', (await section.locator('[data-origin="hive"]').count()) === 2, await section.innerText().catch(() => ''))
@@ -311,7 +311,7 @@ function pathWithoutGit() {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('repo', { exact: true }).first().click()
-  await page.locator('.tab', { hasText: 'Git' }).click()
+  await page.locator('.tab', { hasText: 'Version Control' }).click()
   const picker2 = page.locator('.split-list .root-select')
   await lib.until(async () => (await picker2.locator(`option[value="unused:${claudette.worktree.path.replace(/\\/g, '\\\\')}"]`).count()) === 1, 10000)
   await picker2.selectOption(`unused:${claudette.worktree.path}`)

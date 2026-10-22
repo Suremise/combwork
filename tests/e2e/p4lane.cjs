@@ -1,6 +1,6 @@
 // S54, P4's RC scenario end to end (#1287, SPEC §16.18, §16.19.1-2): "Pair (the agent merges)" with agent worktrees,
 // the Assistant off, on fake Claude Code agents acting by their own tokens (their hive tools' calls). The project's
-// options are set through Project Settings → Workflow (#1278); a lane is started from the board (#1280). Card 1: the
+// options are set through Version Control → Workflow (#1278); a lane is started from the board (#1280). Card 1: the
 // builder starts it in its own worktree (the next card's start refused meanwhile: one card at a time), commits, runs
 // the quick check through hive-progress --check (counted), submits; the reviewer starts its review and passes it; the
 // builder merges it (a merge commit) and reports the merge, which done.contained checks: Done, and only then does the
@@ -56,9 +56,9 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     await page.getByText('alpha', { exact: true }).first().click()
     const projectJson = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8'))
 
-    // --- Pair (the agent merges) through Project Settings → Workflow (#1278).
-    await lib.openProjectSettings(page)
-    await page.locator('.settings-nav .row', { hasText: 'Workflow' }).click()
+    // --- Pair (the agent merges) through Version Control → Workflow (#1278).
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    await page.locator('.git-sections [data-section="workflow"]').click()
     const form = page.locator('.workflow-form')
     await until(async () => (await form.count()) > 0, HUNG_MS)
     await form.locator('.workflow-preset select').selectOption('pairAgent')

@@ -3,6 +3,9 @@
 // no agent tool or Agent API route for any of it.
 import { msg, tr, type Msg } from './i18n'
 import { listOf, shownText, withValues, type Text } from './advanced'
+import type { PlatformId } from './platform/descriptors'
+import { queueShown } from './progressQueue'
+import type { QueueView } from './workflow/queue'
 
 /** A merge, rebase or other operation git has in progress in the folder. */
 export type GitRepoState = 'merge' | 'rebase' | 'cherry-pick' | 'revert' | 'bisect'
@@ -160,6 +163,7 @@ export const HISTORY_TAGS = 50
 export const BRANCHES_SHOWN = 200
 
 const M = {
+  workflow: msg({ id: 'git.section.workflow', defaultMessage: 'Workflow', description: "The Version Control tab's section with the project's workflow options (glossary 2.1: workflow)." }),
   changes: msg({ id: 'git.section.changes', defaultMessage: 'Changes', description: "The Git tab's section with the uncommitted changes." }),
   history: msg({ id: 'git.section.history', defaultMessage: 'History', description: "The Git tab's section with the last commits and the tags." }),
   branches: msg({ id: 'git.section.branches', defaultMessage: 'Branches & remotes', description: "The Git tab's section with the branch, branches, remotes, worktrees and commit identity." }),
@@ -178,7 +182,7 @@ const M = {
   noCommitsYet: msg({ id: 'git.head.noCommits', defaultMessage: 'no commits yet', description: "What the project folder has checked out in a repository with no commit yet. Lower case: also in the status bar." }),
   aheadBehind: msg({ id: 'git.status.aheadBehind', defaultMessage: '↑{ahead, number} ↓{behind, number}', description: 'Status bar and Git → Branches & remotes: how many commits a branch is ahead of the remote branch it tracks (↑, to push) and behind it (↓, to pull), "↑2 ↓0". Keep the arrows and the order.' }),
   upstreamGone: msg({ id: 'git.upstream.gone', defaultMessage: 'upstream gone', description: 'In place of the ahead/behind counts: the remote branch a branch tracked was deleted on the remote.' }),
-  parentRepo: msg({ id: 'git.parentRepo', defaultMessage: "This project is inside the git repository in {folder}, so the Git view only shows it: Hive changes only a project's own repository.", description: "Banner in the Git tab of a project whose folder is inside another repository (a workspace kept in git). {folder} is that repository's folder." }),
+  parentRepo: msg({ id: 'git.parentRepo', defaultMessage: "This project is inside the git repository in {folder}, so the Version Control tab only shows it: Hive changes only a project's own repository.", description: "Banner in the Version Control tab of a project whose folder is inside another repository (a workspace kept in git). {folder} is that repository's folder." }),
   noUpstream: msg({ id: 'git.status.noUpstream', defaultMessage: 'no upstream', description: 'Status bar, after the branch: it tracks no remote branch ("main · no upstream").' }),
   tipOn: msg({ id: 'git.tip.on', defaultMessage: 'On {branch}', description: "First line of the status bar's git tooltip: the branch checked out." }),
   tipDetached: msg({ id: 'git.tip.detached', defaultMessage: 'HEAD is detached at {commit}', description: "First line of the status bar's git tooltip. {commit} is a short commit hash." }),
@@ -202,14 +206,38 @@ const M = {
   notEmail: msg({ id: 'git.validate.notEmail', defaultMessage: "That isn't an email address", description: 'Under a commit identity form.' })
 }
 
-/** The Git tab's sections. */
-export const GIT_SECTIONS: readonly { id: 'changes' | 'history' | 'branches' | 'queue'; label: Msg; icon: string }[] = [
+/** The Version Control tab's sections (#1416, SPEC §16.6): Workflow, then the platform's own. */
+export const VC_SECTIONS: readonly { id: 'workflow' | 'changes' | 'history' | 'branches' | 'queue'; label: Msg; icon: string }[] = [
+  { id: 'workflow', label: M.workflow, icon: 'git-pull-request' },
   { id: 'changes', label: M.changes, icon: 'git-compare' },
   { id: 'history', label: M.history, icon: 'history' },
   { id: 'branches', label: M.branches, icon: 'git-branch' },
   { id: 'queue', label: M.queue, icon: 'git-merge' }
 ]
-export type GitSection = (typeof GIT_SECTIONS)[number]['id']
+export type VcSection = (typeof VC_SECTIONS)[number]['id']
+
+/** Each platform's own sections, after Workflow: None has none of its own. */
+const PLATFORM_SECTIONS: Record<PlatformId, readonly VcSection[]> = {
+  git: ['changes', 'history', 'branches', 'queue'],
+  none: []
+}
+
+/**
+ * The sections the tab shows (#1416): Workflow, then the platform's own; and Merge queue while an old Git ruleset's queue
+ * is still there (#1356's rule from the project's queues' actual state, `queueShown`), whatever the platform is now,
+ * until that state is clear.
+ */
+export function vcSections(platform: PlatformId, queues: readonly QueueView[], now: number): VcSection[] {
+  const own = PLATFORM_SECTIONS[platform]
+  const queue = queues.some((v) => queueShown(v, now))
+  return ['workflow', ...own, ...(queue && !own.includes('queue') ? (['queue'] as const) : [])]
+}
+
+/** The section a project opens at when none is kept (or the kept one isn't shown): Changes for Git, else Workflow. */
+export function vcSectionShown(kept: VcSection | undefined, shown: readonly VcSection[]): VcSection {
+  if (kept && shown.includes(kept)) return kept
+  return shown.includes('changes') ? 'changes' : 'workflow'
+}
 
 /** The actions refused while an agent works in the project folder or holds its merge slot. */
 export type GitFolderAction = 'switch' | 'create' | 'pull'
@@ -435,4 +463,4 @@ export const identityProblem = (name: string, email: string): string | null => i
 
 /** The user guide's heading for this view. */
 // i18n-ignore: a user guide heading, found by its English text
-export const GIT_VIEW_GUIDE = 'Git view'
+export const GIT_VIEW_GUIDE = 'Version Control tab'

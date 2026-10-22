@@ -168,8 +168,8 @@
     "description": "What to do when git has no name or email to commit as (main.gitInit.failed.identity). Make first commit is a button: use its name as shown."
   },
   "main.gitInit.fix.ignored": {
-    "defaultMessage": "fix that, then choose Make first commit on the Git tab",
-    "description": "What to do after .hive was found not ignored by git (main.gitInit.failed.ignored). Make first commit is a button on the Git tab: use its name as shown."
+    "defaultMessage": "fix that, then choose Make first commit in the Version Control tab",
+    "description": "What to do after .hive was found not ignored by git (main.gitInit.failed.ignored). Make first commit is a button in the Version Control tab (glossary 2.1): use its name as shown."
   },
   "main.gitInit.fix.staged": {
     "defaultMessage": "check the .gitignore for a rule that brings .hive back",

@@ -19,7 +19,7 @@ const claudeHome = path.join(lib.WORK, 'tabstrip-claude-home')
 const alpha = path.join(ws, 'alpha')
 const beta = path.join(ws, 'beta')
 // The strip's tabs, then More ▾ (#1043), which shows the name of the tab of its menu that is open.
-const LABELS = ['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'Files', 'Attachments', 'Git', 'More']
+const LABELS = ['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'Files', 'Attachments', 'Version Control', 'More']
 const MORE = ['Memory', 'Skills', 'Templates', 'MCP']
 const SPARE = 12
 let failed = 0
@@ -129,9 +129,9 @@ const check = (name, ok, extra = '') => {
   const perf = await expectFit('Performance active', 'icons')
   check('Performance has the label now', perf.active === 'Performance', perf.active)
   await shot('tabstrip-2-icons-dark.png')
-  await page.locator('.tabs .tab', { hasText: 'Git' }).hover()
+  await page.locator('.tabs .tab', { hasText: 'Version Control' }).hover()
   const tip = page.locator('.tip')
-  check('an icon-only tab\'s tooltip names it', !!(await lib.until(async () => ((await tip.textContent().catch(() => '')) ?? '').startsWith('Git'), HUNG_MS)), await tip.textContent().catch(() => ''))
+  check('an icon-only tab\'s tooltip names it', !!(await lib.until(async () => ((await tip.textContent().catch(() => '')) ?? '').startsWith('Version Control'), HUNG_MS)), await tip.textContent().catch(() => ''))
   await page.mouse.move(5, 500)
   await inv('settings:update', { appearance: { theme: 'light' } })
   await lib.sleep(300)

@@ -181,7 +181,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   check('…not counted', (await itemText()) === '1 needs you', await itemText())
   await shot(page, '2-review')
   await review.getByRole('button', { name: 'Changes' }).click()
-  check('Changes opens the Git tab at Changes', !!(await until(async () => (await page.locator('.tab.active', { hasText: 'Git' }).count()) === 1 && (await page.locator('.git-sections button.active', { hasText: 'Changes' }).count()) === 1, HUNG_MS)))
+  check('Changes opens the Git tab at Changes', !!(await until(async () => (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1 && (await page.locator('.git-sections button.active', { hasText: 'Changes' }).count()) === 1, HUNG_MS)))
 
   // Answering Three: nothing needs you, and the status bar says what is left to review.
   await lib.acceptClaudeTrust(inv, beta, three.id)

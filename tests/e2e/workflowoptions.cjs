@@ -1,5 +1,5 @@
-// Project Settings → Workflow (#1278): after an upgrade from 0.9 the one-time presets notice names the project, and
-// Choose… opens its Workflow section; picking Pair (the agent merges) fills in its options (every preset offered), each
+// The workflow options (#1278), in the Version Control tab's Workflow section since #1416: after an upgrade from 0.9 the
+// one-time presets notice names the project, and Choose… opens its Version Control tab at Workflow; picking Pair (the agent merges) fills in its options (every preset offered), each
 // with where its value comes from; Pair (Hive merges, #1355) fills in G9's checks and the install row, shown only while
 // Hive merges and with merge checks; Team (#1361) adds the unit tests, a clean install every time and your OK for ui and
 // release, and says per-card focused tests come later; Save… lists the running lane that keeps the old rules
@@ -88,7 +88,13 @@ function board(sql, ...args) {
     await themes('notice', notice)
     await notice.getByRole('button', { name: 'Choose…' }).click()
     const section = page.locator('.workflow-form')
-    check('Choose… opens the project’s Workflow section', !!(await lib.until(async () => (await section.count()) > 0, HUNG_MS)))
+    const workflowTab = page.locator('.git-sections [data-section="workflow"]')
+    check('Choose… opens the project’s Version Control tab at Workflow', !!(await lib.until(async () => (await section.count()) > 0 && (await workflowTab.getAttribute('aria-selected')) === 'true' && (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1, HUNG_MS)))
+    /** Leaves the Workflow section and comes back to it: the form is read again. */
+    const reopen = async () => {
+      await page.locator('.git-sections [data-section="changes"]').click()
+      await workflowTab.click()
+    }
     check('the notice is gone, and answered for good', !!(await lib.until(async () => (await notice.count()) === 0 && (await inv('workflow:presetsNotice')) === null, HUNG_MS)))
 
     // --- The form as the upgrade left it: no preset, each option with where its value comes from.
@@ -174,8 +180,7 @@ function board(sql, ...args) {
     const saved = () => projectJson().workflow?.options ?? {}
     check('saved: the labels policy and the check with its command', !!(await lib.until(async () => saved().okBefore?.mode === 'labels' && saved().commands?.['unit tests'] === 'npm run test -- --silent', HUNG_MS)), JSON.stringify(saved()))
     check('…the labels as a list', JSON.stringify(saved().okBefore?.labels) === JSON.stringify(['ui', 'release']) && saved().preChecks?.includes('unit tests'))
-    await page.locator('.settings-nav .row', { hasText: 'Storage' }).click()
-    await page.locator('.settings-nav .row', { hasText: 'Workflow' }).click()
+    await reopen()
     await section.waitFor({ timeout: HUNG_MS })
     check('opened again: the policy shows Cards with these labels, its labels and the check’s command', !!(await lib.until(async () => (await row('okBefore').locator('select').inputValue()) === 'labels' && (await row('okBefore').locator('input').inputValue()) === 'ui, release' && (await row('preChecks').locator('.workflow-check input').evaluateAll((els) => els.map((e) => e.value))).includes('npm run test -- --silent'), HUNG_MS)))
 
@@ -276,8 +281,7 @@ function board(sql, ...args) {
 
     // --- With the rules not enforced, the section says so.
     await inv('advanced:set', 'hive.workflow.enforce', false)
-    await page.locator('.settings-nav .row', { hasText: 'Storage' }).click()
-    await page.locator('.settings-nav .row', { hasText: 'Workflow' }).click()
+    await reopen()
     check('with Workflow rules are enforced off, the section says so', !!(await lib.until(async () => (await section.locator('.workflow-note').count()) > 0 && (await section.innerText()).includes('aren’t enforced'), HUNG_MS)))
     await inv('advanced:set', 'hive.workflow.enforce', null)
 
@@ -288,8 +292,7 @@ function board(sql, ...args) {
     const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
     const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
     await speak({ ...base, code: 'pl', locale: 'pl', messages })
-    await page.locator('.settings-nav .row').nth(0).click()
-    await page.locator('.settings-nav .row', { hasText: 'Przepływ pracy' }).click()
+    await reopen()
     check('the section shows in Polish', !!(await lib.until(async () => (await section.count()) > 0 && (await section.innerText()).includes('Kto scala'), HUNG_MS)), await section.innerText().catch(() => ''))
     await section.locator('.workflow-preset').scrollIntoViewIfNeeded()
     await page.screenshot({ path: path.join(lib.WORK, 'workflowoptions-form-pl.png') })

@@ -34,7 +34,7 @@ const M = {
   tooOld: msg({ id: 'git.tool.tooOld', defaultMessage: 'Git {version} is too old for Hive (it needs {min} or later)', description: 'Said wherever git is needed when the installed git is too old to run. {version} and {min} are git versions. No full stop: some places add more after it.' }),
   fixOld: msg({ id: 'git.tool.fixOld', defaultMessage: 'Update Git for Windows to {min} or later, then Check again in Agent Setup.', description: 'How to fix a git that is too old. {min} is a git version; Check again is a button in Agent Setup.' }),
   fixMissing: msg({ id: 'git.tool.fixMissing', defaultMessage: 'Install Git for Windows ({min} or later), or add the folder holding git.exe to your PATH, then Check again in Agent Setup (no need to restart Hive).', description: 'How to fix git missing. {min} is a git version; Check again is a button in Agent Setup.' }),
-  tooOldToRun: msg({ id: 'git.tool.tooOldToRun', defaultMessage: "Hive's git commands fail with Git {version}: worktrees, merging, the Git tab and the unmerged counts don't work.", description: "Agent Setup, for a git too old for any of Hive's git commands. {version} is its version." }),
+  tooOldToRun: msg({ id: 'git.tool.tooOldToRun', defaultMessage: "Hive's git commands fail with Git {version}: worktrees, merging, the Version Control tab's Git sections and the unmerged counts don't work.", description: "Agent Setup, for a git too old for any of Hive's git commands. {version} is its version." }),
   oldLoses: msg({
     id: 'git.tool.oldLoses',
     defaultMessage:

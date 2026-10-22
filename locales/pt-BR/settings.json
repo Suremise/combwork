@@ -690,7 +690,7 @@
   "settings.project.transcriptWarnMB.off": "Nunca",
   "settings.project.transcriptWarnMB.tip": "Uma conversa longa deixa a CLI e o Hive mais lentos; passar o trabalho para uma nova conversa a deixa curta de novo.",
   "settings.project.transcriptWarnMB.title": "Avisar quando uma transcrição passar de",
-  "settings.project.workflow.desc": "Escolha uma predefinição ou defina cada opção. Cada uma mostra de onde vem o seu valor.",
+  "settings.project.workflow.moved": "Quem revisa, quais verificações passam antes e quem faz o merge: isso é definido na aba Controle de versão do projeto, em Fluxo de trabalho.",
   "settings.project.workflow.title": "Opções do fluxo de trabalho",
   "settings.project.worktreeCopy.desc": "Arquivos ignorados pelo git a copiar da pasta do projeto para um novo worktree, como arquivos .env. Um padrão por linha; vazio herda Configurações → Agentes e worktrees → Copiar para novos worktrees.",
   "settings.project.worktreeCopy.tip": "Um worktree novo só recebe os arquivos que o git rastreia. Padrões sem barra correspondem a um nome de arquivo ou pasta em qualquer lugar (por exemplo .env*); com barra, a um caminho a partir da raiz do projeto (por exemplo config/local.json). Pastas grandes como node_modules são melhor recriadas pelo comando de preparação.",

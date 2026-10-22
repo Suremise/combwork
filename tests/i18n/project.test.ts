@@ -88,7 +88,7 @@ describe('the project area', () => {
 
 describe('data kept at module level follows the language', () => {
   it("the tabs' labels are messages, shown when drawn", () => {
-    expect(PROJECT_TABS.map((t) => tr(t.label))).toEqual(['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'Files', 'Attachments', 'Git', 'Memory', 'Skills', 'Templates', 'MCP', 'Settings'])
+    expect(PROJECT_TABS.map((t) => tr(t.label))).toEqual(['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'Files', 'Attachments', 'Version Control', 'Memory', 'Skills', 'Templates', 'MCP', 'Settings'])
     setLanguage(PSEUDO_LANGUAGE, {})
     expect(tr(PROJECT_TABS[0].label)).toMatch(/^\[Šéššíöñ/)
   })

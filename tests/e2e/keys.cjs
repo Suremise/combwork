@@ -37,7 +37,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await page.keyboard.press('Control+Shift+Tab'); await lib.until(async () => /Session/.test(await tab().catch(() => '')), HUNG_MS)
   check('Ctrl+Shift+Tab: previous tab', /Session/.test(await tab()), await tab())
   // Alt+1…8: the strip's tabs in the order they show (#1043); More ▾'s have none.
-  const MAIN = ['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'Files', 'Attachments', 'Git']
+  const MAIN = ['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'Files', 'Attachments', 'Version Control']
   const strip = (await page.locator('.tabs .tab:not(.tab-more) .tab-label').allInnerTexts()).map((t) => t.trim())
   check('the strip shows the main tabs, in order, then More ▾', JSON.stringify(strip) === JSON.stringify(MAIN) && (await page.locator('.tabs .tab').last().evaluate((t) => t.classList.contains('tab-more'))), JSON.stringify(strip))
   const reached = []

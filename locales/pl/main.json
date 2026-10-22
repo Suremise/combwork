@@ -41,7 +41,7 @@
   "main.gitInit.failed.staged": "folder .hive trafił do indeksu, więc nie utworzono commita",
   "main.gitInit.fix.commit": "{git}. Utwórz commit w terminalu albo poproś o to agenta",
   "main.gitInit.fix.identity": "{which, select, name {wpisz ją i wybierz Utwórz pierwszy commit} email {wpisz go i wybierz Utwórz pierwszy commit} other {wpisz je i wybierz Utwórz pierwszy commit}}",
-  "main.gitInit.fix.ignored": "popraw to, a potem wybierz Utwórz pierwszy commit w zakładce Git",
+  "main.gitInit.fix.ignored": "popraw to, a potem wybierz Utwórz pierwszy commit w zakładce Kontrola wersji",
   "main.gitInit.fix.staged": "sprawdź, czy w pliku .gitignore nie ma reguły, która przywraca .hive",
   "main.gitInit.nested": "Ten folder leży w repozytorium git w folderze {root}. Potwierdź, że chcesz w nim osobnego repozytorium.",
   "main.gitInit.noEmail": "Git nie ma adresu e-mail do pierwszego commita: wpisz go.",
