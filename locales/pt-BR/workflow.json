@@ -134,6 +134,7 @@
   "workflow.option.target.title": "O trabalho é mesclado em",
   "workflow.preset.custom": "Personalizado",
   "workflow.preset.needs.slots": "Precisa de uma pasta própria para cada cartão, o que chega em uma versão futura.",
+  "workflow.preset.note.team": "Equipe verifica o resultado mesclado com as verificações rápidas e os testes de unidade. Rodar ali também os testes específicos de cada cartão chega em uma versão futura.",
   "workflow.preset.pair": "Dupla",
   "workflow.preset.pairAgent": "Dupla (o agente faz o merge)",
   "workflow.preset.solo": "Solo",

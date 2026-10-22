@@ -316,6 +316,8 @@
   "tips.storagePurge.title": "Expurgar o que o Hive guarda",
   "tips.taskbarBadge.text": "O botão do Hive na barra de tarefas mostra quantos agentes precisam de você e pisca quando um deles pergunta algo enquanto o Hive está em segundo plano.",
   "tips.taskbarBadge.title": "Dê uma olhada na barra de tarefas",
+  "tips.teamPreset.text": "Equipe, em Configurações do projeto → Fluxo de trabalho, é a Dupla com verificações mais rígidas: os testes de unidade passam antes da revisão e no resultado mesclado, as dependências são instaladas do zero antes de cada merge, e cartões com o rótulo ui ou release esperam a sua aprovação.",
+  "tips.teamPreset.title": "Vários executores? Experimente a predefinição Equipe",
   "tips.templateNames.text": "Os nomes de agentes são únicos no espaço de trabalho. Ao carregar um modelo de outro projeto, dê novos nomes aos agentes dele na lista, ao lado dos nomes do modelo: Carregar modelo espera até que nenhum esteja em uso.",
   "tips.templateNames.title": "Dê nomes aos agentes de um modelo ao carregá-lo",
   "tips.templateWorktrees.text": "Carregar um modelo põe um agente de volta no worktree limpo com o nome dele, com o branch como está, em vez de criar um novo. Worktrees antigos mesclados e limpos também podem ser removidos: marque a caixa no diálogo Carregar.",

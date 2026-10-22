@@ -316,6 +316,8 @@
   "tips.storagePurge.title": "Bereinigen, was Hive aufbewahrt",
   "tips.taskbarBadge.text": "Die Taskleistenschaltfläche von Hive zeigt, wie viele Agenten dich brauchen, und blinkt, wenn einer dich etwas fragt, während Hive im Hintergrund ist.",
   "tips.taskbarBadge.title": "Ein Blick auf die Taskleiste",
+  "tips.teamPreset.text": "Team in Projekteinstellungen → Workflow ist Paar mit strengeren Checks: Die Unit-Tests bestehen vor dem Review und auf dem gemergten Ergebnis, Abhängigkeiten werden vor jedem Merge von Grund auf installiert, und Karten mit dem Label ui oder release warten auf deine Zustimmung.",
+  "tips.teamPreset.title": "Mehrere Bearbeiter? Probier die Voreinstellung Team",
   "tips.templateNames.text": "Agentennamen sind im ganzen Arbeitsbereich eindeutig. Lädst du eine Vorlage aus einem anderen Projekt, gib ihren Agenten neue Namen in der Liste neben den Namen der Vorlage: „Vorlage laden“ wartet, bis keiner mehr vergeben ist.",
   "tips.templateNames.title": "Die Agenten einer Vorlage beim Laden benennen",
   "tips.templateWorktrees.text": "Beim Laden einer Vorlage kommt ein Agent zurück in den sauberen Worktree mit seinem Namen, der Branch bleibt, wie er ist, statt dass ein neuer angelegt wird. Alte Worktrees, die gemergt und sauber sind, können auch weg: Hake das Kästchen im Dialog „Laden“ an.",

@@ -134,6 +134,7 @@
   "workflow.option.target.title": "Le travail est fusionné dans",
   "workflow.preset.custom": "Personnalisé",
   "workflow.preset.needs.slots": "Nécessite un dossier propre pour chaque carte, ce qui arrive dans une version ultérieure.",
+  "workflow.preset.note.team": "Équipe vérifie le résultat fusionné avec les vérifications rapides et les tests unitaires. Y lancer aussi les tests ciblés de chaque carte arrive dans une version ultérieure.",
   "workflow.preset.pair": "Binôme",
   "workflow.preset.pairAgent": "Binôme (l’agent fusionne)",
   "workflow.preset.solo": "Solo",

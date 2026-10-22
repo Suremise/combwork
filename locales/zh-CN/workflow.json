@@ -134,6 +134,7 @@
   "workflow.option.target.title": "工作合并到",
   "workflow.preset.custom": "自定义",
   "workflow.preset.needs.slots": "需要每张卡片都有自己的文件夹，此功能将在以后的版本中提供。",
+  "workflow.preset.note.team": "团队会用快速检查和单元测试检查合并结果。在那里也运行每张卡片自己的针对性测试，将在以后的版本中提供。",
   "workflow.preset.pair": "结对",
   "workflow.preset.pairAgent": "结对（智能体合并）",
   "workflow.preset.solo": "单人",

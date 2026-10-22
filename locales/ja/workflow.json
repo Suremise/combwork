@@ -134,6 +134,7 @@
   "workflow.option.target.title": "マージ先",
   "workflow.preset.custom": "カスタム",
   "workflow.preset.needs.slots": "カードごとに専用フォルダーが必要です。これは今後のバージョンで提供されます。",
+  "workflow.preset.note.team": "チームは、マージ結果をクイックチェックと単体テストで確認します。カードごとの対象テストもそこで実行する機能は、今後のバージョンで提供されます。",
   "workflow.preset.pair": "ペア",
   "workflow.preset.pairAgent": "ペア（エージェントがマージ）",
   "workflow.preset.solo": "ソロ",

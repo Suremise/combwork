@@ -136,6 +136,7 @@
   "workflow.preset.custom": "Custom",
   "workflow.preset.needs.hiveMerges": "Needs Hive to merge cards, which comes in a later version.",
   "workflow.preset.needs.slots": "Needs a folder of its own for every card, which comes in a later version.",
+  "workflow.preset.note.team": "Team checks the merged result with the quick checks and the unit tests. Running each card’s own focused tests there too comes in a later version.",
   "workflow.preset.pair": "Pair",
   "workflow.preset.pairAgent": "Pair (the agent merges)",
   "workflow.preset.solo": "Solo",

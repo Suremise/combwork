@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ProjectInfo, WorkflowChange, WorkflowForm, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
 import { CONTRADICTIONS, FORM_OPTIONS, formShows, NOT_OFFERED, reviewerAgent, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
-import { optionTitle, OPTION_TEXT, PRESET_NEEDS_TEXT, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
+import { optionTitle, OPTION_TEXT, PRESET_NEEDS_TEXT, PRESET_NOTE_TEXT, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import { LOOP_ROUNDS, loopDefaults } from '@shared/lanes'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
@@ -359,6 +359,8 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
         <div className="s-text">
           <div className="s-title">{tr(T.preset)}</div>
           <div className="s-desc">{tr(T.presetDesc)}</div>
+          {/* Git's presets only: None has no merged result. */}
+          {form.platform === 'git' && draft.preset && PRESET_NOTE_TEXT[draft.preset] && <div className="s-desc workflow-preset-note">{tr(PRESET_NOTE_TEXT[draft.preset]!)}</div>}
           {form.presets
             .filter((p) => p.needs)
             .map((p) => (

@@ -318,6 +318,8 @@ interface HiveMessageValues {
   'tips.storagePurge.title': undefined
   'tips.taskbarBadge.text': undefined
   'tips.taskbarBadge.title': undefined
+  'tips.teamPreset.text': undefined
+  'tips.teamPreset.title': undefined
   'tips.templateNames.text': undefined
   'tips.templateNames.title': undefined
   'tips.templateWorktrees.text': undefined

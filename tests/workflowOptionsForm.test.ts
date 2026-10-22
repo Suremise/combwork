@@ -67,8 +67,8 @@ async function workspace(opts: { project?: unknown; preset?: string | null; work
 }
 
 describe("P4's and P5's presets (#1278, #1355, §16.19.1)", () => {
-  it('offers Solo, Pair (the agent merges) and Pair (Hive merges) for Git, and shows Team unavailable with why; None gets all three', () => {
-    expect(PRESETS.git).toEqual([{ id: 'solo' }, { id: 'pairAgent' }, { id: 'pair' }, { id: 'team', needs: 'slots' }])
+  it('offers every preset for Git (Team since #1361, on agent worktrees), none unavailable; None gets all three', () => {
+    expect(PRESETS.git).toEqual([{ id: 'solo' }, { id: 'pairAgent' }, { id: 'pair' }, { id: 'team' }])
     expect(PRESETS.none.map((p) => p.id)).toEqual(['solo', 'pair', 'team'])
   })
 
@@ -86,6 +86,29 @@ describe("P4's and P5's presets (#1278, #1355, §16.19.1)", () => {
     expect(preset('git', 'pair', { ...inputs, target: 'master' }).target).toBe('master')
     // A project without scripts: no checks suggested, so none guessed.
     expect(preset('git', 'pair')).toMatchObject({ preChecks: [], mergeChecks: [], commands: {} })
+  })
+
+  it("Team is Darren's (#1361, point 1 on #1121): as Pair, with quick checks + unit tests before review and on the merged result, installed from scratch every time, your OK for ui and release", () => {
+    const inputs = { quick: ['typecheck', 'lint'], tests: ['test'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint', test: 'npm test' }, identity: { name: 'Pat', email: 'p@e' }, target: 'trunk' }
+    const t = preset('git', 'team', inputs)
+    const { platform: _p, ...pair } = preset('git', 'pair', inputs)
+    expect(t).toEqual({
+      ...pair,
+      platform: 'git',
+      preChecks: ['typecheck', 'lint', 'test'],
+      mergeChecks: ['typecheck', 'lint', 'test'],
+      mergeInstall: 'always',
+      okBefore: { mode: 'labels', labels: ['ui', 'release'] },
+      commands: { typecheck: 'npm run typecheck', lint: 'npm run lint', test: 'npm test' }
+    })
+    expect(t).toMatchObject({ review: 'agent', reviewers: 1, finish: 'hiveMerges', target: 'trunk', strict: false, folder: 'slots', slotsUpToDate: false, identity: { name: 'Pat', email: 'p@e' } })
+    expect(notOffered(t)).toEqual([])
+    expect(checkOptions('git', { project: t }).problems).toEqual([])
+    const r = compile(t)
+    expect(r.ok && r.ruleset.guards.integrate).toContain('integrate.checksPassed')
+    expect(r.ok && r.ruleset.guards.approve).toContain('approval.given')
+    // Your OK with review by you would contradict it: Team's reviewer is an agent (§16.5.4).
+    expect(checkOptions('git', { project: { ...t, review: 'agentThenYou' } }).problems).toEqual([{ kind: 'contradiction', id: 'okWithReview' }])
   })
 
   it('Hive merges still needs Git and its own folder per card (§16.7.2)', () => {
@@ -147,7 +170,13 @@ describe('the Workflow section (#1278)', () => {
     expect(f.inheritedOrigins.target).toBe('platform')
     const pair = f.presets.find((p) => p.id === 'pairAgent')!
     expect(pair.options).toMatchObject({ preChecks: ['typecheck', 'lint'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint' }, identity: { name: 'Pat Builder', email: 'pat@example.com' } })
-    expect(f.presets.filter((p) => p.needs).map((p) => p.id)).toEqual(['team'])
+    expect(f.presets.filter((p) => p.needs).map((p) => p.id)).toEqual([])
+    // Team saves as chosen from the window's presets (#1361).
+    const team = f.presets.find((p) => p.id === 'team')!
+    expect(team.options).toMatchObject({ mergeChecks: ['typecheck', 'lint', 'test'], mergeInstall: 'always', commands: { test: 'npm test' } })
+    const { platform: _tp, ...teamOptions } = team.options
+    expect((await form.setWorkflowOptions(w, repo, { preset: 'team', options: teamOptions })).preset).toBe('team')
+    expect((await w.projectConfig(repo)).workflow).toMatchObject({ preset: 'team', options: { finish: 'hiveMerges', mergeInstall: 'always', okBefore: { mode: 'labels', labels: ['ui', 'release'] } } })
     // Pair (Hive merges) suggests the same scripts as its merge checks (OP-24).
     expect(f.presets.find((p) => p.id === 'pair')!.options).toMatchObject({ finish: 'hiveMerges', target: 'main', mergeChecks: ['typecheck', 'lint'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint' } })
   })

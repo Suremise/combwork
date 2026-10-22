@@ -1,7 +1,8 @@
 // Project Settings → Workflow (#1278): after an upgrade from 0.9 the one-time presets notice names the project, and
-// Choose… opens its Workflow section; picking Pair (the agent merges) fills in its options (Team shown unavailable, with
-// why), each with where its value comes from; Pair (Hive merges, #1355) fills in G9's checks and the install row, shown
-// only while Hive merges and with merge checks; Save… lists the running lane that keeps the old rules
+// Choose… opens its Workflow section; picking Pair (the agent merges) fills in its options (every preset offered), each
+// with where its value comes from; Pair (Hive merges, #1355) fills in G9's checks and the install row, shown only while
+// Hive merges and with merge checks; Team (#1361) adds the unit tests, a clean install every time and your OK for ui and
+// release, and says per-card focused tests come later; Save… lists the running lane that keeps the old rules
 // and saves; a contradiction is refused with its reason; Inherit goes back to the inherited value; Copy as JSON and Paste
 // JSON… carry the options; with Workflow rules are enforced off the section says so. Screenshots in both themes, in
 // Polish and in German. Dev build, throwaway profile and workspace; no CLI is started.
@@ -95,7 +96,7 @@ function board(sql, ...args) {
     check('the version control is shown: Git', (await section.locator('.workflow-platform').innerText()).trim() === 'Git')
     check('no preset was chosen', (await section.locator('.workflow-preset select').inputValue()) === '')
     const unavailable = (await section.locator('.workflow-unavailable').allInnerTexts()).join('\n')
-    check('Team is listed unavailable, with why; Pair (Hive merges) is offered (#1355)', unavailable.includes('Team: Needs a folder of its own') && !unavailable.includes('Pair') && (await section.locator('.workflow-preset select option[value="pair"]').isEnabled()), unavailable)
+    check('every preset is offered: Pair (Hive merges, #1355) and Team (#1361), none listed unavailable', !unavailable && (await section.locator('.workflow-preset select option[value="pair"]').isEnabled()) && (await section.locator('.workflow-preset select option[value="team"]').isEnabled()), unavailable)
     check('the upgrade’s options are the project’s own', (await row('finish').innerText()).includes('Set for this project'))
     check('Hive merges is offered; strict is not shown', (await row('finish').locator('option').allInnerTexts()).includes('Hive merges') && (await section.locator('.workflow-option[data-option="strict"]').count()) === 0)
     check('G9 and its install are not shown while the agent does not merge through Hive', (await row('mergeChecks').count()) === 0 && (await row('mergeInstall').count()) === 0)
@@ -250,6 +251,29 @@ function board(sql, ...args) {
     await section.getByRole('button', { name: 'Discard Changes' }).click()
     check('Discard Changes brings back the saved merge checks', !!(await lib.until(async () => (await row('mergeChecks').count()) === 1 && (await row('mergeInstall').count()) === 1, HUNG_MS)))
 
+    // --- Team (#1361, Darren's point 1 on #1121): Pair plus the unit tests before review and on the merged result,
+    // installed from scratch every time, your OK for ui and release; it says per-card focused tests come later.
+    const note = section.locator('.workflow-preset-note')
+    check('no preset note while Pair is chosen', (await note.count()) === 0)
+    await section.locator('.workflow-preset select').selectOption('team')
+    check('Team: its note says per-card focused tests come later', !!(await lib.until(async () => (await note.count()) === 1 && (await note.innerText()).includes('focused tests there too comes in a later version'), HUNG_MS)), await note.innerText().catch(() => ''))
+    check('…Hive merges into the default branch', (await row('finish').locator('select').inputValue()) === 'hiveMerges' && (await row('target').locator('input').inputValue()) === 'master')
+    const teamChecks = JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint', 'test', 'npm test'])
+    check('…quick checks + unit tests before review and on the merged result, with their commands', JSON.stringify(await values('preChecks')) === teamChecks && JSON.stringify(await values('mergeChecks')) === teamChecks, JSON.stringify([await values('preChecks'), await values('mergeChecks')]))
+    check('…installed from scratch before every merge', (await row('mergeInstall').locator('select').inputValue()) === 'always')
+    check('…your OK for cards labelled ui or release', (await row('okBefore').locator('select').inputValue()) === 'labels' && (await row('okBefore').locator('input').inputValue()) === 'ui, release')
+    await clearToasts()
+    await themes('team', null, section.locator('.workflow-preset'))
+    await themes('team-checks', null, row('mergeChecks'))
+    await section.getByRole('button', { name: 'Save…' }).click()
+    await dialog.waitFor({ timeout: HUNG_MS })
+    await saveAndClose()
+    check('saved: Team, in project.json', !!(await lib.until(async () => projectJson().workflow?.preset === 'team' && saved().mergeInstall === 'always' && JSON.stringify(saved().mergeChecks) === JSON.stringify(['typecheck', 'lint', 'test']) && saved().okBefore?.mode === 'labels', HUNG_MS)), JSON.stringify(projectJson().workflow))
+    // A change after it makes it Custom, started from Team; the note stays (it is still Team's checks).
+    await row('mergeInstall').locator('select').selectOption('onManifestChange')
+    check('a changed option: Custom, started from Team, the note kept', (await section.locator('.workflow-preset select option[value=""]').innerText()).includes('started from Team') && (await note.count()) === 1)
+    await section.getByRole('button', { name: 'Discard Changes' }).click()
+
     // --- With the rules not enforced, the section says so.
     await inv('advanced:set', 'hive.workflow.enforce', false)
     await page.locator('.settings-nav .row', { hasText: 'Storage' }).click()
@@ -269,6 +293,7 @@ function board(sql, ...args) {
     check('the section shows in Polish', !!(await lib.until(async () => (await section.count()) > 0 && (await section.innerText()).includes('Kto scala'), HUNG_MS)), await section.innerText().catch(() => ''))
     await section.locator('.workflow-preset').scrollIntoViewIfNeeded()
     await page.screenshot({ path: path.join(lib.WORK, 'workflowoptions-form-pl.png') })
+    check('Team’s note shows in Polish', (await note.innerText()).includes('w późniejszej wersji'), await note.innerText().catch(() => ''))
     await clearToasts()
     await row('mergeChecks').scrollIntoViewIfNeeded()
     await page.screenshot({ path: path.join(lib.WORK, 'workflowoptions-hivemerges-pl.png') })
@@ -279,6 +304,8 @@ function board(sql, ...args) {
     await clearToasts()
     await row('mergeChecks').scrollIntoViewIfNeeded()
     await page.screenshot({ path: path.join(lib.WORK, 'workflowoptions-hivemerges-de.png') })
+    await section.locator('.workflow-preset').scrollIntoViewIfNeeded()
+    await page.screenshot({ path: path.join(lib.WORK, 'workflowoptions-team-de.png') })
     await speak(base)
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))

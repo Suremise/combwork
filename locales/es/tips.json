@@ -316,6 +316,8 @@
   "tips.storagePurge.title": "Purgar lo que guarda Hive",
   "tips.taskbarBadge.text": "El botón de Hive en la barra de tareas muestra cuántos agentes te necesitan, y parpadea cuando uno te pregunta algo con Hive en segundo plano.",
   "tips.taskbarBadge.title": "Un vistazo a la barra de tareas",
+  "tips.teamPreset.text": "Equipo, en Configuración del proyecto → Flujo de trabajo, es Pareja con comprobaciones más estrictas: las pruebas unitarias pasan antes de la revisión y en el resultado fusionado, las dependencias se instalan desde cero antes de cada fusión, y las tarjetas con la etiqueta ui o release esperan tu aprobación.",
+  "tips.teamPreset.title": "¿Varios autores? Prueba el ajuste predefinido Equipo",
   "tips.templateNames.text": "Los nombres de los agentes son únicos en todo el espacio de trabajo. Al cargar una plantilla de otro proyecto, da nombres nuevos a sus agentes en la lista, junto a los de la plantilla: Cargar plantilla espera hasta que ninguno esté en uso.",
   "tips.templateNames.title": "Pon nombre a los agentes de una plantilla al cargarla",
   "tips.templateWorktrees.text": "Al cargar una plantilla, un agente vuelve al worktree limpio con su nombre, con la rama tal como está, en vez de crear uno nuevo. Los worktrees antiguos fusionados y limpios también pueden quitarse: marca la casilla en el cuadro Cargar plantilla.",

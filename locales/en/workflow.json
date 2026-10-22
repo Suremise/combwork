@@ -539,6 +539,10 @@
     "defaultMessage": "Needs a folder of its own for every card, which comes in a later version.",
     "description": "Why a workflow preset can’t be chosen yet."
   },
+  "workflow.preset.note.team": {
+    "defaultMessage": "Team checks the merged result with the quick checks and the unit tests. Running each card’s own focused tests there too comes in a later version.",
+    "description": "Under the preset choice of Project Settings → Workflow while Team is chosen (glossary 2.1: Team; G9: the merged result)."
+  },
   "workflow.preset.pair": {
     "defaultMessage": "Pair",
     "description": "A workflow preset (glossary 2.1): a builder and a reviewer."

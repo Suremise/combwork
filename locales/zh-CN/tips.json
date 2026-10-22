@@ -316,6 +316,8 @@
   "tips.storagePurge.title": "彻底清除 Hive 保留的内容",
   "tips.taskbarBadge.text": "Hive 的任务栏按钮会显示有多少个智能体需要你；Hive 在后台时，若有智能体向你提问，按钮会闪烁。",
   "tips.taskbarBadge.title": "看一眼任务栏",
+  "tips.teamPreset.text": "“项目设置”→“工作流程”中的“团队”是检查更严格的“结对”：单元测试需在评审前和合并结果上通过，每次合并前都会从头安装依赖，带有 ui 或 release 标签的卡片会等待你的批准。",
+  "tips.teamPreset.title": "有多个构建者？试试“团队”预设",
   "tips.templateNames.text": "智能体名称在整个工作区内唯一。从其他项目加载模板时，在模板自带名称旁边的列表中为其智能体取新名称：“加载模板”会等到没有名称被占用时才可用。",
   "tips.templateNames.title": "加载模板时为其智能体命名",
   "tips.templateWorktrees.text": "加载模板时，智能体会回到以其名称命名的干净工作树中，分支保持原样，而不是新建一个。已合并且干净的旧工作树也可以一并删除：在“加载”对话框中勾选复选框即可。",
