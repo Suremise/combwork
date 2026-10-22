@@ -9056,8 +9056,12 @@ textarea.input.task-blocked-input {
 .removal-list th:first-child {
   width: 42%;
 }
+/* A long name or branch breaks inside itself rather than being cut (the shared table's ellipsis is for the folder's
+   short name only). */
 .item-table.fill.removal-list td {
   white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
 }
 /* "Folder" and its name on one line (the shared table makes a path's tooltip a block of its own). */
 .item-table.removal-list td > .tip-wrap:has(> .short-path) {
