@@ -155,6 +155,9 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
   const shownFor = useRef<string | null>(null)
   const dirtyRef = useRef(false)
   const form = loaded?.for === project.path ? loaded.form : null
+  /** Whether the shown project's form is on screen (a failed reload keeps it, with any edits). */
+  const hasForm = useRef(false)
+  hasForm.current = !!form
   const draft = loaded?.for === project.path ? loaded.draft : null
   const error = failed?.for === project.path ? failed.error : null
 
@@ -173,7 +176,8 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
   }
   /**
    * Reads the project's form. Only the newest read's answer is shown, and only while its project is shown; a reload
-   * (`auto`: the options changed elsewhere) is dropped if the draft was edited while it waited.
+   * (`auto`: the options changed elsewhere) is dropped if the draft was edited while it waited, and its failure leaves
+   * the form shown as it is.
    */
   const load = useCallback(
     async (auto: boolean): Promise<void> => {
@@ -185,7 +189,10 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
         if (n !== reads.current || pathRef.current !== path || (auto && edits.current !== edited)) return
         show(path, f)
       } catch (e) {
-        if (n === reads.current && pathRef.current === path) setFailed({ for: path, error: errorMessage(e) })
+        // A reload that fails keeps the form shown, and the edits in it (HR5's round 2): its save is still checked
+        // against what is saved. Only a first read's failure, with no form to show, is said in its place.
+        if (n !== reads.current || pathRef.current !== path || (auto && hasForm.current)) return
+        setFailed({ for: path, error: errorMessage(e) })
       }
     },
     [project.path, show]

@@ -365,6 +365,12 @@ async function theForm(page, app, inv) {
         for (const h of s.held.filter((y) => y.p === x)) h.r(h.m)
         s.held = s.held.filter((y) => y.p !== x)
       }, p)
+    const reject = (p) =>
+      app.evaluate((_, x) => {
+        const s = globalThis.__wf
+        for (const h of s.held.filter((y) => y.p === x)) h.r(Promise.reject(new Error('the read failed (held by the test)')))
+        s.held = s.held.filter((y) => y.p !== x)
+      }, p)
     const heldFor = (p) => app.evaluate((_, x) => globalThis.__wf.held.filter((y) => y.p === x).length, p)
     const changedElsewhere = (p) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: p })
     // After a release, a read of the window's own answered after it: the held answer has been taken (or dropped) by then.
@@ -378,6 +384,17 @@ async function theForm(page, app, inv) {
     await hold(notes, false)
     await fence(notes)
     check('an edit made while a reload waited stays (You, not the read’s No one)', !!(await lib.until(async () => (await row('review').locator('select').inputValue()) === 'you', HUNG_MS)) && (await section.getByRole('button', { name: 'Discard Changes' }).isEnabled()))
+    await discard()
+    // A reload that fails while the draft has an edit keeps the form and the edit (HR5's round 2).
+    await hold(notes, true)
+    await changedElsewhere(notes)
+    check('another reload of notes is held', !!(await lib.until(async () => (await heldFor(notes)) > 0, HUNG_MS)))
+    await row('excluded').locator('input').fill('build')
+    await row('excluded').locator('input').blur()
+    await reject(notes)
+    await hold(notes, false)
+    await fence(notes)
+    check('a reload that fails keeps the form and its edits, Save and Discard there', !!(await lib.until(async () => (await row('excluded').locator('input').inputValue()) === 'build' && (await section.getByRole('button', { name: 'Discard Changes' }).isEnabled()), HUNG_MS)) && (await page.locator('.s-desc.error', { hasText: 'read the workflow options' }).count()) === 0)
     await discard()
     // An older read answering after a newer one is dropped.
     await hold(notes, true)
