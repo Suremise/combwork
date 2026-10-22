@@ -286,7 +286,7 @@ const f = q.folderHelpers(fx)
       const text = async (loc) => ((await loc.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
       const work2 = s2.dialog.locator('.card-work-queue-stuck')
       const rows = work2.locator('.card-work-queue-command')
-      check('Work section: both commands, as Hive gives them, each with where to run it', !!(await until(async () => (await rows.count()) === 2, HUNG_MS)) && (await rows.locator('code').allInnerTexts()).join('\n') === [finish.command, undo.command].join('\n') && /To finish it, in alpha$/.test(await text(rows.first().locator('.faint'))) && /To undo it, in alpha$/.test(await text(rows.nth(1).locator('.faint'))) && (await rows.first().locator('.faint').getAttribute('title')) === fx.alpha && (await rows.nth(1).locator('.faint').getAttribute('title')) === st2.folder, await text(work2))
+      check('Work section: both commands, as Hive gives them, each with where to run it', !!(await until(async () => (await rows.count()) === 2, HUNG_MS)) && (await rows.locator('code').allInnerTexts()).join('\n') === [finish.command, undo.command].join('\n') && (await text(rows.first().locator('.faint'))).endsWith('To finish it, in alpha') && (await text(rows.nth(1).locator('.faint'))).endsWith('To undo it, in alpha') && (await rows.first().locator('.faint').getAttribute('title')) === fx.alpha && (await rows.nth(1).locator('.faint').getAttribute('title')) === st2.folder, await text(work2))
       await rows.first().getByRole('button', { name: 'Copy the command to finish it' }).click()
       await rows.nth(1).getByRole('button', { name: 'Copy the command to undo it' }).click()
       const copied = await until(async () => {
