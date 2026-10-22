@@ -143,6 +143,8 @@ export class WorkspaceService {
   static onIdsRead: ((ws: WorkspaceService, seen: ProjectSeen[]) => void) | null = null
   /** Told when a workspace starts closing (its path still set), so services drop what they keep for it. */
   static readonly closingListeners = new Set<(path: string) => void>()
+  /** Told each time a workspace has opened (after onOpened), so services repair what a close left (#1392). Never awaited. */
+  static readonly openedListeners = new Set<(ws: WorkspaceService) => void>()
   /**
    * Awaited as a workspace starts closing, its board still open: what must end and be written down first (the merge
    * queue's runners give up their leases, #1360). A failure is logged and the close goes on.
@@ -312,6 +314,13 @@ export class WorkspaceService {
       log.warn('setting up the Assistant', e)
     }
     await inWorkspace(this, async () => WorkspaceService.onOpened?.(fresh)).catch((e) => log.warn('opening the workspace', e))
+    for (const l of WorkspaceService.openedListeners) {
+      try {
+        l(this)
+      } catch (e) {
+        log.warn('opening the workspace', e)
+      }
+    }
     this.startWatching()
     log.info(`Opened workspace ${userText(abs)}`)
     return this.refresh()

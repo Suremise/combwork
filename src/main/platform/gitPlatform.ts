@@ -42,6 +42,8 @@ interface Primed {
   own: string[] | null
   /** The index as prime read it (`ls-files --stage`, the whole folder's), for content's first answer only (#1373). */
   staged?: Awaited<ReturnType<typeof git>>
+  /** A card in Todo: the target its start plans on (startTarget, #1401), whose ref the evidence covers. */
+  target?: string | null
 }
 
 export class GitPlatform implements PlatformAdapter {
@@ -95,16 +97,41 @@ export class GitPlatform implements PlatformAdapter {
     return { folder: 'project', line, base, target: o.finish === 'committed' ? line : card.target || o.target || line }
   }
 
+  /**
+   * The target `start` plans on, by its rule (#1401): with the builder's worktree (`own`), the card's, G7's, the
+   * worktree's base, else the repository's default branch; slots, the card's, G7's, else the default branch; in the
+   * project folder, the card's or G7's, or the line the folder works on (always, when finishing is a commit). Kept
+   * beside `start`, whose branches it follows: `tests/workflow/boundaries.test.ts` checks the two agree.
+   */
+  private async startTarget(card: CardRecord, o: WorkflowOptions, builder?: string): Promise<Maybe<string | null>> {
+    const own = builder && this.wf.cfg.agentFolder ? await this.wf.cfg.agentFolder(builder) : null
+    if (own) return card.target || o.target || own.base || G.defaultBranch(this.project)
+    if (o.folder === 'slots' && !this.wf.cfg.agentFolder) return card.target || o.target || G.defaultBranch(this.project)
+    if (o.finish !== 'committed' && (card.target || o.target)) return card.target || o.target
+    return G.branch(this.project)
+  }
+
+  /** The plan's target is the one prime resolved and the evidence covers (a Todo card's; otherwise nothing was resolved). */
+  planCovered(primed: unknown, plan: StartPlan): boolean {
+    const p = primed as Primed | null
+    return !p || p.target === undefined || p.target === plan.target
+  }
+
   private common: string | null = null
 
   /** The slow part of the evidence, once per intent: the git folders, and the tracked files (and their folders) it covers. */
-  async prime(card: CardRecord, s: CardState): Promise<unknown> {
+  async prime(card: CardRecord, s: CardState, o: WorkflowOptions, builder?: string): Promise<unknown> {
     if (!this.common) {
       const c = await G.commonDir(this.project)
       if (!isUnknown(c)) this.common = c
     }
-    // A card in Todo has no folder of its own yet (or an earlier cycle's, gone): a start decides on its target alone.
-    if (!s.started || s.stage === 'todo') return { gitDir: null, folder: null, files: [], own: null } satisfies Primed
+    // A card in Todo has no folder of its own yet (or an earlier cycle's, gone): a start decides on its target alone,
+    // resolved as the start resolves it (an empty G7 is the default branch, #1401). Unreadable: the evidence says so.
+    if (!s.started || s.stage === 'todo') {
+      const target = await this.startTarget(card, o, builder)
+      if (isUnknown(target)) return null
+      return { gitDir: null, folder: null, files: [], own: null, target } satisfies Primed
+    }
     const folder = this.wf.folderOf(s)
     // Its git dir from its `.git` where it has one (no git process: #1373), else git's answer.
     let gitDir = G.gitDirSync(folder)
@@ -132,7 +159,8 @@ export class GitPlatform implements PlatformAdapter {
   evidence(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): string | null {
     const p = primed as Primed | null
     if (!this.common || !p) return null
-    const target = s.started?.target ?? card.target ?? o.target
+    // A card in Todo: the target its start plans on (prime's, #1401); started, the one it recorded.
+    const target = p.target !== undefined ? p.target : (s.started?.target ?? card.target ?? o.target)
     const line = s.stage === 'todo' ? null : s.started?.line
     const parts = [target ? G.refSync(this.common, `refs/heads/${target}`) : '', line ? G.refSync(this.common, `refs/heads/${line}`) : '']
     if (p.gitDir && p.folder) {
@@ -159,7 +187,8 @@ export class GitPlatform implements PlatformAdapter {
   async content(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): Promise<string | null> {
     const p = primed as Primed | null
     if (!this.common || !p) return null
-    const target = s.started?.target ?? card.target ?? o.target
+    // A card in Todo: the target its start plans on (prime's, #1401); started, the one it recorded.
+    const target = p.target !== undefined ? p.target : (s.started?.target ?? card.target ?? o.target)
     const line = s.stage === 'todo' ? null : s.started?.line
     const parts = [target ? G.refSync(this.common, `refs/heads/${target}`) : '', line ? G.refSync(this.common, `refs/heads/${line}`) : '']
     if (p.gitDir && p.folder) {
