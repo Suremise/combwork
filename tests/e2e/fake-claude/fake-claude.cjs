@@ -313,7 +313,17 @@ const out = (s) => {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const now = () => new Date().toISOString()
-const write = (entry) => fs.appendFileSync(transcript, JSON.stringify({ sessionId, cwd, timestamp: now(), ...entry }) + '\n')
+/**
+ * Each entry is chained to the one before by parentUuid, and a user entry carries its turn's promptId (the prompt_id its
+ * hooks send), as Claude Code 2.1.306 writes them: what Hive joins a transcript turn to its hooks by (#1371).
+ */
+let lastUuid = null
+const write = (entry) => {
+  const uuid = entry.uuid ?? randomUUID()
+  const turn = entry.type === 'user' && promptId ? { promptId } : {}
+  fs.appendFileSync(transcript, JSON.stringify({ parentUuid: lastUuid, sessionId, cwd, timestamp: now(), ...turn, ...entry, uuid }) + '\n')
+  lastUuid = uuid
+}
 
 /** The turn under way: each prompt's own id, which its hooks carry (prompt_id), as Claude Code 2.1.296's do (#648). */
 let promptId = null
@@ -810,7 +820,7 @@ async function startBackgroundTask(secs) {
     promptId = randomUUID()
     turnStarted = Date.now()
     const note = `<task-notification>\n<task-id>${task}</task-id>\n<tool-use-id>${id}</tool-use-id>\n<status>completed</status>\n<summary>Background command "Run the tests" completed (exit code 0)</summary>\n</task-notification>`
-    write({ type: 'user', message: { role: 'user', content: note } })
+    write({ type: 'user', origin: { kind: 'task-notification' }, promptSource: 'system', message: { role: 'user', content: note } })
     await hook('UserPromptSubmit', { prompt: note })
     await sleep(1500)
     await endTurn(`The background task ${task} has finished.`)

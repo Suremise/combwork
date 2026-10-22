@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'async_hooks'
 import { randomBytes, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
 import { basename, dirname, join, resolve as resolvePath } from 'path'
+import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
 import type { AgentApiInfo, AgentDef, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage } from '../shared/types'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
@@ -164,6 +165,13 @@ export async function startHookServer(): Promise<string> {
       const note = refusedHookNote(run)
       if (note) log.info(note)
       return send(res, 401, { error: 'unauthorized' })
+    }
+    // Tests lose every hook while the file HIVE_TEST_DROP_HOOKS names is there (#1371: a CLI whose hooks Hive can't
+    // stop at its end, Copilot), answered as if Hive had taken them; unpackaged builds only.
+    const drop = !app.isPackaged ? process.env.HIVE_TEST_DROP_HOOKS : undefined
+    if (drop && existsSync(drop)) {
+      await readBody(req).catch(() => '')
+      return send(res, 200, {})
     }
     let done: (() => void) | null = null
     try {

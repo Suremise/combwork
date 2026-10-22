@@ -8,11 +8,14 @@
 // signing pauses are P5's. The merge checks (#1349) run as Hive's own runs (queueChecks.ts), each bracketed here: green
 // only when it exited 0 and its `CheckRan` counted for exactly the test merge's revision.
 
+import { spawn, type ChildProcess } from 'child_process'
 import { createHash, randomUUID } from 'crypto'
 import { existsSync, readFileSync } from 'original-fs'
 import { join } from 'path'
-import { git } from '../git'
+import { git, GIT_PREFIX } from '../git'
+import { endTree } from '../progressReporters/wrapper'
 import { openEntry, type CardState, type FactData, type QueueEntry } from '../../shared/workflow/facts'
+import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
@@ -31,6 +34,8 @@ export interface CheckResult {
   ok: boolean
   /** The failure was the environment (a check that didn't start, a network error, a timeout), not a result. */
   transient?: boolean
+  /** Why it was (#1362): recorded on the card's IntegrationFailed. */
+  cause?: TransientFailure
   output: string
   /** The command that ran, and its run's id (a progress run's, when Hive keeps runs). */
   command?: string
@@ -49,7 +54,7 @@ export interface CheckContext {
 }
 
 /** What the merge checks of a test merge came to: green (every one passed and counted), red, or not proved. */
-type ChecksOutcome = { kind: 'green' } | { kind: 'red'; transient: boolean; output: string } | { kind: 'uncounted' }
+type ChecksOutcome = { kind: 'green' } | { kind: 'red'; transient: boolean; cause?: TransientFailure; output: string } | { kind: 'uncounted' }
 
 export interface QueueConfig {
   /** The queue's own worktree (a merge slot, kept warm). */
@@ -72,7 +77,12 @@ export interface QueueConfig {
    * Runs git for the queue (its test merges, the advance, the pins): the runner's recording one in the app (#1360,
    * QueueRunner.git: its processes in the lease's job, recorded before they run); left out, Hive's own git().
    */
-  git?: (cwd: string, args: string[]) => Promise<{ ok: boolean; out: string; err: string; code: number }>
+  git?: (cwd: string, args: string[], opts?: QueueGitOptions) => Promise<QueueGitResult>
+  /**
+   * The longest Hive's merge commit runs when the repository signs its commits (#1350, Advanced
+   * `hive.queue.signSeconds`): a signer still waiting then (for a passphrase) is ended and the entry pauses. 60 s left out.
+   */
+  signTimeoutMs?: number
   /**
    * Runs the advance under the repository's lock across processes (#1347, withRepoLock), its `IntegrationStarted` and
    * the ref's compare-and-swap together; left out, as it is.
@@ -103,10 +113,28 @@ export interface QueueConfig {
   }
 }
 
+/** How the queue runs a git command that may run the repository's hooks or sign (#1350): its environment and bound. */
+export interface QueueGitOptions {
+  env?: NodeJS.ProcessEnv
+  /** Ends the command's whole tree (git, its hooks, its signer) once it has run this long. */
+  timeoutMs?: number
+}
+
+export interface QueueGitResult {
+  ok: boolean
+  out: string
+  err: string
+  code: number
+  /** Ended at its bound (QueueGitOptions.timeoutMs). */
+  timedOut?: boolean
+  /** Its stderr as far as it had come when the bound ended it: what was running then. */
+  errAtTimeout?: string
+}
+
 export type QueueOutcome =
   | { card: string; entry: string; outcome: 'integrated'; result: string; retests: number }
   | { card: string; entry: string; outcome: 'returned'; reason: FactData['IntegrationFailed']['reason']; transient: boolean }
-  | { card: string; entry: string; outcome: 'paused'; reason: PauseReason; files?: string[] }
+  | { card: string; entry: string; outcome: 'paused'; reason: PauseReason; files?: string[]; message?: string }
   | { card: string; entry: string; outcome: 'skipped'; why: 'notApproved' | 'cancelled' }
   | { card: string; entry: string; outcome: 'integratedOutside' }
 
@@ -125,9 +153,204 @@ export interface QueueStepInfo {
 
 /**
  * `uncounted`: its checks passed but didn't count for the result MAX_RETESTS times in a row (the card's `CheckRan` says
- * why). `user`: Pause queue (the user's, or the Assistant's within Control: #1353).
+ * why). `signingWaits`: signing Hive's commit waited for a passphrase (or a pinentry) and was ended; `signing`: it failed
+ * (git's message in the pause). `hookTimedOut`: a hook of a signed commit was still running at the signing bound.
+ * `identity`: no commit identity for the repository (its folder in the pause). `user`: Pause queue (the user's, or the
+ * Assistant's within Control: #1353).
  */
-export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff'
+export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut'
+
+/** The longest a signed merge commit runs when the config gives none (Advanced `hive.queue.signSeconds`'s default). */
+const SIGN_TIMEOUT_MS = 60_000
+
+/**
+ * A signer's messages that say it would wait for someone (a passphrase, a pinentry, a terminal): read only once git's
+ * trace says the signer is what failed, never to tell a signer from a hook.
+ */
+const SIGN_WAITS = /passphrase|pinentry|inappropriate ioctl|cannot open \/dev\/tty|no tty|tty.*not available/i
+
+/** git's own line when a pre-merge-commit or commit-msg hook stopped a merge commit (used only with no trace to read). */
+const MERGE_HOOK_STOPPED = /^Not committing merge;/m
+
+/** A child git ran for a commit, as its trace names it, with the text it wrote: a hook, the signer, or another (git's own). */
+export interface CommitChild {
+  kind: 'hook' | 'signer' | 'other'
+  /** A hook's name (`commit-msg`). */
+  name?: string
+  /** Its exit code; none while it ran (the stream ended, or was cut, first). */
+  code?: number
+  text: string
+}
+
+/**
+ * A commit's stderr read with git's own trace in it (#1350: `GIT_TRACE2_EVENT=2`, trace2's events on git's stderr, in
+ * the order things happened): each piece of text given to the source that wrote it. A child's text comes after its
+ * `child_start` and before its `child_exit` (a hook writes before it exits; git writes `child_exit` once it has waited
+ * for it); text while no child of the top git runs is git's own. `traced`: the top git's events were there (an old
+ * git writes none). `open`: the child running where the stream ends.
+ */
+export interface CommitStream {
+  traced: boolean
+  children: CommitChild[]
+  open: CommitChild | null
+  git: string
+  /** All the text, every source's, in order, without the events: what a message shows. */
+  text: string
+}
+
+/** A trace2 event: a complete JSON record with the fields its kind needs; anything else is text, whatever it looks like. */
+type TraceEvent = { event: string; sid: string; child_id?: number; child_class?: string; hook_name?: string; argv?: string[]; code?: number }
+
+function traceEvent(s: string): TraceEvent | null {
+  let v: unknown
+  try {
+    v = JSON.parse(s)
+  } catch {
+    return null
+  }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const e = v as Record<string, unknown>
+  if (typeof e.event !== 'string' || typeof e.sid !== 'string' || typeof e.time !== 'string') return null
+  if (e.event === 'child_start' && (typeof e.child_id !== 'number' || !Array.isArray(e.argv) || !e.argv.every((a) => typeof a === 'string'))) return null
+  if (e.event === 'child_exit' && (typeof e.child_id !== 'number' || typeof e.code !== 'number')) return null
+  return e as TraceEvent
+}
+
+/**
+ * A line split into its text and the trace event ending it: an event begins at a `{"event":"` and runs to the line's
+ * end, so text with no newline before it (a hook's last line) stays text. The first place a valid record starts wins;
+ * an event-looking fragment that isn't one is text.
+ */
+function splitTraceLine(line: string): { text: string; ev: TraceEvent | null } {
+  const body = line.endsWith('\r') ? line.slice(0, -1) : line
+  for (let i = body.indexOf('{"event":"'); i >= 0; i = body.indexOf('{"event":"', i + 1)) {
+    const ev = traceEvent(body.slice(i))
+    if (ev) return { text: body.slice(0, i), ev }
+  }
+  return { text: line, ev: null }
+}
+
+/** Reads a commit's stderr (git's trace in it) into who wrote what (CommitStream). */
+export function readCommitStream(err: string): CommitStream {
+  const children: CommitChild[] = []
+  const byId = new Map<number, CommitChild>()
+  let open: CommitChild | null = null
+  let top: string | null = null
+  let own = ''
+  let text = ''
+  const add = (t: string): void => {
+    if (!t) return
+    text += t
+    if (open) open.text += t
+    else own += t
+  }
+  const lines = err.split('\n')
+  lines.forEach((line, i) => {
+    const nl = i < lines.length - 1 ? '\n' : ''
+    const { text: t, ev } = splitTraceLine(line)
+    if (!ev) return add(t + nl)
+    // Text cut by an event (no newline of its own) keeps a line of its own.
+    add(t ? `${t}\n` : '')
+    // The top git's session id has no parent's prefix; a git a hook runs is `<parent>/<own>`: its events are only
+    // dropped from the text, never a source.
+    if (top === null && !ev.sid.includes('/')) top = ev.sid
+    if (ev.sid !== top || ev.child_id === undefined) return
+    if (ev.event === 'child_start') {
+      const argv = ev.argv ?? []
+      const signer = argv.includes('-bsau') || (argv.includes('-Y') && argv.includes('sign'))
+      const c: CommitChild = { kind: ev.child_class === 'hook' ? 'hook' : signer ? 'signer' : 'other', ...(ev.child_class === 'hook' ? { name: ev.hook_name ?? argv[0] ?? 'hook' } : {}), text: '' }
+      children.push(c)
+      byId.set(ev.child_id, c)
+      open = c
+    } else if (ev.event === 'child_exit') {
+      const c = byId.get(ev.child_id)
+      if (c) c.code = ev.code
+      if (open === c) open = null
+    }
+  })
+  return { traced: top !== null, children, open, git: own, text }
+}
+
+const joined = (...parts: (string | undefined)[]): string => parts.map((p) => p?.trim()).filter(Boolean).join('\n')
+
+/**
+ * Why Hive's merge, or a squash's commit, failed (#1350), from the source of each piece of what it said (its stream,
+ * readCommitStream), never from words in another's (a hook that passed saying "passphrase" changes nothing):
+ * - ended at the bound: always a pause, decided by what was running when it was ended (`cut`, its stream until then;
+ *   ending it may make a hook exit non-zero, which is never its rejection): a hook → `hookTimedOut`; the signer, or
+ *   nothing known in a repository that signs → `signingWaits`; else `needsYou`;
+ * - a hook that exited non-zero → returned (`hook`) with its own text, then git's;
+ * - the signer exiting non-zero → `signingWaits` when its own text says it needs a passphrase, a pinentry or a
+ *   terminal, else `signing`, with its text and git's;
+ * - anything else (an index lock, a broken repository) → `needsYou` with git's own lines, never a return.
+ * With no trace (an old git), only git's own "Not committing merge" is a hook. A message never has an event in it.
+ */
+export function commitFailed(r: QueueGitResult, signs: boolean): { fail: 'hook'; log: string } | { pause: PauseReason; message?: string } {
+  const s = readCommitStream(r.err)
+  const all = joined(r.out, s.text)
+  if (r.timedOut) {
+    const running = readCommitStream(r.errAtTimeout ?? r.err).open
+    if (running?.kind === 'hook') return { pause: 'hookTimedOut', message: all }
+    return { pause: running?.kind === 'signer' || signs ? 'signingWaits' : 'needsYou', message: all }
+  }
+  if (!s.traced) return MERGE_HOOK_STOPPED.test(all) ? { fail: 'hook', log: all } : { pause: 'needsYou', message: all }
+  const hook = s.children.find((c) => c.kind === 'hook' && c.code !== undefined && c.code !== 0)
+  if (hook) return { fail: 'hook', log: joined(hook.text, s.git, r.out) }
+  const signer = s.children.find((c) => c.kind === 'signer' && c.code !== undefined && c.code !== 0)
+  if (signer) return { pause: SIGN_WAITS.test(signer.text) ? 'signingWaits' : 'signing', message: joined(signer.text, s.git) }
+  return { pause: 'needsYou', message: joined(r.out, s.git) }
+}
+
+/**
+ * The environment of Hive's commits (#1350): no prompt is ever waited on. git asks for no credentials, ssh-keygen never
+ * asks for a passphrase, and a credential manager stays non-interactive; a pinentry window is ended by the bound.
+ */
+function commitEnv(): NodeJS.ProcessEnv {
+  // GIT_TRACE2_EVENT=2: git's trace2 events on its own stderr, in order with what its hooks and signer write there.
+  return { ...process.env, GIT_TERMINAL_PROMPT: '0', SSH_ASKPASS_REQUIRE: 'never', GCM_INTERACTIVE: 'never', GIT_TRACE2_EVENT: '2' }
+}
+
+/**
+ * git as Hive runs it, with no input (no terminal to prompt on), in an environment and within a bound: at the bound its
+ * whole tree (git, a hook, a signer) is ended, and the result says so. The queue's git when its config gives none (tests;
+ * the app runs it through the runner's recorded spawn).
+ */
+function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<QueueGitResult> {
+  return new Promise((res) => {
+    const out: Buffer[] = []
+    const err: Buffer[] = []
+    let timedOut = false
+    let child: ChildProcess
+    try {
+      child = spawn('git', [...GIT_PREFIX, ...args], { cwd, env: opts.env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch (e) {
+      return res({ ok: false, out: '', err: e instanceof Error ? e.message : String(e), code: -1 })
+    }
+    let atTimeout: string | undefined
+    const timer = opts.timeoutMs
+      ? setTimeout(() => {
+          timedOut = true
+          atTimeout = Buffer.concat(err).toString('utf8')
+          endTree(child)
+        }, opts.timeoutMs)
+      : undefined
+    child.stdout?.on('data', (d: Buffer) => out.push(d))
+    child.stderr?.on('data', (d: Buffer) => err.push(d))
+    let settled = false
+    const done = (code: number): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      res({ ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim(), ...(timedOut ? { timedOut, errAtTimeout: atTimeout } : {}) })
+    }
+    child.once('error', (e) => {
+      err.push(Buffer.from(e.message))
+      done(-1)
+    })
+    // `exit`, not `close`: a descendant that got away may hold the output open.
+    child.once('exit', (c) => setImmediate(() => done(c ?? 1)))
+  })
+}
 
 /**
  * How many times an entry is tested again for a target that moved (§16.9.1 step 6), or for checks that passed without
@@ -156,21 +379,23 @@ export class MergeQueue {
     return this.wf.cfg.project
   }
 
-  private git(cwd: string, args: string[]): Promise<{ ok: boolean; out: string; err: string; code: number }> {
-    return (this.cfg.git ?? git)(cwd, args)
+  private git(cwd: string, args: string[], opts?: QueueGitOptions): Promise<QueueGitResult> {
+    return this.cfg.git ? this.cfg.git(cwd, args, opts) : opts ? gitTree(cwd, args, opts) : git(cwd, args)
   }
 
-  paused(target: string): { reason: PauseReason; card: string; files?: string[] } | null {
-    return this.wf.store.queuePause(target) as { reason: PauseReason; card: string; files?: string[] } | null
+  paused(target: string): { reason: PauseReason; card: string; files?: string[]; message?: string } | null {
+    return this.wf.store.queuePause(target) as { reason: PauseReason; card: string; files?: string[]; message?: string } | null
   }
 
   resume(target: string): void {
     this.wf.store.setQueuePause(target, null)
   }
 
-  private async pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[]): Promise<QueueOutcome> {
-    await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: card.key, ...(files ? { files } : {}) }))
-    return { card: card.key, entry: entry.id, outcome: 'paused', reason, ...(files ? { files } : {}) }
+  /** Pauses the target's queue at this entry: its reason, the files or folder it names, git's message (bounded). */
+  private async pause(target: string, card: CardRecord, entry: QueueEntry, reason: PauseReason, files?: string[], message?: string): Promise<QueueOutcome> {
+    const m = message?.trim().slice(0, 4000) || undefined
+    await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: card.key, ...(files ? { files } : {}), ...(m ? { message: m } : {}) }))
+    return { card: card.key, entry: entry.id, outcome: 'paused', reason, ...(files ? { files } : {}), ...(m ? { message: m } : {}) }
   }
 
   /**
@@ -288,7 +513,7 @@ export class MergeQueue {
       // The test merge, in the queue's own worktree, at the expected revision.
       step('testMerge', expected)
       const test = await this.testMerge(card, s, revision, expected)
-      if ('pause' in test) return this.pause(target, card, entry, test.pause)
+      if ('pause' in test) return this.pause(target, card, entry, test.pause, test.files, test.message)
       if ('fail' in test) return this.returnCard(card, entry, revision, target, test.fail, false, test.files, test.log)
       const result = test.result
       await this.cfg.hooks?.afterTest?.(entry.id)
@@ -297,7 +522,7 @@ export class MergeQueue {
       // proved (something changed the folder while one ran): tested again from a fresh test merge, then paused.
       step('checks', expected)
       const checks = await this.mergeChecks(card, result)
-      if (checks.kind === 'red') return this.returnCard(card, entry, revision, target, 'checks', checks.transient, undefined, checks.output)
+      if (checks.kind === 'red') return this.returnCard(card, entry, revision, target, 'checks', checks.transient, undefined, checks.output, checks.cause)
       if (checks.kind === 'uncounted') {
         if (++uncounted > MAX_RETESTS) return this.pause(target, card, entry, 'uncounted')
         continue
@@ -383,16 +608,22 @@ export class MergeQueue {
     return this.wf.cfg.options().identity ?? (await G.identity(this.project))
   }
 
-  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string): Promise<{ result: string } | { fail: 'conflict' | 'hook'; files?: string[]; log: string } | { pause: PauseReason }> {
+  /**
+   * The test merge (§16.9.1 step 4), committed as Hive's commits are (#1350): with the project's identity (else paused
+   * `identity`, naming the folder), the repository's hooks run (one that fails returns the card), signed as the
+   * repository says but never waiting on a prompt (paused). Any other failure of git pauses with its message; only a
+   * conflict or a hook returns the card. A failure leaves the queue's worktree clean, at the expected revision.
+   */
+  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string): Promise<{ result: string } | { fail: 'conflict' | 'hook'; files?: string[]; log: string } | { pause: PauseReason; files?: string[]; message?: string }> {
     const id = await this.identity()
-    if (!id) return { pause: 'identity' }
+    if (!id) return { pause: 'identity', files: [this.project] }
     const f = this.cfg.folder
     if (!existsSync(f)) {
       const add = await this.git(this.project, ['worktree', 'add', '--detach', f, expected])
-      if (!add.ok) return { pause: 'needsYou' }
+      if (!add.ok) return { pause: 'needsYou', message: add.err }
     } else {
       const co = await this.git(f, ['checkout', '--detach', '-f', expected])
-      if (!co.ok) return { pause: 'needsYou' }
+      if (!co.ok) return { pause: 'needsYou', message: co.err }
       await this.git(f, ['clean', '-fdq'])
     }
     const r = this.wf.rulesetOf(card, s)
@@ -401,20 +632,29 @@ export class MergeQueue {
     const message = `${card.key}: ${card.title}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}${reviewers ? `\nHive-Reviewed-By: ${reviewers}` : ''}` // i18n-ignore: a commit message, in English
     const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
     const squash = r.options.style === 'squash'
-    const m = await this.git(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision])
-    if (!m.ok) {
-      const u = await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
-      const files = u.out.split(/\r?\n/).filter(Boolean)
+    // Signed as the repository says (never overridden), within a bound when it signs: a signer waiting for a passphrase
+    // is ended with the rest of the commit's tree.
+    const signs = (await this.git(f, ['config', '--type=bool', '--get', 'commit.gpgsign'])).out.trim() === 'true'
+    const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
+    const clean = async (): Promise<void> => {
       await this.git(f, ['merge', '--abort'])
       await this.git(f, ['reset', '--hard', '-q', expected])
-      if (files.length) return { fail: 'conflict', files, log: m.out + m.err }
-      return { fail: 'hook', log: m.out + m.err }
+      await this.git(f, ['clean', '-fdq'])
+    }
+    // Its output read with git's own trace in it (commitEnv), so a failure is told by who said what, never by words.
+    const m = await this.git(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision], opts)
+    if (!m.ok) {
+      const u = m.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
+      const files = u?.out.split(/\r?\n/).filter(Boolean) ?? []
+      await clean()
+      if (files.length) return { fail: 'conflict', files, log: joined(m.out, readCommitStream(m.err).text) }
+      return commitFailed(m, signs)
     }
     if (squash) {
-      const c = await this.git(f, [...who, 'commit', '-q', '-m', message])
+      const c = await this.git(f, [...who, 'commit', '-q', '-m', message], opts)
       if (!c.ok) {
-        await this.git(f, ['reset', '--hard', '-q', expected])
-        return { fail: 'hook', log: c.out + c.err }
+        await clean()
+        return commitFailed(c, signs)
       }
     }
     const h = await G.head(f)
@@ -422,6 +662,7 @@ export class MergeQueue {
     await this.git(this.project, ['update-ref', `refs/hive/queue/${refSafe(card.key)}`, h])
     return { result: h }
   }
+
 
   /**
    * Runs the merge checks (G9) on the test merge's result, one after another, stopping at the first that isn't green.
@@ -442,7 +683,7 @@ export class MergeQueue {
     let noInstall = false
     if (this.cfg.install && (o.mergeInstall === 'always' || this.wf.store.meta(key) !== now)) {
       const i = await this.cfg.install(f, true, ctx)
-      if (!i.ok) return { kind: 'red', transient: !!i.transient, output: i.output }
+      if (!i.ok) return { kind: 'red', transient: !!i.transient, ...(i.cause ? { cause: i.cause } : {}), output: i.output }
       noInstall = !!i.skipped
       await this.wf.locked(() => this.wf.store.setMeta(key, now))
     }
@@ -466,7 +707,7 @@ export class MergeQueue {
       }
       await this.write(card, (w) => w.fact('CheckRan', data))
       r.note?.({ name, counted: b.counted, ...(b.whyNot ? { whyNot: b.whyNot } : {}) })
-      if (!r.ok) return { kind: 'red', transient: !!r.transient, output: r.output }
+      if (!r.ok) return { kind: 'red', transient: !!r.transient, ...(r.cause ? { cause: r.cause } : {}), output: r.output }
       if (!b.counted) return { kind: 'uncounted' }
     }
     return { kind: 'green' }
@@ -576,17 +817,19 @@ export class MergeQueue {
   }
 
   /** A conflict, red checks or a hook: `IntegrationFailed`, the card back to its builder with the output (§16.9.1 step 8). */
-  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string): Promise<QueueOutcome> {
+  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure): Promise<QueueOutcome> {
     // Removed from the queue (or cancelled by a decision) while its test merge or checks ran: its cancellation stands,
     // the card where that left it (Approved), and the late failure isn't written.
     const wrote = await this.write(card, (w) => {
       if (!this.isOpen(w, entry)) return false
-      w.fact('IntegrationFailed', { entry: entry.id, revision, target, reason, transient, ...(files ? { files } : {}), ...(log ? { log: log.slice(0, 4000) } : {}) })
+      // Why a transient failure was one, as codes (#1362): its cause, and the network error code that said so.
+      const why = transient && cause ? { cause: cause.cause, ...(cause.code ? { code: cause.code } : {}) } : {}
+      w.fact('IntegrationFailed', { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: log.slice(0, 4000) } : {}) })
       w.move('active', 'derived')
       this.wf.wake(w, w.state().started?.builder, `${card.key} came back from the merge queue: ${reason}`) // i18n-ignore: a wake, agent-facing
       return true
     })
-    if (!wrote) return { card: card.key, entry: entry.id, outcome: 'skipped', why: 'cancelled' }
+    if (!wrote) return { card: card.key, entry: entry.id, outcome: 'skipped', why: 'cancelled' } // i18n-ignore: a reason's key, not text
     return { card: card.key, entry: entry.id, outcome: 'returned', reason, transient }
   }
 

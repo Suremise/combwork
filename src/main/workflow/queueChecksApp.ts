@@ -10,7 +10,7 @@ import { createLogger } from '../logger'
 import { progress, progressGate } from '../progressService'
 import { childEnv } from '../ptyHost'
 import type { WorkspaceService } from '../workspace'
-import { QUEUE_CHECK_MINUTES } from '../../shared/advanced'
+import { QUEUE_CHECK_MINUTES, QUEUE_NETWORK_CODES } from '../../shared/advanced'
 import { progressRuns, queueChecks, type Spawn } from './queueChecks'
 
 const log = createLogger('queue')
@@ -30,6 +30,7 @@ export function appQueueChecks(ws: WorkspaceService, projectPath: string, spawn?
     runs: runs && onRun ? { ...runs, start: (r) => { const id = runs.start(r); onRun(id); return id } } : runs,
     logDir: queueLogDir(),
     timeoutMs: () => Math.max(1, Number(advanced.get(QUEUE_CHECK_MINUTES)) || 90) * 60_000,
+    networkCodes: () => advanced.pattern(QUEUE_NETWORK_CODES),
     setupCommand: async () => (await ws.projectConfig(projectPath).catch(() => null))?.worktreeSetup ?? ''
   })
 }

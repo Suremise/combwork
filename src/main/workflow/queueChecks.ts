@@ -25,6 +25,7 @@ import { randomUUID } from 'crypto'
 import { spawn as nodeSpawn, type ChildProcess, type SpawnOptions } from 'child_process'
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, rmdirSync, rmSync, statSync, unlinkSync, writeSync } from 'original-fs'
 import { join } from 'path'
+import { StringDecoder } from 'string_decoder'
 import { git } from '../git'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
@@ -32,7 +33,7 @@ import { endTree, resolveCommand, shellSpec } from '../progressReporters/wrapper
 import { snapshot } from './checks'
 import type { CheckContext, CheckResult } from './mergeQueue'
 import type { ProgressCaller, ProgressStore } from '../progress'
-import type { CheckWhyNot, RunCheck } from '../../shared/types'
+import type { CheckWhyNot, RunCheck, TransientFailure } from '../../shared/types'
 
 /** Starts a process (the app's recording spawn, #1360; a test's plain one). */
 export type Spawn = (file: string, args: string[], opts: SpawnOptions) => ChildProcess
@@ -45,7 +46,8 @@ export interface QueueRuns {
    * `installAsWritten`: an install run as written, with no clean form (its details say so).
    */
   start(run: { title: string; command: string; card: number; revision: string; folder: string; noInstall?: boolean; titleFromCommand?: boolean; installAsWritten?: boolean }): string | null
-  finish(id: string, end: { ok: boolean; exitCode: number | null; logPath: string | null }): void
+  /** `transient`: why a failure counts as temporary (its details say so). */
+  finish(id: string, end: { ok: boolean; exitCode: number | null; logPath: string | null; transient?: TransientFailure }): void
   /** How it counted as a check of the card's result revision (its `CheckRan`). */
   counts(id: string, c: RunCheck): void
 }
@@ -70,7 +72,7 @@ export function progressRuns(store: ProgressStore, on: () => boolean, workspaceP
     },
     finish: (id, end) => {
       try {
-        store.finish(caller(), id, { ok: end.ok, ...(end.exitCode !== null ? { exitCode: end.exitCode } : {}), ...(end.logPath ? { logPath: end.logPath } : {}) })
+        store.finish(caller(), id, { ok: end.ok, ...(end.exitCode !== null ? { exitCode: end.exitCode } : {}), ...(end.logPath ? { logPath: end.logPath } : {}), ...(end.transient ? { transient: end.transient } : {}) })
       } catch {
         // forgotten meanwhile (the panel turned off, the workspace closed)
       }
@@ -90,6 +92,8 @@ export interface QueueChecksDeps {
   timeoutMs: () => number
   /** The project's worktree setup command (Project Settings → Agents & Worktrees), as it is now. */
   setupCommand: () => string | Promise<string>
+  /** The network error codes that make a failed check transient in its last lines (Settings → Advanced, #1362); none: only the sure causes. */
+  networkCodes?: () => RegExp | null
   platform?: NodeJS.Platform
   /** The log's file calls (a test's, to fail them). */
   logIo?: LogIo
@@ -123,29 +127,161 @@ export function checkEnv(base: Record<string, string | undefined>): Record<strin
 export interface CheckEnd {
   /** It couldn't be started (the shell or the folder missing). */
   spawnError?: boolean
+  /** Its program wasn't found before it was started (Windows: programFound). */
+  notFound?: boolean
   /** Ended by its time limit. */
   timedOut?: boolean
   exitCode: number | null
   signal: string | null
   output: string
+  /** The network code its last lines had, looked for by the runner as its output came (TailCodes): absent, `output` is looked in. */
+  tailCode?: string | null
 }
 
 /** Windows' STATUS_CONTROL_C_EXIT, unsigned and signed: a process ended by an interrupt. */
 const INTERRUPTED = new Set([0xc000013a, -1073741510])
 
+/** The exit code a check gives to say "a temporary failure, try again" (EX_TEMPFAIL, #1362). */
+export const TEMPFAIL = 75
+/** How much of a failed check's output its network error codes are looked for in: its last lines. */
+export const TAIL_LINES = 40
+
 /**
- * Whether a failed check is the environment's failure (transient: the same revision may go back into the queue) or the
- * work's (red: it needs a new revision): transient when it couldn't start (a spawn error, or the shell's "no such
- * command", 9009 on Windows and 127 elsewhere), was ended by its time limit, or was killed from outside (a signal, or
- * Windows' interrupt status). A process another program ends with TerminateProcess exits with the code that program
- * gave, which can't be told from the check's own: it counts as red. #1362 adds what it decides here.
+ * Why a failed check is the environment's failure (transient: the same revision may go back into the queue) rather
+ * than the work's (red: it needs a new revision), or null when it is the work's. Transient when it couldn't start (a
+ * spawn error, or the shell's "no such command", 9009 on Windows and 127 elsewhere), was ended by its time limit, was
+ * killed from outside (a signal, or Windows' interrupt status), exited 75 (the project's own script saying so, #1362),
+ * or has a network error code (`network`: Settings → Advanced, Node's and npm's own) in its last 40 lines (#1362,
+ * Darren's decision on #1121): never guessed from anything else. A process another program ends with TerminateProcess
+ * exits with the code that program gave, which can't be told from the check's own: it counts as red.
  */
-export function classifyCheckFailure(e: CheckEnd, platform: NodeJS.Platform = process.platform): 'transient' | 'red' {
-  if (e.spawnError || e.timedOut) return 'transient'
-  if (e.signal !== null) return 'transient'
-  if (e.exitCode !== null && INTERRUPTED.has(e.exitCode)) return 'transient'
-  if (e.exitCode === (platform === 'win32' ? 9009 : 127)) return 'transient'
-  return 'red'
+export function transientCause(e: CheckEnd, platform: NodeJS.Platform = process.platform, network: RegExp | null = null): TransientFailure | null {
+  if (e.spawnError) return { cause: e.notFound ? 'notFound' : 'spawn' }
+  if (e.timedOut) return { cause: 'timeout' }
+  if (e.signal !== null || (e.exitCode !== null && INTERRUPTED.has(e.exitCode))) return { cause: 'killed' }
+  if (e.exitCode === (platform === 'win32' ? 9009 : 127)) return { cause: 'notFound' }
+  if (e.exitCode === TEMPFAIL) return { cause: 'exit75' }
+  if (network) {
+    const code = e.tailCode !== undefined ? e.tailCode : networkCodeIn(e.output, network)
+    if (code) return { cause: 'network', code }
+  }
+  return null
+}
+
+/** How much of a line still being written TailCodes holds before it settles what it can of it. */
+const LINE_CHARS = 64 * 1024
+/**
+ * The real text kept on each side of what is still undecided in such a line: a match is taken only with half of this
+ * after it, and is searched with this much before it, so a match and what decides it (a word boundary, a lookaround)
+ * up to half of it come out the same however the output was chunked (codes are short).
+ */
+const LINE_CONTEXT = 512
+
+/**
+ * The network error code in a check's last TAIL_LINES lines, looked for as its output comes (#1362). The answer depends
+ * on the output, never on how it was chunked: each line is searched as a whole, from its real start, once it ends. A
+ * line still being written past LINE_CHARS is settled as far as its text decides: a match there counts only when it
+ * starts before its last LINE_CONTEXT characters and ends before its last half of that (what follows can't change it);
+ * one running into them is left undecided and searched again from its start. Only what is undecided is kept, after
+ * LINE_CONTEXT characters of the real text before it (searched from there with lastIndex, so a boundary or a lookbehind
+ * sees that text, never a start the trimming made). Bounded: a code (or none) per line for the last TAIL_LINES lines,
+ * and a line in progress up to about LINE_CHARS. Blank lines at the end don't count.
+ */
+export class TailCodes {
+  private readonly re: RegExp | null
+  private codes: (string | null)[] = []
+  private blanks = 0
+  private line = ''
+  /** Where in `line` a match not decided yet may start. */
+  private from = 0
+  private lineCode: string | null = null
+  private lineBlank = true
+  private decoder = new StringDecoder('utf8')
+
+  constructor(re: RegExp | null) {
+    this.re = re && new RegExp(re.source, re.flags.replace(/[gy]/g, '') + 'g')
+  }
+
+  write(chunk: Buffer | string): void {
+    if (!this.re) return
+    const parts = (typeof chunk === 'string' ? chunk : this.decoder.write(chunk)).split('\n')
+    this.add(parts[0])
+    for (let i = 1; i < parts.length; i++) {
+      this.endLine()
+      this.add(parts[i])
+    }
+    if (this.line.length > LINE_CHARS) this.settle()
+  }
+
+  /** The output has ended (a last line without its newline counts): the first code in its last lines, or null. */
+  end(): string | null {
+    if (!this.re) return null
+    this.add(this.decoder.end())
+    if (this.line) this.endLine()
+    return this.codes.find((c) => !!c) ?? null
+  }
+
+  private add(text: string): void {
+    this.line += text
+    if (this.lineBlank && /\S/.test(text)) this.lineBlank = false
+  }
+
+  /**
+   * The first match from `from`, if it starts before `before` and ends by `endBy` (the line's code); where a match not
+   * decided yet may start after it.
+   */
+  private scan(before: number, endBy: number): number {
+    const re = this.re!
+    re.lastIndex = this.from
+    const found = re.exec(this.line)
+    if (!found || found.index >= before) return before
+    if (found.index + found[0].length > endBy) return found.index
+    this.lineCode = found[0].slice(0, 64)
+    return before
+  }
+
+  /** A long line still being written: what its text decides is settled, and only what isn't is kept, with its context. */
+  private settle(): void {
+    const cut = this.line.length - LINE_CONTEXT
+    this.from = this.lineCode === null ? this.scan(cut, this.line.length - LINE_CONTEXT / 2) : cut
+    // A match still undecided this far back (a pattern matching a long stretch) is given up: the bound holds.
+    if (this.line.length - this.from > LINE_CHARS) this.from = cut
+    const drop = Math.max(0, this.from - LINE_CONTEXT)
+    this.line = this.line.slice(drop)
+    this.from -= drop
+  }
+
+  private endLine(): void {
+    // Its real end: everything left is decided.
+    if (this.lineCode === null) this.scan(Infinity, Infinity)
+    if (this.lineBlank) this.blanks++
+    else {
+      for (let n = Math.min(this.blanks, TAIL_LINES); n > 0; n--) this.push(null)
+      this.blanks = 0
+      this.push(this.lineCode)
+    }
+    this.line = ''
+    this.from = 0
+    this.lineCode = null
+    this.lineBlank = true
+  }
+
+  private push(code: string | null): void {
+    this.codes.push(code)
+    if (this.codes.length > TAIL_LINES) this.codes.shift()
+  }
+}
+
+/** The network error code in the last TAIL_LINES lines of `output` (TailCodes on the whole of it), or null. */
+export function networkCodeIn(output: string, network: RegExp): string | null {
+  const tail = new TailCodes(network)
+  tail.write(output)
+  return tail.end()
+}
+
+/** Whether a failed check is the environment's failure ('transient') or the work's ('red'): transientCause's verdict. */
+export function classifyCheckFailure(e: CheckEnd, platform: NodeJS.Platform = process.platform, network: RegExp | null = null): 'transient' | 'red' {
+  return transientCause(e, platform, network) ? 'transient' : 'red'
 }
 
 /** cmd.exe's own commands, which no file on PATH runs. */
@@ -283,7 +419,9 @@ class BoundedLog {
 
   constructor(
     readonly path: string | null,
-    private io: LogIo
+    private io: LogIo,
+    /** Its network error codes, looked for in its whole last lines as the output comes (#1362). */
+    readonly codes: TailCodes = new TailCodes(null)
   ) {
     if (!path) return
     try {
@@ -313,6 +451,7 @@ class BoundedLog {
 
   write(chunk: Buffer): void {
     this.last = (this.last + chunk.toString('utf8')).slice(-OUTPUT_CHARS)
+    this.codes.write(chunk)
     if (this.fd === null) return
     const room = MAX_LOG_BYTES - this.written
     if (room > 0) {
@@ -398,6 +537,14 @@ export async function bracketEnd(folder: string, revision: string, start: QueueB
 export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, command: string, folder: string, ctx: CheckContext) => Promise<CheckResult>; install: (folder: string, clean: boolean, ctx: CheckContext) => Promise<CheckResult & { skipped?: boolean }> } {
   const spawn = deps.spawn ?? nodeSpawn
   const platform = deps.platform ?? process.platform
+  // A pattern that can't be read (an Advanced value gone bad) leaves only the sure causes.
+  const network = (): RegExp | null => {
+    try {
+      return deps.networkCodes?.() ?? null
+    } catch {
+      return null
+    }
+  }
   const io = deps.logIo ?? FILE_IO
 
   /** Runs a command to its end or its time limit, its output into the log; never throws. */
@@ -426,7 +573,7 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
         const env = checkEnv(deps.env())
         if (!programFound(command, env, folder, platform)) {
           log.write(Buffer.from(`Hive couldn't find the program this command starts: ${command}\n`)) // i18n-ignore: the run's log, beside the command's own output
-          return done({ spawnError: true, exitCode: null, signal: null })
+          return done({ spawnError: true, notFound: true, exitCode: null, signal: null })
         }
         const sh = shellSpec(command, env, platform)
         child = spawn(sh.file, sh.args, { cwd: folder, env, windowsHide: true, windowsVerbatimArguments: sh.verbatim, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -458,9 +605,11 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
     } catch {
       logPath = null
     }
-    const log = new BoundedLog(logPath, io)
+    const codes = network()
+    const log = new BoundedLog(logPath, io, new TailCodes(codes))
     let end: CheckEnd = { spawnError: true, exitCode: null, signal: null, output: '' }
     let output = ''
+    let cause: TransientFailure | null = null
     try {
       try {
         opts.before?.()
@@ -468,19 +617,20 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
         // What the command needs first failed (node_modules couldn't be removed): the machine's failure, not the work's.
         log.write(Buffer.from(`${e instanceof Error ? e.message : String(e)}\n`))
         end = { spawnError: true, exitCode: null, signal: null, output: '' }
-        return { ok: false, transient: true, output: '', command, run: id ?? randomUUID() }
+        return { ok: false, transient: true, cause: { cause: 'spawn' }, output: '', command, run: id ?? randomUUID() }
       }
       end = await exec(command, folder, log)
     } finally {
       output = log.close()
       const ok = !end.spawnError && !end.timedOut && end.exitCode === 0
-      if (id) deps.runs?.finish(id, { ok, exitCode: end.exitCode, logPath: log.usable ? logPath : null })
+      // Its last lines as they came, not the short output the result carries (a long line would push a code out of it).
+      cause = ok ? null : transientCause({ ...end, output, tailCode: log.codes.end() }, platform, codes)
+      if (id) deps.runs?.finish(id, { ok, exitCode: end.exitCode, logPath: log.usable ? logPath : null, ...(cause ? { transient: cause } : {}) })
     }
     const ok = !end.spawnError && !end.timedOut && end.exitCode === 0
-    const transient = !ok && classifyCheckFailure({ ...end, output }, platform) === 'transient'
     return {
       ok,
-      ...(transient ? { transient: true } : {}),
+      ...(cause ? { transient: true, cause } : {}),
       output,
       command,
       run: id ?? randomUUID(),

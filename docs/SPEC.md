@@ -367,9 +367,10 @@ Hooks are normalised by each adapter into one set of events (start, prompt, tool
 **Hooks health** (#1336; there is no hooks-free mode, §16.15 row 10): hooks that stop arriving while Hive thinks all is well (a CLI update changed them, a policy turned them off, Hive refused their token) are said, never left as a wrong status. Read from what Hive already has, no status engine of its own (`main/hooksHealth.ts`), each sign needing time and evidence, never time alone, within **Hooks missing: wait** (Settings → Advanced, `hive.hooks.missingSeconds`, 60 s):
 - **its start**: a CLI that sends a hook as it starts (`capabilities.startHook`: Claude Code's SessionStart; Codex's and Copilot's come with the first prompt) sent none within the wait, the time a question at its start (folder trust) is on its screen not counted;
 - **a prompt**: one sent while it was idle (the user's Enter in its pane, a line Hive typed, a task on its command line) had no hook of a current turn after it for the wait (the turn ledger's verdict: a late hook of a turn that is over answers nothing), while its screen reading said working (it was idle when the prompt went, so that work is this prompt's), seen at least 15 s before (at most the wait). The check runs in the launch's hook order, so a hook that came first is taken first. A long silent think never counts (its prompt's hook came), nor a prompt sent while it works; an Enter that started nothing (a menu, a local command) is dropped once its screen shows it idle.
-- **Not covered yet** (the Assistant's scope, #1336; transcript turn identity and Copilot are #1371): a quick turn over before Hive's first look at its screen (every 5 s) isn't flagged by itself; a later turn long enough to be seen working is, and a line Hive types meanwhile is marked not taken (#430). A CLI without a screen reading (Copilot), and so a Copilot agent's prompts, aren't covered; nor is Codex's start (its first hook comes with a prompt).
+- **a turn its transcript shows** (#1371): a turn the CLI's own records identify, begun by a prompt written since this launch started and taken up by the model, with no hook naming it for the wait since Hive found it. Identity, not position: Claude Code's turn is its prompt's `promptId` (every user entry carries it; an assistant entry belongs to the turn its `parentUuid` chain leads to), which its hooks carry as `prompt_id`; Codex's is its `turn_id` (its prompt's `item_completed` UserMessage, or before 0.159 its `user_message` inside the task; its model's items and reply), carried by its hooks; Copilot's is an `interactionId` (`user.message`, then `assistant.turn_start`/`assistant.message`), and its hooks carry none, so its prompt hook answers it by the prompt's text (Copilot records the prompt once that hook has returned) and any hook received after the prompt was recorded answers it too. A hook naming the turn answers it whenever it comes, before or after the transcript is written (a Stop that comes first, a response flushed late after a local command: both are their own turn's). Not turns: a local command (no model work), a compaction, a sub-agent's or side conversation's (`isSidechain`, Codex's sub-turns), Claude Code's task-notification wakes (whether their hooks come isn't certain). The reading (`turnsReader.ts`, each adapter's `transcriptTurns`) is one per conversation and file, done in the 5 s transcript look: this launch's new conversation from its start, any other (resumed, switched to by `/clear` or `/resume`, found later) from its end then, so history never counts (nor a prompt older than the launch); another path or conversation, a shrink or other first bytes (a file replaced under its name) start it again and drop what it found; whole lines only, a line begun before the reading dropped; more than 4 MB since the last look forgets what it knew, so a turn whose prompt it didn't read is unknown; what a read found is kept only if the launch, conversation and reading are still the ones it read for. The check only reads what was stored: no hook waits on a read. A quick turn over before Hive's first look at its screen is caught this way, and Copilot too.
+- **Not covered**: a new Codex session's turns while its hooks are missing (with no hook it reports no session id, so there is no rollout to read; a turn long enough to be seen on its screen is caught, and its start with a task); a Copilot turn whose turn before's late hook arrives after its prompt was recorded (taken as its hook: it errs toward saying nothing); Claude Code's task-notification wakes.
 
-Then, for that launch (`LiveSessionState.hooksMissing`: since, after start or prompt, and why when Hive can tell: it refused their token, the CLI's settings turn them off (Claude Code: the first scope setting `disableAllHooks`, or managed settings with `allowManagedHooksOnly`), or the CLI is newer than Hive was tested with): its status reads **"Status unknown: no hooks from Claude Code"** (pane, sidebar row, board, the Agent API's `statusMessage`), its mark is stalled, nothing is typed into it (`readyFor`: no wakes, messages or tasks), its lanes pause (`hooks`: "paused: B6's hooks aren't arriving"), the project's banner over its pane says why and what to do with **Restart session**, and a toast says it once a conversation (kept in Notifications). A current turn's hook of that launch clears it (a late hook of a turn that is over doesn't); a restart starts a new launch.
+Then, for that launch (`LiveSessionState.hooksMissing`: since, after start, prompt or transcript (with the turn's id), and why when Hive can tell: it refused their token, the CLI's settings turn them off (Claude Code: the first scope setting `disableAllHooks`, or managed settings with `allowManagedHooksOnly`), or the CLI is newer than Hive was tested with): its status reads **"Status unknown: no hooks from Claude Code"** (pane, sidebar row, board, the Agent API's `statusMessage`), its mark is stalled, nothing is typed into it (`readyFor`: no wakes, messages or tasks), its lanes pause (`hooks`: "paused: B6's hooks aren't arriving"), the project's banner over its pane says why and what to do with **Restart session**, and a toast says it once a conversation (kept in Notifications). A current turn's hook of that launch clears it (a late hook of a turn that is over doesn't); one a transcript turn raised clears only on that turn's hook or a newer turn's, by identity. The invariant (#1371): a transcript turn T stops being waited on, alarm or not, only on a hook naming T or a turn the transcript places after T, whichever comes first, the hook or the record; nothing else but dropping the reading ends it. One transition does it (`answeredUpTo`, from `hookTurn` as each hook is taken, or from `transcriptTurns` when a hook came before its record), whether or not an alarm has fired: a newer turn's hook before the deadline means the older turn is never flagged. An id the transcript hasn't placed is unknown, never newer, whatever the ledger makes of it (the ledger's current turn may be older than the flagged one) (Copilot: any hook answers a standing flag, and only the turns read so far). Places are bounded (the latest 500): a turn still waited on or flagged keeps its own place when they let go of it, and one let go that wasn't (answered, or never worked) is remembered as forgotten, so a late record of it is unknown, never placed anew as newer. What is answered stays answered for that reading: a record of an answered turn appended later (Claude Code chains one to it) isn't waited on again, while a turn read after the answer still is. The transcript reading starting again (another file, a shrink, other first bytes, another conversation) drops that alarm with the evidence it came from; a start or prompt alarm stays. A read whose file changed while it waited (a hook naming another transcript) is dropped. A restart starts a new launch.
 
 **Background tasks.** An agent can leave work running when its turn ends: a test run, a server, a watch. Each adapter reads them from the transcript as it grows (`backgroundTasks()`), and Hive counts the ones started since the agent launched (`backgroundTasks` in its live state; shown as "· 2 background tasks running").
 - **Claude Code**: a background Bash call's result has `backgroundTaskId` (also a command moved to the background after running too long), a Monitor's has `taskId` and an expiry. A task ends with a `<task-notification>` naming it (any status but a Monitor's events) or a `TaskStop`. Claude Code is told when a task ends and starts a new turn by itself, so the provider has the `backgroundWakes` capability: a turn that ends with tasks open leaves the agent **background** ("Waiting on 2 background tasks"), not finished. When the last one ends, the agent is **working** again (the notification's turn), then finished at its Stop. No "finished" notification or chime until then. A task the agent stopped itself (`TaskStop`) gets no notification and starts no turn: the last one ending that way leaves it **finished** (#640).
@@ -2050,6 +2051,43 @@ submissions' pins once it is archived.
      output (`IntegrationFailed`, reason `hook`);
    - with `commit.gpgsign`, signing runs as configured; if it would wait for a passphrase (a pinentry window), the
      entry pauses with "signing waits for you" rather than failing, and a signing error pauses it with git's message.
+   **Built [#1350]:**
+   - **Identity:** G12's when on, else the repository's own (`git config user.name` / `user.email`: local, then
+     global), passed to the merge with `-c`. With none, the entry pauses `identity`, naming the project folder: the
+     window says to set a commit identity for this repository (`git config user.name` / `user.email`).
+   - **Hooks:** they run (no `--no-verify`).
+   - **Who said what** [HR4's rounds 1 and 2 on #1350]: a failure is told by which part failed, and a decision reads
+     only that part's own words, never the whole output (a hook can print anything).
+     - Hive's commits run with `GIT_TRACE2_EVENT=2`, so git writes its trace2 events into its own stderr, in order
+       with what its hooks and its signer write there. A child's text comes after its `child_start` and before its
+       `child_exit`: a hook writes before it exits, and git writes `child_exit` only once it has waited for it.
+     - Each piece of text belongs to the top git's child running then: a hook (`child_class: hook`, its name) or the
+       signer (gpg's or gpgsm's `-bsau`, ssh-keygen's `-Y sign`). Text while none runs is git's own. A git that a hook
+       runs (its sid `<parent>/<own>`) is never a source.
+     - An event is only a complete JSON record with the fields its kind needs, starting `{"event":"` and running to
+       the line's end. Anything else, an event-looking fragment included, is text. Events never appear in a message.
+   - **Hook failure:** a hook that exited non-zero (`pre-merge-commit`, `commit-msg`, or `pre-commit` for a squash's
+     commit) returns the card with its own text, then git's (`IntegrationFailed`, reason `hook`).
+   - **Other failures:** anything else (an index lock, a broken repository, a worktree it couldn't check out) pauses
+     `needsYou` with git's own lines, never a return.
+   - **No trace** (a git older than 2.24): only git's own "Not committing merge" is a hook, and signing is never read
+     from text.
+   - **Signing:** the repository's config (never overridden). Hive's commits run with no terminal: no input,
+     `GIT_TERMINAL_PROMPT=0`, `SSH_ASKPASS_REQUIRE=never`, `GCM_INTERACTIVE=never`. In the app they go through the
+     queue runner's recorded spawn (#1360). When `commit.gpgsign` is on, the commit (hooks included) has a bound:
+     Settings → Advanced, `hive.queue.signSeconds`, 60 s. At the bound the whole tree (git, its hooks, the signer) is
+     ended.
+     - **Ended at the bound:** always a pause, decided by what was running when it was ended (the stream as far as
+       it had come then). Ending a hook may make it exit non-zero, and that is never its rejection. A hook running
+       then pauses `hookTimedOut`. The signer, or nothing known in a repository that signs, pauses `signingWaits`,
+       "signing waits for you".
+     - **A signer that exited non-zero:** pauses `signingWaits` when **its own** text says it needs a passphrase, a
+       pinentry or a terminal, and `signing` otherwise, with its text and git's.
+   - **After any of these:** the queue's worktree is left clean at the expected revision (`merge --abort`,
+     `reset --hard`, `clean`), and nothing in the target changes.
+   - **The pause:** keeps git's message in its own words (`workflow_queue_pauses.message`, the 1.0 group's 15th
+     step). Only a conflict, a hook or red checks return a card; every other cause is a pause.
+   - Resuming after fixing the cause is #1353's; signing without a prompt stays #1185.
 5. **Merge checks** (G9) run on that worktree as runs attributed to "Hive (merge queue)", named for the card and the
    result revision (§16.13). The worktree is the queue's own and no one else writes in it, so the checks run on
    exactly the result. **Dependencies from scratch** [HB3's round 1 finding 12]: when the result's package manifests or
@@ -2092,8 +2130,23 @@ submissions' pins once it is archived.
    that couldn't start (a spawn error, or its program not found, told before it starts on Windows, where cmd exits 1 for
    it), one ended by its time limit, or one killed from outside (a signal, Windows' interrupt status) is transient;
    anything else is red. A process another program ends with TerminateProcess exits with the code that program gave,
-   which can't be told from the check's own, so it counts as red. Network errors are #1362's (Darren, 21 Oct: exit 75,
-   or Node's and npm's network error codes in the last 40 lines, an Advanced list). **Pauses are not failures:** a busy or dirty target folder, a missing
+   which can't be told from the check's own, so it counts as red. **Built [#1362]** (Darren, 21 Oct, #1121 point 3:
+   (a) and (b)): a check that exits **75** (EX_TEMPFAIL: the project's own script saying "a temporary failure, try
+   again", a way to mark its own environment failures) is transient, and so is a failed check whose **last 40 lines**
+   (trailing blank lines aside) have one of Node's and npm's network error codes (`ENOTFOUND`, `EAI_AGAIN`,
+   `ECONNRESET`, `ECONNREFUSED`, `ETIMEDOUT` as whole words: Settings → Advanced, **Merge queue: network errors that
+   count as temporary**, a pattern with samples recorded from npm 11.17.0 and Node 24.19.0; `(?!)` turns it off). A code
+   only earlier in the output, or in a check that passed, is nothing. Why is recorded as codes, never text: the
+   `IntegrationFailed` fact's `cause` (`spawn`, `notFound`, `timeout`, `killed`, `exit75`, `network`) and `code` (the
+   network error code found), and the check's run says it in its details. Transient only permits: the card is still
+   returned to its builder (`returnCard`), and the builder's resubmission puts the same revision back; nothing retries by
+   itself. Codes are looked for as the output comes (`TailCodes`), each line whole as it ends, so the 40 lines are the
+   check's real last lines, not the short output a result carries. The answer depends on the output, never on how it was
+   chunked: a line still being written past 64 KB is settled only as far as its text decides (a match counts once 256
+   real characters follow it; one running closer to the unfinished end is searched again from its start), and only the
+   undecided part is kept, after 512 real characters before it, so a word boundary or lookbehind sees the real text,
+   never a start the trimming made. Bounded: a code per line for the last 40 lines, a line in progress up to about
+   64 KB; the limit is a match and what decides it within 256 characters (a code). **Pauses are not failures:** a busy or dirty target folder, a missing
    identity or a signing wait pauses the entry with its reason and never returns the card [HB3's round 1 finding 3].
 
 #### 16.9.2 Advancing the target

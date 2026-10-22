@@ -5,7 +5,7 @@
 //
 // In the app since P3: hive.db's `card_facts` (main/workflow/factStore.ts), folded wherever a card's state is read.
 
-import type { StoredText } from '../types'
+import type { StoredText, TransientCause } from '../types'
 
 /** Who caused a fact. */
 export type Actor = 'user' | 'assistant' | 'hive' | 'outside' | `agent:${string}`
@@ -168,7 +168,8 @@ export interface FactData {
   IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' }
   IntegrationStarted: { entry: string; expected: string; result: string; files?: string[]; checkedOut?: string | null }
   IntegrationPhase: { entry: string; phase: 'files' | 'ref' | 'rollback' }
-  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean }
+  /** `cause` and `code`: why a transient failure was one (#1362), as codes; `code` is the network error code found. */
+  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string }
   Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'hive' | 'agent' | 'outside'; outsideRules?: string[] }
   /** Some of an unfinished card's work found in the target (a partial hand merge): a mark, not a move (§16.4.4). */
   MergedInPart: { revision: string; target: string }
