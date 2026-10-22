@@ -132,6 +132,11 @@ export interface QueueView {
   queued: QueueQueued[]
   /** Newest first, at most RECENT_MAX. */
   recent: QueueRecent[]
+  /**
+   * Returns older than `recent` still waiting to be seen (#1356; the window's model only), each its card's newest
+   * outcome, newest first, at most PENDING_MAX: a return shows until seen however many outcomes came after it.
+   */
+  pending: QueueRecent[]
   /** The project's current options have Hive merge into this target (#1356; the window's model only). */
   hiveMerges: boolean
   /**
@@ -145,13 +150,15 @@ export interface QueueView {
  * A queue as the Agent API gives it (GET /v1/queue, hive_queue): no folder (a stuck advance's folder neither), and whether
  * an outcome has a log, not the log.
  */
-export type QueuePublic = Omit<QueueView, 'projectPath' | 'recent' | 'paused' | 'hiveMerges' | 'inFlight'> & {
+export type QueuePublic = Omit<QueueView, 'projectPath' | 'recent' | 'pending' | 'paused' | 'hiveMerges' | 'inFlight'> & {
   paused: (Omit<QueuePauseInfo, 'stuck' | 'message'> & { stuck?: Omit<QueueStuck, 'folder'> }) | null
   recent: (Omit<QueueRecent, 'log' | 'seen'> & { hasLog?: true })[]
 }
 
 /** How many outcomes a queue's model keeps for the panel. */
 export const RECENT_MAX = 20
+/** How many older returns not seen yet a queue's model keeps beside them (each a card's newest outcome). */
+export const PENDING_MAX = 50
 
 /** What Resume did: resumed, or paused again because §16.9.2's conditions still fail (the pause as it is now). */
 export interface QueueResumed {

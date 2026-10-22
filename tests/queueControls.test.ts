@@ -279,7 +279,10 @@ describe("the window's listing (#1356: which queues the panel can show)", () => 
     const card = await approved(w, wt)
     expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', hiveMerges: true, inFlight: [card], queued: [{ card }] }])
     // The next cards go to the agent: the queue isn't the current options' any more, but its card is still in flight under them.
+    host.changed.length = 0
     await inWorkspace(w, () => setWorkflowOptions(w, repo, { preset: null, options: { ...HIVE_MERGES, finish: 'agentMerges', mergeChecks: [] } }))
+    // The windows are told (which queues show follows the options), whoever saved them.
+    expect(host.changed).toEqual(['main'])
     expect(await inWorkspace(w, () => queueViews(w, repo, undefined, true))).toMatchObject([{ target: 'main', hiveMerges: false, inFlight: [card], queued: [{ card }] }])
     // Merged: Done, nothing in flight; the merge stays in its outcomes.
     expect(await drain(w, repo, true)).toMatchObject([{ outcome: 'integrated' }])
@@ -309,5 +312,37 @@ describe("the window's listing (#1356: which queues the panel can show)", () => 
     expect([...s.queueSeen().keys()]).toEqual([entry])
     await inWorkspace(w, () => markQueueSeen(w, repo, 'release', ['x']))
     expect([...s.queueSeen().keys()]).toEqual([entry])
+  })
+})
+
+describe('a return waits to be seen however many outcomes come after it (#1356, HR3\'s round 1 finding 2)', () => {
+  it('older than the latest 20 outcomes, an unseen return stays in the window\'s model (not the Agent API\'s) until seen', async () => {
+    const { w, wt, repo } = await workspace()
+    const { markQueueSeen } = await import('../src/main/workflow/queueControls')
+    const card = await approved(w, wt)
+    await drain(w, repo, false)
+    const wf = (await service.workflowFor(w, repo))!
+    // 20 later outcomes, of other cards: each queued for main, then cancelled.
+    for (let i = 0; i < 20; i++) {
+      const other = await inWorkspace(w, async () => (await tasks.createTask({ title: `Other ${i}`, project: 'p' }, user)).number)
+      await wf.locked(() =>
+        wf.store.tx((tx) => {
+          tx.append(other, { kind: 'IntegrationRequested', actor: 'hive', source: 'recorded', data: { entry: `o${i}/e1`, revision: 'f'.repeat(40), key: null, target: 'main', style: 'merge' } })
+          tx.append(other, { kind: 'IntegrationCancelled', actor: 'hive', source: 'recorded', data: { entry: `o${i}/e1`, reason: 'removed' } })
+        })
+      )
+    }
+    const [v] = await inWorkspace(w, () => queueViews(w, repo, 'main', true))
+    expect(v.recent).toHaveLength(20)
+    expect(v.recent.some((r) => r.card === card)).toBe(false)
+    expect(v.pending).toMatchObject([{ card, outcome: 'returned', reason: 'checks' }])
+    const { shownReturns } = await import('../src/shared/progressQueue')
+    expect(shownReturns(v, Date.now()).map((r) => r.card)).toEqual([card])
+    // The Agent API keeps its 20.
+    expect(await inWorkspace(w, () => queueViews(w, repo, 'main'))).toMatchObject([{ recent: expect.any(Array) }])
+    await inWorkspace(w, () => markQueueSeen(w, repo, 'main', [v.pending[0].entry]))
+    const [after] = await inWorkspace(w, () => queueViews(w, repo, 'main', true))
+    expect(after.pending[0]?.seen).toEqual(expect.any(String))
+    expect(shownReturns(after, Date.parse(after.pending[0].seen!) + 60_000)).toEqual([])
   })
 })

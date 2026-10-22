@@ -30,6 +30,11 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
 
 ;(async () => {
   q.prepare(fx)
+  // A second project, also on Hive merges (its queue's card shows, empty): the project filter has both.
+  const beta = path.join(fx.ws, 'beta')
+  lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.hive/\n' })
+  lib.git(beta, ['branch', '-M', 'main'])
+  lib.git(beta, ['branch', 'integration'])
   const h = await q.startHive(fx, { port: PORT })
   try {
     const { page, inv } = h
@@ -80,31 +85,47 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     }
 
     // --- Hive merges, nothing queued: the queue's card shows, empty.
+    await inv('workflow:setOptions', beta, { preset: null, options: q.queueOptions(fx) })
     await showTab('merges')
-    check("the Merges tab shows the queue's card, empty, while the options have Hive merge", !!(await until(async () => /Merge queue · integration/.test(await cardText()) && /Nothing queued\./.test(await cardText()), HUNG_MS)), await cardText())
+    check("the Merges tab shows the queue's card, empty, while the options have Hive merge", !!(await until(async () => /Merge queue · integration/.test(await cardText()) && /Nothing queued\./.test(await cardText()), HUNG_MS)), JSON.stringify({ panel: await panel.innerText().catch(() => ''), alpha: await inv('queue:list', fx.alpha).catch((e) => String(e)), beta: await inv('queue:list', beta).catch((e) => String(e)), projects: (await inv('workspace:refresh')).projects.map((p) => p.path) }))
     check('…with Pause queue, and no Release (the merge slot\'s)', (await card.locator('[data-action="pause"]').count()) === 1 && (await card.getByRole('button', { name: /Release/ }).count()) === 0)
 
-    // --- A red check: returned with its check's name; Open card and Show log.
+    // --- A red check: returned with its check's name; unseen while the filter shows another project or a dialog covers
+    // the panel (HR3's round 1 finding 1); then Show log and Open card.
+    const projectFilter = panel.getByRole('combobox', { name: 'Show the runs of' })
+    const betaCard = panel.locator(`.progress-queue-card[data-queue="beta#${TARGET}"]`)
+    check('the project filter offers both projects (each has a queue shown)', !!(await until(async () => (await projectFilter.count()) === 1 && (await betaCard.count()) === 1, HUNG_MS)))
+    await projectFilter.selectOption({ label: 'beta' })
+    check('…filtered to beta, alpha\'s queue card is not shown', !!(await until(async () => (await card.count()) === 0 && (await betaCard.count()) === 1, HUNG_MS)))
     q.steer(fx, 'fail', 'unit broke')
     const zero = await q.approve(fx, h, reviewer, 'Zero', { 'zero.txt': 'zero\n' })
     const zeroKey = await keyOf(zero.n)
-    const red = await until(async () => (/returned/.test(await cardText()) ? await cardText() : null), HUNG_MS)
-    check('a red check: "returned to its builder: checks failed: quick"', new RegExp(`${zeroKey} returned to ${zero.builder.name}: checks failed: quick`).test(red ?? ''), red ?? (await cardText()))
-    check('…announced politely', !!(await until(async () => new RegExp(`${zeroKey} returned: checks failed: quick`).test(await said()), HUNG_MS)), await said())
+    check('…the return is announced (the window has it)', !!(await until(async () => new RegExp(`${zeroKey} returned: checks failed: quick`).test(await said()), HUNG_MS)), await said())
+    const zeroSeen = async () => (await view())?.recent.find((r) => r.card === zero.n && r.outcome === 'returned')?.seen ?? null
+    check('…but not seen: its queue card is filtered out', (await card.count()) === 0 && (await zeroSeen()) === null)
+    // A dialog over the panel, then all projects: shown, but covered.
+    await page.getByRole('button', { name: 'Task Board' }).click()
+    await page.locator(`.task-card[data-task="${zero.n}"]`).click()
+    const dialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
+    await until(async () => (await dialog.count()) === 1, HUNG_MS)
+    await projectFilter.evaluate((el) => {
+      el.value = '*'
+      el.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    check('…all projects under a dialog: its card is drawn, still not seen', !!(await until(async () => /returned/.test(await cardText()), HUNG_MS)) && (await zeroSeen()) === null, await cardText())
+    await page.keyboard.press('Escape')
+    await until(async () => (await dialog.count()) === 0, HUNG_MS)
+    check('…the dialog closed: seen', !!(await until(zeroSeen, HUNG_MS)))
+    const red = await cardText()
+    check('a red check: "returned to its builder: checks failed: quick"', new RegExp(`${zeroKey} returned to ${zero.builder.name}: checks failed: quick`).test(red), red)
     const zeroRow = card.locator('.progress-queue-returned').first()
     await zeroRow.locator('[data-action="show-log"]').click()
     check('…Show log opens its check\'s log', !!(await until(async () => ((await opened()) ?? []).some((p) => /\.log$/i.test(p)), HUNG_MS)), JSON.stringify(await opened()))
     await zeroRow.locator('[data-action="open-card"]').click()
-    const dialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
     check('…Open card opens it', !!(await until(async () => (await dialog.count()) === 1 && (await dialog.locator('.task-title-input').inputValue()) === 'Zero', HUNG_MS)))
     await page.keyboard.press('Escape')
     await until(async () => (await dialog.count()) === 0, HUNG_MS)
-    const seenZero = await until(async () => {
-      const v = await view()
-      return v?.recent.find((r) => r.card === zero.n)?.seen ?? null
-    }, HUNG_MS)
-    check('…seen, the Merges tab shown in a focused window', !!seenZero)
-    check('…and it leaves the card a few seconds later', !!(await until(async () => (await card.locator('.progress-queue-returned').count()) === 0, HUNG_MS)))
+    check('…and it leaves the card a few seconds after it was seen', !!(await until(async () => (await card.locator('.progress-queue-returned').count()) === 0, HUNG_MS)))
 
     // --- Testing now and queued; the check's run in Runs.
     q.steer(fx, 'wait')

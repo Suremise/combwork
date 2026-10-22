@@ -27,7 +27,7 @@ import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import type { CardRecord, QueuePause } from './factStore'
 import { QUEUE_ADVANCE_GATE, type CardState, type Fact, type FactData } from '../../shared/workflow/facts'
-import { RECENT_MAX, type QueueQueued, type QueueRecent, type QueueResumed, type QueueTesting, type QueueView } from '../../shared/workflow/queue'
+import { PENDING_MAX, RECENT_MAX, type QueueQueued, type QueueRecent, type QueueResumed, type QueueTesting, type QueueView } from '../../shared/workflow/queue'
 
 /**
  * The targets of a project's queues: every target a card was queued for, and any paused one, in that order; for the
@@ -135,7 +135,7 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
       const d = o.f.data as FactData['IntegrationRequested']
       return { ...named(o.card), entry: d.entry, revision: d.revision, at: o.f.at }
     })
-  const recent = recentOutcomes(wf, target, entries, cards, (id) => of(id).card, store.queueSeen())
+  const { recent, pending } = recentOutcomes(wf, target, entries, cards, (id) => of(id).card, store.queueSeen())
   const p = store.queuePause(target)
   return {
     project: basename(projectPath),
@@ -147,13 +147,19 @@ export function queueView(ws: WorkspaceService, wf: Workflow, projectPath: strin
     testing,
     queued,
     recent,
+    pending,
     hiveMerges: scope?.current === target,
     inFlight: scope?.inFlight.get(target) ?? []
   }
 }
 
-/** The latest outcomes of a target's entries, newest first: merged, returned to the builder, cancelled. */
-function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, cards: Set<number>, card: (id: number) => CardRecord, seen: Map<string, string>): QueueRecent[] {
+/**
+ * The latest outcomes of a target's entries, newest first (merged, returned to the builder, cancelled), and the returns
+ * older than those still waiting to be seen (#1356; HR3's round 1 finding 2: a return shows until seen however many
+ * outcomes came after it): each its card's newest outcome, not seen (or seen in the last minute, so it leaves the
+ * panel as a return seen does), at most PENDING_MAX of them.
+ */
+function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, cards: Set<number>, card: (id: number) => CardRecord, seen: Map<string, string>): { recent: QueueRecent[]; pending: QueueRecent[] } {
   const out: (QueueRecent & { seq: number })[] = []
   const named = (f: Fact) => {
     const c = card(f.card)
@@ -179,7 +185,17 @@ function recentOutcomes(wf: Workflow, target: string, entries: Set<string>, card
   }
   // Newest first: by time, and by each card's own order within one instant.
   out.sort((a, b) => (a.at === b.at ? b.seq - a.seq : a.at < b.at ? 1 : -1))
-  return out.slice(0, RECENT_MAX).map(({ seq: _seq, ...r }) => r)
+  const strip = ({ seq: _seq, ...r }: QueueRecent & { seq: number }): QueueRecent => r
+  const newest = new Set<number>()
+  const since = Date.now() - 60_000
+  const pending: QueueRecent[] = []
+  out.forEach((r, i) => {
+    const first = !newest.has(r.card)
+    newest.add(r.card)
+    if (i < RECENT_MAX || !first || r.outcome !== 'returned' || pending.length >= PENDING_MAX) return
+    if (!r.seen || Date.parse(r.seen) > since) pending.push(strip(r))
+  })
+  return { recent: out.slice(0, RECENT_MAX).map(strip), pending }
 }
 
 /**

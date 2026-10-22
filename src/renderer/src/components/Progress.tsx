@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { ALL_PROJECTS, PASSED_SHOWN_MS, SHOW_ALL, activeFilter, onPulse, agentChoices, ProgressSync, barLook, shortRevision, filterChoices, filterMergeSlots, filterRuns, fractionDone, inStrip, isOpenRun, runDetails, runAgentName, runDetailsText, runStateWord, runStatusLine, stripRuns, stripSummary, unseenTrouble } from '@shared/progress'
 import { durationText } from '@shared/tasks'
 import type { MergeSlotInfo, ProgressRun, ProgressTelling } from '@shared/types'
+import type { QueueView } from '@shared/workflow/queue'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { attempt, selectProject } from '../actions'
 import { call } from '../api'
@@ -141,27 +142,32 @@ export function ProgressPanel() {
   useEffect(() => {
     if (on && open && focused && unseen) void call('progress:seen')
   }, [on, open, focused, unseen, runs])
-  // Looking at the Merges tab counts as seeing the queues' returns (#1356): each leaves its queue's card a few seconds later.
-  const onMerges = on && open && focused && tab === 'merges'
+  // The merge queues that show (#1356 item 0: by their state), of the filtered project; their projects are choices too.
+  const allQueues = shownQueues(queues, now)
+  const queueProjects = allQueues.map((v) => v.projectPath)
+  const filter = activeFilter(runs, chosen, queueProjects)
+  const shownQueue = filter.project === ALL_PROJECTS ? allQueues : allQueues.filter((v) => v.projectPath.toLowerCase() === filter.project)
+  // Looking at the Merges tab counts as seeing the returns it shows (#1356; HR3's round 1 finding 1): the filtered
+  // project's only, and not while a dialog covers the panel. Each leaves its queue's card a few seconds later.
+  const covered = useStore((s) => s.dialog !== null || s.taskOpen !== null)
+  const toSee = on && open && focused && !covered && tab === 'merges' ? shownQueue.flatMap((v) => unseenReturns(v, now).map((r) => ({ v, entry: r.entry }))) : []
+  const seeKey = toSee.map((x) => x.entry).join('\n')
   useEffect(() => {
-    if (!onMerges) return
-    const t = Date.now()
-    for (const v of shownQueues(queues, t)) {
-      const entries = unseenReturns(v, t).map((r) => r.entry)
-      if (entries.length) void call('queue:seen', v.projectPath, v.target, entries).catch(() => undefined)
+    const by = new Map<string, { v: QueueView; entries: string[] }>()
+    for (const x of toSee) {
+      const k = `${x.v.projectPath.toLowerCase()}\n${x.v.target}`
+      by.set(k, { v: x.v, entries: [...(by.get(k)?.entries ?? []), x.entry] })
     }
-  }, [onMerges, queues])
+    for (const { v, entries } of by.values()) void call('queue:seen', v.projectPath, v.target, entries).catch(() => undefined)
+    // seeKey names what toSee holds: the same returns aren't asked for again on every tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seeKey])
   if (!on) return null
   const announcer = <QueueAnnouncer views={queues} runs={runs} />
   // The filter (#251): one project's runs (and one agent's), or all; offered when the runs span more than one project.
   const nameOf = (p: string): string => workspace?.projects.find((x) => x.path.toLowerCase() === p.toLowerCase())?.name ?? p.split(/[\\/]/).pop() ?? p
-  // The merge queues that show (#1356 item 0: by their state), of the filtered project; their projects are choices too.
-  const allQueues = shownQueues(queues, now)
-  const queueProjects = allQueues.map((v) => v.projectPath)
   const choices = filterChoices(runs, nameOf, tr, queueProjects)
-  const filter = activeFilter(runs, chosen, queueProjects)
   const shown = filterRuns(runs, filter)
-  const shownQueue = filter.project === ALL_PROJECTS ? allQueues : allQueues.filter((v) => v.projectPath.toLowerCase() === filter.project)
   const filterName = filter === SHOW_ALL ? null : `${choices.find((c) => c.value === filter.project)?.label ?? ''}${filter.agent ? ` · ${(shown[0] ? runAgentName(shown[0], tr) : '')}` : ''}`
   if (!open)
     return (

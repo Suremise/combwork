@@ -28,8 +28,9 @@ export function shownReturns(v: QueueView, now: number): QueueRecent[] {
   const again = new Set([...(v.testing ? [v.testing.card] : []), ...v.queued.map((q) => q.card)])
   const newest = new Set<number>()
   const out: QueueRecent[] = []
-  // Newest first: a card's first outcome here is its latest.
-  for (const r of v.recent) {
+  // Newest first: a card's first outcome here is its latest (the older returns not seen yet come after the latest
+  // outcomes, each its card's newest).
+  for (const r of [...v.recent, ...v.pending]) {
     if (newest.has(r.card)) continue
     newest.add(r.card)
     if (r.outcome !== 'returned' || again.has(r.card)) continue

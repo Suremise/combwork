@@ -5,7 +5,6 @@ import { optionTitle, OPTION_TEXT, PRESET_NEEDS_TEXT, PRESET_NOTE_TEXT, PRESET_T
 import { LOOP_ROUNDS, loopDefaults } from '@shared/lanes'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { queueChangedEvent } from '../queueSource'
 import { cardLabelOf, confirm, notify, openProjectSettings, set as setStore, setActivity, useStore } from '../store'
 import { Icon, Switch, Tooltip } from './ui'
 
@@ -168,8 +167,6 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
         const f = await call('workflow:setOptions', project.path, draft, { applyTo: [...picked] })
         setForm(f)
         setDraft({ preset: f.preset, options: { ...f.own } })
-        // Whether Hive merges changed: the project's queues show by the new options (#1356).
-        queueChangedEvent(project.path)
       }
     })
     if (ok) notify('success', tr(T.saved))
