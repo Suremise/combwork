@@ -18,7 +18,7 @@ import { HiveError, hiveError } from './hiveError'
 import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSessionState, ProjectConfig, ProjectInfo, RemovedData, SessionRecord, WorkspaceConfig, WorkspaceInfo, WorkspaceMoved } from '../shared/types'
 import { config } from './config'
 import { emit, emitTo } from './events'
-import { containsPlace, insideReal, isDir, readJson, readKeptJson, removePath, samePlace, withFileLock, writeKeptJson } from './fsutil'
+import { containsPlace, insideReal, isDir, placeKey, readJson, readKeptJson, removePath, samePlace, withFileLock, writeKeptJson } from './fsutil'
 import { markClosed, markOpen, setFenceReason } from './openingFence'
 import { createLogger, userText } from './logger'
 import { changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
@@ -130,6 +130,11 @@ export interface ProjectSeen {
 
 export class WorkspaceService {
   path: string | null = null
+  /**
+   * Its folder's real location as the window opened it (`placeKey`): what the close fences and lets go (#1402), so a
+   * junction or short name it was opened by, removed or pointed elsewhere since, can't send the close to another folder.
+   */
+  private place: string | null = null
   private wsConfig: WorkspaceConfig = structuredClone(DEFAULT_WORKSPACE_CONFIG)
   private watcher: FSWatcher | null = null
   private rootWatcher: RootWatcher | null = null
@@ -286,6 +291,7 @@ export class WorkspaceService {
       await this.close()
       this.generation++
       this.path = abs
+      this.place = placeKey(abs)
       markOpen(abs)
       // A save's lease doesn't close the database now it is this window's, opened before or after (#1383).
       keepBoard(abs)
@@ -341,8 +347,9 @@ export class WorkspaceService {
     const reason = hiveError(M.closed, undefined, { kind: 'conflict' })
     this.life.abort(reason)
     const closing = this.path
+    const place = this.place ?? undefined
     // First: from here, nothing opens its databases again until a window opens it again (#1379), whoever asks.
-    if (closing) markClosed(closing)
+    if (closing) markClosed(place ?? closing)
     if (closing) {
       for (const l of WorkspaceService.closingListeners) {
         try {
@@ -367,11 +374,12 @@ export class WorkspaceService {
     // new one is scheduled from the abort on (scheduleRefresh).
     while (this.scheduledRuns.size) await Promise.allSettled([...this.scheduledRuns])
     if (closing) letGoBoard(closing)
-    if (closing) closeBoard(closing)
+    if (closing) closeBoard(closing, place)
     if (closing) closeJournal(join(closing, HIVE_DIR, ASSISTANT_DIR))
     await this.watcher?.close()
     this.watcher = null
     this.path = null
+    this.place = null
     this.cached = null
     this.moved = null
     this.movedFrom = null

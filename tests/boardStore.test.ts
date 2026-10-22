@@ -6,7 +6,7 @@ import { join, sep } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
-import { junction } from './pathAliases'
+import { junction, shortPath } from './pathAliases'
 import { tempDir } from './tempDir'
 import type { BoardNotice } from '../src/main/boardStore'
 
@@ -20,6 +20,7 @@ const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { backupTo, openDb, schemaVersion } = await import('../src/main/db')
 const { renameRetrying } = await import('../src/main/fsutil')
+const { fencedOut } = await import('../src/main/openingFence')
 
 const user = { kind: 'user' } as const
 let n = 0
@@ -476,32 +477,106 @@ describe("the window's board (#1017)", () => {
 })
 
 describe('a board opened under another name for its folder (#1402)', () => {
-  it("is closed as the window closes the workspace, letting the folder go; a lease's own board closes only itself", async () => {
-    const ws = workspaceWith()
-    const w = await open(ws)
-    const alias = junction(ws, join(base, `alias-${++n}`))
-    try {
-      // The window's board (opened as first used), and one opened through the junction, as deliveries can (their host's
-      // path as it was spelt).
-      await inWorkspace(w, () => tasks.listTasks({}))
-      store.workspaceDb(alias)
-      expect([store.boardOpen(ws), store.boardOpen(alias)]).toEqual([true, true])
-      // A lease's board under a third spelling, ended: only that one closes, the others stay open.
-      const other = junction(ws, join(base, `alias-${++n}`))
-      try {
-        store.leaseDb(other).release()
-        expect([store.boardOpen(ws), store.boardOpen(alias), store.boardOpen(other)]).toEqual([true, true, false])
-      } finally {
-        unlinkSync(other)
-      }
-      await w.close()
-      expect([store.boardOpen(ws), store.boardOpen(alias)]).toEqual([false, false])
-    } finally {
-      unlinkSync(alias)
+  /** Another name for `ws`: a junction (removed by `drop`), or its 8.3 short name (null where the volume makes none). */
+  const aliasOf = (kind: 'junction' | '8.3', ws: string): { path: string; drop: () => void } | null => {
+    if (kind === '8.3') {
+      const s = shortPath(ws)
+      return s ? { path: s, drop: () => undefined } : null
     }
-    // Nothing holds it: the folder can be moved (Windows refuses while a connection has its database open).
+    const path = junction(ws, join(base, `alias-${++n}`))
+    return { path, drop: () => unlinkSync(path) }
+  }
+  /** The window's board, opened as it is first used (by its window's spelling). */
+  const useBoard = (w: WS) => inWorkspace(w, () => tasks.listTasks({}))
+  const fenced = (ws: string): boolean => fencedOut(join(ws, '.hive', 'hive.db')) !== null
+  /** Nothing holds the folder: it can be moved (Windows refuses while a connection has its database open). */
+  async function moves(ws: string): Promise<void> {
     await renameRetrying(ws, `${ws}-moved`)
     expect(existsSync(join(`${ws}-moved`, '.hive', 'hive.db'))).toBe(true)
+  }
+
+  for (const kind of ['junction', '8.3'] as const) {
+    it(`${kind}: the window opened by the real path, a board opened only by the other name (as deliveries can), closed with the window`, async ({ skip }) => {
+      const ws = workspaceWith()
+      const alias = aliasOf(kind, ws)
+      if (!alias) return skip('this volume makes no 8.3 names')
+      try {
+        const w = await open(ws)
+        store.workspaceDb(alias.path)
+        expect(store.boardOpen(alias.path)).toBe(true)
+        await w.close()
+        expect(store.boardOpen(alias.path)).toBe(false)
+      } finally {
+        alias.drop()
+      }
+      await moves(ws)
+    })
+
+    it(`${kind}: the window opened by the other name, a board opened by the real path, both closed with the window`, async ({ skip }) => {
+      const ws = workspaceWith()
+      const alias = aliasOf(kind, ws)
+      if (!alias) return skip('this volume makes no 8.3 names')
+      try {
+        const w = await open(alias.path)
+        await useBoard(w)
+        store.workspaceDb(ws)
+        expect([store.boardOpen(alias.path), store.boardOpen(ws)]).toEqual([true, true])
+        await w.close()
+        expect([store.boardOpen(alias.path), store.boardOpen(ws)]).toEqual([false, false])
+      } finally {
+        alias.drop()
+      }
+      await moves(ws)
+    })
+  }
+
+  it('the junction the window opened by removed before it closes: its other boards close all the same (HR6 round 1)', async () => {
+    const ws = workspaceWith()
+    const alias = aliasOf('junction', ws)!
+    const w = await open(alias.path)
+    await useBoard(w)
+    store.workspaceDb(ws)
+    alias.drop()
+    await w.close()
+    expect([store.boardOpen(alias.path), store.boardOpen(ws)]).toEqual([false, false])
+    expect(fenced(ws)).toBe(true)
+    await moves(ws)
+  })
+
+  it("the junction the window opened by pointed at another window's workspace before it closes: that one keeps its board and stays unfenced (HR6 round 1)", async () => {
+    const [ws, other] = [workspaceWith(), workspaceWith()]
+    const alias = aliasOf('junction', ws)!
+    try {
+      const w = await open(alias.path)
+      await useBoard(w)
+      store.workspaceDb(ws)
+      const w2 = await open(other)
+      await useBoard(w2)
+      alias.drop()
+      junction(other, alias.path)
+      await w.close()
+      expect([store.boardOpen(alias.path), store.boardOpen(ws), store.boardOpen(other)]).toEqual([false, false, true])
+      expect([fenced(ws), fenced(other)]).toEqual([true, false])
+      await w2.close()
+    } finally {
+      unlinkSync(alias.path)
+    }
+    await moves(ws)
+  })
+
+  it("a lease's own board, under another name, closes only itself as the lease ends", async () => {
+    const ws = workspaceWith()
+    const w = await open(ws)
+    await useBoard(w)
+    const alias = aliasOf('junction', ws)!
+    try {
+      store.leaseDb(alias.path).release()
+      expect([store.boardOpen(ws), store.boardOpen(alias.path)]).toEqual([true, false])
+    } finally {
+      alias.drop()
+    }
+    await w.close()
+    expect(store.boardOpen(ws)).toBe(false)
   })
 })
 

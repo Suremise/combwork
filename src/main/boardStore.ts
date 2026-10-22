@@ -801,14 +801,16 @@ export function noteLanesSaved(path: string): void {
 /**
  * Closes a workspace's board (it closed, or its file is replaced): the stub's next number brought up to date for older
  * versions. Every board of that folder, however it was spelt as it opened (#1402: one opened through a junction or an
- * 8.3 name, by deliveries say, would otherwise hold the folder until Hive quits).
+ * 8.3 name, by deliveries say, would otherwise hold the folder until Hive quits). The folder is `place`, its real
+ * location as its window opened it, else as this spelling's board opened: never what the spelling resolves to now, so a
+ * junction removed or pointed at another workspace since neither keeps this one's boards open nor closes another's.
  */
-export function closeBoard(path: string): void {
+export function closeBoard(path: string, place?: string): void {
   const key = keyOf(path)
   const others = [...boards.keys(), ...failures.keys()].some((k) => k !== key)
-  const place = others ? placeKey(path) : ''
-  for (const k of [...failures.keys()]) if (k === key || (others && placeKey(k) === place)) failures.delete(k)
-  for (const [k, b] of [...boards]) if (k === key || (others && b.place === place)) closeOne(k, b)
+  const at = others ? (place ?? boards.get(key)?.place ?? placeKey(path)) : ''
+  for (const k of [...failures.keys()]) if (k === key || (others && placeKey(k) === at)) failures.delete(k)
+  for (const [k, b] of [...boards]) if (k === key || (others && b.place === at)) closeOne(k, b)
 }
 
 /** Closes the board under that spelling only (a lease's own, Hive quitting). */
