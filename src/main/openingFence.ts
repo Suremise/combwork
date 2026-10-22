@@ -11,24 +11,23 @@ import { placeKey } from './fsutil'
  * last save as its workspace closes) aren't fenced. By real paths (`placeKey`), as workspaces are told apart: a junction,
  * a symlink or an 8.3 short name is the same workspace and the same file, however the closing or the opening spells it.
  */
-const closed = new Map<string, Error>()
-
 /**
- * How many closed workspaces are kept (#1381), the most recently closed: the map would otherwise grow with every workspace
- * closed and not opened again in a session. Dropping the oldest is safe: what the fence stops is work still under way for
- * a workspace as it closes (a request, a queued job, a timer, a session's end), which ends within seconds or minutes; by
- * the time this many other workspaces have closed after it, none of it is left to open the files again.
+ * The workspaces closed and not opened again, by real path, with why (#1381: its bound). An entry ends only as a window
+ * opens the workspace again, never for room: nothing tells when the last of a workspace's late work has ended (a delivery
+ * store's tick, a job queued behind others, a read awaiting a slow disk), so an entry dropped earlier would let that work
+ * open its files again and hold the folder (#1379), or recreate a folder the user deleted (openDb makes its folder). So it
+ * holds one entry per workspace a window has closed this run, a workspace closed again taking its old entry's place: as
+ * many as the user's workspaces, a path and an error each.
  */
-export const MAX_CLOSED = 64
+const closed = new Map<string, Error>()
 
 /** A window starts closing the workspace: from now on its databases aren't opened, `reason` saying why. */
 export function markClosed(path: string, reason: Error): void {
-  const key = placeKey(path)
-  // The newest last: closed again, it moves to the end.
-  closed.delete(key)
-  closed.set(key, reason)
-  while (closed.size > MAX_CLOSED) closed.delete(closed.keys().next().value!)
+  closed.set(placeKey(path), reason)
 }
+
+/** How many workspaces are closed and not opened again (tests, diagnostics). */
+export const closedCount = (): number => closed.size
 
 /** A window opens the workspace (again): its databases open as they're used. */
 export function markOpen(path: string): void {

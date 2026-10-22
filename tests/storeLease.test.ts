@@ -4,18 +4,36 @@
 // save leaves nothing open that isn't a window's.
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-store-lease-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (f: string) => Promise<void> }).trashItem = async (f) => rmSync(f, { force: true })
+// A store's move in, its file read: `whileReading`, when set, runs once the file is read, before the move goes on.
+const moveHooks = vi.hoisted(() => ({ whileReading: null as (() => Promise<void>) | null }))
+vi.mock('../src/main/storeRows', async (orig) => {
+  const m = await orig<typeof import('../src/main/storeRows')>()
+  return {
+    ...m,
+    openTable: ((...a: Parameters<typeof m.openTable>) => {
+      const read = a[4]
+      a[4] = async () => {
+        const got = await read()
+        await moveHooks.whileReading?.()
+        return got
+      }
+      return m.openTable(...a)
+    }) as typeof m.openTable
+  }
+})
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const board = await import('../src/main/boardStore')
 const { withStoreLock, storeValue } = await import('../src/main/storeRows')
 const { readTable, saveTable } = await import('../src/main/storeTables')
+const { markClosed, markOpen } = await import('../src/main/openingFence')
 
 const at = '2026-10-22T00:00:00.000Z'
 let n = 0
@@ -211,6 +229,56 @@ describe("a store's save holds its own connection (#1383)", () => {
     await w.open(ws)
     expect((await w.sessionsFile(proj)).sessions.map((s) => s.id)).toEqual(['s-last'])
     await w.open(elsewhere)
+  })
+
+  it("a session's change whose host's file moves in as the window closes the workspace lands, and leaves nothing open (#1381)", async () => {
+    const ws = workspace()
+    const proj = join(ws, 'proj')
+    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, id: 'p-move', agents: [] }))
+    // Its old file, moved in by the first change of this run.
+    writeFileSync(join(proj, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id: 's-old', agent: 'claude-code', name: 'Old', createdAt: at, lastActiveAt: at, archived: false }] }))
+    await w.open(ws)
+    const g = gate()
+    const reading = gate()
+    moveHooks.whileReading = async () => {
+      moveHooks.whileReading = null
+      reading.release()
+      await g.held
+    }
+    const saving = w.mutateSessions(proj, (f) => {
+      f.sessions.push({ id: 's-new', agent: 'claude-code', name: 'New', createdAt: at, lastActiveAt: at, archived: false })
+    })
+    await reading.held
+    await w.open(elsewhere)
+    expect(board.boardOpen(ws)).toBe(false)
+    g.release()
+    await saving
+    expect(board.boardOpen(ws)).toBe(false)
+    expect(nothingOpen(ws)).toBe(true)
+    await w.open(ws)
+    expect((await w.sessionsFile(proj)).sessions.map((s) => s.id).sort()).toEqual(['s-new', 's-old'])
+    await w.open(elsewhere)
+  })
+
+  it("a background read held across its workspace's close stays fenced however many workspaces close after it (#1381)", async () => {
+    const ws = workspace()
+    await w.open(ws)
+    const g = gate()
+    const reader = (async () => {
+      await g.held
+      return board.workspaceDb(ws)
+    })()
+    await w.open(elsewhere)
+    const others = Array.from({ length: 100 }, (_, i) => join(base, 'closed-after', `ws-${i}`))
+    try {
+      for (const o of others) markClosed(o, new Error('closed'))
+      g.release()
+      await expect(reader).rejects.toThrow('The workspace was closed')
+      expect(board.boardOpen(ws)).toBe(false)
+      expect(nothingOpen(ws)).toBe(true)
+    } finally {
+      for (const o of others) markOpen(o)
+    }
   })
 
   it("a lease on a window's board leaves it open, and ends once however often it is released", () => {

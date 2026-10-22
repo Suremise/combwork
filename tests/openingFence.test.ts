@@ -4,7 +4,7 @@
 import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { assertNotFencedOut, fencedOut, markClosed, markOpen, MAX_CLOSED } from '../src/main/openingFence'
+import { assertNotFencedOut, closedCount, fencedOut, markClosed, markOpen } from '../src/main/openingFence'
 import { junction, shortPath } from './pathAliases'
 import { tempDir } from './tempDir'
 
@@ -72,21 +72,25 @@ describe('the opening fence', () => {
     expect(fencedOut(join(p.real, '.hive', 'hive.db'))).toBeNull()
   })
 
-  it('keeps the most recently closed workspaces, MAX_CLOSED of them (#1381); one closed again counts as newest', () => {
-    const many = Array.from({ length: MAX_CLOSED + 2 }, (_, i) => join('C:\\', 'fence', 'many', `ws-${i}`))
+  it('keeps a workspace fenced however many close after it, one entry per workspace however often it closes (#1381)', () => {
+    const before = closedCount()
+    const many = Array.from({ length: 300 }, (_, i) => join('C:\\', 'fence', 'many', `ws-${i}`))
     const fileOf = (at: string): string => join(at, '.hive', 'hive.db')
     try {
-      for (const at of many.slice(0, MAX_CLOSED)) markClosed(at, new Error(at))
-      // The first closed again: the second is now the oldest.
+      for (const at of many) markClosed(at, new Error(at))
+      // Closed again (by another spelling too): still one entry, with the newest reason.
       markClosed(many[0], new Error('again'))
-      markClosed(many[MAX_CLOSED], new Error('one more'))
+      markClosed(many[0].toUpperCase(), new Error('again, upper'))
+      expect(closedCount()).toBe(before + many.length)
+      expect(fencedOut(fileOf(many[0]))?.message).toBe('again, upper')
+      for (const at of many) expect(fencedOut(fileOf(at))).not.toBeNull()
+      // Opened again: its entry goes.
+      markOpen(many[1])
+      expect(closedCount()).toBe(before + many.length - 1)
       expect(fencedOut(fileOf(many[1]))).toBeNull()
-      expect(fencedOut(fileOf(many[0]))?.message).toBe('again')
-      markClosed(many[MAX_CLOSED + 1], new Error('and another'))
-      expect(fencedOut(fileOf(many[2]))).toBeNull()
-      for (const at of [many[0], ...many.slice(3)]) expect(fencedOut(fileOf(at))).not.toBeNull()
     } finally {
       for (const at of many) markOpen(at)
     }
+    expect(closedCount()).toBe(before)
   })
 })

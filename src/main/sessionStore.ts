@@ -6,7 +6,7 @@ import { onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './board
 import { readKeptJson, writeKeptJson } from './fsutil'
 import { createLogger, userText } from './logger'
 import { keepAsBackup, openTable, readStore, rowKeys, storeValue, withStoreLock, writeStore, type StoreData, type StoreRow } from './storeRows'
-import { transaction } from './db'
+import { transaction, type Db } from './db'
 import { addSessionRecords, countSessions, readDeleted, readDeletedUsage, readSessionRecord, readSessionRecords, removeSessionRecords, writeSessionRecords } from './schema/sessionDeliveryTables'
 import { withMode } from '../shared/defaults'
 
@@ -172,17 +172,17 @@ const TABLE = {
  * left in its folder once the project is back. A removed host's file stays where it is. Nothing while the workspace's
  * upgrade to 1.0 waits (asked again once it is upgraded).
  */
-async function opening(place: SessionsPlace): Promise<void> {
+async function opening(place: SessionsPlace, db?: Db): Promise<void> {
   const k = openedKey(place)
-  if (opened.has(k) || upgradeWaiting(place.workspace)) return
-  if (storeValue(workspaceDb(resolve(place.workspace)).writer, 'sessions', place.scope, 'exported') !== null) {
+  if (opened.has(k) || (db ? !!db.pending : upgradeWaiting(place.workspace))) return
+  if (storeValue((db ?? workspaceDb(resolve(place.workspace))).writer, 'sessions', place.scope, 'exported') !== null) {
     // Not marked opened: asked again at each read until the project is back.
     if (place.removed || removing.has(k)) return
     await moveBack(place)
     opened.add(k)
     return
   }
-  await openTable(place.workspace, 'sessions', place.scope, place.file, () => readOldFile(place.file), TABLE, { whenEmpty: true })
+  await openTable(place.workspace, 'sessions', place.scope, place.file, () => readOldFile(place.file), TABLE, { whenEmpty: true, db })
   opened.add(k)
 }
 
@@ -212,10 +212,11 @@ export async function readSession(place: SessionsPlace, id: string): Promise<Ses
  * isn't read. It throws, and nothing is written.
  */
 export async function changeSessions<T>(place: SessionsPlace, fn: (f: SessionsFile) => T): Promise<T> {
-  // A save, which lands as its workspace closes too (#1379): its lease keeps the database open for the move-in it may
-  // need first (#1381: that read was fenced, losing a session's last change), and closes it after if it opened it.
-  return withLeasedDb(resolve(place.workspace), async () => {
-    await opening(place)
+  // A save, which lands as its workspace closes too (#1379): the move-in it may need first reads and writes on its lease's
+  // connection, which a close meanwhile leaves open for it (#1381: through the workspace's, that was fenced, losing a
+  // session's last change); the save takes a lease of its own under the board's lock. Each closes what it opened.
+  return withLeasedDb(resolve(place.workspace), async (db) => {
+    await opening(place, db)
     return saveSessions(place, fn)
   })
 }

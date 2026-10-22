@@ -1,7 +1,7 @@
 import { existsSync } from 'original-fs'
 import { resolve } from 'path'
 import { boardLock, inBoardWrite, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
-import { transaction } from './db'
+import { transaction, type Db } from './db'
 import { withFileLock } from './fsutil'
 import { keepAsBackup } from './storeBackup'
 import { createLogger, userText } from './logger'
@@ -135,17 +135,19 @@ export interface StoreTable<T> {
  * openStore for a store kept in a typed table of its own (#1211): its file moved in the first time (and, `whenEmpty`,
  * when found while the scope has none), in one transaction marked `imported` and checked there (the table has what was
  * written), the file then kept as a backup; a file found after that kept so, unread. Nothing while the workspace's
- * upgrade to 1.0 waits. The caller reads the table after.
+ * upgrade to 1.0 waits. The caller reads the table after. `db`: the connection to use throughout, a save's lease's
+ * (#1381), so a workspace closed while the file is read doesn't take it away (else the workspace's, as it is then).
  */
-export async function openTable<T>(workspacePath: string, store: StoreName, scope: string, file: string, readFile: () => Promise<T | null>, table: StoreTable<T>, opts: { whenEmpty?: boolean } = {}): Promise<void> {
+export async function openTable<T>(workspacePath: string, store: StoreName, scope: string, file: string, readFile: () => Promise<T | null>, table: StoreTable<T>, opts: { whenEmpty?: boolean; db?: Db } = {}): Promise<void> {
   const path = resolve(workspacePath)
-  if (upgradeWaiting(path)) return
+  const conn = (): Db => opts.db ?? workspaceDb(path)
+  if (opts.db ? !!opts.db.pending : upgradeWaiting(path)) return
   const toMove = (db: Writer): boolean => storeValue(db, store, scope, 'imported') === null || (!!opts.whenEmpty && table.count(db, scope) === 0 && existsSync(file))
-  const first = toMove(workspaceDb(path).writer)
+  const first = toMove(conn().writer)
   if (first) {
     const got = await readFile()
     await withFileLock(boardLock(path), async () => {
-      const db = workspaceDb(path).writer
+      const db = conn().writer
       if (!toMove(db)) return
       let written = 0
       transaction(db, () => {
