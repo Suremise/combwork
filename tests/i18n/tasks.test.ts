@@ -97,8 +97,8 @@ async function caught(p: Promise<unknown>): Promise<Error> {
 /** A stored line as the window shows it: its message in the window's language (what Board.tsx does). */
 const shown = (s: StoredText | undefined): string | null => (s ? storedLineText(s, (m, values) => tr(m, values), providerMessage) : null)
 
-/** A stored line's English (what main stores in `what`). */
-const englishOf = (s: StoredText): string | null => storedLineText(s, (m, values) => englishText(values ? withValues(m, values) : m), providerMessage)
+/** A stored line's English (what main stores in `what`): agents' column names (#1458). */
+const englishOf = (s: StoredText): string | null => storedLineText(s, tasks.agentEnglish, providerMessage)
 
 describe('the tasks area', () => {
   it('every message is of the tasks area, with a note for translators, and the two files have no text left to convert', () => {
@@ -214,6 +214,32 @@ describe("a card's history: English as stored, its line as data for the window",
     for (const n of [1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101, 111, 112, 499]) expect(en(storedText(HISTORY.placed, { place: n, column: 'review' }))).toBe(`Placed ${ordinal(n)} in Review`)
   })
 
+  it('the window says Active and Approved where agents read Doing and Passed (#1458)', async () => {
+    const c = await run(() => tasks.createTask({ title: 'Staged', project: 'alpha', column: 'passed' }, user))
+    const other = await run(() => tasks.createTask({ title: 'Other', project: 'alpha', column: 'doing' }, user))
+    await run(() => tasks.updateTask(c.number, { column: 'doing', before: other.number }, assistant))
+    await run(() => tasks.updateTask(c.number, { position: 'bottom' }, assistant))
+    await run(() => tasks.updateTask(c.number, { position: 'top' }, assistant))
+    await run(() => tasks.updateTask(c.number, { column: 'passed' }, user))
+    const history = (await run(() => tasks.getTask(c.number))).history
+    const lines = ['Created in Passed', 'Moved to Doing, before #' + other.number, 'Moved to the bottom of Doing', 'Moved to the top of Doing', 'Moved to Passed']
+    expect(history.map((h) => h.what)).toEqual(lines)
+    expect(history.map((h) => entryForAgents(h).what)).toEqual(lines)
+    expect(history.map((h) => shown(h.whatText))).toEqual(['Created in Approved', 'Moved to Active, before #' + other.number, 'Moved to the bottom of Active', 'Moved to the top of Active', 'Moved to Approved'])
+    // Every column in both: agents' names are TASK_COLUMNS' labels, the window's its column names.
+    for (const [column, agents, window] of [['hold', 'On Hold', 'On Hold'], ['todo', 'Todo', 'Todo'], ['doing', 'Doing', 'Active'], ['review', 'Review', 'Review'], ['passed', 'Passed', 'Approved'], ['done', 'Done', 'Done']] as const) {
+      for (const m of [HISTORY.created, HISTORY.moved, HISTORY.movedTop, HISTORY.movedBottom]) {
+        const s = storedText(m, { column })
+        expect(englishOf(s)).toBe(englishText(withValues(m, { column: agents })))
+        expect(shown(s)).toBe(englishText(withValues(m, { column: window })))
+      }
+      expect(englishOf(storedText(HISTORY.placed, { place: 3, column }))).toBe(`Placed 3rd in ${agents}`)
+      expect(shown(storedText(HISTORY.placed, { place: 3, column }))).toBe(`Placed 3rd in ${window}`)
+      expect(englishOf(storedText(HISTORY.movedBeforeIn, { before: 4, column }))).toBe(`Moved before #4 in ${agents}`)
+      expect(shown(storedText(HISTORY.movedBeforeIn, { before: 4, column }))).toBe(`Moved before #4 in ${window}`)
+    }
+  })
+
   it('a review ended by Hive, and a project rename repaired, are data too', async () => {
     const c = await run(() => tasks.createTask({ title: 'Reviewed', project: 'alpha', column: 'review' }, user))
     await run(() => tasks.updateTask(c.number, { review: 'start' }, agent))
@@ -285,6 +311,10 @@ describe("the board's refusals: English for agents as before, the window's langu
   it('the window says card where agents and the Agent API keep the words they always read (#910)', async () => {
     // The status: what it always was (a busy Start's from its English: servers.ts statusFor).
     const cases: [Error, string, string, number, string?][] = [
+      // A refusal naming a column (#1458; Start's "was moved to … meanwhile"): the window says Active and Approved,
+      // agents Doing and Passed.
+      [tasks.columnError(HISTORY.moved, { column: 'doing' }, { kind: 'conflict' }), 'Moved to Doing', 'Moved to Active', 409],
+      [tasks.columnError(HISTORY.movedBefore, { column: 'passed', before: 3 }), 'Moved to Passed, before #3', 'Moved to Approved, before #3', apiErrorReply(new Error('Moved to Passed, before #3')).status],
       [await caught(run(() => tasks.getTask(99))), 'Unknown task #99', 'Unknown card #99', 404, 'Unbekannte Aufgabe #99'],
       [await caught(run(() => tasks.createTask({ title: ' ' }, user))), 'A task needs a title.', 'A card needs a title.', 400, 'Eine Aufgabe braucht einen Titel.'],
       [await caught(run(() => tasks.createTask({ title: 'x', agent: 'a1' }, user))), 'Choose a project before giving the task to an agent.', 'Choose a project before giving the card to an agent.', 400],
@@ -321,7 +351,7 @@ describe("the board's refusals: English for agents as before, the window's langu
     expect(r.skipped).toEqual([{ number: c.number, why: 'nach In Arbeit verschoben' }])
     setLanguage('en', {})
     const again = await run(() => tasks.archiveBatch([c.number], { label: 'All in Todo', column: 'todo', project: null, query: '', includeBusy: false }, user))
-    expect(again.skipped).toEqual([{ number: c.number, why: 'moved to Doing' }])
+    expect(again.skipped).toEqual([{ number: c.number, why: 'moved to Active' }])
     // Archived with its batch: the line is German in the window; the batch's name is kept as it was named (the card
     // dialog words Archive All's own names with archiveBatchText, as the archive's picker does).
     const done = await run(() => tasks.archiveBatch([c.number], { label: 'All in Doing', column: 'doing', project: null, query: '', includeBusy: false }, user))
