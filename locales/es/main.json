@@ -132,6 +132,7 @@
   "main.move.result.unlinked": "vínculo quitado; su carpeta quedó como estaba",
   "main.move.result.unrecorded": "renombrada, pero aún sin registrar ({why}): Reparar lo termina",
   "main.move.result.working": "marcados de nuevo: {projects}",
+  "main.move.result.wouldPrune": "no se pudo volver a crear mientras {n, plural, one {falte también otro worktree (el de {agents}): localízalo, vuelve a crearlo o quítalo primero} many {falten también otros # worktrees (los de {agents}): localízalos, vuelve a crearlos o quítalos primero} other {falten también otros # worktrees (los de {agents}): localízalos, vuelve a crearlos o quítalos primero}}",
   "main.move.running": "Detén primero los agentes en ejecución: {agents}.",
   "main.move.savedFailed": "No se pudo pasar al proyecto {to} todo lo guardado con el nombre {from} ({why}). Reparar lo vuelve a intentar.",
   "main.move.sessions": "{n, plural, one {{host}: # sesión apunta ahora a la carpeta nueva.} many {{host}: # sesiones apuntan ahora a la carpeta nueva.} other {{host}: # sesiones apuntan ahora a la carpeta nueva.}}",

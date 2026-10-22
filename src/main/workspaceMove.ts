@@ -18,6 +18,7 @@ import { listWorktrees, localBranches } from './worktrees'
 import { workflowFor } from './workflow/service'
 import { reconcilersIdle } from './workflow/reconciler'
 import { moveExclusions } from './antivirus'
+import { HiveError } from './hiveError'
 import { branchHere, chooseSpace, refPart, type BranchHome } from '../shared/hiveBranches'
 import { orphanNames } from '../shared/projectIds'
 import { legacyCards, moveOrphanCards, stampCardProjects } from './tasks'
@@ -250,6 +251,7 @@ const R = {
   linked: msg({ id: 'main.move.result.linked', defaultMessage: 'linked again', description: "Repair's report, the Result column: an agent's worktree is linked to the moved project again (git worktree repair)." }),
   notRepaired: msg({ id: 'main.move.result.notRepaired', defaultMessage: "couldn't be repaired{hasWhy, select, yes {: {why}} other {}}", description: "Repair's report, the Result column: an agent's worktree couldn't be linked again; {why} is git's message." }),
   recreated: msg({ id: 'main.move.result.recreated', defaultMessage: '{made, select, new {made new (its branch was gone)} other {recreated on its branch}}', description: "Repair's report, the Result column: an agent's worktree made again on its branch, or new when its branch was gone. The branch's name is in the agent's branch row (Repair may rename it in the same run)." }),
+  wouldPrune: msg({ id: 'main.move.result.wouldPrune', defaultMessage: "couldn't be recreated while {n, plural, one {another worktree is missing too ({agents}'s): locate, recreate or remove it first} other {# other worktrees are missing too ({agents}'s): locate, recreate or remove them first}}", description: "Repair's report, the Result column: a missing worktree can't be made again yet, because git's clean-up would also forget other missing worktrees ({agents}: whose they are, the agents' names; {n}: how many). The row's tooltip says it in full." }),
   recreateFailed: msg({ id: 'main.move.result.recreateFailed', defaultMessage: "{made, select, new {couldn't be made new: {why}} other {couldn't be recreated: {why}}}", description: "Repair's report, the Result column: an agent's worktree couldn't be made again ({why}: the reason)." }),
   unlinked: msg({ id: 'main.move.result.unlinked', defaultMessage: 'link removed; its folder was left as it was', description: "Repair's report, the Result column: the agent no longer has a worktree; the folder, if any, is untouched." }),
   missing: msg({ id: 'main.move.result.missing', defaultMessage: '{gone, select, yes {not found, its branch gone too: create, locate or remove its link} other {not found: recreate, locate or remove its link}}', description: "Repair's report, the Result column: an agent's worktree wasn't found; Repair waits for the user's choice (Repair's buttons)." }),
@@ -270,6 +272,9 @@ const R = {
   working: msg({ id: 'main.move.result.working', defaultMessage: 'marked again: {projects}', description: "Repair's report, the Result column of Working on: the projects ({projects}) are marked Working on again." }),
   recent: msg({ id: 'main.move.result.recent', defaultMessage: 'lists the new folder', description: "Repair's report, the Result column of Open Recent: the new folder replaces the old one." })
 }
+
+/** Recreating was refused because git's prune would also forget other missing worktrees (agentWorktree.ts). */
+const pruneBlocked = (e: unknown): boolean => e instanceof HiveError && typeof e.text === 'object' && 'm' in e.text && e.text.m.id === 'worktrees.missing.wouldPrune'
 
 /** One step of Repair's report: its line in done, skipped or failed, and its row in the dialog's table (#1313). */
 function say(report: MoveReport, outcome: MoveReportRow['outcome'], line: string, row: Omit<MoveReportRow, 'outcome' | 'line'>): void {
@@ -586,6 +591,8 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
     }
     // Worktrees to make again: after the repairs above, so git's prune can't drop a link they still needed.
     const remake = h.worktrees.filter((w) => w.how === 'recreate')
+    // The worktrees still missing after this Repair (not recreated, located or unlinked): what blocks recreating one.
+    const missingOthers = h.worktrees.filter((w) => w.how === 'missing')
     for (const w of remake) {
       try {
         // Its new path and the move its sessions and data follow are written together (in recreateWorktree).
@@ -607,7 +614,13 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
           w.branchExists
             ? tr(msg({ id: 'main.move.recreateFailed', defaultMessage: "{host}: {agent}'s worktree couldn't be recreated: {why}", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {why} says why." }), { host: h.name, agent: w.agentName, why })
             : tr(msg({ id: 'main.move.makeNewFailed', defaultMessage: "{host}: {agent}'s worktree couldn't be made new: {why}", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {why} says why." }), { host: h.name, agent: w.agentName, why }),
-          { host: h.name, what: { kind: 'worktree', agent: w.agentName }, was: w.from, result: tr(R.recreateFailed, { made: w.branchExists ? 'again' : 'new', why }) }
+          {
+            host: h.name,
+            what: { kind: 'worktree', agent: w.agentName },
+            was: w.from,
+            // Git's clean-up would forget the other missing worktrees: named by their agents here, the folders in the line.
+            result: pruneBlocked(e) && missingOthers.length ? tr(R.wouldPrune, { n: missingOthers.length, agents: fmt.list(missingOthers.map((x) => x.agentName), 'unit') }) : tr(R.recreateFailed, { made: w.branchExists ? 'again' : 'new', why })
+          }
         )
       }
     }

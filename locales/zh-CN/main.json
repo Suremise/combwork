@@ -132,6 +132,7 @@
   "main.move.result.unlinked": "已删除链接；其文件夹保持不变",
   "main.move.result.unrecorded": "已重命名，但尚未记录（{why}）：修复会完成它",
   "main.move.result.working": "已重新标记：{projects}",
+  "main.move.result.wouldPrune": "{n, plural, other {另有 # 个工作树（{agents} 的）也缺失，因此无法重新创建：请先定位、重新创建或删除它们}}",
   "main.move.running": "请先停止正在运行的智能体：{agents}。",
   "main.move.savedFailed": "{from} 名下保存的内容未能全部转给 {to}（{why}）。“修复”会再次尝试。",
   "main.move.sessions": "{n, plural, other {{host}：# 个会话现在指向新文件夹。}}",

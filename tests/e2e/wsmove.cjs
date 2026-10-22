@@ -200,6 +200,9 @@ async function launch() {
     check('…the report as a table, What · Was · Now · Result', (await dialog.locator('.repair-report thead th').allInnerTexts()).slice(0, 4).join('|') === 'WHAT|WAS|NOW|RESULT', JSON.stringify(await dialog.locator('.repair-report thead th').allInnerTexts()))
     const outcomes = await dialog.locator('.repair-report tbody tr:not(.item-table-group)').evaluateAll((rows) => rows.map((r) => ['failed', 'skipped', 'done'].find((o) => r.classList.contains(`repair-${o}`))))
     check('…problems first, then what is left to choose, then what was done', outcomes.length > 3 && outcomes.join(',') === [...outcomes].sort((a, b) => ['failed', 'skipped', 'done'].indexOf(a) - ['failed', 'skipped', 'done'].indexOf(b)).join(','), JSON.stringify(outcomes))
+    // Third's result names the worktree in the way by its agent, no path (the row's tooltip has git's full sentence).
+    const thirdResult = (await dialog.locator('.repair-report tr', { hasText: "Third's worktree" }).first().locator('td').nth(3).innerText()).replace(/\s+/g, ' ').trim()
+    check('…Third’s result: Second’s worktree in the way, by name, no path', /another worktree is missing too \(Second's\)/.test(thirdResult) && !/[A-Z]:\\/.test(thirdResult), thirdResult)
     await inv('settings:update', { appearance: { theme: 'light' } })
     await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'light'), 10000)
     await page.screenshot({ path: path.join(lib.WORK, 'wsmove-3-report-light.png') })

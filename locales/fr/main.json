@@ -132,6 +132,7 @@
   "main.move.result.unlinked": "lien retiré ; son dossier est resté tel quel",
   "main.move.result.unrecorded": "renommée, mais pas encore enregistrée ({why}) : Réparer le termine",
   "main.move.result.working": "remis : {projects}",
+  "main.move.result.wouldPrune": "n’a pas pu être recréé tant qu’{n, plural, one {un autre worktree manque aussi (celui de {agents}) : retrouve-le, recrée-le ou retire-le d’abord} many {# autres worktrees manquent aussi (ceux de {agents}) : retrouve-les, recrée-les ou retire-les d’abord} other {# autres worktrees manquent aussi (ceux de {agents}) : retrouve-les, recrée-les ou retire-les d’abord}}",
   "main.move.running": "Arrête d’abord les agents en cours : {agents}.",
   "main.move.savedFailed": "Ce qui était enregistré sous l’ancien nom {from} n’a pas pu être entièrement rattaché au projet {to} ({why}). La réparation réessaiera.",
   "main.move.sessions": "{n, plural, one {{host} : # session pointe maintenant vers le nouveau dossier.} many {{host} : # sessions pointent maintenant vers le nouveau dossier.} other {{host} : # sessions pointent maintenant vers le nouveau dossier.}}",

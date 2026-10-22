@@ -134,6 +134,7 @@ interface HiveMessageValues {
   'main.move.result.unlinked': undefined
   'main.move.result.unrecorded': { why: string | number }
   'main.move.result.working': { projects: string | number }
+  'main.move.result.wouldPrune': { n: number; agents: string | number }
   'main.move.running': { agents: string | number }
   'main.move.savedFailed': { from: string | number; to: string | number; why: string | number }
   'main.move.sessions': { n: number; host: string | number }

@@ -132,6 +132,7 @@
   "main.move.result.unlinked": "Verknüpfung entfernt; sein Ordner blieb, wie er war",
   "main.move.result.unrecorded": "umbenannt, aber noch nicht festgehalten ({why}): Die Reparatur schließt es ab",
   "main.move.result.working": "wieder markiert: {projects}",
+  "main.move.result.wouldPrune": "konnte nicht wiederhergestellt werden, solange {n, plural, one {ein weiterer Worktree ebenfalls fehlt (der von {agents}): Suche ihn, lege ihn neu an oder entferne ihn zuerst} other {# weitere Worktrees ebenfalls fehlen (die von {agents}): Suche sie, lege sie neu an oder entferne sie zuerst}}",
   "main.move.running": "Stoppe zuerst die laufenden Agenten: {agents}.",
   "main.move.savedFailed": "Was unter {from} gespeichert war, konnte nicht vollständig an {to} übergeben werden ({why}). Beim nächsten Reparieren wird es erneut versucht.",
   "main.move.sessions": "{n, plural, one {{host}: # Sitzung verweist jetzt auf den neuen Ordner.} other {{host}: # Sitzungen verweisen jetzt auf den neuen Ordner.}}",

@@ -531,6 +531,10 @@
     "defaultMessage": "marked again: {projects}",
     "description": "Repair's report, the Result column of Working on: the projects ({projects}) are marked Working on again."
   },
+  "main.move.result.wouldPrune": {
+    "defaultMessage": "couldn't be recreated while {n, plural, one {another worktree is missing too ({agents}'s): locate, recreate or remove it first} other {# other worktrees are missing too ({agents}'s): locate, recreate or remove them first}}",
+    "description": "Repair's report, the Result column: a missing worktree can't be made again yet, because git's clean-up would also forget other missing worktrees ({agents}: whose they are, the agents' names; {n}: how many). The row's tooltip says it in full."
+  },
   "main.move.running": {
     "defaultMessage": "Stop the running agents first: {agents}.",
     "description": "Why Repair (after a workspace moved) can't start: agents are running. {agents} lists them (project · agent)."

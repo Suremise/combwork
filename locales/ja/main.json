@@ -132,6 +132,7 @@
   "main.move.result.unlinked": "リンクを削除（フォルダーはそのまま）",
   "main.move.result.unrecorded": "名前は変更済みですが、まだ記録されていません（{why}）。修復で完了します",
   "main.move.result.working": "再び作業中に：{projects}",
+  "main.move.result.wouldPrune": "{n, plural, other {ほかに#件のワークツリー（{agents}のもの）も見つからないため再作成できませんでした。先に場所を指定するか、再作成するか、削除してください}}",
   "main.move.running": "先に実行中のエージェントを停止してください：{agents}。",
   "main.move.savedFailed": "{from}で保存されていたものを、すべては{to}に移せませんでした（{why}）。「修復」で再試行できます。",
   "main.move.sessions": "{n, plural, other {{host}：#件のセッションが新しいフォルダーを指すようになりました。}}",

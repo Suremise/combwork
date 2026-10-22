@@ -132,6 +132,7 @@
   "main.move.result.unlinked": "vínculo removido; a pasta ficou como estava",
   "main.move.result.unrecorded": "renomeado, mas ainda não registrado ({why}): o reparo termina",
   "main.move.result.working": "marcados de novo: {projects}",
+  "main.move.result.wouldPrune": "não foi possível recriar enquanto {n, plural, one {outro worktree também estiver faltando (o de {agents}): localize, recrie ou remova-o primeiro} other {outros # worktrees também estiverem faltando (os de {agents}): localize, recrie ou remova-os primeiro}}",
   "main.move.running": "Pare primeiro os agentes em execução: {agents}.",
   "main.move.savedFailed": "Nem tudo que foi salvo em {from} pôde ser passado ao projeto {to} ({why}). O próximo Reparar tenta de novo.",
   "main.move.sessions": "{n, plural, one {{host}: # sessão agora aponta para a nova pasta.} other {{host}: # sessões agora apontam para a nova pasta.}}",

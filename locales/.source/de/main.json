@@ -132,6 +132,7 @@
   "main.move.result.unlinked": "link removed; its folder was left as it was",
   "main.move.result.unrecorded": "renamed, but not recorded yet ({why}): Repair finishes it",
   "main.move.result.working": "marked again: {projects}",
+  "main.move.result.wouldPrune": "couldn't be recreated while {n, plural, one {another worktree is missing too ({agents}'s): locate, recreate or remove it first} other {# other worktrees are missing too ({agents}'s): locate, recreate or remove them first}}",
   "main.move.running": "Stop the running agents first: {agents}.",
   "main.move.savedFailed": "What was saved under {from} couldn't all be given to {to} ({why}). Repair tries again.",
   "main.move.sessions": "{n, plural, one {{host}: # session now points to the new folder.} other {{host}: # sessions now point to the new folder.}}",

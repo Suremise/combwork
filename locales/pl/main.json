@@ -132,6 +132,7 @@
   "main.move.result.unlinked": "usunięto powiązanie; jego folder został bez zmian",
   "main.move.result.unrecorded": "zmieniono nazwę, ale jeszcze jej nie zapisano ({why}): naprawa to dokończy",
   "main.move.result.working": "ponownie oznaczone: {projects}",
+  "main.move.result.wouldPrune": "nie udało się odtworzyć, dopóki {n, plural, one {brakuje też innego worktree (agenta {agents}): najpierw go wskaż, odtwórz lub usuń} few {brakuje też # innych worktree (agentów {agents}): najpierw je wskaż, odtwórz lub usuń} many {brakuje też # innych worktree (agentów {agents}): najpierw je wskaż, odtwórz lub usuń} other {brakuje też # innego worktree (agentów {agents}): najpierw je wskaż, odtwórz lub usuń}}",
   "main.move.running": "Najpierw zatrzymaj działających agentów: {agents}.",
   "main.move.savedFailed": "Nie wszystko, co zapisano pod nazwą {from}, udało się przekazać projektowi {to} ({why}). Naprawa spróbuje ponownie.",
   "main.move.sessions": "{n, plural, one {{host}: # sesja wskazuje teraz nowy folder.} few {{host}: # sesje wskazują teraz nowy folder.} many {{host}: # sesji wskazuje teraz nowy folder.} other {{host}: # sesji wskazuje teraz nowy folder.}}",
