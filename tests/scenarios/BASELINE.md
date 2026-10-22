@@ -36,6 +36,23 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## The Assistant's override, fixed scenarios: fakes, Claude Code, Codex, fixtures v74, 22 October 2026
+
+#1474 fixes the two scenario faults #1322's trial found (below). **assistant-override-reason**'s repository now shows the
+hand merge the user tells of (a card branch with a commit, merged `--no-ff` into alpha's default branch, which the
+prompt names with the branch), and the "passed no override" checks count every tool that moves the card
+(`hive_update_task`, `hive_update_tasks`, and the intents `hive_start_card`, `hive_put_back`, `hive_submit`,
+`hive_verdict`, `hive_report_merge`): **assistant-override-unneeded** needs one of them to have worked, and
+**assistant-override-none** no longer misses an override given through another tool than `hive_update_task`. Source
+db34091a with the change uncommitted.
+- **Fakes**: 9 of 9 checks on each (`2026-10-22T21-11-21-fake`, `2026-10-22T21-12-10-fake-codex`).
+- **Claude Code** (CLI 2.1.308, its default model, the test home's Max login): 30 of 30 checks in 3 samples of each
+  (`2026-10-22T21-13-13-claude-code`). With the merge in git it moved the card to Done with the user's reason as
+  `override` each time; it put the unneeded card back with `hive_put_back` each time, with no override. $1.09 for the 9
+  sessions (API-equivalent, as the CLI reports it).
+- **Codex** (0.163.0, its default model, its test home): 30 of 30 in 3 samples of each (`2026-10-22T21-17-11-codex`),
+  every move by `hive_update_task`. $0.48 for the 9 sessions.
+
 ## The Assistant's override, Claude Code's trial: fixtures v73, 22 October 2026
 
 #1322: the Claude Code trial of #1319's three scenarios (below, where Codex passed 10 of 10), its test home signed in to a
