@@ -24,6 +24,7 @@ import { tipsState } from '@shared/tips'
 import { CornerPlacement, TipCard, TipsDialog } from './components/Tips'
 import { applyTipsState, showTodaysTip } from './tips'
 import { startupReplay } from './startupReplay'
+import { movesShown } from './pendingMoves'
 import { AssistantPanel, AssistantSettingsDialog } from './components/Assistant'
 import { ProgressPanel, progressRunsChanged } from './components/Progress'
 import { AssistantMain } from './components/AssistantView'
@@ -84,7 +85,8 @@ function handleEvent(e: HiveEvent): void {
       break
     case 'workspace-changed': {
       const sel = get().selectedProject
-      const ws = e.workspace
+      // A move shown and still being saved stays as shown (#1229): this report may have read the order from before it.
+      const ws = movesShown.keep(e.workspace)
       // Another workspace in this window: its Assistant panel shows as that workspace left it, and its board.
       const other = ws?.path !== get().workspace?.path
       if (other) set({ assistantOpen: assistantWasOpen(ws?.path), tasks: [], boardProject: null, taskOpen: null, taskStartFor: null, laneStartFor: null, taskDoing: null })
