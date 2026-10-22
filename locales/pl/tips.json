@@ -210,6 +210,8 @@
   "tips.mergeQueueFolder.title": "Scalanie do folderu, w którym pracujesz",
   "tips.mergeSlot.text": "Gdy kilku agentów kończy naraz, każdy zajmuje kolejkę scalania projektu, zanim scali do siebie main, sprawdzi i scali, więc niczyje testy nie muszą się wykonywać dwa razy. Kto ją zajmuje, a kto czeka, widać w Przeglądzie i w panelu Postęp.",
   "tips.mergeSlot.title": "Agenci scalają po kolei",
+  "tips.mergeStrict.text": "Gdy Hive scala, Ustawienia projektu → Przepływ pracy mogą wymagać, by praca była aktualna względem celu przed scaleniem: kolejka scalania aktualizuje kartę we własnym folderze, nigdy na gałęzi wykonawcy, a recenzja nadal się liczy, jeśli to ta sama zmiana.",
+  "tips.mergeStrict.title": "Praca aktualna przed scaleniem",
   "tips.messageReceipts.text": "Każda wiadomość, którą Asystent zostawia agentowi, ma identyfikator i jest przechowywana, nawet po ponownym uruchomieniu: jest odebrana, gdy agent przeczyta skrzynkę odbiorczą, i potwierdzona, gdy na nią zareaguje. Niepotwierdzona w ciągu {minutes, plural, one {# minuty} few {# minut} many {# minut} other {# minuty}} pokazuje się w jego panelu jako zaległa (✉).",
   "tips.messageReceipts.title": "Sprawdź, gdzie jest wiadomość",
   "tips.modelFallbacks.text": "Hive pyta Claude Code i Codex, jakie mają modele i jakie poziomy wysiłku przyjmuje każdy z nich. Jeśli CLI nie potrafi tego powiedzieć, listy modeli, wysiłku i cen na jego stronie ustawień możesz edytować sam.",

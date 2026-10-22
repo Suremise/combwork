@@ -210,6 +210,8 @@
   "tips.mergeQueueFolder.title": "Fusionner dans le dossier où vous travaillez",
   "tips.mergeSlot.text": "Quand plusieurs agents terminent en même temps, chacun prend le créneau de fusion du projet avant de fusionner main dans sa branche, de vérifier et de fusionner, pour que personne n’ait à relancer ses vérifications. Qui le détient et qui attend s’affiche dans la Vue d’ensemble et le panneau Progression.",
   "tips.mergeSlot.title": "Les agents fusionnent chacun leur tour",
+  "tips.mergeStrict.text": "Quand Hive fusionne, Paramètres du projet → Flux de travail peut exiger que le travail soit à jour avec sa cible avant sa fusion : la file de fusion met la carte à jour dans son propre dossier, jamais sur la branche de l’auteur, et la relecture compte toujours si c’est le même changement.",
+  "tips.mergeStrict.title": "Un travail à jour avant sa fusion",
   "tips.messageReceipts.text": "Chaque message que l’Assistant laisse à un agent a un identifiant et est conservé, même après un redémarrage : il est reçu quand l’agent lit sa boîte de réception, et l’agent en accuse réception une fois qu’il y a donné suite. Un message sans accusé de réception après {minutes, plural, one {# minute} many {# minutes} other {# minutes}} s’affiche comme en retard (✉) dans son volet.",
   "tips.messageReceipts.title": "Voir où en est un message",
   "tips.modelFallbacks.text": "Hive demande à Claude Code et à Codex quels modèles ils ont et quels niveaux d’effort chacun accepte. Si une CLI ne peut pas le dire, tu peux modifier toi-même les listes de modèles, d’effort et de prix sur sa page de paramètres.",

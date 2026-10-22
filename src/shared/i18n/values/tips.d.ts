@@ -212,6 +212,8 @@ interface HiveMessageValues {
   'tips.mergeQueueFolder.title': undefined
   'tips.mergeSlot.text': undefined
   'tips.mergeSlot.title': undefined
+  'tips.mergeStrict.text': undefined
+  'tips.mergeStrict.title': undefined
   'tips.messageReceipts.text': { minutes: number }
   'tips.messageReceipts.title': undefined
   'tips.modelFallbacks.text': undefined

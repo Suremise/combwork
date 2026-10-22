@@ -78,6 +78,23 @@ describe('strict (G8): the queue brings the reviewed revision up to date', () =>
     })
   }
 
+  // HR4's round 1: git's rebase.updateRefs moves every other ref at a rebased commit; the queue's rebase moves none.
+  for (const where of ['the builder\'s branch, its worktree detached', "a user's branch at the reviewed commit"] as const) {
+    it(`squash under rebase.updateRefs=true: ${where} stays where it was`, async () => {
+      const e = strict({ style: 'squash' })
+      const { folder, line, revision } = await approved(e, 'A', { 'a.txt': 'A\n' }, { 'b.txt': 'B\n' })
+      advanceMain(e, { 'other.txt': 'meanwhile\n' }, 'meanwhile')
+      sh(e.project, 'config', 'rebase.updateRefs', 'true')
+      if (where.startsWith('the builder')) sh(folder, 'checkout', '-q', '--detach', revision)
+      else sh(e.project, 'branch', 'user-backup', revision)
+      const watched = where.startsWith('the builder') ? `refs/heads/${line}` : 'refs/heads/user-backup'
+      expect((await e.queue().drain('main'))[0]).toMatchObject({ outcome: 'integrated' })
+      expect(sh(e.project, 'rev-parse', watched)).toBe(revision)
+      // The repository's own setting is left as the user set it.
+      expect(sh(e.project, 'config', '--get', 'rebase.updateRefs')).toBe('true')
+    })
+  }
+
   it('a reviewed revision that already contains the target merges as it is: no update', async () => {
     const e = strict()
     const { card } = await approved(e, 'A', { 'a.txt': 'A\n' })

@@ -210,6 +210,8 @@
   "tips.mergeQueueFolder.title": "In den Ordner mergen, in dem du arbeitest",
   "tips.mergeSlot.text": "Werden mehrere Agenten gleichzeitig fertig, holt sich jeder den Merge-Slot des Projekts, bevor er main hineinmergt, prüft und mergt, sodass niemandes Prüfungen zweimal laufen müssen. Wer ihn hat und wer wartet, zeigen die Übersicht und das Fortschrittspanel.",
   "tips.mergeSlot.title": "Agenten mergen der Reihe nach",
+  "tips.mergeStrict.text": "Wenn Hive mergt, kann Projekteinstellungen → Workflow verlangen, dass die Arbeit vor dem Merge auf dem Stand ihres Ziels ist: Die Merge-Warteschlange aktualisiert eine Karte in ihrem eigenen Ordner, nie auf dem Branch des Bearbeiters, und die Review zählt weiter, wenn es dieselbe Änderung ist.",
+  "tips.mergeStrict.title": "Arbeit vor dem Merge auf dem neuesten Stand",
   "tips.messageReceipts.text": "Jede Nachricht, die der Assistent einem Agenten hinterlässt, hat eine ID und bleibt erhalten, auch über einen Neustart hinweg: Sie gilt als empfangen, sobald der Agent seinen Posteingang liest, und als bestätigt, sobald er danach gehandelt hat. Eine, die nach {minutes, plural, one {# Minute} other {# Minuten}} nicht bestätigt ist, erscheint in seinem Bereich als überfällig (✉).",
   "tips.messageReceipts.title": "Sehen, wo eine Nachricht steht",
   "tips.modelFallbacks.text": "Hive fragt Claude Code und Codex, welche Modelle sie haben und welche Aufwandsstufen jedes kennt. Kann eine CLI das nicht sagen, kannst du die Listen für Modelle, Aufwand und Preise auf ihrer Einstellungsseite selbst bearbeiten.",

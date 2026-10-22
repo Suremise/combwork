@@ -843,6 +843,14 @@
     "defaultMessage": "Agents take turns to merge",
     "description": "A tip's title."
   },
+  "tips.mergeStrict.text": {
+    "defaultMessage": "With Hive merging, Project Settings → Workflow can have work up to date with its target before it merges: the merge queue updates a card in its own folder, never on the builder’s branch, and the review still counts if it’s the same change.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: merge queue, builder, review."
+  },
+  "tips.mergeStrict.title": {
+    "defaultMessage": "Work up to date before it merges",
+    "description": "A tip's title: the workflow option that has Hive's merge queue bring a card's work up to date with its target branch first (G8, strict)."
+  },
   "tips.messageReceipts.text": {
     "defaultMessage": "Every message the Assistant leaves an agent has an id and is kept, even across a restart: it is received once the agent reads its inbox, and acked once the agent acted on it. One not acked within {minutes, plural, one {# minute} other {# minutes}} shows as overdue (✉) in its pane.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {minutes} is how long before a message shows as overdue (30)."

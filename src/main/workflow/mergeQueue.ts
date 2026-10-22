@@ -785,7 +785,10 @@ export class MergeQueue {
     const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
     const target = entry.target
     const message = `Merge ${target} into ${card.key}\n\nHive-Card: ${card.key}\nHive-Revision: ${revision}` // i18n-ignore: a commit message, in English
-    const u = rebase ? await this.git(f, [...who, 'rebase', '--no-autostash', '--onto', expected, base], opts) : await this.git(f, [...who, 'merge', '--no-ff', '--no-edit', '-m', message, expected], opts)
+    // A rebase here rewrites only the queue's detached HEAD: never other refs at the rebased commits (HR4's #1352 round
+    // 1: with the repository's `rebase.updateRefs` on, git would move the builder's branch, or a user's, to the update).
+    // Overridden for this command only; the repository's config is left as it is.
+    const u = rebase ? await this.git(f, [...who, '-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', '--onto', expected, base], opts) : await this.git(f, [...who, 'merge', '--no-ff', '--no-edit', '-m', message, expected], opts)
     if (!u.ok) {
       const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
       const files = c?.out.split(/\r?\n/).filter(Boolean) ?? []
