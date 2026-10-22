@@ -358,6 +358,9 @@ export class WorkspaceService {
     this.scheduled = null
     if (this.idsTimer) clearTimeout(this.idsTimer)
     this.idsTimer = null
+    // A scheduled refresh already running reads the projects' files until it sees the close (at the next project): closed
+    // only once it has, so a project's folder can be moved as soon as its window lets it go (#1341: EPERM renaming it).
+    await Promise.allSettled([...this.scheduledRuns])
     if (this.rootRetry) clearTimeout(this.rootRetry)
     this.rootRetry = null
     this.rootWatcher?.close()
