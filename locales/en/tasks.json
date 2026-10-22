@@ -344,8 +344,8 @@
     "description": "A line in a card's history: the card's list of doc sections the agent reads first was cleared."
   },
   "tasks.history.created": {
-    "defaultMessage": "Created in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
-    "description": "A line in a card's history: the card was added, in this column. {column} is a board column (select: On Hold, Todo, Doing, Review, Passed, Done): translate each."
+    "defaultMessage": "Created in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "A line in a card's history: the card was added, in this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each."
   },
   "tasks.history.decision": {
     "defaultMessage": "Recorded a decision: \"{decision}\"",
@@ -420,24 +420,24 @@
     "description": "A line in a card's history: in a card loop, Hive woke the agent {agent} (its name), as the card arrived in Review for it to review (review), or with its review's verdict (other). \"Card loop\" and \"loop wake\" are Hive's terms."
   },
   "tasks.history.moved": {
-    "defaultMessage": "Moved to {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
-    "description": "A line in a card's history: the card was moved to this column. {column} is a board column (select: On Hold, Todo, Doing, Review, Passed, Done): translate each."
+    "defaultMessage": "Moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "A line in a card's history: the card was moved to this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each."
   },
   "tasks.history.movedBefore": {
-    "defaultMessage": "Moved to {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}, before #{before}",
-    "description": "A line in a card's history: the card was moved to this column, just above card #{before} (a number). {column} is a board column (select: On Hold, Todo, Doing, Review, Passed, Done): translate each."
+    "defaultMessage": "Moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}, before #{before}",
+    "description": "A line in a card's history: the card was moved to this column, just above card #{before} (a number). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each."
   },
   "tasks.history.movedBeforeIn": {
-    "defaultMessage": "Moved before #{before} in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
-    "description": "A line in a card's history: within its column, the card was moved just above card #{before} (a number). {column} is a board column (select: On Hold, Todo, Doing, Review, Passed, Done): translate each."
+    "defaultMessage": "Moved before #{before} in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "A line in a card's history: within its column, the card was moved just above card #{before} (a number). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each."
   },
   "tasks.history.movedBottom": {
-    "defaultMessage": "Moved to the bottom of {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
-    "description": "A line in a card's history: the card was put last in this column. {column} is a board column (select: On Hold, Todo, Doing, Review, Passed, Done): translate each."
+    "defaultMessage": "Moved to the bottom of {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "A line in a card's history: the card was put last in this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each."
   },
   "tasks.history.movedTop": {
-    "defaultMessage": "Moved to the top of {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
-    "description": "A line in a card's history: the card was put first in this column. {column} is a board column (select: On Hold, Todo, Doing, Review, Passed, Done): translate each."
+    "defaultMessage": "Moved to the top of {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "A line in a card's history: the card was put first in this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each."
   },
   "tasks.history.noDependencies": {
     "defaultMessage": "No longer depends on other cards",
@@ -448,8 +448,8 @@
     "description": "A line in a card's history: Hive sent the user a notification about this card (a banner or a Windows notification): its review failed, it is blocked, it has stalled, every card of its lane ({lane}, a label such as “B1 / R1 (greetings)”) passed review so the lane's work can be merged, that merge has stalled, or the card needs the user (an approval, a question) (select: translate each). A lane is Hive's record of a card loop. With hasWhy yes, it ends with what the notification said ({why}): why it is blocked or stalled, or the question (someone's own words, or Hive's own sentence already translated)."
   },
   "tasks.history.placed": {
-    "defaultMessage": "Placed {place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
-    "description": "A line in a card's history: an agent put the column's cards in order, and this card is now at place {place} (an ordinal: 2nd, 3rd). {column} is a board column (select: On Hold, Todo, Doing, Review, Passed, Done): translate each."
+    "defaultMessage": "Placed {place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "A line in a card's history: an agent put the column's cards in order, and this card is now at place {place} (an ordinal: 2nd, 3rd). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each."
   },
   "tasks.history.renamed": {
     "defaultMessage": "Renamed to \"{title}\"",
@@ -532,8 +532,8 @@
     "description": "A line in a card's history: Hive stopped the agent {watcher} (its name) waiting for the card to change, because the card is blocked, another agent ({agent}) now reviews it, the review it waited for was taken from it, or the card was given to another agent ({agent}) or to none ({why}, select: translate each)."
   },
   "tasks.skipped.movedColumn": {
-    "defaultMessage": "moved to {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
-    "description": "Why Archive All left a card on the board (after its number, \"#12 moved to Doing\"): it moved to the column {column} meanwhile (select: a board column; translate each). Lower case: it follows the number."
+    "defaultMessage": "moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "description": "Why Archive All left a card on the board (after its number, \"#12 moved to Active\"): it moved to the column {column} meanwhile (select: a board column; translate each). Lower case: it follows the number."
   },
   "tasks.skipped.movedProject": {
     "defaultMessage": "moved to another project",
@@ -576,7 +576,7 @@
     "description": "An error: the card #{n} (a number) was changed while Hive was starting it (archived, moved to another column or project, given to another agent, deleted, or its Read first doc sections edited), so it wasn't given to the agent. Read first is the card's field: keep its name as the card dialog shows it."
   },
   "tasks.start.movedColumn": {
-    "defaultMessage": "#{n} was moved to {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}} meanwhile. Start it again if it's still to do.",
+    "defaultMessage": "#{n} was moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}} meanwhile. Start it again if it's still to do.",
     "description": "An error: while card #{n} (a number) was being started, it was moved to the column {column} (select: a board column; translate each)."
   },
   "tasks.start.movedDone": {

@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 73
+const FIXTURES_VERSION = 74
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -108,6 +108,41 @@ async function pairInProject(c) {
   const cfg = JSON.parse(require('fs').readFileSync(file, 'utf8'))
   require('fs').writeFileSync(file, JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' } } }, null, 2))
 }
+/**
+ * The hand merge the user tells of (#1474): a branch for card `n` with a commit, merged (--no-ff) into alpha's default
+ * branch, so the repository shows what the prompt says. Returns the branch and the base it was merged into.
+ */
+function handMerged(c, n) {
+  c.git('config', 'user.email', 'agent@example.com')
+  c.git('config', 'user.name', 'Agent')
+  const base = c.git('branch', '--show-current').trim()
+  const branch = `card-${n}-retry-upload`
+  c.git('checkout', '-qb', branch)
+  c.write('upload.js', 'module.exports = async (send) => { for (let i = 0; ; i++) try { return await send() } catch (e) { if (i === 2) throw e } }\n')
+  c.git('add', 'upload.js')
+  c.git('commit', '-qm', `Retry a failed upload three times (#${n})`)
+  c.git('checkout', '-q', base)
+  c.git('merge', '-q', '--no-ff', '-m', `Merge branch '${branch}'`, branch)
+  return { branch, base }
+}
+/**
+ * Whether a call's card reference is card `n`: its number (12, "12", "#12") or its key ("AL-12"), as the tools take it
+ * (#1219).
+ */
+const isCard = (ref, n) => new RegExp(`^(#|[A-Za-z][A-Za-z0-9]*-)?${n}$`).test(String(ref ?? '').trim())
+/**
+ * The calls that could move card `n` (#1474): hive_update_task and hive_update_tasks with a column or an override, and
+ * the intents that move a card.
+ */
+const MOVING_INTENTS = ['hive_start_card', 'hive_put_back', 'hive_submit', 'hive_verdict', 'hive_report_merge']
+const movesOf = (o, n) =>
+  o.hiveCalls.filter((x) => {
+    const a = argsOf(x)
+    const moves = a.column !== undefined || a.override !== undefined
+    if (x.tool === 'hive_update_task') return isCard(a.number, n) && moves
+    if (x.tool === 'hive_update_tasks') return (a.numbers ?? []).some((m) => isCard(m, n)) && moves
+    return MOVING_INTENTS.includes(x.tool) && isCard(a.card, n)
+  })
 /** The facts of kind `kind` of the scenario's card `key`. */
 const factsOf = (o, key, kind) => (o.facts?.[key] ?? []).filter((f) => f.kind === kind)
 /** The Override facts of the scenario's card `key` (#1319: the harness reads each card's facts). */
@@ -2173,11 +2208,14 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairRules(c)
       await c.card('m', { title: 'Retry the upload', description: 'Retry a failed upload three times.', column: 'doing', agent: 'coder' })
+      // #1474: the repository shows the hand merge the prompt tells of (a model checks git before taking the user's word).
+      c.merged = handMerged(c, c.cards.m)
     },
-    prompt: (c) => `I merged card #${c.cards.m}'s branch into main by hand this morning. Move #${c.cards.m} to Done.`,
+    prompt: (c) => `I merged card #${c.cards.m}'s branch, ${c.merged.branch}, into ${c.merged.base} by hand. Move #${c.cards.m} to Done.`,
     fake: (c) => `hive hive_update_task {"number":${c.cards.m},"column":"done","override":{"reason":"The user merged its branch into main by hand"}}`,
     expect: (o, c) => {
-      const calls = called(o, 'hive_update_task').filter((x) => field(x.args, 'number', c.cards.m))
+      // #1474: by number or key, through hive_update_task or hive_update_tasks.
+      const calls = movesOf(o, c.cards.m)
       const given = calls.find((x) => x.ok && argsOf(x).override)
       const overrides = overridesOf(o, 'm')
       return [
@@ -2200,9 +2238,10 @@ module.exports.SCENARIOS = [
     prompt: (c) => `Move card #${c.cards.m} to Done.`,
     fake: (c) => `hive hive_update_task {"number":${c.cards.m},"column":"done"}`,
     expect: (o, c) => {
-      const calls = called(o, 'hive_update_task').filter((x) => field(x.args, 'number', c.cards.m))
+      // #1474: every tool that moves the card, not only hive_update_task.
+      const calls = movesOf(o, c.cards.m)
       return [
-        ['passed no override (the user gave no reason)', !calls.some((x) => argsOf(x).override), calls.map((x) => x.args).join(' | ')],
+        ['passed no override (the user gave no reason)', !calls.some((x) => argsOf(x).override), calls.map((x) => `${x.tool} ${x.args}`).join(' | ')],
         ['the card is not in Done', o.cards.m?.column !== 'done', o.cards.m?.column],
         ['no Override fact', !overridesOf(o, 'm').length, JSON.stringify(overridesOf(o, 'm').map((f) => f.data))],
         ['told the user what the move would skip, or asked', o.replies.some((r) => /review|merg|rule|skip|requir|integrat|submi/i.test(r)), o.replies.at(-1)]
@@ -2223,10 +2262,11 @@ module.exports.SCENARIOS = [
     prompt: (c) => `Card #${c.cards.m} isn't ready to work on yet: put it back in Todo.`,
     fake: (c) => `hive hive_update_task {"number":${c.cards.m},"column":"todo"}`,
     expect: (o, c) => {
-      const calls = called(o, 'hive_update_task').filter((x) => field(x.args, 'number', c.cards.m))
+      // #1474: hive_put_back moves it too (#1267), or hive_update_tasks: one of them worked, and none passed override.
+      const calls = movesOf(o, c.cards.m)
       return [
         ['the card is in Todo', o.cards.m?.column === 'todo', o.cards.m?.column],
-        ['passed no override (the move skips nothing)', calls.length > 0 && !calls.some((x) => argsOf(x).override), calls.map((x) => x.args).join(' | ')],
+        ['passed no override (the move skips nothing)', calls.some((x) => x.ok) && !calls.some((x) => argsOf(x).override), calls.map((x) => `${x.tool} ${x.args}${x.ok ? '' : '!'}`).join(' | ')],
         ['no Override fact', !overridesOf(o, 'm').length, JSON.stringify(overridesOf(o, 'm').map((f) => f.data))]
       ]
     }
@@ -3476,4 +3516,4 @@ module.exports.SCENARIOS.push({
   fakeSkips: ["read the screenshots' text report", "read it before opening any screenshot but the changed screen's", 'opened only the screenshots it flags and those of the screen the card changed']
 })
 
-module.exports.helpers = { called, ran, asksTheUser, read, moved, history, field, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { called, ran, asksTheUser, read, moved, history, field, isCard, movesOf, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }

@@ -903,11 +903,15 @@ export function PresetsNotice() {
   const workspace = useStore((s) => s.workspace)
   const readOnly = useStore((s) => s.boardState?.readOnly ?? null)
   const [projects, setProjects] = useState<{ path: string; name: string }[] | null>(null)
+  // The workspaces answered in this window (#1464): a reload begun before the answer's board write commits (a new
+  // workspace object meanwhile, or one already in flight) reads the old board, and must not show it again.
+  const answered = useRef(new Set<string>())
   useEffect(() => {
-    if (!workspace?.path || readOnly !== null) return setProjects(null)
+    const path = workspace?.path
+    if (!path || readOnly !== null || answered.current.has(path)) return setProjects(null)
     let live = true
     call('workflow:presetsNotice')
-      .then((p) => live && setProjects(p))
+      .then((p) => live && setProjects(answered.current.has(path) ? null : p))
       .catch(() => live && setProjects(null))
     return () => {
       live = false
@@ -915,6 +919,7 @@ export function PresetsNotice() {
   }, [workspace, readOnly])
   if (!projects?.length) return null
   const answer = (choose: boolean): void => {
+    if (workspace?.path) answered.current.add(workspace.path)
     if (choose) openVersionControl(projects[0].path, 'workflow')
     setProjects(null)
     void call('workflow:presetsNoticeSaid').catch((e) => notify('error', errorMessage(e)))

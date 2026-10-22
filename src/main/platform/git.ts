@@ -83,6 +83,11 @@ export async function commonDir(repo: string): Promise<Maybe<string>> {
   return r.ok ? r.out.trim() : unknown(U.gitFolder, { folder: repo })
 }
 
+/** commonDir, read from the `.git` files with no git process where they say (#1462: every reconcile asks it), else by git. */
+export async function commonDirFast(repo: string): Promise<Maybe<string>> {
+  return commonDirSync(repo) ?? commonDir(repo)
+}
+
 /**
  * A folder's own git dir, read from its `.git` (a folder, or a linked worktree's `gitdir:` file) with no git process, as
  * `rev-parse --absolute-git-dir` would answer it there (#1373: asked by every intent's evidence). Null when the folder

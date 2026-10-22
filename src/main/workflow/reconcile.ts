@@ -16,7 +16,7 @@ import { join } from 'path'
 import { foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, hasStage } from '../../shared/workflow/compile'
 import * as G from '../platform/git'
-import { isUnknown } from '../platform/types'
+import { isUnknown, type Maybe } from '../platform/types'
 import { samePath } from '../../shared/movePaths'
 import type { CardRecord } from './factStore'
 import type { Workflow, Write } from './runtime'
@@ -160,9 +160,10 @@ async function followFolder(wf: Workflow, card: CardRecord, s: CardState): Promi
 
 /**
  * Records an observed head change once (the dedupe key names the fact it follows). When another observer already wrote
- * a fact after the same one, reads the winner and the platform now, and writes only what is true now, after it.
+ * a fact after the same one, reads the winner and the platform now, and writes only what is true now, after it. Replies
+ * with the platform as it last read it (#1462: the caller's Gone check reads no line again).
  */
-async function observeHead(wf: Workflow, card: CardRecord, read: () => Promise<string | null | { unknown: true }>, line: string | null, hooks: ReconcileHooks): Promise<void> {
+async function observeHead(wf: Workflow, card: CardRecord, read: () => Promise<Maybe<string | null>>, line: string | null, hooks: ReconcileHooks): Promise<Maybe<string | null>> {
   // The view this observer read the log at (the fact it follows), then the platform.
   let s = wf.state(card)
   const cycle = s.cycle
@@ -171,9 +172,8 @@ async function observeHead(wf: Workflow, card: CardRecord, read: () => Promise<s
   let prev = s.lastHeadFact
   let from = s.head
   for (let tries = 0; tries < 5; tries++) {
-    if (isUnknown(now)) return
-    if (now === from) return
-    const to = now as string | null
+    if (isUnknown(now) || now === from) return now
+    const to = now
     // Written only after the fact it was read after, in the cycle it was read in (HR4's #1217 round 1): a new cycle
     // since (the card started again) drops it; another fact since is a lost race.
     const wrote = await wf.locked(() =>
@@ -186,14 +186,15 @@ async function observeHead(wf: Workflow, card: CardRecord, read: () => Promise<s
         return tx.appendObserved(card.id, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: `prev:${prev}`, data: { line, from, to } })
       })
     )
-    if (wrote === 'cycle' || wrote) return
+    if (wrote === 'cycle' || wrote) return now
     // Lost the race: read the winner and the platform now.
     s = wf.state(card)
-    if (s.cycle !== cycle || (line !== null && s.started?.line !== line)) return
+    if (s.cycle !== cycle || (line !== null && s.started?.line !== line)) return now
     prev = s.lastHeadFact
     from = s.head
     now = await read()
   }
+  return now
 }
 
 /** Reconciles one card with its platform (§16.4.4's table): the card's platform adapter observes and records. */
@@ -226,7 +227,8 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     await wf.write(card, null, 'outside', (w) => sameCycle(w, s0) && w.state().started?.folder === folder && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:folder:${s0.cycle}`, data: { what: 'folder' } })) // i18n-ignore: a fact's kind and codes, not text
   }
   s = wf.state(card)
-  await observeTarget(wf, card, s, hooks)
+  // The target's head as observed (#1462: the partial-merge check below reads it from here, not from git again).
+  const seenTarget = await observeTarget(wf, card, s, hooks)
 
   if (!wf.ownLine(s)) {
     // A shared folder: attribution; its commits are working revisions, never an integration (§16.4.4).
@@ -242,9 +244,8 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     // Every observation below writes only while the card is still on this line in this cycle (checked under the write's
     // lock): a rename since stops it.
     if (followed !== 'unknown' && line) {
-      await observeHead(wf, card, () => G.lineHead(project, line), line, hooks)
+      const lh = await observeHead(wf, card, () => G.lineHead(project, line), line, hooks)
       s = wf.state(card)
-      const lh = await G.lineHead(project, line)
       // Never gone while a rename points away from it: the next run follows it once git's names can be read.
       if (lh === null && !(await wf.cfg.pendingRename?.(line))) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.state().started?.line === line && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:line:${s.cycle}`, data: { what: 'line' } })) // i18n-ignore: a fact's kind and codes, not text
     }
@@ -304,7 +305,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
   if (card.stage === 'active' && wf.ownLine(s) && s.head && base && s.head !== base) {
     // Some of its own work in the target (a partial hand merge): a mark; the card stays where it is. Its own commits
     // are its line's first-parent history since its base: the target merged into the card (an update) isn't its work.
-    const th = await G.lineHead(project, target)
+    const th = seenTarget?.target === target ? seenTarget.head : await G.lineHead(project, target)
     if (isUnknown(th) || !th) return
     const own = await G.firstParents(project, base, s.head)
     if (isUnknown(own)) return
@@ -458,17 +459,24 @@ function presence(path: string): 'there' | 'gone' | 'unknown' {
  * The card's target, observed (`TargetMoved`, §16.4.4): its head now against the last one recorded this cycle, read
  * again under the write's lock from the ref files (a cheap read: no git process), so what is written is the move from the
  * newest recorded head to the head now. Keyed by the fact it follows: two Hives write each move once; a run that finds
- * no move writes nothing, and one after a time closed records what changed meanwhile.
+ * no move writes nothing, and one after a time closed records what changed meanwhile. Replies with the head git read
+ * (none when it couldn't be read, or there's no target).
  */
-async function observeTarget(wf: Workflow, card: CardRecord, s0: CardState, hooks: ReconcileHooks): Promise<void> {
+async function observeTarget(wf: Workflow, card: CardRecord, s0: CardState, hooks: ReconcileHooks): Promise<{ target: string; head: string | null } | undefined> {
   const target = s0.started?.target
   if (!target) return
-  const common = await G.commonDir(wf.cfg.project)
-  if (isUnknown(common)) return hooks.unknown?.(common.what)
+  const common = await G.commonDirFast(wf.cfg.project)
+  if (isUnknown(common)) {
+    hooks.unknown?.(common.what)
+    return
+  }
   // Read by git first: an unreadable target is unknown (nothing recorded), where a target that doesn't exist is a value
   // of its own, null (HR4's round 2: a deleted target is recorded, X→null, and its return, null→Y).
   const seen = await G.lineHead(wf.cfg.project, target)
-  if (isUnknown(seen)) return hooks.unknown?.(seen.what)
+  if (isUnknown(seen)) {
+    hooks.unknown?.(seen.what)
+    return
+  }
   await wf.locked(() =>
     wf.store.tx((tx) => {
       const facts = tx.facts(card.id)
@@ -484,4 +492,5 @@ async function observeTarget(wf: Workflow, card: CardRecord, s0: CardState, hook
       tx.appendObserved(card.id, { kind: 'TargetMoved', actor: 'outside', source: 'observed', dedupe: `target:${last?.seq ?? s.cycle}`, data: { target, from, to } })
     })
   )
+  return { target, head: seen }
 }

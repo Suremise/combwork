@@ -12,7 +12,7 @@ import { sessions } from './sessions'
 import { HiveError, hiveError, errorText } from './hiveError'
 import { RAW_CARD_START, forAgents, withValues } from '../shared/advanced'
 import { advanced } from './advanced'
-import { getTask, setContextProblems, UNKNOWN_AGENT, updateTask, type TaskActor } from './tasks'
+import { columnError, getTask, setContextProblems, UNKNOWN_AGENT, updateTask, type TaskActor } from './tasks'
 import { createLogger, userText } from './logger'
 import { workspace, workspaceOf } from './workspace'
 import { checkDocRef, type DocRefCheck } from './docSections'
@@ -167,7 +167,7 @@ async function giveCard(
             : hiveError(msg({ id: 'tasks.start.movedWorkspace', defaultMessage: '#{n} moved to the workspace meanwhile. Start it again.', description: 'An error: while card #{n} (a number) was being started, it was taken out of its project, to the whole workspace.' }), { n })
         }
         if (now.column === 'done' && before.column !== 'done') throw hiveError(msg({ id: 'tasks.start.movedDone', defaultMessage: '#{n} was moved to Done meanwhile. Start it again if there is more to do.', description: 'An error: while card #{n} (a number) was being started, it was moved to Done (a board column).' }), { n })
-        if (now.column !== before.column) throw hiveError(msg({ id: 'tasks.start.movedColumn', defaultMessage: "#{n} was moved to {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}} meanwhile. Start it again if it's still to do.", description: 'An error: while card #{n} (a number) was being started, it was moved to the column {column} (select: a board column; translate each).' }), { n, column: now.column })
+        if (now.column !== before.column) throw columnError(msg({ id: 'tasks.start.movedColumn', defaultMessage: "#{n} was moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}} meanwhile. Start it again if it's still to do.", description: 'An error: while card #{n} (a number) was being started, it was moved to the column {column} (select: a board column; translate each).' }), { n, column: now.column })
         if (now.agent !== before.agent) throw hiveError(msg({ id: 'tasks.start.reassigned', defaultMessage: "#{n} was given to {who, select, another {another agent} other {nobody}} meanwhile. Start it again if it's still to do.", description: 'An error: while card #{n} (a number) was being started, it was given to another agent, or taken from its agent ({who}, select: translate each).' }), { n, who: now.agent ? 'another' : 'nobody' })
       }
     })

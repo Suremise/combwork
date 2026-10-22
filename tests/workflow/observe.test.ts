@@ -6,6 +6,7 @@ import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { reconcile } from '../../src/main/workflow/reconcile'
 import type { FactData } from '../../src/shared/workflow/facts'
+import { gitTestHooks } from '../../src/main/git'
 
 let env: Env | null = null
 afterEach(() => {
@@ -106,5 +107,27 @@ describe('two Hives observing one workspace', () => {
     await Promise.all([reconcile(e.wf, card), reconcile(other, card)])
     expect(e.store.facts(card.id).filter((f) => f.kind === 'Integrated')).toHaveLength(1)
     expect(e.wf.state(card).stage).toBe('done')
+  })
+
+  it('a reconcile reads its target and its line once each, and its common dir from the files (#1462: S59 ran 7.5 gits a run)', async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }))
+    const card = e.wf.createCard({ title: 'Counted' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    const line = e.wf.state(card).started!.line!
+    const a = commit(s.data!.folder as string, { 'a.txt': 'a\n' }, 'A')
+    const ran: string[] = []
+    gitTestHooks.started = (_cwd, args) => {
+      ran.push(args.join(' '))
+    }
+    try {
+      await reconcile(e.wf, card)
+    } finally {
+      gitTestHooks.started = undefined
+    }
+    expect(heads(e, card.id)).toEqual([a])
+    expect(ran.filter((c) => c.endsWith('refs/heads/main'))).toHaveLength(1)
+    expect(ran.filter((c) => c.endsWith(`refs/heads/${line}`))).toHaveLength(1)
+    expect(ran.filter((c) => c.includes('--git-common-dir'))).toEqual([])
   })
 })

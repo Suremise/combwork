@@ -199,7 +199,7 @@ const check = (name, ok, extra = '') => {
   await inv('tasks:update', race, { column: 'doing', agent: b4.id })
   const raced = page.locator('.toast', { hasText: `Archived ${todoCount - 1} card` }).last()
   check('the card an agent took meanwhile stays on the board', !!(await until(async () => (await order('todo')).length === 0, 8000)) && (await archivedNow(race)) === false)
-  check('…and the toast says why', !!(await until(async () => (await raced.count()) === 1, 5000)) && (await raced.innerText()).includes(`One card was left on the board: ${await lib.cardLabel(inv, race)} moved to Doing`), await raced.innerText().catch(() => ''))
+  check('…and the toast says why', !!(await until(async () => (await raced.count()) === 1, 5000)) && (await raced.innerText()).includes(`One card was left on the board: ${await lib.cardLabel(inv, race)} moved to Active`), await raced.innerText().catch(() => ''))
   await app.evaluate(() => {
     delete process.env.HIVE_TEST_SLOW_IPC
   })
