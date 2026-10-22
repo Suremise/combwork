@@ -13,7 +13,7 @@ const base = tempDir('hive-deliveries-closed-')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const deliveries = await import('../src/main/deliveries')
-const { boardOpen, closeBoard } = await import('../src/main/boardStore')
+const { boardOpen } = await import('../src/main/boardStore')
 const { sessions } = await import('../src/main/sessions')
 
 const [wsA, wsB] = ['alpha', 'beta'].map((n) => join(base, n))
@@ -87,9 +87,9 @@ describe("a closed workspace's deliveries", () => {
       expect(deliveries.deliveryNow(aliasHost, id)).toBeNull()
       expect(deliveries.deliveryNow(host, id)).toBeNull()
       expect(await deliveries.offerNow(aliasHost, 'b1')).toBe(false)
+      // Its board, opened under the alias's spelling, closed with the window's (#1402).
+      expect(boardOpen(alias)).toBe(false)
     } finally {
-      // Its board was opened under the alias's spelling: closed here so the junction can go.
-      closeBoard(alias)
       unlinkSync(alias)
     }
   })

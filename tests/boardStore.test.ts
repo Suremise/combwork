@@ -1,11 +1,12 @@
 // The board in SQLite (#1017): the database layer (settings, migrations, a file from a newer Hive), the move of the cards'
 // files into it (once, checked, the folder kept as a backup and a stub left for older versions), cards an older Hive saved
 // meanwhile, Export Board to JSON (an export read back is the same board), and the window's board with archived cards in short.
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { join, sep } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
+import { junction } from './pathAliases'
 import { tempDir } from './tempDir'
 import type { BoardNotice } from '../src/main/boardStore'
 
@@ -18,6 +19,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { backupTo, openDb, schemaVersion } = await import('../src/main/db')
+const { renameRetrying } = await import('../src/main/fsutil')
 
 const user = { kind: 'user' } as const
 let n = 0
@@ -470,6 +472,36 @@ describe("the window's board (#1017)", () => {
     // The Agent API's reads (listTasks, getTask) never carry the window's short form.
     expect((await inWorkspace(w, () => tasks.listTasks({ archived: true })))[0].summary).toBeUndefined()
     expect(JSON.stringify(await inWorkspace(w, () => tasks.getTask(2, w)))).toBe(JSON.stringify(full.find((c) => c.number === 2)))
+  })
+})
+
+describe('a board opened under another name for its folder (#1402)', () => {
+  it("is closed as the window closes the workspace, letting the folder go; a lease's own board closes only itself", async () => {
+    const ws = workspaceWith()
+    const w = await open(ws)
+    const alias = junction(ws, join(base, `alias-${++n}`))
+    try {
+      // The window's board (opened as first used), and one opened through the junction, as deliveries can (their host's
+      // path as it was spelt).
+      await inWorkspace(w, () => tasks.listTasks({}))
+      store.workspaceDb(alias)
+      expect([store.boardOpen(ws), store.boardOpen(alias)]).toEqual([true, true])
+      // A lease's board under a third spelling, ended: only that one closes, the others stay open.
+      const other = junction(ws, join(base, `alias-${++n}`))
+      try {
+        store.leaseDb(other).release()
+        expect([store.boardOpen(ws), store.boardOpen(alias), store.boardOpen(other)]).toEqual([true, true, false])
+      } finally {
+        unlinkSync(other)
+      }
+      await w.close()
+      expect([store.boardOpen(ws), store.boardOpen(alias)]).toEqual([false, false])
+    } finally {
+      unlinkSync(alias)
+    }
+    // Nothing holds it: the folder can be moved (Windows refuses while a connection has its database open).
+    await renameRetrying(ws, `${ws}-moved`)
+    expect(existsSync(join(`${ws}-moved`, '.hive', 'hive.db'))).toBe(true)
   })
 })
 

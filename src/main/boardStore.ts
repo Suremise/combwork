@@ -16,7 +16,7 @@ import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_SEARCH_STEP, CARDS
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
-import { withFileLock } from './fsutil'
+import { placeKey, withFileLock } from './fsutil'
 import { trash } from './trash'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
@@ -270,6 +270,8 @@ interface Imported {
 interface Board {
   /** The workspace folder, as the workspace has it. */
   path: string
+  /** Its real location (`placeKey`) as it opened: another spelling's board of the same folder is closed with it (#1402). */
+  place: string
   db: Db
   /** Its cards are still JSON documents, a row each (a 0.9 board waiting for its upgrade to 1.0, read-only), not 1.0's tables. */
   legacy: boolean
@@ -657,6 +659,7 @@ function openBoard(path: string, upgrade: boolean): Board {
     const w = db.writer
     const b: Board = {
       path,
+      place: placeKey(path),
       db,
       legacy: db.reader.prepare("SELECT 1 FROM pragma_table_info('cards') WHERE name = 'doc'").get() !== undefined, // i18n-ignore: SQL
       version: w.prepare('PRAGMA data_version'), // i18n-ignore: SQL
@@ -795,22 +798,32 @@ export function noteLanesSaved(path: string): void {
   if (b) b.revision++
 }
 
-/** Closes a workspace's board (it closed): the stub's next number brought up to date for older versions. */
+/**
+ * Closes a workspace's board (it closed, or its file is replaced): the stub's next number brought up to date for older
+ * versions. Every board of that folder, however it was spelt as it opened (#1402: one opened through a junction or an
+ * 8.3 name, by deliveries say, would otherwise hold the folder until Hive quits).
+ */
 export function closeBoard(path: string): void {
   const key = keyOf(path)
-  failures.delete(key)
-  const b = boards.get(key)
-  if (!b) return
+  const others = [...boards.keys(), ...failures.keys()].some((k) => k !== key)
+  const place = others ? placeKey(path) : ''
+  for (const k of [...failures.keys()]) if (k === key || (others && placeKey(k) === place)) failures.delete(k)
+  for (const [k, b] of [...boards]) if (k === key || (others && b.place === place)) closeOne(k, b)
+}
+
+/** Closes the board under that spelling only (a lease's own, Hive quitting). */
+function closeOne(key: string, b: Board): void {
+  if (boards.get(key) !== b) return
   boards.delete(key)
   clearInterval(b.poll)
   clearInterval(b.presence)
   try {
-    removePresence(join(path, HIVE_DIR), presenceId())
+    removePresence(join(b.path, HIVE_DIR), presenceId())
   } catch (e) {
     log.warn('removing the workspace presence marker', e)
   }
   try {
-    if (writable(b.db) && existsSync(join(path, HIVE_DIR, TASKS))) writeStub(join(path, HIVE_DIR), nextOf(b.db.writer))
+    if (writable(b.db) && existsSync(join(b.path, HIVE_DIR, TASKS))) writeStub(join(b.path, HIVE_DIR), nextOf(b.db.writer))
   } catch (e) {
     log.warn('bringing the board folder up to date', e)
   }
@@ -821,7 +834,7 @@ export function closeBoard(path: string): void {
 
 /** Closes every board (Hive quits). */
 export function closeAllBoards(): void {
-  for (const b of [...boards.values()]) closeBoard(b.path)
+  for (const [k, b] of [...boards]) closeOne(k, b)
 }
 
 // ---------------------------------------------------------------------------
@@ -1525,7 +1538,7 @@ export function leaseDb(workspacePath: string): DbLease {
       if (b.detached) b.db.close()
       // Whether a window has the workspace open is asked now, not when the lease began: one may have opened it since,
       // before or after this board was opened, and uses this connection as its board.
-      else if (b.transient && !held.has(keyOf(b.path)) && boards.get(keyOf(b.path)) === b) closeBoard(b.path)
+      else if (b.transient && !held.has(keyOf(b.path))) closeOne(keyOf(b.path), b)
     }
   }
 }
