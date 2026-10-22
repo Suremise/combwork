@@ -218,7 +218,7 @@ export const AREAS = [
   { paths: ['src/main/titleBar.ts', 'src/shared/titleBar.ts'], suites: ['carddialog'] },
   // A window fitted to the display it opens on (#812).
   { paths: ['src/main/windowBounds.ts'], suites: ['tabstrip', 'windows', 'closewindow', 'resize'] },
-  { paths: ['src/main/transcripts.ts', 'src/main/transcriptReads.ts', 'src/main/transcriptFiles.ts', 'src/renderer/src/views/SessionsTab.tsx', 'src/shared/sessionOrigin.ts', 'src/shared/sessionResume.ts', 'src/shared/sessionTree.ts'], suites: ['transcript', 'sessionorigin', 'sessionsize', 'sessiontree', 'sessioncleanup', 'loadfail', 'sessionname', 'packaged-transcript', 'purge'] },
+  { paths: ['src/main/transcripts.ts', 'src/main/transcriptReads.ts', 'src/main/transcriptFiles.ts', 'src/renderer/src/views/SessionsTab.tsx', 'src/shared/sessionOrigin.ts', 'src/shared/sessionResume.ts', 'src/shared/sessionTree.ts'], suites: ['transcript', 'sessionorigin', 'sessionsize', 'sessiontree', 'sessioncleanup', 'loadfail', 'sessionname', 'packaged-transcript', 'purge', 'overview'] },
   // Compressed backups (#1110): resumed from, sized in Storage, read in another language.
   { paths: ['src/main/transcriptFiles.ts'], suites: ['resume', 'storage', 'i18nlive'] },
   { paths: ['src/shared/sessionCleanup.ts', 'src/renderer/src/views/SessionCleanup.tsx'], suites: ['sessioncleanup', 'sessiontree'] },
