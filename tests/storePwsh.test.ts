@@ -54,9 +54,11 @@ describe('the Store PowerShell first on PATH (#585)', () => {
     if (process.platform === 'win32' && link) expect(storePwshFirst(real, process.env.LOCALAPPDATA, 'win32')).toBe(true)
   })
 
-  it('warns in Agent Setup: the symptom and the fix, no button (Hive never changes the shell)', () => {
+  it('warns in Agent Setup: a short label, then the problem, the symptom and the fix, no button (Hive never changes the shell)', () => {
     const issue = storePwshIssue()
-    expect(issue).toMatchObject({ id: 'store-pwsh', level: 'warning' })
+    expect(issue).toMatchObject({ id: 'store-pwsh', level: 'warning', message: 'PowerShell 7 from the Microsoft Store is installed' })
+    // The label is a badge and the window's banner (#1404): the explanation is the detail's first paragraph.
+    expect(issue.detail![0]).toMatch(/^Codex agents' commands can fail while a PowerShell 7 from the Microsoft Store is open/)
     expect(issue.action).toBeUndefined()
     expect(issue.detail!.join('\n')).toMatch(/CreateProcessAsUserW failed: 5/)
     expect(issue.detail!.join('\n')).toMatch(/winget install --id Microsoft\.PowerShell --source winget/)

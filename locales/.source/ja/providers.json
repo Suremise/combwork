@@ -45,6 +45,7 @@
   "providers.codex.sandbox.upgrade": "**Upgrade** switches Codex to its default sandbox, which runs commands under separate Windows accounts instead of your own. Windows asks for Administrator permission once. Codex agents that are running keep their sandbox until they restart.",
   "providers.codex.sandbox.upgradeAction": "Upgrade",
   "providers.codex.storePwsh.fix": "To avoid it, install PowerShell 7 from its installer instead of the Store (`winget install --id Microsoft.PowerShell --source winget`) and uninstall the Store one, then restart Hive and its Codex agents. Hive leaves your shell as it is.",
+  "providers.codex.storePwsh.label": "PowerShell 7 from the Microsoft Store is installed",
   "providers.codex.storePwsh.symptom": "The symptom: a Codex command fails at once with `CreateProcessAsUserW failed: 5` (access denied), and works again once every PowerShell 7 window and command is closed.",
   "providers.codex.storePwsh.warning": "Codex agents' commands can fail while a PowerShell 7 from the Microsoft Store is open: Codex's Windows sandbox can't start that PowerShell while another copy of it runs.",
   "providers.codex.stray.message": "{folder} holds {files}, which isn't Codex configuration (config.toml, agents, rules) or a file it names. Codex treats the folder as its own, and stray files in it (an agent's scratch or logs) can make every Codex agent's commands fail (\"setup refresh had errors\"). Move those files out of it (scratch belongs outside the project); leave Codex's configuration where it is.",

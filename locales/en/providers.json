@@ -183,6 +183,10 @@
     "defaultMessage": "To avoid it, install PowerShell 7 from its installer instead of the Store (`winget install --id Microsoft.PowerShell --source winget`) and uninstall the Store one, then restart Hive and its Codex agents. Hive leaves your shell as it is.",
     "description": "Agent Setup (#585), under the warning about the Microsoft Store's PowerShell 7: what to do. `…` marks a command to type: keep it as it is."
   },
+  "providers.codex.storePwsh.label": {
+    "defaultMessage": "PowerShell 7 from the Microsoft Store is installed",
+    "description": "Agent Setup and Settings → Providers (#585, #1404): the short label of the warning about the Microsoft Store's PowerShell 7 (a badge and the banner atop the window); the explanation follows under it."
+  },
   "providers.codex.storePwsh.symptom": {
     "defaultMessage": "The symptom: a Codex command fails at once with `CreateProcessAsUserW failed: 5` (access denied), and works again once every PowerShell 7 window and command is closed.",
     "description": "Agent Setup (#585), under the warning about the Microsoft Store's PowerShell 7: how the problem shows. `…` marks the error as Codex prints it: keep it as it is."

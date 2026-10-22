@@ -28,7 +28,7 @@ import { NonePlatform } from '../platform/nonePlatform'
 import { isUnknown, unknown, type Maybe } from '../platform/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
-import { NOT_RUN_HERE, queueLine, queueStateOf, type QueueLive } from './queueState'
+import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
 
 /** An Override's move when the user applied changed options to a card in flight (§16.11.4, OP-38). */
 export const APPLY_OPTIONS = 'applyOptions'
@@ -1236,6 +1236,8 @@ export class Workflow {
     const values: Record<string, string | number> = { card: card.key, queue: q.state }
     if (q.state === 'queued' || q.state === 'testing' || q.state === 'paused') values.target = q.target
     if (q.state === 'queued') values.n = q.position
+    // What the pause waits for (#1406): the refusal's next step says it.
+    if (q.state === 'paused') values.waits = pauseWait(q.reason, q.stuck)
     return { rule: 'merge.hiveMerges', values }
   }
 

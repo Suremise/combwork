@@ -132,6 +132,8 @@ interface HiveMessageValues {
   'workflow.option.sharedFolderWarning.title': undefined
   'workflow.option.stopOwnRuns.desc': undefined
   'workflow.option.stopOwnRuns.title': undefined
+  'workflow.option.strict.desc': undefined
+  'workflow.option.strict.title': undefined
   'workflow.option.style.desc': undefined
   'workflow.option.style.title': undefined
   'workflow.option.target.desc': undefined
@@ -179,6 +181,10 @@ interface HiveMessageValues {
   'workflow.refused.merge.hiveMerges.next': undefined
   'workflow.refused.merge.hiveMerges.nextMerged': undefined
   'workflow.refused.merge.hiveMerges.nextPaused': { target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedAnswer': { target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedFix': { target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedFolder': { target: string | number }
+  'workflow.refused.merge.hiveMerges.nextPausedRules': { target: string | number }
   'workflow.refused.merge.hiveMerges.nextQueued': { target: string | number; n: number }
   'workflow.refused.merge.hiveMerges.nextReturned': undefined
   'workflow.refused.merge.hiveMerges.nextTesting': { target: string | number }

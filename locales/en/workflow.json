@@ -523,6 +523,14 @@
     "defaultMessage": "Agents stop what they started before review",
     "description": "A workflow option (glossary 2.6, G13)."
   },
+  "workflow.option.strict.desc": {
+    "defaultMessage": "When the target branch has moved on since the review, Hive’s merge queue merges it into the card’s work (or rebases the work, with the Squash merge style) in its own folder, never on the builder’s branch. The review still counts if the result is the same change; if not, or if it conflicts, the card goes back to its builder.",
+    "description": "What the workflow option “Work is up to date with its target branch before it merges” does (glossary 2.1: merge queue; Squash is the merge style’s value)."
+  },
+  "workflow.option.strict.title": {
+    "defaultMessage": "Work is up to date with its target branch before it merges",
+    "description": "A workflow option (glossary 2.6, G8, strict): a card’s work must contain the target branch’s latest commit before it is merged; Hive’s merge queue brings it up to date itself."
+  },
   "workflow.option.style.desc": {
     "defaultMessage": "How a card’s work is merged into the target branch.",
     "description": "What the workflow option “Merge style” does."
@@ -710,6 +718,22 @@
   "workflow.refused.merge.hiveMerges.nextPaused": {
     "defaultMessage": "It is in the merge queue for {target}, which is paused until it is resumed: wait for Done, or for it to come back.",
     "description": "The next step after a refused merge of a card in a paused merge queue. {target} is a branch name."
+  },
+  "workflow.refused.merge.hiveMerges.nextPausedAnswer": {
+    "defaultMessage": "It is in the merge queue for {target}, which is paused until the user answers in For you: wait for Done, or for it to come back.",
+    "description": "The next step after a refused merge of a card in a merge queue paused for the user's answer (in For you: whether to update the branch now, or how to settle a merge Hive couldn't finish). {target} is a branch name."
+  },
+  "workflow.refused.merge.hiveMerges.nextPausedFix": {
+    "defaultMessage": "It is in the merge queue for {target}, which is paused until the user fixes what stopped it and resumes it: wait for Done, or for it to come back.",
+    "description": "The next step after a refused merge of a card in a merge queue paused by something only the user can fix (an error from git, say), then Resume. {target} is a branch name."
+  },
+  "workflow.refused.merge.hiveMerges.nextPausedFolder": {
+    "defaultMessage": "It is in the merge queue for {target}, which is paused until the user puts right the folder {target} is checked out in and resumes it: wait for Done, or for it to come back.",
+    "description": "The next step after a refused merge of a card in a merge queue paused for the folder its branch is checked out in (on another branch, files staged or changed, agents at work there). {target} is a branch name."
+  },
+  "workflow.refused.merge.hiveMerges.nextPausedRules": {
+    "defaultMessage": "It is in the merge queue for {target}, which paused while workflow rules were off and moves on once they are enforced again (if they already are, once the user resumes it): wait for Done, or for it to come back.",
+    "description": "The next step after a refused merge of a card in a merge queue that paused while the workflow rules were turned off: Hive resumes it when they are turned on again. {target} is a branch name."
   },
   "workflow.refused.merge.hiveMerges.nextQueued": {
     "defaultMessage": "It is in the merge queue for {target} (position {n, number}) and moves to Done once merged: wait for that, or for it to come back.",
