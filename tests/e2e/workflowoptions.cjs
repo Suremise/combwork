@@ -345,6 +345,72 @@ async function theForm(page, app, inv) {
     check('None: a folder per card pasted is refused, everyone works in the project folder', !!(await lib.until(async () => (await merging.innerText()).includes('everyone works in the project folder'), HUNG_MS)), await merging.innerText())
     await merging.getByRole('button', { name: 'Cancel' }).click()
 
+    // --- Reads answering late (HR5's round 1): a reload never replaces an edit made while it waited, an older read never
+    // replaces a newer one, and another project's form never shows while this one's is read. main answers from the forms
+    // as they are now (the models), each held read with the model of when it was asked.
+    const models = { [project]: await inv('workflow:form', project), [notes]: await inv('workflow:form', notes) }
+    await app.evaluate(({ ipcMain }, m) => {
+      globalThis.__wf = { hold: {}, held: [], models: m }
+      ipcMain.removeHandler('workflow:form')
+      ipcMain.handle('workflow:form', (_e, p) => {
+        const s = globalThis.__wf
+        if (s.hold[p]) return new Promise((r) => s.held.push({ p, r, m: s.models[p] }))
+        return s.models[p]
+      })
+    }, models)
+    const hold = (p, on) => app.evaluate((_, [x, v]) => void (globalThis.__wf.hold[x] = v), [p, on])
+    const release = (p) =>
+      app.evaluate((_, x) => {
+        const s = globalThis.__wf
+        for (const h of s.held.filter((y) => y.p === x)) h.r(h.m)
+        s.held = s.held.filter((y) => y.p !== x)
+      }, p)
+    const heldFor = (p) => app.evaluate((_, x) => globalThis.__wf.held.filter((y) => y.p === x).length, p)
+    const changedElsewhere = (p) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: p })
+    // After a release, a read of the window's own answered after it: the held answer has been taken (or dropped) by then.
+    const fence = (p) => inv('workflow:form', p)
+    // An edit made while a reload waits stays.
+    await hold(notes, true)
+    await changedElsewhere(notes)
+    check('a reload of notes is held', !!(await lib.until(async () => (await heldFor(notes)) > 0, HUNG_MS)))
+    await row('review').locator('select').selectOption('you')
+    await release(notes)
+    await hold(notes, false)
+    await fence(notes)
+    check('an edit made while a reload waited stays (You, not the read’s No one)', !!(await lib.until(async () => (await row('review').locator('select').inputValue()) === 'you', HUNG_MS)) && (await section.getByRole('button', { name: 'Discard Changes' }).isEnabled()))
+    await discard()
+    // An older read answering after a newer one is dropped.
+    await hold(notes, true)
+    await changedElsewhere(notes)
+    await lib.until(async () => (await heldFor(notes)) > 0, HUNG_MS)
+    await hold(notes, false)
+    await app.evaluate((_, x) => {
+      const m = globalThis.__wf.models[x]
+      globalThis.__wf.models[x] = { ...m, own: { ...m.own, excluded: ['dist'] } }
+    }, notes)
+    await changedElsewhere(notes)
+    check('the newer read shows', !!(await lib.until(async () => (await row('excluded').locator('input').inputValue()) === 'dist', HUNG_MS)))
+    await release(notes)
+    await fence(notes)
+    check('…and the older one, answering after it, is dropped', !!(await lib.until(async () => (await row('excluded').locator('input').inputValue()) === 'dist', HUNG_MS)))
+    // Another project's form never shows: web's reload held, notes selected while its own read is held, web's answer then.
+    await page.getByText('web', { exact: true }).first().click()
+    check('web’s form shown', !!(await lib.until(async () => (await section.getAttribute('data-platform').catch(() => null)) === 'git', HUNG_MS)))
+    await hold(project, true)
+    await changedElsewhere(project)
+    await lib.until(async () => (await heldFor(project)) > 0, HUNG_MS)
+    await hold(notes, true)
+    await page.getByText('notes', { exact: true }).first().click()
+    check('notes is selected while its read is held', !!(await lib.until(async () => (await page.locator('.project-header', { hasText: 'notes' }).count()) > 0 && (await heldFor(notes)) > 0, HUNG_MS)))
+    check('…and web’s form isn’t shown for it meanwhile', (await page.locator('.workflow-form[data-platform="git"]').count()) === 0)
+    await release(project)
+    await hold(project, false)
+    await fence(project)
+    check('web’s late answer doesn’t show under notes', !!(await lib.until(async () => (await page.locator('.workflow-form[data-platform="git"]').count()) === 0, HUNG_MS)))
+    await release(notes)
+    await hold(notes, false)
+    check('notes’ own form shows once its read answers', !!(await lib.until(async () => (await section.getAttribute('data-platform').catch(() => null)) === 'none', HUNG_MS)))
+
     // --- German, among the longest labels, and Polish: the groups and the presets.
     await page.getByText('web', { exact: true }).first().click()
     await reopen()

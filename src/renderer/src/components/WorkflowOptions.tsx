@@ -139,36 +139,68 @@ const sameOwn = (a: { preset: PresetId | null; options: Partial<WorkflowOptions>
 }
 
 export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
-  const [form, setForm] = useState<WorkflowForm | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [draft, setDraft] = useState<WorkflowChange | null>(null)
+  // The form as read and its draft, kept with the project they are for: another project's never shows (HR5's round 1).
+  const [loaded, setLoaded] = useState<{ for: string; form: WorkflowForm; draft: WorkflowChange } | null>(null)
+  const [failed, setFailed] = useState<{ for: string; error: string } | null>(null)
   const [problems, setProblems] = useState<WorkflowProblem[]>([])
   const [preview, setPreview] = useState<Choice | null>(null)
   const settings = useStore((s) => s.settings)
   const version = useStore((s) => s.workflowVersion)
   const workspaceLoops = loopDefaults({ loops: useStore((s) => s.workspace?.config.loops) })
-  const loadedFor = useRef<string | null>(null)
+  /** The project shown now (a read's answer for another is dropped), the newest read's number, and the draft's edits. */
+  const pathRef = useRef(project.path)
+  pathRef.current = project.path
+  const reads = useRef(0)
+  const edits = useRef(0)
+  const shownFor = useRef<string | null>(null)
   const dirtyRef = useRef(false)
+  const form = loaded?.for === project.path ? loaded.form : null
+  const draft = loaded?.for === project.path ? loaded.draft : null
+  const error = failed?.for === project.path ? failed.error : null
 
-  const load = useCallback(async (): Promise<void> => {
-    const path = project.path
-    try {
-      const f = await call('workflow:form', path)
-      if (project.path !== path) return
-      loadedFor.current = path
-      setForm(f)
-      setDraft({ preset: f.preset, options: { ...f.own } })
-      setProblems([])
-      setError(null)
-    } catch (e) {
-      setError(errorMessage(e))
-    }
-  }, [project.path])
+  /** The form as read (or saved) for a project, its draft reset to it; any read still under way is outdated by it. */
+  const show = useCallback((path: string, f: WorkflowForm): void => {
+    reads.current++
+    if (pathRef.current !== path) return
+    setLoaded({ for: path, form: f, draft: { preset: f.preset, options: { ...f.own } } })
+    setProblems([])
+    setFailed(null)
+  }, [])
+  /** An edit of the draft (by the user: a reload under way never replaces it). */
+  const setDraft = (change: WorkflowChange): void => {
+    edits.current++
+    setLoaded((l) => (l && l.for === pathRef.current ? { ...l, draft: change } : l))
+  }
+  /**
+   * Reads the project's form. Only the newest read's answer is shown, and only while its project is shown; a reload
+   * (`auto`: the options changed elsewhere) is dropped if the draft was edited while it waited.
+   */
+  const load = useCallback(
+    async (auto: boolean): Promise<void> => {
+      const path = project.path
+      const n = ++reads.current
+      const edited = edits.current
+      try {
+        const f = await call('workflow:form', path)
+        if (n !== reads.current || pathRef.current !== path || (auto && edits.current !== edited)) return
+        show(path, f)
+      } catch (e) {
+        if (n === reads.current && pathRef.current === path) setFailed({ for: path, error: errorMessage(e) })
+      }
+    },
+    [project.path, show]
+  )
   // Read for each project, and again when its options change elsewhere (`workflow-changed`: the Assistant's tool, another
   // window) while nothing here is unsaved; unsaved edits stay, and their Save is refused as changed meanwhile.
   useEffect(() => {
-    if (loadedFor.current === project.path && dirtyRef.current) return
-    void load()
+    const again = shownFor.current === project.path
+    shownFor.current = project.path
+    if (!again) {
+      setPreview(null)
+      setProblems([])
+    }
+    if (again && dirtyRef.current) return
+    void load(again)
   }, [load, project.path, version])
 
   const effective = useMemo((): WorkflowOptions | null => (form && draft ? ({ ...form.inherited, ...draft.options, platform: form.platform } as WorkflowOptions) : null), [form, draft])
@@ -222,18 +254,15 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
       content: <SaveDetails changes={changes} check={check} picked={picked} />,
       confirmLabel: tr(T.save).replace(/…$/, ''),
       run: async () => {
+        const path = project.path
         try {
-          const f = await call('workflow:setOptions', project.path, change, { applyTo: [...picked] })
-          setForm(f)
-          setDraft({ preset: f.preset, options: { ...f.own } })
+          show(path, await call('workflow:setOptions', path, change, { applyTo: [...picked] }))
         } catch (e) {
           // Changed meanwhile (the Assistant's tool, another window): never written over; shown as it is now.
-          const now = await call('workflow:form', project.path).catch(() => null)
+          const now = await call('workflow:form', path).catch(() => null)
           if (!now || sameOwn({ preset: now.preset, options: now.own }, { preset: form.preset, options: form.own })) throw e
           stale = true
-          setForm(now)
-          setDraft({ preset: now.preset, options: { ...now.own } })
-          setProblems([])
+          show(path, now)
         }
       }
     })
