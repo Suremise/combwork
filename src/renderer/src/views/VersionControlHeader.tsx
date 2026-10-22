@@ -131,11 +131,14 @@ function SwitchDetails({ project, check, names }: { project: ProjectInfo; check:
   )
 }
 
-/** The offer Hive makes when what it detects differs from the platform in force (§16.3.5), until Not now. */
-function PlatformOfferLine({ project, platform }: { project: ProjectInfo; platform: PlatformId }) {
-  const [, redraw] = useState(0)
+/** The offer shown under the header (§16.3.5): the project's, unless Not now hid it until Hive starts again. */
+function shownOffer(project: ProjectInfo): PlatformOffer | null {
   const o = project.platform?.offer
-  if (!o || hiddenOffers.has(offerKey(project.path, o))) return null
+  return o && !hiddenOffers.has(offerKey(project.path, o)) ? o : null
+}
+
+/** The offer Hive makes when what it detects differs from the platform in force (§16.3.5), until Not now. */
+function PlatformOfferLine({ project, platform, o, onHide }: { project: ProjectInfo; platform: PlatformId; o: PlatformOffer; onHide: () => void }) {
   const d = project.platform!.detected
   const text = o.why === 'gitFound' ? tr(S.gitFound, { root: d.root ?? project.path }) : o.why === 'otherFound' ? tr(S.otherFound, { vcs: d.other ?? '' }) : tr(S.repositoryGone)
   return (
@@ -151,7 +154,7 @@ function PlatformOfferLine({ project, platform }: { project: ProjectInfo; platfo
           data-action="vc-offer-notnow"
           onClick={() => {
             hiddenOffers.add(offerKey(project.path, o))
-            redraw((n) => n + 1)
+            onHide()
           }}
         >
           {tr(S.notNow)}
@@ -200,6 +203,9 @@ export function VersionControlHeader({ project, platform }: { project: ProjectIn
   useLanguage()
   const form = useWorkflowForm(project)
   const preset = form ? presetState(form) : null
+  const [, redraw] = useState(0)
+  // The offer says what Hive found, with its action: the fact line beside the choice waits until it's hidden (Not now).
+  const offer = shownOffer(project)
   return (
     <>
       <div className="vc-head" data-vc-head="">
@@ -223,7 +229,7 @@ export function VersionControlHeader({ project, platform }: { project: ProjectIn
             )
           })}
         </div>
-        {project.platform && (
+        {project.platform && !offer && (
           <span className={cx('vc-fact', 'faint', project.platform.detected.other || (platform === 'git' && project.platform.detected.platform !== 'git') ? 'caution' : null)} data-vc-fact="">
             {factText(project.platform)}
           </span>
@@ -236,7 +242,7 @@ export function VersionControlHeader({ project, platform }: { project: ProjectIn
           </Tooltip>
         )}
       </div>
-      <PlatformOfferLine project={project} platform={platform} />
+      {offer && <PlatformOfferLine project={project} platform={platform} o={offer} onHide={() => redraw((n) => n + 1)} />}
     </>
   )
 }

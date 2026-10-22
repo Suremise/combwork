@@ -1080,7 +1080,8 @@ export function pushToast(t: ToastMessage): void {
   }))
   if (t.quiet) return
   const timeout = t.timeoutMs ?? (t.level === 'error' ? 12000 : t.actions?.length ? 15000 : 6000)
-  setTimeout(() => dismissToast(t.id), timeout)
+  // This toast's own time: one that replaced it under the same id (a project's newer notice, #1419) keeps its own.
+  setTimeout(() => set((s) => ({ toasts: s.toasts.filter((x) => x !== t) })), timeout)
 }
 
 export function dismissToast(id: string): void {

@@ -1127,7 +1127,8 @@ export class WorkspaceService {
     else log.info(`${userText(basename(projectPath))} is a ${p.id} project; its folder now says ${p.detected.platform}${p.detected.other ? ` (${p.detected.other} found)` : ''}`)
     // An offer has its button to the tab that makes it (#1419); an unknown setting is fixed in project.json.
     const actions = p.offer ? [{ label: tr(M.openVc), command: 'project.openVersionControl', args: [projectPath] }] : undefined
-    this.emit({ type: 'toast', toast: { id: randomUUID(), level: p.invalid !== undefined ? 'warning' : 'info', ...platformNotice(basename(projectPath), p), ...(actions ? { actions } : {}), source: projectPath, timestamp: new Date().toISOString() } })
+    // One notice per project: a newer detection replaces the one before it rather than stacking (#1419).
+    this.emit({ type: 'toast', toast: { id: `platform:${key}`, level: p.invalid !== undefined ? 'warning' : 'info', ...platformNotice(basename(projectPath), p), ...(actions ? { actions } : {}), source: projectPath, timestamp: new Date().toISOString() } })
   }
 
   /** Whether project.json was written after this read of it began (#999). */

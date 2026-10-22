@@ -161,6 +161,27 @@ describe('in ProjectInfo', () => {
     expect(notices(p).map((t) => t.message)).toEqual(["beta's Git repository is gone. Git's rules hold, so its cards can't move on until the repository is back or you switch the project to None in its Version Control tab."])
   })
 
+  it("one notice per project: a newer detection replaces the earlier one, in Hive's language (#1419)", async () => {
+    const p = await project('gamma', gitInit)
+    renameSync(join(p, '.git'), join(p, 'moved.git'))
+    await info(p)
+    mkdirSync(join(p, '.hg'))
+    const { setLanguage } = await import('../src/shared/i18n')
+    const { loadCatalogue } = await import('../src/shared/i18n/catalogues')
+    setLanguage('de', await loadCatalogue('de'), 'de')
+    try {
+      await info(p)
+    } finally {
+      setLanguage('en', {})
+    }
+    const said = notices(p)
+    expect(said).toHaveLength(2)
+    // The same id: the window shows the newer in the older's place, never both.
+    expect(new Set(said.map((t) => t.id))).toEqual(new Set([`platform:${p.toLowerCase()}`]))
+    expect(said[1].title).not.toBe(said[0].title)
+    expect(said[1].actions?.[0].label).not.toBe('Open Version Control')
+  })
+
   it('a project.json naming no platform stays readable, with a warning said once', async () => {
     const p = join(ws, 'delta')
     mkdirSync(join(p, '.hive'), { recursive: true })

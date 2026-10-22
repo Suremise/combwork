@@ -1133,7 +1133,7 @@ If the version control changed while the dialog was open (switched in another wi
 - **The Git repository is gone** (`.git` removed or moved): Git's rules hold until you switch, because what they check can't be read: a card's start or submit is refused, saying so, with the switch to None as the next step. **Switch to None…**, or put the repository back.
 - **Mercurial or Jujutsu found** in a Git project (a colocated `.jj` beside `.git` counts as Jujutsu): not supported yet, so **Switch to None…** is offered and Git can't be chosen.
 
-**Not Now** hides the offer until Hive starts again; the line beside the choice still says what Hive finds.
+While an offer shows, it says what Hive found; **Not Now** hides it until Hive starts again, and the line beside the choice says it instead. A project has one notice at a time: a later change replaces the one before.
 
 **A project inside a larger repository** (its folder is a subfolder of a Git repository) is Git, and the tab says that branch and merge actions affect that whole repository. So when Hive or the agent merges, the project must name the branch its work merges into itself (**Target branch** in Workflow): options that would merge into the whole repository's default branch are refused when you save them, saying so. If a card's options name none anyway (from before), the merge queue pauses at it, saying how to go on.
 

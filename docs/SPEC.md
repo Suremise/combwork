@@ -1210,8 +1210,10 @@ Everything is visible in the Version Control tab itself, not only through the As
 - **Offers** (`ProjectPlatform.offer`) show under the tab's header: `gitFound` "Git found at <root>: switch to Git?"
   with **Switch…** and **Not Now**; `repositoryGone` "The Git repository is gone. Git's rules hold until you switch…"
   with **Switch to None…**; `otherFound` "Mercurial found: not supported yet, so this project can only use None" with
-  **Switch to None…**. Not Now hides an offer until Hive starts again (in memory); the fact line still says it. The
-  once-per-start notice (`sayPlatform`) gains **Open Version Control**. Initialise repository… on None's page brings the
+  **Switch to None…**. Not Now hides an offer until Hive starts again (in memory). The fact is said once: while an
+  offer shows, the fact line beside the choice is hidden, and after Not Now it says what was found ("Mercurial found in
+  this folder: not supported yet." while Git is in force). The once-per-start notice (`sayPlatform`) gains **Open
+  Version Control**, one per project (`platform:<path>`): a newer detection replaces the one before it. Initialise repository… on None's page brings the
   `gitFound` offer without a restart (the refresh after it). Each switch goes through §16.6.5's warning.
 - **The repository gone (S20):** Git's rules hold. A Git card's start or submit refused for what can't be read
   (`platform.unknown`) carries `offer: repositoryGone` while detection finds no Git repository, and its next step is
