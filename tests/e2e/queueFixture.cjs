@@ -187,6 +187,14 @@ function mergeOn(fx, branch, revision, message) {
 const head = (fx, ref = 'integration') => lib.git(fx.alpha, ['rev-parse', ref]).trim()
 
 /**
+ * The Task Board shown, its button clicked only when it isn't (#1459): clicking it on a shown board toggles the sidebar,
+ * which moves the board's cards (280 px in S14) after Playwright has read where to click one, so the click misses.
+ */
+async function showBoard(page) {
+  if (!(await page.locator('.board').isVisible())) await page.getByRole('button', { name: 'Task Board' }).click()
+}
+
+/**
  * Helpers for suites merging into `main` checked out in the project folder (#1351): the options, the folder's status
  * (tracked files only), Hive's merge commits of a card on main (never two), a file's text as written (any line ending),
  * a card by its title, screenshots in both themes, and a card's For you section in its dialog.
@@ -206,7 +214,7 @@ function folderHelpers(fx) {
       await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     },
     forYouSection: async (h, n) => {
-      await h.page.getByRole('button', { name: 'Task Board' }).click()
+      await showBoard(h.page)
       await h.page.locator(`.task-card[data-task="${n}"]`).click()
       const d = h.page.locator('.dialog').filter({ has: h.page.locator('.task-title-input') })
       await d.waitFor({ timeout: HUNG_MS })
@@ -264,4 +272,4 @@ function otherProfile(fx, suffix) {
   return { ...fx, userData }
 }
 
-module.exports = { HUNG_MS, queueProject, prepare, steer, queueOptions, startHive, agent, rejoin, intent, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, checkWith, restoreCheck, mergesTab, otherProfile }
+module.exports = { HUNG_MS, queueProject, prepare, steer, queueOptions, startHive, agent, rejoin, intent, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, checkWith, restoreCheck, mergesTab, otherProfile }
