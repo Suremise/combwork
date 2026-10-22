@@ -14,8 +14,8 @@ export type QueueState =
   | { state: 'queued'; target: string; position: number }
   /** The queue's entry now, at its step (null: another Hive runs the queue, or its advance is recovered, step unknown). */
   | { state: 'testing'; target: string; step: QueueStep | null }
-  /** In the queue, which is paused for its target (`card`: the card it paused on). */
-  | { state: 'paused'; target: string; reason: PauseReason; card: string }
+  /** In the queue, which is paused for its target (`card`: the card it paused on; `stuck`: an interrupted advance, asked in For you). */
+  | { state: 'paused'; target: string; reason: PauseReason; card: string; stuck?: true }
   /** Back from the queue to its builder: a conflict, red checks, a hook (`failure`: what came back, as recorded). */
   | { state: 'returned'; reason: IntegrationFailReason; transient: boolean; failure: FactData['IntegrationFailed'] }
   /** Left the queue: it isn't approved any more (its pass stale, or a decision since). */
@@ -33,8 +33,8 @@ export function queueStateOf(wf: Workflow, card: CardRecord, s: CardState = wf.s
     const order = queueOrder(wf, open.target)
     // The one testing now finishes its step even with the queue paused.
     if (order.testing?.entry === open.id) return { state: 'testing', target: open.target, step: order.testing.step }
-    const pause = wf.store.queuePause(open.target) as { reason: PauseReason; card: string } | null
-    if (pause) return { state: 'paused', target: open.target, reason: pause.reason, card: pause.card }
+    const pause = wf.store.queuePause(open.target) as { reason: PauseReason; card: string; stuck?: unknown } | null
+    if (pause) return { state: 'paused', target: open.target, reason: pause.reason, card: pause.card, ...(pause.stuck ? { stuck: true as const } : {}) }
     return { state: 'queued', target: open.target, position: order.queued.findIndex((q) => q.entry === open.id) + 1 }
   }
   const last = s.entries.at(-1)
@@ -113,6 +113,49 @@ export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.qu
 }
 
 /**
+ * What a paused queue waits for (#1406), by its pause as the queue saved it (read only): the user's answer in For you
+ * (the question to update a checked-out target now, which Resume doesn't stand in for; a stuck advance's Decide, or
+ * Resume once settled), a step that needs the user fixed and Resume (a needs-you pause with no question: git's error, an
+ * earlier runner's process), the folder its target is checked out in put right (Resume checks it first), or the rules
+ * enforced again (Hive resumes it then: queueHost's startOpen); anything else, the user's Resume.
+ */
+export type PauseWait = 'resume' | 'answer' | 'fix' | 'folder' | 'rules'
+
+export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
+  switch (reason) {
+    case 'approval':
+      return 'answer'
+    case 'needsYou':
+      return stuck ? 'answer' : 'fix'
+    case 'wrongBranch':
+    case 'staged':
+    case 'unstagedChanges':
+    case 'folderBusy':
+      return 'folder'
+    case 'rulesOff':
+      return 'rules'
+    default:
+      return 'resume'
+  }
+}
+
+/** A paused queue's "it moves on once …" for agents: what the pause waits for, never a step of the agent's own. */
+function pausedWaits(q: Extract<QueueState, { state: 'paused' }>): string {
+  switch (pauseWait(q.reason, q.stuck)) {
+    case 'answer':
+      return q.reason === 'approval' ? `it moves on once the user answers, in For you, whether to update ${q.target} now` : 'it moves on once the user settles its interrupted advance (their answer in For you, or Resume)'
+    case 'fix':
+      return 'it moves on once the user fixes what stopped it and resumes it'
+    case 'folder':
+      return `it moves on once the user puts right the folder ${q.target} is checked out in and resumes it`
+    case 'rules':
+      return 'it paused while workflow rules were off; it moves on once they are enforced again (if they already are, once the user resumes it)'
+    case 'resume':
+      return 'it moves on once the user resumes it'
+  }
+}
+
+/**
  * The card's queue state in a sentence for agents (English: agent-facing). `enforced` false (Settings → Advanced:
  * workflow rules not enforced): nothing refuses, so the agent merges and reports as before 1.0.
  */
@@ -125,7 +168,7 @@ export function queueLine(q: QueueState, enforced = true): string {
     case 'testing':
       return `${who} The merge queue is ${q.step === 'advance' ? `moving ${q.target} to its merge` : q.step === 'checks' ? `running the merge checks on its merge into ${q.target}` : `testing its merge into ${q.target}`} now; it moves to Done once merged.`
     case 'paused':
-      return `${who} It is in the merge queue for ${q.target}, which is paused (${q.reason}, on ${q.card}); it moves on once the user resumes it.`
+      return `${who} It is in the merge queue for ${q.target}, which is paused (${q.reason}, on ${q.card}); ${pausedWaits(q)}.`
     case 'returned':
       return `${who} ${returnedText('It', q.failure, READ_MAX, READ_LINES)}`
     case 'left':
