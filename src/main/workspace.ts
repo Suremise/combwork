@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'crypto'
 import { basename, dirname, join, resolve, sep } from 'path'
 import { mkdir, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, statSync, watch, type FSWatcher as RootWatcher } from 'original-fs'
-import { closeBoard, keepBoard, letGoBoard } from './boardStore'
+import { closeBoard } from './boardStore'
 import { closeJournal } from './journal'
 import { AsyncLocalStorage } from 'async_hooks'
 import type { BrowserWindow } from 'electron'
@@ -19,7 +19,7 @@ import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSess
 import { config } from './config'
 import { emit, emitTo } from './events'
 import { containsPlace, insideReal, isDir, placeKey, readJson, readKeptJson, removePath, samePlace, withFileLock, writeKeptJson } from './fsutil'
-import { markClosed, markOpen, setFenceReason } from './openingFence'
+import { admit, dismiss, setFenceReason } from './openingFence'
 import { createLogger, userText } from './logger'
 import { changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
@@ -280,7 +280,7 @@ export class WorkspaceService {
     if (!(await isDir(abs))) throw hiveError(msg({ id: 'service.workspace.notFound', defaultMessage: 'Folder not found: {folder}', description: 'An error opening a workspace: the folder {folder} is not there.' }), { folder: abs })
     // One workspace inside another would make its projects belong to both. Windows claim their folders one
     // at a time, so two opening at once can't both pass the check before either has claimed its own.
-    const admit = admission.then(async () => {
+    const claim = admission.then(async () => {
       // By real paths: the same folder by another name (an 8.3 short name, a junction) is the same workspace (#455).
       for (const w of services) {
         if (w === this || !w.path) continue
@@ -292,12 +292,25 @@ export class WorkspaceService {
       this.generation++
       this.path = abs
       this.place = placeKey(abs)
-      markOpen(abs)
-      // A save's lease doesn't close the database now it is this window's, opened before or after (#1383).
-      keepBoard(abs)
+      // Its databases are kept open from now on, by this place (#1395); a save's lease doesn't close the database now it
+      // is this window's, opened before or after (#1383).
+      admit(this.place)
     })
-    admission = admit.catch(() => undefined)
-    await admit
+    admission = claim.catch(() => undefined)
+    await claim
+    // An open that fails from here gives back what it took (its admission, what it opened), unless another open or a
+    // close of this window has taken over meanwhile.
+    const gen = this.generation
+    try {
+      return await this.opened(abs)
+    } catch (e) {
+      if (this.generation === gen && this.path === abs) await this.close().catch((c) => log.warn('closing a workspace whose open failed', c))
+      throw e
+    }
+  }
+
+  /** The rest of open, once the window holds the folder. */
+  private async opened(abs: string): Promise<WorkspaceInfo> {
     const fresh = !existsSync(join(abs, HIVE_DIR))
     await this.ensureWorkspaceStructure()
     this.wsConfig = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), withoutSkillSwitches(await readKeptJson(join(this.hiveDir, 'workspace.json'), {})))
@@ -348,8 +361,8 @@ export class WorkspaceService {
     this.life.abort(reason)
     const closing = this.path
     const place = this.place ?? undefined
-    // First: from here, nothing opens its databases again until a window opens it again (#1379), whoever asks.
-    if (closing) markClosed(place ?? closing)
+    // First: from here, nothing keeps its databases open until a window opens it again (#1395), whoever asks.
+    if (place) dismiss(place)
     if (closing) {
       for (const l of WorkspaceService.closingListeners) {
         try {
@@ -373,7 +386,6 @@ export class WorkspaceService {
     // only once it has, so a project's folder can be moved as soon as its window lets it go (#1341: EPERM renaming it). No
     // new one is scheduled from the abort on (scheduleRefresh).
     while (this.scheduledRuns.size) await Promise.allSettled([...this.scheduledRuns])
-    if (closing) letGoBoard(closing)
     if (closing) closeBoard(closing, place)
     if (closing) closeJournal(join(closing, HIVE_DIR, ASSISTANT_DIR))
     await this.watcher?.close()

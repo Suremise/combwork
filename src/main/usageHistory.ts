@@ -18,7 +18,7 @@ import { cardHolds, type CardHolds } from './tasks'
 import { usageFile, type SessionId, type SessionMeta, type StoredSession } from './usageDb'
 import type { IngestJob, IngestResult, KeptJob, ReadResult, ReadSeed, WorkerReply, WorkerRequest } from './usageWorker'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
-import { assertNotFencedOut, fencedOut } from './openingFence'
+import { assertAdmitted, refusal } from './openingFence'
 
 const log = createLogger('usage')
 
@@ -241,11 +241,16 @@ class UsageHistory {
 
   /** A request to the worker, the settings it reads sent first when they changed. */
   private async call<T>(body: Body): Promise<T> {
-    // A closed workspace's usage.db isn't opened again until a window opens it (#1379); a read goes on without the
-    // session's saved state there.
-    if (body.type !== 'close' && 'file' in body) assertNotFencedOut(body.file)
-    if (body.type === 'read' && body.seed && fencedOut(body.seed.file)) body = { ...body, seed: null }
+    // A workspace's usage.db is opened only while a window holds it (#1395: the worker keeps it open); a read goes on
+    // without the session's saved state in one no window holds. Asked again once the worker is there, with nothing
+    // awaited from then to the request: a close meanwhile refuses it.
+    const admitted = (b: Body): Body => {
+      if (b.type !== 'close' && 'file' in b) assertAdmitted(b.file)
+      return b.type === 'read' && b.seed && refusal(b.seed.file) ? { ...b, seed: null } : b
+    }
+    body = admitted(body)
     const send = await this.transport()
+    body = admitted(body)
     const cfg = JSON.stringify({ advanced: resolvedValues(advanced), providers: config.settings.providers, hiveVersion: appVersion(), cacheSize: usageCacheSize() })
     if (cfg !== this.sentConfig) {
       this.sentConfig = cfg

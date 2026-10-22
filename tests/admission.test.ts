@@ -1,0 +1,255 @@
+// Admission (#1395): a workspace's databases are kept open only while a window holds it. Its window admits it as it opens
+// (by the place it recorded) and dismisses it first as it closes; an open that fails gives it back; nothing about closed
+// workspaces is kept. A persistent reader of one no window holds is refused, also while a connection to it is still open;
+// what must reach a workspace no window holds (the Assistant told of an unexpected close at start) goes on a transient
+// open of its own (leaveEntry, leaveDelivery) that leaves no handle, and never admits it.
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
+import { join } from 'path'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import * as electron from 'electron'
+import { tempDir } from './tempDir'
+
+const base = tempDir('hive-admission-')
+;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
+
+const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
+const fence = await import('../src/main/openingFence')
+const board = await import('../src/main/boardStore')
+const journal = await import('../src/main/journal')
+const deliveries = await import('../src/main/deliveries')
+const { sessions } = await import('../src/main/sessions')
+const { usageHistory } = await import('../src/main/usageHistory')
+const { placeKey } = await import('../src/main/fsutil')
+const { journalSettings } = await import('../src/shared/journal')
+
+let n = 0
+/** A new workspace folder with a project (its stable id given: #508) whose agent reads an inbox. */
+function workspace(): string {
+  const ws = join(base, `ws-${++n}`)
+  mkdirSync(join(ws, 'proj', '.hive'), { recursive: true })
+  writeFileSync(join(ws, 'proj', '.hive', 'project.json'), JSON.stringify({ version: 2, id: `p-${n.toString(16).padStart(12, '0')}`, agents: [{ id: 'b1', name: 'B1' }] }))
+  return ws
+}
+/** Whether nothing holds the folder's files open: Windows won't rename a folder with an open SQLite file in it. */
+function nothingOpen(ws: string): boolean {
+  try {
+    renameSync(ws, `${ws}-moved`)
+  } catch {
+    return false
+  }
+  renameSync(`${ws}-moved`, ws)
+  return true
+}
+const settings = journalSettings({ enabled: true })
+const fact = (summary: string) => ({ kind: 'event', summary })
+const delivery = (body: string) => ({ agentId: 'b1', agentName: 'B1', conversation: null, kind: 'control' as const, from: { kind: 'hive' as const, name: 'Hive' }, body })
+
+let w: ReturnType<typeof createWorkspaceService>
+const elsewhere = join(base, 'elsewhere')
+
+beforeAll(() => {
+  mkdirSync(join(elsewhere, 'proj', '.hive'), { recursive: true })
+  mkdirSync(join(base, 'profile'), { recursive: true })
+  // No agent runs: nothing is typed, deliveries only wait.
+  Object.assign(sessions, { liveFor: () => null, setInbox: () => undefined })
+  deliveries.followWorkspaceCloses()
+  w = createWorkspaceService()
+})
+afterAll(async () => {
+  deliveries.setInLeaveForTests(null)
+  await disposeWorkspaceService(w)
+  await usageHistory.stop()
+  journal.closeAllJournals()
+})
+
+describe('admission follows the window (#1395)', () => {
+  it('admitted once as a window opens it, dismissed as it closes: however many open and close, nothing is kept', async () => {
+    const before = fence.admittedCount()
+    for (let i = 0; i < 20; i++) {
+      const ws = workspace()
+      await w.open(ws)
+      expect(fence.admittedCount()).toBe(before + 1)
+      expect(fence.refusal(join(ws, '.hive', 'hive.db'))).toBeNull()
+    }
+    await w.close()
+    expect(fence.admittedCount()).toBe(before)
+  })
+
+  it('a second window on the same folder, or one inside it, is refused and admits nothing', async () => {
+    const ws = workspace()
+    await w.open(ws)
+    const before = fence.admittedCount()
+    const other = createWorkspaceService()
+    try {
+      await expect(other.open(ws)).rejects.toThrow(/already open/)
+      await expect(other.open(join(ws, 'proj'))).rejects.toThrow(/inside the workspace/)
+      expect(fence.admittedCount()).toBe(before)
+    } finally {
+      await disposeWorkspaceService(other)
+    }
+    await w.close()
+  })
+
+  it('an open that fails once it holds the folder gives its admission back and leaves nothing open', async () => {
+    const before = fence.admittedCount()
+    const ws = join(base, `broken-${++n}`)
+    mkdirSync(ws, { recursive: true })
+    // Its .hive a file: the workspace's folders can't be made there.
+    writeFileSync(join(ws, '.hive'), 'not a folder')
+    await expect(w.open(ws)).rejects.toThrow()
+    expect(fence.admittedCount()).toBe(before)
+    expect(w.path).toBeNull()
+    expect(nothingOpen(ws)).toBe(true)
+  })
+})
+
+describe("the journal (#1395)", () => {
+  it("a journal still open once its workspace was dismissed is refused to a reader, which doesn't keep it", async () => {
+    const ws = workspace()
+    await w.open(ws)
+    const home = w.assistantHome
+    journal.writeEntry(home, settings, fact('before the close'), 'hive')
+    // Dismissed, its connection not closed yet (as between the close's first step and closeJournal).
+    fence.dismiss(placeKey(ws))
+    try {
+      expect(() => journal.recall(home, {})).toThrow('The workspace was closed')
+      expect(() => journal.writeEntry(home, settings, fact('late'), 'hive')).toThrow('The workspace was closed')
+    } finally {
+      fence.admit(placeKey(ws))
+    }
+    await w.close()
+    expect(nothingOpen(ws)).toBe(true)
+  })
+
+  it('an entry left for a workspace no window holds is written on a connection of its own, closed again; a failing one leaves nothing open either', async () => {
+    const ws = workspace()
+    const home = join(ws, '.hive', 'assistant')
+    mkdirSync(home, { recursive: true })
+    const id = journal.leaveEntry(home, settings, fact('Hive closed unexpectedly'), 'hive')
+    expect(id).toBeGreaterThan(0)
+    expect(nothingOpen(ws)).toBe(true)
+    expect(() => journal.recall(home, {})).toThrow('The workspace was closed')
+    // A link to an entry there isn't: refused in its transaction, the connection closed all the same.
+    expect(() => journal.leaveEntry(home, settings, { ...fact('linked'), links: [{ type: 'entry', ref: '999' }] }, 'hive')).toThrow(/no entry 999/)
+    expect(nothingOpen(ws)).toBe(true)
+    // Its window opens it: the entry is there, in the journal it keeps open.
+    await w.open(ws)
+    expect(journal.recall(w.assistantHome, { query: 'unexpectedly' }).map((r) => r.id)).toEqual([id])
+    // Admitted, an entry left goes through the window's journal, which stays open.
+    journal.leaveEntry(w.assistantHome, settings, fact('while open'), 'hive')
+    expect(nothingOpen(ws)).toBe(false)
+    await w.close()
+    expect(nothingOpen(ws)).toBe(true)
+  })
+})
+
+describe('deliveries (#1395)', () => {
+  it('a delivery left for a workspace no window holds is saved on a lease and kept by nobody; its next open loads it', async () => {
+    const ws = workspace()
+    const host = join(ws, 'proj')
+    const before = fence.admittedCount()
+    const r = (await deliveries.leaveDelivery(host, delivery('Hive closed unexpectedly')))!
+    expect(r.state).toBe('queued')
+    expect(fence.admittedCount()).toBe(before)
+    expect(deliveries.deliveryNow(host, r.id)).toBeNull()
+    expect(board.boardOpen(ws)).toBe(false)
+    expect(nothingOpen(ws)).toBe(true)
+    await expect(deliveries.load(host)).rejects.toThrow('The workspace was closed')
+    // A second one takes the next id.
+    const r2 = (await deliveries.leaveDelivery(host, delivery('again')))!
+    expect(r2.seq).toBe(r.seq + 1)
+    await w.open(ws)
+    await deliveries.loadsForTests()
+    expect((await deliveries.deliveriesOf(host, 'b1')).map((x) => [x.id, x.body])).toEqual([
+      [r.id, 'Hive closed unexpectedly'],
+      [r2.id, 'again']
+    ])
+    await w.close()
+    expect(nothingOpen(ws)).toBe(true)
+  })
+
+  it('a leased delivery that fails leaves nothing saved and nothing open', async () => {
+    const ws = workspace()
+    const host = join(ws, 'proj')
+    deliveries.setInLeaveForTests(() => {
+      throw new Error('disk gone (test)')
+    })
+    try {
+      await expect(deliveries.leaveDelivery(host, delivery('lost'))).rejects.toThrow('disk gone (test)')
+    } finally {
+      deliveries.setInLeaveForTests(null)
+    }
+    expect(board.boardOpen(ws)).toBe(false)
+    expect(nothingOpen(ws)).toBe(true)
+    await w.open(ws)
+    await deliveries.loadsForTests()
+    expect(await deliveries.deliveriesOf(host, 'b1')).toEqual([])
+    await w.close()
+  })
+
+  it("a window opening the workspace while a delivery is left: the lease doesn't close the window's board, and the window has the delivery", async () => {
+    const ws = workspace()
+    const host = join(ws, 'proj')
+    deliveries.setInLeaveForTests(async () => {
+      deliveries.setInLeaveForTests(null)
+      await w.open(ws)
+    })
+    const r = (await deliveries.leaveDelivery(host, delivery('while opening')))!
+    expect(board.boardOpen(ws)).toBe(true)
+    expect(nothingOpen(ws)).toBe(false)
+    // Nothing here loads the host's deliveries until asked (no initDeliveries): read once the lease has saved.
+    expect((await deliveries.deliveriesOf(host, 'b1')).map((x) => x.id)).toContain(r.id)
+    await w.close()
+    expect(nothingOpen(ws)).toBe(true)
+  })
+})
+
+describe('the usage worker (#1395)', () => {
+  it("a request whose workspace closes while it waits for the worker is refused once it's there, and leaves usage.db closed", async () => {
+    const ws = workspace()
+    await w.open(ws)
+    // The worker reached only once the window has switched away (as its first start, a module loaded, can be slow).
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    let waiting = false
+    const hist = usageHistory as unknown as { transport: () => Promise<unknown> }
+    const transport = hist.transport.bind(hist)
+    const spy = vi.spyOn(hist, 'transport').mockImplementationOnce(async () => {
+      waiting = true
+      await held
+      return transport()
+    })
+    try {
+      const asked = usageHistory.storedSessions(ws, null)
+      await vi.waitFor(() => expect(waiting).toBe(true), { timeout: 10_000 })
+      await w.open(elsewhere)
+      release()
+      await expect(asked).rejects.toThrow('The workspace was closed')
+    } finally {
+      spy.mockRestore()
+    }
+    expect(nothingOpen(ws)).toBe(true)
+    await w.close()
+  })
+})
+
+describe("the rule's owner (#1395)", () => {
+  it("only a window's workspace admits and dismisses: no other code in src/main imports them", () => {
+    const importers: string[] = []
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = join(dir, e.name)
+        if (e.isDirectory()) walk(p)
+        else if (e.name.endsWith('.ts')) {
+          const text = readFileSync(p, 'utf8')
+          const from = [...text.matchAll(/import\s*\{([^}]*)\}\s*from\s*'[./]*openingFence'/g)].map((m) => m[1])
+          if (from.some((names) => /\b(admit|dismiss)\b/.test(names))) importers.push(p.slice(p.indexOf('src')).replaceAll('\\', '/'))
+        }
+      }
+    }
+    const main = join(__dirname, '..', 'src', 'main')
+    expect(existsSync(join(main, 'workspace.ts'))).toBe(true)
+    walk(main)
+    expect(importers).toEqual(['src/main/workspace.ts'])
+  })
+})

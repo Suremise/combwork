@@ -20,7 +20,7 @@ const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { backupTo, openDb, schemaVersion } = await import('../src/main/db')
 const { renameRetrying } = await import('../src/main/fsutil')
-const { fencedOut } = await import('../src/main/openingFence')
+const { refusal } = await import('../src/main/openingFence')
 
 const user = { kind: 'user' } as const
 let n = 0
@@ -488,7 +488,7 @@ describe('a board opened under another name for its folder (#1402)', () => {
   }
   /** The window's board, opened as it is first used (by its window's spelling). */
   const useBoard = (w: WS) => inWorkspace(w, () => tasks.listTasks({}))
-  const fenced = (ws: string): boolean => fencedOut(join(ws, '.hive', 'hive.db')) !== null
+  const fenced = (ws: string): boolean => refusal(join(ws, '.hive', 'hive.db')) !== null
   /** The next number in the stub older versions read, and the profiles' presence markers there. */
   const stubNext = (ws: string): number => JSON.parse(readFileSync(join(ws, '.hive', 'tasks', 'board.json'), 'utf8')).next
   const markers = (ws: string): string[] => (existsSync(join(ws, '.hive', 'open')) ? readdirSync(join(ws, '.hive', 'open')) : [])
@@ -590,7 +590,7 @@ describe('a board opened under another name for its folder (#1402)', () => {
     }
   })
 
-  it("a lease's own board, under another name, closes only itself as the lease ends, the profile's presence marker kept while the window's board is open (HR6 round 2)", async () => {
+  it("a lease's board under another name of a workspace a window holds is the window's (#1395: by its place), kept as the lease ends with the presence marker, and closed with the window (HR6 round 2)", async () => {
     const ws = workspaceWith()
     const w = await open(ws)
     await useBoard(w)
@@ -598,14 +598,28 @@ describe('a board opened under another name for its folder (#1402)', () => {
     const alias = aliasOf('junction', ws)!
     try {
       store.leaseDb(alias.path).release()
-      expect([store.boardOpen(ws), store.boardOpen(alias.path)]).toEqual([true, false])
+      expect([store.boardOpen(ws), store.boardOpen(alias.path)]).toEqual([true, true])
       expect(markers(ws)).toHaveLength(1)
+      await w.close()
+      expect([store.boardOpen(ws), store.boardOpen(alias.path)]).toEqual([false, false])
+      expect(markers(ws)).toEqual([])
     } finally {
       alias.drop()
     }
-    await w.close()
-    expect(store.boardOpen(ws)).toBe(false)
-    expect(markers(ws)).toEqual([])
+  })
+
+  it("a lease's board under another name of a workspace no window holds closes as the lease ends, leaving no presence marker (#1395)", () => {
+    const ws = workspaceWith()
+    const alias = aliasOf('junction', ws)!
+    try {
+      const lease = store.leaseDb(alias.path)
+      expect(markers(ws)).toHaveLength(1)
+      lease.release()
+      expect([store.boardOpen(ws), store.boardOpen(alias.path)]).toEqual([false, false])
+      expect(markers(ws)).toEqual([])
+    } finally {
+      alias.drop()
+    }
   })
 })
 

@@ -7,6 +7,7 @@ import { join } from 'path'
 import { tempDir } from '../tempDir'
 import { FactStore } from '../../src/main/workflow/factStore'
 import { boardFile, closeBoard, workspaceDb } from '../../src/main/boardStore'
+import { admitted } from '../admitted'
 import { isRefusal, Workflow, type Reply } from '../../src/main/workflow/runtime'
 import { MergeQueue, type CheckResult, type QueueConfig } from '../../src/main/workflow/mergeQueue'
 import type { QueueLive } from '../../src/main/workflow/queueState'
@@ -85,6 +86,8 @@ export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'n
   // The workspace's hive.db, made through the board's open path (#1215: the project's cards are the board's); the
   // runtime, outside any board change, has a connection of its own to it, as another Hive would.
   const scope = { project: 'project', key: 'AM' }
+  // Its window's, as a window opening it would admit it (#1395).
+  const dismiss = admitted(home)
   workspaceDb(home)
   const store = FactStore.open(boardFile(home), scope)
   const wakes: Env['wakes'] = []
@@ -131,6 +134,7 @@ export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'n
     close: () => {
       for (const s of stores) s.close()
       closeBoard(home)
+      dismiss()
     }
   }
 }

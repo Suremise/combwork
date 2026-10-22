@@ -20,7 +20,7 @@ import { placeKey, realPath, withFileLock } from './fsutil'
 import { trash } from './trash'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
-import { assertNotFencedOut } from './openingFence'
+import { assertAdmitted, assertPlaceAdmitted, isAdmitted, isRefusal } from './openingFence'
 import { HEARTBEAT_MS, othersPresent, profileId, removePresence, writePresence } from './presence'
 import { moveStoreRows } from './schema/sessionDeliveryTables'
 import type { WorkspaceService } from './workspace'
@@ -624,9 +624,13 @@ const failures = new Map<string, Error>()
 function boardOf(path: string, transient = false): Board {
   const key = keyOf(path)
   const open = boards.get(key)
-  if (open) return open
-  // Not opened again by work of an opening of it that has closed (#1379): it would stay open, holding the folder.
-  if (!transient) assertNotFencedOut(join(path, HIVE_DIR, DB_FILE))
+  // Kept open only for a workspace a window holds (#1395): late work of one closed (or never opened) is refused, also
+  // when a lease has its connection open now (a store's last save), which it neither borrows nor comes to own.
+  if (open) {
+    if (!transient) assertPlaceAdmitted(open.place)
+    return open
+  }
+  if (!transient) assertAdmitted(join(path, HIVE_DIR, DB_FILE))
   const failed = failures.get(key)
   if (failed) throw hiveError(M.unavailable, { error: failed.message }, { kind: 'conflict' })
   try {
@@ -1528,9 +1532,10 @@ export interface DbLease {
 }
 
 /**
- * The workspace database's connection for a save that may come as its workspace closes (a store's last save): not fenced
- * (#1379), so it still lands, leaving nothing open. The lease owns that exact connection (#1383): a board opened for it
- * is closed as its last lease ends unless a window has the workspace open by then (keepBoard), and a board closed meanwhile (its
+ * The workspace database's connection for a save that may come as its workspace closes (a store's last save): a
+ * transient open, needing no admission (#1395), so it still lands, leaving nothing open. The lease owns that exact
+ * connection (#1383): a board opened for it is closed as its last lease ends unless a window has the workspace open by
+ * then (admitted, by the place the board recorded), and a board closed meanwhile (its
  * window closed, or closed and opened again) keeps this connection open for the lease, so its writer is never closed
  * under it, and the lease never closes another opening's board.
  */
@@ -1541,7 +1546,7 @@ export function leaseDb(workspacePath: string): DbLease {
   return {
     db: b.db,
     get kept() {
-      return !b.detached && (!b.transient || held.has(keyOf(b.path)))
+      return !b.detached && (!b.transient || isAdmitted(b.place))
     },
     release() {
       if (ended) return
@@ -1550,22 +1555,9 @@ export function leaseDb(workspacePath: string): DbLease {
       if (b.detached) b.db.close()
       // Whether a window has the workspace open is asked now, not when the lease began: one may have opened it since,
       // before or after this board was opened, and uses this connection as its board.
-      else if (b.transient && !held.has(keyOf(b.path))) closeOne(keyOf(b.path), b)
+      else if (b.transient && !isAdmitted(b.place)) closeOne(keyOf(b.path), b)
     }
   }
-}
-
-/** The workspaces a window has open (keepBoard): their boards are theirs, whoever opened them, and stay open as leases end. */
-const held = new Set<string>()
-
-/** A window opens the workspace (#1383): its board, open now or opened later by a lease, stays open as leases end. */
-export function keepBoard(workspacePath: string): void {
-  held.add(keyOf(workspacePath))
-}
-
-/** The window closes the workspace: its board is closed (closeBoard), and a lease from now on closes what it opens. */
-export function letGoBoard(workspacePath: string): void {
-  held.delete(keyOf(workspacePath))
 }
 
 /** Runs `fn` with a lease on the workspace database (leaseDb), ended after it, however it ends. */
@@ -1645,12 +1637,14 @@ function replaced(path: string): void {
 /**
  * Whether a workspace's data waits for its upgrade to 1.0 (the user said Not Now): hive.db then takes no writes, so
  * nothing that must be recorded may start (an agent's session, #1207 round 1). False when the board can't be opened at
- * all: that is told where it is used.
+ * all: that is told where it is used. Throws the refusal for a workspace no window holds (#1395).
  */
 export function upgradeWaiting(workspacePath: string): boolean {
   try {
     return !!boardOf(workspacePath).db.pending
-  } catch {
+  } catch (e) {
+    // A workspace no window holds (#1395) is refused, never taken for one with nothing pending.
+    if (isRefusal(e)) throw e
     return false
   }
 }
@@ -1679,6 +1673,8 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
     const pending = boardOf(path).db.pending
     if (!pending) return { backup: null }
     const from09 = pending.from < FIRST_10
+    // Opened for keeps: only while a window holds it (#1395), as boardOf above checked, nothing awaited since.
+    assertAdmitted(join(path, HIVE_DIR, DB_FILE))
     closeBoard(path)
     try {
       openBoard(path, true)

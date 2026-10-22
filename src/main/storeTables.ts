@@ -62,8 +62,11 @@ const hasTable = (db: ReturnType<typeof workspaceDb>['reader'], name: string): b
 /** A store's entries and values as last committed: its tables, or 0.9's `store_rows` while its upgrade waits. */
 export function readTable(workspacePath: string, store: TableStore): TableData {
   if (tableTestHooks.failRead?.(store)) throw new Error(`SQLITE_IOERR: disk I/O error (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
-  const path = resolve(workspacePath)
-  const db = workspaceDb(path).reader
+  return readTableIn(workspaceDb(resolve(workspacePath)).reader, store)
+}
+
+/** readTable on the connection given (a lease's: a look at a workspace no window holds, #1395). */
+export function readTableIn(db: ReturnType<typeof workspaceDb>['reader'], store: TableStore): TableData {
   const def = TABLE_DEFS[store]
   if (!hasTable(db, def.main)) return readOld(db, store)
   return { docs: readEntries(db, store).map((e) => e.doc), meta: readMeta(db, store) }

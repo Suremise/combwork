@@ -32,9 +32,10 @@ import type { TaskCard } from '../shared/types'
 import * as assistant from './assistantControl'
 import { config } from './config'
 import { onHiveEvent } from './events'
-import { placeKey, readCapped, readJson, renameRetrying } from './fsutil'
+import { placeKey, readCapped, readJson, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readStore, saveTable, storeValue } from './storeRows'
-import { dbGeneration, onDbReplaced, upgradeWaiting, workspaceDb } from './boardStore'
+import { boardLock, dbGeneration, onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
+import { transaction } from './db'
 import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, readDeliveriesWithBases, saveDeliveryChanges, StaleDeliveries } from './schema/sessionDeliveryTables'
 import { canTypeLine, typeLine, whyNoLine } from './lineWriter'
 import { createLogger, userText } from './logger'
@@ -43,7 +44,7 @@ import { sessions } from './sessions'
 import { folderChanging, folderSteady, inFolder, onFolderSteady } from './folderFence'
 import { getTask } from './tasks'
 import { workspaceFor, WorkspaceService } from './workspace'
-import { fencedOut } from './openingFence'
+import { refusal } from './openingFence'
 import { cardRef } from '../shared/projectKeys'
 import { scopeOfHost, withCardNames } from './projectKeys'
 
@@ -210,8 +211,8 @@ function hostWorkspace(host: string): string {
   const parent = dirname(h)
   return basename(h).toLowerCase() === 'assistant' && basename(parent).toLowerCase() === HIVE_DIR ? dirname(parent) : parent
 }
-/** Why a host's workspace is closed (#1391: a window closed it and none has opened it again, #1379's fence); null while open. */
-const hostFenced = (host: string): Error | null => fencedOut(join(hostWorkspace(host), HIVE_DIR))
+/** Why a host's deliveries aren't kept (#1395: no window holds its workspace, closed or never opened); null while one does. */
+const hostFenced = (host: string): Error | null => refusal(join(hostWorkspace(host), HIVE_DIR, 'hive.db'))
 const hostClosed = (host: string): boolean => !!hostFenced(host)
 const nowIso = (): string => new Date().toISOString()
 
@@ -424,18 +425,26 @@ async function readSaved(host: string, place: Store['place']): Promise<{ records
     // The rows, their bases and the values beside them, read in one read transaction (one snapshot, #1266 round 3): a
     // record and its base are the same row's, never two reads another Hive committed between.
     const db = workspaceDb(place.workspace).reader
-    const values = new Map<string, string | null>()
     db.exec('BEGIN')
     try {
-      const read = readDeliveriesWithBases(db, place.scope)
-      raw = read.records
-      base = read.bases
-      for (const key of ['invalid', 'next']) values.set(key, storeValue(db, 'deliveries', place.scope, key))
+      ;({ raw, base, value } = readRows(db, place.scope))
     } finally {
       db.exec('COMMIT')
     }
-    value = (key) => values.get(key) ?? null
   }
+  return parsedRows({ raw, base, value })
+}
+
+/** A host's delivery rows, their bases and the values beside them, on the connection given (in the caller's transaction). */
+function readRows(db: Parameters<typeof readDeliveriesWithBases>[0], scope: string): { raw: unknown[]; base: Map<string, string>; value: (key: string) => string | null } {
+  const read = readDeliveriesWithBases(db, scope)
+  const values = new Map<string, string | null>()
+  for (const key of ['invalid', 'next']) values.set(key, storeValue(db, 'deliveries', scope, key))
+  return { raw: read.records, base: read.bases, value: (key) => values.get(key) ?? null }
+}
+
+/** Saved delivery rows as records, each checked as it is read back (one that isn't valid kept aside), and the next id. */
+function parsedRows({ raw, base, value }: { raw: unknown[]; base: Map<string, string>; value: (key: string) => string | null }): { records: DeliveryRecord[]; next: number; invalid: unknown[]; base: Map<string, string> } {
   const kept = value('invalid')
   const savedNext = value('next') !== null ? (JSON.parse(value('next')!) as unknown) : undefined
   const records: DeliveryRecord[] = []
@@ -779,13 +788,7 @@ export const waitingCount = (host: string, agentId: string, kind: DeliveryKind):
  * One already waiting with the same source and ref is returned instead (made again from this one with `replace`).
  */
 export async function createDelivery(host: string, nd: NewDelivery, hooks?: DeliveryHooks): Promise<DeliveryRecord> {
-  // Only what reads back is saved (readDelivery's limits): a longer text is refused here, never lost on a restart.
-  if (nd.body.length > DELIVERY_BODY_MAX_CHARS) throw new Error(`It is too long to give an agent (${nd.body.length} characters, at most ${DELIVERY_BODY_MAX_CHARS}).`)
-  if ((nd.ref?.length ?? 0) > 300 || (nd.source?.length ?? 0) > 40) throw new Error('Not a delivery Hive can keep: its source or key is too long.')
-  const meta = nd.meta && Object.fromEntries(Object.entries(nd.meta).slice(0, 20).map(([k, v]) => [k.slice(0, 40), typeof v === 'string' ? v.slice(0, 500) : v]))
-  const agentName = nd.agentName?.slice(0, 300)
-  // An agent that can't read an inbox is given none (#650's decision): refused now, with the reason its sender sees.
-  if (!readsInbox(host, nd.agentId)) throw new NoInbox(noInbox(agentName ?? nd.agentId))
+  const { meta, agentName } = checkedNew(host, nd)
   const store = await load(host)
   const r = await transact(store, (d) => {
     const why = senderRefusal(nd.from)
@@ -805,35 +808,7 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
       put(d, had, again)
       return again
     }
-    if (nd.maxWaiting !== undefined && d.records.filter((x) => x.agentId === nd.agentId && x.kind === nd.kind && isWaiting(x)).length >= nd.maxWaiting) throw new TooManyWaiting(`${nd.maxWaiting} already wait`)
-    if (d.records.filter(isLive).length >= MAX_LIVE_PER_HOST) throw new DeliveriesFull(`This project already has ${MAX_LIVE_PER_HOST} deliveries waiting or not acked, the most Hive keeps.`)
-    const seq = d.next++
-    const rec: DeliveryRecord = {
-      id: `m${seq}`,
-      seq,
-      agentId: nd.agentId,
-      ...(agentName ? { agentName } : {}),
-      conversation: nd.conversation || null,
-      kind: nd.kind,
-      from: nd.from,
-      ...(nd.card ? { card: nd.card, ...(nd.round ? { round: nd.round } : {}) } : {}),
-      body: nd.body,
-      state: 'queued',
-      created: nowIso(),
-      expires: new Date(Date.now() + (nd.expiresMs ?? DELIVERY_EXPIRY_HOURS * 60 * 60_000)).toISOString(),
-      ...(nd.source ? { source: nd.source, ...(nd.ref !== undefined ? { ref: nd.ref } : {}) } : {}),
-      ...(meta ? { meta } : {}),
-      ...(nd.need && nd.need !== 'idle' ? { need: nd.need } : {}),
-      ...(nd.forRun ? { forRun: nd.forRun } : {}),
-      ...(nd.again ? { again: nd.again } : {}),
-      ...(nd.action ? { action: nd.action } : {}),
-      // Made offered, into a launch about to start (launchWith): saved before the launch, never offered by the scheduler.
-      ...(nd.launching ? { state: 'offered' as const, offered: nowIso(), offers: 1, offerRun: LAUNCHING } : {})
-    }
-    d.records.push(rec)
-    d.dirty = true
-    // Within the file's budget (ended ones' history makes room first), or not made at all.
-    if (!makeRoom(d)) throw new DeliveriesFull("This project's deliveries are full (what waits for its agents and isn't acked): wait until they are received and acked, or cancel some.")
+    const rec = addNew(d, nd, meta, agentName)
     d.after.push(() => log.info(`Delivery ${rec.id} (${rec.kind}) for ${userText(nd.agentName ?? nd.agentId)} queued`))
     return rec
   })
@@ -841,6 +816,94 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
   if (hooks && isUnread(r)) store.hooks.set(r.id, hooks)
   show(store, nd.agentId)
   return r
+}
+
+/** A new delivery's checks before anything is read: refused (an Error) as createDelivery says; its meta and name as kept. */
+function checkedNew(host: string, nd: NewDelivery): { meta: DeliveryRecord['meta']; agentName: string | undefined } {
+  // Only what reads back is saved (readDelivery's limits): a longer text is refused here, never lost on a restart.
+  if (nd.body.length > DELIVERY_BODY_MAX_CHARS) throw new Error(`It is too long to give an agent (${nd.body.length} characters, at most ${DELIVERY_BODY_MAX_CHARS}).`)
+  if ((nd.ref?.length ?? 0) > 300 || (nd.source?.length ?? 0) > 40) throw new Error('Not a delivery Hive can keep: its source or key is too long.')
+  const meta = nd.meta && Object.fromEntries(Object.entries(nd.meta).slice(0, 20).map(([k, v]) => [k.slice(0, 40), typeof v === 'string' ? v.slice(0, 500) : v]))
+  const agentName = nd.agentName?.slice(0, 300)
+  // An agent that can't read an inbox is given none (#650's decision): refused now, with the reason its sender sees.
+  if (!readsInbox(host, nd.agentId)) throw new NoInbox(noInbox(agentName ?? nd.agentId))
+  return { meta, agentName }
+}
+
+/** A new delivery added to a draft, within its limits (how many wait, how many are live, the file's budget), or refused. */
+function addNew(d: Draft, nd: NewDelivery, meta: DeliveryRecord['meta'], agentName: string | undefined): DeliveryRecord {
+  if (nd.maxWaiting !== undefined && d.records.filter((x) => x.agentId === nd.agentId && x.kind === nd.kind && isWaiting(x)).length >= nd.maxWaiting) throw new TooManyWaiting(`${nd.maxWaiting} already wait`)
+  if (d.records.filter(isLive).length >= MAX_LIVE_PER_HOST) throw new DeliveriesFull(`This project already has ${MAX_LIVE_PER_HOST} deliveries waiting or not acked, the most Hive keeps.`)
+  const seq = d.next++
+  const rec: DeliveryRecord = {
+    id: `m${seq}`,
+    seq,
+    agentId: nd.agentId,
+    ...(agentName ? { agentName } : {}),
+    conversation: nd.conversation || null,
+    kind: nd.kind,
+    from: nd.from,
+    ...(nd.card ? { card: nd.card, ...(nd.round ? { round: nd.round } : {}) } : {}),
+    body: nd.body,
+    state: 'queued',
+    created: nowIso(),
+    expires: new Date(Date.now() + (nd.expiresMs ?? DELIVERY_EXPIRY_HOURS * 60 * 60_000)).toISOString(),
+    ...(nd.source ? { source: nd.source, ...(nd.ref !== undefined ? { ref: nd.ref } : {}) } : {}),
+    ...(meta ? { meta } : {}),
+    ...(nd.need && nd.need !== 'idle' ? { need: nd.need } : {}),
+    ...(nd.forRun ? { forRun: nd.forRun } : {}),
+    ...(nd.again ? { again: nd.again } : {}),
+    ...(nd.action ? { action: nd.action } : {}),
+    // Made offered, into a launch about to start (launchWith): saved before the launch, never offered by the scheduler.
+    ...(nd.launching ? { state: 'offered' as const, offered: nowIso(), offers: 1, offerRun: LAUNCHING } : {})
+  }
+  d.records.push(rec)
+  d.dirty = true
+  // Within the file's budget (ended ones' history makes room first), or not made at all.
+  if (!makeRoom(d)) throw new DeliveriesFull("This project's deliveries are full (what waits for its agents and isn't acked): wait until they are received and acked, or cancel some.")
+  return rec
+}
+
+/** For tests: run inside leaveDelivery's lease, before it reads (to fail it, or to open the workspace meanwhile). */
+let inLeave: (() => Promise<void> | void) | null = null
+export const setInLeaveForTests = (fn: (() => Promise<void> | void) | null): void => {
+  inLeave = fn
+}
+
+/**
+ * A delivery left for an agent of a host whose workspace no window may hold now (#1395: the Assistant told of an
+ * unexpected close Hive finds as it starts, for each workspace of the last run): made as createDelivery makes one while
+ * a window holds it. Else one read and one write, in one transaction, on a lease's connection under the board's lock (the
+ * deliveries moved in first, as a load does, on that connection), with the saves' row checks: published nowhere and kept
+ * by nobody (no store, no load under way), so its workspace's next open loads it. The workspace isn't admitted for it.
+ * Only a new delivery (no replace, action, launch or hooks). Null: nothing saved, the workspace's upgrade to 1.0 waiting.
+ */
+export async function leaveDelivery(host: string, nd: NewDelivery): Promise<DeliveryRecord | null> {
+  if (nd.replace || nd.action || nd.launching) throw new Error('A delivery left this way is a new one only') // i18n-ignore: a mistake in Hive's code, never shown
+  if (!hostFenced(host)) return createDelivery(host, nd)
+  const { meta, agentName } = checkedNew(host, nd)
+  const place = await hostPlace(host)
+  return withLeasedDb(place.workspace, async (db) => {
+    await inLeave?.()
+    if (db.pending) return null
+    await openTable(place.workspace, 'deliveries', place.scope, fileOf(host), () => readFileOf(host), DELIVERIES_TABLE, { db })
+    return withFileLock(boardLock(place.workspace), async () =>
+      transaction(db.writer, () => {
+        const w = db.writer
+        const read = parsedRows(readRows(w, place.scope))
+        const d: Draft = { records: [...read.records], next: read.next, invalid: [...read.invalid], dirty: false, after: [] }
+        const rec = addNew(d, nd, meta, agentName)
+        const now = new Set(d.records.map((r) => r.id))
+        const saved = saveDeliveryChanges(w, place.scope, { put: [rec as unknown as Record<string, unknown>], removed: read.records.filter((r) => !now.has(r.id)).map((r) => r.id), base: read.base })
+        const to = saved.renamed.get(rec.id)
+        if (to) Object.assign(rec, to)
+        const value = w.prepare("INSERT INTO store_meta (store, scope, key, value) VALUES ('deliveries', ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value") // i18n-ignore: SQL
+        value.run(place.scope, 'next', JSON.stringify(Math.max(d.next, rec.seq + 1)))
+        log.info(`Delivery ${rec.id} (${rec.kind}) for ${userText(nd.agentName ?? nd.agentId)} left for when its workspace opens`)
+        return rec
+      })
+    )
+  })
 }
 
 /** A delivery as it is now (null when it is gone, or its host isn't loaded). */

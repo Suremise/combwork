@@ -8,6 +8,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
+import { admitted } from './admitted'
 import { canonical, entryOfRows, moveStores, readEntries, rowsOfEntry, STORES_STEP, TABLE_DEFS, TABLE_STORES, type TableStore } from '../src/main/schema/storeCodec'
 
 const base = tempDir('hive-store-tables-')
@@ -18,20 +19,37 @@ const tables = await import('../src/main/storeTables')
 const board = await import('../src/main/boardStore')
 const lanes = await import('../src/main/lanes')
 const { openDb } = await import('../src/main/db')
+const { admit, dismiss: dismissPlace } = await import('../src/main/openingFence')
+const { placeKey } = await import('../src/main/fsutil')
+const dismiss = (ws: string): void => dismissPlace(placeKey(ws))
 
 let n = 0
-/** A new workspace folder (its board made at the first use: every step, the 1.0 group's included). */
+/** A new workspace folder (its board made at the first use: every step, the 1.0 group's included), a window's (#1395). */
+const dismissals: (() => void)[] = []
 const workspace = (): string => {
   const ws = join(base, `ws-${++n}`)
   mkdirSync(join(ws, '.hive'), { recursive: true })
+  dismissals.push(admitted(ws))
   return ws
 }
 const files = (ws: string): string[] => readdirSync(join(ws, '.hive')).sort()
+/** Its window closes it: dismissed (#1395), then its board closed, as WorkspaceService.close does; `reopen` opens it again. */
+const closed = (ws: string): void => {
+  dismiss(ws)
+  board.closeBoard(ws)
+}
+const reopen = (ws: string): void => {
+  admit(placeKey(ws))
+  board.workspaceDb(ws)
+}
 
 afterEach(() => {
   tables.tableTestHooks.failSave = null
 })
-afterAll(() => board.closeAllBoards())
+afterAll(() => {
+  board.closeAllBoards()
+  for (const d of dismissals.splice(0)) d()
+})
 
 const LANE = {
   id: 'lane-1',
@@ -346,14 +364,14 @@ describe("what saves keep of committed entries is bounded (round 1, finding 2)",
     await tables.saveTable(a, 'lanes', [LANE])
     expect(tables.committedFor()).toContain(a)
     // Closed, its stores' last saves open the database for the save and close it again: nothing kept.
-    board.closeBoard(a)
+    closed(a)
     await tables.saveTable(a, 'lanes', [{ ...LANE, rounds: 3 }])
     expect(tables.committedFor()).not.toContain(a)
     // Kept while open, gone at the next save (anyone's) once closed.
-    board.workspaceDb(a)
+    reopen(a)
     await tables.saveTable(a, 'watches', [WATCH])
     expect(tables.committedFor()).toContain(a)
-    board.closeBoard(a)
+    closed(a)
     await tables.saveTable(b, 'lanes', [LANE])
     expect(tables.committedFor()).not.toContain(a)
     expect(tables.committedFor()).toContain(b)

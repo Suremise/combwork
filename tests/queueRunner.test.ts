@@ -12,6 +12,7 @@ import { buildSync } from 'esbuild'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
+import { admitted } from './admitted'
 import { gitTestHooks } from '../src/main/git'
 import { FactStore, withoutWriteFence, withWriteFence } from '../src/main/workflow/factStore'
 import { fileTimeMs, parseJournal, queueHost, startLauncher } from '../src/main/workflow/queueJobs'
@@ -61,6 +62,8 @@ interface World {
 function world(): World {
   const ws = join(tempDir('qr-'), 'ws')
   const project = gitRepo(join(ws, 'project'))
+  // Its window's, as a window opening it would admit it (#1395).
+  const dismiss = admitted(ws)
   workspaceDb(ws)
   const store = FactStore.open(boardFile(ws), { project: 'project', key: 'AM' })
   return {
@@ -75,6 +78,7 @@ function world(): World {
       await windowsProbe.end(left)
       store.close()
       closeBoard(ws)
+      dismiss()
     }
   }
 }
