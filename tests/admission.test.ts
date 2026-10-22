@@ -218,7 +218,8 @@ describe('deliveries (#1395)', () => {
         })
         const r = (await deliveries.leaveDelivery(join(spelt(c.lease), 'proj'), delivery('while opening')))!
         await early
-        expect(board.boardOpen(spelt(c.window))).toBe(true)
+        // The lease left open the board the window's deliveries use: by the real path, where they read (round 4).
+        expect(board.boardOpen(ws)).toBe(true)
         // Persisted, and in the store the window loaded (the same one, not a fresh load), waiting for its agent.
         expect((await deliveries.savedForTests(host)).deliveries.map((x) => x.id)).toEqual([r.id])
         expect(deliveries.deliveryNow(host, r.id)).toMatchObject({ state: 'queued', body: 'while opening' })
@@ -257,6 +258,45 @@ describe('deliveries (#1395)', () => {
     }
     expect([nothingOpen(ws), nothingOpen(other)]).toEqual([true, true])
   })
+
+  // HR6's round 3: a load resolves its host once as it enters and reads, keeps and saves there, whatever the spelling
+  // points at by the time it reads.
+  for (const then of ['pointed at the other workspace', 'removed'] as const) {
+    it(`a load through a junction ${then} while it waits reads its own workspace, and the store saves there (HR6 round 3)`, async () => {
+      const [a, b] = [workspace(), workspace()]
+      const wb = createWorkspaceService()
+      const via = junction(a, join(base, `via-${++n}`))
+      try {
+        await w.open(a)
+        await wb.open(b)
+        const mineA = await deliveries.createDelivery(join(a, 'proj'), delivery('A’s own'))
+        const mineB = await deliveries.createDelivery(join(b, 'proj'), delivery('B’s incident'))
+        deliveries.setBeforeReadForTests(() => {
+          deliveries.setBeforeReadForTests(null)
+          unlinkSync(via)
+          if (then === 'pointed at the other workspace') junction(b, via)
+        })
+        const store = (await deliveries.load(join(via, 'proj'))) as unknown as { place: { key: string; scope: string; host: string }; records: { id: string; body: string }[] }
+        const idOf = (ws: string): string => JSON.parse(readFileSync(join(ws, 'proj', '.hive', 'project.json'), 'utf8')).id
+        expect({ key: store.place.key, scope: store.place.scope, records: store.records.map((r) => r.body) }).toEqual({ key: placeKey(a), scope: idOf(a), records: ['A’s own'] })
+        // A delivery made through that store is saved in A; B keeps only its own.
+        const made = await deliveries.createDelivery(join(via, 'proj'), delivery('made through the junction'))
+        expect((await deliveries.savedForTests(join(a, 'proj'))).deliveries.map((x) => x.body).sort()).toEqual(['A’s own', 'made through the junction'])
+        expect((await deliveries.savedForTests(join(b, 'proj'))).deliveries.map((x) => x.id)).toEqual([mineB.id])
+        expect(made.id).not.toBe(mineA.id)
+      } finally {
+        deliveries.setBeforeReadForTests(null)
+        await w.close()
+        await disposeWorkspaceService(wb)
+        try {
+          unlinkSync(via)
+        } catch {
+          // removed already
+        }
+      }
+      expect([nothingOpen(a), nothingOpen(b)]).toEqual([true, true])
+    })
+  }
 
   it("a host loaded through a junction goes as its window closes, the junction removed since: by the place its store recorded", async () => {
     const ws = workspace()

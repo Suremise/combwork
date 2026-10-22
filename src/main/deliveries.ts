@@ -193,8 +193,13 @@ const stores = new Map<string, Store>()
 const loading = new Map<string, Promise<Store>>()
 /** Each load under way's workspace place, recorded as it entered (Store.place.key's, before its store exists). */
 const loadingKeys = new Map<string, string>()
-/** A host's identity: its workspace (as spelt, and its real location recorded as it entered) and its scope there. */
-type HostPlace = { workspace: string; scope: string; key: string }
+/**
+ * A host's identity, resolved once as it entered (#1395): `host` the host's folder where it really was then (every read,
+ * write and file of its deliveries goes there, never through the spelling it came by, which a junction removed or pointed
+ * elsewhere since would send to another folder), `workspace` its workspace folder from that, `key` that folder's real
+ * location (what decisions match by), `scope` its scope there.
+ */
+type HostPlace = { host: string; workspace: string; scope: string; key: string }
 const keyOf = (host: string): string => host.toLowerCase()
 /** A host's deliveries file before #1018: moved into its workspace's database the first time, then kept as a backup. */
 const fileOf = (host: string): string => join(host, HIVE_DIR, 'deliveries.json')
@@ -329,7 +334,7 @@ const STALE_TRIES = 4
 
 /** A host's deliveries read again from its workspace's database (another Hive saved since): what the store has is replaced. */
 async function reread(store: Store): Promise<void> {
-  const read = await readSaved(store.host, store.place)
+  const read = await readSaved(store.place)
   store.records = read.records
   store.next = read.next
   store.invalid = read.invalid
@@ -379,16 +384,18 @@ export function load(host: string): Promise<Store> {
   if (had) return isAdmitted(had.place.key) ? Promise.resolve(had) : Promise.reject(refusedOpen())
   const going = loading.get(k)
   if (going) return going
-  // Its workspace where it really is, recorded now, before anything is awaited (#1395). A closed workspace's deliveries
-  // aren't read (#1391): restored when a window opens it again.
-  const key = workspaceKeyOf(host)
+  // The host where it really is, and its workspace's place, resolved now, before anything is awaited (#1395): what the
+  // load reads and its store keeps reading and writing, whatever the spelling points at later. A closed workspace's
+  // deliveries aren't read (#1391): restored when a window opens it again.
+  const real = realPath(host)
+  const key = workspaceKeyOf(real)
   if (!isAdmitted(key)) return Promise.reject(refusedOpen())
   const p = (async () => {
     await beforeRead?.()
-    const place: HostPlace = { ...(await hostPlace(host)), key }
+    const place: HostPlace = { ...(await hostPlace(real)), host: real, key }
     for (let tries = 1; ; tries++) {
       const gen = dbGenerationAt(key)
-      const read = await readSaved(host, place)
+      const read = await readSaved(place)
       if (stores.has(k)) return stores.get(k)!
       const store: Store = { host, place, records: read.records, next: read.next, invalid: read.invalid, lock: Promise.resolve(), offering: new Set(), confirming: new Map(), rungAgain: new Set(), launches: new Map(), hooks: new Map(), gen, base: read.base }
       // Restored before anything else sees it (a second load waits for this one).
@@ -425,8 +432,8 @@ export function load(host: string): Promise<Store> {
  * A host's deliveries as saved in its workspace's database (#1018), moved in from its deliveries.json the first time:
  * each checked as it is read back; one that isn't valid is kept aside, not used.
  */
-async function readSaved(host: string, place: Store['place']): Promise<{ records: DeliveryRecord[]; next: number; invalid: unknown[]; base: Map<string, string> }> {
-  const file = fileOf(host)
+async function readSaved(place: HostPlace): Promise<{ records: DeliveryRecord[]; next: number; invalid: unknown[]; base: Map<string, string> }> {
+  const file = fileOf(place.host)
   let raw: unknown[]
   let value: (key: string) => string | null
   // The rows' texts as read (none while the upgrade waits: nothing is saved then).
@@ -438,7 +445,7 @@ async function readSaved(host: string, place: Store['place']): Promise<{ records
     value = (key) => data.meta.get(key) ?? null
   } else {
     // In their own table since 1.0 (#1211), deliveries.json moved in the first time (its next id and entries kept aside with it).
-    await openTable(place.workspace, 'deliveries', place.scope, file, () => readFileOf(host), DELIVERIES_TABLE)
+    await openTable(place.workspace, 'deliveries', place.scope, file, () => readFileOf(place.host), DELIVERIES_TABLE)
     // The rows, their bases and the values beside them, read in one read transaction (one snapshot, #1266 round 3): a
     // record and its base are the same row's, never two reads another Hive committed between.
     const db = workspaceDb(place.workspace).reader
@@ -545,7 +552,7 @@ export const setBeforeSaveForTests = (fn: (() => Promise<void> | void) | null): 
 async function save(store: Store, d: Draft): Promise<void> {
   await beforeSave?.()
   prune(store, d)
-  const file = fileOf(store.host)
+  const file = fileOf(store.place.host)
   // Entries kept aside that would push it over: moved to a file of their own (never lost), not kept in this one.
   if (!makeRoom(d) && d.invalid.length) {
     const aside = `${file}.kept-aside-${Date.now()}-${randomBytes(3).toString('hex')}`
@@ -905,7 +912,7 @@ export async function leaveDelivery(host: string, nd: NewDelivery): Promise<Deli
   const key = workspaceKeyOf(real)
   if (isAdmitted(key)) return createDelivery(host, nd)
   const { meta, agentName } = checkedNew(host, nd)
-  const place: HostPlace = { ...(await hostPlace(real)), key }
+  const place: HostPlace = { ...(await hostPlace(real)), host: real, key }
   const rec = await leftOnLease(real, place, nd, meta, agentName)
   if (rec) await reconcileLeft(place)
   return rec
@@ -938,7 +945,7 @@ function leftOnLease(host: string, place: HostPlace, nd: NewDelivery, meta: Deli
   return withLeasedDb(place.workspace, async (db) => {
     await inLeave?.()
     if (db.pending) return null
-    await openTable(place.workspace, 'deliveries', place.scope, fileOf(host), () => readFileOf(host), DELIVERIES_TABLE, { db })
+    await openTable(place.workspace, 'deliveries', place.scope, fileOf(place.host), () => readFileOf(place.host), DELIVERIES_TABLE, { db })
     return withFileLock(boardLock(place.workspace), async () =>
       transaction(db.writer, () => {
         const w = db.writer
