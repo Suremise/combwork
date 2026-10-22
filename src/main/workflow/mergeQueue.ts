@@ -10,8 +10,7 @@
 
 import { spawn, type ChildProcess } from 'child_process'
 import { createHash, randomUUID } from 'crypto'
-import { existsSync, readFileSync, rmSync } from 'original-fs'
-import { tmpdir } from 'os'
+import { existsSync, readFileSync } from 'original-fs'
 import { join } from 'path'
 import { git, GIT_PREFIX } from '../git'
 import { endTree } from '../progressReporters/wrapper'
@@ -119,6 +118,8 @@ export interface QueueGitResult {
   code: number
   /** Ended at its bound (QueueGitOptions.timeoutMs). */
   timedOut?: boolean
+  /** Its stderr as far as it had come when the bound ended it: what was running then. */
+  errAtTimeout?: string
 }
 
 export type QueueOutcome =
@@ -148,74 +149,133 @@ const SIGN_WAITS = /passphrase|pinentry|inappropriate ioctl|cannot open \/dev\/t
 /** git's own line when a pre-merge-commit or commit-msg hook stopped a merge commit (used only with no trace to read). */
 const MERGE_HOOK_STOPPED = /^Not committing merge;/m
 
-/**
- * What git's own trace (trace2's events, `GIT_TRACE2_EVENT`) says about the children a commit ran (#1350): which hook
- * failed or was still running, and whether the signer (gpg's `-bsau`, gpgsm's, ssh-keygen's `-Y sign`) failed or was
- * still running. Only the top git's own children count, never those of a git a hook ran.
- */
-export interface CommitChildren {
-  hookFailed?: string
-  hookRunning?: string
-  signerFailed: boolean
-  signerRunning: boolean
+/** A child git ran for a commit, as its trace names it, with the text it wrote: a hook, the signer, or another (git's own). */
+export interface CommitChild {
+  kind: 'hook' | 'signer' | 'other'
+  /** A hook's name (`commit-msg`). */
+  name?: string
+  /** Its exit code; none while it ran (the stream ended, or was cut, first). */
+  code?: number
+  text: string
 }
 
-/** Reads a commit's trace2 event file into what its children did; null when there is none to read (an old git). */
-export function readCommitTrace(file: string): CommitChildren | null {
-  let text: string
+/**
+ * A commit's stderr read with git's own trace in it (#1350: `GIT_TRACE2_EVENT=2`, trace2's events on git's stderr, in
+ * the order things happened): each piece of text given to the source that wrote it. A child's text comes after its
+ * `child_start` and before its `child_exit` (a hook writes before it exits; git writes `child_exit` once it has waited
+ * for it); text while no child of the top git runs is git's own. `traced`: the top git's events were there (an old
+ * git writes none). `open`: the child running where the stream ends.
+ */
+export interface CommitStream {
+  traced: boolean
+  children: CommitChild[]
+  open: CommitChild | null
+  git: string
+  /** All the text, every source's, in order, without the events: what a message shows. */
+  text: string
+}
+
+/** A trace2 event: a complete JSON record with the fields its kind needs; anything else is text, whatever it looks like. */
+type TraceEvent = { event: string; sid: string; child_id?: number; child_class?: string; hook_name?: string; argv?: string[]; code?: number }
+
+function traceEvent(s: string): TraceEvent | null {
+  let v: unknown
   try {
-    text = readFileSync(file, 'utf8')
+    v = JSON.parse(s)
   } catch {
     return null
   }
-  const started = new Map<number, { hook?: string; signer: boolean }>()
-  const exits = new Map<number, number>()
-  let top: string | null = null
-  for (const line of text.split(/\r?\n/)) {
-    let ev: { event?: string; sid?: string; child_id?: number; child_class?: string; hook_name?: string; argv?: string[]; code?: number }
-    try {
-      ev = JSON.parse(line)
-    } catch {
-      continue
-    }
-    // The top git's session id has no parent's prefix; a nested git's is `<parent>/<own>`.
-    if (top === null && ev.sid && !ev.sid.includes('/')) top = ev.sid
-    if (ev.sid !== top || typeof ev.child_id !== 'number') continue
-    if (ev.event === 'child_start') {
-      const argv = ev.argv ?? []
-      const signer = argv.includes('-bsau') || (argv.includes('-Y') && argv.includes('sign'))
-      started.set(ev.child_id, { ...(ev.child_class === 'hook' ? { hook: ev.hook_name ?? argv[0] ?? 'hook' } : {}), signer })
-    } else if (ev.event === 'child_exit' && typeof ev.code === 'number') exits.set(ev.child_id, ev.code)
-  }
-  if (top === null) return null
-  const out: CommitChildren = { signerFailed: false, signerRunning: false }
-  for (const [id, c] of started) {
-    const code = exits.get(id)
-    if (c.hook && code === undefined) out.hookRunning ??= c.hook
-    else if (c.hook && code !== 0) out.hookFailed ??= c.hook
-    if (c.signer && code === undefined) out.signerRunning = true
-    else if (c.signer && code !== 0) out.signerFailed = true
-  }
-  return out
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const e = v as Record<string, unknown>
+  if (typeof e.event !== 'string' || typeof e.sid !== 'string' || typeof e.time !== 'string') return null
+  if (e.event === 'child_start' && (typeof e.child_id !== 'number' || !Array.isArray(e.argv) || !e.argv.every((a) => typeof a === 'string'))) return null
+  if (e.event === 'child_exit' && (typeof e.child_id !== 'number' || typeof e.code !== 'number')) return null
+  return e as TraceEvent
 }
 
 /**
- * Why Hive's merge, or a squash's commit, failed (#1350), from which child of git failed (its trace), never from words
- * a hook may print: a hook that failed returns the card with the output; a hook still running at the bound pauses
- * `hookTimedOut`; a signer still running at the bound, or failing saying it needs a passphrase, pauses `signingWaits`,
- * and one failing otherwise pauses `signing`; anything else (an index lock, a broken repository) pauses `needsYou`
- * with git's message, never a return. With no trace to read (an old git), only git's own "Not committing merge" is a hook.
+ * A line split into its text and the trace event ending it: an event begins at a `{"event":"` and runs to the line's
+ * end, so text with no newline before it (a hook's last line) stays text. The first place a valid record starts wins;
+ * an event-looking fragment that isn't one is text.
  */
-export function commitFailed(r: QueueGitResult, children: CommitChildren | null, signs: boolean): { fail: 'hook'; log: string } | { pause: PauseReason; message?: string } {
-  const log = [r.out.trim(), r.err.trim()].filter(Boolean).join('\n')
-  if (children?.hookFailed) return { fail: 'hook', log }
-  if (r.timedOut) {
-    if (children?.hookRunning) return { pause: 'hookTimedOut', message: log }
-    return { pause: signs ? 'signingWaits' : 'needsYou', message: log }
+function splitTraceLine(line: string): { text: string; ev: TraceEvent | null } {
+  const body = line.endsWith('\r') ? line.slice(0, -1) : line
+  for (let i = body.indexOf('{"event":"'); i >= 0; i = body.indexOf('{"event":"', i + 1)) {
+    const ev = traceEvent(body.slice(i))
+    if (ev) return { text: body.slice(0, i), ev }
   }
-  if (children?.signerFailed) return { pause: SIGN_WAITS.test(log) ? 'signingWaits' : 'signing', message: log }
-  if (!children && MERGE_HOOK_STOPPED.test(log)) return { fail: 'hook', log }
-  return { pause: 'needsYou', message: log }
+  return { text: line, ev: null }
+}
+
+/** Reads a commit's stderr (git's trace in it) into who wrote what (CommitStream). */
+export function readCommitStream(err: string): CommitStream {
+  const children: CommitChild[] = []
+  const byId = new Map<number, CommitChild>()
+  let open: CommitChild | null = null
+  let top: string | null = null
+  let own = ''
+  let text = ''
+  const add = (t: string): void => {
+    if (!t) return
+    text += t
+    if (open) open.text += t
+    else own += t
+  }
+  const lines = err.split('\n')
+  lines.forEach((line, i) => {
+    const nl = i < lines.length - 1 ? '\n' : ''
+    const { text: t, ev } = splitTraceLine(line)
+    if (!ev) return add(t + nl)
+    // Text cut by an event (no newline of its own) keeps a line of its own.
+    add(t ? `${t}\n` : '')
+    // The top git's session id has no parent's prefix; a git a hook runs is `<parent>/<own>`: its events are only
+    // dropped from the text, never a source.
+    if (top === null && !ev.sid.includes('/')) top = ev.sid
+    if (ev.sid !== top || ev.child_id === undefined) return
+    if (ev.event === 'child_start') {
+      const argv = ev.argv ?? []
+      const signer = argv.includes('-bsau') || (argv.includes('-Y') && argv.includes('sign'))
+      const c: CommitChild = { kind: ev.child_class === 'hook' ? 'hook' : signer ? 'signer' : 'other', ...(ev.child_class === 'hook' ? { name: ev.hook_name ?? argv[0] ?? 'hook' } : {}), text: '' }
+      children.push(c)
+      byId.set(ev.child_id, c)
+      open = c
+    } else if (ev.event === 'child_exit') {
+      const c = byId.get(ev.child_id)
+      if (c) c.code = ev.code
+      if (open === c) open = null
+    }
+  })
+  return { traced: top !== null, children, open, git: own, text }
+}
+
+const joined = (...parts: (string | undefined)[]): string => parts.map((p) => p?.trim()).filter(Boolean).join('\n')
+
+/**
+ * Why Hive's merge, or a squash's commit, failed (#1350), from the source of each piece of what it said (its stream,
+ * readCommitStream), never from words in another's (a hook that passed saying "passphrase" changes nothing):
+ * - ended at the bound: always a pause, decided by what was running when it was ended (`cut`, its stream until then;
+ *   ending it may make a hook exit non-zero, which is never its rejection): a hook → `hookTimedOut`; the signer, or
+ *   nothing known in a repository that signs → `signingWaits`; else `needsYou`;
+ * - a hook that exited non-zero → returned (`hook`) with its own text, then git's;
+ * - the signer exiting non-zero → `signingWaits` when its own text says it needs a passphrase, a pinentry or a
+ *   terminal, else `signing`, with its text and git's;
+ * - anything else (an index lock, a broken repository) → `needsYou` with git's own lines, never a return.
+ * With no trace (an old git), only git's own "Not committing merge" is a hook. A message never has an event in it.
+ */
+export function commitFailed(r: QueueGitResult, signs: boolean): { fail: 'hook'; log: string } | { pause: PauseReason; message?: string } {
+  const s = readCommitStream(r.err)
+  const all = joined(r.out, s.text)
+  if (r.timedOut) {
+    const running = readCommitStream(r.errAtTimeout ?? r.err).open
+    if (running?.kind === 'hook') return { pause: 'hookTimedOut', message: all }
+    return { pause: running?.kind === 'signer' || signs ? 'signingWaits' : 'needsYou', message: all }
+  }
+  if (!s.traced) return MERGE_HOOK_STOPPED.test(all) ? { fail: 'hook', log: all } : { pause: 'needsYou', message: all }
+  const hook = s.children.find((c) => c.kind === 'hook' && c.code !== undefined && c.code !== 0)
+  if (hook) return { fail: 'hook', log: joined(hook.text, s.git, r.out) }
+  const signer = s.children.find((c) => c.kind === 'signer' && c.code !== undefined && c.code !== 0)
+  if (signer) return { pause: SIGN_WAITS.test(signer.text) ? 'signingWaits' : 'signing', message: joined(signer.text, s.git) }
+  return { pause: 'needsYou', message: joined(r.out, s.git) }
 }
 
 /**
@@ -223,7 +283,8 @@ export function commitFailed(r: QueueGitResult, children: CommitChildren | null,
  * asks for a passphrase, and a credential manager stays non-interactive; a pinentry window is ended by the bound.
  */
 function commitEnv(): NodeJS.ProcessEnv {
-  return { ...process.env, GIT_TERMINAL_PROMPT: '0', SSH_ASKPASS_REQUIRE: 'never', GCM_INTERACTIVE: 'never' }
+  // GIT_TRACE2_EVENT=2: git's trace2 events on its own stderr, in order with what its hooks and signer write there.
+  return { ...process.env, GIT_TERMINAL_PROMPT: '0', SSH_ASKPASS_REQUIRE: 'never', GCM_INTERACTIVE: 'never', GIT_TRACE2_EVENT: '2' }
 }
 
 /**
@@ -242,9 +303,11 @@ function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<Qu
     } catch (e) {
       return res({ ok: false, out: '', err: e instanceof Error ? e.message : String(e), code: -1 })
     }
+    let atTimeout: string | undefined
     const timer = opts.timeoutMs
       ? setTimeout(() => {
           timedOut = true
+          atTimeout = Buffer.concat(err).toString('utf8')
           endTree(child)
         }, opts.timeoutMs)
       : undefined
@@ -255,7 +318,7 @@ function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<Qu
       if (settled) return
       settled = true
       clearTimeout(timer)
-      res({ ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim(), ...(timedOut ? { timedOut } : {}) })
+      res({ ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim(), ...(timedOut ? { timedOut, errAtTimeout: atTimeout } : {}) })
     }
     child.once('error', (e) => {
       err.push(Buffer.from(e.message))
@@ -516,33 +579,20 @@ export class MergeQueue {
       await this.git(f, ['reset', '--hard', '-q', expected])
       await this.git(f, ['clean', '-fdq'])
     }
-    // Each command traced (trace2's events), so a failure is told by which child of git failed, never by its words.
-    const traced = async (args: string[]): Promise<{ r: QueueGitResult; children: CommitChildren | null }> => {
-      const trace = join(tmpdir(), `hive-queue-${randomUUID()}.trace2.json`)
-      try {
-        const run = await this.git(f, args, { ...opts, env: { ...opts.env, GIT_TRACE2_EVENT: trace } })
-        return { r: run, children: run.ok ? null : readCommitTrace(trace) }
-      } finally {
-        try {
-          rmSync(trace, { force: true })
-        } catch {
-          // still held by a process the bound ended: the system's temp folder's own clean-up has it
-        }
-      }
-    }
-    const m = await traced([...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision])
-    if (!m.r.ok) {
-      const u = m.r.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
+    // Its output read with git's own trace in it (commitEnv), so a failure is told by who said what, never by words.
+    const m = await this.git(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision], opts)
+    if (!m.ok) {
+      const u = m.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
       const files = u?.out.split(/\r?\n/).filter(Boolean) ?? []
       await clean()
-      if (files.length) return { fail: 'conflict', files, log: m.r.out + m.r.err }
-      return commitFailed(m.r, m.children, signs)
+      if (files.length) return { fail: 'conflict', files, log: joined(m.out, readCommitStream(m.err).text) }
+      return commitFailed(m, signs)
     }
     if (squash) {
-      const c = await traced([...who, 'commit', '-q', '-m', message])
-      if (!c.r.ok) {
+      const c = await this.git(f, [...who, 'commit', '-q', '-m', message], opts)
+      if (!c.ok) {
         await clean()
-        return commitFailed(c.r, c.children, signs)
+        return commitFailed(c, signs)
       }
     }
     const h = await G.head(f)

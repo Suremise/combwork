@@ -99,6 +99,8 @@ export interface RunResult {
   err: string
   /** Ended at its bound (`run`'s timeoutMs): its whole tree. */
   timedOut?: boolean
+  /** Its stderr as far as it had come when the bound ended it (#1350: what was running then). */
+  errAtTimeout?: string
 }
 
 /** A queue's folder name: collision-safe for targets alike (`a/b`, `a-b`) and per lease, so a takeover never reuses one. */
@@ -365,9 +367,11 @@ export class QueueRunner {
     child.stdout?.on('data', (d: Buffer) => out.push(d))
     child.stderr?.on('data', (d: Buffer) => err.push(d))
     let timedOut = false
+    let atTimeout: string | undefined
     const timer = timeoutMs
       ? setTimeout(() => {
           timedOut = true
+          atTimeout = Buffer.concat(err).toString('utf8')
           endTree(child)
         }, timeoutMs)
       : undefined
@@ -380,7 +384,7 @@ export class QueueRunner {
       })
     })
     clearTimeout(timer)
-    return { ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim(), ...(timedOut ? { timedOut } : {}) }
+    return { ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim(), ...(timedOut ? { timedOut, errAtTimeout: atTimeout } : {}) }
   }
 
   /**

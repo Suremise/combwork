@@ -8,8 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { git } from '../../src/main/git'
-import { commitFailed, readCommitTrace, type QueueGitResult } from '../../src/main/workflow/mergeQueue'
-import { tempDir } from '../tempDir'
+import { commitFailed, readCommitStream, type QueueGitResult } from '../../src/main/workflow/mergeQueue'
 
 let env: Env | null = null
 afterEach(() => {
@@ -101,6 +100,20 @@ describe("Hive's queue commits (#1350)", () => {
     expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'returned', reason: 'hook' }])
     expect(e.store.facts(card.id).filter((f) => f.kind === 'IntegrationFailed').at(-1)!.data).toMatchObject({ reason: 'hook', log: expect.stringContaining('passphrase policy rejected this message') })
     expect(e.store.queuePause('main')).toBeNull()
+    cleanAt(e, before)
+  })
+
+  it('HR4 r2: a commit-msg hook that passes saying "passphrase", then a signer with no secret key: paused signing, not signing waits', async () => {
+    const e = team()
+    await queued(e)
+    sh(e.project, 'config', 'commit.gpgsign', 'true')
+    sh(e.project, 'config', 'gpg.program', script(join(e.home, 'gpg-nokey.sh'), 'echo "gpg: signing failed: No secret key" >&2\nexit 2').replace(/\\/g, '/'))
+    hook(e, 'commit-msg', 'echo "passphrase policy validation passed" >&2\nexit 0')
+    const before = head(e)
+    const [o] = await e.queue().drain('main')
+    expect(o).toMatchObject({ outcome: 'paused', reason: 'signing', message: expect.stringContaining('No secret key') })
+    expect(o.outcome === 'paused' && o.message).not.toContain('passphrase policy')
+    expect(o.outcome === 'paused' && o.message).not.toContain('{"event"')
     cleanAt(e, before)
   })
 
@@ -220,36 +233,72 @@ describe("Hive's queue commits (#1350)", () => {
   })
 })
 
-describe("a commit's trace (#1350)", () => {
-  it("counts only the top git's children: a git a hook ran, whose own hook failed, isn't the commit's hook", () => {
-    const file = join(tempDir('trace-'), 'trace.json')
-    const ev = (o: object): string => JSON.stringify(o)
-    writeFileSync(
-      file,
-      [
-        ev({ event: 'version', sid: 'T1' }),
-        ev({ event: 'child_start', sid: 'T1', child_id: 0, child_class: 'hook', hook_name: 'pre-commit', argv: ['.git/hooks/pre-commit'] }),
-        ev({ event: 'child_start', sid: 'T1/N1', child_id: 0, child_class: 'hook', hook_name: 'commit-msg', argv: ['x'] }),
-        ev({ event: 'child_exit', sid: 'T1/N1', child_id: 0, code: 1 }),
-        ev({ event: 'child_exit', sid: 'T1', child_id: 0, code: 0 }),
-        ev({ event: 'child_start', sid: 'T1', child_id: 1, child_class: '?', argv: ['gpg', '--status-fd=2', '-bsau', 'me'] }),
-        ev({ event: 'child_exit', sid: 'T1', child_id: 1, code: 2 }),
-        'not json'
-      ].join('\n')
-    )
-    expect(readCommitTrace(file)).toEqual({ signerFailed: true, signerRunning: false })
-    expect(readCommitTrace(join(tempDir('trace-'), 'none.json'))).toBeNull()
+describe("a commit's stream, git's trace in it (#1350)", () => {
+  // Real git 2.45 stderr (GIT_TRACE2_EVENT=2) of a failing merge commit, recorded with its paths replaced
+  // (tests/fixtures/queueCommits: how each was made is in its README).
+  const stream = (name: string): string => readFileSync(join(__dirname, '..', 'fixtures', 'queueCommits', `${name}.txt`), 'utf8')
+  const failed = (err: string, more: Partial<QueueGitResult> = {}): QueueGitResult => ({ ok: false, out: '', err, code: 128, ...more })
+  const noEvents = (s: string): boolean => !/\{"event":"/.test(s)
+
+  it("HR4 r2: a hook that passed saying \"passphrase\" never changes the signer's diagnosis: signing, with the signer's own words", () => {
+    const s = readCommitStream(stream('passing-hook-then-signer'))
+    expect(s.traced).toBe(true)
+    expect(s.children.filter((c) => c.kind !== 'other')).toEqual([
+      { kind: 'hook', name: 'commit-msg', code: 0, text: 'passphrase policy validation passed\n' },
+      { kind: 'signer', code: 2, text: 'gpg: signing failed: No secret key\n' }
+    ])
+    expect(s.git).toContain('error: gpg failed to sign the data')
+    const o = commitFailed(failed(stream('passing-hook-then-signer')), true)
+    expect(o).toMatchObject({ pause: 'signing' })
+    expect('message' in o && o.message).toBe('gpg: signing failed: No secret key\nerror: gpg failed to sign the data\nfatal: failed to write commit object')
   })
 
-  it('classifies by the child that failed: a hook over its words, a signer, a hook or signer at the bound, and git itself', () => {
-    const r = (err: string, more: Partial<QueueGitResult> = {}): QueueGitResult => ({ ok: false, out: '', err, code: 1, ...more })
-    const none = { signerFailed: false, signerRunning: false }
-    expect(commitFailed(r('fatal: passphrase needed'), { ...none, hookFailed: 'pre-commit' }, true)).toMatchObject({ fail: 'hook' })
-    expect(commitFailed(r('gpg: signing failed: No pinentry'), { ...none, signerFailed: true }, true)).toMatchObject({ pause: 'signingWaits' })
-    expect(commitFailed(r('gpg: signing failed: No secret key'), { ...none, signerFailed: true }, true)).toMatchObject({ pause: 'signing' })
-    expect(commitFailed(r('', { timedOut: true }), { ...none, hookRunning: 'pre-commit' }, true)).toMatchObject({ pause: 'hookTimedOut' })
-    expect(commitFailed(r('', { timedOut: true }), { ...none, signerRunning: true }, true)).toMatchObject({ pause: 'signingWaits' })
-    expect(commitFailed(r('passphrase policy: Not committing merge; nope'), none, true)).toMatchObject({ pause: 'needsYou' })
-    expect(commitFailed(r("Not committing merge; use 'git commit' to complete the merge."), null, false)).toMatchObject({ fail: 'hook' })
+  it('the reverse: a hook that passed saying "No secret key", and a signer that needs a terminal → signing waits', () => {
+    expect(commitFailed(failed(stream('passing-hook-then-signer-waits')), true)).toMatchObject({ pause: 'signingWaits', message: expect.stringContaining('Inappropriate ioctl for device') })
+  })
+
+  it("a failing hook whose last line has no newline, an event-looking fragment before git's own event: returned with its text intact, no event in it", () => {
+    const err = stream('failing-hook-no-newline')
+    const s = readCommitStream(err)
+    const failing = s.children.find((c) => c.kind === 'hook')!
+    expect(failing).toMatchObject({ name: 'commit-msg', code: 1 })
+    expect(failing.text).toBe('message rejected: passphrase in it\n{"event": not one\n')
+    const o = commitFailed(failed(err, { code: 1 }), false)
+    expect(o).toMatchObject({ fail: 'hook' })
+    expect('log' in o && o.log).toContain('{"event": not one')
+    expect('log' in o && noEvents(o.log)).toBe(true)
+  })
+
+  it("a git a hook runs, whose own hook fails, isn't a source: the top git's hook passed and its signer decides", () => {
+    const s = readCommitStream(stream('nested-git-hook'))
+    expect(s.children.filter((c) => c.kind === 'hook')).toEqual([expect.objectContaining({ name: 'pre-merge-commit', code: 0 })])
+    expect(commitFailed(failed(stream('nested-git-hook')), true)).toMatchObject({ pause: 'signing' })
+  })
+
+  it('only a complete record with its fields is an event: JSON-looking text a hook prints stays text', () => {
+    const s = readCommitStream(['{"event":"child_exit","child_id":1}', '{"event":"start","sid":"S"', '{"event":"x","sid":"S","time":"t"}{"event":"y"}', 'plain'].join('\n'))
+    expect(s.traced).toBe(false)
+    expect(s.text).toBe('{"event":"child_exit","child_id":1}\n{"event":"start","sid":"S"\n{"event":"x","sid":"S","time":"t"}{"event":"y"}\nplain')
+  })
+
+  it('HR4 r2: ended at the bound, it is a pause decided by what ran then, even when ending it made the hook exit non-zero', () => {
+    // As git writes them: `event` first.
+    const ev = ({ event, ...rest }: { event: string } & Record<string, unknown>): string => JSON.stringify({ event, sid: 'T', time: 't', ...rest })
+    const atTimeout = [ev({ event: 'version' }), ev({ event: 'child_start', child_id: 1, child_class: 'hook', hook_name: 'pre-merge-commit', argv: ['h'] }), 'linting…'].join('\n') + '\n'
+    // What came after: the ended hook's non-zero exit, written by git before it was ended too.
+    const err = atTimeout + ev({ event: 'child_exit', child_id: 1, code: 1 }) + '\n'
+    expect(readCommitStream(err).children[0]).toMatchObject({ kind: 'hook', code: 1 })
+    expect(commitFailed(failed(err, { timedOut: true, errAtTimeout: atTimeout }), true)).toMatchObject({ pause: 'hookTimedOut' })
+    // The signer running then: signing waits, whatever followed.
+    const signing = [ev({ event: 'version' }), ev({ event: 'child_start', child_id: 2, argv: ['gpg', '--status-fd=2', '-bsau', 'me'] })].join('\n') + '\n'
+    expect(commitFailed(failed(signing + ev({ event: 'child_exit', child_id: 2, code: 1 }), { timedOut: true, errAtTimeout: signing }), false)).toMatchObject({ pause: 'signingWaits' })
+    // Nothing known running then: signing waits in a repository that signs, else needs you; never a return.
+    expect(commitFailed(failed('', { timedOut: true, errAtTimeout: '' }), true)).toMatchObject({ pause: 'signingWaits' })
+    expect(commitFailed(failed('', { timedOut: true, errAtTimeout: '' }), false)).toMatchObject({ pause: 'needsYou' })
+  })
+
+  it("no trace (an old git): only git's own \"Not committing merge\" is a hook; anything else needs you, signing never read from text", () => {
+    expect(commitFailed(failed("Not committing merge; use 'git commit' to complete the merge."), false)).toMatchObject({ fail: 'hook' })
+    expect(commitFailed(failed('gpg: signing failed: No pinentry\nerror: gpg failed to sign the data'), true)).toMatchObject({ pause: 'needsYou' })
   })
 })

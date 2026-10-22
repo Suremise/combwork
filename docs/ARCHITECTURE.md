@@ -274,11 +274,18 @@ fence (`withoutWriteFence`): a fence is only the queue's own work's. `releaseSlo
 with `commitEnv()` (no prompt: `GIT_TERMINAL_PROMPT=0` and the like) and, when the repository has `commit.gpgsign`, a
 bound (`QueueConfig.signTimeoutMs`, Advanced `hive.queue.signSeconds`). The runner's `run`/`git` take `env` and
 `timeoutMs` and end the launcher's whole tree at the bound (`endTree`); without a config git, `gitTree` does the same.
-Each command runs with `GIT_TRACE2_EVENT` set to a file of its own; `readCommitTrace` reads which of the top git's
-children (a hook, the signer) failed or was still running, and `commitFailed` classifies from that, never from the
-output's words: a hook that failed returns the card (`hook`), a hook still running at the bound pauses `hookTimedOut`,
-a signer that waited or failed pauses (`signingWaits`, `signing`), anything else pauses `needsYou`. A pause keeps git's
-message (`QueuePause.message`, `workflow_queue_pauses.message`).
+`commitEnv` sets `GIT_TRACE2_EVENT=2`, so git's trace2 events are in its stderr, in order with its hooks' and signer's
+text. `readCommitStream` splits that stream into validated events and text, and gives each piece of text to the top
+git's child running then (a hook, the signer) or to git. `commitFailed` decides from the source each decision is about,
+never from the whole output:
+- at the bound, a pause by what ran then (`errAtTimeout`, the stream as of the timeout): `hookTimedOut` or
+  `signingWaits`;
+- a hook that failed returns the card (`hook`);
+- a signer that failed pauses `signingWaits` or `signing`, by its own text;
+- anything else pauses `needsYou`.
+
+A pause keeps the message (`QueuePause.message`, `workflow_queue_pauses.message`). Recorded streams are in
+`tests/fixtures/queueCommits`.
 
 **The queue's runner** (#1360, SPEC §16.9.3): one per project and target across Hives on a workspace. `QueueRunner.acquire`
 takes the target's lease (`queue_runners`, written through `factStore.ts` inside `boardWrite`), from no one or from a
