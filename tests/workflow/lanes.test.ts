@@ -41,9 +41,11 @@ describe('lanes', () => {
     await finish(e, c2.key, 'two.txt')
     expect(e.wf.laneNext('L')).toBe(c3.id)
     expect(e.wf.lane('L')!.cards).toEqual([c1.id, c2.id, c3.id, c4.id])
-    await finish(e, c3.key, 'three.txt')
+    // The rest only need to be Done for the lane to go on, however they get there (laneDone): the user's move, not a
+    // whole Git cycle each (#1384: S3 timed out under load; the cycle is c1's and c2's, and S19's lane ends by one).
+    moved(await e.wf.move(c3.key, 'done', 'user', { confirm: true, reason: 'done elsewhere' }))
     expect(e.wf.laneNext('L')).toBe(c4.id)
-    await finish(e, c4.key, 'four.txt')
+    moved(await e.wf.move(c4.key, 'done', 'user', { confirm: true, reason: 'done elsewhere' }))
     expect(e.wf.laneNext('L')).toBeNull()
     expect(e.store.deliveries().filter((d) => d.kind === 'laneEnded')).toHaveLength(1)
   })
@@ -59,6 +61,8 @@ describe('lanes', () => {
     e.wf.laneNext('L')
     await finish(e, c2.key, 'two.txt')
     expect(e.wf.laneNext('L')).toBeNull()
+    // Ended once, by its last card's finish.
+    expect(e.store.deliveries().filter((d) => d.kind === 'laneEnded')).toHaveLength(1)
     const after = e.wf.createCard({ title: 'After the lane' })
     const s = await e.wf.start(after.key, B2)
     moved(s)
