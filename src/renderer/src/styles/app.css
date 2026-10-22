@@ -6658,6 +6658,14 @@ body.pane-resizing .monaco-editor {
 .antivirus-folders td:first-child .mono {
   margin-left: 4px;
 }
+/* Hive's exclusions of folders that are gone (#1389): a heading and a table of their own under the workspace's. */
+.antivirus-gone h4 {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: inherit;
+}
+.antivirus-gone td.mono {
+  overflow-wrap: anywhere;
+}
 .perf-antivirus a {
   cursor: pointer;
 }

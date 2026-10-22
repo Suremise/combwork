@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Hive's Defender exclusions of folders that are gone can be removed.** If you declined Repair's offer to move Hive's exclusions with a moved workspace, or deleted a folder Hive had excluded, those exclusions stayed in Defender, and nothing in Hive showed them. Settings → Workspace → Antivirus scanning now lists **Hive's exclusions of folders that are gone**, and **Remove Hive's Exclusions…** takes them away too (#1389).
 - **A card's work follows its worktree when a workspace moves.** A card started in an agent's worktree recorded the worktree's old folder. After the workspace moved, Hive took that folder for gone, even once Repair had relinked or recreated the worktree at its new place. The card now follows the worktree there, and nothing is marked gone while a move waits for Repair (#1343).
 - **A compaction opened from the Overview stays in view.** Opening one of a session's compactions from the Overview's compaction history could open its summary while the Sessions tab stayed at the end of the transcript, out of sight of it, when the window was busy. The transcript now stays where the jump put it until you scroll it yourself; the same goes for a search hit (#1323).
 - **No crash when many agents' sessions end at once.** When several agents stopped together (a new Assistant conversation ending its batch agents, say), the window could fail with an update loop (React error #185). The Git status in the status bar and the Git tab now read Git once at a time and catch up afterwards, rather than once per agent (#1366).

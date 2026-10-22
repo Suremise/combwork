@@ -61,6 +61,8 @@ const M = {
   checked: msg({ id: 'workspace.antivirus.checkedAt', defaultMessage: 'Checked {when}', description: 'When the antivirus status was checked ({when}: "4 minutes ago").' }),
   checkAgain: msg({ id: 'workspace.antivirus.checkAgain', defaultMessage: 'Check Again', description: "Settings → Workspace's antivirus: a button." }),
   checkAdmin: msg({ id: 'workspace.antivirus.checkAdmin', defaultMessage: 'Check with Administrator Rights…', description: "Settings → Workspace's antivirus: a button (Windows asks for administrator rights)." }),
+  goneTitle: msg({ id: 'workspace.antivirus.goneTitle', defaultMessage: 'Hive’s exclusions of folders that are gone', description: "Settings → Workspace's antivirus: a heading over a list of exclusions Hive added for folders that no longer exist (moved or deleted)." }),
+  goneHint: msg({ id: 'workspace.antivirus.goneHint', defaultMessage: '{n, plural, one {Hive excluded this folder, which no longer exists (moved or deleted). Remove Hive’s Exclusions… takes it away too.} other {Hive excluded these folders, which no longer exist (moved or deleted). Remove Hive’s Exclusions… takes them away too.}}', description: "Settings → Workspace's antivirus, under the heading for exclusions of folders that are gone. {n}: how many. Remove Hive’s Exclusions… is the button below: use its name as shown." }),
   removeHive: msg({ id: 'workspace.antivirus.removeHive', defaultMessage: 'Remove Hive’s Exclusions…', description: "Settings → Workspace's antivirus: a button." }),
   addExclusions: msg({ id: 'workspace.antivirus.addExclusions', defaultMessage: 'Add Exclusions…', description: "Settings → Workspace's antivirus: a button." }),
   aboutDevDrive: msg({ id: 'workspace.antivirus.aboutDevDrive', defaultMessage: 'About Dev Drive', description: "Settings → Workspace's antivirus: opens Microsoft's Dev Drive documentation." }),
@@ -165,7 +167,7 @@ export function AntivirusPanel() {
   const defender = status.scan === 'defender'
   const offerable = status.paths.filter((p) => !p.unsafe)
   const toAdd = offerable.filter((p) => p.state !== 'excluded')
-  const hiveAdded = offerable.some((p) => p.addedByHive)
+  const hiveAdded = offerable.some((p) => p.addedByHive) || !!status.gone?.length
   return (
     <div className="antivirus">
       <p className={cx('antivirus-scan', status.slowed && 'warn-text')}>
@@ -200,6 +202,34 @@ export function AntivirusPanel() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {defender && !!status.gone?.length && (
+        <div className="antivirus-gone">
+          <h4>{tr(M.goneTitle)}</h4>
+          <p className="hint">{tr(M.goneHint, { n: status.gone.length })}</p>
+          <div className="table-wrap">
+            <table className="table antivirus-folders">
+              <thead>
+                <tr>
+                  <th>{tr(M.folder)}</th>
+                  <th>{tr(M.scanning)}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {status.gone.map((g) => (
+                  <tr key={g.path}>
+                    <td className="mono small">{g.path}</td>
+                    <td className="nowrap">
+                      <span className={AV_STATE[g.state].tone} title={tr(AV_STATE[g.state].tip)}>
+                        {tr(AV_STATE[g.state].label)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
       {defender && (

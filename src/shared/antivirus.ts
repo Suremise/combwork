@@ -107,6 +107,17 @@ export interface AntivirusStatus {
   slowed: boolean
   /** The folders an offer is about (the slowed ones), as a key: an offer is made once for each set. */
   offerKey: string
+  /**
+   * Hive's own exclusions of folders that no longer exist (#1389: a workspace moved without Repair moving them, its
+   * prompt declined, a folder deleted): those Defender lists (`excluded`), or with its list hidden every one Hive
+   * recorded (`added`, unconfirmed). Remove Hive's Exclusions… takes them away with the workspace's.
+   */
+  gone?: AvGone[]
+}
+
+export interface AvGone {
+  path: string
+  state: 'excluded' | 'added'
 }
 
 /** The read-only probe's output (main/antivirus.ts probeScript), as untrusted JSON. */
@@ -245,10 +256,26 @@ export interface AdminCheck {
 }
 
 /**
- * The status of a workspace's folders, from the probe. `added`: the exclusions Hive added; `adminCheck`: what was last
- * read with administrator rights, used while the live list is hidden (and for Dev Drives, which only it can confirm).
+ * Hive's exclusions of folders that are gone (#1389), from those it recorded whose folder doesn't exist (`missing`):
+ * the workspace's own folders left out; with Defender's list known, only those it lists itself (exact entries: what
+ * Remove can take away), else every one, unconfirmed.
  */
-export function statusOf(workspacePath: string, probe: AvProbe, folders: { path: string; kind: AvPathKind; unsafe?: string }[], opts: { added: string[]; adminCheck?: AdminCheck | null; now: Date }): AntivirusStatus {
+export function goneExclusions(missing: string[], folders: { path: string }[], known: string[] | null): AvGone[] {
+  const out: AvGone[] = []
+  for (const p of missing) {
+    if (folders.some((f) => normPath(f.path) === normPath(p)) || out.some((g) => normPath(g.path) === normPath(p))) continue
+    if (!known) out.push({ path: p, state: 'added' })
+    else if (listed(p, known)) out.push({ path: p, state: 'excluded' })
+  }
+  return out
+}
+
+/**
+ * The status of a workspace's folders, from the probe. `added`: the exclusions Hive added; `adminCheck`: what was last
+ * read with administrator rights, used while the live list is hidden (and for Dev Drives, which only it can confirm);
+ * `missing`: those of `added` whose folder no longer exists.
+ */
+export function statusOf(workspacePath: string, probe: AvProbe, folders: { path: string; kind: AvPathKind; unsafe?: string }[], opts: { added: string[]; adminCheck?: AdminCheck | null; now: Date; missing?: string[] }): AntivirusStatus {
   const others = (probe.products ?? []).filter((p) => productOn(p.state) && !isDefender(p.name)).map((p) => p.name)
   const d = probe.defender
   // Defender in passive mode (another antivirus is active) or switched off doesn't scan in real time.
@@ -272,6 +299,7 @@ export function statusOf(workspacePath: string, probe: AvProbe, folders: { path:
   // A trusted Dev Drive in performance mode is scanned lightly; an untrusted one, or performance mode off, is scanned like any other.
   const light = (p: AvPath): boolean => p.devDrive === 'trusted' && probe.performanceMode === true
   const slowedPaths = scan === 'defender' && realTime ? paths.filter((p) => !p.unsafe && p.state !== 'excluded' && p.state !== 'added' && !light(p)) : []
+  const gone = scan === 'defender' ? goneExclusions(opts.missing ?? [], folders, known) : []
   return {
     workspacePath,
     scan,
@@ -283,7 +311,8 @@ export function statusOf(workspacePath: string, probe: AvProbe, folders: { path:
     paths,
     checkedAt: opts.now.toISOString(),
     slowed: slowedPaths.length > 0,
-    offerKey: slowedPaths.map((p) => normPath(p.path)).sort().join('|')
+    offerKey: slowedPaths.map((p) => normPath(p.path)).sort().join('|'),
+    ...(gone.length ? { gone } : {})
   }
 }
 

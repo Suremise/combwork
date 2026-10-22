@@ -176,6 +176,16 @@ const resolved = (p: string): Promise<string | null> => realpath(resolve(p)).cat
 
 const exists = (p: string): Promise<boolean> => stat(p).then((s) => s.isDirectory(), () => false)
 
+/**
+ * Of the folders Hive excluded, those that no longer exist (#1389): gone only when they truly aren't there (ENOENT,
+ * ENOTDIR), never for a folder that can't be looked at.
+ */
+async function missingOf(paths: string[]): Promise<string[]> {
+  const out: string[] = []
+  for (const p of paths) if (await stat(p).then(() => false, (e: NodeJS.ErrnoException) => e.code === 'ENOENT' || e.code === 'ENOTDIR')) out.push(p)
+  return out
+}
+
 /** Whether the workspace holds Hive's own repository (someone developing Hive). */
 async function holdsHive(w: WorkspaceService): Promise<boolean> {
   for (const p of await w.listProjectPaths().catch(() => [] as string[])) {
@@ -326,7 +336,7 @@ async function probe(root: string, folders: { path: string; kind: AvPathKind; un
       raw = fixture.probe
     } else raw = JSON.parse((await runPowerShell(probeScript(drivesOf(folders.map((f) => f.path))), PROBE_TIMEOUT_MS)).trim() || 'null')
     const mem = remembered()
-    return statusOf(root, parseProbe(raw), folders, { added: mem.added ?? [], adminCheck: mem.adminCheck ?? null, now })
+    return statusOf(root, parseProbe(raw), folders, { added: mem.added ?? [], adminCheck: mem.adminCheck ?? null, now, missing: await missingOf(mem.added ?? []) })
   } catch (e) {
     log.warn(`antivirus status of ${userText(root)}: ${userText((e as Error).message)}`)
     return emptyStatus(root, 'unavailable', folders, now, (e as Error).message)
@@ -348,13 +358,16 @@ interface Prepared {
 /** Changes waiting for the user's answer, by id: used once, within ten minutes, at most a few at a time. */
 const prepared = new Map<string, Prepared>()
 
-/** The folders an action would change now: Add the safe ones not known to be excluded, Remove the safe ones Hive added. */
+/**
+ * The folders an action would change now: Add the safe ones not known to be excluded, Remove the safe ones Hive added
+ * and Hive's exclusions of folders that are gone (#1389).
+ */
 async function planFor(w: WorkspaceService, action: AvAction): Promise<{ status: AntivirusStatus; paths: string[] }> {
   const status = await statusFor(w, true)
   if (status.scan !== 'defender') throw new Error(status.scan === 'other' ? tr(msg({ id: 'main.antivirus.other', defaultMessage: 'Another antivirus is active: Hive can only change Microsoft Defender’s exclusions.', description: 'An error in Settings → Workspace → Antivirus scanning. Microsoft Defender is a name.' })) : tr(msg({ id: 'main.antivirus.notDefender', defaultMessage: 'Microsoft Defender isn’t the active antivirus here.', description: 'An error in Settings → Workspace → Antivirus scanning.' })))
   const added = (remembered().added ?? []).map(normPath)
   const safe = status.paths.filter((p) => !p.unsafe)
-  const paths = action === 'add' ? safe.filter((p) => p.state !== 'excluded').map((p) => p.path) : action === 'remove' ? safe.filter((p) => added.includes(normPath(p.path))).map((p) => p.path) : []
+  const paths = action === 'add' ? safe.filter((p) => p.state !== 'excluded').map((p) => p.path) : action === 'remove' ? [...safe.filter((p) => added.includes(normPath(p.path))).map((p) => p.path), ...(status.gone ?? []).map((g) => g.path)] : []
   if (action !== 'check' && !paths.length) throw new Error(action === 'add' ? tr(msg({ id: 'main.antivirus.allExcluded', defaultMessage: 'Every folder Hive may offer is already excluded.', description: 'An error in Settings → Workspace → Antivirus scanning: nothing to add.' })) : tr(msg({ id: 'main.antivirus.noneAdded', defaultMessage: 'Hive added no exclusions for this workspace.', description: 'An error in Settings → Workspace → Antivirus scanning: nothing to remove.' })))
   return { status, paths }
 }
@@ -397,16 +410,28 @@ export async function applyAntivirus(id: string): Promise<{ result: AvChangeResu
   log.info(`antivirus ${op.action}: ${op.paths.map((p) => userText(p)).join(', ') || '(read the list)'}`)
   const result = await elevated(op.action, op.paths, op.drives)
   // What happened to Defender is the machine's, whatever the window shows now: remembered either way.
+  await remember(result)
+  log.info(`antivirus ${op.action}: ${result.outcome}`)
+  const status = op.life.aborted || op.w.path !== op.root ? null : await statusFor(op.w, true)
+  return { result, status }
+}
+
+/**
+ * What an elevated run found, remembered (config.json, the machine's): the list read with administrator rights, what
+ * it added and removed. With the list read, Hive also forgets its exclusions of folders that are gone and that Defender
+ * no longer lists (#1389: taken away in Windows Security, say): there's nothing of Hive's left to show or remove.
+ */
+async function remember(result: AvChangeResult): Promise<void> {
+  const missing = result.exclusions ? await missingOf(remembered().added ?? []) : []
   config.update((c) => {
     const a = { ...c.antivirus }
     if (result.exclusions) a.adminCheck = { at: new Date().toISOString(), exclusions: result.exclusions, ...(result.devDrives ? { devDrives: result.devDrives } : {}) }
     if (result.added?.length) a.added = [...new Set([...(a.added ?? []), ...result.added])]
     if (result.removed?.length) a.added = (a.added ?? []).filter((p) => !result.removed!.some((x) => normPath(x) === normPath(p)))
+    const known = result.exclusions
+    if (known && a.added) a.added = a.added.filter((p) => listed(p, known) || !missing.some((m) => normPath(m) === normPath(p)))
     c.antivirus = a
   })
-  log.info(`antivirus ${op.action}: ${result.outcome}`)
-  const status = op.life.aborted || op.w.path !== op.root ? null : await statusFor(op.w, true)
-  return { result, status }
 }
 
 /** A moved workspace's old folders, as Hive kept them: where it was, and its worktrees folder beside it then. */
@@ -437,13 +462,7 @@ export async function moveExclusions(w: WorkspaceService, from: string): Promise
   if (!plan || plan.scan !== 'defender' || !plan.remove.length) return null
   log.info(`antivirus move: remove ${plan.remove.map((p) => userText(p)).join(', ')}; add ${plan.add.map((p) => userText(p)).join(', ') || '(none)'}`)
   const result = await elevated('move', plan.add, drivesOf([...plan.add, ...plan.now.map((p) => p.path)]), plan.remove)
-  config.update((c) => {
-    const a = { ...c.antivirus }
-    if (result.exclusions) a.adminCheck = { at: new Date().toISOString(), exclusions: result.exclusions, ...(result.devDrives ? { devDrives: result.devDrives } : {}) }
-    if (result.added?.length) a.added = [...new Set([...(a.added ?? []), ...result.added])]
-    if (result.removed?.length) a.added = (a.added ?? []).filter((p) => !result.removed!.some((x) => normPath(x) === normPath(p)))
-    c.antivirus = a
-  })
+  await remember(result)
   log.info(`antivirus move: ${result.outcome}`)
   // The window's status reads the new list.
   if (!w.lifetime.aborted && w.path) await statusFor(w, true).catch(() => undefined)
