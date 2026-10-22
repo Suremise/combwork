@@ -3,7 +3,7 @@
 // Branches & remotes, a card started in an agent's worktree shows on its branch's row (and the worktree's) with its key
 // and Active; submitted, Review and the revision under review, the same as its Work section's; merged by the queue, Done
 // and merged with Integrated's revision; a no-code card's builder's branch has no card; a branch no card works on is as
-// before; the card's key opens the card. Screenshots in both themes. Dev build, throwaway profile, workspace and
+// before; a worktree names its agent's card even with another branch checked out; the card's key opens the card. Screenshots in both themes. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -93,9 +93,23 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 150)
     check("…its builder's branch shows no card", (await row(b2branch).count()) === 1 && (await row(b2branch).locator('[data-branch-card]').count()) === 0, await text(row(b2branch)))
     check('a branch no card works on shows as before: no card', (await row('feature/plain').count()) === 1 && (await row('feature/plain').locator('[data-branch-card]').count()) === 0, await text(row('feature/plain')))
 
+    // --- A worktree names its agent's card, whatever its folder has checked out (HR4's round 1): B1 starts another
+    // card, then something outside Hive checks out feature/plain in B1's worktree.
+    const n2 = (await inv('tasks:create', { title: 'Next on B1', project: 'alpha' })).number
+    const key2 = (await h.card(n2)).key
+    const s2 = await q.intent(h, b1, n2, 'start')
+    check('B1 starts its next card', s2.status === 200, JSON.stringify(s2.body))
+    lib.git(b1.folder, ['checkout', '-q', 'feature/plain'])
+    await page.locator('[data-action="reload-branches"]').click()
+    const b1Worktree = page.locator('.git-worktree').filter({ hasText: "B1's worktree" })
+    check("the worktree names its agent's card even on another branch", !!(await waitHung(async () => (await b1Worktree.locator(`[data-branch-card="${n2}"]`).count()) === 1 && (await text(b1Worktree)).includes('feature/plain'))), await text(b1Worktree))
+    check('…while that branch’s own row, a line no card works on, shows none', (await row('feature/plain').locator('[data-branch-card]').count()) === 0, await text(row('feature/plain')))
+    check("…and B1's own branch still shows the card whose line it is", (await row(line).locator(`[data-branch-card="${n2}"]`).count()) === 1 && (await text(row(line))).includes(key2), await text(row(line)))
+    lib.git(b1.folder, ['checkout', '-q', line])
+
     // --- The card's key opens the card.
-    await chip(line).locator('.git-branch-card-key').click()
-    check("the card's key opens it", !!(await waitHung(async () => (await page.locator('.dialog[role="dialog"] .task-title-input').first().inputValue().catch(() => '')) === 'Branch card')))
+    await row(line).locator(`[data-branch-card="${n2}"] .git-branch-card-key`).click()
+    check("the card's key opens it", !!(await waitHung(async () => (await page.locator('.dialog[role="dialog"] .task-title-input').first().inputValue().catch(() => '')) === 'Next on B1')))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

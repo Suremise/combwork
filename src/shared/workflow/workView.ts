@@ -250,6 +250,8 @@ export interface WorkView {
   lastSeq: number
   /** The ruleset it keeps while in flight (`ownRuleset`); null in Todo, before its start, or none recorded. */
   ruleset: string | null
+  /** When its current cycle started (its Started's or Adopted's time); null before its first start. */
+  startedAt: string | null
 }
 
 /**
@@ -358,7 +360,8 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     rounds: s.rounds,
     forYou: s.requests.length,
     lastSeq: s.lastSeq,
-    ruleset: ownRuleset(facts, s)
+    ruleset: ownRuleset(facts, s),
+    startedAt: s.cycle ? (at.get(s.cycle) ?? null) : null
   }
 }
 
@@ -436,6 +439,8 @@ export interface WorkBadge {
    * the window shows it through its platform's short form. Null outside Review, or for a no-code card.
    */
   underReview: string | null
+  /** When its current cycle (on `line`) started: what orders a branch's cards, one after another (#1424). */
+  startedAt: string | null
   lastSeq: number
 }
 
@@ -484,6 +489,7 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     stages: v.ruleset && v.stage !== 'done' ? (stagesOf?.(v.ruleset) ?? null) : null,
     line: v.line,
     underReview: v.stage === 'review' && v.kind !== 'no-code' ? (latest?.revision ?? null) : null,
+    startedAt: v.startedAt,
     lastSeq: v.lastSeq
   }
 }

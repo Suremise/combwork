@@ -19,7 +19,7 @@ import { samePath } from '@shared/movePaths'
 import { call } from '../api'
 import { attempt } from '../actions'
 import { bumpGit, cardLabelOf, choose, confirm, notify, prompt, set, showVersionControl, UNUSED_ROOT, useStore } from '../store'
-import { branchCards, type BranchCard } from '@shared/branchCards'
+import { agentCard, branchCards, type BranchCard } from '@shared/branchCards'
 import { revisionShort } from '@shared/platform/descriptors'
 import { stageName } from '@shared/workflow/stages'
 import { stageLook } from '@shared/laneStages'
@@ -173,6 +173,8 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
   const tasks = useStore((st) => st.tasks)
   const badges = useWorkBadges()
   const onBranch = useMemo(() => branchCards(project.name, tasks, badges), [project.name, tasks, badges])
+  // The project's names for its stages, read once for every row (HR4's #1424 round 1).
+  const names = useProjectStages().get(project.path.toLowerCase())?.names
   useNow(60000)
 
   const act = (name: string, title: string, fn: () => Promise<string>): void => void run(name, () => gitAction(project, title, fn))
@@ -281,6 +283,8 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
         const warnings = identityWarnings(info.identity, info.remotes)
         const agentOf = (path: string | null) => (path ? project.agents.find((a) => a.worktree && samePath(a.worktree.path, path)) : undefined)
         const cardsOf = (branch: string | null) => (branch ? (onBranch.get(branch) ?? []) : [])
+        // A worktree names the card its agent is on, whatever its folder has checked out (HR4's #1424 round 1).
+        const agentsCard = (path: string) => agentCard(project.name, agentOf(path)?.id, tasks, badges)
         return (
           <div className="git-branches" data-git-branches="">
             <h2 className="section git-section-head">
@@ -374,7 +378,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                     <Icon name={b.current ? 'check' : b.worktree ? 'repo' : 'git-branch'} />
                     <span className="git-name">{b.name}</span>
                     {b.worktree && <span className="badge" data-worktree="">{agent ? tr(M.agentWorktree, { agent: agent.name }) : tr(M.worktreeBadge)}</span>}
-                    <BranchCards cards={cardsOf(b.name)} project={project} />
+                    <BranchCards cards={cardsOf(b.name)} project={project} names={names} />
                     {b.upstream && (
                       <span className="faint git-track">
                         {b.upstream} · {aheadBehindText(b)}
@@ -463,7 +467,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                         <Icon name="repo" />
                         <span className="git-name">{agent ? tr(M.agentWorktree, { agent: agent.name }) : tr(M.unusedWorktree)}</span>
                         <span className="faint">{w.branch ?? (w.head ? headText({ branch: null, head: w.head }) : '')}</span>
-                        <BranchCards cards={cardsOf(w.branch)} project={project} />
+                        <BranchCards cards={agentsCard(w.path)} project={project} names={names} />
                         <span className="git-url faint">{w.path}</span>
                         <button
                           className="btn small subtle"
@@ -616,12 +620,12 @@ const CARDS = {
 
 /**
  * A branch's cards (#1424): the card its line belongs to now (in flight first, else the latest), by key, a link that opens
- * it, with its stage in its category's colour (the project's name for it), its revision under review (with a copy button)
- * or, Done, that it was merged and as what; and how many earlier cards worked on the same branch.
+ * it, with its stage in its category's colour (`names`: the project's, read once for the section), its revision under
+ * review (with a copy button) or, Done, that it was merged and as what; and how many earlier cards worked on the same
+ * branch. A worktree's: its agent's card, the same way.
  */
-function BranchCards({ cards, project }: { cards: BranchCard[]; project: ProjectInfo }) {
+function BranchCards({ cards, project, names }: { cards: BranchCard[]; project: ProjectInfo; names: Partial<Record<BranchCard['stage'], string>> | undefined }) {
   const tasks = useStore((st) => st.tasks)
-  const names = useProjectStages().get(project.path.toLowerCase())?.names
   const [copied, setCopied] = useState(false)
   useEffect(() => {
     if (!copied) return
