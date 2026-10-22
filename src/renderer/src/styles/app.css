@@ -11757,11 +11757,18 @@ button.progress-run-show:focus-visible {
 .workflow-preview-list li {
   padding-block: 2px;
 }
+/* An option the preset would change: a bar at the start, its bullet kept so the list stays aligned (the Assistant's OK). */
 .workflow-preview-list li.changes {
-  border-inline-start: 3px solid var(--accent);
-  padding-inline-start: 6px;
-  margin-inline-start: -9px;
-  list-style: none;
+  position: relative;
+}
+.workflow-preview-list li.changes::before {
+  content: '';
+  position: absolute;
+  inset-block: 2px;
+  inset-inline-start: -20px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 .workflow-preview-actions {
   display: flex;
