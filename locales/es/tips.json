@@ -206,6 +206,8 @@
   "tips.mcpPerProject.title": "Servidores MCP solo donde hacen falta",
   "tips.memorySnapshot.text": "Activa Configuración → Avanzado → Guardar una instantánea de memoria si Hive está a punto de quedarse sin memoria para averiguar qué la llenó. Las instantáneas pueden ocupar gigabytes, contienen lo que Hive tenía en memoria (texto de tarjetas, transcripciones, posiblemente tokens) y se quedan en este PC.",
   "tips.memorySnapshot.title": "¿Hive se cerró por quedarse sin memoria?",
+  "tips.mergeQueueFolder.text": "Cuando la cola de fusión fusiona en una rama activa en una carpeta (main en la carpeta del proyecto), también actualiza la carpeta, pero se pausa en vez de tocar un archivo que estás cambiando. En Configuración → Avanzado puedes hacer que antes te pregunte en Para ti.",
+  "tips.mergeQueueFolder.title": "Fusionar en la carpeta en la que trabajas",
   "tips.mergeSlot.text": "Cuando varios agentes terminan a la vez, cada uno toma el turno de fusión del proyecto antes de fusionar main en su rama, comprobar y fusionar, para que nadie tenga que repetir sus comprobaciones. Quién lo tiene y quién espera se ve en Resumen y en el panel Progreso.",
   "tips.mergeSlot.title": "Los agentes fusionan por turnos",
   "tips.messageReceipts.text": "Cada mensaje que el Asistente deja a un agente tiene un id y se conserva, incluso tras un reinicio: se da por recibido cuando el agente lee su bandeja de entrada, y por confirmado cuando el agente actuó en consecuencia. Uno que no se confirma en {minutes, plural, one {# minuto} many {# minutos} other {# minutos}} aparece como atrasado (✉) en su panel.",

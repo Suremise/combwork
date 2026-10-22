@@ -14,6 +14,8 @@
   "workflow.forYou.newDecision": "Karta {card} ma nową decyzję: zrecenzujesz ją ponownie?",
   "workflow.forYou.okBefore": "Karta {card} jest zatwierdzona: zgadzasz się na scalenie?",
   "workflow.forYou.passedReview": "Karta {card} przeszła recenzję: dajesz zgodę?",
+  "workflow.forYou.queueAdvance": "Karta {card} jest przetestowana i gotowa do scalenia: zaktualizować teraz {target} w {folder}?",
+  "workflow.forYou.queueStuck": "Scalanie karty {card} do {target} zatrzymało się w połowie w {folder} i Hive niczego tam już nie zmienia. {how, select, both {Aby je dokończyć, uruchom {finish} (PowerShell) w {project}; aby je cofnąć, uruchom {undo} (PowerShell) w {folder}.} finish {Aby je dokończyć, uruchom {finish} (PowerShell) w {folder}.} undo {Aby je cofnąć, uruchom {undo} (PowerShell) w {folder}.} other {Jego pliki nie są ani takie jak przedtem, ani takie jak po scaleniu: popraw je ręcznie.}} Potem odpowiedz tutaj, a kolejka sprawdzi jeszcze raz.",
   "workflow.forYou.review": "Karta {card} czeka na Twoją recenzję",
   "workflow.forYou.roundLimit": "Karta {card} nie przeszła {rounds, plural, one {# recenzji} few {# recenzji} many {# recenzji} other {# recenzji}}: kontynuować z kolejnymi rundami, podzielić ją, przyjąć z dalszymi kartami czy przejąć ją samodzielnie?",
   "workflow.forYouKind": "{kind, select, approve {Zatwierdź} decide {Zdecyduj} test {Przetestuj} signIn {Zaloguj się} other {Inne}}",

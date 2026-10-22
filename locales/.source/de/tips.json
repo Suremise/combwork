@@ -206,6 +206,8 @@
   "tips.mcpPerProject.title": "MCP servers only where they are needed",
   "tips.memorySnapshot.text": "Turn on Settings → Advanced → Save a memory snapshot if Hive is about to run out of memory, to find out what filled it. Snapshots can be gigabytes, hold what Hive had in memory (card text, transcripts, possibly tokens) and stay on this PC.",
   "tips.memorySnapshot.title": "Hive closed running out of memory?",
+  "tips.mergeQueueFolder.text": "When the merge queue merges into a branch checked out in a folder (main in the project folder), it updates the folder too, but pauses rather than touch a file you are changing. Settings → Advanced can have it ask you under For you first.",
+  "tips.mergeQueueFolder.title": "Merging into the folder you work in",
   "tips.mergeSlot.text": "When several agents finish at once, each claims the project's merge slot before it merges main in, checks and merges, so nobody's checks have to run twice. Who holds it and who waits shows in the Overview and the Progress panel.",
   "tips.mergeSlot.title": "Agents take turns to merge",
   "tips.messageReceipts.text": "Every message the Assistant leaves an agent has an id and is kept, even across a restart: it is received once the agent reads its inbox, and acked once the agent acted on it. One not acked within {minutes, plural, one {# minute} other {# minutes}} shows as overdue (✉) in its pane.",

@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, openEntry, passingReviewers, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
@@ -737,14 +737,14 @@ export class Workflow {
    * is; `unbound`: a question no new submission retires (the round limit's, answered only by the user); `revision` and
    * `checklist`: an agent's ask about a revision of its choice, with a Test checklist (#1267).
    */
-  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, o: { asker?: string | null; unbound?: boolean; revision?: string; checklist?: string[] } = {}): string {
+  askUser(w: Write, kind: ForYouKind, gate: string, text: string | StoredText, o: { asker?: string | null; unbound?: boolean; revision?: string; checklist?: string[]; entry?: string; result?: string } = {}): string {
     const s = w.state()
     // Hive's own requests are messages (FOR_YOU): the English for agents and the Agent API, the message for the window.
     const english = typeof text === 'string' ? text : workflowEnglish(text)
     const shown = typeof text === 'string' ? {} : { requestText: text }
     const request = `${w.card.key}/r${s.lastSeq + 1}`
     // Bound to what the user is shown: the submission and revision, the stage and the decision generation it is asked at.
-    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, for: 'user', ...(o.asker ? { asker: o.asker } : {}), stage: w.current, generation: s.generation, ...(s.latest && !o.unbound ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}), ...(o.revision ? { revision: o.revision } : {}), ...(o.checklist ? { checklist: o.checklist } : {}) })
+    w.fact('ApprovalRequested', { request, kind, gate, text: english, ...shown, for: 'user', ...(o.asker ? { asker: o.asker } : {}), stage: w.current, generation: s.generation, ...(s.latest && !o.unbound ? { submission: s.latest.id, revision: s.approved?.revision ?? s.latest.revision } : {}), ...(o.revision ? { revision: o.revision } : {}), ...(o.checklist ? { checklist: o.checklist } : {}), ...(o.entry ? { entry: o.entry } : {}), ...(o.result ? { result: o.result } : {}) })
     w.action('notify', { text: english, ...(typeof text === 'string' ? {} : { shown: text }) })
     return request
   }
@@ -1130,6 +1130,12 @@ export class Workflow {
         // Its lane's reviewer, which paused with it.
         if (card.reviewer && card.reviewer !== builder) this.wake(w, card.reviewer, said, 'answer')
         return null
+      }
+      if (req.gate === QUEUE_ADVANCE_GATE || req.gate === QUEUE_STUCK_GATE) {
+        // The merge queue's own (#1351): its target's queue looks at the answer now (an approved update runs at once; a
+        // stuck advance is looked at again, as Resume does).
+        const e = st.entries.find((x) => x.id === req.entry)
+        if (e) w.action('enqueue', { target: e.target, ...(req.gate === QUEUE_STUCK_GATE ? { recheck: true } : {}) })
       }
       if (req.gate !== 'review' && req.gate !== 'okBefore') {
         // A question an agent asked (or Hive's own, after a merge): recorded, and the asker told; nothing moves.
