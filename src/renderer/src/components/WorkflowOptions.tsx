@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ProjectInfo, WorkflowChange, WorkflowForm, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
-import { CONTRADICTIONS, FORM_OPTIONS, NOT_OFFERED, reviewerAgent, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
-import { optionTitle, OPTION_TEXT, PRESET_NEEDS_TEXT, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
+import { CONTRADICTIONS, FORM_OPTIONS, formShows, NOT_OFFERED, reviewerAgent, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
+import { optionTitle, OPTION_TEXT, PRESET_NEEDS_TEXT, PRESET_NOTE_TEXT, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import { LOOP_ROUNDS, loopDefaults } from '@shared/lanes'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
@@ -206,7 +206,7 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
   const rowOf = (key: OptionKey): React.ReactNode => {
     const title = optionTitle(key, form.platform)
     const text = OPTION_TEXT[key]
-    if (!title || !text) return null
+    if (!title || !text || !formShows(key, effective)) return null
     const origin = originOf(key)
     return (
       <div className="setting workflow-option" key={key} data-option={key}>
@@ -282,10 +282,11 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
       case 'sameness':
         return select('sameness', [['change', tr(V.sameness.change)], ['exact', tr(V.sameness.exact)]])
       case 'finish': {
-        // Hive merges isn't offered in this version (§16.19.1): shown only for a project that has it, to change.
-        const values: [string, string][] = [['agentMerges', tr(V.finish.agentMerges)], ['committed', tr(V.finish.committed)], ['notChecked', tr(V.finish.notChecked)]]
-        return select('finish', effective.finish === 'hiveMerges' ? [['hiveMerges', tr(V.finish.hiveMerges)], ...values] : values)
+        // Hive merges since P5's queue (#1355).
+        return select('finish', [['hiveMerges', tr(V.finish.hiveMerges)], ['agentMerges', tr(V.finish.agentMerges)], ['committed', tr(V.finish.committed)], ['notChecked', tr(V.finish.notChecked)]])
       }
+      case 'mergeInstall':
+        return select('mergeInstall', [['onManifestChange', tr(V.mergeInstall.onManifestChange)], ['always', tr(V.mergeInstall.always)]])
       case 'style':
         return select('style', [['merge', tr(V.style.merge)], ['squash', tr(V.style.squash)]])
       case 'folder':
@@ -313,7 +314,12 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
       case 'sharedFolderWarning':
         return <Switch checked={effective[key]} onChange={(v) => set(key, v)} />
       case 'preChecks':
-        return <ChecksEditor names={effective.preChecks} commands={effective.commands} onChange={(names, commands) => setDraft({ ...draft, options: { ...draft.options, preChecks: names, commands } })} />
+      case 'mergeChecks': {
+        // One commands map for both lists (§16.13): the other list's commands are kept through this one's change.
+        const other = effective[key === 'preChecks' ? 'mergeChecks' : 'preChecks']
+        const kept = Object.fromEntries(Object.entries(effective.commands).filter(([n]) => other.includes(n)))
+        return <ChecksEditor names={effective[key]} commands={effective.commands} onChange={(names, commands) => setDraft({ ...draft, options: { ...draft.options, [key]: names, commands: { ...kept, ...commands } } })} />
+      }
       case 'excluded':
         return <DraftText value={effective.excluded.join(', ')} placeholder={tr(T.folders)} onCommit={(v) => set('excluded', list(v))} />
       default:
@@ -353,6 +359,8 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
         <div className="s-text">
           <div className="s-title">{tr(T.preset)}</div>
           <div className="s-desc">{tr(T.presetDesc)}</div>
+          {/* Git's presets only: None has no merged result. */}
+          {form.platform === 'git' && draft.preset && PRESET_NOTE_TEXT[draft.preset] && <div className="s-desc workflow-preset-note">{tr(PRESET_NOTE_TEXT[draft.preset]!)}</div>}
           {form.presets
             .filter((p) => p.needs)
             .map((p) => (
