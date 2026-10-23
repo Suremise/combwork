@@ -26,8 +26,8 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** §16.6.3's Pair as P5 offers it (Hive merges), as project.json keeps it. */
-const PAIR = { review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'hiveMerges', style: 'merge', target: 'main', strict: false, mergeChecks: [], mergeInstall: 'onManifestChange', okBefore: { mode: 'never', labels: [] }, folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: false, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} }
+/** §16.6.3's Pair (Hive merges) at P7's values, as project.json keeps it: G15 On, so the start's one-time G15 step (#1445) leaves it as it is. */
+const PAIR = { review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'hiveMerges', style: 'merge', target: 'main', strict: false, mergeChecks: [], mergeInstall: 'onManifestChange', okBefore: { mode: 'never', labels: [] }, folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: true, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} }
 
 /** A project's project.json, as Hive keeps it, with `workflow` as given. */
 function projectJson(dir, platform, workflow) {
