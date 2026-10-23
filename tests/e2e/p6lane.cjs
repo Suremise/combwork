@@ -12,7 +12,8 @@
 //   left out of Pulse (no lanes section), kept in the Lanes tab.
 // - gamma (Git), all off saved in the tab with G16 on, two agents in the project folder (S11, S39): a card blocked by
 //   another starts with a warning, both commit with trailers and submit to Done, the user moves a card back and forth with
-//   nothing asked or refused. G16's warning itself waits for #1481 (the app doesn't give the runtime its lock records).
+//   nothing asked or refused; G16 (#1481): G1's edit hook locks a file, recorded on its card, and G2's commit including
+//   it is submitted with the warning naming G1's card.
 // - S20 on alpha: `.git` moved away, None offered; switched, a new card starts under None's rules.
 // Screenshots in both themes, in English and German: the step, the board, Branches & remotes, the Pulse hovers, the
 // legend, the old rules mark, the save's warning, the offer, and each Version Control section of a Git and a None
@@ -551,6 +552,24 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     const gsub1 = await send(g1, gc1, 'submit', { summary: 'one' })
     check('S11: both submit in the shared folder: Done, nothing checked', gsub1.status === 200 && gsub2.status === 200 && (await done(gc1)) && (await done(gc2)), JSON.stringify({ gsub1: gsub1.body, gsub2: gsub2.body }))
     check("…two's submission is its own commit only",((await factsOf(gc2, 'Submitted')).at(-1)?.data?.files ?? []).map((x) => x.path).join() === 'two.txt', JSON.stringify((await factsOf(gc2, 'Submitted')).at(-1)?.data))
+    // G16 (#1481): G1 edits three.txt on its next card (its CLI's edit hook takes Hive's file lock); G2's commit sweeps it
+    // in: G2's submit warns, naming G1's card, and goes through.
+    const gc3 = (await inv('tasks:create', { title: 'Gamma three', project: 'gamma' })).number
+    const gc4 = (await inv('tasks:create', { title: 'Gamma four', project: 'gamma' })).number
+    const gk3 = await keyOf(gc3)
+    const gk4 = await keyOf(gc4)
+    check('G1 starts three, G2 four', (await send(g1, gc3, 'start')).status === 200 && (await send(g2, gc4, 'start')).status === 200)
+    const g1live = (await inv('session:live')).find((l) => l.projectPath.toLowerCase() === gamma.toLowerCase() && l.agentId === g1.id)
+    const g1hook = lib.launchHook(fx.userData, g1live.runId)
+    const edit = await fetch(g1hook.url, { method: 'POST', headers: { Authorization: `Bearer ${g1hook.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: g1live.sessionId, hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: path.join(gamma, 'three.txt') }, cwd: gamma }) })
+    check("G16: G1's edit of three.txt takes the lock, recorded on its card", edit.status === 200 && !!(await waitHung(async () => (await factsOf(gc3, 'FilesLocked')).some((f) => f.data.paths.includes('three.txt')))), JSON.stringify(await factsOf(gc3, 'FilesLocked')))
+    fs.writeFileSync(path.join(gamma, 'three.txt'), 'three, by G2\n')
+    lib.git(gamma, ['add', 'three.txt'])
+    gcommit('four.txt', gk4)
+    check("…G2's commit attributed to four", !!(await waitHung(async () => (await kinds(gc4)).includes('CommitAttributed'))), JSON.stringify(await kinds(gc4)))
+    const gsub4 = await send(g2, gc4, 'submit', { summary: 'four' })
+    const g16warning = `three.txt is ${g1.id}'s (${gk3})`
+    check("G16: G2's submit including G1's file warns, naming G1's card; nothing refused", gsub4.status === 200 && (gsub4.body?.warnings ?? []).includes(g16warning) && (await done(gc4)), JSON.stringify(gsub4.body))
     // The user moves a card back and forth: nothing asks, nothing is refused.
     await showBoard('gamma')
     check("gamma's board: On Hold, Todo, Active and Done", !!(await waitHung(async () => (await columns()) === 'hold todo doing done')), await columns())
