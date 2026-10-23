@@ -8,6 +8,7 @@ import { preset } from '../../src/shared/workflow/options'
 import { reconcile, attributeFolder } from '../../src/main/workflow/reconcile'
 import { checkCopy, runCheck } from '../../src/main/workflow/checks'
 import { isRefusal } from '../../src/main/workflow/runtime'
+import { gitTestHooks } from '../../src/main/git'
 
 let env: Env | null = null
 afterEach(() => {
@@ -102,6 +103,28 @@ describe('workflow scenarios, several agents in one folder', () => {
     const good = await runCheck(e.wf, { card, name: 'unit', by: 'B1', revision: head, exec: async () => ({ ok: true }) })
     expect(good).toMatchObject({ counted: true })
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  })
+
+  it("a check run reads the folder's head from its status before and after, and its git dir from `.git` (#1478: S58's runs were a long chain of gits)", async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), preChecks: ['unit'], mergeChecks: [], commands: { unit: 'npm test' } }))
+    const card = e.wf.createCard({ title: 'Counted' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    const folder = s.data!.folder as string
+    const head = commit(folder, { 'c.txt': 'c\n' }, 'c')
+    const ran: string[] = []
+    gitTestHooks.started = (_cwd, args) => {
+      ran.push(args.join(' '))
+    }
+    try {
+      expect(await runCheck(e.wf, { card, name: 'unit', by: 'B1', exec: async () => ({ ok: true }) })).toMatchObject({ counted: true, revision: head, tested: head })
+    } finally {
+      gitTestHooks.started = undefined
+    }
+    expect(ran.filter((c) => c.startsWith('status '))).toHaveLength(2)
+    expect(ran.filter((c) => c.includes('--absolute-git-dir'))).toEqual([])
+    // The card's revision (its line's head) once; the folder's, before and after, from the status reads.
+    expect(ran.filter((c) => c === 'rev-parse --verify -q HEAD')).toHaveLength(1)
   })
 
   it('S58: shared folder: A submits its own newest commit; B\'s change excludes A\'s; A\'s run while B edits is uncounted, the isolated run counts; an untrailered commit is listed for the user', async () => {
