@@ -750,7 +750,7 @@ interface HiveMessageValues {
   'board.work.check': { name: string | number; result: string; counted: string }
   'board.work.failed': { error: string | number }
   'board.work.files': { n: number }
-  'board.work.filesNotRead': { why: string | number }
+  'board.work.filesNotRead': { note: string; why: string | number }
   'board.work.folder': undefined
   'board.work.folderGone': { folder: string | number }
   'board.work.integrated': { method: string; target: string | number; result: string | number }
@@ -760,7 +760,7 @@ interface HiveMessageValues {
   'board.work.noRecord': undefined
   'board.work.noRevision': undefined
   'board.work.none': undefined
-  'board.work.notRead': { why: string | number }
+  'board.work.notRead': { note: string; why: string | number }
   'board.work.openFile': { path: string | number }
   'board.work.outsideHive': undefined
   'board.work.outsideRules': { rules: string | number }
@@ -769,7 +769,7 @@ interface HiveMessageValues {
   'board.work.projectFolder': undefined
   'board.work.reading': undefined
   'board.work.retry': undefined
-  'board.work.revisionNotRead': { why: string | number }
+  'board.work.revisionNotRead': { note: string; why: string | number }
   'board.work.revisions': undefined
   'board.work.round': { round: number }
   'board.work.staleChange': { approved: string | number; current: string | number }

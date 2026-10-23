@@ -138,6 +138,18 @@ describe('recording facts from the board’s moves (#1216)', () => {
     expect(s.data).toMatchObject({ line: null, base: null, builder: 'a3' })
     // Its base (from its head, which can't be read) is named unknown, with what couldn't be read.
     expect((s.data as { platform: { unknown: Record<string, string> } }).platform.unknown).toMatchObject({ base: expect.stringContaining('nowhere') })
+    // …and beside the English, the same reason as data for the window to word (#1477): its head's, which the base came from.
+    const texts = (s.data as { platform: { unknownText: Record<string, { id: string; values?: Record<string, unknown> }> } }).platform.unknownText
+    expect(texts.base.id).toMatch(/^workflow\.unreadable\./)
+    expect(JSON.stringify(texts.base.values)).toContain('nowhere')
+  })
+
+  it('a card moved into Review with no agent records its revision and files as not read before the change, in English only (#1477)', async () => {
+    const { w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Nobody', project: 'p' }, user))).number
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'review' }, user))
+    const s = last(w, card, 'Submitted')!
+    expect((s.data as { platform: unknown }).platform).toEqual({ unknown: { revision: 'not read before the change', base: 'not read before the change', files: 'not read before the change', key: 'not read before the change' } })
   })
 
   it('a card from before 1.0 gets no facts until it starts, which makes it a 1.0 card', async () => {

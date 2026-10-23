@@ -708,7 +708,8 @@ or the Assistant's tools and the API, `derived` for Hive's. **Platform reads are
 target, files, candidate key); a batch's are made before its lock and its cards changed by the locked path, so no read
 runs inside a change. A fact whose reads are missing or for another agent records them as not read. A read that fails
 never refuses: its field is null and `platform.unknown` names it with what couldn't be read (a project with no options
-yet names its ruleset so). A card from before 1.0 (`pre_workflow`, #1218 marks them) gets no facts until it starts,
+yet names its ruleset so), in English for agents; a platform's reason is kept beside it as data (`platform.unknownText`),
+and the Work section words both it and the recorder's own notes (`UNREAD_NOTES`, `unreadWhy` in `shared/workflow/texts.ts`). A card from before 1.0 (`pre_workflow`, #1218 marks them) gets no facts until it starts,
 which clears the mark (Darren, #1119 decision 4) and records the decisions it has then, once. **A fact that fails to
 write fails the change whole** (HR4's round 1), a batch's too (`FactWriteError`; `isStorageError`, which the batches'
 per-card catches pass on, as SQLite's own errors: part of the card may be written): a card and its facts never

@@ -2996,8 +2996,8 @@
     "description": "A button in the card dialog's Work section: how many files the revision changed; a click shows them."
   },
   "board.work.filesNotRead": {
-    "defaultMessage": "Files not read: {why}",
-    "description": "In the card dialog's Work section, in place of a revision's changed files: Hive couldn't read which files changed when it was submitted. {why} is the reason as Hive recorded it (in English, as agents read it)."
+    "defaultMessage": "{note, select, beforeChange {Files not read} noBaseOrHead {Files not read: there was no base or revision to compare} other {Files not read: Hive couldn't read {why}}}",
+    "description": "In the card dialog's Work section, in place of a revision's changed files: Hive couldn't read which files changed when it was submitted. {note} picks why: Hive read nothing then (beforeChange: the revision's line above says why), it had no base or revision to compare (noBaseOrHead), or another reason, {why}: what it couldn't read (already translated). Keep the select keys. Glossary: revision."
   },
   "board.work.folder": {
     "defaultMessage": "Folder",
@@ -3036,8 +3036,8 @@
     "description": "The card dialog's Work section for a card whose builder hasn't submitted a revision for review yet. Glossary: revision."
   },
   "board.work.notRead": {
-    "defaultMessage": "Not read: {why}",
-    "description": "In the card dialog's Work section, in place of a branch, base or target Hive couldn't read when the card's work started. {why} is the reason as Hive recorded it (in English, as agents read it)."
+    "defaultMessage": "{note, select, beforeChange {Not read when its work started} noTarget {Not read: there was no target branch to start from} other {Hive couldn't read {why}}}",
+    "description": "In the card dialog's Work section, in place of a branch, base or target Hive couldn't read when the card's work started. {note} picks why: Hive read nothing as the work started (beforeChange), it had no target branch to find the base from (noTarget), or another reason, {why}: what Hive couldn't read (such as \"the latest commit in …\", already translated). Keep the select keys. Glossary: target branch."
   },
   "board.work.openFile": {
     "defaultMessage": "Open {path} in Files",
@@ -3072,8 +3072,8 @@
     "description": "A button in the card dialog's Work section after its work couldn't be read: reads it again."
   },
   "board.work.revisionNotRead": {
-    "defaultMessage": "Revision not read when it was submitted: {why}. Its next submission reads it again.",
-    "description": "In place of a revision in the card dialog's Work section: Hive couldn't read the revision when the builder submitted it (the repository couldn't be read). {why} is the reason as Hive recorded it (in English, as agents read it). Glossary: revision."
+    "defaultMessage": "{note, select, beforeChange {No revision recorded: Hive didn't read one when the card went to Review.} other {Revision not read when it was submitted: Hive couldn't read {why}.}} Its next submission reads it again.",
+    "description": "In place of a revision in the card dialog's Work section. {note} picks why: Hive read nothing when the card was moved into Review (beforeChange; the card had no agent then, say), or it couldn't read the revision when the builder submitted it, {why}: what it couldn't read (such as \"the latest commit in …\", already translated). Then: the next submission reads it again. Keep the select keys. Glossary: revision."
   },
   "board.work.revisions": {
     "defaultMessage": "Revisions, newest first",
