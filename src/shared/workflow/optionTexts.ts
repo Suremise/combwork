@@ -4,7 +4,7 @@
 
 import { msg, type Msg } from '../i18n/msg'
 import type { PlatformId } from '../platform/descriptors'
-import type { FormGroupId, OptionKey, PresetId, PresetNeeds } from './options'
+import type { FormGroupId, OptionKey, PresetId } from './options'
 
 interface OptionText {
   title: Msg
@@ -69,7 +69,11 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   folder: {
     title: msg({ id: 'workflow.option.folder.title', defaultMessage: 'Where cards are built', description: 'A workflow option (glossary 2.6, G11).' }),
-    desc: msg({ id: 'workflow.option.folder.desc', defaultMessage: 'In its own folder, a card is built apart from other agents’ work; in the project folder, everyone sees each other’s unfinished changes.', description: 'What the workflow option “Where cards are built” does.' })
+    desc: msg({ id: 'workflow.option.folder.desc', defaultMessage: 'In its own folder, a slot Hive lends to the card or its lane, each card is built on a branch of its own, apart from other agents’ work; in the project folder, everyone sees each other’s unfinished changes.', description: 'What the workflow option “Where cards are built” does (glossary 2.5: slot, a worktree Hive lends to a card or a lane).' })
+  },
+  slotsUpToDate: {
+    title: msg({ id: 'workflow.option.slotsUpToDate.title', defaultMessage: 'Slots are brought up to date before each card', description: 'A workflow option (glossary 2.6, G15; glossary 2.5: slot): before a card starts in a slot, the slot is brought to the target branch’s latest work.' }),
+    desc: msg({ id: 'workflow.option.slotsUpToDate.desc', defaultMessage: 'Before a card starts in a slot, the slot is brought to the latest work of the target branch, and its dependencies are installed again when the lock file changed.', description: 'What the workflow option “Slots are brought up to date before each card” does (glossary 2.5: slot; lock file, as in the G15 value).' })
   },
   identity: {
     title: msg({ id: 'workflow.option.identity.title', defaultMessage: 'Commits use the project’s identity', description: 'A workflow option (glossary 2.6, G12).' }),
@@ -162,11 +166,6 @@ export const PRESET_NOTE_TEXT: Partial<Record<PresetId, Msg>> = {
   team: msg({ id: 'workflow.preset.note.team', defaultMessage: 'Team checks the merged result with the quick checks and the unit tests. Running each card’s own focused tests there too comes in a later version.', description: 'Under the preset choice of Project Settings → Workflow while Team is chosen (glossary 2.1: Team; G9: the merged result).' })
 }
 
-/** Why a preset is shown unavailable (§16.19.1). */
-export const PRESET_NEEDS_TEXT: Record<PresetNeeds, Msg> = {
-  slots: msg({ id: 'workflow.preset.needs.slots', defaultMessage: 'Needs a folder of its own for every card, which comes in a later version.', description: 'Why a workflow preset can’t be chosen yet.' })
-}
-
 /**
  * An option's label for a platform; with `folder`, Git's label in a shared folder where it differs (G1 reads "Work is
  * reviewed before it's done" with everyone in the project folder, #1418).
@@ -207,6 +206,8 @@ export const OPTION_WHY: Partial<Record<OptionKey, Msg>> = {
   identity: msg({ id: 'workflow.why.identity', defaultMessage: 'Commits name the project’s identity, whoever’s computer made them.', description: 'Why Pair and Team turn on “Commits use the project’s identity”.' }),
   stopOwnRuns: msg({ id: 'workflow.why.stopOwnRuns', defaultMessage: 'A run left going would keep changing or testing the work under review.', description: 'Why Pair and Team turn on “Agents stop what they started before review”.' }),
   dependenciesDone: msg({ id: 'workflow.why.dependenciesDone', defaultMessage: 'It’s cheap, and no card is built on work that isn’t in yet.', description: 'Why every preset turns on “Cards start only when the cards they wait for are merged” (or done).' }),
+  slotsUpToDate: msg({ id: 'workflow.why.slotsUpToDate', defaultMessage: 'Each card starts from the latest work, so no card is built on an old copy of the target branch.', description: 'Why Pair and Team turn on “Slots are brought up to date before each card” (glossary 2.5: slot).' }),
+  reviewerMode: msg({ id: 'workflow.why.reviewerMode', defaultMessage: 'One reviewer per lane keeps the work with a reviewer who has seen its earlier rounds; a shared pool suits a large team.', description: 'Why Pair and Team set “Reviewers” to One per lane (glossary 2.6, G17; glossary: lane, pool).' }),
   sharedFolderWarning: msg({ id: 'workflow.why.sharedFolderWarning', defaultMessage: 'In a shared folder, one agent’s commit can take in another’s half-done files.', description: 'Why Solo turns on “Warn when a commit includes another agent’s files”.' }),
   excluded: msg({ id: 'workflow.why.excluded', defaultMessage: 'Dependencies and build output aren’t part of what a card delivers.', description: 'Why the presets leave node_modules and .venv out of “What the work is” (no version control).' })
 }

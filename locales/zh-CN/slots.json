@@ -1,0 +1,5 @@
+{
+  "slots.setting.bad": "Hive 没有这个槽位设置。",
+  "slots.setting.badSize": "审查和检查副本的数量是 1 到 32 之间的整数。",
+  "slots.setting.badText": "槽位脚本或文件列表是不超过 4,000 个字符的文本。"
+}
