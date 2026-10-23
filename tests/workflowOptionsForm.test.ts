@@ -149,7 +149,7 @@ describe("P4's and P5's presets (#1278, #1355, §16.19.1)", () => {
     expect(solo).toMatchObject({ review: 'none', reviewers: 1, noSelfReview: false, preChecks: [], sameness: 'change', finish: 'committed', target: '', mergeChecks: [], okBefore: { mode: 'never' }, folder: 'project', identity: null, stopOwnRuns: false, dependenciesDone: true, slotsUpToDate: false, sharedFolderWarning: true, commands: {} })
     expect(checkOptions('git', { project: solo }).problems).toEqual([])
     // None: N1 No one / a reviewer agent / a reviewer agent then you; N2 on with a reviewer; N3 none / quick / quick +
-    // tests; accepted where it is, in the project folder; N6 on; N4 as allOff's (#1482: §16.6.1's "the whole folder").
+    // tests; accepted where it is, in the project folder; N6 on; N4 as allOff's (§16.6.1).
     const none = (id: 'solo' | 'pair' | 'team') => preset('none', id, inputs)
     const common = { finish: 'accept', folder: 'project', dependenciesDone: true, okBefore: { mode: 'never' }, excluded: ['node_modules', '.venv'] }
     expect(none('solo')).toMatchObject({ ...common, review: 'none', noSelfReview: false, preChecks: [], commands: {} })

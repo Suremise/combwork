@@ -1127,8 +1127,8 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
 
 [P1, answering HB3's round 1 finding 6 and round 2 finding C, HR2's round 2 finding 6]
 - **Deliverables** (N4, §16.6.1): where a None project's work may be. By default the project folder except `.hive`
-  and folders the option excludes (pre-filled with `node_modules`, `.venv`, build output folders it finds); a card can
-  narrow it to paths (OP-17).
+  and folders the option excludes (`node_modules` and `.venv` by default; no build output folders are found, #1482); a
+  card can narrow it to paths (OP-17).
 - **A card's paths** are **declared, not guessed**: the card's list of files and folders its work covers, kept on the
   card from its start, which the builder sets at any time (the **declare paths** intent, §16.8.1, or `submit`'s
   `paths`) and the user can edit on the card. Hive **pre-fills** it from what
@@ -1678,7 +1678,7 @@ into the 7 locales per `locales/glossary-1.0.md` §2.6.
 | N1 | **Who checks the work before it's done** | No one · A reviewer agent · You · A reviewer agent, then you | Produces Review (and Approved when "then you"). |
 | N2 | **Nobody reviews their own work** | On (fixed while a reviewer agent checks) | Off only with no reviewer. |
 | N3 | **Checks pass before review** | A list of named commands (empty: none) | Each a check (§16.13). |
-| N4 | **What the work is** (deliverables) | Paths and patterns in the project; default the whole folder except `.hive` | OP-17. |
+| N4 | **What the work is** (deliverables) | Paths and patterns in the project; default the whole folder except `.hive`, `node_modules` and `.venv` (no build output folders are found) | OP-17 [#1482]. |
 | N5 | **Stage names** | Rename any shown stage | OP-30. |
 | N6 | **Cards start only when the cards they wait for are done** | On / Off | `start.dependenciesIntegrated`. |
 | N7 | **File locks** | Today's setting (§5 Agents), shown here | Its owner stays Settings → Agents & Worktrees; shown read-only with a link [#966: one owner per switch]. |
@@ -1727,7 +1727,7 @@ afterwards makes it **Custom** (the header says which preset it started from). T
 | G4 carry-over | Same change | Same change | Same change | [#1112 B]. |
 | G5 who merges | Committed is done | Hive merges | Hive merges | Note q1: two red merges reached main through hand merges. |
 | G6 style | — | Merge commit | Merge commit | Today's default (§5 Agents, §15.12). |
-| G7 target | The branch the project is on | `main` | `main` | **Built [#1355]:** the repository's default branch, by name (`main`, else `master`, else the branch it is on; `main` when it can't be read), filled in when the preset is chosen and shown before saving, so a repository whose default is another branch isn't given one it lacks. |
+| G7 target | The repository's default branch (the folder's own line) [#1482] | `main` | `main` | **Built [#1355]:** the repository's default branch, by name (`main`, else `master`, else the branch it is on; `main` when it can't be read), filled in when the preset is chosen and shown before saving, so a repository whose default is another branch isn't given one it lacks. |
 | G8 strict | — | Off | Off | The queue tests target + change anyway and a clean update keeps the pass, so strict mostly changes the history's shape; it is on offer for teams that want every merge up to date (OP-18; HB3's round 1 finding 4). |
 | G9 merge checks | — | Quick checks | Quick checks + unit + each card's focused tests, dependencies installed clean | #1010's merge gate; #187 (§16.9.1 step 5). **Built [#1361], narrowed for now** (Darren, point 1 on #1121): Team's G9 is quick checks + unit tests, installed from scratch before every merge (`mergeInstall: always`); each card's focused tests come with #1367. |
 | G10 your OK | Never | Never | Cards labelled `ui` or `release` | Darren's practice (screenshots, release steps). |
@@ -1739,7 +1739,7 @@ afterwards makes it **Custom** (the header says which preset it started from). T
 | G16 shared-folder warning | On | — | — | Only matters in a shared folder. |
 | G17 reviewers | — | One per lane | One per lane | A pool is the 6+pool template's choice (§16.10.6). |
 
-None's presets fill every option: Solo = N1 No one, N2 —, N3 none, N4 the whole folder, N5 default names, N6 On, N7 as set; Pair = N1 A reviewer agent, N2 On, N3 the quick checks, the rest as Solo; Team = N1 A reviewer agent, then you, N2 On, N3 quick checks + tests, the rest as Solo. (N7 is shown, not set: its owner is Settings → Agents & Worktrees.)
+None's presets fill every option: Solo = N1 No one, N2 —, N3 none, N4 the whole folder except `.hive`, `node_modules` and `.venv`, N5 default names, N6 On, N7 as set; Pair = N1 A reviewer agent, N2 On, N3 the quick checks, the rest as Solo; Team = N1 A reviewer agent, then you, N2 On, N3 quick checks + tests, the rest as Solo. (N7 is shown, not set: its owner is Settings → Agents & Worktrees.)
 
 The Version Control tab documents each preset's choices and why (P6, from this table) [#1122].
 
