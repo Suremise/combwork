@@ -214,6 +214,8 @@
   "main.unexpectedClose.agents": "{n, plural, =0 {Nenhum agente estava em execução.} one {Um agente estava em execução em {projects}.} other {# agentes estavam em execução em {projects}.}}",
   "main.unexpectedClose.dump": "O Hive guardou um despejo de falha: Ajuda → Copiar diagnóstico indica qual.",
   "main.unexpectedClose.failed": "{n, plural, one {Um não pôde ser retomado: {agents}.} other {# não puderam ser retomados: {agents}.}}",
+  "main.unexpectedClose.held": "{n, plural, one {Um ficou parado: {agents}.} other {# ficaram parados: {agents}.}}",
+  "main.unexpectedClose.heldTitle": "{n, plural, one {Um agente ficou parado} other {# agentes ficaram parados}}",
   "main.unexpectedClose.merge": "{agent} estava fazendo merge de {branch}: verifique em {folder} se ficou um merge pela metade (git status lá) antes do próximo merge.",
   "main.unexpectedClose.mergeCards": "{agent} estava fazendo merge de {branch} ({cards}): verifique em {folder} se ficou um merge pela metade (git status lá) antes do próximo merge.",
   "main.unexpectedClose.notChecked": "{u, plural, one {Um processo iniciado por uma execução de testes pode ainda estar em execução: o Windows não deixou o Hive encerrá-lo nem verificá-lo, então o Hive não consegue encontrá-lo de novo. Procure o PID {ids} na guia Detalhes do Gerenciador de Tarefas.} other {# processos iniciados por uma execução de testes podem ainda estar em execução: o Windows não deixou o Hive encerrá-los nem verificá-los, então o Hive não consegue encontrá-los de novo. Procure os PIDs {ids} na guia Detalhes do Gerenciador de Tarefas.}}",

@@ -60,7 +60,9 @@ import { laneCards, laneName, laneNumber } from '../shared/lanes'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
 import { writePty } from './ptyHost'
 import { sessions } from './sessions'
-import { cardStall, laneOrderView } from './cardStall'
+import { folderFacts } from './agentFolders'
+import { slotAt } from '../shared/agentFolders'
+import { cardStall, laneOrderView, stepWaitOf } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
 import { ackDeliveries, deliveriesOf, deliverNow, deliveryView, launchWith, NotGiven, readInbox } from './deliveries'
 import { isDoorbell } from '../shared/doorbell'
@@ -82,7 +84,7 @@ import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRe
 import { workflowSummary } from './workflow/optionsForm'
 import { detect, projectPlatform } from './platform/registry'
 import { revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
-import { CATEGORY_STAGE, type ForYouKind } from '../shared/workflow/facts'
+import { CATEGORY_STAGE, LOOP_STEPS, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
 import { actorOf, recordDecisionsReceived } from './workflow/recorder'
 import { workflowFor } from './workflow/service'
@@ -475,6 +477,9 @@ async function projectSummary(p: string) {
       workflowRole: agentWorkflowRole(a),
       branch: a.worktree?.branch ?? null,
       worktree: a.worktree?.path ?? null,
+      // Where its running session is (#1434), when not the project folder: its folder, and its slot while it runs in one.
+      ...(a.live && !samePlace(a.live.cwd, p) ? { folder: a.live.cwd } : {}),
+      ...(a.live?.slot ? { slot: a.live.slot } : {}),
       status: a.live?.status ?? 'stopped',
       sessionId: a.live?.sessionId ?? null,
       statusMessage: statusMessageOf(a.live),
@@ -766,12 +771,17 @@ route('GET', '/v1/projects/:name/usage', async ({ params, query }) => {
   const id = query.get('sessionId') ?? sessions.liveFor(p, agent ? await agentParam(p, agent) : undefined)?.sessionId ??(await sessions.list(p)).find((s) => s.source === 'hive')?.id
   if (!id) throw new HttpError(404, 'No sessions for this project')
   const usage = await sessions.usage(p, id)
+  // Where it ran (#1434): its folder, and the slot that is, if any.
+  const rec = usage ? await workspace.sessionRecord(p, id).catch(() => undefined) : undefined
+  const folder = rec ? (rec.cwd ?? p) : null
+  const slot = folder ? slotAt(await folderFacts(p).catch(() => ({ projectPath: p, migrated: false, homes: [], slots: [] })), folder)?.name : undefined
+  const where = folder ? { folder, ...(slot ? { slot } : {}) } : {}
   // ?days=false: without the usage by day, which grows with every day the session runs.
   if (usage && query.get('days') === 'false') {
     const { days: _days, ...rest } = usage
-    return rest
+    return { ...rest, ...where }
   }
-  return usage
+  return usage && { ...usage, ...where }
 })
 
 route('POST', '/v1/projects/:name/input', async ({ params, body }) => {
@@ -1430,6 +1440,8 @@ async function agentActivity(p: string, agentId: string, detail = false) {
     ...(detail ? { runtime: st ? agentRuntime(st) : null } : {}),
     branch: a.worktree?.branch ?? null,
     worktree: a.worktree?.path ?? null,
+    ...(st && !samePlace(st.cwd, p) ? { folder: st.cwd } : {}),
+    ...(st?.slot ? { slot: st.slot } : {}),
     sessionId: sessionId || null,
     // A long transcript slows the CLI and Hive; handing over to itself (a new conversation) makes it short again.
     transcriptMB: st?.transcriptBytes !== undefined ? Math.round((st.transcriptBytes / (1024 * 1024)) * 10) / 10 : null,
@@ -2103,8 +2115,8 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
     history: c.history.map(entryForAgents),
     agent,
     // A Doing card nobody works on, a card an agent was looping on and left with no watch (#376), or one in Review its
-    // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410).
-    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null)
+    // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410), or a design nobody checks (#1382).
+    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c))
   }
   // A review whose reviewer has gone or isn't running (Hive ends those, but one can show while that happens).
   if (c.review && c.project) {
@@ -2648,6 +2660,7 @@ const INTENT_WORDS: Record<CardIntent['kind'], string> = {
   ask: 'ask the user about',
   cannot: 'report a rule blocking',
   request: 'ask the builder of',
+  loopStep: 'take a card loop step on',
   removeFromQueue: 'take out of the merge queue',
   retryMerge: 'retry the merge of'
 }
@@ -2664,6 +2677,7 @@ const INTENT_DONE: Record<CardIntent['kind'], string> = {
   ask: 'asked the user',
   cannot: 'reported a rule blocking it',
   request: 'asked its builder',
+  loopStep: 'took a card loop step',
   removeFromQueue: 'taken out of the merge queue',
   retryMerge: 'queued again (Retry merge)'
 }
@@ -2773,7 +2787,15 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
     return { kind: 'ask', askKind, text: textField(body, 'text', true), ...(revision ? { revision } : {}), ...checklistField(body) }
   },
   cannot: (body) => ({ kind: 'cannot', rule: textField(body, 'rule', true), why: textField(body, 'why', true) }),
-  request: (body) => ({ kind: 'request', text: textField(body, 'text', true) })
+  request: (body) => ({ kind: 'request', text: textField(body, 'text', true) }),
+  'loop-step': (body) => {
+    const step = body?.step
+    if (!LOOP_STEPS.includes(step)) throw new HttpError(400, `Unknown step "${String(step)}": ${LOOP_STEPS.join(', ')}.`)
+    // An answer and going ahead name the design or follow-up they are about (its reply's `design`), so a late one never
+    // settles another.
+    const design = step === 'design' || step === 'followUp' ? undefined : textField(body, 'design', true)
+    return { kind: 'loopStep', step, text: textField(body, 'text', true), ...(design ? { design } : {}) }
+  }
 }
 for (const [path, intentOf] of Object.entries(INTENT_ROUTES)) route('POST', `/v1/tasks/:n/${path}`, async ({ params, body }) => cardIntent(params[0], intentOf(body)))
 

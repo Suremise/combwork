@@ -214,6 +214,8 @@
   "main.unexpectedClose.agents": "{n, plural, =0 {No agents were running.} one {One agent was running in {projects}.} other {# agents were running in {projects}.}}",
   "main.unexpectedClose.dump": "Hive kept a crash dump of it: Help → Copy Diagnostics names it.",
   "main.unexpectedClose.failed": "{n, plural, one {One couldn't resume: {agents}.} other {# couldn't resume: {agents}.}}",
+  "main.unexpectedClose.held": "{n, plural, one {One was left stopped: {agents}.} other {# were left stopped: {agents}.}}",
+  "main.unexpectedClose.heldTitle": "{n, plural, one {One agent left stopped} other {# agents left stopped}}",
   "main.unexpectedClose.merge": "{agent} was merging {branch}: check {folder} for a merge left half done (git status there) before the next merge.",
   "main.unexpectedClose.mergeCards": "{agent} was merging {branch} ({cards}): check {folder} for a merge left half done (git status there) before the next merge.",
   "main.unexpectedClose.notChecked": "{u, plural, one {A process started by a test run may still be running: Windows let Hive neither end nor check it, so Hive can't find it again. Look for process ID {ids} in Task Manager's Details.} other {# processes started by a test run may still be running: Windows let Hive neither end nor check them, so Hive can't find them again. Look for process IDs {ids} in Task Manager's Details.}}",

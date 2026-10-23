@@ -483,6 +483,10 @@
     "defaultMessage": "Resume in",
     "description": "The heading of the menu of agents a session can resume in."
   },
+  "sessions.resume.startFresh": {
+    "defaultMessage": "Start Fresh with a Handover",
+    "description": "Button over a session's transcript that can't resume where it ran (#1434: its slot holds other work): opens Hand Over to… for its agent, which starts a new conversation from a handover."
+  },
   "sessions.row.archived": {
     "defaultMessage": "archived",
     "description": "A badge on an archived session. Lower case; keep it short."

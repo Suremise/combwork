@@ -40,7 +40,7 @@ export const TASK_TOOLS = ['hive_create_task', 'hive_update_task', 'hive_update_
  * A card's intents (#1267, SPEC §16.8.1), Hive moving the card: every agent has these, the Assistant at the control level
  * that runs agents. Starting a card oneself is an agent's (the Assistant starts cards on agents: hive_start_task).
  */
-export const INTENT_TOOLS = ['hive_put_back', 'hive_submit', 'hive_declare_paths', 'hive_start_review', 'hive_verdict', 'hive_report_merge', 'hive_ask_user', 'hive_cannot_within_rules', 'hive_request_builder']
+export const INTENT_TOOLS = ['hive_put_back', 'hive_submit', 'hive_declare_paths', 'hive_start_review', 'hive_verdict', 'hive_report_merge', 'hive_ask_user', 'hive_cannot_within_rules', 'hive_request_builder', 'hive_loop_step']
 
 /**
  * Lanes (#483): every Assistant lists them (a read, #500: "which lanes are running?" at Look too); starting, joining and

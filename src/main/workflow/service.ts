@@ -44,6 +44,8 @@ let runsGoing: ((project: string, agent: string) => string[]) | null = null
 export function setRunsGoing(fn: ((project: string, agent: string) => string[]) | null): void {
   runsGoing = fn
 }
+/** What an agent has going now (setRunsGoing's), each named; none without the app. */
+export const agentRunsGoing = (project: string, agent: string): string[] => runsGoing?.(project, agent) ?? []
 
 /**
  * What runs a target's queue in this Hive now (queueHost's queueLive: the queue's order, which card reads and refusals

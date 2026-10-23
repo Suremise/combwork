@@ -129,6 +129,6 @@ describe('Resume (n) and agents a refused sign-in stopped', () => {
     const done: string[] = []
     const r = await resumeAll(agents, async (a) => void done.push(`${stalledOnSignIn(a.live) ? 'carry on' : 'resume'} ${a.name}`))
     expect(done).toEqual(['carry on Stuck', 'carry on Again', 'resume Stopped'])
-    expect(r).toEqual({ resumed: ['Stuck', 'Again', 'Stopped'], running: ['Busy', 'Moved'], nothing: ['Nothing'], failed: [] })
+    expect(r).toEqual({ resumed: ['Stuck', 'Again', 'Stopped'], running: ['Busy', 'Moved'], nothing: ['Nothing'], held: [], failed: [] })
   })
 })

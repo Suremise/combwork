@@ -5,7 +5,7 @@ import { rm, writeFile } from 'original-fs/promises'
 import { join } from 'path'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { fmt, msg, tr } from '../shared/i18n'
-import { HEARTBEAT_MS, RUN_MARKER, parseRunMarker, LeftoverStops, resumeFailedLine, unexpectedCloseText, type LaunchProcesses, type LeftMerge, type ResumeReport, type RunMarker, type RunningAgent } from '../shared/unexpectedClose'
+import { HEARTBEAT_MS, RUN_MARKER, parseRunMarker, LeftoverStops, resumeFailedLine, resumeHeldLine, unexpectedCloseText, type LaunchProcesses, type LeftMerge, type ResumeReport, type RunMarker, type RunningAgent } from '../shared/unexpectedClose'
 import type { ToastAction } from '../shared/types'
 import { endProcessesExactly, endTreesExactly, onLaunchProcessJoined, runningProcesses, stillRunningOf } from './agentProcesses'
 import { assistantHome } from './assistantControl'
@@ -234,11 +234,18 @@ export function addLeftMerge(m: LeftMerge): boolean {
 
 /** Resumes the agents that were running, one at a time; one already running again, or with no conversation, is left. */
 async function resumeAgents(agents: readonly RunningAgent[]): Promise<ResumeReport> {
-  const out: ResumeReport = { resumed: [], failed: [] }
+  const out: ResumeReport = { resumed: [], failed: [], held: [] }
   for (const a of agents) {
     if (sessions.liveFor(a.projectPath, a.agentId) || !a.sessionId) continue
+    // Only where it may resume now (#1434): one whose slot is free or holds other work is left, and listed.
+    const hold = await inWorkspace(workspaceOf(a.projectPath), () => sessions.resumeHoldFor(a.projectPath, a.agentId, a.sessionId!)).catch(() => null)
+    if (hold) {
+      out.held!.push({ name: a.agentName, hold })
+      log.info(`Left ${userText(a.agentName)} in ${userText(a.project)} to resume by hand after the unexpected close (${hold.is})`)
+      continue
+    }
     try {
-      await inWorkspace(workspaceOf(a.projectPath), () => sessions.start(a.projectPath, { agentId: a.agentId, resumeId: a.sessionId, ...(a.sessionName ? { name: a.sessionName } : {}) }))
+      await inWorkspace(workspaceOf(a.projectPath), () => sessions.start(a.projectPath, { agentId: a.agentId, resumeId: a.sessionId, auto: true, ...(a.sessionName ? { name: a.sessionName } : {}) }))
       out.resumed.push(a.agentName)
       log.info(`Resumed ${userText(a.agentName)} in ${userText(a.project)} after the unexpected close`)
     } catch (e) {
@@ -254,6 +261,7 @@ export async function resumeAfterClose(): Promise<ResumeReport> {
   const agents = toResume
   toResume = []
   const r = await resumeAgents(agents)
+  if (r.held?.length) toast('info', tr(msg({ id: 'main.unexpectedClose.heldTitle', defaultMessage: '{n, plural, one {One agent left stopped} other {# agents left stopped}}', description: "A notice's title after resuming the agents that were running when Hive closed unexpectedly (#1434): {n} were left stopped, their conversations' slots free (only their own Resume takes one) or holding other work." }), { n: r.held.length }), resumeHeldLine(r.held))
   if (r.failed.length) toast('error', tr(msg({ id: 'main.unexpectedClose.resumeFailedTitle', defaultMessage: "Some agents couldn't resume", description: "A notice's title: resuming the agents that were running when Hive closed unexpectedly failed for some." })), resumeFailedLine(r))
   else toast('success', tr(msg({ id: 'main.unexpectedClose.resumedTitle', defaultMessage: '{n, plural, =0 {Nothing to resume} one {Resumed one agent} other {Resumed # agents}}', description: "A notice's title: the agents that were running when Hive closed unexpectedly were resumed ({n} of them; 0: all were running again or had no conversation)." }), { n: r.resumed.length }))
   return r
@@ -262,7 +270,7 @@ export async function resumeAfterClose(): Promise<ResumeReport> {
 /** The line the Assistant finds in its inbox (agent-facing: English). */
 function assistantLine(c: UnexpectedClose, r: ResumeReport | null, still: number): string {
   const agents = c.agents.map((a) => `${a.agentName} (${a.project})`).join(', ') // i18n-ignore: the Assistant's inbox (agent-facing, English)
-  const resumed = r ? `Hive resumed ${r.resumed.length} of them (the user's setting)${r.failed.length ? `; ${r.failed.length} couldn't resume` : ''}.` : 'Nothing was resumed: the user decides.' // i18n-ignore: the Assistant's inbox (agent-facing, English)
+  const resumed = r ? `Hive resumed ${r.resumed.length} of them (the user's setting)${r.failed.length ? `; ${r.failed.length} couldn't resume` : ''}${r.held?.length ? `; ${r.held.length} left stopped (their slots are free, to resume by hand, or hold other work)` : ''}.` : 'Nothing was resumed: the user decides.' // i18n-ignore: the Assistant's inbox (agent-facing, English)
   const left = still ? ` ${still} process(es) the agents started are still running; the user can stop them from Hive's notice.` : '' // i18n-ignore: the Assistant's inbox (agent-facing, English)
   return `Hive closed unexpectedly: last seen ${c.lastSeen}. ${c.agents.length ? `${c.agents.length} agent(s) were running: ${agents}. ${resumed}` : 'No agents were running.'}${left} Check for card loops and lanes that stalled and tell the user; don't restart or stop anything yourself.` // i18n-ignore: the Assistant's inbox (agent-facing, English)
 }

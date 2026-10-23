@@ -214,6 +214,8 @@
   "main.unexpectedClose.agents": "{n, plural, =0 {没有正在运行的智能体。} =1 {{projects} 中有 1 个智能体正在运行。} other {{projects} 中有 # 个智能体正在运行。}}",
   "main.unexpectedClose.dump": "Hive 保留了这次的崩溃转储：“帮助”→“复制诊断信息”会列出它。",
   "main.unexpectedClose.failed": "{n, plural, =1 {有 1 个无法恢复：{agents}。} other {有 # 个无法恢复：{agents}。}}",
+  "main.unexpectedClose.held": "{n, plural, other {有 # 个保持停止：{agents}。}}",
+  "main.unexpectedClose.heldTitle": "{n, plural, other {# 个智能体保持停止}}",
   "main.unexpectedClose.merge": "{agent} 当时正在合并 {branch}：下次合并前，请检查 {folder} 中是否留有未完成的合并（在那里运行 git status）。",
   "main.unexpectedClose.mergeCards": "{agent} 当时正在合并 {branch}（{cards}）：下次合并前，请检查 {folder} 中是否留有未完成的合并（在那里运行 git status）。",
   "main.unexpectedClose.notChecked": "{u, plural, =1 {测试运行启动的一个进程可能仍在运行：Windows 既不允许 Hive 结束它，也不允许检查它，因此 Hive 无法再找到它。请在任务管理器的“详细信息”选项卡中查找 PID {ids}。} other {测试运行启动的 # 个进程可能仍在运行：Windows 既不允许 Hive 结束它们，也不允许检查它们，因此 Hive 无法再找到它们。请在任务管理器的“详细信息”选项卡中查找 PID {ids}。}}",

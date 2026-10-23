@@ -555,6 +555,14 @@
     "defaultMessage": "New agents use what you have installed",
     "description": "A tip's title."
   },
+  "tips.designCheck.text": {
+    "defaultMessage": "Ask a card loop’s builder for a design first: it posts it on the card, Hive wakes the reviewer to check it, and the answer wakes the builder. With no answer within the Design check wait (Project Settings → Card loops), it goes ahead as posted.",
+    "description": "A tip (#1382). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Design check wait, Project Settings, Card loops)."
+  },
+  "tips.designCheck.title": {
+    "defaultMessage": "Have a design checked before the build",
+    "description": "A tip's title (#1382). A design: the plan a builder posts on its card before building."
+  },
   "tips.developerConsole.text": {
     "defaultMessage": "Turn on Settings → Advanced → Show developer features, then Help → Developer Console opens a window of its own: pick an agent and see each hook and status line beside what Hive made of it, redacted. Filter, search and pause as it runs.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -594,6 +602,14 @@
   "tips.flightRecorder.title": {
     "defaultMessage": "Catch rare events by themselves",
     "description": "A tip's title."
+  },
+  "tips.followUpCheck.text": {
+    "defaultMessage": "When you ask for a change to a card in Review or Approved for its reviewer to check, its builder posts the change as a follow-up: Hive wakes the reviewer, and the answer wakes the builder. One left unanswered for 15 minutes shows its card as stalled.",
+    "description": "A tip (#1467). Review and Approved are board columns. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.followUpCheck.title": {
+    "defaultMessage": "Have a follow-up checked without a new round",
+    "description": "A tip's title (#1467). A follow-up: a change asked of a card's reviewed work, such as a screenshot's, for its reviewer to check."
   },
   "tips.forYou.text": {
     "defaultMessage": "A card with a For you chip waits for you: an approval, a decision or a question. The Task Board icon counts them, and For you on the board shows only those. Open the card to approve, decline or answer: the agent waiting on it hears at once.",
@@ -1314,6 +1330,14 @@
   "tips.skillsDelivered.title": {
     "defaultMessage": "Choose which skills agents get",
     "description": "A tip's title."
+  },
+  "tips.slotResume.text": {
+    "defaultMessage": "A builder's conversation stays in its card's slot. Once the card ends, Resume All leaves it so the slot stays free for new work; its own Resume takes the slot back while nothing else has used it.",
+    "description": "A tip. A slot is a worktree Hive lends to a card. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.slotResume.title": {
+    "defaultMessage": "A conversation resumes where it was made",
+    "description": "A tip's title (#1434)."
   },
   "tips.sortTables.text": {
     "defaultMessage": "Click a column's header in Hive's tables (shortcuts, Performance, Storage, the Overviews) to sort by it, again for the other way. Hive remembers each table's sort and rows per page.",

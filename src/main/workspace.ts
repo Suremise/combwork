@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'crypto'
 import { basename, dirname, join, resolve, sep } from 'path'
 import { mkdir, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, statSync, watch, type FSWatcher as RootWatcher } from 'original-fs'
-import { closeBoard } from './boardStore'
+import { boardWrite, closeBoard, inBoardWrite } from './boardStore'
 import { closeJournal } from './journal'
 import { AsyncLocalStorage } from 'async_hooks'
 import type { BrowserWindow } from 'electron'
@@ -128,6 +128,9 @@ export interface ProjectSeen {
   lastPath?: string
   copy: boolean
 }
+
+/** For unit tests (#1382): an agent leaving the project, its change about to wait for the board's lock. */
+export const configTestHooks: { beforeBoardRetry?: (projectPath: string) => void } = {}
 
 export class WorkspaceService {
   path: string | null = null
@@ -958,25 +961,48 @@ export class WorkspaceService {
   /**
    * Changes project.json from its current content: fn gets the config as it is now and returns the
    * fields to change. Changes to one project's config never overlap, so none is lost.
+   *
+   * A change that takes an agent out of the project (removed, merged away, replaced by a template's, any `agents` patch
+   * that drops an id) is published under the workspace's board lock too (#1382): a card loop's design step resolves its
+   * reviewer and writes in one board change, so a removal is either before it (no reviewer: refused) or after it, never
+   * between its read and its write. Detected from the change itself (the ids before `fn` against the config it makes),
+   * so no caller can bypass it. Outside a board change, such a change writes nothing, lets go of the file and runs
+   * again inside one (lock order: the agent names lock, the board, then this file), so **`fn` may run twice**: it must
+   * only compute its change from `cfg` (what it records on the side is overwritten by the run that writes).
    */
   async mutateProjectConfig(projectPath: string, fn: (cfg: ProjectConfig) => Partial<ProjectConfig>): Promise<ProjectConfig> {
     const gen = this.generation
     await this.ensureProject(projectPath)
     const file = join(projectPath, HIVE_DIR, 'project.json')
     let ticket = 0
-    const next = await withFileLock(file, async () => {
-      const cfg = await this.projectConfig(projectPath)
-      const patch = fn(cfg)
-      let updated = { ...cfg, ...patch }
-      // The agents changed: each layout's pane placement takes in those added and lets go of those removed (#762), so
-      // every agent keeps its cell (not one worked out again from the order on each read).
-      if ('agents' in patch && updated.placement) updated = { ...updated, placement: settlePlacements(updated.placement, projectAgents(updated).map((a) => a.id)) }
-      await writeKeptJson(file, withLegacyProjectFields(updated))
-      this.configWrites.set(projectPath.toLowerCase(), this.projectConfigWrites(projectPath) + 1)
-      // As it is written: a read begun before now may have found the config from before.
-      ticket = ++this.rootTickets
-      return updated
-    })
+    // The board an agent leaving publishes under: this workspace's, for one of its projects (the Assistant's home has none).
+    const board = this.path && !this.isAssistantHome(projectPath) ? this.path : null
+    const publish = (): Promise<ProjectConfig | null> =>
+      withFileLock(file, async () => {
+        const cfg = await this.projectConfig(projectPath)
+        const had = projectAgents(cfg).map((a) => a.id)
+        const patch = fn(cfg)
+        let updated = { ...cfg, ...patch }
+        // An agent leaving, outside this workspace's board change: nothing written, so it runs again inside one.
+        if (board && !inBoardWrite(board) && 'agents' in patch) {
+          const now = new Set(projectAgents(updated).map((a) => a.id))
+          if (had.some((id) => !now.has(id))) return null
+        }
+        // The agents changed: each layout's pane placement takes in those added and lets go of those removed (#762), so
+        // every agent keeps its cell (not one worked out again from the order on each read).
+        if ('agents' in patch && updated.placement) updated = { ...updated, placement: settlePlacements(updated.placement, projectAgents(updated).map((a) => a.id)) }
+        await writeKeptJson(file, withLegacyProjectFields(updated))
+        this.configWrites.set(projectPath.toLowerCase(), this.projectConfigWrites(projectPath) + 1)
+        // As it is written: a read begun before now may have found the config from before.
+        ticket = ++this.rootTickets
+        return updated
+      })
+    const next =
+      (await publish()) ??
+      (await (async () => {
+        configTestHooks.beforeBoardRetry?.(projectPath)
+        return boardWrite(this, async () => (await publish())!, { alive: () => gen === this.generation && this.path === board })
+      })())
     this.registerRoots(projectPath, next, gen, ticket)
     if (gen === this.generation) this.savedAt.set(projectPath.toLowerCase(), Math.max(ticket, this.savedAt.get(projectPath.toLowerCase()) ?? 0))
     this.scheduleRefresh()

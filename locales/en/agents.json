@@ -1195,6 +1195,38 @@
     "defaultMessage": "It ran in a worktree no agent uses any more ({folder}). Add an agent for that worktree to resume it.",
     "description": "Why a session can't be resumed: no agent works in the worktree folder it ran in ({folder}, a path)."
   },
+  "agents.resume.hold.after": {
+    "defaultMessage": "{agent} is on {kind, select, card {{work}} other {its lane}} in {slot}: resume this after {kind, select, card {{work}} other {its lane}}.",
+    "description": "Why a conversation can't resume now (#1434): its agent ({agent}) builds a card ({work}: \"AM-14\"; kind card) or a lane (kind lane) in another slot ({slot}: \"slot-a\"), and this conversation is in the slot the agent kept: it resumes once that work ends."
+  },
+  "agents.resume.hold.byHand": {
+    "defaultMessage": "Its slot ({slot}) is free: Resume takes it for {agent} again. Resume All and startup leave it, so free slots stay for new work.",
+    "description": "A conversation's note (#1434): the slot it ran in ({slot}: \"slot-b\") is free and as it left it, so the user's own Resume takes it again for its agent ({agent}); Resume All and Hive's startup don't."
+  },
+  "agents.resume.hold.changed": {
+    "defaultMessage": "This conversation's slot ({slot}) has changed since it ran, so it can't resume there. Read its transcript, or start fresh with a handover.",
+    "description": "Why a conversation can't resume (#1434): the slot it ran in ({slot}: \"slot-b\") is free, but its files or its revision changed since (or it isn't set up)."
+  },
+  "agents.resume.hold.draining": {
+    "defaultMessage": "This conversation's slot ({slot}) is still being handed back from its last session. Try again in a moment.",
+    "description": "Why a conversation can't resume just now (#1434): the slot it ran in ({slot}: \"slot-b\") is free, but its last session there is still exiting and Hive hasn't finished taking the slot back. It can be resumed in a moment."
+  },
+  "agents.resume.hold.gone": {
+    "defaultMessage": "This conversation's slot ({slot}) is gone from disk. Read its transcript, or start fresh with a handover.",
+    "description": "Why a conversation can't resume (#1434): the slot folder it ran in ({slot}: \"slot-b\") no longer exists."
+  },
+  "agents.resume.hold.holds": {
+    "defaultMessage": "{agent} already keeps {slot}. Release that slot to resume this conversation in its own.",
+    "description": "Why a conversation can't resume (#1434): its agent ({agent}) already keeps another slot ({slot}: \"slot-a\"), and an agent keeps one at a time."
+  },
+  "agents.resume.hold.reused": {
+    "defaultMessage": "This conversation's slot ({slot}) now holds {kind, select, card {{work}'s work} other {a lane's work}}. Read its transcript, or start fresh with a handover.",
+    "description": "Why a conversation can't resume (#1434): the slot it ran in ({slot}: \"slot-b\") was lent to other work since: a card's ({work}: \"AM-14\"; kind card) or a lane's (kind lane). Reading its transcript and starting fresh with a handover are what the window offers."
+  },
+  "agents.resume.hold.reviewer": {
+    "defaultMessage": "{agent} reviews now, and reviewers never run in a slot ({slot}). Read its transcript, or start fresh with a handover.",
+    "description": "Why a conversation can't resume (#1434): its agent ({agent}) has the reviewer role now, and reviewers work in the project folder, never in a slot ({slot}: \"slot-b\")."
+  },
   "agents.resume.noRoom": {
     "defaultMessage": "No agent works in the project folder, and the project has no room for another agent.",
     "description": "Why a session can't be resumed: no agent works in the project's own folder, and the project has as many agents as it may have."
@@ -1222,6 +1254,22 @@
   "agents.resume.running": {
     "defaultMessage": "It is running now.",
     "description": "Why a session in the Sessions tab can't be resumed: it is running."
+  },
+  "agents.resume.short.after": {
+    "defaultMessage": "after {kind, select, card {{work}} other {its lane}}",
+    "description": "Resume All's list of agents it left (#1434), after the agent's name: this one's conversation resumes after the card ({work}: \"AM-14\"; kind card) or lane (kind lane) its agent builds now."
+  },
+  "agents.resume.short.byHand": {
+    "defaultMessage": "its slot is free. Resume it by hand to take it",
+    "description": "Resume All's list of agents it left (#1434), after the agent's name: this one's conversation resumes only with its own Resume, which takes its slot again (the slot is free)."
+  },
+  "agents.resume.short.other": {
+    "defaultMessage": "can't resume in its slot",
+    "description": "Resume All's list of agents it left (#1434): this one's conversation can't resume in the slot it ran in (changed, gone, or its agent reviews now)."
+  },
+  "agents.resume.short.reused": {
+    "defaultMessage": "its slot now holds {kind, select, card {{work}'s work} other {a lane's work}}",
+    "description": "Resume All's list of agents it left (#1434), after the agent's name: this one's conversation's slot was lent to other work since, a card's ({work}: \"AM-14\"; kind card) or a lane's (kind lane)."
   },
   "agents.resume.sub": {
     "defaultMessage": "A {kind} {cli} ran for another session, not a conversation of its own: it can't be resumed.",

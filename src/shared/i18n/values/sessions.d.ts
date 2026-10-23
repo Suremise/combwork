@@ -122,6 +122,7 @@ interface HiveMessageValues {
   'sessions.resume.addsTip': undefined
   'sessions.resume.agentDetail': { where: string; branch: string | number; running: string }
   'sessions.resume.menuHeader': undefined
+  'sessions.resume.startFresh': undefined
   'sessions.row.archived': undefined
   'sessions.row.backup': undefined
   'sessions.row.backupTip': { cli: string | number }

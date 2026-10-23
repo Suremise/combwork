@@ -1331,6 +1331,7 @@ that can't be written fails the change whole.
 | `FilesLocked` | agent, paths (relative to the project folder) | The card's builder took file locks on paths not yet recorded this cycle, while the card was its current one (G16, §16.6.4, #1481). |
 | `CannotWithinRules` | rule, why | The agent's "I couldn't do it within the rules" intent (#686) [#1120 c]. |
 | `ReviewerRequest` | text | The reviewer's request to the builder mid-review (#912) [#1120 c]. |
+| `LoopStep` | step, text, design?, until?, waitMinutes?, of? | A card loop's step that moves nothing (#1382, #1467): the builder's design for its reviewer's check (`design`: its id, `<key>/s<seq>`, and when its check is due, `until`, by `waitMinutes`) or going ahead with it unchecked (`proceed`), the builder's follow-up of reviewed work for the check (`followUp`: its id, no due time), or the reviewer's answer (`ok`, `gaps`); an answer and going ahead name the step they are about (`design`; `of`: its kind). A design or follow-up waits (`CardState.step`) until answered, gone ahead from (a design), replaced by another, or the card moves, is submitted or given a verdict. |
 | `HeadMoved` (observed) | line, from, to, candidate key of the new change | A new revision in the card's folder outside an intent. |
 | `TargetMoved` (observed) | target, from, to | |
 | `Gone` (observed) | what (line, folder, repository, deliverables) | |
@@ -2044,6 +2045,7 @@ Each takes a card reference (§16.12) and replies with what moved, lean (`shared
 | **ask the user** | Builder or reviewer | card, kind (approve, decide, test, sign-in, other), text, revision? | For you (§16.8.5) |
 | **couldn't within the rules** | Builder or reviewer | card, rule, why | `CannotWithinRules`: a For you of kind decide; never a failed round, never a stall [#1120 c, #686] |
 | **request to builder** | The reviewer | card, text | `ReviewerRequest`; wakes the builder now (#912) [#1120 c]. Codex reviewers get the tool (#913). |
+| **card loop step** | The builder (design, followUp, proceed) or the reviewer (ok, gaps) | card, step, text | `LoopStep`; moves nothing; wakes the other side (§16.8.2) [#1382, #1467]. |
 
 **The same revision again** [P1, answering HR2's round 1 finding 7]: a revision that failed review may be submitted
 again unchanged, with a note (the reviewer asked for an explanation, or a check failed for a reason outside the
@@ -2090,6 +2092,56 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   request and the decision line for a decision stand aside (`watchCovers`, `watchToldDecisions`). A lane watch counts a
   card's block lifted (`unblocked`, by default) and names the lane's merge commit at its end; the user's pane reply to a
   lane's agent is told to the Assistant on its own (#1099).
+- **A design first** (#1382, built [#1382]). The Assistant often asks a builder for a design before it builds (a recurring
+  finding, a card with open questions), and on 21 Oct #1305's sat six hours: its builder posted the design as a comment
+  in Doing, and its reviewer's watch counted only arrivals in Review. It is a step Hive knows: the **card loop step**
+  intent (`hive_loop_step`, `POST /v1/tasks/{card}/loop-step`) writes a `LoopStep` fact, its text as a comment and a
+  history line ("Posted a design for the reviewer to check: …", "Checked the design: OK: …", "Checked the design:
+  gaps: …", "Went ahead with the design unchecked: …"), and moves nothing. The builder posts `design` in Doing: it is
+  named (`<key>/s<seq>`) and its check is due **Project Settings → Card loops → Design check wait** after its post (30
+  minutes by default), both kept in its fact and returned (`design`, `until`, `waitMinutes`); a start's reply gives the
+  wait (`designWaitMinutes`), so the builder arms its watch before posting. The reviewer answers `ok` or `gaps`; with no
+  answer by `until`, the builder sends `proceed` and builds as posted. An answer and `proceed` name the design they are
+  about (`design`), and one about another design is refused (`loop.staleStep`), so a late answer never settles a newer
+  design; posting again replaces the one waiting. A design's comment starts with a line naming it ("Design HI-12/s40, for
+  the reviewer's check (an answer names HI-12/s40):"), so the reviewer has its id however it hears of it: the loop wake,
+  its own watch's line (which quotes a comment's first line) or `hive_read_task` with `latestComment`. `proceed` before the check is due is refused (`loop.tooEarly`), and a
+  design's deadline never moves (a changed setting, a watch started again, a restart). Each side only its own
+  (`loop.stepNotYours`): the builder's steps by the card's builder; an answer by its reviewer, the reviewer of its running
+  lane, else the agent of its latest review started or verdict (by id: a rename doesn't lose it; for a card from before
+  1.0, the agent whose board name last started reviewing it), while it is one of the project's agents (a removed one
+  can't be woken), never its builder; the user and the Assistant take either. One rule decides this for acceptance and
+  for delivery (`loopReviewerOf`, `loopReviewer.ts`), read inside the step's own board change (the runtime's `prepare`,
+  before its transaction). Every change that takes an agent out of a project (a removal, a merge's clean-up, a template's
+  load, any `agents` patch) publishes under the same board lock: `mutateProjectConfig` sees an agent id leave and,
+  outside a board change, writes nothing and runs again inside one (lock order: agent names, board, project.json). So
+  a removal is either before a design's read (refused) or after its write, never between. A design with no reviewer to check it is refused (`loop.noReviewer`), as is one outside Doing
+  (`loop.stepNotHere`), and an answer or `proceed` with nothing waiting (`loop.noStep`); with the rules off, none is.
+  Each step is a loop wake: a design (`step`, asking for a check, naming the design) and going ahead (`stepNotice`, a
+  notice with nothing to answer) to the card's reviewer, an answer (`stepAnswer`) to the builder. They are delivered
+  whatever the agent's own watch counts, so a reviewer waiting only for Review is woken; a watch that counts a verdict, a
+  move or a comment hears a step as it hears a request (`step` among its changes: "a card loop step: read its latest
+  comment"), and then the loop wake stands aside. A design's wake waiting for its reviewer is dropped once nothing waits
+  (answered by someone else, posted again: the newer one is told). Off with Card loops → Wake reviewers and builders. A
+  design left waiting is a stall (beside #1410's deadlock, `loopStepWait` in `shared/tasks.ts`): the card in Doing, not
+  blocked, its builder only watching it five minutes after its check was due (the deadline its history line kept, never
+  restarted by a new watch) ("HB5 posted a design on #1305 for its reviewer to check and has waited 40 min: nobody has
+  answered it, and it hasn't gone ahead as posted"), on the board, in the Agent API's `stalled` and in lane watches'
+  `stalled` events. The card-loop skill says when to post one and how each side answers.
+- **A follow-up checked** (#1467, built [#1467]). On 22 Oct #1417 and #1419 stalled the same way in Review and Approved:
+  the Assistant's screenshot OK asked for changes for the reviewer to check, the builder posted its fixes as a comment,
+  and the reviewer watched for a move into Review that never came. The card loop step has a `followUp`: the builder's,
+  on a card in Review or Approved (`loop.stepNotHere` elsewhere), named as a design is (`<key>/s<seq>`, its comment
+  headed "Follow-up HI-12/s41, for the reviewer's check (an answer names HI-12/s41):"), with the same reviewer rule
+  (`loop.noReviewer` with none), the same `step` loop wake to the reviewer whatever its watch counts, and the same
+  answers (`ok`, `gaps`, naming it; history "Checked the follow-up: OK: …"). It has no due time and no going ahead:
+  `proceed` on a follow-up is refused (`loop.followUpChecked`). A design or follow-up waits until answered, replaced,
+  returned for review, given a verdict or moved to another column (`pendingStep`, by its history lines' columns): a
+  change of its place in its column ("Moved to the bottom of Approved") keeps it, its wake and its stall's age. Unanswered, it is a stall (`loopStepWait`): the card in
+  Review or Approved, not blocked, its builder only watching it REVIEW_WAIT_STALL_MS (15 minutes) after the follow-up
+  ("B1 posted a follow-up on #333 for its reviewer to check and has waited 20 min: nobody has answered it"; the board's
+  hint asks the reviewer to answer it). The card-loop skill has the builder post it, and the reviewer watch comments as
+  well as columns while one it was asked to check is due.
 - **A late message can't reopen a pass** (#699, #703): only a submission or a decision (§16.4.6) moves an Approved card
   back to Review; comments and messages never do [note §10].
 - **Verified lane end:** `endLaneIfDone` replaces the agent's `mergeCommit` (`servers.ts:1556` checks only its format
@@ -2784,6 +2836,70 @@ Hive records each session's provider, folder **and lease** [answering HR2's roun
   reused".
 - **Reviewers have a stable home:** their sessions run in the project folder (never a slot), and they read and run
   commands in review copies by path (§16.10.5), so their conversations always resume.
+
+**Built [#1434], the folder contract** (`shared/agentFolders.ts`, decided there only; `main/agentFolders.ts` reads what
+it decides from: the project's slots and leases in hive.db, #1441's migration and retired homes):
+
+| | Where |
+|---|---|
+| A new conversation (`launchFolder(agent, purpose)`) | `review`: the project folder. `build`: the agent's open dispatch lease's slot, else its carried slot, else the project folder. Before #1441 has migrated a project, an agent with a 0.9 worktree keeps working there. Reviewer-role agents never start in a slot. A start's purpose is its role's (builder and either: `build`) unless its caller says. |
+| A conversation (`resumeFolder(session)`) | Always the folder it recorded (an older row without one: the project folder). Never moved. |
+| Where the agent works now (`currentFolder`) | Its running session's folder (a retired home included), else where a new conversation would start. |
+
+Whether a conversation may resume there is its **hold** (none: it may):
+
+| Its slot, now | `canResumeNow` (Resume All, startup) | `canResumeByUser` (its own Resume) |
+|---|---|---|
+| The project folder, a retired home, or no slot | yes | yes |
+| Its bound lease open, the agent's | yes | yes |
+| The agent's own under a later lease | no | yes: the session is rebound to that lease |
+| Free, set up, clean and at the head its lease ended at (recorded once its last writer has drained), no other lease since | no ("resume by hand") | yes: a new carried lease of it for the agent, and the session rebound to it, in one write |
+| Its carried slot while the agent builds a card or lane elsewhere | no ("HB2 is on AM-14 in slot-a: resume this after AM-14") | no, until that lease ends |
+| Lent to other work (open, or since), or another agent's session still draining there | no ("This conversation's slot now holds AM-14's work") | no |
+| Free but changed (files, revision, not set up), gone, or the agent a reviewer now | no | no |
+
+- **What a session records:** its folder always (the project folder too), and `lease`, the lease it is **bound** to
+  (hive.db's `sessions.lease`, the 1.0 group's `session leases` step, with `slot_leases.end_rev`, the slot's head once
+  its ended lease's last session has drained): set when it starts in a slot. `rebindSession` changes only that column, never the folder or the
+  provider's id, only to a lease of the same agent whose slot is the session's folder, and only inside the same board
+  write as the lease change that needs it (the user's Resume taking a free slot; #1441's carried → dispatch handoff).
+  A record's save never writes it.
+- **One writer:** a session starts or resumes in a slot only through one board write (`claimPlace`) that decides again
+  from hive.db as it is then (the slot's lease is its agent's; the resume authority, the agent's leases included; the
+  user's Resume's new lease or rebinding) and reserves the slot's **writer** for that start's run: its run id, lease,
+  agent and Hive. [#1434 round 3, the design agreed with HR2 on the card:]
+  - Its run's token is among this Hive's live ones (the pools' `holder.live`, as #1429's operations') from before its
+    claim can be seen; the claim is the project's pool's tracked work, so a closing workspace's pool waits until the
+    start has spawned its process or released the writer, and makes no claim once closing.
+  - The claim needs the slot set up and lent, with no operation (warming, installing, removal) and no unsettled job:
+    a slot still being set up is refused ("slot-b is still being set up"). No operation starts while a writer is set.
+  - The writer stays through the start's preparation, the launch and the session's whole run. A start given up before
+    any process of it ran releases it at once. Once a process ran (its CLI, or the agent's own worktree's first setup,
+    which runs in its carried slot but never in a slot the pool set up), it is released only when its launch's process
+    job shows everything it started has ended (`ended`: the job's whole membership seen empty, a member not described
+    counting as one; after End, only once a later look sees the job empty, since a kill is only asked, and `unknown`
+    after 30 looks): leftovers kept running by the user, a launch that couldn't be tracked, or a job that couldn't be
+    read leave it **held**. A run counts as having a process only once `spawnPty` has returned one.
+  - While it is set the slot isn't lent, adopted, taken by hand or removed, and another start there is refused ("slot-b
+    still has another session in it, or processes one left running there"); two at once give one writer.
+  - A writer whose Hive is gone is never taken over or cleared from a snapshot of its processes: it stays held until
+    the user releases the slot (#1506). A refresh clears only this Hive's own writer whose processes are proven ended
+    but whose release couldn't be written.
+- **Its environment:** `HIVE_SLOT` and `HIVE_SLOT_PORT_BASE` (#1429's `slotEnv`) while it runs in a slot; like every
+  `HIVE_*`, never inherited.
+- **Refused, with offers:** the window says why and offers **Read Transcript** (the Sessions tab, on it) and **Start
+  Fresh with a Handover** (Hand Over to… for its agent; the new conversation starts where the agent works now).
+- **Resume All and startup** use `canResumeNow` only: the rest are left and listed after them ("B1 — resume by hand",
+  "slot reused", "after AM-14"), so a free slot stays for new work.
+- **A lease's end** (#1429's `release`): the slot's writer under that lease drains. Hive lets its turn finish (not in a
+  turn, no prompt waiting, no run or background task going), then stops that run (a start of it still being prepared
+  gives up); never another run of the agent's, in that slot under a new lease or elsewhere. Once the run's processes
+  are known to have ended and its writer is released, the lease's last revision is recorded (its final commit
+  included) and the slot looked at.
+  A run of another Hive is that Hive's to stop; the slot stays its until it exits. No off switch: one writer needs it
+  (with workflow rules off, leases aren't ended by rules, so nothing is stopped).
+- **The Agent API:** an agent's row and detail give its running session's `folder` (when not the project folder) and
+  `slot`, and a session's usage its `folder` and `slot`.
 
 #### 16.10.4 Fresh conversations and hand-overs
 
