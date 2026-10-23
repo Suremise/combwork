@@ -1377,6 +1377,26 @@ function offerHolds(store: Store, o: Offer, records: readonly DeliveryRecord[] =
   })
 }
 
+/**
+ * Why an offer no longer holds (offerHolds false), for the log (#1504): its agent's launch or conversation changed, a
+ * delivery no longer offered by it, ended or no longer to be given out, or no longer wanted by its source or producer.
+ * Null when it holds.
+ */
+function whyOfferFails(store: Store, o: Offer): string | null {
+  const live = sessions.liveFor(store.host, o.ids.length ? (byId(store.records, o.ids[0])?.agentId ?? '') : '')
+  if (!live || live.runId !== o.runId) return 'its launch changed'
+  if (o.sessionId && live.sessionId && live.sessionId !== o.sessionId) return 'its conversation changed'
+  for (const id of o.ids) {
+    const r = byId(store.records, id)
+    if (r?.state !== 'offered' || r.offerRun !== o.runId) return `${id} is no longer offered by it (${r?.state ?? 'gone'})`
+    const not = whyNot(store, r)
+    if (not) return `${id} may no longer be given out (${not})`
+    if (r.source && sources.get(r.source)?.holds?.(r, store.host) === false) return `${id} is no longer wanted by its source (${r.source})`
+    if (!producerHolds(store, r)) return `${id} is no longer wanted by its producer`
+  }
+  return null
+}
+
 /** Puts an offer's deliveries back as they were (the line wasn't typed), those it still has as offered. */
 function unoffer(store: Store, o: Offer): Promise<void> {
   for (const id of o.ids) store.offering.delete(id)
@@ -1520,8 +1540,15 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
   }
   for (const id of o.ids) store.offering.add(id)
   let typed = false
+  // Why the line was put off as it was typed, when the offer stopped holding (#1504: Deliver Now gave up silently).
+  let putOff: string | null = null
+  const wanted = (): boolean => {
+    const why = whyOfferFails(store, o) ?? (o.ids.every((id) => store.offering.has(id)) ? null : 'its offer was ended') ?? (!wake || wakesOn() ? null : 'idle wakes were turned off')
+    if (why) putOff ??= why
+    return !why
+  }
   try {
-    typed = await typeLine(host, agentId, o.line, () => offerHolds(store, o) && o.ids.every((id) => store.offering.has(id)) && (!wake || wakesOn()), {
+    typed = await typeLine(host, agentId, o.line, wanted, {
       need: o.need,
       // A line the user typed into before its CLI took it is theirs (#652 round 1 finding 2): what it named waits again.
       follow: { confirming: (before) => confirming(store, o, before), lost: () => lost(store), left: () => void unoffer(store, o) }
@@ -1532,11 +1559,17 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
     // its source no longer has due (what it was made from changed as it was typed) ends now too, not at the next try.
     if (typed) log.info(`Deliveries ${o.ids.join(', ')} for ${userText(agentId)} offered`)
     else {
+      if (asked) log.info(`Deliver Now for ${userText(agentId)} put off as it was typed: ${putOff ?? 'its line was not taken'}`)
       await unoffer(store, o)
       await dropUndue(store, o.ids)
     }
     show(store, agentId)
   }
+  // Deliver Now put off part-way because what its line was made from changed as it was typed (#1504: a loop wake's
+  // board and lanes changed, as the card's own arrival in Review updates its lane): made again at once from things as
+  // they are now, as an offer overtaken before its first key is. With idle wakes off the retry below types nothing, so
+  // the user's ask would be lost. Never over the user's own typing.
+  if (!typed && asked && putOff && tries < OVERTAKEN_TRIES && !sessions.userMayBeTyping(host, agentId)) return offerOnce(host, agentId, only, tries + 1, asked)
   // Put off part-way (the user began typing there, what it was made from changed): tried again by itself, soon.
   if (!typed) retrySoon(host, agentId)
   return typed

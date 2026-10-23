@@ -1,6 +1,6 @@
 // A Copy button beside every command Agent Setup shows (#1204, Darren's Store PowerShell fix): Codex found, with the
-// warning about the Microsoft Store's PowerShell 7 and its detail (the symptom's error text and the winget command, each
-// as code); Claude Code not installed, with its install note (the installer's command and folder). Each code span has
+// warning about the Microsoft Store's PowerShell 7 and its detail (the symptom's error text, and the uninstall command
+// before the winget one, #1512: each as code); Claude Code not installed, with its install note (the installer's command and folder). Each code span has
 // its own Copy button; it copies exactly that command (a fake clipboard in the page: the real one is never touched) and
 // says Copied for a moment. Sent to the window as main sends them, in the window's language (its catalogue's words):
 // no CLI is run, installed or signed in. In German, the install note is the German one (#1404), its commands still
@@ -12,7 +12,8 @@ const path = require('path')
 const HUNG_MS = 10000
 
 const userData = path.join(lib.WORK, 'setupcopy-profile')
-const WINGET = 'winget install --id Microsoft.PowerShell --source winget'
+const WINGET = 'winget install --id Microsoft.PowerShell --source winget --installer-type wix'
+const REMOVE = 'Get-AppxPackage Microsoft.PowerShell | Remove-AppxPackage'
 const IRM = 'irm https://claude.ai/install.ps1 | iex'
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -80,6 +81,9 @@ async function openSetup(app, page, lang = 'en') {
       const winget = setup.locator(`.copy-code-btn[data-copy-code="${WINGET}"]`)
       check('the winget command has a Copy button beside it', !!(await lib.until(async () => (await winget.count()) === 1, HUNG_MS)))
       check('…and so has the error text, shown as code', (await setup.locator('.copy-code-btn[data-copy-code="CreateProcessAsUserW failed: 5"]').count()) === 1)
+      // #1512: winget installs nothing while the Store's copy is there, so its uninstall comes first.
+      const copies = await setup.locator('.copy-code-btn').evaluateAll((els) => els.map((e) => e.getAttribute('data-copy-code')))
+      check('the uninstall command has its Copy button too, shown before the install', copies.includes(REMOVE) && copies.indexOf(REMOVE) < copies.indexOf(WINGET), JSON.stringify(copies))
       check('its tooltip names what it copies', (await winget.getAttribute('title')) === `Copy ${WINGET}`, await winget.getAttribute('title'))
       // `has` is relative to each .copy-code: the button by its own selector, not the dialog-scoped locator.
       const done = setup.locator('.copy-code', { has: page.locator(`.copy-code-btn[data-copy-code="${WINGET}"]`) }).locator('.copy-code-done')
