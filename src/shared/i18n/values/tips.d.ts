@@ -328,6 +328,8 @@ interface HiveMessageValues {
   'tips.signInExpired.title': undefined
   'tips.silentUnknown.text': undefined
   'tips.silentUnknown.title': undefined
+  'tips.slotResume.text': undefined
+  'tips.slotResume.title': undefined
   'tips.sortTables.text': undefined
   'tips.sortTables.title': undefined
   'tips.staleMessages.text': undefined

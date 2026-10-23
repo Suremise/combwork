@@ -41,7 +41,7 @@ interface World {
   pool: SlotPool
   runs: (SlotRun & SlotRunEnd)[]
   opts: { setup: string; archive: string; copy: string }
-  set: { builders: number; removeIdle: boolean; sessions: Map<string, string>; inFlight: Set<number> }
+  set: { builders: number; removeIdle: boolean; sessions: Map<string, string>; inFlight: Set<number>; ended: string[] }
   steer: Steer
   clock: { now: number }
   /** Pids of holder processes that have ended. */
@@ -78,7 +78,7 @@ function world(o: { setup?: string; builders?: number } = {}): World {
   const runs: World['runs'] = []
   const logs = tempDir('slots-logs-')
   const opts = { setup: o.setup ?? '', archive: '', copy: '.env' }
-  const set = { builders: o.builders ?? 2, removeIdle: true, sessions: new Map<string, string>(), inFlight: new Set<number>() }
+  const set = { builders: o.builders ?? 2, removeIdle: true, sessions: new Map<string, string>(), inFlight: new Set<number>(), ended: [] as string[] }
   const steer: Steer = { gates: new Map(), settled: true, noSupervisor: false, settle: true, settledJobs: [] }
   const dead = new Set<number>()
   const root = join(`${ws}.worktrees`, 'project')
@@ -118,6 +118,7 @@ function world(o: { setup?: string; builders?: number } = {}): World {
       sessionIn: (f) => set.sessions.get(f.toLowerCase()) ?? null,
       inFlight: (card) => set.inFlight.has(card),
       removeIdle: () => set.removeIdle,
+      ended: (l, s) => void set.ended.push(`${l.id} ${s.name}`),
       now: () => clock.now
     })
     return { pool, store }
@@ -169,6 +170,19 @@ async function lent(w: World, ask: { agent: string; card?: number; lane?: string
 }
 
 describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
+  it("records the slot's head as its lease ends, and tells the app (#1434: its builder's session is stopped)", async () => {
+    const w = world()
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    const head = sh(r.slot.folder, 'rev-parse', 'HEAD')
+    expect(await w.pool.release(r.lease.id, 'done')).toBe(true)
+    expect(w.store.lease(r.lease.id)).toMatchObject({ why: 'done', endRev: head })
+    expect(w.store.lastLease('slot-a')?.id).toBe(r.lease.id)
+    expect(w.set.ended).toEqual([`${r.lease.id} slot-a`])
+    // Not open: nothing ends, nothing told.
+    expect(await w.pool.release(r.lease.id, 'again')).toBe(false)
+    expect(w.set.ended).toHaveLength(1)
+  })
+
   it('lends a new slot (a detached worktree at the target, its files copied, set up as a run) and gets it back', async () => {
     const w = world({ setup: WRITE_ENV })
     const r = await lent(w, { agent: 'a1', card: 12 })

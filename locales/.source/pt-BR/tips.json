@@ -326,6 +326,8 @@
   "tips.signInExpired.title": "When a sign-in expires",
   "tips.silentUnknown.text": "Hive never guesses an agent is idle: when its turn has been silent for a while with no sign of its end, its pane says so. If its terminal waits at its prompt, Mark idle puts it right.",
   "tips.silentUnknown.title": "An agent silent with its state unknown",
+  "tips.slotResume.text": "A builder's conversation stays in its card's slot. Once the card ends, Resume All leaves it so the slot stays free for new work; its own Resume takes the slot back while nothing else has used it.",
+  "tips.slotResume.title": "A conversation resumes where it was made",
   "tips.sortTables.text": "Click a column's header in Hive's tables (shortcuts, Performance, Storage, the Overviews) to sort by it, again for the other way. Hive remembers each table's sort and rows per page.",
   "tips.sortTables.title": "Sort any table",
   "tips.staleMessages.text": "When the Assistant relays something about a card's current round, it ties the message to that card: if the card passes or starts another round before the agent reads it, Hive drops it as stale, so no agent reopens a passed card for an old finding.",

@@ -1307,6 +1307,14 @@
     "defaultMessage": "An agent silent with its state unknown",
     "description": "A tip's title."
   },
+  "tips.slotResume.text": {
+    "defaultMessage": "A builder's conversation stays in its card's slot. Once the card ends, Resume All leaves it so the slot stays free for new work; its own Resume takes the slot back while nothing else has used it.",
+    "description": "A tip. A slot is a worktree Hive lends to a card. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.slotResume.title": {
+    "defaultMessage": "A conversation resumes where it was made",
+    "description": "A tip's title (#1434)."
+  },
   "tips.sortTables.text": {
     "defaultMessage": "Click a column's header in Hive's tables (shortcuts, Performance, Storage, the Overviews) to sort by it, again for the other way. Hive remembers each table's sort and rows per page.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

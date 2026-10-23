@@ -114,6 +114,8 @@ export interface SlotLease {
   from: string
   to: string | null
   why: string | null
+  /** The slot's head when it ended (#1434): its conversations may resume by hand while the slot is free and still there. */
+  endRev: string | null
 }
 
 /** Why a lend was refused (#1438 turns `noSlot` and `warming` into "waiting for a slot"). */
@@ -238,6 +240,9 @@ export function fileSlotConn(file: string): SlotConn {
   }
 }
 
+/** A write's own check refused it (`carry`'s `also`): it is undone, and the caller told so. */
+class Refused extends Error {}
+
 /** An operation no longer holds its slot (another took it over, or it ended): it stops, writing nothing more. */
 export class OpLost extends Error {
   constructor(readonly slot: string) {
@@ -272,7 +277,8 @@ const leaseOfRow = (r: Row): SlotLease => ({
   agent: r.agent as string,
   from: r.from_at as string,
   to: (r.ended_at as string | null) ?? null,
-  why: (r.why as string | null) ?? null
+  why: (r.why as string | null) ?? null,
+  endRev: (r.end_rev as string | null) ?? null
 })
 
 /** Which unique index a failed insert hit: a slot's open lease, an agent's, or a slot's name or folder. */
@@ -425,15 +431,16 @@ export class SlotStore {
 
   private insertLease(db: DatabaseSync, id: string, slot: string, kind: LeaseKind, req: { agent: string; card?: number; lane?: string }, at: string): SlotLease {
     db.prepare('INSERT INTO slot_leases (id, project, slot, kind, card, lane, agent, from_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(id, this.project, slot, kind, kind === 'card' ? req.card! : null, kind === 'lane' ? req.lane! : null, req.agent, at)
-    return { id, project: this.project, slot, kind, card: kind === 'card' ? req.card! : null, lane: kind === 'lane' ? req.lane! : null, agent: req.agent, from: at, to: null, why: null }
+    return { id, project: this.project, slot, kind, card: kind === 'card' ? req.card! : null, lane: kind === 'lane' ? req.lane! : null, agent: req.agent, from: at, to: null, why: null, endRev: null }
   }
 
   /**
    * A carried lease (#1441): an agent's own worktree adopted in place as a slot under its folder's name, protected while
    * the lease is open. The slot's row is made if it has none. Refused (null) when the slot has an operation or a job, is
-   * being removed, or is recorded at another folder, or the slot or the agent has an open lease.
+   * being removed, or is recorded at another folder, or the slot or the agent has an open lease. `also` runs in the same
+   * write once the lease is made (#1434: the user's Resume binds its session to it); it throws, and nothing is written.
    */
-  async carry(agent: string, slot: { name: string; folder: string; target: string | null }): Promise<SlotLease | null> {
+  async carry(agent: string, slot: { name: string; folder: string; target: string | null }, also?: (db: DatabaseSync, lease: SlotLease, had: Slot | null) => boolean): Promise<SlotLease | null> {
     try {
       return await this.conn.write((db) => {
         const at = this.iso()
@@ -444,10 +451,12 @@ export class SlotStore {
           const took = db.prepare(`UPDATE slots SET state = 'lent', used_at = ? WHERE project = ? AND name = ? AND state <> 'removing' AND ${FREE}`).run(at, this.project, slot.name)
           if (Number(took.changes) !== 1) return null
         }
-        return this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, slot.name, 'carried', { agent }, at)
+        const lease = this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, slot.name, 'carried', { agent }, at)
+        if (also && !also(db, lease, had)) throw new Refused()
+        return lease
       })
     } catch (e) {
-      if (constraintOf(e)) return null
+      if (constraintOf(e) || e instanceof Refused) return null
       throw e
     }
   }
@@ -456,15 +465,26 @@ export class SlotStore {
     return (db.prepare('SELECT * FROM slots WHERE project = ?').all(this.project) as Row[]).map(slotOfRow)
   }
 
-  /** Ends an open lease: the lease as ended, or null when it wasn't open. The slot is looked at by the pool. */
-  async end(lease: string, why: string): Promise<SlotLease | null> {
+  /**
+   * Ends an open lease: the lease as ended, or null when it wasn't open. The slot is looked at by the pool. `endRev`: the
+   * slot's head then (#1434), where its conversations may resume by hand.
+   */
+  async end(lease: string, why: string, endRev: string | null = null): Promise<SlotLease | null> {
     return this.conn.write((db) => {
       const r = db.prepare('SELECT * FROM slot_leases WHERE id = ? AND project = ? AND ended_at IS NULL').get(lease, this.project) as Row | undefined
       if (!r) return null
       const at = this.iso()
-      db.prepare('UPDATE slot_leases SET ended_at = ?, why = ? WHERE id = ?').run(at, why, lease)
+      db.prepare('UPDATE slot_leases SET ended_at = ?, why = ?, end_rev = ? WHERE id = ?').run(at, why, endRev, lease)
       db.prepare('UPDATE slots SET used_at = ? WHERE project = ? AND name = ?').run(at, this.project, r.slot)
-      return { ...leaseOfRow(r), to: at, why }
+      return { ...leaseOfRow(r), to: at, why, endRev }
+    })
+  }
+
+  /** A slot's newest lease, open or ended (#1434: whose work it holds). */
+  lastLease(slot: string): SlotLease | null {
+    return this.conn.read((db) => {
+      const r = db.prepare('SELECT * FROM slot_leases WHERE project = ? AND slot = ? ORDER BY from_at DESC LIMIT 1').get(this.project, slot) as Row | undefined
+      return r ? leaseOfRow(r) : null
     })
   }
 
@@ -624,6 +644,8 @@ export interface PoolDeps {
   inFlight?: (card: number) => boolean | Promise<boolean>
   /** Settings → Advanced, Remove idle slots after a day. */
   removeIdle?: () => boolean
+  /** A lease ended (#1434): its builder's session in the slot is stopped once its turn ends. */
+  ended?: (lease: SlotLease, slot: Slot) => void
   now?: () => number
 }
 
@@ -746,8 +768,14 @@ export class SlotPool {
 
   /** Ends a lease and looks at its slot once no operation holds it. Whether the lease was open. */
   async release(lease: string, why: string): Promise<boolean> {
-    const ended = await this.store.end(lease, why)
+    const l = this.store.lease(lease)
+    const s = l ? this.store.slot(l.slot) : null
+    // Its head as it ends: a conversation of the lease resumes there by hand while the slot is free and still at it.
+    const rev = s && existsSync(s.folder) ? await G.head(s.folder) : null
+    const ended = await this.store.end(lease, why, rev && !isUnknown(rev) ? rev : null)
     if (!ended) return false
+    const slot = this.store.slot(ended.slot)
+    if (slot) this.deps.ended?.(ended, slot)
     await this.settle(ended.slot)
     return true
   }

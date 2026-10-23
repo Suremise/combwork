@@ -635,6 +635,10 @@
     "defaultMessage": "It ran in a worktree no agent uses any more ({folder}). Add an agent for that worktree (Add Agent → existing worktree) to resume it.",
     "description": "Why a session can't be resumed: no agent works in the worktree folder it ran in ({folder}). Add Agent → existing worktree is where: use the translated names."
   },
+  "actions.resume.heldTitle": {
+    "defaultMessage": "Can't resume here now",
+    "description": "A warning's title (#1434): the conversation can't resume in the slot it ran in (the message says why: its slot holds other work, changed, or its agent builds elsewhere)."
+  },
   "actions.resume.noneMessage": {
     "defaultMessage": "{agent, select, none {There is no session to resume.} other {{agent} has no session to resume.}} Start a new one instead.",
     "description": "Under the notification that there is no session to resume: the agent ({agent}; none in a project with one agent)."
@@ -642,6 +646,14 @@
   "actions.resume.noneTitle": {
     "defaultMessage": "No previous session",
     "description": "A notification's title: there is no session to resume."
+  },
+  "actions.resume.readTranscript": {
+    "defaultMessage": "Read Transcript",
+    "description": "A button in the warning that a conversation can't resume where it ran (#1434): opens it in the Sessions tab."
+  },
+  "actions.resume.startFresh": {
+    "defaultMessage": "Start Fresh with a Handover",
+    "description": "A button in the warning that a conversation can't resume where it ran (#1434): opens Hand Over to… for its agent, which starts a new conversation from a handover."
   },
   "actions.resumeAll.coldLine": {
     "defaultMessage": "• {agent} — about {tokens} tokens",
@@ -654,6 +666,14 @@
   "actions.resumeAll.failed": {
     "defaultMessage": "{all, select, yes {{tried, plural, one {Could not resume the agent} other {Could not resume the agents}}} other {{failed} of {tried} agents could not resume}}",
     "description": "An error's title after Resume All: none of the {tried} agents resumed (yes), or {failed} of them didn't."
+  },
+  "actions.resumeAll.heldLine": {
+    "defaultMessage": "• {agent} — {why}",
+    "description": "A line of Resume All's report of the agents it left (#1434): the agent ({agent}) and why, in a few words ({why}: \"resume by hand\", \"slot reused\", \"after AM-14\")."
+  },
+  "actions.resumeAll.heldTitle": {
+    "defaultMessage": "{n, plural, one {Resume All left one agent} other {Resume All left # agents}}",
+    "description": "A notification's title after Resume All (#1434): it left {n} agents stopped, whose conversations can't resume now where they ran (a slot that is free, so only their own Resume takes it, or holds other work); the lines below say why."
   },
   "actions.resumeAll.message": {
     "defaultMessage": "The prompt cache has expired for {who, select, all {all of them} other {{cold, plural, one {one agent} other {# agents}}}}. Resuming re-caches on the first message:",

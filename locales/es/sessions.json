@@ -120,6 +120,7 @@
   "sessions.resume.addsTip": "Reanudar (agrega un agente si ninguno puede ejecutarla)",
   "sessions.resume.agentDetail": "{where, select, worktree {worktree · {branch}} other {carpeta del proyecto}}{running, select, yes { · en ejecución, su sesión actual se detiene primero} other {}}",
   "sessions.resume.menuHeader": "Reanudar en",
+  "sessions.resume.startFresh": "Empezar de nuevo con un traspaso",
   "sessions.row.archived": "archivada",
   "sessions.row.backup": "copia",
   "sessions.row.backupTip": "{cli} ya no tiene esta transcripción; Hive la muestra y la reanuda desde su copia de seguridad.",

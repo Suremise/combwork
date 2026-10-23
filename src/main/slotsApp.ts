@@ -24,7 +24,10 @@ import { progress, progressGate } from './progressService'
 import { childEnv } from './ptyHost'
 import { sessions } from './sessions'
 import { settleSlotJob } from './slotJobs'
-import { builderCountOf, SlotPool, slotOptionsOf, SlotStore, type OpHolder, type SlotConn, type SlotRunEnd, type SlotRunner } from './slots'
+import { builderCountOf, SlotPool, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRunEnd, type SlotRunner } from './slots'
+import { onHiveEvent } from './events'
+import { agentBusy } from './workflow/lineUpdates'
+import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, WorkspaceService } from './workspace'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
 import { endLeaseJob, journalPath, LeaseJob, startLauncher } from './workflow/queueJobs'
@@ -206,12 +209,44 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
           return false
         }
       },
-      removeIdle: () => advanced.get(SLOTS_REMOVE_IDLE) !== false
+      removeIdle: () => advanced.get(SLOTS_REMOVE_IDLE) !== false,
+      ended: (lease, slot) => stopLeaseSession(projectPath, lease, slot)
     })
   })()
   pools.set(key, { life: ws.lifetime, pool })
   pool.catch(() => pools.delete(key))
   return pool
+}
+
+/**
+ * A lease ended (#1434, SPEC §16.10.2): its builder's session in the slot is stopped once its turn has finished (not in
+ * a turn, no prompt waiting, no run or background task going), also one starting there as it ended. Its conversation
+ * stays resumable by hand while the slot isn't lent again, and the pool doesn't lend the slot while a session runs in
+ * it. Looked at again at each change of its status or of the Progress panel's runs, until it is stopped or ends.
+ */
+export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Slot): void {
+  const inSlot = (): boolean => {
+    const st = sessions.liveFor(projectPath, lease.agent)
+    return !!st && containsPlace(slot.folder, st.cwd)
+  }
+  const starting = (): boolean => sessions.startingFor(projectPath, lease.agent)
+  if (!inSlot() && !starting()) return
+  let off: (() => void) | null = null
+  const look = (): void => {
+    if (!inSlot()) {
+      if (!starting()) off?.()
+      return
+    }
+    if (agentBusy(projectPath, lease.agent) || agentRunsGoing(projectPath, lease.agent).length) return
+    off?.()
+    off = null
+    log.info(`Stopping ${userText(lease.agent)}'s session in ${userText(slot.name)}: its lease ${lease.id} ended (${lease.why ?? 'released'})`)
+    sessions.stop(projectPath, lease.agent)
+  }
+  off = onHiveEvent((e) => {
+    if ((e.type === 'session-status' && e.state.agentId === lease.agent && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
+  })
+  look()
 }
 
 let timer: NodeJS.Timeout | null = null
@@ -278,6 +313,9 @@ export async function slotTest(pool: SlotPool, op: SlotTestOp): Promise<unknown>
       return pool.tidy(op.at)
     case 'remove':
       return pool.remove(op.slot)
+    case 'carry':
+      // #1441's adoption of an agent's own worktree (#1434's suite, until #1441 is built).
+      return pool.carry(op.agent, { name: op.slot, folder: op.folder })
     default:
       throw new Error('unknown slot test op') // i18n-ignore: a test channel, never shown
   }

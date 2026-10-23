@@ -120,6 +120,7 @@
   "sessions.resume.addsTip": "再開（実行できるエージェントがなければ追加します）",
   "sessions.resume.agentDetail": "{where, select, worktree {ワークツリー · {branch}} other {プロジェクトフォルダー}}{running, select, yes { · 実行中、現在のセッションを先に停止} other {}}",
   "sessions.resume.menuHeader": "再開先",
+  "sessions.resume.startFresh": "引き継ぎメモで新しく始める",
   "sessions.row.archived": "アーカイブ済み",
   "sessions.row.backup": "バックアップ",
   "sessions.row.backupTip": "{cli}にはこのトランスクリプトがもうありません。Hiveはバックアップから表示・再開します。",

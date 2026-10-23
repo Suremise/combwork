@@ -463,6 +463,10 @@
     "defaultMessage": "End or Keep the Processes an Agent Left Running",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: notifications and buttons run it by its name."
   },
+  "shell.command.session.showTranscript": {
+    "defaultMessage": "Read a Session's Transcript",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: notifications and buttons run it by its name. It opens the Sessions tab on one session (#1434)."
+  },
   "shell.command.session.startNewAll": {
     "defaultMessage": "Start New (All)…",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it."

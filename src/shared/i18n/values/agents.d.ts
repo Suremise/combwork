@@ -300,6 +300,13 @@ interface HiveMessageValues {
   'agents.provider.lastTurn': { input: number; output: number }
   'agents.provider.warning': { why: string; provider: string | number }
   'agents.resume.goneWorktree': { folder: string | number }
+  'agents.resume.hold.after': { agent: string | number; kind: string; work: string | number; slot: string | number }
+  'agents.resume.hold.byHand': { slot: string | number; agent: string | number }
+  'agents.resume.hold.changed': { slot: string | number }
+  'agents.resume.hold.gone': { slot: string | number }
+  'agents.resume.hold.holds': { agent: string | number; slot: string | number }
+  'agents.resume.hold.reused': { slot: string | number; kind: string; work: string | number }
+  'agents.resume.hold.reviewer': { agent: string | number; slot: string | number }
   'agents.resume.noRoom': undefined
   'agents.resume.noTranscript': { cli: string | number }
   'agents.resume.notInstalled': { cli: string | number }
@@ -307,6 +314,10 @@ interface HiveMessageValues {
   'agents.resume.removedAdd': { agent: string; cli: string | number }
   'agents.resume.removedTo': { agent: string; target: string | number }
   'agents.resume.running': undefined
+  'agents.resume.short.after': { kind: string; work: string | number }
+  'agents.resume.short.byHand': undefined
+  'agents.resume.short.other': undefined
+  'agents.resume.short.reused': undefined
   'agents.resume.sub': { kind: string | number; cli: string | number }
   'agents.session.unnamed': { id: string | number }
   'agents.settings.appliesNext': { agent: string | number }

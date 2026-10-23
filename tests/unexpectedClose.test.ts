@@ -69,6 +69,11 @@ describe('the notice (#984)', () => {
     expect(resumeFailedLine({ resumed: [], failed: [{ name: 'A', error: 'x' }, { name: 'B', error: 'y' }] })).toBe("2 couldn't resume: A (x) and B (y).")
   })
 
+  it("leaves a conversation whose slot is free or holds other work (#1434), and says so", () => {
+    const text = unexpectedCloseText({ lastSeen, agents: [agent('B1', 'hive'), agent('B2', 'hive')], dump: false, merges: [] }, { resumed: [], failed: [], held: [{ name: 'B1', hold: { is: 'byHand', slot: 'slot-a', how: 'take', lease: 'l1' } }, { name: 'B2', hold: { is: 'reused', slot: 'slot-b', card: 14, lane: null } }] })
+    expect(text).toMatch(/None was resumed\. 2 were left stopped: B1 \(resume by hand\) and B2 \(slot reused\)\.$/)
+  })
+
   it('names a crash dump, and each merge left half done with the folder it was in', () => {
     const text = unexpectedCloseText({ lastSeen, agents: [agent('B1', 'hive')], dump: true, merges: [{ agentName: 'HB5', branch: 'feature/090-session', cards: [977], folder: 'D:/wt/hb5' }, { agentName: 'HB2', branch: 'main', cards: [], folder: 'D:/ws/hive' }] }, null)
     expect(text).toContain('Hive kept a crash dump of it: Help → Copy Diagnostics names it.')

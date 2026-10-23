@@ -236,6 +236,16 @@ An agent's header, its **⋯** and the **Session** menu let you:
 - **Hand Over to…** (agent menu) — hand this agent's work to another agent of the project, which may use another provider, or to the agent itself **in a new conversation** (see [Long conversations](#long-conversations)). Hive asks this agent to write a handover (if it's running and idle; untick to use the latest handover instead), then starts the other agent, or messages it if it's already running, and tells it to read that handover and carry on. Hive waits for a handover from that agent's own conversation, so one another agent writes meanwhile isn't picked up. Every handover an agent writes starts with a header Hive fills in: the project, the **author** (the agent and its CLI, e.g. *Claude (Claude Code)*), the **session** it was written in (to resume it with questions) and the date, in your time with UTC in brackets. The new session shows a **handed over** badge in the Sessions tab that links back. It needs **Settings → Agent API → Provide Hive tools to sessions**. If the other agent's CLI asks something first (for example whether to trust the folder), answer it in its terminal.
 - **Archive and Start New…** (in the agent's **⋯** menu, or **Archive Session and Start New…** in the command palette) — archive the current conversation and start a clean one. This is the cheapest way to continue after a long session: the new session starts with an empty context instead of re-caching the old one. Write a handover first (see below) so the new session knows where to pick up.
 
+### Resuming in slots
+
+A project's **slots** are worktrees Hive lends to a card or a lane, one builder at a time. A builder's new conversation starts in its card's slot (a reviewer's in the project folder, never a slot), with `HIVE_SLOT` and `HIVE_SLOT_PORT_BASE` (the slot's name and its block of ports) in its environment. A conversation always resumes in the folder it was made in, because the CLIs keep conversations by folder:
+
+- **While its card's slot is still its own**, Resume, Resume All and a restart resume it there.
+- **When the card ends** (Done, put back, or its lane ends), Hive lets the builder finish its turn, then stops its session in the slot. Its conversation stays in the Sessions tab.
+- **While that slot is free and unchanged**, only the agent's own **Resume** takes it again (under a new lease). **Resume All** and Hive's start leave it, and say so afterwards (*B1 — resume by hand*), so free slots stay for new work.
+- **Once the slot holds other work** (*This conversation's slot (slot-a) now holds AM-14's work*), or it changed since, the conversation can't resume there. Hive says why and offers **Read Transcript** (the Sessions tab, on that conversation) and **Start Fresh with a Handover** (Hand Over to… for its agent). Resume All lists it as *slot reused*.
+- **An agent that kept its own worktree** (from before slots) and is given a card in another slot builds the card there; its older conversation waits until that card ends (*B1 is on AM-15 in slot-b: resume this after AM-15*).
+
 ### Agent states
 
 Hive sums up what each agent is doing in one of four states, each drawn with its own shape as well as its own colour, so they read apart without colour too:

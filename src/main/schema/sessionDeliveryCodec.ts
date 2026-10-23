@@ -177,7 +177,8 @@ export function sessionToRows(host: string, ord: number, rec: Record<string, unk
   const cardsTyped = !!cards && cards.length > 0 && cards.every((c) => c && c.extra === null)
   const sub = rec.sub as { parentId?: unknown; kind?: unknown } | undefined
   const subTyped = !!sub && typeof sub === 'object' && Object.keys(sub).every((k) => k === 'parentId' || k === 'kind') && (sub.parentId === null || (typeof sub.parentId === 'string' && wellFormed(sub.parentId))) && typeof sub.kind === 'string' && wellFormed(sub.kind)
-  const row = encode(SESSION, rec, [...(cardsTyped ? ['cards'] : []), ...(subTyped ? ['sub'] : [])])
+  // Its `lease` is its column's own (#1434: written only by agentFolders.ts, never by a record's save).
+  const row = encode(SESSION, rec, ['lease', ...(cardsTyped ? ['cards'] : []), ...(subTyped ? ['sub'] : [])])
   if (!row) return null
   row.host = host
   row.ord = ord
@@ -199,6 +200,7 @@ export function sessionFromRows(row: Record<string, unknown>, cards: Record<stri
     // SessionRecord's order: cards after handedOverFrom… (key order is for reading only: records compare as JSON).
     if (cards.length) out.cards = cards.map((c) => decode(SESSION_CARD, c))
     if (row.sub_kind !== null && row.sub_kind !== undefined) out.sub = { parentId: row.parent_id ?? null, kind: row.sub_kind }
+    if (typeof row.lease === 'string') out.lease = row.lease
   })
 }
 

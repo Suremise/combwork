@@ -60,6 +60,8 @@ import { laneCards, laneName, laneNumber } from '../shared/lanes'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
 import { writePty } from './ptyHost'
 import { sessions } from './sessions'
+import { folderFacts } from './agentFolders'
+import { slotAt } from '../shared/agentFolders'
 import { cardStall, laneOrderView } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
 import { ackDeliveries, deliveriesOf, deliverNow, deliveryView, launchWith, NotGiven, readInbox } from './deliveries'
@@ -473,6 +475,9 @@ async function projectSummary(p: string) {
       workflowRole: agentWorkflowRole(a),
       branch: a.worktree?.branch ?? null,
       worktree: a.worktree?.path ?? null,
+      // Where its running session is (#1434): its folder, and its slot while it runs in one.
+      ...(a.live ? { folder: a.live.cwd } : {}),
+      ...(a.live?.slot ? { slot: a.live.slot } : {}),
       status: a.live?.status ?? 'stopped',
       sessionId: a.live?.sessionId ?? null,
       statusMessage: statusMessageOf(a.live),
@@ -764,12 +769,17 @@ route('GET', '/v1/projects/:name/usage', async ({ params, query }) => {
   const id = query.get('sessionId') ?? sessions.liveFor(p, agent ? await agentParam(p, agent) : undefined)?.sessionId ??(await sessions.list(p)).find((s) => s.source === 'hive')?.id
   if (!id) throw new HttpError(404, 'No sessions for this project')
   const usage = await sessions.usage(p, id)
+  // Where it ran (#1434): its folder, and the slot that is, if any.
+  const rec = usage ? await workspace.sessionRecord(p, id).catch(() => undefined) : undefined
+  const folder = rec ? (rec.cwd ?? p) : null
+  const slot = folder ? slotAt(await folderFacts(p).catch(() => ({ projectPath: p, migrated: false, homes: [], slots: [] })), folder)?.name : undefined
+  const where = folder ? { folder, ...(slot ? { slot } : {}) } : {}
   // ?days=false: without the usage by day, which grows with every day the session runs.
   if (usage && query.get('days') === 'false') {
     const { days: _days, ...rest } = usage
-    return rest
+    return { ...rest, ...where }
   }
-  return usage
+  return usage && { ...usage, ...where }
 })
 
 route('POST', '/v1/projects/:name/input', async ({ params, body }) => {
@@ -1428,6 +1438,8 @@ async function agentActivity(p: string, agentId: string, detail = false) {
     ...(detail ? { runtime: st ? agentRuntime(st) : null } : {}),
     branch: a.worktree?.branch ?? null,
     worktree: a.worktree?.path ?? null,
+    ...(st ? { folder: st.cwd } : {}),
+    ...(st?.slot ? { slot: st.slot } : {}),
     sessionId: sessionId || null,
     // A long transcript slows the CLI and Hive; handing over to itself (a new conversation) makes it short again.
     transcriptMB: st?.transcriptBytes !== undefined ? Math.round((st.transcriptBytes / (1024 * 1024)) * 10) / 10 : null,

@@ -859,6 +859,14 @@
     "defaultMessage": "{n, plural, one {One couldn't resume: {agents}.} other {# couldn't resume: {agents}.}}",
     "description": "In the notice that Hive closed unexpectedly, or the report of resuming its agents: the agents that failed to resume ({agents}: their names with why)."
   },
+  "main.unexpectedClose.held": {
+    "defaultMessage": "{n, plural, one {One was left stopped: {agents}.} other {# were left stopped: {agents}.}}",
+    "description": "In the notice that Hive closed unexpectedly (#1434): agents whose conversations can't resume now where they ran (their slot is free, or holds other work), left for the user ({agents}: their names, each with why in a few words)."
+  },
+  "main.unexpectedClose.heldTitle": {
+    "defaultMessage": "{n, plural, one {One agent left stopped} other {# agents left stopped}}",
+    "description": "A notice's title after resuming the agents that were running when Hive closed unexpectedly (#1434): {n} were left stopped, their conversations' slots free (only their own Resume takes one) or holding other work."
+  },
   "main.unexpectedClose.merge": {
     "defaultMessage": "{agent} was merging {branch}: check {folder} for a merge left half done (git status there) before the next merge.",
     "description": "The notice that Hive closed unexpectedly: an agent ({agent}) held the merge slot for a branch ({branch}); {folder} is where the merge was (its worktree or the main checkout)."

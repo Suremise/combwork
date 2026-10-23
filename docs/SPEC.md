@@ -2781,6 +2781,48 @@ Hive records each session's provider, folder **and lease** [answering HR2's roun
 - **Reviewers have a stable home:** their sessions run in the project folder (never a slot), and they read and run
   commands in review copies by path (§16.10.5), so their conversations always resume.
 
+**Built [#1434], the folder contract** (`shared/agentFolders.ts`, decided there only; `main/agentFolders.ts` reads what
+it decides from: the project's slots and leases in hive.db, #1441's migration and retired homes):
+
+| | Where |
+|---|---|
+| A new conversation (`launchFolder(agent, purpose)`) | `review`: the project folder. `build`: the agent's open dispatch lease's slot, else its carried slot, else the project folder. Before #1441 has migrated a project, an agent with a 0.9 worktree keeps working there. Reviewer-role agents never start in a slot. A start's purpose is its role's (builder and either: `build`) unless its caller says. |
+| A conversation (`resumeFolder(session)`) | Always the folder it recorded (an older row without one: the project folder). Never moved. |
+| Where the agent works now (`currentFolder`) | Its running session's folder (a retired home included), else where a new conversation would start. |
+
+Whether a conversation may resume there is its **hold** (none: it may):
+
+| Its slot, now | `canResumeNow` (Resume All, startup) | `canResumeByUser` (its own Resume) |
+|---|---|---|
+| The project folder, a retired home, or no slot | yes | yes |
+| Its bound lease open, the agent's | yes | yes |
+| The agent's own under a later lease | no | yes: the session is rebound to that lease |
+| Free, set up, clean and at the head its lease ended at, no other lease since | no ("resume by hand") | yes: a new carried lease of it for the agent, and the session rebound to it, in one write |
+| Its carried slot while the agent builds a card or lane elsewhere | no ("HB2 is on AM-14 in slot-a: resume this after AM-14") | no, until that lease ends |
+| Lent to other work (open, or since) | no ("This conversation's slot now holds AM-14's work") | no |
+| Free but changed (files, revision, not set up), gone, or the agent a reviewer now | no | no |
+
+- **What a session records:** its folder always (the project folder too), and `lease`, the lease it is **bound** to
+  (hive.db's `sessions.lease`, the 1.0 group's `session leases` step, with `slot_leases.end_rev`, the slot's head as a
+  lease ends): set when it starts in a slot. `rebindSession` changes only that column, never the folder or the
+  provider's id, only to a lease of the same agent whose slot is the session's folder, and only inside the same board
+  write as the lease change that needs it (the user's Resume taking a free slot; #1441's carried → dispatch handoff).
+  A record's save never writes it.
+- **One writer:** a session starts or resumes in a slot only while that slot's open lease is its agent's; another
+  agent's launch there is refused with why, and two at once give one refusal.
+- **Its environment:** `HIVE_SLOT` and `HIVE_SLOT_PORT_BASE` (#1429's `slotEnv`) while it runs in a slot; like every
+  `HIVE_*`, never inherited.
+- **Refused, with offers:** the window says why and offers **Read Transcript** (the Sessions tab, on it) and **Start
+  Fresh with a Handover** (Hand Over to… for its agent; the new conversation starts where the agent works now).
+- **Resume All and startup** use `canResumeNow` only: the rest are left and listed after them ("B1 — resume by hand",
+  "slot reused", "after AM-14"), so a free slot stays for new work.
+- **A lease's end** (#1429's `release`): Hive lets the builder's turn finish (not in a turn, no prompt waiting, no run
+  or background task going), then stops its session in the slot, one starting there as it ended too; the pool doesn't
+  lend the slot while a session runs in it. No off switch: one writer needs it (with workflow rules off, leases aren't
+  ended by rules, so nothing is stopped).
+- **The Agent API:** an agent's row and detail give its running session's `folder` and `slot`, and a session's usage
+  its `folder` and `slot`.
+
 #### 16.10.4 Fresh conversations and hand-overs
 
 Designed in P7 with Darren [#1123 c]: start fresh for idle agents (#1086), a fresh conversation after an idle gap

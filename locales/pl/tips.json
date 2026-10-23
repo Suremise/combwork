@@ -326,6 +326,8 @@
   "tips.signInExpired.title": "Gdy logowanie wygaśnie",
   "tips.silentUnknown.text": "Hive nigdy nie zgaduje, że agent jest bezczynny: gdy jego tura od dłuższego czasu milczy bez oznak końca, jego panel to mówi. Jeśli jego terminal czeka na prompt, Oznacz jako bezczynny to naprawia.",
   "tips.silentUnknown.title": "Agent milczy, a jego stan jest nieznany",
+  "tips.slotResume.text": "Rozmowa wykonawcy zostaje w slocie jego karty. Gdy karta się zakończy, „Wznów wszystkich” ją pomija, żeby slot został wolny dla nowej pracy; jej własne Wznów zabiera slot z powrotem, dopóki nic innego go nie użyło.",
+  "tips.slotResume.title": "Rozmowa wznawia się tam, gdzie powstała",
   "tips.sortTables.text": "Kliknij nagłówek kolumny w tabelach Hive (skróty, Wydajność, Miejsce na dysku, przeglądy), żeby posortować według niej, a ponownie – w drugą stronę. Hive pamięta sortowanie i liczbę wierszy na stronę każdej tabeli.",
   "tips.sortTables.title": "Sortuj dowolną tabelę",
   "tips.staleMessages.text": "Gdy Asystent przekazuje coś o bieżącej rundzie karty, wiąże wiadomość z tą kartą: jeśli karta zostanie zatwierdzona lub zacznie kolejną rundę, zanim agent ją przeczyta, Hive odrzuca ją jako nieaktualną, więc żaden agent nie otworzy ponownie zatwierdzonej karty z powodu starego ustalenia.",

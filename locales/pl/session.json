@@ -157,6 +157,7 @@
   "session.start.providerOff": "Dostawca {provider} jest wyłączony. {resuming, select, yes {Włącz go w sekcji Ustawienia → Dostawcy, by wznowić tę rozmowę.} other {Włącz go w sekcji Ustawienia → Dostawcy, by uruchomić agenta {agent}.}}",
   "session.start.removing": "Ten projekt jest usuwany",
   "session.start.repairing": "Hive naprawia ten przeniesiony obszar roboczy: uruchom agenta, gdy naprawa się zakończy.",
+  "session.start.slotChanged": "{slot} nie należy już do agenta {agent}: jego karta lub tor się zakończyły albo zajmuje go praca innego agenta. Uruchom lub wznów agenta {agent} ponownie.",
   "session.start.subSession": "Ta sesja (rodzaj: {kind}) została uruchomiona przez {provider} dla innej sesji i nie jest rozmową: nie można jej wznowić.",
   "session.start.turnedOff": "Dostawcę {provider} wyłączono podczas uruchamiania agenta {agent}.",
   "session.start.worktreeMissing": "Brakuje folderu worktree agenta {agent}: {folder}. Uruchom agenta {agent} z jego panelu, by odtworzyć worktree na jego gałęzi (Napraw…, jeśli obszar roboczy przeniesiono), albo usuń agenta.",
