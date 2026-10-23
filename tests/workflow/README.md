@@ -132,7 +132,7 @@ Pair and Team are §16.6.3's (#1425)").
 | G4 carry-over | `sameness` | change / change / change | Agrees | `workflow/scenarios.git.test.ts` "S9: …" | `workflowoptions` (Same change, then Exact revision only, each saved) | `workflowoptions` (CarriedOver after a clean rebase; Stale with Exact revision only) |
 | G5 who merges | `finish` | committed / hiveMerges / hiveMerges; None: accept | Agrees | `combinations.test.ts` "S36: …"; `workflow/scenarios.git.test.ts` "S17: …"; `workflow/transitions.test.ts` | `p4lane` (the agent merges), `p5lane`, `p6lane` (Hive merges), `p6lane` (Committed is done by Solo; not checked by All off) | `p4lane` (S17); `p5lane`, `p6lane`, `mergequeue` (the queue); `p6lane` (Committed is done, S44; not checked, S11) |
 | G6 style | `style` | merge / merge / merge | Agrees (Solo —) | `workflow/queueCommits.test.ts` "squash: …"; `workflow/queueStrict.test.ts`; `lineUpdates.test.ts` "after a squash, …" | `workflowoptions` (squash saved); `workflowdefaults` (the workspace's level); `p6lane` (squash mid-lane) | `p5lane` (lane B squashed, inv); `p6lane` (merge commit under old rules) |
-| G7 target | `target` | '' / default branch / default branch | Solo's row says "the branch the project is on": the same in effect (#1482) | `platformSwitch.test.ts` "Hive merges and the agent merges need the project's own target"; `workflowOptionsForm.test.ts` "Pair is §16.6.3's …" | `workflowoptions` (typed; Pair fills the default branch); `p5lane`, `p6lane` (`main` by Pair) | `p5lane`, `p6lane` (into `main`); `mergequeue` (into `integration`, inv); `vcswitch` (OP-29's refusal) |
+| G7 target | `target` | '' / default branch / default branch | Agrees: Solo's row says the repository's default branch (the folder's own line, #1482) | `platformSwitch.test.ts` "Hive merges and the agent merges need the project's own target"; `workflowOptionsForm.test.ts` "Pair is §16.6.3's …" | `workflowoptions` (typed; Pair fills the default branch); `p5lane`, `p6lane` (`main` by Pair) | `p5lane`, `p6lane` (into `main`); `mergequeue` (into `integration`, inv); `vcswitch` (OP-29's refusal) |
 | G8 strict | `strict` | false / false / false | Agrees | `workflow/queueStrict.test.ts` "the target moved after the pass: …" | `mergestrict`, `p5lane` (switched on, saved) | `mergestrict`; `p5lane` (lane A's Two and Three) |
 | G9 merge checks | `mergeChecks` | [] / quick / quick + tests | Agrees (Team's per-card tests: #1367) | `workflow/queueChecks.test.ts`; `workflow/queue.test.ts` "S4: …" | `workflowoptions` (Pair fills them, saved); `p5lane`, `p6lane` | `p5scenarios` (S4); `p5lane`, `p6lane` (the queue runs typecheck on the merged result) |
 | G9's install | `mergeInstall` | onManifestChange / onManifestChange / always | Agrees (Built [#1361]) | `workflow/queueChecks.test.ts` "takes its two values; …", "onManifestChange: …", "always: …" | `workflowoptions` (always chosen, saved) | `p5scenarios` (S13: onManifestChange, inv); always: #1483 |
@@ -144,7 +144,7 @@ Pair and Team are §16.6.3's (#1425)").
 | G15 slots up to date | `slotsUpToDate` | false / false / false | §16.6.3's On for Pair and Team waits for slots (Built [#1355]) | P7 | P7 (not in the form) | P7 |
 | G16 shared-folder warning | `sharedFolderWarning` | true / false / false | Agrees (Pair and Team —) | `workflow/sharedFolder.test.ts` "S11: …" | `p6lane` (switched on with All off, saved) | #1481 (no lock records in the app) |
 | G17 reviewers per lane | — | — | P7 | P7 | P7 | P7 |
-| N4 what the work is | `excluded` | node_modules, .venv (every None preset) | **Disagrees**: §16.6.1, §16.6.3 "the whole folder"; §16.3 pre-filled with found build folders (#1482) | `runChecks.test.ts` "a write to a folder the options leave out of the deliverables still counts …" | #1483 | #1483 |
+| N4 what the work is | `excluded` | node_modules, .venv (every None preset) | Agrees: §16.3, §16.6.1 and §16.6.3 say the whole folder except `.hive`, `node_modules` and `.venv`, no build folders found (#1482) | `runChecks.test.ts` "a write to a folder the options leave out of the deliverables still counts …" | #1483 | #1483 |
 | N5 stage names | `stageNames` | default names | Agrees | `workflow/stages.test.ts`; `projectWorkflow.test.ts` "a rename alone applies at once …" | `workflowoptions` (a rename saved, applies now; a duplicate refused) | `boardstages` (renamed columns, Git and None); `stagenames` (the Assistant's tool); `lanestages` (hovers and the legend) |
 | N7 file locks | — (Settings → Agents & Worktrees) | as set | Shown, not set | — | `workflowoptions` (shown in None's Set elsewhere) | — |
 
@@ -152,7 +152,7 @@ Pair and Team are §16.6.3's (#1425)").
 merges) is §16.19.1's …" and runs in `p4lane`.
 
 **Gaps** (carded): G16's warning in the app (#1481); the window or acting e2e of G1b, G12 (edited), G13, G14's project
-row, `mergeInstall: always`, None's N1–N4 and N6 (#1483); N4's and G7 Solo's wording in SPEC (#1482).
+row, `mergeInstall: always`, None's N1–N4 and N6 (#1483).
 
 ## Later phases (named here so nothing is missed)
 
