@@ -7,7 +7,8 @@
 // rows as it is chosen and keeps Save off; those the form can't reach are refused when pasted, as a save is. Save… lists
 // what changes and the running lane keeping the old rules; a stage rename alone applies now; a save after another change
 // (the Assistant's tool, another window) is refused as changed meanwhile and the section reloads. Inherit, Copy as JSON
-// and Paste JSON…, All off with what never turns off, and the rules not enforced. G4 set from the tab decides a clean
+// and Paste JSON…, All off with what never turns off, and the rules not enforced. Options each saved alone from the
+// window (#1483): G1b two reviewers, G12, G13, G14 on the project's own row; None's N1, N3, N4, N6. G4 set from the tab decides a clean
 // rebase: Same change carries the pass over, Exact revision only makes it stale (S9). Screenshots in both themes, in
 // German and in Polish. Dev build, throwaway profiles and workspaces; the fake Claude Code for G4's agents.
 const lib = require('./lib.cjs')
@@ -333,6 +334,44 @@ async function theForm(page, app, inv) {
     check('…and still saves', !!(await lib.until(async () => saved().style === 'squash', HUNG_MS)))
     await inv('advanced:set', 'hive.workflow.enforce', null)
 
+    // --- Set in the window on their own and saved (#1483), each before only by a preset or at Hive's level: G1b two
+    // reviewers, G12 the project's identity, G13 stop own runs, G14 on the project's own row. From Pair (the agent
+    // merges), saved first: a reviewer agent chosen from All off can't be saved yet (#1508).
+    if (await section.getByRole('button', { name: 'Discard Changes' }).isEnabled()) await discard()
+    await applyChoice('pairAgent')
+    await saveAll()
+    check('Pair (the agent merges) saved again, one reviewer', !!(await lib.until(() => projectJson().workflow?.preset === 'pairAgent' && saved().review === 'agent' && (saved().reviewers ?? 1) === 1, HUNG_MS)), JSON.stringify(projectJson().workflow))
+    const switchOf = (option) => row(option).locator('[role="switch"]')
+    const switchedOn = async (option) => (await switchOf(option).getAttribute('aria-checked')) === 'true'
+    const without = (o, key) => JSON.stringify(Object.fromEntries(Object.entries(o).filter(([k]) => k !== key).sort(([a], [b]) => a.localeCompare(b))))
+    /**
+     * Switches one option in the form and saves it alone: project.json has the switched value (`value(on)`), and no
+     * other option changed.
+     */
+    const switchAlone = async (opts, option, value) => {
+      const before = opts()
+      const was = await switchedOn(option)
+      await switchOf(option).click()
+      await saveAll()
+      const want = JSON.stringify(value(!was))
+      const ok = await lib.until(() => JSON.stringify(opts()[option] ?? null) === want && without(opts(), option) === without(before, option), HUNG_MS)
+      return { ok: !!ok, now: !was, said: JSON.stringify({ was, want: value(!was), now: opts() }) }
+    }
+    const before1b = saved()
+    await row('reviewers').locator('select').selectOption('2')
+    await saveAll()
+    check('G1b: two reviewers chosen in the window alone, saved', !!(await lib.until(() => saved().reviewers === 2 && without(saved(), 'reviewers') === without(before1b, 'reviewers'), HUNG_MS)), JSON.stringify(saved()))
+    const g12 = await switchAlone(saved, 'identity', (v) => (v ? { name: 'Pat Builder', email: 'pat@example.invalid' } : null))
+    check('G12: the project’s identity switched alone, saved (on: its name and email)', g12.ok, g12.said)
+    const g13 = await switchAlone(saved, 'stopOwnRuns', (v) => v)
+    check('G13: stop own runs switched alone, saved', g13.ok, g13.said)
+    const g14 = await switchAlone(saved, 'dependenciesDone', (v) => v)
+    check('G14: dependencies done switched on the project’s own row, saved', g14.ok, g14.said)
+    await reopen()
+    const shownNow = async () => ({ reviewers: await row('reviewers').locator('select').inputValue().catch(() => null), identity: await switchedOn('identity').catch(() => null), stopOwnRuns: await switchedOn('stopOwnRuns').catch(() => null), dependenciesDone: await switchedOn('dependenciesDone').catch(() => null) })
+    const savedShown = JSON.stringify({ reviewers: '2', identity: g12.now, stopOwnRuns: g13.now, dependenciesDone: g14.now })
+    check('…opened again: two reviewers, and each switch as saved', !!(await lib.until(async () => JSON.stringify(await shownNow()) === savedShown, HUNG_MS)), JSON.stringify({ shown: await shownNow(), saved: savedShown }))
+
     // --- None (no version control): its groups, and the contradictions only its options could have, refused when pasted.
     await page.getByText('notes', { exact: true }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
@@ -349,6 +388,29 @@ async function theForm(page, app, inv) {
     await merging.getByRole('button', { name: 'Try Again' }).click()
     check('None: a folder per card pasted is refused, everyone works in the project folder', !!(await lib.until(async () => (await merging.innerText()).includes('everyone works in the project folder'), HUNG_MS)), await merging.innerText())
     await merging.getByRole('button', { name: 'Cancel' }).click()
+
+    // --- None's form (#1483): N1, N3, N4 and N6 chosen on it and saved, each on its own.
+    const noneSaved = () => projectJson(notes).workflow?.options ?? {}
+    await row('review').locator('select').selectOption('you')
+    await saveAll()
+    check('N1: You chosen on None’s form, saved', !!(await lib.until(() => noneSaved().review === 'you', HUNG_MS)), JSON.stringify(noneSaved()))
+    await row('preChecks').getByRole('button', { name: 'Add Check' }).click()
+    const noneCheck = row('preChecks').locator('.workflow-check').last()
+    await noneCheck.locator('input').first().fill('')
+    await noneCheck.locator('input').first().pressSequentially('spelling')
+    await noneCheck.locator('input').nth(1).pressSequentially('npm run spell')
+    await saveAll()
+    check('N3: a check added on None’s form, saved with its command', !!(await lib.until(() => JSON.stringify(noneSaved().preChecks) === JSON.stringify(['spelling']) && noneSaved().commands?.spelling === 'npm run spell', HUNG_MS)), JSON.stringify(noneSaved()))
+    await row('excluded').locator('input').fill('node_modules, .venv, build')
+    await row('excluded').locator('input').blur()
+    await saveAll()
+    check('N4: a folder left out of the work on None’s form, saved', !!(await lib.until(() => JSON.stringify(noneSaved().excluded) === JSON.stringify(['node_modules', '.venv', 'build']), HUNG_MS)), JSON.stringify(noneSaved()))
+    const n6 = await switchAlone(noneSaved, 'dependenciesDone', (v) => v)
+    check('N6: dependencies done switched on None’s form alone, saved', n6.ok, n6.said)
+    // notes as it was (Solo, nothing of its own), which the late reads below start from; the form reads it again.
+    await inv('workflow:setOptions', notes, { preset: 'solo', options: {} })
+    await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: notes })
+    check('notes back to Solo, the form with it', !!(await lib.until(async () => projectJson(notes).workflow?.preset === 'solo' && (await row('review').locator('select').inputValue()) === 'none' && (await row('excluded').locator('input').inputValue()) === 'node_modules, .venv', HUNG_MS)), JSON.stringify(projectJson(notes).workflow))
 
     // --- Reads answering late (HR5's round 1): a reload never replaces an edit made while it waited, an older read never
     // replaces a newer one, and another project's form never shows while this one's is read. main answers from the forms
