@@ -201,6 +201,23 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     })
   })
 
+  it("idle wakes off: Deliver Now pressed while a watch's line for the agent is being made waits for it, then types its own", async () => {
+    await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: false })
+    const writer = await import('../src/main/lineWriter')
+    const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Then #1442.' })
+    // A watch's line is being made for the agent for its first checks, then done.
+    let asked = 0
+    writer.onLineComing(() => ++asked <= 2)
+    try {
+      const { deliverWaiting } = await import('../src/main/agentMessages')
+      expect(await deliverWaiting(alpha, 'b1')).toBe(true)
+      expect(asked).toBeGreaterThan(2)
+      expect(st.typed).toEqual([`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox to read it.`])
+    } finally {
+      writer.onLineComing(() => false)
+    }
+  })
+
   it('idle wakes off: a task given now (a card started on a running agent, hive_send_task) is no wake, and is typed', async () => {
     await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: false })
     const r = await deliveries.deliverNow(alpha, { agentId: 'b1', agentName: 'B1', conversation: st.sessionId, kind: 'task', from: { kind: 'user', name: 'the user' }, card: 7, body: 'Work on #7.', need: 'free' })

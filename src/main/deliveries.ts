@@ -39,7 +39,7 @@ import { openTable, readStore, saveTable, storeValue } from './storeRows'
 import { boardLock, dbGenerationAt, onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
 import { transaction } from './db'
 import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, readDeliveriesWithBases, saveDeliveryChanges, StaleDeliveries } from './schema/sessionDeliveryTables'
-import { canTypeLine, typeLine, whyNoLine } from './lineWriter'
+import { canTypeLine, lineBusy, typeLine, whyNoLine } from './lineWriter'
 import { createLogger, userText } from './logger'
 import { readyFor } from './readiness'
 import { sessions } from './sessions'
@@ -1440,6 +1440,9 @@ export function offerNow(host: string, agentId: string, only?: string, asked = f
   return run
 }
 
+/** How many moments Deliver Now waits for another line of Hive's that has its agent (RETRY_MS each). */
+const ASKED_TRIES = 10
+
 /** How many times an offer overtaken before its first key (what it was made from changed as it was planned) is made again at once. */
 const OVERTAKEN_TRIES = 3
 
@@ -1455,6 +1458,13 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
   let items = pickOffer(store, store.records, agentId, only)
   if (!items.length) return false
   if (!canTypeLine(host, agentId, needOf(items))) {
+    // Deliver Now (#1432) while another line of Hive's has the agent (being typed, or a watch's being made): it waits
+    // for that one, a moment at a time, rather than being lost; anything else that stops it is logged.
+    if (asked && lineBusy(host, agentId) && tries < ASKED_TRIES) {
+      await new Promise((r) => setTimeout(r, RETRY_MS))
+      return offerOnce(host, agentId, only, tries + 1, asked)
+    }
+    if (asked) log.info(`Deliver Now for ${userText(agentId)} not typed: ${whyNoLine(host, agentId, needOf(items)) ?? 'nothing to type'}`)
     // The user may still be writing there: nothing says when they stop, so it is tried again in a moment.
     if (sessions.userMayBeTyping(host, agentId)) retrySoon(host, agentId)
     return false
