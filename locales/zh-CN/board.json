@@ -528,6 +528,7 @@
   "board.progress.showLog": "在文件夹中显示",
   "board.progress.showLogFailed": "无法显示日志",
   "board.progress.showTheAgent": "显示智能体",
+  "board.progress.slotRun": "Hive（槽位 {slot}）",
   "board.progress.stepOf": "{step, number}/{total, number}",
   "board.progress.stepOfNamed": "{step, number}/{total, number}：{name}",
   "board.progress.tab": "{tab, select, pulse {动态} merges {合并} runs {运行} other {通道}}",
