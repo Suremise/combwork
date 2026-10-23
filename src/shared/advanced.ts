@@ -743,7 +743,7 @@ const SOURCES: readonly AdvancedSource[] = [
     desc: msg({
       id: 'settings.advanced.hive.skills.removeIdleCopies.desc',
       defaultMessage:
-        "Codex and Copilot read Hive's skills from copies Hive puts in the folder an agent works in (.agents/skills/hive-…); Claude Code gets them at each launch and leaves nothing behind. Once the last of Hive's agents in a folder stops, Hive can remove its copies, so a CLI you run there yourself doesn't see them. Slots only removes them in every folder but the project folder (slots and agents' worktrees), Everywhere in the project folder too, Never nowhere. Only copies Hive made and nobody changed since are removed, never your own skills.",
+        "Codex and Copilot read Hive's skills from copies Hive puts in each agent's folder (.agents/skills/hive-…); Claude Code gets them at each launch and leaves nothing behind. Once the last of Hive's agents in a folder stops, Hive can remove its copies, so a CLI you run there yourself doesn't see them. Slots only removes them from slots and agents' worktrees, never the project folder. Everywhere removes them from the project folder too. Never keeps them. Only copies Hive made, and nobody changed since, are removed: never your own skills.",
       description: 'What the advanced setting "Remove Hive\'s skill copies when no agent works in the folder" does (Settings → Advanced, under Hive). Codex, Copilot and Claude Code are CLIs\' names and .agents/skills/hive-… a folder: keep them. Slots only, Everywhere and Never are the setting\'s choices: use the words its list shows.'
     }),
     kind: 'choice',

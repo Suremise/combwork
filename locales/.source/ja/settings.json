@@ -202,7 +202,7 @@
   "settings.advanced.hive.recorder.version.title": "Flight recorder: capture a CLI version change",
   "settings.advanced.hive.showDeveloperFeatures.desc": "Show Help → Developer Console (Ctrl+Alt+J): what each CLI sends Hive, next to what Hive made of it.",
   "settings.advanced.hive.showDeveloperFeatures.title": "Show developer features",
-  "settings.advanced.hive.skills.removeIdleCopies.desc": "Codex and Copilot read Hive's skills from copies Hive puts in the folder an agent works in (.agents/skills/hive-…); Claude Code gets them at each launch and leaves nothing behind. Once the last of Hive's agents in a folder stops, Hive can remove its copies, so a CLI you run there yourself doesn't see them. Slots only removes them in every folder but the project folder (slots and agents' worktrees), Everywhere in the project folder too, Never nowhere. Only copies Hive made and nobody changed since are removed, never your own skills.",
+  "settings.advanced.hive.skills.removeIdleCopies.desc": "Codex and Copilot read Hive's skills from copies Hive puts in each agent's folder (.agents/skills/hive-…); Claude Code gets them at each launch and leaves nothing behind. Once the last of Hive's agents in a folder stops, Hive can remove its copies, so a CLI you run there yourself doesn't see them. Slots only removes them from slots and agents' worktrees, never the project folder. Everywhere removes them from the project folder too. Never keeps them. Only copies Hive made, and nobody changed since, are removed: never your own skills.",
   "settings.advanced.hive.skills.removeIdleCopies.everywhere": "Everywhere",
   "settings.advanced.hive.skills.removeIdleCopies.never": "Never",
   "settings.advanced.hive.skills.removeIdleCopies.slots": "Slots only",

@@ -202,7 +202,7 @@
   "settings.advanced.hive.recorder.version.title": "フライトレコーダー：CLIのバージョン変更をキャプチャ",
   "settings.advanced.hive.showDeveloperFeatures.desc": "「ヘルプ」→「開発者コンソール」（Ctrl+Alt+J）を表示します。各CLIがHiveに送った内容と、Hiveがそれをどう解釈したかを並べて表示します。",
   "settings.advanced.hive.showDeveloperFeatures.title": "開発者向け機能を表示",
-  "settings.advanced.hive.skills.removeIdleCopies.desc": "CodexとCopilotは、エージェントが作業するフォルダーにHiveが置くコピー（.agents/skills/hive-…）からHiveのスキルを読みます。Claude Codeは起動ごとにスキルを受け取り、何も残しません。フォルダーでHiveの最後のエージェントが停止したら、Hiveはそのコピーを削除できます。そこで自分で実行するCLIにはコピーが見えなくなります。「スロットのみ」はプロジェクトフォルダー以外のすべてのフォルダー（スロットとエージェントのワークツリー）で、「すべて」はプロジェクトフォルダーでも削除し、「しない」はどこでも削除しません。削除されるのは、Hiveが作成し、その後だれも変更していないコピーだけです。あなた自身のスキルは削除されません。",
+  "settings.advanced.hive.skills.removeIdleCopies.desc": "CodexとCopilotは、Hiveが各エージェントのフォルダーに置くコピー（.agents/skills/hive-…）からHiveのスキルを読みます。Claude Codeは起動ごとにスキルを受け取り、何も残しません。フォルダーでHiveの最後のエージェントが停止したら、Hiveはそのコピーを削除できます。そこで自分で実行するCLIにはコピーが見えなくなります。「スロットのみ」はスロットとエージェントのワークツリーから削除し、プロジェクトフォルダーからは削除しません。「すべて」はプロジェクトフォルダーからも削除します。「しない」はコピーを残します。削除されるのは、Hiveが作成し、その後だれも変更していないコピーだけです。あなた自身のスキルは削除されません。",
   "settings.advanced.hive.skills.removeIdleCopies.everywhere": "すべて",
   "settings.advanced.hive.skills.removeIdleCopies.never": "しない",
   "settings.advanced.hive.skills.removeIdleCopies.slots": "スロットのみ",
