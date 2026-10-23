@@ -19,9 +19,10 @@ import type { WorkspaceService } from './workspace'
  *
  * Once per workspace after its upgrade (board_meta `templates.v09`), at each open until done. Idempotent, with no state
  * of its own to recover: a template whose bytes the backup already has is copied already; a copy is written under a
- * temporary name (never a template's) and published at the first free name by a link that never replaces a file (a
- * copy that won't overwrite where links can't be made), so a rerun, a run cut short (its temporary file removed by the
- * next) or two Hives at once never lose or change anything, and at worst keep two copies of the same bytes. A folder or
+ * temporary name of its own (never a template's, removed by the copy that made it) and published at the first free name
+ * by a link that never replaces a file (a copy that won't overwrite where links can't be made), so a rerun or two runs at
+ * once (two Hives) never lose or change anything, never touch each other's temporary files, and copy each template once.
+ * A temporary file left by a crash is harmless (no template's name, never listed or read) and left alone. A folder or
  * file that can't be read (other than gone) stops the run unmarked, for the next open.
  */
 
@@ -33,11 +34,8 @@ const MARK = 'templates.v09'
 const NOTICE = 'templates.v09.notice'
 /** The folder in `.hive/backups` the copies go to: `workspace`, and `projects/<project id>` (ids follow a rename, #508). */
 export const V09_TEMPLATES = 'templates-0.9'
-/** A copy being written: a dot first and `.part` last, never a template's name. */
-const PART = /^\..+\.part$/
-
-/** Seams for unit tests: a failure where a run reads or writes. */
-export const testHooks: { fail?: (op: 'scan' | 'read' | 'write', path: string) => void } = {}
+/** Seams for unit tests: a failure where a run reads or writes, and the moment a copy is written but not yet published. */
+export const testHooks: { fail?: (op: 'scan' | 'read' | 'write', path: string) => void; beforePublish?: (part: string) => Promise<void> } = {}
 
 const backupDir = (workspacePath: string): string => join(workspacePath, HIVE_DIR, 'backups', V09_TEMPLATES)
 const code = (e: unknown): string | undefined => (e as NodeJS.ErrnoException)?.code
@@ -125,6 +123,7 @@ async function copyOne(bytes: Buffer, to: string, f: string): Promise<boolean> {
     const part = join(to, `.${name}.${randomBytes(6).toString('hex')}.part`)
     try {
       await writeFile(part, bytes, { flag: 'wx' })
+      await testHooks.beforePublish?.(part)
       if (await publishNew(part, join(to, name))) return true
     } finally {
       await unlink(part).catch(() => undefined)
@@ -144,8 +143,6 @@ export async function copyV09Templates(ws: WorkspaceService): Promise<number | n
   const life = ws.lifetime
   let copied = 0
   for (const { from, to } of await places(ws, path)) {
-    // A copy a run cut short left half written: never published, so it goes.
-    for (const f of (await filesIn(to)).filter((x) => PART.test(x))) await unlink(join(to, f)).catch(() => undefined)
     for (const f of (await filesIn(from)).filter(isTemplateFile)) {
       if (life.aborted) return null
       const bytes = await bytesOf(join(from, f))

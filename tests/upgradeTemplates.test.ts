@@ -2,8 +2,9 @@
 // call: copy only): nothing is copied while the upgrade waits; once upgraded, each 0.9 template of the workspace and of
 // each project is copied into the 0.9 backup's folder (by the project's id), the originals left byte for byte as they
 // were (a 1.0 template, a damaged file and a .bak not copied); 1.0 never lists, loads or deletes a 0.9 file; it is done
-// once (board_meta), again and twice at once copying each template once; a copy cut short is cleaned up; a folder or
-// file that can't be read leaves it unmarked for the next open; one quiet notice says a copy is kept.
+// once (board_meta), again, twice at once and overlapping copying each template once and never touching another run's
+// temporary file; a folder or file that can't be read leaves it unmarked for the next open; one quiet notice says a copy
+// is kept.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
@@ -34,6 +35,7 @@ afterAll(async () => {
 afterEach(() => {
   store.boardTestHooks.upgradeAnswer = null
   step.testHooks.fail = undefined
+  step.testHooks.beforePublish = undefined
 })
 
 async function open(ws: string): Promise<WS> {
@@ -147,6 +149,34 @@ describe("0.9's agent templates at the upgrade to 1.0 (#1436)", () => {
     await close(w)
   })
 
+  it("two runs overlapping (HR3's round 4): one paused with its copy written, not yet published, while the other runs through; both complete, the originals unchanged, each template copied once", async () => {
+    const { ws, wsTemplates } = await workspace09()
+    store.boardTestHooks.upgradeAnswer = 'yes'
+    const w = await open(ws)
+    const before = snapshot(wsTemplates)
+    let reached!: () => void
+    let release!: () => void
+    const atGate = new Promise<void>((r) => (reached = r))
+    const gate = new Promise<void>((r) => (release = r))
+    step.testHooks.beforePublish = async (part) => {
+      if (!part.includes('.pair.json.')) return
+      step.testHooks.beforePublish = undefined
+      reached()
+      await gate
+    }
+    const a = inWorkspace(w, () => step.copyV09Templates(w))
+    await atGate
+    // The other run, start to finish, while the first holds its temporary copy of pair.json.
+    const b = await inWorkspace(w, () => step.copyV09Templates(w))
+    release()
+    const first = await a
+    expect([typeof first, b]).toEqual(['number', 3])
+    const id = (await w.projectIds()).byPath.get(join(ws, 'p').toLowerCase())!
+    expect(await step.backupFiles(ws)).toEqual(['workspace/pair.json', 'workspace/team.json', `projects/${id}/mine.json`].sort())
+    expect(snapshot(wsTemplates)).toEqual(before)
+    await close(w)
+  })
+
   it('a template changed since its copy is copied again beside it (pair-2.json); the first copy stays', async () => {
     const { ws, wsTemplates } = await workspace09()
     store.boardTestHooks.upgradeAnswer = 'yes'
@@ -179,12 +209,12 @@ describe("0.9's agent templates at the upgrade to 1.0 (#1436)", () => {
       expect(store.boardValue(w, 'templates.v09'), op).toBeNull()
     }
     step.testHooks.fail = undefined
-    // A copy a crash left half written: never a template's name, and removed by the next run.
+    // A copy a crash left half written: never a template's name, so harmless, and left alone (it may be another run's).
     const kept = join(ws, '.hive', 'backups', step.V09_TEMPLATES, 'workspace')
     mkdirSync(kept, { recursive: true })
     writeFileSync(join(kept, '.team.json.0123456789ab.part'), '{"version": 1, "na')
     await inWorkspace(w, () => step.copyV09Templates(w))
-    expect(files(kept)).toEqual(['pair.json', 'team.json'])
+    expect(files(kept)).toEqual(['.team.json.0123456789ab.part', 'pair.json', 'team.json'])
     expect(store.boardValue(w, 'templates.v09')).not.toBeNull()
     await close(w)
   })

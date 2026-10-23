@@ -2884,8 +2884,8 @@ repeating them (#533) [note §8].
   workspace's and each project's `.hive/templates` is **copied** into `.hive/backups/templates-0.9/workspace` and
   `…/projects/<project id>`; the originals are never moved, deleted or rewritten, and `.bak` files aren't copied.
   Idempotent with no state to recover: bytes the backup already has (under its name or a numbered one) are copied
-  already; a copy is written under a temporary name (`.<name>.<random>.part`, removed by the next run if one is cut
-  short) and published at the first free name (`pair.json`, `pair-2.json`…) by a link that never replaces a file. A
+  already; a copy is written under a temporary name of its own (`.<name>.<random>.part`, removed by the run that made
+  it; one a crash left is harmless and left alone, as it may be another run's) and published at the first free name (`pair.json`, `pair-2.json`…) by a link that never replaces a file. A
   folder or file that can't be read, or a copy that can't be written, leaves the step unmarked for the next open. One
   quiet notice (`templates.v09.notice`), "Your 0.9 agent templates aren't used in 1.0 … A copy … is kept with the 0.9
   board backup", counts what the backup holds. Nothing puts them back (Restore the 0.9 Board Backup restores the board).
