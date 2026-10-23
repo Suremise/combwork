@@ -2860,13 +2860,19 @@ repeating them (#533) [note §8].
   a template the user made stays refused instead. **0.9's at the upgrade** (`templateUpgrade.ts`): once the board is
   upgraded, at each open until done (board_meta `templates.v09`), the workspace's and each project's version 1 files and
   their `.bak` move into `.hive/backups/templates-0.9/workspace` and `…/projects/<project id>` (a name taken there
-  numbered), others left. Each file is published by a hard link (a copy that won't overwrite where there are none),
-  which no process can make over a file already there, then unlinked: nothing is replaced, and with two Hives at once
-  each file ends in one place; in this process each folder's moves hold the templates' lock. The mark is written only
-  once every scan, read and move succeeded (a failure other than a file gone leaves it for the next open, and a `.bak`
-  left behind follows its template then). One quiet notice (`templates.v09.notice`) counts what the backup holds. Help →
-  Restore the 0.9 Board Backup… publishes them back the same way: a template saved there since, in any process, is never
-  replaced, and its 0.9 namesake stays in the backup.
+  numbered), others left. A move never touches a file it doesn't own, whatever another Hive or a save does meanwhile:
+  the template (and its `.bak`, same run) is first renamed in its own folder to a name only that move uses
+  (`pair.json.v09-<run>-<target>`, carrying its backup name; never a template's name, so not listed), read again (a save
+  that landed before the claim is given back, never moved), published at its target by a hard link (a copy that won't
+  overwrite where links can't be made; a target taken meanwhile: another, the claim renamed to say so), then the claim
+  unlinked. A save after the claim makes a new file. Every state left by a run cut short (a crash, a failure) is
+  finished by the next from the names alone: claims in a templates folder, a target that is the same file (by identity)
+  as its claim, a 0.9 `.bak` whose template is gone; nothing is copied twice. The mark is written once a run finds
+  nothing 0.9's and no claim left (a folder or file that can't be read, other than gone, stops it unmarked). In this
+  process each folder's moves hold the templates' lock. One quiet notice (`templates.v09.notice`) counts what the backup
+  holds. Help → Restore the 0.9 Board Backup… links them back where no file of that name is (never over a template
+  saved since, in any process: its 0.9 namesake stays in the backup), then removes the backup name; a Restore cut short
+  between the two is finished by the next (the same file at both names).
 
 #### 16.10.7 What reaches agents in slots
 
