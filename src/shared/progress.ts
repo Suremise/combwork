@@ -431,13 +431,15 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
 
 /**
  * Who ran a run, as the window shows it (#872): a name Hive gave it (`defaultName`: "Script" for a script, "Agent" for
- * a kept run with no name, "Hive (merge queue)" for the queue's own runs, #1349) in the window's language; a name an agent or the Assistant has stays as it is, "Agent"
+ * a kept run with no name, "Hive (merge queue)" for the queue's own runs, #1349, "Hive (slot <name>)" for a slot's warming,
+ * #1429) in the window's language; a name an agent or the Assistant has stays as it is, "Agent"
  * too. The stored name stays English: agents read it through the Agent API and hive-progress.
  */
-export function runAgentName(r: Pick<ProgressRun, 'agentName' | 'defaultName'>, tr: Tr): string {
+export function runAgentName(r: Pick<ProgressRun, 'agentName' | 'defaultName' | 'slot'>, tr: Tr): string {
   if (r.defaultName === 'script') return tr(msg({ id: 'board.progress.script', defaultMessage: 'Script', description: "Who ran a run in the Progress panel when a script (a program calling Hive's Agent API) ran it, not an agent." }))
   if (r.defaultName === 'agent') return tr(msg({ id: 'board.progress.anAgent', defaultMessage: 'Agent', description: "Who ran a run in the Progress panel when Hive doesn't have the agent's name (an older record)." }))
   if (r.defaultName === 'mergeQueue') return tr(msg({ id: 'board.progress.mergeQueue', defaultMessage: 'Hive (merge queue)', description: "Who ran a run in the Progress panel when Hive's merge queue ran it itself: a merge check or install on a card's merged result, not an agent (glossary 2.5: merge queue)." }))
+  if (r.defaultName === 'slot' && r.slot) return tr(msg({ id: 'board.progress.slotRun', defaultMessage: 'Hive (slot {slot})', description: "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's slots (a worktree Hive lends to a card or a lane: its setup command, a dependency install or its archive command), not an agent. {slot} is the slot's name, such as slot-b: keep it as it is." }), { slot: r.slot })
   return r.agentName
 }
 

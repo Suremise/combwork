@@ -529,6 +529,7 @@
   "board.progress.showLog": "Afficher dans le dossier",
   "board.progress.showLogFailed": "Impossible d’afficher le journal",
   "board.progress.showTheAgent": "Afficher l’agent",
+  "board.progress.slotRun": "Hive (emplacement {slot})",
   "board.progress.stepOf": "{step, number} sur {total, number}",
   "board.progress.stepOfNamed": "{step, number} sur {total, number} : {name}",
   "board.progress.tab": "{tab, select, pulse {Pouls} merges {Fusions} runs {Exécutions} other {Couloirs}}",

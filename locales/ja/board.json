@@ -529,6 +529,7 @@
   "board.progress.showLog": "フォルダーに表示",
   "board.progress.showLogFailed": "ログを表示できませんでした",
   "board.progress.showTheAgent": "エージェントを表示",
+  "board.progress.slotRun": "Hive（スロット {slot}）",
   "board.progress.stepOf": "{step, number}/{total, number}",
   "board.progress.stepOfNamed": "{step, number}/{total, number}：{name}",
   "board.progress.tab": "{tab, select, pulse {概況} merges {マージ} runs {実行} other {レーン}}",

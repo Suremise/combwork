@@ -1188,11 +1188,38 @@ export interface ProjectConfig {
   worktreeCopy: string | null
   /** Command run in a new worktree before its agent's first session, e.g. "npm install". */
   worktreeSetup: string
+  /**
+   * The project's slot options (#1429, SPEC §16.10.2): the setup command run in a new slot (and again when its lock
+   * files change), the archive command run before Hive removes one, and the git-ignored files copied into a new one.
+   * Each left out reads today's `worktreeSetup`, none, and `worktreeCopy` (which stay as they are, for 0.9.3).
+   */
+  slots?: SlotOptions
   /** Hive wakes a card loop's reviewer when a card arrives in Review, and its builder on a verdict (#405). */
   loopWakes: boolean
   /** Card loops' rounds and wait in hours for this project (#412); null inherits the workspace's. */
   loopRounds: number | null
   loopWaitHours: number | null
+}
+
+/** One of a project's slots as the window reads it (#1429, slots.ts): its state and its open lease, if any. */
+export interface SlotView {
+  name: string
+  folder: string
+  state: 'creating' | 'ready' | 'lent' | 'dirty' | 'gone' | 'removing'
+  /** Its last setup or install failed: why (in English) and the run's log. */
+  warmError: string | null
+  warmLog: string | null
+  lease: { id: string; kind: 'card' | 'lane' | 'carried'; agent: string; card: number | null; lane: string | null } | null
+}
+
+/** What a test copy asks of a project's slot pool (`slots:test`, unpackaged builds only: #1429's e2e). */
+export type SlotTestOp = { op: 'lend'; agent: string; card?: number; lane?: string } | { op: 'release'; lease: string; why?: string } | { op: 'tidy'; at?: number } | { op: 'remove'; slot: string }
+
+/** A project's slot options as project.json keeps them (ProjectConfig.slots): each left out falls back (slots.ts). */
+export interface SlotOptions {
+  setup?: string
+  archive?: string
+  copy?: string
 }
 
 export interface ProjectProviderConfig {
@@ -2924,9 +2951,10 @@ export interface ProgressRun {
   agentName: string
   /**
    * `agentName` is a name Hive gave the run, not one its caller has (#872): "Script" for an Agent API script, "Agent"
-   * for a kept run with no name. The window shows it in its language; the Agent API leaves this out (publicRun).
+   * for a kept run with no name, "Hive (slot <name>)" for a slot's warming (#1429, its `slot`). The window shows it in its
+   * language; the Agent API leaves this out (publicRun).
    */
-  defaultName?: 'script' | 'agent' | 'mergeQueue'
+  defaultName?: 'script' | 'agent' | 'mergeQueue' | 'slot'
   provider: ProviderId | null
   source: ProgressSource
   title: string
@@ -2995,6 +3023,8 @@ export interface ProgressRun {
   installAsWritten?: true
   /** Hive's own failed merge check or install that counts as temporary (#1362): why, and the network error code that said so. */
   transient?: TransientFailure
+  /** Hive's own run warming a slot (#1429: its setup, an install, its archive script): the slot's name. */
+  slot?: string
 }
 
 /**
