@@ -69,6 +69,7 @@ import type {
   MergeSlotInfo,
   LaneInfo,
   LaneStartRequest,
+  LaneStartInfo,
   LaneStartResult,
   ModelPrice,
   MemorySource,
@@ -702,6 +703,8 @@ export interface HiveRequests {
    * fresh conversation with the generated brief. Refused (nothing recorded) while either agent is busy.
    */
   'lanes:start': (projectPath: string, req: LaneStartRequest) => LaneStartResult
+  /** What Start Lane… offers for a project (#1443): the reviewer pool's agents when its rules have G17 a shared pool, else null. */
+  'lanes:startInfo': (projectPath: string) => LaneStartInfo
   /**
    * Cost per card (#602): the cards named, or every card (a project's, by its folder name) held at some time in [from, to)
    * (ms since the epoch).

@@ -19,6 +19,10 @@
     "defaultMessage": "Your OK before merging is already part of review by you.",
     "description": "Why workflow options cannot be saved: the user's OK before merging was set while the user already reviews."
   },
+  "workflow.contradiction.poolNeedsAgent": {
+    "defaultMessage": "A shared pool of reviewers needs review by reviewer agents.",
+    "description": "Why workflow options cannot be saved: “Reviewers” was set to a shared pool (reviewer agents lanes share) without review by reviewer agents."
+  },
   "workflow.contradiction.quorumNeedsAgent": {
     "defaultMessage": "Two reviewers per card need review by reviewer agents.",
     "description": "Why workflow options cannot be saved: two reviewers per card were set without reviewer agents."
@@ -638,6 +642,14 @@
   "workflow.option.review.title": {
     "defaultMessage": "Work is reviewed before it’s merged",
     "description": "A workflow option (glossary 2.6, G1): who reviews a card’s work before it is merged."
+  },
+  "workflow.option.reviewerMode.desc": {
+    "defaultMessage": "One reviewer per lane, or a shared pool: Hive gives each card submitted in a pool lane, oldest first, to the next free reviewer that didn’t build it.",
+    "description": "What the workflow option “Reviewers” does (glossary 2.6, G17; glossary: lane, pool)."
+  },
+  "workflow.option.reviewerMode.title": {
+    "defaultMessage": "Reviewers",
+    "description": "A workflow option (glossary 2.6, G17): whether each lane has its own reviewer agent or the lanes share a pool of reviewers."
   },
   "workflow.option.reviewers.desc": {
     "defaultMessage": "With two, both must pass the same change.",
@@ -1594,6 +1606,14 @@
   "workflow.value.review.you": {
     "defaultMessage": "You",
     "description": "A value of the workflow option for review: you review (glossary 2.6, G1 and N1)."
+  },
+  "workflow.value.reviewerMode.lane": {
+    "defaultMessage": "One per lane",
+    "description": "A value of the workflow option “Reviewers” (glossary 2.6, G17): each lane has its own reviewer agent."
+  },
+  "workflow.value.reviewerMode.pool": {
+    "defaultMessage": "A shared pool",
+    "description": "A value of the workflow option “Reviewers” (glossary 2.6, G17): lanes share a pool of reviewer agents, each card going to the next free one."
   },
   "workflow.value.sameness.change": {
     "defaultMessage": "Same change",
