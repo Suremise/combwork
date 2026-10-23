@@ -38,6 +38,41 @@ class StopHere extends Error {}
 /** What the suite records for the RC notes and OP-41, not a check. */
 const record = (what, text) => console.log(`RECORD ${what}: ${text}`)
 
+/** A step that didn't finish within its bound: the run stops there, the step named (#1494). */
+class Hung extends Error {}
+/** The Hives open, for what a hang says about each (set as they start). */
+const running = []
+/**
+ * `p` within `ms`, else a FAIL naming `what` and the run stopped (#1494: a hang in the Sandbox printed nothing until the
+ * guest's 900 s bound): IPC calls (page.evaluate has no timeout of its own), screenshots and clicks. What each Hive
+ * still answers is said first: its main process, its window, a screenshot.
+ */
+async function bounded(what, p, ms = HUNG_MS) {
+  const LATE = {}
+  let timer
+  try {
+    const r = await Promise.race([p, new Promise((res) => (timer = setTimeout(() => res(LATE), ms)))])
+    if (r !== LATE) return r
+  } finally {
+    clearTimeout(timer)
+  }
+  check(`${what} within ${ms} ms`, false, 'hung')
+  for (const h of running) {
+    const answers = async (q) => (await Promise.race([q.then(() => 'answers', (e) => `fails: ${String(e?.message ?? e).split('\n')[0]}`), new Promise((res) => setTimeout(() => res('no answer in 5 s'), 5000))]))
+    const main = await answers(h.app.evaluate(() => process.pid))
+    const page = await answers(h.page.evaluate(() => document.readyState))
+    const shot = path.join(shots, `hung-${h.name}.png`)
+    const shown = await answers(h.page.screenshot({ path: shot, timeout: 5000 }))
+    console.log(`HUNG ${h.name}: main process ${main}; window ${page}; screenshot ${shown === 'answers' ? shot : shown}`)
+  }
+  throw new Hung(what)
+}
+/** An IPC caller whose every call is bounded, named by its channel. */
+const boundedInv = (name, inv, ms = HUNG_MS) => (ch, ...a) => bounded(`${name}: ${ch}`, inv(ch, ...a), ms)
+/** A click within the bound, Playwright's own timeout naming its locator. */
+const click = (locator, what) => bounded(`clicking ${what}`, locator.click({ timeout: HUNG_MS }), HUNG_MS + 5000)
+const screenshot = (page, file) => bounded(`screenshot ${file}`, page.screenshot({ path: path.join(shots, file), timeout: HUNG_MS }), HUNG_MS + 5000)
+
 /** The 0.9 build to run, or why there is none. */
 function hive09() {
   let dir = process.env.HIVE_E2E_HIVE09
@@ -72,13 +107,15 @@ const copiesOf = (prefix) => (fs.existsSync(backups) ? fs.readdirSync(backups).f
 /**
  * Starts the 0.9 Hive in its own profile on the workspace. Its Agent API finds the suite's port taken by the dev build at
  * times: it says so and runs on. `mayFail`: opening the workspace may fail (during the upgrade), the reason in `openError`.
+ * `ms`: its calls' bound (longer while the dev build holds the upgrade's lock, which they may wait on).
  */
-async function startOld(old, mayFail = false) {
+async function startOld(old, mayFail = false, ms = HUNG_MS) {
   const app = await _electron.launch({ executablePath: old.exe, args: [], env: lib.hiveEnv({ HIVE_USER_DATA: oldProfile }) })
   try {
     const page = await app.firstWindow()
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = boundedInv('0.9 Hive', (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a]), ms)
+    running.push({ name: '0.9', app, page })
     if (!mayFail) {
       await lib.openWorkspace(inv, page, ws)
       return { app, page, inv, openError: null }
@@ -112,8 +149,8 @@ const ASK = "Upgrade this workspace's board to 1.0?"
 async function themes(dev, name) {
   for (const theme of ['dark', 'light']) {
     await dev.inv('settings:update', { appearance: { theme } })
-    await lib.until(async () => (await dev.page.evaluate(() => document.documentElement.dataset.theme).catch(() => '')) === theme, HUNG_MS)
-    await dev.page.screenshot({ path: path.join(shots, `${name}-${theme}.png`) })
+    await bounded(`the ${theme} theme shown (${name})`, lib.until(async () => (await dev.page.evaluate(() => document.documentElement.dataset.theme).catch(() => '')) === theme, HUNG_MS), HUNG_MS + 5000)
+    await screenshot(dev.page, `${name}-${theme}.png`)
   }
   await dev.inv('settings:update', { appearance: { theme: 'dark' } })
 }
@@ -129,9 +166,15 @@ async function themes(dev, name) {
   fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
   fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-coder', name: 'Coder' }] }))
   const open = new Set()
+  // Closed within the bound, else its process ended (#1494: a hung Hive mustn't hold the run after the hang is said).
   const close = async (h) => {
     open.delete(h)
-    await h.app.close().catch(() => undefined)
+    running.splice(0, running.length, ...running.filter((r) => r.app !== h.app))
+    const closed = await Promise.race([h.app.close().then(() => true, () => true), new Promise((res) => setTimeout(() => res(false), HUNG_MS))])
+    if (!closed) {
+      console.log(`a Hive didn't close within ${HUNG_MS} ms: its process ended`)
+      h.app.process().kill()
+    }
   }
   try {
     // 1. The 0.9 Hive makes the board, and keeps the workspace open.
@@ -145,6 +188,8 @@ async function themes(dev, name) {
     fs.mkdirSync(devProfile, { recursive: true })
     const claude = lib.fakeClaude(devProfile, claudeHome, [alpha])
     const dev = await lib.launch({ userData: devProfile, viewport: { width: 1400, height: 900 }, env: claude })
+    dev.inv = boundedInv('dev build', dev.inv)
+    running.push({ name: 'dev', app: dev.app, page: dev.page })
     open.add(dev)
     dev.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(dev.inv, dev.page, ws)
@@ -154,19 +199,19 @@ async function themes(dev, name) {
     await themes(dev, '1-ask')
 
     // 3. Upgrade while the 0.9 Hive has it open: refused, nothing changed.
-    await ask.getByRole('button', { name: 'Upgrade', exact: true }).click()
+    await click(ask.getByRole('button', { name: 'Upgrade', exact: true }), "the ask's Upgrade (0.9 open)")
     check('Upgrade is refused: "close it first"', !!(await lib.until(async () => /Another Hive has this workspace open: close it first\./.test(await ask.innerText().catch(() => '')), HUNG_MS)), await ask.innerText().catch(() => ''))
     await themes(dev, '2-refused')
     check('…the file still at v2, no 0.9 copy made', fileVersion() === 2 && copiesOf('hive-before-1.0-').length === 0)
     check('…and the 0.9 Hive still writes', (await failure(old1.inv('tasks:create', { title: 'Still 0.9', project: 'alpha' }))) === null)
 
     // 4. Not Now: read-only, with the banner.
-    await ask.getByRole('button', { name: 'Not Now', exact: true }).click()
+    await click(ask.getByRole('button', { name: 'Not Now', exact: true }), "the ask's Not Now")
     const banner = dev.page.locator('.board-upgrade')
     // On every view, not only the board's: here the project's Session view.
     check('Not Now leaves a banner at the top of the window', !!(await lib.until(async () => (await banner.count()) === 1 && (await ask.count()) === 0, HUNG_MS)))
     check("…which says the board is read-only and agents can't start", /its board is read-only here and its agents can't start/.test(await banner.innerText().catch(() => '')), await banner.innerText().catch(() => ''))
-    await dev.page.screenshot({ path: path.join(shots, '3-banner-session.png') })
+    await screenshot(dev.page, '3-banner-session.png')
     // New Session is off too, saying why (#1230): a start would be refused.
     const newSession = dev.page.locator('.session-empty-card .btn.act-start')
     check('…New Session is off, saying why', !!(await lib.until(async () => (await newSession.count()) === 1 && (await newSession.isDisabled()), HUNG_MS)) && /its agents can't start/.test((await newSession.getAttribute('title')) ?? ''), (await newSession.getAttribute('title').catch(() => null)) ?? 'no title')
@@ -204,8 +249,8 @@ async function themes(dev, name) {
 
     // 5. The 0.9 Hive closed: the banner's Upgrade… runs it.
     await close(old1)
-    await banner.getByRole('button', { name: 'Upgrade…' }).click()
-    await ask.getByRole('button', { name: 'Upgrade', exact: true }).click()
+    await click(banner.getByRole('button', { name: 'Upgrade…' }), "the banner's Upgrade…")
+    await click(ask.getByRole('button', { name: 'Upgrade', exact: true }), "the ask's Upgrade (0.9 closed)")
     check('with the 0.9 Hive closed, the upgrade runs', !!(await lib.until(async () => (await ask.count()) === 0 && (await dev.page.locator('.toast', { hasText: 'Board upgraded to 1.0' }).count()) === 1, HUNG_MS)))
     check('…the file moved on from v2', fileVersion() > 2, String(fileVersion()))
     check('…the 0.9 copy kept', copiesOf('hive-before-1.0-v2-').length === 1, String(copiesOf('hive-before')))
@@ -225,7 +270,7 @@ async function themes(dev, name) {
     const refused09 = old2.openError ?? (await failure(old2.inv('tasks:create', { title: 'From 0.9 after', project: 'alpha' })))
     check('…nor change it', refused09 !== null, 'accepted')
     record('0.9 after the upgrade', old2.openError ? `opening the workspace failed: ${old2.openError}` : `the workspace opened; its board: ${read09}; a change: ${refused09}`)
-    await old2.page.screenshot({ path: path.join(shots, '4-old-after.png') })
+    await screenshot(old2.page, '4-old-after.png')
     await close(old2)
 
     // 7. Help → Restore the 0.9 Board Backup…: not while the agent runs (it would go on unrecorded).
@@ -234,12 +279,12 @@ async function themes(dev, name) {
     check('…nothing changed', fileVersion() > 2 && copiesOf('hive-before-restore-').length === 0)
     await dev.inv('session:stop', alpha, 'a-coder')
     check('the agent stopped', !!(await lib.until(async () => (await live(dev)).length === 0, HUNG_MS)))
-    await dev.page.locator('.menubar-item', { hasText: 'Help' }).click()
-    await lib.menuEntry(dev.page, 'Restore the 0.9 Board Backup…').click()
+    await click(dev.page.locator('.menubar-item', { hasText: 'Help' }), 'the Help menu')
+    await click(lib.menuEntry(dev.page, 'Restore the 0.9 Board Backup…'), 'Restore the 0.9 Board Backup…')
     const restore = dialogWith(dev.page, 'Restore the 0.9 board backup?')
     check('Restore asks first', !!(await lib.until(async () => (await restore.count()) === 1, HUNG_MS)))
     await themes(dev, '5-restore')
-    await restore.getByRole('button', { name: 'Restore', exact: true }).click()
+    await click(restore.getByRole('button', { name: 'Restore', exact: true }), "the restore dialog's Restore")
     check('…then the 0.9 board is back', !!(await lib.until(async () => (await restore.count()) === 0 && (await dev.page.locator('.toast', { hasText: 'The 0.9 board is back' }).count()) === 1, HUNG_MS)))
     check('…the file at v2 again', fileVersion() === 2, String(fileVersion()))
     check('…the 1.0 board kept, and the 0.9 copy still there', copiesOf('hive-before-restore-').length === 1 && copiesOf('hive-before-1.0-').length === 1)
@@ -257,6 +302,8 @@ async function themes(dev, name) {
     // The hold is for unpackaged builds only: a packaged one (HIVE_EXE, the Sandbox checks) ends here.
     if (process.env.HIVE_EXE) throw new StopHere('step 8 (a 0.9 Hive started during the upgrade) needs an unpackaged build: not run with HIVE_EXE')
     const dev2 = await lib.launch({ userData: devProfile, viewport: { width: 1400, height: 900 }, env: { ...claude, HIVE_TEST_UPGRADE_HOLD: `${HOLD_MS};${held}` } })
+    dev2.inv = boundedInv('dev build', dev2.inv)
+    running.push({ name: 'dev', app: dev2.app, page: dev2.page })
     open.add(dev2)
     await lib.openWorkspace(dev2.inv, dev2.page, ws)
     const ask2 = dialogWith(dev2.page, ASK)
@@ -265,7 +312,7 @@ async function themes(dev, name) {
     // Not awaited: the click's input goes through Electron's main thread, which the hold keeps waiting.
     const clicked = ask2.getByRole('button', { name: 'Upgrade', exact: true }).click({ timeout: HOLD_MS + HUNG_MS }).catch(() => undefined)
     check('…and holds the lock once its steps are in', !!(await lib.until(() => fs.existsSync(held), HUNG_MS)))
-    const old4 = await startOld(old, true)
+    const old4 = await startOld(old, true, HOLD_MS + HUNG_MS)
     open.add(old4)
     // What it shows: the workspace not opened, or opened with its board unreadable.
     const during = old4.openError ?? (await failure(old4.inv('tasks:list')))
@@ -273,7 +320,7 @@ async function themes(dev, name) {
     check('a 0.9 Hive started meanwhile is kept off the board', during !== null && duringAt < HOLD_MS, `${during ?? 'read it'} after ${duringAt} ms`)
     record(`0.9 started during the upgrade (after ${duringAt} ms)`, old4.openError ? `opening the workspace failed: ${old4.openError}` : `the workspace opened; its board: ${during}`)
     if (!old4.openError) record('0.9 started during the upgrade, a change', (await failure(old4.inv('tasks:create', { title: 'During', project: 'alpha' }))) ?? 'accepted')
-    await old4.page.screenshot({ path: path.join(shots, '6-old-during.png') })
+    await screenshot(old4.page, '6-old-during.png')
     await clicked
     check('the upgrade finishes once the hold ends', !!(await lib.until(async () => (await ask2.count()) === 0, HOLD_MS + HUNG_MS)) && fileVersion() > 2)
     // Its user tries again.
@@ -282,13 +329,14 @@ async function themes(dev, name) {
     const after = await failure(old4.inv('tasks:list'))
     record('the same 0.9 Hive after the upgrade, its board', after ?? 'read')
     record('the same 0.9 Hive after the upgrade, a change', (await failure(old4.inv('tasks:create', { title: 'After', project: 'alpha' }))) ?? 'accepted')
-    await old4.page.screenshot({ path: path.join(shots, '7-old-after-hold.png') })
+    await screenshot(old4.page, '7-old-after-hold.png')
     check('nothing 0.9 tried meanwhile reached the board', !(await dev2.inv('tasks:list')).some((c) => c.title === 'During' || c.title === 'After'))
     await close(old4)
     await close(dev2)
   } catch (e) {
-    if (!(e instanceof StopHere)) throw e
-    console.log(`NOT RUN ${e.message}`)
+    if (e instanceof Hung) console.log(`STOPPED: ${e.message} didn't finish (its FAIL above, what each Hive answered after it)`)
+    else if (!(e instanceof StopHere)) throw e
+    else console.log(`NOT RUN ${e.message}`)
   } finally {
     for (const h of [...open]) await close(h)
   }
