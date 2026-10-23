@@ -67,12 +67,16 @@ function seedRepo(ctx) {
   git(ctx, 'worktree', 'add', '-q', path.join(path.dirname(ctx.workspace), `${path.basename(ctx.workspace)}-wt`), '-b', 'spare')
 }
 
-/** The Git tab of a project that isn't a repository: its .git set aside while the screen shows. */
+/**
+ * The Git tab of a project that isn't a repository: its .git set aside while the screen shows. Its header says the
+ * repository is gone, with the offer (#1492: the tab's read has the workspace read again), never a mix.
+ */
 async function gitSetup(ctx) {
   seedRepo(ctx)
   fs.renameSync(path.join(ctx.project, '.git'), path.join(ctx.project, '.git-aside'))
   await ctx.command('project.tab.changes')
   await shown(ctx, ctx.page.locator('[data-git-setup]'), 'the Git tab without a repository')
+  await shown(ctx, ctx.page.locator('[data-vc-offer="repositoryGone"]'), 'the offer: the repository gone')
   return gitView(ctx)
 }
 
@@ -89,6 +93,8 @@ async function closeInit(ctx) {
   // The tab reads git again when the window gets focus (as after using a terminal).
   await ctx.page.evaluate(() => window.dispatchEvent(new Event('focus')))
   await gone(ctx, ctx.page.locator('[data-git-setup]'), 'the Git tab without a repository')
+  // The workspace read again with it (#1492): settled before the next screen, whose reads it would otherwise start over.
+  await gone(ctx, ctx.page.locator('[data-vc-offer]'), 'the offer: the repository gone')
 }
 
 /** History when it couldn't be read: said in its place, with Retry. */

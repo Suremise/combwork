@@ -153,14 +153,30 @@ function writeProject(dir, cfg) {
     const gl = await q.agent(fx, h, 'GL', { project: gamma })
     const lane = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${gl.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'gamma', reviewer: 'GR', cards: [c2], name: 'gamma lane' }) })
     check('gamma: a lane runs', lane.status === 200, `${lane.status} ${await lane.text().catch(() => '')}`)
+    // The tab open on gamma while its repository goes (#1492): coming back to the window, the tab reads git again and the
+    // header follows it, with no workspace refresh asked for here.
+    await toTab('gamma')
+    const vcFact = page.locator('[data-vc-fact]')
+    check('gamma: the header says the folder is a Git repository', !!(await until(async () => (await text(vcFact)).startsWith('This folder is a Git repository'), HUNG_MS)), await text(vcFact))
     // Again while something holds it a moment (a watcher, the scanner: EPERM under load).
     check('gamma: .git moved away', !!(await until(() => { try { fs.renameSync(path.join(gamma, '.git'), path.join(gamma, 'git-away')); return true } catch { return false } }, HUNG_MS)))
-    await inv('workspace:refresh')
-    await toTab('gamma')
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
     check('the offer: the repository gone, Switch to None…', !!(await until(async () => (await offer.getAttribute('data-vc-offer').catch(() => null)) === 'repositoryGone', HUNG_MS)) && (await text(offer)).startsWith('The Git repository is gone.'), await text(offer))
+    // While the offer shows it says the fact itself: no fact line (counted, as innerText would wait for one).
+    check('…and the header no longer says it is a Git repository', (await vcFact.count()) === 0 || !(await text(vcFact)).startsWith('This folder is a Git repository'), await text(page.locator('[data-vc-head]')))
     const toast = page.locator('.toast', { hasText: "gamma's Git repository is gone" })
     check('the notice has Open Version Control', !!(await until(async () => (await toast.getByRole('button', { name: 'Open Version Control' }).count()) === 1, HUNG_MS)))
     await shoot(page.locator('.vc-view'), 'offer-gone')
+    // Put back and the workspace read again (F5, not the tab's catch-up), then gone a second time (HR6's round 1): the
+    // tab asks again, as the first time.
+    const moveGit = (from, to) => until(() => { try { fs.renameSync(path.join(gamma, from), path.join(gamma, to)); return true } catch { return false } }, HUNG_MS)
+    check('gamma: .git put back', !!(await moveGit('git-away', '.git')))
+    await inv('workspace:refresh')
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    check('…the refresh and the tab agree: a Git repository, no offer', !!(await until(async () => (await offer.count()) === 0 && (await vcFact.count()) === 1 && (await text(vcFact)).startsWith('This folder is a Git repository'), HUNG_MS)), await text(page.locator('[data-vc-head]')))
+    check('gamma: .git moved away again', !!(await moveGit('.git', 'git-away')))
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    check('…gone a second time: the offer again, no fact line saying Git', !!(await until(async () => (await offer.getAttribute('data-vc-offer').catch(() => null)) === 'repositoryGone' && (await vcFact.count()) === 0, HUNG_MS)), await text(page.locator('[data-vc-head]')))
     const refused = await q.intent(h, g1, c3, 'start')
     check("a Git card's start is refused: what can't be read, and the switch as its next step", refused.status === 409 && refused.body?.rule === 'platform.unknown' && /switch the project to None in its Version Control tab/.test(refused.body?.next ?? ''), JSON.stringify(refused))
     // German: the offer and the warning.
