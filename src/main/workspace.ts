@@ -181,8 +181,16 @@ export class WorkspaceService {
    * moves back.
    */
   private savedAt = new Map<string, number>()
-  /** How many times Hive has written each project's project.json (#1432): a reader can tell it changed since it read. */
-  private configWrites = new Map<string, number>()
+  /**
+   * Each project's project.json writes by Hive (#1432), as the stamp of its last write and the root ticket it was written
+   * at: a reader compares the stamp it read before with now's, and can tell it changed. Bounded (#1498): forgotten when the
+   * workspace closes, or a refresh finds the project gone; a project with none reads `configFloor`, the newest stamp ever
+   * forgotten, and stamps only grow (`configStamp`, never reset), so a forgotten write still reads as a change, never as
+   * none (an old snapshot may read changed when it isn't: it looks again).
+   */
+  private configWrites = new Map<string, { stamp: number; ticket: number }>()
+  private configStamp = 0
+  private configFloor = 0
   private readAt = new WeakMap<ProjectInfo, number>()
   /** The projects the last refresh reported (lower-cased) and its listing's ticket: one missing was gone by then (#784). */
   private listedAt: { ticket: number; known: Set<string> } | null = null
@@ -411,6 +419,9 @@ export class WorkspaceService {
     this.roots.clear()
     this.rootsAt.clear()
     this.savedAt.clear()
+    // Every write stamp forgotten at once: the floor is the newest stamp, so each old snapshot still reads a change.
+    this.configWrites.clear()
+    this.configFloor = this.configStamp
     this.listedAt = null
     this.unusedRoots.clear()
     this.wsConfig = structuredClone(DEFAULT_WORKSPACE_CONFIG)
@@ -949,9 +960,17 @@ export class WorkspaceService {
     return this.isAssistantHome(projectPath) ? assistantProjectConfig(cfg, config.settings) : cfg
   }
 
-  /** How many times Hive has written this project's project.json since it started (#1432): compared, whether it changed since a read. */
+  /** A stamp of Hive's last write of this project's project.json (#1432, #1498): compared, whether it changed since a read. */
   projectConfigWrites(projectPath: string): number {
-    return this.configWrites.get(projectPath.toLowerCase()) ?? 0
+    return this.configWrites.get(projectPath.toLowerCase())?.stamp ?? this.configFloor
+  }
+
+  /** Forgets a project's write stamp (#1498): it reads the floor from now, at least as new, so still a change. */
+  private forgetConfigWrites(key: string): void {
+    const w = this.configWrites.get(key)
+    if (!w) return
+    this.configWrites.delete(key)
+    this.configFloor = Math.max(this.configFloor, w.stamp)
   }
 
   async updateProjectConfig(projectPath: string, patch: Partial<ProjectConfig>): Promise<ProjectConfig> {
@@ -992,9 +1011,9 @@ export class WorkspaceService {
         // every agent keeps its cell (not one worked out again from the order on each read).
         if ('agents' in patch && updated.placement) updated = { ...updated, placement: settlePlacements(updated.placement, projectAgents(updated).map((a) => a.id)) }
         await writeKeptJson(file, withLegacyProjectFields(updated))
-        this.configWrites.set(projectPath.toLowerCase(), this.projectConfigWrites(projectPath) + 1)
         // As it is written: a read begun before now may have found the config from before.
         ticket = ++this.rootTickets
+        this.configWrites.set(projectPath.toLowerCase(), { stamp: ++this.configStamp, ticket })
         return updated
       })
     const next =
@@ -1216,6 +1235,7 @@ export class WorkspaceService {
     for (const [k, v] of this.roots) if (!known.has(v.toLowerCase()) && (this.rootsAt.get(v.toLowerCase()) ?? 0) < listed) this.roots.delete(k)
     for (const [project, at] of this.rootsAt) if (!known.has(project) && at < listed) this.rootsAt.delete(project)
     for (const [project, at] of this.savedAt) if (!this.listedAt.known.has(project) && at < listed) this.savedAt.delete(project)
+    for (const [project, w] of this.configWrites) if (!this.listedAt.known.has(project) && w.ticket < listed) this.forgetConfigWrites(project)
     // A project gone is said again if it comes back.
     for (const project of this.platformOffers.keys()) if (!known.has(project)) this.platformOffers.delete(project)
     this.cached = { path: this.path, name: basename(this.path), config: this.wsConfig, projects, assistant: assistant && { ...assistant, name: ASSISTANT_NAME, active: true, unmanagedMcp: [] }, moved: this.moved }
