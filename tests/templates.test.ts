@@ -13,7 +13,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, w
 import { basename, join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { TEMPLATE_VERSION, exportFileName, exportable, isAgentTemplate, readTemplate as readAny, templateAgentNames, templateFile, templateFrom, templatePairs, uniqueName, uniqueTemplateName, unknownProviders, type AgentTemplate } from '../src/shared/templates'
+import { TEMPLATE_VERSION, expandName, exportFileName, exportable, isAgentTemplate, namePatterns, namesFollowKey, pairIndex, readTemplate as readAny, templateAgentNames, templateFile, templateFrom, templatePairs, uniqueName, uniqueTemplateName, unknownProviders, type AgentTemplate } from '../src/shared/templates'
+import { suggestTemplateAgentName } from '../src/shared/agentNames'
 import { HIVE_TEMPLATES, templateTitle } from '../src/shared/templateDefaults'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '../src/shared/workflow/roles'
 import { AGENT_LIMIT_DEFAULT } from '../src/shared/defaults'
@@ -112,7 +113,7 @@ describe('the template format', () => {
     expect(readTemplate('nope')).toMatch(/isn't a Hive agent template/)
   })
 
-  it("names from a pattern of the project's key, numbered within each role; pairs from the agents' pairing", () => {
+  it("names from a pattern of the project's key, numbered among those of the pattern; pairs from the agents' pairing", () => {
     const list = [
       { name: '{key}-B{n}', role: 'builder' as const },
       { name: '{key}-R{n}', role: 'reviewer' as const },
@@ -120,7 +121,8 @@ describe('the template format', () => {
       { name: 'Fixed', role: 'either' as const },
       { name: '{key}-A{n}', role: 'either' as const }
     ]
-    expect(templateAgentNames(list, 'HI')).toEqual(['HI-B1', 'HI-R1', 'HI-B2', 'Fixed', 'HI-A2'])
+    expect(templateAgentNames(list, 'HI')).toEqual(['HI-B1', 'HI-R1', 'HI-B2', 'Fixed', 'HI-A1'])
+    expect(expandName('{key}-B{n}', 'AM', 3)).toBe('AM-B3')
     expect(templateAgentNames([{ name: '{key}-B1', role: 'builder' }], 'ABCD')).toEqual(['ABCD-B1'])
     // A pair is a builder naming a reviewer; each agent in one pair at most; a reviewer naming a builder adds nothing.
     expect(
@@ -132,6 +134,51 @@ describe('the template format', () => {
         { name: 'B3', role: 'builder', pairedWith: 'B3' }
       ])
     ).toEqual([{ builder: 'B1', reviewer: 'R1' }])
+  })
+
+  it('patterns (#1440): only {key} and {n}, and agents of one pattern never share a name', () => {
+    const read = (list: Record<string, unknown>[]): AgentTemplate | string => {
+      const t = readAny({ version: TEMPLATE_VERSION, name: 'T', layout: 'auto', agents: list.map((a) => ({ role: 'builder', provider: 'claude-code', ...a })) })
+      return isAgentTemplate(t) ? t : englishText(t)
+    }
+    expect(typeof read([{ name: '{key}-B{n}' }, { name: '{key}-B{n}' }, { name: '{key}-R{n}', role: 'reviewer' }])).toBe('object')
+    expect(read([{ name: '{key}-{role}{n}' }])).toBe('{key}-{role}{n} uses {role}: an agent’s name may only hold {key} (the project’s key) and {n} (its number among the agents with that name).')
+    // A fixed name the pattern also makes: two agents with one name.
+    expect(read([{ name: 'X{n}' }, { name: 'X1' }])).toMatch(/Two agents are called "X1"|Two agents are called "X\{n\}"/)
+    expect(read([{ name: '{key}-B1' }, { name: '{key}-b1' }])).toMatch(/Two agents are called/)
+  })
+
+  it("saving as patterns (#1440): names that follow the project's key become {key}-B{n}, others stay; pairs by numbered name", () => {
+    const named = (names: string[]) => names.map((name) => ({ name, role: agentWorkflowRole({ name }) }))
+    // A group numbered 1, 2, 3… in order: {n}; any other (a gap, another order) keeps its numbers (HR3, #1440 round 1),
+    // so its names are made again, each once.
+    expect(namePatterns(named(['HI-B1', 'HI-R1', 'HI-B2', 'Docs', 'HB1', 'HI-R2']), 'HI')).toEqual(['{key}-B{n}', '{key}-R{n}', '{key}-B{n}', 'Docs', 'HB1', '{key}-R{n}'])
+    expect(namePatterns(named(['HI-B1', 'HI-B2', 'HI-R1', 'HI-B4']), 'HI')).toEqual(['{key}-B1', '{key}-B2', '{key}-R{n}', '{key}-B4'])
+    for (const order of [['AM-B2', 'AM-B1', 'AM-B3', 'AM-R1', 'AM-R2', 'AM-R3'], ['AM-B3', 'AM-R1', 'AM-B1', 'AM-R3', 'AM-b2', 'AM-R2'], ['AM-B1', 'AM-B3', 'AM-R2']]) {
+      const kept = namePatterns(named(order), 'AM')
+      expect(templateAgentNames(kept.map((name, i) => ({ name, role: named(order)[i].role })), 'AM')).toEqual(order)
+      expect(templateAgentNames(kept.map((name, i) => ({ name, role: named(order)[i].role })), 'AP')).toEqual(order.map((n) => n.replace('AM', 'AP')))
+    }
+    expect([namesFollowKey(['HB1', 'HR1'], 'HI'), namesFollowKey(['HI-B1', 'Docs'], 'HI'), namesFollowKey(['HI-B1'], null), namesFollowKey(['AM-B1'], 'HI')]).toEqual([false, true, false, false])
+    const team: AgentDef[] = [
+      { id: 'b1', name: 'HI-B1', workflowRole: 'builder', pairedWith: 'HI-R1', provider: 'claude-code' },
+      { id: 'b2', name: 'HI-B2', workflowRole: 'builder', pairedWith: 'HI-R2', provider: 'claude-code' },
+      { id: 'r1', name: 'HI-R1', workflowRole: 'reviewer', provider: 'codex' },
+      { id: 'r2', name: 'HI-R2', workflowRole: 'reviewer', provider: 'codex' },
+      { id: 'd', name: 'Docs', workflowRole: 'either', provider: 'claude-code' }
+    ]
+    const t = templateFrom('Team', team, 'grid', () => 'claude-code', new Date('2026-10-23T10:00:00Z'), 'team', 'HI')
+    expect([t.agents.map((a) => a.name), t.pairs]).toEqual([['{key}-B{n}', '{key}-B{n}', '{key}-R{n}', '{key}-R{n}', 'Docs'], [{ builder: '{key}-B1', reviewer: '{key}-R1' }, { builder: '{key}-B2', reviewer: '{key}-R2' }]])
+    expect(readAny(JSON.parse(JSON.stringify(t)))).toEqual(t)
+    expect(templateAgentNames(t.agents, 'AM')).toEqual(['AM-B1', 'AM-B2', 'AM-R1', 'AM-R2', 'Docs'])
+    // Not asked: fixed names.
+    expect(templateFrom('Team', team, 'grid', () => 'claude-code').agents.map((a) => a.name)).toEqual(['HI-B1', 'HI-B2', 'HI-R1', 'HI-R2', 'Docs'])
+  })
+
+  it("a free name for a template's agent (#1440): another project's key swapped for this one's, else suggestAgentName's", () => {
+    expect(suggestTemplateAgentName('AM-B1', 'apiary', 'AP', ['AM-B1', 'AM-R1'])).toBe('AP-B1')
+    expect(suggestTemplateAgentName('AM-B1', 'apiary', 'AP', ['AM-B1', 'AP-B1'])).not.toMatch(/^(AM|AP)-B1$/)
+    expect(suggestTemplateAgentName('Builder', 'apiary', 'AP', ['Builder'])).toBe('Builder (apiary)')
   })
 
   it("Hive's own templates (#1436): each valid as a file is, its names a pattern each role reads as, paired builders with reviewers, a layout that fits within the cap", () => {
@@ -166,10 +213,11 @@ describe('the template format', () => {
         expect(new Set(names.map((n) => n.toLowerCase())).size).toBe(names.length)
         expect(names.map((n) => agentWorkflowRole({ name: n })), `${h.file} ${key}`).toEqual(t.agents.map((a) => a.role))
       }
+      // Builder n with reviewer n, by their numbered names (#1440).
       for (const p of t.pairs ?? []) {
-        const b = t.agents.find((a) => a.name === p.builder)!
-        const r = t.agents.find((a) => a.name === p.reviewer)!
-        expect([buildsWork(b.role), reviewsWork(r.role), b.name.replace('B', 'R')]).toEqual([true, true, r.name])
+        const b = t.agents[pairIndex(t.agents, p.builder)]
+        const r = t.agents[pairIndex(t.agents, p.reviewer)]
+        expect([buildsWork(b.role), reviewsWork(r.role), p.builder.replace('B', 'R')]).toEqual([true, true, p.reviewer])
       }
     }
     expect(HIVE_TEMPLATES.find((h) => h.file === 'team-6x6.json')!.template.agents.filter((a) => a.role === 'builder').every((a) => a.effort === 'medium')).toBe(true)
@@ -485,7 +533,7 @@ describe('saving and loading templates', () => {
     await expect(run(() => templates.duplicateTemplate({ scope: 'workspace', file: 'pair.json' }, { scope: 'hive' }))).rejects.toThrow(refused)
     // A copy to change: its agents, pairs and suggestion, with when it was made.
     const copy = await run(() => templates.duplicateTemplate(pair, { scope: 'project', project: beta }))
-    expect([copy.scope, copy.name, copy.agents.map((a) => [a.name, a.role, a.provider]), copy.pairs, copy.suggestedPreset, !!copy.savedAt]).toEqual(['project', 'Pair', [['{key}-B1', 'builder', 'claude-code'], ['{key}-R1', 'reviewer', 'codex']], [{ builder: '{key}-B1', reviewer: '{key}-R1' }], 'pair', true])
+    expect([copy.scope, copy.name, copy.agents.map((a) => [a.name, a.role, a.provider]), copy.pairs, copy.suggestedPreset, !!copy.savedAt]).toEqual(['project', 'Pair', [['{key}-B{n}', 'builder', 'claude-code'], ['{key}-R{n}', 'reviewer', 'codex']], [{ builder: '{key}-B1', reviewer: '{key}-R1' }], 'pair', true])
     const out = join(base, 'exports-hive')
     mkdirSync(out, { recursive: true })
     await run(() => templates.exportTemplate(pair, join(out, 'pair.json')))
@@ -497,16 +545,18 @@ describe('saving and loading templates', () => {
     const team = await run(() => templates.duplicateTemplate({ scope: 'hive', file: 'team-3x3.json' }, { scope: 'workspace' }))
     expect(team.pairs).toHaveLength(3)
     const ref = { scope: 'workspace' as const, file: team.file }
-    const agents = team.agents.map((a) => (a.name === '{key}-B1' ? { ...a, role: 'reviewer' as const } : a))
+    // The first builder made a reviewer (its pattern, so its number, unchanged): its pair goes, the other two stay.
+    const agents = team.agents.map((a, i) => (i === 0 ? { ...a, role: 'reviewer' as const } : a))
     const edited = await run(() => templates.updateTemplate(ref, { name: team.name, layout: team.layout, agents }, team.savedAt))
     expect(edited.pairs).toEqual([
       { builder: '{key}-B2', reviewer: '{key}-R2' },
       { builder: '{key}-B3', reviewer: '{key}-R3' }
     ])
-    // A reviewer removed and another renamed: their own pairs go, the third stays.
-    const fewer = edited.agents.filter((a) => a.name !== '{key}-R2').map((a) => (a.name === '{key}-R1' ? { ...a, name: 'Checker' } : a))
-    const again = await run(() => templates.updateTemplate(ref, { name: team.name, layout: team.layout, agents: fewer }, edited.savedAt))
-    expect([again.pairs, again.suggestedPreset]).toEqual([[{ builder: '{key}-B3', reviewer: '{key}-R3' }], 'team'])
+    // The second reviewer removed and the first renamed, as the editor sends it (#1440: its pairs by place, here B3 with
+    // the third reviewer, now the only `{key}-R{n}`, so R1): the right agents stay paired.
+    const fewer = edited.agents.filter((_, i) => i !== 4).map((a, i) => (i === 3 ? { ...a, name: 'Checker' } : a))
+    const again = await run(() => templates.updateTemplate(ref, { name: team.name, layout: team.layout, agents: fewer, pairs: [{ builder: '{key}-B3', reviewer: '{key}-R1' }, { builder: '{key}-B2', reviewer: 'nobody' }] }, edited.savedAt))
+    expect([again.pairs, again.suggestedPreset]).toEqual([[{ builder: '{key}-B3', reviewer: '{key}-R1' }], 'team'])
     await run(() => templates.deleteTemplate(ref))
   })
 
@@ -591,10 +641,16 @@ describe('saving and loading templates', () => {
 
   gitIt("Hive's Team 3×3 (#1436): six agents named from the project's key, paired both ways, in a grid, none in a worktree; a provider that can't run is swapped, said on its row", async () => {
     const ids = cfgOf(beta).agents.map((a: AgentDef) => a.id)
-    const plan = await run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))
-    // Beta's key (or, before it has one, its name's first letters).
-    const key = plan.create[0].name.split('-')[0]
+    // Names made from the key that can't be read (beta has none yet): refused, never a guessed key (#1440).
+    await expect(run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))).rejects.toThrow(/couldn't read beta's key/)
+    await expect(run(() => templates.addAgentFromTemplate(beta, 'hive', 'team-3x3.json', 0))).rejects.toThrow(/couldn't read beta's key/)
+    await expect(run(() => templates.saveTemplate(beta, 'workspace', 'Unkeyed', false, true))).rejects.toThrow(/couldn't read beta's key/)
+    expect(cfgOf(beta).agents.map((a: AgentDef) => a.id)).toEqual(ids)
+    const { keyProjects, projectKeyOf } = await import('../src/main/projectKeys')
+    await run(() => keyProjects(w))
+    const key = (await run(() => projectKeyOf(w, beta)))!
     expect(key).toMatch(/^[A-Z]{2,4}$/)
+    const plan = await run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))
     const want = ['B1', 'B2', 'B3', 'R1', 'R2', 'R3'].map((n) => `${key}-${n}`)
     expect([plan.name, plan.blocked, plan.create.map((a) => a.name), plan.templateNames, plan.layout, plan.suggestedPreset, plan.swaps]).toEqual(['Team 3×3', [], want, want, 'grid6', 'team', []])
     expect(plan.pairs).toEqual([{ builder: 0, reviewer: 3 }, { builder: 1, reviewer: 4 }, { builder: 2, reviewer: 5 }])
@@ -720,6 +776,30 @@ describe('saving and loading templates', () => {
     const neatGone = await run(() => removeAgent(beta, neatAgain.id, { deleteWorktree: 'merged-clean', mergedInto: 'main' }))
     expect(neatGone.worktree?.deleted).toBe(true)
     expect(pending()).not.toContain(placeKey(neat.worktree!.path))
+  })
+
+  it("names from the project's key (#1440): saved as patterns, loaded with another project's key, one agent added under a chosen name", async () => {
+    const { keyProjects, projectKeyOf } = await import('../src/main/projectKeys')
+    await run(() => keyProjects(w))
+    const ka = (await run(() => projectKeyOf(w, alpha)))!
+    const kb = (await run(() => projectKeyOf(w, beta)))!
+    expect([ka, kb].every((k) => /^[A-Z]{2,4}$/.test(k)) && ka !== kb).toBe(true)
+    const alphaBefore = cfgOf(alpha).agents
+    await w.mutateProjectConfig(alpha, () => ({ agents: [{ id: 'k1', name: `${ka}-B1`, workflowRole: 'builder', pairedWith: `${ka}-R1`, provider: 'claude-code' }, { id: 'k2', name: `${ka}-R1`, workflowRole: 'reviewer', pairedWith: `${ka}-B1`, provider: 'claude-code' }] }))
+    const saved = await run(() => templates.saveTemplate(alpha, 'workspace', 'Keyed', false, true))
+    const keyed = 'saved' in saved ? saved.saved : null
+    expect([keyed?.agents.map((a) => a.name), keyed?.pairs]).toEqual([['{key}-B{n}', '{key}-R{n}'], [{ builder: '{key}-B1', reviewer: '{key}-R1' }]])
+    // Into beta: beta's key, nothing taken, so loading is one click.
+    const plan = await run(() => templates.templatePlan(beta, 'workspace', keyed!.file))
+    expect([plan.create.map((a) => a.name), plan.templateNames, plan.taken, plan.pairs]).toEqual([[`${kb}-B1`, `${kb}-R1`], [`${kb}-B1`, `${kb}-R1`], [], [{ builder: 0, reviewer: 1 }]])
+    // One agent of it under the name chosen in its dialog; a name another agent has is refused, naming a free one.
+    const before = cfgOf(beta).agents.map((a: AgentDef) => a.id)
+    const def = await run(() => templates.addAgentFromTemplate(beta, 'workspace', keyed!.file, 1, undefined, 'Checker 2'))
+    expect([def.name, def.workflowRole, def.worktree]).toEqual(['Checker 2', 'reviewer', undefined])
+    await expect(run(() => templates.addAgentFromTemplate(beta, 'workspace', keyed!.file, 0, undefined, `${ka}-B1`))).rejects.toThrow(/already an agent called/)
+    await w.mutateProjectConfig(beta, (c) => ({ agents: c.agents.filter((a) => before.includes(a.id)) }))
+    await w.mutateProjectConfig(alpha, () => ({ agents: alphaBefore }))
+    await run(() => templates.deleteTemplate({ scope: 'workspace', file: keyed!.file }))
   })
 
   it('changes at once to one place never pick the same file or miss a name: imports, duplicates, saves', async () => {

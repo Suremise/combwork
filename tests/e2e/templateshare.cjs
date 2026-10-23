@@ -115,10 +115,10 @@ const check = (name, ok, extra = '') => {
   const confirmLoad = page.locator('.dialog', { hasText: 'Load "Team"?' })
   await confirmLoad.waitFor({ timeout: 5000 })
   check("…then loading's confirmation, for the chosen project", (await confirmLoad.locator('.template-plan-table tbody tr[data-state="removed"]').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Old')
-  // Its names are alpha's agents' (#702): marked, Load template greyed out until they are changed.
+  // Its names are alpha's agents' (#702): free ones filled in (#1440), so Load template is ready; chosen here instead.
   const nameBoxes = (d) => d.locator('.template-plan-name-input')
   const loadOf = (d) => d.getByRole('button', { name: 'Load template' })
-  check("…alpha's names marked, Load template greyed out", (await confirmLoad.locator('.template-plan-table .field-error').count()) === 2 && (await loadOf(confirmLoad).isDisabled()))
+  check("…alpha's names: free ones filled in, none marked, Load template ready", JSON.stringify(await nameBoxes(confirmLoad).evaluateAll((l) => l.map((x) => x.value))) === '["Builder (beta)","Reviewer (beta)"]' && (await confirmLoad.locator('.template-plan-table .field-error').count()) === 0 && (await loadOf(confirmLoad).isEnabled()), JSON.stringify(await nameBoxes(confirmLoad).evaluateAll((l) => l.map((x) => x.value))))
   await nameBoxes(confirmLoad).nth(0).fill('BBuilder')
   await nameBoxes(confirmLoad).nth(1).fill('BReviewer')
   await lib.until(() => loadOf(confirmLoad).isEnabled(), 5000)

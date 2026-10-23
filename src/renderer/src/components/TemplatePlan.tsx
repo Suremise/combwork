@@ -115,7 +115,7 @@ export function TemplatePlan({ view, edit }: { view: TemplateLoadView; edit?: Na
                       </div>
                     )}
                   </td>
-                  <td>
+                  <td className="template-plan-model">
                     <Setting s={a.model} />
                   </td>
                   <td>{a.effort ? <Setting s={a.effort} /> : <span className="faint">—</span>}</td>
@@ -166,5 +166,6 @@ function withNote(thing: ReactNode, note: string, className: string): ReactNode[
 }
 
 function Setting({ s }: { s: SettingShown }) {
-  return <>{s.isDefault ? withNote(s.text, tr(M.isDefault), 'faint template-plan-default') : s.text}</> // i18n-ignore: class names
+  const text = <span className="template-plan-setting">{s.text}</span>
+  return <>{s.isDefault ? withNote(text, tr(M.isDefault), 'faint template-plan-default') : text}</> // i18n-ignore: class names
 }

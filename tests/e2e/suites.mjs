@@ -250,6 +250,7 @@ export const SUITES = [
   { name: 'tabstrip' },
   { name: 'taskbar', serial: 'window focus' },
   { name: 'taskoverview' },
+  { name: 'templatenames' },
   { name: 'templates' },
   { name: 'templateshare' },
   { name: 'templatesv2' },
