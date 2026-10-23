@@ -1474,10 +1474,10 @@ describe('sending a prompt to a CLI until it takes it (lib.sendPrompt, #190)', (
     expect(t.writes).toEqual([text, '\r', '\r'])
   })
 
-  it('a prompt dropped while the CLI was drawing: typed again over a cleared line', async () => {
+  it('a prompt dropped while the CLI was drawing: typed again over a cleared line, Ctrl+U on its own (#1547)', async () => {
     const { t, run } = terminal({ dropText: 1 })
     expect(await run()).toBe(2)
-    expect(t.writes).toEqual([text, '\r', `\x15${text}`, '\r'])
+    expect(t.writes).toEqual([text, '\r', '\x15', text, '\r'])
   })
 
   it('never taken: 0 after the tries', async () => {

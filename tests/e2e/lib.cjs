@@ -898,7 +898,13 @@ async function sendPrompt(inv, key, text, { submitted, tries = 3, waitMs = 20000
     const typed = attempt > 1 && attempt < tries && plainText(await raw()).includes(text.slice(0, 30))
     const mark = (await raw()).length
     if (attempt === 1) await inv('pty:write', key, text)
-    else if (!typed) await inv('pty:write', key, `\x15${text}`)
+    else if (!typed) {
+      // Ctrl+U on its own, as Hive presses it: written with a long prompt, Claude Code 2.1.309 reads both as a paste, the
+      // Ctrl+U in it an invisible character it takes out, and leaves the prompt unsent until Enter again (#1547).
+      await inv('pty:write', key, '\x15')
+      await sleep(150)
+      await inv('pty:write', key, text)
+    }
     // Deliberate pause, not a wait for a state: a CLI takes an Enter that comes within its paste window as part of the
     // text (a new line, not a submit), and nothing on screen says when that window ends: Copilot shows the line at once
     // and still takes an Enter right after it as part of the paste (tried in #527). submitted() is the check.

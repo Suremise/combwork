@@ -15,7 +15,7 @@ const { copilot } = await import('../src/main/providers/copilot/adapter')
 const { TerminalScreen } = await import('../src/main/terminalScreen')
 const { advanced } = await import('../src/main/advanced')
 const { PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId } = await import('../src/shared/advanced')
-const { promptInput } = await import('../src/main/sessions')
+const { promptInput, withoutInvisible } = await import('../src/main/sessions')
 
 describe('a prompt Hive puts into a CLI (#597)', () => {
   const p = 'C:/hive-test/pasted-prompt'
@@ -129,6 +129,23 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
       expect(promptInput('a b\x1b', true, false)).toBe('a b')
       // Typed and not as typed: as before, the line as it comes (already on one line).
       expect(promptInput('a b', false, false)).toBe('a b')
+    })
+
+    // Claude Code 2.1.309 leaves a prompt with one of these unsent ("Removed 1 invisible character · review and press Enter
+    // to send"), and sends them inside an emoji: each as tried with the real CLI (#1547).
+    it('promptInput leaves out invisible characters, pasted or typed, as typed or not, but keeps the emoji made with them', () => {
+      for (const c of ['​', '‌', '‍', '‎', '­', '⁠', '‮', '﻿', '️']) {
+        for (const [paste, asTyped] of [[true, true], [true, false], [false, true], [false, false]]) expect(promptInput(`A${c}b c`, paste, asTyped)).toBe('Ab c')
+      }
+      for (const emoji of ['❤️', '1️⃣', '\u{1f3f4}\u{e0067}\u{e0062}\u{e0073}\u{e0063}\u{e0074}\u{e007f}', '\u{1f44d}\u{1f3fd}', '\u{1f468}‍\u{1f469}‍\u{1f467}', '\u{1f3f3}️‍\u{1f308}', '☺︎']) {
+        expect(promptInput(`word${emoji} PONG`, true, false)).toBe(`word${emoji} PONG`)
+      }
+      // Stray ones beside an emoji still go: a joiner at its end, a selector after a letter or a lone digit, a tag alone.
+      expect(promptInput('\u{1f468}‍ word 1️ x\u{e0067}', true, false)).toBe('\u{1f468} word 1 x')
+    })
+
+    it("withoutInvisible, which Compact's focus goes through too", () => {
+      expect(withoutInvisible('keep​ the﻿ plan')).toBe('keep the plan')
     })
 
     it("the draft switch off: no Ctrl+U before the prompt, so the CLI's draft stays in front of it", async () => {
