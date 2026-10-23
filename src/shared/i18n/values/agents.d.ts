@@ -42,6 +42,39 @@ interface HiveMessageValues {
   'agents.batch.worktreeKept': { branch: string | number; why: string | number }
   'agents.batch.worktreeRemovable': { branch: string | number }
   'agents.batch.worktreeUnchecked': { branch: string | number }
+  'agents.branchMerge.anyway': undefined
+  'agents.branchMerge.anywayConfirm': undefined
+  'agents.branchMerge.anywayMessage': undefined
+  'agents.branchMerge.anywayTitle': { card: string | number }
+  'agents.branchMerge.branch': undefined
+  'agents.branchMerge.cancel': undefined
+  'agents.branchMerge.cantList': { error: string | number }
+  'agents.branchMerge.cardWork': { card: string | number }
+  'agents.branchMerge.cardWorkMore': undefined
+  'agents.branchMerge.close': undefined
+  'agents.branchMerge.commits': { commits: number; branch: string | number; into: string | number }
+  'agents.branchMerge.confirmButton': undefined
+  'agents.branchMerge.confirmMessage': { card: string | number; branch: string | number; into: string | number }
+  'agents.branchMerge.confirmTitle': { card: string | number }
+  'agents.branchMerge.conflict': { branch: string | number; into: string | number }
+  'agents.branchMerge.failed': undefined
+  'agents.branchMerge.group.carried': undefined
+  'agents.branchMerge.group.line': undefined
+  'agents.branchMerge.group.other': undefined
+  'agents.branchMerge.inSlot': { branch: string | number; slot: string | number }
+  'agents.branchMerge.into': undefined
+  'agents.branchMerge.loading': undefined
+  'agents.branchMerge.merge': undefined
+  'agents.branchMerge.mergeNote': undefined
+  'agents.branchMerge.merged': { branch: string | number; into: string | number }
+  'agents.branchMerge.message': undefined
+  'agents.branchMerge.none': undefined
+  'agents.branchMerge.nothing': { branch: string | number; into: string | number }
+  'agents.branchMerge.reading': { branch: string | number }
+  'agents.branchMerge.squash': undefined
+  'agents.branchMerge.squashNote': undefined
+  'agents.branchMerge.title': undefined
+  'agents.branchMerge.uncommitted': { files: number; branch: string | number }
   'agents.choice.chooseOne': undefined
   'agents.choice.noneOn': undefined
   'agents.choice.notInstalled': undefined

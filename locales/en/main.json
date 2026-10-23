@@ -71,6 +71,18 @@
     "defaultMessage": "Review…",
     "description": "A button on the notice about cards an older Hive saved: opens a dialog listing them, to add each to the board or discard it."
   },
+  "main.branchMerge.cardWork": {
+    "defaultMessage": "{branch} is {card}'s work: merge it through its card, or confirm merging it here.",
+    "description": "An error merging from the Merge dialog: the branch ({branch}) is the line of a card ({card}: its key) that isn't Done, and the merge wasn't confirmed for that card (the dialog asks first)."
+  },
+  "main.branchMerge.notBranch": {
+    "defaultMessage": "{branch} is not a local branch of the project.",
+    "description": "An error merging from the Merge dialog (#1450): the branch picked ({branch}) isn't one of the repository's local branches (deleted meanwhile, say)."
+  },
+  "main.branchMerge.same": {
+    "defaultMessage": "{branch} can't be merged into itself.",
+    "description": "An error merging from the Merge dialog: the branch picked and the target are the same ({branch})."
+  },
   "main.console.noWorkspace": {
     "defaultMessage": "Open a workspace first: the developer console shows a workspace's agents and Hive's work there.",
     "description": "An error when the developer console is opened with no workspace open."
@@ -1035,6 +1047,46 @@
     "defaultMessage": "Hive doesn't remove it: {why}.",
     "description": "An error asking to Remove anyway one of the Overview's unused worktrees (Remove, Remove anyway, Merge). {why} says why (main.unused.why.*)."
   },
+  "main.unused.slot.archiveFailed": {
+    "defaultMessage": "its archive command failed ({error})",
+    "description": "Why Hive didn't remove a slot listed in Unused worktrees: the project's archive command, run first, failed ({error}: why, in English). A clause."
+  },
+  "main.unused.slot.busy": {
+    "defaultMessage": "Hive is setting it up or removing it now",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: another operation of Hive's has it. A clause."
+  },
+  "main.unused.slot.cantCheck": {
+    "defaultMessage": "Hive couldn't check it ({detail})",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: git couldn't say what it holds ({detail}: why, in English). A clause."
+  },
+  "main.unused.slot.dirty": {
+    "defaultMessage": "{files, plural, one {# file in it isn't committed} other {# files in it aren't committed}}",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: it has uncommitted or untracked files ({files}: how many). A clause."
+  },
+  "main.unused.slot.gitRefused": {
+    "defaultMessage": "git didn't remove it ({detail})",
+    "description": "Why Hive didn't remove a slot listed in Unused worktrees: git worktree remove refused ({detail}: git's message). A clause."
+  },
+  "main.unused.slot.inFlight": {
+    "defaultMessage": "card #{card}, which it held, is still being merged",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its number) that worked in it. A clause."
+  },
+  "main.unused.slot.leased": {
+    "defaultMessage": "it is lent to {agent}",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees (#1450): it is lent to the agent {agent} now. A clause."
+  },
+  "main.unused.slot.process": {
+    "defaultMessage": "a process still has it open",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: a program still uses its folder. A clause."
+  },
+  "main.unused.slot.session": {
+    "defaultMessage": "a session runs in it ({detail})",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: an agent's session runs in it ({detail}: the agent and its state). A clause."
+  },
+  "main.unused.slot.unmerged": {
+    "defaultMessage": "it has commits that aren't on {target}",
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: its commit isn't contained in its target branch ({target}). A clause."
+  },
   "main.unused.stale": {
     "defaultMessage": "{n, plural, one {what it holds was checked more than # minute ago} other {what it holds was checked more than # minutes ago}}",
     "description": "Why Remove anyway did nothing to one of the Overview's unused worktrees (Remove, Remove anyway, Merge): the confirmation was too old. {n} is how many minutes it lasts. A clause; the window then looks again and asks again, saying this."
@@ -1059,6 +1111,10 @@
     "defaultMessage": "git doesn't list it as one of the project's worktrees",
     "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
   },
+  "main.unused.why.notUnused": {
+    "defaultMessage": "it isn't one of the project's unused worktrees now (an agent's conversation, a review copy or the merge queue may use it)",
+    "description": "Why Hive won't remove or merge a folder from Unused worktrees (#1450): it isn't listed any more, as a conversation can resume there, it is one of Hive's copies, or the merge queue holds it. A clause."
+  },
   "main.unused.why.otherProject": {
     "defaultMessage": "it is another project of the workspace",
     "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
@@ -1066,6 +1122,18 @@
   "main.unused.why.owned": {
     "defaultMessage": "an agent works in it now",
     "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
+  },
+  "main.unused.why.session": {
+    "defaultMessage": "a session runs in it",
+    "description": "Why Hive won't remove a folder from Unused worktrees (#1450): an agent's session runs in it now. A clause."
+  },
+  "main.unused.why.slotGuarded": {
+    "defaultMessage": "it is a slot, which Hive removes only when it is clean and its work is merged",
+    "description": "Why Hive won't remove a slot anyway from Unused worktrees (#1450): slots go only through the guarded clean-up. A clause."
+  },
+  "main.unused.why.slotInUse": {
+    "defaultMessage": "it is a slot in use",
+    "description": "Why Hive won't remove a slot from Unused worktrees (#1450): it is lent, protected or busy now (it changed since it was listed). A clause."
   },
   "main.update.checksum": {
     "defaultMessage": "The downloaded update did not match its checksum and was discarded.",

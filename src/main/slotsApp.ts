@@ -29,7 +29,7 @@ import { onHiveEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
-import { setWriterHost, writerOver } from './agentFolders'
+import { setRetiredHomes, setWriterHost, writerOver } from './agentFolders'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
 import { endLeaseJob, journalPath, LeaseJob, startLauncher } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
@@ -323,6 +323,9 @@ export function slotViews(pool: SlotPool): SlotView[] {
   })
 }
 
+/** A test copy's retired homes by project folder (`slots:test` `homes`, #1450's suite), until #1441 records real ones. */
+const testHomes = new Map<string, readonly string[]>()
+
 /** A test copy's call into a pool (`slots:test`): what #1438 and #1447 will do from the board and Repair. */
 export async function slotTest(pool: SlotPool, op: SlotTestOp): Promise<unknown> {
   switch (op?.op) {
@@ -337,6 +340,11 @@ export async function slotTest(pool: SlotPool, op: SlotTestOp): Promise<unknown>
     case 'carry':
       // #1441's adoption of an agent's own worktree (#1434's suite, until #1441 is built).
       return pool.carry(op.agent, { name: op.slot, folder: op.folder })
+    case 'homes':
+      // #1441's retired homes (#1450's suite, until #1441 is built): the folders given, for this project.
+      if (!testHomes.size) setRetiredHomes((p) => testHomes.get(p.toLowerCase()) ?? [])
+      testHomes.set(pool.deps.project.toLowerCase(), op.folders)
+      return true
     default:
       throw new Error('unknown slot test op') // i18n-ignore: a test channel, never shown
   }
