@@ -2721,6 +2721,30 @@ at most 40 characters) [P1].
 - **Pool size:** as many slots as the project has builder agents, at most the project's agent cap; idle slots beyond
   that are removed after a day [P1].
 
+**Built [#1429], the pool (main only; #1438 lends for a card's start):** `src/main/slots.ts`, tables `slots` and
+`slot_leases` (the 1.0 group's `slots` step). A slot's state is `creating`, `ready`, `lent`, `dirty`, `gone` or `removing`.
+A lease's kind is `card` or `lane` (a dispatch lease) or `carried` (#1441's adopted worktree, which protects its slot
+while open, even while its agent holds a dispatch lease elsewhere). One open lease per slot, and one dispatch and one
+carried lease per agent, are partial unique indexes: a second fails in SQLite. Lending prefers the slot the builder
+last had, then the most recently used; a slot named that is in use is refused "slot-b is in use by HI-B1 for AM-12"
+(in English to agents; #1438 words the window's). A new slot is a detached worktree at the target's head, with the
+project's copied files and its setup run; a slot whose lock files changed since its last install is installed again;
+a failed setup leaves it `creating` with the error and the run's log, and lending skips it. The pool's size is the
+project's builders (`setBuilderCount`; until #1438 its agents), at least one, at most Agents per project.
+- **Options:** `project.json` `slots: { setup, archive, copy }`, each left out read from `worktreeSetup`, none and
+  `worktreeCopy` (left as they are). Settings → Agents & Worktrees edits the old fields until #1445's tab.
+- **Environment:** `HIVE_SLOT` and `HIVE_SLOT_PORT_BASE` (from 41000, 10 ports a slot, unique in the project) for its
+  runs now and its sessions from #1434.
+- **Runs:** setup, install and archive are Hive's runs attributed to "Hive (slot slot-b)" (the window's language;
+  the stored name stays English), each in a job of its own on the process supervisor, logs in Hive's `logs/slots`,
+  bounded by Settings → Advanced, **Slots: longest a setup command runs** (`hive.slots.setupMinutes`, 60 min).
+- **Released:** a slot left with uncommitted or untracked files that aren't ignored is `dirty`, not lent until clean;
+  a free slot gone from disk is recreated when next lent, a leased one marked `gone`.
+- **Clean-up** is guarded as above, a process in the folder proved absent by renaming it aside and back; the archive
+  command runs first and a failure keeps the slot; git removes the worktree, never forced. Settings → Advanced,
+  **Remove idle slots after a day** (`hive.slots.removeIdle`, on) removes free slots beyond the pool's size unused for
+  a day, and failed ones, every hour.
+
 #### 16.10.3 Agents unbound from folders, and resuming
 
 [note §7, #1123] Agents lose their `worktree` field (`AgentDef.worktree`, `types.ts:964`) and gain "in slot X" while

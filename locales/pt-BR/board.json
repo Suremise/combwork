@@ -528,6 +528,7 @@
   "board.progress.showLog": "Mostrar na pasta",
   "board.progress.showLogFailed": "Não foi possível mostrar o log",
   "board.progress.showTheAgent": "Mostrar o agente",
+  "board.progress.slotRun": "Hive (slot {slot})",
   "board.progress.stepOf": "{step, number} de {total, number}",
   "board.progress.stepOfNamed": "{step, number} de {total, number}: {name}",
   "board.progress.tab": "{tab, select, pulse {Pulso} merges {Merges} runs {Execuções} other {Raias}}",
