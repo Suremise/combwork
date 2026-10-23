@@ -149,14 +149,17 @@ const check = (name, ok, extra = '') => {
     await lib.until(async () => lines(path.join(codexHome, 'fake-launches.jsonl')).length > launches, HUNG_MS, 200)
     check('switched off, the next launch gets none of it', !codexTold(codexW.cwd).includes('NOTE-ALL'), codexTold(codexW.cwd).slice(-300))
     // Claude Code keeps a conversation's first system prompt on resume (since 2.1.267): one Hive gave the note to is
-    // resumed with it rendered fresh, so the note is gone from it too (HR5's round 1).
+    // resumed with it rendered fresh, so the note is gone from it too, by another agent in its folder as well (HR5's
+    // rounds 1–2: the record is the conversation's, SessionRecord.promptAdded).
     const claudeSession = (await live(claudeP.id))?.sessionId
     check(`${claudeP.name} stops`, await stopped(claudeP.id))
+    const second = await lib.addAgent(inv, proj, { name: 'Cla-Q', provider: 'claude-code', location: 'project' })
     const claudeLaunches = lines(path.join(claudeHome, 'fake-launches.jsonl')).length
-    await inv('session:start', proj, { agentId: claudeP.id, resumeId: claudeSession })
-    check(`${claudeP.name} resumes`, !!(await ready(claudeP.id)))
-    const resumed = await lib.until(async () => lines(path.join(claudeHome, 'fake-launches.jsonl')).slice(claudeLaunches).find((x) => x.cwd.toLowerCase() === claudeP.cwd.toLowerCase()), HUNG_MS, 200)
+    await inv('session:start', proj, { agentId: second.id, resumeId: claudeSession })
+    check(`${second.name} resumes ${claudeP.name}'s conversation`, !!(await ready(second.id)))
+    const resumed = await lib.until(async () => lines(path.join(claudeHome, 'fake-launches.jsonl')).slice(claudeLaunches).find((x) => x.cwd.toLowerCase() === proj.toLowerCase()), HUNG_MS, 200)
     check('switched off, a resumed Claude Code conversation that had the note appends nothing and renders its prompt fresh', resumed?.opts['--resume'] === claudeSession && !resumed?.opts['--append-system-prompt-file'] && resumed?.opts['--system-prompt-snapshot'] === 'off', JSON.stringify(resumed?.opts))
+    agents.push({ ...second, cwd: proj })
     await inv('advanced:set', 'hive.notes.deliverWorkspaceNotes', null)
 
     // --- A project agent reads the note but can't write it; a script with the workspace's token can.

@@ -1,7 +1,7 @@
 import { homedir } from 'os'
 import { msg, tr } from '../../../shared/i18n'
 import { join, basename } from 'path'
-import { mkdir, open, readdir, readFile, stat, writeFile } from 'original-fs/promises'
+import { mkdir, open, readdir, stat, writeFile } from 'original-fs/promises'
 import { existsSync, readFileSync, realpathSync } from 'original-fs'
 import type { AgentInstallInfo, AutoCompactSetting, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, SubSession } from '../../../shared/types'
 import { HIVE_DIR, assertSessionId, isSessionId } from '../../../shared/defaults'
@@ -12,7 +12,7 @@ import { samePath } from '../../../shared/movePaths'
 import { config } from '../../config'
 import { claudeFileAllowed, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
-import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
+import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
 import type { Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, settingsScopes } from './autoCompact'
@@ -51,13 +51,6 @@ const EDIT_TOOL = new RegExp(`^(?:${EDIT_TOOLS})$`)
  * resume, whatever a later launch appends, until it compacts; `--system-prompt-snapshot off` renders it fresh (#334).
  */
 const PROMPT_SNAPSHOT_SINCE = '2.1.267'
-
-/**
- * In an agent's launch folder: the conversations Hive appended to the system prompt of (#1433), newest last, at most
- * PROMPTED_KEPT. A resume of one renders its prompt fresh, whatever this launch appends.
- */
-const PROMPTED_FILE = 'prompted.json'
-const PROMPTED_KEPT = 200
 
 /** The version whose screens claudeTurnScreen was checked against (#648, screens recorded in #645's spike and in Hive). */
 const TURN_SCREEN_SINCE = '2.1.296'
@@ -148,8 +141,6 @@ export function appendedInstructions(ctx: LaunchContext): string {
 
 export class ClaudeCodeAdapter implements ProviderAdapter {
   readonly id = CLAUDE_CODE
-  /** Whether each launch's resume renders its system prompt fresh (prepareLaunch), for buildCommand. */
-  private refreshByRun = new Map<string, boolean>()
   readonly descriptor = CLAUDE_DESCRIPTOR
   /** If Hive itself was started from inside a Claude Code session, don't leak that session's identity. User configuration such as CLAUDE_CODE_GIT_BASH_PATH is kept. */
   readonly envToStrip = ['CLAUDECODE', 'CLAUDE_PID', 'CLAUDE_AGENT_SDK_VERSION', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_SESSION_ATTENDED', 'CLAUDE_CODE_MESSAGING_SOCKET', 'CLAUDE_CODE_MESSAGING_TOKEN', 'CLAUDE_CODE_SSE_PORT', 'CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING', 'MCP_CONNECTION_NONBLOCKING']
@@ -320,9 +311,6 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // A --settings of the user's is read first: one Hive can't read stops the launch before anything changes (#330).
     const theirs = await userSettings(ctx.extraArgs, ctx.cwd)
     const dir = this.launchDir(ctx.projectPath, ctx.agentId)
-    // The agent's conversations Hive appended to the system prompt of (kept across the folder's rebuild): a resume of one
-    // refreshes the prompt even when this launch appends nothing (#1433: notes switched off or emptied since).
-    const prompted = await readFile(join(dir, PROMPTED_FILE), 'utf8').then((t) => (JSON.parse(t) as unknown[]).filter((s): s is string => typeof s === 'string'), () => [] as string[])
     await removePath(dir)
     const pluginDir = join(dir, 'plugin')
     await mkdir(join(pluginDir, '.claude-plugin'), { recursive: true })
@@ -403,10 +391,6 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // system prompt from a file.
     const appended = appendedInstructions(ctx)
     if (appended) await writeFile(join(dir, 'instructions.md'), appended)
-    const had = prompted.includes(ctx.sessionId)
-    keepBounded(this.refreshByRun, ctx.runId, !!appended || had)
-    const now = appended ? [...prompted.filter((s) => s !== ctx.sessionId), ctx.sessionId].slice(-PROMPTED_KEPT) : prompted
-    if (now.length) await writeJsonAtomic(join(dir, PROMPTED_FILE), now)
     await writeFile(
       join(dir, 'README.txt'),
       'This folder is generated by Hive each time a session starts. Edits here are overwritten.\n'
@@ -429,10 +413,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const appended = !!appendedInstructions(ctx)
     if (appended) args.push('--append-system-prompt-file', join(dir, 'instructions.md'))
     // A resumed conversation gets this launch's instructions (the Assistant's current mode, the notes as they are now), not
-    // the ones it started with: a newer Claude Code would keep sending those. So does one Hive appended to before and
-    // appends nothing to now (the notes switched off or emptied, #1433): it gets none. Not where the user's own arguments
-    // choose, nor with the switch off (#1167).
-    const refresh = appended || this.refreshByRun.get(ctx.runId) === true
+    // the ones it started with: a newer Claude Code would keep sending those. So does one Hive appended to at an earlier
+    // launch, by any agent, and appends nothing to now (the notes switched off or emptied, #1433: SessionRecord.promptAdded):
+    // it gets none. Not where the user's own arguments choose, nor with the switch off (#1167).
+    const refresh = appended || ctx.promptAddedBefore === true
     if (refresh && ctx.resume && launchOverrides(ctx.overrides, CLAUDE_CODE, 'promptSnapshotOff') && ctx.cliVersion && compareVersions(ctx.cliVersion, PROMPT_SNAPSHOT_SINCE) >= 0 && !ctx.extraArgs.some((a) => /^--system-prompt-snapshot(=|$)/.test(a))) args.push('--system-prompt-snapshot', 'off')
     if (ctx.trustedHiveTools?.length && ctx.mcpServers.hive && launchOverrides(ctx.overrides, CLAUDE_CODE, 'preApproveHiveTools')) args.push('--allowedTools', ctx.trustedHiveTools.map((t) => `mcp__hive__${t}`).join(','))
     // With 1M turned off, Claude Code rejects a "[1m]" model as unrecognised (2.1.287): run the base model.

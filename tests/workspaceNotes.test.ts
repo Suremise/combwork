@@ -152,33 +152,30 @@ describe('delivered at launch, on every CLI, after Hive\'s guidance', () => {
     expect(args(context({ notes: NOTES, resume: true, cliVersion: '2.1.305' })).join(' ')).toContain('--system-prompt-snapshot off')
   })
 
-  it("Claude Code: a conversation Hive appended notes to loses them on resume once they're off or emptied (HR5's round 1)", async () => {
-    const projectPath = join(base, 'claude-proj')
-    mkdirSync(projectPath, { recursive: true })
-    const sessionId = '6a0c1d2e-0000-4000-8000-000000000001'
-    const other = '6a0c1d2e-0000-4000-8000-000000000002'
-    /** A launch as Hive makes it: prepared, then its command; whether it renders the prompt fresh, and what it appends. */
-    const launch = async (over: Partial<LaunchContext>) => {
-      const ctx = context({ projectPath, cwd: projectPath, agentId: 'a-claude', sessionId, cliVersion: '2.1.305', mcpServers: {}, guidance: '', ...over })
-      await claudeCode.prepareLaunch(ctx)
-      const args = claudeCode.buildCommand('C:\\bin\\claude.exe', ctx).args
+  it("Claude Code: a conversation Hive gave instructions to before loses them on resume once they're off or emptied (HR5's rounds 1–2)", () => {
+    /** A launch's command: whether it renders the prompt fresh, and whether it appends. */
+    const launch = (over: Partial<LaunchContext>) => {
+      const args = claudeCode.buildCommand('C:\\bin\\claude.exe', context({ cliVersion: '2.1.305', mcpServers: {}, guidance: '', ...over })).args
       return { fresh: args.join(' ').includes('--system-prompt-snapshot off'), appends: args.includes('--append-system-prompt-file') }
     }
     // Started with notes.
-    expect(await launch({ notes: NOTES })).toEqual({ fresh: false, appends: true })
-    // Resumed with notes switched off (no notes): nothing appended, and the prompt rendered fresh, without the old note.
-    expect(await launch({ resume: true, notes: '' })).toEqual({ fresh: true, appends: false })
-    // …and on every resume after (Claude Code would go back to its saved prompt with the note).
-    expect(await launch({ resume: true, notes: '' })).toEqual({ fresh: true, appends: false })
-    // Emptied rather than switched off: the same (Hive passes no notes either way).
-    expect(await launch({ resume: true })).toEqual({ fresh: true, appends: false })
-    // Another conversation of the agent never given any: left as it is.
-    expect(await launch({ sessionId: other })).toEqual({ fresh: false, appends: false })
-    expect(await launch({ sessionId: other, resume: true })).toEqual({ fresh: false, appends: false })
+    expect(launch({ notes: NOTES })).toEqual({ fresh: false, appends: true })
+    // Resumed with notes switched off or emptied (none given now), the conversation's record saying Hive gave some before
+    // (SessionRecord.promptAdded, by whichever agent): nothing appended, and the prompt rendered fresh, without the old note.
+    expect(launch({ resume: true, notes: '', promptAddedBefore: true })).toEqual({ fresh: true, appends: false })
+    // A conversation never given any: left as Claude Code keeps it.
+    expect(launch({ resume: true, promptAddedBefore: false })).toEqual({ fresh: false, appends: false })
+    expect(launch({ resume: true })).toEqual({ fresh: false, appends: false })
+    // A new conversation has nothing saved to refresh.
+    expect(launch({ promptAddedBefore: true })).toEqual({ fresh: false, appends: false })
     // The user's own --system-prompt-snapshot, and the switch off (#1167), still decide.
-    expect((await launch({ resume: true, extraArgs: ['--system-prompt-snapshot', 'on'] })).fresh).toBe(false)
+    expect(launch({ resume: true, promptAddedBefore: true, extraArgs: ['--system-prompt-snapshot', 'on'] }).fresh).toBe(false)
+  })
+
+  it('Claude Code: the switch off (#1167) leaves a resumed prompt as Claude Code keeps it', async () => {
     await advanced.set(overrideId('claude-code', 'promptSnapshotOff'), false)
-    expect((await launch({ resume: true, overrides: overridesNow('claude-code') })).fresh).toBe(false)
+    const args = claudeCode.buildCommand('C:\\bin\\claude.exe', context({ cliVersion: '2.1.305', resume: true, promptAddedBefore: true, overrides: overridesNow('claude-code') })).args
+    expect(args).not.toContain('--system-prompt-snapshot')
   })
 
   it('Copilot: in its instruction file, after the guidance and the role', async () => {
@@ -264,6 +261,41 @@ describe("in a workspace: the launch's notes and the switch", () => {
       await advanced.set(DELIVER_WORKSPACE_NOTES, null)
       writeFileSync(file, '   \n')
       expect(await workspaceNotesFor(join(root, 'gamma'))).toBe('')
+    } finally {
+      await disposeWorkspaceService(ws)
+      closeAllBoards()
+    }
+  })
+
+  it("remembers that a conversation was given Hive's instructions with the conversation itself: any agent, a restart, many newer ones", async () => {
+    const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
+    const { closeAllBoards } = await import('../src/main/boardStore')
+    const root = join(base, 'ws-prompted')
+    const proj = join(root, 'alpha')
+    mkdirSync(join(proj, '.hive'), { recursive: true })
+    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-first', name: 'First' }, { id: 'a-second', name: 'Second' }] }))
+    const old = '7b1d2e3f-0000-4000-8000-000000000000'
+    const open = async () => {
+      const ws = createWorkspaceService()
+      await ws.open(root)
+      return ws
+    }
+    let ws = await open()
+    try {
+      // First gave it notes (sessions.ts records promptAdded with the launch's session record).
+      await ws.upsertSession(proj, { id: old, agent: 'claude-code', agentId: 'a-first', promptAdded: true })
+      // Many newer conversations since, and Second records a later launch of the same one (no field: nothing cleared).
+      await ws.mutateSessions(proj, (f) => {
+        for (let i = 1; i <= 250; i++) f.sessions.push({ id: `7b1d2e3f-0000-4000-8000-${String(i).padStart(12, '0')}`, agent: 'claude-code', name: '', createdAt: new Date().toISOString(), lastActiveAt: new Date().toISOString(), archived: false })
+      })
+      await ws.upsertSession(proj, { id: old, agentId: 'a-second', lastActiveAt: new Date().toISOString() })
+      await disposeWorkspaceService(ws)
+      closeAllBoards()
+      // After a restart: still there, for whichever agent resumes it.
+      ws = await open()
+      const rec = (await ws.sessionsFile(proj)).sessions.find((s) => s.id === old)
+      expect(rec?.promptAdded).toBe(true)
+      expect(rec?.agentId).toBe('a-second')
     } finally {
       await disposeWorkspaceService(ws)
       closeAllBoards()

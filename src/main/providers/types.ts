@@ -66,6 +66,11 @@ export interface LaunchContext {
    */
   notes?: string
   /**
+   * A resume of a conversation Hive gave instructions of its own at an earlier launch, by any agent (SessionRecord.promptAdded,
+   * #1433): its prompt is rendered fresh, so instructions given then and not now leave it.
+   */
+  promptAddedBefore?: boolean
+  /**
    * The provider's override switches (#1167) as read once for this launch (overridesNow), so prepareLaunch and
    * buildCommand agree when one changes meanwhile; read with launchOverrides. Missing: each read as it is now.
    */

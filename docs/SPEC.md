@@ -2869,7 +2869,8 @@ repeating them (#533) [note §8].
   - Delivered inline at each launch, as the note is then, after Hive's guidance and the launch's own instructions, to
     every agent and the Assistant in any folder, whatever its tools: Claude Code `--append-system-prompt-file` (with
     `--system-prompt-snapshot off` on resume, as for the Assistant's mode, and on every resume of a conversation Hive
-    appended to before, so notes switched off or emptied since leave it: the launch folder's `prompted.json`), Codex `developer_instructions` after the
+    appended to before, by any agent, so notes switched off or emptied since leave it: the conversation's own session
+    record says so, `promptAdded`, never cleared), Codex `developer_instructions` after the
     user's own (when Codex can't say what those are, an agent's are left alone, without the notes), Copilot its
     instruction file. Under "Workspace notes (this machine), from the shared note "Workspace notes":"; reviewers get it
     through their own session.
