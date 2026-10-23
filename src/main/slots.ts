@@ -66,6 +66,8 @@ const LOCK_FILES = ['package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml'
 const RESERVED = new Set(['copies'])
 /** What a warming taken over from a holder that is gone leaves as its error (never ready). */
 export const INTERRUPTED = 'its setup was interrupted' // i18n-ignore: agent-facing and the log
+/** Why nothing is lent or made while the project's Delete holds its slots (#1447). */
+export const DELETING = 'the project is being deleted' // i18n-ignore: agent-facing and the log, as INTERRUPTED
 
 export type SlotState = 'creating' | 'ready' | 'lent' | 'dirty' | 'gone' | 'removing'
 export type LeaseKind = 'card' | 'lane' | 'carried'
@@ -398,6 +400,8 @@ export class SlotStore {
     try {
       return await this.conn.write((db) => {
         const at = this.iso()
+        // The project being deleted (#1447): nothing lent or made until its reservation ends.
+        if (deletingIn(db, this.project)) return { ok: false as const, refusal: { why: 'notReady' as const, slot: req.slot ?? 'a slot', state: 'removing' as const, error: DELETING } }
         const mine = this.dispatchOf(db, req.agent)
         if (mine) {
           if ((req.card !== undefined && mine.card === req.card) || (req.lane !== undefined && mine.lane === req.lane)) return { ok: true as const, lease: mine, slot: this.slotIn(db, mine.slot)!, fresh: false, again: true }
@@ -486,6 +490,7 @@ export class SlotStore {
   carryIn(db: DatabaseSync, agent: string, slot: { name: string; folder: string; target: string | null }): SlotLease | null {
     const at = this.iso()
     const had = this.slotIn(db, slot.name)
+    if (deletingIn(db, this.project)) return null
     if (!had && (this.reservedIn(db).has(slot.name.toLowerCase()) || this.renamesIn(db).some((r) => samePlace(r.intent.to, slot.folder)))) return null
     if (!had) db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at) VALUES (?, ?, ?, 'lent', ?, ?, ?, ?)").run(this.project, slot.name, slot.folder, freePort(this.slotsIn(db)), slot.target, at, at)
     else {
@@ -951,6 +956,41 @@ function recreateIntentOf(v: string): RecreateIntent | null {
   }
 }
 
+/**
+ * Delete's reservation of a project's slots and copies (#1447, HR1's round 2), written in one write with its token as
+ * the operation of every row it names (their states unchanged): no claim begins on them, and no slot or copy of the
+ * project is made, until it ends, finished (the rows deleted), released (their operations cleared), or released by a
+ * refresh once its holder is gone.
+ */
+export interface DeleteReservation {
+  token: string
+  pid: number
+  started: number
+  at: string
+  slots: string[]
+  copies: string[]
+}
+/** board_meta: a project's Delete reservation. */
+export const deleteKey = (project: string): string => `project_delete:${project}`
+/** The project's Delete reservation, if one is recorded (a damaged one still counts, with no holder: released at the next refresh). */
+export function deletingIn(db: DatabaseSync, project: string): DeleteReservation | null {
+  const r = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(deleteKey(project)) as { value: string } | undefined
+  if (!r) return null
+  try {
+    const d = JSON.parse(r.value) as Partial<DeleteReservation>
+    if (typeof d.token === 'string' && typeof d.pid === 'number' && typeof d.started === 'number' && Array.isArray(d.slots) && Array.isArray(d.copies)) return d as DeleteReservation
+  } catch {
+    // Damaged: below.
+  }
+  return { token: '', pid: 0, started: 0, at: '', slots: [], copies: [] }
+}
+/** Ends a Delete's reservation (its token), inside a write: the operations it set cleared, its key deleted, nothing else changed. */
+export function releaseDeleteIn(db: DatabaseSync, project: string, token: string): void {
+  db.prepare('UPDATE slots SET op = NULL, op_kind = NULL, op_lease = NULL, op_pid = NULL, op_started = NULL WHERE project = ? AND op = ?').run(project, token)
+  db.prepare('UPDATE copies SET op = NULL, op_kind = NULL, op_pid = NULL, op_started = NULL WHERE project = ? AND op = ?').run(project, token)
+  if (deletingIn(db, project)?.token === token) db.prepare('DELETE FROM board_meta WHERE key = ?').run(deleteKey(project))
+}
+
 /** board_meta: a slot's rename intent. */
 export const renameKey = (project: string, slot: string): string => `slot_rename:${project}:${slot}`
 function intentOf(v: string): RenameIntent | null {
@@ -1219,11 +1259,26 @@ export class SlotPool {
   }
 
   /**
+   * A Delete's reservation of the project's slots and copies whose holder is gone (#1447: its Hive ended mid-Delete):
+   * released whole in one write, the rows as they were (a folder already in the Recycle Bin is then seen gone).
+   */
+  private async releaseStaleDelete(): Promise<void> {
+    const project = this.store.project
+    const d = this.store.conn.read((db) => deletingIn(db, project))
+    if (!d || (d.token && !(await this.holderGone({ token: d.token, kind: 'remove', lease: null, pid: d.pid, started: d.started })))) return
+    await this.store.conn.write((db) => {
+      if (deletingIn(db, project)?.token === d.token) releaseDeleteIn(db, project, d.token)
+    })
+    log.warn(`Released a Delete's hold on the project's slots and copies: process ${d.pid}, which held it, is gone`)
+  }
+
+  /**
    * Brings the rows in step with what runs and what is on disk: an operation whose holder is gone is taken over and
    * recovered, a job left unsettled is settled again, an unleased slot left `lent` or `dirty` is looked at, a leased one
    * whose folder is gone is marked `gone`.
    */
   async refresh(): Promise<void> {
+    await this.releaseStaleDelete()
     for (const s of this.store.slots()) {
       if (this.closed) return
       // A writer whose run is over, its processes known to have ended, but not cleared (its release couldn't be written).
@@ -1253,6 +1308,8 @@ export class SlotPool {
    */
   private async recover(s: Slot): Promise<void> {
     const was = s.op!
+    // A Delete's (#1447): never taken over row by row, only released whole (`releaseStaleDelete`).
+    if (this.store.conn.read((db) => deletingIn(db, this.store.project))?.token === was.token) return
     const token = newToken()
     await this.op(token, async () => {
       // Eligible still, as the row is now (the holder looked at again), right before the write that takes it over.

@@ -14,7 +14,7 @@ import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
 
 // The Recycle Bin, as a folder of the test's (and one item it refuses, as Windows does when a program holds it open).
-const bin = vi.hoisted(() => ({ dir: '', refuse: '' }))
+const bin = vi.hoisted(() => ({ dir: '', refuse: '', during: null as null | ((p: string) => Promise<void>) }))
 vi.mock('../src/main/trash', async (orig) => {
   const { renameSync: mv, mkdirSync: mk } = await import('fs')
   const { basename: bn, join: jn } = await import('path')
@@ -23,6 +23,7 @@ vi.mock('../src/main/trash', async (orig) => {
     ...(await orig<object>()),
     trash: async (p: string) => {
       if (bin.refuse && p.toLowerCase() === bin.refuse.toLowerCase()) throw new Error('EPERM: a program has it open (test)')
+      await bin.during?.(p)
       mk(bin.dir, { recursive: true })
       mv(p, jn(bin.dir, `${++n}-${bn(p)}`))
     }
@@ -42,6 +43,9 @@ const { checkMoved, movePlan, repairMove } = await import('../src/main/workspace
 const { missingWorktree, recreateWorktree, unlinkMissingWorktree } = await import('../src/main/agentWorktree')
 const { projectFolders, relocateFolder, removeFolders } = await import('../src/main/projectFolders')
 const { poolFor } = await import('../src/main/slotsApp')
+const { fileSlotConn, SlotStore, deleteKey } = await import('../src/main/slots')
+const { CopyStore } = await import('../src/main/copies')
+const { reserveDelete } = await import('../src/main/projectFolders')
 const { DEFAULT_PROJECT_CONFIG } = await import('../src/shared/defaults')
 const { folderWhat } = await import('../src/shared/projectFolders')
 
@@ -382,6 +386,10 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
     }
     for (const f of [g.p, g.dirty, g.unmerged, g.home]) expect(existsSync(f)).toBe(true)
     expect((await projectFolders(ws, g.p)).filter((f) => f.of.kind === 'slot')).toHaveLength(2)
+    // Its hold let go: no operation of Delete's left on a row, no reservation.
+    const id = (await ws.projectConfig(g.p)).id!
+    expect((boardRead(ws, (db) => db.prepare('SELECT count(*) AS n FROM slots WHERE project = ? AND op IS NOT NULL').get(id)) as { n: number }).n).toBe(0)
+    expect(boardRead(ws, (db) => db.prepare('SELECT 1 FROM board_meta WHERE key = ?').get(deleteKey(id)))).toBeUndefined()
   })
 
   it('the project and its slots and home go to the Recycle Bin together, their work recoverable', async () => {
@@ -403,6 +411,105 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
     expect(sh(g.unmerged, 'log', '-1', '--format=%s')).toBe('unmerged')
     expect(existsSync(join(g.dirty, 'draft.txt'))).toBe(true)
     expect(sh(g.home, 'branch', '--show-current')).toBe('hive/hr')
+  })
+
+  // Another Hive on the same workspace (HR1's round 2): its own connection to hive.db, its own holder.
+  const otherHive = { pid: 990_001, started: 1 }
+  const dbFile = (): string => join(ws.path!, '.hive', 'hive.db')
+  const reservation = (id: string): string | undefined => boardRead(ws, (db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(deleteKey(id)) as { value: string } | undefined)?.value)
+  const opsOf = (id: string): (string | null)[] => boardRead(ws, (db) => [...(db.prepare('SELECT op FROM slots WHERE project = ?').all(id) as { op: string | null }[]), ...(db.prepare('SELECT op FROM copies WHERE project = ?').all(id) as { op: string | null }[])].map((r) => r.op))
+  /** A free review copy of the project's, made for real, its row as #1435's pool keeps it. */
+  async function withCopy(g: { p: string }): Promise<{ id: string; copy: string }> {
+    const id = (await ws.projectConfig(g.p)).id!
+    const copy = join(`${ws.path!}.worktrees`, g.p.split(/[\\/]/).at(-1)!, 'copies', 'copy-1')
+    sh(g.p, 'worktree', 'add', '-q', '--detach', copy)
+    const at = new Date().toISOString()
+    await boardWrite(ws, async () => boardWriteOp(ws, (db) => db.prepare("INSERT INTO copies (project, name, folder, state, created_at, used_at) VALUES (?, 'copy-1', ?, 'free', ?, ?)").run(id, copy, at, at)))
+    return { id, copy }
+  }
+
+  it("a claim another Hive makes after Delete's check wins: Delete's hold refused, nothing written or recycled", async () => {
+    const g = await gamma('gamma4', [531, 532])
+    const { id, copy } = await withCopy(g)
+    // The plan Delete checked, read before the other Hive's claims.
+    const checked = await projectFolders(ws, g.p)
+    const conn = fileSlotConn(dbFile())
+    try {
+      const slots = new SlotStore(conn, id)
+      const slot = checked.find((f) => f.of.kind === 'slot' && f.folder.toLowerCase() === g.dirty.toLowerCase())!
+      expect(await slots.startWarm(slot.name, slot.lease!.id, 'o-other', otherHive)).toBe(true)
+      expect(await reserveDelete(ws, id, checked, 'd-test4', otherHive)).toEqual({ busy: [slot.name], deleting: false })
+      expect(reservation(id)).toBeUndefined()
+      expect(opsOf(id).filter((o) => o === 'd-test4')).toEqual([])
+      // Through Delete itself: refused, nothing deleted, the other Hive's operation untouched.
+      const { removeProject } = await removal()
+      await expect(run(() => removeProject(g.p, 'delete'))).rejects.toThrow(/Nothing was deleted/)
+      expect(slots.slot(slot.name)!.op?.token).toBe('o-other')
+      await conn.write((db) => db.prepare("UPDATE slots SET op = NULL, op_kind = NULL, op_lease = NULL, op_pid = NULL, op_started = NULL WHERE op = 'o-other'").run())
+      // A copy the other Hive leased after the plan refuses it the same way.
+      const copies = new CopyStore(conn, id)
+      const leased = await copies.take({ kind: 'review', card: 533, revision: 'HEAD' }, { size: 2, dir: join(copy, '..'), token: 'o-copy', holder: otherHive, profile: 'test' })
+      expect(leased.ok).toBe(true)
+      expect(await reserveDelete(ws, id, checked, 'd-test4b', otherHive)).toEqual({ busy: ['copy-1'], deleting: false })
+      for (const f of [g.p, g.dirty, g.unmerged, g.home, copy]) expect(existsSync(f)).toBe(true)
+      expect(reservation(id)).toBeUndefined()
+    } finally {
+      conn.close()
+    }
+  })
+
+  it("Delete's hold wins: while it recycles, the other Hive can begin nothing on the project's slots or copies, nor make one", async () => {
+    const g = await gamma('gamma5', [541, 542])
+    const { id, copy } = await withCopy(g)
+    const trees = join(`${ws.path!}.worktrees`, 'gamma5')
+    const conn = fileSlotConn(dbFile())
+    const tried: Record<string, unknown> = {}
+    try {
+      const slots = new SlotStore(conn, id)
+      const copies = new CopyStore(conn, id)
+      const dirty = slots.slots().find((s) => s.folder.toLowerCase() === g.dirty.toLowerCase())!
+      const lease = slots.openLease(dirty.name)!
+      // The gate: inside Delete, as the project's folder goes (after its hold, before its slots go).
+      bin.during = async (p) => {
+        if (p.toLowerCase() !== g.p.toLowerCase()) return
+        tried.held = reservation(id) !== undefined
+        tried.take = (await slots.take({ card: 549, agent: 'g9' }, { size: 9, root: trees, target: 'main', token: 'o-take', holder: otherHive })).ok
+        tried.named = (await slots.take({ card: 548, agent: 'g8', slot: 'slot-z' }, { size: 9, root: trees, target: 'main', token: 'o-named', holder: otherHive })).ok
+        tried.warm = await slots.startWarm(dirty.name, lease.id, 'o-warm', otherHive)
+        tried.prepare = await slots.startPrepare(dirty.name, lease.id, 'o-prep', otherHive)
+        tried.carry = await slots.carry('g7', { name: 'carried-z', folder: join(trees, 'carried-z'), target: 'main' })
+        tried.copy = (await copies.take({ kind: 'review', card: 547, revision: 'HEAD' }, { size: 3, dir: join(copy, '..'), token: 'o-copy', holder: otherHive, profile: 'test' })).ok
+      }
+      const { removeProject } = await removal()
+      const done = await run(() => removeProject(g.p, 'delete'))
+      expect(done.warnings).toEqual([])
+      expect(tried).toEqual({ held: true, take: false, named: false, warm: false, prepare: false, carry: null, copy: false })
+      for (const f of [g.p, g.dirty, g.unmerged, g.home, copy]) expect(existsSync(f)).toBe(false)
+      expect(slots.slots()).toEqual([])
+      expect(copies.copies()).toEqual([])
+      expect(reservation(id)).toBeUndefined()
+      expect(boardRead(ws, (db) => (db.prepare('SELECT count(*) AS n FROM copy_leases WHERE project = ?').get(id) as { n: number }).n)).toBe(0)
+    } finally {
+      bin.during = null
+      conn.close()
+    }
+  })
+
+  it("Delete's Hive gone after its hold: the next refresh lets the slots and copies go, as they were", async () => {
+    const g = await gamma('gamma6', [551, 552])
+    const { id } = await withCopy(g)
+    const { spawnSync } = await import('child_process')
+    const ended = { pid: spawnSync(process.execPath, ['-e', ''], { env: {} }).pid!, started: 1 }
+    const checked = await projectFolders(ws, g.p)
+    expect(await reserveDelete(ws, id, checked, 'd-gone', ended)).toBeNull()
+    expect(opsOf(id).every((o) => o === 'd-gone')).toBe(true)
+    const pool = await run(() => poolFor(ws, g.p))
+    await pool.refresh()
+    expect(reservation(id)).toBeUndefined()
+    expect(opsOf(id).every((o) => o === null)).toBe(true)
+    // Its slots as they were: their leases kept, and the pool lends again.
+    expect(pool.openLeases().map((l) => l.card).sort()).toEqual([551, 552])
+    expect((await pool.lend({ card: 553, agent: 'gr' }, { install: false })).ok).toBe(true)
   })
 
   it("a slot outside the project's worktrees folder stops Delete before anything is done", async () => {

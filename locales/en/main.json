@@ -731,6 +731,14 @@
     "defaultMessage": "a review uses it now",
     "description": "Remove Project (#1447): a review copy is kept because a review or check uses it. A clause."
   },
+  "main.removal.folder.deleting": {
+    "defaultMessage": "another Delete of this project holds its slots",
+    "description": "Why Delete can't go ahead (#1447): another Hive window or process is deleting the same project now. A clause."
+  },
+  "main.removal.folder.heldNow": {
+    "defaultMessage": "one of Hive's steps or a session took it up meanwhile",
+    "description": "Why Delete can't go ahead (#1447): between the dialog's check and Delete's start, one of the project's slots or copies was taken up (set up, renamed, a session started in it, a review copy leased), or a new one made. A clause."
+  },
   "main.removal.folder.home": {
     "defaultMessage": "left as it is: its conversations resume there",
     "description": "Remove Project (#1447): an old reviewer folder (a reviewer's own worktree from before 1.0) stays where it is. A clause."
@@ -738,6 +746,10 @@
   "main.removal.folder.notForgotten": {
     "defaultMessage": "Hive's record of the project's slots couldn't all be cleared: {why}",
     "description": "A warning after Delete (#1447): the project's slot or copy records stayed in Hive's database ({why}: the system's message)."
+  },
+  "main.removal.folder.notHeld": {
+    "defaultMessage": "{n, plural, one {# slot or copy was} other {# slots or copies were}} taken up by another step, and left",
+    "description": "A warning's reason after Delete (#1447): records of the project's slots or copies Delete didn't hold, so it didn't delete them. Follows main.removal.folder.notForgotten's colon."
   },
   "main.removal.folder.notHives": {
     "defaultMessage": "left as it is: it isn't in Hive's worktrees folder for the project",

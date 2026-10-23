@@ -184,8 +184,11 @@ interface HiveMessageValues {
   'main.removal.folder.copyBusy': undefined
   'main.removal.folder.copyHeld': { by: string | number }
   'main.removal.folder.copyLeased': undefined
+  'main.removal.folder.deleting': undefined
+  'main.removal.folder.heldNow': undefined
   'main.removal.folder.home': undefined
   'main.removal.folder.notForgotten': { why: string | number }
+  'main.removal.folder.notHeld': { n: number }
   'main.removal.folder.notHives': undefined
   'main.removal.folder.notTrashed': { path: string | number; why: string | number }
   'main.removal.folder.outsideDelete': undefined

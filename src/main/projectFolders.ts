@@ -8,12 +8,14 @@ import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { msg, tr } from '../shared/i18n'
 import type { ProjectFolderOf } from '../shared/types'
+import { folderWhat } from '../shared/projectFolders'
 import { containsPlace } from './fsutil'
 import { legacyWorktree } from './agentFolders'
 import { existsSync } from 'original-fs'
 import { boardRead, boardWrite, boardWriteOp, cardKeys } from './boardStore'
 import { createLogger, userText } from './logger'
 import { replaceHome, retiredHomes } from './slotMigration'
+import { deleteKey, deletingIn, releaseDeleteIn, type DeleteReservation, type Holder } from './slots'
 import { workflowFor } from './workflow/service'
 import type { WorkspaceService } from './workspace'
 
@@ -149,6 +151,9 @@ const K = {
   outsideDelete: msg({ id: 'main.removal.folder.outsideDelete', defaultMessage: "it isn't in Hive's worktrees folder for the project, and would be left without its repository: release its slot and move or remove it first", description: "Why Delete can't go ahead (#1447): a slot outside <workspace>.worktrees/<project> (one Hive didn't make) would keep its files but lose the repository Delete sends to the Recycle Bin. Release its slot is a command in the agent's menu (Release Slot…). A clause." }),
   notTrashed: msg({ id: 'main.removal.folder.notTrashed', defaultMessage: "{path} couldn't be moved to the Recycle Bin: {why}", description: "A warning after Delete (#1447): one of the project's slots, copies or old folders ({path}) couldn't go to the Recycle Bin ({why}: the system's message)." }),
   notForgotten: msg({ id: 'main.removal.folder.notForgotten', defaultMessage: "Hive's record of the project's slots couldn't all be cleared: {why}", description: "A warning after Delete (#1447): the project's slot or copy records stayed in Hive's database ({why}: the system's message)." }),
+  heldNow: msg({ id: 'main.removal.folder.heldNow', defaultMessage: "one of Hive's steps or a session took it up meanwhile", description: "Why Delete can't go ahead (#1447): between the dialog's check and Delete's start, one of the project's slots or copies was taken up (set up, renamed, a session started in it, a review copy leased), or a new one made. A clause." }),
+  deleting: msg({ id: 'main.removal.folder.deleting', defaultMessage: 'another Delete of this project holds its slots', description: "Why Delete can't go ahead (#1447): another Hive window or process is deleting the same project now. A clause." }),
+  notHeld: msg({ id: 'main.removal.folder.notHeld', defaultMessage: '{n, plural, one {# slot or copy was} other {# slots or copies were}} taken up by another step, and left', description: "A warning's reason after Delete (#1447): records of the project's slots or copies Delete didn't hold, so it didn't delete them. Follows main.removal.folder.notForgotten's colon." }),
   copyHeld: msg({ id: 'main.removal.folder.copyHeld', defaultMessage: 'it is in use ({by})', description: "Remove Project (#1447): a review copy is kept because something runs in it ({by}: what, in English). A clause." })
 }
 
@@ -227,35 +232,88 @@ export async function deleteBlocks(ws: WorkspaceService, projectPath: string, fo
       const s = (await poolFor(ws, projectPath)).deps.store.slot(f.name)
       if (s && (s.op || s.job || s.writer)) out.set(f.key, tr(K.copyBusy))
     } else if (f.of.kind === 'copy') {
-      const c = (await copiesFor(ws, projectPath)).deps.store.copy(f.name)
+      const store = (await copiesFor(ws, projectPath)).deps.store
+      const c = store.copy(f.name)
       if (c && (c.op || c.job)) out.set(f.key, tr(K.copyBusy))
+      else if (c && store.leaseOn(f.name)) out.set(f.key, tr(K.copyLeased))
     }
   }
   return out
 }
 
 /**
- * Delete's step for a project's slots, copies and retired homes (#1447), once the project folder has gone to the
- * Recycle Bin (so nothing irreversible happens before it can refuse): each folder in the project's worktrees folder goes
- * to the Recycle Bin too, with whatever work is in it (recoverable with the repository, as agents' worktrees are), then
- * the project's rows are deleted (their leases with them) and its homes forgotten. What couldn't go is said.
+ * Delete's reservation of the project's slots and copies (#1447, HR1's round 2), in one write against the rows as they
+ * are then: refused, nothing written, if one is held (an operation, a job, a writer, a copy's lease not freed), if a row
+ * is there the plan didn't list (made since), or if another Delete holds them; else `token` (this Hive's, held by
+ * `holder`) becomes every listed row's operation and the project's reservation is recorded, so nothing begins on them
+ * and no slot or copy is made until it ends (`trashFolders`, or `releaseDelete`). Null once held, else the folders
+ * that refused it.
  */
-export async function trashFolders(ws: WorkspaceService, projectPath: string, id: string, folders: ProjectFolder[], trash: (path: string) => Promise<void>): Promise<string[]> {
+export async function reserveDelete(ws: WorkspaceService, id: string, folders: ProjectFolder[], token: string, holder: Holder): Promise<{ busy: string[]; deleting: boolean } | null> {
+  const slots = new Set(folders.filter((f) => f.of.kind === 'slot').map((f) => f.name.toLowerCase()))
+  const copies = new Set(folders.filter((f) => f.of.kind === 'copy').map((f) => f.name.toLowerCase()))
+  return boardWrite(ws, async () =>
+    boardWriteOp(ws, (db) => {
+      if (deletingIn(db, id)) return { busy: [], deleting: true }
+      const busy: string[] = []
+      const rows = db.prepare('SELECT name, op, job, writer_run FROM slots WHERE project = ?').all(id) as { name: string; op: string | null; job: string | null; writer_run: string | null }[] // i18n-ignore: SQL
+      for (const r of rows) if (!slots.has(r.name.toLowerCase()) || r.op || r.job || r.writer_run) busy.push(r.name)
+      const cs = db.prepare('SELECT name, op, job, EXISTS (SELECT 1 FROM copy_leases l WHERE l.project = copies.project AND l.copy = copies.name AND l.freed_at IS NULL) AS leased FROM copies WHERE project = ?').all(id) as { name: string; op: string | null; job: string | null; leased: number }[] // i18n-ignore: SQL
+      for (const c of cs) if (!copies.has(c.name.toLowerCase()) || c.op || c.job || c.leased) busy.push(c.name)
+      if (busy.length) return { busy, deleting: false }
+      const at = new Date().toISOString()
+      db.prepare("UPDATE slots SET op = ?, op_kind = 'remove', op_lease = NULL, op_pid = ?, op_started = ? WHERE project = ? AND op IS NULL AND job IS NULL AND writer_run IS NULL").run(token, holder.pid, holder.started, id) // i18n-ignore: SQL
+      db.prepare("UPDATE copies SET op = ?, op_kind = 'remove', op_pid = ?, op_started = ? WHERE project = ? AND op IS NULL AND job IS NULL").run(token, holder.pid, holder.started, id) // i18n-ignore: SQL
+      const d: DeleteReservation = { token, pid: holder.pid, started: holder.started, at, slots: rows.map((r) => r.name), copies: cs.map((c) => c.name) }
+      db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?)').run(deleteKey(id), JSON.stringify(d)) // i18n-ignore: SQL
+      return null
+    })
+  )
+}
+
+/** What refused Delete's reservation, for its message: each folder by what it is (a slot made since by its name), and why. */
+export function reserveRefusal(folders: ProjectFolder[], r: { busy: string[]; deleting: boolean }): string[] {
+  if (r.deleting) return [tr(K.deleting)]
+  return r.busy.map((n) => {
+    const f = folders.find((x) => x.of.kind !== 'home' && x.name.toLowerCase() === n.toLowerCase())
+    return `${f ? folderWhat(f.of) : n} (${tr(K.heldNow)})`
+  })
+}
+
+/** Ends Delete's reservation before anything was deleted (#1447: refused, or the project folder couldn't go): its rows as they were. */
+export async function releaseDelete(ws: WorkspaceService, id: string, token: string): Promise<void> {
+  await boardWrite(ws, async () => boardWriteOp(ws, (db) => releaseDeleteIn(db, id, token)))
+}
+
+/**
+ * Delete's step for a project's slots, copies and retired homes (#1447), once the project folder has gone to the
+ * Recycle Bin (so nothing irreversible happens before it can refuse), under its reservation (`token`, `reserveDelete`):
+ * each folder in the project's worktrees folder goes to the Recycle Bin too, with whatever work is in it (recoverable
+ * with the repository, as agents' worktrees are), then, in one write, the rows the reservation holds are deleted (their
+ * leases with them) and the reservation with them; a row it doesn't hold is left, never deleted. Its homes are then
+ * forgotten. What couldn't go is said.
+ */
+export async function trashFolders(ws: WorkspaceService, projectPath: string, id: string, folders: ProjectFolder[], token: string, trash: (path: string) => Promise<void>): Promise<string[]> {
   const root = join(ws.worktreesRoot, basename(projectPath))
   const warnings: string[] = []
   for (const f of folders) {
     if (!containsPlace(root, f.folder) || !existsSync(f.folder)) continue
     await trash(f.folder).catch((e: Error) => warnings.push(tr(K.notTrashed, { path: f.folder, why: e.message })))
   }
-  const slots = folders.filter((f) => f.of.kind === 'slot').map((f) => f.name)
-  const copies = folders.filter((f) => f.of.kind === 'copy').map((f) => f.name)
-  await boardWrite(ws, async () =>
+  const gone = await boardWrite(ws, async () =>
     boardWriteOp(ws, (db) => {
-      for (const n of slots) db.prepare('DELETE FROM slots WHERE project = ? AND name = ?').run(id, n) // i18n-ignore: SQL
-      for (const n of copies) db.prepare('DELETE FROM copies WHERE project = ? AND name = ?').run(id, n) // i18n-ignore: SQL
+      const n = Number(db.prepare('DELETE FROM slots WHERE project = ? AND op = ?').run(id, token).changes) // i18n-ignore: SQL
+      const m = Number(db.prepare('DELETE FROM copies WHERE project = ? AND op = ?').run(id, token).changes) // i18n-ignore: SQL
+      const left = (db.prepare('SELECT count(*) AS n FROM slots WHERE project = ?').get(id) as { n: number }).n + (db.prepare('SELECT count(*) AS n FROM copies WHERE project = ?').get(id) as { n: number }).n // i18n-ignore: SQL
+      releaseDeleteIn(db, id, token)
+      return { slots: n, copies: m, left }
     })
-  ).catch((e: Error) => warnings.push(tr(K.notForgotten, { why: e.message })))
+  ).catch((e: Error) => {
+    warnings.push(tr(K.notForgotten, { why: e.message }))
+    return null
+  })
+  if (gone?.left) warnings.push(tr(K.notForgotten, { why: tr(K.notHeld, { n: gone.left }) }))
   for (const f of folders) if (f.of.kind === 'home') await replaceHome(ws, projectPath, f.folder, null, id).catch((e: Error) => warnings.push(tr(K.notForgotten, { why: e.message })))
-  if (slots.length || copies.length) log.info(`Deleted ${userText(basename(projectPath))}'s ${slots.length} slot(s) and ${copies.length} copy(ies) with it`)
+  if (gone && (gone.slots || gone.copies)) log.info(`Deleted ${userText(basename(projectPath))}'s ${gone.slots} slot(s) and ${gone.copies} copy(ies) with it`)
   return warnings
 }

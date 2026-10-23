@@ -669,7 +669,10 @@ steps relink, recreate, release, forget or mark them `later` (gone at their plac
 missing-worktree functions answer for an agent's gone slot. `removeFolders` (preview and apply; Remove from Hive)
 removes slots and copies through their pools' guarded removal (`SlotPool.keepsFromRemoval` first, the lease ended only
 when nothing would be kept) and keeps homes and folders outside the project's worktrees folder; Delete checks
-`deleteBlocks` before anything, then `trashFolders` once the project folder is in the Recycle Bin. The slots' pass (`settleSlotCards`) and
+`deleteBlocks` before anything, then holds every slot and copy row with `reserveDelete` (one write: its token as each
+row's operation and `project_delete:<id>` in board_meta, which `SlotStore.take`, `carryIn` and `CopyStore.take` refuse to
+make rows under; a reservation whose holder is gone is released whole by either pool's `refresh`, never recovered row by
+row), and `trashFolders` once the project folder is in the Recycle Bin deletes only the rows it holds. The slots' pass (`settleSlotCards`) and
 reconciliation's `followFolder` wait while the workflow's `movePending` says a move waits for Repair.
 
 **The reviewer pool, built [#1443].** G17 is `WorkflowOptions.reviewerMode` (`lane`, left out of a compiled ruleset so
