@@ -40,10 +40,11 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
 
 ;(async () => {
   q.prepare(fx)
-  // The repository's own identity, which Pair takes as G12's (p5lane's), and its quick check from its scripts.
+  // The repository's own identity, which Pair takes as G12's (p5lane's), and its quick check from its scripts (the
+  // script's path quoted: the test root may have a space in it).
   lib.git(alpha, ['config', 'user.name', fx.identity.name])
   lib.git(alpha, ['config', 'user.email', fx.identity.email])
-  fs.writeFileSync(path.join(alpha, 'package.json'), JSON.stringify({ name: 'alpha', scripts: { typecheck: `node ${slash(path.join(fx.tools, 'check.js'))}` } }, null, 2) + '\n')
+  fs.writeFileSync(path.join(alpha, 'package.json'), JSON.stringify({ name: 'alpha', scripts: { typecheck: `node "${slash(path.join(fx.tools, 'check.js'))}"` } }, null, 2) + '\n')
   lib.git(alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'add', '-A'])
   lib.git(alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'scripts'])
   const h = await q.startHive(fx, { port: PORT, keepOptions: true })
