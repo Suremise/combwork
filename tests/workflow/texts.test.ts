@@ -4,16 +4,17 @@
 // as data beside their English.
 import { afterEach, describe, expect, it } from 'vitest'
 import { fmt, setLanguage, tr } from '../../src/shared/i18n'
-import type { Msg } from '../../src/shared/i18n/msg'
+import { msg, type Msg } from '../../src/shared/i18n/msg'
 import { availableLanguages, loadCatalogue } from '../../src/shared/i18n/catalogues'
 import { REFUSALS, refusal, refusalLines, type RefusalFormat, type RefusalValues, type RuleId } from '../../src/shared/workflow/refusals'
-import { FOR_YOU, MOVE_NAMES, RULE_NAMES, UNREADABLE, workflowEnglish, workflowLine, workflowText } from '../../src/shared/workflow/texts'
+import { FOR_YOU, MOVE_NAMES, RULE_NAMES, UNREAD_NOTES, UNREADABLE, unreadWhy, workflowEnglish, workflowLine, workflowText } from '../../src/shared/workflow/texts'
 import { STAGE_TEXT } from '../../src/shared/workflow/stages'
 import { unknown } from '../../src/main/platform/types'
 import { GUARDS } from '../../src/shared/workflow/pieces'
 import { B1, commit, moved, setup, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import en from '../../locales/en/workflow.json'
+import board from '../../locales/en/board.json'
 
 const LOCALES = ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']
 
@@ -130,6 +131,37 @@ describe("what a platform couldn't read", () => {
     expect(shown.message).toContain(tr(UNREADABLE.head, { where: 'D:\\work\\am' }))
     expect(shown.message).toContain(tr(RULE_NAMES['submit.checksPassed']))
     expect(shown.message).not.toContain('the latest commit')
+  })
+
+  it("the card dialog's Work section words why a field wasn't read, in the window's language, saying it once (#1477)", async () => {
+    const work = (id: keyof typeof board): Msg => msg({ id, defaultMessage: board[id].defaultMessage, description: board[id].description })
+    const notRead = work('board.work.notRead')
+    const revision = work('board.work.revisionNotRead')
+    const files = work('board.work.filesNotRead')
+    const format = (m: Msg, values?: Record<string, string | number>): string => tr(m, values)
+    // Nothing read before the change (a card moved into Review with no agent), as main records it for agents.
+    const before = { unknown: { line: UNREAD_NOTES.beforeChange, revision: UNREAD_NOTES.beforeChange, files: UNREAD_NOTES.beforeChange }, unknownText: {} }
+    // A platform's read that failed, its reason kept as data too; and main's other two notes.
+    const head = unknown(UNREADABLE.head, { where: 'D:\\work\\am' })
+    const failed = { unknown: { revision: head.what, base: UNREAD_NOTES.noTarget, files: UNREAD_NOTES.noBaseOrHead }, unknownText: { revision: head.whatText! } }
+    const lines = (): string[] => [tr(revision, unreadWhy('revision', before, format)), tr(files, unreadWhy('files', before, format)), tr(notRead, unreadWhy('line', before, format)), tr(revision, unreadWhy('revision', failed, format)), tr(notRead, unreadWhy('base', failed, format)), tr(files, unreadWhy('files', failed, format))]
+    expect(lines()).toEqual([
+      "No revision recorded: Hive didn't read one when the card went to Review. Its next submission reads it again.",
+      'Files not read',
+      'Not read when its work started',
+      "Revision not read when it was submitted: Hive couldn't read the latest commit in D:\\work\\am. Its next submission reads it again.",
+      'Not read: there was no target branch to start from',
+      'Files not read: there was no base or revision to compare'
+    ])
+    for (const code of LOCALES) {
+      setLanguage(code, await loadCatalogue(code), code)
+      const shown = lines()
+      for (const line of shown) expect(line, code).not.toMatch(/not read|no target|no base|latest commit|\{/)
+      expect(shown[3], code).toContain(tr(UNREADABLE.head, { where: 'D:\\work\\am' }))
+    }
+    // A fact recorded before the reasons were kept as data: main's notes are still worded, another reason shown as recorded.
+    expect(unreadWhy('revision', { unknown: { revision: UNREAD_NOTES.beforeChange }, unknownText: {} }, format)).toEqual({ note: 'beforeChange', why: '' })
+    expect(unreadWhy('revision', { unknown: { revision: 'cannot read repository HEAD' }, unknownText: {} }, format)).toEqual({ note: 'other', why: 'cannot read repository HEAD' })
   })
 
   it("an id this Hive doesn't know (a newer Hive's record) shows as nothing rather than failing", () => {

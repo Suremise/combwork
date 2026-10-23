@@ -13,11 +13,11 @@ import { AsyncLocalStorage } from 'async_hooks'
 import { join } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { HISTORY } from '../../shared/taskHistory'
-import type { TaskCard } from '../../shared/types'
+import type { StoredText, TaskCard } from '../../shared/types'
 import type { Actor, Fact, FileChange, StageId } from '../../shared/workflow/facts'
 import { compile, type Ruleset } from '../../shared/workflow/compile'
 import { agentActor, atRoundLimit, foldCard, ROUND_LIMIT_GATE, STAGE_CATEGORY } from '../../shared/workflow/facts'
-import { FOR_YOU, workflowEnglish, workflowText } from '../../shared/workflow/texts'
+import { FOR_YOU, UNREAD_NOTES, workflowEnglish, workflowText } from '../../shared/workflow/texts'
 import { advanced } from '../advanced'
 import { boardRead, boardReadOnly, boardWrite } from '../boardStore'
 import { createLogger } from '../logger'
@@ -49,6 +49,8 @@ export interface Reads {
   ruleset?: Ruleset
   /** Each field that couldn't be read, and why. */
   unknown: Record<string, string>
+  /** The same reasons as data, where a platform's read gave one (UNREADABLE), for the window to word (#1477). */
+  unknownText?: Record<string, StoredText>
 }
 
 /** A change's context: who made it, and the reads made for its cards before it. */
@@ -151,7 +153,8 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
   const cfg = await ws.projectConfig(projectPath)
   const def = projectAgents(cfg).find((a) => a.id === p.agent)
   const folder = def?.worktree?.path ?? projectPath
-  const r: Reads = { agent: p.agent!, folder: def?.worktree ? folder : 'project', line: null, head: null, target: null, base: null, files: [], key: null, unknown: {} }
+  const r: Reads = { agent: p.agent!, folder: def?.worktree ? folder : 'project', line: null, head: null, target: null, base: null, files: [], key: null, unknown: {}, unknownText: {} }
+  const texts = r.unknownText!
   // The ruleset the card starts under (HR4's round 1 finding 7): the project's options as #1218 keeps them, compiled.
   // A card of a running lane starts under the lane's ruleset, the one in force when the lane started (#1270, §16.11.1).
   const laneRuleset = p.why === 'start' ? laneRulesetOf(ws, p) : null
@@ -172,6 +175,7 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
   const take = <T>(field: string, v: Maybe<T>): T | null => {
     if (isUnknown(v)) {
       r.unknown[field] = v.what
+      if (v.whatText) texts[field] = v.whatText
       return null
     }
     return v
@@ -183,7 +187,11 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
     const targetHead = r.target ? take('base', await G.lineHead(folder, r.target)) : null
     r.base = r.head && targetHead ? take('base', await G.mergeBase(folder, r.head, targetHead)) : null
     // Not read: why (its head or target couldn't be read, or there is no target to start from).
-    if (!r.base && !r.unknown.base) r.unknown.base = r.unknown.head ?? r.unknown.target ?? 'no target to start from' // i18n-ignore: a fact's note, in English for agents
+    if (!r.base && !r.unknown.base) {
+      const from = r.unknown.head ? 'head' : r.unknown.target ? 'target' : null
+      r.unknown.base = from ? r.unknown[from] : UNREAD_NOTES.noTarget
+      if (from && texts[from]) texts.base = texts[from]
+    }
     return r
   }
   // A submission: from where its work started (its Started), else the merge base with the target now.
@@ -197,7 +205,7 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
     r.files = take('files', await G.filesChanged(folder, r.base, r.head)) ?? []
     r.key = take('key', await G.candidateKey(folder, r.base, r.head))
   } else {
-    r.unknown.files ??= 'no base or head to compare' // i18n-ignore: a fact's note, in English for agents
+    r.unknown.files ??= UNREAD_NOTES.noBaseOrHead
   }
   return r
 }
@@ -456,15 +464,21 @@ function causeOf(a: ChangeActor | undefined): 'intent' | 'user' | 'derived' {
   return actorOf(a) === 'hive' ? 'derived' : 'intent'
 }
 
-/** The fields of a fact that couldn't be read, and why (as `platform.unknown`); none when the reads weren't made at all, named so. */
+/**
+ * The fields of a fact that couldn't be read, and why (as `platform.unknown`, in English for agents); none when the reads
+ * weren't made at all, named so. Where a platform's read said why as data, that too (`platform.unknownText`), for the
+ * window to word in its language (#1477); the notes of UNREAD_NOTES it words by themselves.
+ */
 function unknownOf(r: Reads | null, fields: string[]): { platform?: Record<string, unknown> } {
-  if (!r) return { platform: { unknown: Object.fromEntries(fields.map((f) => [f, 'not read before the change'])) } } // i18n-ignore: a fact's note, in English for agents
+  if (!r) return { platform: { unknown: Object.fromEntries(fields.map((f) => [f, UNREAD_NOTES.beforeChange])) } }
   const map: Record<string, string> = {}
+  const texts: Record<string, StoredText> = {}
   for (const f of fields) {
     const from = f === 'revision' ? 'head' : f
     if (r.unknown[from]) map[f] = r.unknown[from]
+    if (r.unknown[from] && r.unknownText?.[from]) texts[f] = r.unknownText[from]
   }
-  return Object.keys(map).length ? { platform: { unknown: map } } : {}
+  return Object.keys(map).length ? { platform: { unknown: map, ...(Object.keys(texts).length ? { unknownText: texts } : {}) } } : {}
 }
 
 /**

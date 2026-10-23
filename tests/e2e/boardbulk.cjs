@@ -204,6 +204,22 @@ const check = (name, ok, extra = '') => {
     delete process.env.HIVE_TEST_SLOW_IPC
   })
 
+  // 8. Every card it would archive leaves while the dialog is open (#1463): it says none is left, with Archive
+  // disabled and no box to tick, never that agents are on them.
+  await page.locator('.toast .icon-btn[aria-label="Dismiss"], .toast button[title="Dismiss"]').first().click().catch(() => undefined)
+  const leaving = await make('Leaves meanwhile', 'todo')
+  await until(async () => (await page.locator(`.task-card[data-task="${leaving}"]`).count()) === 1, 5000)
+  await openColumnMenu('todo', 'Todo')
+  await item('Archive All in Todo (1)…').click()
+  check('the dialog opens with the card to archive', !!(await until(async () => (await dialog.count()) === 1 && (await dialog.getByRole('button', { name: 'Archive 1 card' }).isEnabled()), 5000)))
+  await inv('tasks:update', leaving, { column: 'review' })
+  const noneLeft = 'No cards are left in Todo to archive: they moved on while this was open.'
+  check('once it leaves, the dialog says none is left', !!(await until(async () => (await dialog.innerText()).includes(noneLeft), 5000)), await dialog.innerText().catch(() => ''))
+  check('…with Archive disabled, no box to tick and no word of agents', (await dialog.getByRole('button', { name: 'Archive 0 cards' }).isDisabled()) && (await dialog.locator('input[type="checkbox"]').count()) === 0 && !(await dialog.innerText()).includes('an agent is on'), await dialog.innerText().catch(() => ''))
+  await shot('none-left')
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+  check('Cancel closes it, the card where it went', !!(await until(async () => (await dialog.count()) === 0, 5000)) && (await archivedNow(leaving)) === false)
+
   await app.close()
   console.log(failed ? `\n${failed} check(s) failed` : '\nAll checks passed')
   process.exit(failed ? 1 : 0)

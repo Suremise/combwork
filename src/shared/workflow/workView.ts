@@ -105,6 +105,8 @@ export interface WorkRevision {
    * revision or diff never read isn't shown as none (#1224 round 1, finding 2). Empty when all was read.
    */
   unknown: Record<string, string>
+  /** The same reasons as data where a platform's read gave one (its `platform.unknownText`, #1477): the window words them. */
+  unknownText: Record<string, StoredText>
 }
 
 export interface WorkVerdict {
@@ -227,6 +229,8 @@ export interface WorkView {
   head: string | null
   /** What couldn't be read when its work started, and why (`line`, `base`, `target`…, its Started's `platform.unknown`). */
   unknown: Record<string, string>
+  /** The same reasons as data where a platform's read gave one (its `platform.unknownText`, #1477): the window words them. */
+  unknownText: Record<string, StoredText>
   /** The revision the latest submission's passes now cover, and its base. */
   approved: { revision: string | null; base: string | null } | null
   /** This cycle's submissions, oldest first. */
@@ -292,6 +296,13 @@ function unknownOf(platform: Record<string, unknown> | undefined): Record<string
   return Object.fromEntries(Object.entries(u as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string'))
 }
 
+/** A fact's `platform.unknownText` (#1477): each reason a platform's read gave as data (`{ id, values }`), from facts only. */
+function unknownTextOf(platform: Record<string, unknown> | undefined): Record<string, StoredText> {
+  const u = platform?.unknownText
+  if (!u || typeof u !== 'object') return {}
+  return Object.fromEntries(Object.entries(u as Record<string, unknown>).filter((e): e is [string, StoredText] => !!e[1] && typeof e[1] === 'object' && typeof (e[1] as StoredText).id === 'string'))
+}
+
 /** A card's work view from its facts, in seq order. Only the current cycle's (since its latest Started or Adopted). */
 export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
   const s = foldCard(facts, c.stage)
@@ -299,7 +310,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
   const at = new Map(facts.map((f) => [f.seq, f.at]))
   const latest = s.latest?.id ?? null
   const revisions = s.submissions.map(
-    (x): WorkRevision => ({ submission: x.id, revision: x.revision, base: x.base, round: x.round, files: x.files, at: at.get(x.id) ?? '', by: x.by, generation: x.generation, sameRevision: x.sameRevision, adopted: !!x.adopted, warnings: x.warnings ?? [], summary: x.summary, unknown: unknownOf(x.platform) })
+    (x): WorkRevision => ({ submission: x.id, revision: x.revision, base: x.base, round: x.round, files: x.files, at: at.get(x.id) ?? '', by: x.by, generation: x.generation, sameRevision: x.sameRevision, adopted: !!x.adopted, warnings: x.warnings ?? [], summary: x.summary, unknown: unknownOf(x.platform), unknownText: unknownTextOf(x.platform) })
   )
   const verdicts = s.verdicts
     .filter((v) => v.seq >= s.cycle)
@@ -347,6 +358,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     builder: started?.builder ?? null,
     head: s.head,
     unknown: unknownOf(started?.platform),
+    unknownText: unknownTextOf(started?.platform),
     approved: s.approved,
     revisions,
     verdicts,

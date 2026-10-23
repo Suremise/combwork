@@ -1350,8 +1350,12 @@ A card's history text (`TaskHistoryEntry`) stays, for people; the facts are the 
   with Retry. The board card shows, in one line, the revision, the last verdict, the checks on it and a stale or
   outside-the-rules mark, each an icon with its words as its accessible name. None's revisions show once P4 reads them
   ("No revision recorded" until then). What a fact names as not read (`platform.unknown`: a revision, its files, a
-  line or base) is shown as not read, with why, never as none; a revision's files open in the folder recorded for it
-  (the agent whose worktree it is now), else are listed as text, saying the folder is no longer an agent's [#1224 round 1].
+  line or base) is shown as not read, with why, never as none. The English there is agents': the window words why
+  itself [#1477]: what a platform couldn't read from the reason kept beside it as data (`platform.unknownText`), and
+  Hive's own notes (nothing read before the change, as for a card sent to Review with no agent: "No revision recorded:
+  Hive didn't read one when the card went to Review") in sentences of their own. A revision's files open in the folder
+  recorded for it (the agent whose worktree it is now), else are listed as text, saying the folder is no longer an
+  agent's [#1224 round 1].
 - **Restart** resumes from the log. The merge queue rebuilds from `IntegrationRequested` entries with no
   `IntegrationCancelled`, `IntegrationFailed` or `Integrated` for the same entry id; an entry with `IntegrationStarted`
   and no outcome is reconciled first (§16.4.5) [note §4; P1, answering HR2's round 1 finding 8].
@@ -1554,7 +1558,9 @@ stages; a column takes a project's rename when one project is shown or every sho
 default name, and a card's project chip then says its own project's name for the stage. A drop into a stage is its
 category's move; **Merging is no drop target** (its hover says cards come through the merge queue), and a card in
 Merging leaves it by Remove from queue, never by a drag into Approved; Approved's Archive All takes Approved's cards only (a
-card that moves on to Merging meanwhile stays: main checks its stage again), and Merging has none. Folds are kept per column id: a category's
+card that moves on to Merging meanwhile stays: main checks its stage again), and Merging has none. When every card an
+open Archive All dialog took leaves its column, stage or project, the dialog says none is left to archive, with Archive
+disabled, rather than that agents are on them (#1463). Folds are kept per column id: a category's
 apply to its stage, Merging keeps its own (`merging`). The toolbar links each shown project's workflow ("Workflow: Git ·
 Team", or a **Workflows** menu with a line per project), opening its Version Control tab at Workflow.
 
@@ -1647,7 +1653,9 @@ control; another system found, so None; the repository gone), and **Workflow: Gi
 no preset chosen, from `workflow:form`), which opens Workflow. The sections (`VC_SECTIONS`, `vcSections` in
 `gitRepo.ts`, kept per project while Hive runs) are Workflow, then Git's Changes, History, Branches & remotes
 (`GitBranches.tsx`) and Merge queue (#1357's section, placed as it was); a project opens at Changes for Git and at
-Workflow for None. **None's page:** Workflow, with Initialise repository… under the header while the folder has no
+Workflow for None. When the sections' names don't fit the tab's width beside the status line [#1461], they fold to
+their icons (each name in its tooltip and for screen readers), the selected section keeping its name; narrower still,
+the row scrolls with the selected section in view. **None's page:** Workflow, with Initialise repository… under the header while the folder has no
 repository; and **Merge queue while an old Git ruleset's queue is still there**, by #1356's actual-state rule
 (`queueShown`: an entry testing or queued, a pause, a return not seen yet, a runner, or a card in flight whose own
 ruleset has Hive merge), with its controls and the links to it, until that state is clear. The section list is a pure

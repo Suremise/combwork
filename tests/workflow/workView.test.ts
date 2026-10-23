@@ -96,6 +96,21 @@ describe("a card's work view (#1223)", () => {
     expect(v.revisions.map((r) => r.unknown)).toEqual([{ revision: 'cannot read repository HEAD', files: 'cannot read repository diff' }, {}])
     // A later submission read in full keeps the earlier one's record as it was.
     expect(v.revisions[0]).toMatchObject({ revision: null, files: [] })
+    // Facts from before #1477 keep no reasons as data.
+    expect(v.unknownText).toEqual({})
+    expect(v.revisions.map((r) => r.unknownText)).toEqual([{}, {}])
+  })
+
+  it('the reasons kept as data beside the English (#1477): each with an id, anything else left out', () => {
+    seq = 0
+    const head = { id: 'workflow.unreadable.head', values: { where: 'D:\\work\\am' } }
+    const facts = [
+      fact('Started', start({ line: null, platform: { unknown: { line: 'the branch checked out in D:\\work\\am', base: 'x' }, unknownText: { line: { id: 'workflow.unreadable.branch', values: { folder: 'D:\\work\\am' } }, base: 'not a text', target: { values: {} } } } }), 'agent:B1'),
+      fact('Submitted', submit(null as unknown as string, 1, { revision: null, head: null, files: [], platform: { unknown: { revision: 'the latest commit in D:\\work\\am' }, unknownText: { revision: head } } }), 'agent:B1')
+    ]
+    const v = workView(card, facts)
+    expect(v.unknownText).toEqual({ line: { id: 'workflow.unreadable.branch', values: { folder: 'D:\\work\\am' } } })
+    expect(v.revisions[0].unknownText).toEqual({ revision: head })
   })
 
   it('verdicts tied to their submission, revision and round; only the latest submission at this generation counts', () => {
