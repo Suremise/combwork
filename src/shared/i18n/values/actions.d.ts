@@ -125,8 +125,8 @@ interface HiveMessageValues {
   'actions.releaseHeld.detailListed': { n: number }
   'actions.releaseHeld.detailUnknown': undefined
   'actions.releaseHeld.endFirst': undefined
-  'actions.releaseHeld.messageGone': { slot: string | number; agent: string | number; pid: string | number }
-  'actions.releaseHeld.messageSelf': { agent: string | number; slot: string | number }
+  'actions.releaseHeld.messageGone': { slot: string | number; agent: string | number; run: string | number; pid: string | number }
+  'actions.releaseHeld.messageSelf': { agent: string | number; slot: string | number; run: string | number; pid: string | number }
   'actions.releaseHeld.process': { label: string | number; pid: string | number }
   'actions.releaseHeld.readFailed': undefined
   'actions.releaseHeld.title': { agent: string | number; slot: string | number }

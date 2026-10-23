@@ -35,7 +35,7 @@ const tracker = vi.hoisted(() => ({
   ended: [] as { run?: string; at: string | null }[],
   writerAt: () => null as string | null,
   /** The last run's marker's launches (the notice that Hive closed unexpectedly), and whether ending them works. */
-  restart: [] as { projectPath: string; agentId: string; agentName: string; processes: Proc[] }[],
+  restart: [] as { projectPath: string; agentId: string; agentName: string; runId?: string; processes: Proc[] }[],
   endedExactly: [] as { list: Proc[]; at: string | null }[],
   endWorks: true
 }))
@@ -370,11 +370,22 @@ describe('Release Slot… on a held writer (#1506)', () => {
     expect(writer()).toBeNull()
   })
 
-  it("its Hive gone with nothing listed for its run: the notice's list of b1's processes that still run, ended exactly first when asked; a failed end releases nothing", async () => {
+  it("its Hive gone with nothing listed for its run: the notice's list of that run's own processes that still run, ended exactly first when asked; a failed end releases nothing", async () => {
     hostOn(false)
     tracker.writerAt = () => writer()?.run ?? null
     const node = { pid: 5150, name: 'node.exe', label: 'node serve.js', created: '133900000000000000' }
-    tracker.restart = [{ projectPath: project, agentId: 'b1', agentName: 'B1', processes: [node] }, { projectPath: project, agentId: 'b2', agentName: 'B2', processes: [{ ...node, pid: 6160 }] }]
+    // The last run's marker: this run's launch, b1's newer launch elsewhere, a launch from before runs were named, b2's.
+    tracker.restart = [
+      { projectPath: project, agentId: 'b1', agentName: 'B1', runId: 'r-newer', processes: [{ ...node, pid: 7170 }] },
+      { projectPath: project, agentId: 'b1', agentName: 'B1', runId: 'r-crash', processes: [node] },
+      { projectPath: project, agentId: 'b1', agentName: 'B1', processes: [{ ...node, pid: 8180 }] },
+      { projectPath: project, agentId: 'b2', agentName: 'B2', runId: 'r-crash', processes: [{ ...node, pid: 6160 }] }
+    ]
+    // HR4's round 1: an older held writer of b1's never takes its newer launch's processes, nor an unnamed one's.
+    await plant('r-older')
+    expect((await heldWriter(project, 'slot-a'))?.processes).toBeNull()
+    await releaseHeldWriter(project, 'slot-a', 'r-older', { end: true })
+    expect(tracker.endedExactly).toEqual([])
     await plant('r-crash')
     expect((await heldWriter(project, 'slot-a'))?.processes).toEqual({ list: [node], more: 0, from: 'restart' })
     tracker.endWorks = false

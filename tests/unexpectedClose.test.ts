@@ -41,6 +41,8 @@ describe('the running marker (#984)', () => {
     const read = parseRunMarker(marker({ processes: many }))?.processes ?? []
     expect(read.length).toBe(MAX_MARKER_LAUNCHES)
     expect(read.every((l) => l.processes.length === MAX_MARKER_PROCESSES)).toBe(true)
+    // Each launch's run (#1506: Release Slot… lists a held writer's own run only); one too long or not text is left out.
+    expect(parseRunMarker(marker({ processes: [{ ...launch, runId: 'r-1' }, { ...launch, runId: 'x'.repeat(101) }, { ...launch, runId: 7 }] }))?.processes).toEqual([{ ...launch, runId: 'r-1' }, launch, launch])
   })
 
   it('names each project once, in the order met', () => {

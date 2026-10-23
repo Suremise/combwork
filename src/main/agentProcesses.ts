@@ -241,7 +241,7 @@ export async function runningProcesses(): Promise<LaunchProcesses[]> {
   for (const l of [...running.values()].slice(-MAX_MARKER_LAUNCHES)) {
     const list = await listJob(l.runId)
     const processes = (list?.processes ?? []).filter((p) => p.created).slice(0, MAX_MARKER_PROCESSES)
-    if (processes.length) out.push({ projectPath: l.projectPath, agentId: l.agentId, agentName: l.agentName, processes })
+    if (processes.length) out.push({ projectPath: l.projectPath, agentId: l.agentId, agentName: l.agentName, runId: l.runId, processes })
   }
   return out
 }

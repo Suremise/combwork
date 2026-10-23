@@ -496,12 +496,12 @@
     "description": "Release Slot…: a tick box, on by default: Hive ends the listed processes before releasing the slot."
   },
   "actions.releaseHeld.messageGone": {
-    "defaultMessage": "{slot} is held by {agent}'s session in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.",
-    "description": "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {pid} is that Hive's process id."
+    "defaultMessage": "{slot} is held by {agent}'s session (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.",
+    "description": "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another."
   },
   "actions.releaseHeld.messageSelf": {
-    "defaultMessage": "{agent}'s last session in {slot} has ended, but Hive doesn't know that everything it started there has: until you release it, nothing else uses the slot.",
-    "description": "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Hive; its processes were kept running or Hive could not follow them."
+    "defaultMessage": "{agent}'s last session in {slot} (run {run}) has ended in this Hive (process {pid}, running), but Hive doesn't know that everything it started there has: until you release it, nothing else uses the slot.",
+    "description": "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Hive; its processes were kept running or Hive could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Hive's process id: they tell one launch from another."
   },
   "actions.releaseHeld.process": {
     "defaultMessage": "{label} (process {pid})",

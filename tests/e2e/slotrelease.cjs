@@ -1,11 +1,14 @@
 // Release Slot… on a held writer (#1506, SPEC §16.10.3 One writer): a slot whose writer's Hive has gone is the user's
 // to release. B1 is lent slot-a (`slots:test`, as a card's start does) and started there, on the fake Claude Code:
-// 1. While B1 runs there, Release is refused ("still running in this Hive"), and the slot isn't listed as held.
-// 2. That Hive is ended from outside (its own process tree, by pid and start time, never by name), as a crash would:
-//    the next Hive, on the same profile, lists slot-a's writer as held, and B1's ⋯ offers Release Slot….
+// 1. While B1 runs there, and while what it left running is still followed, Release is refused ("still running in
+//    this Hive"), and the slot isn't listed as held. Its leftover kept running (Keep Running): held by this Hive, and
+//    the question from B1's ⋯ names the run and this Hive (its process, running); Release frees it.
+// 2. B1 again, and that Hive is ended from outside (its own process tree, by pid and start time, never by name), as a
+//    crash would: the next Hive, on the same profile, lists slot-a's writer as held, and B1's ⋯ offers Release Slot….
 // 3. The Version Control tab's slot list shows slot-a held by B1's ended session with Release…; its question names
-//    the Hive that is gone and says Hive doesn't know what still runs; Release frees the slot, and B1 starts there again.
-// Screenshots of the question, light and dark. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+//    the run and the Hive that is gone, and says Hive doesn't know what still runs; Release frees the slot, and B1
+//    starts there again.
+// Screenshots of both questions, light and dark. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { processes, descendantsIn, endExactly, childrenFirst } = require('./folderProcesses.cjs')
 const fs = require('fs')
@@ -66,6 +69,15 @@ async function endFromOutside(app) {
   const slotA = async () => (await inv('slots:list', alpha)).find((s) => s.name === 'slot-a')
   const agentInfo = async (id) => (await inv('workspace:refresh')).projects.find((p) => same(p.path, alpha))?.agents.find((a) => a.id === id)
   const dialog = () => h.page.locator('.dialog', { hasText: 'Release B1' })
+  /** The question in both themes (the window as it is, the dialog open). */
+  const themed = async (name) => {
+    for (const theme of ['light', 'dark']) {
+      await h.page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await h.page.screenshot({ path: path.join(shots, `slotrelease-${name}-${theme}.png`) })
+    }
+  }
+  /** B1's lingering node, by pid and start time: ended once its step is done, or at the end. */
+  const kept = []
 
   try {
     await start()
@@ -80,11 +92,45 @@ async function endFromOutside(app) {
     const w1 = await inv('slots:heldWriter', alpha, 'slot-a')
     check('…its run is slot-a\'s writer, live in this Hive', w1?.agent === b1.id && w1.live === true && w1.hive.self === true, JSON.stringify(w1))
     check('…not listed as held', (await slotA())?.writer?.held === false && !(await agentInfo(b1.id))?.heldSlot)
-    const refused = await inv('slots:releaseWriter', alpha, 'slot-a', w1.run, false).then(() => 'released', (e) => String(e?.message ?? e))
+    const releaseNow = (run) => inv('slots:releaseWriter', alpha, 'slot-a', run, false).then(() => 'released', (e) => String(e?.message ?? e))
+    const refused = await releaseNow(w1.run)
     check('Release is refused while its run is live', /still running in this Hive/.test(refused), refused)
     check('…and slot-a keeps its writer', (await slotA())?.writer?.agent === b1.id)
 
-    // --- 2. That Hive ends as a crash would: the next one lists slot-a's writer as held.
+    // B1 leaves a process running and is stopped: while Hive follows it, still live; kept running, held by this Hive.
+    const key = lib.ptyKey(alpha, b1.id)
+    const lingerFile = path.join(home, 'fake-linger.jsonl')
+    const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l).pid) : [])
+    await lib.sendPrompt(inv, key, 'linger 1', { submitted: async () => (await live(b1.id))?.status === 'working' || lingering().length > 0 })
+    check('B1 leaves a process running', !!(await until(async () => lingering().length === 1 && (await idle(b1.id)))))
+    kept.push(...lib.identify(lingering()))
+    await inv('session:stop', alpha, b1.id)
+    check('…stopped, its leftover listed', !!(await until(async () => !(await live(b1.id)) && (await inv('session:leftovers')).some((l) => l.agentId === b1.id))))
+    const followed = await releaseNow(w1.run)
+    check('Release is refused while Hive still follows what it left running', /still running in this Hive/.test(followed), followed)
+    await inv('session:settleLeftovers', alpha, b1.id, 'keep')
+    const wSelf = await until(async () => {
+      const w = await inv('slots:heldWriter', alpha, 'slot-a')
+      return w && !w.live ? w : null
+    })
+    check('kept running: slot-a held by this Hive, nothing listed of its processes', wSelf?.run === w1.run && wSelf.hive.self && wSelf.processes === null, JSON.stringify(wSelf))
+    check("…B1's ⋯ offers Release Slot…", !!(await until(async () => (await agentInfo(b1.id))?.heldSlot === 'slot-a')) && (await lib.agentMenu(h.page, 'B1')).some((t) => t.startsWith('Release Slot…')))
+    await lib.menuEntry(h.page, 'Release Slot…').click()
+    await dialog().waitFor({ timeout: HUNG_MS })
+    const saidSelf = await dialog().innerText()
+    check('its question names the run and this Hive (its process, running)', saidSelf.includes(`(run ${w1.run})`) && saidSelf.includes(`in this Hive (process ${w1.hive.pid}, running)`), saidSelf)
+    await themed('self', dialog())
+    await dialog().getByRole('button', { name: 'Release', exact: true }).click()
+    await dialog().waitFor({ state: 'detached', timeout: HUNG_MS })
+    check('Release frees it', !!(await until(async () => !(await slotA())?.writer)), JSON.stringify(await slotA()))
+    lib.endExactly(kept.splice(0))
+
+    // --- 2. B1 again, and that Hive ends as a crash would: the next one lists slot-a's writer as held.
+    await inv('session:start', alpha, { agentId: b1.id })
+    const s2 = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null))
+    const w1b = await inv('slots:heldWriter', alpha, 'slot-a')
+    check('B1 runs in slot-a again, its new run the writer', s2?.slot === 'slot-a' && w1b?.run === s2.runId && w1b.run !== w1.run, JSON.stringify({ s2, w1b }))
+    w1.run = w1b.run
     check('the first Hive is ended from outside', await endFromOutside(h.app))
     await start()
     const w2 = await until(async () => {
@@ -110,11 +156,8 @@ async function endFromOutside(app) {
     await row.locator('[data-action="release-held"]').click()
     await dialog().waitFor({ timeout: HUNG_MS })
     const said = await dialog().innerText()
-    check('its question names the Hive that has gone, and says Hive doesn\'t know what still runs', said.includes("Release B1's slot slot-a?") && said.includes(`process ${w1.hive.pid}`) && /doesn.t know which of the processes/.test(said), said)
-    for (const theme of ['light', 'dark']) {
-      await h.page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
-      await h.page.screenshot({ path: path.join(shots, `slotrelease-question-${theme}.png`) })
-    }
+    check('its question names the run and the Hive that has gone, and says Hive doesn\'t know what still runs', said.includes("Release B1's slot slot-a?") && said.includes(`(run ${w1.run}) in a Hive that is no longer running (process ${w1.hive.pid})`) && /doesn.t know which of the processes/.test(said), said)
+    await themed('gone', dialog())
     await dialog().getByRole('button', { name: 'Release', exact: true }).click()
     await dialog().waitFor({ state: 'detached', timeout: HUNG_MS })
     check('Release frees slot-a: no writer, still lent to #12', !!(await until(async () => {
@@ -127,6 +170,7 @@ async function endFromOutside(app) {
     check('B1 starts in slot-a again', s3?.slot === 'slot-a' && (await inv('slots:heldWriter', alpha, 'slot-a'))?.run === s3.runId, JSON.stringify(s3))
   } finally {
     await h?.app.close().catch(() => undefined)
+    lib.endExactly(kept)
   }
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nALL PASSED')
   process.exit(failed ? 1 : 0)

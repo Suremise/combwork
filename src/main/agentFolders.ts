@@ -452,18 +452,19 @@ export async function heldWriter(projectPath: string, slot: string): Promise<Hel
     run: w.run,
     hive: { pid: w.pid, self, alive },
     live: self && writerHost.live.has(w.run),
-    processes: left ? { list: left.processes, more: left.more, from: 'leftovers' } : !self && alive === false ? await restartList(projectPath, w.agent) : null
+    processes: left ? { list: left.processes, more: left.more, from: 'leftovers' } : !self && alive === false ? await restartList(projectPath, w) : null
   }
 }
 
 /**
- * What the notice that Hive closed unexpectedly lists for an agent in this project (#1506: a held writer's Hive gone, its
- * run's own leftovers not listed): its launch's processes from the last run's marker that still run now, each by id
- * and start time. Null when there are none, or it can't be told.
+ * What the notice that Hive closed unexpectedly lists of a held writer's own run (#1506: its Hive gone, the run's own
+ * leftovers not listed): that launch's processes in the last run's marker (by its run, and its agent and project), those
+ * that still run now, each by id and start time. Another launch of the same agent's, a marker of another Hive's, or one
+ * from before launches named their run, is never this run's: null then, as when none still runs or it can't be told.
  */
-async function restartList(projectPath: string, agent: string): Promise<HeldWriter['processes']> {
+async function restartList(projectPath: string, w: { run: string; agent: string }): Promise<HeldWriter['processes']> {
   const { lastUnexpectedClose } = await import('./lastRun')
-  const kept = (lastUnexpectedClose()?.processes ?? []).filter((l) => l.agentId === agent && samePlace(l.projectPath, projectPath)).flatMap((l) => l.processes)
+  const kept = (lastUnexpectedClose()?.processes ?? []).filter((l) => l.runId === w.run && l.agentId === w.agent && samePlace(l.projectPath, projectPath)).flatMap((l) => l.processes)
   const running = kept.length ? await stillRunningOf(kept) : null
   return running?.length ? { list: running, more: 0, from: 'restart' } : null
 }
