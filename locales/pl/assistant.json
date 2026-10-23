@@ -330,6 +330,8 @@
   "assistant.sidebar.workingOnTip": "Aktywne projekty mają sesję terminala, wskaźniki stanu i powiadomienia.",
   "assistant.sidebar.workspace": "Obszar roboczy: {name}",
   "assistant.sidebar.workspaceGroup": "Obszar roboczy",
+  "assistant.sidebar.workspaceNotes": "Workspace notes",
+  "assistant.sidebar.workspaceNotesTip": "Notatki o tym komputerze (pełna ścieżka, wersja lokalnego narzędzia), które każdy agent dostaje przy starcie, w każdym agencie kodującym i w każdym folderze. Trzymane w .hive/shared, poza gitem.",
   "assistant.skills.add": "Dodaj",
   "assistant.skills.addFailed": "Nie udało się dodać umiejętności",
   "assistant.skills.alsoFor": "Dodaj ją też dla {provider}",

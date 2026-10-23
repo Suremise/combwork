@@ -330,6 +330,8 @@
   "assistant.sidebar.workingOnTip": "アクティブなプロジェクトには、ターミナルのセッション、状態表示、通知があります。",
   "assistant.sidebar.workspace": "ワークスペース：{name}",
   "assistant.sidebar.workspaceGroup": "ワークスペース",
+  "assistant.sidebar.workspaceNotes": "Workspace notes",
+  "assistant.sidebar.workspaceNotesTip": "このマシンについてのノート（フルパス、ローカルツールのバージョンなど）。すべてのエージェントが、どのコーディングエージェントでも、どのフォルダーでも、起動時に受け取ります。.hive/sharedに保存され、gitの対象外です。",
   "assistant.skills.add": "追加",
   "assistant.skills.addFailed": "スキルを追加できませんでした",
   "assistant.skills.alsoFor": "{provider}にも追加する",

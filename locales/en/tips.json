@@ -1559,6 +1559,14 @@
     "defaultMessage": "Defender exclusions follow a moved workspace",
     "description": "A tip's title."
   },
+  "tips.workspaceNotes.text": {
+    "defaultMessage": "Workspace notes, pinned first in Shared Notes, is for what's true of this machine, like a full path. Every agent gets it when it starts, in any folder, so it needn't go in a committed AGENTS.md. A section headed with a project's name is that project's alone.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Workspace notes is a shared note's name and AGENTS.md a file name: keep both in English."
+  },
+  "tips.workspaceNotes.title": {
+    "defaultMessage": "Notes about this machine for every agent",
+    "description": "A tip's title."
+  },
   "tips.worktreeReuse.text": {
     "defaultMessage": "Adding an agent with a new worktree named like one you kept (B4, and B4's worktree is unused)? If it's merged and clean, Hive gives the agent that folder, brought up to main: its node_modules are already there.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

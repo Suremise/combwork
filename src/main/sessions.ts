@@ -87,6 +87,7 @@ import { KeysStopped, PickNotFound, typeKeySteps } from './keySteps'
 import { withBinOnPath } from './progressReporters/shims'
 import { hiveSkills, parseSkillFrontmatter, skillFor } from './skills'
 import { copyBook, sessionEnded } from './skillCopies'
+import { workspaceNotesFor } from './workspaceNotes'
 import { skillOff } from '../shared/skillDelivery'
 import { samePath } from '../shared/movePaths'
 import { GUIDANCE_REVISION, launchParts, launchRecord } from './guidance'
@@ -1586,6 +1587,8 @@ class SessionManager {
     const hookAuth = await newHookToken(state.runId)
     times?.mark('tokens')
     const guidance = await this.hiveGuidance(projectPath).catch(() => '')
+    // The Workspace notes note as it is now (#1433): every agent, whatever its tools or folder; a running one keeps its own.
+    const notes = await workspaceNotesFor(projectPath).catch(() => '')
     times?.mark('guidance')
     const ctx = {
       projectPath,
@@ -1612,6 +1615,7 @@ class SessionManager {
       privateDir: hookAuth.dir,
       guidance,
       instructions: assistantText?.text,
+      notes,
       overrides: overridesNow(adapter.id),
       trustedHiveTools: workspace.isAssistantHome(projectPath) ? assistantTools(config.settings.assistant?.control, config.settings.assistant?.changeSettings === true, journalSettingsOf(workspaceOf(projectPath)).enabled) : undefined,
       initialPrompt: l.initialPrompt,
@@ -1679,7 +1683,7 @@ class SessionManager {
     // Performance metrics: what Hive gave this session, exact sizes. The session contract once (whichever way the
     // provider gets it); the skills that reached it, measured on their copies; the ones asked for that didn't.
     const given = Object.keys(record.skills)
-    const parts = launchParts(ctx.guidance, workspace.isAssistantHome(projectPath) ? 'assistant' : 'agent', basename(projectPath), assistantText)
+    const parts = launchParts(ctx.guidance, workspace.isAssistantHome(projectPath) ? 'assistant' : 'agent', basename(projectPath), assistantText, ctx.notes)
     recordLaunch(metrics, workspace.isAssistantHome(projectPath) ? null : basename(projectPath), {
       provider: adapter.id,
       role: workspace.isAssistantHome(projectPath) ? 'assistant' : 'agent',

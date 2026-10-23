@@ -330,6 +330,8 @@
   "assistant.sidebar.workingOnTip": "活跃的项目会获得终端会话、状态指示和通知。",
   "assistant.sidebar.workspace": "工作区：{name}",
   "assistant.sidebar.workspaceGroup": "工作区",
+  "assistant.sidebar.workspaceNotes": "Workspace notes",
+  "assistant.sidebar.workspaceNotesTip": "关于这台机器的笔记（完整路径、本地工具的版本），每个智能体在启动时都会获得，无论使用哪种编程智能体、在哪个文件夹中。保存在 .hive/shared 中，不纳入 git。",
   "assistant.skills.add": "添加",
   "assistant.skills.addFailed": "无法添加技能",
   "assistant.skills.alsoFor": "同时为 {provider} 添加",

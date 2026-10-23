@@ -74,6 +74,8 @@ import { startTask } from './taskStart'
 import { hiveSkills, listSkills, skillFiles, validSkillName } from './skills'
 import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
+import { workspaceNotesFile } from './workspaceNotes'
+import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
 import { cardFacts, cardKind, factRow } from './workflow/cardWork'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket } from './workflow/runChecks'
@@ -1890,6 +1892,10 @@ route('PUT', '/v1/shared/file', async ({ query, body }) => {
   const rel = query.get('path') ?? body?.path
   if (!rel) throw new HttpError(400, 'path is required')
   const abs = inWorkspace(requireWorkspace(), () => assertInShared(rel))
+  // Workspace notes reach every agent at launch (#1433): the user's and the Assistant's to write, never a project agent's.
+  if (agentCaller() && resolvePath(abs).toLowerCase() === resolvePath(inWorkspace(requireWorkspace(), () => workspaceNotesFile(workspace.sharedDir))).toLowerCase()) {
+    throw new HttpError(403, `The shared note "${WORKSPACE_NOTES_PATH}" is the user's and the Hive Assistant's: project agents read it but don't change it. Tell the user what it should say.`)
+  }
   const content = String(body?.content ?? '')
   // Only a write that leaves it out is unguarded: one given (null, empty, not a string) must be a revision.
   const expected: unknown = body && typeof body === 'object' && 'expectedRevision' in body ? body.expectedRevision : undefined

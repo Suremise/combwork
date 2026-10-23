@@ -185,6 +185,12 @@ interface HiveMessageValues {
   'workspace.move.working': undefined
   'workspace.notes.delete': undefined
   'workspace.notes.select': undefined
+  'workspace.notes.workspaceNotes.assistant': undefined
+  'workspace.notes.workspaceNotes.cut': { max: number; who: string | number }
+  'workspace.notes.workspaceNotes.how': { example: string | number }
+  'workspace.notes.workspaceNotes.off': undefined
+  'workspace.notes.workspaceNotes.template': undefined
+  'workspace.notes.workspaceNotes.title': undefined
   'workspace.overview.agentLabel': { project: string | number; agent: string | number }
   'workspace.overview.apiCost': undefined
   'workspace.overview.asReported': undefined

@@ -282,6 +282,7 @@ export const SUITES = [
   { name: 'windows' },
   { name: 'workflowdefaults' },
   { name: 'workflowoptions' },
+  { name: 'workspacenotes' },
   { name: 'wsmove' },
   { name: 'wsoverview' },
   { name: 'wtrecreate' },

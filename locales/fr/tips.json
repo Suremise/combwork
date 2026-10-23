@@ -389,6 +389,8 @@
   "tips.workspaceMoved.title": "Déplacer un espace de travail sans perdre ses agents",
   "tips.workspaceMovedDefender.text": "Si Hive a fait ignorer à Defender les dossiers de l’espace de travail, Réparer… après un déplacement propose de déplacer ces exclusions vers les nouveaux dossiers, avec une seule demande d’administrateur, pour qu’aucune ne reste sur un dossier disparu. Les exclusions que tu as créées toi-même restent telles quelles.",
   "tips.workspaceMovedDefender.title": "Les exclusions Defender suivent un espace de travail déplacé",
+  "tips.workspaceNotes.text": "Workspace notes, épinglée en tête des Notes partagées, sert à ce qui est vrai pour cette machine, comme un chemin complet. Chaque agent la reçoit à son démarrage, dans n’importe quel dossier : inutile de le mettre dans un AGENTS.md commité. Une section portant le nom d’un projet n’est qu’à ce projet.",
+  "tips.workspaceNotes.title": "Des notes sur cette machine pour chaque agent",
   "tips.worktreeReuse.text": "Tu ajoutes un agent avec un nouveau worktree du même nom qu’un worktree conservé (B4, et le worktree de B4 n’est pas utilisé) ? S’il est fusionné et propre, Hive donne ce dossier à l’agent, mis à jour avec main : ses node_modules y sont déjà.",
   "tips.worktreeReuse.title": "Un worktree conservé resservi",
   "tips.worktrees.text": "Dans Ajouter un agent…, choisis Nouveau worktree : l’agent travaille sur sa propre branche, et Fusionner… ramène son travail quand il te convient.",

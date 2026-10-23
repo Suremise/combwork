@@ -389,6 +389,8 @@
   "tips.workspaceMoved.title": "移动工作区而不丢失智能体",
   "tips.workspaceMovedDefender.text": "如果 Hive 曾让 Defender 跳过工作区的文件夹，移动后点击“修复…”即可将这些排除项移到新文件夹（一次管理员提示），不会在已不存在的文件夹上留下排除项。你自己创建的排除项保持不变。",
   "tips.workspaceMovedDefender.title": "Defender 排除项会跟随移动后的工作区",
+  "tips.workspaceNotes.text": "固定在“共享笔记”顶部的 Workspace notes 用来记录这台机器特有的内容，比如完整路径。每个智能体在启动时都会获得它，无论在哪个文件夹，所以不必写进已提交的 AGENTS.md。以项目名为标题的章节只属于该项目。",
+  "tips.workspaceNotes.title": "让每个智能体都知道的本机笔记",
   "tips.worktreeReuse.text": "添加智能体时新建的工作树与你保留的某个工作树同名（例如 B4，而 B4 的工作树没人使用）？如果它已合并且干净，Hive 会把那个文件夹交给该智能体，并更新到 main：它的 node_modules 已经在里面了。",
   "tips.worktreeReuse.title": "保留的工作树会被再次使用",
   "tips.worktrees.text": "在“添加智能体…”中选择“新建工作树”：智能体在自己的分支上工作，你满意后，“合并…”会把它的工作合并回来。",

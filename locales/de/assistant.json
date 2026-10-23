@@ -330,6 +330,8 @@
   "assistant.sidebar.workingOnTip": "Aktive Projekte bekommen eine Terminalsitzung, Statusanzeigen und Benachrichtigungen.",
   "assistant.sidebar.workspace": "Arbeitsbereich: {name}",
   "assistant.sidebar.workspaceGroup": "Arbeitsbereich",
+  "assistant.sidebar.workspaceNotes": "Workspace notes",
+  "assistant.sidebar.workspaceNotesTip": "Notizen über diesen Rechner (ein vollständiger Pfad, die Version eines lokalen Tools), die jeder Agent beim Start bekommt, bei jedem Coding-Agenten und in jedem Ordner. Liegt in .hive/shared, außerhalb von Git.",
   "assistant.skills.add": "Hinzufügen",
   "assistant.skills.addFailed": "Skill konnte nicht hinzugefügt werden",
   "assistant.skills.alsoFor": "Auch für {provider} hinzufügen",

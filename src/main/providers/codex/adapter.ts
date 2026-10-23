@@ -696,7 +696,7 @@ export class CodexAdapter implements ProviderAdapter {
     // The developer_instructions Codex would give this session, for Hive's guidance to follow (#1285): asked at each
     // launch Hive adds some to, with its own arguments, folder and environment (no cache: only Codex knows what they
     // depend on). Unreadable, buildCommand never puts anything in their place (developerOverride).
-    if ([ctx.guidance, ctx.instructions].some((t) => t && t.trim())) {
+    if ([ctx.guidance, ctx.instructions, ctx.notes].some((t) => t && t.trim())) {
       const theirs = await developerInstructionsFromCodex(ctx.executable, ctx.cwd, ctx.extraArgs, ctx.env)
       if (theirs === null) log.warn("Codex couldn't render the session's prompt to say which developer_instructions apply; Hive leaves them as they are")
       keepBounded(this.developerByRun, ctx.runId, theirs)
@@ -716,18 +716,20 @@ export class CodexAdapter implements ProviderAdapter {
   /**
    * The launch's developer_instructions, or null for none of Hive's (#1285, #966 row 13; the Assistant's decisions on
    * it): Hive's guidance and the Assistant's role after those Codex gives the session (prepareLaunch), never in their
-   * place. Codex unable to say: an agent's left as they are, with no guidance of Hive's, and the Assistant's role alone
-   * (without it there is no Assistant), each told once (launchNotice). Hive never writes Codex's config.
+   * place, then the Workspace notes note (#1433). Codex unable to say: an agent's left as they are, with no guidance or
+   * notes of Hive's, and the Assistant's role alone with its notes (without it there is no Assistant), each told once
+   * (launchNotice). Hive never writes Codex's config.
    */
   private developerOverride(ctx: LaunchContext): string | null {
     const guidance = ctx.guidance?.trim() ?? ''
     const role = ctx.instructions?.trim() ?? ''
+    const notes = ctx.notes?.trim() ?? ''
     const theirs = this.developerByRun.get(ctx.runId)
     this.developerByRun.delete(ctx.runId)
-    if (!guidance && !role) return null
-    if (typeof theirs === 'string') return [theirs, guidance, role].filter(Boolean).join('\n\n')
+    if (!guidance && !role && !notes) return null
+    if (typeof theirs === 'string') return [theirs, guidance, role, notes].filter(Boolean).join('\n\n')
     keepBounded(this.developerUnread, ctx.runId, role ? 'assistant' : 'agent')
-    return role || null
+    return role ? [role, notes].filter(Boolean).join('\n\n') : null
   }
 
   launchNotice(ctx: LaunchContext): { title: string; message: string } | null {

@@ -330,6 +330,8 @@
   "assistant.sidebar.workingOnTip": "Les projets actifs ont une session de terminal, des indicateurs d’état et des notifications.",
   "assistant.sidebar.workspace": "Espace de travail : {name}",
   "assistant.sidebar.workspaceGroup": "Espace de travail",
+  "assistant.sidebar.workspaceNotes": "Workspace notes",
+  "assistant.sidebar.workspaceNotesTip": "Des notes sur cette machine (un chemin complet, la version d’un outil local) que chaque agent reçoit à son démarrage, avec tout agent de code et dans n’importe quel dossier. Gardées dans .hive/shared, hors de git.",
   "assistant.skills.add": "Ajouter",
   "assistant.skills.addFailed": "Impossible d’ajouter la compétence",
   "assistant.skills.alsoFor": "L’ajouter aussi pour {provider}",
