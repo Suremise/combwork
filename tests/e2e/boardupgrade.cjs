@@ -14,6 +14,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
+const { endChildTree } = require('./folderProcesses.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 15000
 // How long the dev build holds the upgrade's lock in the last step: room for a 0.9 Hive to start and try the board.
@@ -66,6 +67,20 @@ async function bounded(what, p, ms = HUNG_MS) {
     console.log(`HUNG ${h.name}: main process ${main}; window ${page}; screenshot ${shown === 'answers' ? shot : shown}`)
   }
   throw new Hung(what)
+}
+/**
+ * Closes a Hive within the bound, else ends its process and waits for it to exit (#1494: a hung Hive mustn't hold the
+ * run after the hang is said, HR6's round 1: at its start too).
+ */
+async function closeApp(app) {
+  const closed = await Promise.race([app.close().then(() => true, () => false), new Promise((res) => setTimeout(() => res(false), HUNG_MS))])
+  if (closed) return
+  const proc = app.process()
+  if (proc.exitCode !== null || proc.signalCode !== null) return
+  const exited = new Promise((res) => proc.once('exit', res))
+  // With what it started (its renderer, GPU and network processes), children first, by identity (#603).
+  console.log(`a Hive didn't close within ${HUNG_MS} ms: ended ${endChildTree(proc)} of its processes`)
+  await Promise.race([exited, new Promise((res) => setTimeout(res, HUNG_MS))])
 }
 /** An IPC caller whose every call is bounded, named by its channel. */
 const boundedInv = (name, inv, ms = HUNG_MS) => (ch, ...a) => bounded(`${name}: ${ch}`, inv(ch, ...a), ms)
@@ -122,7 +137,8 @@ async function startOld(old, mayFail = false, ms = HUNG_MS) {
     }
     return { app, page, inv, openError: await failure(inv('workspace:open', ws)) }
   } catch (e) {
-    await app.close().catch(() => undefined)
+    running.splice(0, running.length, ...running.filter((r) => r.app !== app))
+    await closeApp(app)
     throw e
   }
 }
@@ -166,15 +182,10 @@ async function themes(dev, name) {
   fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
   fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-coder', name: 'Coder' }] }))
   const open = new Set()
-  // Closed within the bound, else its process ended (#1494: a hung Hive mustn't hold the run after the hang is said).
   const close = async (h) => {
     open.delete(h)
     running.splice(0, running.length, ...running.filter((r) => r.app !== h.app))
-    const closed = await Promise.race([h.app.close().then(() => true, () => true), new Promise((res) => setTimeout(() => res(false), HUNG_MS))])
-    if (!closed) {
-      console.log(`a Hive didn't close within ${HUNG_MS} ms: its process ended`)
-      h.app.process().kill()
-    }
+    await closeApp(h.app)
   }
   try {
     // 1. The 0.9 Hive makes the board, and keeps the workspace open.
