@@ -163,12 +163,21 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note']
   await inv('advanced:set', 'hive.skills.removeIdleCopies', null)
 
   // A skill switched off for the project isn't delivered at the next launch: not copied, not in Claude Code's plugin, not
-  // named in the guidance.
+  // named in the guidance. Its copy stays while another agent of Hive's works in the folder (it may be reading it), and
+  // goes at a launch with the folder to itself.
+  const other = await lib.addAgent(inv, proj, { name: 'Sena', provider: 'codex' })
+  await inv('session:start', proj, { agentId: other.id })
+  check('another agent in the project folder gets every skill', !!(await ready(proj, other.id)) && copies(codexDir).includes('card-loop'), copies(codexDir).join(','))
   await inv('skills:setDelivered', proj, 'card-loop', false)
   await inv('session:start', proj, { agentId: codex.id })
   await ready(proj, codex.id)
-  check('a skill switched off is not copied at the next launch', copies(codexDir).includes('work-on-card') && !copies(codexDir).includes('card-loop'), copies(codexDir).join(','))
-  check("…nor named in the agent's guidance", /work-on-card skill/.test(developer(codexLaunch(proj))) && !/card-loop/.test(developer(codexLaunch(proj))))
+  check("a skill switched off isn't named in the next launch's guidance", /work-on-card skill/.test(developer(codexLaunch(proj))) && !/card-loop/.test(developer(codexLaunch(proj))))
+  check('…and its copy stays while the other agent there still runs', !!(await live(proj, other.id)) && fs.existsSync(path.join(codexDir, 'hive-card-loop', 'SKILL.md')), copies(codexDir).join(','))
+  check('the other agent stops', await stopped(proj, other.id))
+  check('the agent stops', await stopped(proj, codex.id))
+  await inv('session:start', proj, { agentId: codex.id })
+  await ready(proj, codex.id)
+  check('a launch with the folder to itself no longer has it copied', copies(codexDir).includes('work-on-card') && !copies(codexDir).includes('card-loop'), copies(codexDir).join(','))
   await inv('session:start', proj, { agentId: claude.id })
   await ready(proj, claude.id)
   const pluginNow = fs.readdirSync(plugin)

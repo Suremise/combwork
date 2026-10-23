@@ -320,6 +320,8 @@
   "tips.signInExpired.title": "Quando um login expira",
   "tips.silentUnknown.text": "O Hive nunca supõe que um agente está ocioso: quando o turno dele fica em silêncio por um tempo, sem sinal de fim, o painel dele avisa. Se o terminal estiver esperando no prompt, Marcar como ocioso corrige isso.",
   "tips.silentUnknown.title": "Um agente em silêncio, com estado desconhecido",
+  "tips.skillsDelivered.text": "O interruptor ao lado de cada skill do Hive, na visualização Skills ou na aba Skills de um projeto, diz se os agentes a recebem (Entregue aos agentes). As cópias que o Hive coloca numa pasta para o Codex e o Copilot são removidas quando nenhum agente trabalha mais lá, como diz Configurações → Avançado.",
+  "tips.skillsDelivered.title": "Escolha quais skills os agentes recebem",
   "tips.sortTables.text": "Clique no cabeçalho de uma coluna nas tabelas do Hive (atalhos, Desempenho, Armazenamento, as Visões gerais) para ordenar por ela, e de novo para inverter a ordem. O Hive lembra a ordenação e as linhas por página de cada tabela.",
   "tips.sortTables.title": "Ordene qualquer tabela",
   "tips.staleMessages.text": "Quando o Assistente repassa algo sobre a rodada atual de um cartão, ele vincula a mensagem a esse cartão: se o cartão for aprovado ou começar outra rodada antes que o agente a leia, o Hive a descarta como obsoleta, para que nenhum agente reabra um cartão aprovado por uma constatação antiga.",

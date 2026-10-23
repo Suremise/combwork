@@ -320,6 +320,8 @@
   "tips.signInExpired.title": "Quand une connexion expire",
   "tips.silentUnknown.text": "Hive ne devine jamais qu’un agent est inactif : quand son tour est silencieux depuis un moment sans signe de fin, son volet le dit. Si son terminal attend à son prompt, Marquer comme inactif rétablit les choses.",
   "tips.silentUnknown.title": "Un agent silencieux, d’état inconnu",
+  "tips.skillsDelivered.text": "L’interrupteur à côté de chaque compétence de Hive, dans la vue Compétences ou l’onglet Compétences d’un projet, indique si les agents la reçoivent (Fournie aux agents). Les copies que Hive place dans un dossier pour Codex et Copilot sont supprimées dès qu’aucun agent n’y travaille, comme le dit Paramètres → Avancé.",
+  "tips.skillsDelivered.title": "Choisis les compétences que reçoivent les agents",
   "tips.sortTables.text": "Clique sur l’en-tête d’une colonne dans les tableaux de Hive (raccourcis, Performances, Stockage, les vues d’ensemble) pour trier dessus, une deuxième fois pour l’ordre inverse. Hive mémorise le tri et le nombre de lignes par page de chaque tableau.",
   "tips.sortTables.title": "Trier n’importe quel tableau",
   "tips.staleMessages.text": "Quand l’Assistant transmet quelque chose sur le tour en cours d’une carte, il lie le message à cette carte : si la carte est validée ou commence un autre tour avant que l’agent le lise, Hive l’abandonne comme périmé, pour qu’aucun agent ne rouvre une carte validée pour un ancien constat.",

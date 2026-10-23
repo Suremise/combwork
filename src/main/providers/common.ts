@@ -6,7 +6,7 @@ import { englishText, shownText, type TextPart } from '../../shared/advanced'
 import { msg, tr } from '../../shared/i18n'
 import type { AgentInstallInfo, ReadinessIssue, RecacheEstimate, SessionUsage } from '../../shared/types'
 import { readFirstLineOf } from '../transcriptFiles'
-import { cleanSwaps, contentHash, ContentTooLarge, COPY_MARKER, CopyFailed, LinkNotCopied, retireDir, sourceProblem, swapIn, tooBigToDeliver, withFileLock } from '../fsutil'
+import { cleanSwaps, contentHash, ContentTooLarge, COPY_MARKER, CopyFailed, LinkNotCopied, sourceProblem, swapIn, swapOut, tooBigToDeliver, withFileLock } from '../fsutil'
 import { createLogger, userText } from '../logger'
 import { hiveError } from '../hiveError'
 import { git } from '../git'
@@ -264,12 +264,17 @@ async function syncAgentsSkillsNow(ctx: LaunchContext, cli: string): Promise<Rec
   if (!ctx.skills.length && !existsSync(dir)) return out
   await mkdir(dir, { recursive: true })
   // Under the same lock as the swaps: Hive's own leftovers only (dot-folders named for a swap).
-  await cleanSwaps(dir)
+  await cleanSwaps(dir, unchangedCopy)
   const own = await ownCopies(ctx.cwd, ctx.projectPath, ctx.copies)
   for (const f of await readdir(dir).catch(() => [] as string[])) {
-    // A copy Hive no longer gives (switched off, deleted or renamed) goes only when it is Hive's own, unchanged (#1431);
-    // one that can't be removed now (a file in it open) goes at a later launch.
-    if (f.startsWith('hive-') && !wanted.has(f) && (await own(f.slice('hive-'.length)))) await retireCopy(ctx.cwd, f.slice('hive-'.length), ctx.copies).catch((e) => log.warn(`Could not remove ${userText(f)} for ${cli}; trying again next time`, e))
+    // A copy Hive no longer gives (switched off, deleted or renamed) goes only when it is Hive's own, unchanged (#1431),
+    // and no other session of Hive's works in the folder (it may be reading it): asked for each copy, inside the lock.
+    // One kept now (a reader there, or a file in it open) goes at a later launch with the folder to itself, or when the
+    // last session there ends (as Settings → Advanced says).
+    if (!f.startsWith('hive-') || wanted.has(f) || ctx.othersHere?.()) continue
+    const skill = f.slice('hive-'.length)
+    const revision = await own(skill)
+    if (revision) await retireCopy(ctx.cwd, skill, revision, ctx.copies).catch((e) => log.warn(`Could not remove ${userText(f)} for ${cli}; trying again next time`, e))
   }
   for (const [folder, s] of wanted) {
     // One skill's failure is its own: the others are still delivered, and each record says what the CLI reads.
@@ -294,32 +299,47 @@ async function syncAgentsSkillsNow(ctx: LaunchContext, cli: string): Promise<Rec
  * record says so too, and its content is still the revision recorded (unchanged since delivery), so neither a user's
  * skill nor a copy edited since is ever removed. A marked copy without a record (made before records) whose content is
  * still its marker's hash is provably Hive's and unchanged: it is recorded then. Records that can't be read: none is.
- * Without a book (tests), the marker and content alone decide.
+ * Without a book (tests), the marker and content alone decide. Each answer is the revision the copy may be removed at
+ * (null: it stays), which retireCopy checks again as it goes: an edit made meanwhile keeps it.
  */
-async function ownCopies(folder: string, project: string, book: SkillCopyBook | undefined): Promise<(skill: string) => Promise<boolean>> {
+async function ownCopies(folder: string, project: string, book: SkillCopyBook | undefined): Promise<(skill: string) => Promise<string | null>> {
   const records = book ? await book.of(folder).catch((e) => (log.warn("Could not read Hive's record of its skill copies", e), null)) : undefined
   return async (skill) => {
-    if (records === null) return false
+    if (records === null) return null
     const dest = agentsSkillCopyPath(folder, skill)
     const marker = await skillMarker(dest)
     // No marker: the user's. An empty one, from before hashes: whether it was changed can't be told.
-    if (!marker) return false
+    if (!marker) return null
     const now = await contentHash(dest).catch(() => null)
-    if (!now) return false
-    if (!records) return now === marker
+    if (!now) return null
+    if (!records) return now === marker ? now : null
     const rec = records.get(skill.toLowerCase())
-    if (rec) return now === rec.revision
-    if (now !== marker) return false
+    if (rec) return now === rec.revision ? now : null
+    if (now !== marker) return null
     await book!.record(folder, project, skill, now)
-    return true
+    return now
   }
 }
 
-/** Removes Hive's copy of a skill in a folder whole (retireDir) and its record; one already gone just loses its record. */
-async function retireCopy(folder: string, skill: string, book: SkillCopyBook | undefined): Promise<void> {
+/**
+ * Removes Hive's copy of a skill in a folder only while it is still `revision` (swapOut: checked under Hive's editors'
+ * file locks, again once moved aside and just before it goes, so an edit made since ownCopies looked keeps it, put back
+ * or kept beside it as a conflict copy), then its record. One already gone just loses its record; one edited meanwhile
+ * keeps its record, whose revision no longer matches, so it is never taken for Hive's own again.
+ */
+async function retireCopy(folder: string, skill: string, revision: string, book: SkillCopyBook | undefined): Promise<void> {
   const dest = agentsSkillCopyPath(folder, skill)
-  if (existsSync(dest)) await retireDir(dest)
+  if (existsSync(dest)) await swapOut(dest, revision)
   await book?.forget(folder, skill)
+}
+
+/**
+ * cleanSwaps' test in .agents/skills: what a crash left aside is removed only while it is a Hive copy whose content is
+ * still its marker's hash; anything else is kept beside it as a conflict copy.
+ */
+async function unchangedCopy(aside: string): Promise<boolean> {
+  const marker = await skillMarker(aside)
+  return !!marker && (await contentHash(aside).catch(() => null)) === marker
 }
 
 /**
@@ -338,7 +358,7 @@ export async function removeHiveCopies(folder: string, project: string, book: Sk
       for (const r of recorded.values()) await book?.forget(folder, r.skill).catch(() => undefined)
       return []
     }
-    await cleanSwaps(dir)
+    await cleanSwaps(dir, unchangedCopy)
     const own = await ownCopies(folder, project, book)
     const names = new Set([...recorded.values()].map((r) => r.skill))
     for (const f of await readdir(dir).catch(() => [] as string[])) if (f.startsWith('hive-')) names.add(f.slice('hive-'.length))
@@ -346,8 +366,10 @@ export async function removeHiveCopies(folder: string, project: string, book: Sk
     for (const skill of names) {
       try {
         if (!existsSync(agentsSkillCopyPath(folder, skill))) await book?.forget(folder, skill)
-        else if (await own(skill)) {
-          await retireCopy(folder, skill, book)
+        else {
+          const revision = await own(skill)
+          if (!revision) continue
+          await retireCopy(folder, skill, revision, book)
           removed.push(skill)
         }
       } catch (e) {

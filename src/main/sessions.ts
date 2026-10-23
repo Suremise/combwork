@@ -1070,6 +1070,11 @@ class SessionManager {
     return [...this.live.values()].some((l) => samePath(l.state.cwd, folder))
   }
 
+  /** runningIn, leaving out one session (by liveId): the launch asking whether another session reads the folder. */
+  othersIn(folder: string, except: string): boolean {
+    return [...this.live].some(([id, l]) => id !== except && samePath(l.state.cwd, folder))
+  }
+
   /** How many agents of a workspace (its projects', its worktrees', its Assistant's) run or are starting. */
   agentsIn(workspacePath: string): number {
     const mine = (p: string): boolean => workspaceFor(p)?.path?.toLowerCase() === workspacePath.toLowerCase()
@@ -1601,6 +1606,7 @@ class SessionManager {
       extraArgs: eff.extraArgs,
       use200kContext: eff.use200kContext,
       copies: copyBook(workspaceOf(projectPath)),
+      othersHere: () => this.othersIn(cwd, id),
       hookUrl: `${this.hookUrl}?run=${state.runId}`,
       hookAuthFile: hookAuth.file,
       privateDir: hookAuth.dir,

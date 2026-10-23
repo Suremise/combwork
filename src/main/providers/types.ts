@@ -79,6 +79,11 @@ export interface LaunchContext {
    * (syncAgentsSkills). Missing: nothing is recorded, and no copy is removed but by its marker and content (tests).
    */
   copies?: SkillCopyBook
+  /**
+   * Whether another session of Hive's (not this launch's) runs or is starting in `cwd` (#1431): it may be reading Hive's
+   * skill copies there, so the copies of skills this launch no longer gets stay while one does.
+   */
+  othersHere?: () => boolean
 }
 
 /** One skill copy Hive recorded making in a folder (#1431): its revision is the copy's contentHash, its marker left out. */

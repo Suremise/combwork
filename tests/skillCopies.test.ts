@@ -172,6 +172,42 @@ describe('safe clean-up (#1431)', () => {
     expect(readFileSync(join(w.copy(w.slot, 'deploy'), 'SKILL.md'), 'utf8')).toBe('# deploy')
     expect([...book.rows.values()].map((r) => r.skill)).toEqual(['deploy'])
   })
+
+  it('an edit made while the clean-up is part way through keeps the copy, at a session\'s end and at a launch', async () => {
+    for (const via of ['clean-up', 'launch'] as const) {
+      const w = world('deploy')
+      // Made before records: the clean-up records it (an await) before removing it, and the user saves meanwhile.
+      await sync(w.slot, w.project, w.sources)
+      const file = join(w.copy(w.slot, 'deploy'), 'SKILL.md')
+      const book = memBook()
+      const editing: SkillCopyBook = { ...book, record: async (...a) => (writeFileSync(file, '# deploy, my edit'), book.record(...a)) }
+      const removed = via === 'clean-up' ? await removeHiveCopies(w.slot, w.project, editing, () => false) : (await sync(w.slot, w.project, [], editing), [])
+      expect(removed, via).toEqual([])
+      expect(readFileSync(file, 'utf8'), via).toBe('# deploy, my edit')
+      // Its record is at the revision before the edit: never taken for Hive's own again.
+      expect(await removeHiveCopies(w.slot, w.project, book, () => false), via).toEqual([])
+      expect(readFileSync(file, 'utf8'), via).toBe('# deploy, my edit')
+      expect(readdirSync(join(w.slot, '.agents', 'skills')).filter((f) => f.startsWith('.')), via).toEqual([])
+    }
+  })
+
+  it('a skill switched off keeps its copy while another session of Hive\'s works in the folder, and loses it once none does', async () => {
+    const w = world('deploy', 'notes')
+    const book = memBook()
+    await sync(w.slot, w.project, w.sources, book)
+    const [deploy] = w.sources
+    let others = true
+    const launch = (): Promise<unknown> => syncAgentsSkills({ cwd: w.slot, projectPath: w.project, skills: [deploy], copies: book, othersHere: () => others } as never, 'Codex')
+    // A second session starts with notes switched off: the first may be reading it, so it stays.
+    await launch()
+    expect(readFileSync(join(w.copy(w.slot, 'notes'), 'SKILL.md'), 'utf8')).toBe('# notes')
+    expect(existsSync(w.copy(w.slot, 'deploy'))).toBe(true)
+    // The first has stopped: the next launch there removes it.
+    others = false
+    await launch()
+    expect(existsSync(w.copy(w.slot, 'notes'))).toBe(false)
+    expect([...book.rows.values()].map((r) => r.skill)).toEqual(['deploy'])
+  })
 })
 
 describe('the switch: Slots only, Everywhere, Never (#1431)', () => {

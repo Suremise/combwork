@@ -320,6 +320,8 @@
   "tips.signInExpired.title": "Cuando caduca un inicio de sesión",
   "tips.silentUnknown.text": "Hive nunca supone que un agente está inactivo: cuando su turno lleva un rato en silencio sin señales de terminar, su panel lo dice. Si su terminal espera en su prompt, Marcar como inactivo lo corrige.",
   "tips.silentUnknown.title": "Un agente en silencio, con estado desconocido",
+  "tips.skillsDelivered.text": "El interruptor junto a cada habilidad de Hive, en la vista Habilidades o en la pestaña Habilidades de un proyecto, indica si los agentes la reciben (Entregada a los agentes). Las copias que Hive pone en una carpeta para Codex y Copilot se quitan cuando ya no trabaja allí ningún agente, como indica Configuración → Avanzado.",
+  "tips.skillsDelivered.title": "Elige qué habilidades reciben los agentes",
   "tips.sortTables.text": "Haz clic en el encabezado de una columna en las tablas de Hive (atajos, Rendimiento, Almacenamiento, los resúmenes) para ordenar por ella, y otra vez para invertir el orden. Hive recuerda el orden y las filas por página de cada tabla.",
   "tips.sortTables.title": "Ordena cualquier tabla",
   "tips.staleMessages.text": "Cuando el Asistente transmite algo sobre la ronda actual de una tarjeta, vincula el mensaje a esa tarjeta: si la tarjeta se aprueba o empieza otra ronda antes de que el agente lo lea, Hive lo descarta por obsoleto, para que ningún agente reabra una tarjeta aprobada por un hallazgo antiguo.",
