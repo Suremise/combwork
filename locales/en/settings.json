@@ -707,6 +707,22 @@
     "defaultMessage": "Merges: wait for another Hive",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. Another Hive: the installed Hive and a dev or test Hive on the same machine."
   },
+  "settings.advanced.hive.notes.deliverWorkspaceNotes.desc": {
+    "defaultMessage": "Each agent and the Hive Assistant get the shared note Workspace notes in their instructions when they start, on every CLI and in whichever folder they work: notes about this machine that no committed file should hold. A project's agents get the parts for everyone and their own project's section. Turned off, or with the note empty, nothing is added, from each agent's next session.",
+    "description": "What the advanced setting \"Deliver workspace notes to agents\" does (Settings → Advanced, under Hive). Workspace notes is the name of a shared note: keep it in English, as the Notes view shows it."
+  },
+  "settings.advanced.hive.notes.deliverWorkspaceNotes.title": {
+    "defaultMessage": "Deliver workspace notes to agents",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: Hive gives every agent the shared note Workspace notes when it starts."
+  },
+  "settings.advanced.hive.notes.workspaceNotesMax.desc": {
+    "defaultMessage": "How much of the shared note Workspace notes an agent's instructions get, at most, in bytes. A longer note is cut, and agents are told to read the note for the rest. Every agent reads it at every start, so a short note costs less.",
+    "description": "What the advanced setting \"Workspace notes: most an agent gets\" does (Settings → Advanced, under Hive). Workspace notes is the name of a shared note: keep it in English, as the Notes view shows it."
+  },
+  "settings.advanced.hive.notes.workspaceNotesMax.title": {
+    "defaultMessage": "Workspace notes: most an agent gets",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in bytes: how much of the shared note Workspace notes an agent's instructions get at most."
+  },
   "settings.advanced.hive.progress.lanesShown.desc": {
     "defaultMessage": "How many card-loop lanes the Progress panel shows before its lanes scroll, until you drag the section's top edge (the drag is kept per workspace). A workspace that runs many lanes at once can set its own.",
     "description": "What the advanced setting \"Progress panel: lanes shown\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -1062,6 +1078,10 @@
   "settings.advanced.unitLabel.agents": {
     "defaultMessage": "agents",
     "description": "Beside the box of an advanced setting that is a number of agents (Settings → Advanced)."
+  },
+  "settings.advanced.unitLabel.bytes": {
+    "defaultMessage": "bytes",
+    "description": "Beside the box of an advanced setting that is a size in bytes (Settings → Advanced), as in \"4096 bytes\"."
   },
   "settings.advanced.unitLabel.captures": {
     "defaultMessage": "captures",

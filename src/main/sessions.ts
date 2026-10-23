@@ -87,6 +87,7 @@ import { KeysStopped, PickNotFound, typeKeySteps } from './keySteps'
 import { withBinOnPath } from './progressReporters/shims'
 import { hiveSkills, parseSkillFrontmatter, skillFor } from './skills'
 import { copyBook, sessionEnded } from './skillCopies'
+import { workspaceNotesFor } from './workspaceNotes'
 import { skillOff } from '../shared/skillDelivery'
 import { samePath } from '../shared/movePaths'
 import { GUIDANCE_REVISION, launchParts, launchRecord } from './guidance'
@@ -375,6 +376,8 @@ interface LiveSession {
   resumed?: boolean
   /** The Hive Assistant's mode (its id) its conversation was last given, started in or told: recorded with it. */
   mode?: string
+  /** This launch gave its conversation instructions of Hive's own (SessionRecord.promptAdded): recorded with it. */
+  promptAdded?: true
   /** Prompts the CLI has reported submitted in this launch (UserPromptSubmit), for sendPrompt's confirm and a wake's (#376). */
   prompts?: number
   /**
@@ -1586,6 +1589,11 @@ class SessionManager {
     const hookAuth = await newHookToken(state.runId)
     times?.mark('tokens')
     const guidance = await this.hiveGuidance(projectPath).catch(() => '')
+    // The Workspace notes note as it is now (#1433): every agent, whatever its tools or folder; a running one keeps its own.
+    const notes = await workspaceNotesFor(projectPath).catch(() => '')
+    // Instructions of Hive's own given to this conversation at an earlier launch, by any agent (SessionRecord.promptAdded).
+    const promptAddedBefore = resume && (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions.find((s) => s.id === sessionId)?.promptAdded === true
+    if (assistantText?.text.trim() || notes.trim()) l.promptAdded = true
     times?.mark('guidance')
     const ctx = {
       projectPath,
@@ -1612,6 +1620,8 @@ class SessionManager {
       privateDir: hookAuth.dir,
       guidance,
       instructions: assistantText?.text,
+      notes,
+      promptAddedBefore,
       overrides: overridesNow(adapter.id),
       trustedHiveTools: workspace.isAssistantHome(projectPath) ? assistantTools(config.settings.assistant?.control, config.settings.assistant?.changeSettings === true, journalSettingsOf(workspaceOf(projectPath)).enabled) : undefined,
       initialPrompt: l.initialPrompt,
@@ -1679,7 +1689,7 @@ class SessionManager {
     // Performance metrics: what Hive gave this session, exact sizes. The session contract once (whichever way the
     // provider gets it); the skills that reached it, measured on their copies; the ones asked for that didn't.
     const given = Object.keys(record.skills)
-    const parts = launchParts(ctx.guidance, workspace.isAssistantHome(projectPath) ? 'assistant' : 'agent', basename(projectPath), assistantText)
+    const parts = launchParts(ctx.guidance, workspace.isAssistantHome(projectPath) ? 'assistant' : 'agent', basename(projectPath), assistantText, ctx.notes)
     recordLaunch(metrics, workspace.isAssistantHome(projectPath) ? null : basename(projectPath), {
       provider: adapter.id,
       role: workspace.isAssistantHome(projectPath) ? 'assistant' : 'agent',
@@ -1795,6 +1805,8 @@ class SessionManager {
       agentName: agent.name,
       // The Assistant's mode its conversation was last given (a resumed one's is unknown until it is told: assistantMode.ts).
       ...(l.mode ? { mode: l.mode } : {}),
+      // Hive's own instructions were given it (#1433): kept, never cleared, so later resumes refresh its prompt.
+      ...(l.promptAdded ? { promptAdded: true as const } : {}),
       // Providers that choose their own ids file transcripts by date, not folder: remember where.
       ...(l.transcriptPath && !l.adapter.descriptor.capabilities.fixedSessionId ? { transcriptPath: l.transcriptPath } : {}),
       // Where it ran, when not the project folder (a worktree, or the Assistant's workspace folder).

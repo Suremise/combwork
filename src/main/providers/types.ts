@@ -61,6 +61,16 @@ export interface LaunchContext {
   /** More instructions for this launch, over the provider's own (the Hive Assistant's role and mode). */
   instructions?: string
   /**
+   * The Workspace notes note as this launch delivers it (#1433: its part for the project, bounded, under its header), on
+   * every provider after Hive's guidance and the launch's instructions; empty or missing: none (switched off, no note).
+   */
+  notes?: string
+  /**
+   * A resume of a conversation Hive gave instructions of its own at an earlier launch, by any agent (SessionRecord.promptAdded,
+   * #1433): its prompt is rendered fresh, so instructions given then and not now leave it.
+   */
+  promptAddedBefore?: boolean
+  /**
    * The provider's override switches (#1167) as read once for this launch (overridesNow), so prepareLaunch and
    * buildCommand agree when one changes meanwhile; read with launchOverrides. Missing: each read as it is now.
    */

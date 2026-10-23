@@ -389,6 +389,8 @@
   "tips.workspaceMoved.title": "Move a workspace without losing its agents",
   "tips.workspaceMovedDefender.text": "If Hive had Defender skip the workspace's folders, Repair… after a move offers to move those exclusions to the new folders, with one administrator prompt, so none is left on a folder that's gone. Exclusions you made yourself stay as they are.",
   "tips.workspaceMovedDefender.title": "Defender exclusions follow a moved workspace",
+  "tips.workspaceNotes.text": "Workspace notes, pinned first in Shared Notes, is for what's true of this machine, like a full path. Every agent gets it when it starts, in any folder, so it needn't go in a committed AGENTS.md. A section headed with a project's name is that project's alone.",
+  "tips.workspaceNotes.title": "Notes about this machine for every agent",
   "tips.worktreeReuse.text": "Adding an agent with a new worktree named like one you kept (B4, and B4's worktree is unused)? If it's merged and clean, Hive gives the agent that folder, brought up to main: its node_modules are already there.",
   "tips.worktreeReuse.title": "A kept worktree is used again",
   "tips.worktrees.text": "In Add Agent…, choose New worktree: the agent works on its own branch, and Merge… brings its work back when you're happy with it.",

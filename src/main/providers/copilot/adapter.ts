@@ -209,10 +209,10 @@ export class CopilotAdapter implements ProviderAdapter {
   /**
    * This launch's custom instructions: the Hive Assistant's role and mode, and Hive's guidance when Copilot won't show
    * the hive server's instructions (their switch off, #1167: without --allow-all-mcp-server-instructions it leaves them
-   * out, whatever the server is called).
+   * out, whatever the server is called), then the Workspace notes note (#1433).
    */
   private customInstructions(ctx: LaunchContext): string {
-    return [launchOverrides(ctx.overrides, COPILOT, 'allMcpInstructions') ? '' : ctx.mcpServers.hive ? ctx.guidance : '', ctx.instructions ?? ''].map((t) => t.trim()).filter(Boolean).join('\n\n')
+    return [launchOverrides(ctx.overrides, COPILOT, 'allMcpInstructions') ? '' : ctx.mcpServers.hive ? ctx.guidance : '', ctx.instructions ?? '', ctx.notes ?? ''].map((t) => t.trim()).filter(Boolean).join('\n\n')
   }
 
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {

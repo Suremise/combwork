@@ -2911,7 +2911,29 @@ repeating them (#533) [note §8].
 #### 16.10.7 What reaches agents in slots
 
 - **Workspace notes** (#873): git-ignored, machine-specific notes must reach agents in slots and review copies on every
-  CLI; designed in P7 with Darren [#1123 c].
+  CLI; designed in P7 with Darren [#1123 c]. **Built [#1433]** (Darren, 22 Oct: as recommended):
+  - One note per workspace, `Workspace notes.md` in `.hive/shared` (git-excluded), pinned first in Shared Notes. The user
+    edits it in the window and the Assistant with the notes tools; a project agent's write is refused (403), its read
+    isn't. A `## <project name>` section (any case, a project of the workspace, hidden ones included) is that project's
+    alone; the rest, other headings included, is everyone's, and the Assistant gets the whole note (`notesFor`). A
+    heading inside a code block is text (Markdown's fences: the same character, at least as many, close one), and only
+    `#`/`##` headings up to three spaces in start a section.
+  - Delivered inline at each launch, as the note is then, after Hive's guidance and the launch's own instructions, to
+    every agent and the Assistant in any folder, whatever its tools: Claude Code `--append-system-prompt-file` (with
+    `--system-prompt-snapshot off` on resume, as for the Assistant's mode, and on every resume of a conversation Hive
+    appended to before, by any agent, so notes switched off or emptied since leave it: the conversation's own session
+    record says so, `promptAdded`, never cleared), Codex `developer_instructions` after the
+    user's own (when Codex can't say what those are, an agent's are left alone, without the notes), Copilot its
+    instruction file. Under "Workspace notes (this machine), from the shared note "Workspace notes":"; reviewers get it
+    through their own session.
+  - Bounded: at most `hive.notes.workspaceNotesMax` bytes (4096, UTF-8, header included); over it, cut at a line and
+    ended with "(cut: read the shared note Workspace notes for the rest)". The editor says who gets it and when, and
+    warns as you type for each project (or the Assistant) it would be cut for.
+  - Off: the note empty or missing, or Settings → Advanced **Deliver workspace notes to agents**
+    (`hive.notes.deliverWorkspaceNotes`, on). An edit or the switch reaches each agent's next launch or new
+    conversation. Counted in the launch metrics' custom part.
+  - Where notes go (project rules → AGENTS.md, allow rules → `.claude/settings.json`, lane specifics → the brief,
+    machine or personal notes → Workspace notes) is the bundled `workspace-note` skill's, not the session contract's.
 - **Skill delivery** (#966 row 15, group C, P7): slots get their own skill copies (Codex, Copilot), Hive's owned copies
   are cleaned up safely, and the user chooses which skills are delivered [#966]. **Built [#1431]:**
   - Delivery follows the session's folder (`ctx.cwd`: a slot, the project folder, a carried worktree); reviewers'

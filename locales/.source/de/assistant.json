@@ -350,6 +350,8 @@
   "assistant.sidebar.workingOnTip": "Active projects get a terminal session, status indicators and notifications.",
   "assistant.sidebar.workspace": "Workspace: {name}",
   "assistant.sidebar.workspaceGroup": "Workspace",
+  "assistant.sidebar.workspaceNotes": "Workspace notes",
+  "assistant.sidebar.workspaceNotesTip": "Notes about this machine (a full path, a local tool's version) that every agent gets when it starts, on every coding agent and in any folder. Kept in .hive/shared, out of git.",
   "assistant.skills.add": "Add",
   "assistant.skills.addFailed": "Could not add the skill",
   "assistant.skills.alsoFor": "Also add it for {provider}",

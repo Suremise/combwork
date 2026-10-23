@@ -1371,6 +1371,14 @@
     "defaultMessage": "Workspace",
     "description": "The MCP sidebar: the section of the workspace's servers."
   },
+  "assistant.sidebar.workspaceNotes": {
+    "defaultMessage": "Workspace notes",
+    "description": "The pinned first row of Shared Notes: the note Hive gives every agent when it starts (notes about this machine). Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told."
+  },
+  "assistant.sidebar.workspaceNotesTip": {
+    "defaultMessage": "Notes about this machine (a full path, a local tool's version) that every agent gets when it starts, on every coding agent and in any folder. Kept in .hive/shared, out of git.",
+    "description": "Tooltip on the pinned Workspace notes row of Shared Notes. Keep .hive/shared as it is."
+  },
   "assistant.skills.add": {
     "defaultMessage": "Add",
     "description": "The Add Skill from File dialog: its button."
