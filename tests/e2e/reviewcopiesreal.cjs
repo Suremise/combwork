@@ -1,9 +1,10 @@
 // S51 (#1439, SPEC §16.10.5 Access), the real tier: a Claude Code, a Codex and a Copilot reviewer each build and run the
 // project's test in a review copy, outside their own folder, within their permission mode. Each reviewer's launch is
 // granted the project's copies folder (--add-dir, seen on its process's command line); its start review leases it a copy
-// at the card's submitted revision; it is asked to write build.txt there and run the copy's test.js (which writes
+// at the card's submitted revision; it is asked to write build.txt there and run `node test.js` there (which writes
 // ran.txt beside itself). Passes when both are in the copy and nothing of theirs is in the project folder (what is there
-// is named, with whose turn left it and its screen, #1546). An edit there
+// is named, with whose turn left it and its screen, #1546: a reviewer's shell starts in the project folder, and Haiku
+// once ran `node test.js` there before running it in its copy). An edit there
 // is never asked about (granted): a command may be (Claude Code's Accept edits and Copilot's ask before one), and is
 // answered Yes, counted in the output. What each CLI's own home has afterwards never names the copies folder (Hive
 // passes it on the command line only).
@@ -187,9 +188,7 @@ const namingCopies = () => {
       const prompt =
         r.key === 'copilot'
           ? `write ${built} built then shell Set-Location '${folder}'; node test.js then say done`
-          : // The test by its full path (#1546): told to run "node test.js" there, Haiku once ran the project folder's own
-            // test.js first (two commands asked, ran.txt left in the project folder).
-            `Work only in the folder ${folder} (outside your own; you may use it). First create the file build.txt there containing the word built, with your file tools. Then run exactly this command, once: node "${path.join(folder, 'test.js')}". Reply done.`
+          : `Work only in the folder ${folder} (outside your own; you may use it). First create the file build.txt there containing the word built, with your file tools. Then run "node test.js" with that folder as the working directory. Reply done.`
       // Its turn waits on the real CLI answering: an environment failure in its session meanwhile is a SKIP (lib.cliStep).
       let asked = 0
       let askedBeforeEdit = false
