@@ -23,6 +23,7 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { WorkspaceService } from '../workspace'
 import { FactStore } from './factStore'
+import { locksSettled } from './lockRecord'
 import { resolvedOf, type ResolvedOptions } from './rulesets'
 import { lastActionId, noteRequestsSince } from '../workflowNotices'
 import { Workflow, type SlotForStart } from './runtime'
@@ -135,6 +136,12 @@ export async function workflowFor(ws: WorkspaceService, projectPath: string): Pr
   return inst.wf
 }
 
+/** The project's runtime if this workspace's lifetime has made one (workflowFor), without resolving anything: else null. */
+export function workflowNow(ws: WorkspaceService, projectPath: string): Workflow | null {
+  const inst = instances.get(ws)?.get(keyOf(projectPath))
+  return inst && inst.life === ws.lifetime && !inst.life.aborted && inst.wsPath === ws.path ? inst.wf : null
+}
+
 /**
  * None (§16.3.3): a runtime kept across calls keeps its paths' hashes, which a write with the same size and time (a
  * file restored or copied) wouldn't change (HR2's #1263 round 1). So each call first drops the hashes of the paths the
@@ -179,6 +186,8 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // Actions run by the actions worker after the commit, never here.
     autoRun: false,
     runsOf: (agent) => runsGoing?.(project.path, agent) ?? [],
+    // G16 (#1481): the file locks seen before an intent are in the cards' records before it reads them.
+    locksSettled: () => locksSettled(ws, project.path),
     // A branch rename Repair recorded and hasn't finished (#1305): its new name, which a card on the old line follows.
     pendingRename: async (line) => (await ws.projectConfig(project.path)).pendingBranchRenames?.find((r) => r.from.toLowerCase() === line.toLowerCase())?.to ?? null,
     // A move Repair hasn't recorded (#1343): the workspace's or the project's last folder isn't where it is now.

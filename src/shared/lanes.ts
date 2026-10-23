@@ -70,6 +70,16 @@ export function loopDefaults(ws?: Pick<WorkspaceConfig, 'loops'> | null, project
   const pick = (own: unknown, shared: unknown, def: number, max: number): number => (ok(own, max) ? own : ok(shared, max) ? shared : def)
   return { rounds: pick(project?.loopRounds, ws?.loops?.rounds, LOOP_ROUNDS, LANE_MAX_ROUNDS), waitHours: pick(project?.loopWaitHours, ws?.loops?.waitHours, LOOP_WAIT_HOURS, LOOP_WAIT_MAX_HOURS) }
 }
+/**
+ * How long a card loop's builder waits for its reviewer's check of a design it posted before it goes ahead as posted, and
+ * a step left waiting longer is a stall (#1382): Project Settings → Card loops → Design check wait, in minutes.
+ */
+export const LOOP_STEP_WAIT_MINUTES = 30
+export const LOOP_STEP_WAIT_MAX_MINUTES = 240
+export function loopStepWaitMinutes(project?: Partial<Pick<ProjectConfig, 'loopStepWaitMinutes'>> | null): number {
+  const v = project?.loopStepWaitMinutes
+  return typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= LOOP_STEP_WAIT_MAX_MINUTES ? v : LOOP_STEP_WAIT_MINUTES
+}
 /** A lane's name, at most. */
 export const LANE_NAME_MAX = 80
 /** An ended lane stays listed this long (unless its builder starts another), and is kept in the file this long. */

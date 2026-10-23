@@ -18,6 +18,7 @@ import type {
   WorktreeCheck,
   UnusedWorktrees,
   UnusedWorktreeRemoval,
+  MergeBranchList,
   UnusedWorktreePreview,
   RemovedAgent,
   MoveOptions,
@@ -575,13 +576,24 @@ export interface HiveRequests {
   'worktrees:unused': (projectPath: string) => UnusedWorktrees
   /** An unused worktree's branch as the Merge dialog shows it, and its merge (#400): as an agent's, by its folder. */
   'worktrees:unusedBranchStatus': (projectPath: string, path: string) => AgentBranchStatus
-  'worktrees:mergeUnused': (projectPath: string, path: string, opts: { squash: boolean; message: string; cleanup: boolean }) => MergeResult
+  'worktrees:mergeUnused': (projectPath: string, path: string, opts: { squash: boolean; message: string; cleanup: boolean; card?: number; outsideQueue?: { card: number; reason: string } }) => MergeResult
   /** What removing one anyway loses, checked now, under a token the removal presents; throws when git can't say. */
   'worktrees:removalPreview': (projectPath: string, path: string) => UnusedWorktreePreview
   /** Removes one (the user's choice): a merged, clean one; or with `force`, a preview's token, only while nothing in it changed since. */
   'worktrees:removeUnused': (projectPath: string, path: string, opts: { expectInto?: string | null; force?: string }) => UnusedWorktreeRemoval
-  /** `outsideQueue`: merged anyway, though Hive merges the card on this branch (#1357): an override on it, with the reason. */
-  'agents:merge': (projectPath: string, agentId: string, opts: { squash: boolean; message: string; cleanup: boolean; moveBranch?: boolean; outsideQueue?: { card: number; reason: string } }) => MergeResult
+  /** The Merge dialog's merges outside cards (#1450): the branches it offers and the targets. */
+  'worktrees:mergeBranches': (projectPath: string) => MergeBranchList
+  /** What a branch holds that the target doesn't. */
+  'worktrees:branchMergeStatus': (projectPath: string, branch: string, target: string) => AgentBranchStatus
+  /** The card a branch is: the one Hive's merge queue merges (Merge anyway), and the card whose line it is while not Done. */
+  'worktrees:branchCards': (projectPath: string, branch: string) => { queue: BranchQueueCard | null; line: { number: number; key: string; title: string } | null }
+  /** Merges a branch into a target; `card`: confirmed for that unfinished card's line; `outsideQueue` as agents:merge's. */
+  'worktrees:mergeBranch': (projectPath: string, branch: string, opts: { target: string; squash: boolean; message: string; card?: number; outsideQueue?: { card: number; reason: string } }) => MergeResult
+  /**
+   * `outsideQueue`: merged anyway, though Hive merges the card on this branch (#1357): an override on it, with the reason.
+   * `card`: confirmed for that unfinished card's line (#1450); every merge route refuses one without it.
+   */
+  'agents:merge': (projectPath: string, agentId: string, opts: { squash: boolean; message: string; cleanup: boolean; moveBranch?: boolean; card?: number; outsideQueue?: { card: number; reason: string } }) => MergeResult
 
   /** The conversation for the transcript viewer; null when the file has not changed since knownVersion (a Transcript's `version`). Long tool input/output is shortened. */
   /** The conversation from item `from` on (default: the last TRANSCRIPT_WINDOW items); null when the file hasn't changed since knownVersion and `from` is unchanged. */

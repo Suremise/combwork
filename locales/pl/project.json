@@ -287,6 +287,8 @@
   "project.settings.saveFailed": "Nie udało się zapisać ustawień projektu",
   "project.settings.search": "Szukaj w ustawieniach projektu {project}",
   "project.settings.sessionsIn": "Sesje w projekcie {project} będą wykonywać wszystkie polecenia, edycje i połączenia sieciowe bez pytania.",
+  "project.settings.stepWait": "Oczekiwanie na sprawdzenie projektu (minuty)",
+  "project.settings.stepWaitDefault": "Domyślnie ({count, number} min)",
   "project.settings.waitHours": "Oczekiwanie (godziny)",
   "project.settings.wake": "Wybudzaj recenzentów i wykonawców",
   "project.settings.warnOver": "Ostrzegaj, gdy transkrypcja przekracza",

@@ -260,11 +260,14 @@ export async function dirtyCount(cwd: string): Promise<number | null> {
  * A worktree branch's commits not merged and its uncommitted files. A git command that fails (git missing included)
  * throws, never counting as nothing to merge or nothing to lose (#346).
  */
-export async function branchStatus(projectPath: string, wt: AgentWorktree, reads?: RepoReads): Promise<AgentBranchStatus> {
-  // Detached is a real answer (counted against the base); a failed read isn't, and stops here.
-  const into = await (reads ?? new RepoReads(projectPath)).checkedOutBranch().catch((e: Error) => {
-    throw hiveError(M.cantCheck, { branch: wt.branch, why: errorText(e) }, { cause: e })
-  })
+export async function branchStatus(projectPath: string, wt: AgentWorktree, reads?: RepoReads, target?: string): Promise<AgentBranchStatus> {
+  // Detached is a real answer (counted against the base); a failed read isn't, and stops here. A target named (the Merge
+  // dialog's branch picked with its target, #1450) is counted against instead of the project folder's branch.
+  const into =
+    target ??
+    (await (reads ?? new RepoReads(projectPath)).checkedOutBranch().catch((e: Error) => {
+      throw hiveError(M.cantCheck, { branch: wt.branch, why: errorText(e) }, { cause: e })
+    }))
   const count = await git(projectPath, ['rev-list', '--count', `${into ?? wt.base}..${wt.branch}`])
   const dirty = existsSync(wt.path) ? await (reads ? reads.dirty(wt.path) : dirtyCount(wt.path)) : 0
   if (!count.ok || dirty === null) {

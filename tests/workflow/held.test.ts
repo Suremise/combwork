@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createHash } from 'crypto'
 import { readFileSync, statSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
+import { B1, B2, commit, locked, moved, R1, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { gitTestHooks } from '../../src/main/git'
 import { isRefusal } from '../../src/main/workflow/runtime'
@@ -122,11 +122,14 @@ describe('an index refreshed or a file touched meanwhile is no change', () => {
   })
 
   it("in a shared folder, another agent staging its own file during the submit → submitted; the builder's own → refused", async () => {
-    const locks: Record<string, string[]> = { B1: ['mine.txt'], B2: ['theirs.txt'] }
-    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: [], mergeChecks: [], target: '' }, { locksOf: (a) => locks[a] ?? [] }))
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: [], mergeChecks: [], target: '' }))
     const card = e.wf.createCard({ title: 'Mine' })
+    const theirs = e.wf.createCard({ title: 'Theirs' })
     moved(await e.wf.start(card.key, B1))
-    commit(e.project, { 'theirs.txt': 'theirs\n' }, 'theirs')
+    moved(await e.wf.start(theirs.key, B2))
+    // B2's file lock, recorded on its card (#1481): its edits in the shared folder aren't B1's.
+    expect(await locked(e.wf, B2, ['theirs.txt'])).toBe(true)
+    commit(e.project, { 'theirs.txt': 'theirs\n' }, 'theirs', { trailer: theirs.key })
     commit(e.project, { 'mine.txt': 'mine\n' }, 'mine', { trailer: card.key })
     // An edit to a file already there (a new file would change the folder's own time, which the evidence covers).
     during(e, 'submit', () => {
@@ -139,6 +142,22 @@ describe('an index refreshed or a file touched meanwhile is no change', () => {
     commit(e.project, { 'mine.txt': 'mine again\n' }, 'mine again', { trailer: other.key })
     during(e, 'submit', () => void sh(e.project, 'rm', '-q', '--cached', 'mine.txt'))
     refusedBy(await e.wf.submit(other.key, B1, { summary: 'y' }), 'evidence.changed')
+  })
+
+  it("in a shared folder, a file both agents locked in turn is still the builder's own: edited during the submit → refused (HR6's #1481 round 2)", async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: [], mergeChecks: [], target: '' }))
+    const card = e.wf.createCard({ title: 'Mine' })
+    const theirs = e.wf.createCard({ title: 'Theirs' })
+    moved(await e.wf.start(card.key, B1))
+    moved(await e.wf.start(theirs.key, B2))
+    commit(e.project, { 'both.txt': 'both\n' }, 'both', { trailer: theirs.key })
+    expect([await locked(e.wf, B2, ['both.txt']), await locked(e.wf, B1, ['both.txt'])]).toEqual([true, true])
+    commit(e.project, { 'mine.txt': 'mine\n' }, 'mine', { trailer: card.key })
+    during(e, 'submit', () => {
+      writeFileSync(join(e.project, 'both.txt'), 'both, edited\n')
+      sh(e.project, 'add', 'both.txt')
+    })
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'evidence.changed')
   })
 
   // Git, not Hive, says what content is the same: each path's own attributes and filters (HR5, round 1).
