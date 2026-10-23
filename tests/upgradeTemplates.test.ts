@@ -1,9 +1,10 @@
-// 0.9's agent templates at the upgrade to 1.0 (#1436; Darren's 19 Oct decision on #1123: wiped, with Hive's own in their
-// place): nothing moves while the upgrade waits; once upgraded, the workspace's and each project's 0.9 files (with their
-// kept copies) go into the 0.9 backup's folder, by the project's id, and a 1.0 template, a damaged file and anything else
-// stay; it is done once (board_meta), twice at once moves each file once, one quiet notice says so, and Help → Restore
-// the 0.9 Board Backup… puts them back for 0.9.3 without replacing a template saved since.
-import { existsSync, linkSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from 'fs'
+// 0.9's agent templates at the upgrade to 1.0 (#1436; Darren's 19 Oct decision on #1123, and the Assistant's 23 Oct scope
+// call: copy only): nothing is copied while the upgrade waits; once upgraded, each 0.9 template of the workspace and of
+// each project is copied into the 0.9 backup's folder (by the project's id), the originals left byte for byte as they
+// were (a 1.0 template, a damaged file and a .bak not copied); 1.0 never lists, loads or deletes a 0.9 file; it is done
+// once (board_meta), again and twice at once copying each template once; a copy cut short is cleaned up; a folder or
+// file that can't be read leaves it unmarked for the next open; one quiet notice says a copy is kept.
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -33,13 +34,7 @@ afterAll(async () => {
 afterEach(() => {
   store.boardTestHooks.upgradeAnswer = null
   step.testHooks.fail = undefined
-  step.testHooks.beforeClaim = undefined
-  step.testHooks.afterClaim = undefined
-  step.testHooks.beforeLink = undefined
 })
-
-/** An error as the file system gives one (EACCES: a file or folder another program holds). */
-const ioError = (what: string): NodeJS.ErrnoException => Object.assign(new Error(`EACCES: permission denied, ${what}`), { code: 'EACCES' })
 
 async function open(ws: string): Promise<WS> {
   const w = createWorkspaceService()
@@ -94,261 +89,113 @@ function notices(w: WS): { title: string; message: string }[] {
   return seen
 }
 
+/** Each file of a folder with its bytes: what must stay exactly as it was. */
+const snapshot = (dir: string): Record<string, string> => Object.fromEntries(files(dir).map((f) => [f, readFileSync(join(dir, f), 'latin1')]))
+/** The mark gone, as after Restore the 0.9 Board Backup and another upgrade (the board put back has none). */
+const unmark = (w: WS): Promise<void> => inWorkspace(w, () => store.boardWrite(w, async () => void store.boardWriteOp(w, (db) => db.prepare("DELETE FROM board_meta WHERE key = 'templates.v09'").run())))
+/** An error as the file system gives one (EACCES: a file or folder another program holds). */
+const ioError = (what: string): NodeJS.ErrnoException => Object.assign(new Error(`EACCES: permission denied, ${what}`), { code: 'EACCES' })
+
 describe("0.9's agent templates at the upgrade to 1.0 (#1436)", () => {
-  it('waits for the upgrade; then moves 0.9\'s files into the backup once, says so once, and Restore puts them back', async () => {
+  it('waits for the upgrade; then copies each 0.9 template once, leaves the originals as they were, never lists them, says so once', async () => {
     const { ws, wsTemplates, pTemplates } = await workspace09()
     let w = await open(ws)
-    // The upgrade waits: nothing moves.
-    expect(await inWorkspace(w, () => step.setAsideV09Templates(w))).toBeNull()
-    expect(files(wsTemplates)).toEqual(['damaged.json', 'new.json', 'pair.json', 'pair.json.bak', 'team.json'])
-    // 1.0 lists them meanwhile as 0.9's, which it can't use.
-    const listed = await inWorkspace(w, () => templates.listTemplates(join(ws, 'p')))
-    expect(listed.find((t) => t.scope === 'workspace' && t.file === 'team.json')?.problem).toMatch(/from Hive 0\.9 and can't be loaded in 1\.0/)
+    // The upgrade waits: nothing copied.
+    expect(await inWorkspace(w, () => step.copyV09Templates(w))).toBeNull()
+    expect(await step.backupFiles(ws)).toEqual([])
     await close(w)
     store.boardTestHooks.upgradeAnswer = 'yes'
     w = await open(ws)
     const said = notices(w)
-    expect(await inWorkspace(w, () => step.setAsideV09Templates(w))).toBe(3)
-    // 0.9's (and the kept copy) gone; the 1.0 template and the damaged file stay.
-    expect(files(wsTemplates)).toEqual(['damaged.json', 'new.json'])
-    expect(files(pTemplates)).toEqual([])
+    const before = [snapshot(wsTemplates), snapshot(pTemplates)]
+    expect(await inWorkspace(w, () => step.copyV09Templates(w))).toBe(3)
+    // The originals byte for byte; copies of the three 0.9 templates (not the .bak, the 1.0 one or the damaged one).
+    expect([snapshot(wsTemplates), snapshot(pTemplates)]).toEqual(before)
     const id = (await w.projectIds()).byPath.get(join(ws, 'p').toLowerCase())!
-    expect(await step.setAsideFiles(ws)).toEqual(['workspace/pair.json', 'workspace/pair.json.bak', 'workspace/team.json', `projects/${id}/mine.json`].sort())
-    expect(JSON.parse(readFileSync(join(ws, '.hive', 'backups', step.V09_TEMPLATES, 'projects', id, 'mine.json'), 'utf8')).name).toBe('Mine')
-    // Once: again, nothing to do; a 0.9 file put there by hand later stays (listed as 0.9's).
-    writeFileSync(join(wsTemplates, 'late.json'), v1('Late'))
-    expect(await inWorkspace(w, () => step.setAsideV09Templates(w))).toBeNull()
-    expect(files(wsTemplates)).toContain('late.json')
-    // Said once, quietly.
+    expect(await step.backupFiles(ws)).toEqual(['workspace/pair.json', 'workspace/team.json', `projects/${id}/mine.json`].sort())
+    expect(readFileSync(join(ws, '.hive', 'backups', step.V09_TEMPLATES, 'workspace', 'pair.json'), 'utf8')).toBe(v1('Pair'))
+    // 1.0 lists only its own: the 0.9 files aren't listed, loaded, added from or deleted.
+    const listed = await inWorkspace(w, () => templates.listTemplates(join(ws, 'p')))
+    expect(listed.filter((t) => t.scope !== 'hive').map((t) => t.file).sort()).toEqual(['damaged.json', 'new.json'])
+    await expect(inWorkspace(w, () => templates.templatePlan(join(ws, 'p'), 'workspace', 'pair.json'))).rejects.toThrow(/no longer there/)
+    await expect(inWorkspace(w, () => templates.addAgentFromTemplate(join(ws, 'p'), 'project', 'mine.json', 0))).rejects.toThrow(/no longer there/)
+    await expect(inWorkspace(w, () => templates.deleteTemplate({ scope: 'workspace', file: 'team.json' }))).rejects.toThrow(/no longer there/)
+    // A save of that name makes a new file beside the 0.9 one, never over it.
+    await inWorkspace(w, () => templates.saveTemplate(join(ws, 'p'), 'workspace', 'Pair'))
+    expect(readFileSync(join(wsTemplates, 'pair.json'), 'utf8')).toBe(v1('Pair'))
+    // Done once.
+    expect(await inWorkspace(w, () => step.copyV09Templates(w))).toBeNull()
     await step.sayV09TemplatesOnce(w)
     await expect.poll(() => store.boardValue(w, 'templates.v09.notice'), { timeout: HUNG_MS }).toBe('said')
     await step.sayV09TemplatesOnce(w)
-    expect(said).toEqual([{ title: 'Your 0.9 agent templates were set aside', message: "1.0 templates don't pin agents to worktrees. The Hive templates replace them; the 3 files are kept with the 0.9 board backup." }])
-    // A template saved since under one of their names isn't replaced by Restore: that one stays in the backup.
-    writeFileSync(join(wsTemplates, 'team.json'), v2('Team again'))
-    await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
-    expect(await inWorkspace(w, () => step.putBackV09Templates(w))).toBe(2)
-    expect(files(wsTemplates)).toEqual(['damaged.json', 'late.json', 'new.json', 'pair.json', 'pair.json.bak', 'team.json'])
-    expect(JSON.parse(readFileSync(join(wsTemplates, 'team.json'), 'utf8')).name).toBe('Team again')
-    expect(files(pTemplates)).toEqual(['mine.json'])
-    expect(await step.setAsideFiles(ws)).toEqual(['workspace/team.json'])
-    // The board put back has no mark: upgraded again, those put back are set aside again.
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    // (Team again is 1.0's: it stays.)
-    expect(await inWorkspace(w, () => step.setAsideV09Templates(w))).toBe(3)
-    expect(files(wsTemplates)).toEqual(['damaged.json', 'new.json', 'team.json'])
-    expect(await step.setAsideFiles(ws)).toEqual(['workspace/late.json', 'workspace/pair.json', 'workspace/pair.json.bak', 'workspace/team.json', `projects/${id}/mine.json`].sort())
+    expect(said).toEqual([{ title: 'Your 0.9 agent templates aren’t used in 1.0', message: '1.0 templates don’t pin agents to worktrees, so the Hive templates take their place. A copy of the 3 templates is kept with the 0.9 board backup.' }])
     await close(w)
   })
 
-  it("two runs at once in one Hive move each file once, losing none (the folder's lock)", async () => {
-    const { ws, wsTemplates } = await workspace09()
+  it('again (the mark gone) and twice at once: each template copied once', async () => {
+    const { ws } = await workspace09()
     store.boardTestHooks.upgradeAnswer = 'yes'
     const w = await open(ws)
-    const said = notices(w)
-    const both = await Promise.all([inWorkspace(w, () => step.setAsideV09Templates(w)), inWorkspace(w, () => step.setAsideV09Templates(w))])
-    // Both ran (neither had seen the other's mark); each 0.9 file is in the backup once, none lost or numbered twice.
+    const both = await Promise.all([inWorkspace(w, () => step.copyV09Templates(w)), inWorkspace(w, () => step.copyV09Templates(w))])
     expect(both.every((x) => typeof x === 'number')).toBe(true)
-    expect(files(wsTemplates)).toEqual(['damaged.json', 'new.json'])
     const id = (await w.projectIds()).byPath.get(join(ws, 'p').toLowerCase())!
-    expect(await step.setAsideFiles(ws)).toEqual(['workspace/pair.json', 'workspace/pair.json.bak', 'workspace/team.json', `projects/${id}/mine.json`].sort())
-    // The notice counts what the backup holds, whichever of them moved it.
-    await step.sayV09TemplatesOnce(w)
-    expect(said.map((s) => s.message)).toEqual([expect.stringContaining('the 3 files are kept')])
+    const once = ['workspace/pair.json', 'workspace/team.json', `projects/${id}/mine.json`].sort()
+    expect(await step.backupFiles(ws)).toEqual(once)
+    await unmark(w)
+    expect(await inWorkspace(w, () => step.copyV09Templates(w))).toBe(0)
+    expect(await step.backupFiles(ws)).toEqual(once)
     await close(w)
   })
 
-  // --- HR3's rounds 1–3: a move never touches a file it doesn't own, and every state a run can leave is finished by the
-  // next, never copied twice. Another Hive is another process: its steps are made by hand here, between this run's.
-  const claims = (dir: string): string[] => files(dir).filter((f) => f.includes('.v09-'))
-  const kept = (ws: string): string => join(ws, '.hive', 'backups', step.V09_TEMPLATES, 'workspace')
-
-  it('a save landing after the claim makes a new file: it keeps its bytes, and the 0.9 one is set aside', async () => {
+  it('a template changed since its copy is copied again beside it (pair-2.json); the first copy stays', async () => {
     const { ws, wsTemplates } = await workspace09()
     store.boardTestHooks.upgradeAnswer = 'yes'
     const w = await open(ws)
-    const saved = v2('Saved meanwhile')
-    step.testHooks.afterClaim = async (src) => {
-      if (src.endsWith('pair.json')) writeFileSync(src, saved)
-    }
-    expect(await inWorkspace(w, () => step.setAsideV09Templates(w))).toBe(3)
-    expect(readFileSync(join(wsTemplates, 'pair.json'), 'utf8')).toBe(saved)
-    expect(JSON.parse(readFileSync(join(kept(ws), 'pair.json'), 'utf8')).version).toBe(1)
+    await inWorkspace(w, () => step.copyV09Templates(w))
+    writeFileSync(join(wsTemplates, 'pair.json'), v1('Pair, edited in 0.9'))
+    await unmark(w)
+    expect(await inWorkspace(w, () => step.copyV09Templates(w))).toBe(1)
+    const kept = join(ws, '.hive', 'backups', step.V09_TEMPLATES, 'workspace')
+    expect(files(kept)).toEqual(['pair-2.json', 'pair.json', 'team.json'])
+    expect([readFileSync(join(kept, 'pair.json'), 'utf8'), readFileSync(join(kept, 'pair-2.json'), 'utf8')]).toEqual([v1('Pair'), v1('Pair, edited in 0.9')])
     await close(w)
   })
 
-  it('a save landing between the look and the claim (another Hive, atomically): it is given back, never moved', async () => {
+  it("a folder or file that can't be read, or a copy that can't be written, leaves it unmarked; the next open goes on; a copy cut short is cleaned up", async () => {
     const { ws, wsTemplates } = await workspace09()
     store.boardTestHooks.upgradeAnswer = 'yes'
     const w = await open(ws)
-    const saved = v2('Saved just before')
-    step.testHooks.beforeClaim = async (src) => {
-      if (!src.endsWith('team.json')) return
-      writeFileSync(`${src}.tmp`, saved)
-      renameSync(`${src}.tmp`, src)
+    const cases: [op: 'scan' | 'read' | 'write', match: (p: string) => boolean][] = [
+      ['scan', (p) => resolve(p).toLowerCase() === resolve(wsTemplates).toLowerCase()],
+      ['read', (p) => p.endsWith('team.json')],
+      // (pair.json is copied by then: team.json's copy fails to be written.)
+      ['write', (p) => p.endsWith('team.json')]
+    ]
+    for (const [op, match] of cases) {
+      step.testHooks.fail = (o, path) => {
+        if (o === op && match(path)) throw ioError(`${op} '${path}'`)
+      }
+      await expect(inWorkspace(w, () => step.copyV09Templates(w)), op).rejects.toThrow(/EACCES/)
+      expect(store.boardValue(w, 'templates.v09'), op).toBeNull()
     }
-    expect(await inWorkspace(w, () => step.setAsideV09Templates(w))).toBe(2)
-    expect(readFileSync(join(wsTemplates, 'team.json'), 'utf8')).toBe(saved)
-    expect(files(kept(ws))).toEqual(['pair.json', 'pair.json.bak'])
-    expect(claims(wsTemplates)).toEqual([])
-    await close(w)
-  })
-
-  it('another Hive finishing the same move first: this run leaves it, never a second copy', async () => {
-    const { ws, wsTemplates } = await workspace09()
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    const w = await open(ws)
-    // Just before this run claims pair.json, the other Hive's whole move of it (claim, link, unlink).
-    step.testHooks.beforeClaim = async (src) => {
-      if (!src.endsWith('pair.json')) return
-      step.testHooks.beforeClaim = undefined
-      const other = `${src}.v09-aaaaaaaaaaaa-pair.json`
-      renameSync(src, other)
-      mkdirSync(kept(ws), { recursive: true })
-      linkSync(other, join(kept(ws), 'pair.json'))
-      unlinkSync(other)
-    }
-    await inWorkspace(w, () => step.setAsideV09Templates(w))
-    expect(files(kept(ws)).filter((f) => f.startsWith('pair'))).toEqual(['pair.json', 'pair.json.bak'])
-    expect(claims(wsTemplates)).toEqual([])
-    await close(w)
-  })
-
-  it('a move cut short between its link and its claim going (EACCES, or a crash): the next run finishes it, no second copy', async () => {
-    const { ws, wsTemplates } = await workspace09()
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    const w = await open(ws)
-    step.testHooks.fail = (op, path) => {
-      if (op === 'unlink' && /pair\.json\.v09-[0-9a-f]+-pair\.json$/.test(path)) throw ioError(`unlink '${path}'`)
-    }
-    await expect(inWorkspace(w, () => step.setAsideV09Templates(w))).rejects.toThrow(/EACCES/)
-    expect(store.boardValue(w, 'templates.v09')).toBeNull()
-    expect(files(kept(ws))).toContain('pair.json')
-    expect(claims(wsTemplates).length).toBeGreaterThan(0)
     step.testHooks.fail = undefined
-    await inWorkspace(w, () => step.setAsideV09Templates(w))
-    const id = (await w.projectIds()).byPath.get(join(ws, 'p').toLowerCase())!
-    expect(await step.setAsideFiles(ws)).toEqual(['workspace/pair.json', 'workspace/pair.json.bak', 'workspace/team.json', `projects/${id}/mine.json`].sort())
-    expect(claims(wsTemplates)).toEqual([])
+    // A copy a crash left half written: never a template's name, and removed by the next run.
+    const kept = join(ws, '.hive', 'backups', step.V09_TEMPLATES, 'workspace')
+    mkdirSync(kept, { recursive: true })
+    writeFileSync(join(kept, '.team.json.0123456789ab.part'), '{"version": 1, "na')
+    await inWorkspace(w, () => step.copyV09Templates(w))
+    expect(files(kept)).toEqual(['pair.json', 'team.json'])
     expect(store.boardValue(w, 'templates.v09')).not.toBeNull()
     await close(w)
   })
 
-  it('a numbered target and its kept copy failing: the next run puts the copy beside its template (pair-2.json.bak)', async () => {
-    const { ws, wsTemplates } = await workspace09()
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    // The backup already has a pair.json (an earlier upgrade's, kept when Restore found its place taken).
-    mkdirSync(kept(ws), { recursive: true })
-    writeFileSync(join(kept(ws), 'pair.json'), v1('Earlier pair'))
-    const w = await open(ws)
-    step.testHooks.fail = (op, path) => {
-      if (op === 'link' && /pair\.json\.bak\.v09-/.test(path)) throw ioError(`link '${path}'`)
-    }
-    await expect(inWorkspace(w, () => step.setAsideV09Templates(w))).rejects.toThrow(/EACCES/)
-    expect(store.boardValue(w, 'templates.v09')).toBeNull()
-    expect(files(kept(ws))).toEqual(['pair-2.json', 'pair.json'])
-    step.testHooks.fail = undefined
-    await inWorkspace(w, () => step.setAsideV09Templates(w))
-    expect(files(kept(ws))).toEqual(['pair-2.json', 'pair-2.json.bak', 'pair.json', 'team.json'])
-    expect(JSON.parse(readFileSync(join(kept(ws), 'pair.json'), 'utf8')).name).toBe('Earlier pair')
-    expect(claims(wsTemplates)).toEqual([])
-    expect(store.boardValue(w, 'templates.v09')).not.toBeNull()
-    await close(w)
-  })
-
-  it('moves another Hive claimed and left (it closed): this run finishes them', async () => {
-    const { ws, wsTemplates } = await workspace09()
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    renameSync(join(wsTemplates, 'pair.json'), join(wsTemplates, 'pair.json.v09-bbbbbbbbbbbb-pair.json'))
-    renameSync(join(wsTemplates, 'pair.json.bak'), join(wsTemplates, 'pair.json.bak.v09-bbbbbbbbbbbb-pair.json.bak'))
-    const w = await open(ws)
-    // Not listed as templates meanwhile.
-    expect((await inWorkspace(w, () => templates.listTemplates(join(ws, 'p')))).some((t) => t.file.includes('v09'))).toBe(false)
-    expect(await inWorkspace(w, () => step.setAsideV09Templates(w))).toBe(3)
-    expect(files(kept(ws))).toEqual(['pair.json', 'pair.json.bak', 'team.json'])
-    expect(claims(wsTemplates)).toEqual([])
-    await close(w)
-  })
-
-  it('a move cut short between claiming a template and its kept copy: the copy follows it', async () => {
-    const { ws, wsTemplates } = await workspace09()
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    renameSync(join(wsTemplates, 'pair.json'), join(wsTemplates, 'pair.json.v09-cccccccccccc-pair.json'))
-    const w = await open(ws)
-    await inWorkspace(w, () => step.setAsideV09Templates(w))
-    expect(files(kept(ws))).toEqual(['pair.json', 'pair.json.bak', 'team.json'])
-    expect(files(wsTemplates)).toEqual(['damaged.json', 'new.json'])
-    await close(w)
-  })
-
-  it("a folder or file that can't be read stops the run unmarked (none lost), and the next open goes on", async () => {
-    const { ws, wsTemplates } = await workspace09()
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    const w = await open(ws)
-    step.testHooks.fail = (op, path) => {
-      if (op === 'scan' && resolve(path).toLowerCase() === resolve(wsTemplates).toLowerCase()) throw ioError(`scandir '${path}'`)
-    }
-    await expect(inWorkspace(w, () => step.setAsideV09Templates(w))).rejects.toThrow(/EACCES/)
-    expect(store.boardValue(w, 'templates.v09')).toBeNull()
-    expect(files(wsTemplates)).toContain('pair.json')
-    step.testHooks.fail = (op, path) => {
-      if (op === 'read' && path.endsWith('team.json')) throw ioError(`open '${path}'`)
-    }
-    await expect(inWorkspace(w, () => step.setAsideV09Templates(w))).rejects.toThrow(/EACCES/)
-    expect(store.boardValue(w, 'templates.v09')).toBeNull()
-    expect(files(wsTemplates)).toContain('team.json')
-    step.testHooks.fail = undefined
-    await inWorkspace(w, () => step.setAsideV09Templates(w))
-    expect(files(wsTemplates)).toEqual(['damaged.json', 'new.json'])
-    expect(files(kept(ws))).toEqual(['pair.json', 'pair.json.bak', 'team.json'])
-    expect(store.boardValue(w, 'templates.v09')).not.toBeNull()
-    await close(w)
-  })
-
-  it('Restore never replaces a template saved meanwhile, in any process: its bytes stay, and so does the backup’s', async () => {
-    const { ws, wsTemplates } = await workspace09()
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    const w = await open(ws)
-    expect(await inWorkspace(w, () => step.setAsideV09Templates(w))).toBe(3)
-    await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
-    // A template saved as pair.json just as Restore links 0.9's there (after any look it could take first).
-    const saved = v2('Saved meanwhile')
-    step.testHooks.beforeLink = async (dest) => {
-      if (dest === join(wsTemplates, 'pair.json')) writeFileSync(dest, saved)
-    }
-    expect(await inWorkspace(w, () => step.putBackV09Templates(w))).toBe(2)
-    expect(readFileSync(join(wsTemplates, 'pair.json'), 'utf8')).toBe(saved)
-    expect(await step.setAsideFiles(ws)).toEqual(['workspace/pair.json', 'workspace/pair.json.bak'])
-    expect(files(wsTemplates)).toEqual(['damaged.json', 'new.json', 'pair.json', 'team.json'])
-    await close(w)
-  })
-
-  it('a Restore cut short between its link and its backup name going: the next finishes it, no second copy', async () => {
-    const { ws, wsTemplates } = await workspace09()
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    const w = await open(ws)
-    await inWorkspace(w, () => step.setAsideV09Templates(w))
-    await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
-    step.testHooks.fail = (op, path) => {
-      if (op === 'unlink' && path === join(kept(ws), 'team.json')) throw ioError(`unlink '${path}'`)
-    }
-    await expect(inWorkspace(w, () => step.putBackV09Templates(w))).rejects.toThrow(/EACCES/)
-    expect(files(wsTemplates)).toContain('team.json')
-    expect(files(kept(ws))).toContain('team.json')
-    step.testHooks.fail = undefined
-    await inWorkspace(w, () => step.putBackV09Templates(w))
-    expect(files(kept(ws))).toEqual([])
-    expect(files(wsTemplates)).toEqual(['damaged.json', 'new.json', 'pair.json', 'pair.json.bak', 'team.json'])
-    await close(w)
-  })
-
-  it('a workspace made in 1.0 has nothing to set aside: marked done, nothing said', async () => {
+  it('a workspace made in 1.0 has nothing to copy: marked done, nothing said', async () => {
     const ws = join(base, `ws-${++n}`)
     mkdirSync(join(ws, 'p', '.hive'), { recursive: true })
     writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     const w = await open(ws)
     const said = notices(w)
-    expect(await inWorkspace(w, () => step.setAsideV09Templates(w))).toBe(0)
+    expect(await inWorkspace(w, () => step.copyV09Templates(w))).toBe(0)
     expect(store.boardValue(w, 'templates.v09')).toBe('0')
     await step.sayV09TemplatesOnce(w)
     expect(said).toEqual([])

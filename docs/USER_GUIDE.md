@@ -448,7 +448,7 @@ Set a project's agents up once, see them work, and reuse the setup anywhere: a *
 
 **Saving from a project.** Each agent's **Role in the workflow** and **Note** (Agent Settings) are saved in the template; an agent from before 1.0 with no role saved is saved with the role its name reads as. **Save Agents as Template…**, **Load Template…** and **Add Agent from Template…** are in the command palette too (the last two open + Add ▾'s menus).
 
-**Templates from Hive 0.9** held whether each agent had a worktree of its own, which 1.0 doesn't do, so 1.0 can't load them: importing one is refused, saying so. At the upgrade to 1.0, Hive moves your saved 0.9 templates (the workspace's and each project's) into `.hive/backups/templates-0.9`, beside the 0.9 board backup, and says so once. Hive's own templates take their place; make your own again with **Save Template…**. **Help → Restore the 0.9 Board Backup…** puts the 0.9 templates back where they were, for Hive 0.9.3 (one you've saved since under the same name stays).
+**Templates from Hive 0.9** held whether each agent had a worktree of its own, which 1.0 doesn't do, so 1.0 doesn't use them: they aren't listed or loaded, and importing one is refused, saying so. Your saved 0.9 templates (the workspace's and each project's) stay where they were, untouched, and at the upgrade to 1.0 Hive also keeps a copy of each in `.hive/backups/templates-0.9`, beside the 0.9 board backup, and says so once. Hive's own templates take their place; make your own again with **Save Template…**.
 
 ### Hive's own templates
 

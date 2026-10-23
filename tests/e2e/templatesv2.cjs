@@ -1,13 +1,13 @@
 // Templates v2 and Hive's own (#1436, SPEC §16.10.6), on fake Claude Code with the Assistant off and Codex turned off:
-// a workspace opened with 0.9's templates (the workspace's and a project's) sets them aside into the 0.9 backup's folder
-// and says so once in the Notifications panel; importing a 0.9 file is refused, saying why; the Templates view lists
+// a workspace opened with 0.9's templates (the workspace's and a project's) copies them into the 0.9 backup's folder,
+// leaves them as they were and never lists them, and says so once in the Notifications panel; importing a 0.9 file is refused, saying why; the Templates view lists
 // Hive's six, read-only, with the preset each suggests; Team 3×3 loaded into a project from the view makes six agents
 // named from its key, builders and reviewers paired both ways, in a grid of six, none in a worktree, Codex's agents on
 // Claude Code with a note on their rows; Pair loaded from + Add ▾ → Templates with "Also switch this project to Pair…"
 // ticked lands in Version Control → Workflow with Pair chosen and not saved. Screenshots of the Hive templates, and of
 // the load dialog's suggestion and swap note, in both themes. Dev build, throwaway profile, workspace and
-// CLAUDE_CONFIG_DIR; a quiet test copy. (0.9's templates set aside at the board's real upgrade, the upgrade waiting, and
-// Restore putting them back: tests/upgradeTemplates.test.ts, on boards made 0.9's.)
+// CLAUDE_CONFIG_DIR; a quiet test copy. (0.9's templates copied at the board's real upgrade, and the upgrade waiting:
+// tests/upgradeTemplates.test.ts, on boards made 0.9's.)
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -71,15 +71,17 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
       await inv('settings:update', { appearance: { theme: 'dark' } })
     }
 
-    // --- 0.9's templates set aside as the workspace opens in 1.0, into the 0.9 backup's folder, said once.
+    // --- 0.9's templates copied as the workspace opens in 1.0, into the 0.9 backup's folder, said once; the originals
+    // stay (#1436, the Assistant's scope call: copy only).
+    const originals = [path.join(ws, '.hive', 'templates'), path.join(alpha, '.hive', 'templates')].map((d) => Object.fromEntries(fs.readdirSync(d).map((f) => [f, fs.readFileSync(path.join(d, f), 'utf8')])))
     const backup = path.join(ws, '.hive', 'backups', 'templates-0.9')
     const listed = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).sort() : [])
     const projectsDir = path.join(backup, 'projects')
-    check("0.9's templates are moved into the backup's folder (the workspace's with its kept copy, and alpha's by its id)", !!(await until(async () => JSON.stringify(listed(path.join(backup, 'workspace'))) === '["old-pair.json","old-pair.json.bak"]' && listed(projectsDir).length === 1 && JSON.stringify(listed(path.join(projectsDir, listed(projectsDir)[0]))) === '["mine.json"]', HUNG_MS)), JSON.stringify([listed(path.join(backup, 'workspace')), listed(projectsDir)]))
-    check('…gone from where they were', listed(path.join(ws, '.hive', 'templates')).length === 0 && listed(path.join(alpha, '.hive', 'templates')).length === 0)
+    check("0.9's templates are copied into the backup's folder (the workspace's, and alpha's by its id; no .bak)", !!(await until(async () => JSON.stringify(listed(path.join(backup, 'workspace'))) === '["old-pair.json"]' && listed(projectsDir).length === 1 && JSON.stringify(listed(path.join(projectsDir, listed(projectsDir)[0]))) === '["mine.json"]', HUNG_MS)), JSON.stringify([listed(path.join(backup, 'workspace')), listed(projectsDir)]))
+    check('…the originals left as they were, byte for byte', JSON.stringify([path.join(ws, '.hive', 'templates'), path.join(alpha, '.hive', 'templates')].map((d) => Object.fromEntries(fs.readdirSync(d).map((f) => [f, fs.readFileSync(path.join(d, f), 'utf8')])))) === JSON.stringify(originals))
     await page.locator('.activitybar .activity-btn[aria-label="Notifications"]').click()
-    const notice = page.locator('.notif-panel .notif-item', { hasText: 'Your 0.9 agent templates were set aside' })
-    check('one quiet notice says so, in the Notifications panel', !!(await until(async () => (await notice.count()) === 1, HUNG_MS)) && /1\.0 templates don't pin agents to worktrees\. The Hive templates replace them; the 2 files are kept with the 0\.9 board backup\./.test(await notice.innerText()), await page.locator('.notif-panel').innerText().catch(() => ''))
+    const notice = page.locator('.notif-panel .notif-item', { hasText: 'Your 0.9 agent templates aren’t used in 1.0' })
+    check('one quiet notice says so, in the Notifications panel', !!(await until(async () => (await notice.count()) === 1, HUNG_MS)) && /1\.0 templates don’t pin agents to worktrees, so the Hive templates take their place\. A copy of the 2 templates is kept with the 0\.9 board backup\./.test(await notice.innerText()), await page.locator('.notif-panel').innerText().catch(() => ''))
     await shoot('notice', () => page.locator('.notif-panel'))
     await page.locator('.notif-panel [aria-label="Close"]').click()
 
@@ -88,7 +90,7 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     const sidebar = page.locator('.sidebar')
     const hiveRows = sidebar.locator('.template-row[data-scope="hive"]')
     check("the Templates view lists Hive's own: Solo, Pair, Pair: one provider, Team 3×3, Team 6×6, Team 6 + pool", !!(await until(async () => JSON.stringify(await hiveRows.evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(['Solo', 'Pair', 'Pair: one provider', 'Team 3×3', 'Team 6×6', 'Team 6 + pool']), HUNG_MS)), JSON.stringify(await hiveRows.evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))))
-    check('…and none of the 0.9 ones', (await sidebar.locator('.template-row:not([data-scope="hive"])').count()) === 0)
+    check('…and none of the 0.9 ones (still in the folders)', (await sidebar.locator('.template-row:not([data-scope="hive"])').count()) === 0)
     await sidebar.locator('.template-row[data-scope="hive"][aria-label="Team 3×3"]').click()
     const detail = page.locator('.main-area > .tab-body .template-detail[data-scope="hive"]')
     await until(async () => (await detail.count()) === 1, HUNG_MS)

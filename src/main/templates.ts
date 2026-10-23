@@ -105,13 +105,23 @@ const place = (d: TemplateDest): TemplateDest => (d.scope === 'project' ? { scop
 /** What a template suggests and pairs, as an entry carries it (#1436). */
 const extras = (t: Pick<AgentTemplate, 'suggestedPreset' | 'reviewerMode' | 'pairs'>): Pick<TemplateEntry, 'suggestedPreset' | 'reviewerMode' | 'pairs'> => ({ ...(t.suggestedPreset ? { suggestedPreset: t.suggestedPreset } : {}), ...(t.reviewerMode ? { reviewerMode: t.reviewerMode } : {}), ...(t.pairs?.length ? { pairs: t.pairs } : {}) })
 
+/** Whether a template file's content is Hive 0.9's: a version under 1.0's (#1436). */
+const isV09 = (raw: unknown): boolean => {
+  const v = raw && typeof raw === 'object' ? (raw as { version?: unknown }).version : undefined
+  return typeof v === 'number' && Number.isInteger(v) && v >= 1 && v < TEMPLATE_VERSION
+}
+
 /** One of Hive's own templates as listed (#1436): its name and description in the language Hive shows now. */
 function hiveEntry(h: HiveTemplate): TemplateEntry {
   const t = h.template
   return { scope: 'hive', file: h.file, name: tr(h.name), savedAt: null, layout: t.layout, description: tr(h.description), agents: t.agents, ...extras(t) }
 }
 
-async function readOne(d: TemplateDest, file: string): Promise<TemplateEntry> {
+/**
+ * One template as listed, or null for a file of Hive 0.9's (#1436: 1.0 doesn't use them; the upgrade keeps a copy
+ * with the 0.9 backup, and the file stays as it is, never listed, loaded, changed or deleted here).
+ */
+async function readOne(d: TemplateDest, file: string): Promise<TemplateEntry | null> {
   if (d.scope === 'hive') {
     const h = hiveTemplate(file)
     if (!h) throw refusal(M.gone, undefined, 'notFound')
@@ -119,6 +129,7 @@ async function readOne(d: TemplateDest, file: string): Promise<TemplateEntry> {
   }
   const where = place(d)
   const raw = await readKeptJson<unknown>(join(folder(d), file), null)
+  if (isV09(raw)) return null
   const t = raw === null ? msg({ id: 'content.templates.unreadable', defaultMessage: "It couldn't be read.", description: "Why a template can't be used: its file couldn't be read." }) : readTemplate(raw)
   if (!isAgentTemplate(t)) {
     const name = raw && typeof raw === 'object' && typeof (raw as { name?: unknown }).name === 'string' ? String((raw as { name: string }).name).slice(0, TEMPLATE_NAME_MAX) : file.replace(/\.json$/, '')
@@ -133,7 +144,10 @@ async function listIn(d: TemplateDest): Promise<TemplateEntry[]> {
   if (d.scope === 'hive') return HIVE_TEMPLATES.map(hiveEntry)
   const files = (await readdir(folder(d)).catch(() => [] as string[])).filter(isTemplateFile).sort()
   const out: TemplateEntry[] = []
-  for (const f of files) out.push(await readOne(d, f))
+  for (const f of files) {
+    const e = await readOne(d, f)
+    if (e) out.push(e)
+  }
   return out
 }
 
@@ -173,6 +187,7 @@ function fileOf(ref: TemplateRef): string {
 async function usable(ref: TemplateRef): Promise<TemplateEntry & { template: AgentTemplate }> {
   fileOf(ref)
   const e = await readOne(ref, ref.file)
+  if (!e) throw refusal(M.gone, undefined, 'notFound')
   if (e.problem) throw refusal(msg({ id: 'content.templates.cantUse', defaultMessage: '"{name}" can\'t be used: {problem}', description: "An error: the template {name} can't be used; {problem} says why (a sentence)." }), { name: e.name, problem: e.problemText ?? e.problem })
   return { ...e, template: { version: TEMPLATE_VERSION, name: e.name, savedAt: e.savedAt ?? '', layout: e.layout, ...(e.description ? { description: e.description } : {}), agents: e.agents, ...extras(e) } }
 }
@@ -201,8 +216,8 @@ function changing<T>(d: TemplateDest, fn: () => Promise<T>): Promise<T> {
   return withTemplatesLock(folder(d), fn)
 }
 
-/** The lock of one folder of templates (`changing`'s), for what else changes its files: 0.9's set aside and put back (#1436). */
-export function withTemplatesLock<T>(dir: string, fn: () => Promise<T>): Promise<T> {
+/** The lock of one folder of templates (`changing`'s). */
+function withTemplatesLock<T>(dir: string, fn: () => Promise<T>): Promise<T> {
   return withFileLock(`${resolve(dir)}|templates`, fn)
 }
 
@@ -210,7 +225,7 @@ export function withTemplatesLock<T>(dir: string, fn: () => Promise<T>): Promise
 async function write(d: TemplateDest, file: string, t: AgentTemplate): Promise<TemplateEntry> {
   await mkdir(folder(d), { recursive: true })
   await writeKeptJson(join(folder(d), file), exportable(t))
-  return readOne(d, file)
+  return (await readOne(d, file))!
 }
 
 /**
@@ -299,10 +314,11 @@ export async function duplicateTemplate(ref: TemplateRef, to: TemplateDest): Pro
   })
 }
 
-/** Deletes a template: its file (and the copy kept beside it) go to the Recycle Bin. Hive's own can't be (#1436). */
+/** Deletes a template: its file (and the copy kept beside it) go to the Recycle Bin. Hive's own and 0.9's can't be (#1436). */
 export async function deleteTemplate(ref: TemplateRef): Promise<void> {
   await changing(ref, async () => {
     const f = fileOf(ref)
+    if (!(await readOne(ref, ref.file))) throw refusal(M.gone, undefined, 'notFound')
     await trash(f)
     if (existsSync(`${f}.bak`)) await trash(`${f}.bak`).catch((e) => log.warn('Could not remove the copy of a deleted template', e))
     log.info(`Deleted template ${userText(ref.file)} (${ref.scope})`)
