@@ -3265,12 +3265,18 @@ decided again in it):
   the agent's branch.
 - **The rename.** A free adopted slot (no lease, operation, job or writer, ready, no session running there, nothing
   holding the folder: the rename probe) is renamed to the next generic name (`slot-c`) in the pool's folder, so a slot
-  named after one agent isn't lent to another: Repair's steps (`relocateWorktree`, extracted from `workspaceMove.ts`):
-  each CLI's per-folder data tried first, git's move (refused when the destination exists), its cards' `FolderMoved`,
-  its sessions' recorded folder, the CLIs' data copied, then the slot's row and its leases' history. A session whose
-  conversation can't follow means no rename (logged); a failure part way is put back; one cut short by a crash after
-  git's move is finished by the next pass from its recorded intent (board_meta `slot_rename:`). Only with the rules on and
-  Settings → Advanced, **Rename adopted worktrees to slot names** (`hive.slots.renameAdopted`, on).
+  named after one agent isn't lent to another. The rename is the slot's operation (a `remove`-kind one, its holder's
+  alone) from the write that takes the slot and **reserves its destination** (the next generic name no slot has and no
+  other rename has reserved, its folder absent: board_meta `slot_rename:`, its intent) to the fenced write that renames
+  the row and its leases' history and deletes the intent, so two renames (of two slots, or in two Hives) never share a
+  destination. Repair's helpers (`worktreeRenamer`, from `workspaceMove.ts`) do the steps: each CLI's per-folder data
+  copied first, every provider's copy applied with no failure (any failing: no rename, nothing moved); git's move,
+  refused onto anything already there and checked where git lists it (exactly the reserved folder, else moved back);
+  its cards' `FolderMoved` and its sessions' recorded folder. A step failing after the move puts back what was done; if
+  even that fails, the operation and intent stay, the slot out of the pool, until a later look puts it back. A rename cut
+  short by a crash is the next holder's (the pool's recovery, once its Hive is gone): given up if git hasn't moved it,
+  finished (or put back) if it has; a live one is never touched by another Hive. Only with the rules on and Settings →
+  Advanced, **Rename adopted worktrees to slot names** (`hive.slots.renameAdopted`, on).
 - **A reviewer's own worktree** gets no slot and no rename: it becomes a retired home (its conversations resume there,
   its new ones start in the project folder).
 - **One-way.** The board backup and Help → Restore the 0.9 Board Backup… stay (cards and history), with no promise that

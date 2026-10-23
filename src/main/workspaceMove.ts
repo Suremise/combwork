@@ -14,7 +14,8 @@ import { allProviders } from './providers'
 import { recentChanged } from './recentWorkspaces'
 import { sessions } from './sessions'
 import type { WorkspaceService } from './workspace'
-import { listWorktrees, localBranches } from './worktrees'
+import { listWorktrees, listWorktreesOrNull, localBranches } from './worktrees'
+import type { SlotRenamer } from './slots'
 import { workflowFor } from './workflow/service'
 import { reconcilersIdle } from './workflow/reconciler'
 import { moveExclusions } from './antivirus'
@@ -391,48 +392,77 @@ async function pathData(moves: Move[], apply: boolean): Promise<PathDataCopy[]> 
 }
 
 /**
- * A worktree's folder moved with Repair's own steps (#1441: an adopted worktree renamed to a slot's name, once nothing
- * holds it): each CLI's per-folder data tried first without copying (a conversation that couldn't follow: nothing moves,
- * and why), then git's move, its cards' work following it (`FolderMoved`), its sessions' recorded folder repointed, and
- * the CLIs' data copied (kept as a pending copy, finished later as Repair's are, until it is). A step failing part way
- * puts back what was done (git's move too): nothing is lost. Repair's own flow uses the same steps, unchanged.
+ * A worktree's rename with Repair's own helpers (#1441, the slot pool's `SlotRenamer`: an adopted worktree given a
+ * generic name once nothing holds it). Each step stands alone so the pool's operation can resume from where git lists
+ * the worktree after a crash; each is a no-op where it was done. Repair's own flow is unchanged.
+ */
+export function worktreeRenamer(ws: WorkspaceService, projectPath: string): SlotRenamer {
+  const where = async (from: string, to: string): Promise<'from' | 'to' | null> => {
+    const listed = await listWorktreesOrNull(projectPath).catch(() => null)
+    if (!listed) return null
+    if (listed.some((w) => samePlace(w.path, to))) return 'to'
+    return listed.some((w) => samePlace(w.path, from)) ? 'from' : null
+  }
+  return {
+    where,
+    // Each CLI's per-folder data (its conversations and memory) copied for the new path, checked first: every provider's
+    // copy applied with no failure, or no rename. The old data is never touched.
+    copy: async (from, to, who) => {
+      const m: Move = { from, to, ...owned({ kind: 'worktree', agent: who }) }
+      const failed = (list: PathDataCopy[]): string[] => list.filter((f) => f.failed?.length).map((f) => `${f.provider}: ${f.failed!.join(', ')}`)
+      const dry = failed(await copyFor(m, false))
+      if (dry.length) return log.info(`${userText(from)} can't be renamed: ${userText(dry.join('; '))}`), false
+      const applied = failed(await copyFor(m, true))
+      if (applied.length) return log.warn(`${userText(from)} can't be renamed, its conversations' data didn't follow: ${userText(applied.join('; '))}`), false
+      return true
+    },
+    // Git's move, refused when anything is at `to` (git would move it inside), its parent made first; then checked: git
+    // must list it at exactly `to`. Anywhere else, it is moved back.
+    move: async (from, to) => {
+      if (existsSync(to)) return log.info(`${userText(from)} not renamed: ${userText(to)} is already there`), false
+      await mkdir(dirname(to), { recursive: true })
+      const moved = await git(projectPath, ['worktree', 'move', from, to])
+      if (!moved.ok) return log.info(`${userText(from)} not renamed: ${userText((moved.err || '').trim())}`), false
+      if ((await where(from, to)) === 'to') return true
+      log.warn(`${userText(from)} moved, but git doesn't list it at ${userText(to)}: moving it back`)
+      const listed = (await listWorktreesOrNull(projectPath).catch(() => null)) ?? []
+      const at = listed.find((w) => !samePlace(w.path, projectPath) && samePlace(dirname(w.path), to))?.path
+      if (at) await git(projectPath, ['worktree', 'move', at, from])
+      return false
+    },
+    follow: async (from, to) => {
+      await moveCardFolders(projectPath, from, to)
+      await sessionCwds(ws, projectPath, [{ from, to }], true)
+    },
+    back: async (from, to) => {
+      await sessionCwds(ws, projectPath, [{ from: to, to: from }], true)
+      await moveCardFolders(projectPath, to, from)
+      if ((await where(from, to)) === 'to') {
+        const back = await git(projectPath, ['worktree', 'move', to, from])
+        if (!back.ok) log.warn(`${userText(to)} couldn't be moved back to ${userText(from)}: ${userText(back.err)}`)
+      }
+      return (await where(from, to)) === 'from'
+    }
+  }
+}
+
+/**
+ * A worktree's folder moved with the renamer's steps, outside a slot's operation (tests, and a caller with its own
+ * guard): the data copied first, git's move, cards and sessions following; put back when a step fails after the move.
  */
 export async function relocateWorktree(ws: WorkspaceService, projectPath: string, from: string, to: string, owner: MoveOwner): Promise<{ ok: true } | { ok: false; why: string }> {
-  const m: Move = { from, to, ...owned(owner) }
-  const dry = await copyFor(m, false)
-  const blocked = dry.filter((f) => f.failed?.length)
-  if (blocked.length) return { ok: false, why: blocked.map((f) => `${f.provider}: ${f.failed!.join(', ')}`).join('; ') }
-  // Git moves a worktree into a folder that is already there (to/<name>): refused instead.
-  if (existsSync(to)) return { ok: false, why: `${to} is already there` } // i18n-ignore: the log's reason
-  // Its new parent made first (a pool's root before its first slot): git doesn't.
-  await mkdir(dirname(to), { recursive: true })
-  const moved = await git(projectPath, ['worktree', 'move', from, to])
-  if (!moved.ok) return { ok: false, why: (moved.err || 'git worktree move').trim() } // i18n-ignore: a git command's name
+  const r = worktreeRenamer(ws, projectPath)
+  const who = owner.kind === 'worktree' ? owner.agent : basename(projectPath)
+  if (!(await r.copy(from, to, who))) return { ok: false, why: "its conversations' data couldn't follow" } // i18n-ignore: the log's reason
+  if (!(await r.move(from, to))) return { ok: false, why: "git couldn't move it there" } // i18n-ignore: the log's reason
   try {
-    await relocateSteps(ws, projectPath, from, to, owner)
+    await r.follow(from, to)
   } catch (e) {
-    // Put back as it was (each step undone where it was done: repointing back is a no-op where nothing moved), then git's move.
-    await sessionCwds(ws, projectPath, [{ from: to, to: from }], true).catch((x) => log.warn(`putting ${userText(from)}'s sessions back`, x))
-    await moveCardFolders(projectPath, to, from).catch((x) => log.warn(`putting ${userText(from)}'s cards back`, x))
-    const back = await git(projectPath, ['worktree', 'move', to, from])
-    if (!back.ok) log.warn(`${userText(to)} couldn't be moved back to ${userText(from)}: ${userText(back.err)}`)
+    if (!(await r.back(from, to))) log.warn(`${userText(to)} couldn't be put back at ${userText(from)}`)
     return { ok: false, why: e instanceof Error ? e.message : String(e) }
   }
   log.info(`Moved ${userText(from)} to ${userText(to)} with its cards, sessions and conversations`)
   return { ok: true }
-}
-
-/**
- * Repair's steps after git has moved a worktree (`relocateWorktree`'s, and a rename cut short after git's move, finished
- * by the next pass): its cards' work follows it (`FolderMoved`), its sessions' recorded folder is repointed, and the
- * CLIs' per-folder data is copied (a pending copy until it is). Each step is a no-op where it was done already.
- */
-export async function relocateSteps(ws: WorkspaceService, projectPath: string, from: string, to: string, owner: MoveOwner): Promise<void> {
-  const m: Move = { from, to, ...owned(owner) }
-  await moveCardFolders(projectPath, from, to)
-  await sessionCwds(ws, projectPath, [{ from, to }], true)
-  await ws.mutateProjectConfig(projectPath, (cfg) => ({ pendingCopies: withPending(cfg.pendingCopies, m) }))
-  if (!(await copyFor(m, true)).some((f) => f.failed?.length)) await donePending(ws, projectPath, m)
 }
 
 /** Agents running in the workspace (the Assistant too), as "project · agent". */

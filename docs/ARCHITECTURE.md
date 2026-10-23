@@ -649,9 +649,13 @@ homes (`setRetiredHomes`). Kept for a lane or card, the runtime's `agentFolder` 
 (`SlotStarts.standIn`) and the pass releases the lease once that ends. Kept for nothing, `carriedToHand` and
 `handOffCarried` (in `leaseForStart`, `lendLane` and lanes waiting for a slot) hand the slot over to the card or lane in
 one write (`SlotStore.handOff`, its sessions rebound in it). The pass's last step, `renameAdopted`, renames a free adopted
-slot to a generic name through `SlotPool.rename` (a removal-kind operation) with `workspaceMove.ts`' `relocateWorktree`
-(Repair's steps: `relocateSteps` after git's move), its intent recorded first (board_meta `slot_rename:`) so
-`settleRenames` finishes or forgets one a crash cut short. Release Slot… is `slots:releaseCarried`.
+slot to a generic name through `SlotPool.rename`, a removal-kind operation: `SlotStore.startRename` takes the slot and
+reserves the destination with its intent (board_meta `slot_rename:`) in one write, the pool's `SlotRenamer`
+(`workspaceMove.ts`' `worktreeRenamer`: copy, move, follow, back, where) does Repair's steps, and `finishRename` or
+`abandonRename` ends it in one fenced write. A rename whose holder is gone is the pool's `recover`'s (from `refresh`;
+the pass's `settleRenames` asks for one when an intent is there): given up when git still lists the worktree at its
+old folder, finished or put back when at its new one. `relocateWorktree` composes the same steps outside an operation.
+Release Slot… is `slots:releaseCarried`.
 
 **Storage (P3's one migration, #1025, designed in #1208).** The DDL is `src/main/schema/v1_0.ts`: five steps, registered
 in `BOARD_MIGRATIONS` in this order by their cards, each taking the next version number when it merges, and run by

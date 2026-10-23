@@ -29,14 +29,13 @@ import { agentWorkflowRole, buildsWork } from '../shared/workflow/roles'
 import { workflowText } from '../shared/workflow/texts'
 import type { Fact, FactData, StartedData, StageId } from '../shared/workflow/facts'
 import { SLOTS_DELETE_MERGED, SLOTS_RENAME_ADOPTED } from '../shared/advanced'
-import { existsSync } from 'original-fs'
 import { basename } from 'path'
 import type { AgentDef } from '../shared/types'
 import { app } from 'electron'
 import { advanced } from './advanced'
 import { exitBy } from './exitLog'
 import { legacyWorktree, rebindSession } from './agentFolders'
-import { boardRead, boardWrite, boardWriteOp } from './boardStore'
+import { boardRead } from './boardStore'
 import { deliveriesOf, deliverNow, launchWith } from './deliveries'
 import { onHiveEvent } from './events'
 import { changingFolder } from './folderFence'
@@ -51,7 +50,6 @@ import { sessions } from './sessions'
 import { holder, poolFor, setSlotFreed } from './slotsApp'
 import { quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool } from './slots'
 import { carriedOf, keptFor, keptGoing } from './slotMigration'
-import { relocateSteps, relocateWorktree } from './workspaceMove'
 import { getTask } from './tasks'
 import { onAction } from './workflow/actionWorker'
 import { agentBusy } from './workflow/lineUpdates'
@@ -414,8 +412,8 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
     const card = cardOf(wf, n)
     if (card) await withRepoLock(projectPath, () => settleDeletion(projectPath, wf, card, n, d), { quiet: true, project: projectPath }).catch((e) => log.warn(`settling #${n}'s begun deletion of ${userText(d.line)}`, e))
   }
-  // 0b. Renames of adopted slots cut short (#1441): finished, or forgotten, from what is on disk.
-  await settleRenames(ws, projectPath, pool)
+  // 0b. Renames of adopted slots cut short (#1441): their holders gone, finished or given up by the pool.
+  await settleRenames(pool)
   const lanes = new Map((await rawLanes(ws)).map((l) => [l.id, l]))
   // 1. Releases, rules on or off: a card's lease its current cycle doesn't use, a lane's whose lane has ended.
   for (const l of pool.openLeases()) {
@@ -716,83 +714,35 @@ async function settleDeletion(projectPath: string, wf: Workflow, card: CardRecor
 
 // --- Adopted slots renamed (#1441).
 
-/** board_meta: a rename under way (`slot_rename:<project id>:<slot>`), so one cut short is finished or forgotten. */
-const renameKey = (project: string, slot: string): string => `slot_rename:${project}:${slot}`
 /** A slot's generic name (`slot-a`): adopted ones keep their folder's (`hb2`) until renamed. */
 const GENERIC = /^slot-[a-z]+$/
 
 /**
- * Free adopted slots renamed to the next generic name (#1441), with Repair's steps (`relocateWorktree`): only with the
- * rules on and Settings → Advanced, Rename adopted worktrees to slot names; a slot with no lease, operation, job or writer,
- * clean (`ready`), with no session running or recorded there that couldn't follow, and nothing else in it (the rename
- * probe). Its intent is recorded first (board_meta), so a rename cut short is settled by the next pass.
+ * Free adopted slots renamed to the next generic name (#1441) by the pool's rename operation (`SlotPool.rename`: its
+ * destination reserved in the write that takes the slot, Repair's steps, its end in one fenced write), only with the
+ * rules on and Settings → Advanced, Rename adopted worktrees to slot names; a slot with no lease, operation, job or
+ * writer, ready, with no session running there, and nothing else in it (the rename probe).
  */
 export async function renameAdopted(ws: WorkspaceService, projectPath: string, pool: SlotPool): Promise<void> {
   const allowed = (): boolean => workflowEnforced() && advanced.get(SLOTS_RENAME_ADOPTED) !== false
   if (!allowed()) return
-  const id = (await ws.projectConfig(projectPath)).id ?? basename(projectPath)
   for (const s of pool.slots()) {
     if (GENERIC.test(s.name) || s.state !== 'ready' || s.op || s.job || s.writer || pool.openLease(s.name)) continue
     if (sessions.liveStates().some((x) => x.cwd && samePlace(x.cwd, s.folder))) continue
     if (!(await quietFolder(s.folder)) || !allowed()) continue
-    const toName = pool.nextName()
-    const agentName = pool.lastLease(s.name)?.agent ?? s.name
-    await writeMeta(ws, renameKey(id, s.name), { to: toName, from: s.folder })
-    const moved = await pool.rename(s.name, toName, async (from, to) => {
-      if (!allowed()) return false
-      const r = await relocateWorktree(ws, projectPath, from, to, { kind: 'worktree', agent: agentName })
-      if (!r.ok) log.info(`The adopted ${userText(s.name)} keeps its name: ${userText(r.why)}`)
-      return r.ok
-    })
-    await writeMeta(ws, renameKey(id, s.name), null)
-    if (moved) log.info(`The adopted ${userText(s.name)} is now ${userText(toName)}`)
+    const to = await pool.rename(s.name, allowed)
+    if (to) log.info(`The adopted ${userText(s.name)} is now ${userText(to)}`)
   }
 }
 
-/** Renames cut short (a crash): git's move done, the row finished as it would have been; not done, forgotten. */
-export async function settleRenames(ws: WorkspaceService, projectPath: string, pool: SlotPool): Promise<void> {
-  const id = (await ws.projectConfig(projectPath)).id ?? basename(projectPath)
-  let rows: { key: string; value: string }[]
-  try {
-    rows = boardRead(ws, (db) => db.prepare('SELECT key, value FROM board_meta WHERE key LIKE ?').all(`${renameKey(id, '')}%`) as { key: string; value: string }[]) // i18n-ignore: SQL
-  } catch {
-    return
-  }
-  if (!rows.length) return
-  // Operations whose Hive has gone, recovered first (a rename's: the slot looked at again).
+/**
+ * Renames cut short (#1441): each is its operation's, so only `refresh` takes one over, once its holder is gone, and
+ * finishes or gives it up (`SlotPool.recover`); a live one is left to its holder. An intent no operation owns is cleared.
+ */
+export async function settleRenames(pool: SlotPool): Promise<void> {
+  if (!pool.renames().length) return
   await pool.refresh()
-  for (const r of rows) {
-    const name = r.key.slice(renameKey(id, '').length)
-    const intent = (() => {
-      try {
-        return JSON.parse(r.value) as { to: string; from: string }
-      } catch {
-        return null
-      }
-    })()
-    const slot = pool.slots().find((x) => x.name.toLowerCase() === name.toLowerCase())
-    if (intent && slot && !slot.op && !existsSync(slot.folder)) {
-      const to = pool.folderFor(intent.to)
-      const listed = await listWorktreesOrNull(projectPath).catch(() => null)
-      if (!listed || !listed.some((w) => samePlace(w.path, to))) continue
-      // Git's move done: the rest of Repair's steps (each a no-op where already done), then the row.
-      const agentName = pool.lastLease(name)?.agent ?? name
-      await relocateSteps(ws, projectPath, slot.folder, to, { kind: 'worktree', agent: agentName })
-      if (!(await pool.renameRow(name, intent.to, to))) continue
-      log.info(`The adopted ${userText(name)}'s rename, cut short, finished: ${userText(intent.to)}`)
-    }
-    await writeMeta(ws, r.key, null)
-  }
-}
-
-/** board_meta's value at a key, written (null: removed) in a board write. */
-async function writeMeta(ws: WorkspaceService, key: string, value: unknown): Promise<void> {
-  await boardWrite(ws, async () =>
-    boardWriteOp(ws, (db) => {
-      if (value === null) db.prepare('DELETE FROM board_meta WHERE key = ?').run(key) // i18n-ignore: SQL
-      else db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(value)) // i18n-ignore: SQL
-    })
-  )
+  await pool.clearOrphanRenames()
 }
 
 // --- Lanes.

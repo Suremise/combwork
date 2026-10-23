@@ -95,16 +95,16 @@ describe("an adopted worktree handed over to its agent's first card (#1441)", ()
     }
   })
 
-  it("its head not in the target: not handed over; once merged, it can be", async () => {
+  // One scenario: each step needs the one before it (B1's work merged, then handed over, then restarted).
+  it("B1's first card: not while its head isn't merged; a failed write changes nothing; handed over in one write; resumed after a restart; asked again, the same lease", async () => {
+    // Its head not in the target: not handed over; once merged, it can be (a dry start changes nothing).
     commit(wt('hb1'), { 'b.txt': 'b\n' }, 'unmerged work')
     expect(await start(card1, 'b1', true).then((r) => (r && 'slot' in r ? r.slot : null))).not.toBe('hb1')
     sh(project, 'merge', '-q', '--ff-only', 'hive/hb1')
     expect(await start(card1, 'b1', true).then((r) => (r && 'slot' in r ? r.slot : null))).toBe('hb1')
-    // A dry start changes nothing.
     expect(open('b1')?.kind).toBe('carried')
-  })
 
-  it('a failure inside the handover write leaves the carried lease, the slot and the sessions as they were', async () => {
+    // A failure inside the handover's write: the carried lease, the slot and the sessions as they were.
     const carried = open('b1')!
     const pool = await run(() => poolFor(ws, project))
     await expect(
@@ -115,10 +115,8 @@ describe("an adopted worktree handed over to its agent's first card (#1441)", ()
     expect(open('b1')).toEqual(carried)
     expect(store.openLeases().filter((l) => l.slot === 'hb1')).toHaveLength(1)
     expect(leaseOf('s-b1')).toBe(carried.id)
-  })
 
-  it("handed over in one write: the carried lease ended, the card's begun on the same slot, its sessions rebound", async () => {
-    const carried = open('b1')!
+    // Handed over in one write: the carried lease ended, the card's begun on the same slot, its sessions rebound.
     const r = await start(card1, 'b1', false)
     expect(r && 'slot' in r ? { slot: r.slot, folder: r.folder.toLowerCase() } : r).toEqual({ slot: 'hb1', folder: wt('hb1').toLowerCase() })
     const now = open('b1')!
@@ -127,13 +125,17 @@ describe("an adopted worktree handed over to its agent's first card (#1441)", ()
     expect(ended.why).toBe('handedOff')
     expect(ended.ended_at).not.toBeNull()
     expect(leaseOf('s-b1')).toBe(now.id)
-  })
 
-  it("after a restart: Resume All resumes the card's session in the same folder", async () => {
+    // After a restart (read afresh from the board): Resume All resumes the card's session in the same folder.
     const facts = await run(() => folderFacts(project))
-    const r = (await run(() => workspace.sessionsFile(project))).sessions.find((x) => x.id === 's-b1')!
-    expect(r.cwd?.toLowerCase()).toBe(wt('hb1').toLowerCase())
-    expect(canResumeNow(facts, folderAgent({ id: 'b1', name: 'B1', workflowRole: 'builder' } as never), r)).toBe(true)
+    const rec = (await run(() => workspace.sessionsFile(project))).sessions.find((x) => x.id === 's-b1')!
+    expect(rec.cwd?.toLowerCase()).toBe(wt('hb1').toLowerCase())
+    expect(canResumeNow(facts, folderAgent({ id: 'b1', name: 'B1', workflowRole: 'builder' } as never), rec)).toBe(true)
+
+    // Its start written again: the same lease, nothing handed twice.
+    const again = await start(card1, 'b1', false)
+    expect(again && 'lease' in again ? again.lease : null).toBe(now.id)
+    expect(store.openLeases().filter((l) => l.agent === 'b1')).toHaveLength(1)
   })
 
   it("unmerged work in it: the card gets another slot, the adopted one stays carried and its conversation waits for the card", async () => {
@@ -146,13 +148,6 @@ describe("an adopted worktree handed over to its agent's first card (#1441)", ()
     const facts = await run(() => folderFacts(project))
     const s4 = (await run(() => workspace.sessionsFile(project))).sessions.find((x) => x.id === 's-b4')!
     expect(resumeHold(facts, folderAgent({ id: 'b4', name: 'B4', workflowRole: 'builder' } as never), s4)).toMatchObject({ is: 'after', card: card4 })
-  })
-
-  it('asked again (a restart, the start written again): the same lease, nothing handed twice', async () => {
-    const before = open('b1')!
-    const r = await start(card1, 'b1', false)
-    expect(r && 'lease' in r ? r.lease : null).toBe(before.id)
-    expect(store.openLeases().filter((l) => l.agent === 'b1')).toHaveLength(1)
   })
 
   it('two Hives handing over the same carried lease at once: one wins, the other gets nothing', async () => {

@@ -42,6 +42,8 @@ const carried = () => store.slots().flatMap((s) => (store.openLease(s.name)?.kin
 const meta = (key: string): string | null => boardRead(ws, (db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null)
 const leaseOf = (id: string): string | null => boardRead(ws, (db) => (db.prepare('SELECT lease FROM sessions WHERE id = ?').get(id) as { lease: string | null } | undefined)?.lease ?? null)
 let card1 = 0
+let adoptionMark: string | null = null
+let migratedBefore = true
 let laneId = ''
 
 beforeAll(async () => {
@@ -67,6 +69,10 @@ beforeAll(async () => {
   ])
     await run(() => workspace.upsertSession(project, { id, agent: 'claude-code', agentId, cwd, name: id, lastActiveAt: new Date().toISOString() }))
   startSlotMigration()
+  // Before the migration: the board's adoption mark (every 1.0 board has it), and nothing migrated.
+  adoptionMark = meta(ADOPTION_UPTO)
+  migratedBefore = await run(() => slotsMigrated(project, 'b1'))
+  await migrateSlots(ws)
 })
 
 afterAll(async () => {
@@ -78,9 +84,8 @@ afterAll(async () => {
 describe("agents' worktrees become slots (#1441)", () => {
   it("builders' worktrees carried under their folders' names, kept for their lane or card", async () => {
     // Every 1.0 board has the adoption's mark (a 0.9 project added to a workspace made by 1.0 is migrated too).
-    expect(meta(ADOPTION_UPTO)).not.toBeNull()
-    expect(await run(() => slotsMigrated(project, 'b1'))).toBe(false)
-    await migrateSlots(ws)
+    expect(adoptionMark).not.toBeNull()
+    expect(migratedBefore).toBe(false)
     const c = carried()
     expect(c.map((x) => [x.agent, x.slot]).sort()).toEqual([
       ['b1', 'hb1'],

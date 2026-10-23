@@ -39,6 +39,7 @@ import { projectAgents } from '../shared/defaults'
 import { openEntry } from '../shared/workflow/facts'
 import { SLOTS_REMOVE_IDLE, SLOTS_SETUP_MINUTES } from '../shared/advanced'
 import type { SlotTestOp, SlotView } from '../shared/types'
+import { worktreeRenamer } from './workspaceMove'
 
 const log = createLogger('slots')
 
@@ -214,7 +215,8 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       removeIdle: () => advanced.get(SLOTS_REMOVE_IDLE) !== false,
       ended: (lease, slot) => stopLeaseSession(projectPath, lease, slot),
       writerOver: (w) => writerOver(w),
-      removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }) // i18n-ignore: the log's reason (English)
+      removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }), // i18n-ignore: the log's reason (English)
+      renamer: worktreeRenamer(ws, projectPath)
     })
   })()
   pools.set(key, { life: ws.lifetime, pool })

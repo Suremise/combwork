@@ -19,7 +19,17 @@ const SRC = process.env.HIVE_TRIAL_WS ?? ''
 const base = tempDir('wscopy-trial-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+/**
+ * Every git the trial starts gets this environment, given explicitly: what Windows and git need to run, nothing of the
+ * shell's (no GIT_DIR, GIT_WORK_TREE or NODE_OPTIONS), and no global or system config (as tests/noGlobalGit.ts).
+ */
+const GIT_ENV: NodeJS.ProcessEnv = {
+  ...Object.fromEntries(['PATH', 'Path', 'SystemRoot', 'SYSTEMROOT', 'ComSpec', 'PATHEXT', 'TEMP', 'TMP', 'USERPROFILE', 'LOCALAPPDATA', 'APPDATA'].flatMap((k) => (process.env[k] ? [[k, process.env[k]]] : []))),
+  GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_TERMINAL_PROMPT: '0'
+}
+const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, env: GIT_ENV, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const under = (p: string, root: string): boolean => p.toLowerCase().startsWith(root.toLowerCase())
 const report: string[] = []
 
