@@ -1194,6 +1194,8 @@ export interface ProjectConfig {
    * Each left out reads today's `worktreeSetup`, none, and `worktreeCopy` (which stay as they are, for 0.9.3).
    */
   slots?: SlotOptions
+  /** The project's review and check copies (#1435): how many it keeps (left out: the larger of 2 and its reviewers plus one). */
+  copies?: { size?: number }
   /** Hive wakes a card loop's reviewer when a card arrives in Review, and its builder on a verdict (#405). */
   loopWakes: boolean
   /** Card loops' rounds and wait in hours for this project (#412); null inherits the workspace's. */
@@ -1210,6 +1212,16 @@ export interface SlotView {
   warmError: string | null
   warmLog: string | null
   lease: { id: string; kind: 'card' | 'lane' | 'carried'; agent: string; card: number | null; lane: string | null } | null
+}
+
+/** One of a project's review and check copies as the window reads it (#1435, copies.ts): its state and its lease not freed. */
+export interface CopyView {
+  name: string
+  folder: string
+  state: 'creating' | 'free' | 'leased' | 'returning' | 'dirty' | 'gone'
+  revision: string | null
+  warmError: string | null
+  lease: { id: string; kind: 'review' | 'check'; card: number; agent: string | null; returned: boolean } | null
 }
 
 /** What a test copy asks of a project's slot pool (`slots:test`, unpackaged builds only: #1429's e2e). */
@@ -2868,8 +2880,9 @@ export interface LaneInfo {
  * passed but not merged yet (merging: in the merge queue), its pass gone stale (submit again), no reviewer on a card in
  * Review, or a list change queued after the card in flight. The first four and the merge pause the lane, as does `hooks`
  * (#1336): its builder's or reviewer's hooks aren't arriving, so Hive can't tell what it does and types nothing into it.
+ * `checkCopy` (#1435): its card's review or isolated check waits for a review or check copy to be free.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy'
 
 /** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */
 export interface LaneStartRequest {
@@ -2954,7 +2967,7 @@ export interface ProgressRun {
    * for a kept run with no name, "Hive (slot <name>)" for a slot's warming (#1429, its `slot`). The window shows it in its
    * language; the Agent API leaves this out (publicRun).
    */
-  defaultName?: 'script' | 'agent' | 'mergeQueue' | 'slot'
+  defaultName?: 'script' | 'agent' | 'mergeQueue' | 'slot' | 'copy'
   provider: ProviderId | null
   source: ProgressSource
   title: string
@@ -3025,6 +3038,11 @@ export interface ProgressRun {
   transient?: TransientFailure
   /** Hive's own run warming a slot (#1429: its setup, an install, its archive script): the slot's name. */
   slot?: string
+  /**
+   * A review or check copy (#1435): Hive's own run warming it, or an agent's isolated check run in it (its details name
+   * it, and it can be stopped from the panel: its processes are in the copy's job).
+   */
+  copy?: string
 }
 
 /**

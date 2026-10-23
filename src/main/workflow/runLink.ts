@@ -29,6 +29,10 @@ export interface RunLink {
   testedCheckout: string | null
   check: { name: string; command: string } | null
   folder: string | null
+  /** The review or check copy it runs in (#1435): its card and revision are the copy's lease's. */
+  copy?: string
+  /** Run with `--isolated` (#1435): in a check copy leased to it alone. */
+  isolated?: true
 }
 
 export interface RunLinkDeps {
@@ -52,6 +56,11 @@ export interface RunLinkDeps {
   keyCard: (key: string, scope: string | null) => number | null
   /** The command a project (by its folder name) has configured for a named check, or null. */
   checkCommand: (project: string, name: string) => Promise<string | null>
+  /**
+   * The review or check copy a folder is in (#1435), with its lease's card and revision while it is out (null when it
+   * has none); null when the folder is no copy.
+   */
+  copyAt?: (folder: string) => Promise<{ copy: string; card: number | null; revision: string | null } | null>
 }
 
 const MAX_FOLDER = 1000
@@ -90,6 +99,8 @@ export async function resolveRunLink(caller: ProgressCaller, asked: RunLinkAsked
     folder = asked.folder
   }
   const own = caller.source === 'agent' ? deps.projectName(caller.projectPath).toLowerCase() : null
+  // A run in a review or check copy (#1435) is a check of the copy's lease: its card and revision, never another's.
+  const inCopy = folder && deps.copyAt ? await deps.copyAt(folder) : null
 
   let card: number | null = null
   let cardProject: string | null = null
@@ -102,10 +113,13 @@ export async function resolveRunLink(caller: ProgressCaller, asked: RunLinkAsked
     // A project agent sees only its own project's cards: another's answers as an unknown one does (in the words it used).
     if (!c || (own !== null && c.project.toLowerCase() !== own)) throw refused(`Unknown card ${named}`)
     cardProject = c.project
+  } else if (asked.card === undefined && inCopy?.card != null) {
+    card = inCopy.card
   } else if (asked.card === undefined && caller.source === 'agent') {
     const doing = await deps.doing(caller.projectPath, caller.agentId)
     if (doing.length === 1) card = doing[0]
   }
+  if (inCopy && card !== null && inCopy.card !== null && card !== inCopy.card) throw refused(`${inCopy.copy} holds ${cardRefText(inCopy.card)}'s revision, not ${cardRefText(card)}'s: run it there for ${cardRefText(inCopy.card)}, or elsewhere for ${cardRefText(card)}`)
 
   let named: string | null = null
   if (asked.revision !== undefined && asked.revision !== null) {
@@ -145,7 +159,9 @@ export async function resolveRunLink(caller: ProgressCaller, asked: RunLinkAsked
     check = { name, command }
   }
 
-  return { card, revision, testedCheckout: tested, check, folder }
+  // In a copy: its lease's revision is the run's, whatever the card's is now (a later one is another review's).
+  if (inCopy?.revision && named === null) revision = inCopy.revision
+  return { card, revision, testedCheckout: tested, check, folder, ...(inCopy ? { copy: inCopy.copy } : {}) }
 }
 
 /** A link as the Agent API gives it: the card by its reference, the commits in full, and the id its start passes back. */

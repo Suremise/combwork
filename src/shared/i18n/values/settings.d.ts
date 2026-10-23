@@ -154,6 +154,10 @@ interface HiveMessageValues {
   'settings.advanced.hive.assistant.startView.title': undefined
   'settings.advanced.hive.console.showText.desc': undefined
   'settings.advanced.hive.console.showText.title': undefined
+  'settings.advanced.hive.copies.quietWaitMinutes.desc': undefined
+  'settings.advanced.hive.copies.quietWaitMinutes.title': undefined
+  'settings.advanced.hive.copies.review.desc': undefined
+  'settings.advanced.hive.copies.review.title': undefined
   'settings.advanced.hive.disableHardwareAcceleration.desc': undefined
   'settings.advanced.hive.disableHardwareAcceleration.title': undefined
   'settings.advanced.hive.guidance.desc': undefined

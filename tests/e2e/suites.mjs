@@ -133,6 +133,7 @@ export const SUITES = [
   { name: 'inboxnotices' },
   { name: 'installdir' },
   { name: 'intents' },
+  { name: 'isolatedcheck' },
   { name: 'isolation' },
   { name: 'journal' },
   { name: 'journalbrowse' },

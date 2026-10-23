@@ -186,6 +186,8 @@
   "tips.improveTranslation.title": "让 Hive 的中文读起来更顺",
   "tips.inboxNotices.text": "助手给工作中的智能体留的消息，会在它下一次调用工具时或本轮结束前，以 Hive 的简短通知送达：不会在它的工作上打字。智能体从收件箱读取消息并确认；在此之前，它的窗格会将其显示为未读（✉）。",
   "tips.inboxNotices.title": "消息在步骤之间送达忙碌的智能体",
+  "tips.isolatedChecks.text": "在共享文件夹中，如果检查运行期间另一个智能体编辑了文件，这次检查就不计数。hive-progress --check typecheck --isolated 会在卡片修订版本上的一个专属副本中运行检查，其他任何东西都不会写入。在进度面板中点击停止，即可结束该检查及其启动的所有进程。",
+  "tips.isolatedChecks.title": "谁也破坏不了的检查",
   "tips.keepAwake.text": "智能体工作时，Hive 会阻止 Windows 进入睡眠（屏幕仍可锁定），等它们完成后再允许睡眠。在“设置”→“常规”中选择何时这样做。",
   "tips.keepAwake.title": "智能体在工作，电脑保持唤醒",
   "tips.laneBranchSquash.text": "智能体的卡片以压缩合并方式合并后，Hive 会在其下一张卡片之前将其分支更新到最新，使每次审查只显示该卡片的工作。无法安全完成的事会在“待你处理”中询问；在“设置”→“高级”中可让它每次都询问。",

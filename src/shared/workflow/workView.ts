@@ -137,6 +137,8 @@ export interface WorkCheck {
   by: string
   durationMs: number
   at: string
+  /** Run with `--isolated` in a check copy of its own (#1435). */
+  isolated?: true
 }
 
 export interface WorkMarks {
@@ -321,7 +323,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     .filter((f) => f.kind === 'CheckRan')
     .map((f) => {
       const d = f.data as CheckRanData
-      return { name: d.name, revision: d.revision, tested: d.tested, result: d.result, counted: d.counted, ...(d.whyNot ? { whyNot: d.whyNot } : {}), run: d.run, by: d.by, durationMs: d.durationMs, at: f.at } satisfies WorkCheck
+      return { name: d.name, revision: d.revision, tested: d.tested, result: d.result, counted: d.counted, ...(d.whyNot ? { whyNot: d.whyNot } : {}), run: d.run, by: d.by, durationMs: d.durationMs, at: f.at, ...(d.isolated ? { isolated: true as const } : {}) } satisfies WorkCheck
     })
   const carriedOver = cycle
     .filter((f) => f.kind === 'CarriedOver')

@@ -188,6 +188,8 @@ interface HiveMessageValues {
   'tips.improveTranslation.title': undefined
   'tips.inboxNotices.text': undefined
   'tips.inboxNotices.title': undefined
+  'tips.isolatedChecks.text': undefined
+  'tips.isolatedChecks.title': undefined
   'tips.keepAwake.text': undefined
   'tips.keepAwake.title': undefined
   'tips.laneBranchSquash.text': undefined

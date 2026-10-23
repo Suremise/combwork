@@ -186,6 +186,8 @@
   "tips.improveTranslation.title": "Haz que Hive suene mejor en tu idioma",
   "tips.inboxNotices.text": "Un mensaje que el Asistente deja a un agente que trabaja le llega en su siguiente llamada a una herramienta, o antes de que termine su turno, como un breve aviso de Hive: no se escribe nada encima de su trabajo. El agente lo lee en su bandeja de entrada y confirma que lo recibió; su panel lo muestra como sin leer (✉) hasta entonces.",
   "tips.inboxNotices.title": "Los mensajes llegan a un agente ocupado entre pasos",
+  "tips.isolatedChecks.text": "En una carpeta compartida, una comprobación no cuenta si otro agente edita algo mientras se ejecuta. hive-progress --check typecheck --isolated la ejecuta en una copia propia en la revisión de la tarjeta, donde nada más escribe. Detener, en el panel Progreso, la termina con todo lo que inició.",
+  "tips.isolatedChecks.title": "Una comprobación que nadie puede estropear",
   "tips.keepAwake.text": "Mientras un agente trabaja, Hive impide que Windows entre en suspensión (la pantalla aún puede bloquearse), y lo deja suspenderse cuando terminan. Elige cuándo en Configuración → General.",
   "tips.keepAwake.title": "Deja a los agentes trabajando: el equipo sigue despierto",
   "tips.laneBranchSquash.text": "Tras fusionar con squash la tarjeta de un agente, Hive actualiza su rama antes de su siguiente tarjeta, para que cada revisión muestre solo el trabajo de esa tarjeta. Lo que no puede hacer con seguridad lo pregunta en Para ti; Configuración → Avanzado hace que pregunte siempre.",

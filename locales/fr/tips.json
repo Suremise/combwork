@@ -186,6 +186,8 @@
   "tips.improveTranslation.title": "Rendre Hive plus agréable à lire dans ta langue",
   "tips.inboxNotices.text": "Un message que l’Assistant laisse à un agent au travail lui parvient à son prochain appel d’outil, ou avant la fin de son tour, sous forme d’un court avis de Hive : rien n’est tapé par-dessus son travail. L’agent le lit dans sa boîte de réception et en accuse réception ; son volet l’affiche comme non lu (✉) jusque-là.",
   "tips.inboxNotices.title": "Les messages joignent un agent occupé entre deux étapes",
+  "tips.isolatedChecks.text": "Dans un dossier partagé, une vérification ne compte pas si un autre agent modifie quelque chose pendant qu’elle tourne. hive-progress --check typecheck --isolated la lance dans une copie à elle, à la révision de la carte, où rien d’autre n’écrit. Arrêter, dans le panneau Progression, l’arrête avec tout ce qu’elle a lancé.",
+  "tips.isolatedChecks.title": "Une vérification que personne ne peut gâcher",
   "tips.keepAwake.text": "Pendant qu’un agent travaille, Hive empêche Windows de se mettre en veille (l’écran peut toujours se verrouiller), et le laisse se mettre en veille une fois les agents terminés. Choisis quand dans Paramètres → Général.",
   "tips.keepAwake.title": "Laisse les agents travailler, le PC reste éveillé",
   "tips.laneBranchSquash.text": "Après la fusion en squash de la carte d’un agent, Hive met sa branche à jour avant sa carte suivante, pour que chaque revue ne montre que le travail de cette carte. Ce qu’il ne peut pas faire sans risque, il le demande dans Pour toi ; Paramètres → Avancé le fait demander à chaque fois.",

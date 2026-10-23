@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Isolated checks.** `hive-progress --check <name> --isolated` runs a check in a copy of its own at the card's revision, so another agent's edits in a shared folder can't spoil it, and it counts. It waits for a copy when all are in use, and **Stop** in the Progress panel ends it with everything it started (#1435).
 - **Role in the workflow** for each agent: Builder, Reviewer or Either, in Add Agent and Agent Settings. Start Lane offers builders and reviewers by it, and the project's agents table shows it. Agents from before 1.0 read as their names suggest (HR1 is a reviewer); the free-text role is now the agent's Note. (#1430)
 
 - **Slots, the start.** Hive now keeps a pool of worktrees per project, *slots*, to lend to a card or a lane and get back when it ends, set up by the project's setup command as Hive's own runs (*Hive (slot slot-b)* in the Progress panel) and removed when idle only if nothing would be lost (Settings → Advanced, **Remove idle slots after a day**). Nothing lends them yet: cards start on slots in a later update (#1429).
