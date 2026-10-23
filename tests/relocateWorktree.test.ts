@@ -2,8 +2,10 @@
 // - the steps (`relocateWorktree`, the pool's renamer): the CLIs' data copied first, every provider's copy applied with
 //   no failure (a copy failing at apply time: nothing moved); git's move refused onto anything already there and checked
 //   where git lists it; cards and sessions following; a step failing after the move put back whole;
-// - the pool's rename operation: its destination reserved in the write that takes the slot, so two different slots
-//   renamed at once (in two Hives) never share one; a live rename's intent left alone by another Hive's pass; one cut
+// - the pool's rename operation: its destination reserved in the write that takes the slot and honoured by every write
+//   that makes a slot, so two different slots renamed at once (in two Hives), or a lend meanwhile, never share it; each
+//   step acts only on the worktree with the rename's identity (another arriving at the destination is never followed or
+//   moved); a live rename's intent left alone by another Hive's pass; one cut
 //   short after git's move finished by the Hive that takes its operation over, one cut short before it given up, and one
 //   whose putting back fails kept out of the pool until a later look puts it back;
 // - the pass: only free adopted slots (no lease, no session running), only with the rules and the switch on, history and
@@ -85,7 +87,7 @@ let projectId = 'p1'
 let store: InstanceType<typeof SlotStore>
 const owner = { kind: 'worktree' as const, agent: 'X1' }
 /** Each test's own agent (its worktree `h<id>`); x1's worktree, outside the pool, is the steps' own tests'. */
-const AGENTS = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9']
+const AGENTS = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'c1', 'c2']
 const treeOf = (a: string): string => (a === 'x1' ? wt('x1') : wt(`h${a}`))
 
 function writeProject(): void {
@@ -128,8 +130,9 @@ function hivePool(pid: number, renamer: Renamer): Pool {
     project,
     root: join(`${wsPath}.worktrees`, 'alpha'),
     options: async () => ({ setup: '', archive: '', copy: '' }),
-    builders: () => AGENTS.length,
-    cap: () => AGENTS.length,
+    // Room for new slots beside the adopted ones (a lend racing a rename).
+    builders: () => AGENTS.length + 4,
+    cap: () => AGENTS.length + 4,
     runner: async () => ({ ok: true, exitCode: 0, settled: true, logPath: null }),
     settle: async () => true,
     holder: { self: async () => me, alive: async (other) => !dead.has(other), live: new Set() },
@@ -137,9 +140,9 @@ function hivePool(pid: number, renamer: Renamer): Pool {
   })
 }
 /** The app's renamer, its steps run in the test workspace (as the app's pass does). */
-function realRenamer(): Renamer {
-  const r = worktreeRenamer(ws, project)
-  return { where: (a, b) => run(() => r.where(a, b)), copy: (a, b, w) => run(() => r.copy(a, b, w)), move: (a, b) => run(() => r.move(a, b)), follow: (a, b) => run(() => r.follow(a, b)), back: (a, b) => run(() => r.back(a, b)) }
+function realRenamer(hooks: Parameters<typeof worktreeRenamer>[2] = {}): Renamer {
+  const r = worktreeRenamer(ws, project, hooks)
+  return { identity: (f) => r.identity(f), where: (a, b, t) => run(() => r.where(a, b, t)), copy: (a, b, w) => run(() => r.copy(a, b, w)), move: (a, b, t) => run(() => r.move(a, b, t)), follow: (a, b, t) => run(() => r.follow(a, b, t)), back: (a, b, t) => run(() => r.back(a, b, t)) }
 }
 
 beforeAll(async () => {
@@ -194,6 +197,26 @@ describe("a worktree moved with Repair's helpers (#1441)", () => {
     }
     expect(existsSync(wt('x1-copyfail'))).toBe(false)
     expect(await listed()).toContain(wt('x1').toLowerCase())
+    expect(await cwdOf('s-x1')).toBe(wt('x1').toLowerCase())
+  })
+
+  it('another worktree arriving at the destination after the check: this one is moved back, the other left as it is', async () => {
+    const dest = wt('x1-raced')
+    const r = realRenamer({ beforeGitMove: async (_from, to) => void sh(project, 'worktree', 'add', '-q', '-b', 'hive/intruder', to) })
+    const tree = (await r.identity(wt('x1')))!
+    expect(await r.move(wt('x1'), dest, tree)).toBe(false)
+    const gitSays = await listed()
+    // Ours back where it was, nothing nested; the other at the destination, its own identity, untouched.
+    expect(await r.where(wt('x1'), dest, tree)).toBe('from')
+    expect(gitSays).toContain(wt('x1').toLowerCase())
+    expect(gitSays).toContain(dest.toLowerCase())
+    expect(gitSays.some((p) => p.startsWith(`${dest.toLowerCase()}\\`))).toBe(false)
+    expect(await r.identity(dest)).not.toBe(tree)
+    expect(sh(dest, 'branch', '--show-current')).toBe('hive/intruder')
+    // Putting back never touches the other worktree, and following refuses (this one isn't there).
+    expect(await r.back(wt('x1'), dest, tree)).toBe(true)
+    await expect(r.follow(wt('x1'), dest, tree)).rejects.toThrow()
+    expect(await listed()).toContain(dest.toLowerCase())
     expect(await cwdOf('s-x1')).toBe(wt('x1').toLowerCase())
   })
 
@@ -276,7 +299,7 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     const gB = gate()
     const gated = (g: ReturnType<typeof gate>): Renamer => {
       const r = realRenamer()
-      return { ...r, move: async (a, b) => (await g.wait(), r.move(a, b)) }
+      return { ...r, move: async (a, b, t) => (await g.wait(), r.move(a, b, t)) }
     }
     const a = hivePool(91001, gated(gA)).rename(n4)
     const b = hivePool(91002, gated(gB)).rename(n5)
@@ -298,6 +321,34 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     expect(store.slot(iB.toName)?.folder.toLowerCase()).toBe(iB.to.toLowerCase())
     expect(await cwdOf('s-b4')).toBe(iA.to.toLowerCase())
     expect(await cwdOf('s-b5')).toBe(iB.to.toLowerCase())
+  })
+
+  it("a rename's reserved name never lent: a new slot made meanwhile in another Hive gets another name and folder", async () => {
+    const name = await free('c1')
+    const atCopy = gate()
+    const r = realRenamer()
+    const renaming = hivePool(95001, { ...r, copy: async (a, b, w) => (await atCopy.wait(), r.copy(a, b, w)) }).rename(name)
+    await atCopy.reached
+    const intent = intentOf(name)!
+    // Another Hive lends a new slot while the rename copies (its destination not on disk yet): made and set up for real.
+    const lending = hivePool(95002, realRenamer())
+    const lent = await lending.lend({ card: 9901, agent: 'c2' }, { install: false })
+    expect(lent.ok).toBe(true)
+    const made = lent.ok ? lent.slot : null
+    expect(made?.name).not.toBe(intent.toName)
+    expect(made?.folder.toLowerCase()).not.toBe(intent.to.toLowerCase())
+    expect(existsSync(made!.folder)).toBe(true)
+    // Asked for by name, the reserved one is refused.
+    const named = await lending.lend({ card: 9902, agent: 'b1x', slot: intent.toName }, { install: false })
+    expect(named.ok).toBe(false)
+    atCopy.open()
+    expect(await renaming).toBe(intent.toName)
+    const gitSays = await listed()
+    expect(gitSays).toContain(intent.to.toLowerCase())
+    expect(gitSays).toContain(made!.folder.toLowerCase())
+    expect(store.slot(intent.toName)?.folder.toLowerCase()).toBe(intent.to.toLowerCase())
+    expect(store.slot(made!.name)?.folder.toLowerCase()).toBe(made!.folder.toLowerCase())
+    expect(await cwdOf('s-c1')).toBe(intent.to.toLowerCase())
   })
 
   it("a live rename's intent left alone by another Hive's pass; its Hive gone after git's move, the other finishes it", async () => {
@@ -343,7 +394,7 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     const name = await free('b9')
     const r = realRenamer()
     let backFails = true
-    const hive = hivePool(94001, { ...r, follow: async () => Promise.reject(new Error('the sessions could not follow (test)')), back: async (a, b) => (backFails ? false : r.back(a, b)) })
+    const hive = hivePool(94001, { ...r, follow: async () => Promise.reject(new Error('the sessions could not follow (test)')), back: async (a, b, t) => (backFails ? false : r.back(a, b, t)) })
     expect(await hive.rename(name)).toBeNull()
     expect(intentOf(name)).not.toBeNull()
     expect(store.slot(name)?.op).not.toBeNull()

@@ -3268,10 +3268,13 @@ decided again in it):
   named after one agent isn't lent to another. The rename is the slot's operation (a `remove`-kind one, its holder's
   alone) from the write that takes the slot and **reserves its destination** (the next generic name no slot has and no
   other rename has reserved, its folder absent: board_meta `slot_rename:`, its intent) to the fenced write that renames
-  the row and its leases' history and deletes the intent, so two renames (of two slots, or in two Hives) never share a
-  destination. Repair's helpers (`worktreeRenamer`, from `workspaceMove.ts`) do the steps: each CLI's per-folder data
+  the row and its leases' history and deletes the intent. Every write that makes a slot honours the reservation (a lend,
+  by name or not; an adoption), so two renames, or a rename and a lend, in one Hive or two, never share a destination.
+  Each step acts only on the worktree the rename recorded (its identity: git's administrative folder, kept through git's
+  move): one that comes to the destination meanwhile is never followed, moved or put back, and ours, if git moved it
+  inside that one, is moved back. Repair's helpers (`worktreeRenamer`, from `workspaceMove.ts`) do the steps: each CLI's per-folder data
   copied first, every provider's copy applied with no failure (any failing: no rename, nothing moved); git's move,
-  refused onto anything already there and checked where git lists it (exactly the reserved folder, else moved back);
+  refused onto anything already there and checked by identity (exactly the reserved folder, else moved back);
   its cards' `FolderMoved` and its sessions' recorded folder. A step failing after the move puts back what was done; if
   even that fails, the operation and intent stay, the slot out of the pool, until a later look puts it back. A rename cut
   short by a crash is the next holder's (the pool's recovery, once its Hive is gone): given up if git hasn't moved it,

@@ -650,7 +650,8 @@ homes (`setRetiredHomes`). Kept for a lane or card, the runtime's `agentFolder` 
 `handOffCarried` (in `leaseForStart`, `lendLane` and lanes waiting for a slot) hand the slot over to the card or lane in
 one write (`SlotStore.handOff`, its sessions rebound in it). The pass's last step, `renameAdopted`, renames a free adopted
 slot to a generic name through `SlotPool.rename`, a removal-kind operation: `SlotStore.startRename` takes the slot and
-reserves the destination with its intent (board_meta `slot_rename:`) in one write, the pool's `SlotRenamer`
+reserves the destination with its intent (board_meta `slot_rename:`, with the worktree's identity: `worktreeIdentity`,
+its git administrative folder) in one write (`take` and `carryIn` skip reserved names), the pool's `SlotRenamer`
 (`workspaceMove.ts`' `worktreeRenamer`: copy, move, follow, back, where) does Repair's steps, and `finishRename` or
 `abandonRename` ends it in one fenced write. A rename whose holder is gone is the pool's `recover`'s (from `refresh`;
 the pass's `settleRenames` asks for one when an intent is there): given up when git still lists the worktree at its
