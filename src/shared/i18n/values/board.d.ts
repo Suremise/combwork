@@ -677,6 +677,7 @@ interface HiveMessageValues {
   'board.slots.waitingToMerge': { agent: string | number }
   'board.slots.youMerging': undefined
   'board.slots.youMergingStart': undefined
+  'board.stall.hintFollowUp': undefined
   'board.stall.hintLaneOrder': undefined
   'board.stall.hintLoopStep': undefined
   'board.stall.hintNobody': undefined
@@ -685,6 +686,7 @@ interface HiveMessageValues {
   'board.stall.hintReviewVerdict': undefined
   'board.stall.hintReviewWait': undefined
   'board.stall.hintWakeUntaken': undefined
+  'board.stalled.followUpWait': { builder: string | number; card: string | number; waited: string | number }
   'board.stalled.laneOrderWait': { reviewer: string | number; other: string | number; card: string | number; builder: string | number; waited: string | number }
   'board.stalled.loopStepWait': { builder: string | number; card: string | number; waited: string | number }
   'board.stalled.noAgent': undefined

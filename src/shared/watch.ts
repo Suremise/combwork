@@ -457,7 +457,7 @@ const NOTE_MAX = 600
 export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string): string {
   const who =
     kind === 'review' ? 'You review this card in its loop: carry on with it' : kind === 'step'
-        ? "You review this card in its loop: check it and answer with hive_loop_step (ok, or gaps saying what's missing, and the design's id)"
+        ? "You review this card in its loop: check it and answer with hive_loop_step (ok, or gaps saying what's missing, and its id)"
         : kind === 'stepNotice'
           ? 'Nothing to answer: carry on with your loop'
           : kind === 'answer' ? 'The user answered: carry on from where you asked' : 'This is your card in its loop: carry on'
@@ -480,12 +480,13 @@ export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: stri
 export const LOOP_WAKE_KINDS = ['review', 'verdict', 'approved', 'done', 'request', 'note', 'answer', 'step', 'stepAnswer', 'stepNotice'] as const
 
 /**
- * A card loop's step (#1382) as its wake quotes it: what the step is, with the design it is about (its id, which an answer
- * names), then its text (English, agent-facing).
+ * A card loop's step (#1382, #1467) as its wake quotes it: what the step is, with the design or follow-up it is about
+ * (its id, which an answer names; `of`: which an answer checked), then its text (English, agent-facing).
  */
-export function loopStepWords(step: string, text: string, design?: string): string {
+export function loopStepWords(step: string, text: string, design?: string, of?: string): string {
   const id = design ? ` ${design}` : ''
-  const what: Record<string, string> = { design: `design${id} posted for your check (answer with its id)`, proceed: `no check of design${id} came in time: the builder goes ahead with it as posted`, ok: `design${id} is OK`, gaps: `design${id} has gaps` }
+  const checked = of === 'followUp' ? 'follow-up' : 'design'
+  const what: Record<string, string> = { design: `design${id} posted for your check (answer with its id)`, followUp: `follow-up${id} ready for your check (answer with its id)`, proceed: `no check of design${id} came in time: the builder goes ahead with it as posted`, ok: `${checked}${id} is OK`, gaps: `${checked}${id} has gaps` }
   return `${what[step] ?? step}: ${text}`
 }
 export type LoopWakeKind = (typeof LOOP_WAKE_KINDS)[number]

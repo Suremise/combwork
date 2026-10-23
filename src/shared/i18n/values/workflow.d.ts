@@ -213,6 +213,8 @@ interface HiveMessageValues {
   'workflow.refused.lane.oneAtATime.change': undefined
   'workflow.refused.lane.oneAtATime.message': { card: string | number; earlier: string | number }
   'workflow.refused.lane.oneAtATime.next': { earlier: string | number; card: string | number }
+  'workflow.refused.loop.followUpChecked.message': { card: string | number }
+  'workflow.refused.loop.followUpChecked.next': undefined
   'workflow.refused.loop.noReviewer.message': { card: string | number }
   'workflow.refused.loop.noReviewer.next': undefined
   'workflow.refused.loop.noStep.message': { card: string | number }
@@ -221,8 +223,8 @@ interface HiveMessageValues {
   'workflow.refused.loop.roundLimit.next': undefined
   'workflow.refused.loop.staleStep.message': { card: string | number; design: string | number; waiting: string | number }
   'workflow.refused.loop.staleStep.next': undefined
-  'workflow.refused.loop.stepNotHere.message': { card: string | number; stage: string | number }
-  'workflow.refused.loop.stepNotHere.next': undefined
+  'workflow.refused.loop.stepNotHere.message': { step: string; card: string | number; stage: string | number }
+  'workflow.refused.loop.stepNotHere.next': { step: string }
   'workflow.refused.loop.stepNotYours.message': { side: string; card: string | number }
   'workflow.refused.loop.stepNotYours.next': { side: string }
   'workflow.refused.loop.tooEarly.change': undefined

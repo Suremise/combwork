@@ -150,6 +150,8 @@ interface HiveMessageValues {
   'tips.filesTab.title': undefined
   'tips.flightRecorder.text': undefined
   'tips.flightRecorder.title': undefined
+  'tips.followUpCheck.text': undefined
+  'tips.followUpCheck.title': undefined
   'tips.forYou.text': undefined
   'tips.forYou.title': undefined
   'tips.gitCheck.text': undefined

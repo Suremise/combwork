@@ -416,8 +416,8 @@
     "description": "A line in a card's history: the card's links to related cards were all removed."
   },
   "tasks.history.loopStep": {
-    "defaultMessage": "{step, select, design {Posted a design for the reviewer to check} ok {Checked the design: OK} gaps {Checked the design: gaps} other {Went ahead with the design unchecked}}: \"{text}\"",
-    "description": "A line in a card's history (#1382), a step of a card loop: its builder (named beside it) posted a design for its reviewer to check before building (design), the reviewer checked it and found it OK (ok) or found gaps (gaps), or, with no answer in time, the builder went ahead with it as posted (other). {text} is what they said (cut short). Select keys: translate each sentence."
+    "defaultMessage": "{step, select, design {Posted a design for the reviewer to check} followUp {Posted a follow-up for the reviewer to check} ok {Checked the design: OK} gaps {Checked the design: gaps} okFollowUp {Checked the follow-up: OK} gapsFollowUp {Checked the follow-up: gaps} other {Went ahead with the design unchecked}}: \"{text}\"",
+    "description": "A line in a card's history (#1382, #1467), a step of a card loop: its builder (named beside it) posted a design for its reviewer to check before building (design), or a follow-up of reviewed work for its check, such as a change asked of a screenshot (followUp); the reviewer checked a design and found it OK (ok) or found gaps (gaps), or checked a follow-up so (okFollowUp, gapsFollowUp); or, with no answer in time, the builder went ahead with its design as posted (other). {text} is what they said (cut short). Select keys: translate each sentence."
   },
   "tasks.history.loopWake": {
     "defaultMessage": "Woke {agent} {kind, select, review {to review it} step {with a card loop step} other {with its verdict}} (a loop wake)",

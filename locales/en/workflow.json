@@ -847,21 +847,29 @@
     "defaultMessage": "Finish {earlier} first: once it is Done, the lane goes on to {card}.",
     "description": "The next step after a start refused because an earlier card of the lane is not Done. {card} and {earlier} are card keys like AM-12."
   },
+  "workflow.refused.loop.followUpChecked.message": {
+    "defaultMessage": "{card}: a follow-up waits for its reviewer's check, with no going ahead without it.",
+    "description": "A refused going ahead unchecked (#1467): what waits is a follow-up (a change asked of reviewed work, such as a screenshot's), which only its reviewer's answer settles. {card} is a card key."
+  },
+  "workflow.refused.loop.followUpChecked.next": {
+    "defaultMessage": "Wait for the reviewer's ok or gaps; if none comes, ask the user.",
+    "description": "The next step after going ahead with a follow-up unchecked (#1467). ok and gaps are the reviewer's answers, as agents name them: keep them as they are."
+  },
   "workflow.refused.loop.noReviewer.message": {
-    "defaultMessage": "{card} has no reviewer to check a design: it is in no lane with a reviewer, and nobody has reviewed it yet.",
-    "description": "A refused design posted for a check (#1382): nobody can be woken to check it. {card} is a card key. A lane: a card loop's record of its builder and reviewer."
+    "defaultMessage": "{card} has no reviewer to check it: it is in no lane with a reviewer, and nobody has reviewed it yet.",
+    "description": "A refused design or follow-up posted for a check (#1382, #1467): nobody can be woken to check it. {card} is a card key. A lane: a card loop's record of its builder and reviewer."
   },
   "workflow.refused.loop.noReviewer.next": {
-    "defaultMessage": "Start a lane for the card with a reviewer, or ask about the design in a comment instead.",
-    "description": "The next step after a design refused for want of a reviewer (#1382)."
+    "defaultMessage": "Start a lane for the card with a reviewer, or say it in a comment instead.",
+    "description": "The next step after a design or follow-up refused for want of a reviewer (#1382, #1467)."
   },
   "workflow.refused.loop.noStep.message": {
-    "defaultMessage": "{card} has no design waiting for its check.",
-    "description": "A refused card loop step (#1382): an answer to a design (OK, gaps) or going ahead with it when no design posted by its builder waits for its reviewer's check. {card} is a card key."
+    "defaultMessage": "{card} has no design or follow-up waiting for its check.",
+    "description": "A refused card loop step (#1382, #1467): an answer (OK, gaps) or going ahead when no design or follow-up posted by its builder waits for its reviewer's check. A follow-up: a change asked of reviewed work, such as a screenshot's. {card} is a card key."
   },
   "workflow.refused.loop.noStep.next": {
-    "defaultMessage": "Read the card: its design may have been answered, or the card moved on.",
-    "description": "The next step after a card loop step with nothing to answer (#1382)."
+    "defaultMessage": "Read the card: it may have been answered, or the card moved on.",
+    "description": "The next step after a card loop step with nothing to answer (#1382): what was posted for the check may have been answered."
   },
   "workflow.refused.loop.roundLimit.message": {
     "defaultMessage": "{card} reached its round limit: it goes on once its round-limit question is answered.",
@@ -872,28 +880,28 @@
     "description": "The next step while a card waits at its round limit for its question (For you, a label: use it as Hive shows it) to be answered. Read by agents and shown in the window alike: it names no one (never \"the user\"); Hive then wakes the agents that wait on the card."
   },
   "workflow.refused.loop.staleStep.message": {
-    "defaultMessage": "{card}: that is about design {design}, but the design waiting now is {waiting}.",
-    "description": "A refused answer to a design, or going ahead with one (#1382): it names an earlier design than the one waiting now, so it can't settle it. {card} is a card key; {design} and {waiting} are designs' ids, such as AM-12/s40."
+    "defaultMessage": "{card}: that is about {design}, but the one waiting for its check now is {waiting}.",
+    "description": "A refused answer to a design or follow-up, or going ahead with a design (#1382, #1467): it names an earlier one than the one waiting now, so it can't settle it. {card} is a card key; {design} and {waiting} are their ids, such as AM-12/s40."
   },
   "workflow.refused.loop.staleStep.next": {
-    "defaultMessage": "Read the card's latest design and answer that one.",
-    "description": "The next step after an answer to an earlier design (#1382)."
+    "defaultMessage": "Read the card's latest comment and answer the one it names.",
+    "description": "The next step after an answer to an earlier design or follow-up (#1382, #1467)."
   },
   "workflow.refused.loop.stepNotHere.message": {
-    "defaultMessage": "{card} is in {stage}: a design is posted for its check before the work goes to review.",
-    "description": "A refused card loop step (#1382): a design was posted for a card that isn't being worked on (not in Doing). {card} is a card key; {stage} the stage it is in."
+    "defaultMessage": "{step, select, followUp {{card} is in {stage}: a follow-up is posted for its check once the work is in review or has passed it.} other {{card} is in {stage}: a design is posted for its check before the work goes to review.}}",
+    "description": "A refused card loop step (#1382, #1467): a design was posted for a card that isn't being worked on (not in Doing), or a follow-up (a change asked of reviewed work, such as a screenshot's) for a card that isn't in Review or Passed. {card} is a card key; {stage} the stage it is in; step (select): followUp, or other for a design. Translate each sentence."
   },
   "workflow.refused.loop.stepNotHere.next": {
-    "defaultMessage": "Post it while the card is being worked on, or say it in a comment.",
-    "description": "The next step after a design posted for a card that is not being worked on (#1382)."
+    "defaultMessage": "{step, select, followUp {Send the work to review, or say it in a comment.} other {Post it while the card is being worked on, or say it in a comment.}}",
+    "description": "The next step after a design posted for a card that is not being worked on, or a follow-up for a card not in Review or Passed (#1382, #1467). step (select): followUp, or other for a design. Translate each sentence."
   },
   "workflow.refused.loop.stepNotYours.message": {
-    "defaultMessage": "{side, select, builder {Only the builder of {card} posts its design or goes ahead with it.} other {Only the reviewer of {card} checks its design.}}",
-    "description": "A refused card loop step (#1382): the agent isn't on the side of the loop the step belongs to (a reviewer posting a design, a builder answering its own). {card} is a card key; side (select): builder or reviewer, whose step it is. Translate each sentence."
+    "defaultMessage": "{side, select, builder {Only the builder of {card} posts its design or follow-up, or goes ahead with a design.} other {Only the reviewer of {card} checks its design or follow-up.}}",
+    "description": "A refused card loop step (#1382, #1467): the agent isn't on the side of the loop the step belongs to (a reviewer posting a design or a follow-up, a builder answering its own). A follow-up: a change asked of reviewed work (such as a screenshot's), ready for the reviewer's check. {card} is a card key; side (select): builder or reviewer, whose step it is. Translate each sentence."
   },
   "workflow.refused.loop.stepNotYours.next": {
-    "defaultMessage": "{side, select, builder {Leave it to the card's builder; a reviewer answers with ok or gaps.} other {Leave it to the card's reviewer; nobody checks their own design.}}",
-    "description": "The next step after a refused card loop step from the wrong side (#1382). side: builder or reviewer, the agent the step belongs to. ok and gaps are the reviewer's answers, as agents name them: keep them as they are."
+    "defaultMessage": "{side, select, builder {Leave it to the card's builder; a reviewer answers with ok or gaps.} other {Leave it to the card's reviewer; nobody checks their own work.}}",
+    "description": "The next step after a refused card loop step from the wrong side (#1382, #1467). side: builder or reviewer, the agent the step belongs to. ok and gaps are the reviewer's answers, as agents name them: keep them as they are."
   },
   "workflow.refused.loop.tooEarly.change": {
     "defaultMessage": "How long is set in Project Settings → Card loops → Design check wait.",

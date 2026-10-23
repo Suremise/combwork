@@ -148,6 +148,8 @@
   "tips.filesTab.title": "Edytuj pliki bez wychodzenia z Hive",
   "tips.flightRecorder.text": "Włącz wyzwalacz rejestratora lotu (Ustawienia → Zaawansowane: zatrzymanie przez zabezpieczenia, coś nieznanego z CLI, zmiana wersji CLI, agent, który milczy), a gdy to nastąpi, Hive od razu zapisze ostatnie zdarzenia konsoli deweloperskiej agenta, z ukrytymi danymi, i pokaże komunikat.",
   "tips.flightRecorder.title": "Wyłapuj rzadkie zdarzenia automatycznie",
+  "tips.followUpCheck.text": "Gdy prosisz o zmianę karty w kolumnie Recenzja albo Zatwierdzone, którą ma sprawdzić jej recenzent, wykonawca publikuje zmianę jako poprawki do sprawdzenia: Hive budzi recenzenta, a odpowiedź budzi wykonawcę. Poprawki bez odpowiedzi przez 15 minut oznaczają kartę jako utkniętą.",
+  "tips.followUpCheck.title": "Poprawki do sprawdzenia bez nowej rundy",
   "tips.forYou.text": "Karta z etykietą Dla Ciebie czeka na Ciebie: zatwierdzenie, decyzja albo pytanie. Ikona Tablicy zadań je liczy, a Dla Ciebie na tablicy pokazuje tylko je. Otwórz kartę, aby zatwierdzić, odrzucić lub odpowiedzieć: czekający agent dowie się od razu.",
   "tips.forYou.title": "Odpowiadaj na to, co czeka na Ciebie",
   "tips.gitCheck.text": "Pomoc → Konfiguracja agentów… pokazuje, jakiego gita znalazł Hive i w jakiej wersji. Agenci w worktree, scalanie i sekcje Git zakładki Kontrola wersji wymagają Git for Windows 2.38 lub nowszego.",

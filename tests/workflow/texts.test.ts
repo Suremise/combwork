@@ -29,6 +29,7 @@ const SAMPLE: RefusalValues = {
   side: 'builder',
   design: 'AM-12/s40',
   waiting: 'AM-12/s44',
+  step: 'followUp',
   minutes: 12,
   files: 'src/a.ts',
   folder: 'D:\\work\\am',

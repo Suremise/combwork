@@ -523,6 +523,58 @@ describe('a card by intent (#1267)', () => {
     expect(await refused(act(w, card, reviewer, design('Plan v3')))).toBeNull()
   })
 
+  it("a follow-up of a passed card (#1467): named, it wakes the reviewer; only the reviewer's answer settles it, never going ahead", async () => {
+    const { w, wt } = await workspace()
+    const card = await inLane(w)
+    const followUp = (text: string) => ({ kind: 'loopStep', step: 'followUp', text }) as const
+    // Not while the work is being done: that is a design's place.
+    expect(await refused(act(w, card, builder, followUp('Fixes')))).toBe('loop.stepNotHere')
+    commit(wt, 'h.txt')
+    await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    await act(w, card, reviewer, { kind: 'startReview' })
+    await act(w, card, reviewer, { kind: 'verdict', pass: true, comment: 'Round 1: PASSED.' })
+    const before = wakesOf(w, card).length
+    // In Passed (the Assistant's screenshot OK asked for changes for the reviewer to check): posted, nothing moves.
+    const posted = await act(w, card, builder, followUp('Fixes: the dark theme at 1093e21.'))
+    const id = String(posted.done.data?.design)
+    expect(id).toMatch(/\/s\d+$/)
+    expect(posted.done).toMatchObject({ from: 'approved', to: 'approved' })
+    expect(posted.done.data).not.toHaveProperty('until')
+    expect(posted.card).toMatchObject({ column: 'passed', agent: 'a1' })
+    expect(posted.card.comments.at(-1)).toMatchObject({ text: `Follow-up ${id}, for the reviewer's check (an answer names ${id}):\n\nFixes: the dark theme at 1093e21.` })
+    expect(posted.card.history.at(-1)?.what).toBe('Posted a follow-up for the reviewer to check: "Fixes: the dark theme at 1093e21."')
+    expect(foldCard(facts(w, card)).step).toMatchObject({ step: 'followUp', id, until: null })
+    // Its reviewer is woken, whatever it watches.
+    expect(wakesOf(w, card).slice(before)).toEqual(['a2'])
+    // No going ahead with it unchecked, however long it waits.
+    expect(await refused(act(w, card, builder, answer('proceed', id)))).toBe('loop.followUpChecked')
+    expect(await refused(act(w, card, builder, answer('ok', id)))).toBe('loop.stepNotYours')
+    // Gaps: not checked; the builder fixes them and posts it again, and the late answer to the first is refused.
+    const gaps = await act(w, card, reviewer, answer('gaps', id, 'The light theme too.'))
+    expect(gaps.card.history.at(-1)?.what).toBe('Checked the follow-up: gaps: "The light theme too."')
+    expect(facts(w, card).at(-1)).toMatchObject({ kind: 'LoopStep', data: { step: 'gaps', of: 'followUp', design: id } })
+    expect(wakesOf(w, card).slice(before)).toEqual(['a2', 'a1'])
+    expect(foldCard(facts(w, card)).step).toBeNull()
+    const again = String((await act(w, card, builder, followUp('Both themes at 77ab3c1.'))).done.data?.design)
+    expect(await refused(act(w, card, reviewer, answer('ok', id)))).toBe('loop.staleStep')
+    const ok = await act(w, card, reviewer, answer('ok', again, 'Both fine.'))
+    expect(ok.card.history.at(-1)?.what).toBe('Checked the follow-up: OK: "Both fine."')
+    expect(ok.card.column).toBe('passed')
+  })
+
+  it('a follow-up in Review wakes the reviewer too; with no reviewer it is refused (#1467)', async () => {
+    const { w, wt } = await workspace()
+    const card = await create(w)
+    await act(w, card, builder, { kind: 'start' })
+    commit(wt, 'i.txt')
+    await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    // No lane, nobody has reviewed it: nobody could be woken.
+    expect(await refused(act(w, card, builder, { kind: 'loopStep', step: 'followUp', text: 'Fixes' }))).toBe('loop.noReviewer')
+    await act(w, card, reviewer, { kind: 'startReview' })
+    expect(await refused(act(w, card, builder, { kind: 'loopStep', step: 'followUp', text: 'Fixes' }))).toBeNull()
+    expect(wakesOf(w, card).at(-1)).toBe('a2')
+  })
+
   it('a no-code card is submitted with a summary and no revision (S25, S38)', async () => {
     const { w } = await workspace()
     const card = await create(w, 'A design note')

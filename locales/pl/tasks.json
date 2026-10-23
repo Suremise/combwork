@@ -103,7 +103,7 @@
   "tasks.history.labelsTakenOff": "Etykiety: usunięto {labels}",
   "tasks.history.linked": "Powiązano z: {cards}",
   "tasks.history.linksRemoved": "Usunięto powiązania",
-  "tasks.history.loopStep": "{step, select, design {Opublikowano projekt do sprawdzenia przez recenzenta} ok {Sprawdzono projekt: OK} gaps {Sprawdzono projekt: luki} other {Kontynuowano bez sprawdzenia projektu}}: „{text}”",
+  "tasks.history.loopStep": "{step, select, design {Opublikowano projekt do sprawdzenia przez recenzenta} followUp {Opublikowano poprawki do sprawdzenia przez recenzenta} ok {Sprawdzono projekt: OK} gaps {Sprawdzono projekt: luki} okFollowUp {Sprawdzono poprawki: OK} gapsFollowUp {Sprawdzono poprawki: luki} other {Kontynuowano bez sprawdzenia projektu}}: „{text}”",
   "tasks.history.loopWake": "Wybudzono agenta {agent} {kind, select, review {do recenzji} step {z krokiem pętli} other {z werdyktem}} (wybudzenie pętli)",
   "tasks.history.moved": "Przeniesiono do kolumny {column, select, hold {Wstrzymane} todo {Do zrobienia} doing {Aktywne} review {Recenzja} passed {Zatwierdzone} done {Gotowe} other {{column}}}",
   "tasks.history.movedBefore": "Przeniesiono do kolumny {column, select, hold {Wstrzymane} todo {Do zrobienia} doing {Aktywne} review {Recenzja} passed {Zatwierdzone} done {Gotowe} other {{column}}}, przed #{before}",

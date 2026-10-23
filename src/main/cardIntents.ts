@@ -35,7 +35,7 @@ export type CardIntent =
   | { kind: 'ask'; askKind: ForYouKind; text: string; revision?: string; checklist?: string[] }
   | { kind: 'cannot'; rule: string; why: string }
   | { kind: 'request'; text: string }
-  /** A card loop's step (#1382): a design for the reviewer's check, its answer, or going ahead unchecked. */
+  /** A card loop's step (#1382, #1467): a design or a follow-up for the reviewer's check, its answer, or going ahead unchecked. */
   | { kind: 'loopStep'; step: LoopStepId; text: string; design?: string }
   /** The merge queue's controls (#1353): the user's, or the Assistant's with a reason (OP-9); never an agent's. */
   /** `guard`: the Assistant's change boundary, checked again inside the write. */
@@ -143,12 +143,13 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
         // Its history line too, which the builder's watch counts (#1272).
         return { opts: { keepAgent, comment: intent.text, note: [requestNote(intent.text)] } }
       case 'loopStep': {
-        const step = w.written.findLast((f) => f.kind === 'LoopStep')?.data as { design?: string; until?: string } | undefined
-        // A design's comment names it first (#1382): its first line is what a watch's wake and latestComment show, so the
-        // reviewer has the id its answer names whichever way it is woken. Its history line keeps when its check is due,
-        // which the stall check reads (shared/tasks.ts' pendingDesign).
-        const comment = intent.step === 'design' && step?.design ? `Design ${step.design}, for the reviewer's check (an answer names ${step.design}):\n\n${intent.text}` : intent.text // i18n-ignore: Hive's line atop an agent's comment, agent-facing
-        return { opts: { keepAgent, comment, note: [loopStepNote(intent.step, intent.text, step?.until)] } }
+        const step = w.written.findLast((f) => f.kind === 'LoopStep')?.data as { design?: string; until?: string; of?: string } | undefined
+        // A design's or a follow-up's comment names it first (#1382, #1467): its first line is what a watch's wake and
+        // latestComment show, so the reviewer has the id its answer names whichever way it is woken. A design's history line
+        // keeps when its check is due, which the stall check reads (shared/tasks.ts' pendingStep); an answer's says what it checked.
+        const asks = intent.step === 'design' ? 'Design' : intent.step === 'followUp' ? 'Follow-up' : null // i18n-ignore: Hive's line atop an agent's comment, agent-facing
+        const comment = asks && step?.design ? `${asks} ${step.design}, for the reviewer's check (an answer names ${step.design}):\n\n${intent.text}` : intent.text // i18n-ignore: Hive's line atop an agent's comment, agent-facing
+        return { opts: { keepAgent, comment, note: [loopStepNote(intent.step, intent.text, step?.until, step?.of)] } }
       }
       default:
         return { opts: { keepAgent } }

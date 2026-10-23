@@ -157,6 +157,9 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     check("the reviewer's answer is taken", ok.status === 200 && (await card(n))?.history.some((h) => h.what === 'Checked the design: OK: "Holds: build it."'), JSON.stringify(ok.body))
     check('…and wakes the builder with it', !!(await until(() => wakesOf('Builder').length > builderWakes && wakesOf('Builder').at(-1).includes(`The reviewer: "design ${designId} is OK: Holds: build it."`), HUNG_MS)), JSON.stringify(wakesOf('Builder').slice(builderWakes)))
     await until(async () => (await live(builder.id))?.status === 'ready', HUNG_MS)
+    // A follow-up (#1467) is for work in Review or Passed: in Doing it is refused, and nothing is written.
+    const followUp = await asBuilder(`/v1/tasks/${ref}/loop-step`, { step: 'followUp', text: 'Fixes ready.' })
+    check('a follow-up in Doing is refused (409, loop.stepNotHere)', followUp.status === 409 && followUp.body?.rule === 'loop.stepNotHere' && !(await card(n))?.history.some((h) => h.what.startsWith('Posted a follow-up')), JSON.stringify(followUp.body))
 
     // Ask the user: nothing moves.
     const head = git('rev-parse', 'HEAD')

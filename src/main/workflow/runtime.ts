@@ -1340,12 +1340,13 @@ export class Workflow {
   }
 
   /**
-   * A card loop's step (#1382): the builder's design posted for its reviewer's check (in Doing), or its going ahead with
-   * it unchecked once the check is due (`proceed`), or the reviewer's answer (`ok`, `gaps`). A design is named
-   * (`<key>/s<seq>`) and due `waitMinutes` after its post (Card loops → Design check wait, the caller's), kept in its fact:
-   * an answer or `proceed` names the design it is about, and one for an earlier design is refused, so a late reply never
-   * settles a newer one. Moves nothing; wakes the other side: the builder's steps its reviewer (the lane's, else the
-   * agent that last reviewed it), an answer its builder. A design with no reviewer to check it is refused. With the rules
+   * A card loop's step (#1382, #1467): the builder's design posted for its reviewer's check (in Doing), or its going ahead
+   * with it unchecked once the check is due (`proceed`), or a follow-up of its work ready for the reviewer's check (in
+   * Review or Passed: a change asked of it, such as a screenshot's; never gone ahead with unchecked), or the reviewer's
+   * answer (`ok`, `gaps`). A design or a follow-up is named (`<key>/s<seq>`); a design is due `waitMinutes` after its post
+   * (Card loops → Design check wait, the caller's), kept in its fact: an answer or `proceed` names the step it is about,
+   * and one for an earlier step is refused, so a late reply never settles a newer one. Moves nothing; wakes the other side: the builder's steps its reviewer (the lane's, else the
+   * agent that last reviewed it), an answer its builder. A design or follow-up with no reviewer to check it is refused. With the rules
    * off, nothing is checked. `reviewer`: the card's loop reviewer as it is when the write decides (loopReviewer.ts), read
    * inside its board change: an agent's removal publishes under the same lock, so it is either before (refused) or after.
    */
@@ -1353,7 +1354,7 @@ export class Workflow {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
-    let posted: { design: string; until: string } | null = null
+    let posted: { design: string; until?: string } | null = null
     const refused = await this.write(
       card,
       s.started ? this.rulesetOf(card, s) : null,
@@ -1369,12 +1370,16 @@ export class Workflow {
           // Each side its own (an agent; the user and the Assistant take either): the builder's steps by the card's
           // builder, an answer by its reviewer, never its builder.
           if (agent && (side === 'builder' ? agent !== builder : agent !== reviewer || agent === builder)) return { rule: 'loop.stepNotYours', values: { card: card.key, side } } as GuardRefusal
-          if (step === 'design') {
-            if (now.stage !== 'active') return { rule: 'loop.stepNotHere', values: { card: card.key, stage: now.stage } } as GuardRefusal
+          if (step === 'design' || step === 'followUp') {
+            // A design before the work goes to review; a follow-up of work reviewed or under review.
+            const here = step === 'design' ? now.stage === 'active' : now.stage === 'review' || now.stage === 'approved'
+            if (!here) return { rule: 'loop.stepNotHere', values: { card: card.key, stage: now.stage, step } } as GuardRefusal
             if (!reviewer || reviewer === builder) return { rule: 'loop.noReviewer', values: { card: card.key } } as GuardRefusal
           } else {
             if (!now.step) return { rule: 'loop.noStep', values: { card: card.key } } as GuardRefusal
             if (opts.design !== now.step.id) return { rule: 'loop.staleStep', values: { card: card.key, design: opts.design ?? '', waiting: now.step.id } } as GuardRefusal
+            // A follow-up was asked for: it waits for its check, with no going ahead unchecked.
+            if (step === 'proceed' && now.step.step === 'followUp') return { rule: 'loop.followUpChecked', values: { card: card.key } } as GuardRefusal
             const due = now.step.until ? Date.parse(now.step.until) : NaN
             if (step === 'proceed' && due > at) return { rule: 'loop.tooEarly', values: { card: card.key, minutes: Math.ceil((due - at) / 60_000) } } as GuardRefusal
           }
@@ -1382,6 +1387,9 @@ export class Workflow {
         if (step === 'design') {
           posted = { design: `${card.key}/s${now.lastSeq + 1}`, until: new Date(at + opts.waitMinutes * 60_000).toISOString() }
           w.fact('LoopStep', { step, text, ...posted, waitMinutes: opts.waitMinutes })
+        } else if (step === 'followUp') {
+          posted = { design: `${card.key}/s${now.lastSeq + 1}` }
+          w.fact('LoopStep', { step, text, ...posted })
         } else {
           const about = opts.design ?? now.step?.id
           w.fact('LoopStep', { step, text, ...(about ? { design: about } : {}), ...(now.step ? { of: now.step.step } : {}) })
@@ -1394,8 +1402,8 @@ export class Workflow {
       opts.reviewer
     )
     if (refused) return this.refuse(card, actor, 'loop step', refused) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-    const p = posted as { design: string; until: string } | null
-    return this.ok(card, s.stage, s.stage, p ? { design: p.design, until: p.until, waitMinutes: opts.waitMinutes } : undefined)
+    const p = posted as { design: string; until?: string } | null
+    return this.ok(card, s.stage, s.stage, p ? { design: p.design, ...(p.until ? { until: p.until, waitMinutes: opts.waitMinutes } : {}) } : undefined)
   }
 
   /**

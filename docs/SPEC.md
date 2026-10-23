@@ -1325,7 +1325,7 @@ that can't be written fails the change whole.
 | `DecisionsReceived` | agent, generation | The agent received the card's decisions up to that generation (§16.4.6). |
 | `CannotWithinRules` | rule, why | The agent's "I couldn't do it within the rules" intent (#686) [#1120 c]. |
 | `ReviewerRequest` | text | The reviewer's request to the builder mid-review (#912) [#1120 c]. |
-| `LoopStep` | step, text, design?, until?, waitMinutes?, of? | A card loop's step that moves nothing (#1382): the builder's design for its reviewer's check (`design`: its id, `<key>/s<seq>`, and when its check is due, `until`, by `waitMinutes`) or going ahead with it unchecked (`proceed`), or the reviewer's answer (`ok`, `gaps`); an answer and going ahead name the design they are about (`design`; `of`: its kind). A design waits (`CardState.step`) until answered, gone ahead from, replaced by another, or the card moves, is submitted or given a verdict. |
+| `LoopStep` | step, text, design?, until?, waitMinutes?, of? | A card loop's step that moves nothing (#1382, #1467): the builder's design for its reviewer's check (`design`: its id, `<key>/s<seq>`, and when its check is due, `until`, by `waitMinutes`) or going ahead with it unchecked (`proceed`), the builder's follow-up of reviewed work for the check (`followUp`: its id, no due time), or the reviewer's answer (`ok`, `gaps`); an answer and going ahead name the step they are about (`design`; `of`: its kind). A design or follow-up waits (`CardState.step`) until answered, gone ahead from (a design), replaced by another, or the card moves, is submitted or given a verdict. |
 | `HeadMoved` (observed) | line, from, to, candidate key of the new change | A new revision in the card's folder outside an intent. |
 | `TargetMoved` (observed) | target, from, to | |
 | `Gone` (observed) | what (line, folder, repository, deliverables) | |
@@ -2036,7 +2036,7 @@ Each takes a card reference (§16.12) and replies with what moved, lean (`shared
 | **ask the user** | Builder or reviewer | card, kind (approve, decide, test, sign-in, other), text, revision? | For you (§16.8.5) |
 | **couldn't within the rules** | Builder or reviewer | card, rule, why | `CannotWithinRules`: a For you of kind decide; never a failed round, never a stall [#1120 c, #686] |
 | **request to builder** | The reviewer | card, text | `ReviewerRequest`; wakes the builder now (#912) [#1120 c]. Codex reviewers get the tool (#913). |
-| **card loop step** | The builder (design, proceed) or the reviewer (ok, gaps) | card, step, text | `LoopStep`; moves nothing; wakes the other side (§16.8.2) [#1382]. |
+| **card loop step** | The builder (design, followUp, proceed) or the reviewer (ok, gaps) | card, step, text | `LoopStep`; moves nothing; wakes the other side (§16.8.2) [#1382, #1467]. |
 
 **The same revision again** [P1, answering HR2's round 1 finding 7]: a revision that failed review may be submitted
 again unchanged, with a note (the reviewer asked for an explanation, or a check failed for a reason outside the
@@ -2119,6 +2119,18 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   restarted by a new watch) ("HB5 posted a design on #1305 for its reviewer to check and has waited 40 min: nobody has
   answered it, and it hasn't gone ahead as posted"), on the board, in the Agent API's `stalled` and in lane watches'
   `stalled` events. The card-loop skill says when to post one and how each side answers.
+- **A follow-up checked** (#1467, built [#1467]). On 22 Oct #1417 and #1419 stalled the same way in Review and Approved:
+  the Assistant's screenshot OK asked for changes for the reviewer to check, the builder posted its fixes as a comment,
+  and the reviewer watched for a move into Review that never came. The card loop step has a `followUp`: the builder's,
+  on a card in Review or Approved (`loop.stepNotHere` elsewhere), named as a design is (`<key>/s<seq>`, its comment
+  headed "Follow-up HI-12/s41, for the reviewer's check (an answer names HI-12/s41):"), with the same reviewer rule
+  (`loop.noReviewer` with none), the same `step` loop wake to the reviewer whatever its watch counts, and the same
+  answers (`ok`, `gaps`, naming it; history "Checked the follow-up: OK: …"). It has no due time and no going ahead:
+  `proceed` on a follow-up is refused (`loop.followUpChecked`). Unanswered, it is a stall (`loopStepWait`): the card in
+  Review or Approved, not blocked, its builder only watching it REVIEW_WAIT_STALL_MS (15 minutes) after the follow-up
+  ("B1 posted a follow-up on #333 for its reviewer to check and has waited 20 min: nobody has answered it"; the board's
+  hint asks the reviewer to answer it). The card-loop skill has the builder post it, and the reviewer watch comments as
+  well as columns while one it was asked to check is due.
 - **A late message can't reopen a pass** (#699, #703): only a submission or a decision (§16.4.6) moves an Approved card
   back to Review; comments and messages never do [note §10].
 - **Verified lane end:** `endLaneIfDone` replaces the agent's `mergeCommit` (`servers.ts:1556` checks only its format

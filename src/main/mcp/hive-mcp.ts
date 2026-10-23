@@ -200,8 +200,8 @@ function intentTools(): Tool[] {
     intent(
       'hive_loop_step',
       'loop-step',
-      "A card loop's step between builder and reviewer that moves nothing: text is written as a comment and the other side is woken. Builder: design (posted for the card's reviewer to check, the card in Doing; replies with its design id and until, when the check is due), proceed (no answer by then: building as posted; refused before). Reviewer: ok or gaps, its answer. Refused with no reviewer to check it.",
-      { step: { type: 'string', enum: [...LOOP_STEPS] }, text: { type: 'string', description: 'The design, the answer (gaps: what is missing), or a line.' }, design: { type: 'string', description: 'ok, gaps, proceed: the design they are about, as its reply or wake names it ("HI-12/s40").' } },
+      "A card loop's step between builder and reviewer that moves nothing: text is written as a comment and the other side is woken. Builder: design (posted for the card's reviewer to check, the card in Doing; replies with its design id and until, when the check is due), proceed (no answer by then: building as posted; refused before), followUp (a follow-up asked of reviewed work, such as a screenshot change, ready for its reviewer's check, the card in Review or Passed; replies with its id; no proceed). Reviewer: ok or gaps, its answer. Refused with no reviewer to check it.",
+      { step: { type: 'string', enum: [...LOOP_STEPS] }, text: { type: 'string', description: 'The design or follow-up, the answer (gaps: what is missing), or a line.' }, design: { type: 'string', description: 'ok, gaps, proceed: the design or follow-up they are about, as its reply or wake names it ("HI-12/s40").' } },
       ['step', 'text'],
       (a) => ({ step: a.step, text: a.text, design: a.design })
     )

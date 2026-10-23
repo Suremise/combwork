@@ -73,6 +73,8 @@ For each card, in order:
 
 **A design first** (the card, its decisions or the user asks for one, or you want one checked before building): in Doing, start the watch on the card first (`changes: ["comment"]`, `limitMinutes`: `designWaitMinutes` from `hive_start_card`'s reply), then post it with `hive_loop_step`, `step: "design"` (the design as its text), and end your turn. Its reviewer is woken; the reply names the design (`design`) and when its check is due (`until`). `ok`: build it. `gaps`: revise, and post it again (watch first). Woken by something else meanwhile: watch again, `limitMinutes` the time left until `until`. No answer by then: `step: "proceed"` with its `design` (saying so), and build as posted. Refused with no reviewer for the card: ask in a comment instead.
 
+**A follow-up** (a change asked of the card in Review or Passed for its reviewer to check, such as a screenshot OK with changes): make it and commit, start the watch on the card (`changes: ["comment", "column", "verdict"]`), then post it with `hive_loop_step`, `step: "followUp"` (what changed, naming the commit), and end your turn: a comment alone wakes nobody. Its reviewer is woken; the reply names the follow-up (`design`). `ok`: carry on (a passed card to its merge). `gaps`: fix them, and post it again (watch first). There's no going ahead unchecked: with no answer by the run's wait, ask the user.
+
 **The lane's end:** once every card is Done, the lane ends by itself. A merge step that needs the user (a commit or merge your CLI or a permission check refuses, a conflict you can't settle) is `hive_cannot_within_rules` on that card (the rule, and why): it goes to the user, who answers in your inbox; then finish the merge.
 
 **Checks in a round:** each move to Review carries a run record (work-on-card). After a round's fixes, rerun the checks those fixes affect (the project's notes may have a way to pick them), not every check again; but before a card can pass, the card's full checks must have run on its final code. The reviewer checks the record instead of repeating it, and runs the affected tests and its own probes (review-agent-work).
@@ -86,6 +88,8 @@ For each card, in order:
 4. **Passed**: `hive_verdict` with `pass: true`: it moves on and waits to be merged. Done is for merged work, not yours to move. Take the next card.
 
 **A design to check** (woken with "The builder: design HI-12/s40 posted for your check…", the card in Doing): read its latest comment, start your watch again as before, then answer with `hive_loop_step`, `step: "ok"` or `"gaps"` (what's missing, numbered) and `design`, its id (the wake names it, and so does the first line of the design's comment: `hive_read_task` with `latestComment`), and end your turn. It's not a review: no verdict, no round. Told the builder went ahead unchecked: nothing to answer.
+
+**A follow-up to check** (woken with "The builder: follow-up HI-12/s41 ready for your check…", the card in Review or Passed): check what it names (the commit), start your watch again, then answer with `hive_loop_step`, `step: "ok"` or `"gaps"` (what's missing, numbered) and `design`, its id, and end your turn. Not a review: no verdict, no round. **While a follow-up you were asked to check is due**, watch the card with `changes: ["comment", "column"]`, not for its arrival in Review: a follow-up doesn't move the card.
 
 ## Rounds and when to ask
 

@@ -103,7 +103,7 @@
   "tasks.history.labelsTakenOff": "Labels: removed {labels}",
   "tasks.history.linked": "Linked to {cards}",
   "tasks.history.linksRemoved": "Removed the links",
-  "tasks.history.loopStep": "{step, select, design {Posted a design for the reviewer to check} ok {Checked the design: OK} gaps {Checked the design: gaps} other {Went ahead with the design unchecked}}: \"{text}\"",
+  "tasks.history.loopStep": "{step, select, design {Posted a design for the reviewer to check} followUp {Posted a follow-up for the reviewer to check} ok {Checked the design: OK} gaps {Checked the design: gaps} okFollowUp {Checked the follow-up: OK} gapsFollowUp {Checked the follow-up: gaps} other {Went ahead with the design unchecked}}: \"{text}\"",
   "tasks.history.loopWake": "Woke {agent} {kind, select, review {to review it} step {with a card loop step} other {with its verdict}} (a loop wake)",
   "tasks.history.moved": "Moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
   "tasks.history.movedBefore": "Moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}, before #{before}",

@@ -12,7 +12,8 @@ import { workspaceOf, type WorkspaceService } from './workspace'
  * (its agent gone or not running), a card an agent in a card loop left with no watch (#376), or one waiting in Review on
  * a reviewer that watches it but hasn't started (#521), or on one that started and only watches it, with no verdict (#843),
  * or one whose lane is deadlocked, its reviewer waiting for another of its cards while its builder waits on it (#1410),
- * or a Doing card whose builder waits on a check of its design nobody gives (#1382). Null when it isn't.
+ * or a card whose builder waits on a check nobody gives: of its design in Doing (#1382), or of its follow-up in Review or
+ * Passed (#1467). Null when it isn't.
  */
 
 /** A workspace's live agents (by its folder): their names, projects, cards left with no watch, card watches (and since when), and how each is now. */

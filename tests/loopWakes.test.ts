@@ -468,7 +468,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     expect(st.typed[0].agent).toBe('r1')
     // It names the design, which the answer names.
     expect(st.typed[0].text).toContain(`The builder: "design ${id} posted for your check (answer with its id): Design: a step the reviewer is woken for."`)
-    expect(st.typed[0].text).toContain("check it and answer with hive_loop_step (ok, or gaps saying what's missing, and the design's id)")
+    expect(st.typed[0].text).toContain("check it and answer with hive_loop_step (ok, or gaps saying what's missing, and its id)")
     st.status.set('b1', 'ready')
     await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step: 'ok', text: 'Holds: build it.', design: id }))
     await typedUntil(st, 2)
@@ -579,6 +579,67 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     st.status.set('r1', 'ready')
     await drained()
     expect(st.typed.filter((t) => t.agent === 'r1')).toHaveLength(1)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a follow-up of a card in Passed wakes its reviewer though its watch counts only Review; the answer wakes the builder (#1467)", async () => {
+    await loopWakes.clearLoopWakes()
+    // A workflow whose passed work waits in Passed (for the user's OK too), as a card waiting to be merged does.
+    const { w, alpha } = await open({ workflow: { ...WORKFLOW.workflow, options: { review: 'agentThenYou', noSelfReview: true } } })
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    const intent = (who: typeof b1, i: Parameters<typeof runCardIntent>[2]) => inWorkspace(w, () => runCardIntent({ n: c, plain: false }, who, i))
+    await intent(b1, { kind: 'submit', summary: 'Ready', paths: ['a.txt'] })
+    await intent(r1, { kind: 'startReview' })
+    await intent(r1, { kind: 'verdict', pass: true, comment: 'Round 1: PASSED.' })
+    await drained()
+    await settled()
+    const k = st.typed.length
+    // HR3 on #1419: the screenshot OK asked for changes for it to check, and it waited for the card's move into Review.
+    st.status.set('r1', 'watching')
+    await watches.registerWatch(w, alpha, 'r1', readCondition({ cards: [c], column: 'review' }) as WatchCondition)
+    const id = String((await intent(b1, { kind: 'loopStep', step: 'followUp', text: 'Fixes ready: the dark theme.' })).done.data?.design)
+    await typedUntil(st, k + 1)
+    expect(st.typed[k].agent).toBe('r1')
+    expect(st.typed[k].text).toContain(`The builder: "follow-up ${id} ready for your check (answer with its id): Fixes ready: the dark theme."`)
+    expect(st.typed[k].text).toContain("check it and answer with hive_loop_step (ok, or gaps saying what's missing, and its id)")
+    st.status.set('b1', 'ready')
+    await intent(r1, { kind: 'loopStep', step: 'ok', text: 'Both themes fine.', design: id })
+    await typedUntil(st, k + 2)
+    expect(st.typed[k + 1]).toMatchObject({ agent: 'b1' })
+    expect(st.typed[k + 1].text).toContain(`The reviewer: "follow-up ${id} is OK: Both themes fine."`)
+    expect(await history(w, c)).toContain('R1 (alpha): Checked the follow-up: OK: "Both themes fine."')
+    await disposeWorkspaceService(w)
+  })
+
+  it("a reviewer waiting for a failed card's next round (fresh) hears a follow-up from its own watch, one line (#1467)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open({ workflow: { ...WORKFLOW.workflow, options: { review: 'agentThenYou', noSelfReview: true } } })
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    const intent = (who: typeof b1, i: Parameters<typeof runCardIntent>[2]) => inWorkspace(w, () => runCardIntent({ n: c, plain: false }, who, i))
+    await intent(b1, { kind: 'submit', summary: 'Ready', paths: ['a.txt'] })
+    await intent(r1, { kind: 'startReview' })
+    await intent(r1, { kind: 'verdict', pass: true, comment: 'Round 1: PASSED.' })
+    await drained()
+    await settled()
+    const k = st.typed.length
+    st.status.set('r1', 'watching')
+    await watches.registerWatch(w, alpha, 'r1', readCondition({ cards: [c], column: 'review', fresh: true }) as WatchCondition)
+    watches.testHooks.settleMs = undefined
+    try {
+      await intent(b1, { kind: 'loopStep', step: 'followUp', text: 'Fixes ready.' })
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.typed).toHaveLength(k + 1), HANG)
+    } finally {
+      watches.testHooks.settleMs = 0
+    }
+    await drained()
+    await settled()
+    // Its watch's line, naming the follow-up in the latest comment; the loop wake stands aside.
+    expect(st.typed).toHaveLength(k + 1)
+    expect(st.typed[k].agent).toBe('r1')
+    expect(st.typed[k].text).toMatch(/Follow-up \S+\/s\d+, for the reviewer's check.*Your card watch has ended/)
     await disposeWorkspaceService(w)
   })
 

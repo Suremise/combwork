@@ -334,18 +334,29 @@ export function laneOrderWaitReason(card: Pick<TaskCard, 'number' | 'column' | '
   return `${d.reviewer.name} is waiting for ${cardName(other)}, before ${cardName(card)} in the lane, while ${d.builder.name} waits on the review of ${cardName(card)}: each has waited on the other for ${minutesText(min)}.` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
-/** A card loop's step in a card's history (#1382, tasks.history.loopStep's English): a design posted, its answer, or going ahead unchecked. */
-const LOOP_STEP = /^(Posted a design for the reviewer to check|Checked the design: (OK|gaps)|Went ahead with the design unchecked): /
+/**
+ * A card loop's step in a card's history (#1382, #1467, tasks.history.loopStep's English): a design or a follow-up
+ * posted, its answer, or going ahead unchecked.
+ */
+const LOOP_STEP = /^(Posted a (design|follow-up) for the reviewer to check|Checked the (design|follow-up): (OK|gaps)|Went ahead with the design unchecked): /
 export const isLoopStepEntry = (what: string): boolean => LOOP_STEP.test(what)
 
 /**
- * The design a card's builder posted for its reviewer's check (#1382) while it still waits: no answer, no going ahead,
- * and the card not moved or given a verdict since. Its history entry; null when none waits.
+ * The design or follow-up a card's builder posted for its reviewer's check (#1382, #1467) while it still waits: no
+ * answer, no going ahead, and the card not moved or given a verdict since. Its history entry and which it is; null when
+ * none waits.
  */
-export function pendingDesign(card: Pick<TaskCard, 'history'>): TaskCard['history'][number] | null {
+export function pendingStep(card: Pick<TaskCard, 'history'>): { entry: TaskCard['history'][number]; step: 'design' | 'followUp' } | null {
   const i = card.history.findLastIndex((h) => isLoopStepEntry(h.what))
-  if (i < 0 || !card.history[i].what.startsWith('Posted a design')) return null
-  return card.history.slice(i + 1).some((h) => /^(Moved to\b|Returned for review\b|Review (passed|failed)\b)/.test(h.what)) ? null : card.history[i]
+  const posted = i < 0 ? null : /^Posted a (design|follow-up)\b/.exec(card.history[i].what)
+  if (!posted || card.history.slice(i + 1).some((h) => /^(Moved to\b|Returned for review\b|Review (passed|failed)\b)/.test(h.what))) return null
+  return { entry: card.history[i], step: posted[1] === 'design' ? 'design' : 'followUp' }
+}
+
+/** The design a card's builder posted for its reviewer's check (#1382) while it still waits (pendingStep); null when none waits. */
+export const pendingDesign = (card: Pick<TaskCard, 'history'>): TaskCard['history'][number] | null => {
+  const p = pendingStep(card)
+  return p?.step === 'design' ? p.entry : null
 }
 
 /** How long past its bound a design may wait before it is a stall: the builder's watch ends at the bound, and it goes ahead then. */
@@ -359,28 +370,36 @@ export function designDue(step: TaskCard['history'][number], boundMs: number): n
 }
 
 /**
- * Its builder waiting on a check of its design nobody gives (#1382, beside #1410's deadlock): the card in Doing, not
- * blocked, a design posted for its reviewer's check still waiting (pendingDesign), its check due (the deadline its line
- * kept when posted, else its post and `boundMs`: Card loops → Design check wait) a grace ago, and its builder only
- * watching it (its turn ended): it neither had an answer nor went ahead as posted. Counted from the design, never from
- * the builder's watch, so watching again doesn't restart it. On 21 Oct HB5 posted #1305's design in Doing; HR5's watch
- * counted only moves into Review, and the card sat six hours, unflagged. `ms`: how long since the design. Null otherwise.
+ * Its builder waiting on a check nobody gives (#1382, #1467, beside #1410's deadlock): not blocked, and its builder only
+ * watching it (its turn ended), while what it posted for its reviewer's check still waits (pendingStep):
+ * - a design, the card in Doing, its check due (the deadline its line kept when posted, else its post and `boundMs`:
+ *   Card loops → Design check wait) a grace ago: it neither had an answer nor went ahead as posted. On 21 Oct HB5 posted
+ *   #1305's design in Doing; HR5's watch counted only moves into Review, and the card sat six hours, unflagged.
+ * - a follow-up, the card in Review or Passed, for REVIEW_WAIT_STALL_MS (no going ahead: it waits for the check). On 22
+ *   Oct HB3 posted #1419's screenshot fixes on the card in Passed; HR3 watched for its move into Review, which never came.
+ * Counted from the post, never from the builder's watch, so watching again doesn't restart it. `ms`: how long since the
+ * post. Null otherwise.
  */
-export function loopStepWait<W extends { name: string; project: string; agentId: string; cards: number[]; status?: string }>(card: Pick<TaskCard, 'number' | 'column' | 'archived' | 'project' | 'agent' | 'blocked' | 'history'>, watchers: W[], boundMs: number, now = Date.now()): { builder: W; ms: number } | null {
-  if (card.archived || card.column !== 'doing' || card.blocked || !card.agent) return null
-  const step = pendingDesign(card)
-  if (!step) return null
+export function loopStepWait<W extends { name: string; project: string; agentId: string; cards: number[]; status?: string }>(card: Pick<TaskCard, 'number' | 'column' | 'archived' | 'project' | 'agent' | 'blocked' | 'history'>, watchers: W[], boundMs: number, now = Date.now()): { builder: W; ms: number; step: 'design' | 'followUp' } | null {
+  if (card.archived || card.blocked || !card.agent) return null
+  const p = pendingStep(card)
+  if (!p || (p.step === 'design' ? card.column !== 'doing' : card.column !== 'review' && card.column !== 'passed')) return null
   const builder = watchers.find((w) => w.project.toLowerCase() === card.project.toLowerCase() && w.agentId === card.agent && w.status === 'watching' && w.cards.includes(card.number))
-  const posted = Date.parse(step.at)
+  const posted = Date.parse(p.entry.at)
   if (!builder || !Number.isFinite(posted)) return null
-  return now >= designDue(step, boundMs) + LOOP_STEP_STALL_GRACE_MS ? { builder, ms: now - posted } : null
+  const due = p.step === 'design' ? designDue(p.entry, boundMs) + LOOP_STEP_STALL_GRACE_MS : posted + REVIEW_WAIT_STALL_MS
+  return now >= due ? { builder, ms: now - posted, step: p.step } : null
 }
 
-/** Why a card is stalled on a design nobody checks (loopStepWait), in the window's language with tr, else English. Null when it isn't. */
+/** Why a card is stalled on a design or follow-up nobody checks (loopStepWait), in the window's language with tr, else English. Null when it isn't. */
 export function loopStepWaitReason(card: Pick<TaskCard, 'number' | 'column' | 'archived' | 'project' | 'agent' | 'blocked' | 'history'>, watchers: { name: string; project: string; agentId: string; cards: number[]; status?: string; watchSince?: string }[], boundMs: number, now = Date.now(), tr?: Tr): string | null {
   const d = loopStepWait(card, watchers, boundMs, now)
   if (!d) return null
   const min = Math.round(d.ms / 60_000)
+  if (d.step === 'followUp') {
+    if (tr) return tr(msg({ id: 'board.stalled.followUpWait', defaultMessage: "{builder} posted a follow-up on {card} for its reviewer to check and has waited {waited}: nobody has answered it.", description: "Why a card in Review or Passed is stalled (#1467): in a card loop, its builder ({builder}, an agent's name) posted a follow-up for its reviewer to check (a change asked of reviewed work, such as a screenshot's), and is only waiting; no reviewer answered. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none; {waited} how long (\"40 min\", \"2 h 5 min\")." }), { builder: d.builder.name, card: cardLabel(card), waited: durationText(min * 60_000, tr) })
+    return `${d.builder.name} posted a follow-up on ${cardName(card)} for its reviewer to check and has waited ${minutesText(min)}: nobody has answered it (hive_loop_step ok or gaps).` // i18n-ignore: agent-facing (the Agent API's stalled)
+  }
   if (tr) return tr(msg({ id: 'board.stalled.loopStepWait', defaultMessage: "{builder} posted a design on {card} for its reviewer to check and has waited {waited}: nobody has answered it, and it hasn't gone ahead as posted.", description: "Why a card in Doing is stalled (#1382): in a card loop, its builder ({builder}, an agent's name) posted a design for its reviewer to check before building, and is only waiting; no reviewer answered, and the builder didn't go ahead once its wait (Card loops → Design check wait) was over. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none; {waited} how long (\"40 min\", \"2 h 5 min\")." }), { builder: d.builder.name, card: cardLabel(card), waited: durationText(min * 60_000, tr) })
   return `${d.builder.name} posted a design on ${cardName(card)} for its reviewer to check and has waited ${minutesText(min)}: nobody has answered it, and it hasn't gone ahead as posted (hive_loop_step proceed).` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
