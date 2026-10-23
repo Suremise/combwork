@@ -90,6 +90,15 @@ export const canTypeLine = (projectPath: string, agentId: string, need: Delivery
  */
 export interface LineFollow {
   confirming?: (before: { runId: string; count: number }) => void
+  /**
+   * Whether what the line rang for has been read since it was typed (#1514): the CLI took it, whether or not a prompt was
+   * seen. Codex takes a line typed while a turn runs (its compaction at a turn's start) as queued input, with no
+   * UserPromptSubmit: on 23 Oct RR2 read m157 eight seconds after it was typed, and Hive still pressed Enter again and
+   * marked the line not taken, which then blocked every prompt until the user pressed Enter on an empty composer.
+   */
+  read?: () => boolean
+  /** The deliveries the line rang for (its doorbell's ids): kept with a mark that it wasn't taken, which only their read clears. */
+  ids?: readonly string[]
   settled?: () => void
   taken?: () => void
   lost?: () => void
@@ -140,7 +149,7 @@ export async function confirmTaken(projectPath: string, agentId: string, before:
   follow?.confirming?.(before)
   confirmsRunning++
   try {
-    const r = await confirming(projectPath, agentId, before, line)
+    const r = await confirming(projectPath, agentId, before, line, follow?.read, follow?.ids)
     if (r === 'taken') follow?.taken?.()
     else if (r === 'gone') follow?.lost?.()
     else if (r === 'left') follow?.left?.()
@@ -155,15 +164,17 @@ let confirmsRunning = 0
 /** How many typed lines are being checked for being taken now: tests wait for none, after which no Enter comes. */
 export const confirmsInFlight = (): number => confirmsRunning
 
-async function confirming(projectPath: string, agentId: string, before: { runId: string; count: number }, line: string): Promise<'taken' | 'gone' | 'left' | false> {
+async function confirming(projectPath: string, agentId: string, before: { runId: string; count: number }, line: string, read?: () => boolean, ids: readonly string[] = []): Promise<'taken' | 'gone' | 'left' | false> {
   const t0 = Date.now()
   const taken = (): 'taken' | 'gone' | false => {
     const now = sessions.promptsTaken(projectPath, agentId)
     // Another launch (or none): what was typed has gone with the old one, untaken.
     if (!now || now.runId !== before.runId) return 'gone'
-    if (now.count <= before.count) return false
     // Each wake's outcome in the log (#430): typed (Woke …), taken and how soon, Enter again, not taken.
-    log.info(`The wake typed into ${userText(agentId)} was taken after ${Date.now() - t0} ms`)
+    if (now.count > before.count) log.info(`The wake typed into ${userText(agentId)} was taken after ${Date.now() - t0} ms`)
+    // What it rang for read with no prompt seen (#1514: Codex's queued input in a running turn): taken all the same.
+    else if (read?.()) log.info(`The wake typed into ${userText(agentId)} was taken after ${Date.now() - t0} ms: what it rang for was read, with no prompt seen`)
+    else return false
     return 'taken'
   }
   const waitTaken = async (): Promise<'taken' | 'gone' | false> => {
@@ -213,6 +224,6 @@ async function confirming(projectPath: string, agentId: string, before: { runId:
     log.warn(`The wake typed into ${userText(agentId)} still wasn't taken: it may be waiting in its prompt`)
   } else log.warn(`The wake typed into ${userText(agentId)} wasn't taken, and Enter couldn't be pressed again (busy, or the user typing there)`)
   // Shown in its pane, the user told once, and nothing more typed into it until it is taken (#430).
-  sessions.lineNotTaken(projectPath, agentId, before.runId, line, retried)
+  sessions.lineNotTaken(projectPath, agentId, before.runId, line, retried, ids)
   return false
 }
