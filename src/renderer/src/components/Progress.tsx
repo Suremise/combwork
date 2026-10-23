@@ -14,7 +14,7 @@ import { AssistantMark } from './AssistantMark'
 import { ProviderIcon } from './ProviderIcon'
 import { PaneResizer, usePaneSize } from './Resizer'
 import { useMergeSlots } from './MergeSlots'
-import { LanesSection } from './ProgressLanes'
+import { LanesSection, lanePair } from './ProgressLanes'
 import { MergeCards } from './ProgressMerge'
 import { MergesList, QueueAnnouncer, QueueLines } from './ProgressQueue'
 import { useLanes } from '../laneSource'
@@ -124,6 +124,16 @@ export function ProgressPanel() {
   const [runsFilter, setRunsFilter] = useState<RunsFilter>(NO_RUNS_FILTER)
   // Another workspace: its own filters, from none.
   useEffect(() => setRunsFilter(NO_RUNS_FILTER), [workspace?.path])
+  // The Runs tab asked for with a filter (#1446: what a lane waits for, from its row): shown, and the ask cleared.
+  const runsShow = useStore((s) => s.runsShow)
+  useEffect(() => {
+    if (!runsShow) return
+    setRunsFilter(runsShow)
+    setTab('runs')
+    set({ runsShow: null })
+    // setTab is made each render; the ask alone decides.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runsShow])
   const width = usePaneSize('progress', 280)
   // The run whose details are open.
   const [detail, setDetail] = useState<string | null>(null)
@@ -373,7 +383,7 @@ function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs
               <option value="">{tr(msg({ id: 'board.runs.anyLane', defaultMessage: 'Any lane', description: "A choice of the Progress panel's Runs tab filter by lane: runs of any card." }))}</option>
               {lanes.map((l) => (
                 <option key={l.id} value={l.id}>
-                  {l.reviewer ? `${l.builder.name} / ${l.reviewer.name}` : l.builder.name}
+                  {lanePair(l)}
                   {l.name ? ` · ${l.name}` : ''}
                 </option>
               ))}
@@ -591,6 +601,13 @@ function RunFor({ run: r }: { run: ProgressRun }) {
           <code>{shortRevision(r.revision)}</code>
         </button>
       )}
+      {/* A review or check copy's run (#1435, #1446): a check of that revision, in the copy, never the builder's slot. */}
+      {r.copy && r.source !== 'hive' && (
+        <span className="progress-run-copy">
+          {(card || r.revision) && <span aria-hidden="true"> · </span>}
+          {tr(msg({ id: 'board.progress.inCopy', defaultMessage: 'in {copy}', description: "Under a run's agent in the Progress panel, after its card and revision (\"AM-12 · a3f2c1d · in copy-2\"): the run ran in that review or check copy (a folder Hive keeps at exactly the card's revision). {copy} is its name, such as copy-2: keep it as it is." }), { copy: r.copy })}
+        </span>
+      )}
     </div>
   )
 }
@@ -658,6 +675,8 @@ const RecentRow = memo(function RecentRow({ run: r, now, open, onToggle }: { run
         </Tooltip>
         <DetailsToggle run={r} open={open} onToggle={onToggle} />
       </div>
+      {/* A check in a review or check copy (#1446): what it checked, "AM-12 · a3f2c1d · in copy-2", never the builder's slot. */}
+      {r.copy && r.source !== 'hive' && (r.card || r.revision) && <RunFor run={r} />}
       {open && <RunDetails run={r} now={now} />}
     </div>
   )

@@ -710,6 +710,15 @@ When agents work in pairs, a builder and a reviewer taking cards in turn (the **
 
 With no lanes and no merge going on, the panel is just the runs, as before.
 
+#### Slots, pools and copies in the Progress panel
+
+- **A lane's slot:** its row names the slot its builder works in, *HI-B1 / HI-R1 · slot-b* (or the builder's own worktree from before 1.0, *· hb2*). Click it for Version Control → **Branches & remotes**, where the project's slots are listed. Point at the row: its hover says whether the slot is ready or being prepared, since when the lane has had it, and the branch of the card being built there.
+- **A pool lane:** *HI-B1 / pool*. Its hover says who reviews the current card now and who gave its last verdict.
+- **A reviewer's or isolated check in a copy:** the run reads *AM-12 · a3f2c1d · in copy-2* under it: a check of that card's revision, not of the builder's slot. Its details name the copy and the folder it ran in.
+- **Hive setting up a slot or a copy** (its setup command, an install) is a run of **Hive (slot slot-b)** or **Hive (copy copy-1)**, each in the Runs tab's **Agent** filter.
+- **Waiting:** *waiting for a slot* and *waiting for a check copy* pause a lane; *waiting: preparing slot-b* doesn't. Click the reason to see what it waits for: the slots, or the runs.
+- A run's folder is where it ran, kept as it was, even after its agent moves to another slot.
+
 #### A reviewer pool
 
 Lanes can share their reviewers instead of each having its own. A project whose workflow option **Reviewers** is **A shared pool** (the **Team 6 + pool** template suggests it; until the Version Control tab has its row, ask the Hive Assistant to set it, `project.workflow.reviewerMode`) offers **The reviewer pool (HI-R1 and HI-R2)** in **Start Lane**'s reviewer list. Its agents are the project's reviewers and either-role agents. A lane started with it has no reviewer of its own, so only its builder starts, and its brief says the pool reviews its cards.

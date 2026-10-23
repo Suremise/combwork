@@ -336,6 +336,17 @@ describe('runs keep what they ran for (#1220)', () => {
     expect(runDetails(s.start(agent, { title: 'e2e' }), 'hive', 2000, tr).map((d) => d.label)).not.toContain('Card')
   })
 
+  // #1446: the folder it ran in is the run's own, kept as it ran, whatever its agent works in now.
+  it('its details show the folder it ran in, not where its agent is now', () => {
+    setLanguage('en', {})
+    const s = store()
+    const slotB = join(PROJECT, '..', 'slot-b')
+    const r: ProgressRun = s.start(agent, { title: 'unit tests' }, { card: 1061, folder: slotB })
+    // Its agent moved on to another slot since: the run's record keeps where it ran.
+    expect(runDetails(r, 'hive', 2000, tr)).toContainEqual({ label: 'Folder', text: slotB, code: true })
+    expect(runDetails(s.start(agent, { title: 'e2e' }), 'hive', 2000, tr).map((d) => d.label)).not.toContain('Folder')
+  })
+
   // #1273: what it was tested on, beside the card's revision, only when they differ.
   it('its details show what it was tested on when that is not the card\'s revision', () => {
     setLanguage('en', {})

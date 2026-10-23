@@ -164,6 +164,7 @@ interface HiveMessageValues {
   'board.details.countsAsCheck': { name: string | number }
   'board.details.ended': undefined
   'board.details.exitCode': undefined
+  'board.details.folder': undefined
   'board.details.gone': undefined
   'board.details.install': undefined
   'board.details.installAsWritten': undefined
@@ -439,9 +440,14 @@ interface HiveMessageValues {
   'board.lanes.none': undefined
   'board.lanes.oldRules': undefined
   'board.lanes.oldRulesTip': { enforced: string }
+  'board.lanes.poolLastVerdict': { name: string | number; pass: string }
   'board.lanes.poolPair': { builder: string | number }
+  'board.lanes.poolReviewing': { reviewing: string; name: string | number }
   'board.lanes.projectLink': { project: string | number }
   'board.lanes.show': undefined
+  'board.lanes.slotLine': { line: string | number }
+  'board.lanes.slotLink': { slot: string | number }
+  'board.lanes.slotTip': { state: string; carried: string; since: string | number }
   'board.lanes.stalled': undefined
   'board.lanes.start': undefined
   'board.lanes.state': { state: string }
@@ -451,6 +457,8 @@ interface HiveMessageValues {
   'board.lanes.usualOrderSaid': undefined
   'board.lanes.waitingForYou': { n: number }
   'board.lanes.waits': { reason: string; card: string | number; ask: string; agent: string | number }
+  'board.lanes.waitsLink': { why: string | number }
+  'board.lanes.waitsPreparing': { slot: string | number }
   'board.links.archivedTitle': { card: string | number; title: string | number; column: string | number }
   'board.links.title': { card: string | number; title: string | number; column: string | number }
   'board.menu.delete': undefined
@@ -508,6 +516,7 @@ interface HiveMessageValues {
   'board.progress.fold': undefined
   'board.progress.hideDetails': { run: string | number }
   'board.progress.hiveRun': undefined
+  'board.progress.inCopy': { copy: string | number }
   'board.progress.mergeQueue': undefined
   'board.progress.miniWaiting': { agent: string | number; run: string | number }
   'board.progress.moreOthers': { n: number }
