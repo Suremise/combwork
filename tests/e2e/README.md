@@ -175,10 +175,11 @@ for the build), and the e2e runner, `lib.cjs` and the scenario harness all take 
   or pointing at your own `~/.claude`, `~/.codex`, `~/.copilot` or `%APPDATA%\GitHub CLI` (however the path is spelled),
   and makes the empty ones. **Its git has the suite's global config** (#1466): `GIT_CONFIG_GLOBAL` is
   `<suite folder>\gitconfig` (`runContext.gitConfig`), which `lib.cjs` writes with the test identity (`Hive Test`,
-  `hive-test@example.invalid`, `lib.TEST_GIT_IDENTITY`), and `GIT_CONFIG_NOSYSTEM=1`, so your name and email never show
-  in its screens or commits, and the machine's git settings (Git for Windows' `core.autocrlf`, `init.defaultBranch`)
-  don't apply. A suite that needs no identity, or another, gives its Hive a `GIT_CONFIG_GLOBAL` of its own (`gitinit`,
-  `p5scenarios`); `lib.cjs` refuses one missing or pointing at your own `~/.gitconfig`.
+  `hive-test@example.invalid`, `lib.TEST_GIT_IDENTITY`), so your name and email never show in its screens or commits.
+  The system config stays: the suites' own git reads it too, and a Hive whose git hadn't Git for Windows'
+  `core.autocrlf` took their CRLF checkouts for uncommitted changes. A suite that needs no identity, or another, gives
+  its Hive a `GIT_CONFIG_GLOBAL` of its own (`gitinit`, `p5scenarios`, with `GIT_CONFIG_NOSYSTEM`); `lib.cjs` refuses
+  one missing or pointing at your own `~/.gitconfig`.
 - **The build, once per worktree** (`build.mjs`): runners started at the same time in one worktree share its `out/`,
   so the first that finds it stale takes the worktree's build lock (`%LOCALAPPDATA%\hive-test\build-locks`, a folder
   per worktree with its holder's process id), looks again, builds once and stamps it; the others wait (`Waited for

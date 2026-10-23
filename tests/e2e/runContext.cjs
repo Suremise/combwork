@@ -203,8 +203,10 @@ function isUserCliHome(dir, parent = process.env) {
  * text, and dates and numbers format the same on any Windows; `vars` can set another language); its trash folder (HIVE_TEST_TRASH_DIR: the suite's, #414, so it
  * never uses the user's Recycle Bin); the CLI homes (CLAUDE_CONFIG_DIR, CODEX_HOME, COPILOT_HOME, GH_CONFIG_DIR: empty
  * folders of the suite's, cliHomes, #382, #452, so it never reads the user's); its git's global config (GIT_CONFIG_GLOBAL:
- * the work folder's, with the test identity, gitConfig, #1466) and no system config (GIT_CONFIG_NOSYSTEM), so its git
- * never reads the user's ~/.gitconfig or the machine's settings; the suite's Agent API port from its runner
+ * the work folder's, with the test identity, gitConfig, #1466), so its git never reads the user's ~/.gitconfig; the
+ * system config stays (Git for Windows' core.autocrlf, init.defaultBranch): the suites' own git reads it too, and a
+ * test Hive whose git didn't took their CRLF checkouts for uncommitted changes (#1466 round 2); its identity, if any,
+ * is the global one's under the test identity; the suite's Agent API port from its runner
  * (HIVE_E2E_PORT), and the CARRIED variables; then `vars` (its profile, HIVE_USER_DATA, always; a port, test CLI homes,
  * test hooks), where undefined removes one (lib.cjs refuses to start a test Hive without each home or a global git config).
  */
@@ -216,7 +218,6 @@ function hiveEnv(vars = {}, parent = process.env) {
   env.HIVE_TEST_TRASH_DIR = trashDir(parent)
   Object.assign(env, cliHomes(parent))
   env.GIT_CONFIG_GLOBAL = gitConfig(parent)
-  env.GIT_CONFIG_NOSYSTEM = '1'
   if (parent.HIVE_E2E_PORT) env.HIVE_API_PORT = parent.HIVE_E2E_PORT
   Object.assign(env, pick(parent, CARRIED))
   apply(env, vars)

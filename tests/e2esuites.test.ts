@@ -1747,8 +1747,11 @@ describe('the run context: what a test starts gets only the allowlist and its ow
 
   it("every test copy of Hive's git has the suite's global config, with a test identity, never the user's ~/.gitconfig (#1466)", () => {
     const suite = ctx.suiteEnv({ name: 'gitview', port: 47961, work: 'C:\\lanes\\1\\gitview', runDir: 'C:\\lanes\\1\\gitview' }, parent)
-    // The suite's, whatever the shell had; no system config; a suite may give its own.
-    expect(ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p' }, { ...suite, GIT_CONFIG_GLOBAL: 'C:\\Users\\t\\.gitconfig', GIT_CONFIG_NOSYSTEM: '0' })).toMatchObject({ GIT_CONFIG_GLOBAL: 'C:\\lanes\\1\\gitview\\gitconfig', GIT_CONFIG_NOSYSTEM: '1' })
+    // The suite's, whatever the shell had; the system config as the suites' own git has it (round 2: their CRLF
+    // checkouts otherwise looked changed to Hive); a suite may give its own.
+    const fromShell = ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p' }, { ...suite, GIT_CONFIG_GLOBAL: 'C:\\Users\\t\\.gitconfig', GIT_CONFIG_NOSYSTEM: '1' })
+    expect(fromShell.GIT_CONFIG_GLOBAL).toBe('C:\\lanes\\1\\gitview\\gitconfig')
+    expect(has(fromShell, 'GIT_CONFIG_NOSYSTEM')).toBe(false)
     expect(ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p' }, parent).GIT_CONFIG_GLOBAL).toBe(join(ctx.WORK, 'gitconfig'))
     expect(ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p', GIT_CONFIG_GLOBAL: 'C:\\w\\empty.gitconfig' }, suite).GIT_CONFIG_GLOBAL).toBe('C:\\w\\empty.gitconfig')
     for (const k of ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM']) expect(has(ctx.childEnv({}, suite), k), k).toBe(false)
