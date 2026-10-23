@@ -160,6 +160,8 @@
   "service.providers.task": "{task, select, install {Instalacja {cli}} update {Aktualizacja {cli}} login {Logowanie do {cli}} other {Konfiguracja {cli}}}",
   "service.providers.taskDone": "{task}: zakończono",
   "service.providers.taskFailed": "{task}: zakończono z kodem {code}",
+  "service.templates.v09": "Szablony w 1.0 nie przypisują agentów do worktree. Zastępują je szablony Hive; {n, plural, one {plik jest przechowywany} few {# pliki są przechowywane} many {# plików jest przechowywanych} other {# pliku jest przechowywane}} razem z kopią zapasową tablicy z 0.9.",
+  "service.templates.v09Title": "Twoje szablony agentów z 0.9 zostały odłożone",
   "service.transcripts.busy": "Ta sesja jest właśnie archiwizowana lub usuwana. Spróbuj ponownie za chwilę.",
   "service.transcripts.exported": "{session} · wyeksportowano z Hive {date}",
   "service.transcripts.imageNotKept": "Obraz nie jest zapisany w transkrypcji",

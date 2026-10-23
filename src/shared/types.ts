@@ -7,7 +7,7 @@ import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActi
 import type { AttachmentKind } from './attachments'
 import type { StartFailure } from './startFailure'
 import type { TipsState } from './tips'
-import type { TemplateAgent, TemplateScope } from './templates'
+import type { SuggestedPreset, TemplateAgent, TemplateScope } from './templates'
 import type { KeepAwakeSetting } from './keepAwake'
 import type { DateFormat, TimeFormat } from './dates'
 import type { ProjectPref } from './uiPrefs'
@@ -20,7 +20,7 @@ import type { PlatformId, ProjectPlatform } from './platform/descriptors'
 import type { SwitchRefusal } from './platform/switching'
 import type { Contradiction, NOT_OFFERED, PresetId, PresetNeeds, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
-import type { WorkflowRole } from './workflow/roles'
+import type { ReviewerMode, WorkflowRole } from './workflow/roles'
 import type { StageNameProblem } from './workflow/stages'
 import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
@@ -1263,6 +1263,11 @@ export interface AgentDef {
   /** Which side of the workflow it takes (#1430); unset, the guess from its note or name (`agentWorkflowRole`). */
   workflowRole?: WorkflowRole
   /**
+   * The agent it is paired with (#1436): a builder's reviewer, or a reviewer's builder, by name, as a template's `pairs`
+   * made it. Start Lane fills in a builder's reviewer from it (#1443).
+   */
+  pairedWith?: string
+  /**
    * Only these of the project's MCP servers (#537, shared/agentMcp.ts), saved in templates; absent: all of them. The
    * built-in hive server is given whatever this says.
    */
@@ -1273,18 +1278,6 @@ export interface AgentDef {
 export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'model' | 'effort' | 'permissionMode' | 'mode' | 'role'>> & { use200kContext?: boolean | null; mcpServers?: string[] | null; workflowRole?: WorkflowRole | null }
 
 /** What loading a template into a project would do (#126), and what stops it now. */
-/**
- * What happened to an old worktree the user chose to remove with a template's load (#289, #313): `removed` (the folder
- * went), and `branchKept` when its branch stayed all the same (a ref moved in the last step); `why` it was kept, or why
- * the branch was.
- */
-export interface OldWorktreeOutcome {
-  branch: string
-  removed: boolean
-  branchKept?: true
-  why?: string
-}
-
 export interface TemplateLoadPlan {
   scope: TemplateScope
   file: string
@@ -1292,27 +1285,27 @@ export interface TemplateLoadPlan {
   layout: PageLayout
   /** The project's agents, all removed: running ones and uncommitted worktree work block the load. */
   remove: { id: string; name: string; running: boolean; dirty: number; worktree?: { path: string; branch: string } }[]
-  /** The agents it creates, with the names chosen in the dialog (#702) when it gave some. */
+  /**
+   * The agents it creates, with the names chosen in the dialog (#702) when it gave some, its patterns expanded with the
+   * project's key (#1123 names), and the provider each runs (another than the template's when that one can't run here:
+   * `swaps`). Each works in the project folder (#1436): where an agent works is the card's or lane's, not the template's.
+   */
   create: TemplateAgent[]
-  /** The template's own names for them, by `create`'s order: what a prefix goes in front of (#702). */
+  /** The template's own names for them, by `create`'s order, expanded with the project's key: what a prefix goes in front of (#702). */
   templateNames: string[]
   /** Created names another project's agent has (#702): the load is refused until they are renamed. */
   taken: { name: string; project: string }[]
+  /** Builders and their reviewers among `create`, by their indexes (#1436): kept as the agents' `pairedWith`. */
+  pairs: { builder: number; reviewer: number }[]
   /**
-   * Where each created agent's worktree is (#268), by `create`'s order: a branch in this project's repository and a folder
-   * in its worktree location; null for an agent in the project folder. `reuse`: a clean worktree of that name it works in
-   * again, its branch left as it is (#289); else a new one, with `notReused` saying why the one of that name can't be.
+   * Hive's own templates only (#1436): an agent whose provider can't run here (off or not installed) runs another that
+   * can, said on its row; by `create`'s index. A template of the workspace's or a project's is refused instead (`missing`).
    */
-  worktrees: ({ branch: string; path: string; base: string; reuse?: true; notReused?: string } | null)[]
-  /**
-   * The removed agents' worktrees no created agent works in again (#289): `removable` when merged into the main branch
-   * (`mergedInto`) and clean (`worktreeCheck`), which the load can remove with their branches if asked; else kept, `why`.
-   */
-  oldWorktrees: { agent: string; path: string; branch: string; removable: boolean; why?: string }[]
-  /** The main branch the old worktrees were checked against: a removal is refused if it is another by then. */
-  mergedInto: string | null
-  /** The project's worktree setup command, which each new worktree runs before its agent first starts (null: none). */
-  setup: string | null
+  swaps: { index: number; from: ProviderId; to: ProviderId; problem: 'off' | 'notInstalled' }[]
+  /** The preset it suggests (#1436), when the project's options didn't start from it: the dialog offers to switch. */
+  suggestedPreset: SuggestedPreset | null
+  /** G17's choice it suggests (#1436), offered once the Workflow section has it (#1443, #1445); never written by the load. */
+  reviewerMode: ReviewerMode | null
   /** Providers the template needs that are off or not installed, and which of its agents need each. */
   missing: { provider: ProviderId; reason: string; agents: string[]; problem?: 'unknown' | 'off' | 'notInstalled' }[]
   /** Why it can't be loaded now (empty: it can). */

@@ -863,10 +863,6 @@
     "defaultMessage": "Could not read the template",
     "description": "An error's title: reading a template failed."
   },
-  "actions.template.removeOld": {
-    "defaultMessage": "{n, plural, one {Also remove the old worktree and its branch} other {Also remove # old worktrees and their branches}} (merged into {into, select, none {the main branch} other {{into}}} and clean): {branches}",
-    "description": "A tick box when loading a template: also delete the replaced agents' {n} worktrees and branches that are merged into a branch ({into}; none when it isn't known) and have no changes. {branches} lists them."
-  },
   "actions.template.replace": {
     "defaultMessage": "Replace",
     "description": "Button: replaces the template of that name."
@@ -883,14 +879,6 @@
     "defaultMessage": "Replace the template?",
     "description": "Title of the question when a template of that name exists."
   },
-  "actions.template.reusedMessage": {
-    "defaultMessage": "{branch} in {path}: it was clean, and its branch is left as it is.",
-    "description": "Under the notification that an agent works in its old worktree again: its branch ({branch}) and folder ({path})."
-  },
-  "actions.template.reusedTitle": {
-    "defaultMessage": "{agent} works in its worktree again",
-    "description": "A notification's title: an agent added from a template ({agent}) works in the clean worktree it had before."
-  },
   "actions.template.save": {
     "defaultMessage": "Save",
     "description": "Button: saves the template."
@@ -900,8 +888,8 @@
     "description": "An error's title: saving a template failed."
   },
   "actions.template.saveMessage": {
-    "defaultMessage": "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings and roles) and its layout, to load into any project later. Sessions and worktrees aren't saved.",
-    "description": "The Save as Template dialog: what a template keeps of the project's {n} agents."
+    "defaultMessage": "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings, roles and notes), its layout and its preset, to load into any project later. Sessions and worktrees aren't saved.",
+    "description": "The Save as Template dialog: what a template keeps of the project's {n} agents. Glossary: preset."
   },
   "actions.template.saveTitle": {
     "defaultMessage": "Save as template",
@@ -914,6 +902,10 @@
   "actions.template.savedMessage": {
     "defaultMessage": "\"{name}\" ({n, plural, one {# agent} other {# agents}}), for {scope, select, workspace {the workspace} other {this project}}.",
     "description": "Under the notification that a template ({name}) of {n} agents was saved for the workspace (workspace) or this project (other)."
+  },
+  "actions.template.switchPreset": {
+    "defaultMessage": "Also switch this project to {preset}… (opens Version Control → Workflow with it chosen, to save there)",
+    "description": "A tick box when loading a template that suggests a preset ({preset}: Solo, Pair or Team, as the presets are named): after loading, the project's Version Control tab opens at Workflow with that preset chosen but not saved. Glossary: preset."
   },
   "actions.unsaved.changedMessage": {
     "defaultMessage": "Save them, then {action, select, switch {switch workspace} close {close the workspace} other {reload the window}} again.",

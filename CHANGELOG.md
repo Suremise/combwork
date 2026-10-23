@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Agent templates for 1.0, and Hive's own.** A template now keeps each agent's role in the workflow (builder, reviewer or either), its note, which builder and reviewer are paired, and the preset it suits; never a worktree, since where an agent works is its card's. Hive comes with six ready-made templates in the Templates view's **Hive** group: Solo, Pair, Pair: one provider, Team 3×3, Team 6×6 and Team 6 + pool, named from the project's key (HI-B1, HI-R1…), on another coding agent when one isn't installed. Loading one offers to switch the project to its preset in Version Control → Workflow. **Your 0.9 templates can't be loaded in 1.0**: at the upgrade they're moved into the 0.9 board backup's folder (Help → Restore the 0.9 Board Backup puts them back for 0.9.3), and importing one is refused; save your agents as a template again. (#1436)
+
 - **Role in the workflow** for each agent: Builder, Reviewer or Either, in Add Agent and Agent Settings. Start Lane offers builders and reviewers by it, and the project's agents table shows it. Agents from before 1.0 read as their names suggest (HR1 is a reviewer); the free-text role is now the agent's Note. (#1430)
 
 - **Slots, the start.** Hive now keeps a pool of worktrees per project, *slots*, to lend to a card or a lane and get back when it ends, set up by the project's setup command as Hive's own runs (*Hive (slot slot-b)* in the Progress panel) and removed when idle only if nothing would be lost (Settings → Advanced, **Remove idle slots after a day**). Nothing lends them yet: cards start on slots in a later update (#1429).

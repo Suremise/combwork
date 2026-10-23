@@ -160,6 +160,8 @@
   "service.providers.task": "{task, select, install {{cli} 安装} update {{cli} 更新} login {{cli} 登录} other {{cli} 配置}}",
   "service.providers.taskDone": "{task}已完成",
   "service.providers.taskFailed": "{task}已退出，退出码 {code}",
+  "service.templates.v09": "1.0 的模板不会把智能体固定到工作树。改用 Hive 自带的模板；{n, plural, other {这 # 个文件}}与 0.9 看板备份保存在一起。",
+  "service.templates.v09Title": "你的 0.9 智能体模板已被移到一旁",
   "service.transcripts.busy": "此会话正在归档或删除。请稍后重试。",
   "service.transcripts.exported": "{session} · {date} 从 Hive 导出",
   "service.transcripts.imageNotKept": "会话记录中未保存此图片",

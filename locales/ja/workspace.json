@@ -471,8 +471,6 @@
   "workspace.unused.commitsNoBranch": "どのブランチにもないコミット{count, plural, other {#件}}",
   "workspace.unused.commitsNotOn": "{known, select, yes {{into}} other {メインブランチ}}にないコミット{count, plural, other {#件}}",
   "workspace.unused.detached": "（detached）",
-  "workspace.unused.hintDetail": "テンプレートのワークツリーエージェントが作業していたワークツリーです。テンプレートを削除しても、そのまま残っています。「変更」で確認してください。",
-  "workspace.unused.hintTitle": "{many, select, yes {{projects, plural, other {#個のプロジェクト}}} other {{project}}}に未使用のワークツリーが{count, plural, other {#個}}あります",
   "workspace.unused.lostCommits": "{known, select, yes {{into}} other {ほかのどのブランチ}}にもない{branch}のコミット{count, plural, other {#件}}",
   "workspace.unused.lostDetached": "{count, plural, other {どのブランチにもないコミット#件（detached HEADにだけあります）}}",
   "workspace.unused.lostFiles": "{path}内の未コミットのファイル{count, plural, other {#件}}",

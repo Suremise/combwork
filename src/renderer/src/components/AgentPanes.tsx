@@ -11,7 +11,9 @@ import { SESSION_LAYOUTS, agentLimitText, agentsPerPage, compactThreshold, conte
 import { cellPage, cellPageCount, neighbourCell, pageCells, pageIds, type CellDirection } from '@shared/paneCells'
 import { agentLimit, useAgentLimit } from '../advanced'
 import type { AgentInfo, LiveSessionState, PageLayout, ProjectInfo, SessionLayout, SessionListItem, SessionUsage, SessionView } from '@shared/types'
-import { TEMPLATE_SCOPES, shownProblem, type TemplateEntry } from '@shared/templates'
+import { namesKey, shownProblem, templateAgentNames, type TemplateEntry, type TemplateScope } from '@shared/templates'
+import { templateTitle } from '@shared/templateDefaults'
+import { WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
 import type { StartFailure } from '@shared/startFailure'
 import type { AgentLeftovers } from '@shared/agentProcesses'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
@@ -679,13 +681,15 @@ const templateList = (path: string): Promise<TemplateEntry[] | null> =>
 function addFromTemplateItems(project: ProjectInfo, list: TemplateEntry[]): MenuEntry[] {
   const all = list.filter((t) => !t.problem)
   const full = project.agents.length >= agentLimit()
+  // Their names as this project's (#1123 names: Hive's own are patterns of its key, HI-B1).
+  const key = namesKey(get().projectKeys.find((k) => k.projectPath.toLowerCase() === project.path.toLowerCase())?.key, project.name)
   return all.length
     ? all.flatMap((t) => [
-        { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, workspace {workspace} other {this project}}', description: 'A heading in Add Agent from Template: the template\'s name ({template}) and where it is kept (lower case).' }), { template: t.name, scope: t.scope }) },
+        { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, hive {Hive} workspace {workspace} other {this project}}', description: "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Hive: one of Hive's own templates, #1436)." }), { template: templateTitle(t), scope: t.scope }) },
         ...t.agents.map((a, i) => ({
-          label: a.name,
+          label: templateAgentNames(t.agents, key)[i],
           icon: 'person-add',
-          detail: [a.role, providerName(a.provider), a.worktree ? tr(msg({ id: 'panes.template.ownWorktree', defaultMessage: 'own worktree', description: "A template agent's detail (Add Agent from Template): it works in its own worktree. Lower case." })) : ''].filter(Boolean).join(' · '),
+          detail: [tr(WORKFLOW_ROLE_TEXT[a.role].name), a.note ?? '', providerName(a.provider)].filter(Boolean).join(' · '),
           disabled: full,
           onClick: () => void actions.addAgentFromTemplate(project.path, t, i)
         }))
@@ -696,12 +700,12 @@ function addFromTemplateItems(project: ProjectInfo, list: TemplateEntry[]): Menu
 /** + Add ▾ → Templates: Save Template…, then the templates to load, by scope (loading replaces the agents, after saying who goes and who comes). */
 function templateMenuItems(project: ProjectInfo, all: TemplateEntry[]): MenuEntry[] {
   const load: MenuEntry[] = all.length
-    ? TEMPLATE_SCOPES.flatMap((scope) => {
+    ? (['hive', 'workspace', 'project'] satisfies TemplateScope[]).flatMap((scope) => {
         const here = all.filter((t) => t.scope === scope)
         return here.length
           ? [
-              { header: true, label: tr(msg({ id: 'panes.template.scopeHeading', defaultMessage: "{scope, select, workspace {Workspace templates} other {This project's templates}}", description: "A heading in + Add ▾ → Templates above the templates kept in the workspace, or in this project." }), { scope }) },
-              ...here.map((t) => ({ label: t.name, icon: 'library', detail: shownProblem(t) ?? tr(msg({ id: 'panes.template.detail', defaultMessage: '{n, plural, one {# agent} other {# agents}} · {layout}', description: "A template's detail in + Add ▾ → Templates: how many agents it has and its layout ({layout}: \"two columns\")." }), { n: t.agents.length, layout: layoutName(t.layout) }), disabled: !!t.problem, onClick: () => void actions.loadTemplate(project.path, t) }))
+              { header: true, label: tr(msg({ id: 'panes.template.scopeHeading', defaultMessage: "{scope, select, hive {Hive's templates} workspace {Workspace templates} other {This project's templates}}", description: "A heading in + Add ▾ → Templates above Hive's own templates (#1436), those kept in the workspace, or in this project." }), { scope }) },
+              ...here.map((t) => ({ label: templateTitle(t), icon: 'library', detail: shownProblem(t) ?? tr(msg({ id: 'panes.template.detail', defaultMessage: '{n, plural, one {# agent} other {# agents}} · {layout}', description: "A template's detail in + Add ▾ → Templates: how many agents it has and its layout ({layout}: \"two columns\")." }), { n: t.agents.length, layout: layoutName(t.layout) }), disabled: !!t.problem, onClick: () => void actions.loadTemplate(project.path, t) }))
             ]
           : []
       })

@@ -692,8 +692,8 @@
     "description": "A template's detail in + Add ▾ → Templates: how many agents it has and its layout ({layout}: \"two columns\")."
   },
   "panes.template.heading": {
-    "defaultMessage": "{template} · {scope, select, workspace {workspace} other {this project}}",
-    "description": "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case)."
+    "defaultMessage": "{template} · {scope, select, hive {Hive} workspace {workspace} other {this project}}",
+    "description": "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Hive: one of Hive's own templates, #1436)."
   },
   "panes.template.layout": {
     "defaultMessage": "{layout, select, auto {automatic layout} single {one at a time} columns2 {two columns} columns3 {three columns} grid {grid of four} grid6 {grid of six} other {{layout}}}",
@@ -711,17 +711,13 @@
     "defaultMessage": "No templates yet: + Add ▾ → Templates → Save Template… first",
     "description": "Add Agent from Template with no template: how to save one first. \"+ Add ▾\" is the session toolbar's button, \"Templates\" its menu item and \"Save Template…\" the item of that menu: use their translations."
   },
-  "panes.template.ownWorktree": {
-    "defaultMessage": "own worktree",
-    "description": "A template agent's detail (Add Agent from Template): it works in its own worktree. Lower case."
-  },
   "panes.template.save": {
     "defaultMessage": "Save Template…",
     "description": "Menu item (+ Add ▾ → Templates): saves this project's agents and layout as a template."
   },
   "panes.template.scopeHeading": {
-    "defaultMessage": "{scope, select, workspace {Workspace templates} other {This project's templates}}",
-    "description": "A heading in + Add ▾ → Templates above the templates kept in the workspace, or in this project."
+    "defaultMessage": "{scope, select, hive {Hive's templates} workspace {Workspace templates} other {This project's templates}}",
+    "description": "A heading in + Add ▾ → Templates above Hive's own templates (#1436), those kept in the workspace, or in this project."
   },
   "panes.terminal.exited": {
     "defaultMessage": "process exited with code {code}",

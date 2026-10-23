@@ -69,23 +69,19 @@ interface HiveMessageValues {
   'content.skill.zipUnsafe': { path: string | number }
   'content.templates.agentGone': undefined
   'content.templates.bullet': { item: string | number }
-  'content.templates.cantCheck': { branch: string | number; error: string | number }
   'content.templates.cantLoad': undefined
   'content.templates.cantUse': { name: string | number; problem: string | number }
   'content.templates.changedSince': undefined
   'content.templates.changedWhile': undefined
   'content.templates.checkFailed': { agent: string | number; folder: string | number; error: string | number }
-  'content.templates.dirty': { branch: string | number; n: number }
   'content.templates.editedMeanwhile': { name: string | number }
   'content.templates.enterName': undefined
   'content.templates.failed': { error: string | number }
   'content.templates.fenced': undefined
-  'content.templates.gitBroken': { problem: string | number; count: number; names: string | number }
   'content.templates.gone': undefined
+  'content.templates.hiveOnly': undefined
   'content.templates.importNotJson': undefined
   'content.templates.importTooLarge': { kb: string | number }
-  'content.templates.inUse': { branch: string | number }
-  'content.templates.inUseNow': undefined
   'content.templates.loading': undefined
   'content.templates.nameEach': undefined
   'content.templates.nameEachTooLong': { max: string | number }
@@ -95,20 +91,12 @@ interface HiveMessageValues {
   'content.templates.neededBy': { problem: string; provider: string | number; agents: string | number }
   'content.templates.needsIt': { problem: string; provider: string | number; agent: string | number }
   'content.templates.noAgents': undefined
-  'content.templates.noBranch': { branch: string | number }
   'content.templates.noFile': undefined
   'content.templates.noWorkspace': undefined
-  'content.templates.notChecked': undefined
-  'content.templates.notListed': { folder: string | number }
-  'content.templates.notOnBranch': { project: string | number; count: number; names: string | number }
-  'content.templates.notRepo': { project: string | number; count: number; names: string | number }
   'content.templates.nothing': { problem: string | number }
-  'content.templates.otherBranch': { current: string | number; branch: string | number }
   'content.templates.provider': { problem: string; provider: string | number }
-  'content.templates.removing': undefined
   'content.templates.running': { agent: string | number }
   'content.templates.scope': { scope: string | number }
-  'content.templates.several': { branches: string | number }
   'content.templates.started': undefined
   'content.templates.taken': { names: string | number; count: number; projects: string | number }
   'content.templates.takenNothing': { names: string | number; count: number; projects: string | number }

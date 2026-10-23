@@ -254,10 +254,18 @@ async function retryTemplates(ctx) {
   await shown(ctx, ctx.page.locator('.sidebar .template-row'), 'the templates')
 }
 
-/** The Templates view, a template selected: what it holds. */
+/** The Templates view, one of Hive's own selected (#1436): Team 3×3, its roles and pairs, read-only. */
+async function hiveTemplates(ctx) {
+  await showView(ctx, 'view.templates', '.sidebar .template-row')
+  await (await shown(ctx, ctx.page.locator('.sidebar .template-row[data-scope="hive"]'), "Hive's templates")).nth(3).click()
+  await shown(ctx, ctx.page.locator('.template-detail[data-scope="hive"] .template-agents'), "one of Hive's templates")
+  return windowShot()
+}
+
+/** The Templates view, a template selected: what it holds (the workspace's: Hive's own are listed first). */
 async function templates(ctx) {
   await showView(ctx, 'view.templates', '.sidebar .template-row')
-  await (await shown(ctx, ctx.page.locator('.sidebar .template-row'), 'the templates')).first().click()
+  await (await shown(ctx, ctx.page.locator('.sidebar .template-row[data-scope="workspace"]'), 'the templates')).first().click()
   await shown(ctx, ctx.page.locator('.template-detail .template-agents'), 'the template')
   return windowShot()
 }
@@ -325,6 +333,7 @@ module.exports = {
     { name: 'project-menu', open: projectMenu, close: closeMenu },
     { name: 'projects-rail', open: projectsRail, close: expandRail },
     { name: 'templates-failed', open: templatesFailed, close: retryTemplates },
+    { name: 'templates-hive', open: hiveTemplates },
     { name: 'templates', open: templates },
     { name: 'template-editor', open: templateEditor, close: closeEditor },
     { name: 'template-load', open: templateLoad, close: cancelDialog },

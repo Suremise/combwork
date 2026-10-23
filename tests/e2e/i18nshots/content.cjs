@@ -82,9 +82,10 @@ async function closeMcpError(ctx) {
  */
 async function templateBlocked(ctx) {
   fs.mkdirSync(path.dirname(templateFile(ctx)), { recursive: true })
-  fs.writeFileSync(templateFile(ctx), JSON.stringify({ version: 1, name: 'Aardvark', savedAt: '', layout: 'auto', agents: [{ name: 'Gem', provider: 'gemini', worktree: false }] }, null, 2))
+  fs.writeFileSync(templateFile(ctx), JSON.stringify({ version: 2, name: 'Aardvark', savedAt: '', layout: 'auto', agents: [{ name: 'Gem', role: 'builder', provider: 'gemini' }] }, null, 2))
   await showView(ctx, 'view.templates', '.sidebar .template-row')
-  const rows = ctx.page.locator('.sidebar .template-row')
+  // The workspace's (Hive's own are listed first, #1436).
+  const rows = ctx.page.locator('.sidebar .template-row[data-scope="workspace"]')
   // Until the new one is there, first by name (its name is the template's, in any language).
   const first = async () => (await rows.count()) > 0 && (await rows.first().getAttribute('aria-label')) === 'Aardvark'
   if (!(await ctx.lib.until(async () => (await first()) || (await iconButton(ctx, '.sidebar .pane-header', 'refresh').click({ timeout: 2000 }).then(() => false, () => false)), ctx.hungMs))) throw new Error('the template did not show')

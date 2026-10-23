@@ -12,9 +12,10 @@ import { shownText } from '@shared/advanced'
 import { fmt, tr } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
 import { HAND_OVER_TEXT } from '@shared/handOver'
-import type { McpServerInfo, OldWorktreeOutcome, ProjectInfo, ProjectProviderConfig, ProviderId, SessionLayout, SessionListItem, SessionView, ToastAction } from '@shared/types'
+import type { McpServerInfo, ProjectInfo, ProjectProviderConfig, ProviderId, SessionLayout, SessionListItem, SessionView, ToastAction } from '@shared/types'
 import { TEMPLATE_NAME_MAX, type TemplateEntry, type TemplateScope } from '@shared/templates'
-import { oldWorktreesNotice, templateLoadDetail } from '@shared/templateLoad'
+import { templateLoadDetail } from '@shared/templateLoad'
+import { PRESET_TEXT } from '@shared/workflow/optionTexts'
 import { formatTokens, type SessionAction } from './util'
 import { movesShown } from './pendingMoves'
 import { createElement } from 'react'
@@ -1115,7 +1116,7 @@ export async function saveTemplate(path: string): Promise<void> {
   let workspaceScope = false
   const name = await prompt({
     title: tr(msg({ id: 'actions.template.saveTitle', defaultMessage: 'Save as template', description: 'Title of the Save as Template dialog.' })),
-    message: tr(msg({ id: 'actions.template.saveMessage', defaultMessage: "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings and roles) and its layout, to load into any project later. Sessions and worktrees aren't saved.", description: "The Save as Template dialog: what a template keeps of the project's {n} agents." }), { n: p.agents.length }),
+    message: tr(msg({ id: 'actions.template.saveMessage', defaultMessage: "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings, roles and notes), its layout and its preset, to load into any project later. Sessions and worktrees aren't saved.", description: "The Save as Template dialog: what a template keeps of the project's {n} agents. Glossary: preset." }), { n: p.agents.length }),
     placeholder: tr(msg({ id: 'actions.template.namePlaceholder', defaultMessage: 'Template name', description: "Placeholder of the Save as Template dialog's name box." })),
     confirmLabel: tr(msg({ id: 'actions.template.save', defaultMessage: 'Save', description: 'Button: saves the template.' })),
     validate: (v) => (!v.trim() ? tr(msg({ id: 'actions.template.nameEmpty', defaultMessage: 'Enter a name.', description: "Why a template's name can't be used: it is empty." })) : v.trim().length > TEMPLATE_NAME_MAX ? tr(msg({ id: 'actions.template.nameTooLong', defaultMessage: 'At most {max} characters.', description: "Why a template's name can't be used: it is longer than {max} characters." }), { max: TEMPLATE_NAME_MAX }) : null),
@@ -1143,7 +1144,9 @@ export async function saveTemplate(path: string): Promise<void> {
  * Loads a template into a project: it replaces every agent, so it says first who goes and who comes. Refused, saying
  * why, while an agent runs, a worktree has uncommitted work or a provider it needs is off or not installed (with a way
  * into Agent Setup or Settings). `from`: the project a project's template is kept in, when it isn't this one (the Templates
- * view loads any template into any project).
+ * view loads any template into any project). A preset it suggests that the project's options didn't start from is
+ * offered (#1436): ticked, the Version Control tab's Workflow section opens with it chosen, not saved, so what it changes
+ * shows before anything is.
  */
 export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'scope' | 'file' | 'name'>, from?: string): Promise<void> {
   const plan = await attempt(tr(msg({ id: 'actions.template.readFailed', defaultMessage: 'Could not read the template', description: "An error's title: reading a template failed." })), () => call('templates:plan', path, entry.scope, entry.file, from))
@@ -1168,9 +1171,8 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
   const expected = p.agents.map((a) => a.id)
   // The names its agents get (#702): chosen in the dialog, which greys out its button while one clashes.
   let names = plan.create.map((a) => a.name)
-  const removable = plan.oldWorktrees.filter((w) => w.removable)
-  let removeOld = false
-  let result: { oldWorktrees: OldWorktreeOutcome[] } | undefined
+  const suggested = plan.suggestedPreset
+  let switchPreset = false
   const ok = await confirm({
     title: tr(msg({ id: 'actions.template.loadTitle', defaultMessage: 'Load "{name}"?', description: 'Title of the question before loading a template ({name}) into a project.' }), { name: plan.name }),
     message: plan.remove.length
@@ -1185,29 +1187,25 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
     confirmLabel: tr(msg({ id: 'actions.template.load', defaultMessage: 'Load template', description: 'Button: loads the template into the project.' })),
     busyLabel: tr(msg({ id: 'actions.template.loading', defaultMessage: 'Loading…', description: 'The Load template button while it works.' })),
     danger: plan.remove.length > 0,
-    // The removed agents' worktrees that are merged and clean can go with the load, if ticked (off by default, #289).
-    check: removable.length ? { label: removeOldLabel(removable.map((w) => w.branch), plan.mergedInto), initial: false, set: (v) => (removeOld = v) } : undefined,
+    // The preset it suggests (#1436): off by default, and only ever chosen in the form, never saved from here.
+    check: suggested ? { label: tr(msg({ id: 'actions.template.switchPreset', defaultMessage: 'Also switch this project to {preset}… (opens Version Control → Workflow with it chosen, to save there)', description: "A tick box when loading a template that suggests a preset ({preset}: Solo, Pair or Team, as the presets are named): after loading, the project's Version Control tab opens at Workflow with that preset chosen but not saved. Glossary: preset." }), { preset: tr(PRESET_TEXT[suggested]) }), initial: false, set: (v) => (switchPreset = v) } : undefined,
     run: async () => {
-      result = await call('templates:load', path, entry.scope, entry.file, expected, from, removeOld ? { paths: removable.map((w) => w.path), mergedInto: plan.mergedInto } : undefined, names)
+      await call('templates:load', path, entry.scope, entry.file, expected, from, names)
     }
   })
   if (!ok) return
   await refreshWorkspace()
-  const said = oldWorktreesNotice(result?.oldWorktrees ?? [])
-  if (said) notify(said.level, said.title, said.detail)
-}
-
-/** The tick box for removing the old worktrees that are merged and clean (#289). */
-function removeOldLabel(branches: string[], into: string | null): string {
-  return tr(msg({ id: 'actions.template.removeOld', defaultMessage: '{n, plural, one {Also remove the old worktree and its branch} other {Also remove # old worktrees and their branches}} (merged into {into, select, none {the main branch} other {{into}}} and clean): {branches}', description: "A tick box when loading a template: also delete the replaced agents' {n} worktrees and branches that are merged into a branch ({into}; none when it isn't known) and have no changes. {branches} lists them." }), { n: branches.length, into: into ?? 'none', branches: branches.join(', ') })
+  if (suggested && switchPreset) {
+    // Filled in once the form has read the project's options (#1423's way), and left for the user to save.
+    set({ workflowPrefill: { path, preset: suggested } })
+    openVersionControl(path, 'workflow')
+  }
 }
 
 /** Adds one agent of a template, the project's others left alone (a name already taken gets a number). */
 export async function addAgentFromTemplate(path: string, entry: Pick<TemplateEntry, 'scope' | 'file'>, index: number): Promise<void> {
   const def = await attempt(tr(msg({ id: 'actions.template.addAgentFailed', defaultMessage: 'Could not add the agent', description: "An error's title: adding an agent from a template failed." })), () => call('templates:addAgent', path, entry.scope, entry.file, index))
   if (!def) return
-  // A clean worktree Hive made for that name, which no agent used, is worked in again rather than a new "-2" (#289).
-  if (def.reused && def.worktree) notify('info', tr(msg({ id: 'actions.template.reusedTitle', defaultMessage: '{agent} works in its worktree again', description: "A notification's title: an agent added from a template ({agent}) works in the clean worktree it had before." }), { agent: def.name }), tr(msg({ id: 'actions.template.reusedMessage', defaultMessage: '{branch} in {path}: it was clean, and its branch is left as it is.', description: 'Under the notification that an agent works in its old worktree again: its branch ({branch}) and folder ({path}).' }), { branch: def.worktree.branch, path: def.worktree.path }))
   await refreshWorkspace()
   const p = project(path)
   if (p) showAgent(p, def.id, 'select')

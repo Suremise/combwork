@@ -179,7 +179,6 @@ interface HiveMessageValues {
   'panes.template.listFailed': undefined
   'panes.template.noneSaved': undefined
   'panes.template.noneYet': undefined
-  'panes.template.ownWorktree': undefined
   'panes.template.save': undefined
   'panes.template.scopeHeading': { scope: string }
   'panes.terminal.exited': { code: string | number }

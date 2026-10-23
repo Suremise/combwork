@@ -6,7 +6,7 @@ import { PSEUDO_LANGUAGE } from '../../src/shared/i18n/languages'
 import { setLanguage, setProblemReporter, tr, type Msg } from '../../src/shared/i18n'
 import { isAgentTemplate, readTemplate, shownProblem, templateLimitText } from '../../src/shared/templates'
 import { englishText, shownText, type Text } from '../../src/shared/advanced'
-import { oldWorktreesNotice, templateAgentParts, templateLoadDetail, templateLoadView } from '../../src/shared/templateLoad'
+import { templateAgentParts, templateLoadDetail, templateLoadView } from '../../src/shared/templateLoad'
 import { findSecretWarnings } from '../../src/main/mcpSecrets'
 import { LEVEL_NAME } from '../../src/main/assistantControl'
 import { assistantStatusLine } from '../../src/shared/assistantStatus'
@@ -104,12 +104,12 @@ describe('what Hive works out in shared code is in the language when it is worke
     }
     const cases: [Text, string][] = [
       [problem('nope'), "It isn't a Hive agent template."],
-      [problem({ version: 1, name: 'T', agents: [{ name: 'A', provider: 42 }] }), "A's coding agent isn't one Hive can use (none)."],
-      [problem({ version: 1, name: 'T', agents: [{ name: 'A', provider: 'claude-code', effort: 'x y' }] }), "A's effort isn't one Hive can use."],
+      [problem({ version: 2, name: 'T', agents: [{ name: 'A', provider: 42 }] }), "A's coding agent isn't one Hive can use (none)."],
+      [problem({ version: 2, name: 'T', agents: [{ name: 'A', provider: 'claude-code', effort: 'x y' }] }), "A's effort isn't one Hive can use."],
       [templateLimitText(24, 12), 'It has 24 agents, and this project can have up to 12 (Settings → Advanced → Agents per project).']
     ]
     for (const [t, english] of cases) expect(shownText(t)).toBe(english)
-    const empty = problem({ version: 1, name: 'T', agents: [] })
+    const empty = problem({ version: 2, name: 'T', agents: [] })
     // The same text follows a change of language: a listed template's problem too.
     setLanguage(PSEUDO_LANGUAGE, {})
     expect(shownText(cases[0][0])).toMatch(/^\[Íţ íšñ'ţ/)
@@ -130,27 +130,21 @@ describe('what Hive works out in shared code is in the language when it is worke
     expect(w).toMatch(/^\[.*GITHUB_TOKEN.*\$\{GITHUB_TOKEN\}.*\]$/)
   })
 
-  it("the Load template plan and the notice after it, as before in English", () => {
+  it("the Load template plan, as before in English", () => {
     const plan = {
       remove: [{ id: 'a', name: 'Dev', running: false, dirty: 0, worktree: { path: 'D:/x/site/dev', branch: 'hive/dev' } }],
-      create: [{ name: 'Dev', role: 'builder', provider: 'claude-code' as const, worktree: true }],
-      worktrees: [{ branch: 'hive/dev-2', path: 'D:/x/site/dev-2', base: 'main', notReused: 'hive/dev has 1 uncommitted file' }],
-      oldWorktrees: [{ path: 'D:/x/site/dev', removable: false, why: '2 commits not merged into main' }],
-      setup: 'npm install'
-    } as unknown as Parameters<typeof templateLoadDetail>[0]
+      create: [{ name: 'Dev', role: 'builder' as const, provider: 'claude-code' as const }]
+    }
     const text = templateLoadDetail(plan, cfg, settings, () => info)
-    expect(text).toContain('Removed:\n• Dev (its worktree and branch hive/dev stay: 2 commits not merged into main): replaced by a new agent with the same name\n')
-    expect(text).toContain('• Dev — builder (new): Claude Code, Opus 5.5 (default) · Medium (default)')
-    expect(text).toContain('    own worktree on hive/dev-2 (from main) in D:/x/site/dev-2 (new: hive/dev has 1 uncommitted file)')
-    expect(text).toMatch(/\n\nEach new worktree runs the project's setup command \(npm install\) before its agent first starts\.\nTheir conversations stay in the Sessions tab, and their open cards go back \(Active ones to Todo\)\. The layout becomes the template's\.$/)
-    expect(oldWorktreesNotice([{ branch: 'hive/a', removed: true }])).toEqual({ level: 'success', title: 'Removed an old worktree', detail: 'hive/a, with its branch: merged and clean.' })
-    expect(oldWorktreesNotice([{ branch: 'hive/a', removed: false }, { branch: 'hive/b', removed: false, why: 'dirty' }])).toEqual({ level: 'warning', title: '2 old worktrees were kept', detail: 'hive/a: kept.\nhive/b: kept (dirty).' })
+    expect(text).toContain('Removed:\n• Dev (its worktree and branch hive/dev stay): replaced by a new agent with the same name\n')
+    expect(text).toContain('• Dev — Builder (new): Claude Code, Opus 5.5 (default) · Medium (default)')
+    expect(text).toMatch(/\n\nTheir conversations stay in the Sessions tab, and their open cards go back \(Active ones to Todo\)\. The layout becomes the template's\.$/)
   })
 
   it("marks the defaults from the values, never from a label's words: the same in any language", () => {
     const agents = [
-      { name: 'Own', provider: 'claude-code' as const, model: 'opus', effort: 'high' as const, permissionMode: 'acceptEdits' as const, worktree: false },
-      { name: 'Left', provider: 'claude-code' as const, worktree: false }
+      { name: 'Own', role: 'builder' as const, provider: 'claude-code' as const, model: 'opus', effort: 'high' as const, permissionMode: 'acceptEdits' as const },
+      { name: 'Left', role: 'reviewer' as const, provider: 'claude-code' as const }
     ]
     const marks = (): boolean[][] => agents.map((a) => Object.values(templateAgentParts(a, cfg, settings, info)).map((s) => !!s?.isDefault))
     const english = marks()
@@ -161,14 +155,14 @@ describe('what Hive works out in shared code is in the language when it is worke
     // A language whose default mark is other words: the marks, and the setting's own name without them, stay.
     setLanguage('pl', { 'assistant.templateLoad.isDefault': '{setting} (domyślnie)' }, 'pl-PL')
     expect(marks()).toEqual(english)
-    const left = templateLoadView({ remove: [], create: [agents[1]], worktrees: [null], setup: null }, cfg, settings, () => info).created[0]
+    const left = templateLoadView({ remove: [], create: [agents[1]] }, cfg, settings, () => info).created[0]
     expect(left.model.text).toBe('Opus 5.5')
-    expect(templateLoadDetail({ remove: [], create: [agents[1]], worktrees: [null], setup: null }, cfg, settings, () => info)).toContain('Opus 5.5 (domyślnie) · Medium (domyślnie)')
+    expect(templateLoadDetail({ remove: [], create: [agents[1]] }, cfg, settings, () => info)).toContain('Opus 5.5 (domyślnie) · Medium (domyślnie)')
   })
 
   it("names the permission mode in the language shown (#889: it said Auto in a Japanese window)", () => {
     setLanguage(PSEUDO_LANGUAGE, {})
-    const parts = templateAgentParts({ name: 'Own', provider: 'claude-code', permissionMode: 'acceptEdits', worktree: false }, cfg, settings, info)
+    const parts = templateAgentParts({ name: 'Own', role: 'builder', provider: 'claude-code', permissionMode: 'acceptEdits' }, cfg, settings, info)
     expect(parts.mode?.text).toContain('[')
     expect(parts.mode?.text).not.toContain('Accept edits')
   })

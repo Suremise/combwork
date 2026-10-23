@@ -101,6 +101,7 @@ import { deleteJournalEntry, deleteWorkspaceJournal, editJournalEntry, forgetJou
 import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
+import { putBackV09Templates, sayV09TemplatesOnce, setAsideV09Templates } from './templateUpgrade'
 import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
 import { presetNotNow } from './workflow/presetStep'
@@ -318,6 +319,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     // then what changed in its projects while it was closed, recorded as observed facts (#1217): the cards adopted too.
     const opening = contextWorkspace()!
     void adoptWorkspace(opening).finally(() => reconcileWorkspace(opening))
+    // 0.9's agent templates set aside once after the upgrade (#1436), and a quiet notice saying so.
+    void setAsideV09Templates(opening)
+      .then(() => sayV09TemplatesOnce(opening))
+      .catch((e) => log.warn("setting aside 0.9's agent templates (tried again at the next open)", e))
     // What failed or interrupted saves and the project-id migration left in the .hive folders (#1016).
     void sweepWorkspaceLeftovers(ws).catch((e) => log.warn('removing leftover temp and backup files', e))
     // Moved since it was last opened (#146)? In the background: the window opens meanwhile, and a banner follows.
@@ -629,13 +634,19 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'board:upgrade': async () => {
       const ws = currentWorkspace()
       const out = await upgradeBoard(ws)
-      // Then the upgrade's adoption, in the background (#1218).
+      // Then the upgrade's adoption, in the background (#1218), and 0.9's templates set aside (#1436).
       void adoptWorkspace(ws)
+      void setAsideV09Templates(ws)
+        .then(() => sayV09TemplatesOnce(ws))
+        .catch((e) => log.warn("setting aside 0.9's agent templates (tried again at the next open)", e))
       return out
     },
-    'board:restore09': () => {
+    'board:restore09': async () => {
       const ws = currentWorkspace()
-      return restoreBoardBackup(ws, () => (ws.path ? sessions.agentsIn(ws.path) : 0))
+      const out = await restoreBoardBackup(ws, () => (ws.path ? sessions.agentsIn(ws.path) : 0))
+      // 0.9's templates back where 0.9.3 reads them (#1436); a failure there leaves them in the backup, said in the log.
+      await putBackV09Templates(ws).catch((e) => log.warn("putting 0.9's agent templates back", e))
+      return out
     },
     'tasks:list': (fullArchive) => tasks.windowTasks(workspace, fullArchive === true),
     'tasks:export': async () => {
@@ -878,7 +889,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'templates:list': (p) => templates.listTemplates(p),
     'templates:save': (p, scope, name, overwrite) => templates.saveTemplate(p, scope, name, overwrite),
     'templates:plan': (p, scope, file, from, names) => templates.templatePlan(p, scope, file, from, names),
-    'templates:load': (p, scope, file, expected, from, removeOld, names) => templates.loadTemplate(p, scope, file, expected, from, removeOld, names),
+    'templates:load': (p, scope, file, expected, from, names) => templates.loadTemplate(p, scope, file, expected, from, names),
     'templates:addAgent': (p, scope, file, index, from) => templates.addAgentFromTemplate(p, scope, file, index, from),
     'templates:all': () => templates.listAllTemplates(),
     'templates:rename': (ref, name) => templates.renameTemplate(ref, name),

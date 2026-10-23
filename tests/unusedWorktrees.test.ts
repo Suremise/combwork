@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writ
 import { delimiter, join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { holdsWork, lostByRemoving, originLabel, templateWorktreesHint, unusedPickerLabel, unusedState, unusedSummary, unusedWorkNotice } from '../src/shared/unusedWorktrees'
+import { holdsWork, lostByRemoving, originLabel, unusedPickerLabel, unusedState, unusedSummary, unusedWorkNotice } from '../src/shared/unusedWorktrees'
 import type { UnusedWorktree } from '../src/shared/types'
 import { junction, shortPath } from './pathAliases'
 import { tempDir } from './tempDir'
@@ -30,12 +30,11 @@ vi.mock('../src/main/git', async (importOriginal) => {
   return { ...real, git: ((cwd, args, ...rest) => (failing?.(args) ? failed() : real.git(cwd, args, ...rest))) as typeof real.git }
 })
 
-const { PREVIEW_MS, mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchStatus, unusedWorktreeCounts, unusedWorktrees, unusedWorktreesNamed } = await import('../src/main/unusedWorktrees')
+const { PREVIEW_MS, mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchStatus, unusedWorktreeCounts, unusedWorktrees } = await import('../src/main/unusedWorktrees')
 const { createWorktree } = await import('../src/main/worktrees')
 const { addAgent, reserveForRemoval, worktreeChecks } = await import('../src/main/projectAgents')
 const { gitTestHooks } = await import('../src/main/git')
 const { gitOnPath, setGitToolForTests } = await import('../src/main/gitTool')
-const templates = await import('../src/main/templates')
 // Paths compared as places: git lists the long names of folders Hive may know by short (8.3) ones, as on CI (#389).
 const { placeKey, withFileLock } = await import('../src/main/fsutil')
 
@@ -583,26 +582,6 @@ describe('without git (#346)', () => {
   })
 })
 
-describe("a deleted template's worktree agents", () => {
-  it('finds the unused worktrees named after them, numbered ones too; deleting the template touches none', async () => {
-    n++
-    const a = await tree(`claudette${n}`)
-    const b = await tree(`claudette${n}-2`)
-    const other = await tree(`someone${n}`)
-    const found = await run(() => unusedWorktreesNamed(proj, [`Claudette${n}`, 'Nobody']))
-    expect(found.map(placeKey).sort()).toEqual([a.path, b.path].map(placeKey).sort())
-    expect(found.map(placeKey)).not.toContain(placeKey(other.path))
-
-    const t = { version: 1, name: `Trio ${n}`, savedAt: '2026-10-06T10:00:00.000Z', layout: 'auto', agents: [{ name: `Claudette${n}`, provider: 'claude-code', worktree: true }, { name: 'Folder', provider: 'claude-code', worktree: false }] }
-    mkdirSync(join(proj, '.hive', 'templates'), { recursive: true })
-    writeFileSync(join(proj, '.hive', 'templates', `trio-${n}.json`), JSON.stringify(t))
-    const left = await run(() => templates.deleteTemplate({ scope: 'project', project: proj, file: `trio-${n}.json` }))
-    expect(left.unusedWorktrees).toEqual([{ project: proj, count: 2 }])
-    expect(existsSync(a.path) && existsSync(b.path)).toBe(true)
-    expect(templateWorktreesHint(left, () => 'proj')).toMatchObject({ title: '2 unused worktrees in proj', project: proj })
-  })
-})
-
 describe('what the window says', () => {
   const wt = (check: UnusedWorktree['check'], extra: Partial<UnusedWorktree> = {}): UnusedWorktree => ({ path: 'C:\\w\\x', branch: 'hive/x', check, ...extra })
   it("the Overview's line counts them and the merged ones (#400)", () => {
@@ -620,8 +599,5 @@ describe('what the window says', () => {
   it('nothing to remove anyway when git could not count it', () => {
     expect(lostByRemoving(wt({ removable: false, into: 'main', reason: "git couldn't check hive/x" }))).toBeNull()
     expect(unusedState(wt({ removable: false, into: 'main', reason: "git couldn't check hive/x" }))).toBe("git couldn't check hive/x")
-  })
-  it('no template hint without unused worktrees', () => {
-    expect(templateWorktreesHint({ unusedWorktrees: [] }, () => 'x')).toBeNull()
   })
 })

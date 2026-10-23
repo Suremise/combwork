@@ -1,7 +1,8 @@
-import type { SettingShown, TemplateLoadView, PlaceShown } from '@shared/templateLoad'
+import { pairedShown, type SettingShown, type TemplateLoadView } from '@shared/templateLoad'
 import { isKnownProvider } from '@shared/providers'
+import { WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
 import { ProviderIcon } from './ProviderIcon'
-import { Icon, Tooltip } from './ui'
+import { Icon } from './ui'
 import { AGENT_NAME_MAX } from '@shared/agentNames'
 import { cx } from '../util'
 import { locale, msg, tr, tRich, type Msg } from '@shared/i18n'
@@ -17,21 +18,15 @@ const M = {
   stateNewTip: msg({ id: 'assistant.templatePlan.stateNewTip', defaultMessage: 'An agent the project doesn’t have yet.', description: "Load template's table: tooltip on new." }),
   stateRemovedTip: msg({ id: 'assistant.templatePlan.stateRemovedTip', defaultMessage: 'The template has no agent of this name, so this one goes.', description: "Load template's table: tooltip on removed." }),
   agent: msg({ id: 'assistant.templatePlan.agent', defaultMessage: 'Agent', description: "Load template's table: the column of the agents' names." }),
+  role: msg({ id: 'assistant.templatePlan.role', defaultMessage: 'Role', description: "Load template's table: the column of each agent's role in the workflow (Builder, Reviewer, Either; glossary: workflow role)." }),
   codingAgent: msg({ id: 'assistant.templatePlan.codingAgent', defaultMessage: 'Coding agent', description: "Load template's table: the column of each agent's CLI (Claude Code, Codex…)." }),
   model: msg({ id: 'assistant.templatePlan.model', defaultMessage: 'Model', description: "Load template's table: a column." }),
   effort: msg({ id: 'assistant.templatePlan.effort', defaultMessage: 'Effort', description: "Load template's table: a column (the model's reasoning effort)." }),
   mode: msg({ id: 'assistant.templatePlan.mode', defaultMessage: 'Mode', description: "Load template's table: a column (the permission mode)." }),
-  where: msg({ id: 'assistant.templatePlan.where', defaultMessage: 'Where', description: "Load template's table: a column (the folder or worktree each agent works in)." }),
   fromTip: msg({ id: 'assistant.templatePlan.fromTip', defaultMessage: 'Its name in the template', description: "Load template's table: tooltip on an agent's name as the template has it, beside the box for its new name." }),
   nameLabel: msg({ id: 'assistant.templatePlan.nameLabel', defaultMessage: 'Name of agent {n}', description: "Load template's table: the accessible name of the box for agent number {n}'s name." }),
   withNote: msg({ id: 'assistant.templatePlan.withNote', defaultMessage: '{thing} <faint>{note}</faint>', description: "Load template: a name or a setting ({thing}), then a note about it in brackets ({note}, which brings its brackets: \"(default)\"), greyed. Keep the <faint> tags around {note}. Japanese and Chinese: no space before full-width brackets." }),
-  isDefault: msg({ id: 'assistant.templatePlan.default', defaultMessage: '(default)', description: "Load template's table, after a model, effort or mode: the template leaves it to the project's or Hive's defaults." }),
-  folder: msg({ id: 'assistant.templatePlan.folder', defaultMessage: 'project folder', description: "Load template's table, Where: the agent works in the project's folder." }),
-  ownWorktree: msg({ id: 'assistant.templatePlan.ownWorktree', defaultMessage: 'own worktree', description: "Load template's table, Where: the agent gets a worktree of its own." }),
-  reuses: msg({ id: 'assistant.templatePlan.reuses', defaultMessage: 'reuses {branch}', description: "Load template's table, Where: the agent works in an old worktree again, on branch {branch}." }),
-  ownOn: msg({ id: 'assistant.templatePlan.ownOn', defaultMessage: 'own worktree {branch}', description: "Load template's table, Where: the agent's new worktree, on branch {branch}." }),
-  reuseTip: msg({ id: 'assistant.templatePlan.reuseTip', defaultMessage: 'Works in its worktree again: {path} (clean; its branch is left as it is)', description: "Load template's table: tooltip on a worktree worked in again ({path}: its folder)." }),
-  newTip: msg({ id: 'assistant.templatePlan.newTip', defaultMessage: 'A new worktree in {path}, from {base}', description: "Load template's table: tooltip on a new worktree ({path}: its folder; {base}: the branch it starts from)." })
+  isDefault: msg({ id: 'assistant.templatePlan.default', defaultMessage: '(default)', description: "Load template's table, after a model, effort or mode: the template leaves it to the project's or Hive's defaults." })
 }
 
 /** A note's first letter as a capital, in the window's language. */
@@ -59,11 +54,12 @@ function Change({ state }: { state: State }) {
 const oldNote = (note: string): ReactNode => <span className="faint template-plan-old">{tr(M.noteSentence, { note: capitalised(note) })}</span>
 
 /**
- * The Load template dialog's plan (#511, one table since #1315): a row an agent, Agent · Change · Coding agent · Model ·
- * Effort · Mode · Where: the template's agents in its order, each replacing the project's agent of its name or new, then
- * the project's agents it has none of, removed. What becomes of a removed agent's worktree is said across its row's
- * settings (it has none), a replaced one's on a line under its row. What the template leaves to the defaults is shown as what it is here with
- * a muted "(default)", a new worktree by its branch with its folder on hover; then the notes, said once.
+ * The Load template dialog's plan (#511, one table since #1315): a row an agent, Agent · Change · Role · Coding agent ·
+ * Model · Effort · Mode: the template's agents in its order, each replacing the project's agent of its name or new, then
+ * the project's agents it has none of, removed. An agent's note is under its name, the agent it is paired with under its
+ * role, and another provider than the template's (#1436) under its coding agent, saying why. What becomes of a removed
+ * agent's worktree is said across its row's settings (it has none), a replaced one's on a line under its row. What the
+ * template leaves to the defaults is shown as what it is here with a muted "(default)"; then the notes, said once.
  */
 export function TemplatePlan({ view, edit }: { view: TemplateLoadView; edit?: NameEdit }) {
   const goes = new Map(view.removed.map((a) => [a.name.toLowerCase(), a]))
@@ -74,11 +70,11 @@ export function TemplatePlan({ view, edit }: { view: TemplateLoadView; edit?: Na
           <tr>
             <th>{tr(M.agent)}</th>
             <th>{tr(M.state)}</th>
+            <th>{tr(M.role)}</th>
             <th>{tr(M.codingAgent)}</th>
             <th>{tr(M.model)}</th>
             <th>{tr(M.effort)}</th>
             <th>{tr(M.mode)}</th>
-            <th>{tr(M.where)}</th>
           </tr>
         </thead>
         <tbody>
@@ -101,23 +97,29 @@ export function TemplatePlan({ view, edit }: { view: TemplateLoadView; edit?: Na
                     ) : (
                       <span className="template-plan-name">{a.name}</span>
                     )}
-                    {a.role && <div className="faint">{a.role}</div>}
+                    {a.note && <div className="faint">{a.note}</div>}
                   </td>
                   <Change state={a.replaces ? 'replaced' : 'new'} />
+                  <td className="template-plan-role" data-role={a.role}>
+                    {tr(WORKFLOW_ROLE_TEXT[a.role].name)}
+                    {a.pairedWith && <div className="faint" data-paired-with={a.pairedWith}>{pairedShown(a.pairedWith)}</div>}
+                  </td>
                   <td>
                     <span className="badge template-plan-provider">
                       {isKnownProvider(a.provider) && <ProviderIcon provider={a.provider} />}
                       {a.providerName}
                     </span>
+                    {a.swapped && (
+                      <div className="faint template-plan-swapped" data-swapped>
+                        <Icon name="info" /> {a.swapped}
+                      </div>
+                    )}
                   </td>
                   <td>
                     <Setting s={a.model} />
                   </td>
                   <td>{a.effort ? <Setting s={a.effort} /> : <span className="faint">—</span>}</td>
                   <td>{a.mode ? <Setting s={a.mode} /> : <span className="faint">—</span>}</td>
-                  <td>
-                    <Place w={a.where} />
-                  </td>
                 </tr>
                 {old && (
                   <tr data-old-of={a.name} className="template-plan-old-row">
@@ -165,19 +167,4 @@ function withNote(thing: ReactNode, note: string, className: string): ReactNode[
 
 function Setting({ s }: { s: SettingShown }) {
   return <>{s.isDefault ? withNote(s.text, tr(M.isDefault), 'faint template-plan-default') : s.text}</> // i18n-ignore: class names
-}
-
-function Place({ w }: { w: PlaceShown }) {
-  if (w.kind === 'folder') return <>{tr(M.folder)}</>
-  if (w.kind === 'own') return <>{tr(M.ownWorktree)}</>
-  const text = tr(w.kind === 'reuse' ? M.reuses : M.ownOn, { branch: w.branch ?? '' })
-  const tip = w.kind === 'reuse' ? tr(M.reuseTip, { path: w.path ?? '' }) : tr(M.newTip, { path: w.path ?? '', base: w.base ?? '' })
-  return (
-    <Tooltip content={tip}>
-      <span className="template-plan-place" data-path={w.path}>
-        {text}
-        {w.note && <div className="faint">{w.note}</div>}
-      </span>
-    </Tooltip>
-  )
 }

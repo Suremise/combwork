@@ -1347,20 +1347,20 @@
     "defaultMessage": "Several builders? Try the Team preset",
     "description": "A tip's title (glossary 2.1: Team, preset)."
   },
+  "tips.teamTemplates.text": {
+    "defaultMessage": "The Templates view’s Hive group has ready-made teams: Solo, Pair, Pair: one provider, Team 3×3, Team 6×6 and Team 6 + pool, with builders and reviewers paired. Loading one offers to switch the project to the preset it suits.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands, and of Hive's own templates: keep them as Hive shows them. Glossary: builder, reviewer, preset."
+  },
+  "tips.teamTemplates.title": {
+    "defaultMessage": "Start from one of Hive’s templates",
+    "description": "A tip's title. Glossary: template."
+  },
   "tips.templateNames.text": {
     "defaultMessage": "Agent names are unique across the workspace. Loading a template from another project, give its agents new names in the list beside the template's own: Load template waits until none is taken.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.templateNames.title": {
     "defaultMessage": "Name a template's agents as you load it",
-    "description": "A tip's title."
-  },
-  "tips.templateWorktrees.text": {
-    "defaultMessage": "Loading a template puts an agent back in the clean worktree of its name, its branch left as it is, instead of making a new one. Old worktrees that are merged and clean can go too: tick the box in the Load dialog.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
-  },
-  "tips.templateWorktrees.title": {
-    "defaultMessage": "Templates reuse worktrees",
     "description": "A tip's title."
   },
   "tips.testedClis.text": {
