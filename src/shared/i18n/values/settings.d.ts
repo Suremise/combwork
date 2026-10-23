@@ -154,6 +154,10 @@ interface HiveMessageValues {
   'settings.advanced.hive.assistant.startView.title': undefined
   'settings.advanced.hive.console.showText.desc': undefined
   'settings.advanced.hive.console.showText.title': undefined
+  'settings.advanced.hive.copies.quietWaitMinutes.desc': undefined
+  'settings.advanced.hive.copies.quietWaitMinutes.title': undefined
+  'settings.advanced.hive.copies.review.desc': undefined
+  'settings.advanced.hive.copies.review.title': undefined
   'settings.advanced.hive.disableHardwareAcceleration.desc': undefined
   'settings.advanced.hive.disableHardwareAcceleration.title': undefined
   'settings.advanced.hive.guidance.desc': undefined
@@ -162,6 +166,12 @@ interface HiveMessageValues {
   'settings.advanced.hive.heapSnapshotNearLimit.title': undefined
   'settings.advanced.hive.hooks.missingSeconds.desc': undefined
   'settings.advanced.hive.hooks.missingSeconds.title': undefined
+  'settings.advanced.hive.inbox.checkpoints.desc': undefined
+  'settings.advanced.hive.inbox.checkpoints.title': undefined
+  'settings.advanced.hive.inbox.idleWakes.desc': undefined
+  'settings.advanced.hive.inbox.idleWakes.title': undefined
+  'settings.advanced.hive.inbox.stopContinuation.desc': undefined
+  'settings.advanced.hive.inbox.stopContinuation.title': undefined
   'settings.advanced.hive.mcp.connectSeconds.desc': undefined
   'settings.advanced.hive.mcp.connectSeconds.title': undefined
   'settings.advanced.hive.mcp.replySeconds.desc': undefined
@@ -209,6 +219,10 @@ interface HiveMessageValues {
   'settings.advanced.hive.skills.removeIdleCopies.never': undefined
   'settings.advanced.hive.skills.removeIdleCopies.slots': undefined
   'settings.advanced.hive.skills.removeIdleCopies.title': undefined
+  'settings.advanced.hive.slots.removeIdle.desc': undefined
+  'settings.advanced.hive.slots.removeIdle.title': undefined
+  'settings.advanced.hive.slots.setupMinutes.desc': undefined
+  'settings.advanced.hive.slots.setupMinutes.title': undefined
   'settings.advanced.hive.terminal.allKeysToCli.desc': undefined
   'settings.advanced.hive.terminal.allKeysToCli.title': undefined
   'settings.advanced.hive.terminal.ctrlCVToCli.desc': undefined
@@ -268,6 +282,8 @@ interface HiveMessageValues {
   'settings.advancedList.default': { value: string | number }
   'settings.advancedList.fileError': { problem: string | number }
   'settings.advancedList.filter': undefined
+  'settings.advancedList.inboxAvailable': { on: string }
+  'settings.advancedList.inboxAvailableOpen': undefined
   'settings.advancedList.keep': { version: string | number }
   'settings.advancedList.keepFailed': undefined
   'settings.advancedList.label': { group: string | number; title: string | number }
@@ -370,6 +386,7 @@ interface HiveMessageValues {
   'settings.assistant.control.option.projects': undefined
   'settings.assistant.control.tip': undefined
   'settings.assistant.control.tip.agents': undefined
+  'settings.assistant.control.tip.inbox': undefined
   'settings.assistant.control.tip.look': undefined
   'settings.assistant.control.tip.projects': undefined
   'settings.assistant.control.title': undefined
@@ -674,6 +691,15 @@ interface HiveMessageValues {
   'settings.project.fileLocks.desc': undefined
   'settings.project.fileLocks.tip': undefined
   'settings.project.fileLocks.title': undefined
+  'settings.project.inboxCheckpoints.desc': undefined
+  'settings.project.inboxCheckpoints.tip': undefined
+  'settings.project.inboxCheckpoints.title': undefined
+  'settings.project.inboxIdleWakes.desc': undefined
+  'settings.project.inboxIdleWakes.tip': undefined
+  'settings.project.inboxIdleWakes.title': undefined
+  'settings.project.inboxStopContinuation.desc': undefined
+  'settings.project.inboxStopContinuation.tip': undefined
+  'settings.project.inboxStopContinuation.title': undefined
   'settings.project.key.desc': { example: string | number }
   'settings.project.key.title': undefined
   'settings.project.keybindings.desc': undefined

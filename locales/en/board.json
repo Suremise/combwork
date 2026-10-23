@@ -635,6 +635,10 @@
     "defaultMessage": "Command",
     "description": "A label in a run's details (Progress panel): the command it ran follows."
   },
+  "board.details.copy": {
+    "defaultMessage": "Copy",
+    "description": "A label in a run's details (Progress panel): the name of the review or check copy it ran in follows (copy-1): a folder Hive keeps at exactly the card's revision, which nothing else writes."
+  },
   "board.details.countsAsCheck": {
     "defaultMessage": "Counts as check: {name}",
     "description": "A run's details in the Progress panel: the run counts as the card's check named {name} (\"typecheck\", as the project names it)."
@@ -1567,6 +1571,10 @@
     "defaultMessage": "The project has no agents. Add one first.",
     "description": "In the Start Lane dialog: the chosen project has no agents to build the cards."
   },
+  "board.laneStart.noBuilders": {
+    "defaultMessage": "None of the project’s agents builds. Set Role in the workflow to Builder or Either in an agent’s settings.",
+    "description": "In the Start Lane dialog: every agent of the project is a reviewer, so none can build the cards. Role in the workflow, Builder and Either are the Agent Settings field and its choices: use their translated names. Glossary: builder, either."
+  },
   "board.laneStart.noCards": {
     "defaultMessage": "No cards yet: add them from the project’s Todo below.",
     "description": "In the Start Lane dialog's list of cards, while none is chosen. Todo is a board column."
@@ -1776,8 +1784,8 @@
     "description": "In the Progress panel's Lanes bar, after how many lanes there are: how many of them wait for the user's answer (an approval, a decision, a round limit). Glossary: lane."
   },
   "board.lanes.waits": {
-    "defaultMessage": "{reason, select, blocked {{card} is blocked} hold {{card} is On Hold} you {waiting for you ({ask, select, approve {approval} decide {a decision} test {a test} signIn {a sign-in} other {an answer}}): {card}} roundLimit {waiting for you: {card} reached its round limit} notMerged {waiting: {card} not merged} merging {waiting: {card} merging} stale {stale: {card} must be submitted again} reviewer {waiting for a reviewer on {card}} lineUpdate {waiting: bringing the builder’s branch up to date before {card}} hooks {paused: {agent}'s hooks aren't arriving} other {list changes after {card}}}",
-    "description": "Why a lane (a builder and its reviewer working through cards) waits, in its header in the Progress panel, lower case. {card} is a card's name (its key, such as HI-12). reason: blocked or On Hold (a board column); waiting for the user (ask: for their approval, a decision, a test, a sign-in or another answer); at its round limit (the user decides how to go on); a card passed but not merged yet (or merging now), so the next can't start (one card at a time); its pass is stale (the builder must submit again); nobody reviews it; Hive brings the builder's branch up to date before that card (after a squash merge, #1271); hooks: the agent {agent} (a name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing), so the lane is paused; changes to the lane's list of cards apply once that card is done (other). Keep the select keys. Glossary: lane, round limit, stale."
+    "defaultMessage": "{reason, select, blocked {{card} is blocked} hold {{card} is On Hold} you {waiting for you ({ask, select, approve {approval} decide {a decision} test {a test} signIn {a sign-in} other {an answer}}): {card}} roundLimit {waiting for you: {card} reached its round limit} notMerged {waiting: {card} not merged} merging {waiting: {card} merging} stale {stale: {card} must be submitted again} reviewer {waiting for a reviewer on {card}} lineUpdate {waiting: bringing the builder’s branch up to date before {card}} hooks {paused: {agent}'s hooks aren't arriving} checkCopy {waiting for a check copy for {card}} other {list changes after {card}}}",
+    "description": "Why a lane (a builder and its reviewer working through cards) waits, in its header in the Progress panel, lower case. {card} is a card's name (its key, such as HI-12). reason: blocked or On Hold (a board column); waiting for the user (ask: for their approval, a decision, a test, a sign-in or another answer); at its round limit (the user decides how to go on); a card passed but not merged yet (or merging now), so the next can't start (one card at a time); its pass is stale (the builder must submit again); nobody reviews it; Hive brings the builder's branch up to date before that card (after a squash merge, #1271); hooks: the agent {agent} (a name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing), so the lane is paused; checkCopy: its review or check waits for a check copy (a folder Hive keeps at one revision for a review or an isolated check) to be free; changes to the lane's list of cards apply once that card is done (other). Keep the select keys. Glossary: lane, round limit, stale."
   },
   "board.links.archivedTitle": {
     "defaultMessage": "{card} {title} · Archived (from {column}) · Ctrl+click to open",
@@ -1971,6 +1979,10 @@
     "defaultMessage": "Copy revision {revision}",
     "description": "Tooltip of a run's revision in the Progress panel (under its agent): copies the whole commit id. {revision} is its short form (a3f2c1d)."
   },
+  "board.progress.copyRun": {
+    "defaultMessage": "Hive (copy {copy})",
+    "description": "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's review or check copies (a folder at one revision where a reviewer reads a card's work, or an isolated check runs): its setup command or a dependency install, not an agent. {copy} is the copy's name, such as copy-1: keep it as it is."
+  },
   "board.progress.detailsOf": {
     "defaultMessage": "Details of {run}",
     "description": "Accessible name of a run's details in the Progress panel ({run}: the run's title)."
@@ -2115,6 +2127,10 @@
     "defaultMessage": "Show the agent",
     "description": "Button and tooltip on a Progress panel run: shows the agent that ran it."
   },
+  "board.progress.slotRun": {
+    "defaultMessage": "Hive (slot {slot})",
+    "description": "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's slots (a worktree Hive lends to a card or a lane: its setup command, a dependency install or its archive command), not an agent. {slot} is the slot's name, such as slot-b: keep it as it is."
+  },
   "board.progress.stepOf": {
     "defaultMessage": "{step, number} of {total, number}",
     "description": "A run's step in the Progress panel, under its bar: step {step} of {total}."
@@ -2122,6 +2138,10 @@
   "board.progress.stepOfNamed": {
     "defaultMessage": "{step, number} of {total, number}: {name}",
     "description": "A run's step in the Progress panel, under its bar: step {step} of {total}, and the step's name ({name}, as its reporter named it)."
+  },
+  "board.progress.stopIsolated": {
+    "defaultMessage": "Stop this check and everything it started",
+    "description": "Tooltip of the button stopping an isolated check (a check an agent runs in a copy of its own) in the Progress panel: Hive ends its command and every process it started."
   },
   "board.progress.tab": {
     "defaultMessage": "{tab, select, pulse {Pulse} merges {Merges} runs {Runs} other {Lanes}}",

@@ -58,6 +58,8 @@ export interface CheckRunFor {
   /** None: the card's declared paths, and the folders left out of the deliverables (the options' `excluded`). */
   paths: string[]
   excluded: string[]
+  /** Run with `--isolated` in a check copy of its own (#1435): its CheckRan says so. */
+  isolated?: boolean
 }
 
 /** What the watcher answers (the app's observer; a test's own). */
@@ -145,7 +147,7 @@ function whichCheck(r: CheckRunFor): { name: string | null; ran: boolean } {
  */
 export async function checkEnd(r: CheckRunFor, start: CheckStart, end: { at: number; result: CheckRanData['result']; run: string; by: string; title: string; endPaths?: string[] }, log: WriteLog = appObserver): Promise<CheckRanData> {
   const check = whichCheck(r)
-  const base = { name: check.name ?? end.title, command: r.command?.trim() ?? '', run: end.run, durationMs: Math.max(0, end.at - start.t0), by: end.by, result: end.result }
+  const base = { name: check.name ?? end.title, command: r.command?.trim() ?? '', run: end.run, durationMs: Math.max(0, end.at - start.t0), by: end.by, result: end.result, ...(r.isolated ? { isolated: true } : {}) }
   let whyNot: CheckRanData['whyNot']
   if (r.platform === 'none') {
     const none = noneOf(r)
@@ -215,7 +217,7 @@ export async function bracketFor(ws: WorkspaceService, link: RunLink): Promise<B
   const commands = Object.fromEntries(Object.entries(options?.commands ?? {}).filter((e): e is [string, string] => typeof e[1] === 'string' && !!e[1].trim()).map(([k, v]) => [k, v.trim()]))
   // The options' exclusions, else the defaults (node_modules, .venv), until #1218 resolves the options with defaults.
   const excluded = Array.isArray(options?.excluded) && options.excluded.every((x) => typeof x === 'string') ? (options.excluded as string[]) : allOff('none').excluded
-  const f: CheckRunFor = { card: link.card, folder: platform === 'none' ? project : link.folder!, project, platform, tested: link.testedCheckout, check: link.check?.name ?? null, checkCommand: link.check?.command ?? null, command: null, commands, facts: got.facts, paths: platform === 'none' ? declaredPaths(ws, c.project, link.card) : [], excluded }
+  const f: CheckRunFor = { card: link.card, folder: platform === 'none' ? project : link.folder!, project, platform, tested: link.testedCheckout, check: link.check?.name ?? null, checkCommand: link.check?.command ?? null, command: null, commands, facts: got.facts, paths: platform === 'none' ? declaredPaths(ws, c.project, link.card) : [], excluded, ...(link.isolated ? { isolated: true } : {}) }
   return { ws, workspacePath, project: c.project, for: f, start: await checkStart(f) }
 }
 

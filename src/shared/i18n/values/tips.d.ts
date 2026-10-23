@@ -13,6 +13,8 @@ interface HiveMessageValues {
   'tips.agentSettings.title': undefined
   'tips.agentStates.text': undefined
   'tips.agentStates.title': undefined
+  'tips.agentWorkflowRole.text': undefined
+  'tips.agentWorkflowRole.title': undefined
   'tips.allKeysToCli.text': undefined
   'tips.allKeysToCli.title': undefined
   'tips.alwaysOnTop.text': undefined
@@ -184,8 +186,12 @@ interface HiveMessageValues {
   'tips.imagesTab.title': undefined
   'tips.improveTranslation.text': undefined
   'tips.improveTranslation.title': undefined
+  'tips.inboxCarryingOn.text': undefined
+  'tips.inboxCarryingOn.title': undefined
   'tips.inboxNotices.text': undefined
   'tips.inboxNotices.title': undefined
+  'tips.isolatedChecks.text': undefined
+  'tips.isolatedChecks.title': undefined
   'tips.keepAwake.text': undefined
   'tips.keepAwake.title': undefined
   'tips.laneBranchSquash.text': undefined

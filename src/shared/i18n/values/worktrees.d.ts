@@ -2,6 +2,7 @@
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
   'worktrees.agent.badPlacement': undefined
+  'worktrees.agent.badWorkflowRole': undefined
   'worktrees.agent.chooseMove': undefined
   'worktrees.agent.chooseTree': undefined
   'worktrees.agent.detached': undefined

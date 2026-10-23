@@ -47,6 +47,15 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     const tile = (n) => board.locator(`.task-card[data-task="${n}"]`)
     const inColumn = async (n, id) => (await col(id).locator(`.task-card[data-task="${n}"]`).count()) === 1
     const columns = () => board.locator('.board-column').evaluateAll((els) => els.map((e) => e.getAttribute('data-column')).join(' '))
+    // Each open column's header: one row or two (the name over its count, + and ⋯), and whether it's tidy: the count on
+    // ⋯'s row and ⋯ at the header's inline end.
+    const headerRows = () => board.locator('.board-column:not(.collapsed) .board-column-header').evaluateAll((els) => els.map((head) => {
+      const top = (sel) => head.querySelector(sel).getBoundingClientRect().top
+      const more = [...head.querySelectorAll('.board-column-tools .icon-btn')].pop().getBoundingClientRect()
+      const end = head.getBoundingClientRect().right - parseFloat(getComputedStyle(head).paddingRight)
+      const rows = Math.abs(top('.board-column-tools') - top('.board-column-label')) < 1 ? 1 : 2
+      return { column: head.closest('.board-column').getAttribute('data-column'), rows, tidy: Math.abs(top('.count') - more.top) < 4 && Math.abs(more.right - end) < 1.5 }
+    }))
     // The board with its sidebar (the activity bar's button toggles the sidebar when the board is shown already).
     const showBoard = async (project, button = 'Task Board') => {
       const row = page.locator('.pane-body .row', { hasText: project ?? 'All projects' }).first()
@@ -87,6 +96,13 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     check('each column named by its stage', (await labelText('passed')) === 'Approved' && (await labelText('merging')) === 'Merging', `${await labelText('passed')} / ${await labelText('merging')}`)
     check('every category shows with all projects (the union)', (await columns()) === 'hold todo doing review passed merging done', await columns())
     check("the None project's card is on the board", await inColumn(notesCard, 'todo'))
+    check('the grouped columns are as wide as the others', !!(await until(async () => {
+      const widths = await board.locator('.board-column').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().width))
+      return Math.max(...widths) - Math.min(...widths) < 1.5
+    })), JSON.stringify(await board.locator('.board-column').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))))
+    check('en: every column header is one row, Approved and Merging too (#1490)', (await headerRows()).every((r) => r.rows === 1), JSON.stringify(await headerRows()))
+    const headerTops = await board.locator('.board-column-header').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))
+    check("…and every column's header starts at the same height", new Set(headerTops).size === 1, JSON.stringify(headerTops))
     await shoot('merging-en')
 
     // Merging's hover, and no drop.
@@ -267,6 +283,9 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
       return [...c.querySelectorAll('.board-column-header > *')].filter((e) => { const b = e.getBoundingClientRect(); return b.left < r.left - 1 || b.right > r.right + 1 }).map((e) => `${c.getAttribute('data-column')}: ${e.textContent}`)
     }))
     check('…every header inside its own column', (await outside()).length === 0, JSON.stringify(await outside()))
+    // A header that wraps reads the name over "count … ⋯": the count never alone, ⋯ at the inline end (#1490).
+    const rows = await headerRows()
+    check('Polish: wrapped headers read the name over "count … ⋯", ⋯ at the end', rows.some((r) => r.rows === 2) && rows.every((r) => r.tidy), JSON.stringify(rows))
     await shoot('merging-pl')
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: { ...q.queueOptions(fx), stageNames: { active: 'W'.repeat(24) } } })
     await showBoard('alpha', 'Tablica zadań')

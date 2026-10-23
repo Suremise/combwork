@@ -631,6 +631,10 @@
     "defaultMessage": "Outcome",
     "description": "A column heading of the Git tab's merge queue history: merged (with the result), returned (with why) or taken out."
   },
+  "git.queue.reading": {
+    "defaultMessage": "Reading the merge queues…",
+    "description": "The Version Control tab's Merge queue section while the project's queues are read. Glossary 2.5: merge queue."
+  },
   "git.queue.region": {
     "defaultMessage": "Merge queues",
     "description": "Accessible name of the Git tab's Merge queue section: the project's merge queues, a part per target branch. Glossary 2.5: merge queue."

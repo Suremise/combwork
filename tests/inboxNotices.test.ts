@@ -148,6 +148,47 @@ describe('notices in the hook replies (#650)', () => {
     expect(context(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p2', stop_hook_active: false }))).toContain(m.id)
   })
 
+  it("with their switches off (#1432), each CLI's tool end and Stop get no reply: Codex and Copilot aren't blocked, Claude Code gets no context, the turn ends, and what is unread stays", async () => {
+    const { advanced } = await import('../src/main/advanced')
+    const { INBOX_SWITCH_ID } = await import('../src/shared/inboxSwitches')
+    try {
+      await advanced.set(INBOX_SWITCH_ID.checkpoints, false)
+      await advanced.set(INBOX_SWITCH_ID.stopContinuation, false)
+      for (const adapter of [claude, codex, copilot]) {
+        const st = agent(adapter)
+        await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
+        const m = await leave(st)
+        expect(await hook(st, tool('p1', 'c1'))).toBeNull()
+        expect(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p1', stop_hook_active: false, last_assistant_message: 'Done' })).toBeNull()
+        expect(st.status).toBe('finished')
+        expect((await run(() => deliveries.deliveriesOf(p, st.agentId))).map((r) => `${r.id} ${r.state}`)).toEqual([`${m.id} queued`])
+      }
+      // On again: the next turn is told and drained as before.
+      await advanced.set(INBOX_SWITCH_ID.checkpoints, null)
+      await advanced.set(INBOX_SWITCH_ID.stopContinuation, null)
+      const st = agent(codex)
+      await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
+      const m = await leave(st)
+      expect(context(await hook(st, tool('p1', 'c1')))).toContain(m.id)
+      expect(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p1', stop_hook_active: false })).toMatchObject({ decision: 'block' })
+      // The project's own off, Settings' on: read from project.json as it is now, no refresh needed; inherit again: told.
+      const writes = w.projectConfigWrites(p)
+      await run(() => w.updateProjectConfig(p, { inboxCheckpoints: 'off' }))
+      // Each write Hive makes is counted (what an idle wake's typing checks, round 2 finding).
+      expect(w.projectConfigWrites(p)).toBe(writes + 1)
+      const own = agent(claude)
+      await hook(own, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
+      const m2 = await leave(own)
+      expect(await hook(own, tool('p1', 'c1'))).toBeNull()
+      await run(() => w.updateProjectConfig(p, { inboxCheckpoints: 'inherit' }))
+      expect(context(await hook(own, tool('p1', 'c2')))).toContain(m2.id)
+    } finally {
+      await run(() => w.updateProjectConfig(p, { inboxCheckpoints: 'inherit' }))
+      await advanced.set(INBOX_SWITCH_ID.checkpoints, null)
+      await advanced.set(INBOX_SWITCH_ID.stopContinuation, null)
+    }
+  })
+
   it('one drain a turn however its hooks arrive, decided in the launch\'s order from the turn ledger: two Stops of a turn sent at once, a late Stop of an earlier turn, a prompt sent while a Stop\'s notice is worked out (round 1 finding 3)', async () => {
     const st = agent()
     const full = (body: Record<string, unknown>) => ({ session_id: st.sessionId, cwd: p, ...body })

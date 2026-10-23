@@ -1,5 +1,6 @@
 {
   "worktrees.agent.badPlacement": "The panes can't be placed like that in this layout.",
+  "worktrees.agent.badWorkflowRole": "A role in the workflow is builder, reviewer or either.",
   "worktrees.agent.chooseMove": "Choose where to move the agent.",
   "worktrees.agent.chooseTree": "Choose a worktree.",
   "worktrees.agent.detached": "That worktree is not on a branch (detached HEAD).",

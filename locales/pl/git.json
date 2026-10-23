@@ -157,6 +157,7 @@
   "git.queue.none": "Brak kolejki scalania. Gdy przepływ pracy projektu każe Hive scalać jego karty (Kontrola wersji → Przepływ pracy: Kto scala), tutaj pojawi się kolejka każdej gałęzi docelowej z jej historią.",
   "git.queue.open": "Otwórz {card}",
   "git.queue.outcome": "Wynik",
+  "git.queue.reading": "Odczytywanie kolejek scalania…",
   "git.queue.region": "Kolejki scalania",
   "git.queue.returned": "Zwrócona: {why}",
   "git.queue.revision": "Rewizja",

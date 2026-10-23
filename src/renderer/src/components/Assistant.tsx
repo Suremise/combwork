@@ -15,6 +15,7 @@ import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projec
 import { cardLabel } from '@shared/projectKeys'
 import { loadAssistantChanges } from '../assistantUndo'
 import { useInbox } from '../inbox'
+import { useInboxSwitch } from '../advanced'
 import { useLiveUsage } from '../usage'
 import { cx, formatKeybinding, sessionLabel, timeAgo } from '../util'
 import { Overrides, ProviderChoice, contextChoice, contextValue, type ContextChoice } from './AgentDialogs'
@@ -40,6 +41,16 @@ const AGENT = ASSISTANT_AGENT_ID
 const SESSION_NAMES = 'Assistant'
 
 const M = {
+  // Its inbox in ⋯ (#1432), as an agent's pane shows it.
+  unreadCount: msg({ id: 'assistant.panel.unreadCount', defaultMessage: '{n, plural, one {# unread} other {# unread}}', description: "Read out with the Assistant's ⋯ button: how many items in its inbox it hasn't fetched or acked yet. Keep it short." }),
+  inboxTip: msg({ id: 'assistant.panel.inboxTip', defaultMessage: "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.", description: "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox ({n}: how many). hive_inbox is a tool's name: keep it." }),
+  inboxTipNoWakes: msg({ id: 'assistant.panel.inboxTipNoWakes', defaultMessage: "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet", description: "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox, when the setting Wake an idle agent (Settings → Advanced) is off (a hint line under it says so; {n}: how many)." }),
+  noWakesHint: msg({ id: 'assistant.panel.noWakesHint', defaultMessage: 'Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.', description: "A hint line under the heading of the Assistant's ⋯ menu's list of its unread inbox, when the setting Wake an idle agent (Settings → Advanced) is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them." }),
+  inboxLine: msg({ id: 'assistant.panel.inboxLine', defaultMessage: '{id} from {from}: {text}', description: "An item of the Assistant's inbox in its ⋯ menu: its id, who it is from ({from}) and the start of its text ({text})." }),
+  deliverNow: msg({ id: 'assistant.panel.deliverNow', defaultMessage: 'Deliver Now', description: "Menu item in the Assistant's ⋯ menu, shown while the setting Wake an idle agent is off: types the line telling it of what waits in its inbox into its terminal, once." }),
+  deliverFailed: msg({ id: 'assistant.panel.deliverFailed', defaultMessage: "Could not deliver the Assistant's inbox", description: "An error's title: typing the line that tells the Assistant of what waits in its inbox (Deliver Now) failed." }),
+  notDelivered: msg({ id: 'assistant.panel.notDelivered', defaultMessage: "The Assistant wasn't told now", description: "A notice's title: Deliver Now couldn't type the line into the Assistant's terminal now." }),
+  notDeliveredDetail: msg({ id: 'assistant.panel.notDeliveredDetail', defaultMessage: "It isn't idle, or you are typing in its terminal. What waits stays in its inbox: try again once it's idle.", description: 'The detail of the notice that Deliver Now could not type the line into the Assistant now.' }),
   resumeLater: msg({ id: 'assistant.panel.resumeLater', defaultMessage: "You can resume the current conversation later from the Assistant's ⋯ menu.", description: "Under a confirmation that restarts the Assistant. ⋯ is the panel's More button." }),
   restartButton: msg({ id: 'assistant.panel.restartButton', defaultMessage: 'Restart the Assistant', description: "A confirmation's button: stops the Assistant and starts a new conversation." }),
   stopFailed: msg({ id: 'assistant.panel.stopFailed', defaultMessage: 'Could not stop the Assistant', description: "An error notice: the Assistant's session couldn't be stopped; the reason follows." }),
@@ -501,6 +512,7 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
   const usage = useLiveUsage(project, AGENT)
   const starting = useStarting(project.path, AGENT)
   const live = a.live
+  const wakes = useInboxSwitch('idleWakes', null)
   const idle = live && (live.status === 'ready' || live.status === 'finished')
   const empty = !usage || usage.userMessages === 0 || (usage.contextTokens ?? 0) === 0
   // Highlighted past Settings → Assistant's threshold (overlaid on its host's config), as an agent's past its project's.
@@ -537,6 +549,23 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
   const compacting = isCompacting(live)
   // Compact…'s detail in ⋯, as an agent's: why it is unavailable, or that it is recommended.
   const compactDetail = compacting ? tr(M.compacting) : !idle ? tr(M.compactLater) : empty ? tr(M.nothingToCompact) : suggested ? tr(M.compactRecommended) : undefined
+  // Its inbox (#1432 round 1): what it hasn't read, as an agent's pane shows it; with Settings' idle wakes off (it has
+  // no project of its own), nothing waiting is typed by itself, and Deliver Now types its line once.
+  const unread = live?.inbox?.unread ?? []
+  const waiting = unread.filter((m) => m.state === 'queued' || m.state === 'uncertain').length
+  const deliver = (): void =>
+    void actions.attempt(tr(M.deliverFailed), async () => {
+      if (!(await call('session:deliverNow', project.path, AGENT))) notify('info', tr(M.notDelivered), tr(M.notDeliveredDetail))
+    })
+  const inboxEntries: MenuEntry[] = unread.length
+    ? [
+        { header: true, label: tr(wakes ? M.inboxTip : M.inboxTipNoWakes, { n: unread.length }) },
+        ...(wakes ? [] : [{ label: tr(M.noWakesHint), disabled: true }]),
+        ...unread.map((m) => ({ label: tr(M.inboxLine, { id: m.id, from: m.from, text: m.text }), disabled: true })),
+        ...(waiting && !wakes && live ? [{ label: tr(M.deliverNow), icon: 'send', onClick: deliver } as MenuEntry] : []),
+        { separator: true }
+      ]
+    : []
   /** Stop's place: an icon with a tooltip, in its action's colour, as on an agent's pane. */
   // A start or resume under way shows on its button, which takes no clicks (#1177).
   const btn = (icon: string, label: string, onClick: () => void, tone: string, tip: string, busy?: boolean) => (
@@ -555,6 +584,7 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
       x,
       y,
       [
+        ...inboxEntries,
         // Compact… as on an agent's ⋯: once the Assistant has finished, recommended past the threshold.
         ...(live ? [{ label: tr(M.compactMenu), icon: compacting ? 'loading' : 'fold', detail: compactDetail, disabled: !idle || empty || compacting, onClick: compact } as MenuEntry] : []),
         // Stop's place has Resume while there is a conversation to go back to: a new one is here.
@@ -597,8 +627,9 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
           ? btn('debug-continue', tr(M.resume), resume, 'act-resume', resumeTip, !!starting)
           : btn('play', tr(M.startMenu), start, 'act-start', tr(M.startTip), !!starting)}
       <Tooltip content={tr(M.more)}>
-        <button ref={more} type="button" className="icon-btn pane-more" aria-label={tr(M.more)} aria-haspopup="menu" onClick={(e) => openMore(e.detail === 0)}>
+        <button ref={more} type="button" className="icon-btn pane-more" aria-label={tr(M.more)} aria-description={unread.length ? tr(M.unreadCount, { n: unread.length }) : undefined} aria-haspopup="menu" onClick={(e) => openMore(e.detail === 0)}>
           <Icon name="ellipsis" />
+          {unread.length > 0 && <span className="pane-more-badge" />}
         </button>
       </Tooltip>
       {/* Fold, as the Progress panel's header has it (#1330): its chevron points to the edge the panel folds to. */}
