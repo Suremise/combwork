@@ -4,7 +4,8 @@
 // which opens Workflow), the five sections in order, opening at Changes; Project Settings → Workflow's Open Version
 // Control and the presets notice's Choose… land on Workflow. A None project (no repository): Workflow only, where it
 // opens, with Initialise repository… under the header. A subfolder of a larger repository (a second workspace kept in
-// git): the whole-repository line. Screenshots in both themes, in English and German. Dev build, throwaway profile and
+// git): the whole-repository line. A narrow tab: the sections folded to icons, the selected one named, each reached
+// (#1461). Screenshots in both themes, in English and German. Dev build, throwaway profile and
 // workspaces; no CLI is started, and the Assistant is off.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -89,6 +90,7 @@ function board(sql, ...args) {
     check('the fact line names the repository root', !!(await lib.until(async () => (await text(fact)) === `This folder is a Git repository at ${alpha}.`, HUNG_MS)), await text(fact))
     check('the workflow link says no preset is chosen', !!(await lib.until(async () => (await text(link)).trim() === 'Workflow: Git · no preset chosen', HUNG_MS)), await text(link))
     check('the five sections, Workflow first', JSON.stringify(await sections()) === JSON.stringify(['workflow', 'changes', 'history', 'branches', 'queue']), JSON.stringify(await sections()))
+    check('a wide tab names every section', (await page.locator('.git-sections.icons, .git-sections .icon-only').count()) === 0)
     check('a Git project opens at Changes', (await selected()) === 'changes')
 
     // The preset saved, as the form or the Assistant's tool saves it: the header follows.
@@ -230,6 +232,45 @@ function board(sql, ...args) {
     const factBox = async () => (await fact.boundingBox())?.width ?? 0
     check('narrow: the fact line has a row of its own, the link still level with the choice', !!(await lib.until(async () => (await factBox()) > (await page.locator('.vc-view').boundingBox()).width * 0.6 && (await linkInPlace()), HUNG_MS)), String(await factBox()))
     await shots('subfolder-narrow', page.locator('.vc-view'))
+
+    // The sections at that width (#1461): folded to their icons, the selected one with its name, all inside the tab,
+    // each reached with a click; the icons' names in their tooltips. In English and German.
+    const row = () =>
+      page.locator('.git-sections').evaluate((list) => {
+        const l = list.getBoundingClientRect()
+        const v = list.closest('.vc-view').getBoundingClientRect()
+        const sel = list.querySelector('[aria-selected="true"]')
+        const s = sel?.getBoundingClientRect()
+        const name = sel?.querySelector('.git-section-label')?.getBoundingClientRect()
+        const others = [...list.querySelectorAll('[role="tab"]:not([aria-selected="true"])')]
+        return {
+          view: Math.round(v.width),
+          inside: l.left >= v.left - 0.5 && l.right <= v.right + 0.5,
+          scrolls: list.scrollWidth > list.clientWidth,
+          selectedWhole: !!s && s.left >= l.left - 0.5 && s.right <= l.right + 0.5,
+          named: (name?.width ?? 0) > 20,
+          icons: others.every((b) => b.classList.contains('icon-only') && b.getBoundingClientRect().width >= 16)
+        }
+      })
+    const rowOk = (r) => r.inside && !r.scrolls && r.selectedWhole && r.named && r.icons
+    const everySection = async (lang) => {
+      for (const id of await sections()) {
+        await page.locator(`.git-sections [data-section="${id}"]`).click()
+        check(`narrow (${lang}): ${id} reached, shown whole with its name, the others icons, all inside the tab`, !!(await lib.until(async () => (await selected()) === id && rowOk(await row()), HUNG_MS)), JSON.stringify(await row()))
+      }
+    }
+    check('the tab is narrow (about 370px)', (await row()).view < 420, String((await row()).view))
+    await everySection('en')
+    const histTip = await lib.hoverTip(page, page.locator('.git-sections [data-section="history"]'), (t) => t === 'History')
+    check("a folded section's tooltip names it", histTip === 'History', histTip)
+    await page.locator('.git-sections [data-section="branches"]').click()
+    await shots('sections-narrow', page.locator('.vc-view'))
+    await speak({ ...base, code: 'de', locale: 'de', messages })
+    check('the sections in German', !!(await lib.until(async () => (await page.locator('.tabs .tab', { hasText: 'Versionsverwaltung' }).count()) === 1, HUNG_MS)))
+    await everySection('de')
+    await page.locator('.git-sections [data-section="branches"]').click()
+    await shots('sections-narrow-de', page.locator('.vc-view'))
+    await speak(base)
   } finally {
     await app.close()
   }

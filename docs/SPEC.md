@@ -1649,7 +1649,9 @@ control; another system found, so None; the repository gone), and **Workflow: Gi
 no preset chosen, from `workflow:form`), which opens Workflow. The sections (`VC_SECTIONS`, `vcSections` in
 `gitRepo.ts`, kept per project while Hive runs) are Workflow, then Git's Changes, History, Branches & remotes
 (`GitBranches.tsx`) and Merge queue (#1357's section, placed as it was); a project opens at Changes for Git and at
-Workflow for None. **None's page:** Workflow, with Initialise repository… under the header while the folder has no
+Workflow for None. When the sections' names don't fit the tab's width beside the status line [#1461], they fold to
+their icons (each name in its tooltip and for screen readers), the selected section keeping its name; narrower still,
+the row scrolls with the selected section in view. **None's page:** Workflow, with Initialise repository… under the header while the folder has no
 repository; and **Merge queue while an old Git ruleset's queue is still there**, by #1356's actual-state rule
 (`queueShown`: an entry testing or queued, a pause, a return not seen yet, a runner, or a card in flight whose own
 ruleset has Hive merge), with its controls and the links to it, until that state is clear. The section list is a pure
