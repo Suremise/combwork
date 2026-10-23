@@ -259,10 +259,13 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     // Every observation below writes only while the card is still on this line in this cycle (checked under the write's
     // lock): a rename since stops it.
     if (followed !== 'unknown' && line && !owed) {
+      // The cycle the line was read in, which passed the check above: what it read is that cycle's only (HR6's #1551
+      // round 1: started again meanwhile, an old null read would mark the new cycle, its preparation still owed).
+      const read = s
       const lh = await observeHead(wf, card, () => G.lineHead(project, line), line, hooks)
       s = wf.state(card)
       // Never gone while a rename points away from it: the next run follows it once git's names can be read.
-      if (lh === null && !(await wf.cfg.pendingRename?.(line))) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.state().started?.line === line && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:line:${s.cycle}`, data: { what: 'line' } })) // i18n-ignore: a fact's kind and codes, not text
+      if (lh === null && !(await wf.cfg.pendingRename?.(line))) await wf.write(card, null, 'outside', (w) => sameCycle(w, read) && w.state().started?.line === line && w.tx.appendObserved(card.id, { kind: 'Gone', actor: 'outside', source: 'observed', dedupe: `gone:line:${read.cycle}`, data: { what: 'line' } })) // i18n-ignore: a fact's kind and codes, not text
     }
   }
 

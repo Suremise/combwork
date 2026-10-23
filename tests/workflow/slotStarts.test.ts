@@ -181,6 +181,34 @@ describe("a slot card's line before its slot's preparation (#1551)", () => {
     expect(lineFacts(e, card.id)).toEqual([])
   })
 
+  it("a null read of a prepared cycle's line never marks the cycle started meanwhile (HR6's round 1)", async () => {
+    let lease = 'l-1'
+    const { e } = world(() => ({ slot: 'slot-a', folder: tempDir('slot-'), lease, fresh: true }))
+    const card = e.wf.createCard({ title: 'Race' })
+    moved(await e.wf.start(card.key, B1))
+    const s = e.wf.state(card)
+    const line = s.started!.line!
+    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease, line, revision: s.started!.base! }))
+    // Prepared, then deleted outside Hive before this observer reads it.
+    sh(e.project, 'branch', line, s.started!.base!)
+    sh(e.project, 'branch', '-D', line)
+    let changed = false
+    // Between the read and the write: put back and started again under another lease (the same line's name).
+    await reconcile(e.wf, card, {
+      afterRead: async () => {
+        if (changed) return
+        changed = true
+        moved(await e.wf.move(card.key, 'todo', 'user'))
+        lease = 'l-2'
+        moved(await e.wf.start(card.key, B1))
+      }
+    })
+    expect(changed).toBe(true)
+    expect(e.wf.state(card).started).toMatchObject({ lease: 'l-2', line })
+    expect(slotPreparationOwed(e.wf, card, e.wf.state(card))).toBe(true)
+    expect(lineFacts(e, card.id)).toEqual([])
+  })
+
   it('a card started outside slots owes nothing', async () => {
     const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }, { autoRun: false }))
     const card = e.wf.createCard({ title: 'On its own line' })
