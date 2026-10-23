@@ -101,8 +101,13 @@ async function placesOf(projectPath: string): Promise<Places> {
   const facts = await folderFacts(projectPath)
   if (facts.homes.length) {
     const agents = new Set(projectAgents(await workspace.projectConfig(projectPath)).map((a) => a.id))
-    const sessions = (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions ?? []
-    for (const h of facts.homes) out.homes.set(key(h), homeListed(h, sessions, agents, (a, b) => key(a) === key(b)))
+    // Records that can't be read never mean "no conversation" (HR3's round 2): every home is then kept, unlisted, until
+    // a read succeeds; never an empty list that would let one be removed.
+    const sessions = await workspace.sessionsFile(projectPath).then(
+      (f) => f.sessions,
+      (e) => void log.warn(`reading ${userText(basename(projectPath))}'s session records for its retired homes: all kept`, e)
+    )
+    for (const h of facts.homes) out.homes.set(key(h), sessions ? homeListed(h, sessions, agents, (a, b) => key(a) === key(b)) : false)
   }
   // A slot is never an ordinary unused worktree, even when its pool can't be read: then none is listed.
   for (const s of facts.slots) out.slots.set(key(s.folder), { name: s.name, kind: null })

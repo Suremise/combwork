@@ -5,7 +5,7 @@
 // into a target. A real workspace and Git project; slots' rows are written as the pool leaves them.
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { homeListed, slotsListed, type SlotSeen } from '../src/shared/unusedWorktrees'
 import { tempDir } from './tempDir'
@@ -155,6 +155,19 @@ describe('Unused Worktrees and the Merge dialog on slots (#1450)', { timeout: 12
     expect(await run(() => removeUnusedWorktree(project, at(join('copies', 'copy-2'))))).toMatchObject({ deleted: false })
     await expect(run(() => removalPreview(project, at(join('copies', 'copy-2'))))).rejects.toThrow(/isn't one of the project's unused worktrees now/)
     expect(existsSync(at(join('copies', 'copy-2')))).toBe(true)
+    // Session records that can't be read (HR3's round 2): no home is listed or removed, plain or forced, until a read
+    // succeeds again; then the home no conversation resumes in is listed again.
+    const unreadable = vi.spyOn(ws, 'sessionsFile').mockRejectedValue(new Error('records unreadable'))
+    try {
+      expect(Object.keys(await kinds())).not.toContain('home-r1')
+      expect((await run(() => removeUnusedWorktree(project, at('home-r1')))).deleted).toBe(false)
+      await expect(run(() => removalPreview(project, at('home-r1')))).rejects.toThrow(/isn't one of the project's unused worktrees now/)
+      expect((await run(() => removeUnusedWorktree(project, at('home-r1'), { force: 'stale-token' }))).deleted).toBe(false)
+      expect(existsSync(at('home-r1'))).toBe(true)
+    } finally {
+      unreadable.mockRestore()
+    }
+    expect((await kinds())['home-r1']).toBe('home')
     // Facts that can't be read: nothing is listed or removed (fail closed).
     setRetiredHomes(() => {
       throw new Error('homes unreadable')

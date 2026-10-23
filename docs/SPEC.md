@@ -2773,7 +2773,8 @@ project's builders (`setBuilderCount`; until #1438 its agents), at least one, at
   language), its verdict shown before as `SlotPool.check` (the same guards without the rename probe); never Remove
   anyway (its preview is refused) or Give to an agent. "Remove all merged" takes the same rows. Every removal and
   Remove anyway's preview checks again that the folder is still a listed row (a home a conversation resumes in, a copy
-  or a live queue folder is refused, by HR3's round 1), and refuses when what it decides from can't be read; right
+  or a live queue folder is refused, by HR3's round 1), and refuses when what it decides from can't be read (session
+  records that can't be read keep every retired home, unlisted, HR3's round 2); right
   before anything is deleted, a session running in the folder keeps it.
 - **The Merge dialog for merges outside cards** (OP-13) picks a branch, a card's line (with its slot), a carried slot's
   branch or any other local branch, and a target (any local branch, the project folder's by default), and merges it as
