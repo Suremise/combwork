@@ -89,6 +89,7 @@ import { beginWork } from './mainStalls'
 import { metricsExport, metricsReport } from './metricsUsage'
 import { cancelWatch, stampWatchProjects } from './watches'
 import { cancelMessages, deliverWaiting } from './agentMessages'
+import { freshPlan, startFreshIfIdle } from './freshStarts'
 import { cardBusy } from './cardBusy'
 import { devConsole } from './devConsole'
 import { consoleSources } from './devConsoleSources'
@@ -577,6 +578,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'watch:cancel': (projectPath, agentId) => cancelWatch(workspaceOf(projectPath), projectPath, agentId),
     'session:cancelMessages': (projectPath, agentId) => cancelMessages(projectPath, agentId, 'the user'), // i18n-ignore: who cancelled them, as their agent is told (English)
     'session:deliverNow': (projectPath, agentId) => deliverWaiting(projectPath, agentId),
+    'session:freshPlan': (projectPath) => freshPlan(projectPath),
+    'session:startFresh': (projectPath, agentId) => startFreshIfIdle(projectPath, agentId),
     'benchmarks:list': (scope) => listBenchmarks(benchContext(currentWorkspace()), scope),
     'benchmarks:import': async (scope, answer) => {
       const ctx = benchContext(currentWorkspace())

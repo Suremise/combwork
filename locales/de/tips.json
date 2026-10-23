@@ -334,6 +334,8 @@
   "tips.sortTables.title": "Jede Tabelle sortieren",
   "tips.staleMessages.text": "Gibt der Assistent etwas zur aktuellen Runde einer Karte weiter, verknüpft er die Nachricht mit dieser Karte: Besteht die Karte oder beginnt sie eine neue Runde, bevor der Agent die Nachricht liest, verwirft Hive sie als veraltet. So öffnet kein Agent eine geprüfte Karte wegen eines alten Befunds erneut.",
   "tips.staleMessages.title": "Eine Nachricht zu einer Runde veraltet, statt zu spät zu kommen",
+  "tips.startFreshIdle.text": "Lange Unterhaltungen kosten mehr. „Neu beginnen (untätige Agenten)“ im Menü „Agenten“ der Projektkopfzeile gibt jedem untätigen Agenten in einem Schritt eine neue, und Hive schlägt es vor, wenn die Arbeit eines Projekts fertig ist.",
+  "tips.startFreshIdle.title": "Untätige Agenten neu beginnen lassen, wenn die Arbeit fertig ist",
   "tips.startNewAll.text": "„Neu beginnen“ im Menü „Agenten“ des Projektkopfs gibt nach einer Rückfrage jedem Agenten eine neue Sitzung; „Archivieren und neu beginnen“ archiviert vorher ihre alten. Ihre Unterhaltungen bleiben im Tab „Sitzungen“.",
   "tips.startNewAll.title": "Neue Sitzungen für jeden Agenten",
   "tips.storageCleanup.text": "Projekteinstellungen → Speicher zeigt, wie viel Platz Sicherungen, Archiv, Anhänge und Worktrees eines Projekts belegen. „Aufräumen…“ verschiebt alte Anhänge und Sicherungen in den Papierkorb und zeigt dir vorher genau, was weggeht.",

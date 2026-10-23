@@ -2852,6 +2852,27 @@ Designed in P7 with Darren [#1123 c]: start fresh for idle agents (#1086), a fre
 verified lane end), the Assistant's save-and-start-fresh (#1089, #1090), and the queued hand-over (#1067: "after this
 card" means after its Done fact; its merge-slot case goes away with P5). They are open in P7, not here.
 
+**Built [#1437]** (Darren, 22 Oct, "as recommended": #1086 and #1088, which meets #1090's solo case;
+`shared/freshStarts.ts`, `main/freshStarts.ts`):
+- **Start Fresh (Idle Agents)…** (the project header's Agents ▾, the command palette): one confirmed step giving each
+  idle running agent a new conversation; its old one stays in the Sessions tab. Idle is ready or finished, with no prompt
+  its CLI hasn't taken and no background tasks, and no dispatch lease open (a card's or lane's slot still in flight,
+  #1434). The question lists every agent with what happens to it (starts fresh; working, waiting, watching, background
+  tasks, a prompt not taken, a card or lane in flight: left as it is; stopped: left stopped). Each is checked again in
+  main as it starts (`startFreshIfIdle`), and one busy since is left and reported. Project scope; the Assistant isn't
+  included.
+- **The nudge** ("A good moment to start fresh", with Start Fresh (Idle Agents) as the banner's button), model-independent
+  and with the Assistant on or off: when a project's last running lane ends (`lane-ended`, its verified end), or, with no
+  lane running, a card of it reaches Done, and its work has finished (no agent starting, working, waiting, watching, with
+  background tasks or a prompt not taken; no card in Review or Passed). Once per quiet spell: the board keeps the last
+  trigger told per project (`fresh_nudge:<project id>` in board_meta, decided in the write that keeps it), so a refresh,
+  another window or another Hive doesn't repeat it; and this Hive tells it again only after an agent of the project has
+  been busy since. Off switch: Settings → Notifications, **Suggest a fresh start when work finishes** (on), and the
+  project's own (Project Settings → Sessions).
+- **Stay On Hold** (Darren's answer): #1087 (a fresh conversation after an idle gap: lanes already start fresh, and the
+  rest needs a cache-lifetime threshold per provider), #1089 (the Assistant's save and start fresh: about the Assistant,
+  not slots) and #1067 (the queued hand-over: a lease's end already stops the builder's session at a safe moment).
+
 #### 16.10.5 Reviewers and review copies
 
 [note §8, #1112 c] Reviewers aren't tied to slots. A reviewer reviews the **exact revision** in a **review copy**: a

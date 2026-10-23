@@ -3177,8 +3177,16 @@ p.hint {
 .notice-banner .lead { margin-top: 1px; color: var(--info); }
 .notice-banner.finished .lead { color: var(--success); }
 .notice-banner.waiting .lead { color: var(--warning); }
-.notice-text {
+.notice-main {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.notice-text {
+  align-self: stretch;
   min-width: 0;
 }
 .notice-open {

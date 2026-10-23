@@ -755,6 +755,62 @@
     "defaultMessage": "{kind, select, archive {{n, plural, one {Archive and start new?} other {Archive and start new for all agents?}}} other {{n, plural, one {Start a new session?} other {Start new sessions for all agents?}}}}",
     "description": "Title of the question before Start New (All) or Archive and Start New (All) (archive) for {n} agents."
   },
+  "actions.startFresh.confirm": {
+    "defaultMessage": "Start Fresh",
+    "description": "Start Fresh (Idle Agents)' button (#1437)."
+  },
+  "actions.startFresh.line": {
+    "defaultMessage": "• {agent}: {why}",
+    "description": "A line of Start Fresh (Idle Agents)' question (#1437): an agent ({agent}) and what happens to it ({why}: \"idle: starts fresh\", \"working: left as it is\")."
+  },
+  "actions.startFresh.message": {
+    "defaultMessage": "Idle agents in {project} start new conversations; their old ones stay in the Sessions tab. The others are left as they are:",
+    "description": "Start Fresh (Idle Agents)' question (#1437), above the list of the project's ({project}) agents and what happens to each."
+  },
+  "actions.startFresh.noneTitle": {
+    "defaultMessage": "No idle agent to start fresh",
+    "description": "A notification's title (#1437): Start Fresh (Idle Agents) found no idle running agent."
+  },
+  "actions.startFresh.reportTitle": {
+    "defaultMessage": "{n, plural, one {Started one agent fresh} other {Started # agents fresh}}",
+    "description": "A notification's title after Start Fresh (Idle Agents) (#1437): {n} agents got new conversations; the lines say which didn't, and why."
+  },
+  "actions.startFresh.title": {
+    "defaultMessage": "{n, plural, one {Start the idle agent fresh?} other {Start # idle agents fresh?}}",
+    "description": "Title of Start Fresh (Idle Agents)' question (#1437): {n} idle agents get new conversations."
+  },
+  "actions.startFresh.why.background": {
+    "defaultMessage": "background tasks running: left as it is",
+    "description": "Start Fresh (Idle Agents)' list (#1437): this agent has background tasks running, so it keeps its conversation."
+  },
+  "actions.startFresh.why.fresh": {
+    "defaultMessage": "idle: starts fresh",
+    "description": "Start Fresh (Idle Agents)' list (#1437): this agent is idle and gets a new conversation."
+  },
+  "actions.startFresh.why.lease": {
+    "defaultMessage": "{card, select, none {its lane is still in flight} other {{card} is still in flight}}: left as it is",
+    "description": "Start Fresh (Idle Agents)' list (#1437): this agent holds a slot for a card ({card}: \"AM-12\") or a lane (none) whose work isn't finished, so it keeps its conversation."
+  },
+  "actions.startFresh.why.pending": {
+    "defaultMessage": "a prompt not taken yet: left as it is",
+    "description": "Start Fresh (Idle Agents)' list (#1437): Hive typed a prompt this agent's CLI hasn't taken yet, so it keeps its conversation."
+  },
+  "actions.startFresh.why.stopped": {
+    "defaultMessage": "stopped: left stopped",
+    "description": "Start Fresh (Idle Agents)' list (#1437): this agent isn't running, and stays stopped."
+  },
+  "actions.startFresh.why.waiting": {
+    "defaultMessage": "waiting for you: left as it is",
+    "description": "Start Fresh (Idle Agents)' list (#1437): this agent is asking the user something, so it keeps its conversation."
+  },
+  "actions.startFresh.why.watching": {
+    "defaultMessage": "watching cards: left as it is",
+    "description": "Start Fresh (Idle Agents)' list (#1437): this agent waits on a card watch, so it keeps its conversation."
+  },
+  "actions.startFresh.why.working": {
+    "defaultMessage": "working: left as it is",
+    "description": "Start Fresh (Idle Agents)' list (#1437): this agent is in a turn (or starting), so it keeps its conversation."
+  },
   "actions.stop.confirm": {
     "defaultMessage": "Stop",
     "description": "Button: stops the session."

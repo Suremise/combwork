@@ -93,6 +93,8 @@ export interface Notice {
   projectPath: string | null
   /** The agent waiting, for a waiting banner to close once it is answered. */
   agentId?: string
+  /** A banner's button (#1437): a command of the window's, with its arguments; its label in the language Hive shows. */
+  action?: { label: string; command: string; args?: unknown[] }
 }
 export type CacheTtlSetting = 'auto' | '5m' | '1h'
 
@@ -213,6 +215,8 @@ export interface AppSettings {
     taskbarCount: boolean
     /** Flash the taskbar button when an agent starts waiting for your input and the window isn't focused. */
     flashOnWaiting: boolean
+    /** A notice when a project's work has finished (#1437): a good moment to start its idle agents fresh. A project may set its own. */
+    suggestFreshStart: boolean
   }
   sessions: {
     backupTranscripts: boolean
@@ -1132,6 +1136,8 @@ export interface ProjectConfig {
   /** The Hive skills this project's agents aren't given (#1431, its Skills tab → Delivered to agents), over the workspace's. */
   skillDelivery?: SkillDeliveryChoice
   chime: 'inherit' | 'on' | 'off'
+  /** This project's own Suggest a fresh start when work finishes (#1437), over Settings → Notifications'. */
+  suggestFreshStart: 'inherit' | 'on' | 'off'
   /** Carrying on (#1432, shared/inboxSwitches.ts): this project's own inbox switches over Settings → Advanced's; inherit uses those. */
   inboxCheckpoints: 'inherit' | 'on' | 'off'
   inboxStopContinuation: 'inherit' | 'on' | 'off'

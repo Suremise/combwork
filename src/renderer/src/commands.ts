@@ -449,6 +449,17 @@ const COMMAND_DEFS: CommandDef[] = [
   },
   { id: 'session.archive', name: msg({ id: 'shell.command.session.archive', defaultMessage: 'Archive Session and Start New…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it.' }), category: 'session', when: hasProject, run: () => actions.archiveCurrent() },
   // Every agent of the project at once, after one confirmation (#216); the menus and the palette say how many (#275).
+  {
+    id: 'session.startFreshIdle',
+    name: msg({ id: 'shell.command.session.startFreshIdle', defaultMessage: 'Start Fresh (Idle Agents)…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category (#1437): gives each idle running agent of the project a new conversation, after one question. The … says it opens a dialog first: keep it." }),
+    category: 'session',
+    when: () => hasProject() && !!selected()?.agents.some((a) => a.live),
+    // The nudge's button passes its project; otherwise the selected one.
+    run: (projectPath?: unknown) => {
+      const path = typeof projectPath === 'string' ? projectPath : selected()?.path
+      if (path) void actions.startFreshIdle(path)
+    }
+  },
   { id: 'session.startNewAll', name: msg({ id: 'shell.command.session.startNewAll', defaultMessage: 'Start New (All)…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it.' }), category: 'session', when: () => hasProject() && !!selected()?.agents.length, liveLabel: () => batchLabel(msg({ id: 'shell.command.session.startNewAllLive', defaultMessage: '{several, select, yes {Start New ({n})…} other {Start New…}}', description: 'The command that gives every agent of the project a new session, as the menus and the palette show it: with several agents, how many it acts on ({n}). The … says it asks first: keep it.' }), 'startNew'), run: () => void actions.startNewAll(get().selectedProject!) },
   // The project's agents and layout as a template (#126); loading one and adding one of its agents open the agent strip's menus (#286).
   { id: 'template.save', name: msg({ id: 'shell.command.template.save', defaultMessage: 'Save Agents as Template…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it.' }), category: 'session', when: () => hasProject() && !!selected()?.agents.length, run: () => void actions.saveTemplate(get().selectedProject!) },

@@ -1339,6 +1339,14 @@
     "defaultMessage": "A message about a round goes stale, not late",
     "description": "A tip's title."
   },
+  "tips.startFreshIdle.text": {
+    "defaultMessage": "Long conversations cost more. Start Fresh (Idle Agents) in the project header's Agents menu gives every idle agent a new one in one step, and Hive suggests it when a project's work has finished.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.startFreshIdle.title": {
+    "defaultMessage": "Start idle agents fresh when work is done",
+    "description": "A tip's title (#1437)."
+  },
   "tips.startNewAll.text": {
     "defaultMessage": "Start New in the project header's Agents menu gives every agent a new session after one question; Archive and Start New archives their old ones first. Their conversations stay in the Sessions tab.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

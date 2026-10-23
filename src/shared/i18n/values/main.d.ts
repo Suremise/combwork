@@ -30,6 +30,10 @@ interface HiveMessageValues {
   'main.finished.inProject': { n: number; project: string | number }
   'main.finished.many': { n: number }
   'main.finished.project': { project: string | number; n: string | number }
+  'main.freshStart.action': undefined
+  'main.freshStart.body': { project: string | number }
+  'main.freshStart.notFound': { agent: string | number }
+  'main.freshStart.title': undefined
   'main.gitInit.already': undefined
   'main.gitInit.done': { steps: string | number }
   'main.gitInit.failed.commit': undefined

@@ -637,6 +637,9 @@ interface HiveMessageValues {
   'settings.notifications.notifyOnWaiting.desc': undefined
   'settings.notifications.notifyOnWaiting.tip': undefined
   'settings.notifications.notifyOnWaiting.title': undefined
+  'settings.notifications.suggestFreshStart.desc': undefined
+  'settings.notifications.suggestFreshStart.tip': undefined
+  'settings.notifications.suggestFreshStart.title': undefined
   'settings.notifications.taskbarCount.desc': undefined
   'settings.notifications.taskbarCount.tip': undefined
   'settings.notifications.taskbarCount.title': undefined
@@ -724,6 +727,9 @@ interface HiveMessageValues {
   'settings.project.reset.title': undefined
   'settings.project.storage.desc': undefined
   'settings.project.storage.title': undefined
+  'settings.project.suggestFreshStart.desc': undefined
+  'settings.project.suggestFreshStart.tip': undefined
+  'settings.project.suggestFreshStart.title': undefined
   'settings.project.transcriptWarnMB.desc': undefined
   'settings.project.transcriptWarnMB.off': undefined
   'settings.project.transcriptWarnMB.tip': undefined

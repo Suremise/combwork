@@ -334,6 +334,8 @@
   "tips.sortTables.title": "Ordene qualquer tabela",
   "tips.staleMessages.text": "Quando o Assistente repassa algo sobre a rodada atual de um cartão, ele vincula a mensagem a esse cartão: se o cartão for aprovado ou começar outra rodada antes que o agente a leia, o Hive a descarta como obsoleta, para que nenhum agente reabra um cartão aprovado por uma constatação antiga.",
   "tips.staleMessages.title": "Uma mensagem sobre uma rodada fica obsoleta, não atrasada",
+  "tips.startFreshIdle.text": "Conversas longas custam mais. Começar de novo (agentes ociosos), no menu Agentes do cabeçalho do projeto, dá a cada agente ocioso uma conversa nova em um só passo, e o Hive sugere isso quando o trabalho de um projeto termina.",
+  "tips.startFreshIdle.title": "Comece de novo com os agentes ociosos quando o trabalho terminar",
   "tips.startNewAll.text": "Começar de novo, no menu Agentes do cabeçalho do projeto, dá a cada agente uma nova sessão depois de uma pergunta; Arquivar e começar de novo arquiva as antigas antes. As conversas continuam na aba Sessões.",
   "tips.startNewAll.title": "Sessões novas para todos os agentes",
   "tips.storageCleanup.text": "Configurações do projeto → Armazenamento mostra quanto espaço os backups, os arquivados, os anexos e os worktrees de um projeto ocupam. Limpar… move anexos e backups antigos para a Lixeira e mostra antes exatamente o que vai.",

@@ -647,6 +647,10 @@
     "defaultMessage": "Resuming…",
     "description": "The project header's Resume button while it runs."
   },
+  "project.header.startFreshIdle": {
+    "defaultMessage": "Start Fresh (Idle Agents)…",
+    "description": "The project header's Agents ▾ menu (#1437): gives each idle running agent a new conversation, after one question listing who will and who won't. The … says it asks first: keep it."
+  },
   "project.header.startNew": {
     "defaultMessage": "{many, select, yes {Start New ({count})} other {Start New}}",
     "description": "The project header's Agents ▾ menu: starts a fresh session for each agent. {count} is how many (shown with several agents)."
@@ -1128,7 +1132,7 @@
     "description": "Button: resets the project settings (asks first)."
   },
   "project.settings.resetMessage": {
-    "defaultMessage": "The default provider, each provider’s model, effort, permission mode, context and extra arguments, the chime, the compact threshold, the transcript size warning, file locks, worktree setup and the card-loop rounds and wait go back to Inherit, and loop wakes back on. Agents and skill and MCP opt-outs are kept.",
+    "defaultMessage": "The default provider, each provider’s model, effort, permission mode, context and extra arguments, the chime, the fresh-start suggestion, the compact threshold, the transcript size warning, file locks, worktree setup and the card-loop rounds and wait go back to Inherit, and loop wakes back on. Agents and skill and MCP opt-outs are kept.",
     "description": "The confirmation before resetting the project settings."
   },
   "project.settings.resetTitle": {

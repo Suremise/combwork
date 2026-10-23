@@ -2543,6 +2543,18 @@
     "defaultMessage": "Notify when input is needed",
     "description": "A setting's title (Settings → Notifications)."
   },
+  "settings.notifications.suggestFreshStart.desc": {
+    "defaultMessage": "A notice when a project's last lane ends, or a card is done with no lane running, and none of its agents is busy: a good moment for Start Fresh (Idle Agents).",
+    "description": "What the setting \"Suggest a fresh start when work finishes\" does, under its title (Settings → Notifications). Start Fresh (Idle Agents) is a command: keep its name as Hive shows it."
+  },
+  "settings.notifications.suggestFreshStart.tip": {
+    "defaultMessage": "Once each time the work finishes. Fresh conversations cost less than long ones; the old ones stay in the Sessions tab. A project can set its own in Project Settings → Sessions.",
+    "description": "The info tip of the setting \"Suggest a fresh start when work finishes\" (Settings → Notifications)."
+  },
+  "settings.notifications.suggestFreshStart.title": {
+    "defaultMessage": "Suggest a fresh start when work finishes",
+    "description": "A setting's title (Settings → Notifications, #1437)."
+  },
   "settings.notifications.taskbarCount.desc": {
     "defaultMessage": "A badge on Hive's taskbar button, and the window title, show how many agents need you.",
     "description": "What the setting \"Show a count on the taskbar button\" does, under its title (Settings → Notifications)."
@@ -2890,6 +2902,18 @@
   "settings.project.storage.title": {
     "defaultMessage": "What Hive keeps",
     "description": "A setting's title (Project Settings → Storage)."
+  },
+  "settings.project.suggestFreshStart.desc": {
+    "defaultMessage": "A notice when this project's work has finished, with Start Fresh (Idle Agents).",
+    "description": "What the setting \"Suggest a fresh start when work finishes\" does, under its title (Project Settings → Sessions). Start Fresh (Idle Agents) is a command: keep its name as Hive shows it."
+  },
+  "settings.project.suggestFreshStart.tip": {
+    "defaultMessage": "Inherit follows Settings → Notifications.",
+    "description": "The info tip of the setting \"Suggest a fresh start when work finishes\" (Project Settings → Sessions)."
+  },
+  "settings.project.suggestFreshStart.title": {
+    "defaultMessage": "Suggest a fresh start when work finishes",
+    "description": "A setting's title (Project Settings → Sessions, #1437)."
   },
   "settings.project.transcriptWarnMB.desc": {
     "defaultMessage": "Size, in MB, at which a running conversation's transcript is flagged for this project. Empty inherits Settings → Sessions → Warn when a transcript is over.",
