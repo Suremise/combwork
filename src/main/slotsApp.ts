@@ -23,10 +23,11 @@ import { agentLimit } from './projectAgents'
 import { progress, progressGate } from './progressService'
 import { childEnv } from './ptyHost'
 import { sessions } from './sessions'
+import { settleSlotJob } from './slotJobs'
 import { builderCountOf, SlotPool, slotOptionsOf, SlotStore, type OpHolder, type SlotConn, type SlotRunEnd, type SlotRunner } from './slots'
 import { openWorkspaces, WorkspaceService } from './workspace'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
-import { clearJournal, endLeaseJob, journalOf, journalPath, LeaseJob, startLauncher } from './workflow/queueJobs'
+import { endLeaseJob, journalPath, LeaseJob, startLauncher } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
 import { workflowFor } from './workflow/service'
 import { projectAgents } from '../shared/defaults'
@@ -81,6 +82,9 @@ function jobSpawn(job: LeaseJob): Spawn {
   }
 }
 
+/** How this Hive tells processes apart (pid and start), ends them, and knows itself. */
+const probe = defaultProbe()
+
 /** Where a project's slot jobs keep their journals (what their supervisor follows outside them). */
 const journalsOf = (root: string): string => join(root, '.slot-journals')
 
@@ -127,11 +131,9 @@ function appRunner(ws: WorkspaceService, projectPath: string, root: string): Slo
       r.signal.removeEventListener('abort', onClose)
       out.close()
       // What the command left running (a watcher it started) ends with its job; settled only once it is seen empty.
-      const settled = await job.end().catch(() => false)
-      if (settled) {
-        await job.close().catch(() => undefined)
-        await clearJournal(root, r.job, journalsOf(root)).catch(() => undefined)
-      }
+      // Settled as a dead holder's job would be (slotJobs.ts): ended, its journal sealed, read and what it names ended.
+      const settled = await settleSlotJob({ endJob: () => job.end().catch(() => false), probe, root, dir: journalsOf(root) }, r.job).catch(() => false)
+      await job.close().catch(() => undefined)
       end = { ...end, settled, logPath: out.usable ? logPath : null }
       if (id) {
         try {
@@ -147,33 +149,19 @@ function appRunner(ws: WorkspaceService, projectPath: string, root: string): Slo
 }
 
 /**
- * Settles a job an operation recorded (its holder gone, or a job that couldn't be emptied): the job ended by its name
- * on this Hive's supervisor (a supervisor that outlived its Hive holds it until then), and every process its journal
- * names ended exactly (pid and start). True once none runs; its journal is then cleared.
+ * Settles a job an operation recorded (its holder gone, or a job that couldn't be emptied), by #1360's protocol
+ * (slotJobs.ts): ended by its name on this Hive's supervisor, its journal sealed and read, what it names ended. True
+ * once none of it runs; its journal is then cleared, and the pool clears the slot's job.
  */
 function appSettle(root: string): (job: string) => Promise<boolean> {
   return async (job) => {
     const host = processSupervisor()
-    if (!host.usable || !(await host.ensure()) || !(await endLeaseJob(host, job))) return false
-    const j = await journalOf(root, job, journalsOf(root))
-    if (j.state === 'unknown') return false
-    if (j.state === 'read' && j.entries.length) {
-      const probe = defaultProbe()
-      const list = await probe.list()
-      if (!list) return false
-      const left = list.filter((p) => j.entries.some((x) => x.pid === p.pid && Math.abs(x.started - p.started) <= 1))
-      if (left.length) {
-        await probe.end(left)
-        for (const p of left) if ((await probe.alive(p.pid, p.started)) !== false) return false
-      }
-    }
-    await clearJournal(root, job, journalsOf(root)).catch(() => undefined)
-    return true
+    if (!host.usable || !(await host.ensure())) return false
+    return settleSlotJob({ endJob: (name) => endLeaseJob(host, name), probe, root, dir: journalsOf(root) }, job).catch(() => false)
   }
 }
 
 /** This process as the holder of slot operations: its pid and start, read once, and the operations it runs now. */
-const probe = defaultProbe()
 let self: Promise<{ pid: number; started: number }> | null = null
 const holder: OpHolder = {
   self: () => (self ??= probe.self()),

@@ -718,4 +718,81 @@ describe('operations own a slot while it changes (HR1 round 1)', { timeout: 90_0
   })
 })
 
+describe("an operation is its pool's from before its reservation (HR1 round 2)", { timeout: 90_000 }, () => {
+  /** Runs `then` (to its end) just after each reservation write commits (a take), before the lend goes on. */
+  function afterTake(w: World, then: () => unknown): void {
+    const take = w.store.take.bind(w.store)
+    w.store.take = async (...a) => {
+      const r = await take(...a)
+      await then()
+      return r
+    }
+  }
+
+  it("a refresh in the same Hive right after the reservation commits doesn't take the operation over", async () => {
+    const w = world({ setup: WRITE_ENV })
+    // Another of this Hive's pools on the project: the same store, holder and live operations.
+    const same = new SlotPool({ ...w.pool.deps })
+    afterTake(w, () => same.refresh())
+    const r = await w.pool.lend({ agent: 'a1', card: 1 })
+    expect(r).toMatchObject({ ok: true, slot: { name: 'slot-a', state: 'lent', op: null, warmError: null } })
+    expect(w.store.leaseOf({ card: 1 })?.why).toBeNull()
+  })
+
+  it('the workspace closing right after the reservation commits: nothing is made, and close awaits the lend', async () => {
+    const w = world({ setup: WRITE_ENV })
+    let closing: Promise<void> | null = null
+    afterTake(w, () => {
+      // Not awaited here: close awaits this lend.
+      closing ??= w.pool.close()
+    })
+    const r = await w.pool.lend({ agent: 'a1', card: 1 })
+    await closing
+    expect(r).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: 'the workspace closed' } })
+    expect(existsSync(join(w.root, 'slot-a'))).toBe(false)
+    expect(w.runs).toEqual([])
+    expect(w.store.slot('slot-a')).toMatchObject({ op: null })
+  })
+
+  it('closing right after an existing slot is reserved gives it back as it was', async () => {
+    const w = world()
+    const first = await lent(w, { agent: 'a1', card: 1 })
+    await w.pool.release(first.lease.id, 'done')
+    afterTake(w, () => void w.pool.close())
+    expect(await w.pool.lend({ agent: 'a1', card: 2 })).toEqual({ ok: false, refusal: { why: 'notReady', slot: 'slot-a', state: 'ready', error: 'the workspace closed' } })
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
+    expect(w.store.leaseOf({ card: 2 })).toBeNull()
+  })
+
+  it("a removal and its takeover check are this Hive's from before their writes too", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    await w.pool.release(r.lease.id, 'done')
+    const same = new SlotPool({ ...w.pool.deps })
+    const start = w.store.startRemoval.bind(w.store)
+    w.store.startRemoval = async (...a) => {
+      const ok = await start(...a)
+      await same.refresh()
+      return ok
+    }
+    expect(await w.pool.remove('slot-a')).toBeNull()
+    expect(existsSync(r.slot.folder)).toBe(false)
+  })
+
+  it('a slot asked for by name with a session in it is refused once, not reserved again and again', async () => {
+    const w = world()
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    await w.pool.release(r.lease.id, 'done')
+    w.set.sessions.set(r.slot.folder.toLowerCase(), 'someone')
+    expect(await w.pool.lend({ agent: 'a2', card: 2, slot: 'slot-a' })).toEqual({ ok: false, refusal: { why: 'busy', slot: 'slot-a' } })
+    const db = new DatabaseSync(boardFile(w.ws))
+    try {
+      expect(db.prepare("SELECT why FROM slot_leases WHERE slot = 'slot-a' AND card = 2").all()).toEqual([{ why: 'busy' }])
+    } finally {
+      db.close()
+    }
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
+  })
+})
+
 afterAll(() => setBuilderCount(null))

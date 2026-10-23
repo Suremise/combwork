@@ -122,6 +122,7 @@ export type SlotRefusal =
   | { why: 'inUse'; slot: string; agent: string; card: number | null; lane: string | null }
   | { why: 'agentLeased'; slot: string; card: number | null; lane: string | null }
   | { why: 'warming'; slot: string }
+  | { why: 'busy'; slot: string }
   | { why: 'notReady'; slot: string; state: SlotState; error: string | null }
   | { why: 'setupFailed'; slot: string; error: string; log: string | null }
 
@@ -152,6 +153,8 @@ export function refusalText(r: SlotRefusal, name: (agent: string) => string = (a
       return `this agent already builds in ${r.slot} for ${what(r.card, r.lane)}`
     case 'warming':
       return `${r.slot} is being set up`
+    case 'busy':
+      return `${r.slot} has a session or a process in it`
     case 'notReady':
       return `${r.slot} isn't ready (${r.error ?? r.state})`
     case 'setupFailed':
@@ -708,24 +711,29 @@ export class SlotPool {
     const target = o.target ?? (await this.defaultTarget())
     const holder = await this.deps.holder.self()
     const skip = new Set<string>()
+    const size = await this.size()
     for (;;) {
       const token = newToken()
-      const taken = await this.store.take(req, { size: await this.size(), root: this.deps.root, target, token, holder, skip })
-      if (!taken.ok) return taken
-      if (taken.again) {
-        // Its lease already: handed over only once the slot is ready (another Hive may be warming it).
-        const s = taken.slot
-        if (s.op) return { ok: false, refusal: { why: 'warming', slot: s.name } }
-        if (s.state !== 'lent' || s.job || s.warmError) return { ok: false, refusal: { why: 'notReady', slot: s.name, state: s.state, error: s.warmError } }
-        return { ok: true, lease: taken.lease, slot: s }
-      }
-      const done = await this.op(token, () => this.warm(taken.slot, taken.lease, token, taken.fresh, target))
-      if (done === 'ready') return { ok: true, lease: this.store.lease(taken.lease.id)!, slot: this.store.slot(taken.slot.name)! }
-      if (done === 'skip') {
+      // The operation is this pool's (its token live, its work awaited by close) from before the write that reserves the
+      // slot: a refresh meanwhile never takes a reservation just committed for one whose holder is gone.
+      const out = await this.op(token, async (): Promise<LendResult | 'skip'> => {
+        const taken = await this.store.take(req, { size, root: this.deps.root, target, token, holder, skip })
+        if (!taken.ok) return taken
+        if (taken.again) {
+          // Its lease already: handed over only once the slot is ready (another Hive may be warming it).
+          const s = taken.slot
+          if (s.op) return { ok: false, refusal: { why: 'warming', slot: s.name } }
+          if (s.state !== 'lent' || s.job || s.warmError) return { ok: false, refusal: { why: 'notReady', slot: s.name, state: s.state, error: s.warmError } }
+          return { ok: true, lease: taken.lease, slot: s }
+        }
+        const done = await this.warm(taken.slot, taken.lease, token, taken.fresh, target)
+        if (done === 'ready') return { ok: true, lease: this.store.lease(taken.lease.id)!, slot: this.store.slot(taken.slot.name)! }
+        if (done !== 'skip') return { ok: false, refusal: done }
         skip.add(taken.slot.name)
-        continue
-      }
-      return { ok: false, refusal: done }
+        // The slot asked for by name, passed over: refused once, never reserved again and again.
+        return req.slot ? { ok: false, refusal: { why: 'busy', slot: taken.slot.name } } : 'skip'
+      })
+      if (out !== 'skip') return out
     }
   }
 
@@ -802,9 +810,12 @@ export class SlotPool {
   private async recover(s: Slot): Promise<void> {
     const was = s.op!
     const token = newToken()
-    if (!(await this.store.takeOver(s.name, was.token, token, await this.deps.holder.self()))) return
-    log.warn(`Taking over slot ${userText(s.name)}'s ${was.kind} from process ${was.pid}, which is gone`)
     await this.op(token, async () => {
+      // Eligible still, as the row is now (the holder looked at again), right before the write that takes it over.
+      const now = this.store.slot(s.name)
+      if (!now?.op || now.op.token !== was.token || !(await this.holderGone(now.op))) return
+      if (!(await this.store.takeOver(s.name, was.token, token, await this.deps.holder.self()))) return
+      log.warn(`Taking over slot ${userText(s.name)}'s ${was.kind} from process ${was.pid}, which is gone`)
       try {
         // Its processes may still run: then its job stays recorded (the slot out of the pool) until they are seen ended.
         const settled = !s.job || (await this.deps.settle(s.job))
@@ -867,11 +878,15 @@ export class SlotPool {
       return 'skip'
     }
     try {
+      // The workspace closed between the reservation and now: nothing on disk changes. A new slot is left not ready
+      // (nothing made: `tidy` forgets it), an existing one goes back as it was.
+      if (this.closed) return fresh ? await fail('the workspace closed') : await this.unreserve(name, lease, token, slot.state)
       let made = fresh
       if (!made) {
         if (!(await this.present(slot))) {
           // Gone from disk while free: made again where it was (git's stale entry pruned first).
           if (existsSync(slot.folder)) return await fail('its folder is there but git does not list it as a worktree')
+          await this.store.fenced(name, token, () => undefined)
           await git(this.deps.project, ['worktree', 'prune'])
           made = true
         } else {
@@ -883,6 +898,8 @@ export class SlotPool {
       }
       if (this.closed) return await fail('the workspace closed')
       const opts = await this.deps.options()
+      // Still this operation's, right before the worktree is made or anything is copied into it.
+      await this.store.fenced(name, token, () => undefined)
       if (made) {
         const at = target ? await G.lineHead(this.deps.project, target) : await G.head(this.deps.project)
         if (isUnknown(at) || !at) return await fail(`git couldn't read ${target ?? 'HEAD'}`)
@@ -914,6 +931,15 @@ export class SlotPool {
     }
   }
 
+  /** A reservation given back untouched (the workspace closed before anything was done): its lease ended, the slot as it was. */
+  private async unreserve(name: string, lease: SlotLease, token: string, state: SlotState): Promise<SlotRefusal> {
+    await this.store.fenced(name, token, (db) => {
+      this.store.endIn(db, lease.id, 'closed')
+      this.store.setIn(db, name, state, {}, { op: null })
+    })
+    return { why: 'notReady', slot: name, state, error: 'the workspace closed' }
+  }
+
   /**
    * Removes a slot, guarded (§16.6.4: no switch): kept, with why, while it has an open lease (carried included), an
    * operation or an unsettled job, a session or a process in it, a queue entry in flight for a card it held,
@@ -932,14 +958,14 @@ export class SlotPool {
     if (open) return { why: 'leased', agent: open.agent }
     if (s.op || s.job) return { why: 'busy', state: s.state }
     const token = newToken()
-    // Taken out of the pool first, in a write that sees it free and as read: nothing lends or adopts it meanwhile.
-    if (!(await this.store.startRemoval(name, s.state, token, await this.deps.holder.self()))) {
-      const now = this.store.openLease(name)
-      return now ? { why: 'leased', agent: now.agent } : { why: 'busy', state: this.store.slot(name)?.state ?? s.state }
-    }
     const from = s.state
     const slot = s
     return this.op(token, async () => {
+      // Taken out of the pool first, in a write that sees it free and as read: nothing lends or adopts it meanwhile.
+      if (!(await this.store.startRemoval(name, from, token, await this.deps.holder.self()))) {
+        const now = this.store.openLease(name)
+        return now ? { why: 'leased', agent: now.agent } : { why: 'busy', state: this.store.slot(name)?.state ?? from }
+      }
       const keep = async (kept: SlotKept): Promise<SlotKept> => {
         log.info(`Kept slot ${userText(name)} of ${userText(this.deps.project)}: ${kept.why}`)
         await this.store.fenced(name, token, (db) => this.store.setIn(db, name, from, {}, { op: null })).catch((e) => {
