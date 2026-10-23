@@ -49,6 +49,7 @@
   "content.skill.cantDelete": "W Hive można usuwać tylko umiejętności Hive i lokalne umiejętności projektu.",
   "content.skill.chooseFile": "Wybierz plik .md lub archiwum .zip.",
   "content.skill.copyExists": "Obszar roboczy ma już umiejętność o nazwie „{name}”",
+  "content.skill.deliveredName": "To nie jest nazwa umiejętności.",
   "content.skill.exists": "Umiejętność o nazwie „{name}” już istnieje w {folder}",
   "content.skill.isCopy": "To kopia umiejętności obszaru roboczego, którą zarządza Hive; zamiast tego usuń umiejętność w obszarze roboczym.",
   "content.skill.metadata": "jej pole metadata nie jest zbiorem pól (`metadata:`, a pod nim z wcięciem `audience: …`)",

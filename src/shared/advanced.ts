@@ -222,6 +222,12 @@ export const ASSISTANT_OTHER_MCP = 'hive.assistant.otherMcpServers'
 export const HIVE_GUIDANCE = 'hive.guidance'
 
 /**
+ * Where Hive removes its skill copies (.agents/skills/hive-*) once no agent of Hive's works in the folder (#1431, #966 row
+ * 15): `slots` in every folder but the project folder, `everywhere`, or `never`. Read by main's skillCopies.ts.
+ */
+export const SKILLS_REMOVE_IDLE_COPIES = 'hive.skills.removeIdleCopies'
+
+/**
  * Whether right-click goes to a provider's CLI rather than Hive's copy/paste (#737): `<provider>.mouse.rightClickToCli`,
  * an advanced value for a CLI that handles the mouse itself. A provider without one keeps Hive's.
  */
@@ -800,6 +806,27 @@ const SOURCES: readonly AdvancedSource[] = [
     kind: 'boolean',
     default: true,
     applies: 'sessions'
+  },
+  // Hive's skill copies for Codex and Copilot outlive their sessions (#1431, #966 row 15): a CLI run on its own in the
+  // folder would still see them. Removed by default where Hive's own folders are (slots), kept in the project folder.
+  {
+    id: SKILLS_REMOVE_IDLE_COPIES,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.title', defaultMessage: "Remove Hive's skill copies when no agent works in the folder", description: "An advanced setting's title (Settings → Advanced), listed under Hive: the copies of Hive's skills it puts in a folder for Codex and Copilot." }),
+    desc: msg({
+      id: 'settings.advanced.hive.skills.removeIdleCopies.desc',
+      defaultMessage:
+        "Codex and Copilot read Hive's skills from copies Hive puts in each agent's folder (.agents/skills/hive-…); Claude Code gets them at each launch and leaves nothing behind. Once the last of Hive's agents in a folder stops, Hive can remove its copies, so a CLI you run there yourself doesn't see them. Slots only removes them from slots and agents' worktrees, never the project folder. Everywhere removes them from the project folder too. Never keeps them. Only copies Hive made, and nobody changed since, are removed: never your own skills.",
+      description: 'What the advanced setting "Remove Hive\'s skill copies when no agent works in the folder" does (Settings → Advanced, under Hive). Codex, Copilot and Claude Code are CLIs\' names and .agents/skills/hive-… a folder: keep them. Slots only, Everywhere and Never are the setting\'s choices: use the words its list shows.'
+    }),
+    kind: 'choice',
+    choices: [
+      { value: 'slots', label: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.slots', defaultMessage: 'Slots only', description: 'A choice of the advanced setting "Remove Hive\'s skill copies when no agent works in the folder": in every folder but the project folder.' }) },
+      { value: 'everywhere', label: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.everywhere', defaultMessage: 'Everywhere', description: 'A choice of the advanced setting "Remove Hive\'s skill copies when no agent works in the folder": in the project folder too.' }) },
+      { value: 'never', label: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.never', defaultMessage: 'Never', description: 'A choice of the advanced setting "Remove Hive\'s skill copies when no agent works in the folder": copies stay, as before.' }) }
+    ],
+    default: 'slots',
+    applies: 'now'
   },
   // Carrying on (#1432, #966 row 16; shared/inboxSwitches.ts): how Hive gets an agent to read its inbox, one switch each,
   // apart from whether it can read one (its hive tools). None drops an item: off, it stays in the inbox.

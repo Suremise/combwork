@@ -49,6 +49,7 @@
   "content.skill.cantDelete": "En Hive solo se pueden eliminar las habilidades de Hive y las habilidades locales de un proyecto.",
   "content.skill.chooseFile": "Elige un archivo .md o un .zip.",
   "content.skill.copyExists": "El espacio de trabajo ya tiene una habilidad llamada “{name}”",
+  "content.skill.deliveredName": "Ese no es un nombre de habilidad.",
   "content.skill.exists": "Ya existe una habilidad llamada “{name}” en {folder}",
   "content.skill.isCopy": "Esa es la copia que Hive hace de una habilidad del espacio de trabajo; elimina la habilidad en el espacio de trabajo.",
   "content.skill.metadata": "su metadata no es un conjunto de campos (`metadata:` y, debajo, `audience: …` con sangría)",

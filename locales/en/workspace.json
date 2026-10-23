@@ -1552,7 +1552,7 @@
     "description": "What could not be refreshed while the skill stays open: shown in \"Could not refresh {what}; last updated …\", with Retry."
   },
   "workspace.skillView.select": {
-    "defaultMessage": "Select a Hive skill to view or edit it. The agents in every project of this workspace get these skills, except those marked for the Hive Assistant.",
+    "defaultMessage": "Select a Hive skill to view or edit it. The agents in every project of this workspace get these skills, except those marked for the Hive Assistant and those switched off beside them (Delivered to agents).",
     "description": "The Skills view with no skill selected."
   },
   "workspace.statusBar.api": {

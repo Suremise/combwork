@@ -648,6 +648,11 @@ export interface WorkspaceConfig {
    * projects, unless a project turned it off); absent, they are moved to it when the workspace opens.
    */
   mcp: { enabled: string[]; model?: 2 }
+  /**
+   * The Hive skills the workspace's agents aren't given (#1431, Skills → Delivered to agents), by name: every other skill
+   * for their audience is delivered. A project can switch off more (ProjectConfig.skillDelivery), never one on again.
+   */
+  skillDelivery?: SkillDeliveryChoice
   /** Project folders Hive leaves out (Hide, or Remove from Hive while the folder is still in the workspace), by folder name. */
   hiddenProjects?: HiddenProject[]
   /** Card loops' rounds and wait in hours when a request doesn't say (#412, Settings → Workspace); absent: 10 and 6. */
@@ -1123,6 +1128,8 @@ export interface ProjectConfig {
    * projects): read once when the workspace's settings are moved to #1093's model, then emptied.
    */
   mcp: { disabled: string[]; enabled: string[] }
+  /** The Hive skills this project's agents aren't given (#1431, its Skills tab → Delivered to agents), over the workspace's. */
+  skillDelivery?: SkillDeliveryChoice
   chime: 'inherit' | 'on' | 'off'
   /** Carrying on (#1432, shared/inboxSwitches.ts): this project's own inbox switches over Settings → Advanced's; inherit uses those. */
   inboxCheckpoints: 'inherit' | 'on' | 'off'
@@ -2042,6 +2049,11 @@ export interface SkillInfo {
 
 /** Who a Hive skill is for. */
 export type SkillAudience = 'agents' | 'assistant' | 'all'
+
+/** Hive skills switched off for agents (#1431): their names (a hand-edited file may hold anything: skillDelivered reads it). */
+export interface SkillDeliveryChoice {
+  off: string[]
+}
 
 /** Where a new skill goes: the workspace's Hive skills, or a provider's local skills folder in a project. */
 export type SkillTarget = { kind: 'hive' } | { kind: 'local'; projectPath: string; provider: ProviderId }

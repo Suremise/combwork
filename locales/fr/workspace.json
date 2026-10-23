@@ -387,7 +387,7 @@
   "workspace.skillView.loadTarget": "la compétence",
   "workspace.skillView.ok": "OK",
   "workspace.skillView.refreshTarget": "la compétence",
-  "workspace.skillView.select": "Sélectionne une compétence Hive pour l’afficher ou la modifier. Les agents de tous les projets de cet espace de travail reçoivent ces compétences, sauf celles réservées au Hive Assistant.",
+  "workspace.skillView.select": "Sélectionne une compétence Hive pour l’afficher ou la modifier. Les agents de tous les projets de cet espace de travail reçoivent ces compétences, sauf celles marquées pour le Hive Assistant et celles désactivées à côté (Fournie aux agents).",
   "workspace.statusBar.api": "API",
   "workspace.statusBar.apiError": "Agent API : {error}",
   "workspace.statusBar.apiOff": "L’Agent API est désactivée",

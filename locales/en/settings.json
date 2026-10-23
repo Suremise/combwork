@@ -851,6 +851,26 @@
     "defaultMessage": "Show developer features",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.skills.removeIdleCopies.desc": {
+    "defaultMessage": "Codex and Copilot read Hive's skills from copies Hive puts in each agent's folder (.agents/skills/hive-…); Claude Code gets them at each launch and leaves nothing behind. Once the last of Hive's agents in a folder stops, Hive can remove its copies, so a CLI you run there yourself doesn't see them. Slots only removes them from slots and agents' worktrees, never the project folder. Everywhere removes them from the project folder too. Never keeps them. Only copies Hive made, and nobody changed since, are removed: never your own skills.",
+    "description": "What the advanced setting \"Remove Hive's skill copies when no agent works in the folder\" does (Settings → Advanced, under Hive). Codex, Copilot and Claude Code are CLIs' names and .agents/skills/hive-… a folder: keep them. Slots only, Everywhere and Never are the setting's choices: use the words its list shows."
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.everywhere": {
+    "defaultMessage": "Everywhere",
+    "description": "A choice of the advanced setting \"Remove Hive's skill copies when no agent works in the folder\": in the project folder too."
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.never": {
+    "defaultMessage": "Never",
+    "description": "A choice of the advanced setting \"Remove Hive's skill copies when no agent works in the folder\": copies stay, as before."
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.slots": {
+    "defaultMessage": "Slots only",
+    "description": "A choice of the advanced setting \"Remove Hive's skill copies when no agent works in the folder\": in every folder but the project folder."
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.title": {
+    "defaultMessage": "Remove Hive's skill copies when no agent works in the folder",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: the copies of Hive's skills it puts in a folder for Codex and Copilot."
+  },
   "settings.advanced.hive.slots.removeIdle.desc": {
     "defaultMessage": "A project keeps as many slots as it has builders. A free slot beyond that, unused for a day, is removed: its archive command runs first, and it is kept if that fails. Hive never removes one with an agent or a process in it, a lease, a merge in flight, or work that isn't committed and merged. Turned off, idle slots stay until you remove them.",
     "description": "What the advanced setting \"Remove idle slots after a day\" does (Settings → Advanced, under Hive). A slot is a worktree Hive lends to a card or a lane; a lease is one loan of it."

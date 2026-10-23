@@ -371,6 +371,11 @@ interface HiveMessageValues {
   'assistant.skills.deleteTitle': undefined
   'assistant.skills.deletedBadge': undefined
   'assistant.skills.deletedHere': undefined
+  'assistant.skills.delivered.failed': { name: string | number }
+  'assistant.skills.delivered.offInWorkspace': undefined
+  'assistant.skills.delivered.switch': { name: string | number }
+  'assistant.skills.delivered.tipProject': undefined
+  'assistant.skills.delivered.tipWorkspace': undefined
   'assistant.skills.editInWorkspace': undefined
   'assistant.skills.editTip': undefined
   'assistant.skills.fileMessage': { file: string | number; where: string | number }

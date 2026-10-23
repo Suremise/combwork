@@ -199,6 +199,10 @@
     "defaultMessage": "The workspace already has a skill named \"{name}\"",
     "description": "An error copying a skill into the workspace: it has one called {name} already."
   },
+  "content.skill.deliveredName": {
+    "defaultMessage": "That is not a skill name.",
+    "description": "An error switching a skill on or off for agents (Skills → Delivered to agents): the name given is not a valid skill name."
+  },
   "content.skill.exists": {
     "defaultMessage": "A skill named \"{name}\" already exists in {folder}",
     "description": "An error adding a skill: the skills folder {folder} (relative to the workspace) already has one called {name}."

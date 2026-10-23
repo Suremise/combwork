@@ -387,7 +387,7 @@
   "workspace.skillView.loadTarget": "den Skill",
   "workspace.skillView.ok": "OK",
   "workspace.skillView.refreshTarget": "den Skill",
-  "workspace.skillView.select": "Wähle einen Hive-Skill aus, um ihn anzusehen oder zu bearbeiten. Die Agenten in jedem Projekt dieses Arbeitsbereichs erhalten diese Skills, außer denen, die für den Hive Assistant markiert sind.",
+  "workspace.skillView.select": "Wähle einen Hive-Skill aus, um ihn anzusehen oder zu bearbeiten. Die Agenten aller Projekte dieses Arbeitsbereichs bekommen diese Skills, außer den für den Hive Assistant markierten und den daneben ausgeschalteten (An Agenten ausgeliefert).",
   "workspace.statusBar.api": "API",
   "workspace.statusBar.apiError": "Agent API: {error}",
   "workspace.statusBar.apiOff": "Agent API ist aus",

@@ -49,6 +49,7 @@
   "content.skill.cantDelete": "Hiveで削除できるのは、Hiveのスキルとプロジェクトのローカルスキルだけです。",
   "content.skill.chooseFile": ".mdファイルか.zipを選んでください。",
   "content.skill.copyExists": "ワークスペースには「{name}」という名前のスキルが既にあります",
+  "content.skill.deliveredName": "スキル名ではありません。",
   "content.skill.exists": "{folder}には「{name}」という名前のスキルが既にあります",
   "content.skill.isCopy": "これはワークスペースのスキルをHiveがコピーしたものです。ワークスペースのスキルを削除してください。",
   "content.skill.metadata": "metadataがフィールドの集まりになっていません（`metadata:`の下に`audience: …`をインデントして書きます）",
