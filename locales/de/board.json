@@ -22,6 +22,7 @@
   "board.archiveAll.messageColumn": "{n, plural, one {# Karte} other {# Karten}} in {column} archivieren? Unter „Archiviert“ kannst du sie zurückholen.",
   "board.archiveAll.messageShown": "Die {n, plural, one {# angezeigte Karte} other {# angezeigten Karten}} archivieren (von {total, number})? Unter „Archiviert“ kannst du sie zurückholen.",
   "board.archiveAll.messageShownIn": "Die {n, plural, one {# angezeigte Karte} other {# angezeigten Karten}} in {column} archivieren (von {total, number})? Unter „Archiviert“ kannst du sie zurückholen.",
+  "board.archiveAll.noneLeft": "{hasColumn, select, yes {In {column} sind keine Karten mehr zum Archivieren: Sie wurden verschoben, während dieser Dialog offen war.} other {Es sind keine Karten mehr zum Archivieren: Sie wurden verschoben, während dieser Dialog offen war.}}",
   "board.archiveAll.titleAll": "Alle Karten archivieren?",
   "board.archiveAll.titleColumn": "Alle in {column} archivieren?",
   "board.archiveAll.titleShown": "{n, plural, one {Die # angezeigte Karte archivieren?} other {Die # angezeigten Karten archivieren?}}",

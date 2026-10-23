@@ -180,6 +180,8 @@ interface HiveMessageValues {
   'tips.hiveSkills.title': undefined
   'tips.hooksMissing.text': undefined
   'tips.hooksMissing.title': undefined
+  'tips.howDoYouWork.text': undefined
+  'tips.howDoYouWork.title': undefined
   'tips.imagesTab.text': undefined
   'tips.imagesTab.title': undefined
   'tips.improveTranslation.text': undefined

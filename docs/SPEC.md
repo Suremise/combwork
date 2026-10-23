@@ -1229,6 +1229,31 @@ Everything is visible in the Version Control tab itself, not only through the As
   defaults) pauses its queue (`subfolderTarget`), saying how to go on.
 - `hive_project_status` gives `versionControl`: the platform, what is found, and any offer.
 
+**Built [#1423], "How do you work? Solo / Pair / Team":**
+- **Who asks, per platform** (`asksPreset`, `src/shared/workflow/presetStep.ts`): a project whose platform in force has
+  no preset, no options of its own and no answer (`workflow.presetAsked`). That is a project added since 1.0 (New
+  Project, a folder found when the workspace is read, its project.json made then as opening makes it, one the
+  Assistant or the Agent API adds) and one switched to a
+  platform it never had (#1419: nothing in `kept`), even with its other platform answered. A project from before 1.0
+  (no platform recorded) never asks, also before its upgrade has run: the upgrade writes its options (it gets the
+  one-time presets notice, §16.17).
+- **The answer is the platform's:** `chosen` (any save from the Workflow section, the step's Choose included) or
+  `notNow` (for the platform the step showed: one switched meanwhile isn't answered for it), written with
+  `setPresetAsked` (`projectWorkflow.ts`) under the project's lock; it goes into `kept` with the
+  platform's options when the project switches away and comes back with them, so each platform asks once. The settings
+  tool's saves keep it.
+- **The step**, under the Version Control tab's header (`PresetStep.tsx`): Solo, Pair and Team (for Git, Pair is Hive
+  merging), the one suggested from the project's agents marked (Solo for one or none, Pair for a builder and a reviewer
+  counted as the upgrade counts one, Team for more; worked out again as agents are added) and previewed with what it
+  sets and why (#1418's preview). **Choose** checks it as the Workflow section's save does and asks once ("Nothing is
+  in flight yet…"), then saves; **Customise…** opens the Workflow section with the preset filled in, not saved; **Not
+  now** writes `notNow` and no options, so they stay inherited (the workspace's and Hive's defaults, else all off), and
+  the header says "no preset chosen". Nothing is applied before Choose.
+- **Where:** New Project opens the new project's Version Control tab at the step; a project found when the workspace
+  is read, or added by the Assistant or the Agent API, gets a notice in the presets notice's look ("<project> was
+  added: how do you work?", **Choose…** to the step, **Not Now** answers `notNow`); after a switch to a platform with no
+  answer, the tab shows the step. All of it works with the Assistant off.
+
 ### 16.4 Facts
 
 #### 16.4.1 The log
@@ -1515,6 +1540,10 @@ can't be called *Erledigt* while Hive is in German); a bad one is refused with i
 renaming the Active stage leaves the category Active. The user's names are for the user's side (the window, the
 project's status lists them beside the ids); agents keep the ids. In the window the `doing` and `passed` categories read
 **Active** and **Approved** (OP-1; glossary §2.2); the ids, the Agent API and the English agents read don't change.
+That includes a card's history and the board's messages the window shows (#1458): a history line is stored in agents'
+English ("Moved to Doing", which agents, Hive's code and the scenarios read) and as its message, which the card dialog
+shows as "Moved to Active"; Archive All's reasons and Start's refusals say Active and Approved. Refusals only agents get
+(an agent's placement, ordering or review of a card) keep Doing and Passed.
 
 **Built [#1420]:** the board's columns are stages (`src/renderer/src/boardStages.ts`, laid out from `workflow:stages`
 and each card's stage from its facts). Each category in its fixed order shows its stages as columns: those the shown
@@ -1526,7 +1555,9 @@ stages; a column takes a project's rename when one project is shown or every sho
 default name, and a card's project chip then says its own project's name for the stage. A drop into a stage is its
 category's move; **Merging is no drop target** (its hover says cards come through the merge queue), and a card in
 Merging leaves it by Remove from queue, never by a drag into Approved; Approved's Archive All takes Approved's cards only (a
-card that moves on to Merging meanwhile stays: main checks its stage again), and Merging has none. Folds are kept per column id: a category's
+card that moves on to Merging meanwhile stays: main checks its stage again), and Merging has none. When every card an
+open Archive All dialog took leaves its column, stage or project, the dialog says none is left to archive, with Archive
+disabled, rather than that agents are on them (#1463). Folds are kept per column id: a category's
 apply to its stage, Merging keeps its own (`merging`). The toolbar links each shown project's workflow ("Workflow: Git ·
 Team", or a **Workflows** menu with a line per project), opening its Version Control tab at Workflow.
 
@@ -1619,7 +1650,9 @@ control; another system found, so None; the repository gone), and **Workflow: Gi
 no preset chosen, from `workflow:form`), which opens Workflow. The sections (`VC_SECTIONS`, `vcSections` in
 `gitRepo.ts`, kept per project while Hive runs) are Workflow, then Git's Changes, History, Branches & remotes
 (`GitBranches.tsx`) and Merge queue (#1357's section, placed as it was); a project opens at Changes for Git and at
-Workflow for None. **None's page:** Workflow, with Initialise repository… under the header while the folder has no
+Workflow for None. When the sections' names don't fit the tab's width beside the status line [#1461], they fold to
+their icons (each name in its tooltip and for screen readers), the selected section keeping its name; narrower still,
+the row scrolls with the selected section in view. **None's page:** Workflow, with Initialise repository… under the header while the folder has no
 repository; and **Merge queue while an old Git ruleset's queue is still there**, by #1356's actual-state rule
 (`queueShown`: an entry testing or queued, a pause, a return not seen yet, a runner, or a card in flight whose own
 ruleset has Hive merge), with its controls and the links to it, until that state is clear. The section list is a pure
@@ -3456,6 +3489,9 @@ when a role or name says *review*.
   projects with no preset chosen; **Choose…** opens the first one's Project Settings → Workflow, **Not Now** dismisses
   it. Either answer is recorded in `board_meta` (`workflow.presetsNotice`), so it shows once per workspace, and never on
   a board made by 1.0 (no card from before it: `adoption_upto` 0).
+- **[#1423]** Only projects from before 1.0 get the upgrade's options: those whose project.json records no platform
+  (Hive records it as it makes a project.json, which no Hive before 1.0 did), whatever the board (an upgraded board
+  with no cards included). A project made by 1.0 gets none, and asks "How do you work?" (§16.3.5) instead.
 
 **Agents' old moves, for one transition** [HB3's finding 7]: from P4 until P8 rewrites the skills, an agent's
 `hive_update_task` column move is translated into the matching intent instead of refused: `review` → submit, `passed`

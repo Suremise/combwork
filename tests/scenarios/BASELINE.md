@@ -36,6 +36,44 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## The Assistant's override, fixed scenarios: fakes, Claude Code, Codex, fixtures v74, 22 October 2026
+
+#1474 fixes the two scenario faults #1322's trial found (below). **assistant-override-reason**'s repository now shows the
+hand merge the user tells of (a card branch with a commit, merged `--no-ff` into alpha's default branch, which the
+prompt names with the branch), and the "passed no override" checks count every tool that moves the card
+(`hive_update_task`, `hive_update_tasks`, and the intents `hive_start_card`, `hive_put_back`, `hive_submit`,
+`hive_verdict`, `hive_report_merge`): **assistant-override-unneeded** needs one of them to have worked, and
+**assistant-override-none** no longer misses an override given through another tool than `hive_update_task`. Source
+db34091a with the change uncommitted.
+- **Fakes**: 9 of 9 checks on each (`2026-10-22T21-11-21-fake`, `2026-10-22T21-12-10-fake-codex`).
+- **Claude Code** (CLI 2.1.308, its default model, the test home's Max login): 30 of 30 checks in 3 samples of each
+  (`2026-10-22T21-13-13-claude-code`). With the merge in git it moved the card to Done with the user's reason as
+  `override` each time; it put the unneeded card back with `hive_put_back` each time, with no override. $1.09 for the 9
+  sessions (API-equivalent, as the CLI reports it).
+- **Codex** (0.163.0, its default model, its test home): 30 of 30 in 3 samples of each (`2026-10-22T21-17-11-codex`),
+  every move by `hive_update_task`. $0.48 for the 9 sessions.
+- **Round 2** (still v74, never merged at the first round's checks): the checks take a card by number, "#n" or its key
+  ("AL-1"), in `hive_update_task`, `hive_update_tasks` and the intents alike, and assistant-override-reason counts an
+  override given through `hive_update_tasks` too (unit tests in `tests/scenarioObserve.test.ts`). Fakes again: every
+  check passes (`2026-10-22T21-30-17-fake`, `2026-10-22T21-31-08-fake-codex`). The 18 real sessions above, re-scored with
+  these checks from their recorded observations rather than run again: all 60 results unchanged (every call named the
+  card by number).
+
+## The Assistant's override, Claude Code's trial: fixtures v73, 22 October 2026
+
+#1322: the Claude Code trial of #1319's three scenarios (below, where Codex passed 10 of 10), its test home signed in to a
+Max subscription. CLI 2.1.308, its default model, source 3a75fd16. Both failures are the scenarios', not the override
+path's: #1474.
+- **assistant-override-none**: passes, 4 of 4 (`2026-10-22T21-02-51-claude-code`). It tried the move without an
+  override, was refused, and told the user what the move would skip.
+- **assistant-override-unneeded**: 2 of 3 (same run). It put the card back with `hive_put_back` (#1267), with no
+  override and no `Override` fact; the check "passed no override" counts only `hive_update_task` calls, so it failed.
+- **assistant-override-reason**: 0 of 3 checks, in 3 samples (that run and `2026-10-22T21-05-00-claude-code`, 2 more).
+  Each time it checked the user's "merged into main by hand" against git, found the fixture's repository has only
+  `master` with one `init` commit (no `main`, no branch, no merge), and asked the user rather than moving the card.
+  Codex never looked at git. The fixture should show the merge.
+- Cost $0.64 for the 5 sessions (API-equivalent, as the CLI reports it; the test home's login is a Max subscription).
+
 ## Agents' old moves as intents: fakes, Codex (its default model), fixtures v73, 21 October 2026
 
 #1268 makes a project agent's `hive_update_task` `column` and `review` the card's intents while the skills still say
@@ -85,7 +123,7 @@ override and no `Override` fact.
   what the move would skip; asked to put the card back it moved it without an override.
 - **Claude Code**: not run. Its test home is still signed out (`2026-10-21T04-58-14-claude-code`: "Not logged in · Run
   /login" in its status line, the prompt never taken; the harness counted that as 3 failures instead of skipping it for
-  the environment: #1321). The trial is #1322, once the test home is signed in.
+  the environment: #1321). The trial is #1322, once the test home is signed in: run 22 October (above).
 
 ## The Assistant's override of a card's workflow rules: fakes, Codex (its default model), fixtures v70, 21 October 2026
 

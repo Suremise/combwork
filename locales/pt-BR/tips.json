@@ -178,6 +178,8 @@
   "tips.hiveSkills.title": "Skills para trabalhar com o Hive",
   "tips.hooksMissing.text": "Se uma atualização da CLI ou uma política impedir que os hooks de um agente cheguem ao Hive, o painel dele mostra Status desconhecido em vez de um status que pode estar errado, nada é digitado nele e a raia dele pausa. O banner acima do painel diz o motivo quando o Hive sabe.",
   "tips.hooksMissing.title": "Quando os hooks de um agente param de chegar",
+  "tips.howDoYouWork.text": "A aba Controle de versão de um projeto novo pergunta “Como você trabalha?”: Solo, Dupla ou Equipe, e sugere a que combina com os agentes dele. Escolher configura tudo com um clique; Agora não mantém seus padrões.",
+  "tips.howDoYouWork.title": "Comece um projeto novo com uma predefinição",
   "tips.imagesTab.text": "A aba Anexos guarda cada captura de tela e cada arquivo colado ou solto nas sessões do projeto, agrupados por sessão, com prévias e um filtro por tipo, prontos para inserir de novo.",
   "tips.imagesTab.title": "Tudo o que você anexou, em um só lugar",
   "tips.improveTranslation.text": "Encontrou uma palavra estranha ou errada no seu idioma? Ajuda → Melhorar esta tradução mostra como corrigi-la, ou como adicionar um idioma, com um pull request no GitHub.",

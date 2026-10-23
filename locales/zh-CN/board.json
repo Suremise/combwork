@@ -22,6 +22,7 @@
   "board.archiveAll.messageColumn": "归档“{column}”中的 {n, plural, other {# 张卡片}}？之后可在“已归档”中取消归档。",
   "board.archiveAll.messageShown": "归档显示的 {n, plural, other {# 张卡片}}（共 {total, number} 张）？之后可在“已归档”中取消归档。",
   "board.archiveAll.messageShownIn": "归档“{column}”中显示的 {n, plural, other {# 张卡片}}（共 {total, number} 张）？之后可在“已归档”中取消归档。",
+  "board.archiveAll.noneLeft": "{hasColumn, select, yes {“{column}”中已没有可归档的卡片：在此对话框打开期间，它们已被移走。} other {已没有可归档的卡片：在此对话框打开期间，它们已被移走。}}",
   "board.archiveAll.titleAll": "归档全部卡片？",
   "board.archiveAll.titleColumn": "归档“{column}”中的全部卡片？",
   "board.archiveAll.titleShown": "{n, plural, other {归档显示的 # 张卡片？}}",

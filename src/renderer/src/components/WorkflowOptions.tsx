@@ -125,7 +125,7 @@ const ownProblemText = (p: OwnWorkflowProblem): string => (p.kind === 'contradic
 
 /** A problem's lines: an inheriting project's (a level's save, #1422) names it, its reason on a line of its own. */
 const problemLines = (p: WorkflowProblem): string[] => (p.kind === 'inheritor' ? [tr(T.inheritor, { project: p.project }), ownProblemText(p.problem)] : [ownProblemText(p)])
-const problemText = (p: WorkflowProblem): string => problemLines(p).join('\n')
+export const problemText = (p: WorkflowProblem): string => problemLines(p).join('\n')
 
 /**
  * Where the editor's options come from and go to (#1422): a project's (the Version Control tab's Workflow section) or a
@@ -149,7 +149,7 @@ interface CopiedOptions {
 }
 
 /** A choice the preset area previews: a preset, or All off (§16.6.4). */
-type Choice = PresetId | 'allOff'
+export type Choice = PresetId | 'allOff'
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
 const list = (s: string): string[] =>
@@ -293,6 +293,14 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
     if (again && dirtyRef.current) return
     void load(again)
   }, [load, source.key, version])
+  // "How do you work?"'s Customise… (#1423): the preset filled in once the project's form is read, not saved.
+  const prefill = useStore((s) => s.workflowPrefill)
+  useEffect(() => {
+    if (!prefill || source.level || prefill.path !== source.key || loaded?.for !== source.key) return
+    setStore({ workflowPrefill: null })
+    const p = loaded.form.presets.find((x) => x.id === prefill.preset)?.options
+    if (p) setDraft({ preset: prefill.preset, options: loaded.draft.options.stageNames ? { ...ownOptions(p), stageNames: loaded.draft.options.stageNames } : ownOptions(p) })
+  }, [prefill, loaded, source])
 
   const effective = useMemo((): WorkflowOptions | null => (form && draft ? ({ ...form.inherited, ...draft.options, platform: form.platform } as WorkflowOptions) : null), [form, draft])
   const dirty = !!form && !!draft && (draft.preset !== form.preset || !same(draft.options, form.own))
@@ -393,27 +401,7 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
   }
 
   /** A value in words: the Inherit button's tooltip, what a save changes, a preset's preview. */
-  const valueText = (key: OptionKey, v: unknown): string => {
-    if (typeof v === 'boolean') return tr(v ? T.on : T.off)
-    if (key === 'review') return tr(platform === 'none' && v === 'none' ? VALUE_TEXT.review.noneNone : VALUE_TEXT.review[v as keyof typeof VALUE_TEXT.review])
-    const values = (VALUE_TEXT as Record<string, Record<string, ReturnType<typeof msg>>>)[key]
-    if (values && typeof v === 'string' && values[v]) return tr(values[v])
-    // A structured value with what it holds (HR6's round 3: the labels, the identity), not only its kind.
-    if (key === 'okBefore') {
-      const ok = v as OkBefore
-      return ok.mode === 'labels' ? tr(T.labelsValue, { labels: ok.labels.length ? fmt.list(ok.labels) : tr(T.noneValue) }) : tr(VALUE_TEXT.okBefore[ok.mode])
-    }
-    if (key === 'identity') {
-      const id = v as WorkflowOptions['identity']
-      return id ? tr(T.identityValue, { name: id.name, email: id.email }) : tr(T.off)
-    }
-    if (key === 'stageNames') return tr(T.stageNamesValue, { n: Object.keys((v as StageNames | undefined) ?? {}).length })
-    if (key === 'reviewers') return fmt.number(v as number)
-    if (key === 'commands') return Object.keys(v as Record<string, string>).length ? fmt.list(Object.entries(v as Record<string, string>).map(([name, command]) => `${name} (${command})`)) : tr(T.noneValue) // i18n-ignore: a check's name and command, shown as they are
-    if (Array.isArray(v)) return v.length ? fmt.list(v.map(String)) : tr(T.noneValue)
-    if (key === 'target') return (v as string) || tr(T.defaultBranch)
-    return String(v)
-  }
+  const valueText = (key: OptionKey, v: unknown): string => optionValueText(key, v, platform)
 
   const rowOf = (key: OptionKey): React.ReactNode => {
     const title = optionTitle(key, platform, effective.folder)
@@ -638,7 +626,7 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
  * A preset's preview (#1418, §16.6.3): each option it sets, with its value and why in one sentence, those it would change
  * here marked with their value now; Use fills the form (saved only with Save…). All off lists what never turns off.
  */
-function ChoicePreview({ choice, name, options, effective, valueText, onUse, onClose }: { choice: Choice; name: string; options: WorkflowOptions; effective: WorkflowOptions; valueText: (key: OptionKey, v: unknown) => string; onUse: () => void; onClose: () => void }) {
+export function ChoicePreview({ choice, name, options, effective, valueText, onUse, onClose }: { choice: Choice; name: string; options: WorkflowOptions; effective: WorkflowOptions; valueText: (key: OptionKey, v: unknown) => string; onUse?: () => void; onClose?: () => void }) {
   const keys = FORM_OPTIONS[options.platform].filter((k) => formShows(k, options))
   const changed = keys.filter((k) => !same(options[k], effective[k]))
   return (
@@ -661,16 +649,42 @@ function ChoicePreview({ choice, name, options, effective, valueText, onUse, onC
         })}
       </ul>
       {choice === 'allOff' && <NeverOff />}
-      <div className="workflow-preview-actions">
-        <button className="btn primary small" data-action="use-choice" onClick={onUse}>
-          {tr(T.use, { preset: name })}
-        </button>
-        <button className="btn subtle small" onClick={onClose}>
-          {tr(T.closePreview)}
-        </button>
-      </div>
+      {/* Its own Use and Close, unless the caller has its own (#1423: How do you work?). */}
+      {onUse && onClose && (
+        <div className="workflow-preview-actions">
+          <button className="btn primary small" data-action="use-choice" onClick={onUse}>
+            {tr(T.use, { preset: name })}
+          </button>
+          <button className="btn subtle small" onClick={onClose}>
+            {tr(T.closePreview)}
+          </button>
+        </div>
+      )}
     </div>
   )
+}
+
+/** An option's value in words (the rows' Inherit tips, a preview), as its platform names it. */
+export function optionValueText(key: OptionKey, v: unknown, platform: PlatformId): string {
+  if (typeof v === 'boolean') return tr(v ? T.on : T.off)
+  if (key === 'review') return tr(platform === 'none' && v === 'none' ? VALUE_TEXT.review.noneNone : VALUE_TEXT.review[v as keyof typeof VALUE_TEXT.review])
+  const values = (VALUE_TEXT as Record<string, Record<string, ReturnType<typeof msg>>>)[key]
+  if (values && typeof v === 'string' && values[v]) return tr(values[v])
+  // A structured value with what it holds (HR6's round 3: the labels, the identity), not only its kind.
+  if (key === 'okBefore') {
+    const ok = v as OkBefore
+    return ok.mode === 'labels' ? tr(T.labelsValue, { labels: ok.labels.length ? fmt.list(ok.labels) : tr(T.noneValue) }) : tr(VALUE_TEXT.okBefore[ok.mode])
+  }
+  if (key === 'identity') {
+    const id = v as WorkflowOptions['identity']
+    return id ? tr(T.identityValue, { name: id.name, email: id.email }) : tr(T.off)
+  }
+  if (key === 'stageNames') return tr(T.stageNamesValue, { n: Object.keys((v as StageNames | undefined) ?? {}).length })
+  if (key === 'reviewers') return fmt.number(v as number)
+  if (key === 'commands') return Object.keys(v as Record<string, string>).length ? fmt.list(Object.entries(v as Record<string, string>).map(([name, command]) => `${name} (${command})`)) : tr(T.noneValue) // i18n-ignore: a check's name and command, shown as they are
+  if (Array.isArray(v)) return v.length ? fmt.list(v.map(String)) : tr(T.noneValue)
+  if (key === 'target') return (v as string) || tr(T.defaultBranch)
+  return String(v)
 }
 
 /** What never turns off, whatever the options (§16.6.4: data safety). */
@@ -889,11 +903,15 @@ export function PresetsNotice() {
   const workspace = useStore((s) => s.workspace)
   const readOnly = useStore((s) => s.boardState?.readOnly ?? null)
   const [projects, setProjects] = useState<{ path: string; name: string }[] | null>(null)
+  // The workspaces answered in this window (#1464): a reload begun before the answer's board write commits (a new
+  // workspace object meanwhile, or one already in flight) reads the old board, and must not show it again.
+  const answered = useRef(new Set<string>())
   useEffect(() => {
-    if (!workspace?.path || readOnly !== null) return setProjects(null)
+    const path = workspace?.path
+    if (!path || readOnly !== null || answered.current.has(path)) return setProjects(null)
     let live = true
     call('workflow:presetsNotice')
-      .then((p) => live && setProjects(p))
+      .then((p) => live && setProjects(answered.current.has(path) ? null : p))
       .catch(() => live && setProjects(null))
     return () => {
       live = false
@@ -901,6 +919,7 @@ export function PresetsNotice() {
   }, [workspace, readOnly])
   if (!projects?.length) return null
   const answer = (choose: boolean): void => {
+    if (workspace?.path) answered.current.add(workspace.path)
     if (choose) openVersionControl(projects[0].path, 'workflow')
     setProjects(null)
     void call('workflow:presetsNoticeSaid').catch((e) => notify('error', errorMessage(e)))
