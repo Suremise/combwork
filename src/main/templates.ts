@@ -12,7 +12,9 @@ import {
   TEMPLATE_VERSION,
   templateAgentNames,
   templatePairs,
-  namesKey,
+  pairIndex,
+  pairNames,
+  usesKey,
   templateFile,
   templateFrom,
   uniqueName,
@@ -77,6 +79,8 @@ const M = {
   taken: msg({ id: 'content.templates.taken', defaultMessage: '{names} {count, plural, one {is already an agent} other {are already agents}} in {projects}: agent names are unique across the workspace, so rename {count, plural, one {it} other {them}}.', description: "Why a template can't be loaded: agents of other projects ({projects}) have its agents' names {names} ({count} of them). {names} and {projects} are lists, in the language's way (\"B1 and R1\")." }),
   takenNothing: msg({ id: 'content.templates.takenNothing', defaultMessage: '{names} {count, plural, one {is already an agent} other {are already agents}} in {projects}: agent names are unique across the workspace, so rename {count, plural, one {it} other {them}}. Nothing was changed.', description: "An error loading a template: agents of other projects ({projects}) took its agents' names {names} ({count} of them) while it loaded, so nothing changed. {names} and {projects} are lists, in the language's way (\"B1 and R1\")." }),
   nothing: msg({ id: 'content.templates.nothing', defaultMessage: '{problem} Nothing was changed.', description: "An error loading a template, nothing changed: {problem} is why, a sentence of its own (how many agents a project can have)." }),
+  noKey: msg({ id: 'content.templates.noKey', defaultMessage: "Hive couldn't read {project}'s key, and this template's agent names are made from it. Try again, or check the key in Project Settings → Agents & Worktrees.", description: "An error loading a template, or adding one of its agents, whose names hold the project's key (HI-B1 in a project whose key is HI): the key of the project ({project}, its name) couldn't be read. Project Settings → Agents & Worktrees is where the key is changed: use its translation." }),
+  noKeySave: msg({ id: 'content.templates.noKeySave', defaultMessage: "Hive couldn't read {project}'s key, so the names can't be saved with it. Try again, or save without Use the project key in names.", description: "An error saving a project's agents as a template with \"Use the project key in names\" ticked: the key of the project ({project}, its name) couldn't be read. \"Use the project key in names\" is the tick box's label: use its translation." }),
   hiveOnly: msg({ id: 'content.templates.hiveOnly', defaultMessage: "Hive's own templates can't be changed: duplicate one into the workspace or a project to change it.", description: "An error: saving, renaming, editing, importing into or deleting one of Hive's own templates (the Hive scope, read-only). Duplicate is a button: as Hive names it." })
 }
 
@@ -232,14 +236,21 @@ async function write(d: TemplateDest, file: string, t: AgentTemplate): Promise<T
  * Saves the project's agents and layout as a template in `scope`. A template of that name already there (case aside) is
  * replaced only with `overwrite`; otherwise the answer says it exists, so the user can be asked.
  */
-export async function saveTemplate(projectPath: string, scope: TemplateScope, name: string, overwrite = false): Promise<{ saved: TemplateEntry } | { exists: string }> {
+export async function saveTemplate(projectPath: string, scope: TemplateScope, name: string, overwrite = false, usePatterns = false): Promise<{ saved: TemplateEntry } | { exists: string }> {
   projectPath = workspace.assertProject(projectPath)
   const d: TemplateDest = { scope: checkScope(scope), project: projectPath }
   const clean = cleanName(name)
   const cfg = await workspace.projectConfig(projectPath)
   const agents = projectAgents(cfg)
   if (!agents.length) throw refusal(msg({ id: 'content.templates.noAgents', defaultMessage: 'This project has no agents to save.', description: "An error saving a project's agents as a template: it has none." }))
-  const t = templateFrom(clean, agents, cfg.layout, (a) => agentProvider(a, cfg, config.settings), new Date(), presetOf(cfg))
+  // The project's key in its names kept as a pattern (#1440), when asked: HI-B1 as {key}-B{n}; refused when the key
+  // can't be read, never saved with fixed names unasked.
+  const key = usePatterns ? await keyFor(projectPath) : null
+  if (usePatterns && !key) throw refusal(M.noKeySave, { project: basename(projectPath) })
+  const t = templateFrom(clean, agents, cfg.layout, (a) => agentProvider(a, cfg, config.settings), new Date(), presetOf(cfg), key ?? undefined)
+  // What is saved must load: read as a file is.
+  const checked = readTemplate(JSON.parse(JSON.stringify(t)))
+  if (!isAgentTemplate(checked)) throw new TemplateError(checked, { kind: 'invalid' })
   return changing(d, async () => {
     // The same name: its file (replaced when asked). Another name whose file name would be the same: a file of its own.
     const same = (await listIn(d)).find((e) => e.name.toLowerCase() === clean.toLowerCase())
@@ -277,20 +288,24 @@ export async function renameTemplate(ref: TemplateRef, name: string): Promise<Te
  */
 export async function updateTemplate(ref: TemplateRef, edited: unknown, savedAt: string | null): Promise<TemplateEntry> {
   const clean = cleanName(edited && typeof edited === 'object' ? (edited as { name?: unknown }).name : '')
-  const base = { ...(edited as object), version: TEMPLATE_VERSION, name: clean, savedAt: new Date().toISOString() }
+  // Its pairs are checked one by one below, never refusing the edit.
+  const { pairs: sent, ...rest } = (edited && typeof edited === 'object' ? edited : {}) as { pairs?: unknown }
+  const base = { ...rest, version: TEMPLATE_VERSION, name: clean, savedAt: new Date().toISOString() }
   const checked = readTemplate(base)
   if (!isAgentTemplate(checked)) throw new TemplateError(checked, { kind: 'invalid' })
   return changing(ref, async () => {
     const now = await usable(ref)
-    // What the editor doesn't change (#1436) stays: the preset and reviewer mode it suggests, and each of its pairs while
-    // it still fits the agents as edited (an agent renamed, removed or given a role on the other side drops its own pair
+    // What the editor doesn't change (#1436) stays: the preset and reviewer mode it suggests. Its pairs: as the editor
+    // sends them (#1440: it follows them by place through moves and renumbering), else the ones it had; either way each
+    // only while it fits the agents as edited (an agent removed or given a role on the other side drops its own pair
     // only: templatePairs keeps the others, each agent in one pair).
     const kept = { ...(now.suggestedPreset ? { suggestedPreset: now.suggestedPreset } : {}), ...(now.reviewerMode ? { reviewerMode: now.reviewerMode } : {}) }
-    const agent = (n: string): TemplateAgent | undefined => checked.agents.find((a) => sameAgentName(a.name, n))
-    const pairs = templatePairs((now.pairs ?? []).flatMap((p) => {
-      const b = agent(p.builder)
-      const r = agent(p.reviewer)
-      return b && r ? [{ name: b.name, role: b.role, pairedWith: r.name }, { name: r.name, role: r.role }] : []
+    const given = Array.isArray(sent) ? sent.filter((p): p is { builder: string; reviewer: string } => !!p && typeof p === 'object' && typeof (p as { builder?: unknown }).builder === 'string' && typeof (p as { reviewer?: unknown }).reviewer === 'string') : (now.pairs ?? [])
+    const numbered = pairNames(checked.agents)
+    const pairs = templatePairs(given.flatMap((p) => {
+      const b = pairIndex(checked.agents, p.builder)
+      const r = pairIndex(checked.agents, p.reviewer)
+      return b >= 0 && r >= 0 ? [{ name: numbered[b], role: checked.agents[b].role, pairedWith: numbered[r] }, { name: numbered[r], role: checked.agents[r].role }] : []
     }))
     const t = { ...checked, ...kept, ...(pairs.length ? { pairs } : {}) }
     if ((now.savedAt ?? null) !== (savedAt ?? null)) throw refusal(msg({ id: 'content.templates.editedMeanwhile', defaultMessage: '"{name}" changed since you started editing it (saved again meanwhile): nothing was saved. Close the editor to see it as it is now.', description: 'An error saving an edited template: it was saved again elsewhere after the editor opened it.' }), { name: now.name }, 'conflict')
@@ -404,9 +419,19 @@ function statusReads(projectPath: string, reads: wt.RepoReads): StatusOf {
   }
 }
 
-/** The key a template's names are expanded with in a project (`namesKey`, #1123 names). */
-async function keyFor(projectPath: string): Promise<string> {
-  return namesKey(await projectKeyOf(workspaceOf(projectPath), projectPath).catch(() => null), basename(projectPath))
+/** A project's key (#704), as a template's names are made with it (#1123 names); null when it can't be read. */
+async function keyFor(projectPath: string): Promise<string | null> {
+  return projectKeyOf(workspaceOf(projectPath), projectPath).catch(() => null)
+}
+
+/**
+ * A template's agents' names in a project (#1123 names, #1440): its patterns made with the project's key, refused when
+ * they hold `{key}` and the key can't be read (never a guessed one).
+ */
+async function namesIn(projectPath: string, agents: readonly TemplateAgent[]): Promise<string[]> {
+  const key = await keyFor(projectPath)
+  if (!key && usesKey(agents)) throw refusal(M.noKey, { project: basename(projectPath) })
+  return templateAgentNames(agents, key ?? '')
 }
 
 /**
@@ -444,7 +469,7 @@ async function planFor(projectPath: string, scope: TemplateScope, file: string, 
   const status = statusReads(projectPath, repo)
   const original = await usable(refFor(projectPath, scope, file, from))
   // Its patterns as this project's names (#1123 names), then the names chosen in the dialog.
-  const expanded = templateAgentNames(original.agents, await keyFor(projectPath))
+  const expanded = await namesIn(projectPath, original.agents)
   const t = { ...original, agents: withNames(original.agents.map((a, i) => ({ ...a, name: expanded[i] })), names) }
   const cfg = await workspace.projectConfig(projectPath)
   const current = projectAgents(cfg)
@@ -496,7 +521,7 @@ async function planFor(projectPath: string, scope: TemplateScope, file: string, 
     return owner ? [{ name: a.name, project: owner.project }] : []
   })
   // Its pairs by place, from the template's own names, so they follow the names chosen in the dialog.
-  const at = (n: string): number => original.agents.findIndex((a) => a.name.toLowerCase() === n.toLowerCase())
+  const at = (n: string): number => pairIndex(original.agents, n)
   const pairs = (original.pairs ?? []).map((p) => ({ builder: at(p.builder), reviewer: at(p.reviewer) })).filter((p) => p.builder >= 0 && p.reviewer >= 0)
   // A suggestion the project's options already follow isn't one.
   const suggestedPreset = original.suggestedPreset && original.suggestedPreset !== presetOf(cfg) ? original.suggestedPreset : null
@@ -626,10 +651,11 @@ export async function loadTemplate(projectPath: string, scope: TemplateScope, fi
 
 /**
  * Adds one agent of a template to the project, the others left alone, in the project folder with its role in the
- * workflow and note (#1436): its name a pattern expanded with the project's key, and a name already taken gets a number
+ * workflow and note (#1436): named `name` when given (the dialog's, #1440: refused, with a free one to try, when another
+ * agent of the workspace has it), else its pattern made with the project's key, a name already taken numbered
  * ("Builder 2").
  */
-export async function addAgentFromTemplate(projectPath: string, scope: TemplateScope, file: string, index: number, from?: string): Promise<AgentDef> {
+export async function addAgentFromTemplate(projectPath: string, scope: TemplateScope, file: string, index: number, from?: string, chosen?: string): Promise<AgentDef> {
   projectPath = workspace.assertProject(projectPath)
   const t = await usable(refFor(projectPath, scope, file, from))
   const a = Number.isInteger(index) ? t.agents[index] : undefined
@@ -637,7 +663,7 @@ export async function addAgentFromTemplate(projectPath: string, scope: TemplateS
   const why = providerProblem(a.provider)
   if (why) throw refusal(M.needsIt, { ...why, agent: a.name })
   // Unique across the workspace (#702): a name any agent of it has gets a number ("Builder 2"), never a prefix.
-  const own = templateAgentNames(t.agents, await keyFor(projectPath))[index]
-  const name = uniqueName(own, (await workspaceAgents(projectPath)).map((x) => x.name))
+  const own = (await namesIn(projectPath, t.agents))[index]
+  const name = typeof chosen === 'string' && chosen.trim() ? withNames([{ ...a, name: own }], [chosen])[0].name : uniqueName(own, (await workspaceAgents(projectPath)).map((x) => x.name))
   return addAgent(projectPath, { name, role: a.note, workflowRole: a.role, provider: a.provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext, mcpServers: a.mcpServers, location: 'project' })
 }

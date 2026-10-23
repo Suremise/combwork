@@ -45,7 +45,7 @@ async function closeAdvancedFileError(ctx) {
 const BIG = 'too-big-to-diff.bin'
 
 /** git in the project, with an identity of its own (never the machine's config). */
-const git = (ctx, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: ctx.project, env: ctx.lib.baseEnv(), stdio: 'pipe', encoding: 'utf8' })
+const git = (ctx, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: ctx.project, env: ctx.lib.gitEnv(), stdio: 'pipe', encoding: 'utf8' })
 
 /** A file over the Changes tab's 2 MB, uncommitted: in place of its changes, the tab says it is too large to compare. */
 async function diffTooLarge(ctx) {

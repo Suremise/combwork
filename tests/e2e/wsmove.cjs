@@ -42,8 +42,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const { baseEnv } = require('./runContext.cjs')
-const gitOut = (cwd, args) => execFileSync('git', args, { cwd, env: baseEnv(), encoding: 'utf8' })
+const gitOut = (cwd, args) => execFileSync('git', args, { cwd, env: lib.gitEnv(), encoding: 'utf8' })
 const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8'))
 /**
  * Makes a host's session records unwritable, or writable again (#1061: rows of its workspace's database, where a

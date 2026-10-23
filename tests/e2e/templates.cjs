@@ -278,7 +278,11 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await menuItems()).includes('Builder'), 5000)
   await page.screenshot({ path: path.join(lib.WORK, 'templates-5-add-from.png') })
   await item('Builder').click()
-  check('Add Agent from Template adds one, numbering a taken name', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer","Builder 2"]', 8000)), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
+  // Its name asked for (#1440), filled in free: Builder is beta's own already.
+  const addOne = page.locator('.dialog', { hasText: 'Add an agent from a template' })
+  check('Add Agent from Template asks for its name, filled in free', !!(await lib.until(async () => (await addOne.locator('#dialog-prompt-field').inputValue().catch(() => '')) === 'Builder (beta)', 8000)), await addOne.locator('#dialog-prompt-field').inputValue().catch(() => ''))
+  await addOne.getByRole('button', { name: 'Add Agent' }).click()
+  check('…and adds it under that name', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer","Builder (beta)"]', 8000)), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
   check('…with its role in the workflow and note, in the project folder', projectCfg(beta).agents[2].workflowRole === 'builder' && projectCfg(beta).agents[2].role === 'builder' && !projectCfg(beta).agents[2].worktree)
   await lib.until(async () => (await lib.agentCount(page)) === 3, 5000)
   // Configure Agent and Add…: the dialog, nothing added until it's confirmed.
@@ -320,7 +324,10 @@ const check = (name, ok, extra = '') => {
   for (let i = 0; i < 80 && (await active()) !== 'Reviewer'; i++) await page.keyboard.press('ArrowDown')
   check('→ opens the template agents, ↓ reaches Reviewer', (await active()) === 'Reviewer', await active())
   await page.keyboard.press('Enter')
-  check('Enter adds it', !!(await lib.until(async () => projectCfg(beta).agents.map((a) => a.name).includes('Reviewer 2'), 8000)), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
+  // Enter chose it: its name dialog (#1440) opens, its free name filled in.
+  check('Enter chooses it: its name asked for, filled in free', !!(await lib.until(async () => (await addOne.locator('#dialog-prompt-field').inputValue().catch(() => '')) === 'Reviewer (beta)', 8000)), await addOne.locator('#dialog-prompt-field').inputValue().catch(() => ''))
+  await addOne.getByRole('button', { name: 'Add Agent' }).click()
+  check('…and it is added', !!(await lib.until(async () => projectCfg(beta).agents.map((a) => a.name).includes('Reviewer (beta)'), 8000)), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
   await lib.until(async () => (await lib.agentCount(page)) === 4, 5000)
 
   // The palette: Load Template… and Add Agent from Template… open + Add ▾'s menus, on their first entry.
@@ -426,8 +433,12 @@ const check = (name, ok, extra = '') => {
   const fromNames = () => crossLoad.locator('.template-plan-from').allInnerTexts()
   const errors = () => crossLoad.locator('.template-plan-table .field-error').allInnerTexts()
   const loadButton = crossLoad.getByRole('button', { name: 'Load template' })
-  check("each name in the template beside a box for its new one, as the template has them", JSON.stringify(await fromNames()) === '["Alpha builder","Alpha reviewer","Tree"]' && JSON.stringify(await namesNow()) === '["Alpha builder","Alpha reviewer","Tree"]', JSON.stringify([await fromNames(), await namesNow()]))
-  check("…the two alpha's agents have marked, saying so, and Load template greyed out", JSON.stringify(await errors()) === '["alpha has an agent called Alpha builder.","alpha has an agent called Alpha reviewer."]' && /alpha already has agents called Alpha builder, Alpha reviewer/.test(await crossLoad.locator('[data-names-taken]').innerText()) && (await loadButton.isDisabled()), JSON.stringify(await errors()))
+  // #1440: the two names alpha's agents have start as free ones, so loading is one click; the others as they are.
+  check("each name in the template beside a box for its new one: alpha's two filled in free", JSON.stringify(await fromNames()) === '["Alpha builder","Alpha reviewer","Tree"]' && JSON.stringify(await namesNow()) === '["Alpha builder (beta)","Alpha reviewer (beta)","Tree"]', JSON.stringify([await fromNames(), await namesNow()]))
+  check("…saying why, none marked, Load template ready", (await errors()).length === 0 && /alpha already has agents called Alpha builder, Alpha reviewer: free names are filled in below/.test(await crossLoad.locator('[data-names-taken]').innerText()) && (await loadButton.isEnabled()), JSON.stringify(await errors()))
+  // One edited back to alpha's: marked, saying so, and Load template greyed out.
+  await nameInputs.nth(0).fill('Alpha builder')
+  check("…one edited to alpha's agent's name is marked, Load template greyed out", !!(await lib.until(async () => JSON.stringify(await errors()) === '["alpha has an agent called Alpha builder."]' && (await loadButton.isDisabled()), HUNG_MS)), JSON.stringify(await errors()))
   await page.screenshot({ path: path.join(lib.WORK, 'templates-13-names-taken.png') })
   // One changed, the other still alpha's: still greyed out. A name used twice is marked too.
   await nameInputs.nth(0).fill('BAB')

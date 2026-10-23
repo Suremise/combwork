@@ -37,7 +37,7 @@ const failing = (ctx, calls) => ctx.app.evaluate((_, c) => {
 const sendEvent = (ctx, ev) => ctx.app.evaluate(({ BrowserWindow }, e) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', e), ev)
 
 /** git in the project, with an identity of its own for the commits made here (never the machine's config). */
-const git = (ctx, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: ctx.project, env: ctx.lib.baseEnv(), stdio: 'pipe', encoding: 'utf8' })
+const git = (ctx, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: ctx.project, env: ctx.lib.gitEnv(), stdio: 'pipe', encoding: 'utf8' })
 
 /** The project as a repository with uncommitted changes, whatever the cases before made of it. */
 function seedChanges(ctx) {

@@ -13,9 +13,11 @@ import { fmt, tr } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
 import { HAND_OVER_TEXT } from '@shared/handOver'
 import type { McpServerInfo, ProjectInfo, ProjectProviderConfig, ProviderId, SessionLayout, SessionListItem, SessionView, ToastAction } from '@shared/types'
-import { TEMPLATE_NAME_MAX, type TemplateEntry, type TemplateScope } from '@shared/templates'
+import { TEMPLATE_NAME_MAX, namesFollowKey, templateAgentNames, usesKey, type TemplateEntry, type TemplateScope } from '@shared/templates'
 import { templateLoadDetail } from '@shared/templateLoad'
 import { PRESET_TEXT } from '@shared/workflow/optionTexts'
+import { WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
+import { agentNameProblem, nameTaken, nameTakenMessage, suggestTemplateAgentName, workspaceAgentList } from '@shared/agentNames'
 import { formatTokens, type SessionAction } from './util'
 import { movesShown } from './pendingMoves'
 import { createElement } from 'react'
@@ -1114,18 +1116,24 @@ export async function saveTemplate(path: string): Promise<void> {
   const p = project(path)
   if (!p?.agents.length) return notify('info', tr(msg({ id: 'actions.template.noAgents', defaultMessage: 'No agents to save', description: "A notification's title: the project has no agents to save as a template." })), tr(msg({ id: 'actions.template.noAgentsMessage', defaultMessage: 'Add the agents first, then save them as a template.', description: 'Under the notification that there are no agents to save as a template.' })))
   let workspaceScope = false
+  // Names that follow the project's key (HI-B1…) can be kept as patterns (#1440), so the template names its agents from
+  // the key of whichever project it is loaded into; Darren's HB1-style names aren't the key and stay as they are.
+  const key = get().projectKeys.find((k) => k.projectPath.toLowerCase() === path.toLowerCase())?.key ?? null
+  const offerPatterns = namesFollowKey(p.agents.map((a) => a.name), key)
+  let usePatterns = offerPatterns
   const name = await prompt({
     title: tr(msg({ id: 'actions.template.saveTitle', defaultMessage: 'Save as template', description: 'Title of the Save as Template dialog.' })),
     message: tr(msg({ id: 'actions.template.saveMessage', defaultMessage: "A template keeps the project's {n, plural, one {agent} other {# agents}} (settings, roles and notes), its layout and its preset, to load into any project later. Sessions and worktrees aren't saved.", description: "The Save as Template dialog: what a template keeps of the project's {n} agents. Glossary: preset." }), { n: p.agents.length }),
     placeholder: tr(msg({ id: 'actions.template.namePlaceholder', defaultMessage: 'Template name', description: "Placeholder of the Save as Template dialog's name box." })),
     confirmLabel: tr(msg({ id: 'actions.template.save', defaultMessage: 'Save', description: 'Button: saves the template.' })),
     validate: (v) => (!v.trim() ? tr(msg({ id: 'actions.template.nameEmpty', defaultMessage: 'Enter a name.', description: "Why a template's name can't be used: it is empty." })) : v.trim().length > TEMPLATE_NAME_MAX ? tr(msg({ id: 'actions.template.nameTooLong', defaultMessage: 'At most {max} characters.', description: "Why a template's name can't be used: it is longer than {max} characters." }), { max: TEMPLATE_NAME_MAX }) : null),
-    check: { label: tr(msg({ id: 'actions.template.everyProject', defaultMessage: 'For every project in the workspace (else for this project only)', description: "A tick box in the Save as Template dialog: the template is the workspace's (ticked) or this project's." })), initial: false, set: (v) => (workspaceScope = v) }
+    check: { label: tr(msg({ id: 'actions.template.everyProject', defaultMessage: 'For every project in the workspace (else for this project only)', description: "A tick box in the Save as Template dialog: the template is the workspace's (ticked) or this project's." })), initial: false, set: (v) => (workspaceScope = v) },
+    check2: offerPatterns ? { label: tr(msg({ id: 'actions.template.usePatterns', defaultMessage: 'Use the project key in names ({example} becomes {pattern}, named from the key of the project it is loaded into)', description: "A tick box in the Save as Template dialog (#1440): agent names that start with this project's key ({example}, e.g. HI-B1) are saved as a pattern ({pattern}: {key}-B{n}), so a project loading the template names them with its own key. Keep {key} and {n} as they are." }), { example: p.agents.map((a) => a.name).find((n) => n.toUpperCase().startsWith(`${key}-`)) ?? `${key}-B1`, pattern: '{key}-B{n}' }), initial: true, set: (v) => (usePatterns = v) } : undefined
   })
   if (name === null) return
   const scope: TemplateScope = workspaceScope ? 'workspace' : 'project'
   const saveFailed = (): string => tr(msg({ id: 'actions.template.saveFailed', defaultMessage: 'Could not save the template', description: "An error's title: saving a template failed." }))
-  let r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, false))
+  let r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, false, usePatterns))
   if (r && 'exists' in r) {
     const ok = await confirm({
       title: tr(msg({ id: 'actions.template.replaceTitle', defaultMessage: 'Replace the template?', description: 'Title of the question when a template of that name exists.' })),
@@ -1134,7 +1142,7 @@ export async function saveTemplate(path: string): Promise<void> {
       confirmLabel: tr(msg({ id: 'actions.template.replace', defaultMessage: 'Replace', description: 'Button: replaces the template of that name.' }))
     })
     if (!ok) return
-    r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, true))
+    r = await attempt(saveFailed(), () => call('templates:save', path, scope, name, true, usePatterns))
   }
   if (r && 'saved' in r) set((s) => ({ templatesVersion: s.templatesVersion + 1 }))
   if (r && 'saved' in r) notify('success', tr(msg({ id: 'actions.template.saved', defaultMessage: 'Template saved', description: "A notification's title: the template was saved." })), tr(msg({ id: 'actions.template.savedMessage', defaultMessage: '"{name}" ({n, plural, one {# agent} other {# agents}}), for {scope, select, workspace {the workspace} other {this project}}.', description: "Under the notification that a template ({name}) of {n} agents was saved for the workspace (workspace) or this project (other)." }), { name: r.saved.name, n: r.saved.agents.length, scope }))
@@ -1203,12 +1211,44 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
 }
 
 /** Adds one agent of a template, the project's others left alone (a name already taken gets a number). */
-export async function addAgentFromTemplate(path: string, entry: Pick<TemplateEntry, 'scope' | 'file'>, index: number): Promise<void> {
-  const def = await attempt(tr(msg({ id: 'actions.template.addAgentFailed', defaultMessage: 'Could not add the agent', description: "An error's title: adding an agent from a template failed." })), () => call('templates:addAgent', path, entry.scope, entry.file, index))
+/**
+ * Adds one agent of a template (#1440): a dialog with what it is (role, coding agent, model) and its name to choose,
+ * starting as the template's (made with this project's key), or a free one when another agent of the workspace has it;
+ * a name taken is refused there, with a free one to use.
+ */
+export async function addAgentFromTemplate(path: string, entry: Pick<TemplateEntry, 'scope' | 'file' | 'agents'>, index: number): Promise<void> {
+  const p = project(path)
+  const a = entry.agents[index]
+  if (!p || !a) return
+  const key = get().projectKeys.find((k) => k.projectPath.toLowerCase() === path.toLowerCase())?.key ?? null
+  const failed = tr(msg({ id: 'actions.template.addAgentFailed', defaultMessage: 'Could not add the agent', description: "An error's title: adding an agent from a template failed." }))
+  // Names made from the project's key that isn't known here: Hive says why (never a guessed key).
+  if (!key && usesKey(entry.agents)) {
+    if (await attempt(failed, () => call('templates:addAgent', path, entry.scope, entry.file, index))) await refreshWorkspace()
+    return
+  }
+  const everyone = workspaceAgentList(get().workspace?.projects)
+  const own = templateAgentNames(entry.agents, key ?? '')[index]
+  const initial = nameTaken(own, everyone) ? suggestTemplateAgentName(own, p.name, key, everyone.map((x) => x.name)) : own
+  const name = await prompt({
+    title: tr(msg({ id: 'actions.template.addTitle', defaultMessage: 'Add an agent from a template', description: 'Title of the dialog that adds one agent of a template to the project (#1440).' })),
+    message: tr(msg({ id: 'actions.template.addMessage', defaultMessage: '{role} · {provider} · {model}', description: "The dialog adding one agent of a template: what it is: its role in the workflow ({role}: Builder, Reviewer, Either), coding agent ({provider}) and model ({model}, or the provider's default)." }), { role: tr(WORKFLOW_ROLE_TEXT[a.role].name), provider: providerName(a.provider), model: a.model ?? tr(msg({ id: 'actions.template.addDefaultModel', defaultMessage: "the provider's default model", description: "The dialog adding one agent of a template: its model when the template leaves it to the coding agent's default." })) }),
+    fieldLabel: tr(msg({ id: 'actions.template.addName', defaultMessage: 'Its name', description: 'The dialog adding one agent of a template: the label of its name box.' })),
+    initial,
+    confirmLabel: tr(msg({ id: 'actions.template.addConfirm', defaultMessage: 'Add Agent', description: "The dialog adding one agent of a template: its button." })),
+    validate: (v) => {
+      const why = agentNameProblem(v, tr)
+      if (why) return why
+      const owner = nameTaken(v.trim(), everyone)
+      return owner ? nameTakenMessage(v.trim(), owner, suggestTemplateAgentName(v.trim(), p.name, key, everyone.map((x) => x.name)), tr) : null
+    }
+  })
+  if (name === null) return
+  const def = await attempt(failed, () => call('templates:addAgent', path, entry.scope, entry.file, index, undefined, name.trim()))
   if (!def) return
   await refreshWorkspace()
-  const p = project(path)
-  if (p) showAgent(p, def.id, 'select')
+  const now = project(path)
+  if (now) showAgent(now, def.id, 'select')
 }
 
 /** Removes an agent; for a worktree agent, asks whether to keep its worktree and branch. */
