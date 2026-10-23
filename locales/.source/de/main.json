@@ -269,6 +269,7 @@
   "main.unused.slot.busy": "Hive is setting it up or removing it now",
   "main.unused.slot.cantCheck": "Hive couldn't check it ({detail})",
   "main.unused.slot.dirty": "{files, plural, one {# file in it isn't committed} other {# files in it aren't committed}}",
+  "main.unused.slot.editedSkillCopy": "{copies, plural, one {its skill folder {names} isn't an unchanged copy of Hive's} other {its skill folders {names} aren't unchanged copies of Hive's}}",
   "main.unused.slot.gitRefused": "git didn't remove it ({detail})",
   "main.unused.slot.inFlight": "card #{card}, which it held, is still being merged",
   "main.unused.slot.leased": "it is lent to {agent}",

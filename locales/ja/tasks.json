@@ -117,6 +117,8 @@
   "tasks.history.repaired": "プロジェクト：{from} → {to}（名前の変更または移動）",
   "tasks.history.restored": "復帰：{project}が復元されたため",
   "tasks.history.returned": "レビューに再提出（ラウンド{round}）",
+  "tasks.history.reviewCopyLeased": "{agent} は {copy} ({revision}) でレビュー中",
+  "tasks.history.reviewCopyWaiting": "{agent} はレビュー用コピーを待っています",
   "tasks.history.reviewEnded": "{agent}のレビューが終了：{why, select, sessionEnded {セッションが終了したため} agentRemoved {エージェントが削除されたため} other {{why}}}",
   "tasks.history.reviewFailed": "レビュー不合格",
   "tasks.history.reviewPassed": "レビュー合格",

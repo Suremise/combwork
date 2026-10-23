@@ -167,7 +167,7 @@ function intentTools(): Tool[] {
       (a) => ({ summary: a.summary, revision: a.revision, note: a.note, paths: a.paths })
     ),
     intent('hive_declare_paths', 'declare-paths', "Declare the paths a card's work will change (relative to the project), for a folder shared with other agents. Moves nothing.", { paths: { type: 'array', items: { type: 'string' } } }, ['paths'], (a) => ({ paths: a.paths })),
-    intent('hive_start_review', 'start-review', "Start reviewing a card in Review: you are its reviewer; it stays where it is. Replies with the revision, base and files to review.", { submission }, [], (a) => ({ submission: a.submission })),
+    intent('hive_start_review', 'start-review', "Start reviewing a card in Review: you are its reviewer; it stays where it is. Replies with the revision, base and files to review, and the review copy to read and run commands in, when the project has them.", { submission }, [], (a) => ({ submission: a.submission })),
     intent(
       'hive_verdict',
       'verdict',

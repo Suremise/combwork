@@ -94,6 +94,11 @@ export interface LaunchContext {
    * skill copies there, so the copies of skills this launch no longer gets stay while one does.
    */
   othersHere?: () => boolean
+  /**
+   * Folders outside `cwd` the session may read and write (#1439, capabilities.extraDirs): a reviewer's grant of its
+   * project's review copies, one fixed folder. Given on the command line, never in the CLI's config; none when missing.
+   */
+  extraDirs?: string[]
 }
 
 /** One skill copy Hive recorded making in a folder (#1431): its revision is the copy's contentHash, its marker left out. */

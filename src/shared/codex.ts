@@ -133,7 +133,9 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     // Its paste-burst detection drops an Enter that a busy Codex reads with the line, bracketed or not; Enter once the line
     // is drawn sends it (#600, checked with 0.163). disable_paste_burst would too, but loses a user's multi-line paste.
     bracketedPaste: false,
-    enterOnceDrawn: true
+    enterOnceDrawn: true,
+    // --add-dir, added to the writable roots of its own config (0.163.0: tests/fixtures/advanced/writable-roots-codex-0.163.0.json).
+    extraDirs: true
   },
   // Ctrl+T opens Codex's transcript view; Ctrl+G its external editor.
   reservedKeys: ['MOD+T', 'MOD+G'],

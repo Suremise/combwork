@@ -269,6 +269,7 @@
   "main.unused.slot.busy": "Hive lo está preparando o quitando ahora",
   "main.unused.slot.cantCheck": "Hive no pudo comprobarlo ({detail})",
   "main.unused.slot.dirty": "{files, plural, one {# archivo sin commit en él} other {# archivos sin commit en él}}",
+  "main.unused.slot.editedSkillCopy": "{copies, plural, one {su carpeta de habilidades {names} no es una copia sin cambios de Hive} many {sus carpetas de habilidades {names} no son copias sin cambios de Hive} other {sus carpetas de habilidades {names} no son copias sin cambios de Hive}}",
   "main.unused.slot.gitRefused": "git no lo quitó ({detail})",
   "main.unused.slot.inFlight": "la tarjeta #{card}, que estuvo en él, aún se está fusionando",
   "main.unused.slot.leased": "está prestado a {agent}",

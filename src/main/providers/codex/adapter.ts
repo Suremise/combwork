@@ -782,6 +782,10 @@ export class CodexAdapter implements ProviderAdapter {
     if (ctx.model) args.push('-m', ctx.model)
     if (ctx.effort) args.push('-c', `model_reasoning_effort=${toToml(ctx.effort)}`)
     args.push(...(CODEX_MODE_FLAGS[ctx.permissionMode ?? ''] ?? CODEX_MODE_FLAGS[CODEX_DESCRIPTOR.defaultPermissionMode]))
+    // Folders it may also write in (#1439: a reviewer's review copies). --add-dir adds them to the writable roots of the
+    // user's own config; a -c sandbox_workspace_write.writable_roots would replace those (0.163.0: the fixture
+    // writable-roots-codex-0.163.0.json in tests/fixtures/advanced).
+    for (const d of ctx.extraDirs ?? []) args.push('--add-dir', d)
     const files = [join(codexHome(), 'config.toml'), join(ctx.cwd, '.codex', 'config.toml')]
     const developer = this.developerOverride(ctx)
     const hive = { preApprove: launchOverrides(ctx.overrides, CODEX, 'preApproveHiveTools'), trusted: ctx.trustedHiveTools }

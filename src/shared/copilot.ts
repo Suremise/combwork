@@ -240,7 +240,9 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
     // A line typed in pieces that a busy Copilot reads with its Enter in one go isn't sent by that Enter; pasted, it is,
     // as text (#600, checked with 1.0.98).
     bracketedPaste: true,
-    enterOnceDrawn: false
+    enterOnceDrawn: false,
+    // --add-dir (1.0.100).
+    extraDirs: true
   },
   reservedKeys: [],
   instructionsFile: 'AGENTS.md',

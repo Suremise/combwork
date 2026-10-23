@@ -1235,6 +1235,14 @@
     "defaultMessage": "Resume all agents at once",
     "description": "A tip's title."
   },
+  "tips.reviewCopies.text": {
+    "defaultMessage": "A reviewer reviews in a review copy: a folder at exactly the submitted revision, which nothing else writes, so the builder can carry on meanwhile. Its checks there count for that submission. Settings → Advanced turns it off.",
+    "description": "A tip. A review copy: a folder Hive keeps at exactly the revision under review. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.reviewCopies.title": {
+    "defaultMessage": "Reviewers test exactly what was submitted",
+    "description": "A tip's title."
+  },
   "tips.safeguardStops.text": {
     "defaultMessage": "A shield beside an agent's status means its CLI's safety classifier stopped a response: hover it for when, the model, and the agent's last tool calls before it. Orange means its model changed since, or it waits on you.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
