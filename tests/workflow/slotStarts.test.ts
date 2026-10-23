@@ -7,6 +7,8 @@ import { B1, commit, moved, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { lineName, slugOf, type SlotForStart } from '../../src/main/workflow/runtime'
 import { tempDir } from '../tempDir'
+import { reconcile, slotPreparationOwed } from '../../src/main/workflow/reconcile'
+import type { FactData } from '../../src/shared/workflow/facts'
 
 let env: Env | null = null
 afterEach(() => {
@@ -129,5 +131,60 @@ describe('cards on slots (#1438)', () => {
     expect(long.length).toBeLessThanOrEqual(40)
     expect(long).toBe('a-very-long-title-that-goes-on-and-on-we')
     expect(long.endsWith('-')).toBe(false)
+  })
+})
+
+// #1551: a slot card's line is made by its slot's preparation, so between its Started and its SlotPrepared it doesn't
+// exist yet: reconciliation then takes it neither for gone nor for a head moved to nothing.
+describe("a slot card's line before its slot's preparation (#1551)", () => {
+  const lineFacts = (e: Env, card: number) => e.store.facts(card).filter((f) => (f.kind === 'Gone' && (f.data as FactData['Gone']).what === 'line') || (f.kind === 'HeadMoved' && (f.data as FactData['HeadMoved']).to === null))
+
+  it('is never gone while its preparation is owed; once prepared, its line deleted is gone as before', async () => {
+    const { e } = world(() => ({ slot: 'slot-a', folder: tempDir('slot-'), lease: 'l-1', fresh: true }))
+    const card = e.wf.createCard({ title: 'In a slot' })
+    moved(await e.wf.start(card.key, B1))
+    const s = e.wf.state(card)
+    const line = s.started!.line!
+    expect(sh(e.project, 'branch', '--list', line)).toBe('')
+    expect(slotPreparationOwed(e.wf, card, s)).toBe(true)
+    await reconcile(e.wf, card)
+    await reconcile(e.wf, card)
+    expect(lineFacts(e, card.id)).toEqual([])
+    // Its preparation makes the line and records it (slotCards.ts's prepare).
+    sh(e.project, 'branch', line, s.started!.base!)
+    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line, revision: s.started!.base! }))
+    expect(slotPreparationOwed(e.wf, card, e.wf.state(card))).toBe(false)
+    await reconcile(e.wf, card)
+    expect(lineFacts(e, card.id)).toEqual([])
+    // Deleted after that: gone, once.
+    sh(e.project, 'branch', '-D', line)
+    await reconcile(e.wf, card)
+    await reconcile(e.wf, card)
+    expect(e.store.facts(card.id).filter((f) => f.kind === 'Gone').map((f) => f.data)).toEqual([{ what: 'line' }])
+  })
+
+  it("a preparation of another lease doesn't count: a start again in a new lease owes its own", async () => {
+    let lease = 'l-1'
+    const { e } = world(() => ({ slot: 'slot-a', folder: tempDir('slot-'), lease, fresh: true }))
+    const card = e.wf.createCard({ title: 'Started again' })
+    moved(await e.wf.start(card.key, B1))
+    const line = e.wf.state(card).started!.line!
+    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line, revision: 'r' }))
+    expect(slotPreparationOwed(e.wf, card, e.wf.state(card))).toBe(false)
+    // Put back, then started again in another slot's lease: the earlier preparation was for the earlier cycle.
+    moved(await e.wf.move(card.key, 'todo', 'user'))
+    lease = 'l-2'
+    moved(await e.wf.start(card.key, B1))
+    expect(e.wf.state(card).started).toMatchObject({ lease: 'l-2' })
+    expect(slotPreparationOwed(e.wf, card, e.wf.state(card))).toBe(true)
+    await reconcile(e.wf, card)
+    expect(lineFacts(e, card.id)).toEqual([])
+  })
+
+  it('a card started outside slots owes nothing', async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }, { autoRun: false }))
+    const card = e.wf.createCard({ title: 'On its own line' })
+    moved(await e.wf.start(card.key, B1))
+    expect(slotPreparationOwed(e.wf, card, e.wf.state(card))).toBe(false)
   })
 })

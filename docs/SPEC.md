@@ -1394,6 +1394,7 @@ tied to its `Stale` fact) [HR2's #1263 round 1]. Its rules:
 | A shared-folder card's commits interleaved with another card's | Each card's change is its own trailer's commits (§16.3.2); the other card's commits are in neither change. |
 | A Done card's revision no longer in the target (the target was reset) | A warning mark "no longer in main"; the card stays Done [P1]. |
 | The card's line deleted, its slot folder gone | `Gone`. A slot is recreated from the last known revision if it still exists (§16.10.2); otherwise the card shows the problem and its rules hold. Containment of a submitted change still answers from stored keys (§16.3.2). |
+| A slot card's line before its slot's preparation (its cycle's `Started` with a lease, no `SlotPrepared` of that lease yet) | Nothing: the preparation makes the line (§16.10), so until then it isn't gone and its head isn't read. Once prepared, a deleted line is `Gone` as above [#1551]. |
 | The repository gone | `Gone`; rules hold; §16.3.5. |
 | A commit with a card's trailer on the target while the card is in Todo | `HeadMoved` on that card; it isn't moved [P1]. |
 | An entry with `IntegrationStarted` and no outcome (Hive stopped mid-advance) | §16.4.5. Reconciliation leaves the card alone meanwhile: the queue's recovery settles it. |

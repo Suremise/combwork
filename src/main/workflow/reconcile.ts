@@ -197,6 +197,18 @@ async function observeHead(wf: Workflow, card: CardRecord, read: () => Promise<M
   return now
 }
 
+/**
+ * Whether a slot card's cycle still owes its slot's preparation (#1551): started with a lease, and no `SlotPrepared`
+ * of that lease since its `Started`.
+ */
+export function slotPreparationOwed(wf: Workflow, card: CardRecord, s: CardState): boolean {
+  const lease = s.started?.lease
+  if (!lease || !s.started?.slot) return false
+  const facts = wf.store.facts(card.id)
+  const at = facts.findLastIndex((f) => f.kind === 'Started')
+  return !facts.slice(at + 1).some((f) => f.kind === 'SlotPrepared' && (f.data as FactData['SlotPrepared']).lease === lease)
+}
+
 /** Reconciles one card with its platform (§16.4.4's table): the card's platform adapter observes and records. */
 export async function reconcile(wf: Workflow, card: CardRecord, hooks: ReconcileHooks = {}): Promise<void> {
   const c = wf.store.card(card.id)
@@ -241,9 +253,12 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     const followed = await followRename(wf, card, s)
     s = wf.state(card)
     const line = s.started?.line
+    // A slot card's line is made by its slot's preparation (#1438): until then it doesn't exist and isn't gone, nor has
+    // its head moved (#1551). Read before the line, so a preparation that lands meanwhile still counts as owed here.
+    const owed = slotPreparationOwed(wf, card, s)
     // Every observation below writes only while the card is still on this line in this cycle (checked under the write's
     // lock): a rename since stops it.
-    if (followed !== 'unknown' && line) {
+    if (followed !== 'unknown' && line && !owed) {
       const lh = await observeHead(wf, card, () => G.lineHead(project, line), line, hooks)
       s = wf.state(card)
       // Never gone while a rename points away from it: the next run follows it once git's names can be read.
