@@ -1143,12 +1143,33 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.item-table td > .tip-wrap:has(> .short-path) {
+.item-table td > .tip-wrap:has(> .short-path),
+.item-table td > span[aria-hidden] > .tip-wrap:has(> .short-path) {
   display: block;
   max-width: 100%;
 }
 .item-table td .short-path {
   display: block;
+}
+/* Cut in the middle (#1447): the head shrinks with an ellipsis, the last name stays whole (and is cut only if it alone
+   doesn't fit). */
+.short-path-text.short-path-split {
+  display: flex;
+  min-width: 0;
+}
+.short-path-head {
+  flex: 0 1 auto;
+  min-width: 1.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.short-path-tail {
+  flex: 0 0 auto;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* Text for screen readers only (a table's plain-text form, #572). */
 .visually-hidden {
