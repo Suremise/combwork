@@ -25,6 +25,13 @@ const service = await import('../src/main/workflow/service')
 const { ENFORCE } = service
 const { runCardIntent } = await import('../src/main/cardIntents')
 const lanes = await import('../src/main/lanes')
+const projectAgents = await import('../src/main/projectAgents')
+const templates = await import('../src/main/templates')
+const { testHooks: intentHooks } = await import('../src/main/cardIntents')
+const { configTestHooks } = await import('../src/main/workspace')
+const { loopReviewerOf } = await import('../src/main/loopReviewer')
+const { config } = await import('../src/main/config')
+const { providerService } = await import('../src/main/providerService')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { INTENT_ROUTES } = await import('../src/main/servers')
@@ -359,6 +366,130 @@ describe('a card by intent (#1267)', () => {
     await w.mutateProjectConfig(join(w.path!, 'p'), (cfg) => ({ agents: (cfg.agents ?? []).filter((a: { id: string }) => a.id !== 'a2') }))
     expect(await refused(act(w, card, builder, design('Revised design v2')))).toBe('loop.noReviewer')
     expect(foldCard(facts(w, card)).step).toBeNull()
+  })
+
+  /**
+   * A card a1 built and a2 last reviewed (no lane), back in Doing: a2 is its reviewer while it is one of the project's
+   * agents (HR4's round 3 finding: a removal racing a design's write).
+   */
+  const reviewedByA2 = async () => {
+    const { w, wt } = await workspace()
+    const card = await create(w)
+    await act(w, card, builder, { kind: 'start' })
+    commit(wt, `r${card}.txt`)
+    await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    await act(w, card, reviewer, { kind: 'startReview' })
+    await act(w, card, reviewer, { kind: 'verdict', pass: false, comment: 'Round 1: FAILED. 1. Post a design first.' })
+    return { w, card, p: join(w.path!, 'p') }
+  }
+  /** How long a condition here may take before the test has hung (a template's load under load takes seconds), never a wait. */
+  const HUNG = { timeout: 15_000 }
+  const agentIds = (w: WS) => inWorkspace(w, async () => (await w.projectConfig(join(w.path!, 'p'))).agents.map((a) => a.id))
+  /** The ways a2 leaves the project: Hive's removal, a template's load replacing every agent, a change of project.json. */
+  const leaving: [string, (w: WS, p: string) => Promise<unknown>][] = [
+    ['removeAgent', (w, p) => inWorkspace(w, () => projectAgents.removeAgent(p, 'a2', { deleteWorktree: false }))],
+    [
+      "a template's load",
+      (w, p) =>
+        inWorkspace(w, async () => {
+          // Its agents' CLI turned on and found, as a template's load checks.
+          config.settings.providers['claude-code'].enabled = true
+          providerService.info = ((id: string) => ({ provider: id, found: true })) as never
+          mkdirSync(join(w.path!, '.hive', 'templates'), { recursive: true })
+          writeFileSync(join(w.path!, '.hive', 'templates', `solo-${n}.json`), JSON.stringify({ version: 1, name: 'Solo', layout: 'auto', agents: [{ name: `Solo${n}`, provider: 'claude-code', worktree: false }] }))
+          return templates.loadTemplate(p, 'workspace', `solo-${n}.json`, await agentIds(w))
+        })
+    ],
+    ['a direct change of project.json', (w, p) => w.mutateProjectConfig(p, (cfg) => ({ agents: cfg.agents.filter((a) => a.id !== 'a2') }))]
+  ]
+  for (const [how, leave] of leaving) {
+    it(`a design whose reviewer leaves before it is written is refused (#1382, by ${how})`, async () => {
+      const { w, card, p } = await reviewedByA2()
+      // The post paused before its write; a2 leaves meanwhile, all the way.
+      let release!: () => void
+      const gate = new Promise<void>((r) => (release = r))
+      let paused = false
+      intentHooks.beforeDesignWrite = async () => {
+        paused = true
+        await gate
+      }
+      try {
+        const post = refused(act(w, card, builder, design('Revised design')))
+        await vi.waitFor(() => expect(paused).toBe(true), HUNG)
+        await leave(w, p)
+        expect(await agentIds(w)).not.toContain('a2')
+        release()
+        // Refused: nobody to check it (a template's load takes its builder too and moves the card out of Doing: refused for that first).
+        expect(await post).toBe(how === "a template's load" ? 'loop.stepNotHere' : 'loop.noReviewer')
+        expect(foldCard(facts(w, card)).step).toBeNull()
+      } finally {
+        intentHooks.beforeDesignWrite = undefined
+        release()
+      }
+    })
+
+    it(`a reviewer leaving while a design is being written waits for it: the design is taken, the leaving comes after (#1382, by ${how})`, async () => {
+      const { w, card, p } = await reviewedByA2()
+      // The post inside its write, holding the board's lock, paused before it reads its reviewer.
+      let release!: () => void
+      const gate = new Promise<void>((r) => (release = r))
+      let inside = false
+      let waiting = false
+      intentHooks.inDesignWrite = async () => {
+        inside = true
+        await gate
+      }
+      configTestHooks.beforeBoardRetry = () => {
+        waiting = true
+      }
+      try {
+        const post = act(w, card, builder, design('Revised design'))
+        await vi.waitFor(() => expect(inside).toBe(true), HUNG)
+        let left = false
+        const leavingNow = leave(w, p).then(() => (left = true))
+        // It reached its write of project.json, found an agent leaving, and waits for the board's lock: not written.
+        await vi.waitFor(() => expect(waiting).toBe(true), HUNG)
+        expect(left).toBe(false)
+        expect(await agentIds(w)).toContain('a2')
+        release()
+        const done = await post
+        expect(done.done.data?.design).toBeTruthy()
+        await leavingNow
+        expect(await agentIds(w)).not.toContain('a2')
+        // The design stands, written while a2 was the card's reviewer (a template's load, taking its builder too, then
+        // moves the card on, which ends it: still written first).
+        expect(facts(w, card).some((f) => f.kind === 'LoopStep' && (f.data as { design?: string }).design === done.done.data?.design)).toBe(true)
+        if (how !== "a template's load") expect(foldCard(facts(w, card)).step).toMatchObject({ id: done.done.data?.design })
+      } finally {
+        intentHooks.inDesignWrite = undefined
+        configTestHooks.beforeBoardRetry = undefined
+        release()
+      }
+    })
+  }
+
+  it('the reviewer is found by its id: renamed, it is still the reviewer; a lane whose reviewer left has none (#1382)', async () => {
+    const { w, card, p } = await reviewedByA2()
+    await w.updateAgent(p, 'a2', { name: 'Checker' })
+    const id = String((await act(w, card, builder, design('Plan'))).done.data?.design)
+    expect(await refused(act(w, card, reviewer, answer('ok', id)))).toBeNull()
+    const board = await inWorkspace(w, () => tasks.getTask(card, w))
+    expect(await inWorkspace(w, () => loopReviewerOf(w, board))).toEqual({ id: 'a2', name: 'Checker (p)' })
+    // A running lane with a3 reviewing, a3 then gone from project.json while the lane still names it: nobody, for
+    // delivery and for a design alike (never a2 instead).
+    const reviewerNow = () => inWorkspace(w, async () => loopReviewerOf(w, await tasks.getTask(card, w)))
+    await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a3', cards: [card], by: 'Builder (p)' })
+    expect(await reviewerNow()).toEqual({ id: 'a3', name: 'Other (p)' })
+    await w.mutateProjectConfig(p, (cfg) => ({ agents: cfg.agents.filter((a) => a.id !== 'a3') }))
+    expect(await reviewerNow()).toBeNull()
+    expect(await refused(act(w, card, builder, design('Plan v2')))).toBe('loop.noReviewer')
+  })
+
+  it("Hive's removal of a lane's reviewer abandons its lane: the card's last reviewer is its reviewer again (#1382)", async () => {
+    const { w, card, p } = await reviewedByA2()
+    await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a3', cards: [card], by: 'Builder (p)' })
+    await inWorkspace(w, () => projectAgents.removeAgent(p, 'a3', { deleteWorktree: false }))
+    expect(await inWorkspace(w, async () => loopReviewerOf(w, await tasks.getTask(card, w)))).toEqual({ id: 'a2', name: 'Reviewer (p)' })
   })
 
   it('a design with no reviewer to check it is refused, and an answer is the current reviewer\'s (#1382, findings 3 and 4)', async () => {

@@ -2062,9 +2062,14 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   its own watch's line (which quotes a comment's first line) or `hive_read_task` with `latestComment`. `proceed` before the check is due is refused (`loop.tooEarly`), and a
   design's deadline never moves (a changed setting, a watch started again, a restart). Each side only its own
   (`loop.stepNotYours`): the builder's steps by the card's builder; an answer by its reviewer, the reviewer of its running
-  lane, else the agent that last reviewed it, while it is one of the project's agents (a removed one can't be woken), never
-  its builder, read under the write's lock; the user and the Assistant
-  take either. A design with no reviewer to check it is refused (`loop.noReviewer`), as is one outside Doing
+  lane, else the agent of its latest review started or verdict (by id: a rename doesn't lose it; for a card from before
+  1.0, the agent whose board name last started reviewing it), while it is one of the project's agents (a removed one
+  can't be woken), never its builder; the user and the Assistant take either. One rule decides this for acceptance and
+  for delivery (`loopReviewerOf`, `loopReviewer.ts`), read inside the step's own board change (the runtime's `prepare`,
+  before its transaction). Every change that takes an agent out of a project (a removal, a merge's clean-up, a template's
+  load, any `agents` patch) publishes under the same board lock: `mutateProjectConfig` sees an agent id leave and,
+  outside a board change, writes nothing and runs again inside one (lock order: agent names, board, project.json). So
+  a removal is either before a design's read (refused) or after its write, never between. A design with no reviewer to check it is refused (`loop.noReviewer`), as is one outside Doing
   (`loop.stepNotHere`), and an answer or `proceed` with nothing waiting (`loop.noStep`); with the rules off, none is.
   Each step is a loop wake: a design (`step`, asking for a check, naming the design) and going ahead (`stepNotice`, a
   notice with nothing to answer) to the card's reviewer, an answer (`stepAnswer`) to the builder. They are delivered

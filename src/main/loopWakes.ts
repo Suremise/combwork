@@ -5,7 +5,8 @@ import type { TaskCard, TaskHistoryEntry } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
 import { cardChange, LOOP_WAKE_KINDS, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
 import { onHiveEvent } from './events'
-import { listLanes, onLanesWritten } from './lanes'
+import { onLanesWritten } from './lanes'
+import { loopReviewerOf } from './loopReviewer'
 import { createLogger, userText } from './logger'
 import { getTask, noteOnCard } from './tasks'
 import { actionsRunning, actionsSettled, onAction } from './workflow/actionWorker'
@@ -83,24 +84,14 @@ export async function wakesOn(ws: WorkspaceService, projectPath: string): Promis
   return (await ws.projectConfig(projectPath).catch(() => null))?.loopWakes !== false
 }
 
-/**
- * A card's reviewer: the reviewer of a running lane that has the card, else the project's agent that last started
- * reviewing it (by its board name). Null: the card has none (no wakes for it).
- */
-async function reviewerOf(ws: WorkspaceService, card: TaskCard, agents: { id: string; name: string }[]): Promise<string | null> {
-  const lanes = await listLanes(ws, { project: card.project }).catch(() => [])
-  const lane = lanes.find((l) => (l.state === 'active' || l.state === 'paused') && l.reviewer && l.cards.some((c) => c.number === card.number))
-  if (lane?.reviewer) return lane.reviewer.id
-  const last = card.history.findLast((h) => h.what === 'Started reviewing')
-  return (last && agents.find((a) => same(`${a.name} (${card.project})`, last.by))?.id) || null
+/** A card's reviewer's id: loopReviewerOf, the one rule a design's answer is checked by too (#1382). Null: none (no wakes). */
+async function reviewerOf(ws: WorkspaceService, card: TaskCard): Promise<string | null> {
+  return (await loopReviewerOf(ws, card))?.id ?? null
 }
 
-/** A card's reviewer (reviewerOf) by its id and board name, among its project's agents: null when it has none. */
-export async function cardReviewer(ws: WorkspaceService, projectPath: string, card: TaskCard): Promise<{ id: string; name: string } | null> {
-  const agents = projectAgents(await ws.projectConfig(projectPath)).map((a) => ({ id: a.id, name: a.name }))
-  const id = await reviewerOf(ws, card, agents)
-  const found = id ? agents.find((a) => a.id === id) : undefined
-  return found ? { id: found.id, name: `${found.name} (${card.project})` } : null
+/** A card's reviewer (loopReviewerOf) by its id and board name, among its project's agents: null when it has none. */
+export async function cardReviewer(ws: WorkspaceService, _projectPath: string, card: TaskCard): Promise<{ id: string; name: string } | null> {
+  return loopReviewerOf(ws, card)
 }
 
 /**
@@ -111,7 +102,7 @@ export async function cardReviewer(ws: WorkspaceService, projectPath: string, ca
 async function targetOf(ws: WorkspaceService, projectPath: string, card: TaskCard, kind: LoopWakeKind, agent?: string): Promise<{ id: string; name: string } | null> {
   const agents = projectAgents(await ws.projectConfig(projectPath)).map((a) => ({ id: a.id, name: a.name }))
   // The user's answer reaches the agent waiting on it in or out of a loop (#1269); a loop's handoffs need a reviewer.
-  const reviewer = kind === 'answer' ? null : await reviewerOf(ws, card, agents)
+  const reviewer = kind === 'answer' ? null : await reviewerOf(ws, card)
   if (!reviewer && kind !== 'answer') return null
   const target = kind === 'review' || toReviewer(kind) ? (agent ?? reviewer) : (agent ?? card.agent)
   if (!target || ((kind === 'review' || toReviewer(kind)) && target === card.agent)) return null
