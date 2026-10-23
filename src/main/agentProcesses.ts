@@ -155,6 +155,14 @@ export function onRunOutcome(fn: (runId: string, outcome: RunOutcome) => void): 
   outcomeListeners.add(fn)
   return () => outcomeListeners.delete(fn)
 }
+/**
+ * Ended launches whose leftovers Hive was asked to end (#1434): a kill is only asked, so their jobs are kept and looked
+ * at again at each poll until seen empty (`ended`), or, after CONFIRM_POLLS polls still not, given up (`unknown`).
+ */
+const confirming = new Map<string, number>()
+const CONFIRM_POLLS = 30
+/** Whether a job's listing shows it empty: no process described and none beyond those (its whole membership). */
+const emptyJob = (list: { processes: readonly unknown[]; more: number } | null): boolean => !!list && !list.processes.length && !list.more
 /** For tests: an outcome as the tracker would give it. */
 export const settleRunForTests = (runId: string, outcome: RunOutcome): void => settleRun(runId, outcome)
 
@@ -269,7 +277,8 @@ async function findLeftovers(runId: string): Promise<AgentLeftovers | null> {
   await new Promise((r) => setTimeout(r, SETTLE_MS))
   running.delete(runId)
   const list = await listJob(runId)
-  if (!list || !list.processes.length) {
+  // Empty only when its whole membership is: members not described (more) are still members, left as leftovers.
+  if (!list || emptyJob(list)) {
     void host.request('forget', runId)
     settleRun(runId, list ? 'ended' : 'unknown')
     return null
@@ -324,10 +333,10 @@ async function refresh(): Promise<void> {
   for (const l of [...left.values()]) {
     const list = l.restored ? await stillRunning(l.processes) : await listJob(l.runId)
     if (!left.has(l.runId)) continue
-    if (list && !list.processes.length) {
+    if (emptyJob(list)) {
       left.delete(l.runId)
       if (!l.restored) void host.request('forget', l.runId)
-      settleRun(l.runId, 'ended')
+      if (!l.restored) settleRun(l.runId, 'ended')
       changed.add(agentKey(l.projectPath, l.agentId))
     } else if (list && (list.processes.length !== l.processes.length || list.more !== l.more || list.processes.some((p, i) => p.pid !== l.processes[i]?.pid))) {
       left.set(l.runId, { ...l, processes: list.processes, more: list.more })
@@ -340,7 +349,17 @@ async function refresh(): Promise<void> {
     emit({ type: 'agent-leftovers', leftovers: first ? leftoversOf(first.projectPath, first.agentId) : { projectPath, agentId, agentName: '', processes: [], more: 0, since: '' } })
   }
   if (changed.size) persist()
-  if (!left.size && poll) {
+  // Jobs Hive asked to end: ended only once seen empty; still not after CONFIRM_POLLS looks, not known to have ended.
+  for (const [runId, polls] of [...confirming]) {
+    const list = await listJob(runId)
+    if (!confirming.has(runId)) continue
+    if (emptyJob(list) || polls + 1 >= CONFIRM_POLLS) {
+      confirming.delete(runId)
+      void host.request('forget', runId)
+      settleRun(runId, emptyJob(list) ? 'ended' : 'unknown')
+    } else confirming.set(runId, polls + 1)
+  }
+  if (!left.size && !confirming.size && poll) {
     clearInterval(poll)
     poll = null
   }
@@ -384,8 +403,14 @@ export async function settleLeftovers(projectPath: string, agentId: string, how:
       continue
     }
     left.delete(l.runId)
-    if (!l.restored) void host.request('forget', l.runId)
-    settleRun(l.runId, how === 'end' ? 'ended' : 'kept')
+    if (how === 'end' && !l.restored) {
+      // Asked to end, not yet seen ended: its job is kept and looked at until it is empty (confirming).
+      confirming.set(l.runId, 0)
+      startPolling()
+    } else {
+      if (!l.restored) void host.request('forget', l.runId)
+      if (!l.restored) settleRun(l.runId, how === 'end' ? 'ended' : 'kept')
+    }
     done += l.processes.length + l.more
   }
   persist()
@@ -468,13 +493,16 @@ export function closeProcessTracking(): Promise<void> {
 function jobsLost(why: string): void {
   // It held nothing (started early, #1155, or every launch long settled): nothing is lost, and the next request starts
   // a new one.
-  if (!running.size && ![...left.values()].some((l) => !l.restored)) {
+  if (!running.size && !confirming.size && ![...left.values()].some((l) => !l.restored)) {
     log.warn(`the process job host ended (${why}) holding no launch`)
     return
   }
   const launches = running.size
   for (const runId of running.keys()) settleRun(runId, 'unknown')
   running.clear()
+  // Jobs asked to end and not yet seen empty: no longer to be seen at all.
+  for (const runId of confirming.keys()) settleRun(runId, 'unknown')
+  confirming.clear()
   let listed = 0
   const agents = new Map<string, { projectPath: string; agentId: string }>()
   for (const l of [...left.values()]) {

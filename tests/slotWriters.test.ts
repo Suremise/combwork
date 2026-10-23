@@ -14,9 +14,12 @@ import { commit, gitRepo, sh } from './workflow/harness'
 
 /** What spawnPty was asked to start (the worktree setup's terminal): no process is started. */
 const spawned: { key: string; onExit?: (code: number) => void }[] = []
+/** spawnPty throwing before any process exists (its duplicate-key guard, its launch gate, node-pty's own spawn). */
+const spawnThrows = vi.hoisted(() => ({ on: false }))
 vi.mock('../src/main/ptyHost', async (orig) => ({
   ...((await orig()) as object),
   spawnPty: (key: string, o: { onExit?: (code: number) => void }) => {
+    if (spawnThrows.on) throw new Error('spawn failed before any process started')
     spawned.push({ key, onExit: o.onExit })
     return { pid: 0 }
   }
@@ -211,6 +214,36 @@ describe("a slot's writer through sessions.start (#1434 round 3)", () => {
       await vi.waitFor(() => expect(writer()).toBeNull(), { timeout: 15000 })
       expect(live.size).toBe(0)
     }
+  })
+
+  it("the setup's spawn throwing before any process exists releases the writer and its token at once (nothing to wait for)", async () => {
+    hostOn()
+    writeProject({ worktree: folder, setup: 'exit 1' })
+    spawnThrows.on = true
+    try {
+      await expect(start()).rejects.toThrow(/spawn failed/)
+    } finally {
+      spawnThrows.on = false
+    }
+    await vi.waitFor(() => expect(writer()).toBeNull(), { timeout: 15000 })
+    expect(live.size).toBe(0)
+    expect(manager.writers.size).toBe(0)
+  })
+
+  it("the launch failing after its setup ran keeps the setup's duty: held until the setup's processes are known ended", async () => {
+    hostOn()
+    writeProject({ worktree: folder, setup: 'exit 0' })
+    const state = await start()
+    expect(spawned).toHaveLength(1)
+    launchFails = true
+    spawned[0].onExit?.(0)
+    // The setup succeeded, the CLI's launch failed: the run's setup processes still owe their settlement.
+    await vi.waitFor(() => expect(manager.writers.size).toBe(0), { timeout: 15000 })
+    expect(writer()?.run).toBe(state.runId)
+    expect(live.has(state.runId)).toBe(true)
+    settleRunForTests(state.runId, 'ended')
+    await vi.waitFor(() => expect(writer()).toBeNull(), { timeout: 15000 })
+    expect(live.size).toBe(0)
   })
 
   it("a slot the pool set up never runs the agent's worktree setup (its 0.9 worktree elsewhere)", async () => {

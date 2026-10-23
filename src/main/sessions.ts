@@ -1547,7 +1547,6 @@ class SessionManager {
         // The same last check as before an agent's own launch.
         if (this.starting.get(id)?.cancelled || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
         opts.allowed?.()
-        this.writerSpawned(runId)
         spawnPty(key, {
           file: sh.file,
           args: sh.args,
@@ -1558,6 +1557,8 @@ class SessionManager {
           ...(tracked ? { track: (pid: number, cancelled: AbortSignal) => trackLaunch({ runId, projectPath, agentId, agentName: agent.name }, pid, cancelled).then((r) => this.launchWord(r)) } : {}),
           onExit: (code) => void this.afterSetup(projectPath, agentId, code, { sessionId, name: sessionName, resume: !!opts.resumeId })
         })
+        // Its setup's process runs now (spawnPty returned, not thrown): its slot's writer is the run's processes' to settle.
+        this.writerSpawned(runId)
       } catch (e) {
         this.forget(id)
         throw e
@@ -1812,8 +1813,6 @@ class SessionManager {
     // The developer console (#636): how it was started (launchEvent: never its arguments).
     devConsole.capture([sessionSourceId(projectPath, agent.id)], () => launchEvent({ provider: adapter.id, name: adapter.descriptor.name, file: cmd.file, args: cmd.args, cwd, version: info.version, state, resumed: !!l.resumed }))
     flightRecorder.launched(l.state, () => this.label(l.state), info.version)
-    // A process of this run from now: its slot's writer is its exit's to settle (#1434).
-    this.writerSpawned(state.runId)
     spawnPty(key, {
       ...size,
       file: cmd.file,
@@ -1849,6 +1848,8 @@ class SessionManager {
         void this.onExit(projectPath, agent.id, state.runId, code, output)
       }
     })
+    // Its process runs now (spawnPty returned, not thrown): its slot's writer is the run's processes' to settle (#1434).
+    this.writerSpawned(state.runId)
     // A task on its command line is its first prompt (#1336: a hook should follow it), though it is still starting: no
     // turn of its own runs yet.
     if (l.initialPrompt) this.notePrompt(l, true)

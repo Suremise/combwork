@@ -2820,8 +2820,10 @@ Whether a conversation may resume there is its **hold** (none: it may):
   - The writer stays through the start's preparation, the launch and the session's whole run. A start given up before
     any process of it ran releases it at once. Once a process ran (its CLI, or the agent's own worktree's first setup,
     which runs in its carried slot but never in a slot the pool set up), it is released only when its launch's process
-    job shows everything it started has ended (`ended`): leftovers kept running by the user, a launch that couldn't be
-    tracked, or a job that couldn't be read leave it **held**.
+    job shows everything it started has ended (`ended`: the job's whole membership seen empty, a member not described
+    counting as one; after End, only once a later look sees the job empty, since a kill is only asked, and `unknown`
+    after 30 looks): leftovers kept running by the user, a launch that couldn't be tracked, or a job that couldn't be
+    read leave it **held**. A run counts as having a process only once `spawnPty` has returned one.
   - While it is set the slot isn't lent, adopted, taken by hand or removed, and another start there is refused ("slot-b
     still has another session in it, or processes one left running there"); two at once give one writer.
   - A writer whose Hive is gone is never taken over or cleared from a snapshot of its processes: it stays held until
