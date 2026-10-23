@@ -1,6 +1,7 @@
 // The Git adapter's answers on real repositories (#1118, SPEC §16.3.2): fixed endpoints, sameness by replay with the
 // candidate key only as a first test, containment of a merge, a fast-forward and a squash.
 import { execFileSync } from 'child_process'
+import { writeFileSync } from 'fs'
 import { afterEach, describe, expect, it } from 'vitest'
 import { join } from 'path'
 import { tempDir } from '../tempDir'
@@ -213,7 +214,8 @@ describe('Git adapter', () => {
     expect(sub.value).toEqual([true, true])
     expect(ancestors(sub.ran)).toBe(2)
     expect(inside.ran.filter((c) => c === `merge-base ${base} ${rev}`)).toHaveLength(1)
-    expect(inside.ran.filter((c) => c.startsWith('rev-parse --verify'))).toHaveLength(2)
+    // A line's head is read from its ref file each time, with no git (#1491): its own test below.
+    expect(inside.ran.filter((c) => c.startsWith('rev-parse --verify'))).toHaveLength(0)
     // Something the step set off, asking once it has ended: asked again.
     expect(ancestors((await counted(() => leaked!())).ran)).toBe(1)
     // Names, not ids, are never kept; nor an unknown answer.
@@ -223,6 +225,43 @@ describe('Git adapter', () => {
     const unknowns = await counted(() => G.gitStep(async () => [await G.isAncestor(repo, missing, rev), await G.isAncestor(repo, missing, rev)]))
     expect(unknowns.value.every((v) => isUnknown(v))).toBe(true)
     expect(ancestors(unknowns.ran)).toBe(2)
+  })
+
+  it("a line's head is read from the ref files, again each time, with no git; git where they can't say (#1491)", async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    const [, rev] = branchWith('one', { 'one.txt': '1\n' })
+    const main = sh(repo, 'rev-parse', 'main')
+    const wt = join(repo, '..', 'wt')
+    sh(repo, 'worktree', 'add', '-q', '-b', 'hive/card', wt, 'one')
+    const read = await counted(() => G.gitStep(async () => [await G.lineHead(repo, 'main'), await G.lineHead(wt, 'main'), await G.lineHead(wt, 'hive/card')]))
+    expect(read.value).toEqual([main, main, rev])
+    expect(read.ran).toEqual([])
+    // Moved inside the step: the new head, as git would say (a ref is never kept).
+    const moved = await G.gitStep(async () => {
+      const before = await G.lineHead(repo, 'one')
+      sh(repo, 'branch', '-q', '-f', 'one', 'main')
+      return [before, await G.lineHead(repo, 'one')]
+    })
+    expect(moved).toEqual([rev, main])
+    // Packed (no loose file): from packed-refs; a loose ref written after packing wins, as in git.
+    sh(repo, 'pack-refs', '--all')
+    const packed = await counted(() => G.lineHead(wt, 'hive/card'))
+    expect(packed).toEqual({ value: rev, ran: [] })
+    sh(repo, 'update-ref', 'refs/heads/hive/card', main)
+    expect(await G.lineHead(wt, 'hive/card')).toBe(main)
+    expect(await G.lineHead(repo, 'hive/card')).toBe(sh(repo, 'rev-parse', 'refs/heads/hive/card'))
+    // No such line (nor a folder named as a ref's prefix): git says, null.
+    const gone = await counted(async () => [await G.lineHead(repo, 'gone'), await G.lineHead(repo, 'hive')])
+    expect(gone.value).toEqual([null, null])
+    expect(gone.ran).toHaveLength(2)
+    // A ref file that doesn't name a commit: git's answer, not the file's.
+    writeFileSync(join(repo, '.git', 'refs', 'heads', 'broken'), 'not a commit\n')
+    const broken = await counted(() => G.lineHead(repo, 'broken'))
+    expect(broken.ran).toHaveLength(1)
+    expect(broken.value === null || isUnknown(broken.value)).toBe(true)
+    // A subfolder, whose repository its `.git` doesn't name: git.
+    const sub = await counted(() => G.lineHead(join(repo, 'src'), 'main'))
+    expect(sub).toEqual({ value: main, ran: [`rev-parse --verify -q refs/heads/main`] })
   })
 
   it("a step's answers are its repository's: another repository, without those commits, is asked and answers unknown (HR2's #1376 round 1)", async () => {
@@ -246,7 +285,6 @@ describe('Git adapter', () => {
     repo = gitRepo(join(tempDir('git-'), 'r'))
     expect(await G.dirty(repo)).toEqual([])
     commit(repo, { 'b.txt': 'b\n' }, 'b')
-    const { writeFileSync } = await import('fs')
     writeFileSync(join(repo, 'b.txt'), 'changed\n')
     writeFileSync(join(repo, 'new.txt'), 'new\n')
     expect((await G.dirty(repo)) as string[]).toEqual(expect.arrayContaining(['b.txt', 'new.txt']))

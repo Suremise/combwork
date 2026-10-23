@@ -155,8 +155,15 @@ export async function branch(folder: string): Promise<Maybe<string | null>> {
   return unknown(U.branch, { folder })
 }
 
-/** A line's head (refs/heads/<line>), or null when the line doesn't exist. */
+/**
+ * A line's head (refs/heads/<line>), or null when the line doesn't exist. Read from the ref files with no git process
+ * where they name a commit (#1491: a step reads its target's head four or five times, each a git), read again each time
+ * as git would; git where they can't say (no such line, a reftable, a folder whose `.git` doesn't name its repository).
+ */
 export async function lineHead(repo: string, line: string): Promise<Maybe<string | null>> {
+  const common = commonDirSync(repo)
+  const known = common ? refSync(common, `refs/heads/${line}`) : null
+  if (known && SHA.test(known)) return known
   const r = await git(repo, ['rev-parse', '--verify', '-q', `refs/heads/${line}`])
   if (r.ok) return r.out.trim()
   if (r.code === 1) return null
