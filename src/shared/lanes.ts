@@ -1,5 +1,5 @@
 import { currentCard, laneCardState } from './laneBar'
-import type { LaneCard, LaneInfo, LaneState, LaneStatus, LaneWaitReason, ProjectConfig, TaskCard, WorkspaceConfig } from './types'
+import type { LaneCard, LaneInfo, LaneSlotInfo, LaneState, LaneStatus, LaneWaitReason, ProjectConfig, TaskCard, WorkspaceConfig } from './types'
 import type { StageId } from './workflow/facts'
 import { cardRef } from './projectKeys'
 
@@ -128,7 +128,7 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * name last known). Its current card is the one being worked, and it is paused only while it waits for the user
  * (currentCard); an ended lane without its record has none.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean } | null): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null } | null): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
   const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
@@ -145,7 +145,12 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   // Waiting for a slot (#1438, `slot`: the main side's): lent none yet, so nothing of it can start; only what already
   // waits for the user, or its hooks, says more.
   const noSlot = running(rec) && !unrecorded && slot?.waiting && !(found && USERS.has(found.reason)) ? { reason: 'slot' as const, card: current } : null
-  const status = running(rec) ? (hooks ?? noSlot ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null)) : null
+  // Its slot being prepared (#1446: G15's warming, its setup or an install): said when nothing else is, never pausing.
+  const preparing = running(rec) && !unrecorded && slot?.info?.state === 'preparing' ? { reason: 'preparing' as const, card: current, slot: slot.info.name } : null
+  const status = running(rec) ? (hooks ?? noSlot ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null) ?? preparing) : null
+  // Reviewed by the pool (#1443): who gave its current card's last verdict, and who reviews it now (#1446), by name.
+  const now = rec.pool && running(rec) && current !== null ? facts?.get(current) : undefined
+  const agentName = (id: string): string => names?.get(id) ?? (rec.builder.id === id ? rec.builder.name : id)
   const state: LaneState = rec.state === 'active' && status && PAUSING.has(status.reason) ? 'paused' : rec.state
   return {
     id: rec.id,
@@ -169,7 +174,9 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
     queued: running(rec) && rec.pending ? [...rec.pending] : null,
     oldRules: laneOldRules(rec, rulesetNow),
     stages: running(rec) && rec.ruleset && rulesetStages ? [...rulesetStages] : null,
-    slot: running(rec) ? (slot?.slot ?? null) : null
+    slot: running(rec) ? (slot?.slot ?? null) : null,
+    slotInfo: running(rec) ? (slot?.info ?? null) : null,
+    ...(now ? { poolReview: { lastVerdict: now.lastVerdict ? { name: agentName(now.lastVerdict.reviewer), pass: now.lastVerdict.pass } : null, reviewing: now.reviewing ? agentName(now.reviewing) : null } } : {})
   }
 }
 
@@ -187,6 +194,10 @@ export interface LaneCardFacts {
   ask?: LaneStatus['ask']
   stale: boolean
   rounds: number
+  /** Its last verdict's reviewer (an agent's id, or `user`) and whether it passed (#1446: a pool lane's hover). */
+  lastVerdict?: { reviewer: string; pass: boolean } | null
+  /** Who reviews its latest submission now (given or started, no verdict yet), by id (#1446). */
+  reviewing?: string | null
 }
 
 /** The reasons that pause a lane: it can't go on to its next card until they clear. */
@@ -253,6 +264,8 @@ export function laneStatusText(s: LaneStatus): string {
       return `waiting for a check copy for ${card}`
     case 'slot':
       return 'waiting for a slot'
+    case 'preparing':
+      return `waiting: preparing ${s.slot ?? 'its slot'}`
   }
 }
 

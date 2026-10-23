@@ -651,6 +651,10 @@
     "defaultMessage": "Exit code",
     "description": "A label in a run's details (Progress panel): its command's exit code follows (a number)."
   },
+  "board.details.folder": {
+    "defaultMessage": "Folder",
+    "description": "A label in a run's details (Progress panel): the folder it ran in follows (a path), as it was when it ran."
+  },
   "board.details.gone": {
     "defaultMessage": "Ended without a report: its process ended before it said how it went",
     "description": "A run's state in its details (Progress panel): its process ended without reporting."
@@ -1751,9 +1755,17 @@
     "defaultMessage": "Old rules: this lane started under the workflow options from before they changed, and keeps them until it ends. New lanes and cards use the new options.{enforced, select, no { Workflow rules aren’t enforced now (Settings → Advanced).} other {}}",
     "description": "Tooltip and accessible name of a lane's \"old rules\" mark (Progress panel): the project's workflow options changed while the lane ran; it keeps the ones it started with until it ends. enforced no: the switch \"Workflow rules are enforced\" (Settings → Advanced) is off. Keep the select keys. Glossary: lane, workflow options."
   },
+  "board.lanes.poolLastVerdict": {
+    "defaultMessage": "Last verdict: {name}, {pass, select, yes {passed} other {failed}}",
+    "description": "A pool lane's hover in the Progress panel (#1446): who gave the current card's last verdict ({name}, an agent's name) and whether it passed or failed. Keep the select keys. Glossary: verdict, pass / fail."
+  },
   "board.lanes.poolPair": {
     "defaultMessage": "{builder} / pool",
     "description": "A lane's agents in its header in the Progress panel when its cards are reviewed by the project's reviewer pool (#1443): its builder's name ({builder}), then the pool, short (the header is narrow). Glossary: pool (of reviewers)."
+  },
+  "board.lanes.poolReviewing": {
+    "defaultMessage": "{reviewing, select, none {Reviewed by the pool: nobody on the card yet} other {Reviewed by the pool: {name} now}}",
+    "description": "A lane's hover in the Progress panel when its cards are reviewed by the project's reviewer pool (#1446): who reviews its current card now ({name}, an agent's name), or nobody yet (it waits for a free reviewer). Keep the select keys."
   },
   "board.lanes.projectLink": {
     "defaultMessage": "{project}: open its workflow in Version Control",
@@ -1762,6 +1774,18 @@
   "board.lanes.show": {
     "defaultMessage": "Show the lanes",
     "description": "Tooltip of the Progress panel's Lanes bar when the lanes are folded away."
+  },
+  "board.lanes.slotLine": {
+    "defaultMessage": "On {line}",
+    "description": "A lane's slot in its hover (Progress panel, #1446): the branch its current card is built on there follows ({line}, such as hive/HI/HI-12-fix-login: keep it as it is)."
+  },
+  "board.lanes.slotLink": {
+    "defaultMessage": "Show {slot} in Branches & remotes",
+    "description": "Tooltip and accessible name of a lane's slot in its header (Progress panel, #1446): opens the project's Version Control tab at Branches & remotes, where its slots are listed. {slot} is the slot's name (slot-b): keep it as it is. Branches & remotes is a section of the tab: use its name as shown there."
+  },
+  "board.lanes.slotTip": {
+    "defaultMessage": "{state, select, preparing {being prepared} other {ready}} · {carried, select, yes {its builder’s own since {since}} other {lent to the lane since {since}}}",
+    "description": "A lane's slot in its hover (Progress panel, #1446), after the slot's name (slot-b): whether it is ready or being prepared (its setup or a dependency install), then since when it was lent to the lane, or, for a builder's own worktree kept from before 1.0 (carried), since when it has had it. {since} is a date and time. Keep the select keys."
   },
   "board.lanes.stalled": {
     "defaultMessage": "stalled",
@@ -1798,6 +1822,14 @@
   "board.lanes.waits": {
     "defaultMessage": "{reason, select, blocked {{card} is blocked} hold {{card} is On Hold} you {waiting for you ({ask, select, approve {approval} decide {a decision} test {a test} signIn {a sign-in} other {an answer}}): {card}} roundLimit {waiting for you: {card} reached its round limit} notMerged {waiting: {card} not merged} merging {waiting: {card} merging} stale {stale: {card} must be submitted again} reviewer {waiting for a reviewer on {card}} lineUpdate {waiting: bringing the builder’s branch up to date before {card}} hooks {paused: {agent}'s hooks aren't arriving} checkCopy {waiting for a check copy for {card}} slot {waiting for a slot} other {list changes after {card}}}",
     "description": "Why a lane (a builder and its reviewer working through cards) waits, in its header in the Progress panel, lower case. {card} is a card's name (its key, such as HI-12). reason: blocked or On Hold (a board column); waiting for the user (ask: for their approval, a decision, a test, a sign-in or another answer); at its round limit (the user decides how to go on); a card passed but not merged yet (or merging now), so the next can't start (one card at a time); its pass is stale (the builder must submit again); nobody reviews it; Hive brings the builder's branch up to date before that card (after a squash merge, #1271); hooks: the agent {agent} (a name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing), so the lane is paused; checkCopy: its review or check waits for a check copy (a folder Hive keeps at one revision for a review or an isolated check) to be free; slot: every slot (a working folder Hive lends to a card or a lane) is in use, so the lane can't start until one is free; changes to the lane's list of cards apply once that card is done (other). Keep the select keys. Glossary: lane, round limit, stale."
+  },
+  "board.lanes.waitsLink": {
+    "defaultMessage": "{why}. Click to show it.",
+    "description": "Tooltip of why a lane waits, in its header (Progress panel, #1446), when a click shows what it waits for: its slot or the slots in use (Branches & remotes), or the runs it waits on (the Runs tab). {why} is the reason as the header says it (\"waiting for a slot\")."
+  },
+  "board.lanes.waitsPreparing": {
+    "defaultMessage": "waiting: preparing {slot}",
+    "description": "Why a lane waits, in its header in the Progress panel, lower case: Hive is preparing its slot (a working folder it lends to the lane: its setup command or a dependency install before the next card). {slot} is the slot's name, such as slot-b: keep it as it is. The lane isn't paused."
   },
   "board.links.archivedTitle": {
     "defaultMessage": "{card} {title} · Archived (from {column}) · Ctrl+click to open",
@@ -2026,6 +2058,10 @@
   "board.progress.hiveRun": {
     "defaultMessage": "Hive’s merge queue ran it, not an agent: there is no agent to show.",
     "description": "Why a Progress panel run's agent can't be shown: Hive's merge queue ran the run itself (a merge check on a card's merged result; glossary 2.5: merge queue)."
+  },
+  "board.progress.inCopy": {
+    "defaultMessage": "in {copy}",
+    "description": "Under a run's agent in the Progress panel, after its card and revision (\"AM-12 · a3f2c1d · in copy-2\"): the run ran in that review or check copy (a folder Hive keeps at exactly the card's revision). {copy} is its name, such as copy-2: keep it as it is."
   },
   "board.progress.mergeQueue": {
     "defaultMessage": "Hive (merge queue)",

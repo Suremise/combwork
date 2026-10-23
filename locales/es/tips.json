@@ -202,6 +202,8 @@
   "tips.laneGates.title": "Mira por qué un carril no avanza",
   "tips.laneNotices.text": "Hive te avisa cuando la revisión de un carril no se supera, una tarjeta se bloquea o se estanca, o todas las tarjetas superaron la revisión y toca fusionar, con un aviso por carril. Configuración → Notificaciones decide dónde aparecen.",
   "tips.laneNotices.title": "Entérate de cómo va un carril, sin el Asistente",
+  "tips.laneSlots.text": "En el panel Progreso, un carril nombra su slot tras sus agentes (· slot-b): pasa el puntero por encima para ver la rama que se construye allí y si el slot está listo, o haz clic para ir a Ramas y remotos.",
+  "tips.laneSlots.title": "Ver dónde construye un carril",
   "tips.laneStart.text": "Haz clic derecho en la columna Pendiente y elige Iniciar carril con estas tarjetas…: elige el autor y el revisor, ordena las tarjetas y ambos empiezan con unas instrucciones. Termina o abandona un carril desde su fila en el panel Progreso.",
   "tips.laneStart.title": "Inicia un carril tú mismo",
   "tips.lanesLegend.text": "Pasa el ratón por la barra Carriles del panel Progreso para ver su leyenda: cada color es una categoría, con sus etapas. Un carril marcado con reglas anteriores conserva las opciones del flujo de trabajo con las que empezó hasta que termina.",

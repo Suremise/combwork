@@ -3630,7 +3630,23 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     aren't in the ruleset). With `hive.workflow.enforce` off it still shows, and its hover says the rules aren't
     enforced.
 - **P7** [#1123 c]: lane rows name their slot ("HI-B1 / HI-R1 · slot-b"); pooled reviewers ("HI-B1 / pool"); review
-  copies' runs as checks of the revision; slot warming as runs; "waiting for a slot".
+  copies' runs as checks of the revision; slot warming as runs; "waiting for a slot". **Built [#1446]:**
+  - **The lane row's slot:** "HI-B1 / HI-R1 · slot-b" (its builder's carried slot, #1441: "· hb2"), a link to Version
+    Control → Branches & remotes, where the slots are listed. `LaneInfo.slotInfo` (main's `laneSlot`: the lane's open
+    lease, else the builder's carried one) gives the hover: ready or being prepared (a warming operation or a slot being
+    created), since when it was lent (or kept), and the current card's line there (the last `Started` under the lease).
+  - **Pooled reviewers:** "HI-B1 / pool" (#1443). The hover names who reviews the current card now and who gave its last
+    verdict, passed or failed (`LaneInfo.poolReview`, from the cards' facts); a reviewer serving several lanes is in each
+    lane's hover, never a lane of its own.
+  - **Review copies' runs:** a run in a review or check copy, linked to the copy's card and revision (#1435), reads
+    "AM-12 · a3f2c1d · in copy-2" under it, running or finished, and its details name the copy and the folder it ran in.
+  - **Slot warming as runs:** Hive's set-up runs are "Hive (slot slot-b)" and "Hive (copy copy-1)" (#1429, #1435), each
+    an entry of its own in the Runs tab's Agent filter (`slotRunsKey`, `copyRunsKey`), apart from "Hive (merge queue)".
+  - **Waiting reasons:** "waiting for a slot" and "waiting for a check copy" pause the lane (#1438, #1435); "waiting:
+    preparing slot-b" (`preparing`, while its slot is being prepared) doesn't. Each is a link to what it waits for:
+    Branches & remotes for a slot, the slot's set-up runs, or the lane's runs for a check copy (the Runs tab, filtered).
+  - **Agents moving between slots:** a run's folder is its own (`ProgressRun.folder`, in its details), never where its
+    agent works now; its agent link still opens the agent.
 
 ### 16.14 Undo for the Assistant's changes
 

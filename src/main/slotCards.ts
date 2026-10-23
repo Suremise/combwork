@@ -29,7 +29,8 @@ import { agentWorkflowRole, buildsWork } from '../shared/workflow/roles'
 import { workflowText } from '../shared/workflow/texts'
 import type { Fact, FactData, StartedData, StageId } from '../shared/workflow/facts'
 import { SLOTS_DELETE_MERGED } from '../shared/advanced'
-import type { AgentDef } from '../shared/types'
+import type { AgentDef, LaneSlotInfo } from '../shared/types'
+import type { LaneRecord } from '../shared/lanes'
 import { app } from 'electron'
 import { advanced } from './advanced'
 import { exitBy } from './exitLog'
@@ -683,9 +684,18 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
 }
 
 /** The slot a lane works in now (its open lease's): for the lane's view (lanes.ts). */
-function laneSlot(ws: WorkspaceService, lane: string): string | null {
+function laneSlot(ws: WorkspaceService, lane: LaneRecord): LaneSlotInfo | null {
   try {
-    return boardRead(ws, (db) => (db.prepare('SELECT slot FROM slot_leases WHERE lane = ? AND ended_at IS NULL').get(lane) as { slot: string } | undefined)?.slot ?? null) // i18n-ignore: SQL
+    return boardRead(ws, (db) => {
+      // The lane's own lease, else its builder's carried one (#1441: a 0.9 worktree adopted at the upgrade).
+      const l = db
+        .prepare("SELECT l.id, l.slot, l.kind, l.from_at AS since, s.state, s.op_kind AS op FROM slot_leases l JOIN slots s ON s.project = l.project AND s.name = l.slot WHERE l.ended_at IS NULL AND (l.lane = ? OR (l.kind = 'carried' AND l.agent = ?)) ORDER BY l.kind = 'carried' LIMIT 1") // i18n-ignore: SQL
+        .get(lane.id, lane.builder.id) as { id: string; slot: string; kind: string; since: string; state: string; op: string | null } | undefined
+      if (!l) return null
+      // The current card's line there (#1446): the last card started under this lease.
+      const line = (db.prepare("SELECT json_extract(data, '$.line') AS line FROM card_facts WHERE kind = 'Started' AND json_extract(data, '$.lease') = ? ORDER BY at DESC LIMIT 1").get(l.id) as { line: string | null } | undefined)?.line ?? null // i18n-ignore: SQL
+      return { name: l.slot, carried: l.kind === 'carried', line, state: l.state === 'creating' || l.op === 'warm' ? 'preparing' : 'ready', since: l.since }
+    })
   } catch {
     // A board still 0.9's: no slots.
     return null

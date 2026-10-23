@@ -459,6 +459,10 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     expect(laneWaitText({ reason: 'roundLimit', card: 12 }, name, tr)).toBe('waiting for you: HI-12 reached its round limit')
     expect(laneWaitText({ reason: 'blocked', card: 3, blocked: 'x' }, name, tr)).toBe('HI-3 is blocked')
     expect(laneWaitText({ reason: 'hold', card: 3 }, name, tr)).toBe('HI-3 is On Hold')
+    // #1438's and #1435's, and #1446's slot being prepared.
+    expect(laneWaitText({ reason: 'slot', card: null }, name, tr)).toBe('waiting for a slot')
+    expect(laneWaitText({ reason: 'checkCopy', card: 12 }, name, tr)).toBe('waiting for a check copy for HI-12')
+    expect(laneWaitText({ reason: 'preparing', card: 12, slot: 'slot-b' }, name, tr)).toBe('waiting: preparing slot-b')
   })
 
   it("its merge commit once Done: the Integrated fact's, else the lane's record; nothing for a card with no work recorded", () => {
