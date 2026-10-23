@@ -206,6 +206,23 @@ export async function runningProcesses(): Promise<LaunchProcesses[]> {
   return out
 }
 
+/**
+ * Whether a process is one of an agent's own (#1435): in the job of one of its running launches, started between the two
+ * clock readings (Unix ms) its starter took around it. Its pid and window alone prove nothing: a process of another
+ * agent's, or of nobody's, isn't in that job.
+ */
+export async function inAgentLaunch(projectPath: string, agentId: string, pid: number, after: number, before: number): Promise<boolean> {
+  if (process.platform !== 'win32' || !host.pid) return false
+  for (const l of running.values()) {
+    if (agentKey(l.projectPath, l.agentId) !== agentKey(projectPath, agentId)) continue
+    const p = (await listJob(l.runId))?.processes.find((x) => x.pid === pid && x.created)
+    if (!p?.created) continue
+    const started = Number((BigInt(p.created) - 116444736000000000n) / 10000n)
+    if (started >= after - 50 && started <= before + 50) return true
+  }
+  return false
+}
+
 /** Once every launch that has exited has been looked at (Hive quitting asks about all their leftovers at once). */
 export async function leftoversSettled(): Promise<void> {
   while (settling.size) await Promise.allSettled([...settling])

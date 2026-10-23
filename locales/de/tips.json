@@ -186,6 +186,8 @@
   "tips.improveTranslation.title": "Hive in deiner Sprache besser machen",
   "tips.inboxNotices.text": "Eine Nachricht, die der Assistent einem arbeitenden Agenten hinterlässt, erreicht ihn beim nächsten Werkzeugaufruf oder bevor sein Durchgang endet, als kurzer Hinweis von Hive: Nichts wird in seine Arbeit hineingetippt. Der Agent liest sie aus seinem Posteingang und bestätigt sie; bis dahin zeigt sein Bereich sie als ungelesen (✉).",
   "tips.inboxNotices.title": "Nachrichten erreichen beschäftigte Agenten zwischen zwei Schritten",
+  "tips.isolatedChecks.text": "In einem geteilten Ordner zählt ein Check nicht, wenn ein anderer Agent währenddessen etwas ändert. hive-progress --check typecheck --isolated führt ihn in einer eigenen Kopie auf der Revision der Karte aus, in die nichts anderes schreibt. Stop im Fortschrittspanel beendet ihn samt allem, was er gestartet hat.",
+  "tips.isolatedChecks.title": "Ein Check, den niemand verderben kann",
   "tips.keepAwake.text": "Während ein Agent arbeitet, verhindert Hive den Ruhezustand von Windows (der Bildschirm kann trotzdem sperren) und erlaubt ihn wieder, sobald alle fertig sind. Wann, wählst du unter Einstellungen → Allgemein.",
   "tips.keepAwake.title": "Agenten arbeiten lassen, der PC bleibt wach",
   "tips.laneBranchSquash.text": "Nachdem die Karte eines Agenten per Squash gemergt wurde, bringt Hive seinen Branch vor der nächsten Karte auf den neuesten Stand, sodass jede Review nur die Arbeit dieser Karte zeigt. Was es nicht sicher tun kann, fragt es unter Für dich; Einstellungen → Erweitert lässt es jedes Mal fragen.",

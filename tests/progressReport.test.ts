@@ -119,8 +119,10 @@ describe('the hive-progress command line', () => {
     expect(parseArgs(['--check', 'typecheck'])).toEqual({ check: 'typecheck', command: [] })
     expect(parseArgs(['--check=typecheck', '--title', 'types', '--card', '#12'])).toEqual({ check: 'typecheck', title: 'types', card: '#12', command: [] })
     expect(parseArgs(['--check', 'typecheck', '--', 'npm', 'run', 'typecheck'])).toEqual({ error: "--check runs the project's command for typecheck: give no command of your own." })
-    // --isolated needs check copies (a later Hive): refused, saying so.
-    expect(parseArgs(['--check', 'test', '--isolated'])).toMatchObject({ error: expect.stringContaining('--isolated') })
+    // --isolated (#1435): a check in a copy of its own, so only with --check.
+    expect(parseArgs(['--check', 'test', '--isolated'])).toEqual({ check: 'test', isolated: true, command: [] })
+    expect(parseArgs(['--isolated', '--check=test'])).toEqual({ check: 'test', isolated: true, command: [] })
+    expect(parseArgs(['--isolated', '--', 'npm', 'test'])).toMatchObject({ error: expect.stringContaining('use it with --check') })
     // A shell took an unquoted "#12" for a comment: say how to quote it.
     expect(parseArgs(['--card'])).toMatchObject({ error: expect.stringContaining('--card "#1061"') })
     expect(parseArgs(['--card', '#12'])).toEqual({ error: 'No command given.' })
