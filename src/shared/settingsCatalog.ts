@@ -425,6 +425,12 @@ const APP_ROWS: Row[] = [
         id: 'settings.assistant.control.tip',
         defaultMessage: 'It never removes agents, discards worktrees or deletes projects, and never types into an agent that is working, asking you something or that you just typed in (see Pause after you type). What it does is listed in its panel, where you can undo its changes. A running Assistant takes a change after a restart.',
         description: 'The info tip of the setting "Control" (Settings → Assistant): its last paragraph. Pause after you type is another setting: keep its name as Hive shows it.'
+      }),
+      '',
+      msg({
+        id: 'settings.assistant.control.tip.inbox',
+        defaultMessage: "How the Assistant hears of its inbox follows Settings → Advanced's three inbox switches (Tell a working agent at the end of a tool, Keep an agent going when it stops with unread items, Wake an idle agent), Settings' own values: a project's don't apply to it.",
+        description: 'The info tip of the setting "Control" (Settings → Assistant): a paragraph on which inbox switches the Assistant follows. The three names in brackets are settings of Settings → Advanced: use their names as Hive shows them.'
       })
     ]),
     type: 'select',
@@ -802,12 +808,40 @@ const PROJECT_ROWS: Row[] = [
   { section: 'sessions', key: 'compactSuggestTokens', title: msg({ id: 'settings.project.compactSuggestTokens.title', defaultMessage: 'Suggest compacting above', description: "A setting's title (Project Settings → Sessions)." }), desc: msg({ id: 'settings.project.compactSuggestTokens.desc', defaultMessage: 'Context size (tokens) at which Compact is highlighted for this project. Empty inherits Settings → Sessions → Suggest compacting above.', description: 'What the setting "Suggest compacting above" does, under its title (Project Settings → Sessions).' }), tip: msg({ id: 'settings.project.compactSuggestTokens.tip', defaultMessage: 'Only changes when the Compact button turns orange; compacting is always available once the agent has finished.', description: 'The info tip of the setting "Suggest compacting above" (Project Settings → Sessions): more on what it does and when it applies.' }), type: 'number', min: 1000, max: 2000000, step: 10000, off: msg({ id: 'settings.project.compactSuggestTokens.off', defaultMessage: 'Never', description: 'The Off box of the number setting "Suggest compacting above" (Project Settings → Sessions): ticked, the setting is off (0).' }) },
   { section: 'sessions', key: 'transcriptWarnMB', title: msg({ id: 'settings.project.transcriptWarnMB.title', defaultMessage: 'Warn when a transcript is over', description: "A setting's title (Project Settings → Sessions)." }), desc: msg({ id: 'settings.project.transcriptWarnMB.desc', defaultMessage: "Size, in MB, at which a running conversation's transcript is flagged for this project. Empty inherits Settings → Sessions → Warn when a transcript is over.", description: 'What the setting "Warn when a transcript is over" does, under its title (Project Settings → Sessions).' }), tip: msg({ id: 'settings.project.transcriptWarnMB.tip', defaultMessage: 'A long conversation slows down the CLI and Hive; handing the work over to a new conversation makes it short again.', description: 'The info tip of the setting "Warn when a transcript is over" (Project Settings → Sessions): more on what it does and when it applies.' }), type: 'number', min: 1, max: 2000, step: 10, off: msg({ id: 'settings.project.transcriptWarnMB.off', defaultMessage: 'Never', description: 'The Off box of the number setting "Warn when a transcript is over" (Project Settings → Sessions): ticked, the setting is off (0).' }) },
   { section: 'sessions', key: 'chime', title: msg({ id: 'settings.project.chime.title', defaultMessage: 'Completion chime', description: "A setting's title (Project Settings → Sessions)." }), desc: msg({ id: 'settings.project.chime.desc', defaultMessage: 'Play a sound when an agent in this project finishes or needs input.', description: 'What the setting "Completion chime" does, under its title (Project Settings → Sessions).' }), tip: msg({ id: 'settings.project.chime.tip', defaultMessage: 'Inherit follows Settings → Notifications.', description: 'The info tip of the setting "Completion chime" (Project Settings → Sessions): more on what it does and when it applies.' }), type: 'select', options: ON_OFF },
+  // Carrying on (#1432, shared/inboxSwitches.ts): this project's own of Settings → Advanced's inbox switches.
+  {
+    section: 'sessions',
+    key: 'inboxCheckpoints',
+    title: msg({ id: 'settings.project.inboxCheckpoints.title', defaultMessage: 'Tell a working agent at the end of a tool', description: "A setting's title (Project Settings → Sessions): Hive tells a busy agent what has arrived in its inbox each time one of its tool calls ends." }),
+    desc: msg({ id: 'settings.project.inboxCheckpoints.desc', defaultMessage: "Hive tells a working agent of what arrives in its inbox at the end of its next tool call. Off: it isn't told until its turn ends or it is idle; nothing is lost.", description: 'What the setting "Tell a working agent at the end of a tool" does, under its title (Project Settings → Sessions).' }),
+    tip: msg({ id: 'settings.project.inboxCheckpoints.tip', defaultMessage: 'Inherit follows Settings → Advanced → Tell a working agent at the end of a tool.', description: 'The info tip of the setting "Tell a working agent at the end of a tool" (Project Settings → Sessions). Settings → Advanced names Hive\'s settings: use its names as Hive shows them.' }),
+    type: 'select',
+    options: ON_OFF
+  },
+  {
+    section: 'sessions',
+    key: 'inboxStopContinuation',
+    title: msg({ id: 'settings.project.inboxStopContinuation.title', defaultMessage: 'Keep an agent going when it stops with unread items', description: "A setting's title (Project Settings → Sessions): when an agent is about to end its turn with items in its inbox it hasn't read, Hive makes it carry on and read them." }),
+    desc: msg({ id: 'settings.project.inboxStopContinuation.desc', defaultMessage: "Hive keeps an agent ending its turn with unread items going to read them, once a turn. Off: the turn ends, and they wait in the inbox for an idle wake.", description: 'What the setting "Keep an agent going when it stops with unread items" does, under its title (Project Settings → Sessions).' }),
+    tip: msg({ id: 'settings.project.inboxStopContinuation.tip', defaultMessage: 'Codex and Copilot have their stop held back, Claude Code a line added to it. Inherit follows Settings → Advanced → Keep an agent going when it stops with unread items.', description: 'The info tip of the setting "Keep an agent going when it stops with unread items" (Project Settings → Sessions). Codex, Copilot and Claude Code are CLIs\' names: keep them. Settings → Advanced names Hive\'s settings: use its names as Hive shows them.' }),
+    type: 'select',
+    options: ON_OFF
+  },
+  {
+    section: 'sessions',
+    key: 'inboxIdleWakes',
+    title: msg({ id: 'settings.project.inboxIdleWakes.title', defaultMessage: 'Wake an idle agent', description: "A setting's title (Project Settings → Sessions): Hive types a short line into an idle agent's terminal to tell it something has arrived in its inbox." }),
+    desc: msg({ id: 'settings.project.inboxIdleWakes.desc', defaultMessage: "Hive types a short line into an idle agent's terminal when something arrives in its inbox, card loops' wakes included. Off: nothing is typed for what waits; the agent's pane shows how many, and Deliver Now types the line once.", description: 'What the setting "Wake an idle agent" does, under its title (Project Settings → Sessions). Deliver Now is a menu item of the agent\'s pane: use its name as Hive shows it.' }),
+    tip: msg({ id: 'settings.project.inboxIdleWakes.tip', defaultMessage: 'A card started on an agent, or a task given to it now, is still typed. Inherit follows Settings → Advanced → Wake an idle agent.', description: 'The info tip of the setting "Wake an idle agent" (Project Settings → Sessions). Settings → Advanced names Hive\'s settings: use its names as Hive shows them.' }),
+    type: 'select',
+    options: ON_OFF
+  },
   {
     section: 'loops',
     key: 'loopWakes',
     title: msg({ id: 'settings.project.loopWakes.title', defaultMessage: 'Wake reviewers and builders', description: "A setting's title (Project Settings → Card loops)." }),
     desc: msg({ id: 'settings.project.loopWakes.desc', defaultMessage: "When a card with a reviewer arrives in Review, Hive wakes the reviewer; when the review gives its verdict, Hive wakes the card's builder. Off: only the agents' own card watches wake them.", description: 'What the setting "Wake reviewers and builders" does, under its title (Project Settings → Card loops).' }),
-    tip: msg({ id: 'settings.project.loopWakes.tip', defaultMessage: "A card's reviewer is the reviewer of a lane with the card, else the agent that last reviewed it: cards nobody reviews never wake anyone. An agent is only woken while it is idle, never by its own change, and not when its own card watch already tells it.", description: 'The info tip of the setting "Wake reviewers and builders" (Project Settings → Card loops): more on what it does and when it applies.' }),
+    tip: msg({ id: 'settings.project.loopWakes.tip', defaultMessage: "A card's reviewer is the reviewer of a lane with the card, else the agent that last reviewed it: cards nobody reviews never wake anyone. An agent is only woken while it is idle, never by its own change, and not when its own card watch already tells it. These are idle wakes: with Sessions → Wake an idle agent off, none is typed, and the wake waits in the agent's inbox.", description: 'The info tip of the setting "Wake reviewers and builders" (Project Settings → Card loops): more on what it does and when it applies.' }),
     type: 'boolean'
   },
   { section: 'loops', key: 'loopRounds', title: msg({ id: 'settings.project.loopRounds.title', defaultMessage: 'Rounds', description: "A setting's title (Project Settings → Card loops)." }), desc: msg({ id: 'settings.project.loopRounds.desc', defaultMessage: "How many rounds a card gets in this project's card loops before its agents stop and ask you, when you don't say. Empty inherits Settings → Workspace → Card loop rounds.", description: 'What the setting "Rounds" does, under its title (Project Settings → Card loops).' }), tip: msg({ id: 'settings.project.loopRounds.tip', defaultMessage: 'Saying "rounds: 5" when you start a loop still wins.', description: 'The info tip of the setting "Rounds" (Project Settings → Card loops): more on what it does and when it applies.' }), type: 'number', min: 1, max: LANE_MAX_ROUNDS, step: 1 },
@@ -981,6 +1015,9 @@ const DOCS_BY_ID: Record<string, string> = {
   'project.workflow': 'Workflow options', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'workflow.defaults': 'Workflow defaults', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'workspace.workflowDefaults': 'Workflow defaults', // i18n-ignore: a heading of the user guide, which stays English (D2)
+  'project.inboxCheckpoints': 'Messages and the inbox', // i18n-ignore: a heading of the user guide, which stays English (D2)
+  'project.inboxStopContinuation': 'Messages and the inbox', // i18n-ignore: a heading of the user guide, which stays English (D2)
+  'project.inboxIdleWakes': 'Messages and the inbox', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'project.loopWakes': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'project.loopRounds': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
   'project.loopWaitHours': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)

@@ -9,9 +9,11 @@ import { modelCaps } from '@shared/models'
 import { agentChoosesMcp, agentMcpText } from '@shared/agentMcp'
 import { SESSION_LAYOUTS, agentLimitText, agentsPerPage, compactThreshold, contextPercent, agentModelShown, effortLabel, isCompacting, layoutPanes, mergeBlocked, mostUrgent, projectLayout, sessionInAgentFolder, transcriptWarnLimit, unmergedWork } from '@shared/defaults'
 import { cellPage, cellPageCount, neighbourCell, pageCells, pageIds, type CellDirection } from '@shared/paneCells'
-import { agentLimit, useAgentLimit } from '../advanced'
+import { agentLimit, inboxSwitchNow, useAgentLimit } from '../advanced'
 import type { AgentInfo, LiveSessionState, PageLayout, ProjectInfo, SessionLayout, SessionListItem, SessionUsage, SessionView } from '@shared/types'
-import { TEMPLATE_SCOPES, shownProblem, type TemplateEntry } from '@shared/templates'
+import { namesKey, shownProblem, templateAgentNames, type TemplateEntry, type TemplateScope } from '@shared/templates'
+import { templateTitle } from '@shared/templateDefaults'
+import { WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
 import type { StartFailure } from '@shared/startFailure'
 import type { AgentLeftovers } from '@shared/agentProcesses'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
@@ -612,6 +614,12 @@ function paneItems(project: ProjectInfo, a: AgentInfo, left: AgentLeftovers | un
       .join(' · ')
     const overdue = inbox.overdue ? tr(msg({ id: 'panes.messages.overdueTip', defaultMessage: "{n, plural, one {One delivery was not acked in time: the agent hasn't said it acted on it.} other {# deliveries were not acked in time: the agent hasn't said it acted on them.}}", description: "In the menu of an agent's unread messages: how many deliveries ({n}) it didn't ack in time." }), { n: inbox.overdue }) : null
     const cancel = () => void actions.attempt(tr(msg({ id: 'panes.messages.cancelFailed', defaultMessage: 'Could not cancel the messages', description: "An error's title: cancelling messages left for an agent failed." })), () => call('session:cancelMessages', project.path, a.id))
+    // Idle wakes off (#1432): nothing waiting is typed by itself; Deliver Now types its line once.
+    const wakes = inboxSwitchNow('idleWakes', project.config)
+    const deliver = () =>
+      void actions.attempt(tr(msg({ id: 'panes.messages.deliverFailed', defaultMessage: 'Could not deliver the messages', description: "An error's title: typing the line that tells an agent of its waiting messages (Deliver Now) failed." })), async () => {
+        if (!(await call('session:deliverNow', project.path, a.id))) notify('info', tr(msg({ id: 'panes.messages.notDelivered', defaultMessage: "{agent} wasn't told now", description: "A notice's title: Deliver Now couldn't type the line into the agent's terminal now. {agent} is its name." }), { agent: a.name }), tr(msg({ id: 'panes.messages.notDeliveredDetail', defaultMessage: "It isn't idle, or you are typing in its terminal. Its messages stay in its inbox: try again once it's idle.", description: 'The detail of the notice that Deliver Now could not type the line into an agent now.' })))
+      })
     items.push({
       label,
       icon: 'mail',
@@ -619,9 +627,11 @@ function paneItems(project: ProjectInfo, a: AgentInfo, left: AgentLeftovers | un
       onClick: (k) =>
         sub(
           [
-            ...(n ? [{ header: true, label: tr(msg({ id: 'panes.messages.tip', defaultMessage: "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.", description: "The heading of the menu of an agent's unread messages, above the list of them: how many ({n}) for the agent ({agent}: its name). hive_inbox is a tool's name: keep it." }), { n, agent: a.name }) }] : []),
+            ...(n ? [{ header: true, label: wakes ? tr(msg({ id: 'panes.messages.tip', defaultMessage: "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.", description: "The heading of the menu of an agent's unread messages, above the list of them: how many ({n}) for the agent ({agent}: its name). hive_inbox is a tool's name: keep it." }), { n, agent: a.name }) : tr(msg({ id: 'panes.messages.tipNoWakes', defaultMessage: "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet", description: "The heading of the menu of an agent's unread messages when the setting Wake an idle agent is off (a hint line under it says so): how many ({n}) for the agent ({agent}: its name)." }), { n, agent: a.name }) }] : []),
+            ...(n && !wakes ? [{ label: tr(msg({ id: 'panes.messages.noWakesHint', defaultMessage: 'Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.', description: "A hint line under the heading of an agent's unread messages menu, when the setting Wake an idle agent is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them." })), disabled: true }] : []),
             ...inbox.unread.map((m) => ({ label: tr(msg({ id: 'panes.messages.line', defaultMessage: '{id} from {from} ({state, select, queued {waiting} offered {typed, not fetched or acked yet} other {its offer not confirmed}}): {text}', description: "A message left for an agent, in the menu of its unread messages: its id, who from ({from}), its state (waiting; typed into the agent but not fetched or acked; or offered but not confirmed), and the start of its text ({text}, the sender's own words)." }), { id: m.id, from: m.from, state: m.state, text: m.text }), disabled: true })),
             ...(overdue ? [{ label: overdue, disabled: true }] : []),
+            ...(waiting && !wakes && a.live ? [{ separator: true }, { label: tr(msg({ id: 'panes.messages.deliverNow', defaultMessage: 'Deliver Now', description: "Menu item on an agent's unread messages, shown while the setting Wake an idle agent is off: types the line telling the agent of them into its terminal, once." })), icon: 'send', onClick: deliver }] : []),
             ...(waiting ? [{ separator: true }, { label: tr(msg({ id: 'panes.messages.cancel', defaultMessage: '{n, plural, one {Cancel the Message} other {Cancel the # Messages}}', description: "Menu item on an agent's unread messages: cancels the {n} still waiting to be delivered." }), { n: waiting }), icon: 'close', onClick: cancel }] : [])
           ],
           k
@@ -679,13 +689,15 @@ const templateList = (path: string): Promise<TemplateEntry[] | null> =>
 function addFromTemplateItems(project: ProjectInfo, list: TemplateEntry[]): MenuEntry[] {
   const all = list.filter((t) => !t.problem)
   const full = project.agents.length >= agentLimit()
+  // Their names as this project's (#1123 names: Hive's own are patterns of its key, HI-B1).
+  const key = namesKey(get().projectKeys.find((k) => k.projectPath.toLowerCase() === project.path.toLowerCase())?.key, project.name)
   return all.length
     ? all.flatMap((t) => [
-        { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, workspace {workspace} other {this project}}', description: 'A heading in Add Agent from Template: the template\'s name ({template}) and where it is kept (lower case).' }), { template: t.name, scope: t.scope }) },
+        { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, hive {Hive} workspace {workspace} other {this project}}', description: "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Hive: one of Hive's own templates, #1436)." }), { template: templateTitle(t), scope: t.scope }) },
         ...t.agents.map((a, i) => ({
-          label: a.name,
+          label: templateAgentNames(t.agents, key)[i],
           icon: 'person-add',
-          detail: [a.role, providerName(a.provider), a.worktree ? tr(msg({ id: 'panes.template.ownWorktree', defaultMessage: 'own worktree', description: "A template agent's detail (Add Agent from Template): it works in its own worktree. Lower case." })) : ''].filter(Boolean).join(' · '),
+          detail: [tr(WORKFLOW_ROLE_TEXT[a.role].name), a.note ?? '', providerName(a.provider)].filter(Boolean).join(' · '),
           disabled: full,
           onClick: () => void actions.addAgentFromTemplate(project.path, t, i)
         }))
@@ -696,12 +708,12 @@ function addFromTemplateItems(project: ProjectInfo, list: TemplateEntry[]): Menu
 /** + Add ▾ → Templates: Save Template…, then the templates to load, by scope (loading replaces the agents, after saying who goes and who comes). */
 function templateMenuItems(project: ProjectInfo, all: TemplateEntry[]): MenuEntry[] {
   const load: MenuEntry[] = all.length
-    ? TEMPLATE_SCOPES.flatMap((scope) => {
+    ? (['hive', 'workspace', 'project'] satisfies TemplateScope[]).flatMap((scope) => {
         const here = all.filter((t) => t.scope === scope)
         return here.length
           ? [
-              { header: true, label: tr(msg({ id: 'panes.template.scopeHeading', defaultMessage: "{scope, select, workspace {Workspace templates} other {This project's templates}}", description: "A heading in + Add ▾ → Templates above the templates kept in the workspace, or in this project." }), { scope }) },
-              ...here.map((t) => ({ label: t.name, icon: 'library', detail: shownProblem(t) ?? tr(msg({ id: 'panes.template.detail', defaultMessage: '{n, plural, one {# agent} other {# agents}} · {layout}', description: "A template's detail in + Add ▾ → Templates: how many agents it has and its layout ({layout}: \"two columns\")." }), { n: t.agents.length, layout: layoutName(t.layout) }), disabled: !!t.problem, onClick: () => void actions.loadTemplate(project.path, t) }))
+              { header: true, label: tr(msg({ id: 'panes.template.scopeHeading', defaultMessage: "{scope, select, hive {Hive's templates} workspace {Workspace templates} other {This project's templates}}", description: "A heading in + Add ▾ → Templates above Hive's own templates (#1436), those kept in the workspace, or in this project." }), { scope }) },
+              ...here.map((t) => ({ label: templateTitle(t), icon: 'library', detail: shownProblem(t) ?? tr(msg({ id: 'panes.template.detail', defaultMessage: '{n, plural, one {# agent} other {# agents}} · {layout}', description: "A template's detail in + Add ▾ → Templates: how many agents it has and its layout ({layout}: \"two columns\")." }), { n: t.agents.length, layout: layoutName(t.layout) }), disabled: !!t.problem, onClick: () => void actions.loadTemplate(project.path, t) }))
             ]
           : []
       })

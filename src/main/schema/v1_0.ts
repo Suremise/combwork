@@ -862,8 +862,89 @@ export const SLOTS_STEP: SchemaStep = {
   ]
 }
 
+/**
+ * A project's review and check copies (#1435, SPEC §16.10.5, §16.13; copies.ts): detached worktrees in one fixed folder
+ * per project (`<Workspace>.worktrees/<Project>/copies/copy-N`), each leased to one reviewer for one submission or to one
+ * isolated check run, at the exact revision. A lease is open until it is freed: returned (its review or run over) it
+ * stays `returning` until nothing is left in the copy (the quiescence barrier), so at most one lease per copy that isn't
+ * freed, by a partial unique index. Operations own a copy while it changes, as slots' do (#1429).
+ */
+export const COPIES_STEP: SchemaStep = {
+  name: 'copies',
+  ddl: [
+    // A copy: its name and folder, state, the revision it was last reset to, its last install's lock files' hash, a
+    // failed warming's error and log, when it was last used, and the operation that owns it while it changes (its
+    // token, kind, holder pid and start) with a command's job, as slots have them.
+    `CREATE TABLE copies (
+      project    TEXT    NOT NULL COLLATE NOCASE,
+      name       TEXT    NOT NULL COLLATE NOCASE,
+      folder     TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+      state      TEXT    NOT NULL CHECK (state IN ('creating', 'free', 'leased', 'returning', 'dirty', 'gone')),
+      revision   TEXT,
+      install_hash TEXT,
+      warm_error TEXT,
+      warm_log   TEXT,
+      created_at TEXT    NOT NULL,
+      used_at    TEXT    NOT NULL,
+      op         TEXT,
+      op_kind    TEXT    CHECK (op_kind IN ('lease', 'remove', 'recover')),
+      op_pid     INTEGER,
+      op_started INTEGER,
+      job        TEXT,
+      PRIMARY KEY (project, name),
+      CHECK ((op IS NULL) = (op_kind IS NULL))
+    ) STRICT, WITHOUT ROWID`,
+    // A lease: one review (its card and submission) or one isolated run (its card and run, or the link that will start
+    // it) by a holder agent, through a Hive (its profile, pid and start: a lease whose Hive is gone is returned), from
+    // `from_at`; `returned_at` once its review or run is over (why), `freed_at` once the copy was quiet. `job` is the
+    // supervisor job its run's processes are put in (an isolated check), settled before the copy is freed.
+    `CREATE TABLE copy_leases (
+      id          TEXT    PRIMARY KEY,
+      project     TEXT    NOT NULL COLLATE NOCASE,
+      copy        TEXT    NOT NULL COLLATE NOCASE,
+      kind        TEXT    NOT NULL CHECK (kind IN ('review', 'check')),
+      card        INTEGER NOT NULL,
+      revision    TEXT    NOT NULL,
+      ref         TEXT,
+      agent       TEXT,
+      profile     TEXT    NOT NULL,
+      pid         INTEGER NOT NULL,
+      started     INTEGER NOT NULL,
+      job         TEXT,
+      from_at     TEXT    NOT NULL,
+      returned_at TEXT,
+      why         TEXT,
+      freed_at    TEXT,
+      FOREIGN KEY (project, copy) REFERENCES copies (project, name) ON DELETE CASCADE
+    ) STRICT, WITHOUT ROWID`,
+    'CREATE UNIQUE INDEX copy_leases_open ON copy_leases (project, copy) WHERE freed_at IS NULL',
+    'CREATE INDEX copy_leases_unfreed ON copy_leases (project) WHERE freed_at IS NULL',
+    'CREATE INDEX copy_leases_ref ON copy_leases (ref) WHERE ref IS NOT NULL'
+  ]
+}
+
+/**
+ * Hive's skill copies in folders' .agents/skills (#1431, SPEC §16.15 C row 15; Codex and Copilot): which copy Hive made in
+ * which folder, at which revision (the copy's contentHash, its marker left out). A clean-up removes a copy only when this
+ * record and the copy's marker both say Hive made it and its content is still that revision (skillCopies.ts). `project`
+ * is the project folder the copy's session was in: Slots only compares the folder with it.
+ */
+export const SKILL_COPIES_STEP: SchemaStep = {
+  name: 'skill copies',
+  ddl: [
+    `CREATE TABLE skill_copies (
+      folder   TEXT NOT NULL COLLATE NOCASE,
+      skill    TEXT NOT NULL COLLATE NOCASE,
+      project  TEXT NOT NULL COLLATE NOCASE,
+      revision TEXT NOT NULL,
+      made_at  TEXT NOT NULL,
+      PRIMARY KEY (folder, skill)
+    ) STRICT, WITHOUT ROWID`
+  ]
+}
+
 /** The 1.0 group's steps (P3's, then P4's, then P5's, then P7's), in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP, SLOTS_STEP]
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP, SLOTS_STEP, COPIES_STEP, SKILL_COPIES_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {
@@ -961,6 +1042,9 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'queuePauses.ofProject': { sql: 'SELECT target FROM workflow_queue_pauses WHERE project = ?', args: ['p'], index: 'PRIMARY KEY' },
   // queueControls.ts (#1356): when the user saw a project's returned entries.
   'queueSeen.ofProject': { sql: 'SELECT entry, seen_at FROM workflow_queue_seen WHERE project = ?', args: ['p'], index: 'PRIMARY KEY' },
+  // skillCopies.ts (#1431): a folder's copies, one copy's record.
+  'skillCopies.of': { sql: 'SELECT skill, project, revision, made_at FROM skill_copies WHERE folder = ?', args: ['D:\\ws\\p'], index: 'PRIMARY KEY' },
+  'skillCopies.one': { sql: 'SELECT revision FROM skill_copies WHERE folder = ? AND skill = ?', args: ['D:\\ws\\p', 'handover'], index: 'PRIMARY KEY' },
   // queueRunner.ts (through factStore.ts): a target's lease, a lease by id (holds), its processes, a target's folders.
   'queueRunners.of': { sql: 'SELECT * FROM queue_runners WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
   'queueRunners.holds': { sql: 'SELECT 1 FROM queue_runners WHERE lease = ? AND token = ?', args: ['l1', 't1'], index: 'sqlite_autoindex_queue_runners_1' },
@@ -974,6 +1058,11 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'slotLeases.ofCard': { sql: 'SELECT * FROM slot_leases WHERE card = ? AND ended_at IS NULL', args: [1], index: 'slot_leases_card' },
   'slotLeases.ofLane': { sql: 'SELECT * FROM slot_leases WHERE lane = ? AND ended_at IS NULL', args: ['l1'], index: 'slot_leases_lane' },
   'slotLeases.ofAgent': { sql: 'SELECT * FROM slot_leases WHERE project = ? AND agent = ? AND ended_at IS NULL', args: ['p', 'a1'], index: 'slot_leases_agent' },
+  // copies.ts (#1435): a project's copies, its leases not freed, a copy's, a lease by its run or link.
+  'copies.ofProject': { sql: 'SELECT * FROM copies WHERE project = ? ORDER BY name', args: ['p'], index: 'PRIMARY KEY' },
+  'copyLeases.unfreed': { sql: 'SELECT * FROM copy_leases WHERE project = ? AND freed_at IS NULL', args: ['p'], index: ['copy_leases_unfreed', 'copy_leases_open'] },
+  'copyLeases.openOf': { sql: 'SELECT * FROM copy_leases WHERE project = ? AND copy = ? AND freed_at IS NULL', args: ['p', 'copy-1'], index: 'copy_leases_open' },
+  'copyLeases.byRef': { sql: 'SELECT * FROM copy_leases WHERE ref = ?', args: ['r1'], index: 'copy_leases_ref' },
   'slotLeases.lastOf': { sql: 'SELECT * FROM slot_leases WHERE project = ? AND slot = ? ORDER BY from_at DESC LIMIT 1', args: ['p', 'slot-a'], index: 'slot_leases_slot' },
   // cardRefs.ts: a key to its card (current key, an old key of the project, a moved card's alias), a project's key.
   'keys.resolve': { sql: 'SELECT c.number FROM project_keys k JOIN cards c ON c.project_id = k.project_id AND c.project_number = ? WHERE k.key = ?', args: [12, 'am'], index: 'cards_project_number' },

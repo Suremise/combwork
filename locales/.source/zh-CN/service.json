@@ -160,6 +160,8 @@
   "service.providers.task": "{task, select, install {{cli} install} update {{cli} update} login {{cli} sign-in} other {{cli} setup}}",
   "service.providers.taskDone": "{task} finished",
   "service.providers.taskFailed": "{task} exited with code {code}",
+  "service.templates.v09": "1.0 templates don’t pin agents to worktrees, so the Hive templates take their place. A copy of {n, plural, one {the template} other {the # templates}} is kept with the 0.9 board backup.",
+  "service.templates.v09Title": "Your 0.9 agent templates aren’t used in 1.0",
   "service.transcripts.busy": "This session is being archived or deleted. Try again in a moment.",
   "service.transcripts.exported": "{session} · exported from Hive {date}",
   "service.transcripts.imageNotKept": "The image is not stored in the transcript",

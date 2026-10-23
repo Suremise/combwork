@@ -382,6 +382,8 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
   // What it ran for (#1220): its card and the revision (in full, for copying; the row shows it short).
   if (r.card) out.push({ label: tr(msg({ id: 'board.details.card', defaultMessage: 'Card', description: "A label in a run's details (Progress panel): the card it ran for follows (#1061)." })), text: cardName(r.card) })
   if (r.revision) out.push({ label: tr(msg({ id: 'board.details.revision', defaultMessage: 'Revision', description: "A label in a run's details (Progress panel): the card's revision follows, the version of the card's work the run was for: a commit id, or for a project with no platform a hash of the card's files' content (not a commit)." })), text: r.revision, code: true })
+  // The review or check copy it ran in (#1435): an isolated check's, or a reviewer's, at exactly that revision.
+  if (r.copy && r.source !== 'hive') out.push({ label: tr(msg({ id: 'board.details.copy', defaultMessage: 'Copy', description: "A label in a run's details (Progress panel): the name of the review or check copy it ran in follows (copy-1): a folder Hive keeps at exactly the card's revision, which nothing else writes." })), text: r.copy })
   // What it was tested on, when that isn't the card's revision (#1273): a shared folder's head, a reviewer's checkout.
   if (r.testedCheckout && r.testedCheckout !== r.revision) out.push({ label: tr(msg({ id: 'board.details.testedOn', defaultMessage: 'Tested on', description: "A label in a run's details (Progress panel), shown when it differs from the card's revision: the commit that was checked out where the run ran follows (a commit id)." })), text: r.testedCheckout, code: true })
   // How it counted as a check of its card's revision (#1222, SPEC §16.13), once it finished.
@@ -435,11 +437,12 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
  * #1429) in the window's language; a name an agent or the Assistant has stays as it is, "Agent"
  * too. The stored name stays English: agents read it through the Agent API and hive-progress.
  */
-export function runAgentName(r: Pick<ProgressRun, 'agentName' | 'defaultName' | 'slot'>, tr: Tr): string {
+export function runAgentName(r: Pick<ProgressRun, 'agentName' | 'defaultName' | 'slot' | 'copy'>, tr: Tr): string {
   if (r.defaultName === 'script') return tr(msg({ id: 'board.progress.script', defaultMessage: 'Script', description: "Who ran a run in the Progress panel when a script (a program calling Hive's Agent API) ran it, not an agent." }))
   if (r.defaultName === 'agent') return tr(msg({ id: 'board.progress.anAgent', defaultMessage: 'Agent', description: "Who ran a run in the Progress panel when Hive doesn't have the agent's name (an older record)." }))
   if (r.defaultName === 'mergeQueue') return tr(msg({ id: 'board.progress.mergeQueue', defaultMessage: 'Hive (merge queue)', description: "Who ran a run in the Progress panel when Hive's merge queue ran it itself: a merge check or install on a card's merged result, not an agent (glossary 2.5: merge queue)." }))
   if (r.defaultName === 'slot' && r.slot) return tr(msg({ id: 'board.progress.slotRun', defaultMessage: 'Hive (slot {slot})', description: "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's slots (a worktree Hive lends to a card or a lane: its setup command, a dependency install or its archive command), not an agent. {slot} is the slot's name, such as slot-b: keep it as it is." }), { slot: r.slot })
+  if (r.defaultName === 'copy' && r.copy) return tr(msg({ id: 'board.progress.copyRun', defaultMessage: 'Hive (copy {copy})', description: "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's review or check copies (a folder at one revision where a reviewer reads a card's work, or an isolated check runs): its setup command or a dependency install, not an agent. {copy} is the copy's name, such as copy-1: keep it as it is." }), { copy: r.copy })
   return r.agentName
 }
 

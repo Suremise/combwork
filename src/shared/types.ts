@@ -7,7 +7,7 @@ import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActi
 import type { AttachmentKind } from './attachments'
 import type { StartFailure } from './startFailure'
 import type { TipsState } from './tips'
-import type { TemplateAgent, TemplateScope } from './templates'
+import type { SuggestedPreset, TemplateAgent, TemplateScope } from './templates'
 import type { KeepAwakeSetting } from './keepAwake'
 import type { DateFormat, TimeFormat } from './dates'
 import type { ProjectPref } from './uiPrefs'
@@ -20,7 +20,7 @@ import type { PlatformId, ProjectPlatform } from './platform/descriptors'
 import type { SwitchRefusal } from './platform/switching'
 import type { Contradiction, NOT_OFFERED, PresetId, PresetNeeds, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
-import type { WorkflowRole } from './workflow/roles'
+import type { ReviewerMode, WorkflowRole } from './workflow/roles'
 import type { StageNameProblem } from './workflow/stages'
 import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
@@ -648,6 +648,11 @@ export interface WorkspaceConfig {
    * projects, unless a project turned it off); absent, they are moved to it when the workspace opens.
    */
   mcp: { enabled: string[]; model?: 2 }
+  /**
+   * The Hive skills the workspace's agents aren't given (#1431, Skills → Delivered to agents), by name: every other skill
+   * for their audience is delivered. A project can switch off more (ProjectConfig.skillDelivery), never one on again.
+   */
+  skillDelivery?: SkillDeliveryChoice
   /** Project folders Hive leaves out (Hide, or Remove from Hive while the folder is still in the workspace), by folder name. */
   hiddenProjects?: HiddenProject[]
   /** Card loops' rounds and wait in hours when a request doesn't say (#412, Settings → Workspace); absent: 10 and 6. */
@@ -1123,7 +1128,13 @@ export interface ProjectConfig {
    * projects): read once when the workspace's settings are moved to #1093's model, then emptied.
    */
   mcp: { disabled: string[]; enabled: string[] }
+  /** The Hive skills this project's agents aren't given (#1431, its Skills tab → Delivered to agents), over the workspace's. */
+  skillDelivery?: SkillDeliveryChoice
   chime: 'inherit' | 'on' | 'off'
+  /** Carrying on (#1432, shared/inboxSwitches.ts): this project's own inbox switches over Settings → Advanced's; inherit uses those. */
+  inboxCheckpoints: 'inherit' | 'on' | 'off'
+  inboxStopContinuation: 'inherit' | 'on' | 'off'
+  inboxIdleWakes: 'inherit' | 'on' | 'off'
   /** The provider new agents get (Add Agent's quick add); inherit uses the global default. */
   defaultProvider: Inherit<ProviderId>
   /** The project's settings per provider, over the global ones. */
@@ -1194,6 +1205,8 @@ export interface ProjectConfig {
    * Each left out reads today's `worktreeSetup`, none, and `worktreeCopy` (which stay as they are, for 0.9.3).
    */
   slots?: SlotOptions
+  /** The project's review and check copies (#1435): how many it keeps (left out: the larger of 2 and its reviewers plus one). */
+  copies?: { size?: number }
   /** Hive wakes a card loop's reviewer when a card arrives in Review, and its builder on a verdict (#405). */
   loopWakes: boolean
   /** Card loops' rounds and wait in hours for this project (#412); null inherits the workspace's. */
@@ -1210,6 +1223,16 @@ export interface SlotView {
   warmError: string | null
   warmLog: string | null
   lease: { id: string; kind: 'card' | 'lane' | 'carried'; agent: string; card: number | null; lane: string | null } | null
+}
+
+/** One of a project's review and check copies as the window reads it (#1435, copies.ts): its state and its lease not freed. */
+export interface CopyView {
+  name: string
+  folder: string
+  state: 'creating' | 'free' | 'leased' | 'returning' | 'dirty' | 'gone'
+  revision: string | null
+  warmError: string | null
+  lease: { id: string; kind: 'review' | 'check'; card: number; agent: string | null; returned: boolean } | null
 }
 
 /** What a test copy asks of a project's slot pool (`slots:test`, unpackaged builds only: #1429's e2e). */
@@ -1263,6 +1286,11 @@ export interface AgentDef {
   /** Which side of the workflow it takes (#1430); unset, the guess from its note or name (`agentWorkflowRole`). */
   workflowRole?: WorkflowRole
   /**
+   * The agent it is paired with (#1436): a builder's reviewer, or a reviewer's builder, by name, as a template's `pairs`
+   * made it. Start Lane fills in a builder's reviewer from it (#1443).
+   */
+  pairedWith?: string
+  /**
    * Only these of the project's MCP servers (#537, shared/agentMcp.ts), saved in templates; absent: all of them. The
    * built-in hive server is given whatever this says.
    */
@@ -1273,18 +1301,6 @@ export interface AgentDef {
 export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'model' | 'effort' | 'permissionMode' | 'mode' | 'role'>> & { use200kContext?: boolean | null; mcpServers?: string[] | null; workflowRole?: WorkflowRole | null }
 
 /** What loading a template into a project would do (#126), and what stops it now. */
-/**
- * What happened to an old worktree the user chose to remove with a template's load (#289, #313): `removed` (the folder
- * went), and `branchKept` when its branch stayed all the same (a ref moved in the last step); `why` it was kept, or why
- * the branch was.
- */
-export interface OldWorktreeOutcome {
-  branch: string
-  removed: boolean
-  branchKept?: true
-  why?: string
-}
-
 export interface TemplateLoadPlan {
   scope: TemplateScope
   file: string
@@ -1292,27 +1308,27 @@ export interface TemplateLoadPlan {
   layout: PageLayout
   /** The project's agents, all removed: running ones and uncommitted worktree work block the load. */
   remove: { id: string; name: string; running: boolean; dirty: number; worktree?: { path: string; branch: string } }[]
-  /** The agents it creates, with the names chosen in the dialog (#702) when it gave some. */
+  /**
+   * The agents it creates, with the names chosen in the dialog (#702) when it gave some, its patterns expanded with the
+   * project's key (#1123 names), and the provider each runs (another than the template's when that one can't run here:
+   * `swaps`). Each works in the project folder (#1436): where an agent works is the card's or lane's, not the template's.
+   */
   create: TemplateAgent[]
-  /** The template's own names for them, by `create`'s order: what a prefix goes in front of (#702). */
+  /** The template's own names for them, by `create`'s order, expanded with the project's key: what a prefix goes in front of (#702). */
   templateNames: string[]
   /** Created names another project's agent has (#702): the load is refused until they are renamed. */
   taken: { name: string; project: string }[]
+  /** Builders and their reviewers among `create`, by their indexes (#1436): kept as the agents' `pairedWith`. */
+  pairs: { builder: number; reviewer: number }[]
   /**
-   * Where each created agent's worktree is (#268), by `create`'s order: a branch in this project's repository and a folder
-   * in its worktree location; null for an agent in the project folder. `reuse`: a clean worktree of that name it works in
-   * again, its branch left as it is (#289); else a new one, with `notReused` saying why the one of that name can't be.
+   * Hive's own templates only (#1436): an agent whose provider can't run here (off or not installed) runs another that
+   * can, said on its row; by `create`'s index. A template of the workspace's or a project's is refused instead (`missing`).
    */
-  worktrees: ({ branch: string; path: string; base: string; reuse?: true; notReused?: string } | null)[]
-  /**
-   * The removed agents' worktrees no created agent works in again (#289): `removable` when merged into the main branch
-   * (`mergedInto`) and clean (`worktreeCheck`), which the load can remove with their branches if asked; else kept, `why`.
-   */
-  oldWorktrees: { agent: string; path: string; branch: string; removable: boolean; why?: string }[]
-  /** The main branch the old worktrees were checked against: a removal is refused if it is another by then. */
-  mergedInto: string | null
-  /** The project's worktree setup command, which each new worktree runs before its agent first starts (null: none). */
-  setup: string | null
+  swaps: { index: number; from: ProviderId; to: ProviderId; problem: 'off' | 'notInstalled' }[]
+  /** The preset it suggests (#1436), when the project's options didn't start from it: the dialog offers to switch. */
+  suggestedPreset: SuggestedPreset | null
+  /** G17's choice it suggests (#1436), offered once the Workflow section has it (#1443, #1445); never written by the load. */
+  reviewerMode: ReviewerMode | null
   /** Providers the template needs that are off or not installed, and which of its agents need each. */
   missing: { provider: ProviderId; reason: string; agents: string[]; problem?: 'unknown' | 'off' | 'notInstalled' }[]
   /** Why it can't be loaded now (empty: it can). */
@@ -2033,6 +2049,11 @@ export interface SkillInfo {
 
 /** Who a Hive skill is for. */
 export type SkillAudience = 'agents' | 'assistant' | 'all'
+
+/** Hive skills switched off for agents (#1431): their names (a hand-edited file may hold anything: skillDelivered reads it). */
+export interface SkillDeliveryChoice {
+  off: string[]
+}
 
 /** Where a new skill goes: the workspace's Hive skills, or a provider's local skills folder in a project. */
 export type SkillTarget = { kind: 'hive' } | { kind: 'local'; projectPath: string; provider: ProviderId }
@@ -2868,8 +2889,9 @@ export interface LaneInfo {
  * passed but not merged yet (merging: in the merge queue), its pass gone stale (submit again), no reviewer on a card in
  * Review, or a list change queued after the card in flight. The first four and the merge pause the lane, as does `hooks`
  * (#1336): its builder's or reviewer's hooks aren't arriving, so Hive can't tell what it does and types nothing into it.
+ * `checkCopy` (#1435): its card's review or isolated check waits for a review or check copy to be free.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy'
 
 /** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */
 export interface LaneStartRequest {
@@ -2954,7 +2976,7 @@ export interface ProgressRun {
    * for a kept run with no name, "Hive (slot <name>)" for a slot's warming (#1429, its `slot`). The window shows it in its
    * language; the Agent API leaves this out (publicRun).
    */
-  defaultName?: 'script' | 'agent' | 'mergeQueue' | 'slot'
+  defaultName?: 'script' | 'agent' | 'mergeQueue' | 'slot' | 'copy'
   provider: ProviderId | null
   source: ProgressSource
   title: string
@@ -3025,6 +3047,11 @@ export interface ProgressRun {
   transient?: TransientFailure
   /** Hive's own run warming a slot (#1429: its setup, an install, its archive script): the slot's name. */
   slot?: string
+  /**
+   * A review or check copy (#1435): Hive's own run warming it, or an agent's isolated check run in it (its details name
+   * it, and it can be stopped from the panel: its processes are in the copy's job).
+   */
+  copy?: string
 }
 
 /**

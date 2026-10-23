@@ -310,7 +310,6 @@
   "agents.settings.appliesNext": "更改将在 {agent} 下次启动时生效；在此之前，运行中的会话保持原有设置。",
   "agents.settings.note": "备注",
   "agents.settings.noteNone": "可选：它的用途，用你自己的话说",
-  "agents.settings.ownWorktree": "独立的工作树",
   "agents.settings.save": "保存",
   "agents.settings.saving": "正在保存…",
   "agents.settings.stopToChange": "——停止 {agent} 后才能更改",

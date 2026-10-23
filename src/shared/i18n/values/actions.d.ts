@@ -217,19 +217,17 @@ interface HiveMessageValues {
   'actions.template.providerOff': undefined
   'actions.template.providerOffMessage': undefined
   'actions.template.readFailed': undefined
-  'actions.template.removeOld': { n: number; into: string; branches: string | number }
   'actions.template.replace': undefined
   'actions.template.replaceDetail': undefined
   'actions.template.replaceMessage': { scope: string; name: string | number }
   'actions.template.replaceTitle': undefined
-  'actions.template.reusedMessage': { branch: string | number; path: string | number }
-  'actions.template.reusedTitle': { agent: string | number }
   'actions.template.save': undefined
   'actions.template.saveFailed': undefined
   'actions.template.saveMessage': { n: number }
   'actions.template.saveTitle': undefined
   'actions.template.saved': undefined
   'actions.template.savedMessage': { name: string | number; n: number; scope: string }
+  'actions.template.switchPreset': { preset: string | number }
   'actions.unsaved.changedMessage': { action: string }
   'actions.unsaved.changedTitle': undefined
   'actions.unsaved.message': { n: number; file: string | number; action: string }

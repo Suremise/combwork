@@ -608,15 +608,13 @@ interface AgentFields {
   name: string
   /** The agent's note (`AgentDef.role`, #126: free text). */
   role: string
-  /** Its role in the workflow (#1430); null: not asked here (a template's agent: #1436's). */
-  workflowRole: WorkflowRole | null
+  /** Its role in the workflow (#1430; a template's agent's too, #1436). */
+  workflowRole: WorkflowRole
   provider: ProviderId
   model: string
   effort: string
   permission: string
   context: ContextChoice
-  /** A template's agent: its own worktree (true) or the project folder. */
-  worktree: boolean
   /** Only these of the project's MCP servers (#537); null: all of them. */
   mcp: string[] | null
 }
@@ -682,13 +680,13 @@ function McpChoice({ value, offered, where, onChange }: { value: string[] | null
 }
 
 /**
- * The Agent Settings dialog (#126, #271): name, role, where it works, coding agent, model, effort, mode, context and
- * MCP servers (#537: those on in the project, `mcpProject` its MCP choices, or every server of the workspace for a
- * template's agent, null; `mcpWhere` says where they are on, in words).
- * `works`: what the agent works in, shown (a project's agent), or `choice` to pick it (a template's: its own worktree or
- * the project folder). `providerLocked`: why the coding agent can't change now (a running agent). `config`: whose
- * settings an empty choice follows. `nameProblem`: why a name can't be used. `confirmSave`: asked first (false keeps it
- * open); `save` runs with the dialog open, a failure staying in it.
+ * The Agent Settings dialog (#126, #271): name, note, where it works, role in the workflow, coding agent, model, effort,
+ * mode, context and MCP servers (#537: those on in the project, `mcpProject` its MCP choices, or every server of the
+ * workspace for a template's agent, null; `mcpWhere` says where they are on, in words).
+ * `works`: what the agent works in (a project's agent; a template's has none, #1436). `providerLocked`: why the coding
+ * agent can't change now (a running agent). `config`: whose settings an empty choice follows. `nameProblem`: why a name
+ * can't be used. `confirmSave`: asked first (false keeps it open); `save` runs with the dialog open, a failure staying in
+ * it.
  */
 function AgentSettingsModal({
   title,
@@ -711,7 +709,7 @@ function AgentSettingsModal({
   initial: AgentFields
   config: Pick<ProjectInfo, 'config'>
   roles: string[]
-  works: ReactNode | 'choice'
+  works?: ReactNode
   mcpProject: ProjectConfig['mcp'] | null
   mcpWhere: 'project' | 'workspace'
   providerLocked?: ReactNode
@@ -771,21 +769,14 @@ function AgentSettingsModal({
             <option key={r} value={r} />
           ))}
         </datalist>
-        <label>{tr(WORKS_IN)}</label>
-        {works === 'choice' ? (
-          <div className="segmented works-in" role="radiogroup" aria-label={tr(WORKS_IN)}>
-            <button type="button" role="radio" aria-checked={f.worktree} className={cx(f.worktree && 'active')} onClick={() => put({ worktree: true })}>
-              <Icon name="worktree" /> {tr(msg({ id: 'agents.settings.ownWorktree', defaultMessage: 'Its own worktree', description: "A choice of where a template's agent works (Agent Settings): a worktree of its own. Keep it short." }))}
-            </button>
-            <button type="button" role="radio" aria-checked={!f.worktree} className={cx(!f.worktree && 'active')} onClick={() => put({ worktree: false })}>
-              <Icon name="folder" /> {tr(PROJECT_FOLDER)}
-            </button>
-          </div>
-        ) : (
-          <div className="muted">{works}</div>
+        {works !== undefined && (
+          <>
+            <label>{tr(WORKS_IN)}</label>
+            <div className="muted">{works}</div>
+          </>
         )}
       </div>
-      {f.workflowRole && <WorkflowRoleChoice value={f.workflowRole} onChange={(workflowRole) => put({ workflowRole })} />}
+      <WorkflowRoleChoice value={f.workflowRole} onChange={(workflowRole) => put({ workflowRole })} />
       <h3 className="agent-dialog-h">{tr(CODING_AGENT)}</h3>
       {providerLocked ?? <ProviderChoice value={f.provider} current={initial.provider} onChange={chooseProvider} />}
       <h3 className="agent-dialog-h">{tr(SETTINGS)}</h3>
@@ -826,7 +817,7 @@ export function AgentSettingsDialog() {
   const current = agent.live?.provider ?? agentProvider(agent, project.config, settings)
   const close = (): void => set({ agentSettingsFor: null })
   // Its role as it reads now (the guess, for an agent from before 1.0), stored once the user saves (#1430).
-  const initial: AgentFields = { name: agent.name, role: agent.role ?? '', workflowRole: agentWorkflowRole(agent), provider: current, model: agent.model ?? '', effort: agent.effort ?? '', permission: agent.permissionMode ?? '', context: contextChoice(agent.use200kContext), worktree: !!agent.worktree, mcp: agent.mcpServers ? [...agent.mcpServers] : null }
+  const initial: AgentFields = { name: agent.name, role: agent.role ?? '', workflowRole: agentWorkflowRole(agent), provider: current, model: agent.model ?? '', effort: agent.effort ?? '', permission: agent.permissionMode ?? '', context: contextChoice(agent.use200kContext), mcp: agent.mcpServers ? [...agent.mcpServers] : null }
   return (
     <AgentSettingsModal
       title={tr(msg({ id: 'agents.settings.title', defaultMessage: '{agent} settings', description: 'Title of the Agent Settings dialog. {agent} is the agent.' }), { agent: agent.name })}
@@ -871,7 +862,7 @@ export function AgentSettingsDialog() {
         await call('agents:update', project.path, agent.id, {
           name: f.name,
           role: f.role,
-          ...(f.workflowRole ? { workflowRole: f.workflowRole } : {}),
+          workflowRole: f.workflowRole,
           ...(f.provider !== current ? { provider: f.provider } : {}),
           model: f.model || undefined,
           effort: (f.effort || undefined) as EffortLevel | undefined,
@@ -888,7 +879,8 @@ export function AgentSettingsDialog() {
 
 /**
  * The same dialog for a template's agent (#271), from the template editor: what it saves goes back to the editor (which
- * saves the template with it, #510). An empty choice stays empty in the template (it follows the project it is loaded into).
+ * saves the template with it, #510). An empty choice stays empty in the template (it follows the project it is loaded
+ * into). Its role in the workflow and note (#1436), never where it works: that is the card's or lane's.
  */
 export function TemplateAgentDialog() {
   useLanguage()
@@ -905,33 +897,32 @@ export function TemplateAgentDialog() {
     result.current = null
   }
   const provider = a?.provider ?? projectDefaultProvider(project?.config ?? DEFAULT_PROJECT_CONFIG, settings)
-  const initial: AgentFields = { name: a?.name ?? req.suggestedName, role: a?.role ?? '', workflowRole: null, provider, model: a?.model ?? '', effort: a?.effort ?? '', permission: a?.permissionMode ?? '', context: contextChoice(a?.use200kContext), worktree: a?.worktree ?? false, mcp: a?.mcpServers ? [...a.mcpServers] : null }
+  const initial: AgentFields = { name: a?.name ?? req.suggestedName, role: a?.note ?? '', workflowRole: a?.role ?? agentWorkflowRole({ name: req.suggestedName }), provider, model: a?.model ?? '', effort: a?.effort ?? '', permission: a?.permissionMode ?? '', context: contextChoice(a?.use200kContext), mcp: a?.mcpServers ? [...a.mcpServers] : null }
   return (
     <AgentSettingsModal
       title={a ? tr(msg({ id: 'agents.template.title', defaultMessage: '{agent} settings (template)', description: "Title of Agent Settings for an agent of a template ({agent}), from the template editor." }), { agent: a.name }) : tr(msg({ id: 'agents.template.new', defaultMessage: 'New agent (template)', description: 'Title of Agent Settings for a new agent of a template, from the template editor.' }))}
       resetKey={`${req.key}`}
       initial={initial}
       config={project ?? { config: DEFAULT_PROJECT_CONFIG }}
-      roles={roleSuggestions(req.others)}
-      works="choice"
+      roles={roleSuggestions(req.others.map((o) => ({ role: o.note })))}
       mcpProject={null}
       mcpWhere="workspace"
       note={tr(msg({ id: 'agents.template.note', defaultMessage: 'For the template "{template}": Save saves it in the template. Settings left as "{projects}" follow the project it is loaded into.', description: "Under Agent Settings for a template's agent: Save (a button) saves it in the template ({template}); {projects} is the first choice of each setting (\"Project's\")." }), { template: req.template, projects: tr(PROJECTS) })}
       nameProblem={(n) => (req.others.some((o) => o.name.toLowerCase() === n.toLowerCase()) ? tr(msg({ id: 'agents.template.nameTaken', defaultMessage: 'Another agent of the template is called "{name}".', description: "Why a template's agent can't take a name ({name}): another agent of the template has it." }), { name: n }) : null)}
       confirmSave={async (f) => !(f.permission && f.permission !== a?.permissionMode && !(await confirmDangerousMode(f.provider, f.permission, f.name.trim())))}
       save={async (f) => {
-        const role = f.role.replace(/\s+/g, ' ').trim()
+        const note = f.role.replace(/\s+/g, ' ').trim()
         const ctx = contextValue(f.context)
         result.current = {
           name: f.name.replace(/\s+/g, ' ').trim(),
-          ...(role ? { role } : {}),
+          role: f.workflowRole,
+          ...(note ? { note } : {}),
           provider: f.provider,
           ...(f.model ? { model: f.model } : {}),
           ...(f.effort ? { effort: f.effort as EffortLevel } : {}),
           ...(f.permission ? { permissionMode: f.permission as PermissionMode } : {}),
           ...(ctx !== null ? { use200kContext: ctx } : {}),
-          ...(f.mcp ? { mcpServers: f.mcp } : {}),
-          worktree: f.worktree
+          ...(f.mcp ? { mcpServers: f.mcp } : {})
         }
       }}
       onClose={() => close(result.current)}

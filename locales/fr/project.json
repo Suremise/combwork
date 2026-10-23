@@ -293,6 +293,7 @@
   "project.skills.addLocal": "Ajouter une compétence locale pour {provider} depuis un fichier (.md ou .zip)…",
   "project.skills.assistantOnly": "{count, plural, one {# compétence Hive est réservée au Hive Assistant, elle n’est donc pas listée : les agents de ce projet ne la reçoivent pas.} many {# compétences Hive sont réservées au Hive Assistant, elles ne sont donc pas listées : les agents de ce projet ne les reçoivent pas.} other {# compétences Hive sont réservées au Hive Assistant, elles ne sont donc pas listées : les agents de ce projet ne les reçoivent pas.}}",
   "project.skills.delete": "Supprimer la compétence",
+  "project.skills.deliveredNote": "Chaque interrupteur indique si les agents de ce projet reçoivent la compétence (Fournie aux agents), dès leur prochaine session. Une compétence désactivée dans la vue Compétences l’est dans tous les projets.",
   "project.skills.editInWorkspace": "Modifier dans la vue Compétences de l’espace de travail (les compétences Hive sont partagées par tous les projets)",
   "project.skills.heading": "Compétences disponibles pour les agents",
   "project.skills.hive": "Hive",

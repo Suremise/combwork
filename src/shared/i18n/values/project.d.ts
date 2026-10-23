@@ -295,6 +295,7 @@ interface HiveMessageValues {
   'project.skills.addLocal': { provider: string | number }
   'project.skills.assistantOnly': { count: number }
   'project.skills.delete': undefined
+  'project.skills.deliveredNote': undefined
   'project.skills.editInWorkspace': undefined
   'project.skills.heading': undefined
   'project.skills.hive': undefined

@@ -60,6 +60,7 @@ export const EXCLUDED = [
   [/^src\/main\/workflow\/queueState\.ts$/, 'agent-facing: where a card is with the merge queue, in card reads, lane replies and wakes (#1354)'],
   [/^src\/main\/workflow\/queueJobs\.ts$/, "the merge queue's job supervisor and launcher: their C#, PowerShell and protocol, no text (#1360)"],
   [/^src\/main\/workflow\/queueJobs\.ts$/, "the merge queue's job supervisor and launcher: their C#, PowerShell and protocol, no text (#1360)"],
+  [/^src\/main\/(copies|slotJobs)\.ts$/, "the copies pool's SQL, its refusals and held reasons in English for agents and the log; settling jobs: no window text (#1435)"],
   [/^src\/main\/slots\.ts$/, "the slot pool's SQL, and its refusals and kept reasons in English for agents and the log: no window text (#1429)"],
   [/^src\/shared\/appName\.ts$/, 'brand names'],
   [/^src\/shared\/redact\.ts$/, 'log markers'],

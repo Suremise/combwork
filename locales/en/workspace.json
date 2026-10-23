@@ -1552,7 +1552,7 @@
     "description": "What could not be refreshed while the skill stays open: shown in \"Could not refresh {what}; last updated …\", with Retry."
   },
   "workspace.skillView.select": {
-    "defaultMessage": "Select a Hive skill to view or edit it. The agents in every project of this workspace get these skills, except those marked for the Hive Assistant.",
+    "defaultMessage": "Select a Hive skill to view or edit it. The agents in every project of this workspace get these skills, except those marked for the Hive Assistant and those switched off beside them (Delivered to agents).",
     "description": "The Skills view with no skill selected."
   },
   "workspace.statusBar.api": {
@@ -1886,14 +1886,6 @@
   "workspace.unused.detached": {
     "defaultMessage": "(detached)",
     "description": "An unused worktree with no branch (a detached HEAD), in the Changes tab's picker."
-  },
-  "workspace.unused.hintDetail": {
-    "defaultMessage": "The template's worktree agents worked in them. Deleting the template left them as they are: review them in Changes.",
-    "description": "Under the notice of unused worktrees left by a deleted template. Changes is the Git tab's page."
-  },
-  "workspace.unused.hintTitle": {
-    "defaultMessage": "{count, plural, one {# unused worktree} other {# unused worktrees}} in {many, select, yes {{projects, plural, one {# project} other {# projects}}} other {{project}}}",
-    "description": "A notice after deleting a template whose worktree agents left unused worktrees: how many, and in which project (or how many projects)."
   },
   "workspace.unused.lostCommits": {
     "defaultMessage": "{count, plural, one {# commit} other {# commits}} on {branch} not on {known, select, yes {{into}} other {any other branch}}",

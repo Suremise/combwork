@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ADVANCED_DEFS, AGENTS_PER_PROJECT, advancedRow, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
 import { AGENT_LIMIT_DEFAULT, manyAgentsNote } from '@shared/defaults'
 import { msg, tr, tRich } from '@shared/i18n'
+import { INBOX_SWITCH_ID } from '@shared/inboxSwitches'
 import type { ProviderId } from '@shared/types'
 import { call, errorMessage } from '../api'
 import { notify, set, useStore } from '../store'
@@ -172,6 +173,7 @@ function AdvancedItem({ row, cli, workspace, restartDue }: { row: AdvancedRow; c
             </button>
           </div>
         )}
+        {def.id === INBOX_SWITCH_ID.checkpoints && <InboxAvailableNote />}
         {def.id === AGENTS_PER_PROJECT && [row.value, shownValue(def, row.override, null), shownValue(def, row.workspaceValue, null)].some((v) => typeof v === 'number' && v > AGENT_LIMIT_DEFAULT) && <ManyAgentsNote />}
         {error && <div className="field-error">{error}</div>}
       </div>
@@ -185,6 +187,31 @@ function AdvancedItem({ row, cli, workspace, restartDue }: { row: AdvancedRow; c
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Whether agents can read their inbox at all (#1432): owned by Settings → Agent API (their hive tools), so it is shown
+ * here as a link to that setting, not a second switch.
+ */
+function InboxAvailableNote() {
+  const api = useStore((s) => s.settings?.agentApi)
+  const on = !!api?.enabled && !!api.provideHiveMcp
+  return (
+    <div className="advanced-note" data-note="inbox-available">
+      <Icon name="info" />{' '}
+      {tr(
+        msg({
+          id: 'settings.advancedList.inboxAvailable',
+          defaultMessage: "{on, select, true {Agents can read their inbox: they have Hive's tools (Settings → Agent API → Provide Hive tools to sessions).} other {Agents can't read an inbox now: they need Hive's tools (Settings → Agent API → Provide Hive tools to sessions), so nothing is left for them and these switches don't apply.}}",
+          description: 'A note under the advanced setting "Tell a working agent at the end of a tool" (Settings → Advanced), beside the other inbox switches: whether agents can read their inbox at all, which another setting decides. Settings → Agent API → Provide Hive tools to sessions names a setting: use its names as Hive shows them.'
+        }),
+        { on: String(on) }
+      )}
+      <button className="btn small subtle" data-action="open-agent-api" onClick={() => set({ settingsSection: 'agentApi', settingsQuery: '' })}>
+        {tr(msg({ id: 'settings.advancedList.inboxAvailableOpen', defaultMessage: 'Open Agent API Settings', description: 'Button in the note on whether agents can read their inbox (Settings → Advanced): shows Settings → Agent API.' }))}
+      </button>
     </div>
   )
 }

@@ -96,10 +96,16 @@ interface HiveMessageValues {
   'panes.menu.reviewChanges': undefined
   'panes.messages.cancel': { n: number }
   'panes.messages.cancelFailed': undefined
+  'panes.messages.deliverFailed': undefined
+  'panes.messages.deliverNow': undefined
   'panes.messages.line': { id: string | number; from: string | number; state: string; text: string | number }
+  'panes.messages.noWakesHint': undefined
+  'panes.messages.notDelivered': { agent: string | number }
+  'panes.messages.notDeliveredDetail': undefined
   'panes.messages.overdue': { n: number }
   'panes.messages.overdueTip': { n: number }
   'panes.messages.tip': { n: number; agent: string | number }
+  'panes.messages.tipNoWakes': { n: number; agent: string | number }
   'panes.messages.unread': { n: number }
   'panes.pages.agentsTip': { button: string; page: string | number; agents: string | number; added: string; key: string }
   'panes.pages.button': { page: string | number }
@@ -179,7 +185,6 @@ interface HiveMessageValues {
   'panes.template.listFailed': undefined
   'panes.template.noneSaved': undefined
   'panes.template.noneYet': undefined
-  'panes.template.ownWorktree': undefined
   'panes.template.save': undefined
   'panes.template.scopeHeading': { scope: string }
   'panes.terminal.exited': { code: string | number }
