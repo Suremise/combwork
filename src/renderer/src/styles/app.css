@@ -2904,6 +2904,10 @@ p.hint {
   width: 12px;
   height: 12px;
 }
+/* An agent's role and the agent it is paired with (#1436): a name like HI-R1 kept whole. */
+.template-plan-role {
+  white-space: nowrap;
+}
 .template-plan-default {
   font-size: 11px;
 }

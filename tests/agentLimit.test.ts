@@ -33,7 +33,7 @@ describe('the setting', () => {
   })
 
   it('templates hold up to 24 agents, whichever project they are loaded into', () => {
-    const t = (n: number) => ({ version: 1, name: 'T', layout: 'auto', agents: Array.from({ length: n }, (_, i) => ({ name: `A${i}`, provider: 'claude-code' })) })
+    const t = (n: number) => ({ version: 2, name: 'T', layout: 'auto', agents: Array.from({ length: n }, (_, i) => ({ name: `A${i}`, role: 'builder', provider: 'claude-code' })) })
     expect(typeof readTemplate(t(24))).toBe('object')
     const many = readTemplate(t(25))
     expect(!isAgentTemplate(many) && englishText(many)).toBe('It has 25 agents; a project can have up to 24.')
@@ -75,8 +75,8 @@ describe('Hive keeps to it', () => {
       writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: agentsOf(n, prefix) }))
     }
     mkdirSync(join(wsPath, '.hive', 'templates'), { recursive: true })
-    const crew = Array.from({ length: 14 }, (_, i) => ({ name: `T${i + 1}`, provider: 'claude-code', worktree: false }))
-    writeFileSync(join(wsPath, '.hive', 'templates', 'crew.json'), JSON.stringify({ version: 1, name: 'Crew', layout: 'auto', agents: crew }))
+    const crew = Array.from({ length: 14 }, (_, i) => ({ name: `T${i + 1}`, role: 'builder', provider: 'claude-code' }))
+    writeFileSync(join(wsPath, '.hive', 'templates', 'crew.json'), JSON.stringify({ version: 2, name: 'Crew', layout: 'auto', agents: crew }))
     advanced.load(join(base, 'profile'))
     w = createWorkspaceService()
     await w.open(wsPath)

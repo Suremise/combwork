@@ -160,6 +160,8 @@
   "service.providers.task": "{task, select, install {Instalación de {cli}} update {Actualización de {cli}} login {Inicio de sesión en {cli}} other {Configuración de {cli}}}",
   "service.providers.taskDone": "{task}: terminó correctamente",
   "service.providers.taskFailed": "{task}: terminó con el código {code}",
+  "service.templates.v09": "Las plantillas de 1.0 no atan los agentes a worktrees, así que las plantillas de Hive ocupan su lugar. Se guarda una copia {n, plural, one {de la plantilla} many {de las # plantillas} other {de las # plantillas}} con la copia de seguridad del tablero de 0.9.",
+  "service.templates.v09Title": "Tus plantillas de agentes de 0.9 no se usan en 1.0",
   "service.transcripts.busy": "Esta sesión se está archivando o eliminando. Vuelve a intentarlo en un momento.",
   "service.transcripts.exported": "{session} · exportada desde Hive el {date}",
   "service.transcripts.imageNotKept": "La imagen no está guardada en la transcripción",

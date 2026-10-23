@@ -471,8 +471,6 @@
   "workspace.unused.commitsNoBranch": "{count, plural, one {# commit} other {# commits}} on no branch",
   "workspace.unused.commitsNotOn": "{count, plural, one {# commit} other {# commits}} not on {known, select, yes {{into}} other {the main branch}}",
   "workspace.unused.detached": "(detached)",
-  "workspace.unused.hintDetail": "The template's worktree agents worked in them. Deleting the template left them as they are: review them in Changes.",
-  "workspace.unused.hintTitle": "{count, plural, one {# unused worktree} other {# unused worktrees}} in {many, select, yes {{projects, plural, one {# project} other {# projects}}} other {{project}}}",
   "workspace.unused.lostCommits": "{count, plural, one {# commit} other {# commits}} on {branch} not on {known, select, yes {{into}} other {any other branch}}",
   "workspace.unused.lostDetached": "{count, plural, one {# commit on no branch (only its detached HEAD has it)} other {# commits on no branch (only its detached HEAD has them)}}",
   "workspace.unused.lostFiles": "{count, plural, one {# uncommitted file} other {# uncommitted files}} in {path}",

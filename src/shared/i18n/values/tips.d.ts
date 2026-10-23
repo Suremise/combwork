@@ -344,10 +344,10 @@ interface HiveMessageValues {
   'tips.taskbarBadge.title': undefined
   'tips.teamPreset.text': undefined
   'tips.teamPreset.title': undefined
+  'tips.teamTemplates.text': undefined
+  'tips.teamTemplates.title': undefined
   'tips.templateNames.text': undefined
   'tips.templateNames.title': undefined
-  'tips.templateWorktrees.text': undefined
-  'tips.templateWorktrees.title': undefined
   'tips.testedClis.text': undefined
   'tips.testedClis.title': undefined
   'tips.tileStrip.text': undefined

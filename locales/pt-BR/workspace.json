@@ -471,8 +471,6 @@
   "workspace.unused.commitsNoBranch": "{count, plural, one {# commit} other {# commits}} fora de qualquer branch",
   "workspace.unused.commitsNotOn": "{count, plural, one {# commit} other {# commits}} fora {known, select, yes {de {into}} other {do branch principal}}",
   "workspace.unused.detached": "(sem branch)",
-  "workspace.unused.hintDetail": "Os agentes de worktree do modelo trabalhavam neles. Excluir o modelo os deixou como estão: revise-os em Alterações.",
-  "workspace.unused.hintTitle": "{count, plural, one {# worktree não usado} other {# worktrees não usados}} em {many, select, yes {{projects, plural, one {# projeto} other {# projetos}}} other {{project}}}",
   "workspace.unused.lostCommits": "{count, plural, one {# commit} other {# commits}} no branch {branch} fora {known, select, yes {de {into}} other {de qualquer outro branch}}",
   "workspace.unused.lostDetached": "{count, plural, one {# commit fora de qualquer branch (só o detached HEAD do worktree o tem)} other {# commits fora de qualquer branch (só o detached HEAD do worktree os tem)}}",
   "workspace.unused.lostFiles": "{count, plural, one {# arquivo sem commit} other {# arquivos sem commit}} em {path}",
