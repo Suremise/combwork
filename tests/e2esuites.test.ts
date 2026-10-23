@@ -1443,23 +1443,29 @@ describe('sending a prompt to a CLI until it takes it (lib.sendPrompt, #190)', (
   type Send = (inv: (ch: string, ...a: unknown[]) => Promise<unknown>, key: string, text: string, o: { submitted: () => Promise<boolean>; tries?: number; waitMs?: number }) => Promise<number>
   const { sendPrompt } = createRequire(import.meta.url)('./e2e/lib.cjs') as { sendPrompt: Send }
   const text = 'Use apply_patch to add a file notes.txt containing hi.'
-  /** A terminal that drops the first `dropText` prompts typed and ignores the first `dropEnter` Enters. */
-  const terminal = ({ dropText = 0, dropEnter = 0 }) => {
-    const t = { writes: [] as string[], screen: '', input: '', submitted: false }
+  /**
+   * A terminal that drops the first `dropText` prompts typed and ignores the first `dropEnter` Enters. With `paste` it
+   * has bracketed paste on and reads as Claude Code 2.1.309 does (#1547): each write is one read, however it was split; a
+   * long typed read is a paste, a Ctrl+U in it kept as an invisible character that leaves the prompt unsent; a Ctrl+U
+   * before a bracketed paste clears the line.
+   */
+  const terminal = ({ dropText = 0, dropEnter = 0, paste = false, prompt = text }) => {
+    const t = { writes: [] as string[], screen: paste ? '\x1b[?2004h' : '', input: '', submitted: false }
     const inv = async (ch: string, _key: unknown, data?: unknown) => {
       if (ch === 'pty:buffer') return t.screen
       const d = String(data)
       t.writes.push(d)
       if (d === '\r') {
         if (dropEnter-- > 0) t.input += '\n'
-        else if (t.input.trim()) t.submitted = true
+        else if (t.input.trim() && !t.input.includes('\x15')) t.submitted = true
       } else if (dropText-- <= 0) {
-        t.input = d.replace(/^\x15/, '')
+        const pasted = /^\x15?\x1b\[200~([^]*)\x1b\[201~$/.exec(d)
+        t.input = pasted ? pasted[1] : paste && d.length > 20 ? d : d.replace(/^\x15/, '')
         t.screen += `\x1b[2m> ${t.input}`
       }
       return undefined
     }
-    return { t, run: (tries?: number) => sendPrompt(inv, 'k', text, { submitted: async () => t.submitted, waitMs: 50, ...(tries ? { tries } : {}) }) }
+    return { t, run: (tries?: number) => sendPrompt(inv, 'k', prompt, { submitted: async () => t.submitted, waitMs: 50, ...(tries ? { tries } : {}) }) }
   }
 
   it('taken at once: one prompt, one Enter', async () => {
@@ -1478,6 +1484,18 @@ describe('sending a prompt to a CLI until it takes it (lib.sendPrompt, #190)', (
     const { t, run } = terminal({ dropText: 1 })
     expect(await run()).toBe(2)
     expect(t.writes).toEqual([text, '\r', `\x15${text}`, '\r'])
+  })
+
+  it('with bracketed paste on, the prompt goes again as a paste after Ctrl+U, which a read of both together still sends (#1547)', async () => {
+    const { t, run } = terminal({ dropText: 1, paste: true })
+    expect(await run()).toBe(2)
+    expect(t.writes).toEqual([text, '\r', `\x15\x1b[200~${text}\x1b[201~`, '\r'])
+  })
+
+  it('a slash command is typed again, never pasted (pasted, it would be sent as a message)', async () => {
+    const { t, run } = terminal({ dropText: 1, paste: true, prompt: '/exit' })
+    expect(await run()).toBe(2)
+    expect(t.writes).toEqual(['/exit', '\r', '\x15/exit', '\r'])
   })
 
   it('never taken: 0 after the tries', async () => {

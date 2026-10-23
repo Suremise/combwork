@@ -1,4 +1,5 @@
 import { join, resolve } from 'path'
+import { agentPlace, folderFacts } from './agentFolders'
 import { stat } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
 import {
@@ -32,6 +33,7 @@ import {
 import { samePath } from '../shared/movePaths'
 import { checkProject } from './branchWatch'
 import { samePlace } from './fsutil'
+import type { AgentDef } from '../shared/types'
 import { withRepoLock } from './repoLock'
 import { git, type GitResult } from './git'
 import { gitProblem, gitTool } from './gitTool'
@@ -330,14 +332,20 @@ function scrubText(t: TextPart, secrets: string[]): TextPart {
 }
 
 /**
- * The project's agents working in its folder (not a worktree), with their sessions' status. One with input of Hive's
- * still on its way (#646 round 1: a prompt or launch task given and not taken yet, or a line typed and not taken) counts
- * as working: its CLI may start that turn any moment, and the folder's fence can't take back what is in its input.
+ * The project's agents working in its folder now (#1451: their current folder, `currentFolder`: a running session's, else
+ * where a new conversation would start), with their sessions' status. One with input of Hive's still on its way (#646
+ * round 1: a prompt or launch task given and not taken yet, or a line typed and not taken) counts as working: its CLI may
+ * start that turn any moment, and the folder's fence can't take back what is in its input.
  */
 async function folderAgents(projectPath: string): Promise<{ name: string; status: string | null }[]> {
   const cfg = await workspace.projectConfig(projectPath)
-  return projectAgents(cfg)
-    .filter((a) => !a.worktree)
+  const facts = await folderFacts(projectPath)
+  const here: AgentDef[] = []
+  for (const a of projectAgents(cfg)) {
+    const live = sessions.liveFor(projectPath, a.id)
+    if (samePlace((await agentPlace(projectPath, a, live ? { cwd: live.cwd } : null, facts)).now.path, projectPath)) here.push(a)
+  }
+  return here
     .map((a) => {
       const status = sessions.liveFor(projectPath, a.id)?.status ?? null
       const pending = !!status && (!!sessions.agentNow(projectPath, a.id)?.pending || sessions.lineWaiting(projectPath, a.id))

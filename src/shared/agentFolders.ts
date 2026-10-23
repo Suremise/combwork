@@ -11,7 +11,17 @@
 //   or a refusal saying why.
 
 import { samePath } from './movePaths'
+import type { AgentWorktree } from './types'
 import type { WorkflowRole } from './workflow/roles'
+
+/**
+ * An agent's 0.9 worktree, as project.json stores it (`worktree`). Only the migration (#1441), Repair (#1447), the folder
+ * contract and what still knows a project not migrated yet read it (#1451): everything else asks where an agent works.
+ */
+export function legacyWorktree(raw: { worktree?: AgentWorktree | null } | null | undefined): AgentWorktree | null {
+  const w = raw?.worktree
+  return w && typeof w.path === 'string' && w.path ? w : null
+}
 
 export type FolderPurpose = 'build' | 'review'
 export type FolderLeaseKind = 'card' | 'lane' | 'carried'
@@ -163,3 +173,43 @@ export function canResumeByUser(facts: FolderFacts, agent: FolderAgent, s: Folde
   const h = resumeHold(facts, agent, s)
   return h === null || h.is === 'byHand'
 }
+
+/**
+ * Why an agent is in a folder (#1451, the Agent API's word for it): its running session is there (`session`); a new
+ * conversation starts there under its dispatch lease (`lease`: its card's or lane's slot), its carried slot or 0.9
+ * worktree (`carried`), or in the project folder (`project`).
+ */
+export type PlaceWhy = 'session' | 'lease' | 'carried' | 'project'
+
+/** A folder an agent works in, as the Agent API names it: its path, its short name (`placeName`), why, and its slot. */
+export interface AgentPlace {
+  path: string
+  at: string
+  why: PlaceWhy
+  slot: string | null
+}
+
+/**
+ * A folder as the Agent API names it, short (#1451): a slot's name, `project` for the project folder, `home: <name>`
+ * for a retired home (#1441), else its path (a 0.9 worktree not migrated yet).
+ */
+export function placeName(facts: FolderFacts, folder: string): string {
+  const slot = slotAt(facts, folder)
+  if (slot) return slot.name
+  if (samePath(folder, facts.projectPath)) return 'project'
+  if (facts.homes.some((h) => samePath(h, folder))) return `home: ${folder.split(/[\\/]/).filter(Boolean).pop() ?? folder}`
+  return folder
+}
+
+/**
+ * Where an agent is now (`currentFolder`: its running session's folder, else where a new conversation would start) and
+ * where its next new conversation would start (`launchFolder`, for its role's purpose), each named and with why (#1451).
+ */
+export function agentPlaces(facts: FolderFacts, agent: FolderAgent, running: { cwd: string } | null): { now: AgentPlace; launch: AgentPlace } {
+  const p = launchPlace(facts, agent, defaultPurpose(agent.role))
+  const why: PlaceWhy = p.lease ? (p.lease.kind === 'carried' ? 'carried' : 'lease') : samePath(p.folder, facts.projectPath) ? 'project' : 'carried'
+  const place = (path: string, w: PlaceWhy): AgentPlace => ({ path, at: placeName(facts, path), why: w, slot: slotAt(facts, path)?.name ?? null })
+  const launch = place(p.folder, why)
+  return { now: running ? place(running.cwd, 'session') : launch, launch }
+}
+

@@ -37,7 +37,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await inv('project:updateConfig', proj, { worktreeSetup: 'echo HIVE-SETUP-RAN' })
-  const add = (name) => inv('agents:add', proj, { location: 'new-worktree', name })
+  const add = (name) => inv('agents:testLegacy', proj, { location: 'new-worktree', name })
   const keeper = await add('Keeper')
   const gone = await add('Gone')
   const p1 = await add('Pair One')
