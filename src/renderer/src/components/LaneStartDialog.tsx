@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AgentInfo, ProjectInfo } from '@shared/types'
 import { fmt, msg, tr } from '@shared/i18n'
 import { cardLabel } from '@shared/projectKeys'
+import { agentWorkflowRole, buildsWork, reviewsWork } from '@shared/workflow/roles'
 import { call } from '../api'
 import { NO_PROJECTS, get, notify, set, useLanguage, useStore } from '../store'
 import { cx } from '../util'
@@ -22,6 +23,15 @@ export function openLaneStart(project: string | null, cards: number[] = []): voi
 const BUSY = new Set(['working', 'starting', 'waiting', 'background', 'watching', 'signin'])
 const busy = (a: AgentInfo | undefined): boolean => !!a?.live && BUSY.has(a.live.status)
 
+/** Who may build and who may review, by their role in the workflow (#1430): either-role agents are in both lists. */
+const builders = (p: ProjectInfo | null): AgentInfo[] => p?.agents.filter((a) => buildsWork(agentWorkflowRole(a))) ?? []
+const reviewers = (p: ProjectInfo | null, builder: string): AgentInfo[] => p?.agents.filter((a) => a.id !== builder && reviewsWork(agentWorkflowRole(a))) ?? []
+/** The first builder, and the first reviewer besides it. */
+const firstPair = (p: ProjectInfo | null): { builder: string; reviewer: string } => {
+  const builder = builders(p)[0]?.id ?? ''
+  return { builder, reviewer: reviewers(p, builder)[0]?.id ?? '' }
+}
+
 const M = {
   title: msg({ id: 'board.laneStart.title', defaultMessage: 'Start Lane', description: "Title of the Start Lane dialog: a builder and a reviewer agent work through cards in turn (a lane, a card loop), started from the window. Glossary: lane." }),
   intro: msg({ id: 'board.laneStart.intro', defaultMessage: 'The builder works through the cards in this order, one at a time, and the reviewer reviews each. Both start in a new conversation with a brief: the cards, where the builder works, what the project’s rules ask, and your note.', description: 'At the top of the Start Lane dialog. Glossary: lane, rule.' }),
@@ -30,6 +40,7 @@ const M = {
   reviewer: msg({ id: 'board.laneStart.reviewer', defaultMessage: 'Reviewer', description: 'A field label in the Start Lane dialog: the agent that reviews each card. Glossary: reviewer.' }),
   noReviewer: msg({ id: 'board.laneStart.noReviewer', defaultMessage: 'No reviewer', description: 'A choice of the Start Lane dialog’s reviewer: the lane has none (the project’s rules may need one).' }),
   noAgents: msg({ id: 'board.laneStart.noAgents', defaultMessage: 'The project has no agents. Add one first.', description: 'In the Start Lane dialog: the chosen project has no agents to build the cards.' }),
+  noBuilders: msg({ id: 'board.laneStart.noBuilders', defaultMessage: 'None of the project’s agents builds. Set Role in the workflow to Builder or Either in an agent’s settings.', description: 'In the Start Lane dialog: every agent of the project is a reviewer, so none can build the cards. Role in the workflow, Builder and Either are the Agent Settings field and its choices: use their translated names. Glossary: builder, either.' }),
   agentState: msg({ id: 'board.laneStart.agentState', defaultMessage: '{agent} ({status})', description: "An agent in the Start Lane dialog's choices, with what it is doing ({status}: \"Working…\", \"Not running\")." }),
   notRunning: msg({ id: 'board.laneStart.notRunning', defaultMessage: 'not running', description: "An agent's state in the Start Lane dialog's choices: its session isn't running (it starts with the brief)." }),
   cards: msg({ id: 'board.laneStart.cards', defaultMessage: 'Cards, in order', description: 'A field label in the Start Lane dialog: the cards the lane works through, in the order they are worked.' }),
@@ -68,15 +79,16 @@ export function LaneStartDialog() {
   const action = useBusy()
   const project: ProjectInfo | null = projects.find((p) => p.path === projectPath) ?? null
 
-  // Opened: its project and cards, the first two agents as builder and reviewer.
+  // Opened: its project and cards, its first builder and first reviewer (#1430).
   useEffect(() => {
     // Closed (Cancel, Escape, another workspace): nothing waits any more (HR6's #1280 round 1).
     if (!req) return setWaiting(false)
     const named = req.project?.toLowerCase()
     const p = projects.find((x) => x.path.toLowerCase() === named || x.name.toLowerCase() === named) ?? projects.find((x) => x.agents.length > 0) ?? projects[0] ?? null
     setProjectPath(p?.path ?? null)
-    setBuilder(p?.agents[0]?.id ?? '')
-    setReviewer(p?.agents[1]?.id ?? '')
+    const pair = firstPair(p)
+    setBuilder(pair.builder)
+    setReviewer(pair.reviewer)
     setCards(req.cards.filter((n) => tasks.some((c) => c.number === n && c.project.toLowerCase() === p?.name.toLowerCase())))
     setName('')
     setNote('')
@@ -158,8 +170,9 @@ export function LaneStartDialog() {
                 onChange={(e) => {
                   const p = projects.find((x) => x.path === e.target.value) ?? null
                   setProjectPath(p?.path ?? null)
-                  setBuilder(p?.agents[0]?.id ?? '')
-                  setReviewer(p?.agents[1]?.id ?? '')
+                  const pair = firstPair(p)
+                  setBuilder(pair.builder)
+                  setReviewer(pair.reviewer)
                   setCards([])
                 }}
               >
@@ -176,13 +189,24 @@ export function LaneStartDialog() {
           ) : (
             <>
               <label htmlFor="lane-start-builder">{tr(M.builder)}</label>
-              <select id="lane-start-builder" className="select" value={builder} disabled={waiting} onChange={(e) => setBuilder(e.target.value)}>
-                {project?.agents.map(agentChoice)}
+              <select
+                id="lane-start-builder"
+                className="select"
+                value={builder}
+                disabled={waiting}
+                onChange={(e) => {
+                  setBuilder(e.target.value)
+                  // An either-role reviewer chosen as the builder: the next reviewer instead.
+                  if (reviewer === e.target.value) setReviewer(reviewers(project, e.target.value)[0]?.id ?? '')
+                }}
+              >
+                {builders(project).map(agentChoice)}
               </select>
+              {!builders(project).length && <p className="faint span2" data-no-builders>{tr(M.noBuilders)}</p>}
               <label htmlFor="lane-start-reviewer">{tr(M.reviewer)}</label>
               <select id="lane-start-reviewer" className="select" value={reviewer} disabled={waiting} onChange={(e) => setReviewer(e.target.value)}>
                 <option value="">{tr(M.noReviewer)}</option>
-                {project?.agents.filter((a) => a.id !== builder).map(agentChoice)}
+                {reviewers(project, builder).map(agentChoice)}
               </select>
             </>
           )}

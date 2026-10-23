@@ -162,6 +162,8 @@
   "panes.table.notRunning": "Nie działa",
   "panes.table.project": "Projekt",
   "panes.table.projectPrefix": "w projekcie {value}",
+  "panes.table.role": "Rola",
+  "panes.table.rolePrefix": "rola {value}",
   "panes.table.state": "Stan",
   "panes.table.waiting": "Czeka na",
   "panes.table.waitingFor": "Czeka na {what}",

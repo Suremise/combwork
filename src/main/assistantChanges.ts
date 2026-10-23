@@ -26,7 +26,7 @@ export type Value = null | boolean | number | string | Value[] | { [k: string]: 
 export const laneValues = (l: LaneRecord): Record<string, Value> => ({ cards: [...(l.pending ?? l.cards)], reviewer: l.reviewer?.id ?? null, rounds: l.rounds, waitMinutes: l.waitMinutes, name: l.name })
 
 /** An agent's settings undo puts back: those the Assistant can change (servers.ts' agentSettings, and its name). */
-export const AGENT_FIELDS = ['name', 'provider', 'model', 'effort', 'permissionMode', 'use200kContext', 'mcpServers'] as const
+export const AGENT_FIELDS = ['name', 'provider', 'model', 'effort', 'permissionMode', 'use200kContext', 'mcpServers', 'workflowRole'] as const
 
 /** A field a change set: what it was, and what the change wrote. */
 export interface FieldChange {

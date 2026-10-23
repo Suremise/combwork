@@ -11,6 +11,8 @@
   "tips.agentSettings.title": "Un modèle par agent",
   "tips.agentStates.text": "Chaque agent a l’un de quatre états, distingués par la forme autant que par la couleur : un losange t’attend, un carré est à l’arrêt, un point qui pulse est au travail et un anneau est inactif. L’en-tête du projet les compte : « 1 en attente · 2 au travail ».",
   "tips.agentStates.title": "Tes agents d’un coup d’œil",
+  "tips.agentWorkflowRole.text": "Le Rôle dans le flux de travail de chaque agent, dans ses paramètres, dit s’il travaille sur les cartes, les relit ou les deux. Démarrer un couloir propose auteurs et relecteurs selon ce rôle.",
+  "tips.agentWorkflowRole.title": "Auteurs et relecteurs",
   "tips.allKeysToCli.text": "Dans le volet d’un agent, les raccourcis de Hive prennent leurs touches. Active Paramètres → Avancé → Toutes les touches vont à la CLI pour envoyer chaque touche à la CLI à la place, sauf celle de la palette de commandes (Afficher toutes les commandes), pour que chaque commande reste à portée.",
   "tips.allKeysToCli.title": "Donne toutes les touches à la CLI de l’agent",
   "tips.alwaysOnTop.text": "L’épingle de la barre de titre (ou Ctrl+Alt+O) garde la fenêtre au-dessus de tes autres applications, pour qu’une série de tests ou un émulateur tourne en dessous. Chaque fenêtre a la sienne, mémorisée pour son espace de travail.",

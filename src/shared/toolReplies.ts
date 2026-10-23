@@ -316,7 +316,7 @@ export interface ProjectRow {
    * `watching`: what a watching agent waits for ("Waiting for #12 → Review"). `progress`: its open progress run, short
    * ("e2e: 12 suites 4/12, about 6 min left").
    */
-  agents: { name: string; provider: string; status: string; branch: string | null; backgroundTasks: number; watching?: string; progress?: string }[]
+  agents: { name: string; provider: string; workflowRole?: string; status: string; branch: string | null; backgroundTasks: number; watching?: string; progress?: string }[]
 }
 
 /** An agent's open progress run in a few words, title clipped, for the short listing. */
@@ -330,7 +330,7 @@ export function progressLabel(p: { title: string; step?: number; total?: number;
 export function projectRowText(p: ProjectRow, many: boolean): string {
   const head = `${many ? `${p.workspace}/` : ''}${p.name} (${p.active ? 'on' : 'off'}${p.branch ? `, ${p.branch}` : ''})`
   if (!p.agents.length) return `${head}: no agents`
-  const agents = p.agents.map((a) => `${a.name} [${a.provider}${a.branch ? `, ${a.branch}` : ''}] ${a.watching ? a.watching.replace(/^Waiting/, 'waiting') : (STATUS[a.status] ?? a.status)}${a.backgroundTasks > 0 ? ` (${a.backgroundTasks} background)` : ''}${a.progress ? ` (running ${a.progress})` : ''}`)
+  const agents = p.agents.map((a) => `${a.name} [${a.provider}${a.workflowRole ? `, ${a.workflowRole}` : ''}${a.branch ? `, ${a.branch}` : ''}] ${a.watching ? a.watching.replace(/^Waiting/, 'waiting') : (STATUS[a.status] ?? a.status)}${a.backgroundTasks > 0 ? ` (${a.backgroundTasks} background)` : ''}${a.progress ? ` (running ${a.progress})` : ''}`)
   return `${head}: ${agents.join('; ')}`
 }
 

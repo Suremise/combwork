@@ -1,5 +1,6 @@
 {
   "worktrees.agent.badPlacement": "Os painéis não podem ser posicionados assim neste layout.",
+  "worktrees.agent.badWorkflowRole": "Um papel no fluxo de trabalho é builder, reviewer ou either.",
   "worktrees.agent.chooseMove": "Escolha para onde mover o agente.",
   "worktrees.agent.chooseTree": "Escolha um worktree.",
   "worktrees.agent.detached": "Esse worktree não está em um branch (detached HEAD).",

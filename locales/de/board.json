@@ -391,6 +391,7 @@
   "board.laneStart.intro": "Der Bearbeiter arbeitet die Karten in dieser Reihenfolge ab, eine nach der anderen, und der Reviewer prüft jede. Beide starten in einer neuen Unterhaltung mit einer Einweisung: die Karten, wo der Bearbeiter arbeitet, was die Regeln des Projekts verlangen, und deine Notiz.",
   "board.laneStart.name": "Worum es geht (optional)",
   "board.laneStart.noAgents": "Das Projekt hat keine Agenten. Füge zuerst einen hinzu.",
+  "board.laneStart.noBuilders": "Keiner der Agenten des Projekts bearbeitet Karten. Stelle in den Einstellungen eines Agenten Rolle im Workflow auf Bearbeiter oder Beides.",
   "board.laneStart.noCards": "Noch keine Karten: Füge sie unten aus „Offen“ des Projekts hinzu.",
   "board.laneStart.noReviewer": "Kein Reviewer",
   "board.laneStart.notRunning": "läuft nicht",
