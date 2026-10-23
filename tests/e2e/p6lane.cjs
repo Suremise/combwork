@@ -168,7 +168,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     const laneRow = (id) => panel.locator(`.progress-lane[data-lane="${id}"]`)
     const seg = (n) => panel.locator(`.lane-seg[data-card="${n}"]`).first()
     const tips = () => page.locator('.tip')
-    const tipText = async () => ((await tips().first().innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+    const tipText = async () => (await tips().allInnerTexts().catch(() => [])).join(' ').replace(/\s+/g, ' ')
     /**
      * Hovers `target` until its tooltip shows `want` (a tooltip shows after its delay; `want` may read the tooltip's parts
      * too). A tooltip closed by the panel drawing again (the queue moving on) is hovered for again.
@@ -180,16 +180,22 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
         await target.hover()
       }
       await enter()
+      // A tooltip that isn't the target's (the pointer ended on another part as the panel moved) is hovered for again
+      // after a few seconds, as is one that closed.
       let seen = false
+      let other = 0
       return waitHung(async () => {
         const shown = (await tips().count()) > 0
-        if (seen && !shown) {
+        if ((seen && !shown) || other > 25) {
           seen = false
+          other = 0
           await enter()
           return false
         }
         seen = shown
-        return shown && (await want(await tipText()))
+        const ok = shown && (await want(await tipText()))
+        if (shown && !ok) other++
+        return ok
       })
     }
     const laneNow = async (id) => (await inv('lanes:list')).find((l) => l.id === id)
