@@ -379,9 +379,25 @@
     "defaultMessage": "Could not cancel the messages",
     "description": "An error's title: cancelling messages left for an agent failed."
   },
+  "panes.messages.deliverFailed": {
+    "defaultMessage": "Could not deliver the messages",
+    "description": "An error's title: typing the line that tells an agent of its waiting messages (Deliver Now) failed."
+  },
+  "panes.messages.deliverNow": {
+    "defaultMessage": "Deliver Now",
+    "description": "Menu item on an agent's unread messages, shown while the setting Wake an idle agent is off: types the line telling the agent of them into its terminal, once."
+  },
   "panes.messages.line": {
     "defaultMessage": "{id} from {from} ({state, select, queued {waiting} offered {typed, not fetched or acked yet} other {its offer not confirmed}}): {text}",
     "description": "A message left for an agent, in the menu of its unread messages: its id, who from ({from}), its state (waiting; typed into the agent but not fetched or acked; or offered but not confirmed), and the start of its text ({text}, the sender's own words)."
+  },
+  "panes.messages.notDelivered": {
+    "defaultMessage": "{agent} wasn't told now",
+    "description": "A notice's title: Deliver Now couldn't type the line into the agent's terminal now. {agent} is its name."
+  },
+  "panes.messages.notDeliveredDetail": {
+    "defaultMessage": "It isn't idle, or you are typing in its terminal. Its messages stay in its inbox: try again once it's idle.",
+    "description": "The detail of the notice that Deliver Now could not type the line into an agent now."
   },
   "panes.messages.overdue": {
     "defaultMessage": "{n, plural, one {# overdue} other {# overdue}}",
@@ -394,6 +410,10 @@
   "panes.messages.tip": {
     "defaultMessage": "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.",
     "description": "The heading of the menu of an agent's unread messages, above the list of them: how many ({n}) for the agent ({agent}: its name). hive_inbox is a tool's name: keep it."
+  },
+  "panes.messages.tipNoWakes": {
+    "defaultMessage": "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet. Wake an idle agent is off, so nothing is typed by itself: Deliver Now types its line once, or it reads them with hive_inbox.",
+    "description": "The heading of the menu of an agent's unread messages when the setting Wake an idle agent is off: how many ({n}) for the agent ({agent}: its name). Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them. hive_inbox is a tool's name: keep it."
   },
   "panes.messages.unread": {
     "defaultMessage": "{n, plural, one {# unread} other {# unread}}",

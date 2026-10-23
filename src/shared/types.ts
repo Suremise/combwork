@@ -1123,6 +1123,10 @@ export interface ProjectConfig {
    */
   mcp: { disabled: string[]; enabled: string[] }
   chime: 'inherit' | 'on' | 'off'
+  /** Carrying on (#1432, shared/inboxSwitches.ts): this project's own inbox switches over Settings → Advanced's; inherit uses those. */
+  inboxCheckpoints: 'inherit' | 'on' | 'off'
+  inboxStopContinuation: 'inherit' | 'on' | 'off'
+  inboxIdleWakes: 'inherit' | 'on' | 'off'
   /** The provider new agents get (Add Agent's quick add); inherit uses the global default. */
   defaultProvider: Inherit<ProviderId>
   /** The project's settings per provider, over the global ones. */

@@ -29,6 +29,8 @@ import {
 } from '../shared/deliveries'
 import { reviewRounds } from '../shared/laneBar'
 import type { TaskCard } from '../shared/types'
+import { INBOX_SWITCH_ID, inboxSwitchOn, type InboxSwitch } from '../shared/inboxSwitches'
+import { advanced } from './advanced'
 import * as assistant from './assistantControl'
 import { config } from './config'
 import { onHiveEvent } from './events'
@@ -674,6 +676,18 @@ let senderRefusal = (from: DeliverySender): string | null => {
  */
 let readsInbox = (_host: string, agentId: string): boolean => agentId === ASSISTANT_AGENT_ID || (config.settings.agentApi.enabled && config.settings.agentApi.provideHiveMcp)
 export const agentReadsInbox = (host: string, agentId: string): boolean => readsInbox(host, agentId)
+
+/**
+ * Whether one of the carrying-on switches is on for a host's agents (#1432, shared/inboxSwitches.ts): its project's own
+ * over Settings → Advanced's, both read at each use (project.json as it is now, as loop wakes read it); the Assistant's
+ * home has no project, so it follows Settings'.
+ */
+export async function inboxSwitch(host: string, which: InboxSwitch): Promise<boolean> {
+  const global = advanced.get<boolean>(INBOX_SWITCH_ID[which])
+  const ws = workspaceFor(host)
+  if (!ws || ws.isAssistantHome(host) || !ws.isProjectPath(host)) return global
+  return inboxSwitchOn(which, await ws.projectConfig(host).catch(() => null), global)
+}
 /** Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. */
 const noInbox = (name: string): string => `${name} has no inbox: turn on the Agent API`
 /** A delivery refused because its agent can't read an inbox: the message says so, and what to do. */
@@ -1390,14 +1404,18 @@ async function refreshAll(store: Store, items: readonly DeliveryRecord[]): Promi
 
 const trying = new Map<string, Promise<boolean>>()
 
-/** Offers an agent's waiting deliveries now if it can take a line (one try at a time per agent); `only`: that one alone. Whether a line was typed. */
-export function offerNow(host: string, agentId: string, only?: string): Promise<boolean> {
+/**
+ * Offers an agent's waiting deliveries now if it can take a line (one try at a time per agent); `only`: that one alone.
+ * With idle wakes off (#1432) nothing waiting is offered but a task given now (`only`, deliverNow's) or what the user
+ * asks for with Deliver now (`asked`). Whether a line was typed.
+ */
+export function offerNow(host: string, agentId: string, only?: string, asked = false): Promise<boolean> {
   // Its workspace closed: nothing is offered there until a window opens it again (#1391).
   if (hostClosed(host)) return Promise.resolve(false)
   const k = `${keyOf(host)}#${agentId}`
   const going = trying.get(k)
   if (going) return going.then(() => false)
-  const run = offerOnce(host, agentId, only).finally(() => trying.delete(k))
+  const run = offerOnce(host, agentId, only, 1, asked).finally(() => trying.delete(k))
   trying.set(k, run)
   return run
 }
@@ -1405,12 +1423,15 @@ export function offerNow(host: string, agentId: string, only?: string): Promise<
 /** How many times an offer overtaken before its first key (what it was made from changed as it was planned) is made again at once. */
 const OVERTAKEN_TRIES = 3
 
-async function offerOnce(host: string, agentId: string, only?: string, tries = 1): Promise<boolean> {
+async function offerOnce(host: string, agentId: string, only?: string, tries = 1, asked = false): Promise<boolean> {
   const store = await load(host)
   const st = sessions.liveFor(host, agentId)
   if (!st) return false
   // What may no longer be given out (its sender's permission gone, too old, another conversation) ends now, not later.
   if (store.records.some((r) => r.agentId === agentId && isUnread(r) && whyNot(store, r))) await transact(store, (d) => recheck(store, d, agentId)).catch((e) => log.warn('checking deliveries', e))
+  // Idle wakes off (#1432): no doorbell for what waits, of any kind; it stays in the inbox, unread, for hive_inbox, the
+  // agent's hooks (if their switches are on) or Deliver now. A task given now isn't a wake.
+  if (!only && !asked && !(await inboxSwitch(host, 'idleWakes'))) return false
   let items = pickOffer(store, store.records, agentId, only)
   if (!items.length) return false
   if (!canTypeLine(host, agentId, needOf(items))) {
@@ -1449,7 +1470,7 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
     // Overtaken as it was saved (#1036: the board changed after its line was made, by another agent or, seen by the
     // board's poll, another process): made again from things as they are now, at once; still overtaken, tried in a
     // moment, never left for the tick.
-    if (tries < OVERTAKEN_TRIES) return offerOnce(host, agentId, only, tries + 1)
+    if (tries < OVERTAKEN_TRIES) return offerOnce(host, agentId, only, tries + 1, asked)
     retrySoon(host, agentId)
     return false
   }

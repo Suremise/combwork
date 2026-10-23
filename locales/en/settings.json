@@ -643,6 +643,30 @@
     "defaultMessage": "Hooks missing: wait",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. Hooks: the calls an agent's coding agent makes to Hive as it works."
   },
+  "settings.advanced.hive.inbox.checkpoints.desc": {
+    "defaultMessage": "When something arrives in a working agent's inbox, Hive tells it at the end of its next tool call, in that tool's reply, so it can read it without stopping. Turned off, a working agent isn't told until its turn ends or it is idle; nothing is lost, as it stays in the inbox. A project can set its own in Project Settings → Sessions.",
+    "description": "What the advanced setting \"Tell a working agent at the end of a tool\" does (Settings → Advanced, under Hive). Project Settings → Sessions names a section of the project's settings: use its name as Hive shows it."
+  },
+  "settings.advanced.hive.inbox.checkpoints.title": {
+    "defaultMessage": "Tell a working agent at the end of a tool",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: Hive tells a busy agent what has arrived in its inbox each time one of its tool calls ends."
+  },
+  "settings.advanced.hive.inbox.idleWakes.desc": {
+    "defaultMessage": "When something arrives in an idle agent's inbox, Hive types one short line into its terminal saying so, which wakes it. Card loops' wakes (Project Settings → Card loops → Wake reviewers and builders) and card watches' are such wakes. Turned off, nothing is typed for anything waiting: it stays in the inbox, the agent's pane shows how many, and its Deliver Now types the line once. A card started on an agent, or a task given to it now, is still typed. A project can set its own in Project Settings → Sessions.",
+    "description": "What the advanced setting \"Wake an idle agent\" does (Settings → Advanced, under Hive). Project Settings → Card loops → Wake reviewers and builders names a setting and Project Settings → Sessions a section, Deliver Now a menu item: use their names as Hive shows them."
+  },
+  "settings.advanced.hive.inbox.idleWakes.title": {
+    "defaultMessage": "Wake an idle agent",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: Hive types a short line into an idle agent's terminal to tell it something has arrived in its inbox."
+  },
+  "settings.advanced.hive.inbox.stopContinuation.desc": {
+    "defaultMessage": "When an agent is about to end its turn with items in its inbox it hasn't read, Hive keeps it going to read them first, once a turn: Codex and Copilot by holding their stop back, Claude Code by adding a line to its stop. Turned off, the turn ends as the CLI ends it, and the items wait in the inbox for an idle wake. A project can set its own in Project Settings → Sessions.",
+    "description": "What the advanced setting \"Keep an agent going when it stops with unread items\" does (Settings → Advanced, under Hive). Codex, Copilot and Claude Code are CLIs' names: keep them. Project Settings → Sessions names a section of the project's settings: use its name as Hive shows it."
+  },
+  "settings.advanced.hive.inbox.stopContinuation.title": {
+    "defaultMessage": "Keep an agent going when it stops with unread items",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: when an agent is about to end its turn with items in its inbox it hasn't read, Hive makes it carry on and read them."
+  },
   "settings.advanced.hive.mcp.connectSeconds.desc": {
     "defaultMessage": "How long Hive waits, once an agent is ready, for its CLI to connect Hive's tools before it tells the agent of new work anyway. A resumed session can be ready before its tools are, and a message then is a turn spent without them (#865). Lower it if messages reach agents late when their CLI doesn't connect Hive's tools.",
     "description": "What the advanced setting \"hive tools: wait to connect\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -1046,6 +1070,14 @@
   "settings.advancedList.filter": {
     "defaultMessage": "Filter advanced settings",
     "description": "Placeholder and name of the filter box in Settings → Advanced's list."
+  },
+  "settings.advancedList.inboxAvailable": {
+    "defaultMessage": "{on, select, true {Agents can read their inbox: they have Hive's tools (Settings → Agent API → Provide Hive tools to sessions).} other {Agents can't read an inbox now: they need Hive's tools (Settings → Agent API → Provide Hive tools to sessions), so nothing is left for them and these switches don't apply.}}",
+    "description": "A note under the advanced setting \"Tell a working agent at the end of a tool\" (Settings → Advanced), beside the other inbox switches: whether agents can read their inbox at all, which another setting decides. Settings → Agent API → Provide Hive tools to sessions names a setting: use its names as Hive shows them."
+  },
+  "settings.advancedList.inboxAvailableOpen": {
+    "defaultMessage": "Open Agent API Settings",
+    "description": "Button in the note on whether agents can read their inbox (Settings → Advanced): shows Settings → Agent API."
   },
   "settings.advancedList.keep": {
     "defaultMessage": "Keep for {version}",
@@ -1454,6 +1486,10 @@
   "settings.assistant.control.tip.agents": {
     "defaultMessage": "Control agents: it can also add agents, change their settings, start and stop them, and give idle ones tasks, when you ask it to. Stopping a busy agent asks you first.",
     "description": "The info tip of the setting \"Control\" (Settings → Assistant): a line on the choice Control agents."
+  },
+  "settings.assistant.control.tip.inbox": {
+    "defaultMessage": "How the Assistant hears of its inbox follows Settings → Advanced's three inbox switches (Tell a working agent at the end of a tool, Keep an agent going when it stops with unread items, Wake an idle agent), Settings' own values: a project's don't apply to it.",
+    "description": "The info tip of the setting \"Control\" (Settings → Assistant): a paragraph on which inbox switches the Assistant follows. The three names in brackets are settings of Settings → Advanced: use their names as Hive shows them."
   },
   "settings.assistant.control.tip.look": {
     "defaultMessage": "Look and advise: it reads and suggests, and you act.",
@@ -2671,6 +2707,42 @@
     "defaultMessage": "File locks",
     "description": "A setting's title (Project Settings → Agents & Worktrees)."
   },
+  "settings.project.inboxCheckpoints.desc": {
+    "defaultMessage": "Hive tells a working agent of what arrives in its inbox at the end of its next tool call. Off: it isn't told until its turn ends or it is idle; nothing is lost.",
+    "description": "What the setting \"Tell a working agent at the end of a tool\" does, under its title (Project Settings → Sessions)."
+  },
+  "settings.project.inboxCheckpoints.tip": {
+    "defaultMessage": "Inherit follows Settings → Advanced → Tell a working agent at the end of a tool.",
+    "description": "The info tip of the setting \"Tell a working agent at the end of a tool\" (Project Settings → Sessions). Settings → Advanced names Hive's settings: use its names as Hive shows them."
+  },
+  "settings.project.inboxCheckpoints.title": {
+    "defaultMessage": "Tell a working agent at the end of a tool",
+    "description": "A setting's title (Project Settings → Sessions): Hive tells a busy agent what has arrived in its inbox each time one of its tool calls ends."
+  },
+  "settings.project.inboxIdleWakes.desc": {
+    "defaultMessage": "Hive types a short line into an idle agent's terminal when something arrives in its inbox, card loops' wakes included. Off: nothing is typed for what waits; the agent's pane shows how many, and Deliver Now types the line once.",
+    "description": "What the setting \"Wake an idle agent\" does, under its title (Project Settings → Sessions). Deliver Now is a menu item of the agent's pane: use its name as Hive shows it."
+  },
+  "settings.project.inboxIdleWakes.tip": {
+    "defaultMessage": "A card started on an agent, or a task given to it now, is still typed. Inherit follows Settings → Advanced → Wake an idle agent.",
+    "description": "The info tip of the setting \"Wake an idle agent\" (Project Settings → Sessions). Settings → Advanced names Hive's settings: use its names as Hive shows them."
+  },
+  "settings.project.inboxIdleWakes.title": {
+    "defaultMessage": "Wake an idle agent",
+    "description": "A setting's title (Project Settings → Sessions): Hive types a short line into an idle agent's terminal to tell it something has arrived in its inbox."
+  },
+  "settings.project.inboxStopContinuation.desc": {
+    "defaultMessage": "Hive keeps an agent ending its turn with unread items going to read them, once a turn. Off: the turn ends, and they wait in the inbox for an idle wake.",
+    "description": "What the setting \"Keep an agent going when it stops with unread items\" does, under its title (Project Settings → Sessions)."
+  },
+  "settings.project.inboxStopContinuation.tip": {
+    "defaultMessage": "Codex and Copilot have their stop held back, Claude Code a line added to it. Inherit follows Settings → Advanced → Keep an agent going when it stops with unread items.",
+    "description": "The info tip of the setting \"Keep an agent going when it stops with unread items\" (Project Settings → Sessions). Codex, Copilot and Claude Code are CLIs' names: keep them. Settings → Advanced names Hive's settings: use its names as Hive shows them."
+  },
+  "settings.project.inboxStopContinuation.title": {
+    "defaultMessage": "Keep an agent going when it stops with unread items",
+    "description": "A setting's title (Project Settings → Sessions): when an agent is about to end its turn with items in its inbox it hasn't read, Hive makes it carry on and read them."
+  },
   "settings.project.key.desc": {
     "defaultMessage": "The 2 to 4 letters this project’s cards are named by, as in {example}. If you change it, the old key still finds them.",
     "description": "What the setting \"Project key\" does, under its title (Project Settings → Agents & Worktrees). {example} is a card name with the project's own key, such as WB-12."
@@ -2716,7 +2788,7 @@
     "description": "What the setting \"Wake reviewers and builders\" does, under its title (Project Settings → Card loops)."
   },
   "settings.project.loopWakes.tip": {
-    "defaultMessage": "A card's reviewer is the reviewer of a lane with the card, else the agent that last reviewed it: cards nobody reviews never wake anyone. An agent is only woken while it is idle, never by its own change, and not when its own card watch already tells it.",
+    "defaultMessage": "A card's reviewer is the reviewer of a lane with the card, else the agent that last reviewed it: cards nobody reviews never wake anyone. An agent is only woken while it is idle, never by its own change, and not when its own card watch already tells it. These are idle wakes: with Sessions → Wake an idle agent off, none is typed, and the wake waits in the agent's inbox.",
     "description": "The info tip of the setting \"Wake reviewers and builders\" (Project Settings → Card loops): more on what it does and when it applies."
   },
   "settings.project.loopWakes.title": {

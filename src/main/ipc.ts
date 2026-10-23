@@ -88,7 +88,7 @@ import { resetMetrics } from './metrics'
 import { beginWork } from './mainStalls'
 import { metricsExport, metricsReport } from './metricsUsage'
 import { cancelWatch, stampWatchProjects } from './watches'
-import { cancelMessages } from './agentMessages'
+import { cancelMessages, deliverWaiting } from './agentMessages'
 import { cardBusy } from './cardBusy'
 import { devConsole } from './devConsole'
 import { consoleSources } from './devConsoleSources'
@@ -568,6 +568,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     // or switches meanwhile (a dialog left open, a slow read) is refused, never written into the next one.
     'watch:cancel': (projectPath, agentId) => cancelWatch(workspaceOf(projectPath), projectPath, agentId),
     'session:cancelMessages': (projectPath, agentId) => cancelMessages(projectPath, agentId, 'the user'), // i18n-ignore: who cancelled them, as their agent is told (English)
+    'session:deliverNow': (projectPath, agentId) => deliverWaiting(projectPath, agentId),
     'benchmarks:list': (scope) => listBenchmarks(benchContext(currentWorkspace()), scope),
     'benchmarks:import': async (scope, answer) => {
       const ctx = benchContext(currentWorkspace())

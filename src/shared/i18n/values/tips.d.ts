@@ -184,6 +184,8 @@ interface HiveMessageValues {
   'tips.imagesTab.title': undefined
   'tips.improveTranslation.text': undefined
   'tips.improveTranslation.title': undefined
+  'tips.inboxCarryingOn.text': undefined
+  'tips.inboxCarryingOn.title': undefined
   'tips.inboxNotices.text': undefined
   'tips.inboxNotices.title': undefined
   'tips.keepAwake.text': undefined

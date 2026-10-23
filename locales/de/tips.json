@@ -182,6 +182,8 @@
   "tips.imagesTab.title": "Alles, was du angehängt hast, an einem Ort",
   "tips.improveTranslation.text": "Ein holpriges oder falsches Wort in deiner Sprache entdeckt? Hilfe → Diese Übersetzung verbessern zeigt, wie du es mit einem Pull Request auf GitHub korrigierst oder eine Sprache hinzufügst.",
   "tips.improveTranslation.title": "Hive in deiner Sprache besser machen",
+  "tips.inboxCarryingOn.text": "Hive meldet arbeitenden Agenten neue Nachrichten nach einem Werkzeugaufruf, lässt sie vor dem Anhalten lesen und weckt untätige. Je ein Schalter in Einstellungen → Erweitert, auch pro Projekt; ohne Wecken tippt „Jetzt zustellen“ die Zeile.",
+  "tips.inboxCarryingOn.title": "Wähle, wie Agenten von ihrem Posteingang erfahren",
   "tips.inboxNotices.text": "Eine Nachricht, die der Assistent einem arbeitenden Agenten hinterlässt, erreicht ihn beim nächsten Werkzeugaufruf oder bevor sein Durchgang endet, als kurzer Hinweis von Hive: Nichts wird in seine Arbeit hineingetippt. Der Agent liest sie aus seinem Posteingang und bestätigt sie; bis dahin zeigt sein Bereich sie als ungelesen (✉).",
   "tips.inboxNotices.title": "Nachrichten erreichen beschäftigte Agenten zwischen zwei Schritten",
   "tips.keepAwake.text": "Während ein Agent arbeitet, verhindert Hive den Ruhezustand von Windows (der Bildschirm kann trotzdem sperren) und erlaubt ihn wieder, sobald alle fertig sind. Wann, wählst du unter Einstellungen → Allgemein.",

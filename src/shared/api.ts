@@ -244,6 +244,8 @@ export interface HiveRequests {
   'watch:cancel': (projectPath: string, agentId: string) => boolean
   /** Cancels the messages waiting to be offered to an agent (#530, #647): how many there were. */
   'session:cancelMessages': (projectPath: string, agentId: string) => number
+  /** Deliver Now (#1432): the line telling an agent of what waits in its inbox, typed once. Whether it was typed. */
+  'session:deliverNow': (projectPath: string, agentId: string) => boolean
   /** Kept comparisons (Performance → Compare), for a scope only: a project's page sees its own project's. */
   'benchmarks:list': (scope: CompareScope) => { entries: KeptEntry[]; base: string | null; run: string | null; notice?: string }
   /** Imports a benchmark or export (an open dialog; or, with `token`, a file an earlier answer asked about). Null if cancelled. */

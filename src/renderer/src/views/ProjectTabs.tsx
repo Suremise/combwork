@@ -10,7 +10,8 @@ import { gitFixText, gitProblemText } from '@shared/gitTool'
 import { UnusedHeading, UnusedWorkNotice, UnusedWorktreesLine, UnusedWorktreesSection, useUnusedWorktrees } from '../components/UnusedWorktrees'
 import { PERIODS, activeIn, costText, dailyTotals, moneyLabel, periodFrom, sumUsage, type DayTotal, type Period, type Totals } from '@shared/usageTotals'
 import { FILE_LOCK_MODES, contextPercent, turnPushedCompaction, effectiveModelLabel, mergeBlocked, modelLabel } from '@shared/defaults'
-import { useAgentLimit } from '../advanced'
+import { useAdvancedValue, useAgentLimit } from '../advanced'
+import { INBOX_PROJECT_KEY, INBOX_SWITCHES, INBOX_SWITCH_ID, type InboxSwitch } from '@shared/inboxSwitches'
 import { PROVIDERS, contextLines, defaultProviderLabel, isProviderEnabled, modeDescription, offeredModes, permissionLabel, projectDefaultProvider, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
 import { instructionsStarter } from '@shared/projectTabs'
 import { EffortPicker, ModelPicker } from '../components/ModelPicker'
@@ -1743,6 +1744,12 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
   const workspaceLoops = loopDefaults({ loops: useStore((s) => s.workspace?.config.loops) })
   // Its key, for Project key's example (#1221).
   const ownKey = useStore((s) => projectKeyOf(s, project.path))
+  // Settings → Advanced's inbox switches, which this project's Inherit follows (#1432).
+  const inboxGlobals: Record<InboxSwitch, boolean> = {
+    checkpoints: useAdvancedValue<boolean>(INBOX_SWITCH_ID.checkpoints),
+    stopContinuation: useAdvancedValue<boolean>(INBOX_SWITCH_ID.stopContinuation),
+    idleWakes: useAdvancedValue<boolean>(INBOX_SWITCH_ID.idleWakes)
+  }
   if (!settings) return null
   const update = async (patch: Partial<ProjectConfig>): Promise<void> => {
     await actions.attempt(tr(S.saveFailed), () => call('project:updateConfig', project.path, patch))
@@ -1916,6 +1923,23 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
         </select>
       )
     },
+    // Carrying on (#1432): this project's own of Settings → Advanced's inbox switches.
+    ...INBOX_SWITCHES.map((which): ProjectSettingDef => {
+      const key = INBOX_PROJECT_KEY[which]
+      return {
+        section: 'sessions',
+        key,
+        ...rowText(`project.${key}`),
+        modified: cfg[key] !== 'inherit',
+        render: () => (
+          <select className="select" data-setting={key} value={cfg[key]} onChange={(e) => void update({ [key]: e.target.value as ProjectConfig[typeof key] })}>
+            <option value="inherit">{inherit(tr(inboxGlobals[which] ? S.onLower : S.offLower))}</option>
+            <option value="on">{tr(S.on)}</option>
+            <option value="off">{tr(S.offChoice)}</option>
+          </select>
+        )
+      }
+    }),
     {
       section: 'loops',
       key: 'loopWakes',
@@ -2021,7 +2045,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
           className="btn subtle"
           onClick={async () => {
             if (await confirm({ title: tr(S.resetTitle), message: tr(S.resetMessage), confirmLabel: tr(S.reset) }))
-              void update({ defaultProvider: 'inherit', providers: {}, chime: 'inherit', compactSuggestTokens: null, transcriptWarnMB: null, fileLocks: 'inherit', worktreeCopy: null, worktreeSetup: '', loopWakes: true, loopRounds: null, loopWaitHours: null })
+              void update({ defaultProvider: 'inherit', providers: {}, chime: 'inherit', inboxCheckpoints: 'inherit', inboxStopContinuation: 'inherit', inboxIdleWakes: 'inherit', compactSuggestTokens: null, transcriptWarnMB: null, fileLocks: 'inherit', worktreeCopy: null, worktreeSetup: '', loopWakes: true, loopRounds: null, loopWaitHours: null })
           }}
         >
           <Icon name="discard" /> {tr(S.resetButton)}

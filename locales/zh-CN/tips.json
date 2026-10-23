@@ -182,6 +182,8 @@
   "tips.imagesTab.title": "你附加过的一切，集中在一处",
   "tips.improveTranslation.text": "发现你的语言中有生硬或错误的用词？“帮助”→“改进此翻译”会说明如何在 GitHub 上通过拉取请求修正它，或添加一种语言。",
   "tips.improveTranslation.title": "让 Hive 的中文读起来更顺",
+  "tips.inboxCarryingOn.text": "Hive 会在工具调用结束时告诉工作中的智能体有新消息，在它停止前让它继续读取，并在它空闲时唤醒它。每一项在“设置”→“高级”中都有开关，项目也可以单独设置；关闭唤醒后，窗格中的“立即送达”会输入这一行。",
+  "tips.inboxCarryingOn.title": "选择智能体如何得知收件箱中的内容",
   "tips.inboxNotices.text": "助手给工作中的智能体留的消息，会在它下一次调用工具时或本轮结束前，以 Hive 的简短通知送达：不会在它的工作上打字。智能体从收件箱读取消息并确认；在此之前，它的窗格会将其显示为未读（✉）。",
   "tips.inboxNotices.title": "消息在步骤之间送达忙碌的智能体",
   "tips.keepAwake.text": "智能体工作时，Hive 会阻止 Windows 进入睡眠（屏幕仍可锁定），等它们完成后再允许睡眠。在“设置”→“常规”中选择何时这样做。",

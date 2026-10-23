@@ -1,0 +1,133 @@
+// Carrying on (#1432, #966 row 16, shared/inboxSwitches.ts): Hive's three ways of getting an agent to read its inbox,
+// each with its own switch: told at the end of a tool (a checkpoint, inboxNotices.ts), kept going at its Stop (the
+// drain), woken while idle (the doorbell, deliveries.ts offerOnce). Every combination of the switches, for an agent at
+// each point, says what Hive does, and none loses an item: it stays in the inbox, unread, until the agent reads it.
+// Deliver Now types the doorbell once with idle wakes off; a task given now isn't a wake. The sessions are stand-ins
+// here, as in agentMessages.test.ts (the e2e carryingon suite runs fake Claude Code and Codex agents).
+import { rmSync } from 'fs'
+import { join } from 'path'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
+import * as electron from 'electron'
+import { INBOX_SWITCHES, INBOX_SWITCH_ID, inboxSwitchOn, type InboxSwitch } from '../src/shared/inboxSwitches'
+import type { LiveSessionState } from '../src/shared/types'
+import { tempDir } from './tempDir'
+import { admitted } from './admitted'
+
+describe('carrying on: the inbox switches (#1432)', async () => {
+  const base = tempDir('hive-carrying-on-')
+  ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
+  const dismiss = admitted(base)
+  const deliveries = await import('../src/main/deliveries')
+  const { noticeFor } = await import('../src/main/inboxNotices')
+  const { advanced } = await import('../src/main/advanced')
+  const { sessions } = await import('../src/main/sessions')
+  afterAll(async () => {
+    for (const w of INBOX_SWITCHES) await advanced.set(INBOX_SWITCH_ID[w], null)
+    deliveries.setReadsInboxForTests(null)
+    dismiss()
+    ;(await import('../src/main/boardStore')).closeAllBoards()
+    rmSync(base, { recursive: true, force: true })
+  })
+
+  let n = 0
+  let alpha = ''
+  /** A stand-in agent b1 of alpha: its status and launch, and what Hive typed into it. */
+  const st = { status: 'ready' as string, runId: 'r1', sessionId: 's1', typed: [] as string[] }
+  const live = (): LiveSessionState => ({ projectPath: alpha, agentId: 'b1', status: st.status, runId: st.runId, sessionId: st.sessionId }) as never
+  Object.assign(sessions, {
+    liveFor: (p: string, id: string) => (p.toLowerCase() === alpha.toLowerCase() && id === 'b1' ? live() : null),
+    userMayBeTyping: () => false,
+    lineWaiting: () => false,
+    promptsTaken: () => null,
+    setInbox: () => undefined,
+    sendPrompt: async (_p: string, _id: string, text: string, guard?: () => void) => {
+      guard?.()
+      st.typed.push(text)
+      st.status = 'working'
+    }
+  })
+  deliveries.setReadsInboxForTests(() => true)
+  const hive = { kind: 'hive' as const, name: 'Hive' }
+  /** What b1 has unread (queued, offered or uncertain: not received, not ended). */
+  const unread = async (): Promise<string[]> => (await deliveries.deliveriesOf(alpha, 'b1')).filter((r) => ['queued', 'offered', 'uncertain'].includes(r.state)).map((r) => r.id)
+  const setSwitches = async (on: Record<InboxSwitch, boolean>): Promise<void> => {
+    for (const w of INBOX_SWITCHES) await advanced.set(INBOX_SWITCH_ID[w], on[w] ? null : false)
+  }
+
+  beforeEach(() => {
+    alpha = join(base, `alpha${++n}`)
+    Object.assign(st, { status: 'ready', runId: `r${n}`, sessionId: `s${n}`, typed: [] })
+  })
+  afterEach(() => deliveries.settledForTests())
+
+  // Every combination of the three switches (on, off), by what the agent is doing when an item arrives.
+  const combos = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({ checkpoints: !!(i & 1), stopContinuation: !!(i & 2), idleWakes: !!(i & 4) }))
+  const name = (c: Record<InboxSwitch, boolean>): string => INBOX_SWITCHES.map((w) => `${w} ${c[w] ? 'on' : 'off'}`).join(', ')
+
+  describe('the table: each switch decides only its own way, and nothing is dropped', () => {
+    for (const c of combos) {
+      it(name(c), async () => {
+        await setSwitches(c)
+        // Working: an item arrives during a tool; the tool's end is a checkpoint.
+        st.status = 'working'
+        const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Also cover the empty case.' })
+        const atTool = await noticeFor(live(), 'checkpoint')
+        expect(atTool === null ? 'nothing' : 'told').toBe(c.checkpoints ? 'told' : 'nothing')
+        if (c.checkpoints) expect(atTool).toContain(m.id)
+        // Stopping: its turn would end with it unread; the Stop is the drain.
+        const atStop = await noticeFor(live(), 'drain')
+        expect(atStop === null ? 'ends' : 'carried on').toBe(c.stopContinuation ? 'carried on' : 'ends')
+        if (c.stopContinuation) expect(atStop).toContain(m.id)
+        // Neither told it, or it didn't read it: still unread, typed nothing while it worked.
+        expect(await unread()).toEqual([m.id])
+        expect(st.typed).toEqual([])
+        // Idle: the doorbell, or nothing typed at all.
+        st.status = 'ready'
+        expect(await deliveries.offerNow(alpha, 'b1')).toBe(c.idleWakes)
+        expect(st.typed).toEqual(c.idleWakes ? [`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox to read it.`] : [])
+        // Typed or not, it is unread until the agent reads it: never dropped.
+        expect(await unread()).toEqual([m.id])
+        // The agent reads its inbox whenever it next calls hive_inbox: it is all there.
+        expect((await deliveries.readInbox(alpha, 'b1')).items.flatMap((x) => x.ids)).toEqual([m.id])
+        expect(await unread()).toEqual([])
+      })
+    }
+  })
+
+  it('idle wakes off: no kind of item is typed, a card event (a loop wake) included; it stays in the inbox, and Deliver Now types its line once', async () => {
+    await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: false })
+    const e = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, card: 1432, body: '#1432 is in Review.', source: 'loop', ref: '#1432' })
+    const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Then #1434.' })
+    await deliveries.offerAllForTests()
+    expect(st.typed).toEqual([])
+    expect(await unread()).toEqual([e.id, m.id])
+    // Deliver Now (the pane's, session:deliverNow): one line naming both, typed once.
+    const { deliverWaiting } = await import('../src/main/agentMessages')
+    expect(await deliverWaiting(alpha, 'b1')).toBe(true)
+    expect(st.typed).toEqual([`[Hive] New in your inbox: 1 message and 1 card event (#1432) (${e.id}, ${m.id}). Call hive_inbox to read them.`])
+    // The agent idle again without reading them: nothing rings again by itself.
+    st.status = 'ready'
+    await deliveries.offerAllForTests()
+    expect(st.typed).toHaveLength(1)
+    expect(await unread()).toEqual([e.id, m.id])
+  })
+
+  it('idle wakes off: a task given now (a card started on a running agent, hive_send_task) is no wake, and is typed', async () => {
+    await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: false })
+    const r = await deliveries.deliverNow(alpha, { agentId: 'b1', agentName: 'B1', conversation: st.sessionId, kind: 'task', from: { kind: 'user', name: 'the user' }, card: 7, body: 'Work on #7.', need: 'free' })
+    expect(r?.state).toBe('offered')
+    expect(st.typed).toHaveLength(1)
+  })
+
+  it("a project's own value wins over Settings'; inherit (or none, as the Assistant's home) follows Settings'", () => {
+    for (const global of [true, false]) {
+      expect(inboxSwitchOn('idleWakes', { inboxIdleWakes: 'inherit' }, global)).toBe(global)
+      expect(inboxSwitchOn('idleWakes', null, global)).toBe(global)
+      expect(inboxSwitchOn('idleWakes', { inboxIdleWakes: 'on' }, global)).toBe(true)
+      expect(inboxSwitchOn('idleWakes', { inboxIdleWakes: 'off' }, global)).toBe(false)
+      // Each switch reads its own field only.
+      expect(inboxSwitchOn('checkpoints', { inboxIdleWakes: 'off', inboxStopContinuation: 'off' }, global)).toBe(global)
+      expect(inboxSwitchOn('stopContinuation', { inboxStopContinuation: 'off' }, global)).toBe(false)
+    }
+  })
+})
