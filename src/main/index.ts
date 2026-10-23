@@ -54,7 +54,8 @@ import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { releaseQueueRunners } from './workflow/queueRunner'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
-import { startSlots, stopSlots } from './slotsApp'
+import { poolFor, startSlots, stopSlots } from './slotsApp'
+import { setSlotPools } from './unusedWorktrees'
 import { startFreshNudges } from './freshStarts'
 import { startCopies, stopCopies } from './copiesApp'
 import { startReviewCopies, stopReviewCopies } from './reviewCopies'
@@ -996,6 +997,8 @@ app.whenReady().then(async () => {
   startQueueHosts()
   // The slot pools (#1429): their idle slots tidied every hour.
   startSlots()
+  // Unused Worktrees reads the slots through those pools (#1450, #1519).
+  setSlotPools(poolFor)
   // The nudge to start fresh when a project's work has finished (#1437).
   startFreshNudges()
   // Review and check copies (#1435): returning ones looked at again every 30 s, idle ones tidied every hour.
