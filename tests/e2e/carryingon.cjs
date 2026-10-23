@@ -170,7 +170,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
       check(`${a.name}: …its pane shows it unread`, !!(await until(async () => /1 unread/.test(await paneSays(a)), HUNG_MS)), await paneSays(a))
       await paneMore(a).click()
       await page.locator('.menu .menu-item', { hasText: '1 unread' }).click()
-      const deliver = page.locator('.menu .menu-item', { hasText: 'Deliver Now' })
+      const deliver = page.locator('.menu .menu-item', { hasText: /^\s*Deliver Now\s*$/ })
       check(`${a.name}: …its menu says nothing is typed by itself, and offers Deliver Now`, !!(await until(async () => (await deliver.count()) === 1 && (await page.locator('.menu', { hasText: 'Wake an idle agent is off' }).count()) > 0, HUNG_MS)))
       if (a === claude) {
         await page.screenshot({ path: path.join(shots, 'carryingon-pane.png') })
@@ -213,7 +213,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const asstMore = page.locator('.assistant-header button[aria-label="More"]')
     check("…its panel's ⋯ shows it unread", !!(await until(async () => /1 unread/.test((await asstMore.getAttribute('aria-description').catch(() => null)) ?? '') && (await asstMore.locator('.pane-more-badge').count()) === 1, HUNG_MS)))
     await asstMore.click()
-    const asstDeliver = page.locator('.menu .menu-item', { hasText: 'Deliver Now' })
+    const asstDeliver = page.locator('.menu .menu-item', { hasText: /^\s*Deliver Now\s*$/ })
     check('…its ⋯ says nothing is typed by itself, and offers Deliver Now', !!(await until(async () => (await asstDeliver.count()) === 1 && (await page.locator('.menu', { hasText: 'Wake an idle agent is off' }).count()) > 0, HUNG_MS)))
     await page.screenshot({ path: path.join(shots, 'carryingon-assistant.png') })
     check('…still queued before it is pressed', (await asstUnread()).some((m) => m.state === 'queued'), JSON.stringify(await asstUnread()))
