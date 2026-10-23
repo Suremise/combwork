@@ -160,6 +160,7 @@
   "service.providers.task": "{task, select, install {{cli} 安装} update {{cli} 更新} login {{cli} 登录} other {{cli} 配置}}",
   "service.providers.taskDone": "{task}已完成",
   "service.providers.taskFailed": "{task}已退出，退出码 {code}",
+  "service.slots.notPrepared": "Hive 无法为 {card} 准备 {slot}：{why}",
   "service.templates.v09": "1.0 的模板不会把智能体固定到工作树，因此由 Hive 自带的模板取而代之。{n, plural, other {这 # 个模板}}的副本与 0.9 看板备份保存在一起。",
   "service.templates.v09Title": "你的 0.9 智能体模板在 1.0 中不再使用",
   "service.transcripts.busy": "此会话正在归档或删除。请稍后重试。",

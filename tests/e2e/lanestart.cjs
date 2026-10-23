@@ -25,11 +25,13 @@ const check = (name, ok, extra = '') => {
 const until = (fn, ms) => lib.until(fn, ms, 200)
 
 ;(async () => {
-  for (const d of [userData, ws, claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [userData, ws, `${ws}.worktrees`, claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [claudeHome, shots]) fs.mkdirSync(d, { recursive: true })
   lib.gitProject(alpha)
   lib.git(alpha, ['branch', '-M', 'main'])
-  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase()]))
+  // The lane's slot too (#1438): its builder works in slot-a, a new branch per card.
+  const slotA = path.join(`${ws}.worktrees`, 'alpha', 'slot-a')
+  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase(), slotA.toLowerCase()]))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -139,6 +141,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     }, HUNG_MS)), JSON.stringify(await live(b1.id)))
     check('R1 is started', !!(await until(async () => !!(await live(r1.id)), HUNG_MS)))
     check("B1's brief: the builder of the lane, card-loop as the builder, with R1", !!(await until(async () => /You are the builder of a lane in alpha that the user started: use the card-loop skill as the builder, with R1 as the reviewer/.test(await brief('B1')), HUNG_MS)), (await brief('B1')).slice(0, 400))
+    check("…B1 works in the lane's slot, a new branch per card (#1438)", /B1 works in slot-a, a new branch per card/.test(await brief('B1')), (await brief('B1')).slice(0, 600))
     check("R1's brief: the reviewer of B1's lane", !!(await until(async () => /You are the reviewer of B1's lane in alpha/.test(await brief('R1')), HUNG_MS)), (await brief('R1')).slice(0, 400))
 
     // --- The lane in the Progress panel; its menu: End Lane and Abandon Lane….
@@ -163,7 +166,8 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // --- The Lanes tab's Start Lane…: another lane (card C), which Abandon ends.
     await panel.locator('.progress-tab[data-tab="lanes"]').click()
     await until(async () => (await panel.locator('.progress-tab-lanes').count()) === 1, HUNG_MS)
-    await until(async () => (await live(b1.id))?.status === 'ready' || (await live(b1.id))?.status === 'finished', HUNG_MS)
+    // B1's lane ended: its session in the lane's slot is stopped once its turn is over (#1438), freeing the slot.
+    await until(async () => !(await live(b1.id)) || (await live(b1.id))?.status === 'ready' || (await live(b1.id))?.status === 'finished', HUNG_MS)
     await until(async () => (await live(r1.id))?.status === 'ready' || (await live(r1.id))?.status === 'finished', HUNG_MS)
     await panel.locator('.progress-lanes-start').first().click()
     check("the Lanes tab's Start Lane… opens the dialog", !!(await until(async () => (await dialog.count()) === 1, HUNG_MS)))

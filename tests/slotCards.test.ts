@@ -1,0 +1,371 @@
+// Cards on slots, the app's side (#1438, HR1's rounds 1 and 2):
+// - a Done card's merged line deleted by the card (its board number, never a number read from the line's name), only
+//   with the rules on and the switch on, only once its target contains it, never one checked out; a checkout coming in
+//   between the worktree list and the ref's removal keeps both the branch and the checkout; and a deletion cut short by
+//   a crash right after the ref's removal is settled by the next pass from its durable intent (`LineDeleting`), never
+//   leaving a checkout without its branch, never claiming one kept that couldn't be put back;
+// - a builder's placement counts a delivery only while it was given or is on its way: one refused, or a launch that
+//   couldn't start, is made again by the next pass; one uncertain is left to the deliveries' own policy (its agent
+//   started where it is offered, nothing made again);
+// - a card's cycle read from its facts.
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { B1, commit, moved, setup, sh, type Env } from './workflow/harness'
+import { tempDir } from './tempDir'
+import { join } from 'path'
+import { lineName } from '../src/main/workflow/runtime'
+import type { Fact } from '../src/shared/workflow/facts'
+
+/** What the stand-ins do: the switches, git's and the worktree list's hooks, the agent, its deliveries and launches. */
+const state = vi.hoisted(() => ({
+  enforced: true,
+  afterList: null as null | (() => void),
+  /** After git's `update-ref -d` has run: throws to stand for Hive ending right there. */
+  afterRemove: null as null | (() => void),
+  /** Git's `update-ref <ref> <head> ''` (putting a branch back) refused. */
+  restoreFails: false,
+  live: null as null | { cwd: string; sessionId: string },
+  deliveries: [] as { id: string; source?: string; ref?: string; state: string }[],
+  /** The next delivery or launch: given, or not (refused, or its launch failed: cancelled). */
+  next: [] as ('given' | 'refused' | 'launchFails')[],
+  calls: [] as string[],
+  /** The card's runtime, as workflowFor gives it. */
+  wf: null as unknown,
+  /** Settings → Advanced, Delete a card's branch once it's merged. */
+  deleteOn: true
+}))
+
+vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => state.enforced, agentRunsGoing: () => [], workflowFor: async () => state.wf }))
+vi.mock('../src/main/worktrees', async (orig) => {
+  const actual = await orig<typeof import('../src/main/worktrees')>()
+  return {
+    ...actual,
+    listWorktreesOrNull: async (cwd: string) => {
+      const r = await actual.listWorktreesOrNull(cwd)
+      const hook = state.afterList
+      state.afterList = null
+      hook?.()
+      return r
+    }
+  }
+})
+vi.mock('../src/main/git', async (orig) => {
+  const actual = await orig<typeof import('../src/main/git')>()
+  return {
+    ...actual,
+    git: async (cwd: string, args: string[], ...rest: unknown[]) => {
+      if (state.restoreFails && args[0] === 'update-ref' && args.length === 4 && args[3] === '') return { ok: false, out: '', err: 'refused (test)', code: 1 }
+      const r = await (actual.git as (...a: unknown[]) => Promise<{ ok: boolean }>)(cwd, args, ...rest)
+      if (args[0] === 'update-ref' && args[1] === '-d' && r.ok && state.afterRemove) {
+        const hook = state.afterRemove
+        state.afterRemove = null
+        hook()
+      }
+      return r
+    }
+  }
+})
+vi.mock('../src/main/workflow/lineUpdates', async (orig) => ({ ...(await orig<object>()), agentBusy: () => false }))
+vi.mock('../src/main/tasks', async (orig) => ({ ...(await orig<object>()), getTask: async (n: number) => ({ number: n, key: `AM-${n}`, title: 'Placed', description: '', project: 'project', column: 'doing', labels: [], comments: [], history: [], blockedBy: [] }) }))
+vi.mock('../src/main/slotsApp', async (orig) => ({
+  ...(await orig<object>()),
+  holder: { self: async () => ({ pid: process.pid, started: 1 }), alive: async () => false, live: new Set() },
+  // The project's pool as the pass reads it: no leases open or ended (what it settles first doesn't come from them).
+  poolFor: async () => ({ closed: false, openLeases: () => [], endedSince: () => [], lease: () => null })
+}))
+vi.mock('../src/main/lanes', async (orig) => ({ ...(await orig<object>()), rawLanes: async () => [], lanesWaitingForSlot: async () => [] }))
+vi.mock('../src/main/advanced', async (orig) => {
+  const actual = await orig<typeof import('../src/main/advanced')>()
+  const advanced = Object.create(actual.advanced) as typeof actual.advanced
+  advanced.get = ((id: string, ...rest: unknown[]) => (id === 'hive.slots.deleteMergedLines' ? state.deleteOn : (actual.advanced.get as (...a: unknown[]) => unknown)(id, ...rest))) as typeof advanced.get
+  return { ...actual, advanced }
+})
+vi.mock('../src/main/sessions', async (orig) => {
+  const actual = await orig<typeof import('../src/main/sessions')>()
+  const stub = {
+    liveFor: () => (state.live ? { ...state.live, status: 'ready' } : null),
+    agentNow: () => (state.live ? { status: 'ready', pending: false, backgroundTasks: 0 } : null),
+    hiveMcp: () => null,
+    start: async (_p: string, o: { prompt?: string }) => {
+      state.calls.push(o.prompt ? 'start with the card' : 'start')
+      return {}
+    },
+    newConversation: async () => (state.calls.push('newConversation'), {})
+  }
+  return { ...actual, sessions: stub }
+})
+vi.mock('../src/main/deliveries', async (orig) => {
+  const actual = await orig<typeof import('../src/main/deliveries')>()
+  let seq = 0
+  const make = (nd: { source?: string; ref?: string }, given: boolean): { id: string; source?: string; ref?: string; state: string } => {
+    const r = { id: `m${++seq}`, source: nd.source, ref: nd.ref, state: given ? 'offered' : 'cancelled' }
+    state.deliveries.push(r)
+    return r
+  }
+  return {
+    ...actual,
+    deliveriesOf: async () => state.deliveries.map((r) => ({ ...r })),
+    deliverNow: async (_h: string, nd: { source?: string; ref?: string }) => {
+      const how = state.next.shift() ?? 'given'
+      state.calls.push(`typed (${how})`)
+      const r = make(nd, how === 'given')
+      if (how !== 'given') throw new actual.NotGiven('its agent got busy (test)')
+      return r
+    },
+    launchWith: async (_h: string, nd: { source?: string; ref?: string; body: string }, start: (line: string) => Promise<unknown>) => {
+      const how = state.next.shift() ?? 'given'
+      const r = make(nd, how === 'given')
+      if (how === 'launchFails') {
+        state.calls.push('launch failed')
+        throw new Error("its CLI couldn't start (test)")
+      }
+      return { record: r, launched: await start(nd.body) }
+    }
+  }
+})
+
+const { cycleIn, deleteMergedLine, place, settleSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
+
+let env: Env | null = null
+afterEach(() => {
+  env?.close()
+  env = null
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, deliveries: [], next: [], calls: [], wf: null, deleteOn: true })
+})
+
+/** A card started in a slot (a worktree on its line, under lease l-1), its change merged into main and reported: Done. */
+async function doneInSlot(title: string): Promise<{ e: Env; n: number; line: string; slot: string }> {
+  const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+  const card = e.wf.createCard({ title })
+  const line = lineName('AM', card)
+  const slot = join(tempDir('slot-'), 'slot-a')
+  sh(e.project, 'worktree', 'add', '-q', '-b', line, slot, 'main')
+  e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
+  moved(await e.wf.start(card.key, B1))
+  commit(slot, { 'work.txt': `${title}\n` }, title)
+  moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+  sh(e.project, 'merge', '-q', '--no-ff', '-m', `Merge ${line}`, line)
+  moved(await e.wf.reportMerge(card.key, B1))
+  expect(e.wf.state(card).stage).toBe('done')
+  return { e, n: card.id, line, slot }
+}
+
+const hasLine = (e: Env, line: string): boolean => {
+  try {
+    sh(e.project, 'rev-parse', '--verify', '-q', `refs/heads/${line}`)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Hive ending right after the ref's removal: the deletion's call ends there (as the process would), its intent kept. */
+const crashAfterRemove = (): void => {
+  state.afterRemove = () => {
+    throw new Error('Hive ended (test)')
+  }
+}
+
+describe("a Done card's merged line (#1438)", { timeout: 60_000 }, () => {
+  it('is kept while its slot has it checked out, deleted once nothing does, and noted on the card', async () => {
+    const { e, n, line, slot } = await doneInSlot('Merged work')
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
+    expect(hasLine(e, line)).toBe(true)
+    sh(slot, 'switch', '-q', '--detach')
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(true)
+    expect(hasLine(e, line)).toBe(false)
+    expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual(['LineDeleting', 'LineDeleted'])
+    // Once deleted, never again.
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
+  })
+
+  it('a checkout coming in after the worktrees were read keeps both: its branch put back at the same head', async () => {
+    const { e, n, line, slot } = await doneInSlot('Raced')
+    sh(slot, 'switch', '-q', '--detach')
+    const head = sh(e.project, 'rev-parse', line)
+    // Another worktree takes the branch right after the first look, before the ref goes.
+    const other = join(tempDir('other-'), 'wt')
+    state.afterList = () => void sh(e.project, 'worktree', 'add', '-q', other, line)
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
+    expect(sh(e.project, 'rev-parse', line)).toBe(head)
+    expect(sh(other, 'branch', '--show-current')).toBe(line)
+    expect(e.kinds(n)).not.toContain('LineDeleted')
+    expect(e.kinds(n)).toContain('LineDeleteUndone')
+  })
+
+  it("Hive ending right after the ref's removal, a checkout having come in: the next pass puts the branch back at its head, the checkout kept", async () => {
+    const { e, n, line, slot } = await doneInSlot('Crashed with a checkout')
+    sh(slot, 'switch', '-q', '--detach')
+    const head = sh(e.project, 'rev-parse', line)
+    const other = join(tempDir('other-'), 'wt')
+    state.afterList = () => void sh(e.project, 'worktree', 'add', '-q', other, line)
+    crashAfterRemove()
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
+    // As Hive left it: the ref gone, the checkout's HEAD naming it, the intent recorded.
+    expect(hasLine(e, line)).toBe(false)
+    expect(sh(other, 'symbolic-ref', 'HEAD')).toBe(`refs/heads/${line}`)
+    expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual(['LineDeleting'])
+    // The rules off meanwhile: settled all the same (it left a checkout without its branch).
+    state.enforced = false
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
+    expect(sh(e.project, 'rev-parse', line)).toBe(head)
+    expect(sh(other, 'branch', '--show-current')).toBe(line)
+    expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual(['LineDeleting', 'LineDeleteUndone'])
+  })
+
+  it("Hive ending right after the ref's removal, nothing checking it out: the next pass records it deleted", async () => {
+    const { e, n, line, slot } = await doneInSlot('Crashed alone')
+    sh(slot, 'switch', '-q', '--detach')
+    crashAfterRemove()
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
+    expect(hasLine(e, line)).toBe(false)
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(true)
+    expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual(['LineDeleting', 'LineDeleted'])
+  })
+
+  it("a branch that can't be put back is never claimed kept: its intent stays for the next pass, which puts it back", async () => {
+    const { e, n, line, slot } = await doneInSlot('Not put back')
+    sh(slot, 'switch', '-q', '--detach')
+    const head = sh(e.project, 'rev-parse', line)
+    const other = join(tempDir('other-'), 'wt')
+    state.afterList = () => void sh(e.project, 'worktree', 'add', '-q', other, line)
+    state.restoreFails = true
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
+    expect(hasLine(e, line)).toBe(false)
+    expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual(['LineDeleting'])
+    state.restoreFails = false
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
+    expect(sh(e.project, 'rev-parse', line)).toBe(head)
+    expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual(['LineDeleting', 'LineDeleteUndone'])
+  })
+
+  it('never with the rules off, and never a line with work its target lacks', async () => {
+    const { e, n, line, slot } = await doneInSlot('Off')
+    sh(slot, 'switch', '-q', '--detach')
+    state.enforced = false
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
+    expect(hasLine(e, line)).toBe(true)
+    state.enforced = true
+    // A commit after the merge: not in main, so the line stays.
+    sh(slot, 'switch', '-q', line)
+    commit(slot, { 'later.txt': 'later\n' }, 'after the merge')
+    sh(slot, 'switch', '-q', '--detach')
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
+    expect(hasLine(e, line)).toBe(true)
+    expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual([])
+  })
+})
+
+describe("a begun deletion settled by the project's pass, whatever the switches (#1438, HR1's round 3)", { timeout: 60_000 }, () => {
+  /** A Done card's deletion cut short right after its ref went, a checkout having come in: as a crash leaves it. */
+  async function cutShort(title: string): Promise<{ e: Env; n: number; line: string; head: string; other: string; ws: never }> {
+    const { e, n, line, slot } = await doneInSlot(title)
+    state.wf = e.wf
+    sh(slot, 'switch', '-q', '--detach')
+    const head = sh(e.project, 'rev-parse', line)
+    const other = join(tempDir('other-'), 'wt')
+    state.afterList = () => void sh(e.project, 'worktree', 'add', '-q', other, line)
+    crashAfterRemove()
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
+    expect(hasLine(e, line)).toBe(false)
+    expect(sh(other, 'symbolic-ref', 'HEAD')).toBe(`refs/heads/${line}`)
+    const ws = { path: e.home, lifetime: { aborted: false }, info: () => ({ projects: [] }), projectConfig: async () => ({ agents: [] }) } as never
+    return { e, n, line, head, other, ws }
+  }
+
+  for (const off of ['the rules', "Delete a card's branch once it's merged"] as const) {
+    it(`with ${off} off, the next pass puts the branch back for the checkout, and records it`, async () => {
+      const { e, n, line, head, other, ws } = await cutShort(`Off: ${off}`)
+      if (off === 'the rules') state.enforced = false
+      else state.deleteOn = false
+      await settleSlotCards(ws, e.project)
+      expect(sh(e.project, 'rev-parse', line)).toBe(head)
+      expect(sh(other, 'branch', '--show-current')).toBe(line)
+      expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual(['LineDeleting', 'LineDeleteUndone'])
+      expect(unsettledDeletions(e.store.factsOfKind(['LineDeleting', 'LineDeleted', 'LineDeleteUndone']))).toEqual([])
+    })
+  }
+
+  it('found whatever the card has done since (started again), and never settled twice', async () => {
+    const { e, n, line, head, ws } = await cutShort('Started again')
+    // A later cycle of the card: the begun deletion isn't in its current cycle any more, and is still found.
+    await e.wf.write(e.store.card(n), null, 'hive', (w) => void w.fact('Started', { folder: 'project', line: 'main', base: head, target: 'main', builder: 'B1', cardKind: 'code' }))
+    expect(cycleIn(e.store.facts(n))).toBeNull()
+    await settleSlotCards(ws, e.project)
+    expect(sh(e.project, 'rev-parse', line)).toBe(head)
+    await settleSlotCards(ws, e.project)
+    expect(e.kinds(n).filter((k) => k === 'LineDeleteUndone')).toHaveLength(1)
+  })
+})
+
+describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 60_000 }, () => {
+  /** A card started in a slot and prepared there (its `SlotPrepared`), its builder B1: what `place` is asked to do. */
+  async function prepared(): Promise<{ e: Env; n: number; slot: string; cycle: NonNullable<ReturnType<typeof cycleIn>>; ws: never }> {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    const card = e.wf.createCard({ title: 'Placed' })
+    const slot = join(tempDir('slot-'), 'slot-a')
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
+    moved(await e.wf.start(card.key, B1))
+    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'hive/AM/x', revision: 'r' }))
+    const cycle = cycleIn(e.store.facts(card.id))!
+    const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
+    return { e, n: card.id, slot, cycle, ws }
+  }
+  const lease = { id: 'l-1', agent: 'B1', slot: 'slot-a', kind: 'card', card: 0, lane: null, project: 'p', from: '', to: null, why: null, endRev: null } as never
+  const placed = (e: Env, n: number): number => e.kinds(n).filter((k) => k === 'BuilderPlaced').length
+
+  it('typed in where it runs there: refused once (its agent got busy), nothing recorded; the next try gives it, once', async () => {
+    const { e, n, slot, cycle, ws } = await prepared()
+    state.live = { cwd: slot, sessionId: 's1' }
+    state.next = ['refused', 'given']
+    await expect(place(ws, e.project, e.wf, n, cycle, lease)).rejects.toThrow(/busy/)
+    expect(placed(e, n)).toBe(0)
+    await place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
+    expect(placed(e, n)).toBe(1)
+    expect(state.calls).toEqual(['typed (refused)', 'typed (given)'])
+    expect(state.deliveries.map((d) => d.state)).toEqual(['cancelled', 'offered'])
+    // Placed: a later pass makes nothing more.
+    await place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
+    expect(placed(e, n)).toBe(1)
+    expect(state.deliveries).toHaveLength(2)
+  })
+
+  it("not running: a launch that couldn't start is nothing given; the next try starts it with the card, once", async () => {
+    const { e, n, cycle, ws } = await prepared()
+    state.next = ['launchFails', 'given']
+    await expect(place(ws, e.project, e.wf, n, cycle, lease)).rejects.toThrow(/couldn't start/)
+    expect(placed(e, n)).toBe(0)
+    await place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
+    expect(placed(e, n)).toBe(1)
+    expect(state.calls).toEqual(['launch failed', 'start with the card'])
+  })
+
+  it('a delivery on its way (uncertain) is never made again: its agent, not running, is started where it is offered', async () => {
+    const { e, n, cycle, ws } = await prepared()
+    state.deliveries.push({ id: 'm9', source: 'slot-placement', ref: `${n}:${cycle.seq}:l-1`, state: 'uncertain' })
+    await place(ws, e.project, e.wf, n, cycle, lease)
+    expect(placed(e, n)).toBe(1)
+    expect(state.calls).toEqual(['start'])
+    expect(state.deliveries).toHaveLength(1)
+    expect(e.store.facts(n).find((f) => f.kind === 'BuilderPlaced')?.data).toMatchObject({ delivery: 'm9', how: 'started' })
+  })
+})
+
+describe("a card's cycle in a slot (#1438)", () => {
+  const f = (seq: number, kind: string, data: object): Fact => ({ seq, card: 1, kind, at: '', actor: 'hive', source: 'recorded', data }) as unknown as Fact
+  const started = (seq: number, lease: string) => f(seq, 'Started', { folder: 'F', line: 'hive/AM/AM-1-x', base: 'b', target: 'main', builder: 'B1', cardKind: 'code', slot: 'slot-a', lease })
+
+  it("is its last start's, with what was done for it since; a start outside slots has none", () => {
+    expect(cycleIn([f(1, 'Started', { folder: 'project', line: 'main', base: 'b', target: 'main', builder: 'B1', cardKind: 'code' })])).toBeNull()
+    const facts = [started(1, 'l-1'), f(2, 'SlotPrepared', { lease: 'l-1', line: 'hive/AM/AM-1-x', revision: 'r' }), f(3, 'PlacementClaimed', { lease: 'l-1', pid: 5, started: 6 }), f(4, 'BuilderPlaced', { lease: 'l-1', delivery: 'm1', how: 'typed' })]
+    expect(cycleIn(facts)).toMatchObject({ seq: 1, prepared: { revision: 'r' }, claimed: { pid: 5, seq: 3 }, placed: true, deleted: false, deleting: null })
+    // Put back and started again (the same lease, or another): a new cycle owes all of it again.
+    expect(cycleIn([...facts, started(5, 'l-1')])).toMatchObject({ seq: 5, prepared: null, claimed: null, placed: false })
+    // What another lease's facts say isn't this cycle's.
+    expect(cycleIn([started(1, 'l-2'), f(2, 'SlotPrepared', { lease: 'l-1', line: 'x', revision: 'r' })])).toMatchObject({ prepared: null })
+    // A deletion begun is owed until it is settled.
+    expect(cycleIn([...facts, f(6, 'LineDeleting', { line: 'x', revision: 'r' })])).toMatchObject({ deleting: { line: 'x' }, deleted: false })
+    expect(cycleIn([...facts, f(6, 'LineDeleting', { line: 'x', revision: 'r' }), f(7, 'LineDeleteUndone', { line: 'x', revision: 'r', why: 'checkedOut' })])).toMatchObject({ deleting: null, deleted: false })
+    expect(cycleIn([...facts, f(6, 'LineDeleting', { line: 'x', revision: 'r' }), f(7, 'LineDeleted', { line: 'x', revision: 'r', why: 'merged' })])).toMatchObject({ deleting: null, deleted: true })
+  })
+})

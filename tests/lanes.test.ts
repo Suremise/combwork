@@ -7,7 +7,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import type { HiveEvent, TaskCard } from '../src/shared/types'
-import { allDone, keptLanes, laneLine, laneView, listedLanes, loopDefaults, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord } from '../src/shared/lanes'
+import { allDone, keptLanes, laneLine, laneNextText, laneView, listedLanes, loopDefaults, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
 import { storeDocs } from './storeDocs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -52,6 +52,32 @@ const rec = (over: Partial<LaneRecord> = {}): LaneRecord => ({
 
 const card = (number: number, column: TaskCard['column'], over: Partial<TaskCard> = {}): TaskCard =>
   ({ number, title: `Card ${number}`, column, project: 'alpha', blocked: null, history: [], comments: [], archived: false, ...over }) as unknown as TaskCard
+
+describe('a lane on slots (#1438)', () => {
+  const cards = new Map([[1, card(1, 'done')], [2, card(2, 'todo')], [3, card(3, 'todo')]])
+
+  it("names its slot, and while it has none and waits for one: paused, 'waiting for a slot'; what waits for the user says more", () => {
+    const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false })
+    expect([v.slot, v.status, v.state]).toEqual(['slot-b', null, 'active'])
+    expect(laneLine(v)).toContain('B1 / R1 (alpha, in slot-b)')
+    const waiting = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true })
+    expect([waiting.state, waiting.status?.reason, waiting.slot]).toEqual(['paused', 'slot', null])
+    expect(laneLine(waiting)).toContain('waiting for a slot')
+    const blocked = laneView(rec(), new Map([[1, card(1, 'doing', { blocked: 'Asked the user' })], [2, card(2, 'todo')], [3, card(3, 'todo')]]), undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true })
+    expect(blocked.status?.reason).toBe('blocked')
+    // Ended: no slot, no wait.
+    const ended = laneView(rec({ state: 'ended', endedAt: '2026-10-09T11:00:00.000Z' }), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: true })
+    expect([ended.slot, ended.status]).toEqual([null, null])
+  })
+
+  it("hive_lane next says where the next card is built", () => {
+    const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false })
+    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: false }, waits: null })).toBe('Next: #2 Card 2. Start it: it is built in slot-b, on a new branch Hive makes there.')
+    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null })).toBe('Carry on with #2 Card 2 in slot-b.')
+    const none = laneView(rec(), cards)
+    expect(laneNextText({ lane: none, next: { card: 2, title: 'Card 2', carryOn: false }, waits: null })).toBe('Next: #2 Card 2. Start it.')
+  })
+})
 
 describe('a lane against the board', () => {
   it('its current card is the first not passed or done; rounds count failed reviews', () => {
