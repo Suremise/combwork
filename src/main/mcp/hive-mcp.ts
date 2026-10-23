@@ -18,12 +18,13 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, agentWatchText, changeListText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, agentWatchText, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import type { QueuePublic } from '../../shared/workflow/queue'
 import { LOOP_STEPS } from '../../shared/workflow/facts'
 import { laneChangeText, laneEndText, laneNextText, lanesText, type LaneChange } from '../../shared/lanes'
 import { OVERDUE_MINUTES, ackText, inboxText, type InboxItem } from '../../shared/deliveries'
+import { INBOX_SWITCHES, type InboxSwitch } from '../../shared/inboxSwitches'
 import { ENTRY_LIMITS, JOURNAL_KINDS, LINK_TYPES } from '../../shared/journal'
 import { cardName, cardRef, namedBy, namesFrom } from '../../shared/projectKeys'
 
@@ -474,13 +475,14 @@ const tools: Tool[] = [
       "Leave a running agent a message it can't take as a prompt now: one that is watching (a card loop), working, waiting on background tasks or for the user, or where the user just typed. Saved in its inbox, and Hive tells it (its id, never its text): at its next tool call or before its turn ends while it works, else with a short line typed once it is idle or watching (a watching agent is woken by it, and its watch carries on). It reads it with hive_inbox, labelled as yours (at most 5 waiting, 4000 characters each; kept if it stops; refused if your Control is turned down or your session ends meanwhile). For what it already works on (a re-brief, the user's answer); a new task is still hive_prompt_agent or hive_start_task. Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. card: the card in Doing or Review it is about; tied to that card's round, it is dropped as stale, never given, once the card passes, leaves Doing and Review or starts a new round. Replies with its id; hive_agent_activity shows its state: offered once its line is typed, received once it reads it with hive_inbox, acked once it says it acted on it, stale. cancel=true cancels the messages it hasn't read yet.",
     inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, text: { type: 'string' }, card: cardArg, cancel: { type: 'boolean' } }, required: ['project', 'agent'] },
     run: async (a) => {
-      const r = (await api('POST', `${agentPath(a)}/message`, a.cancel === true ? { cancel: true } : { text: a.text, ...(a.card !== undefined ? { card: a.card } : {}) })) as { id?: string; typed?: boolean; queued?: number; status?: string; cancelled?: number; round?: number; card?: number; names?: Record<string, string> }
+      const r = (await api('POST', `${agentPath(a)}/message`, a.cancel === true ? { cancel: true } : { text: a.text, ...(a.card !== undefined ? { card: a.card } : {}) })) as { id?: string; typed?: boolean; queued?: number; status?: string; tells?: InboxSwitch[]; cancelled?: number; round?: number; card?: number; names?: Record<string, string> }
       const who = String(a.agent || 'the agent')
       if (a.cancel === true) return r.cancelled ? `Cancelled ${r.cancelled === 1 ? 'the message' : `${r.cancelled} messages`} waiting for ${who}.` : `No message was waiting for ${who}.`
       // The card as Hive names it (#1219): its key and number ("HI-12 (#40)"), whichever way the agent gave it.
       const tied = r.round && r.card ? `, for ${named(r, () => cardRef(r.card!))} round ${r.round}` : ''
       if (r.typed) return `Told ${who} now (${r.id}${tied}): it reads it with hive_inbox${r.status === 'watching' ? '; its watch carries on' : ''}.`
-      return `Queued for ${who} (${r.id}${tied}, ${r.status}): Hive tells it at its next tool call or turn's end, or once it is idle; ${r.queued} waiting. hive_agent_activity says when it is received and acked.`
+      // Only the ways the carrying-on switches leave on for it (#1497); an older Hive's reply has no tells: all three.
+      return messageQueuedText({ who, id: String(r.id), tied, status: String(r.status), queued: r.queued ?? 0, tells: r.tells ?? INBOX_SWITCHES })
     }
   },
   {
