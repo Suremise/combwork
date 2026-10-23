@@ -400,14 +400,19 @@ export interface LogIo {
   closeSync: (fd: number) => void
 }
 
-const FILE_IO: LogIo = { openSync, writeSync, closeSync }
+export const FILE_IO: LogIo = { openSync, writeSync, closeSync }
+
+/** Where a command's output goes as it comes (BoundedLog). */
+export interface CommandLog {
+  write(chunk: Buffer): void
+}
 
 /**
  * A run's log: its first MAX_LOG_BYTES as they come, then only the last TAIL_BYTES, written at the end after a line
  * saying how much was left out. The output a result carries is its last OUTPUT_CHARS. Never throws: a file that
  * can't be written (a full disk) stops being written, is closed, and isn't given as the run's log (`usable`).
  */
-class BoundedLog {
+export class BoundedLog implements CommandLog {
   private fd: number | null = null
   private written = 0
   private dropped = 0
@@ -488,6 +493,52 @@ class BoundedLog {
   }
 }
 
+/**
+ * Runs a command line (cmd's, `shellSpec`) in a folder to its end or its time limit (then its whole tree is ended), its
+ * output into the log, hidden; never throws. Shared by the queue's checks and installs and a slot's warming (#1429, slots.ts).
+ */
+export const execCommand = (o: { spawn: Spawn; platform: NodeJS.Platform; timeoutMs: number; env: () => Record<string, string> }, command: string, folder: string, log: CommandLog): Promise<CheckEnd> =>
+  new Promise<CheckEnd>((resolve) => {
+    let child: ChildProcess | undefined
+    let timedOut = false
+    let settled = false
+    let after: NodeJS.Timeout | undefined
+    const done = (e: Omit<CheckEnd, 'output'>): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      clearTimeout(after)
+      resolve({ ...e, timedOut: timedOut || undefined, output: '' })
+    }
+    const timer = setTimeout(() => {
+      timedOut = true
+      if (child) endTree(child, o.platform)
+      // A descendant that got away may keep the output open: the run ends anyway.
+      after = setTimeout(() => done({ exitCode: child?.exitCode ?? null, signal: null }), CLOSE_AFTER_KILL_MS)
+      after.unref?.()
+    }, o.timeoutMs)
+    timer.unref?.()
+    try {
+      const env = o.env()
+      if (!programFound(command, env, folder, o.platform)) {
+        log.write(Buffer.from(`Hive couldn't find the program this command starts: ${command}\n`)) // i18n-ignore: the run's log, beside the command's own output
+        return done({ spawnError: true, notFound: true, exitCode: null, signal: null })
+      }
+      const sh = shellSpec(command, env, o.platform)
+      child = o.spawn(sh.file, sh.args, { cwd: folder, env, windowsHide: true, windowsVerbatimArguments: sh.verbatim, stdio: ['ignore', 'pipe', 'pipe'] })
+    } catch (e) {
+      log.write(Buffer.from(`${e instanceof Error ? e.message : String(e)}\n`))
+      return done({ spawnError: true, exitCode: null, signal: null })
+    }
+    child.stdout?.on('data', (c: Buffer) => log.write(c))
+    child.stderr?.on('data', (c: Buffer) => log.write(c))
+    child.on('error', (e) => {
+      log.write(Buffer.from(`${e.message}\n`))
+      done({ spawnError: true, exitCode: null, signal: null })
+    })
+    child.on('close', (code, signal) => done({ exitCode: code, signal: timedOut ? null : signal }))
+  })
+
 /** What a check's bracket read when it started (`bracketStart`). */
 export interface QueueBracket {
   t0: number
@@ -559,47 +610,7 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
   const io = deps.logIo ?? FILE_IO
 
   /** Runs a command to its end or its time limit, its output into the log; never throws. */
-  const exec = (command: string, folder: string, log: BoundedLog): Promise<CheckEnd> =>
-    new Promise<CheckEnd>((resolve) => {
-      let child: ChildProcess | undefined
-      let timedOut = false
-      let settled = false
-      let after: NodeJS.Timeout | undefined
-      const done = (e: Omit<CheckEnd, 'output'>): void => {
-        if (settled) return
-        settled = true
-        clearTimeout(timer)
-        clearTimeout(after)
-        resolve({ ...e, timedOut: timedOut || undefined, output: '' })
-      }
-      const timer = setTimeout(() => {
-        timedOut = true
-        if (child) endTree(child, platform)
-        // A descendant that got away may keep the output open: the run ends anyway.
-        after = setTimeout(() => done({ exitCode: child?.exitCode ?? null, signal: null }), CLOSE_AFTER_KILL_MS)
-        after.unref?.()
-      }, deps.timeoutMs())
-      timer.unref?.()
-      try {
-        const env = checkEnv(deps.env())
-        if (!programFound(command, env, folder, platform)) {
-          log.write(Buffer.from(`Hive couldn't find the program this command starts: ${command}\n`)) // i18n-ignore: the run's log, beside the command's own output
-          return done({ spawnError: true, notFound: true, exitCode: null, signal: null })
-        }
-        const sh = shellSpec(command, env, platform)
-        child = spawn(sh.file, sh.args, { cwd: folder, env, windowsHide: true, windowsVerbatimArguments: sh.verbatim, stdio: ['ignore', 'pipe', 'pipe'] })
-      } catch (e) {
-        log.write(Buffer.from(`${e instanceof Error ? e.message : String(e)}\n`))
-        return done({ spawnError: true, exitCode: null, signal: null })
-      }
-      child.stdout?.on('data', (c: Buffer) => log.write(c))
-      child.stderr?.on('data', (c: Buffer) => log.write(c))
-      child.on('error', (e) => {
-        log.write(Buffer.from(`${e.message}\n`))
-        done({ spawnError: true, exitCode: null, signal: null })
-      })
-      child.on('close', (code, signal) => done({ exitCode: code, signal: timedOut ? null : signal }))
-    })
+  const exec = (command: string, folder: string, log: BoundedLog): Promise<CheckEnd> => execCommand({ spawn, platform, timeoutMs: deps.timeoutMs(), env: () => checkEnv(deps.env()) }, command, folder, log)
 
   /**
    * Runs one command as one of Hive's runs, in the folder. Its run is always finished and its log always closed, also

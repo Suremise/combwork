@@ -178,6 +178,12 @@ export const QUEUE_SIGN_SECONDS = 'hive.queue.signSeconds'
 /** Whether the merge queue asks before updating a target checked out in a folder (#1351, OP-40): read by main's queueHost. */
 export const QUEUE_CHECKED_OUT_TARGET = 'hive.queue.checkedOutTarget'
 
+/** Whether Hive removes a project's idle slots beyond its pool after a day (#1429, SPEC §16.10.2): read by main's slotsApp. */
+export const SLOTS_REMOVE_IDLE = 'hive.slots.removeIdle'
+
+/** The longest a slot's setup, install or archive command runs, in minutes (#1429): read by main's slotsApp. */
+export const SLOTS_SETUP_MINUTES = 'hive.slots.setupMinutes'
+
 /** Ctrl+C and Ctrl+V in an agent's pane go to its CLI rather than Hive's copy and paste (#1286, #966 row 24): read by TerminalView. */
 export const CTRL_CV_TO_CLI = 'hive.terminal.ctrlCVToCli'
 
@@ -596,6 +602,36 @@ const SOURCES: readonly AdvancedSource[] = [
       { value: 'auto', label: msg({ id: 'settings.advanced.hive.queue.checkedOutTarget.auto', defaultMessage: 'Automatically', description: 'A choice of the advanced setting "Merge queue: merge into a checked-out branch": update the folder without asking.' }) }
     ],
     default: 'auto',
+    applies: 'now'
+  },
+  // A project's slots (#1429, SPEC §16.10.2): the pool keeps as many as the project has builders; idle ones beyond it go.
+  {
+    id: SLOTS_REMOVE_IDLE,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.slots.removeIdle.title', defaultMessage: 'Remove idle slots after a day', description: "An advanced setting's title (Settings → Advanced), listed under Hive. A slot is a worktree Hive lends to a card or a lane and gets back when it ends; free ones are kept ready." }),
+    desc: msg({
+      id: 'settings.advanced.hive.slots.removeIdle.desc',
+      defaultMessage: "A project keeps as many slots as it has builders. A free slot beyond that, unused for a day, is removed: its archive command runs first, and it is kept if that fails. Hive never removes one with an agent or a process in it, a lease, a merge in flight, or work that isn't committed and merged. Turned off, idle slots stay until you remove them.",
+      description: 'What the advanced setting "Remove idle slots after a day" does (Settings → Advanced, under Hive). A slot is a worktree Hive lends to a card or a lane; a lease is one loan of it.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
+  {
+    id: SLOTS_SETUP_MINUTES,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.slots.setupMinutes.title', defaultMessage: 'Slots: longest a setup command runs', description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"60 min\"). A slot is a worktree Hive lends to a card or a lane." }),
+    desc: msg({
+      id: 'settings.advanced.hive.slots.setupMinutes.desc',
+      defaultMessage: "How long Hive lets a slot's setup command, a dependency install or its archive command run before it ends it. A slot whose setup was ended this way isn't lent until it is set up again; an archive command ended so keeps its slot.",
+      description: 'What the advanced setting "Slots: longest a setup command runs" does (Settings → Advanced, under Hive). A slot is a worktree Hive lends to a card or a lane.'
+    }),
+    kind: 'number',
+    default: 60,
+    min: 1,
+    max: 1440,
+    unit: 'min',
     applies: 'now'
   },
   // Switches for what Hive does with the pane's keys and with what it types (#1286, #966 rows 24, 28, 29): Hive's own

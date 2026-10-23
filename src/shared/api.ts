@@ -3,6 +3,8 @@ import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestio
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
   ArchiveBatch,
+  SlotTestOp,
+  SlotView,
   BoardState,
   SetAsideCard,
   ArchiveRequest,
@@ -320,6 +322,10 @@ export interface HiveRequests {
    * show). Each change comes as a `queue-changed` event.
    */
   'queue:list': (projectPath: string, target?: string) => QueueView[]
+  /** The project's slots (#1429, SPEC §16.10.1), each with its open lease. */
+  'slots:list': (projectPath: string) => SlotView[]
+  /** Test copies only (unpackaged): lend, release, tidy or remove in the project's slot pool, as #1438 and #1447 will. */
+  'slots:test': (projectPath: string, op: SlotTestOp) => unknown
   /** A target's queue history (#1357, the Git tab's Merge queue section): its latest 50 outcomes, newest first. */
   'queue:history': (projectPath: string, target: string) => QueueRecent[]
   /** The card an agent's worktree branch is for, when Hive merges it (#1357, the Merge dialog), and where it stands in the queue. */

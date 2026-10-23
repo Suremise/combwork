@@ -530,6 +530,7 @@ interface HiveMessageValues {
   'board.progress.showLog': undefined
   'board.progress.showLogFailed': undefined
   'board.progress.showTheAgent': undefined
+  'board.progress.slotRun': { slot: string | number }
   'board.progress.stepOf': { step: number; total: number }
   'board.progress.stepOfNamed': { step: number; total: number; name: string | number }
   'board.progress.tab': { tab: string }

@@ -52,6 +52,7 @@ import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { releaseQueueRunners } from './workflow/queueRunner'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
+import { startSlots, stopSlots } from './slotsApp'
 import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
 import { setQueueLive, setRunsGoing } from './workflow/service'
 import { isOpenRun } from '../shared/progress'
@@ -983,6 +984,8 @@ app.whenReady().then(async () => {
   WorkspaceService.closingTasks.add((path) => releaseQueueRunners((r) => !!r.cfg.workspace && r.cfg.workspace.toLowerCase() === path.toLowerCase()))
   // The merge queue (#1348): a host per project and target, started by enqueue actions and as workspaces open.
   startQueueHosts()
+  // The slot pools (#1429): their idle slots tidied every hour.
+  startSlots()
   // The queue's order as agents read it (#1354): this Hive's entry testing now, at its step.
   setQueueLive(queueLive)
   // An agent's branch brought up to date between a lane's cards after a squash merge (#1271, SPEC §16.19.2), once the
@@ -1114,6 +1117,7 @@ app.on('will-quit', () => {
   stopObserving()
   stopReconciling()
   stopQueueHosts()
+  stopSlots()
   flightRecorder.stop()
   advanced.stop()
   destroyTray()

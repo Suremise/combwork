@@ -2115,6 +2115,10 @@
     "defaultMessage": "Show the agent",
     "description": "Button and tooltip on a Progress panel run: shows the agent that ran it."
   },
+  "board.progress.slotRun": {
+    "defaultMessage": "Hive (slot {slot})",
+    "description": "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's slots (a worktree Hive lends to a card or a lane: its setup command, a dependency install or its archive command), not an agent. {slot} is the slot's name, such as slot-b: keep it as it is."
+  },
   "board.progress.stepOf": {
     "defaultMessage": "{step, number} of {total, number}",
     "description": "A run's step in the Progress panel, under its bar: step {step} of {total}."
