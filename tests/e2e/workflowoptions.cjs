@@ -8,7 +8,7 @@
 // what changes and the running lane keeping the old rules; a stage rename alone applies now; a save after another change
 // (the Assistant's tool, another window) is refused as changed meanwhile and the section reloads. Inherit, Copy as JSON
 // and Paste JSON…, All off with what never turns off, and the rules not enforced. Options each saved alone from the
-// window (#1483): G1b two reviewers, G12, G13, G14 on the project's own row; None's N1, N3, N4, N6. G4 set from the tab decides a clean
+// window (#1483): a reviewer agent chosen from All off (#1508), G1b two reviewers, G12, G13, G14 on the project's own row; None's N1, N3, N4, N6. G4 set from the tab decides a clean
 // rebase: Same change carries the pass over, Exact revision only makes it stale (S9). Screenshots in both themes, in
 // German and in Polish. Dev build, throwaway profiles and workspaces; the fake Claude Code for G4's agents.
 const lib = require('./lib.cjs')
@@ -334,15 +334,26 @@ async function theForm(page, app, inv) {
     check('…and still saves', !!(await lib.until(async () => saved().style === 'squash', HUNG_MS)))
     await inv('advanced:set', 'hive.workflow.enforce', null)
 
-    // --- Set in the window on their own and saved (#1483), each before only by a preset or at Hive's level: G1b two
-    // reviewers, G12 the project's identity, G13 stop own runs, G14 on the project's own row. From Pair (the agent
-    // merges), saved first: a reviewer agent chosen from All off can't be saved yet (#1508).
+    // --- A reviewer agent chosen from All off (#1508): "Nobody reviews their own work", held on while one reviews, is
+    // turned on in the draft too, so it saves, the warning listing both.
     if (await section.getByRole('button', { name: 'Discard Changes' }).isEnabled()) await discard()
-    await applyChoice('pairAgent')
-    await saveAll()
-    check('Pair (the agent merges) saved again, one reviewer', !!(await lib.until(() => projectJson().workflow?.preset === 'pairAgent' && saved().review === 'agent' && (saved().reviewers ?? 1) === 1, HUNG_MS)), JSON.stringify(projectJson().workflow))
     const switchOf = (option) => row(option).locator('[role="switch"]')
     const switchedOn = async (option) => (await switchOf(option).getAttribute('aria-checked')) === 'true'
+    check('#1508: from All off, nobody-reviews-their-own-work saved off', saved().review === 'none' && saved().noSelfReview === false, JSON.stringify(saved()))
+    await row('review').locator('select').selectOption('agent')
+    check('#1508: a reviewer agent chosen, the switch held on, no contradiction shown, Save on', !!(await lib.until(async () => (await switchedOn('noSelfReview')) && (await section.locator('.workflow-contradiction').count()) === 0 && (await save.isEnabled()), HUNG_MS)))
+    await themes('reviewer-from-alloff', row('noSelfReview'))
+    await save.click()
+    await dialog.waitFor({ timeout: HUNG_MS })
+    const said1508 = await dialog.innerText()
+    check('#1508: …the warning lists both changes', said1508.includes('Work is reviewed before it’s done: No review → A reviewer agent') && said1508.includes('Nobody reviews their own work: Off → On'), said1508)
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+    check('#1508: saved, a reviewer agent and nobody reviews their own work, one reviewer', !!(await lib.until(() => saved().review === 'agent' && saved().noSelfReview === true && (saved().reviewers ?? 1) === 1, HUNG_MS)), JSON.stringify(projectJson().workflow))
+
+    // --- Set in the window on their own and saved (#1483), each before only by a preset or at Hive's level: G1b two
+    // reviewers, G12 the project's identity, G13 stop own runs, G14 on the project's own row. From the reviewer agent
+    // just saved.
     const without = (o, key) => JSON.stringify(Object.fromEntries(Object.entries(o).filter(([k]) => k !== key).sort(([a], [b]) => a.localeCompare(b))))
     /**
      * Switches one option in the form and saves it alone: project.json has the switched value (`value(on)`), and no
