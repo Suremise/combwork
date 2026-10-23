@@ -393,6 +393,7 @@ interface HiveMessageValues {
   'board.laneStart.intro': undefined
   'board.laneStart.name': undefined
   'board.laneStart.noAgents': undefined
+  'board.laneStart.noBuilders': undefined
   'board.laneStart.noCards': undefined
   'board.laneStart.noReviewer': undefined
   'board.laneStart.notRunning': undefined

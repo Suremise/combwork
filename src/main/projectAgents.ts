@@ -7,6 +7,7 @@ import { orderByCells, placedCells } from '../shared/paneCells'
 import { forgetPtys } from './ptyHost'
 import { agentProvider, defaultProviderPending, isKnownProvider } from '../shared/providers'
 import { cleanMcpServers } from '../shared/agentMcp'
+import { isWorkflowRole, type WorkflowRole } from '../shared/workflow/roles'
 import type { AddAgentOptions, AddedAgent, AgentBranchStatus, AgentDef, AgentPatch, AgentWorktree, MergeResult, ProjectConfig, ProjectGitInfo, RemovedAgent, SessionLayout, WorktreeCheck, WorktreeMatch, WorktreeReuse } from '../shared/types'
 import { lockfileChanged, reuseNote } from '../shared/unusedWorktrees'
 import { config } from './config'
@@ -370,6 +371,7 @@ export async function prepareAgent(projectPath: string, cfg: ProjectConfig, opts
   if (typeof opts.use200kContext === 'boolean') def.use200kContext = opts.use200kContext
   const role = cleanRole(opts.role)
   if (role) def.role = role
+  if (opts.workflowRole !== undefined) def.workflowRole = cleanWorkflowRole(opts.workflowRole)
   const mcpServers = cleanMcpServers(opts.mcpServers)
   if (mcpServers) def.mcpServers = mcpServers
 
@@ -448,6 +450,12 @@ export function cleanRole(role: unknown): string {
   return r
 }
 
+/** A workflow role as saved (#1430): builder, reviewer or either, else refused. */
+export function cleanWorkflowRole(role: unknown): WorkflowRole {
+  if (isWorkflowRole(role)) return role
+  throw hiveError(msg({ id: 'worktrees.agent.badWorkflowRole', defaultMessage: 'A role in the workflow is builder, reviewer or either.', description: "An error: an agent's role in the workflow was given as something else. builder, reviewer and either are values: keep them in English." }), undefined, { kind: 'invalid' })
+}
+
 export async function updateAgent(projectPath: string, agentId: string, patch: AgentPatch, opts: { check?: (current: AgentDef) => void } = {}): Promise<AgentDef> {
   // The Hive Assistant's settings for this workspace are its agent's, too (it keeps its name).
   projectPath = workspace.assertSessionHost(projectPath)
@@ -463,9 +471,12 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
     if (!patch.name) throw hiveError(msg({ id: 'worktrees.agent.enterName', defaultMessage: 'Enter a name.', description: "An error: an agent's name was emptied." }))
   }
   // Empty values clear an override so the agent follows the project again (and an empty role: its name is its role).
-  const { use200kContext, mcpServers, ...rest } = patch
+  const { use200kContext, mcpServers, workflowRole, ...rest } = patch
   const clean: Partial<AgentDef> = { ...rest }
   if ('role' in clean) clean.role = cleanRole(clean.role) || undefined
+  // null clears it (an undo of the Assistant's change, #1282): the guess again. Absent, it stays as it is.
+  if (workflowRole === null) clean.workflowRole = undefined
+  else if (workflowRole !== undefined) clean.workflowRole = cleanWorkflowRole(workflowRole)
   // null: all of the project's servers again (#537).
   if (mcpServers !== undefined) clean.mcpServers = cleanMcpServers(mcpServers)
   for (const k of ['model', 'effort', 'permissionMode', 'mode'] as const) if (k in clean && !clean[k]) clean[k] = undefined

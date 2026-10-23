@@ -162,6 +162,8 @@
   "panes.table.notRunning": "未运行",
   "panes.table.project": "项目",
   "panes.table.projectPrefix": "项目：{value}",
+  "panes.table.role": "角色",
+  "panes.table.rolePrefix": "角色：{value}",
   "panes.table.state": "状态",
   "panes.table.waiting": "等待对象",
   "panes.table.waitingFor": "正在等待 {what}",

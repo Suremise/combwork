@@ -164,6 +164,8 @@ interface HiveMessageValues {
   'panes.table.notRunning': undefined
   'panes.table.project': undefined
   'panes.table.projectPrefix': { value: string | number }
+  'panes.table.role': undefined
+  'panes.table.rolePrefix': { value: string | number }
   'panes.table.state': undefined
   'panes.table.waiting': undefined
   'panes.table.waitingFor': { what: string | number }

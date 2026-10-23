@@ -391,6 +391,7 @@
   "board.laneStart.intro": "Wykonawca realizuje karty w tej kolejności, jedną po drugiej, a recenzent recenzuje każdą. Obaj zaczynają w nowej rozmowie z instrukcją: karty, gdzie pracuje wykonawca, czego wymagają reguły projektu i Twoja notatka.",
   "board.laneStart.name": "Czego dotyczy (opcjonalnie)",
   "board.laneStart.noAgents": "Projekt nie ma agentów. Najpierw dodaj agenta.",
+  "board.laneStart.noBuilders": "Żaden z agentów projektu nie jest wykonawcą. W ustawieniach agenta ustaw Rolę w przepływie pracy na Wykonawca lub Dowolna.",
   "board.laneStart.noCards": "Brak kart: dodaj je poniżej z Do zrobienia projektu.",
   "board.laneStart.noReviewer": "Bez recenzenta",
   "board.laneStart.notRunning": "nie działa",

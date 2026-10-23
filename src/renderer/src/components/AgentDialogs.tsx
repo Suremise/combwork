@@ -11,6 +11,7 @@ import { reuseNote } from '@shared/unusedWorktrees'
 import { hiveBranch, reusableBranches } from '@shared/hiveBranches'
 import { agentNameProblem, nameTaken, nameTakenMessage, sameAgentName, suggestAgentName, workspaceAgentList } from '@shared/agentNames'
 import type { TemplateAgent } from '@shared/templates'
+import { agentWorkflowRole, ROLE_IN_WORKFLOW, WORKFLOW_ROLE_TEXT, WORKFLOW_ROLES, type WorkflowRole } from '@shared/workflow/roles'
 import { gitFixText, gitProblemText } from '@shared/gitTool'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
@@ -211,6 +212,29 @@ export function ModeCaveat({ provider, mode, model }: { provider: ProviderId; mo
   )
 }
 
+/** Role in the workflow (#1430): builder, reviewer or either, each with a sentence. */
+function WorkflowRoleChoice({ value, onChange }: { value: WorkflowRole; onChange: (v: WorkflowRole) => void }) {
+  useLanguage()
+  return (
+    <>
+      <h3 className="agent-dialog-h" id="agent-workflow-role">
+        {tr(ROLE_IN_WORKFLOW)}
+      </h3>
+      <div className="workflow-role-choice" role="radiogroup" aria-labelledby="agent-workflow-role">
+        {WORKFLOW_ROLES.map((r) => (
+          <label key={r} className={cx('choice', value === r && 'selected')} data-workflow-role={r}>
+            <input type="radio" checked={value === r} onChange={() => onChange(r)} />
+            <div>
+              <strong>{tr(WORKFLOW_ROLE_TEXT[r].name)}</strong>
+              <div className="faint">{tr(WORKFLOW_ROLE_TEXT[r].text)}</div>
+            </div>
+          </label>
+        ))}
+      </div>
+    </>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Add agent
 // ---------------------------------------------------------------------------
@@ -242,6 +266,8 @@ export function AddAgentDialog() {
   const defaultPending = useStore((s) => !!s.addAgentFor && defaultProviderPending(s.workspace?.projects.find((p) => p.path === s.addAgentFor)?.config, s.settings))
   const [startNow, setStartNow] = useState(true)
   const [busy, setBusy] = useState(false)
+  // The role chosen (#1430); null: the guess from its name, as an agent from before 1.0 reads.
+  const [roleChosen, setRoleChosen] = useState<WorkflowRole | null>(null)
 
   useEffect(() => {
     if (!path || !project) return
@@ -267,6 +293,7 @@ export function AddAgentDialog() {
     setFollowDefault(true)
     setStartNow(true)
     setBusy(false)
+    setRoleChosen(null)
     setGit(null)
     setExisting('')
     // Opened to give an unused worktree to an agent (#353): Existing worktree, that one chosen once git lists it free.
@@ -326,6 +353,7 @@ export function AddAgentDialog() {
 
   if (!path || !project || !settings) return null
   const close = (): void => set({ addAgentFor: null })
+  const workflowRole = roleChosen ?? agentWorkflowRole({ name: name.trim() })
   const full = project.agents.length >= limit
   const free = git?.worktrees.filter((w) => !w.used) ?? []
   const copy = project.config.worktreeCopy ?? settings.agents.worktreeCopy
@@ -359,6 +387,7 @@ export function AddAgentDialog() {
       const def = await call('agents:add', project.path, {
         name: name.trim(),
         provider,
+        workflowRole,
         location,
         branch: location === 'new-worktree' ? branch.trim() : undefined,
         base: location === 'new-worktree' ? base : undefined,
@@ -427,6 +456,7 @@ export function AddAgentDialog() {
           </div>
         )}
       </div>
+      <WorkflowRoleChoice value={workflowRole} onChange={setRoleChosen} />
       <h3 className="agent-dialog-h">{tr(CODING_AGENT)}</h3>
       <ProviderChoice value={provider} onChange={chooseProvider} />
       {checking && (
@@ -566,9 +596,9 @@ export function AddAgentDialog() {
 // Agent settings
 // ---------------------------------------------------------------------------
 
-/** Roles to suggest (#126): the usual ones, then those the agents already have (a project's, or a template's). */
+/** Notes to suggest (#126): those the agents already have (a project's, or a template's). */
 function roleSuggestions(agents: readonly { role?: string }[]): string[] {
-  const out = ['builder', 'reviewer']
+  const out: string[] = []
   for (const a of agents) if (a.role && !out.some((r) => r.toLowerCase() === a.role!.toLowerCase())) out.push(a.role)
   return out
 }
@@ -576,7 +606,10 @@ function roleSuggestions(agents: readonly { role?: string }[]): string[] {
 /** What the Agent Settings dialog edits: a project's agent, or a template's (#271), alike. */
 interface AgentFields {
   name: string
+  /** The agent's note (`AgentDef.role`, #126: free text). */
   role: string
+  /** Its role in the workflow (#1430); null: not asked here (a template's agent: #1436's). */
+  workflowRole: WorkflowRole | null
   provider: ProviderId
   model: string
   effort: string
@@ -730,9 +763,9 @@ function AgentSettingsModal({
         <label>{tr(NAME)}</label>
         <input className="input" aria-label={tr(NAME)} value={f.name} maxLength={60} autoFocus onChange={(e) => put({ name: e.target.value })} onKeyDown={enter} />
         {problem && f.name.trim() && <div className="field-error span2">{problem}</div>}
-        {/* What the agent is for, saved in templates (#126): free text, suggesting the usual ones and the agents' own. */}
-        <label htmlFor="agent-role">{tr(msg({ id: 'agents.settings.role', defaultMessage: 'Role', description: "Label of an agent's role (Agent Settings): what it is for, in the user's words (builder, reviewer…)." }))}</label>
-        <input id="agent-role" className="input" value={f.role} maxLength={ROLE_MAX} placeholder={tr(msg({ id: 'agents.settings.roleNone', defaultMessage: 'None (its name: {name})', description: "Placeholder of an agent's empty role (Agent Settings): no role, so its name ({name}) says what it is." }), { name: f.name.trim() || initial.name })} list="agent-role-suggestions" onChange={(e) => put({ role: e.target.value })} onKeyDown={enter} />
+        {/* A note on what the agent is for, saved in templates (#126): free text, suggesting the agents' own. Its role in the workflow is apart (#1430). */}
+        <label htmlFor="agent-role">{tr(msg({ id: 'agents.settings.note', defaultMessage: 'Note', description: "Label of an agent's note (Agent Settings): what it is for, in the user's own words. Not its role in the workflow, which is a separate choice." }))}</label>
+        <input id="agent-role" className="input" value={f.role} maxLength={ROLE_MAX} placeholder={tr(msg({ id: 'agents.settings.noteNone', defaultMessage: 'Optional: what it is for, in your words', description: "Placeholder of an agent's empty note (Agent Settings)." }))} list="agent-role-suggestions" onChange={(e) => put({ role: e.target.value })} onKeyDown={enter} />
         <datalist id="agent-role-suggestions">
           {roles.map((r) => (
             <option key={r} value={r} />
@@ -752,6 +785,7 @@ function AgentSettingsModal({
           <div className="muted">{works}</div>
         )}
       </div>
+      {f.workflowRole && <WorkflowRoleChoice value={f.workflowRole} onChange={(workflowRole) => put({ workflowRole })} />}
       <h3 className="agent-dialog-h">{tr(CODING_AGENT)}</h3>
       {providerLocked ?? <ProviderChoice value={f.provider} current={initial.provider} onChange={chooseProvider} />}
       <h3 className="agent-dialog-h">{tr(SETTINGS)}</h3>
@@ -791,7 +825,8 @@ export function AgentSettingsDialog() {
   }
   const current = agent.live?.provider ?? agentProvider(agent, project.config, settings)
   const close = (): void => set({ agentSettingsFor: null })
-  const initial: AgentFields = { name: agent.name, role: agent.role ?? '', provider: current, model: agent.model ?? '', effort: agent.effort ?? '', permission: agent.permissionMode ?? '', context: contextChoice(agent.use200kContext), worktree: !!agent.worktree, mcp: agent.mcpServers ? [...agent.mcpServers] : null }
+  // Its role as it reads now (the guess, for an agent from before 1.0), stored once the user saves (#1430).
+  const initial: AgentFields = { name: agent.name, role: agent.role ?? '', workflowRole: agentWorkflowRole(agent), provider: current, model: agent.model ?? '', effort: agent.effort ?? '', permission: agent.permissionMode ?? '', context: contextChoice(agent.use200kContext), worktree: !!agent.worktree, mcp: agent.mcpServers ? [...agent.mcpServers] : null }
   return (
     <AgentSettingsModal
       title={tr(msg({ id: 'agents.settings.title', defaultMessage: '{agent} settings', description: 'Title of the Agent Settings dialog. {agent} is the agent.' }), { agent: agent.name })}
@@ -836,6 +871,7 @@ export function AgentSettingsDialog() {
         await call('agents:update', project.path, agent.id, {
           name: f.name,
           role: f.role,
+          ...(f.workflowRole ? { workflowRole: f.workflowRole } : {}),
           ...(f.provider !== current ? { provider: f.provider } : {}),
           model: f.model || undefined,
           effort: (f.effort || undefined) as EffortLevel | undefined,
@@ -869,7 +905,7 @@ export function TemplateAgentDialog() {
     result.current = null
   }
   const provider = a?.provider ?? projectDefaultProvider(project?.config ?? DEFAULT_PROJECT_CONFIG, settings)
-  const initial: AgentFields = { name: a?.name ?? req.suggestedName, role: a?.role ?? '', provider, model: a?.model ?? '', effort: a?.effort ?? '', permission: a?.permissionMode ?? '', context: contextChoice(a?.use200kContext), worktree: a?.worktree ?? false, mcp: a?.mcpServers ? [...a.mcpServers] : null }
+  const initial: AgentFields = { name: a?.name ?? req.suggestedName, role: a?.role ?? '', workflowRole: null, provider, model: a?.model ?? '', effort: a?.effort ?? '', permission: a?.permissionMode ?? '', context: contextChoice(a?.use200kContext), worktree: a?.worktree ?? false, mcp: a?.mcpServers ? [...a.mcpServers] : null }
   return (
     <AgentSettingsModal
       title={a ? tr(msg({ id: 'agents.template.title', defaultMessage: '{agent} settings (template)', description: "Title of Agent Settings for an agent of a template ({agent}), from the template editor." }), { agent: a.name }) : tr(msg({ id: 'agents.template.new', defaultMessage: 'New agent (template)', description: 'Title of Agent Settings for a new agent of a template, from the template editor.' }))}

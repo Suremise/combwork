@@ -1567,6 +1567,10 @@
     "defaultMessage": "The project has no agents. Add one first.",
     "description": "In the Start Lane dialog: the chosen project has no agents to build the cards."
   },
+  "board.laneStart.noBuilders": {
+    "defaultMessage": "None of the project’s agents builds. Set Role in the workflow to Builder or Either in an agent’s settings.",
+    "description": "In the Start Lane dialog: every agent of the project is a reviewer, so none can build the cards. Role in the workflow, Builder and Either are the Agent Settings field and its choices: use their translated names. Glossary: builder, either."
+  },
   "board.laneStart.noCards": {
     "defaultMessage": "No cards yet: add them from the project’s Todo below.",
     "description": "In the Start Lane dialog's list of cards, while none is chosen. Todo is a board column."
