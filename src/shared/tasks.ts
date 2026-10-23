@@ -341,15 +341,39 @@ export function laneOrderWaitReason(card: Pick<TaskCard, 'number' | 'column' | '
 const LOOP_STEP = /^(Posted a (design|follow-up) for the reviewer to check|Checked the (design|follow-up): (OK|gaps)|Went ahead with the design unchecked): /
 export const isLoopStepEntry = (what: string): boolean => LOOP_STEP.test(what)
 
+/** The history lines that say which column a card is in (its creation, a move, a placement), by their message. */
+const COLUMN_LINES = new Set(['tasks.history.created', 'tasks.history.moved', 'tasks.history.movedTop', 'tasks.history.movedBottom', 'tasks.history.movedBefore', 'tasks.history.movedBeforeIn', 'tasks.history.placed'])
+/** Lines only written when a card changes column (moved, moved there before another card). */
+const NEW_COLUMN_LINES = new Set(['tasks.history.moved', 'tasks.history.movedBefore'])
+const columnOfLine = (h: TaskCard['history'][number]): string | null => {
+  const c = h.whatText && COLUMN_LINES.has(h.whatText.id) ? h.whatText.values?.column : undefined
+  return typeof c === 'string' ? c : null
+}
+
 /**
  * The design or follow-up a card's builder posted for its reviewer's check (#1382, #1467) while it still waits: no
- * answer, no going ahead, and the card not moved or given a verdict since. Its history entry and which it is; null when
- * none waits.
+ * answer, no going ahead, and the card not moved to another column, returned for review or given a verdict since. A
+ * change of its place in its column (top, bottom, before another card: "Moved to the bottom of Approved") isn't a move:
+ * by its line's column (its message's values), not its words, which are the same for a move into a column at its top
+ * (HR4's round 1 finding on #1467). Its history entry and which it is; null when none waits.
  */
 export function pendingStep(card: Pick<TaskCard, 'history'>): { entry: TaskCard['history'][number]; step: 'design' | 'followUp' } | null {
   const i = card.history.findLastIndex((h) => isLoopStepEntry(h.what))
   const posted = i < 0 ? null : /^Posted a (design|follow-up)\b/.exec(card.history[i].what)
-  if (!posted || card.history.slice(i + 1).some((h) => /^(Moved to\b|Returned for review\b|Review (passed|failed)\b)/.test(h.what))) return null
+  if (!posted) return null
+  // The column it was posted in, as its lines last said.
+  let column = card.history.slice(0, i).map(columnOfLine).findLast((c) => c !== null) ?? null
+  for (const h of card.history.slice(i + 1)) {
+    if (/^(Returned for review|Review (passed|failed))\b/.test(h.what)) return null
+    const now = columnOfLine(h)
+    if (now === null) {
+      // A line without its message (from before #866): a move's words, never a place in the column's.
+      if (!h.whatText && /^Moved to (?!the (top|bottom) of )/.test(h.what)) return null
+      continue
+    }
+    if (NEW_COLUMN_LINES.has(h.whatText!.id) || (column !== null && now !== column)) return null
+    column = now
+  }
   return { entry: card.history[i], step: posted[1] === 'design' ? 'design' : 'followUp' }
 }
 

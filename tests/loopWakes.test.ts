@@ -612,6 +612,40 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it("a follow-up's wake and stall outlast its card's change of place in Passed (HR4's round 1 finding on #1467)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open({ workflow: { ...WORKFLOW.workflow, options: { review: 'agentThenYou', noSelfReview: true } } })
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    const intent = (who: typeof b1, i: Parameters<typeof runCardIntent>[2]) => inWorkspace(w, () => runCardIntent({ n: c, plain: false }, who, i))
+    await intent(b1, { kind: 'submit', summary: 'Ready', paths: ['a.txt'] })
+    await intent(r1, { kind: 'startReview' })
+    await intent(r1, { kind: 'verdict', pass: true, comment: 'Round 1: PASSED.' })
+    // Another card waiting in Passed, below it.
+    await inWorkspace(w, () => tasks.createTask({ title: 'Also passed', project: 'alpha', column: 'passed' }, user))
+    await drained()
+    await settled()
+    const k = st.typed.length
+    // The reviewer is busy when the follow-up comes; the builder then puts its card below the other one.
+    st.status.set('r1', 'working')
+    const posted = await intent(b1, { kind: 'loopStep', step: 'followUp', text: 'Fixes ready.' })
+    await inWorkspace(w, () => tasks.updateTask(c, { position: 'bottom' }, b1))
+    const now = await inWorkspace(w, () => tasks.getTask(c, w))
+    expect(now.column).toBe('passed')
+    expect(now.history.at(-1)?.what).toBe('Moved to the bottom of Passed')
+    // Still waiting: so is its stall, aged from the follow-up, with the builder only watching it.
+    const { loopStepWaitReason } = await import('../src/shared/tasks')
+    const hb = { name: 'B1', project: 'alpha', agentId: 'b1', cards: [c], status: 'watching' }
+    const at = Date.parse(now.history.findLast((h) => h.what.startsWith('Posted a follow-up'))!.at)
+    expect(loopStepWaitReason(now, [hb], 30 * 60_000, at + 16 * 60_000)).toMatch(/posted a follow-up .* has waited 16 min:/)
+    // And its wake is still due: the reviewer, once free, is told.
+    st.status.set('r1', 'ready')
+    await typedUntil(st, k + 1)
+    expect(st.typed[k].agent).toBe('r1')
+    expect(st.typed[k].text).toContain(`follow-up ${String(posted.done.data?.design)} ready for your check`)
+    await disposeWorkspaceService(w)
+  })
+
   it("a reviewer waiting for a failed card's next round (fresh) hears a follow-up from its own watch, one line (#1467)", async () => {
     await loopWakes.clearLoopWakes()
     const { w, alpha } = await open({ workflow: { ...WORKFLOW.workflow, options: { review: 'agentThenYou', noSelfReview: true } } })

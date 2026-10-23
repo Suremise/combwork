@@ -284,4 +284,27 @@ describe('a follow-up its builder posted in Review or Passed that nobody checks 
     expect(loopStepWaitReason(passed(), [{ ...hb3, status: 'working' }], bound, late)).toBeNull()
     expect(loopStepWaitReason(passed(), [{ ...hb3, cards: [1420] }], bound, late)).toBeNull()
   })
+  it("a change of place in its column isn't a move: the step still waits, its stall aged from its post (HR4's round 1 finding)", () => {
+    // Lines as Hive writes them: the words, and the message with its column.
+    const line = (min: number, id: string, what: string, column: string, more: Record<string, string | number> = {}) => ({ at: at(min), by: 'HB3 (alpha)', what, whatText: { id: `tasks.history.${id}`, values: { column, ...more } } })
+    const into = line(-90, 'moved', 'Moved to Approved', 'passed')
+    const typed = (column: TaskCard['column'], ...after: ReturnType<typeof line>[]) => card(1419, { column, agent: 'b3', history: [line(-90, 'moved', `Moved to ${column}`, column), posted, ...after] })
+    // Within Passed and within Review: top, bottom, before another card, a place by number.
+    for (const [column, name] of [['passed', 'Approved'], ['review', 'Review']] as const) {
+      for (const moved of [line(5, 'movedBottom', `Moved to the bottom of ${name}`, column), line(5, 'movedTop', `Moved to the top of ${name}`, column), line(5, 'movedBeforeIn', `Moved before #1400 in ${name}`, column, { before: 1400 }), line(5, 'placed', `Placed 2nd in ${name}`, column, { place: 2 })]) {
+        expect(pendingStep(typed(column, moved))?.entry).toEqual(posted)
+        expect(loopStepWaitReason(typed(column, moved), [hb3], bound, t0 + 16 * 60_000)).toMatch(/has waited 16 min:/)
+      }
+    }
+    // Into another column, at its top or bottom too: the step ends.
+    expect(pendingStep(card(1419, { column: 'review', agent: 'b3', history: [into, posted, line(5, 'movedTop', 'Moved to the top of Review', 'review')] }))).toBeNull()
+    expect(pendingStep(typed('passed', line(5, 'moved', 'Moved to Done', 'done')))).toBeNull()
+    expect(pendingStep(typed('passed', line(5, 'movedBefore', 'Moved to Review, before #1400', 'review', { before: 1400 })))).toBeNull()
+    // A design in Doing the same way (#1382): reordered in Doing it still waits; moved on, it doesn't.
+    const design = { ...posted, what: 'Posted a design for the reviewer to check: "Design: …"' }
+    const doing = (...after: ReturnType<typeof line>[]) => ({ history: [line(-90, 'moved', 'Moved to Active', 'doing'), design, ...after] })
+    expect(pendingStep(doing(line(5, 'movedTop', 'Moved to the top of Active', 'doing')))?.step).toBe('design')
+    expect(pendingDesign(doing(line(5, 'movedBottom', 'Moved to the bottom of Active', 'doing')))).toEqual(design)
+    expect(pendingStep(doing(line(5, 'movedBottom', 'Moved to the bottom of Todo', 'todo')))).toBeNull()
+  })
 })
