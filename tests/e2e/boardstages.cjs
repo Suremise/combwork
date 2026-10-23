@@ -68,13 +68,13 @@ const nothingToArchive = (dialog) => {
         if ((await row.count()) && (await board.count())) return true
         await page.getByRole('button', { name: button }).click()
         return (await row.count()) > 0 && (await board.count()) > 0
-      })
+      }, HUNG_MS)
       await row.click()
     }
     const shoot = async (name) => {
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })
-        await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
+        await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
         await page.mouse.move(5, 5)
         await page.screenshot({ path: path.join(fx.shots, `boardstages-${name}-${theme}.png`) })
       }
@@ -95,7 +95,7 @@ const nothingToArchive = (dialog) => {
     check('the card is approved and queued', queued.steps.verdict.status === 200, JSON.stringify(queued.steps))
     const notesCard = (await inv('tasks:create', { title: 'Write the plan', project: 'notes' })).number
     await showBoard(null)
-    check('the queued card sits in Merging', !!(await until(async () => inColumn(queued.n, 'merging'))), await columns())
+    check('the queued card sits in Merging', !!(await until(async () => inColumn(queued.n, 'merging'), HUNG_MS)), await columns())
     const approvedGroup = board.locator('.board-category[data-category="passed"]')
     check('Merging and Approved share one Approved heading', (await approvedGroup.locator('.board-category-head').textContent()) === 'Approved' && (await approvedGroup.locator('.board-column').evaluateAll((e) => e.map((x) => x.getAttribute('data-column')).join(' '))) === 'passed merging')
     check('each column named by its stage', (await labelText('passed')) === 'Approved' && (await labelText('merging')) === 'Merging', `${await labelText('passed')} / ${await labelText('merging')}`)
@@ -104,7 +104,7 @@ const nothingToArchive = (dialog) => {
     check('the grouped columns are as wide as the others', !!(await until(async () => {
       const widths = await board.locator('.board-column').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().width))
       return Math.max(...widths) - Math.min(...widths) < 1.5
-    })), JSON.stringify(await board.locator('.board-column').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))))
+    }, HUNG_MS)), JSON.stringify(await board.locator('.board-column').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))))
     check('en: every column header is one row, Approved and Merging too (#1490)', (await headerRows()).every((r) => r.rows === 1), JSON.stringify(await headerRows()))
     const headerTops = await board.locator('.board-column-header').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))
     check("…and every column's header starts at the same height", new Set(headerTops).size === 1, JSON.stringify(headerTops))
@@ -113,9 +113,9 @@ const nothingToArchive = (dialog) => {
     // Merging's hover, and no drop.
     await label('merging').hover()
     const tip = page.locator('.tip', { hasText: 'merge queue' })
-    check("Merging's hover says cards come through the merge queue", !!(await until(async () => (await tip.count()) > 0)))
+    check("Merging's hover says cards come through the merge queue", !!(await until(async () => (await tip.count()) > 0, HUNG_MS)))
     const loose = (await inv('tasks:create', { title: 'Loose', project: 'alpha' })).number
-    await until(async () => (await tile(loose).count()) === 1)
+    await until(async () => (await tile(loose).count()) === 1, HUNG_MS)
     // The drag as the window's events (Merging never takes the drop, so a pointer drag would wait for one).
     const refused = await page.evaluate((n) => {
       const from = document.querySelector(`.board .task-card[data-task="${n}"]`)
@@ -132,7 +132,7 @@ const nothingToArchive = (dialog) => {
     check('Merging refuses the drop (its dragover is not taken)', refused)
     // A later change the board shows: after it, the dropped card's move (if any) would have landed too.
     const sentinel = (await inv('tasks:create', { title: 'Sentinel', project: 'alpha' })).number
-    await until(async () => (await tile(sentinel).count()) === 1)
+    await until(async () => (await tile(sentinel).count()) === 1, HUNG_MS)
     check('a drop into Merging moves nothing', (await h.card(loose))?.column === 'todo' && (await inColumn(loose, 'todo')))
 
     // --- Archive All in Approved takes Approved's cards only, never Merging's (HR2's round 1): a card waiting for your OK
@@ -147,17 +147,17 @@ const nothingToArchive = (dialog) => {
     await q.intent(h, okBuilder, okCard, 'submit', { summary: 'ready' })
     await q.intent(h, reviewer, okCard, 'start-review')
     await q.intent(h, reviewer, okCard, 'verdict', { pass: true, comment: 'ok' })
-    check('a card waiting for your OK sits in Approved, beside the queued one in Merging', !!(await until(async () => (await inColumn(okCard, 'passed')) && (await inColumn(queued.n, 'merging')))), await columns())
+    check('a card waiting for your OK sits in Approved, beside the queued one in Merging', !!(await until(async () => (await inColumn(okCard, 'passed')) && (await inColumn(queued.n, 'merging')), HUNG_MS)), await columns())
     const item = (text) => page.locator('.menu .menu-item', { hasText: text })
     await col('passed').getByRole('button', { name: 'Approved: more' }).click()
-    check("Approved's menu: Archive All in Approved (1)…, its own card only", !!(await until(async () => (await item('Archive All in Approved (1)…').count()) === 1)), JSON.stringify(await page.locator('.menu .menu-item').allTextContents()))
+    check("Approved's menu: Archive All in Approved (1)…, its own card only", !!(await until(async () => (await item('Archive All in Approved (1)…').count()) === 1, HUNG_MS)), JSON.stringify(await page.locator('.menu .menu-item').allTextContents()))
     await item('Archive All in Approved (1)…').click()
     const archiveDialog = page.locator('.dialog', { has: page.locator('.archive-all') })
-    check('…which asks for one card in Approved', !!(await until(async () => (await archiveDialog.count()) === 1)) && /Archive 1 card in Approved\?/.test(await archiveDialog.innerText()), await archiveDialog.innerText().catch(() => ''))
+    check('…which asks for one card in Approved', !!(await until(async () => (await archiveDialog.count()) === 1, HUNG_MS)) && /Archive 1 card in Approved\?/.test(await archiveDialog.innerText()), await archiveDialog.innerText().catch(() => ''))
     // Your OK while it is open: the card goes on to Merging; archiving Approved then leaves it there.
     const ask = (await inv('tasks:forYou', 'alpha')).items.find((i) => i.card === okCard)
     await inv('tasks:answer', okCard, ask.request, { outcome: 'approved' })
-    check('…the OK moves it to Merging while the dialog is open', !!(await until(async () => inColumn(okCard, 'merging'))))
+    check('…the OK moves it to Merging while the dialog is open', !!(await until(async () => inColumn(okCard, 'merging'), HUNG_MS)))
     // The dialog follows the board (#1510: read once, its button could still be on as the move reached it, then off for
     // the click): nothing left in Approved to archive.
     check('…the dialog follows: nothing in Approved to archive', !!(await nothingToArchive(archiveDialog)), await archiveDialog.innerText().catch(() => ''))
@@ -167,9 +167,9 @@ const nothingToArchive = (dialog) => {
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
 
     fs.writeFileSync(fx.go, 'go')
-    check('merged: the card moves to Done', !!(await until(async () => (await h.card(queued.n))?.column === 'done' && (await inColumn(queued.n, 'done')))), JSON.stringify(await h.kinds(queued.n)))
+    check('merged: the card moves to Done', !!(await until(async () => (await h.card(queued.n))?.column === 'done' && (await inColumn(queued.n, 'done')), HUNG_MS)), JSON.stringify(await h.kinds(queued.n)))
     // The OK'd card follows it through the queue.
-    await until(async () => (await h.card(okCard))?.column === 'done')
+    await until(async () => (await h.card(okCard))?.column === 'done', HUNG_MS)
 
     // --- Archive All in Approved while Merging isn't shown (HR2's round 2): a card waiting for your OK under Hive merges,
     // the project switched to The agent merges for later cards (no Merging now); your OK while the dialog is open sends the
@@ -185,32 +185,32 @@ const nothingToArchive = (dialog) => {
     await q.intent(h, reviewer, oldRules, 'start-review')
     await q.intent(h, reviewer, oldRules, 'verdict', { pass: true, comment: 'ok' })
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { finish: 'agentMerges' }) })
-    check('old rules: it waits in Approved, and Merging is not shown', !!(await until(async () => (await inColumn(oldRules, 'passed')) && !(await columns()).includes('merging'))), await columns())
+    check('old rules: it waits in Approved, and Merging is not shown', !!(await until(async () => (await inColumn(oldRules, 'passed')) && !(await columns()).includes('merging'), HUNG_MS)), await columns())
     await col('passed').getByRole('button', { name: 'Approved: more' }).click()
     await item('Archive All in Approved (1)…').click()
-    check('…Archive All in Approved asks for its one card', !!(await until(async () => (await archiveDialog.count()) === 1)) && /Archive 1 card in Approved\?/.test(await archiveDialog.innerText()), await archiveDialog.innerText().catch(() => ''))
+    check('…Archive All in Approved asks for its one card', !!(await until(async () => (await archiveDialog.count()) === 1, HUNG_MS)) && /Archive 1 card in Approved\?/.test(await archiveDialog.innerText()), await archiveDialog.innerText().catch(() => ''))
     const oldAsk = (await inv('tasks:forYou', 'alpha')).items.find((i) => i.card === oldRules)
     await inv('tasks:answer', oldRules, oldAsk.request, { outcome: 'approved' })
-    check('…your OK sends it into Merging (shown now) while the dialog is open', !!(await until(async () => inColumn(oldRules, 'merging'))), await columns())
+    check('…your OK sends it into Merging (shown now) while the dialog is open', !!(await until(async () => inColumn(oldRules, 'merging'), HUNG_MS)), await columns())
     check('…the dialog follows: nothing in Approved to archive (old rules)', !!(await nothingToArchive(archiveDialog)), await archiveDialog.innerText().catch(() => ''))
     await archiveDialog.getByRole('button', { name: 'Cancel' }).click()
     await until(async () => (await archiveDialog.count()) === 0, HUNG_MS)
     check('…and Approved\'s archive leaves it in Merging', (await h.card(oldRules))?.archived === false && (await inColumn(oldRules, 'merging')))
     fs.writeFileSync(fx.go, 'go')
-    check('…then it merges under its own rules: Done', !!(await until(async () => (await h.card(oldRules))?.column === 'done')))
+    check('…then it merges under its own rules: Done', !!(await until(async () => (await h.card(oldRules))?.column === 'done', HUNG_MS)))
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
 
     // --- With the workflow rules not enforced, every category shows, the workspace's own cards' board too (HR2's round 1).
     const own = (await inv('tasks:create', { title: 'About the workspace', project: '' })).number
     await inv('advanced:set', 'hive.workflow.enforce', false)
     await showBoard('Workspace')
-    check('rules off, the Workspace board: all six categories', !!(await until(async () => (await columns()) === 'hold todo doing review passed done' && (await inColumn(own, 'todo')))), await columns())
+    check('rules off, the Workspace board: all six categories', !!(await until(async () => (await columns()) === 'hold todo doing review passed done' && (await inColumn(own, 'todo')), HUNG_MS)), await columns())
     await inv('advanced:set', 'hive.workflow.enforce', null)
-    check('rules on again, the Workspace board: On Hold, Todo, Active and Done', !!(await until(async () => (await columns()) === 'hold todo doing done')), await columns())
+    check('rules on again, the Workspace board: On Hold, Todo, Active and Done', !!(await until(async () => (await columns()) === 'hold todo doing done', HUNG_MS)), await columns())
 
     // --- A No review project alone: Review and Approved hidden.
     await showBoard('beta')
-    check('beta alone: On Hold, Todo, Active and Done only', !!(await until(async () => (await columns()) === 'hold todo doing done')), await columns())
+    check('beta alone: On Hold, Todo, Active and Done only', !!(await until(async () => (await columns()) === 'hold todo doing done', HUNG_MS)), await columns())
     await shoot('noreview-en')
 
     // --- Options changed to No review while a card is in Review: Review stays until the card leaves it.
@@ -226,10 +226,10 @@ const nothingToArchive = (dialog) => {
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { review: 'none', noSelfReview: false }) })
     check("alpha's options no longer produce Review", (await ids(fx.alpha)) === 'hold todo active merging done', await ids(fx.alpha))
     await showBoard('alpha')
-    check('…but Review stays shown while the card is in it', !!(await until(async () => (await columns()).includes('review') && (await inColumn(inReview, 'review')))), await columns())
+    check('…but Review stays shown while the card is in it', !!(await until(async () => (await columns()).includes('review') && (await inColumn(inReview, 'review')), HUNG_MS)), await columns())
     await q.intent(h, reviewer, inReview, 'start-review')
     await q.intent(h, reviewer, inReview, 'verdict', { pass: true, comment: 'ok' })
-    check('once it leaves Review (its own rules: merged), Review goes', !!(await until(async () => (await h.card(inReview))?.column === 'done' && !(await columns()).includes('review'))), await columns())
+    check('once it leaves Review (its own rules: merged), Review goes', !!(await until(async () => (await h.card(inReview))?.column === 'done' && !(await columns()).includes('review'), HUNG_MS)), await columns())
 
     // --- A rename: on the board for one project; with two naming it differently, the default and each card's own.
     const building = (await inv('tasks:create', { title: 'Being built', project: 'alpha' })).number
@@ -237,17 +237,17 @@ const nothingToArchive = (dialog) => {
     const making = (await inv('tasks:create', { title: 'Being made', project: 'beta' })).number
     await inv('tasks:update', making, { column: 'doing' })
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: { ...q.queueOptions(fx, { review: 'none', noSelfReview: false }), stageNames: { active: 'Building' } } })
-    check('alpha alone: its Active column reads Building', !!(await until(async () => (await labelText('doing')) === 'Building')), await labelText('doing'))
+    check('alpha alone: its Active column reads Building', !!(await until(async () => (await labelText('doing')) === 'Building', HUNG_MS)), await labelText('doing'))
     await inv('workflow:setOptions', beta, { preset: null, options: { review: 'none', finish: 'committed', folder: 'project', stageNames: { active: 'Making' } } })
     await showBoard(null)
-    check('all projects, named differently: the column reads Active', !!(await until(async () => (await labelText('doing')) === 'Active')), await labelText('doing'))
+    check('all projects, named differently: the column reads Active', !!(await until(async () => (await labelText('doing')) === 'Active', HUNG_MS)), await labelText('doing'))
     const note = (n) => tile(n).locator('.task-project').getAttribute('data-stage-note')
-    check("each card's own project's name for its stage, on its project's hover", !!(await until(async () => (await note(building)) === 'Building' && (await note(making)) === 'Making')), `${await note(building)} / ${await note(making)}`)
+    check("each card's own project's name for its stage, on its project's hover", !!(await until(async () => (await note(building)) === 'Building' && (await note(making)) === 'Making', HUNG_MS)), `${await note(building)} / ${await note(making)}`)
     await tile(building).locator('.task-project').hover()
-    check('…the hover says it', !!(await until(async () => (await page.locator('.tip', { hasText: 'In alpha, this stage is Building' }).count()) > 0)))
+    check('…the hover says it', !!(await until(async () => (await page.locator('.tip', { hasText: 'In alpha, this stage is Building' }).count()) > 0, HUNG_MS)))
     await inv('workflow:setOptions', beta, { preset: null, options: { review: 'none', finish: 'committed', folder: 'project', stageNames: { active: 'Building' } } })
     await inv('workflow:setOptions', notes, { preset: null, options: { stageNames: { active: 'Building' } } })
-    check('every shown project names it alike: the column reads it', !!(await until(async () => (await labelText('doing')) === 'Building')), await labelText('doing'))
+    check('every shown project names it alike: the column reads it', !!(await until(async () => (await labelText('doing')) === 'Building', HUNG_MS)), await labelText('doing'))
     await shoot('renamed-en')
 
     // --- The workflow link: a line per project with all of them, the link with one; it opens Version Control → Workflow.
@@ -259,14 +259,14 @@ const nothingToArchive = (dialog) => {
       lines = await page.locator('.menu .menu-item').allTextContents()
       await page.keyboard.press('Escape')
       return complete()
-    })
+    }, HUNG_MS)
     check('all projects: a line per project in the Workflows menu', complete(), JSON.stringify(lines))
     await showBoard('alpha')
     const link = page.locator('[data-action="board-workflow"]')
-    check('alpha alone: "Workflow: Git · no preset chosen" in the toolbar', !!(await until(async () => ((await link.textContent().catch(() => '')) ?? '').trim() === 'Workflow: Git · no preset chosen')), await link.textContent().catch(() => ''))
+    check('alpha alone: "Workflow: Git · no preset chosen" in the toolbar', !!(await until(async () => ((await link.textContent().catch(() => '')) ?? '').trim() === 'Workflow: Git · no preset chosen', HUNG_MS)), await link.textContent().catch(() => ''))
     await link.click()
     const selected = () => page.locator('.git-sections [aria-selected="true"]').getAttribute('data-section').catch(() => null)
-    check('it opens Version Control → Workflow', !!(await until(async () => (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1 && (await selected()) === 'workflow')))
+    check('it opens Version Control → Workflow', !!(await until(async () => (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1 && (await selected()) === 'workflow', HUNG_MS)))
 
     // --- Polish: the long stage names.
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { review: 'none', noSelfReview: false }) })
@@ -278,7 +278,7 @@ const nothingToArchive = (dialog) => {
     const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
     await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: { ...base, code: 'pl', locale: 'pl', messages } })
     await showBoard('Wszystkie projekty', 'Tablica zadań')
-    check('Polish: Merging reads Scalanie under Zatwierdzone', !!(await until(async () => (await labelText('merging')) === 'Scalanie' && (await inColumn(second.n, 'merging')))), await labelText('merging'))
+    check('Polish: Merging reads Scalanie under Zatwierdzone', !!(await until(async () => (await labelText('merging')) === 'Scalanie' && (await inColumn(second.n, 'merging')), HUNG_MS)), await labelText('merging'))
     // Seven columns at this width: every name readable, wrapped rather than cut (the Assistant's OK on round 3).
     const cut = await board.locator('.board-column-header .board-column-label').evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1).map((e) => e.textContent))
     check('Polish, seven columns: no column name is cut', cut.length === 0 && (await board.locator('.board-column').count()) === 7, JSON.stringify(cut))
@@ -294,12 +294,12 @@ const nothingToArchive = (dialog) => {
     await shoot('merging-pl')
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: { ...q.queueOptions(fx), stageNames: { active: 'W'.repeat(24) } } })
     await showBoard('alpha', 'Tablica zadań')
-    check('a 24-letter name with no space stays inside its column', !!(await until(async () => (await labelText('doing')) === 'W'.repeat(24) && (await outside()).length === 0)), JSON.stringify(await outside()))
+    check('a 24-letter name with no space stays inside its column', !!(await until(async () => (await labelText('doing')) === 'W'.repeat(24) && (await outside()).length === 0, HUNG_MS)), JSON.stringify(await outside()))
     await shoot('longname-pl')
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
     await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: base })
     fs.writeFileSync(fx.go, 'go')
-    await until(async () => (await h.card(second.n))?.column === 'done')
+    await until(async () => (await h.card(second.n))?.column === 'done', HUNG_MS)
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
     await h.page.screenshot({ path: path.join(fx.shots, 'boardstages-failed.png') }).catch(() => {})
