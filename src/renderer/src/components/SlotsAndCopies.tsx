@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { CopyView, ProjectConfig, ProjectInfo, SlotView } from '@shared/types'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { CopyView, ProjectInfo, SlotView } from '@shared/types'
 import { COPIES_REVIEW } from '@shared/advanced'
 import { reviewsWork, agentWorkflowRole } from '@shared/workflow/roles'
 import { msg, tr } from '@shared/i18n'
@@ -31,6 +31,8 @@ const T = {
   fromSetup: msg({ id: 'workflow.slots.fromSetup', defaultMessage: 'From Agents & Worktrees’ setup command', description: 'Where the setting “Setup script” comes from while it isn’t set: the project’s setup command of Project Settings → Agents & Worktrees (its name as translated there).' }),
   fromCopy: msg({ id: 'workflow.slots.fromCopy', defaultMessage: 'From Agents & Worktrees’ files to copy', description: 'Where the setting “Files copied into new slots” comes from while it isn’t set: Agents & Worktrees’ list of files to copy into new worktrees (its name as translated there).' }),
   none: msg({ id: 'workflow.slots.none', defaultMessage: 'None', description: 'A slot script that isn’t set: nothing runs.' }),
+  setNone: msg({ id: 'workflow.slots.setNone', defaultMessage: 'Set for this project: none', description: 'Where a slot setting’s value comes from: this project sets it to nothing (no script runs, no files are copied), over Agents & Worktrees’ value.' }),
+  inherit: msg({ id: 'workflow.slots.inherit', defaultMessage: 'Inherit', description: 'A button beside a slot setting set for this project: stop setting it here, and use Agents & Worktrees’ value again.' }),
   setHere: msg({ id: 'workflow.slots.setHere', defaultMessage: 'Set for this project', description: 'Where a slot setting’s value comes from: set in this project.' }),
   inUse: msg({ id: 'workflow.slots.inUse', defaultMessage: 'Slots in use and ready', description: 'A read-only list under “Slots and copies”: the project’s slots, what each is lent to, and those ready (glossary 2.5: slot).' }),
   noSlots: msg({ id: 'workflow.slots.noSlots', defaultMessage: 'No slots yet: one is made when a card starts.', description: 'Under “Slots in use and ready” when the project has no slot yet.' }),
@@ -78,17 +80,24 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
     void call('copies:list', project.path).then(setCopies, () => setCopies([]))
   }, [project.path])
   useEffect(reload, [reload, project.config])
-  const update = async (patch: Partial<ProjectConfig>): Promise<void> => {
-    await actions.attempt(tr(msg({ id: 'workflow.slots.saveFailed', defaultMessage: 'Couldn’t save the slot settings', description: 'An error saving a setting under “Slots and copies”.' })), () => call('project:updateConfig', project.path, patch))
-    await actions.refreshWorkspace()
+  // Each setting saved on its own, one key under the project's lock in main (HR5's round 1: never the whole `slots` as this
+  // window last read it), and each field's saves in the order made. A save that fails shows what is stored again.
+  const queues = useRef(new Map<string, Promise<void>>())
+  const [shown, setShown] = useState(0)
+  const save = (key: 'setup' | 'archive' | 'copy' | 'copiesSize', value: string | number | null): Promise<void> => {
+    const next = (queues.current.get(key) ?? Promise.resolve()).then(async () => {
+      const done = await actions.attempt(tr(msg({ id: 'workflow.slots.saveFailed', defaultMessage: 'Couldn’t save the slot settings', description: 'An error saving a setting under “Slots and copies”.' })), () => call('slots:setSetting', project.path, key, value))
+      await actions.refreshWorkspace()
+      if (!done) setShown((x) => x + 1)
+    })
+    queues.current.set(key, next)
+    return next
   }
-  /** A slot setting: its own value set, or left out to fall back (an empty field). */
-  const setSlot = (key: 'setup' | 'archive' | 'copy', v: string): Promise<void> => {
-    const next = { ...cfg.slots }
-    if (v.trim()) next[key] = key === 'copy' ? v : v.trim()
-    else delete next[key]
-    return update({ slots: next })
-  }
+  /**
+   * A field's text as the project's own value. The setup script and copied files: emptied, it is "none" (nothing runs, no
+   * file is copied, over Agents & Worktrees' value); Inherit is its own button. The archive script has nothing to inherit.
+   */
+  const setSlot = (key: 'setup' | 'archive' | 'copy', v: string): Promise<void> => save(key, key === 'archive' && !v.trim() ? null : v)
   const copySize = cfg.copies?.size ?? null
   const reviewers = project.agents.filter((a) => reviewsWork(agentWorkflowRole(a))).length
   const defaultSize = Math.max(2, reviewers + 1)
@@ -110,12 +119,17 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                 {tr(T.setup)}
               </div>
               <div className="s-desc">{tr(T.setupDesc)}</div>
-              <div className="s-desc workflow-origin" data-origin={setupOwn !== undefined ? 'project' : 'worktreeSetup'}>
-                {setupOwn !== undefined ? tr(T.setHere) : `${tr(T.fromSetup)}: ${cfg.worktreeSetup.trim() || tr(T.none)}`}
+              <div className="s-desc workflow-origin" data-origin={setupOwn === undefined ? 'worktreeSetup' : setupOwn.trim() ? 'project' : 'none'}>
+                {setupOwn === undefined ? `${tr(T.fromSetup)}: ${cfg.worktreeSetup.trim() || tr(T.none)}` : tr(setupOwn.trim() ? T.setHere : T.setNone)}
+                {setupOwn !== undefined && (
+                  <button className="btn subtle small workflow-inherit" data-action="inherit-setup" onClick={() => void save('setup', null)}>
+                    {tr(T.inherit)}
+                  </button>
+                )}
               </div>
             </div>
             <div className="s-control">
-              <Field value={setupOwn ?? ''} placeholder={cfg.worktreeSetup.trim() || 'npm ci'} onCommit={(v) => void setSlot('setup', v)} /> {/* i18n-ignore: an example command */}
+              <Field key={`setup-${shown}`} value={setupOwn ?? ''} placeholder={setupOwn !== undefined ? tr(T.none) : cfg.worktreeSetup.trim() || 'npm ci'} onCommit={(v) => void setSlot('setup', v)} /> {/* i18n-ignore: an example command */}
             </div>
           </div>
           <div className="setting" data-slot-option="archive">
@@ -127,7 +141,7 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
               <div className="s-desc">{tr(T.archiveDesc)}</div>
             </div>
             <div className="s-control">
-              <Field value={cfg.slots?.archive ?? ''} placeholder={tr(T.none)} onCommit={(v) => void setSlot('archive', v)} />
+              <Field key={`archive-${shown}`} value={cfg.slots?.archive ?? ''} placeholder={tr(T.none)} onCommit={(v) => void setSlot('archive', v)} />
             </div>
           </div>
           <div className="setting" data-slot-option="copy">
@@ -137,12 +151,17 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                 {tr(T.copy)}
               </div>
               <div className="s-desc">{tr(T.copyDesc)}</div>
-              <div className="s-desc workflow-origin" data-origin={copyOwn !== undefined ? 'project' : 'worktreeCopy'}>
-                {copyOwn !== undefined ? tr(T.setHere) : `${tr(T.fromCopy)}: ${copyInherited.trim() || tr(T.none)}`}
+              <div className="s-desc workflow-origin" data-origin={copyOwn === undefined ? 'worktreeCopy' : copyOwn.trim() ? 'project' : 'none'}>
+                {copyOwn === undefined ? `${tr(T.fromCopy)}: ${copyInherited.trim() || tr(T.none)}` : tr(copyOwn.trim() ? T.setHere : T.setNone)}
+                {copyOwn !== undefined && (
+                  <button className="btn subtle small workflow-inherit" data-action="inherit-copy" onClick={() => void save('copy', null)}>
+                    {tr(T.inherit)}
+                  </button>
+                )}
               </div>
             </div>
             <div className="s-control">
-              <Field multiline value={copyOwn ?? ''} placeholder={copyInherited} onCommit={(v) => void setSlot('copy', v)} />
+              <Field key={`copy-${shown}`} multiline value={copyOwn ?? ''} placeholder={copyOwn !== undefined ? tr(T.none) : copyInherited} onCommit={(v) => void setSlot('copy', v)} />
             </div>
           </div>
           <div className="setting wide" data-slot-option="slots">
@@ -179,7 +198,7 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
           {copies && <div className="s-desc">{tr(T.copiesNow, { n: copies.length, leased: copies.filter((c) => c.lease && !c.lease.returned).length })}</div>}
         </div>
         <div className="s-control">
-          <NumberField value={copySize} min={1} max={32} step={1} label={tr(T.copiesSize)} inherit={tr(T.copiesDefault, { n: defaultSize })} onCommit={(v) => update({ copies: v === null ? {} : { size: v } })} />
+          <NumberField value={copySize} min={1} max={32} step={1} label={tr(T.copiesSize)} inherit={tr(T.copiesDefault, { n: defaultSize })} onCommit={(v) => save('copiesSize', v)} />
         </div>
       </div>
       <div className="setting" data-slot-option="reviewCopies">

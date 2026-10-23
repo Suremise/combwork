@@ -4,7 +4,8 @@
 // - Pair chosen: G15 On and G17 One per lane in its preview, and saved; Team the same;
 // - G11 = project folder hides G15 but shows G17, and A shared pool saves there; G1b = 2 with a pool saves;
 // - the setup script set in Slots and copies is the one the next warming run uses (a marker file in the slot), and the
-//   slots list shows the lent slot with its card; the copies' size saves;
+//   slots list shows the lent slot with its card; the copies' size saves; two fields saved while the first save is slow
+//   (HIVE_TEST_SLOW_IPC) both stay, with another window's change; the setup emptied is "none", and Inherit undoes it;
 // - Project Settings → Agents & Worktrees points to the group;
 // - a project saved by a P6 build with Pair (G15 stored Off, the one-time step not run yet) reads as Pair, not Custom,
 //   after the next start, with G15 On.
@@ -138,7 +139,34 @@ function board(sql, ...args) {
     await size.fill('3')
     await size.press('Enter')
     check('the copies’ size saves', !!(await until(() => projectJson().copies?.size === 3, HUNG_MS)), JSON.stringify(projectJson().copies))
-    check('…and Reviewers review in review copies shows Advanced’s switch', (await slotsGroup.locator('[data-slot-option="reviewCopies"] [data-value]').getAttribute('data-value')) === 'on')
+    // Two fields changed while the first save is still on its way (HR5's round 1: the second save sent the slots as the
+    // window last read them, losing the first): both stay, with the archive script another window set meanwhile.
+    await app.evaluate(() => {
+      process.env.HIVE_TEST_SLOW_IPC = 'slots:setSetting=2500*1'
+    })
+    const archiveField = slotsGroup.locator('[data-slot-option="archive"] input')
+    const copyField = slotsGroup.locator('[data-slot-option="copy"] textarea')
+    await archiveField.fill('echo archived')
+    await archiveField.press('Enter')
+    await inv('slots:setSetting', fx.alpha, 'setup', 'npm ci --other-window')
+    await copyField.fill('.env.test')
+    await copyField.blur()
+    check('two fields saved at once both stay, with another window’s change', !!(await until(() => projectJson().slots?.archive === 'echo archived' && projectJson().slots?.copy === '.env.test' && projectJson().slots?.setup === 'npm ci --other-window', HUNG_MS)), JSON.stringify(projectJson().slots))
+    await app.evaluate(() => {
+      delete process.env.HIVE_TEST_SLOW_IPC
+    })
+    // Emptied, the setup script is this project's "none" over Agents & Worktrees' value; Inherit uses that again.
+    await inv('project:updateConfig', fx.alpha, { worktreeSetup: 'npm ci --old' })
+    const setupOrigin = slotsGroup.locator('[data-slot-option="setup"] .workflow-origin')
+    await until(async () => (await setupField.inputValue()) === 'npm ci --other-window', HUNG_MS)
+    await setupField.fill('')
+    await setupField.press('Enter')
+    check('emptied, the setup script is set to none, over the old setup', !!(await until(async () => projectJson().slots?.setup === '' && (await setupOrigin.getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(projectJson().slots))
+    await shot('slots-none', slotsGroup)
+    await slotsGroup.locator('[data-action="inherit-setup"]').click()
+    check('Inherit uses Agents & Worktrees’ setup again', !!(await until(async () => projectJson().slots && !('setup' in projectJson().slots) && (await setupOrigin.getAttribute('data-origin')) === 'worktreeSetup' && (await setupOrigin.innerText()).includes('npm ci --old'), HUNG_MS)), JSON.stringify(projectJson().slots))
+    check('…with no Inherit button left', (await slotsGroup.locator('[data-action="inherit-setup"]').count()) === 0)
+    check('Reviewers review in review copies shows Advanced’s switch', (await slotsGroup.locator('[data-slot-option="reviewCopies"] [data-value]').getAttribute('data-value')) === 'on')
     await shot('slots-group', slotsGroup)
 
     // --- Project Settings → Agents & Worktrees points to the group.
@@ -166,7 +194,8 @@ function board(sql, ...args) {
     const cfg = projectJson(beta)
     fs.writeFileSync(path.join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: 'pair', options: { ...stored, slotsUpToDate: false } } }))
     await h.app.close()
-    board("DELETE FROM board_meta WHERE key = 'workflow.slotsUpToDateFromBeforeP7'")
+    // As before P7: neither the step's mark nor the projects' own (the first start settled beta, with nothing to change).
+    board("DELETE FROM board_meta WHERE key = 'workflow.slotsUpToDateFromBeforeP7' OR key LIKE 'workflow.slotsUpToDateFromBeforeP7:%'")
     h = await q.startHive(fx, { port: PORT, keepOptions: true })
     ;({ page, inv, app } = h)
     page.on('pageerror', (e) => check('no page errors', false, e.message))

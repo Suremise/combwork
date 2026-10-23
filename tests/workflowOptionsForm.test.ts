@@ -694,19 +694,40 @@ describe('G15 and G17 in the form (#1445)', () => {
 })
 
 describe("G15 saved before P7: the one-time step (#1445)", () => {
+  // The step's check, as a save makes it (no defaults at the levels here).
+  const problemsOf = (platform: 'git' | 'none', o: Partial<WorkflowOptions>): string[] => checkOptions(platform, { project: o }).problems.map((p) => (p.kind === 'contradiction' ? p.id : p.kind))
+  const { platform: _gp, ...pairWhole } = preset('git', 'pair')
+  const { platform: _gt, ...teamWhole } = preset('git', 'team')
+
   it("a preset's project takes its preset's value, one with none drops it; kept options too; G1b untouched", () => {
-    const pair = settledSlotsUpToDate({ platform: 'git', preset: 'pair', options: { ...preset('git', 'pair'), slotsUpToDate: false, reviewers: 2 } })
+    const pair = settledSlotsUpToDate({ platform: 'git', preset: 'pair', options: { ...pairWhole, slotsUpToDate: false, reviewers: 2 } }, problemsOf)
     expect(pair?.options).toMatchObject({ slotsUpToDate: true, reviewers: 2 })
-    const team = settledSlotsUpToDate({ platform: 'git', preset: 'team', options: { slotsUpToDate: false } })
-    expect(team?.options).toEqual({ slotsUpToDate: true })
+    const team = settledSlotsUpToDate({ platform: 'git', preset: 'team', options: { ...teamWhole, slotsUpToDate: false } }, problemsOf)
+    expect(team?.options).toMatchObject({ slotsUpToDate: true })
     // Solo's own value is Off already: nothing to change.
-    expect(settledSlotsUpToDate({ platform: 'git', preset: 'solo', options: { slotsUpToDate: false } })).toBeNull()
-    const custom = settledSlotsUpToDate({ platform: 'git', preset: null, options: { slotsUpToDate: false, review: 'agent', noSelfReview: true } })
+    expect(settledSlotsUpToDate({ platform: 'git', preset: 'solo', options: { slotsUpToDate: false } }, problemsOf)).toBeNull()
+    const custom = settledSlotsUpToDate({ platform: 'git', preset: null, options: { slotsUpToDate: false, review: 'agent', noSelfReview: true } }, problemsOf)
     expect(custom?.options).toEqual({ review: 'agent', noSelfReview: true })
-    expect(settledSlotsUpToDate({ platform: 'git', preset: null, options: { review: 'none' } })).toBeNull()
+    expect(settledSlotsUpToDate({ platform: 'git', preset: null, options: { review: 'none' } }, problemsOf)).toBeNull()
     // Another platform's kept options (#1419), and every other field kept (#1417's writeWorkflow).
-    const kept = settledSlotsUpToDate({ platform: 'none', preset: 'solo', options: {}, presetAsked: 'chosen', kept: { git: { preset: 'pair', options: { slotsUpToDate: false }, presetAsked: 'chosen' } } })
+    const kept = settledSlotsUpToDate({ platform: 'none', preset: 'solo', options: {}, presetAsked: 'chosen', kept: { git: { preset: 'pair', options: { ...pairWhole, slotsUpToDate: false }, presetAsked: 'chosen' } } }, problemsOf)
     expect(kept).toMatchObject({ platform: 'none', presetAsked: 'chosen', kept: { git: { preset: 'pair', options: { slotsUpToDate: true }, presetAsked: 'chosen' } } })
+  })
+
+  it('never adds a problem (HR5): a Pair or Team customised to the project folder, and kept options so, stay as they are', () => {
+    for (const [id, whole] of [['pair', pairWhole], ['team', teamWhole]] as const) {
+      const shared = { ...whole, folder: 'project' as const, finish: 'committed' as const, target: '', slotsUpToDate: false }
+      expect(problemsOf('git', shared), id).toEqual([])
+      expect(settledSlotsUpToDate({ platform: 'git', preset: id, options: shared }, problemsOf), id).toBeNull()
+      // A stored On there (never a P6 build's, but a hand edit) goes Off rather than leave a contradiction it didn't add.
+      expect(settledSlotsUpToDate({ platform: 'none', preset: 'solo', options: {}, kept: { git: { preset: id, options: shared } } }, problemsOf), `${id} kept`).toBeNull()
+    }
+    // One whose folder isn't stored resolves the project folder (all-off's): left Off, never On.
+    expect(settledSlotsUpToDate({ platform: 'git', preset: 'pair', options: { slotsUpToDate: false } }, problemsOf)).toBeNull()
+    // With no preset, a drop that would inherit a contradiction keeps the stored Off.
+    const inherits = (platform: 'git' | 'none', o: Partial<WorkflowOptions>): string[] => checkOptions(platform, { workspace: { git: { slotsUpToDate: true, folder: 'slots' } }, project: o }).problems.map((p) => (p.kind === 'contradiction' ? p.id : p.kind))
+    expect(settledSlotsUpToDate({ platform: 'git', preset: null, options: { folder: 'project', slotsUpToDate: false } }, inherits)).toBeNull()
+    expect(settledSlotsUpToDate({ platform: 'git', preset: null, options: { folder: 'slots', slotsUpToDate: false } }, inherits)?.options).toEqual({ folder: 'slots' })
   })
 
   it('runs once over the workspace (run twice), a value stored after it is kept, and a Pair project reads as Pair, not Custom', async () => {
@@ -726,5 +747,91 @@ describe("G15 saved before P7: the one-time step (#1445)", () => {
     await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, slotsUpToDate: false } } }))
     expect(await settleSlotsUpToDate(w)).toBe(0)
     expect((await w.projectConfig(repo)).workflow!.options.slotsUpToDate).toBe(false)
+  })
+
+  it("a run that read no mark before another finished never overwrites the user's choice made since (HR5: two Hives)", async () => {
+    const { w, repo } = await workspace({})
+    const { platform: _p, ...pairOptions } = (await form.workflowForm(w, repo)).presets.find((x) => x.id === 'pair')!.options
+    await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow, platform: 'git', preset: 'pair', options: { ...pairOptions, slotsUpToDate: false } } }))
+    // A is held after its admission (no mark yet), before the project.
+    let release!: () => void
+    let reached!: () => void
+    const atProject = new Promise<void>((r) => (reached = r))
+    const gate = new Promise<void>((r) => (release = r))
+    const a = settleSlotsUpToDate(w, { beforeProject: async () => (reached(), gate) })
+    await atProject
+    // B runs whole meanwhile, and the user then saves G15 Off.
+    expect(await settleSlotsUpToDate(w)).toBe(1)
+    await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, slotsUpToDate: false } } }))
+    release()
+    expect(await a).toBe(0)
+    expect((await w.projectConfig(repo)).workflow!.options.slotsUpToDate).toBe(false)
+  })
+
+  it('a run that failed part way leaves the projects it settled alone when it runs again', async () => {
+    const { w, repo, ws } = await workspace({})
+    const second = join(ws, 'q')
+    mkdirSync(join(second, '.hive'), { recursive: true })
+    await w.refresh()
+    const { platform: _p, ...pairOptions } = (await form.workflowForm(w, repo)).presets.find((x) => x.id === 'pair')!.options
+    for (const folder of [repo, second]) await w.mutateProjectConfig(folder, (c) => ({ workflow: { ...c.workflow, platform: 'git', preset: 'pair', options: { ...pairOptions, slotsUpToDate: false } } }))
+    // The first run fails at its second project: the first is settled and marked, the step isn't.
+    let calls = 0
+    const firstDone = await settleSlotsUpToDate(w, { beforeProject: () => { if (++calls === 2) throw new Error('interrupted') } })
+    expect(firstDone).toBe(1)
+    expect(boardValue(w, SLOTS_UP_TO_DATE_STEP)).toBeNull()
+    const stored = async (f: string) => (await w.projectConfig(f)).workflow!.options.slotsUpToDate
+    const [r1, r2] = [await stored(repo), await stored(second)]
+    const done = r1 ? repo : second
+    const notYet = r1 ? second : repo
+    expect([r1, r2].filter(Boolean)).toHaveLength(1)
+    // The user turns the settled one Off; the next run settles the other and leaves it so.
+    await w.mutateProjectConfig(done, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, slotsUpToDate: false } } }))
+    expect(await settleSlotsUpToDate(w)).toBe(1)
+    expect(await stored(done)).toBe(false)
+    expect(await stored(notYet)).toBe(true)
+    expect(boardValue(w, SLOTS_UP_TO_DATE_STEP)).not.toBeNull()
+  })
+})
+describe("Slots and copies: one setting saved at a time (#1445, HR5's round 1)", () => {
+  it('changes only its own key, under the lock: two at once both stay, with what another window saved', async () => {
+    const { setSlotSetting } = await import('../src/main/slotSettings')
+    const { w, repo } = await workspace({})
+    await w.mutateProjectConfig(repo, () => ({ slots: { archive: 'echo old' }, worktreeSetup: 'npm ci', worktreeCopy: '.env' }))
+    await Promise.all([setSlotSetting(w, repo, 'setup', '  npm install  '), setSlotSetting(w, repo, 'copy', '.env.local\n'), setSlotSetting(w, repo, 'copiesSize', 4)])
+    const c = await w.projectConfig(repo)
+    expect(c.slots).toEqual({ archive: 'echo old', setup: 'npm install', copy: '.env.local\n' })
+    expect(c.copies).toEqual({ size: 4 })
+  })
+
+  it("an empty value is the project's own none over the old setup and copy; null inherits them again", async () => {
+    const { setSlotSetting } = await import('../src/main/slotSettings')
+    const { w, repo } = await workspace({})
+    await w.mutateProjectConfig(repo, () => ({ worktreeSetup: 'npm ci', worktreeCopy: '.env' }))
+    await setSlotSetting(w, repo, 'setup', '')
+    await setSlotSetting(w, repo, 'copy', '')
+    expect(slotOptionsOf(await w.projectConfig(repo), '*.local')).toMatchObject({ setup: '', copy: '' })
+    await setSlotSetting(w, repo, 'setup', null)
+    await setSlotSetting(w, repo, 'copy', null)
+    expect((await w.projectConfig(repo)).slots).toEqual({})
+    expect(slotOptionsOf(await w.projectConfig(repo), '*.local')).toMatchObject({ setup: 'npm ci', copy: '.env' })
+    // With nothing set anywhere, the copy falls back to the settings' patterns.
+    await w.mutateProjectConfig(repo, () => ({ worktreeCopy: undefined }))
+    expect(slotOptionsOf(await w.projectConfig(repo), '*.local').copy).toBe('*.local')
+    await setSlotSetting(w, repo, 'copiesSize', 3)
+    await setSlotSetting(w, repo, 'copiesSize', null)
+    expect((await w.projectConfig(repo)).copies).toEqual({})
+  })
+
+  it('refuses a key or value it has no setting for, and changes nothing', async () => {
+    const { setSlotSetting } = await import('../src/main/slotSettings')
+    const { w, repo } = await workspace({})
+    await setSlotSetting(w, repo, 'setup', 'npm ci')
+    const before = await w.projectConfig(repo)
+    for (const [k, v] of [['pool', 'x'], ['copiesSize', 0], ['copiesSize', 33], ['copiesSize', 2.5], ['copiesSize', '4'], ['setup', 7], ['copy', 'x'.repeat(4001)]] as const) {
+      await expect(setSlotSetting(w, repo, k as never, v as never), `${k} ${String(v).slice(0, 10)}`).rejects.toThrow()
+    }
+    const after = await w.projectConfig(repo)
+    expect([after.slots, after.copies]).toEqual([before.slots, before.copies])
   })
 })

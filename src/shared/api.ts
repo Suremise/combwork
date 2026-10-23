@@ -6,6 +6,7 @@ import type {
   ArchiveBatch,
   CopyView,
   SlotTestOp,
+  SlotOptions,
   SlotView,
   BoardState,
   SetAsideCard,
@@ -335,6 +336,8 @@ export interface HiveRequests {
   'queue:list': (projectPath: string, target?: string) => QueueView[]
   /** The project's slots (#1429, SPEC §16.10.1), each with its open lease. */
   'slots:list': (projectPath: string) => SlotView[]
+  /** One setting of the Version Control tab's Slots and copies (#1445): set, or with null removed, under the project's lock. */
+  'slots:setSetting': (projectPath: string, key: 'setup' | 'archive' | 'copy' | 'copiesSize', value: string | number | null) => { slots: SlotOptions; copies: { size?: number } }
   /** Ends an agent's carried lease (#1441, Release Slot… in its menu): its adopted worktree stops being its own. Whether it did. */
   'slots:releaseCarried': (projectPath: string, agentId: string) => boolean
   /** The project's review and check copies (#1435, SPEC §16.10.5), each with its lease not freed. */

@@ -1874,17 +1874,28 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
     have G15's and G17's lines (`OPTION_WHY`); G11's is as before. The settings tool has `project.workflow.slotsUpToDate`.
   - **Saved options from before P7** (`src/main/workflow/slotsUpToDateStep.ts`): a pre-P7 build stored G15 only as its
     forced Off. A one-time step after the upgrade's adoption (a `board_meta` mark,
-    `workflow.slotsUpToDateFromBeforeP7`, set once every project is done; safe to repeat, each project changed under its
-    lock through `writeWorkflow`) settles each project's stored value, and its kept options' (#1419): a project whose
-    options started from a preset takes that preset's value (On for Pair and Team), one with none drops it and inherits.
+    `workflow.slotsUpToDateFromBeforeP7`, set once every project is done, and a mark per project,
+    `workflow.slotsUpToDateFromBeforeP7:<project id>`, set once it is settled; both checked under the project's lock
+    before its write through `writeWorkflow`, so a second Hive running the step meanwhile, or a run again after one that
+    failed part way, never touches a project already settled nor a choice made since) settles each project's stored
+    value, and its kept options' (#1419): a project whose options started from a preset takes that preset's value (On
+    for Pair and Team), one with none drops it and inherits. **Never a change that adds a problem:** each is checked
+    against the options' problems at the workspace's levels first (`checkOptions`); one that adds any (a Pair customised
+    to the project folder would contradict G15 On, `upToDateNeedsSlots`) falls back to Off, and if Off adds one too the
+    project is left as it is.
     The card asked for a plain drop; but a preset isn't a resolution level (a project stores its preset's options
     whole), so a dropped value would inherit Off and turn Pair Custom. After the mark, a stored value is the user's and
     is kept; G1b's `reviewers` is never touched.
   - **Slots and copies** (`SlotsAndCopies.tsx`), a group of the Workflow section after Where cards are built, Git
     projects only (not the levels' defaults). Its settings aren't workflow options: project.json's `slots` and `copies`,
-    each saved as it is changed (`project:updateConfig`), not with Save…. With G11 = slots: **Setup script** and
-    **Archive script** (#1429's `slots.setup` / `slots.archive`; unset, the setup shows the old `worktreeSetup` as its
-    origin), **Files copied into new slots** (`slots.copy`, unset showing `worktreeCopy` or Hive's), and **Slots in use
+    each saved as it is changed, not with Save…, one key at a time under the project's lock (`slots:setSetting`,
+    `src/main/slotSettings.ts`; a field's saves in the order made, and one that fails shows what is stored again), so
+    two fields changed at once, or in two windows, both stay. With G11 = slots: **Setup script** and **Archive script**
+    (#1429's `slots.setup` / `slots.archive`; unset, the setup shows the old `worktreeSetup` as its origin), **Files
+    copied into new slots** (`slots.copy`, unset showing `worktreeCopy` or Hive's). Emptied, the setup script and the
+    copied files are the project's own *none* (`''`: nothing runs, nothing is copied, over the old value), shown as
+    *Set for this project: none*; **Inherit** beside a value set here removes it, so the old value applies again (the
+    archive script has nothing to inherit: emptied, it is removed). **Slots in use
     and ready**, read-only (`slots:list`: name, state, lent to whom for which card or lane, or a carried worktree),
     linking to Branches & remotes. With any G11: **Review and check copies** (`copies.size`; empty keeps OP-32's default,
     shown) with how many there are and are leased (`copies:list`), and **Reviewers review in review copies**

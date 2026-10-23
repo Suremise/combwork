@@ -1,0 +1,5 @@
+{
+  "slots.setting.bad": "That isn’t a slot setting Hive has.",
+  "slots.setting.badSize": "The number of review and check copies is a whole number from 1 to 32.",
+  "slots.setting.badText": "A slot script or list of files is text of at most 4,000 characters."
+}

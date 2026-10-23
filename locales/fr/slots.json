@@ -1,0 +1,5 @@
+{
+  "slots.setting.bad": "Ce paramètre de slot n’existe pas dans Hive.",
+  "slots.setting.badSize": "Le nombre de copies de revue et de vérification est un nombre entier de 1 à 32.",
+  "slots.setting.badText": "Un script de slot ou une liste de fichiers est un texte d’au plus 4 000 caractères."
+}

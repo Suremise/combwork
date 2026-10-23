@@ -353,6 +353,7 @@ interface HiveMessageValues {
   'workflow.slots.fromSetup': undefined
   'workflow.slots.heading': undefined
   'workflow.slots.inUse': undefined
+  'workflow.slots.inherit': undefined
   'workflow.slots.lentCard': { agent: string | number; card: string | number }
   'workflow.slots.lentLane': { agent: string | number }
   'workflow.slots.noSlots': undefined
@@ -364,6 +365,7 @@ interface HiveMessageValues {
   'workflow.slots.reviewCopiesDesc': undefined
   'workflow.slots.saveFailed': undefined
   'workflow.slots.setHere': undefined
+  'workflow.slots.setNone': undefined
   'workflow.slots.setup': undefined
   'workflow.slots.setupDesc': undefined
   'workflow.slots.state.creating': undefined

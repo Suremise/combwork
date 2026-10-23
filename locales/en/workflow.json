@@ -1407,6 +1407,10 @@
     "defaultMessage": "Slots in use and ready",
     "description": "A read-only list under “Slots and copies”: the project’s slots, what each is lent to, and those ready (glossary 2.5: slot)."
   },
+  "workflow.slots.inherit": {
+    "defaultMessage": "Inherit",
+    "description": "A button beside a slot setting set for this project: stop setting it here, and use Agents & Worktrees’ value again."
+  },
   "workflow.slots.lentCard": {
     "defaultMessage": "{agent}, for {card}",
     "description": "What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for the card {card} (its key, HI-12)."
@@ -1450,6 +1454,10 @@
   "workflow.slots.setHere": {
     "defaultMessage": "Set for this project",
     "description": "Where a slot setting’s value comes from: set in this project."
+  },
+  "workflow.slots.setNone": {
+    "defaultMessage": "Set for this project: none",
+    "description": "Where a slot setting’s value comes from: this project sets it to nothing (no script runs, no files are copied), over Agents & Worktrees’ value."
   },
   "workflow.slots.setup": {
     "defaultMessage": "Setup script",

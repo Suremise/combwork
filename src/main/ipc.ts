@@ -112,6 +112,7 @@ import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesetsNow } from './workflow/rulesets'
 import { poolFor, slotTest, slotViews } from './slotsApp'
+import { setSlotSetting } from './slotSettings'
 import { copyViews, stopIsolated } from './copiesApp'
 import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
@@ -805,6 +806,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workflow:setLevel': (level, platform, change) => setLevelOptions(workspace, level, platform, change),
     'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined, true),
     'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
+    'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
     'slots:releaseCarried': (p, agentId) => releaseCarried(workspace, workspace.assertProject(p), String(agentId)),
     'copies:list': (p) => copyViews(workspace, workspace.assertProject(p)),
     'slots:test': async (p, op) => {
