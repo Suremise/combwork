@@ -10,6 +10,7 @@
 // approved waits for your OK, then its builder is told to merge). Screenshots in both themes and in Polish. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
+const { showBoard, openByTitle } = require('./queueFixture.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
@@ -117,8 +118,8 @@ const check = (name, ok, extra = '') => {
     // The card's history says whom Hive told of the answer (#1269 round 2), as the card dialog shows it.
     const toldLine = 'Told Builder (alpha) of your answer'
     check("the card's history says whom Hive told of the answer", !!(await lib.until(async () => (await card(n))?.history.some((h) => h.by === 'Hive' && h.what === toldLine), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
-    await page.getByRole('button', { name: 'Task Board' }).click()
-    await page.locator(`.task-card[data-task="${n}"]`).click()
+    await showBoard(page)
+    await openByTitle(page, n)
     const dialog = page.locator('.dialog', { hasText: `(#${n})` })
     await dialog.waitFor({ timeout: HUNG_MS })
     await dialog.locator('[data-section="history"]').click()
@@ -152,7 +153,7 @@ const check = (name, ok, extra = '') => {
     // #922's case: its builder asks for a push OK.
     await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${q}`, kind: 'approve', text: 'OK to push the release tag?' })}`)
     const chip = page.locator(`.task-card[data-task="${q}"] .task-for-you`)
-    await page.getByRole('button', { name: 'Task Board' }).click()
+    await showBoard(page)
     check('an agent’s ask shows the For you chip on its card', !!(await lib.until(async () => (await chip.count()) === 1, HUNG_MS)))
     check('…its kind and request in its accessible name', ((await chip.getAttribute('aria-label')) ?? '').includes('Approve: OK to push the release tag?'), await chip.getAttribute('aria-label'))
     const badge = page.locator('.activity-badge[data-badge="board"]')
@@ -167,7 +168,7 @@ const check = (name, ok, extra = '') => {
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     await filter.uncheck()
     const openQ = async () => {
-      await page.locator(`.task-card[data-task="${q}"]`).click()
+      await openByTitle(page, q)
       const d = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
       await d.waitFor({ timeout: HUNG_MS })
       return d
@@ -243,7 +244,7 @@ const check = (name, ok, extra = '') => {
     commitIn('notes.md')
     await inv('tasks:move', r, 'passed')
     const rKey = (await card(r)).key
-    await page.locator(`.task-card[data-task="${r}"]`).click()
+    await openByTitle(page, r)
     const rDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
     await rDialog.waitFor({ timeout: HUNG_MS })
     const rSection = rDialog.locator('[data-section="for-you"]')
