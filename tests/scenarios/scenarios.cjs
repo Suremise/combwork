@@ -108,6 +108,8 @@ async function pairInProject(c) {
   const cfg = JSON.parse(require('fs').readFileSync(file, 'utf8'))
   require('fs').writeFileSync(file, JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' } } }, null, 2))
 }
+/** The fake builder's work on greet.js, committed before its card goes to Review (#1486: a submit needs a change). */
+const LOOP_COMMIT = `shell: node -e "require('fs').appendFileSync('greet.js', '// Hi\\n')" && git add -A && git commit -qm "Greeting says Hi"`
 /**
  * The hand merge the user tells of (#1474): a branch for card `n` with a commit, merged (--no-ff) into alpha's default
  * branch, so the repository shows what the prompt says. Returns the branch and the base it was merged into.
@@ -1955,11 +1957,13 @@ module.exports.SCENARIOS = [
     title: "A card loop builder registers its lane (#483): the cards in order, its reviewer, the rounds and the wait, before its first card's review",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
+      // A reviewer agent reviews before Done (#1486: with no review, a submit went straight to Done).
+      await pairInProject(c)
       await c.card('a', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>" instead of "Hello, <name>".', agent: 'coder' })
       await c.card('b', { title: 'Greeting trims the name', description: 'greet.js trims spaces around the name.', agent: 'coder' })
     },
     prompt: (c) => `Work through cards #${c.cards.a} then #${c.cards.b} as their builder; Implementer reviews them. Rounds: 10. Wait: 6h.`,
-    fake: (c) => `skill card-loop then hive hive_lane {"action":"start","cards":[${c.cards.a},${c.cards.b}],"reviewer":"Implementer","rounds":10,"waitMinutes":360} then boardmove ${c.cards.a} doing then ${verdictWatch(c.cards.a)} then boardmove ${c.cards.a} review then boardcomment ${c.cards.a}`,
+    fake: (c) => `skill card-loop then hive hive_lane {"action":"start","cards":[${c.cards.a},${c.cards.b}],"reviewer":"Implementer","rounds":10,"waitMinutes":360} then boardmove ${c.cards.a} doing then ${LOOP_COMMIT} then ${verdictWatch(c.cards.a)} then boardmove ${c.cards.a} review then boardcomment ${c.cards.a}`,
     expect: (o, c) => {
       const starts = ran(o, 'hive_lane').map((x) => argsOf(x)).filter((a) => a.action === 'start')
       const first = starts[0] ?? {}
@@ -1986,13 +1990,14 @@ module.exports.SCENARIOS = [
     title: v.title,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
+      await pairInProject(c)
       await c.inv('workspace:setLoops', { rounds: 7, waitHours: 3 })
       await c.card('a', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>" instead of "Hello, <name>".', agent: 'coder' })
       await c.card('b', { title: 'Greeting trims the name', description: 'greet.js trims spaces around the name.', agent: 'coder' })
     },
     prompt: (c) => `Work through cards #${c.cards.a} then #${c.cards.b} as their builder; Implementer reviews them.${v.said}`,
     fake: (c) =>
-      `skill card-loop then hive hive_lane ${JSON.stringify({ action: 'start', cards: [c.cards.a, c.cards.b], reviewer: 'Implementer', ...(v.said ? { rounds: v.rounds, waitMinutes: v.wait } : {}) })} then boardmove ${c.cards.a} doing then hive hive_wait_for_tasks ${JSON.stringify({ cards: [c.cards.a], changes: ['verdict', 'column', 'comment'], column: 'passed', wake: true, limitMinutes: v.wait })} then boardmove ${c.cards.a} review then boardcomment ${c.cards.a}`,
+      `skill card-loop then hive hive_lane ${JSON.stringify({ action: 'start', cards: [c.cards.a, c.cards.b], reviewer: 'Implementer', ...(v.said ? { rounds: v.rounds, waitMinutes: v.wait } : {}) })} then boardmove ${c.cards.a} doing then ${LOOP_COMMIT} then hive hive_wait_for_tasks ${JSON.stringify({ cards: [c.cards.a], changes: ['verdict', 'column', 'comment'], column: 'passed', wake: true, limitMinutes: v.wait })} then boardmove ${c.cards.a} review then boardcomment ${c.cards.a}`,
     expect: (o, c) => {
       // Its lanes as saved (#1018: the workspace's database).
       const lane = require('../e2e/storeDocs.cjs').storeDocs(c.ws, 'lanes').find((l) => l.cards?.includes(c.cards.a))
