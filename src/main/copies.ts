@@ -760,6 +760,14 @@ interface Pending<T> {
   asks: string
   result: RequestAnswer<T> | null
   polled: number
+  /**
+   * Out of the map (#1499): evicted, abandoned, or its workspace closed. Its lease, when one comes, is given back then
+   * (`returned`: once), so a set-up that finishes after its request was dropped never keeps a copy nobody can find.
+   */
+  gone?: boolean
+  returned?: boolean
+  /** Stops following its workspace's closing. */
+  unlisten?: () => void
 }
 
 /** Requests at most at once (the oldest go, a copy of theirs given back). */
@@ -789,17 +797,25 @@ export class IsolatedRequests<T extends { lease: CopyLease }> {
     return this.pending.size
   }
 
-  async ask(owner: string, project: string, asks: string, lease: () => Promise<RequestAnswer<T>>, ticket?: string): Promise<T | { wait: string; ticket: string } | { refused: string }> {
+  /** `life`: the asking workspace's lifetime; its closing drops the request (its copy given back once it has one). */
+  async ask(owner: string, project: string, asks: string, lease: () => Promise<RequestAnswer<T>>, ticket?: string, life?: AbortSignal): Promise<T | { wait: string; ticket: string } | { refused: string }> {
     const known = ticket ? this.pending.get(ticket) : undefined
     let t = known && known.owner === owner && known.asks === asks ? ticket! : null
     if (!t) {
+      if (life?.aborted) return { refused: 'the workspace closed' } // i18n-ignore: hive-progress's words, agent-facing
       while (this.pending.size >= MAX_REQUESTS) this.drop(this.pending.keys().next().value!)
-      t = `t-${randomBytes(8).toString('hex')}`
+      const id = `t-${randomBytes(8).toString('hex')}`
+      t = id
       const p: Pending<T> = { owner, project, asks, result: null, polled: this.now() }
-      this.pending.set(t, p)
+      this.pending.set(id, p)
+      if (life) {
+        const closed = (): void => this.drop(id)
+        life.addEventListener('abort', closed, { once: true })
+        p.unlisten = () => life.removeEventListener('abort', closed)
+      }
       const leasing = lease().then(
-        (got) => void (p.result = got),
-        (e: Error) => void (p.result = { refused: `no check copy could be leased: ${e.message}` })
+        (got) => this.settled(p, got),
+        (e: Error) => this.settled(p, { refused: `no check copy could be leased: ${e.message}` })
       )
       let timer: NodeJS.Timeout | undefined
       await Promise.race([leasing, new Promise<void>((res) => (timer = setTimeout(res, this.firstWaitMs)))])
@@ -810,6 +826,7 @@ export class IsolatedRequests<T extends { lease: CopyLease }> {
     p.polled = this.now()
     if (!p.result) return { wait: 'a check copy to be set up', ticket: t }
     this.pending.delete(t)
+    p.unlisten?.()
     // None free yet: the next ask starts anew (no ticket).
     if ('wait' in p.result) return { wait: p.result.wait, ticket: '' }
     return p.result
@@ -820,9 +837,25 @@ export class IsolatedRequests<T extends { lease: CopyLease }> {
     for (const [t, p] of [...this.pending]) if (p.result && this.now() - p.polled > ABANDON_MS) this.drop(t)
   }
 
+  /** A request's set-up has finished: kept for its next ask, or, dropped meanwhile, its copy given back. */
+  private settled(p: Pending<T>, got: RequestAnswer<T>): void {
+    p.result = got
+    if (p.gone) this.giveBackOnce(p)
+  }
+
+  /** Drops a request: its copy given back now if it has one, else when its set-up finishes (settled). */
   private drop(ticket: string): void {
     const p = this.pending.get(ticket)
+    if (!p) return
     this.pending.delete(ticket)
-    if (p?.result && 'lease' in p.result) this.giveBack(p.project, (p.result as T).lease)
+    p.unlisten?.()
+    p.gone = true
+    this.giveBackOnce(p)
+  }
+
+  private giveBackOnce(p: Pending<T>): void {
+    if (p.returned || !p.result || !('lease' in p.result)) return
+    p.returned = true
+    this.giveBack(p.project, (p.result as T).lease)
   }
 }
