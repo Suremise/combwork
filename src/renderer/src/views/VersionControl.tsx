@@ -47,7 +47,13 @@ function useDetectionCatchUp(project: ProjectInfo, s: GitRepoSummary | null): vo
   const differ = !!s && !s.gitProblem && !!detected && !detected.other && readGit !== (detected.platform === 'git')
   const key = `${project.path}:${readGit}`
   useEffect(() => {
-    if (!differ || asked.current === key) return
+    // Agreeing again (however detection caught up: this refresh, F5, another's) rearms it for the next change (HR6's
+    // #1492 round 1: .git gone a second time after a restore was never asked about).
+    if (!differ) {
+      asked.current = null
+      return
+    }
+    if (asked.current === key) return
     asked.current = key
     void refreshWorkspace().catch(() => undefined)
   }, [differ, key])
