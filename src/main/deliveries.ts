@@ -1414,7 +1414,9 @@ export function offerNow(host: string, agentId: string, only?: string, asked = f
   if (hostClosed(host)) return Promise.resolve(false)
   const k = `${keyOf(host)}#${agentId}`
   const going = trying.get(k)
-  if (going) return going.then(() => false)
+  // Another try under way (the tick's, which with idle wakes off types nothing): Deliver Now is the user's own, so it
+  // waits for that one and then makes its own, rather than being lost.
+  if (going) return going.then((typed) => (asked && !typed ? offerNow(host, agentId, only, asked) : false))
   const run = offerOnce(host, agentId, only, 1, asked).finally(() => trying.delete(k))
   trying.set(k, run)
   return run
