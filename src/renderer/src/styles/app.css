@@ -2927,8 +2927,13 @@ p.hint {
   vertical-align: middle;
 }
 .template-plan-name-input {
-  width: 140px;
+  width: 120px;
   font-weight: 600;
+}
+/* The dialog naming a template's agents (#1440): wider, so every column shows in German and Polish without scrolling
+   sideways (narrower windows still cap it). */
+.dialog.wide:has(.template-plan-name-input) {
+  width: 880px;
 }
 .template-plan-note {
   margin: 8px 0 0;

@@ -4,9 +4,10 @@
 // without it fixed names; the fixed-name one loaded into apiary has every name taken by amberlight's, so free names are
 // filled in (AP-B1…, the key swapped), one edited to a taken name greys Load template out until it is fixed; loaded,
 // apiary's agents have apiary's names. Editing the pattern template's description only keeps its patterns and pairs (HR3,
-// round 1), and it loads into apiary with apiary's names. Add Agent from Template asks for its name, filled in free. Screenshots of the
-// names table with a clash in English and German, light and dark. Dev build, throwaway profile, workspace and
-// CLAUDE_CONFIG_DIR; a quiet test copy.
+// round 1), and it loads into apiary with apiary's names. Each row's partner ("with AP-R1") follows the names in the
+// boxes, and the load pairs the agents under them. In German and Polish every column shows without scrolling sideways.
+// Add Agent from Template asks for its name, filled in free. Screenshots of the names table with a clash in English and
+// German, light and dark. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR; a quiet test copy.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -73,8 +74,20 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
       return d
     }
     const boxes = (d) => d.locator('.template-plan-name-input').evaluateAll((l) => l.map((x) => x.value))
+    const partners = (d) => d.locator('.template-plan-table tbody tr[data-agent]').evaluateAll((l) => l.filter((r) => r.dataset.state !== 'removed').map((r) => r.querySelector('[data-paired-with]')?.getAttribute('data-paired-with') ?? null))
+    // The plan made for the names in the boxes (asked for again as they change): its rows are those names.
+    const settled = (d) => until(async () => JSON.stringify(await d.locator('.template-plan-table tbody tr[data-agent]:not([data-state="removed"])').evaluateAll((l) => l.map((r) => r.dataset.agent))) === JSON.stringify(await boxes(d)), HUNG_MS)
+    // The table as wide as its box at most: nothing to scroll sideways to.
+    const fits = (d) => d.evaluate((el) => { const t = el.querySelector('.template-plan-table'); const box = el.querySelector('.dialog-body'); return !!t && !!box && t.getBoundingClientRect().right <= box.getBoundingClientRect().right + 1 && box.scrollWidth <= box.clientWidth + 1 })
     const loadButton = (d) => d.getByRole('button', { name: 'Load template' })
     const shoot = async (name, target) => {
+      // No notice over the dialog (Template saved, from the edit above).
+      const close = page.locator('.toast .icon-btn[aria-label="Dismiss"]')
+      await until(async () => {
+        if ((await close.count()) === 0) return true
+        await close.first().click().catch(() => undefined)
+        return false
+      }, HUNG_MS)
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })
         await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
@@ -143,25 +156,35 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const second = d.locator('.template-plan-name-input').nth(1)
     await second.fill('AM-B2')
     check('a name edited to one amberlight has is marked, and Load template greyed out', !!(await until(async () => JSON.stringify(await d.locator('.template-plan-table .field-error').allInnerTexts()) === '["amberlight has an agent called AM-B2."]' && (await loadButton(d).isDisabled()), HUNG_MS)), JSON.stringify(await d.locator('.template-plan-table .field-error').allInnerTexts()))
+    // Each partner by the name in its box (the Assistant, on round 2's screenshots): AP-B1 with AP-R1, AP-R2 with AM-B2 as typed.
+    check('"with …" follows the names in the boxes', !!(await until(async () => JSON.stringify(await partners(d)) === JSON.stringify(['AP-R1', 'AP-R2', 'AP-R3', 'AP-B1', 'AM-B2', 'AP-B3']), HUNG_MS)), JSON.stringify(await partners(d)))
+    check('English: every column shows, nothing to scroll sideways', !!(await settled(d)) && (await fits(d)))
     await shoot('names-clash-en', () => d)
-    // The same in German (the dialog opened again, in that language: its text is set as it opens).
+    // The same in German and Polish (the dialog opened again, in that language: its text is set as it opens): every
+    // column shows without scrolling sideways; German shot.
     await d.getByRole('button', { name: 'Cancel' }).click()
     const base = (await inv('app:info')).language
-    const deDir = path.join(lib.ROOT, 'locales', 'de')
-    const deMessages = Object.assign({}, ...fs.readdirSync(deDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(deDir, f), 'utf8'))))
     const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
-    await speak({ ...base, code: 'de', locale: 'de', messages: deMessages })
-    await until(async () => (await page.locator('.session-toolbar .add-menu').innerText().catch(() => '')).includes('Hinzufügen'), HUNG_MS)
-    await lib.addMenuRun(page, 'Vorlagen')
-    await until(async () => (await menuItem('AM fixed').count()) === 1, HUNG_MS)
-    await menuItem('AM fixed').click()
-    const de = page.locator('.dialog', { has: page.locator('.template-plan') }).last()
-    await until(async () => (await de.locator('.template-plan-name-input').count()) === 6, HUNG_MS)
-    await de.locator('.template-plan-name-input').nth(1).fill('AM-B2')
-    check('German: the clash said in German', !!(await until(async () => /amberlight hat einen Agenten namens AM-B2|AM-B2/.test(await de.locator('.template-plan-table .field-error').innerText().catch(() => '')) && /eindeutig/.test(await de.innerText()), HUNG_MS)), await de.innerText().catch(() => ''))
-    await shoot('names-clash-de', () => de)
-    await page.keyboard.press('Escape')
-    await until(async () => (await de.count()) === 0, HUNG_MS)
+    for (const code of ['de', 'pl']) {
+      const dir = path.join(lib.ROOT, 'locales', code)
+      const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
+      await speak({ ...base, code, locale: code, messages })
+      await until(async () => (await page.locator('.session-toolbar .add-menu').innerText().catch(() => '')).includes(messages['panes.add.menu']), HUNG_MS)
+      await lib.addMenuRun(page, messages['panes.add.templates'])
+      await until(async () => (await menuItem('AM fixed').count()) === 1, HUNG_MS)
+      await menuItem('AM fixed').click()
+      const there = page.locator('.dialog', { has: page.locator('.template-plan') }).last()
+      await until(async () => (await there.locator('.template-plan-name-input').count()) === 6, HUNG_MS)
+      await there.locator('.template-plan-name-input').nth(1).fill('AM-B2')
+      check(`${code}: the clash marked`, !!(await until(async () => /AM-B2/.test(await there.locator('.template-plan-table .field-error').innerText().catch(() => '')), HUNG_MS)), await there.innerText().catch(() => ''))
+      check(`${code}: every column shows, nothing to scroll sideways`, !!(await settled(there)) && (await fits(there)))
+      if (code === 'de') {
+        check('German: said in German', /eindeutig/.test(await there.innerText()))
+        await shoot('names-clash-de', () => there)
+      }
+      await page.keyboard.press('Escape')
+      await until(async () => (await there.count()) === 0, HUNG_MS)
+    }
     await speak(base)
     await until(async () => (await page.locator('.session-toolbar .add-menu').innerText().catch(() => '')).includes('Add'), HUNG_MS)
     // Back in English: fixed, then loaded with apiary's names.
@@ -172,6 +195,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     check('…fixed: Load template ready again', !!(await until(async () => (await d.locator('.template-plan-table .field-error').count()) === 0 && (await loadButton(d).isEnabled()), HUNG_MS)))
     await loadButton(d).click()
     check('loaded into apiary with its own names', !!(await until(async () => JSON.stringify(names(apiary)) === JSON.stringify(team.map((n) => `AP-${n}`)), HUNG_MS)), JSON.stringify(names(apiary)))
+    check('…paired under those names', JSON.stringify(agentsOf(apiary).map((a) => a.pairedWith ?? null)) === JSON.stringify(['AP-R1', 'AP-R2', 'AP-R3', 'AP-B1', 'AP-B2', 'AP-B3']), JSON.stringify(agentsOf(apiary).map((a) => a.pairedWith ?? null)))
     // The edited pattern template into apiary: apiary's key, paired the same, Load template ready at once.
     d = await openLoad('AM team')
     check('the edited pattern template loads into apiary with its names', JSON.stringify(await boxes(d)) === JSON.stringify(team.map((n) => `AP-${n}`)) && (await loadButton(d).isEnabled()), JSON.stringify(await boxes(d)))

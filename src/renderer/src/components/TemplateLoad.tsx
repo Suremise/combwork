@@ -78,7 +78,14 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange }
     }
   }, [key, unusable, path, scope, file, from, initial])
   if (!project) return null
-  const view = templateLoadView(plan, project.config, settings, (id) => providers[id])
+  const shown = templateLoadView(plan, project.config, settings, (id) => providers[id])
+  // Each agent's partner by the name in its box (#1440, the Assistant's screenshots): "with AP-R1" follows the edits,
+  // as the load pairs them (by place) under the names chosen.
+  const partnerOf = (i: number): number | undefined => {
+    const p = plan.pairs?.find((x) => x.builder === i || x.reviewer === i)
+    return p ? (p.builder === i ? p.reviewer : p.builder) : undefined
+  }
+  const view = { ...shown, created: shown.created.map((a, i) => { const o = partnerOf(i); return o !== undefined && names[o] ? { ...a, pairedWith: names[o] } : a }) }
   return (
     <>
       {initial.taken.length > 0 && (
