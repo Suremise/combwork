@@ -3285,6 +3285,51 @@ repeating them (#533) [note §8].
 [#1123] Existing agent worktrees (HB1–HB6) become slots, keeping their branches until their current card ends; their
 agents lose `worktree` and are lent the slot they were in. Tested on a copy of Darren's workspace.
 
+**Built [#1441]: adopt in place, rename later with Repair's steps; one-way (Darren, 22 Oct).** A step of the upgrade,
+run at each opening of a 1.0 board (`slotMigration.ts`; every 1.0 board has the adoption's mark, so a 0.9 project added
+to a workspace made by 1.0 is migrated too), per agent (board_meta `slot_migration` records each project's agents
+migrated), safe to repeat and to run in two Hives at once (each agent's adoption, with its record, is one board write,
+decided again in it):
+- **Nothing moves at the upgrade.** Each builder's (or either's) existing worktree becomes a slot under its folder's
+  name (`hb2`), counted in the pool's size, lent to its agent under a **carried** lease; the agent's sessions recorded
+  in that folder are bound to the lease in the same write. What the lease is kept for is recorded beside it: the lane
+  running with that builder at the upgrade, else its card in flight (Doing, Review, Passed), else nothing. A worktree
+  missing at the upgrade, or made since (1.0 can still give an agent its own worktree), stays its agent's folder as in
+  0.9 (Repair or Recreate when it is gone) and is adopted at a later opening once it is there. `project.json`'s agents are not rewritten: 1.0 stops
+  reading `worktree` for where an agent works, which is no promise of a way back.
+- **A carried lease's life.** Kept for a lane or card: those finish where they started, its cards' folder the adopted
+  worktree on the agent's own branch (the stand-in, §16.19.1), and the pass ends the lease once the lane ends or the card
+  is Done or put back. Kept for nothing: the agent keeps starting and resuming there until its next card or lane under
+  slots, which **takes the slot over** when it is clean and its head is in the target: in one write the carried lease
+  ends (`handedOff`), the card's or lane's lease begins on the same slot and its conversations are rebound to it, so the
+  conversation goes on there and resumes there after a restart. Otherwise the card gets another slot and the carried one
+  stays protected; its conversation resumes once that card ends. The same handover applies to a slot the agent's own
+  Resume took (§16.10.3). **Release Slot…** in the agent's ⋯ menu (asks first) ends a carried lease; Hive never deletes
+  the agent's branch.
+- **The rename.** A free adopted slot (no lease, operation, job or writer, ready, no session running there, nothing
+  holding the folder: the rename probe) is renamed to the next generic name (`slot-c`) in the pool's folder, so a slot
+  named after one agent isn't lent to another. The rename is the slot's operation (a `remove`-kind one, its holder's
+  alone) from the write that takes the slot and **reserves its destination** (the next generic name no slot has and no
+  other rename has reserved, its folder absent: board_meta `slot_rename:`, its intent) to the fenced write that renames
+  the row and its leases' history and deletes the intent. Every write that makes a slot honours the reservation (a lend,
+  by name or not; an adoption), so two renames, or a rename and a lend, in one Hive or two, never share a destination.
+  Each step acts only on the worktree the rename recorded (its identity: git's administrative folder, kept through git's
+  move): one that comes to the destination meanwhile is never followed, moved or put back, and ours, if git moved it
+  inside that one, is moved back. Repair's helpers (`worktreeRenamer`, from `workspaceMove.ts`) do the steps: each CLI's per-folder data
+  copied first, every provider's copy applied with no failure (any failing: no rename, nothing moved); git's move,
+  refused onto anything already there and checked by identity (exactly the reserved folder, else moved back);
+  its cards' `FolderMoved` and its sessions' recorded folder. A step failing after the move puts back what was done; if
+  even that fails, the operation and intent stay, the slot out of the pool, until a later look puts it back. A rename cut
+  short by a crash is the next holder's (the pool's recovery, once its Hive is gone): given up if git hasn't moved it,
+  finished (or put back) if it has, put back from inside another worktree if git moved it there; a live one is never
+  touched by another Hive. Only with the rules on and Settings →
+  Advanced, **Rename adopted worktrees to slot names** (`hive.slots.renameAdopted`, on).
+- **A reviewer's own worktree** gets no slot and no rename: it becomes a retired home (its conversations resume there,
+  its new ones start in the project folder).
+- **One-way.** The board backup and Help → Restore the 0.9 Board Backup… stay (cards and history), with no promise that
+  0.9.3 carries on with worktrees, sessions or lanes once slots have moved them; the upgrade's ask says "Back up first:
+  there's no going back to 0.9.3 once your agents' worktrees become slots."
+
 ### 16.11 Lanes, with or without the Assistant
 
 #### 16.11.1 Hive owns the lane's card list
@@ -4029,7 +4074,8 @@ With the old moves translated, a lane's next card waits until the one before it 
 a builder following today's card-loop skill: its move of the next card to Doing is refused (`lane.oneAtATime`) until it
 reports the previous one merged (#1274's skill lines say so).
 
-**Other:** templates v1 wiped; agents' worktrees become slots (§16.10.8); keys suggested (§16.12).
+**Other:** templates v1 wiped; agents' worktrees become slots (§16.10.8, **Built [#1441]**: adopted in place, renamed later
+with Repair's steps, one-way); keys suggested (§16.12).
 
 ### 16.18 Acceptance scenarios
 

@@ -45,8 +45,11 @@ export interface FolderSlot {
 /** What the contract decides from: the project, its slots, its migration and its retired homes. */
 export interface FolderFacts {
   projectPath: string
-  /** #1441 has migrated the project's agents' worktrees into slots: their 0.9 `worktree` no longer counts. */
+  /** #1441 has run on the project (its record is there). */
   migrated: boolean
+  /** The agents #1441 has migrated (their 0.9 worktree adopted as a slot, or a reviewer's kept as a retired home): their
+   * 0.9 `worktree` no longer counts. One not listed (a worktree missing at the upgrade, or made since) keeps it. */
+  migratedAgents: readonly string[]
   /** Retired homes (#1441): folders an agent's conversations resume in, never lent. */
   homes: readonly string[]
   slots: readonly FolderSlot[]
@@ -105,8 +108,8 @@ const folderOf = (facts: FolderFacts, lease: FolderLease | null): string | null 
 
 /** Where a new conversation of the agent starts, and under which lease (null: none, outside a slot). */
 export function launchPlace(facts: FolderFacts, agent: FolderAgent, purpose: FolderPurpose): { folder: string; lease: FolderLease | null } {
-  // Before the migration an agent's 0.9 worktree is its folder, as in 0.9, whatever it does.
-  const legacy = !facts.migrated && agent.legacy ? agent.legacy.path : null
+  // Until the migration takes it over, an agent's 0.9 worktree is its folder, as in 0.9, whatever it does.
+  const legacy = agent.legacy && !facts.migratedAgents.includes(agent.id) ? agent.legacy.path : null
   if (purpose === 'review') return { folder: legacy ?? facts.projectPath, lease: null }
   const { dispatch, carried } = leasesOf(facts, agent.id)
   for (const l of [dispatch, carried]) {

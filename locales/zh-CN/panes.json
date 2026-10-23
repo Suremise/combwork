@@ -90,6 +90,7 @@
   "panes.menu.moveLeft": "左移",
   "panes.menu.moveRight": "右移",
   "panes.menu.moveUp": "上移",
+  "panes.menu.releaseSlot": "释放槽位…",
   "panes.menu.remove": "删除智能体…",
   "panes.menu.reviewChanges": "查看更改",
   "panes.messages.cancel": "{n, plural, =1 {取消这条消息} other {取消这 # 条消息}}",

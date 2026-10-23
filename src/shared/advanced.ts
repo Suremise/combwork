@@ -183,6 +183,9 @@ export const QUEUE_CHECKED_OUT_TARGET = 'hive.queue.checkedOutTarget'
 /** Whether Hive removes a project's idle slots beyond its pool after a day (#1429, SPEC §16.10.2): read by main's slotsApp. */
 export const SLOTS_REMOVE_IDLE = 'hive.slots.removeIdle'
 
+/** Whether an agent's worktree adopted as a slot at the 1.0 upgrade is renamed to a slot's name once free (#1441). */
+export const SLOTS_RENAME_ADOPTED = 'hive.slots.renameAdopted'
+
 /** Whether a Done card's line is deleted once its target contains it (#1438): read by main's slotCards. */
 export const SLOTS_DELETE_MERGED = 'hive.slots.deleteMergedLines'
 
@@ -639,6 +642,19 @@ const SOURCES: readonly AdvancedSource[] = [
       id: 'settings.advanced.hive.slots.removeIdle.desc',
       defaultMessage: "A project keeps as many slots as it has builders. A free slot beyond that, unused for a day, is removed: its archive command runs first, and it is kept if that fails. Hive never removes one with an agent or a process in it, a lease, a merge in flight, or work that isn't committed and merged. Turned off, idle slots stay until you remove them.",
       description: 'What the advanced setting "Remove idle slots after a day" does (Settings → Advanced, under Hive). A slot is a worktree Hive lends to a card or a lane; a lease is one loan of it.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
+  {
+    id: SLOTS_RENAME_ADOPTED,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.slots.renameAdopted.title', defaultMessage: 'Rename adopted worktrees to slot names', description: "An advanced setting's title (Settings → Advanced), listed under Hive. At the upgrade to 1.0, agents' own worktrees became slots (worktrees Hive lends to a card or a lane), keeping their folder names." }),
+    desc: msg({
+      id: 'settings.advanced.hive.slots.renameAdopted.desc',
+      defaultMessage: "At the upgrade to 1.0 your agents' worktrees became slots, keeping their folders (hb2). Once one is free, with no agent or process in it, Hive renames its folder to a slot's name (slot-c), moving its cards' work and the agents' conversations with it, so a slot named after one agent isn't lent to another. Turned off, they keep their names.",
+      description: 'What the advanced setting "Rename adopted worktrees to slot names" does (Settings → Advanced, under Hive). A slot is a worktree Hive lends to a card or a lane. Keep hb2 and slot-c as they are (folder names).'
     }),
     kind: 'boolean',
     default: true,

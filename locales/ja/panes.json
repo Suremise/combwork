@@ -90,6 +90,7 @@
   "panes.menu.moveLeft": "左へ移動",
   "panes.menu.moveRight": "右へ移動",
   "panes.menu.moveUp": "上へ移動",
+  "panes.menu.releaseSlot": "スロットを解放…",
   "panes.menu.remove": "エージェントを削除…",
   "panes.menu.reviewChanges": "変更を確認",
   "panes.messages.cancel": "{n, plural, other {メッセージ#件を取り消す}}",

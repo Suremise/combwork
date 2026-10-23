@@ -180,31 +180,40 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
      * Hovers `target` until its tooltip shows `want` (a tooltip shows after its delay; `want` may read the tooltip's parts
      * too). A tooltip closed by the panel drawing again (the queue moving on) is hovered for again.
      */
+    let hovers = 0
     const hover = async (target, want) => {
+      hovers = 0
       const enter = async () => {
+        hovers++
         await page.mouse.move(5, 5)
         await waitHung(async () => (await tips().count()) === 0)
         await target.hover()
       }
       await enter()
       // A tooltip that isn't the target's (the pointer ended on another part as the panel moved) is hovered for again
-      // after a few seconds, as is one that closed.
+      // after a few seconds, as is one that closed, and a hover that showed none (#1509: the segment drawn again under
+      // the pointer as it entered; no tip came in the minute after).
       let seen = false
       let other = 0
+      let none = 0
       return waitHung(async () => {
         const shown = (await tips().count()) > 0
-        if ((seen && !shown) || other > 25) {
+        if ((seen && !shown) || other > 25 || none > 25) {
           seen = false
           other = 0
+          none = 0
           await enter()
           return false
         }
         seen = shown
         const ok = shown && (await want(await tipText()))
         if (shown && !ok) other++
+        if (!shown) none++
         return ok
       })
     }
+    /** What a hover check that failed had: the tip's text, how often it hovered, the target's own name. */
+    const hoverSaw = async (target) => `tip: ${(await tipText()) || 'none'}; hovered ${hovers}×; target: ${(await target.getAttribute('aria-label').catch(() => null)) ?? 'not found'}`
     const laneNow = async (id) => (await inv('lanes:list')).find((l) => l.id === id)
     const integrated = async (n) => (await factsOf(n, 'Integrated')).at(-1)
     const workspaceToken = JSON.parse(fs.readFileSync(path.join(fx.userData, 'agent-api.json'), 'utf8')).token
@@ -384,7 +393,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     check('G14 (S12): a card blocked by One, approved and unmerged, is refused its start', early.status === 409 && early.body?.rule === 'start.dependenciesIntegrated', JSON.stringify(early.body))
     await showTab('pulse')
     const mergingHover = () => hover(seg(c1), async (t) => t.includes('Merging') && t.includes('Approved') && (await page.locator('.tip .lane-seg-stage.own').innerText().catch(() => '')) === 'Merging' && (await page.locator('.tip .lane-stage-divider').count()) === 1)
-    check("Pulse: One's hover says Approved | Merging, its own (Merging) marked", !!(await mergingHover()), await tipText())
+    check("Pulse: One's hover says Approved | Merging, its own (Merging) marked", !!(await mergingHover()), await hoverSaw(seg(c1)))
     await shoot('4-pulse-merging', { show: () => hover(seg(c1), (t) => t.length > 0 && !!t.match(/One/)) })
     // The legend on the Lanes bar's hover.
     const bar = panel.locator('.progress-lanes-bar')

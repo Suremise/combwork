@@ -1351,6 +1351,8 @@ export interface AgentInfo extends AgentDef {
   restartNeeded: boolean
   /** The session Resume opens for this agent while it isn't running (null: nothing to resume). */
   resume: ResumeTarget | null
+  /** Its adopted worktree's slot, while it holds it under a carried lease (#1441): Release Slot… in its menu ends it. */
+  carriedSlot?: string
 }
 
 export interface ResumeTarget {

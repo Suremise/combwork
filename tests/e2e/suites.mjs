@@ -247,6 +247,7 @@ export const SUITES = [
   { name: 'slotpool' },
   { name: 'slotrecovery' },
   { name: 'slotsessions' },
+  { name: 'slotupgrade' },
   { name: 'stagenames' },
   { name: 'stalls' },
   { name: 'startall' },

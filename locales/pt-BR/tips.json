@@ -344,6 +344,8 @@
   "tips.slotResume.title": "Uma conversa é retomada onde foi criada",
   "tips.slots.text": "Com Onde os cartões são feitos em Cada cartão em sua própria pasta, iniciar um cartão empresta ao executor um slot, um worktree pronto, e cria ali o branch do cartão. Uma raia mantém seu slot de cartão em cartão; com todos em uso, espera por um.",
   "tips.slots.title": "Cada cartão em um branch próprio",
+  "tips.slotsAdopted.text": "Desde a atualização, o worktree de cada construtor é um slot reservado para ele até que seu próximo cartão ou raia o assuma. Liberar slot… no menu ⋯ do agente abre mão de um; quando livre, o Hive renomeia a pasta para um nome de slot, levando as conversas junto.",
+  "tips.slotsAdopted.title": "Os worktrees dos seus agentes agora são slots",
   "tips.sortTables.text": "Clique no cabeçalho de uma coluna nas tabelas do Hive (atalhos, Desempenho, Armazenamento, as Visões gerais) para ordenar por ela, e de novo para inverter a ordem. O Hive lembra a ordenação e as linhas por página de cada tabela.",
   "tips.sortTables.title": "Ordene qualquer tabela",
   "tips.staleMessages.text": "Quando o Assistente repassa algo sobre a rodada atual de um cartão, ele vincula a mensagem a esse cartão: se o cartão for aprovado ou começar outra rodada antes que o agente a leia, o Hive a descarta como obsoleta, para que nenhum agente reabra um cartão aprovado por uma constatação antiga.",

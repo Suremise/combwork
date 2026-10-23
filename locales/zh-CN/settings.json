@@ -225,6 +225,8 @@
   "settings.advanced.hive.slots.deleteMergedLines.title": "卡片合并后删除其分支",
   "settings.advanced.hive.slots.removeIdle.desc": "项目保留与构建者数量相同的槽位。超出部分的空闲槽位如果一天未被使用，就会被移除：先运行它的归档命令，如果失败则保留该槽位。Hive 绝不会移除其中有智能体或进程、有租借、有正在进行的合并，或有未提交、未合并工作的槽位。关闭后，闲置槽位会一直保留，直到你移除它们。",
   "settings.advanced.hive.slots.removeIdle.title": "一天后移除闲置槽位",
+  "settings.advanced.hive.slots.renameAdopted.desc": "升级到 1.0 时，你的代理的工作树变成了槽位，保留原文件夹名（hb2）。一旦某个槽位空闲、里面没有代理或进程，Hive 会把它的文件夹改成槽位名（slot-c），并一并移动其卡片的工作和代理的对话，以免以某个代理命名的槽位被借给另一个代理。关闭后它们保留原名。",
+  "settings.advanced.hive.slots.renameAdopted.title": "把接管的工作树改为槽位名",
   "settings.advanced.hive.slots.setupMinutes.desc": "Hive 允许槽位的初始化命令、依赖安装或其归档命令运行多久后将其结束。以这种方式结束初始化的槽位在重新初始化之前不会被借出；以这种方式结束的归档命令会保留其槽位。",
   "settings.advanced.hive.slots.setupMinutes.title": "槽位：初始化命令的最长运行时间",
   "settings.advanced.hive.terminal.allKeysToCli.desc": "在智能体的窗格中，Hive 自己的快捷键（“设置”→“键盘快捷键”）会接收其按键，CLI 自己使用的按键除外。开启后，所有按键都交给 CLI，命令面板的快捷键（显示所有命令）除外，它仍归 Hive，以便每个命令都还能触达。Ctrl+C 和 Ctrl+V 有单独的设置。",
