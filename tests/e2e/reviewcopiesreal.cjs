@@ -71,7 +71,7 @@ const tokenOf = (projectPath, agentId) => {
 
 /** The command lines of the processes that name the copies folder (read only). */
 const namingCopies = () => {
-  const ps = `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.ToLower().Contains(${JSON.stringify(copiesDir.toLowerCase()).replace(/"/g, "'")}) } | ForEach-Object { $_.CommandLine }`
+  const ps = `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.ToLower().Contains('${copiesDir.toLowerCase().replace(/'/g, "''")}') } | ForEach-Object { $_.CommandLine }`
   return execFileSync('powershell.exe', ['-NoProfile', '-Command', ps], { encoding: 'utf8', env: lib.baseEnv() }).split(/\r?\n/).filter(Boolean)
 }
 
@@ -90,6 +90,9 @@ const namingCopies = () => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   const api = await startFakeCopilotApi({ log: apiLog })
   const copilotEnv = copilotTestEnv(api, copilotDir, { above: lib.WORK })
+  // Codex's sandbox can't start the Store's PowerShell 7 while another process of it runs (#499, #658): as the real
+  // Codex suites do (#584), a PATH without the Store's aliases, so Codex runs commands in Windows PowerShell.
+  copilotEnv.PATH = lib.pathWithoutStoreAliases({ PATH: copilotEnv.PATH })
   // Copilot asks whether to trust a new folder: the project folder is, as "Yes, and remember this folder" saves it.
   fs.writeFileSync(path.join(copilotDir, 'copilot-home', 'config.json'), JSON.stringify({ trustedFolders: [alpha] }, null, 2))
   const homeFiles = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /\.(json|toml)$/i.test(f)).map((f) => path.join(dir, f)) : [])
@@ -168,11 +171,13 @@ const namingCopies = () => {
         r.key === 'copilot'
           ? `write ${built} built then shell Set-Location '${folder}'; node test.js then say done`
           : `Work only in the folder ${folder} (outside your own; you may use it). First create the file build.txt there containing the word built, with your file tools. Then run "node test.js" with that folder as the working directory. Reply done.`
+      // Its turn waits on the real CLI answering: an environment failure in its session meanwhile is a SKIP (lib.cliStep).
+      let asked = 0
+      let askedBeforeEdit = false
+      await lib.cliStep(`${r.def.name}'s turn in its review copy`, { session: key }, async () => {
       const sent = await lib.sendPrompt(inv, key, prompt, { submitted: async () => (await live(r.def.id))?.status === 'working' || fs.existsSync(built), waitMs: HUNG_MS })
       check(`…${r.def.name} takes the prompt`, sent > 0)
       // Edits there are never asked about (granted); a command may be, and is answered Yes.
-      let asked = 0
-      let askedBeforeEdit = false
       const done = await until(async () => {
         const s = await live(r.def.id)
         if (s?.status === 'waiting') {
@@ -186,13 +191,17 @@ const namingCopies = () => {
       console.log(`INFO ${r.def.name}: questions answered Yes: ${asked}${askedBeforeEdit ? ' (one before its edit)' : ''}`)
       const screen = done ? '' : lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '').slice(-1500)
       check(`…${r.def.name} built (build.txt) and ran the test (ran.txt) in its copy`, !!done && /built/.test(fs.readFileSync(built, 'utf8')) && fs.readFileSync(ran, 'utf8').toLowerCase().includes(folder.toLowerCase()), screen)
+      })
       if (r.key === 'copilot') check('…its edit there asked nothing (Accept edits: granted)', !askedBeforeEdit)
       const v = await call(tr, 'PATCH', `/v1/tasks/${r.card}`, { review: 'failed', comment: 'S51: built and tested in the review copy.', reply: 'short' })
       check(`…its verdict`, v.status === 200, JSON.stringify(v.body))
     }
     check('nothing of theirs is in the project folder', !fs.existsSync(path.join(alpha, 'build.txt')) && !fs.existsSync(path.join(alpha, 'ran.txt')))
-    const changed = [...homesBefore].filter(([f, before]) => fs.existsSync(f) && fs.readFileSync(f, 'utf8') !== before && fs.readFileSync(f, 'utf8').toLowerCase().includes('copies'))
-    const added = [...homeFiles(CLAUDE_TEST_HOME), ...homeFiles(CODEX_HOME), ...homeFiles(path.join(copilotDir, 'copilot-home'))].filter((f) => !homesBefore.has(f) && fs.readFileSync(f, 'utf8').toLowerCase().includes(copiesDir.toLowerCase().replace(/\\/g, '\\\\')))
+    // The copies folder as a file may write it: plain, JSON-escaped or with forward slashes.
+    const forms = [copiesDir, JSON.stringify(copiesDir).slice(1, -1), copiesDir.replace(/\\/g, '/')].map((x) => x.toLowerCase())
+    const names = (f) => forms.some((x) => fs.readFileSync(f, 'utf8').toLowerCase().includes(x))
+    const changed = [...homesBefore].filter(([f, before]) => fs.existsSync(f) && fs.readFileSync(f, 'utf8') !== before && names(f))
+    const added = [...homeFiles(CLAUDE_TEST_HOME), ...homeFiles(CODEX_HOME), ...homeFiles(path.join(copilotDir, 'copilot-home'))].filter((f) => !homesBefore.has(f) && names(f))
     check("no CLI's own settings name the copies folder", !changed.length && !added.length, JSON.stringify({ changed: changed.map(([f]) => f), added }))
   } catch (e) {
     check('no unexpected error', false, e.stack)
