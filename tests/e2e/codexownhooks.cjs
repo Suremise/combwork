@@ -111,7 +111,9 @@ const brief = (r) => (r.error ? r.error : JSON.stringify(r.hooks.map((h) => ({ s
   const developerTexts = (args) => {
     try {
       const items = JSON.parse(execFileSync('codex.exe', [...args, 'debug', 'prompt-input'], { cwd: proj, env: env(), encoding: 'utf8', windowsHide: true, timeout: HUNG_MS }))
-      return (items.find((i) => i.role === 'developer')?.content ?? []).map((c) => (typeof c.text === 'string' ? c.text : ''))
+      // Every developer message's texts in order (#1514: 0.164.0 has a tools item with the developer role first, and its
+      // base instructions in a developer message before the one with developer_instructions), as developerTexts does.
+      return items.filter((i) => i.role === 'developer' && (i.type === undefined || i.type === 'message') && Array.isArray(i.content)).flatMap((i) => i.content.map((c) => (typeof c.text === 'string' ? c.text : '')))
     } catch (e) {
       return { error: String(e.stderr ?? e).slice(0, 200) }
     }
@@ -123,7 +125,10 @@ const brief = (r) => (r.error ? r.error : JSON.stringify(r.hooks.map((h) => ({ s
     if (!Array.isArray(as) || !Array.isArray(cleared)) return { error: as.error ?? cleared.error }
     const same = (a, b) => a.length === b.length && a.every((t, i) => t === b[i])
     if (same(as, cleared)) return ''
-    return as.length === cleared.length + 1 && same(as.slice(1), cleared) ? as[0].trim() : null
+    // One text more, anywhere, the rest the same (#1514: in front in 0.163.0, after the base instructions in 0.164.0).
+    if (as.length !== cleared.length + 1) return null
+    const k = as.findIndex((t, i) => t !== cleared[i])
+    return same([...as.slice(0, k), ...as.slice(k + 1)], cleared) ? as[k].trim() : null
   }
   fs.mkdirSync(path.join(proj, '.codex'), { recursive: true })
   // A layer's file, with developer_instructions missing (undefined), or set to the value given.

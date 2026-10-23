@@ -650,6 +650,12 @@ function set(store: Store, d: Draft, r: DeliveryRecord, to: DeliveryState, detai
   }
   if (to === 'refused' || to === 'expired' || to === 'cancelled' || to === 'uncertain' || to === 'stale') d.after.push(() => log.info(`Delivery ${r.id} for ${userText(r.agentName ?? r.agentId)} ${to}${detail ? `: ${userText(detail)}` : ''}`))
   if ((to === 'received' || to === 'acked') && !r.received) tell(store, d, out, 'received')
+  // Read after the line that rang for it was marked not taken (#1514: Codex took it as queued input, late): that line was
+  // taken, so its mark goes, in the launch it was offered into; a mark of another line's stays (round 1 finding).
+  if ((to === 'received' || to === 'acked') && r.state === 'offered' && r.offerRun) {
+    const run = r.offerRun
+    d.after.push(() => sessions.lineTaken(store.host, r.agentId, run, r.id, `${r.id}, which it rang for, was read`)) // i18n-ignore: for the log
+  }
   else if (to === 'refused' || to === 'expired' || to === 'cancelled' || to === 'stale') tell(store, d, out, 'ended')
   return true
 }
@@ -1551,7 +1557,18 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
     typed = await typeLine(host, agentId, o.line, wanted, {
       need: o.need,
       // A line the user typed into before its CLI took it is theirs (#652 round 1 finding 2): what it named waits again.
-      follow: { confirming: (before) => confirming(store, o, before), lost: () => lost(store), left: () => void unoffer(store, o) }
+      follow: {
+        confirming: (before) => confirming(store, o, before),
+        lost: () => lost(store),
+        left: () => void unoffer(store, o),
+        // Read since (#1514): its CLI took the line, whether or not it told of a prompt (Codex's queued input).
+        read: () => o.ids.some((id) => {
+          const r = byId(store.records, id)
+          return r?.state === 'received' || r?.state === 'acked'
+        }),
+        // Kept with a mark that it wasn't taken: only these deliveries' read clears it (#1514 round 1 finding).
+        ids: o.ids
+      }
     })
   } finally {
     for (const id of o.ids) store.offering.delete(id)

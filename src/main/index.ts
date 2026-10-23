@@ -55,6 +55,7 @@ import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { releaseQueueRunners } from './workflow/queueRunner'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { startSlots, stopSlots } from './slotsApp'
+import { startSlotCards, stopSlotCards } from './slotCards'
 import { startFreshNudges } from './freshStarts'
 import { startCopies, stopCopies } from './copiesApp'
 import { startReviewCopies, stopReviewCopies } from './reviewCopies'
@@ -996,6 +997,8 @@ app.whenReady().then(async () => {
   startQueueHosts()
   // The slot pools (#1429): their idle slots tidied every hour.
   startSlots()
+  // Cards on slots (#1438): a start lends its builder a slot and makes its line there, Done or put back gives it back.
+  startSlotCards()
   // The nudge to start fresh when a project's work has finished (#1437).
   startFreshNudges()
   // Review and check copies (#1435): returning ones looked at again every 30 s, idle ones tidied every hour.
@@ -1134,6 +1137,7 @@ app.on('will-quit', () => {
   stopObserving()
   stopReconciling()
   stopQueueHosts()
+  stopSlotCards()
   stopSlots()
   stopCopies()
   stopReviewCopies()

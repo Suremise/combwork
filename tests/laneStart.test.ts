@@ -25,6 +25,7 @@ vi.mock('../src/main/sessions', () => ({
   }
 }))
 vi.mock('../src/main/deliveries', () => ({
+  deliveriesOf: async () => [],
   launchWith: async (_p: string, nd: { body: string }, start: (line: string) => Promise<unknown>) => ({ record: null, launched: await start(nd.body) })
 }))
 vi.mock('../src/main/lanes', () => ({

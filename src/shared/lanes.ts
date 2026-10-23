@@ -47,6 +47,11 @@ export interface LaneRecord {
   ruleset?: string
   pending?: number[]
   inFlight?: number
+  /**
+   * Started from the window with no slot free (#1438, §16.10.2): its agents start once one is lent to it, with the user's
+   * note in their brief. Kept with the lane (its row's `extra`), so it waits through a restart; cleared once it starts.
+   */
+  slotWait?: { since: string; note: string }
 }
 
 /** At most this many cards in a lane, rounds per card, and minutes of wait (a day, as a card watch's longest). */
@@ -118,7 +123,7 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * name last known). Its current card is the one being worked, and it is paused only while it waits for the user
  * (currentCard); an ended lane without its record has none.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean } | null): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
   const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
@@ -132,7 +137,10 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   // is typed into that agent. Only what already waits for the user says more.
   const deaf = running(rec) && !unrecorded ? [rec.builder, rec.reviewer].find((a): a is LaneAgent => !!a && !!hooksOut?.has(a.id)) : undefined
   const hooks = deaf && !(found && USERS.has(found.reason)) ? { reason: 'hooks' as const, card: current, agent: named(deaf).name } : null
-  const status = running(rec) ? (hooks ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null)) : null
+  // Waiting for a slot (#1438, `slot`: the main side's): lent none yet, so nothing of it can start; only what already
+  // waits for the user, or its hooks, says more.
+  const noSlot = running(rec) && !unrecorded && slot?.waiting && !(found && USERS.has(found.reason)) ? { reason: 'slot' as const, card: current } : null
+  const status = running(rec) ? (hooks ?? noSlot ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null)) : null
   const state: LaneState = rec.state === 'active' && status && PAUSING.has(status.reason) ? 'paused' : rec.state
   return {
     id: rec.id,
@@ -154,7 +162,8 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
     status,
     queued: running(rec) && rec.pending ? [...rec.pending] : null,
     oldRules: laneOldRules(rec, rulesetNow),
-    stages: running(rec) && rec.ruleset && rulesetStages ? [...rulesetStages] : null
+    stages: running(rec) && rec.ruleset && rulesetStages ? [...rulesetStages] : null,
+    slot: running(rec) ? (slot?.slot ?? null) : null
   }
 }
 
@@ -175,7 +184,7 @@ export interface LaneCardFacts {
 }
 
 /** The reasons that pause a lane: it can't go on to its next card until they clear. */
-const PAUSING: ReadonlySet<LaneWaitReason> = new Set(['blocked', 'hold', 'you', 'roundLimit', 'notMerged', 'merging', 'hooks'])
+const PAUSING: ReadonlySet<LaneWaitReason> = new Set(['blocked', 'hold', 'you', 'roundLimit', 'notMerged', 'merging', 'hooks', 'slot'])
 /** The reasons that already wait for the user: they say more than an agent's hooks not arriving (#1336). */
 const USERS: ReadonlySet<LaneWaitReason> = new Set(['blocked', 'hold', 'you', 'roundLimit'])
 
@@ -236,6 +245,8 @@ export function laneStatusText(s: LaneStatus): string {
       return `paused: ${s.agent ?? 'an agent'}'s hooks aren't arriving`
     case 'checkCopy':
       return `waiting for a check copy for ${card}`
+    case 'slot':
+      return 'waiting for a slot'
   }
 }
 
@@ -307,7 +318,8 @@ export function readLane(v: unknown): LaneRecord | null {
     ...(snapshot ? { frozen: snapshot } : {}),
     ...(text(v.ruleset, 128) ? { ruleset: v.ruleset } : {}),
     ...(pending ? { pending } : {}),
-    ...(whole(v.inFlight, 1e9) ? { inFlight: v.inFlight as number } : {})
+    ...(whole(v.inFlight, 1e9) ? { inFlight: v.inFlight as number } : {}),
+    ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000) } } : {})
   }
 }
 
@@ -360,7 +372,7 @@ const cardWord = (c: LaneCard): string => `${cardRef(c.number)} ${COLUMN_WORD[c.
  * #412 Todo; rounds 10, wait 6 h. lane-3fa2".
  */
 export function laneLine(l: LaneInfo): string {
-  const pair = `${l.builder.name} / ${l.reviewer?.name ?? 'no reviewer'} (${l.project})`
+  const pair = `${l.builder.name} / ${l.reviewer?.name ?? 'no reviewer'} (${l.project}${l.slot ? `, in ${l.slot}` : ''})`
   const said = l.status ? `; ${laneStatusText(l.status)}` : ''
   const paused = l.cards.find((c) => c.number === l.pausedOn)
   const why = l.status ? laneStatusText(l.status) : `${l.pausedOn !== null ? cardRef(l.pausedOn) : 'a card'} ${paused?.roundLimit && !paused.blocked ? 'waits for the user at its round limit' : 'is blocked'}`
@@ -399,6 +411,8 @@ export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: s
   if (!r.next) return queued ? `${queued} Nothing else to start: the lane ends by itself once all are Done.` : 'Every card of the lane is Done or past review: nothing to start. The lane ends by itself once all are Done.'
   const card = `${cardRef(r.next.card)} ${r.next.title}`
   const also = r.waits ? ` (${laneStatusText(r.waits)})` : ''
-  if (r.next.carryOn) return `Carry on with ${card}${also}.`
-  return queued ? `${queued} Next: ${card}, once ${r.queue!.length > 1 ? 'they are' : 'it is'} Done.` : `Next: ${card}. Start it.`
+  // Its slot (#1438): where the card is built; Hive makes its line there as it starts.
+  const where = r.lane.slot ? ` in ${r.lane.slot}` : ''
+  if (r.next.carryOn) return `Carry on with ${card}${where}${also}.`
+  return queued ? `${queued} Next: ${card}, once ${r.queue!.length > 1 ? 'they are' : 'it is'} Done.` : `Next: ${card}. Start it${where ? `: it is built${where}, on a new branch Hive makes there` : ''}.`
 }

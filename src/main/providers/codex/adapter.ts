@@ -228,15 +228,18 @@ async function developerInstructionsFromCodex(executable: string, cwd: string, a
 }
 
 /**
- * The developer_instructions in a session's rendered prompt (`as`, its developer message's texts), given the same prompt
- * with them cleared (`cleared`): one text more in front, the rest the same, is the value; the same texts, none (''). Null
- * for anything else (a render missing, or renders Hive can't tell apart).
+ * The developer_instructions in a session's rendered prompt (`as`, its developer messages' texts), given the same prompt
+ * with them cleared (`cleared`): one text more, the rest the same and in the same order, is the value (in front in
+ * 0.163.0; first in the second developer message, after Codex's own base instructions, in 0.164.0); the same texts, none
+ * (''). Null for anything else (a render missing, or renders Hive can't tell apart).
  */
 export function developerInstructionsOf(as: readonly string[] | null, cleared: readonly string[] | null): string | null {
   if (!as || !cleared) return null
   const same = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((t, i) => t === b[i])
   if (same(as, cleared)) return ''
-  return as.length === cleared.length + 1 && same(as.slice(1), cleared) ? as[0].trim() : null
+  if (as.length !== cleared.length + 1) return null
+  const k = as.findIndex((t, i) => t !== cleared[i])
+  return same([...as.slice(0, k), ...as.slice(k + 1)], cleared) ? as[k].trim() : null
 }
 
 /** The texts of the developer message in Codex's rendering of a session's prompt (`codex <args> debug prompt-input`), or null. */
@@ -252,14 +255,25 @@ function promptDeveloper(executable: string, cwd: string, args: string[], env?: 
       clearTimeout(timer)
       if (code !== 0) return resolveP(null)
       try {
-        const items = JSON.parse(out) as { role?: string; content?: { text?: unknown }[] }[]
-        const dev = items.find((x) => x.role === 'developer')
-        resolveP(dev ? (dev.content ?? []).map((c) => (typeof c.text === 'string' ? c.text : '')) : [])
+        resolveP(developerTexts(JSON.parse(out)))
       } catch {
         resolveP(null)
       }
     })
   })
+}
+
+/**
+ * The texts of the developer messages in Codex's rendered prompt items (`debug prompt-input`'s JSON), in order: every
+ * item with the developer role that is a message. 0.164.0 renders its tools first as an item with the developer role too
+ * (`additional_tools`, no content), then its base instructions as a developer message of their own, and the
+ * developer_instructions in the next: read from the first developer item alone, every session's read as none, so Hive's
+ * guidance would have replaced the user's (#1514's real tier, codexownhooks).
+ */
+export function developerTexts(items: unknown): string[] | null {
+  if (!Array.isArray(items)) return null
+  const devs = (items as { type?: unknown; role?: unknown; content?: unknown }[]).filter((x) => x?.role === 'developer' && (x.type === undefined || x.type === 'message') && Array.isArray(x.content))
+  return devs.flatMap((dev) => (dev.content as { text?: unknown }[]).map((c) => (typeof c?.text === 'string' ? c.text : '')))
 }
 
 /** One request to Codex's app server (started for it, in `cwd`, with `args`): its result, or null on an error or after 20 s. */

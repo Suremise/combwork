@@ -338,6 +338,8 @@
   "tips.skillsDelivered.title": "Escolha quais skills os agentes recebem",
   "tips.slotResume.text": "A conversa de um executor fica no slot do cartão dele. Quando o cartão termina, Retomar todos a deixa, para que o slot fique livre para trabalho novo; o próprio Retomar dela pega o slot de volta enquanto nada mais o tiver usado.",
   "tips.slotResume.title": "Uma conversa é retomada onde foi criada",
+  "tips.slots.text": "Com Onde os cartões são feitos em Cada cartão em sua própria pasta, iniciar um cartão empresta ao executor um slot, um worktree pronto, e cria ali o branch do cartão. Uma raia mantém seu slot de cartão em cartão; com todos em uso, espera por um.",
+  "tips.slots.title": "Cada cartão em um branch próprio",
   "tips.sortTables.text": "Clique no cabeçalho de uma coluna nas tabelas do Hive (atalhos, Desempenho, Armazenamento, as Visões gerais) para ordenar por ela, e de novo para inverter a ordem. O Hive lembra a ordenação e as linhas por página de cada tabela.",
   "tips.sortTables.title": "Ordene qualquer tabela",
   "tips.staleMessages.text": "Quando o Assistente repassa algo sobre a rodada atual de um cartão, ele vincula a mensagem a esse cartão: se o cartão for aprovado ou começar outra rodada antes que o agente a leia, o Hive a descarta como obsoleta, para que nenhum agente reabra um cartão aprovado por uma constatação antiga.",

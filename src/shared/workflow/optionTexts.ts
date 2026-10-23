@@ -135,7 +135,7 @@ export const VALUE_TEXT = {
     every: msg({ id: 'workflow.value.okBefore.every', defaultMessage: 'Every card', description: 'A value of the workflow option “Your OK before merging” (glossary 2.6, G10).' })
   },
   folder: {
-    slots: msg({ id: 'workflow.value.folder.slots', defaultMessage: 'Each card in its own folder', description: 'A value of the workflow option “Where cards are built” (glossary 2.6, G11). In this version the folder is the builder’s worktree.' }),
+    slots: msg({ id: 'workflow.value.folder.slots', defaultMessage: 'Each card in its own folder', description: 'A value of the workflow option “Where cards are built” (glossary 2.6, G11). The folder is a slot, a worktree Hive lends to the card or its lane (glossary 2.5: slot).' }),
     project: msg({ id: 'workflow.value.folder.project', defaultMessage: 'Everyone in the project folder', description: 'A value of the workflow option “Where cards are built” (glossary 2.6, G11).' })
   }
 } satisfies Record<string, Record<string, Msg>>

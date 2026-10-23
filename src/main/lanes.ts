@@ -409,7 +409,43 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   const current = recorded.length ? await rulesetsNow(ws) : new Map<string, string>()
   // And their own stages, which a lane under old rules keeps (HR4's #1421 round 1).
   const stagesOf = ws.path ? rulesetStages(ws, recorded) : new Map<string, null>()
-  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null))
+  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null))
+}
+
+/** A running lane's slot, and whether it waits for one (Start Lane… found none free, `slotWait`, and it has none yet). */
+function slotView(ws: WorkspaceService, l: LaneRecord): { slot: string | null; waiting: boolean } {
+  const slot = slotOf ? slotOf(ws, l.id) : null
+  return { slot, waiting: !slot && !!l.slotWait }
+}
+
+/**
+ * A lane's wait for a slot (#1438): set as Start Lane… finds none free (with the user's note for its agents' briefs),
+ * cleared once it has one and its agents start (null). A lane not running is left as it is.
+ */
+export async function setLaneSlotWait(ws: WorkspaceService, id: string, wait: LaneRecord['slotWait'] | null): Promise<void> {
+  await mutate(ws, (lanes) => {
+    const l = lanes.find((x) => x.id === id)
+    if (!l || (wait && !running(l))) return
+    if (wait) l.slotWait = wait
+    else delete l.slotWait
+  })
+}
+
+/** The lanes as kept (#1438's slot passes: their state, cards and builders, without reading the board). */
+export async function rawLanes(ws: WorkspaceService): Promise<LaneRecord[]> {
+  return ws.path ? read(ws) : []
+}
+
+/** The running lanes waiting for a slot, as kept (#1438). */
+export async function lanesWaitingForSlot(ws: WorkspaceService): Promise<LaneRecord[]> {
+  if (!ws.path) return []
+  return (await read(ws)).filter((l) => running(l) && !!l.slotWait)
+}
+
+/** A lane's slot (#1438: slotCards.ts gives it; none, no slots). */
+let slotOf: ((ws: WorkspaceService, lane: string) => string | null) | null = null
+export function setLaneSlots(fn: typeof slotOf): void {
+  slotOf = fn
 }
 
 /** A decision about a lane made on a read its cards have since moved on from (#1270): not saved; the lanes are read again. */

@@ -281,6 +281,12 @@ export async function tidyOpenPools(): Promise<void> {
   }
 }
 
+/** Told when a slot may have come free (its writer drained): slotCards.ts's lanes waiting for a slot try again. */
+let slotFreed: ((ws: WorkspaceService, projectPath: string) => void) | null = null
+export function setSlotFreed(fn: typeof slotFreed): void {
+  slotFreed = fn
+}
+
 /** Starts the hourly tidy (index.ts, once); a workspace closing closes its pools. */
 export function startSlots(): void {
   if (timer) return
@@ -298,7 +304,10 @@ export function startSlots(): void {
     },
     drained: async (projectPath, slot) => {
       const ws = workspaceFor(projectPath)
-      if (ws) await poolFor(ws, projectPath).then((p) => p.drained(slot))
+      if (!ws) return
+      await poolFor(ws, projectPath).then((p) => p.drained(slot))
+      // Free now, perhaps: what waits for a slot may get it (#1438: a lane waiting for one).
+      slotFreed?.(ws, projectPath)
     }
   })
 }

@@ -183,6 +183,9 @@ export const QUEUE_CHECKED_OUT_TARGET = 'hive.queue.checkedOutTarget'
 /** Whether Hive removes a project's idle slots beyond its pool after a day (#1429, SPEC §16.10.2): read by main's slotsApp. */
 export const SLOTS_REMOVE_IDLE = 'hive.slots.removeIdle'
 
+/** Whether a Done card's line is deleted once its target contains it (#1438): read by main's slotCards. */
+export const SLOTS_DELETE_MERGED = 'hive.slots.deleteMergedLines'
+
 /** The longest a slot's setup, install or archive command runs, in minutes (#1429): read by main's slotsApp. */
 export const SLOTS_SETUP_MINUTES = 'hive.slots.setupMinutes'
 
@@ -636,6 +639,19 @@ const SOURCES: readonly AdvancedSource[] = [
       id: 'settings.advanced.hive.slots.removeIdle.desc',
       defaultMessage: "A project keeps as many slots as it has builders. A free slot beyond that, unused for a day, is removed: its archive command runs first, and it is kept if that fails. Hive never removes one with an agent or a process in it, a lease, a merge in flight, or work that isn't committed and merged. Turned off, idle slots stay until you remove them.",
       description: 'What the advanced setting "Remove idle slots after a day" does (Settings → Advanced, under Hive). A slot is a worktree Hive lends to a card or a lane; a lease is one loan of it.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
+  {
+    id: SLOTS_DELETE_MERGED,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.slots.deleteMergedLines.title', defaultMessage: "Delete a card's branch once it's merged", description: "An advanced setting's title (Settings → Advanced), listed under Hive. Each card built in a slot (a worktree Hive lends) gets a branch of its own." }),
+    desc: msg({
+      id: 'settings.advanced.hive.slots.deleteMergedLines.desc',
+      defaultMessage: "Each card built in a slot works on a branch of its own, such as hive/AM/AM-12-fix-the-login. Once the card is Done and its target branch contains the branch's work (a squash merge too), Hive deletes the branch and notes it on the card. A branch with work that isn't merged, or checked out somewhere, is never deleted. Turned off, the branches stay.",
+      description: 'What the advanced setting "Delete a card\'s branch once it\'s merged" does (Settings → Advanced, under Hive). A slot is a worktree Hive lends to a card or a lane. Keep hive/AM/AM-12-fix-the-login as it is (an example branch name).'
     }),
     kind: 'boolean',
     default: true,
