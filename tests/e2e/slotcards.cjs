@@ -48,7 +48,8 @@ const isIn = (rev, ref) => {
     return false
   }
 }
-const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf8').trim().split('\n').filter(Boolean) : [])
+// The slots' installs only (a merge check's install runs the same setup, outside any slot: HIVE_SLOT unset).
+const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf8').trim().split('\n').filter((l) => l.startsWith('slot-')) : [])
 
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, tools]) fs.rmSync(d, { recursive: true, force: true })
