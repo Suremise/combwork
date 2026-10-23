@@ -23,7 +23,10 @@ const form = await import('../src/main/workflow/optionsForm')
 const levels = await import('../src/main/workflow/levels')
 const { workflowFor } = await import('../src/main/workflow/service')
 const { checkOptions } = await import('../src/main/workflow/rulesets')
-const { allOff, contradictions, CONTRADICTION_ROWS, CONTRADICTIONS, FORM_GROUPS, FORM_OPTIONS, formShows, liveContradictions, notOffered, preset, PRESETS, setOption } = await import('../src/shared/workflow/options')
+const { allOff, contradictions, CONTRADICTION_ROWS, CONTRADICTIONS, FORM_GROUPS, FORM_OPTIONS, formShows, liveContradictions, preset, PRESETS, setOption } = await import('../src/shared/workflow/options')
+const { settledSlotsUpToDate, settleSlotsUpToDate, SLOTS_UP_TO_DATE_STEP } = await import('../src/main/workflow/slotsUpToDateStep')
+const { boardValue } = await import('../src/main/boardStore')
+const { slotOptionsOf } = await import('../src/main/slots')
 const { OPTION_TEXT, OPTION_WHY, optionTitle, PRESET_SUMMARY } = await import('../src/shared/workflow/optionTexts')
 const { englishText } = await import('../src/shared/advanced')
 const { cardLabel } = await import('../src/shared/projectKeys')
@@ -78,13 +81,12 @@ describe("P4's and P5's presets (#1278, #1355, §16.19.1)", () => {
     expect(PRESETS.none.map((p) => p.id)).toEqual(['solo', 'pair', 'team'])
   })
 
-  it("Pair is §16.6.3's as P5 offers it: Hive merges with the quick checks on the merged result, in agent worktrees, nothing of a later phase", () => {
+  it("Pair is §16.6.3's at its full values (P7, #1445): Hive merges with the quick checks on the merged result, in slots brought up to date, one reviewer per lane", () => {
     const inputs = { quick: ['typecheck', 'lint'], tests: ['test'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint', test: 'npm test' }, identity: { name: 'Pat', email: 'p@e' } }
     const p = preset('git', 'pair', inputs)
-    expect(p).toMatchObject({ review: 'agent', reviewers: 1, noSelfReview: true, preChecks: ['typecheck', 'lint'], sameness: 'change', finish: 'hiveMerges', style: 'merge', target: 'main', strict: false, mergeChecks: ['typecheck', 'lint'], mergeInstall: 'onManifestChange', okBefore: { mode: 'never' }, folder: 'slots', identity: { name: 'Pat', email: 'p@e' }, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: false })
+    expect(p).toMatchObject({ review: 'agent', reviewers: 1, noSelfReview: true, preChecks: ['typecheck', 'lint'], sameness: 'change', finish: 'hiveMerges', style: 'merge', target: 'main', strict: false, mergeChecks: ['typecheck', 'lint'], mergeInstall: 'onManifestChange', okBefore: { mode: 'never' }, folder: 'slots', identity: { name: 'Pat', email: 'p@e' }, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: true, reviewerMode: 'lane' })
     // Each check it names has its command (§16.13), and nothing more.
     expect(p.commands).toEqual({ typecheck: 'npm run typecheck', lint: 'npm run lint' })
-    expect(notOffered(p)).toEqual([])
     expect(checkOptions('git', { project: p }).problems).toEqual([])
     const r = compile(p)
     expect(r.ok && r.ruleset.guards.integrate).toContain('integrate.checksPassed')
@@ -107,8 +109,7 @@ describe("P4's and P5's presets (#1278, #1355, §16.19.1)", () => {
       okBefore: { mode: 'labels', labels: ['ui', 'release'] },
       commands: { typecheck: 'npm run typecheck', lint: 'npm run lint', test: 'npm test' }
     })
-    expect(t).toMatchObject({ review: 'agent', reviewers: 1, finish: 'hiveMerges', target: 'trunk', strict: false, folder: 'slots', slotsUpToDate: false, identity: { name: 'Pat', email: 'p@e' } })
-    expect(notOffered(t)).toEqual([])
+    expect(t).toMatchObject({ review: 'agent', reviewers: 1, finish: 'hiveMerges', target: 'trunk', strict: false, folder: 'slots', slotsUpToDate: true, reviewerMode: 'lane', identity: { name: 'Pat', email: 'p@e' } })
     expect(checkOptions('git', { project: t }).problems).toEqual([])
     const r = compile(t)
     expect(r.ok && r.ruleset.guards.integrate).toContain('integrate.checksPassed')
@@ -137,8 +138,8 @@ describe("P4's and P5's presets (#1278, #1355, §16.19.1)", () => {
     const p = preset('git', 'pairAgent', { quick: ['typecheck', 'lint'], tests: ['test'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint', test: 'npm test' }, identity: { name: 'Pat', email: 'p@e' } })
     expect(p).toMatchObject({ review: 'agent', reviewers: 1, noSelfReview: true, preChecks: ['typecheck', 'lint'], sameness: 'change', finish: 'agentMerges', style: 'merge', target: '', okBefore: { mode: 'never' }, folder: 'slots', identity: { name: 'Pat', email: 'p@e' }, stopOwnRuns: true, dependenciesDone: true })
     expect(p.commands).toEqual({ typecheck: 'npm run typecheck', lint: 'npm run lint' })
-    // Nothing of a later phase: no Hive merges, merge checks, strict or slots kept up to date.
-    expect(notOffered(p)).toEqual([])
+    // Its slots brought up to date and one reviewer per lane, as Pair's (#1445).
+    expect(p).toMatchObject({ slotsUpToDate: true, reviewerMode: 'lane' })
     expect(checkOptions('git', { project: p }).problems).toEqual([])
   })
 
@@ -160,19 +161,18 @@ describe("P4's and P5's presets (#1278, #1355, §16.19.1)", () => {
 })
 
 describe('checking options for a save (#1278)', () => {
-  it('lists every contradiction, and values this version does not offer only when the project sets them', () => {
+  it('lists every contradiction, G15 with everyone in the project folder among them (#1445)', () => {
     const r = checkOptions('git', { project: { review: 'agent', noSelfReview: false, finish: 'committed', folder: 'slots' } })
     expect(r.problems).toEqual([
       { kind: 'contradiction', id: 'selfReview' },
       { kind: 'contradiction', id: 'committedNeedsFolder' }
     ])
-    // Strict (G8) is offered since #1352; slots kept up to date still wait for a later version.
+    // Strict (G8) is offered since #1352, and G15 since P7 (#1445): every option is now.
     expect(checkOptions('git', { project: { finish: 'hiveMerges', folder: 'slots', strict: true } }).problems).toEqual([])
-    expect(checkOptions('git', { project: { finish: 'hiveMerges', folder: 'slots', slotsUpToDate: true } }).problems).toEqual([
-      { kind: 'notOffered', id: 'later' }
-    ])
-    // The workspace's defaults aren't the project's to answer for.
-    expect(checkOptions('git', { workspace: { git: { slotsUpToDate: true } }, project: { review: 'none' } }).problems).toEqual([])
+    expect(checkOptions('git', { project: { finish: 'hiveMerges', folder: 'slots', slotsUpToDate: true } }).problems).toEqual([])
+    // G15 depends on G11 alone: brought up to date only in a slot, however it was set.
+    expect(checkOptions('git', { project: { slotsUpToDate: true } }).problems).toEqual([{ kind: 'contradiction', id: 'upToDateNeedsSlots' }])
+    expect(checkOptions('git', { project: { slotsUpToDate: false } }).problems).toEqual([])
     expect(checkOptions('git', { project: { colour: 'red' } as never }).problems).toEqual([{ kind: 'bad', why: 'project options: unknown option colour' }])
   })
 
@@ -194,7 +194,6 @@ describe('the Workflow section (#1278)', () => {
     expect(f.inheritedOrigins.target).toBe('platform')
     const pair = f.presets.find((p) => p.id === 'pairAgent')!
     expect(pair.options).toMatchObject({ preChecks: ['typecheck', 'lint'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint' }, identity: { name: 'Pat Builder', email: 'pat@example.com' } })
-    expect(f.presets.filter((p) => p.needs).map((p) => p.id)).toEqual([])
     // Team saves as chosen from the window's presets (#1361).
     const team = f.presets.find((p) => p.id === 'team')!
     expect(team.options).toMatchObject({ mergeChecks: ['typecheck', 'lint', 'test'], mergeInstall: 'always', commands: { test: 'npm test' } })
@@ -318,6 +317,7 @@ describe("the Version Control tab's Workflow section (#1418)", () => {
       selfReview: { ...allOff('git'), review: 'agent', noSelfReview: false },
       quorumNeedsAgent: { ...allOff('git'), reviewers: 2 },
       poolNeedsAgent: { ...allOff('git'), reviewerMode: 'pool' },
+      upToDateNeedsSlots: { ...allOff('git'), slotsUpToDate: true },
       mergeNeedsSlots: { ...allOff('git'), finish: 'hiveMerges', folder: 'project' },
       committedNeedsFolder: { ...allOff('git'), finish: 'committed', folder: 'slots' },
       okWithReview: { ...allOff('git'), review: 'you', okBefore: { mode: 'every', labels: [] } },
@@ -635,5 +635,96 @@ describe("Hive's level reaches every open workspace: its warning names each proj
     const of = (name: string) => check.projects.find((p) => p.name === name)
     expect(of('alpha')).toMatchObject({ workspace: { path: a.w.path }, inFlight: [{ number: 1, key: started[0].key, title: "alpha's work" }] })
     expect(of('beta')).toMatchObject({ workspace: { path: b.w.path }, inFlight: [{ number: 1, key: started[1].key, title: "beta's work" }] })
+  })
+})
+
+describe('G15 and G17 in the form (#1445)', () => {
+  it('has a row for every option of §16.6.1 and §16.6.2, G15 and G17 among them, each with its words', () => {
+    const gitRows = FORM_GROUPS.git.flatMap((g) => g.options)
+    for (const key of ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'preChecks', 'sameness', 'finish', 'style', 'target', 'strict', 'mergeChecks', 'mergeInstall', 'okBefore', 'folder', 'slotsUpToDate', 'identity', 'stopOwnRuns', 'dependenciesDone', 'sharedFolderWarning', 'stageNames'] as const) {
+      expect(gitRows, key).toContain(key)
+      expect(OPTION_TEXT[key], key).toBeDefined()
+    }
+    expect(FORM_GROUPS.git.find((g) => g.id === 'review')!.options).toEqual(expect.arrayContaining(['reviewers', 'reviewerMode']))
+    expect(FORM_GROUPS.git.find((g) => g.id === 'where')!.options).toContain('slotsUpToDate')
+    // None has neither (§16.6.2: None has no G11 or G15; G17 is Git's).
+    expect(FORM_GROUPS.none.flatMap((g) => g.options)).not.toEqual(expect.arrayContaining(['slotsUpToDate']))
+    expect(FORM_GROUPS.none.flatMap((g) => g.options)).not.toContain('reviewerMode')
+    expect(englishText(OPTION_TEXT.slotsUpToDate!.title)).toBe('Slots are brought up to date before each card')
+    expect(englishText(OPTION_TEXT.folder!.desc)).toMatch(/slot Hive lends to the card or its lane/)
+    expect(OPTION_WHY.slotsUpToDate).toBeDefined()
+    expect(OPTION_WHY.reviewerMode).toBeDefined()
+  })
+
+  it('shows G15 only with slots, and G17 whenever a reviewer agent reviews, whatever G11 is', () => {
+    const off = allOff('git')
+    expect(formShows('slotsUpToDate', { ...off, folder: 'slots' })).toBe(true)
+    expect(formShows('slotsUpToDate', { ...off, folder: 'project' })).toBe(false)
+    expect(formShows('reviewerMode', { ...off, review: 'agent', noSelfReview: true, folder: 'project' })).toBe(true)
+    expect(formShows('reviewerMode', { ...off, review: 'agentThenYou', noSelfReview: true, folder: 'slots' })).toBe(true)
+    expect(formShows('reviewerMode', { ...off, review: 'you' })).toBe(false)
+    expect(formShows('reviewerMode', off)).toBe(false)
+    // A shared pool with everyone in the project folder saves (the pool's reviewers read in review copies, #1439).
+    expect(checkOptions('git', { project: { review: 'agent', noSelfReview: true, reviewerMode: 'pool', folder: 'project' } }).problems).toEqual([])
+    // Everyone in the project folder hides G15, so choosing it turns G15 off (never left On out of sight).
+    const pair = preset('git', 'pair')
+    expect(setOption({}, pair, 'folder', 'project')).toEqual({ folder: 'project', slotsUpToDate: false })
+    expect(setOption({}, { ...pair, slotsUpToDate: false }, 'folder', 'project')).toEqual({ folder: 'project' })
+    expect(setOption({}, pair, 'folder', 'slots')).toEqual({ folder: 'slots' })
+    // With no reviewer agent, a pool contradicts.
+    expect(checkOptions('git', { project: { reviewerMode: 'pool' } }).problems).toEqual([{ kind: 'contradiction', id: 'poolNeedsAgent' }])
+  })
+
+  it('sets G1b and G17 independently, and saves both', async () => {
+    const { w, repo } = await workspace({})
+    const saved = await form.setWorkflowOptions(w, repo, { preset: null, options: { review: 'agent', noSelfReview: true, reviewers: 2, reviewerMode: 'pool', folder: 'slots', finish: 'hiveMerges' } })
+    expect(saved.own).toMatchObject({ reviewers: 2, reviewerMode: 'pool' })
+    expect((await w.projectConfig(repo)).workflow?.options).toMatchObject({ reviewers: 2, reviewerMode: 'pool' })
+    const one = await form.setWorkflowOptions(w, repo, { preset: null, options: { ...saved.own, reviewers: 1 } })
+    expect(one.own).toMatchObject({ reviewers: 1, reviewerMode: 'pool' })
+    const lane = await form.setWorkflowOptions(w, repo, { preset: null, options: { ...one.own, reviewerMode: 'lane', reviewers: 2 } })
+    expect(lane.own).toMatchObject({ reviewers: 2, reviewerMode: 'lane' })
+  })
+
+  it("the scripts' origins: a slot's setup, archive and copied files fall back to Agents & Worktrees' (before 1.0's), else none", () => {
+    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: '.env*' }, 'global')).toEqual({ setup: 'npm install', archive: '', copy: '.env*' })
+    expect(slotOptionsOf({ worktreeSetup: '', worktreeCopy: null }, '.env')).toEqual({ setup: '', archive: '', copy: '.env' })
+    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: '.env*', slots: { setup: 'npm ci', archive: 'node done.js', copy: 'a.json' } }, 'global')).toEqual({ setup: 'npm ci', archive: 'node done.js', copy: 'a.json' })
+  })
+})
+
+describe("G15 saved before P7: the one-time step (#1445)", () => {
+  it("a preset's project takes its preset's value, one with none drops it; kept options too; G1b untouched", () => {
+    const pair = settledSlotsUpToDate({ platform: 'git', preset: 'pair', options: { ...preset('git', 'pair'), slotsUpToDate: false, reviewers: 2 } })
+    expect(pair?.options).toMatchObject({ slotsUpToDate: true, reviewers: 2 })
+    const team = settledSlotsUpToDate({ platform: 'git', preset: 'team', options: { slotsUpToDate: false } })
+    expect(team?.options).toEqual({ slotsUpToDate: true })
+    // Solo's own value is Off already: nothing to change.
+    expect(settledSlotsUpToDate({ platform: 'git', preset: 'solo', options: { slotsUpToDate: false } })).toBeNull()
+    const custom = settledSlotsUpToDate({ platform: 'git', preset: null, options: { slotsUpToDate: false, review: 'agent', noSelfReview: true } })
+    expect(custom?.options).toEqual({ review: 'agent', noSelfReview: true })
+    expect(settledSlotsUpToDate({ platform: 'git', preset: null, options: { review: 'none' } })).toBeNull()
+    // Another platform's kept options (#1419), and every other field kept (#1417's writeWorkflow).
+    const kept = settledSlotsUpToDate({ platform: 'none', preset: 'solo', options: {}, presetAsked: 'chosen', kept: { git: { preset: 'pair', options: { slotsUpToDate: false }, presetAsked: 'chosen' } } })
+    expect(kept).toMatchObject({ platform: 'none', presetAsked: 'chosen', kept: { git: { preset: 'pair', options: { slotsUpToDate: true }, presetAsked: 'chosen' } } })
+  })
+
+  it('runs once over the workspace (run twice), a value stored after it is kept, and a Pair project reads as Pair, not Custom', async () => {
+    const { w, repo } = await workspace({})
+    // As a pre-P7 build saved Pair: the preset whole, G15 Off.
+    const { platform: _p, ...pairOptions } = (await form.workflowForm(w, repo)).presets.find((x) => x.id === 'pair')!.options
+    await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow, platform: 'git', preset: 'pair', options: { ...pairOptions, slotsUpToDate: false, reviewers: 1 } } }))
+    expect(await settleSlotsUpToDate(w)).toBe(1)
+    expect(boardValue(w, SLOTS_UP_TO_DATE_STEP)).not.toBeNull()
+    const after = (await w.projectConfig(repo)).workflow!
+    expect(after.options).toMatchObject({ slotsUpToDate: true, reviewers: 1 })
+    const f = await form.workflowForm(w, repo)
+    expect(f.preset).toBe('pair')
+    const pairNow = f.presets.find((p) => p.id === 'pair')!.options
+    expect(FORM_OPTIONS.git.filter((k) => JSON.stringify(f.options[k]) !== JSON.stringify(pairNow[k]))).toEqual([])
+    // The user turns it off afterwards: their choice, kept by a second run.
+    await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, slotsUpToDate: false } } }))
+    expect(await settleSlotsUpToDate(w)).toBe(0)
+    expect((await w.projectConfig(repo)).workflow!.options.slotsUpToDate).toBe(false)
   })
 })

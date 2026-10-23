@@ -338,6 +338,8 @@
   "tips.silentUnknown.title": "Um agente em silêncio, com estado desconhecido",
   "tips.skillsDelivered.text": "O interruptor ao lado de cada skill do Hive, na visualização Skills ou na aba Skills de um projeto, diz se os agentes a recebem (Entregue aos agentes). As cópias que o Hive coloca numa pasta para o Codex e o Copilot são removidas quando nenhum agente trabalha mais lá, como diz Configurações → Avançado.",
   "tips.skillsDelivered.title": "Escolha quais skills os agentes recebem",
+  "tips.slotOptions.text": "Controle de versão → Fluxo de trabalho → Slots e cópias reúne o script executado num slot novo, os arquivos copiados para ele, os slots em uso e quantas cópias de revisão o projeto mantém. Tudo é salvo conforme você muda.",
+  "tips.slotOptions.title": "Configure os slots no Controle de versão",
   "tips.slotResume.text": "A conversa de um executor fica no slot do cartão dele. Quando o cartão termina, Retomar todos a deixa, para que o slot fique livre para trabalho novo; o próprio Retomar dela pega o slot de volta enquanto nada mais o tiver usado.",
   "tips.slotResume.title": "Uma conversa é retomada onde foi criada",
   "tips.slots.text": "Com Onde os cartões são feitos em Cada cartão em sua própria pasta, iniciar um cartão empresta ao executor um slot, um worktree pronto, e cria ali o branch do cartão. Uma raia mantém seu slot de cartão em cartão; com todos em uso, espera por um.",

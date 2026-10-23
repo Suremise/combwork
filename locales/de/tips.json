@@ -338,6 +338,8 @@
   "tips.silentUnknown.title": "Ein stiller Agent mit unbekanntem Zustand",
   "tips.skillsDelivered.text": "Der Schalter neben jedem Skill von Hive, in der Skills-Ansicht oder im Skills-Tab eines Projekts, sagt, ob die Agenten ihn bekommen (An Agenten ausgeliefert). Kopien, die Hive für Codex und Copilot in einen Ordner legt, werden entfernt, sobald dort kein Agent mehr arbeitet, wie es Einstellungen → Erweitert sagt.",
   "tips.skillsDelivered.title": "Wähle, welche Skills Agenten bekommen",
+  "tips.slotOptions.text": "Versionsverwaltung → Workflow → Slots und Kopien enthält das Skript, das in einem neuen Slot läuft, die hineinkopierten Dateien, die belegten Slots und wie viele Review-Kopien das Projekt hält. Es wird gespeichert, während du änderst.",
+  "tips.slotOptions.title": "Slots in der Versionsverwaltung einrichten",
   "tips.slotResume.text": "Die Unterhaltung eines Bearbeiters bleibt im Slot seiner Karte. Ist die Karte beendet, lässt „Alle fortsetzen“ sie aus, damit der Slot für neue Arbeit frei bleibt; ihr eigenes „Fortsetzen“ holt den Slot zurück, solange nichts anderes ihn benutzt hat.",
   "tips.slotResume.title": "Eine Unterhaltung wird dort fortgesetzt, wo sie entstand",
   "tips.slots.text": "Steht „Wo Karten bearbeitet werden“ auf „Jede Karte in ihrem eigenen Ordner“, leiht das Starten einer Karte ihrem Bearbeiter einen Slot, einen fertigen Worktree, und legt dort den Branch der Karte an. Eine Lane behält ihren Slot von Karte zu Karte; sind alle Slots belegt, wartet sie.",

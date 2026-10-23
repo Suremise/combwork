@@ -1737,7 +1737,7 @@ afterwards makes it **Custom** (the header says which preset it started from). T
 | G12 identity | Off | On | On | #809. |
 | G13 stop own runs | Off | On | On | |
 | G14 deps merged | On | On | On | Cheap, prevents building on unmerged work. |
-| G15 slots up to date | — | On | On | **Built [#1355]:** Off until slots (P7): agent worktrees stand in, and the form doesn't offer G15 yet. |
+| G15 slots up to date | — | On | On | **Built [#1445]:** On in Pair, Team and Pair (the agent merges) since P7 (#1355 had it Off while agent worktrees stood in); a value saved before P7 is settled once (§16.6.6). |
 | G16 shared-folder warning | On | — | — | Only matters in a shared folder. |
 | G17 reviewers | — | One per lane | One per lane | A pool is the 6+pool template's choice (§16.10.6). |
 
@@ -1857,6 +1857,41 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
     was read with (`WorkflowChange.base`), compared under the lock (`WorkflowStale`, "changed meanwhile"), and the
     section reloads. It reloads on `workflow-changed` too while nothing in it is unsaved. Every save goes through
     `writeWorkflow`, so `kept`, `presetAsked` and any other field of `workflow` stay.
+- **Built [#1445], G11, G15, G17 and Slots and copies in the tab (P7):**
+  - **G11** *Each card in its own folder* means slots: its description says a slot is lent per card or lane, with a branch
+    per card. "The builder's worktree" is gone; while agents hold carried leases (#1441) the row adds *Agents' old
+    worktrees finish their current work first: HI-B1, HI-B2. Then they work in slots too.*
+  - **G15** *Slots are brought up to date before each card* is offered (On / Off, its description the install
+    sentence), shown only with G11 = slots (`formShows`). With G11 = project folder, On is the contradiction
+    `upToDateNeedsSlots`, under both rows. **Nothing is "not offered" any more**: `NOT_OFFERED`, `notOffered` and the
+    `notOffered` problem kind are removed, and so are `PresetNeeds` and its text.
+  - **G17** *Reviewers* (One per lane · A shared pool; #1443's `reviewerMode`, never G1b's `reviewers`) sits under
+    Review beside G1b, shown whenever G1 has a reviewer agent, whatever G11 is (with everyone in the project folder the
+    pool's reviewers read in review copies, #1439). Reviewing agents whose provider lacks `extraDirs` are named under it:
+    they review the builder's folder read-only. A pool with no reviewer agent stays #1443's `poolNeedsAgent`.
+  - **Presets at their full values (§16.6.3):** Pair, Team and Pair (the agent merges) set G15 On and G17 One per lane;
+    every preset is offered (`PRESETS` has no `needs`); Team keeps #1361's focused-tests note (#1367). The presets' whys
+    have G15's and G17's lines (`OPTION_WHY`); G11's is as before. The settings tool has `project.workflow.slotsUpToDate`.
+  - **Saved options from before P7** (`src/main/workflow/slotsUpToDateStep.ts`): a pre-P7 build stored G15 only as its
+    forced Off. A one-time step after the upgrade's adoption (a `board_meta` mark,
+    `workflow.slotsUpToDateFromBeforeP7`, set once every project is done; safe to repeat, each project changed under its
+    lock through `writeWorkflow`) settles each project's stored value, and its kept options' (#1419): a project whose
+    options started from a preset takes that preset's value (On for Pair and Team), one with none drops it and inherits.
+    The card asked for a plain drop; but a preset isn't a resolution level (a project stores its preset's options
+    whole), so a dropped value would inherit Off and turn Pair Custom. After the mark, a stored value is the user's and
+    is kept; G1b's `reviewers` is never touched.
+  - **Slots and copies** (`SlotsAndCopies.tsx`), a group of the Workflow section after Where cards are built, Git
+    projects only (not the levels' defaults). Its settings aren't workflow options: project.json's `slots` and `copies`,
+    each saved as it is changed (`project:updateConfig`), not with Save…. With G11 = slots: **Setup script** and
+    **Archive script** (#1429's `slots.setup` / `slots.archive`; unset, the setup shows the old `worktreeSetup` as its
+    origin), **Files copied into new slots** (`slots.copy`, unset showing `worktreeCopy` or Hive's), and **Slots in use
+    and ready**, read-only (`slots:list`: name, state, lent to whom for which card or lane, or a carried worktree),
+    linking to Branches & remotes. With any G11: **Review and check copies** (`copies.size`; empty keeps OP-32's default,
+    shown) with how many there are and are leased (`copies:list`), and **Reviewers review in review copies**
+    (#1435's switch, read-only here, with a link to Advanced).
+  - **Project Settings → Agents & Worktrees:** the setup command and copied files rows become one line, **Slots and
+    copies**, with **Open Version Control**; their catalog rows stay, hidden, for `hive_update_setting`. Settings →
+    Agents & Worktrees' (Hive-wide) **Copy into new worktrees** stays: it is the default a slot's copied files fall back to.
 - **Built [#1278], P4's plain form** (§16.19), until the Version Control tab replaces it (since #1416 it is the tab's
   Workflow section, and Project Settings → Workflow links to it; #1418 rewrote it as above):
   - **Project Settings → Workflow** shows the version control (detected, read-only), a preset choice and a row per

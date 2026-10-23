@@ -35,6 +35,10 @@
     "defaultMessage": "This project is inside a larger repository: name the branch its work merges into.",
     "description": "Why workflow options cannot be saved (OP-29): Hive or the agent merges, but the project is a subfolder of a bigger Git repository and its own options name no target branch (merges would affect the whole repository)."
   },
+  "workflow.contradiction.upToDateNeedsSlots": {
+    "defaultMessage": "Slots are brought up to date only when each card has its own folder.",
+    "description": "Why workflow options cannot be saved: “Slots are brought up to date before each card” (G15) was set while everyone works in the project folder (glossary 2.5: slot)."
+  },
   "workflow.forYou.decidedAfterMerge": {
     "defaultMessage": "{card} was decided after it merged: does it need a follow-up?",
     "description": "A For you request (Decide): a decision was recorded on the card while its work was being merged, so the merged work didn't see it. {card} is a card key like AM-12."
@@ -110,6 +114,10 @@
   "workflow.form.cantSave": {
     "defaultMessage": "These options can’t be saved:",
     "description": "Above the reasons the workflow options can’t be saved, each a sentence of its own."
+  },
+  "workflow.form.carried": {
+    "defaultMessage": "Agents’ old worktrees finish their current work first: {agents}. Then they work in slots too.",
+    "description": "Under “Where cards are built” (G11) while agents still hold their worktrees from before 1.0 (#1441), kept until their current card or lane ends. {agents} is a list of agent names (glossary 2.5: slot)."
   },
   "workflow.form.changeLine": {
     "defaultMessage": "{option}: {from} → {to}",
@@ -415,6 +423,10 @@
     "defaultMessage": "Now: {value}",
     "description": "In a preset’s preview, beside an option it changes: its value in the form now."
   },
+  "workflow.form.readOnly": {
+    "defaultMessage": "{agents} can’t be given review copies by their coding agent, so they review the builder’s folder read-only.",
+    "description": "Under “Reviewers” (G17) when some reviewing agents use a coding agent that Hive can’t give review copies (folders at the exact revision, glossary 2.5: review copy). {agents} is a list of agent names."
+  },
   "workflow.form.removeCheck": {
     "defaultMessage": "Remove",
     "description": "The tooltip of the button removing a check from “Checks pass before review”."
@@ -443,17 +455,9 @@
     "defaultMessage": "Custom, started from {preset}",
     "description": "Project Settings → Workflow: the options were changed after a preset was chosen. {preset} is its name."
   },
-  "workflow.form.unavailable": {
-    "defaultMessage": "{preset}: {why}",
-    "description": "A preset that can’t be chosen yet, under the preset choice. {preset} is its name, {why} a whole sentence saying why."
-  },
   "workflow.form.use": {
     "defaultMessage": "Use {preset}",
     "description": "A button in a preset’s preview: fills the form with it (saved only with Save…). {preset} is its name."
-  },
-  "workflow.form.worktree": {
-    "defaultMessage": "In this version, a card’s own folder is its builder’s worktree.",
-    "description": "Under “Where cards are built” in Project Settings → Workflow."
   },
   "workflow.group.checks": {
     "defaultMessage": "Checks",
@@ -531,10 +535,6 @@
     "defaultMessage": "Verdict",
     "description": "A move on a card, named in a refused move: a reviewer passing or failing it (glossary 2.3: verdict)."
   },
-  "workflow.notOffered.later": {
-    "defaultMessage": "Some of these options aren’t available in this version yet: leave them as they are.",
-    "description": "Why workflow options cannot be saved: an option set (up to date before merging, slots kept up to date) comes in a later version of Hive."
-  },
   "workflow.option.commands.desc": {
     "defaultMessage": "The command each named check runs. A run counts as the check only when it runs that command.",
     "description": "What the workflow setting “Check commands” does."
@@ -572,8 +572,8 @@
     "description": "A workflow option (glossary 2.6, G5)."
   },
   "workflow.option.folder.desc": {
-    "defaultMessage": "In its own folder, a card is built apart from other agents’ work; in the project folder, everyone sees each other’s unfinished changes.",
-    "description": "What the workflow option “Where cards are built” does."
+    "defaultMessage": "In its own folder, a slot Hive lends to the card or its lane, each card is built on a branch of its own, apart from other agents’ work; in the project folder, everyone sees each other’s unfinished changes.",
+    "description": "What the workflow option “Where cards are built” does (glossary 2.5: slot, a worktree Hive lends to a card or a lane)."
   },
   "workflow.option.folder.title": {
     "defaultMessage": "Where cards are built",
@@ -675,6 +675,14 @@
     "defaultMessage": "Warn when a commit includes another agent’s files",
     "description": "A workflow option (glossary 2.6, G16)."
   },
+  "workflow.option.slotsUpToDate.desc": {
+    "defaultMessage": "Before a card starts in a slot, the slot is brought to the latest work of the target branch, and its dependencies are installed again when the lock file changed.",
+    "description": "What the workflow option “Slots are brought up to date before each card” does (glossary 2.5: slot; lock file, as in the G15 value)."
+  },
+  "workflow.option.slotsUpToDate.title": {
+    "defaultMessage": "Slots are brought up to date before each card",
+    "description": "A workflow option (glossary 2.6, G15; glossary 2.5: slot): before a card starts in a slot, the slot is brought to the target branch’s latest work."
+  },
   "workflow.option.stageNames.desc": {
     "defaultMessage": "Rename any stage the board shows: a name changes no rule and applies at once.",
     "description": "What the workflow option “Stage names” does (glossary 2.2: stage)."
@@ -718,10 +726,6 @@
   "workflow.preset.custom": {
     "defaultMessage": "Custom",
     "description": "The workflow preset shown when the options no longer match a preset (glossary 2.1)."
-  },
-  "workflow.preset.needs.slots": {
-    "defaultMessage": "Needs a folder of its own for every card, which comes in a later version.",
-    "description": "Why a workflow preset can’t be chosen yet."
   },
   "workflow.preset.note.team": {
     "defaultMessage": "Team checks the merged result with the quick checks and the unit tests. Running each card’s own focused tests there too comes in a later version.",
@@ -1343,6 +1347,142 @@
     "defaultMessage": "A verdict follows a review",
     "description": "A rule of the workflow, named where a move skips or can't check it: a reviewer starts a review before giving a verdict (glossary 2.3: verdict)."
   },
+  "workflow.slots.archive": {
+    "defaultMessage": "Archive script",
+    "description": "A setting under “Slots and copies”: the command Hive runs in a slot before removing it."
+  },
+  "workflow.slots.archiveDesc": {
+    "defaultMessage": "Runs in a slot before Hive removes it. If it fails, the slot is kept.",
+    "description": "What the setting “Archive script” does (glossary 2.5: slot)."
+  },
+  "workflow.slots.branches": {
+    "defaultMessage": "Branches & remotes",
+    "description": "A link from “Slots in use and ready” to the Version Control tab’s Branches & remotes section, where each slot’s line is (its name as translated there)."
+  },
+  "workflow.slots.carried": {
+    "defaultMessage": "{agent}’s old worktree, finishing its current work",
+    "description": "What a slot holds, in the list under “Slots and copies”: an agent’s worktree from before 1.0, kept for it until its current card or lane ends (#1441). {agent} is its name."
+  },
+  "workflow.slots.copiesDefault": {
+    "defaultMessage": "{n, number} (the default)",
+    "description": "The placeholder of the setting “Review and check copies” while it isn’t set: the number Hive keeps."
+  },
+  "workflow.slots.copiesNow": {
+    "defaultMessage": "{n, plural, =0 {No copies yet.} one {# copy now, {leased, number} in use.} other {# copies now, {leased, number} in use.}}",
+    "description": "Under the setting “Review and check copies”: how many copies the project has now, and how many are leased."
+  },
+  "workflow.slots.copiesSize": {
+    "defaultMessage": "Review and check copies",
+    "description": "A setting under “Slots and copies”: how many review and check copies the project keeps (glossary 2.5: review copy)."
+  },
+  "workflow.slots.copiesSizeDesc": {
+    "defaultMessage": "How many copies the project keeps, each at exactly one revision, for reviewers and isolated checks. Empty keeps the larger of two and its reviewers plus one. They use the setup script.",
+    "description": "What the setting “Review and check copies” does (glossary 2.5: review copy; isolated checks: hive-progress --check --isolated)."
+  },
+  "workflow.slots.copy": {
+    "defaultMessage": "Files copied into new slots",
+    "description": "A setting under “Slots and copies”: the git-ignored files copied from the project folder into each new slot."
+  },
+  "workflow.slots.copyDesc": {
+    "defaultMessage": "Git-ignored files copied from the project folder into each new slot, one pattern per line, such as .env files.",
+    "description": "What the setting “Files copied into new slots” does (glossary 2.5: slot)."
+  },
+  "workflow.slots.desc": {
+    "defaultMessage": "These are saved as you change them, apart from the options above.",
+    "description": "Under the heading “Slots and copies”: its settings save at once, unlike the workflow options, which are saved with Save…."
+  },
+  "workflow.slots.fromCopy": {
+    "defaultMessage": "From Agents & Worktrees’ files to copy",
+    "description": "Where the setting “Files copied into new slots” comes from while it isn’t set: Agents & Worktrees’ list of files to copy into new worktrees (its name as translated there)."
+  },
+  "workflow.slots.fromSetup": {
+    "defaultMessage": "From Agents & Worktrees’ setup command",
+    "description": "Where the setting “Setup script” comes from while it isn’t set: the project’s setup command of Project Settings → Agents & Worktrees (its name as translated there)."
+  },
+  "workflow.slots.heading": {
+    "defaultMessage": "Slots and copies",
+    "description": "A heading of the Version Control tab’s Workflow section (Git): the project’s slots (worktrees Hive lends to cards and lanes) and its review and check copies (glossary 2.5: slot, review copy)."
+  },
+  "workflow.slots.inUse": {
+    "defaultMessage": "Slots in use and ready",
+    "description": "A read-only list under “Slots and copies”: the project’s slots, what each is lent to, and those ready (glossary 2.5: slot)."
+  },
+  "workflow.slots.lentCard": {
+    "defaultMessage": "{agent}, for {card}",
+    "description": "What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for the card {card} (its key, HI-12)."
+  },
+  "workflow.slots.lentLane": {
+    "defaultMessage": "{agent}, for a lane",
+    "description": "What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for its lane (glossary: lane)."
+  },
+  "workflow.slots.noSlots": {
+    "defaultMessage": "No slots yet: one is made when a card starts.",
+    "description": "Under “Slots in use and ready” when the project has no slot yet."
+  },
+  "workflow.slots.none": {
+    "defaultMessage": "None",
+    "description": "A slot script that isn’t set: nothing runs."
+  },
+  "workflow.slots.off": {
+    "defaultMessage": "Off",
+    "description": "A setting’s value: off."
+  },
+  "workflow.slots.on": {
+    "defaultMessage": "On",
+    "description": "A setting’s value: on."
+  },
+  "workflow.slots.openAdvanced": {
+    "defaultMessage": "Open Advanced",
+    "description": "A button beside “Reviewers review in review copies”: opens Settings → Advanced."
+  },
+  "workflow.slots.reviewCopies": {
+    "defaultMessage": "Reviewers review in review copies",
+    "description": "A read-only row under “Slots and copies”: the setting of Settings → Advanced with this name (as translated there)."
+  },
+  "workflow.slots.reviewCopiesDesc": {
+    "defaultMessage": "Set in Settings → Advanced, for every project.",
+    "description": "Under the row “Reviewers review in review copies” of “Slots and copies”: where it is changed."
+  },
+  "workflow.slots.saveFailed": {
+    "defaultMessage": "Couldn’t save the slot settings",
+    "description": "An error saving a setting under “Slots and copies”."
+  },
+  "workflow.slots.setHere": {
+    "defaultMessage": "Set for this project",
+    "description": "Where a slot setting’s value comes from: set in this project."
+  },
+  "workflow.slots.setup": {
+    "defaultMessage": "Setup script",
+    "description": "A setting under “Slots and copies”: the command Hive runs in a new slot, and again when its lock files change (glossary 2.5: slot)."
+  },
+  "workflow.slots.setupDesc": {
+    "defaultMessage": "Runs in a new slot, and again in a slot whose lock files changed since its last install, e.g. npm ci. Review and check copies run it too.",
+    "description": "What the setting “Setup script” does (glossary 2.5: slot, review copy; lock file)."
+  },
+  "workflow.slots.state.creating": {
+    "defaultMessage": "Being set up",
+    "description": "A slot’s state in the list under “Slots and copies”."
+  },
+  "workflow.slots.state.dirty": {
+    "defaultMessage": "Has changes left in it",
+    "description": "A slot’s state in the list under “Slots and copies”: it has uncommitted or untracked files, so it isn’t lent until clean."
+  },
+  "workflow.slots.state.gone": {
+    "defaultMessage": "Folder missing",
+    "description": "A slot’s state in the list under “Slots and copies”: its folder is gone (Hive recreates it)."
+  },
+  "workflow.slots.state.lent": {
+    "defaultMessage": "In use",
+    "description": "A slot’s state in the list under “Slots and copies”: lent to a card or a lane."
+  },
+  "workflow.slots.state.ready": {
+    "defaultMessage": "Ready",
+    "description": "A slot’s state in the list under “Slots and copies”: free, set up."
+  },
+  "workflow.slots.state.removing": {
+    "defaultMessage": "Being removed",
+    "description": "A slot’s state in the list under “Slots and copies”."
+  },
   "workflow.stage.active": {
     "defaultMessage": "Active",
     "description": "A stage of the board (glossary 2.2: Active, was Doing): cards being worked on."
@@ -1675,6 +1815,10 @@
     "defaultMessage": "A pair exists to review: a second agent catches what the builder missed, while working solo you read the card’s work yourself.",
     "description": "Why the presets set “Work is reviewed before it’s merged” as they do (Solo: no review; Pair and Team: a reviewer agent)."
   },
+  "workflow.why.reviewerMode": {
+    "defaultMessage": "One reviewer per lane keeps the work with a reviewer who has seen its earlier rounds; a shared pool suits a large team.",
+    "description": "Why Pair and Team set “Reviewers” to One per lane (glossary 2.6, G17; glossary: lane, pool)."
+  },
   "workflow.why.reviewers": {
     "defaultMessage": "One reviewer is enough for most work; a second doubles the cost.",
     "description": "Why the presets set “Reviewers per card” to 1."
@@ -1686,6 +1830,10 @@
   "workflow.why.sharedFolderWarning": {
     "defaultMessage": "In a shared folder, one agent’s commit can take in another’s half-done files.",
     "description": "Why Solo turns on “Warn when a commit includes another agent’s files”."
+  },
+  "workflow.why.slotsUpToDate": {
+    "defaultMessage": "Each card starts from the latest work, so no card is built on an old copy of the target branch.",
+    "description": "Why Pair and Team turn on “Slots are brought up to date before each card” (glossary 2.5: slot)."
   },
   "workflow.why.stopOwnRuns": {
     "defaultMessage": "A run left going would keep changing or testing the work under review.",

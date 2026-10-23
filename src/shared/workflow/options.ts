@@ -98,17 +98,8 @@ export const NAME_OPTIONS: readonly OptionKey[] = ['stageNames']
  */
 export type PresetId = 'solo' | 'pair' | 'team' | 'pairAgent'
 
-/**
- * Why a preset isn't offered yet: the piece it needs comes in a later version (§16.19.1). None does since P5 (#1361:
- * Team on agent worktrees); kept for a preset a later phase adds.
- */
-export type PresetNeeds = 'slots'
-
-/**
- * The presets the form offers for a platform, in order, and those it shows unavailable with why (§16.19.1: no RC's preset
- * needs a later phase; shown, not hidden, so the choice reads as P6's will).
- */
-export const PRESETS: Record<PlatformId, { id: PresetId; needs?: PresetNeeds }[]> = {
+/** The presets the form offers for a platform, in order (every one since P7: #1445). */
+export const PRESETS: Record<PlatformId, { id: PresetId }[]> = {
   git: [{ id: 'solo' }, { id: 'pairAgent' }, { id: 'pair' }, { id: 'team' }],
   none: [{ id: 'solo' }, { id: 'pair' }, { id: 'team' }]
 }
@@ -191,11 +182,13 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
       identity: checks.identity ?? null,
       stopOwnRuns: true,
       dependenciesDone: true,
+      slotsUpToDate: true,
+      reviewerMode: 'lane',
       commands: commandsOf(checks.quick)
     }
-  // §16.6.3's Pair as P5 offers it (#1355): Hive merges with the quick checks on the merged result, in the agent's
-  // worktree (§16.19.1). The target is the repository's default branch, named (`main` in the table), so a repository
-  // whose default is another branch isn't given one it lacks. G15 (slots up to date) comes with slots (P7).
+  // §16.6.3's Pair (#1355, at its full values since P7: #1445): Hive merges with the quick checks on the merged result,
+  // each card in a slot brought up to date before it (G15), one reviewer per lane (G17). The target is the repository's
+  // default branch, named (`main` in the table), so a repository whose default is another branch isn't given one it lacks.
   const pair: WorkflowOptions = {
     ...allOff('git'),
     review: 'agent',
@@ -210,13 +203,15 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
     identity: checks.identity ?? null,
     stopOwnRuns: true,
     dependenciesDone: true,
+    slotsUpToDate: true,
+    reviewerMode: 'lane',
     commands: commandsOf(checks.quick)
   }
   if (id === 'pair') return pair
   // Team (#1361, Darren's point 1 on #1121): as Pair, with the unit tests too before review and on the merged result
   // (each card's own focused tests come later: #1367), installed from scratch before every merge, and your OK for cards
-  // labelled ui or release. G15 waits for slots (P7); G17 is one reviewer per lane, as in every preset (a pool is the
-  // Team 6 + pool template's choice, §16.6.3).
+  // labelled ui or release. G15 and G17 as Pair's: slots up to date, one reviewer per lane (a pool is the Team 6 + pool
+  // template's choice, §16.6.3).
   return { ...pair, preChecks: quickAndTests, mergeChecks: quickAndTests, mergeInstall: 'always', okBefore: { mode: 'labels', labels: ['ui', 'release'] }, commands: commandsOf(quickAndTests) }
 }
 
@@ -228,6 +223,7 @@ export const CONTRADICTIONS = {
   okWithReview: msg({ id: 'workflow.contradiction.okWithReview', defaultMessage: 'Your OK before merging is already part of review by you.', description: "Why workflow options cannot be saved: the user's OK before merging was set while the user already reviews." }),
   hiveMergesNeedsGit: msg({ id: 'workflow.contradiction.hiveMergesNeedsGit', defaultMessage: 'Merging needs Git: without version control, work is accepted where it is.', description: 'Why workflow options cannot be saved: a merge option was set for a project with no version control.' }),
   quorumNeedsAgent: msg({ id: 'workflow.contradiction.quorumNeedsAgent', defaultMessage: 'Two reviewers per card need review by reviewer agents.', description: 'Why workflow options cannot be saved: two reviewers per card were set without reviewer agents.' }),
+  upToDateNeedsSlots: msg({ id: 'workflow.contradiction.upToDateNeedsSlots', defaultMessage: 'Slots are brought up to date only when each card has its own folder.', description: 'Why workflow options cannot be saved: “Slots are brought up to date before each card” (G15) was set while everyone works in the project folder (glossary 2.5: slot).' }),
   poolNeedsAgent: msg({ id: 'workflow.contradiction.poolNeedsAgent', defaultMessage: 'A shared pool of reviewers needs review by reviewer agents.', description: 'Why workflow options cannot be saved: “Reviewers” was set to a shared pool (reviewer agents lanes share) without review by reviewer agents.' }),
   subfolderTarget: msg({ id: 'workflow.contradiction.subfolderTarget', defaultMessage: 'This project is inside a larger repository: name the branch its work merges into.', description: 'Why workflow options cannot be saved (OP-29): Hive or the agent merges, but the project is a subfolder of a bigger Git repository and its own options name no target branch (merges would affect the whole repository).' }),
   noneHasNoSlots: msg({ id: 'workflow.contradiction.noneHasNoSlots', defaultMessage: 'Without version control, everyone works in the project folder.', description: 'Why workflow options cannot be saved: separate folders per card were set for a project with no version control.' })
@@ -245,11 +241,14 @@ export const reviewByYou = (r: ReviewBy): boolean => r === 'you' || r === 'agent
 /**
  * A draft's own options after the form sets one (`effective`: the options the form shows). Choosing a reviewer agent
  * turns "Nobody reviews their own work" on where it is off, as the form shows it held (#1508): from All off, the switch
- * that would clear the contradiction is held on and can't be clicked.
+ * that would clear the contradiction is held on and can't be clicked. Everyone in the project folder turns G15 off.
  */
 export function setOption<K extends OptionKey>(own: Partial<WorkflowOptions>, effective: WorkflowOptions, key: K, value: WorkflowOptions[K]): Partial<WorkflowOptions> {
   const next: Partial<WorkflowOptions> = { ...own, [key]: value }
   if (key === 'review' && reviewerAgent(value as ReviewBy) && !effective.noSelfReview) next.noSelfReview = true
+  // G15 depends on G11 alone (#1445): everyone in the project folder hides it, so it goes Off with it, never left On out
+  // of sight as a contradiction nobody can reach.
+  if (key === 'folder' && value === 'project' && effective.slotsUpToDate) next.slotsUpToDate = false
   return next
 }
 
@@ -265,6 +264,7 @@ export const CONTRADICTION_ROWS: Record<Contradiction, OptionKey[]> = {
   hiveMergesNeedsGit: ['finish'],
   quorumNeedsAgent: ['reviewers', 'review'],
   poolNeedsAgent: ['reviewerMode', 'review'],
+  upToDateNeedsSlots: ['slotsUpToDate', 'folder'],
   noneHasNoSlots: ['folder'],
   subfolderTarget: ['target', 'finish']
 }
@@ -298,6 +298,8 @@ export function contradictions(o: WorkflowOptions, where: ContradictionPlace = {
     if (o.finish === 'accept') out.push('hiveMergesNeedsGit')
     if ((o.finish === 'hiveMerges' || o.finish === 'agentMerges') && o.folder !== 'slots') out.push('mergeNeedsSlots')
     if (o.finish === 'committed' && o.folder !== 'project') out.push('committedNeedsFolder')
+    // G15 depends on G11 alone (#1445): only a slot is brought up to date.
+    if (o.slotsUpToDate && o.folder !== 'slots') out.push('upToDateNeedsSlots')
   }
   if (o.okBefore.mode !== 'never' && reviewByYou(o.review)) out.push('okWithReview')
   if (where.subfolder && o.platform === 'git' && (o.finish === 'hiveMerges' || o.finish === 'agentMerges') && !o.targetOwn) out.push('subfolderTarget')
@@ -354,18 +356,18 @@ export const takesOption = (key: string, v: unknown): boolean => Object.hasOwn(O
 export type FormGroupId = 'review' | 'checks' | 'merging' | 'where' | 'work' | 'stages' | 'elsewhere'
 
 /**
- * The Workflow section's groups for a platform, in order, and their options (SPEC §16.6.1, §16.6.2; #1418). It offers
- * what this version ships (§16.19.1): G15 waits for slots (P7), and G17's row is #1445's (until then a project sets it
- * through the Assistant's settings tool, and the form keeps what it inherits). The check commands (`commands`) are edited with
- * the checks that name them. "Shown here, set elsewhere" holds rows whose owner is another setting (N7, Card loops).
- * Some rows show only where they apply (`formShows`).
+ * The Workflow section's groups for a platform, in order, and their options (SPEC §16.6.1, §16.6.2; #1418). Since P7
+ * (#1445) Git's has every option: G17 beside G1b under Review, G15 under Where cards are built. The check commands
+ * (`commands`) are edited with the checks that name them. "Shown here, set elsewhere" holds rows whose owner is another
+ * setting (N7, Card loops). Some rows show only where they apply (`formShows`). The slot and copy options aren't workflow
+ * options (project.json `slots` and `copies`): the tab's Slots and copies group, beside these.
  */
 export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionKey[] }[]> = {
   git: [
-    { id: 'review', options: ['review', 'reviewers', 'noSelfReview', 'sameness', 'okBefore'] },
+    { id: 'review', options: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'] },
     { id: 'checks', options: ['preChecks', 'mergeChecks', 'mergeInstall'] },
     { id: 'merging', options: ['finish', 'style', 'target', 'strict', 'dependenciesDone'] },
-    { id: 'where', options: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning'] },
+    { id: 'where', options: ['folder', 'slotsUpToDate', 'identity', 'stopOwnRuns', 'sharedFolderWarning'] },
     { id: 'stages', options: ['stageNames'] },
     { id: 'elsewhere', options: [] }
   ],
@@ -398,6 +400,10 @@ export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
   // G8 strict (#1352): the merge queue brings work up to date, so only when Hive merges.
   if (key === 'strict') return o.finish === 'hiveMerges'
   if (key === 'sharedFolderWarning') return o.folder === 'project'
+  // G15 depends on G11 alone: only with each card in a slot. G17 whenever a reviewer agent reviews, whatever G11 is
+  // (with everyone in the project folder the pool's reviewers read in review copies, #1439).
+  if (key === 'slotsUpToDate') return o.folder === 'slots'
+  if (key === 'reviewerMode') return reviewerAgent(o.review)
   return FORM_GROUPS[o.platform].some((g) => g.options.includes(key))
 }
 
@@ -407,17 +413,4 @@ export function isAllOff(o: WorkflowOptions): boolean {
   return o.review === 'none' && o.preChecks.length === 0 && o.finish === off.finish && o.folder === 'project' && o.okBefore.mode === 'never' && !o.dependenciesDone && !o.stopOwnRuns
 }
 
-/** Why a value can't be set yet: its piece comes in a later version (§16.19.1). */
-export const NOT_OFFERED = {
-  later: msg({ id: 'workflow.notOffered.later', defaultMessage: 'Some of these options aren’t available in this version yet: leave them as they are.', description: 'Why workflow options cannot be saved: an option set (up to date before merging, slots kept up to date) comes in a later version of Hive.' })
-} satisfies Record<string, Msg>
 
-/**
- * The values a project sets that this version doesn't offer yet (§16.19.1), by why. Hive merges and merge checks are
- * offered since P5 (#1348's queue, #1355's form), and strict (G8) since #1352.
- */
-export function notOffered(own: Partial<WorkflowOptions>): (keyof typeof NOT_OFFERED)[] {
-  const out: (keyof typeof NOT_OFFERED)[] = []
-  if (own.slotsUpToDate === true) out.push('later')
-  return out
-}

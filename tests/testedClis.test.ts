@@ -27,7 +27,9 @@ const CODEX: Cli = { provider: 'codex', version: '0.160.1', path: 'C:\\Users\\t\
 /** A passed suite whose test copies of Hive selected these CLIs (both, as Hive looks for both). */
 const pass = (name: string, clis: Cli[] = []) => ({ name, ok: true, seconds: 3, clis })
 const COPILOT: Cli = { provider: 'copilot', version: '1.0.93', path: 'C:\\Users\\t\\AppData\\Local\\Microsoft\\WinGet\\Links\\copilot.exe' }
-const realResults = () => [pass('about'), ...real('claude').map((n) => pass(n, [CLAUDE, CODEX])), ...real('codex').map((n) => pass(n, [CLAUDE, CODEX])), ...real('copilot').map((n) => pass(n, [CLAUDE, CODEX, COPILOT]))]
+/** Each real suite once, its Hive selecting Claude Code and Codex, and Copilot too for a suite that needs it (one that needs
+ * several CLIs, as #1439's reviewcopiesreal does, is one suite, not one per CLI). */
+const realResults = () => [pass('about'), ...[...new Set([...real('claude'), ...real('codex'), ...real('copilot')])].map((n) => pass(n, [CLAUDE, CODEX, ...(suites.find((x) => x.name === n)?.needs?.includes('copilot') ? [COPILOT] : [])]))]
 /** A run record of the whole real tier (and one fake suite), every suite passed, as run.mjs writes it. */
 const fullRecord = (over: Record<string, unknown> = {}) => {
   const results = realResults()
@@ -152,6 +154,14 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
   // and the three same-commit records were merged by hand.
   describe('several records of the same commit, one per CLI (#1105)', () => {
     const only = (need: string, over: Record<string, unknown> = {}) => fullRecord({ results: [pass('about'), ...realResults().filter((r: Result) => real(need).includes(r.name))], ...over })
+    /**
+     * Why a CLI isn't vouched for when only another CLI's record ran: none of its suites, or (a suite needing both, as
+     * #1439's reviewcopiesreal) only those the two share.
+     */
+    const notRun = (label: string, need: string, other: string): string => {
+      const missing = real(need).filter((x) => !real(other).includes(x))
+      return missing.length === real(need).length ? `${label}: none of its real suites ran` : `${label}: not all of its real suites ran (${missing.join(', ')} didn't)`
+    }
     it("takes each CLI from the record where all its real suites ran and passed", () => {
       const { manifest, updated, problems } = manifestFromRecords([only('codex', { when: '2026-10-19 10:00' }), only('claude', { when: '2026-10-19 12:00' }), only('copilot')], suites)
       expect(problems).toEqual([])
@@ -172,9 +182,9 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
     it("fails a CLI no record vouches for, with the reason from a record where its suites ran", () => {
       const out = manifestFromRecords([only('codex'), only('claude')], suites)
       expect(out.updated).toEqual(['claude-code', 'codex'])
-      expect(out.problems).toEqual(['GitHub Copilot: none of its real suites ran'])
+      expect(out.problems).toEqual([notRun('GitHub Copilot', 'copilot', 'codex')])
       const failed = only('copilot', { results: only('copilot').results.map((r: Result) => (r.name === real('copilot')[0] ? { ...r, ok: false } : r)) })
-      expect(manifestFromRecords([only('codex'), failed], suites).problems).toEqual(['Claude Code: none of its real suites ran', `GitHub Copilot: not all of its real suites passed (${real('copilot')[0]})`])
+      expect(manifestFromRecords([failed, only('codex')], suites).problems).toEqual([notRun('Claude Code', 'claude', 'copilot'), `GitHub Copilot: not all of its real suites passed (${real('copilot')[0]})`])
     })
     it('refuses a CLI two records ran at different versions', () => {
       const newer = only('codex', { results: only('codex').results.map((r: Result) => ({ ...r, clis: r.clis.map((c: Cli) => (c.provider === 'codex' ? { ...c, version: '0.161.0' } : c)) })) })
@@ -189,7 +199,7 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
       const conflicted = (b: object) => manifestFromRecords([only('codex'), only('claude'), b], suites)
       // Partial: one Codex suite, at 0.161.0, the others not run.
       const partial = fullRecord({ results: [pass('about'), at(codexRuns[0], '0.161.0')] })
-      expect(conflicted(partial).problems).toEqual(['Codex: the records ran different versions (0.160.1, 0.161.0)', 'GitHub Copilot: none of its real suites ran'])
+      expect(conflicted(partial).problems).toEqual(['Codex: the records ran different versions (0.160.1, 0.161.0)', notRun('GitHub Copilot', 'copilot', 'codex')])
       expect(conflicted(partial).updated).toEqual(['claude-code'])
       // Failed: every Codex suite ran at 0.161.0, one failed.
       const failed = fullRecord({ results: [pass('about'), ...codexRuns.map((r: Result, i: number) => ({ ...at(r, '0.161.0'), ok: i !== 0 }))] })
@@ -203,7 +213,7 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
       // A CLI in no record still fails, its older entry kept.
       const current = { copilot: { version: '1.0.90', testedAt: '2026-10-01', record: 'fedcba987654' } }
       const out = manifestFromRecords([only('codex'), only('claude')], suites, current)
-      expect(out.problems).toEqual(['GitHub Copilot: none of its real suites ran'])
+      expect(out.problems).toEqual([notRun('GitHub Copilot', 'copilot', 'codex')])
       expect(out.manifest.copilot).toEqual(current.copilot)
     })
   })

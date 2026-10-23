@@ -338,6 +338,8 @@
   "tips.silentUnknown.title": "An agent silent with its state unknown",
   "tips.skillsDelivered.text": "The switch beside each Hive skill, in the Skills view or a project's Skills tab, says whether agents get it (Delivered to agents). Copies Hive puts in a folder for Codex and Copilot are removed once no agent works there, as Settings → Advanced says.",
   "tips.skillsDelivered.title": "Choose which skills agents get",
+  "tips.slotOptions.text": "Version Control → Workflow → Slots and copies holds the script run in a new slot, the files copied into it and the slots in use, and how many review copies the project keeps. They save as you change them.",
+  "tips.slotOptions.title": "Set up slots in Version Control",
   "tips.slotResume.text": "A builder's conversation stays in its card's slot. Once the card ends, Resume All leaves it so the slot stays free for new work; its own Resume takes the slot back while nothing else has used it.",
   "tips.slotResume.title": "A conversation resumes where it was made",
   "tips.slots.text": "With Where cards are built set to Each card in its own folder, starting a card lends its builder a slot, a ready worktree, and makes the card's branch there. A lane keeps its slot from card to card; with every slot in use, it waits for one.",

@@ -10,6 +10,7 @@ interface HiveMessageValues {
   'workflow.contradiction.quorumNeedsAgent': undefined
   'workflow.contradiction.selfReview': undefined
   'workflow.contradiction.subfolderTarget': undefined
+  'workflow.contradiction.upToDateNeedsSlots': undefined
   'workflow.forYou.decidedAfterMerge': { card: string | number }
   'workflow.forYou.lineAsk': { line: string | number; card: string | number; target: string | number; next: string | number }
   'workflow.forYou.lineRefused': { line: string | number; target: string | number; reason: string | number; next: string | number }
@@ -29,6 +30,7 @@ interface HiveMessageValues {
   'workflow.form.allOffSummary': undefined
   'workflow.form.appliesNow': undefined
   'workflow.form.cantSave': undefined
+  'workflow.form.carried': { agents: string | number }
   'workflow.form.changeLine': { option: string | number; from: string | number; to: string | number }
   'workflow.form.changedMeanwhile': undefined
   'workflow.form.changesHead': undefined
@@ -105,6 +107,7 @@ interface HiveMessageValues {
   'workflow.form.previewChanges': { n: number }
   'workflow.form.previewHead': { preset: string | number }
   'workflow.form.previewNow': { value: string | number }
+  'workflow.form.readOnly': { agents: string | number }
   'workflow.form.removeCheck': undefined
   'workflow.form.save': undefined
   'workflow.form.saveBlocked': undefined
@@ -112,9 +115,7 @@ interface HiveMessageValues {
   'workflow.form.stageName': { stage: string | number }
   'workflow.form.stageNamesValue': { n: number }
   'workflow.form.startedFrom': { preset: string | number }
-  'workflow.form.unavailable': { preset: string | number; why: string | number }
   'workflow.form.use': { preset: string | number }
-  'workflow.form.worktree': undefined
   'workflow.group.checks': undefined
   'workflow.group.elsewhere': undefined
   'workflow.group.merging': undefined
@@ -134,7 +135,6 @@ interface HiveMessageValues {
   'workflow.move.startReview': undefined
   'workflow.move.submit': undefined
   'workflow.move.verdict': undefined
-  'workflow.notOffered.later': undefined
   'workflow.option.commands.desc': undefined
   'workflow.option.commands.title': undefined
   'workflow.option.dependenciesDone.desc': undefined
@@ -170,6 +170,8 @@ interface HiveMessageValues {
   'workflow.option.sameness.title': undefined
   'workflow.option.sharedFolderWarning.desc': undefined
   'workflow.option.sharedFolderWarning.title': undefined
+  'workflow.option.slotsUpToDate.desc': undefined
+  'workflow.option.slotsUpToDate.title': undefined
   'workflow.option.stageNames.desc': undefined
   'workflow.option.stageNames.title': undefined
   'workflow.option.stopOwnRuns.desc': undefined
@@ -181,7 +183,6 @@ interface HiveMessageValues {
   'workflow.option.target.desc': undefined
   'workflow.option.target.title': undefined
   'workflow.preset.custom': undefined
-  'workflow.preset.needs.slots': undefined
   'workflow.preset.note.team': undefined
   'workflow.preset.pair': undefined
   'workflow.preset.pairAgent': undefined
@@ -337,6 +338,40 @@ interface HiveMessageValues {
   'workflow.rule.submit.trailer': undefined
   'workflow.rule.verdict.currentSubmission': undefined
   'workflow.rule.verdict.reviewing': undefined
+  'workflow.slots.archive': undefined
+  'workflow.slots.archiveDesc': undefined
+  'workflow.slots.branches': undefined
+  'workflow.slots.carried': { agent: string | number }
+  'workflow.slots.copiesDefault': { n: number }
+  'workflow.slots.copiesNow': { n: number; leased: number }
+  'workflow.slots.copiesSize': undefined
+  'workflow.slots.copiesSizeDesc': undefined
+  'workflow.slots.copy': undefined
+  'workflow.slots.copyDesc': undefined
+  'workflow.slots.desc': undefined
+  'workflow.slots.fromCopy': undefined
+  'workflow.slots.fromSetup': undefined
+  'workflow.slots.heading': undefined
+  'workflow.slots.inUse': undefined
+  'workflow.slots.lentCard': { agent: string | number; card: string | number }
+  'workflow.slots.lentLane': { agent: string | number }
+  'workflow.slots.noSlots': undefined
+  'workflow.slots.none': undefined
+  'workflow.slots.off': undefined
+  'workflow.slots.on': undefined
+  'workflow.slots.openAdvanced': undefined
+  'workflow.slots.reviewCopies': undefined
+  'workflow.slots.reviewCopiesDesc': undefined
+  'workflow.slots.saveFailed': undefined
+  'workflow.slots.setHere': undefined
+  'workflow.slots.setup': undefined
+  'workflow.slots.setupDesc': undefined
+  'workflow.slots.state.creating': undefined
+  'workflow.slots.state.dirty': undefined
+  'workflow.slots.state.gone': undefined
+  'workflow.slots.state.lent': undefined
+  'workflow.slots.state.ready': undefined
+  'workflow.slots.state.removing': undefined
   'workflow.stage.active': undefined
   'workflow.stage.approved': undefined
   'workflow.stage.done': undefined
@@ -420,9 +455,11 @@ interface HiveMessageValues {
   'workflow.why.okBefore': undefined
   'workflow.why.preChecks': undefined
   'workflow.why.review': undefined
+  'workflow.why.reviewerMode': undefined
   'workflow.why.reviewers': undefined
   'workflow.why.sameness': undefined
   'workflow.why.sharedFolderWarning': undefined
+  'workflow.why.slotsUpToDate': undefined
   'workflow.why.stopOwnRuns': undefined
   'workflow.why.strict': undefined
   'workflow.why.style': undefined

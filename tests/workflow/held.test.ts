@@ -122,7 +122,7 @@ describe('an index refreshed or a file touched meanwhile is no change', () => {
   })
 
   it("in a shared folder, another agent staging its own file during the submit → submitted; the builder's own → refused", async () => {
-    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: [], mergeChecks: [], target: '' }))
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', slotsUpToDate: false, preChecks: [], mergeChecks: [], target: '' }))
     const card = e.wf.createCard({ title: 'Mine' })
     const theirs = e.wf.createCard({ title: 'Theirs' })
     moved(await e.wf.start(card.key, B1))
@@ -145,7 +145,7 @@ describe('an index refreshed or a file touched meanwhile is no change', () => {
   })
 
   it("in a shared folder, a file both agents locked in turn is still the builder's own: edited during the submit → refused (HR6's #1481 round 2)", async () => {
-    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: [], mergeChecks: [], target: '' }))
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', slotsUpToDate: false, preChecks: [], mergeChecks: [], target: '' }))
     const card = e.wf.createCard({ title: 'Mine' })
     const theirs = e.wf.createCard({ title: 'Theirs' })
     moved(await e.wf.start(card.key, B1))
