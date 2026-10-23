@@ -179,7 +179,7 @@ describe("a card's run through its platform adapter (#1233)", () => {
   })
 
   it("Git, a shared folder: the card's revision is its newest attributed commit, not the folder's head", async () => {
-    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: [], mergeChecks: [], target: '' }))
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', slotsUpToDate: false, preChecks: [], mergeChecks: [], target: '' }))
     const a = e.wf.createCard({ title: 'A' })
     const b = e.wf.createCard({ title: 'B' })
     moved(await e.wf.start(a.key, B1))

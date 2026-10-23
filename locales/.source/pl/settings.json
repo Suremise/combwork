@@ -730,6 +730,8 @@
   "settings.project.metadata.title": "Settings file",
   "settings.project.reset.desc": "Everything on this page goes back to Inherit. Agents, and skill and MCP opt-outs, are kept.",
   "settings.project.reset.title": "Reset project settings",
+  "settings.project.slotOptions.desc": "The setup and archive scripts, the files copied into new slots and the review copies are set in the project’s Version Control tab, under Workflow → Slots and copies.",
+  "settings.project.slotOptions.title": "Slots and copies",
   "settings.project.storage.desc": "Measured in the background; Refresh measures again. The coding agents’ own transcripts (in ~/.claude, ~/.codex and ~/.copilot) aren’t counted, and Clean Up… and Purge… never touch them.",
   "settings.project.storage.title": "What Hive keeps",
   "settings.project.suggestFreshStart.desc": "A notice when this project's work has finished, with Start Fresh (Idle Agents).",

@@ -1,0 +1,5 @@
+{
+  "slots.setting.bad": "Hive no tiene esa opción de slot.",
+  "slots.setting.badSize": "El número de copias de revisión y comprobación es un número entero de 1 a 32.",
+  "slots.setting.badText": "Un script de slot o una lista de archivos es un texto de 4000 caracteres como máximo."
+}

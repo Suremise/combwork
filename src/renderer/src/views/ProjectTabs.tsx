@@ -1621,12 +1621,6 @@ function DraftInput({ value, onCommit, ...rest }: { value: string; onCommit: (v:
   return <input {...rest} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => draft !== value && onCommit(draft)} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
 }
 
-function DraftTextarea({ value, onCommit, ...rest }: { value: string; onCommit: (v: string) => void } & Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange'>) {
-  const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
-  return <textarea {...rest} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => draft !== value && onCommit(draft)} />
-}
-
 function AgentList({ project }: { project: ProjectInfo }) {
   const settings = useStore((s) => s.settings)
   const limit = useAgentLimit()
@@ -2036,21 +2030,16 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       )
     },
     {
+      // The setup command and copied files are the Version Control tab's Slots and copies since #1445 (their rows stay
+      // for the Assistant's settings tool).
       section: 'agents',
-      key: 'worktreeCopy',
-      ...rowText('project.worktreeCopy'),
-      modified: cfg.worktreeCopy !== null,
+      key: 'slotOptions',
+      ...rowText('project.slotOptions'),
       render: () => (
-        <DraftTextarea className="input mono" rows={3} value={cfg.worktreeCopy ?? ''} placeholder={tr(S.inheritNewline, { value: settings.agents.worktreeCopy })} onCommit={(v) => void update({ worktreeCopy: v.trim() ? v : null })} />
+        <button className="btn" data-action="open-slot-options" onClick={() => openVersionControl(project.path, 'workflow')}>
+          <Icon name="source-control" /> {tr(S.openVersionControl)}
+        </button>
       )
-    },
-    {
-      section: 'agents',
-      key: 'worktreeSetup',
-      ...rowText('project.worktreeSetup'),
-      modified: !!cfg.worktreeSetup,
-      // i18n-ignore: an example command
-      render: () => <DraftInput className="input mono" value={cfg.worktreeSetup} placeholder="npm install" onCommit={(v) => void update({ worktreeSetup: v.trim() })} />
     },
     {
       section: 'advanced',

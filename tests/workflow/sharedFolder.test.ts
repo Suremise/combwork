@@ -39,7 +39,7 @@ describe('workflow scenarios, several agents in one folder', () => {
   })
 
   it('S29: Pair in the project folder (line = target): interleaved commits with trailers never move a card to Done; each change is its own; reviewed, then Done; a commit with no trailer refuses submit', async () => {
-    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: [], mergeChecks: [], target: '' }))
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', slotsUpToDate: false, preChecks: [], mergeChecks: [], target: '' }))
     const a = e.wf.createCard({ title: 'A' })
     const b = e.wf.createCard({ title: 'B' })
     moved(await e.wf.start(a.key, B1))
@@ -128,7 +128,7 @@ describe('workflow scenarios, several agents in one folder', () => {
   })
 
   it('S58: shared folder: A submits its own newest commit; B\'s change excludes A\'s; A\'s run while B edits is uncounted, the isolated run counts; an untrailered commit is listed for the user', async () => {
-    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: ['lint'], mergeChecks: [], commands: { lint: 'npm run lint' }, target: '' }))
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', slotsUpToDate: false, preChecks: ['lint'], mergeChecks: [], commands: { lint: 'npm run lint' }, target: '' }))
     const a = e.wf.createCard({ title: 'A' })
     const b = e.wf.createCard({ title: 'B' })
     moved(await e.wf.start(a.key, B1))

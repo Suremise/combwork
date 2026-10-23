@@ -730,6 +730,8 @@
   "settings.project.metadata.title": "Fichier des paramètres",
   "settings.project.reset.desc": "Tout ce qui est sur cette page revient à Hériter. Les agents, et les compétences et serveurs MCP désactivés, sont conservés.",
   "settings.project.reset.title": "Réinitialiser les paramètres du projet",
+  "settings.project.slotOptions.desc": "Les scripts de préparation et d’archivage, les fichiers copiés dans les nouveaux emplacements et les copies de relecture se règlent dans l’onglet Gestion de versions du projet, sous Flux de travail → Emplacements et copies.",
+  "settings.project.slotOptions.title": "Emplacements et copies",
   "settings.project.storage.desc": "Mesuré en arrière-plan ; Actualiser mesure à nouveau. Les transcriptions propres aux agents de code (dans ~/.claude, ~/.codex et ~/.copilot) ne sont pas comptées, et ni Nettoyer… ni Purger… n’y touchent jamais.",
   "settings.project.storage.title": "Ce que Hive conserve",
   "settings.project.suggestFreshStart.desc": "Un avis quand le travail de ce projet est terminé, avec Repartir de zéro (agents inactifs).",

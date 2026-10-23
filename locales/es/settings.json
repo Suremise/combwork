@@ -730,6 +730,8 @@
   "settings.project.metadata.title": "Archivo de configuración",
   "settings.project.reset.desc": "Todo lo de esta página vuelve a Heredar. Se conservan los agentes y las exclusiones de habilidades y de MCP.",
   "settings.project.reset.title": "Restablecer la configuración del proyecto",
+  "settings.project.slotOptions.desc": "Los scripts de configuración y de archivo, los archivos copiados en los slots nuevos y las copias de revisión se configuran en la pestaña Control de versiones del proyecto, en Flujo de trabajo → Slots y copias.",
+  "settings.project.slotOptions.title": "Slots y copias",
   "settings.project.storage.desc": "Se mide en segundo plano; Actualizar vuelve a medir. Las transcripciones propias de los agentes de programación (en ~/.claude, ~/.codex y ~/.copilot) no se cuentan, y ni Limpiar… ni Purgar… las tocan nunca.",
   "settings.project.storage.title": "Lo que guarda Hive",
   "settings.project.suggestFreshStart.desc": "Un aviso cuando el trabajo de este proyecto ha terminado, con Empezar de nuevo (agentes inactivos).",
