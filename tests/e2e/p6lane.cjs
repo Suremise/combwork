@@ -83,21 +83,24 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     const english = async () => (await page.getByRole('button', { name: 'Task Board', exact: true }).count()) > 0
     /**
      * Screenshots of `loc` (the window by default) in both themes, in English and then German; `show` brings back what
-     * the shot is of (a hover) before each, by selectors that don't depend on the language.
+     * the shot is of (a hover) before each, by selectors that don't depend on the language. A dialog's text is set as it
+     * opens (#1489): `open` opens it in each language and gives it, `close` closes it after its shots.
      */
-    const shoot = async (name, { loc = page, show } = {}) => {
+    const shoot = async (name, { loc = page, show, open, close } = {}) => {
       for (const lang of ['en', 'de']) {
         if (lang === 'de') {
           await speak({ ...base, code: 'de', locale: 'de', messages: german })
           await waitHung(async () => !(await english()))
         }
+        const target = open ? await open() : loc
         for (const theme of ['dark', 'light']) {
           await inv('settings:update', { appearance: { theme } })
           await waitHung(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
           if (show) await show()
           else await page.mouse.move(5, 5)
-          await loc.screenshot({ path: path.join(fx.shots, `p6lane-${name}-${lang}-${theme}.png`) })
+          await target.screenshot({ path: path.join(fx.shots, `p6lane-${name}-${lang}-${theme}.png`) })
         }
+        if (close) await close(target, lang)
       }
       await speak(base)
       await waitHung(english)
@@ -409,7 +412,31 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     const save = page.locator('.dialog', { hasText: 'Save Workflow Options' })
     await save.waitFor({ timeout: HUNG_MS })
     check("the save's warning: squash from the next card, and the running lane keeping the old rules", !!(await waitHung(async () => /keeps the old rules/.test(await text(save)) && /apply from the next card/.test(await text(save)))), await text(save))
-    await shoot('6-save-old-rules', { loc: save })
+    // Cancelled, then opened in each language for its shots (#1489), and again in English to save.
+    const saveDialog = page.locator('.dialog', { has: page.locator('.workflow-save') })
+    const cancelSave = async (d, lang) => {
+      await d.getByRole('button', { name: lang === 'de' ? german['shell.dialog.cancel'] : 'Cancel', exact: true }).click()
+      await d.waitFor({ state: 'detached', timeout: HUNG_MS })
+    }
+    const openSave = async () => {
+      await form.locator('[data-action="save"]').click()
+      await saveDialog.waitFor({ timeout: HUNG_MS })
+      return saveDialog
+    }
+    await cancelSave(save, 'en')
+    await shoot('6-save-old-rules', {
+      open: async () => {
+        const d = await openSave()
+        // In German, its text is German throughout, not only the dialog's own Cancel.
+        if (!(await english())) {
+          const words = [german['workflow.form.confirmTitle'], german['workflow.form.confirmMessage'], german['workflow.form.changesHead']]
+          check("de: the save's dialog is German: its title, message and what changes", !!(await waitHung(async () => { const x = await text(d); return words.every((t) => x.includes(t)) })), await text(d))
+        }
+        return d
+      },
+      close: cancelSave
+    })
+    await openSave()
     await save.getByRole('button', { name: 'Save', exact: true }).click()
     await save.waitFor({ state: 'detached', timeout: HUNG_MS })
     check('saved: squash', !!(await waitHung(() => projectJson(alpha).workflow?.options?.style === 'squash')), JSON.stringify(projectJson(alpha).workflow))
@@ -496,7 +523,8 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     await save.waitFor({ state: 'detached', timeout: HUNG_MS })
     const off = await waitHung(() => (projectJson(gamma).workflow?.options?.sharedFolderWarning === true ? projectJson(gamma).workflow : null))
     check('all off saved in the tab, G16 on: no review, not checked, the project folder, no preset', !!off && off.preset === null && off.options.review === 'none' && off.options.finish === 'notChecked' && off.options.folder === 'project', JSON.stringify(projectJson(gamma).workflow))
-    check('…the step answered: gone', (await stepEl.count()) === 0)
+    // Gone once the window has the saved options (read once just after the save, it raced it: #1489's run).
+    check('…the step answered: gone', !!(await waitHung(async () => (await stepEl.count()) === 0)))
     await shootSections('git-alloff', ['workflow', 'changes', 'history', 'branches'])
     const gc1 = (await inv('tasks:create', { title: 'Gamma one', project: 'gamma' })).number
     const gc2 = (await inv('tasks:create', { title: 'Gamma two', project: 'gamma' })).number
