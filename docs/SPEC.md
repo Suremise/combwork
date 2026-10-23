@@ -2969,8 +2969,9 @@ Whether a conversation may resume there is its **hold** (none: it may):
     contains it (§16.3.2's containment, squash by its key), under the repository's lock: the worktrees read, the intent
     recorded (`LineDeleting`, with the head checked), the ref removed at that head (`update-ref -d`), then settled from
     what is on disk: a checkout of it that came in has the branch put back at that head and checked (`LineDeleteUndone`),
-    none has `LineDeleted`. A deletion cut short by a crash is settled the same way by the next pass, whatever the
-    switches say; a branch that can't be put back leaves the intent for the next pass, never claimed kept [HR1's round 2].
+    none has `LineDeleted`. A deletion cut short by a crash is settled the same way by the next pass, first and whatever
+    the switches say (they gate new deletions only), found from the project's facts whatever the card has done since or
+    how long ago it began [HR1's round 3]; a branch that can't be put back leaves the intent for the next pass, never claimed kept [HR1's round 2].
     A lane's previous line goes once the next card's line is out.
     Off switch: Settings → Advanced **Delete a card's branch once it's merged** (`hive.slots.deleteMergedLines`, on).
 - **The pool's size** is the project's builders and either agents (`setBuilderCount`).

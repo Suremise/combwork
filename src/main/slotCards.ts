@@ -136,6 +136,26 @@ export function cycleIn(facts: readonly Fact[]): Cycle | null {
   return c
 }
 
+/** The kinds a deletion's intent and its settling are recorded as. */
+const DELETION_KINDS = ['LineDeleting', 'LineDeleted', 'LineDeleteUndone'] as const
+
+/**
+ * Deletions begun and not settled, from facts in the order written (a card's, or a project's of DELETION_KINDS): a
+ * `LineDeleting` with no `LineDeleted` or `LineDeleteUndone` of its card and line after it, whatever cycle the card is in
+ * now or how long ago it began (HR1's #1438 round 3: an unfinished destructive effect stays found).
+ */
+export function unsettledDeletions(facts: readonly Fact[]): { card: number; d: FactData['LineDeleting'] }[] {
+  const open = new Map<string, { card: number; d: FactData['LineDeleting'] }>()
+  for (const f of facts) {
+    if (!(DELETION_KINDS as readonly string[]).includes(f.kind)) continue
+    const d = f.data as FactData['LineDeleting']
+    const key = `${f.card}\n${d.line}`
+    if (f.kind === 'LineDeleting') open.set(key, { card: f.card, d: { line: d.line, revision: d.revision } })
+    else open.delete(key)
+  }
+  return [...open.values()]
+}
+
 function cardOf(wf: Workflow, n: number): CardRecord | null {
   try {
     return wf.store.card(n)
@@ -332,6 +352,12 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   if (!wf) return
   const pool = await poolFor(ws, projectPath)
   if (pool.closed) return
+  // 0. Deletions begun and cut short (a crash between the ref's removal and its settling): settled first, as data safety,
+  //    whatever the switches say and wherever the card is now: one may have left a checkout without its branch.
+  for (const { card: n, d } of unsettledDeletions(wf.store.factsOfKind([...DELETION_KINDS]))) {
+    const card = cardOf(wf, n)
+    if (card) await withRepoLock(projectPath, () => settleDeletion(projectPath, wf, card, n, d), { quiet: true, project: projectPath }).catch((e) => log.warn(`settling #${n}'s begun deletion of ${userText(d.line)}`, e))
+  }
   const lanes = new Map((await rawLanes(ws)).map((l) => [l.id, l]))
   // 1. Releases, rules on or off: a card's lease its current cycle doesn't use, a lane's whose lane has ended.
   for (const l of pool.openLeases()) {
@@ -538,12 +564,13 @@ export async function place(ws: WorkspaceService, projectPath: string, first: Wo
 export async function deleteMergedLine(ws: WorkspaceService, projectPath: string, wf: Workflow, n: number): Promise<boolean> {
   const allowed = (): boolean => workflowEnforced() && advanced.get(SLOTS_DELETE_MERGED) !== false
   const card = cardOf(wf, n)
-  const s = card ? wf.state(card) : null
-  const c = card ? cycleIn(wf.store.facts(n)) : null
-  if (!card || !s || !c || s.stage !== 'done' || c.deleted || !s.started?.line?.startsWith('hive/')) return false
+  if (!card) return false
   // A deletion begun and cut short: settled first, whatever the switches say (it may have left a checkout without its branch).
-  const begun = c.deleting
+  const begun = unsettledDeletions(wf.store.facts(n))[0]?.d
   if (begun) return withRepoLock(projectPath, () => settleDeletion(projectPath, wf, card, n, begun), { quiet: true, project: projectPath }).catch(() => false)
+  const s = wf.state(card)
+  const c = cycleIn(wf.store.facts(n))
+  if (!c || s.stage !== 'done' || c.deleted || !s.started?.line?.startsWith('hive/')) return false
   if (!allowed()) return false
   const line = s.started.line
   const target = s.integrated?.target || s.started.target
@@ -562,7 +589,7 @@ export async function deleteMergedLine(ws: WorkspaceService, projectPath: string
       const intent: FactData['LineDeleting'] = { line, revision: head }
       const meant = await wf.write(card, null, 'hive', (w) => {
         const now = cycleIn(w.tx.facts(n))
-        if (!now || now.seq !== c.seq || now.deleted || now.deleting) return false
+        if (!now || now.seq !== c.seq || now.deleted || unsettledDeletions(w.tx.facts(n)).length) return false
         w.fact('LineDeleting', intent) // i18n-ignore: a fact's kind and codes, not text
         return true
       })
@@ -587,7 +614,7 @@ async function settleDeletion(projectPath: string, wf: Workflow, card: CardRecor
   if (isUnknown(head)) return false
   if (head) {
     await wf.write(card, null, 'hive', (w) => {
-      if (cycleIn(w.tx.facts(n))?.deleting?.line === d.line) w.fact('LineDeleteUndone', { ...d, why: 'notDeleted' }) // i18n-ignore: a fact's kind and codes, not text
+      if (unsettledDeletions(w.tx.facts(n)).some((x) => x.d.line === d.line)) w.fact('LineDeleteUndone', { ...d, why: 'notDeleted' }) // i18n-ignore: a fact's kind and codes, not text
     })
     return false
   }
@@ -603,13 +630,13 @@ async function settleDeletion(projectPath: string, wf: Workflow, card: CardRecor
     }
     log.warn(`${userText(d.line)} was checked out as it was deleted: put back at ${d.revision.slice(0, 7)} and kept`)
     await wf.write(card, null, 'hive', (w) => {
-      if (cycleIn(w.tx.facts(n))?.deleting?.line === d.line) w.fact('LineDeleteUndone', { ...d, why: 'checkedOut' }) // i18n-ignore: a fact's kind and codes, not text
+      if (unsettledDeletions(w.tx.facts(n)).some((x) => x.d.line === d.line)) w.fact('LineDeleteUndone', { ...d, why: 'checkedOut' }) // i18n-ignore: a fact's kind and codes, not text
     })
     return false
   }
   log.info(`Deleted ${userText(d.line)} (#${n}, merged)`)
   await wf.write(card, null, 'hive', (w) => {
-    if (cycleIn(w.tx.facts(n))?.deleting?.line === d.line) w.fact('LineDeleted', { line: d.line, revision: d.revision, why: 'merged' }) // i18n-ignore: a fact's kind and codes, not text
+    if (unsettledDeletions(w.tx.facts(n)).some((x) => x.d.line === d.line)) w.fact('LineDeleted', { line: d.line, revision: d.revision, why: 'merged' }) // i18n-ignore: a fact's kind and codes, not text
   })
   return true
 }

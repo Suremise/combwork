@@ -29,7 +29,9 @@ const state = vi.hoisted(() => ({
   next: [] as ('given' | 'refused' | 'launchFails')[],
   calls: [] as string[],
   /** The card's runtime, as workflowFor gives it. */
-  wf: null as unknown
+  wf: null as unknown,
+  /** Settings → Advanced, Delete a card's branch once it's merged. */
+  deleteOn: true
 }))
 
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => state.enforced, agentRunsGoing: () => [], workflowFor: async () => state.wf }))
@@ -64,7 +66,19 @@ vi.mock('../src/main/git', async (orig) => {
 })
 vi.mock('../src/main/workflow/lineUpdates', async (orig) => ({ ...(await orig<object>()), agentBusy: () => false }))
 vi.mock('../src/main/tasks', async (orig) => ({ ...(await orig<object>()), getTask: async (n: number) => ({ number: n, key: `AM-${n}`, title: 'Placed', description: '', project: 'project', column: 'doing', labels: [], comments: [], history: [], blockedBy: [] }) }))
-vi.mock('../src/main/slotsApp', async (orig) => ({ ...(await orig<object>()), holder: { self: async () => ({ pid: process.pid, started: 1 }), alive: async () => false, live: new Set() } }))
+vi.mock('../src/main/slotsApp', async (orig) => ({
+  ...(await orig<object>()),
+  holder: { self: async () => ({ pid: process.pid, started: 1 }), alive: async () => false, live: new Set() },
+  // The project's pool as the pass reads it: no leases open or ended (what it settles first doesn't come from them).
+  poolFor: async () => ({ closed: false, openLeases: () => [], endedSince: () => [], lease: () => null })
+}))
+vi.mock('../src/main/lanes', async (orig) => ({ ...(await orig<object>()), rawLanes: async () => [], lanesWaitingForSlot: async () => [] }))
+vi.mock('../src/main/advanced', async (orig) => {
+  const actual = await orig<typeof import('../src/main/advanced')>()
+  const advanced = Object.create(actual.advanced) as typeof actual.advanced
+  advanced.get = ((id: string, ...rest: unknown[]) => (id === 'hive.slots.deleteMergedLines' ? state.deleteOn : (actual.advanced.get as (...a: unknown[]) => unknown)(id, ...rest))) as typeof advanced.get
+  return { ...actual, advanced }
+})
 vi.mock('../src/main/sessions', async (orig) => {
   const actual = await orig<typeof import('../src/main/sessions')>()
   const stub = {
@@ -109,13 +123,13 @@ vi.mock('../src/main/deliveries', async (orig) => {
   }
 })
 
-const { cycleIn, deleteMergedLine, place } = await import('../src/main/slotCards')
+const { cycleIn, deleteMergedLine, place, settleSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
 
 let env: Env | null = null
 afterEach(() => {
   env?.close()
   env = null
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, deliveries: [], next: [], calls: [] })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, deliveries: [], next: [], calls: [], wf: null, deleteOn: true })
 })
 
 /** A card started in a slot (a worktree on its line, under lease l-1), its change merged into main and reported: Done. */
@@ -238,6 +252,48 @@ describe("a Done card's merged line (#1438)", { timeout: 60_000 }, () => {
     expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
     expect(hasLine(e, line)).toBe(true)
     expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual([])
+  })
+})
+
+describe("a begun deletion settled by the project's pass, whatever the switches (#1438, HR1's round 3)", { timeout: 60_000 }, () => {
+  /** A Done card's deletion cut short right after its ref went, a checkout having come in: as a crash leaves it. */
+  async function cutShort(title: string): Promise<{ e: Env; n: number; line: string; head: string; other: string; ws: never }> {
+    const { e, n, line, slot } = await doneInSlot(title)
+    state.wf = e.wf
+    sh(slot, 'switch', '-q', '--detach')
+    const head = sh(e.project, 'rev-parse', line)
+    const other = join(tempDir('other-'), 'wt')
+    state.afterList = () => void sh(e.project, 'worktree', 'add', '-q', other, line)
+    crashAfterRemove()
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
+    expect(hasLine(e, line)).toBe(false)
+    expect(sh(other, 'symbolic-ref', 'HEAD')).toBe(`refs/heads/${line}`)
+    const ws = { path: e.home, lifetime: { aborted: false }, info: () => ({ projects: [] }), projectConfig: async () => ({ agents: [] }) } as never
+    return { e, n, line, head, other, ws }
+  }
+
+  for (const off of ['the rules', "Delete a card's branch once it's merged"] as const) {
+    it(`with ${off} off, the next pass puts the branch back for the checkout, and records it`, async () => {
+      const { e, n, line, head, other, ws } = await cutShort(`Off: ${off}`)
+      if (off === 'the rules') state.enforced = false
+      else state.deleteOn = false
+      await settleSlotCards(ws, e.project)
+      expect(sh(e.project, 'rev-parse', line)).toBe(head)
+      expect(sh(other, 'branch', '--show-current')).toBe(line)
+      expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual(['LineDeleting', 'LineDeleteUndone'])
+      expect(unsettledDeletions(e.store.factsOfKind(['LineDeleting', 'LineDeleted', 'LineDeleteUndone']))).toEqual([])
+    })
+  }
+
+  it('found whatever the card has done since (started again), and never settled twice', async () => {
+    const { e, n, line, head, ws } = await cutShort('Started again')
+    // A later cycle of the card: the begun deletion isn't in its current cycle any more, and is still found.
+    await e.wf.write(e.store.card(n), null, 'hive', (w) => void w.fact('Started', { folder: 'project', line: 'main', base: head, target: 'main', builder: 'B1', cardKind: 'code' }))
+    expect(cycleIn(e.store.facts(n))).toBeNull()
+    await settleSlotCards(ws, e.project)
+    expect(sh(e.project, 'rev-parse', line)).toBe(head)
+    await settleSlotCards(ws, e.project)
+    expect(e.kinds(n).filter((k) => k === 'LineDeleteUndone')).toHaveLength(1)
   })
 })
 
