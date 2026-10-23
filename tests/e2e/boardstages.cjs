@@ -23,6 +23,11 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
+/** Archive All's dialog once its card has left the column: its button "Archive 0 cards", and off (#1510). */
+const nothingToArchive = (dialog) => {
+  const button = dialog.getByRole('button', { name: /^Archive/ })
+  return until(async () => (await button.innerText().catch(() => '')) === 'Archive 0 cards' && (await button.isDisabled().catch(() => false)), HUNG_MS)
+}
 
 ;(async () => {
   q.prepare(fx)
@@ -153,10 +158,11 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     const ask = (await inv('tasks:forYou', 'alpha')).items.find((i) => i.card === okCard)
     await inv('tasks:answer', okCard, ask.request, { outcome: 'approved' })
     check('…the OK moves it to Merging while the dialog is open', !!(await until(async () => inColumn(okCard, 'merging'))))
-    const confirm = archiveDialog.getByRole('button', { name: /^Archive/ })
-    if (await confirm.isEnabled().catch(() => false)) await confirm.click()
-    else await archiveDialog.getByRole('button', { name: 'Cancel' }).click()
-    await until(async () => (await archiveDialog.count()) === 0)
+    // The dialog follows the board (#1510: read once, its button could still be on as the move reached it, then off for
+    // the click): nothing left in Approved to archive.
+    check('…the dialog follows: nothing in Approved to archive', !!(await nothingToArchive(archiveDialog)), await archiveDialog.innerText().catch(() => ''))
+    await archiveDialog.getByRole('button', { name: 'Cancel' }).click()
+    await until(async () => (await archiveDialog.count()) === 0, HUNG_MS)
     check('…and nothing in Merging is archived', (await h.card(okCard))?.archived === false && (await h.card(queued.n))?.archived === false)
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
 
@@ -186,10 +192,9 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     const oldAsk = (await inv('tasks:forYou', 'alpha')).items.find((i) => i.card === oldRules)
     await inv('tasks:answer', oldRules, oldAsk.request, { outcome: 'approved' })
     check('…your OK sends it into Merging (shown now) while the dialog is open', !!(await until(async () => inColumn(oldRules, 'merging'))), await columns())
-    const archiveNow = archiveDialog.getByRole('button', { name: /^Archive/ })
-    if (await archiveNow.isEnabled().catch(() => false)) await archiveNow.click()
-    else await archiveDialog.getByRole('button', { name: 'Cancel' }).click()
-    await until(async () => (await archiveDialog.count()) === 0)
+    check('…the dialog follows: nothing in Approved to archive (old rules)', !!(await nothingToArchive(archiveDialog)), await archiveDialog.innerText().catch(() => ''))
+    await archiveDialog.getByRole('button', { name: 'Cancel' }).click()
+    await until(async () => (await archiveDialog.count()) === 0, HUNG_MS)
     check('…and Approved\'s archive leaves it in Merging', (await h.card(oldRules))?.archived === false && (await inColumn(oldRules, 'merging')))
     fs.writeFileSync(fx.go, 'go')
     check('…then it merges under its own rules: Done', !!(await until(async () => (await h.card(oldRules))?.column === 'done')))
