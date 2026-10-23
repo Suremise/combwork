@@ -341,7 +341,6 @@ export interface HiveRequests {
   /** A target's queue history (#1357, the Git tab's Merge queue section): its latest 50 outcomes, newest first. */
   'queue:history': (projectPath: string, target: string) => QueueRecent[]
   /** The card an agent's worktree branch is for, when Hive merges it (#1357, the Merge dialog), and where it stands in the queue. */
-  'queue:branchCard': (projectPath: string, agentId: string) => BranchQueueCard | null
   /** The user saw these returned entries of a target's queue (#1356, the Progress panel): they leave its card. */
   'queue:seen': (projectPath: string, target: string, entries: string[]) => void
   /** Pause queue (the user's): the target's queue stops before its next entry; saved. A queue paused already keeps its pause. */
