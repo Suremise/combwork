@@ -645,8 +645,10 @@ older rulesets keep their ids, or `pool`). A lane started with the pool keeps `p
 instead of waking a lane reviewer, and `reviewerPool.ts` (one pass per project, like `settleSlotCards`, also on agents'
 status changes, lanes, board changes, the workspace opening, the rules switched and hourly) gives each waiting card, oldest
 submission first, to a free reviewer (`shared/workflow/reviewerPool.ts`'s `poolAssignments`: role, no dispatch lease,
-idle, reviewing nothing else, not its builder). It records `ReviewerAssigned` in a write that checks again, and tells
-the reviewer once (delivery source `pool-review`; typed in, or started with purpose `review`). `loopReviewer.ts` routes a
+idle, reviewing no other card of the project, not its builder). It records `ReviewerAssigned` in a write that checks
+again inside that transaction (`FactStore.dispatchLeased` on `slot_leases`, `cardsAt('review')`'s reviewers), and tells
+the reviewer once (delivery source `pool-review`; typed in, or started with purpose `review`), first releasing one that
+took a lease, left or stopped reviewing (`ReviewerReleased`). `loopReviewer.ts` routes a
 pool card's other handoffs to its current reviewer, and `loopWakes.ts` leaves its arrivals in Review to the pool.
 
 **Storage (P3's one migration, #1025, designed in #1208).** The DDL is `src/main/schema/v1_0.ts`: five steps, registered

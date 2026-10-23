@@ -168,6 +168,10 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
         const x = d as FactData['ReviewStarted']
         return `${x.reviewer} on submission ${x.submission}`
       }
+      case 'ReviewerReleased': {
+        const x = d as FactData['ReviewerReleased']
+        return `${x.reviewer} on submission ${x.submission} (${x.why})`
+      }
       case 'Verdict': {
         const x = d as FactData['Verdict']
         return `${x.pass ? 'passed' : 'failed'} by ${x.reviewer}, submission ${x.submission} (${r(x.revision)}), round ${x.round}`

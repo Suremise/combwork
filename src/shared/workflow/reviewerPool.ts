@@ -42,10 +42,11 @@ export interface PoolAssignment {
  * The assignments to make now: each pool card waiting for a reviewer (nobody on its latest submission, fewer passes than
  * its quorum), oldest submission first, given to the first free agent that reviews, isn't its builder and hasn't seen
  * this submission. Free: its role reviews (reviewer or either), no open dispatch lease, idle, and not reviewing another
- * card. A card no free agent can take doesn't hold up the cards after it.
+ * card (one of `cards`, or of `reviewing`: whoever reviews any other card of the project, in a lane or not). A card no
+ * free agent can take doesn't hold up the cards after it.
  */
-export function poolAssignments(cards: readonly PoolCard[], agents: readonly PoolAgent[]): PoolAssignment[] {
-  const busy = new Set(cards.map((c) => c.reviewing).filter((r): r is string => !!r))
+export function poolAssignments(cards: readonly PoolCard[], agents: readonly PoolAgent[], reviewing: Iterable<string> = []): PoolAssignment[] {
+  const busy = new Set([...reviewing, ...cards.map((c) => c.reviewing).filter((r): r is string => !!r)])
   const free = agents.filter((a) => reviewsWork(a.role) && !a.leased && a.idle && !busy.has(a.id))
   const waiting = cards.filter((c) => c.pool && !c.reviewing && c.passes < c.quorum).sort((a, b) => a.submittedAt.localeCompare(b.submittedAt) || a.card - b.card)
   const out: PoolAssignment[] = []
@@ -60,19 +61,27 @@ export function poolAssignments(cards: readonly PoolCard[], agents: readonly Poo
 
 /**
  * A submission's reviewers from its card's facts after it (in order): who was given it (`ReviewerAssigned`) or started
- * it (`ReviewStarted`), and who gave it a verdict. `reviewing`: the newest given or started with no verdict yet, among
- * `known` (an agent removed from the project can't review it; the user always counts).
+ * it (`ReviewStarted`), and who gave it a verdict. An assignment given up (`ReviewerReleased`) counts as neither.
+ * `reviewing`: the newest given or started with no verdict yet, among `known` (an agent removed from the project can't
+ * review it; the user always counts).
  */
 export function submissionReviewers(facts: readonly { kind: string; seq: number; data: unknown }[], submission: number, known: (id: string) => boolean): { seen: string[]; reviewing: string | null } {
-  const on: string[] = []
+  let on: string[] = []
   const judged = new Set<string>()
   for (const f of facts) {
     if (f.seq <= submission) continue
     const d = f.data as { reviewer?: unknown; submission?: unknown }
     if (d.submission !== submission || typeof d.reviewer !== 'string') continue
     if (f.kind === 'ReviewerAssigned' || f.kind === 'ReviewStarted') on.push(d.reviewer)
+    else if (f.kind === 'ReviewerReleased') on = on.filter((r) => r !== d.reviewer)
     else if (f.kind === 'Verdict') judged.add(d.reviewer)
   }
   const reviewing = on.filter((r) => !judged.has(r) && (r === 'user' || known(r))).at(-1) ?? null
   return { seen: [...new Set([...on, ...judged])], reviewing }
+}
+
+/** Who reviews a card now: its latest submission's reviewer with no verdict yet (submissionReviewers), else null. */
+export function reviewingNow(facts: readonly { kind: string; seq: number; data: unknown }[], known: (id: string) => boolean): { submission: number; reviewing: string | null } | null {
+  const latest = facts.findLast((f) => f.kind === 'Submitted')
+  return latest ? { submission: latest.seq, reviewing: submissionReviewers(facts, latest.seq, known).reviewing } : null
 }

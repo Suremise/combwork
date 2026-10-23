@@ -24,16 +24,15 @@ const state = vi.hoisted(() => ({
   busy: new Set<string>(),
   /** Agents running (typed into); the rest are launched. */
   running: new Set<string>(),
-  /** Agents holding an open dispatch lease (building in a slot). */
-  leased: new Set<string>(),
   deliveries: [] as { id: string; agentId: string; source?: string; ref?: string; state: string; body: string }[],
+  /** The next deliveries: given, or not (its agent got busy: cancelled). */
+  next: [] as ('given' | 'notGiven')[],
   calls: [] as string[]
 }))
 
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => state.enforced, agentRunsGoing: () => [], workflowFor: async () => state.wf }))
 vi.mock('../src/main/workflow/lineUpdates', async (orig) => ({ ...(await orig<object>()), agentBusy: (_p: string, a: string) => state.busy.has(a) }))
 vi.mock('../src/main/lanes', async (orig) => ({ ...(await orig<object>()), rawLanes: async () => state.lanes }))
-vi.mock('../src/main/slotsApp', async (orig) => ({ ...(await orig<object>()), poolFor: async () => ({ leasesOf: (a: string) => (state.leased.has(a) ? [{ id: `l-${a}`, kind: 'card', agent: a }] : []) }) }))
 vi.mock('../src/main/projectKeys', async (orig) => ({ ...(await orig<object>()), withCardNames: (_ws: unknown, fn: () => string) => fn() }))
 vi.mock('../src/main/sessions', async (orig) => {
   const actual = await orig<typeof import('../src/main/sessions')>()
@@ -52,7 +51,7 @@ vi.mock('../src/main/deliveries', async (orig) => {
   const actual = await orig<typeof import('../src/main/deliveries')>()
   let seq = 0
   const make = (nd: { agentId: string; source?: string; ref?: string; body: string }) => {
-    const r = { id: `m${++seq}`, agentId: nd.agentId, source: nd.source, ref: nd.ref, state: 'offered', body: nd.body }
+    const r = { id: `m${++seq}`, agentId: nd.agentId, source: nd.source, ref: nd.ref, state: state.next.shift() === 'notGiven' ? 'cancelled' : 'offered', body: nd.body }
     state.deliveries.push(r)
     return r
   }
@@ -75,10 +74,12 @@ let env: Env | null = null
 afterEach(() => {
   env?.close()
   env = null
-  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), leased: new Set(), deliveries: [], calls: [] })
+  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), deliveries: [], next: [], calls: [] })
 })
 
 const E1 = agentActor('E1')
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
+const HUNG_MS = 10000
 const AGENTS: AgentDef[] = [
   { id: 'B1', name: 'B1', workflowRole: 'builder' },
   { id: 'B2', name: 'B2', workflowRole: 'builder' },
@@ -100,6 +101,45 @@ function lane(e: Env, id: string, cards: number[], builder: string, reviewer: st
   }
   const t = new Date().toISOString()
   state.lanes.push({ id, project: 'project', name: null, builder: { id: builder, name: builder }, reviewer: reviewer ? { id: reviewer, name: reviewer } : null, cards, rounds: 10, waitMinutes: 360, state: 'active', startedBy: 'the user', startedAt: t, updatedAt: t, endedAt: null, mergeCommit: null, ...(reviewer ? {} : { pool: true as const }) })
+}
+
+/** Runs SQL on the workspace's hive.db on a connection of its own, as another Hive (or the slots' own writes) would. */
+function onDb<T>(e: Env, fn: (db: DatabaseSync) => T): T {
+  const db = new DatabaseSync(boardFile(e.home))
+  try {
+    db.exec('PRAGMA foreign_keys = ON')
+    return fn(db)
+  } finally {
+    db.close()
+  }
+}
+
+let slotNo = 0
+/** An agent's dispatch lease of the project's slots (a lane's), taken or ended, in hive.db's slot tables as #1429 keeps them. */
+function lease(e: Env, agent: string, open: boolean): void {
+  onDb(e, (db) => {
+    const at = new Date().toISOString()
+    if (!open) return void db.prepare('UPDATE slot_leases SET ended_at = ?, why = ? WHERE project = ? AND agent = ? AND ended_at IS NULL').run(at, 'test', 'project', agent)
+    const name = `slot-${++slotNo}`
+    db.prepare("INSERT INTO slots (project, name, folder, state, port_base, created_at, used_at) VALUES (?, ?, ?, 'lent', ?, ?, ?)").run('project', name, join(e.home, 'slots', name), 50000 + slotNo * 10, at, at)
+    db.prepare("INSERT INTO slot_leases (id, project, slot, kind, lane, agent, from_at) VALUES (?, ?, ?, 'lane', ?, ?, ?)").run(`lease-${slotNo}`, 'project', name, `lane-${agent}`, agent, at)
+  })
+}
+
+/**
+ * The runtime the pass is given, with `before` run once just before its next write (an assignment's, or a release's):
+ * another connection's change landing between the pass's reading and its write.
+ */
+function withBoundary(e: Env, before: () => void | Promise<void>): unknown {
+  let once: (() => void | Promise<void>) | null = before
+  const wf = Object.create(e.wf) as typeof e.wf
+  wf.write = (async (...args: Parameters<typeof e.wf.write>) => {
+    const hook = once
+    once = null
+    await hook?.()
+    return e.wf.write(...args)
+  }) as typeof e.wf.write
+  return wf
 }
 
 /** A card built by `by` and submitted: in a slot of its own (G11 = slots), or with a trailer in the project folder. */
@@ -285,11 +325,11 @@ describe("the pool's pass (#1443)", { timeout: 60_000 }, () => {
     await pass(e, agents)
     // E1 built it: nobody else reviews, so it waits.
     expect(assignedTo(e, mine.id)).toEqual([])
-    state.leased = new Set(['E1'])
+    lease(e, 'E1', true)
     await submitted(e, theirs, B1)
     await pass(e, agents)
     expect(assignedTo(e, theirs.id)).toEqual([])
-    state.leased = new Set()
+    lease(e, 'E1', false)
     await pass(e, agents)
     expect(assignedTo(e, theirs.id)).toEqual(['E1'])
     expect(assignedTo(e, mine.id)).toEqual([])
@@ -321,5 +361,95 @@ describe("the pool's pass (#1443)", { timeout: 60_000 }, () => {
     await submitted(e, pooled, B2)
     await pass(e, AGENTS.filter((a) => a.id !== 'R2'))
     expect(assignedTo(e, pooled.id)).toEqual([])
+  })
+
+  it("an agent's review started on another connection just before the assignment's write: not given that card too (HR3's round 1)", async () => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    const agents = AGENTS.filter((a) => a.id !== 'R2')
+    const [a, b] = ['First', 'Second'].map((t) => e.wf.createCard({ title: t }))
+    lane(e, 'L1', [a.id], 'B1', null)
+    lane(e, 'L2', [b.id], 'B2', null)
+    await submitted(e, a, B1)
+    await submitted(e, b, B2)
+    // The pass plans A for R1 (the only reviewer, free as it reads); R1 starts B's review on another connection first.
+    const other = e.another()
+    state.wf = withBoundary(e, async () => void moved(await other.startReview(b.key, R1)))
+    await pass(e, agents)
+    expect(assignedTo(e, a.id)).toEqual([])
+    expect(state.calls).toEqual([])
+    // Its verdict frees it: A is given to R1 then.
+    state.wf = e.wf
+    moved(await e.wf.verdict(b.key, R1, { pass: true, comment: 'ok' }))
+    await pass(e, agents)
+    expect(assignedTo(e, a.id)).toEqual(['R1'])
+  })
+
+  it("a dispatch lease taken just before the assignment's write, or one that can't be read: never given (HR3's round 1)", async () => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    const agents = [{ id: 'B1', name: 'B1', workflowRole: 'builder' }, { id: 'E1', name: 'E1', workflowRole: 'either' }] as AgentDef[]
+    const a = e.wf.createCard({ title: 'Raced' })
+    lane(e, 'L1', [a.id], 'B1', null)
+    await submitted(e, a, B1)
+    state.wf = withBoundary(e, () => lease(e, 'E1', true))
+    await pass(e, agents)
+    expect(assignedTo(e, a.id)).toEqual([])
+    lease(e, 'E1', false)
+    // The slots' table unreadable: nobody counts as free.
+    const unreadable = Object.create(e.wf) as typeof e.wf
+    Object.defineProperty(unreadable, 'store', { value: Object.assign(Object.create(e.store), { dispatchLeased: () => null }) })
+    state.wf = unreadable
+    await pass(e, agents)
+    expect(assignedTo(e, a.id)).toEqual([])
+    state.wf = e.wf
+    await pass(e, agents)
+    expect(assignedTo(e, a.id)).toEqual(['E1'])
+  })
+
+  it("a review outside any lane, or in a lane that has ended, keeps its reviewer from the pool (HR3's round 1)", async () => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    const agents = AGENTS.filter((a) => a.id !== 'R2')
+    state.running = new Set(['R1'])
+    const [loose, ended, pooled] = ['Loose', 'Ended lane', 'Pooled'].map((t) => e.wf.createCard({ title: t }))
+    await submitted(e, loose, B2)
+    moved(await e.wf.startReview(loose.key, R1))
+    lane(e, 'L1', [pooled.id], 'B1', null)
+    await submitted(e, pooled, B1)
+    await pass(e, agents)
+    expect(assignedTo(e, pooled.id)).toEqual([])
+    moved(await e.wf.verdict(loose.key, R1, { pass: true, comment: 'ok' }))
+    // Now one in a lane that has ended: R1 on its card, still not free.
+    lane(e, 'L0', [ended.id], 'B2', 'R1')
+    await submitted(e, ended, B2)
+    moved(await e.wf.startReview(ended.key, R1))
+    state.lanes = state.lanes.filter((l) => l.id !== 'L0')
+    onDb(e, (db) => db.prepare("UPDATE lanes SET state = 'ended', ended_at = ? WHERE id = 'L0'").run(new Date().toISOString()))
+    await pass(e, agents)
+    expect(assignedTo(e, pooled.id)).toEqual([])
+    expect(state.calls).toEqual([])
+    moved(await e.wf.verdict(ended.key, R1, { pass: true, comment: 'ok' }))
+    await pass(e, agents)
+    expect(assignedTo(e, pooled.id)).toEqual(['R1'])
+  })
+
+  it('an agent given a card that takes a dispatch lease before it is told is released, and the card given again', async () => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    const agents = [{ id: 'B1', name: 'B1', workflowRole: 'builder' }, { id: 'E1', name: 'E1', workflowRole: 'either' }, { id: 'R1', name: 'R1', workflowRole: 'reviewer' }] as AgentDef[]
+    const a = e.wf.createCard({ title: 'Released' })
+    lane(e, 'L1', [a.id], 'B1', null)
+    await submitted(e, a, B1)
+    // E1 (first in the project's order) is given it; its delivery isn't given (it got busy).
+    state.running = new Set(['E1'])
+    state.next = ['notGiven']
+    await pass(e, agents)
+    expect(assignedTo(e, a.id)).toEqual(['E1'])
+    // E1 starts building in a slot before it is told: released, and R1 is given the card.
+    lease(e, 'E1', true)
+    await pass(e, agents)
+    const sub = e.wf.state(e.store.card(a.id)).latest!.id
+    expect(e.store.facts(a.id).filter((f) => f.kind === 'ReviewerReleased').map((f) => f.data)).toEqual([{ reviewer: 'E1', submission: sub, why: 'leased' }])
+    await vi.waitFor(() => expect(assignedTo(e, a.id)).toEqual(['E1', 'R1']), { timeout: HUNG_MS })
+    expect(poolReviewerOf(e.store.facts(a.id))).toBe('R1')
   })
 })

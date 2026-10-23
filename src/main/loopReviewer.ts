@@ -48,8 +48,15 @@ export async function loopReviewerOf(ws: WorkspaceService, card: TaskCard): Prom
 export function poolReviewerOf(facts: readonly Fact[]): string | null {
   const latest = facts.findLast((f) => f.kind === 'Submitted')
   if (!latest) return null
-  const on = facts.filter((f) => (f.kind === 'ReviewerAssigned' || f.kind === 'ReviewStarted') && (f.data as { submission?: number }).submission === latest.seq)
-  return (on.at(-1)?.data as { reviewer?: string } | undefined)?.reviewer ?? null
+  let on: string[] = []
+  for (const f of facts) {
+    const d = f.data as { reviewer?: string; submission?: number }
+    if (d.submission !== latest.seq || typeof d.reviewer !== 'string') continue
+    if (f.kind === 'ReviewerAssigned' || f.kind === 'ReviewStarted') on.push(d.reviewer)
+    // An assignment given up before its review started (`ReviewerReleased`) isn't its reviewer.
+    else if (f.kind === 'ReviewerReleased') on = on.filter((r) => r !== d.reviewer)
+  }
+  return on.at(-1) ?? null
 }
 
 /** Whether a card's lane is reviewed by the pool (#1443): its arrivals in Review are the pool's to give, not a loop wake's. */

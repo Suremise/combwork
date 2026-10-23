@@ -407,6 +407,24 @@ export class FactStore {
     return this.records('project = ? AND archived = 0', [this.scope.project])
   }
 
+  /** This project's cards (not archived) in a stage, by number (#1443: whom each card in Review has reviewing it). */
+  cardsAt(stage: StageId): number[] {
+    return this.conn.read((db) => (db.prepare('SELECT number FROM cards WHERE project = ? AND archived = 0 AND (stage = ? OR (stage IS NULL AND col = ?)) ORDER BY number').all(this.scope.project, stage, STAGE_CATEGORY[stage]) as { number: number }[]).map((r) => r.number))
+  }
+
+  /**
+   * Whether an agent holds an open dispatch lease of a project's slots (#1434: a card's or a lane's, not a carried one),
+   * as the slots' table has it (`slotProject`: their project id); null when it can't be read. Read in a write, it is that
+   * write's (#1443: the reviewer pool's assignment checks it where it records one).
+   */
+  dispatchLeased(slotProject: string, agent: string): boolean | null {
+    try {
+      return this.conn.read((db) => !!db.prepare("SELECT 1 FROM slot_leases WHERE project = ? AND agent = ? AND ended_at IS NULL AND kind <> 'carried'").get(slotProject, agent))
+    } catch {
+      return null
+    }
+  }
+
   /** A new card of this project on the board (the runtime's own; the board's are made by tasks.ts), in Todo unless `stage` says. */
   createCard(c: Omit<CardRecord, 'id' | 'key' | 'stage' | 'category' | 'lane' | 'reviewer' | 'reviewerPool' | 'rounds'> & { stage?: StageId }): CardRecord {
     const stage = c.stage ?? 'todo'
