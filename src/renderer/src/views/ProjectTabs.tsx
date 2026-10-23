@@ -302,7 +302,7 @@ const S = {
   hours: msg({ id: 'project.settings.hours', defaultMessage: '{count} h', description: 'Hours, short, as in "Inherit (6 h)".' }),
   openHive: msg({ id: 'project.settings.openHive', defaultMessage: 'Open .hive folder', description: "Button: opens the project's .hive folder. Keep .hive." }),
   resetTitle: msg({ id: 'project.settings.resetTitle', defaultMessage: 'Reset project settings?', description: 'Title of the confirmation before resetting the project settings.' }),
-  resetMessage: msg({ id: 'project.settings.resetMessage', defaultMessage: "The default provider, each provider’s model, effort, permission mode, context and extra arguments, the chime, the compact threshold, the transcript size warning, file locks, worktree setup and the card-loop rounds and wait go back to Inherit, and loop wakes back on. Agents and skill and MCP opt-outs are kept.", description: 'The confirmation before resetting the project settings.' }),
+  resetMessage: msg({ id: 'project.settings.resetMessage', defaultMessage: "The default provider, each provider’s model, effort, permission mode, context and extra arguments, the chime, the fresh-start suggestion, the compact threshold, the transcript size warning, file locks, worktree setup and the card-loop rounds and wait go back to Inherit, and loop wakes back on. Agents and skill and MCP opt-outs are kept.", description: 'The confirmation before resetting the project settings.' }),
   reset: msg({ id: 'project.settings.reset', defaultMessage: 'Reset', description: "The reset confirmation's button." }),
   resetButton: msg({ id: 'project.settings.resetButton', defaultMessage: 'Reset to defaults', description: 'Button: resets the project settings (asks first).' }),
   search: msg({ id: 'project.settings.search', defaultMessage: 'Search {project} settings', description: "Placeholder of Project Settings' search box." }),
@@ -1928,6 +1928,20 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
         </select>
       )
     },
+    {
+      // Suggest a fresh start when work finishes (#1437): this project's own of Settings → Notifications'.
+      section: 'sessions',
+      key: 'suggestFreshStart',
+      ...rowText('project.suggestFreshStart'),
+      modified: (cfg.suggestFreshStart ?? 'inherit') !== 'inherit',
+      render: () => (
+        <select className="select" data-setting="suggestFreshStart" value={cfg.suggestFreshStart ?? 'inherit'} onChange={(e) => void update({ suggestFreshStart: e.target.value as ProjectConfig['suggestFreshStart'] })}>
+          <option value="inherit">{inherit(tr(settings.notifications.suggestFreshStart !== false ? S.onLower : S.offLower))}</option>
+          <option value="on">{tr(S.on)}</option>
+          <option value="off">{tr(S.offChoice)}</option>
+        </select>
+      )
+    },
     // Carrying on (#1432): this project's own of Settings → Advanced's inbox switches.
     ...INBOX_SWITCHES.map((which): ProjectSettingDef => {
       const key = INBOX_PROJECT_KEY[which]
@@ -2057,7 +2071,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
           className="btn subtle"
           onClick={async () => {
             if (await confirm({ title: tr(S.resetTitle), message: tr(S.resetMessage), confirmLabel: tr(S.reset) }))
-              void update({ defaultProvider: 'inherit', providers: {}, chime: 'inherit', inboxCheckpoints: 'inherit', inboxStopContinuation: 'inherit', inboxIdleWakes: 'inherit', compactSuggestTokens: null, transcriptWarnMB: null, fileLocks: 'inherit', worktreeCopy: null, worktreeSetup: '', loopWakes: true, loopRounds: null, loopWaitHours: null, loopStepWaitMinutes: null })
+              void update({ defaultProvider: 'inherit', providers: {}, chime: 'inherit', suggestFreshStart: 'inherit', inboxCheckpoints: 'inherit', inboxStopContinuation: 'inherit', inboxIdleWakes: 'inherit', compactSuggestTokens: null, transcriptWarnMB: null, fileLocks: 'inherit', worktreeCopy: null, worktreeSetup: '', loopWakes: true, loopRounds: null, loopWaitHours: null, loopStepWaitMinutes: null })
           }}
         >
           <Icon name="discard" /> {tr(S.resetButton)}

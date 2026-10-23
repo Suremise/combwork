@@ -307,4 +307,20 @@ describe('a follow-up its builder posted in Review or Passed that nobody checks 
     expect(pendingDesign(doing(line(5, 'movedBottom', 'Moved to the bottom of Active', 'doing')))).toEqual(design)
     expect(pendingStep(doing(line(5, 'movedBottom', 'Moved to the bottom of Todo', 'todo')))).toBeNull()
   })
+  it('the column a step was posted in is kept on its line: a real move ends it, a change of place keeps it, with the lines before trimmed (#1495)', () => {
+    const line = (min: number, id: string, what: string, column: string) => ({ at: at(min), by: 'You', what, whatText: { id: `tasks.history.${id}`, values: { column } } })
+    // MAX_HISTORY keeps 300 lines: a long stay in Passed can trim its arrival before a follow-up is posted.
+    const earlier = Array.from({ length: 298 }, (_, i) => ({ at: at(-60), by: 'Hive', what: `Note ${i}` }))
+    const keptIn = (column: string) => ({ ...posted, whatText: { id: 'tasks.history.loopStep', values: { step: 'followUp', text: 'Fixes: …', column } } })
+    const trimmed = (column: string, ...after: ReturnType<typeof line>[]) => ({ history: [...earlier, keptIn(column), ...after] })
+    // Into Review from Passed, at its top or bottom: the step ends (HR4's case on #1467: a phantom follow-up before).
+    expect(pendingStep(trimmed('passed', line(5, 'movedTop', 'Moved to the top of Review', 'review')))).toBeNull()
+    expect(pendingStep(trimmed('passed', line(5, 'movedBottom', 'Moved to the bottom of Review', 'review')))).toBeNull()
+    // Its place within Passed changed: it still waits.
+    for (const [id, what] of [['movedTop', 'Moved to the top of Approved'], ['movedBottom', 'Moved to the bottom of Approved'], ['placed', 'Placed 2nd in Approved']]) expect(pendingStep(trimmed('passed', line(5, id, what, 'passed')))?.step).toBe('followUp')
+    expect(pendingStep(trimmed('passed'))?.step).toBe('followUp')
+    // The kept column wins over the lines before it; a line from before #1495 keeps reading them.
+    expect(pendingStep({ history: [line(-90, 'moved', 'Moved to Review', 'review'), keptIn('passed'), line(5, 'movedTop', 'Moved to the top of Approved', 'passed')] })?.step).toBe('followUp')
+    expect(pendingStep({ history: [line(-90, 'moved', 'Moved to Approved', 'passed'), posted, line(5, 'movedTop', 'Moved to the top of Review', 'review')] })).toBeNull()
+  })
 })

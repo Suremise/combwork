@@ -31,6 +31,7 @@ const { testHooks: intentHooks } = await import('../src/main/cardIntents')
 const { configTestHooks } = await import('../src/main/workspace')
 const { loopReviewerOf } = await import('../src/main/loopReviewer')
 const { config } = await import('../src/main/config')
+const { pendingStep } = await import('../src/shared/tasks')
 const { providerService } = await import('../src/main/providerService')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
@@ -543,6 +544,10 @@ describe('a card by intent (#1267)', () => {
     expect(posted.card).toMatchObject({ column: 'passed', agent: 'a1' })
     expect(posted.card.comments.at(-1)).toMatchObject({ text: `Follow-up ${id}, for the reviewer's check (an answer names ${id}):\n\nFixes: the dark theme at 1093e21.` })
     expect(posted.card.history.at(-1)?.what).toBe('Posted a follow-up for the reviewer to check: "Fixes: the dark theme at 1093e21."')
+    // Its line keeps the column it was posted in (#1495): with the lines before it trimmed, a reorder in Passed keeps it waiting.
+    expect(posted.card.history.at(-1)?.whatText?.values).toMatchObject({ column: 'passed' })
+    expect(pendingStep({ history: [posted.card.history.at(-1)!, { at: new Date().toISOString(), by: 'You', what: 'Moved to the top of Approved', whatText: { id: 'tasks.history.movedTop', values: { column: 'passed' } } }] })?.step).toBe('followUp')
+    expect(pendingStep({ history: [posted.card.history.at(-1)!, { at: new Date().toISOString(), by: 'You', what: 'Moved to the top of Review', whatText: { id: 'tasks.history.movedTop', values: { column: 'review' } } }] })).toBeNull()
     expect(foldCard(facts(w, card)).step).toMatchObject({ step: 'followUp', id, until: null })
     // Its reviewer is woken, whatever it watches.
     expect(wakesOf(w, card).slice(before)).toEqual(['a2'])

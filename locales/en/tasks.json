@@ -471,6 +471,14 @@
     "defaultMessage": "Returned for review, round {round}",
     "description": "A line in a card's history: after a failed review, the card was sent back for its next review; {round} is the round's number."
   },
+  "tasks.history.reviewCopyLeased": {
+    "defaultMessage": "{agent} reviews in {copy} at {revision}",
+    "description": "A line in a card's history (#1439): the reviewer {agent} (its name) reviews in the review copy {copy} (its name, \"copy-2\": keep it as it is), a folder at exactly the revision {revision} (a commit id: keep it as it is)."
+  },
+  "tasks.history.reviewCopyWaiting": {
+    "defaultMessage": "{agent} is waiting for a review copy",
+    "description": "A line in a card's history (#1439): the reviewer {agent} (its name) started reviewing, but every review copy is in use or being set up; Hive gives it one when it can. A review copy: a folder Hive keeps at exactly the revision under review."
+  },
   "tasks.history.reviewEnded": {
     "defaultMessage": "Review by {agent} stopped: {why, select, sessionEnded {its session ended} agentRemoved {the agent was removed} other {{why}}}",
     "description": "A line in a card's history: the review the agent {agent} (its name) had going on the card ended, because its session ended or it was removed from the project ({why}, select: translate each)."

@@ -259,7 +259,9 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
     startHook: true,
     startupSizeRefresh: false,
     bracketedPaste: true,
-    enterOnceDrawn: false
+    enterOnceDrawn: false,
+    // --add-dir (2.1.309).
+    extraDirs: true
   },
   reservedKeys: ['MOD+B', 'MOD+K', 'MOD+O', 'MOD+R', 'MOD+T', 'MOD+G'],
   instructionsFile: 'CLAUDE.md',

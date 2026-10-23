@@ -405,6 +405,9 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     else args.push('--session-id', ctx.sessionId)
     if (ctx.name) args.push('--name', runsThroughCmd(executable) ? ctx.name.replace(/["%^&|<>!]/g, ' ').replace(/\s+/g, ' ').trim() : ctx.name)
     args.push('--plugin-dir', join(dir, 'plugin'))
+    // Folders it may also work in (#1439: a reviewer's review copies), within its permission mode. --add-dir takes several
+    // (2.1.309), so an option always follows it here, never the first prompt.
+    for (const d of ctx.extraDirs ?? []) args.push('--add-dir', d)
     // Only the workspace's servers; switched off (#1281), Claude Code's own load too, and the --mcp-config ones still win
     // over its own of the same name, hive included (2.1.305: the user's and the project's are never started).
     args.push('--mcp-config', join(ctx.privateDir, 'mcp.json'))

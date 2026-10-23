@@ -23,6 +23,7 @@ import { agentLimit } from './projectAgents'
 import { progress, progressGate } from './progressService'
 import { childEnv } from './ptyHost'
 import { sessions } from './sessions'
+import { removeCopiesIn } from './skillCopies'
 import { settleSlotJob } from './slotJobs'
 import { builderCountOf, SlotPool, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRunEnd, type SlotRunner } from './slots'
 import { onHiveEvent } from './events'
@@ -212,7 +213,8 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       },
       removeIdle: () => advanced.get(SLOTS_REMOVE_IDLE) !== false,
       ended: (lease, slot) => stopLeaseSession(projectPath, lease, slot),
-      writerOver: (w) => writerOver(w)
+      writerOver: (w) => writerOver(w),
+      removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }) // i18n-ignore: the log's reason (English)
     })
   })()
   pools.set(key, { life: ws.lifetime, pool })

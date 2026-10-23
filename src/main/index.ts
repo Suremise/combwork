@@ -56,7 +56,9 @@ import { releaseQueueRunners } from './workflow/queueRunner'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { startSlots, stopSlots } from './slotsApp'
 import { startSlotCards, stopSlotCards } from './slotCards'
+import { startFreshNudges } from './freshStarts'
 import { startCopies, stopCopies } from './copiesApp'
+import { startReviewCopies, stopReviewCopies } from './reviewCopies'
 import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
 import { startLockRecords } from './workflow/lockRecord'
 import { setQueueLive, setRunsGoing } from './workflow/service'
@@ -997,8 +999,11 @@ app.whenReady().then(async () => {
   startSlots()
   // Cards on slots (#1438): a start lends its builder a slot and makes its line there, Done or put back gives it back.
   startSlotCards()
+  // The nudge to start fresh when a project's work has finished (#1437).
+  startFreshNudges()
   // Review and check copies (#1435): returning ones looked at again every 30 s, idle ones tidied every hour.
   startCopies()
+  startReviewCopies()
   // The queue's order as agents read it (#1354): this Hive's entry testing now, at its step.
   setQueueLive(queueLive)
   // An agent's branch brought up to date between a lane's cards after a squash merge (#1271, SPEC §16.19.2), once the
@@ -1135,6 +1140,7 @@ app.on('will-quit', () => {
   stopSlotCards()
   stopSlots()
   stopCopies()
+  stopReviewCopies()
   flightRecorder.stop()
   advanced.stop()
   destroyTray()

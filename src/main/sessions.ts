@@ -1,7 +1,7 @@
 import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { ASSISTANT_OTHER_MCP, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { ASSISTANT_OTHER_MCP, COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { capturedText, hiveError, HiveError, shownError } from './hiveError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
@@ -22,6 +22,8 @@ import { defaultPurpose, resumeHold, slotAt, type FolderPurpose, type FolderSlot
 import { holdText } from '../shared/sessionResume'
 import { bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, releaseWriter, settleWriter } from './agentFolders'
 import { slotEnv } from './slots'
+import { copiesDirOf, grantsCopies } from './copies'
+import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
 import { agentLaunchSettings, canSwitchModeLive, defaultProviderPending, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
 import { resolvedModel } from '../shared/models'
@@ -44,6 +46,7 @@ import type {
   Attached,
   AttachmentPlan,
   SessionListItem,
+  Notice,
   SessionRecord,
   SessionSkipReason,
   SubSession,
@@ -330,6 +333,8 @@ interface LiveSession {
   lease?: string
   /** Its slot's environment (HIVE_SLOT, HIVE_SLOT_PORT_BASE) while it runs in one. */
   slotEnv?: Record<string, string>
+  /** The folders its launch was granted outside its own (#1439: its project's review copies). */
+  extraDirs?: string[]
   /** Throws if whoever asked for this launch may no longer have it (the Assistant's authority), checked just before spawning. */
   startAllowed?: () => void
   /** The CLI asked something before it started (e.g. whether to trust the folder): shown as waiting for the user. */
@@ -418,6 +423,12 @@ interface LiveSession {
    * clears it.
    */
   confirming?: symbol
+  /**
+   * The deliveries the line marked not taken (`state.untakenLine`) rang for (#1514 round 1 finding): only one of them read
+   * shows that line was taken; another's read (an older line's, taken long ago) leaves the mark. Empty: a line that rang
+   * for none Hive knows.
+   */
+  untakenFor?: readonly string[]
 }
 
 export interface EffectiveSettings {
@@ -1129,6 +1140,11 @@ class SessionManager {
     return this.projectStates(projectPath)[0] ?? null
   }
 
+  /** The folders a running agent's launch was granted outside its own (#1439: its project's review copies); none if not running. */
+  grantedDirs(projectPath: string, agentId: string): readonly string[] {
+    return this.live.get(liveId(projectPath, agentId))?.extraDirs ?? []
+  }
+
   projectStates(projectPath: string): LiveSessionState[] {
     const prefix = `${projectPath.toLowerCase()}#`
     return [...this.live.entries()].filter(([k]) => k.startsWith(prefix)).map(([, l]) => l.state)
@@ -1722,6 +1738,12 @@ class SessionManager {
     // Instructions of Hive's own given to this conversation at an earlier launch, by any agent (SessionRecord.promptAdded).
     const promptAddedBefore = resume && (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions.find((s) => s.id === sessionId)?.promptAdded === true
     if (assistantText?.text.trim() || notes.trim()) l.promptAdded = true
+    // A reviewer's grant of the project's review copies (#1439): one fixed folder, made if new, so it never changes
+    // between submissions. Never in a slot (either building there) nor with review copies off.
+    const copies = copiesDirOf(workspaceOf(projectPath).worktreesRoot, projectPath)
+    const granted = grantsCopies({ capable: adapter.descriptor.capabilities.extraDirs, on: advanced.get(COPIES_REVIEW) !== false, reviews: reviewsWork(agentWorkflowRole(agent)), inProjectFolder: !l.slotEnv && samePlace(cwd, projectPath), assistant: workspace.isAssistantHome(projectPath) })
+    const extraDirs = granted && (await mkdir(copies, { recursive: true }).then(() => true, () => false)) ? [copies] : []
+    l.extraDirs = extraDirs
     times?.mark('guidance')
     const ctx = {
       projectPath,
@@ -1743,6 +1765,7 @@ class SessionManager {
       use200kContext: eff.use200kContext,
       copies: copyBook(workspaceOf(projectPath)),
       othersHere: () => this.othersIn(cwd, id),
+      extraDirs,
       hookUrl: `${this.hookUrl}?run=${state.runId}`,
       hookAuthFile: hookAuth.file,
       privateDir: hookAuth.dir,
@@ -2548,10 +2571,11 @@ class SessionManager {
    * marked in its pane, and the user told once; nothing more is typed into it until the CLI takes it or the user types
    * there. Only for this launch.
    */
-  lineNotTaken(projectPath: string, agentId: string, runId: string, text: string, retried = true): void {
+  lineNotTaken(projectPath: string, agentId: string, runId: string, text: string, retried = true, rangFor: readonly string[] = []): void {
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l || l.state.runId !== runId || l.state.untakenLine) return
     l.state.untakenLine = { since: new Date().toISOString(), text: text.replace(/\s+/g, ' ').trim().slice(0, 160) }
+    l.untakenFor = [...rangFor]
     this.emitState(l.state)
     const label = this.label(l.state)
     const body = retried
@@ -2579,6 +2603,18 @@ class SessionManager {
     }
   }
 
+  /**
+   * A line Hive typed into an agent, marked not taken, was taken after all (#1514): `delivery`, which that very line rang
+   * for, was read in the same launch (Codex takes a line typed while a turn runs as queued input, with no prompt Hive
+   * sees). The mark goes, so its input isn't held for a line its CLI no longer has. Another line's delivery read leaves it
+   * (round 1 finding: an older line's, read late, says nothing of this one).
+   */
+  lineTaken(projectPath: string, agentId: string, runId: string, delivery: string, why: string): void {
+    const l = this.live.get(liveId(projectPath, agentId))
+    if (!l || l.state.runId !== runId || !l.untakenFor?.includes(delivery)) return
+    this.clearUntaken(l, why)
+  }
+
   /** Whether an agent has a line Hive typed that its CLI hasn't taken (#430): nothing more is typed into it meanwhile. */
   lineUntaken(projectPath: string, agentId: string): boolean {
     return !!this.live.get(liveId(projectPath, agentId))?.state.untakenLine
@@ -2604,6 +2640,7 @@ class SessionManager {
     if (!u) return
     log.info(`${userText(this.label(l.state))}: the line Hive typed is no longer waiting (${why}, ${Math.round((Date.now() - Date.parse(u.since)) / 1000)} s after it was marked)`)
     l.state.untakenLine = undefined
+    l.untakenFor = undefined
     this.emitState(l.state)
   }
 
@@ -2915,6 +2952,21 @@ class SessionManager {
     if (!(await this.endConversation(projectPath, agentId))) throw hiveError(msg({ id: 'session.newConversation.didntStop', defaultMessage: "It didn't stop, so no new conversation was started.", description: "Giving an agent a task in a new conversation failed: it didn't stop." }))
     allowed?.()
     return this.start(projectPath, { agentId, prompt, allowed })
+  }
+
+  /**
+   * Start Fresh (#1437): an idle running agent's conversation ended (it stays in the Sessions tab) and a new one started,
+   * where its new conversations start (agentFolders.ts): null, or why not. `whyNot` (freshStarts.ts) says why it isn't
+   * idle now; it is asked, and Hive typing into it checked, just before the stop with no wait between them
+   * (stopWhereAndWait marks the run stopping before its first wait), so the run stopped is the idle one checked.
+   */
+  async startFresh<W extends string>(projectPath: string, agentId: string, whyNot: () => W | null): Promise<W | 'pending' | null> {
+    projectPath = workspace.assertProject(projectPath)
+    const why = this.delivering.has(this.key(projectPath, agentId)) ? 'pending' : whyNot()
+    if (why) return why
+    if (!(await this.endConversation(projectPath, agentId))) throw hiveError(msg({ id: 'session.newConversation.didntStop', defaultMessage: "It didn't stop, so no new conversation was started.", description: "Giving an agent a task in a new conversation failed: it didn't stop." }))
+    await this.start(projectPath, { agentId })
+    return null
   }
 
   /** Stops a running agent to end its conversation (kept in the Sessions tab): whether it has stopped. */
@@ -4811,7 +4863,7 @@ class SessionManager {
    * notification (route()). A notice is a warning that needs no sound. Its title and body are formatted in the language
    * Hive shows; the Agent API's stream gets the title in English (`apiTitle`, #796), and never the body.
    */
-  private notify(projectPath: string, titleText: Text, bodyText: TextPart, kind: 'finished' | 'waiting' | 'notice', agentName?: string, agentId?: string): void {
+  private notify(projectPath: string, titleText: Text, bodyText: TextPart, kind: 'finished' | 'waiting' | 'notice', agentName?: string, agentId?: string, action?: { label: Text; command: string; args?: unknown[] }): void {
     const title = shownText(titleText)
     const apiTitle = englishText(titleText)
     const body = shownText(bodyText)
@@ -4834,15 +4886,17 @@ class SessionManager {
       this.finishes.add({ projectPath, project: assistant ? ASSISTANT_NAME : basename(projectPath), agent: assistant ? ASSISTANT_NAME : (agentName ?? 'Agent'), title, apiTitle, body })
       return
     }
-    this.deliver(projectPath, title, body, kind, agentId, apiTitle)
+    this.deliver(projectPath, title, body, kind, agentId, apiTitle, action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) })
   }
 
   /**
    * A notice about a project's work that no one agent gives (#1266: a card's request for the user, a lane's events), told
    * as every notice is (notify): a banner in the window the user is using or a Windows notification, as the settings say.
+   * `action`: a banner's button (#1437: Start Fresh (Idle Agents)), a command of the window's; a Windows notification
+   * shows the project.
    */
-  notice(projectPath: string, title: Text, body: TextPart): void {
-    this.notify(projectPath, title, body, 'notice')
+  notice(projectPath: string, title: Text, body: TextPart, action?: { label: Text; command: string; args?: unknown[] }): void {
+    this.notify(projectPath, title, body, 'notice', undefined, undefined, action)
   }
 
   /** Where a notice about this project goes now: the settings, and the Hive window the user is using (noticeRoute). */
@@ -4851,9 +4905,9 @@ class SessionManager {
   }
 
   /** A banner in the focused window, or a Windows notification, as route() says now; `apiTitle`: its title in English, when `title` is translated. */
-  private deliver(projectPath: string, title: string, body: string, kind: 'finished' | 'waiting' | 'notice', agentId?: string, apiTitle?: string): void {
+  private deliver(projectPath: string, title: string, body: string, kind: 'finished' | 'waiting' | 'notice', agentId?: string, apiTitle?: string, action?: Notice['action']): void {
     const route = this.route(projectPath, kind)
-    const notice = { id: randomUUID(), kind, title, ...(apiTitle && apiTitle !== title ? { apiTitle } : {}), body, projectPath, ...(agentId ? { agentId } : {}) }
+    const notice: Notice = { id: randomUUID(), kind, title, ...(apiTitle && apiTitle !== title ? { apiTitle } : {}), body, projectPath, ...(agentId ? { agentId } : {}), ...(action ? { action } : {}) }
     if (route === 'windows') {
       // The Agent API's stream hears of every notice Hive tells, as a banner or a Windows notification (#620).
       tellListeners({ type: 'notice', notice, windows: true })

@@ -192,6 +192,9 @@ export const SLOTS_SETUP_MINUTES = 'hive.slots.setupMinutes'
 /** Whether reviewers review in review copies (#1435, SPEC §16.10.5): read by main's copiesApp. */
 export const COPIES_REVIEW = 'hive.copies.review'
 
+/** Whether workflow rules are enforced (#1265): the switch every gate answers to (workflow/service.ts's ENFORCE). */
+export const WORKFLOW_ENFORCE = 'hive.workflow.enforce'
+
 /** How long a returned copy waits to be quiet before it shows as still in use, in minutes (#1435): read by main's copiesApp. */
 export const COPIES_QUIET_WAIT = 'hive.copies.quietWaitMinutes'
 

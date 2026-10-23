@@ -23,6 +23,7 @@ import { progress, progressGate } from './progressService'
 import { cardOfRef, isCardRef, withCardNames } from './projectKeys'
 import { admitLinked, commitIn, folderHead, IssuedLinks, linkOwner, publicLink, resolveRunLink, type RunLink, type RunLinkDeps } from './workflow/runLink'
 import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, isolatedRunEnded, takeStopped } from './copiesApp'
+import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
 import { newestComments, progressLabel, taskRow, withoutHistory, type IntentDone, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
@@ -64,7 +65,8 @@ import { folderFacts } from './agentFolders'
 import { slotAt } from '../shared/agentFolders'
 import { cardStall, laneOrderView, stepWaitOf } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
-import { ackDeliveries, deliveriesOf, deliverNow, deliveryView, launchWith, NotGiven, readInbox } from './deliveries'
+import { ackDeliveries, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
+import { INBOX_SWITCHES, type InboxSwitch } from '../shared/inboxSwitches'
 import { isDoorbell } from '../shared/doorbell'
 import type { DeliverySender } from '../shared/deliveries'
 import * as tasks from './tasks'
@@ -1255,7 +1257,7 @@ route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body 
   // Tied to a card's round (#652): stale, never given, once the card has moved on.
   const card = body?.card === undefined || body?.card === null ? undefined : Number(cardRefIn(body.card))
   if (card !== undefined && !(Number.isInteger(card) && card > 0)) throw new HttpError(400, 'card must be a card: its number or key (12 or HI-12)')
-  return assistantChange<{ id: string; typed: boolean; queued: number; status: string; round?: number; card?: number; names?: Record<string, string> }>('agents', `leave ${a.name} in ${basename(p)} a message`, { kind: 'message-agent', project: basename(p), agent: actAgent(a), ...(card !== undefined ? { card } : {}) }, async (guard) => {
+  return assistantChange<{ id: string; typed: boolean; queued: number; status: string; tells?: InboxSwitch[]; round?: number; card?: number; names?: Record<string, string> }>('agents', `leave ${a.name} in ${basename(p)} a message`, { kind: 'message-agent', project: basename(p), agent: actAgent(a), ...(card !== undefined ? { card } : {}) }, async (guard) => {
     const st = sessions.liveFor(p, agentId)
     if (!st) throw new HttpError(409, `${a.name} isn't running. Start it with the message as its task instead (hive_start_agent with prompt).`)
     guard()
@@ -1266,7 +1268,10 @@ route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body 
     if (r.fate === 'cancelled' || r.fate === 'expired' || r.fate === 'refused' || r.fate === 'stale') throw new HttpError(409, `The message wasn't typed into ${a.name}: ${r.fate === 'cancelled' ? (r.detail ?? 'cancelled') : `${r.fate}, ${r.detail ?? ''}`}.`)
     const typed = r.fate === 'typed'
     const tied = r.round && card !== undefined ? ` for ${cardRef(card)} round ${r.round}` : ''
-    return { done: `${typed ? 'Gave' : 'Left'} ${a.name} in ${basename(p)} a message (${r.id})${tied}${typed ? '' : ' (queued)'}`, said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { id: r.id, typed, queued: r.queued, status: typed ? (sessions.liveFor(p, agentId)?.status ?? 'stopped') : st.status, ...(r.round ? { round: r.round, ...(card !== undefined ? { card, ...withNames([card]) } : {}) } : {}) } }
+    // Queued: the ways Hive tells it, by the carrying-on switches on for it now (#1497: its project's own, else Settings').
+    const on = typed ? null : await Promise.all(INBOX_SWITCHES.map((s) => inboxSwitch(p, s)))
+    const tells = on ? INBOX_SWITCHES.filter((_s, i) => on[i]) : null
+    return { done: `${typed ? 'Gave' : 'Left'} ${a.name} in ${basename(p)} a message (${r.id})${tied}${typed ? '' : ' (queued)'}`, said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { id: r.id, typed, queued: r.queued, status: typed ? (sessions.liveFor(p, agentId)?.status ?? 'stopped') : st.status, ...(tells ? { tells } : {}), ...(r.round ? { round: r.round, ...(card !== undefined ? { card, ...withNames([card]) } : {}) } : {}) } }
   })
 })
 
@@ -2331,7 +2336,13 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   // A change of its kind with anything else is one board change (HR3's #1277 round 1): refused part way, none of it.
   const apply = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, changes) : taskView(c))
-  if (actor.kind !== 'assistant') return reply(await apply())
+  if (actor.kind !== 'assistant') {
+    const c = await apply()
+    const copy = await reviewCopyAfter(actor, c, { start: patch.review === 'start', verdict: patch.review === 'passed' || patch.review === 'failed' || patch.column === 'passed' })
+    if (copy) changes.push(copy)
+    const r = await reply(c)
+    return copy && !shortReply(body) ? { ...r, reviewCopy: copy } : r
+  }
   const was = await tasks.getTask(n).catch(() => null)
   const given = typeof patch.agent === 'string' ? await knownAgent(was?.project, patch.agent) : was ? await cardAgent(was) : undefined
   return assistantChange('agents', `change #${n} on the board`, { kind: 'update-task', card: n, ...(patch.column ? { column: patch.column } : {}), ...(was?.project ? { project: was.project } : {}), ...(given ? { agent: given } : {}) }, async (commit) => {
@@ -2687,11 +2698,35 @@ const INTENT_DONE: Record<CardIntent['kind'], string> = {
  * Assistant's through Settings → Assistant → Control. The reply is lean: the card, where it went, what the intent says
  * of it. A refusal is the runtime's, 409 with its rule, what to do next and who can override.
  */
+/**
+ * An agent's review start or verdict on its card (#1439, reviewCopies.ts): a start leases its review copy (the line its
+ * reply gives, or null when it gets none), a verdict returns it. Never refusing what was done: a failure is logged.
+ */
+async function reviewCopyAfter(actor: tasks.TaskActor, c: TaskCard, did: { start: boolean; verdict: boolean }): Promise<string | null> {
+  const self = actor.kind === 'agent' ? actor.self : undefined
+  const ws = requireWorkspace()
+  if (!self || !c.project || !ws.path || (!did.start && !did.verdict)) return null
+  const projectPath = join(ws.path, c.project)
+  if (did.verdict) {
+    await reviewCopyOnVerdict(ws, projectPath, c.number, self.agentId)
+    return null
+  }
+  if (c.review?.agent !== self.agentId) return null
+  return reviewCopyOnStart(ws, projectPath, c.number, { id: self.agentId, name: c.review.agentName }).catch((e) => {
+    log.warn(`Leasing #${c.number}'s review copy`, e)
+    return null
+  })
+}
+
 async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone> {
   requireWorkspace()
   const ref = intentRef(param)
   const actor = await taskActor()
-  if (actor.kind !== 'assistant') return (await runCardIntent(ref, actor, intent)).done
+  if (actor.kind !== 'assistant') {
+    const { done, card } = await runCardIntent(ref, actor, intent)
+    const copy = await reviewCopyAfter(actor, card, { start: intent.kind === 'startReview', verdict: intent.kind === 'verdict' })
+    return copy ? { ...done, data: { ...done.data, reviewCopy: copy } } : done
+  }
   const was = await tasks.getTask(ref.n).catch(() => null)
   const what = INTENT_WORDS[intent.kind]
   return assistantChange('agents', `${what} ${cardRef(ref.n)}`, { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async () => {

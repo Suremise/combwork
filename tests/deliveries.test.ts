@@ -747,6 +747,39 @@ describe('the delivery service (#647)', async () => {
     }
   })
 
+  it("a delivery read after its line was offered tells sessions the line was taken, in the launch it went into (#1514: Codex's queued input clears a stale mark)", async () => {
+    const taken = vi.spyOn(sessions, 'lineTaken').mockImplementation(() => undefined)
+    st.status = 'working'
+    const m = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] #166 changed.', ref: 'x' })
+    st.status = 'ready'
+    await deliveries.offerAllForTests()
+    expect(await states()).toEqual([`${m.id} offered`])
+    st.status = 'working'
+    await deliveries.readInbox(alpha, 'b1')
+    await vi.waitFor(() => expect(taken).toHaveBeenCalledWith(alpha, 'b1', 'r1', m.id, `${m.id}, which it rang for, was read`), { timeout: 5000 })
+    // Two lines in the launch, each offering its own delivery, read together later: each read names its own delivery, so
+    // only the line that rang for it is cleared (round 1 finding: never another line's mark).
+    taken.mockClear()
+    const a = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] #170 changed.', ref: 'a' })
+    st.status = 'ready'
+    await deliveries.offerAllForTests()
+    const b = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] #171 changed.', ref: 'b' })
+    st.status = 'ready'
+    await deliveries.offerAllForTests()
+    expect(await states()).toEqual(expect.arrayContaining([`${a.id} offered`, `${b.id} offered`]))
+    st.status = 'working'
+    await deliveries.readInbox(alpha, 'b1')
+    await vi.waitFor(() => expect(taken).toHaveBeenCalledTimes(2), { timeout: 5000 })
+    expect(taken.mock.calls.map((c) => c[3]).sort()).toEqual([a.id, b.id].sort())
+    // Read without having been offered (queued): no line rang for it, nothing to clear.
+    taken.mockClear()
+    const q = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] #167 changed.', ref: 'y' })
+    await deliveries.readInbox(alpha, 'b1')
+    expect(await states()).toContain(`${q.id} received`)
+    expect(taken).not.toHaveBeenCalled()
+    taken.mockRestore()
+  })
+
   it('a read gives what its agent was rung for even when what it was made from changes again as it is made again for the read (#650: a loop wake whose roles moved once more)', async () => {
     // The board's generation: a version holds while it is the one it was made from; the read's first making is overtaken
     // by a change just after it (as a card note's own event is), once.

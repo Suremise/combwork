@@ -17,7 +17,8 @@
 //   Steps combine with " then " ("question then review deny").
 //   The scenarios' steps, as the fake Claude Code takes them: "skill NAME" (a shell read of its SKILL.md),
 //   "boardmove", "boardreview", "boardcomment" and "hive TOOL {json}" (through the launch's real hive MCP server),
-//   "work N". Anything else: a short turn.
+//   "work N" and "shell: <command line>" (run in cmd with the session's environment, between its PreToolUse and
+//   PostToolUse; fake-shell.jsonl in CODEX_HOME records it, #1486). Anything else: a short turn.
 //   The turn ledger's cases (#648): "latetool" (a command whose PostToolUse reaches Hive after the turn's Stop),
 //   "loststop" (no Stop reaches Hive; its rollout records the turn's end, task_complete) and "silent" (neither).
 //   Notices (#650), as Codex 0.162.1 takes them: context in a PostToolUse reply reaches "the model", and a Stop blocked
@@ -34,9 +35,14 @@
 // - While fake-nohooks-<agent> is in CODEX_HOME it sends no hook at all, as when a Codex update broke them (#1336). A
 //   wake it read is answered with the next line of fake-wakes-<agent>.txt there, when there is one. With
 //   FAKE_CODEX_VERSION 0.162.1 or later, a turn draws Codex's Working line as it begins.
+// - "compacting N" (#1514): a turn that compacts its conversation for N seconds first, as Codex's auto-compaction does
+//   at a turn's start, sending no hook meanwhile (no UserPromptSubmit: Hive sees no prompt, as with RR2 on 23 Oct). With
+//   fake-queue-<agent> in CODEX_HOME, a line typed while a turn runs is queued (as Codex queues input) and taken in the
+//   same turn once it has compacted: recorded as a user message, with no UserPromptSubmit; a doorbell read as above.
 const fs = require('fs')
 const path = require('path')
 const { randomUUID } = require('crypto')
+const { spawn } = require('child_process')
 const { callHiveTool, connectHive, fromCodexTable, parseHiveStep, isDoorbell, doorbellIsWork, inboxRows } = require('../fake-bridge.cjs')
 
 const args = process.argv.slice(2)
@@ -349,7 +355,30 @@ async function scripted(step) {
     await hook('PreToolUse', c)
     if (noticeIn(await hook('PostToolUse', c), 'checkpoint') && followsNotices()) await readInbox()
   }
-  return any || !!(move || rev || comment || call || pause || check)
+  // "shell: <command line>": runs it in cmd as its shell tool would, reported by its hooks (#1486: a scenario's commit).
+  const sh = /\bshell:\s*(.+)$/i.exec(step)
+  if (sh) {
+    const c = { ...bash(sh[1].trim()), tool_use_id: `exec-${randomUUID()}` }
+    await hook('PreToolUse', c)
+    await shellRun(sh[1].trim())
+    await hook('PostToolUse', c)
+  }
+  return any || !!(move || rev || comment || call || pause || check || sh)
+}
+
+/** A shell step's command, in cmd with the session's environment; the agent, command, exit code and output go to fake-shell.jsonl. */
+function shellRun(cmd) {
+  return new Promise((resolve) => {
+    const p = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${cmd}"`], { cwd: process.cwd(), env: process.env, windowsVerbatimArguments: true, windowsHide: true })
+    let stdout = ''
+    let stderr = ''
+    p.stdout.on('data', (d) => (stdout += d))
+    p.stderr.on('data', (d) => (stderr += d))
+    p.on('close', (code) => {
+      if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-shell.jsonl'), JSON.stringify({ agent: process.env.HIVE_AGENT || 'agent', cmd, code, stdout, stderr }) + '\n')
+      resolve()
+    })
+  })
 }
 
 /**
@@ -365,6 +394,34 @@ function nextScripted() {
   return first.trim() || null
 }
 
+/** Whether a line typed while a turn runs is queued and taken in it (fake-queue-<agent> in CODEX_HOME, #1514). */
+function queues() {
+  const home = process.env.CODEX_HOME
+  return !!home && fs.existsSync(path.join(home, `fake-queue-${String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')}`))
+}
+/** Lines typed while a turn ran, queued for it (#1514). */
+const queued = []
+
+/** A user line as Codex records it: the message and the turn's item (#1371). */
+function userLine(text) {
+  fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } }) + '\n')
+  // Its prompt as a turn's item, with the turn's id, as 0.159 records it (#1371: how Hive tells the person's turns).
+  fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'item_completed', turn_id: turnId, item: { type: 'UserMessage', content: [{ type: 'text', text }] } } }) + '\n')
+}
+
+/** The queued lines, taken in the running turn with no UserPromptSubmit (#1514); a doorbell's inbox read and logged. */
+async function takeQueued() {
+  while (queued.length) {
+    const text = queued.shift()
+    userLine(text)
+    if (!isDoorbell(text)) continue
+    const r = await hiveCall('hive_inbox', {})
+    const rows = r.isError ? [] : inboxRows(r.text)
+    if (rows.length && followsNotices()) await hiveCall('hive_inbox', { ack: rows.flatMap((x) => x.ids) })
+    if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-wakes.jsonl'), JSON.stringify({ agent: String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_'), text: rows.map((x) => x.text).join(' '), at: new Date().toISOString(), queued: true }) + '\n')
+  }
+}
+
 /** A prompt: its steps, separated by " then " ("question then review allow"). */
 async function runPrompt(text) {
   busy = true
@@ -376,10 +433,17 @@ async function runPrompt(text) {
   }
   turnId = randomUUID()
   turnRecord('task_started')
-  fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } }) + '\n')
-  // Its prompt as a turn's item, with the turn's id, as 0.159 records it (#1371: how Hive tells the person's turns).
-  fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'item_completed', turn_id: turnId, item: { type: 'UserMessage', content: [{ type: 'text', text }] } } }) + '\n')
-  await hook('UserPromptSubmit', { prompt: text })
+  // Compacting first (#1514): no hook meanwhile, then what was queued is taken in this turn.
+  const compacting = /^compacting (\d+)\b/.exec(text)
+  if (compacting) {
+    await sleep(Number(compacting[1]) * 1000)
+    fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'compacted', payload: { message: '' } }) + '\n')
+    userLine(text)
+    await takeQueued()
+  } else {
+    userLine(text)
+    await hook('UserPromptSubmit', { prompt: text })
+  }
   // Hive's doorbell (#650): it reads its inbox (hive_inbox), as a model does, and acts on what it read (one that follows
   // notices acks it too); what else it read (a wake, a message) is logged in fake-wakes.jsonl in CODEX_HOME.
   if (isDoorbell(text)) {
@@ -470,8 +534,10 @@ process.stdin.on('data', (data) => {
       const text = line.trim()
       line = ''
       if (text && !busy) void runPrompt(text)
+      // Typed while a turn runs (#1514): queued for it, as Codex queues input.
+      else if (text && queues()) queued.push(text)
     } else if (ch === '\x7f' || ch === '\b') line = line.slice(0, -1)
-    else if (ch >= ' ' && !busy) line += ch
+    else if (ch >= ' ' && (!busy || queues())) line += ch
   }
 })
 
