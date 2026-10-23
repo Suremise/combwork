@@ -340,6 +340,8 @@
   "tips.sortTables.title": "Sortuj dowolną tabelę",
   "tips.staleMessages.text": "Gdy Asystent przekazuje coś o bieżącej rundzie karty, wiąże wiadomość z tą kartą: jeśli karta zostanie zatwierdzona lub zacznie kolejną rundę, zanim agent ją przeczyta, Hive odrzuca ją jako nieaktualną, więc żaden agent nie otworzy ponownie zatwierdzonej karty z powodu starego ustalenia.",
   "tips.staleMessages.title": "Wiadomość o rundzie traci ważność, zamiast przyjść za późno",
+  "tips.startFreshIdle.text": "Długie rozmowy kosztują więcej. Zacznij od nowa (bezczynni agenci) w menu Agenci w nagłówku projektu daje każdemu bezczynnemu agentowi nową rozmowę w jednym kroku, a Hive proponuje to, gdy praca w projekcie jest skończona.",
+  "tips.startFreshIdle.title": "Zaczynaj od nowa z bezczynnymi agentami po skończonej pracy",
   "tips.startNewAll.text": "Zacznij nową w menu Agenci w nagłówku projektu daje każdemu agentowi nową sesję po jednym pytaniu; Zarchiwizuj i zacznij nową najpierw archiwizuje stare sesje. Ich rozmowy zostają w zakładce Sesje.",
   "tips.startNewAll.title": "Świeże sesje dla każdego agenta",
   "tips.storageCleanup.text": "Ustawienia projektu → Miejsce na dysku pokazuje, ile miejsca zajmują kopie zapasowe, archiwum, załączniki i worktree projektu. Wyczyść… przenosi stare załączniki i kopie zapasowe do Kosza i pokazuje dokładnie, co zostanie usunięte w pierwszej kolejności.",

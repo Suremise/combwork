@@ -2939,6 +2939,35 @@ Designed in P7 with Darren [#1123 c]: start fresh for idle agents (#1086), a fre
 verified lane end), the Assistant's save-and-start-fresh (#1089, #1090), and the queued hand-over (#1067: "after this
 card" means after its Done fact; its merge-slot case goes away with P5). They are open in P7, not here.
 
+**Built [#1437]** (Darren, 22 Oct, "as recommended": #1086 and #1088, which meets #1090's solo case;
+`shared/freshStarts.ts`, `main/freshStarts.ts`):
+- **Start Fresh (Idle Agents)…** (the project header's Agents ▾, the command palette): one confirmed step giving each
+  idle running agent a new conversation; its old one stays in the Sessions tab. Idle is ready or finished, with no prompt
+  its CLI hasn't taken and no background tasks, and no dispatch lease open (a card's or lane's slot still in flight,
+  #1434). The question lists every agent with what happens to it (starts fresh; working, waiting, watching, background
+  tasks, a prompt not taken, a card or lane in flight: left as it is; stopped: left stopped). Each is checked again in
+  main just before it is stopped, with no wait between the check and the stop (its session, Hive typing into it, and
+  its lease as the board has it then: `startFreshIfIdle`, `sessions.startFresh`), and one busy since is left and
+  reported. Project scope; the Assistant isn't included.
+- **The nudge** ("A good moment to start fresh", with Start Fresh (Idle Agents) as the banner's button), model-independent
+  and with the Assistant on or off: when a project's last running lane ends (`lane-ended`, its verified end), or, with no
+  lane running, a card of it reaches Done, and its work has finished (no agent starting, working, waiting, watching, with
+  background tasks or a prompt not taken; no card in Review or Passed). Once per quiet spell: the board keeps the
+  spell's mark per project (`fresh_nudge:<project name>` in board_meta, each mark unique), claimed in one write that
+  checks the work again as it is then, so two triggers at once, a refresh, another window, another Hive or a restart
+  tell it once. One of the project's agents getting busy ends the spell whose mark is on the board at that moment, read
+  then with no wait: that exact mark (compared by its value) is removed by the next write that gets to it, the reset's
+  or the next claim's, and a mark made later, here or by another Hive, is never removed for it. The duty is kept until
+  such a write commits (a failed one leaves it for the next), and retiring it never removes a newer one. No time is
+  compared. A completion is kept, one per project, from before it is checked: one seen while the work is still
+  finishing (the usual order: the agent marks its last card Done in its turn) is considered again as the project's
+  agents go quiet (never while they are busy), until it is told, a lane of the project runs again or the switch is off.
+  The banner's button runs in the window that has the project, with the project shown, whatever was shown. Off switch: Settings → Notifications, **Suggest a fresh start when work finishes** (on), and the project's own
+  (Project Settings → Sessions).
+- **Stay On Hold** (Darren's answer): #1087 (a fresh conversation after an idle gap: lanes already start fresh, and the
+  rest needs a cache-lifetime threshold per provider), #1089 (the Assistant's save and start fresh: about the Assistant,
+  not slots) and #1067 (the queued hand-over: a lease's end already stops the builder's session at a safe moment).
+
 #### 16.10.5 Reviewers and review copies
 
 [note §8, #1112 c] Reviewers aren't tied to slots. A reviewer reviews the **exact revision** in a **review copy**: a

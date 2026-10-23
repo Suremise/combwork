@@ -340,6 +340,8 @@
   "tips.sortTables.title": "Sort any table",
   "tips.staleMessages.text": "When the Assistant relays something about a card's current round, it ties the message to that card: if the card passes or starts another round before the agent reads it, Hive drops it as stale, so no agent reopens a passed card for an old finding.",
   "tips.staleMessages.title": "A message about a round goes stale, not late",
+  "tips.startFreshIdle.text": "Long conversations cost more. Start Fresh (Idle Agents) in the project header's Agents menu gives every idle agent a new one in one step, and Hive suggests it when a project's work has finished.",
+  "tips.startFreshIdle.title": "Start idle agents fresh when work is done",
   "tips.startNewAll.text": "Start New in the project header's Agents menu gives every agent a new session after one question; Archive and Start New archives their old ones first. Their conversations stay in the Sessions tab.",
   "tips.startNewAll.title": "Fresh sessions for every agent",
   "tips.storageCleanup.text": "Project Settings → Storage shows how much space a project's backups, archive, attachments and worktrees take. Clean Up… moves old attachments and backups to the Recycle Bin, and shows you exactly what goes first.",

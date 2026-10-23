@@ -342,6 +342,8 @@ interface HiveMessageValues {
   'tips.sortTables.title': undefined
   'tips.staleMessages.text': undefined
   'tips.staleMessages.title': undefined
+  'tips.startFreshIdle.text': undefined
+  'tips.startFreshIdle.title': undefined
   'tips.startNewAll.text': undefined
   'tips.startNewAll.title': undefined
   'tips.storageCleanup.text': undefined

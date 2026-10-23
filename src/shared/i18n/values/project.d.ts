@@ -163,6 +163,7 @@ interface HiveMessageValues {
   'project.header.resumeOneTip': { agent: string | number }
   'project.header.resumeShort': { count: string | number }
   'project.header.resuming': undefined
+  'project.header.startFreshIdle': undefined
   'project.header.startNew': { many: string; count: string | number }
   'project.header.stopAgent': undefined
   'project.header.stopAllTip': { count: number }

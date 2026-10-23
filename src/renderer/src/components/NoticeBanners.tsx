@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { keepNotices, MAX_BANNERS } from '@shared/bursts'
 import type { Notice } from '@shared/types'
 import { call } from '../api'
+import { runCommand } from '../commands'
 import { get, set, useStore } from '../store'
 import { cx } from '../util'
 import { Icon } from './ui'
@@ -116,13 +117,31 @@ function Banner({ notice }: { notice: Notice }) {
       <Icon name={icon} className="lead" />
       {/* The text is the project's button for the keyboard (Tab, then Enter or Space; its click reaches the banner's);
           the banner keeps its live role, so it is still announced as it appears. */}
-      {notice.projectPath ? (
-        <button className="notice-text notice-open" aria-label={tr(M.showProjectLabel, { title: notice.title })}>
-          {text}
-        </button>
-      ) : (
-        <div className="notice-text">{text}</div>
-      )}
+      <div className="notice-main">
+        {notice.projectPath ? (
+          <button className="notice-text notice-open" aria-label={tr(M.showProjectLabel, { title: notice.title })}>
+            {text}
+          </button>
+        ) : (
+          <div className="notice-text">{text}</div>
+        )}
+        {/* Its button (#1437), under the text: a command, which closes the banner. With a project, it runs in the
+            window that has the project, with the project shown, whatever this window shows. */}
+        {notice.action && (
+          <button
+            className="btn small notice-action"
+            onClick={(e) => {
+              e.stopPropagation()
+              dismissNotice(notice.id)
+              const { command, args = [] } = notice.action!
+              if (notice.projectPath) void call('notice:action', notice.projectPath, command, args).catch(() => undefined)
+              else runCommand(command, ...args)
+            }}
+          >
+            {notice.action.label}
+          </button>
+        )}
+      </div>
       <button
         className="icon-btn notice-close"
         aria-label={tr(M.dismiss)}
