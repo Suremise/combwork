@@ -1213,6 +1213,8 @@ export interface ProjectConfig {
   /** Card loops' rounds and wait in hours for this project (#412); null inherits the workspace's. */
   loopRounds: number | null
   loopWaitHours: number | null
+  /** How long a builder waits for its reviewer's check of a design before it goes ahead as posted (#1382); null: LOOP_STEP_WAIT_MINUTES. */
+  loopStepWaitMinutes: number | null
 }
 
 /** One of a project's slots as the window reads it (#1429, slots.ts): its state and its open lease, if any. */
@@ -1638,7 +1640,7 @@ export interface RuntimeFacts {
 /** An agent's wake-on-change watch, as its state shows it: the cards and condition, since when, and its overall limit. */
 export interface TaskWatchInfo {
   cards: number[]
-  changes: ('column' | 'comment' | 'verdict' | 'agent' | 'blocked' | 'request' | 'decision')[]
+  changes: ('column' | 'comment' | 'verdict' | 'agent' | 'blocked' | 'request' | 'decision' | 'step')[]
   column?: TaskColumn
   /** An agent watch's agents, by name (#416: its cards are none). */
   agents?: string[]

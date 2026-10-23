@@ -445,6 +445,250 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  /** A card of alpha's lane (b1 builds, r1 reviews) started by its builder's intent, under a workflow (#1382: steps are intents). */
+  const WORKFLOW = { workflow: { platform: 'none', preset: null, options: { review: 'agent', noSelfReview: true } } }
+  const startedInLane = async (w: Awaited<ReturnType<typeof open>>['w']) => {
+    const c = (await inWorkspace(w, () => tasks.createTask({ title: 'Design first', project: 'alpha' }, user))).number
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'start' }))
+    return c
+  }
+  const { runCardIntent } = await import('../src/main/cardIntents')
+
+  it("a builder's design wakes its reviewer though its watch counts only arrivals in Review; the answer wakes the builder (#1382)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open(WORKFLOW)
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    // HR5 on #1305: waiting for the card to arrive in Review, and nothing else.
+    st.status.set('r1', 'watching')
+    await watches.registerWatch(w, alpha, 'r1', readCondition({ cards: [c], column: 'review' }) as WatchCondition)
+    const id = String((await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Design: a step the reviewer is woken for.' }))).done.data?.design)
+    await typedUntil(st, 1)
+    expect(st.typed[0].agent).toBe('r1')
+    // It names the design, which the answer names.
+    expect(st.typed[0].text).toContain(`The builder: "design ${id} posted for your check (answer with its id): Design: a step the reviewer is woken for."`)
+    expect(st.typed[0].text).toContain("check it and answer with hive_loop_step (ok, or gaps saying what's missing, and its id)")
+    st.status.set('b1', 'ready')
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step: 'ok', text: 'Holds: build it.', design: id }))
+    await typedUntil(st, 2)
+    expect(st.typed[1]).toMatchObject({ agent: 'b1' })
+    expect(st.typed[1].text).toContain(`The reviewer: "design ${id} is OK: Holds: build it."`)
+    await vi.waitFor(async () => expect(await history(w, c)).toEqual(expect.arrayContaining(['Hive: Woke R1 (alpha) with a card loop step (a loop wake)', 'Hive: Woke B1 (alpha) with a card loop step (a loop wake)'])), HANG)
+    await disposeWorkspaceService(w)
+  })
+
+  it("leaves a step to a watch that counts it: the builder's watch for its verdict tells it the reviewer's answer, one line (#1382)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open(WORKFLOW)
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    const id = String((await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Plan' }))).done.data?.design)
+    await typedUntil(st, 1)
+    st.status.set('b1', 'watching')
+    await watches.registerWatch(w, alpha, 'b1', readCondition({ cards: [c], changes: ['verdict', 'column', 'comment'], column: 'passed' }) as WatchCondition)
+    watches.testHooks.settleMs = undefined
+    try {
+      await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step: 'gaps', text: 'What bounds the wait?', design: id }))
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.typed).toHaveLength(2), HANG)
+    } finally {
+      watches.testHooks.settleMs = 0
+    }
+    await drained()
+    await settled()
+    expect(st.typed).toHaveLength(2)
+    expect(st.typed[1].agent).toBe('b1')
+    expect(st.typed[1].text).toMatch(/a card loop step: read its latest comment.*Your card watch has ended/)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a reviewer whose own comment watch tells it of a design learns its id from that line and answers it (#1382, HR4's round 2 finding 1)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open(WORKFLOW)
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    st.status.set('r1', 'watching')
+    await watches.registerWatch(w, alpha, 'r1', readCondition({ cards: [c], changes: ['comment'] }) as WatchCondition)
+    watches.testHooks.settleMs = undefined
+    try {
+      await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Design: the id rides in the first line.' }))
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.typed).toHaveLength(1), HANG)
+    } finally {
+      watches.testHooks.settleMs = 0
+    }
+    await drained()
+    await settled()
+    // One line, its watch's: the loop wake stands aside, and the line's latest comment names the design.
+    expect(st.typed).toHaveLength(1)
+    expect(st.typed[0].text).toMatch(/Your card watch has ended/)
+    const learned = /Design (\S+\/s\d+), for the reviewer's check/.exec(st.typed[0].text)?.[1]
+    expect(learned).toBeTruthy()
+    // So does the card's latest comment, as hive_read_task with latestComment gives it.
+    expect((await inWorkspace(w, () => tasks.getTask(c, w))).comments.at(-1)?.text.split('\n')[0]).toContain(learned!)
+    // The reviewer answers with what it learned: taken.
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step: 'ok', text: 'Holds.', design: learned }))
+    expect((await history(w, c)).at(-1)).toBe('R1 (alpha): Checked the design: OK: "Holds."')
+    await disposeWorkspaceService(w)
+  })
+
+  it("going ahead unchecked tells the reviewer, with nothing to answer (#1382, HR4's round 1 finding 5)", async () => {
+    await loopWakes.clearLoopWakes()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const { w, alpha } = await open(WORKFLOW)
+      const st = fake(alpha)
+      const c = await startedInLane(w)
+      const id = String((await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Plan' }))).done.data?.design)
+      await typedUntil(st, 1)
+      st.status.set('r1', 'ready')
+      vi.setSystemTime(Date.now() + 31 * 60_000)
+      await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'proceed', text: 'No answer: building as posted.', design: id }))
+      await typedUntil(st, 2)
+      expect(st.typed[1].agent).toBe('r1')
+      expect(st.typed[1].text).toContain(`The builder: "no check of design ${id} came in time: the builder goes ahead with it as posted: No answer: building as posted."`)
+      expect(st.typed[1].text).toContain('Nothing to answer: carry on with your loop')
+      expect(st.typed[1].text).not.toContain('answer with hive_loop_step')
+      await disposeWorkspaceService(w)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a design to check is dropped once nothing waits: posted again, the newer one is told, not the older (#1382)', async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open(WORKFLOW)
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    // The reviewer is busy: its wakes wait.
+    st.status.set('r1', 'working')
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Design v1' }))
+    const v2 = String((await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Design v2' }))).done.data?.design)
+    await settled()
+    st.status.set('r1', 'ready')
+    await typedUntil(st, 1)
+    await drained()
+    expect(st.typed[0].text).toContain(`design ${v2} posted for your check`)
+    expect(st.typed[0].text).not.toContain('Design v1')
+    // Answered by the user meanwhile: a waiting design wake has nothing left to ask.
+    st.status.set('r1', 'working')
+    const v3 = String((await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Design v3' }))).done.data?.design)
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, user, { kind: 'loopStep', step: 'ok', text: 'Fine by me', design: v3 }))
+    await settled()
+    st.status.set('r1', 'ready')
+    await drained()
+    expect(st.typed.filter((t) => t.agent === 'r1')).toHaveLength(1)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a follow-up of a card in Passed wakes its reviewer though its watch counts only Review; the answer wakes the builder (#1467)", async () => {
+    await loopWakes.clearLoopWakes()
+    // A workflow whose passed work waits in Passed (for the user's OK too), as a card waiting to be merged does.
+    const { w, alpha } = await open({ workflow: { ...WORKFLOW.workflow, options: { review: 'agentThenYou', noSelfReview: true } } })
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    const intent = (who: typeof b1, i: Parameters<typeof runCardIntent>[2]) => inWorkspace(w, () => runCardIntent({ n: c, plain: false }, who, i))
+    await intent(b1, { kind: 'submit', summary: 'Ready', paths: ['a.txt'] })
+    await intent(r1, { kind: 'startReview' })
+    await intent(r1, { kind: 'verdict', pass: true, comment: 'Round 1: PASSED.' })
+    await drained()
+    await settled()
+    const k = st.typed.length
+    // HR3 on #1419: the screenshot OK asked for changes for it to check, and it waited for the card's move into Review.
+    st.status.set('r1', 'watching')
+    await watches.registerWatch(w, alpha, 'r1', readCondition({ cards: [c], column: 'review' }) as WatchCondition)
+    const id = String((await intent(b1, { kind: 'loopStep', step: 'followUp', text: 'Fixes ready: the dark theme.' })).done.data?.design)
+    await typedUntil(st, k + 1)
+    expect(st.typed[k].agent).toBe('r1')
+    expect(st.typed[k].text).toContain(`The builder: "follow-up ${id} ready for your check (answer with its id): Fixes ready: the dark theme."`)
+    expect(st.typed[k].text).toContain("check it and answer with hive_loop_step (ok, or gaps saying what's missing, and its id)")
+    st.status.set('b1', 'ready')
+    await intent(r1, { kind: 'loopStep', step: 'ok', text: 'Both themes fine.', design: id })
+    await typedUntil(st, k + 2)
+    expect(st.typed[k + 1]).toMatchObject({ agent: 'b1' })
+    expect(st.typed[k + 1].text).toContain(`The reviewer: "follow-up ${id} is OK: Both themes fine."`)
+    expect(await history(w, c)).toContain('R1 (alpha): Checked the follow-up: OK: "Both themes fine."')
+    await disposeWorkspaceService(w)
+  })
+
+  it("a follow-up's wake and stall outlast its card's change of place in Passed (HR4's round 1 finding on #1467)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open({ workflow: { ...WORKFLOW.workflow, options: { review: 'agentThenYou', noSelfReview: true } } })
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    const intent = (who: typeof b1, i: Parameters<typeof runCardIntent>[2]) => inWorkspace(w, () => runCardIntent({ n: c, plain: false }, who, i))
+    await intent(b1, { kind: 'submit', summary: 'Ready', paths: ['a.txt'] })
+    await intent(r1, { kind: 'startReview' })
+    await intent(r1, { kind: 'verdict', pass: true, comment: 'Round 1: PASSED.' })
+    // Another card waiting in Passed, below it.
+    await inWorkspace(w, () => tasks.createTask({ title: 'Also passed', project: 'alpha', column: 'passed' }, user))
+    await drained()
+    await settled()
+    const k = st.typed.length
+    // The reviewer is busy when the follow-up comes; the builder then puts its card below the other one.
+    st.status.set('r1', 'working')
+    const posted = await intent(b1, { kind: 'loopStep', step: 'followUp', text: 'Fixes ready.' })
+    await inWorkspace(w, () => tasks.updateTask(c, { position: 'bottom' }, b1))
+    const now = await inWorkspace(w, () => tasks.getTask(c, w))
+    expect(now.column).toBe('passed')
+    expect(now.history.at(-1)?.what).toBe('Moved to the bottom of Passed')
+    // Still waiting: so is its stall, aged from the follow-up, with the builder only watching it.
+    const { loopStepWaitReason } = await import('../src/shared/tasks')
+    const hb = { name: 'B1', project: 'alpha', agentId: 'b1', cards: [c], status: 'watching' }
+    const at = Date.parse(now.history.findLast((h) => h.what.startsWith('Posted a follow-up'))!.at)
+    expect(loopStepWaitReason(now, [hb], 30 * 60_000, at + 16 * 60_000)).toMatch(/posted a follow-up .* has waited 16 min:/)
+    // And its wake is still due: the reviewer, once free, is told.
+    st.status.set('r1', 'ready')
+    await typedUntil(st, k + 1)
+    expect(st.typed[k].agent).toBe('r1')
+    expect(st.typed[k].text).toContain(`follow-up ${String(posted.done.data?.design)} ready for your check`)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a reviewer waiting for a failed card's next round (fresh) hears a follow-up from its own watch, one line (#1467)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open({ workflow: { ...WORKFLOW.workflow, options: { review: 'agentThenYou', noSelfReview: true } } })
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    const intent = (who: typeof b1, i: Parameters<typeof runCardIntent>[2]) => inWorkspace(w, () => runCardIntent({ n: c, plain: false }, who, i))
+    await intent(b1, { kind: 'submit', summary: 'Ready', paths: ['a.txt'] })
+    await intent(r1, { kind: 'startReview' })
+    await intent(r1, { kind: 'verdict', pass: true, comment: 'Round 1: PASSED.' })
+    await drained()
+    await settled()
+    const k = st.typed.length
+    st.status.set('r1', 'watching')
+    await watches.registerWatch(w, alpha, 'r1', readCondition({ cards: [c], column: 'review', fresh: true }) as WatchCondition)
+    watches.testHooks.settleMs = undefined
+    try {
+      await intent(b1, { kind: 'loopStep', step: 'followUp', text: 'Fixes ready.' })
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.typed).toHaveLength(k + 1), HANG)
+    } finally {
+      watches.testHooks.settleMs = 0
+    }
+    await drained()
+    await settled()
+    // Its watch's line, naming the follow-up in the latest comment; the loop wake stands aside.
+    expect(st.typed).toHaveLength(k + 1)
+    expect(st.typed[k].agent).toBe('r1')
+    expect(st.typed[k].text).toMatch(/Follow-up \S+\/s\d+, for the reviewer's check.*Your card watch has ended/)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a step wakes no one while the project's loop wakes are off (#1382)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open({ ...WORKFLOW, loopWakes: false })
+    const st = fake(alpha)
+    const c = await startedInLane(w)
+    await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Plan' }))
+    await settled()
+    expect(loopWakes.pendingLoopWakes()).toEqual([])
+    expect(st.typed).toEqual([])
+    await disposeWorkspaceService(w)
+  })
+
   it("a lane reviewer's comment is only a comment while the project's loop wakes are off (#1410)", async () => {
     await loopWakes.clearLoopWakes()
     const { w, alpha } = await open({ loopWakes: false })

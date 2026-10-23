@@ -287,6 +287,8 @@
   "project.settings.saveFailed": "プロジェクトの設定を保存できませんでした",
   "project.settings.search": "{project}の設定を検索",
   "project.settings.sessionsIn": "{project}のセッションは、すべてのコマンド、編集、ネットワーク通信を確認せずに実行します。",
+  "project.settings.stepWait": "設計確認の待機（分）",
+  "project.settings.stepWaitDefault": "既定（{count, number}分）",
   "project.settings.waitHours": "待機（時間）",
   "project.settings.wake": "レビュアーとビルダーを起こす",
   "project.settings.warnOver": "トランスクリプトがこのサイズを超えたら警告",
