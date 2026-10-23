@@ -730,6 +730,8 @@
   "settings.project.metadata.title": "設定ファイル",
   "settings.project.reset.desc": "このページのすべての項目が「継承」に戻ります。エージェントと、スキルやMCPのオプトアウトは保持されます。",
   "settings.project.reset.title": "プロジェクト設定をリセット",
+  "settings.project.slotOptions.desc": "セットアップスクリプトとアーカイブスクリプト、新しいスロットにコピーするファイル、レビュー用コピーは、プロジェクトの「バージョン管理」タブの ワークフロー → スロットとコピー で設定します。",
+  "settings.project.slotOptions.title": "スロットとコピー",
   "settings.project.storage.desc": "バックグラウンドで計測します。「更新」で計測し直します。コーディングエージェント自身のトランスクリプト（~/.claude、~/.codex、~/.copilot）は数えられず、「クリーンアップ…」や「パージ…」で触れられることもありません。",
   "settings.project.storage.title": "Hiveが保持しているもの",
   "settings.project.suggestFreshStart.desc": "このプロジェクトの作業が終わったときに、「新しく始める（待機中のエージェント）」付きで知らせます。",

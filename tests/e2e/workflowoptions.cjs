@@ -147,10 +147,10 @@ async function theForm(page, app, inv) {
     await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
 
     // --- The form as the upgrade left it: in groups, no preset, each option worded as an outcome with its origin.
-    check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'review', 'checks', 'merging', 'where', 'stages', 'elsewhere']), JSON.stringify(await groups()))
+    check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'review', 'checks', 'merging', 'where', 'slots', 'stages', 'elsewhere']), JSON.stringify(await groups()))
     const inGroup = async (g) => section.locator(`.workflow-group[data-group="${g}"] .workflow-option`).evaluateAll((els) => els.map((e) => e.getAttribute('data-option')))
     const layout = { review: await inGroup('review'), checks: await inGroup('checks'), merging: await inGroup('merging'), where: await inGroup('where'), stages: await inGroup('stages') }
-    check('each group has its options (G4 in Review; G9 and G8 hidden while the agent doesn’t merge through Hive)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning'], stages: ['stageNames'] }), JSON.stringify(layout))
+    check('each group has its options (G4 and G17 in Review, G17 with a reviewer agent; G9 and G8 hidden while the agent doesn’t merge through Hive; G15 only with slots)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning'], stages: ['stageNames'] }), JSON.stringify(layout))
     check('no Version control row: the header has the choice', (await section.locator('.workflow-platform').count()) === 0)
     check('no preset chosen', (await section.locator('.workflow-preset-now').innerText()).trim() === 'No preset chosen')
     check('every preset is offered, with All off', JSON.stringify(await section.locator('.workflow-choice').evaluateAll((els) => els.map((e) => e.getAttribute('data-choice')))) === JSON.stringify(['solo', 'pairAgent', 'pair', 'team', 'allOff']))
@@ -172,7 +172,7 @@ async function theForm(page, app, inv) {
     await themes('preview', preview)
     await preview.locator('[data-action="use-choice"]').click()
     check('Use: the agent merges', !!(await lib.until(async () => (await row('finish').locator('select').inputValue()) === 'agentMerges', HUNG_MS)))
-    check('…each card in its own folder (the builder’s worktree), G1 read as before it’s merged', (await row('folder').locator('select').inputValue()) === 'slots' && (await row('folder').innerText()).includes('worktree') && (await row('review').innerText()).startsWith('Work is reviewed before it’s merged'))
+    check('…each card in its own folder (a slot lent per card or lane), G1 read as before it’s merged', (await row('folder').locator('select').inputValue()) === 'slots' && (await row('folder').innerText()).includes('a slot Hive lends to the card or its lane') && !(await row('folder').innerText()).includes('worktree') && (await row('review').innerText()).startsWith('Work is reviewed before it’s merged'))
     check('…the shared-folder warning not shown with each card in its own folder', (await row('sharedFolderWarning').count()) === 0)
     check('…the quick checks from its scripts, with their commands', JSON.stringify(await values('preChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('preChecks')))
     check('…each from the preset; the preset line names it', (await row('review').innerText()).includes('From the preset') && (await section.locator('.workflow-preset-now').innerText()).trim() === 'Pair (the agent merges)')
