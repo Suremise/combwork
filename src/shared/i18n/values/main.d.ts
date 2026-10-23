@@ -179,12 +179,16 @@ interface HiveMessageValues {
   'main.removal.ahead': { n: number }
   'main.removal.already': { project: string | number }
   'main.removal.cardsKept': { why: string | number }
+  'main.removal.deleteBlocked': { folders: string | number }
   'main.removal.dirty': { n: number }
   'main.removal.folder.copyBusy': undefined
   'main.removal.folder.copyHeld': { by: string | number }
   'main.removal.folder.copyLeased': undefined
   'main.removal.folder.home': undefined
+  'main.removal.folder.notForgotten': { why: string | number }
   'main.removal.folder.notHives': undefined
+  'main.removal.folder.notTrashed': { path: string | number; why: string | number }
+  'main.removal.folder.outsideDelete': undefined
   'main.removal.folderGone': { folder: string | number }
   'main.removal.folderKept': { what: string | number; path: string | number; why: string | number }
   'main.removal.handoverKept': { note: string | number; why: string | number }

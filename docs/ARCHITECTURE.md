@@ -661,13 +661,15 @@ Release Slot… is `slots:releaseCarried`.
 **Repair and project removal on slots, built [#1447].** `projectFolders.ts` lists a project's slots (with their open
 lease, its cards' keys and the line a gone one is made again on), copies and retired homes, and changes each through its
 owner: `relocateFolder` (a slot's or copy's row, `SlotStore.relocate`/`CopyStore.relocate`, only while no operation
-holds it; a home's path, `slotMigration.replaceHome`), `recreateSlot` (`SlotPool.recreateGone`, a warming operation that
-makes a gone leased slot again on its line, its lease kept) and `releaseSlotLease`. `workspaceMove.ts`' plan adds them
+holds it; a home's path, `slotMigration.replaceHome`), `recreateSlot` (`SlotPool.recreateGone`: `SlotStore.startRecreate` takes a warming
+operation with its intent, board_meta `slot_recreate:`, only while the row is as the plan saw it; `recover` finishes or
+puts back one cut short, never ending its lease) and `releaseSlotLease`. `workspaceMove.ts`' plan adds them
 to each project's `MoveWorktree`s (`of`, keys `slot:`/`copy:`/`home:`), skipping agents the migration took over; its
 steps relink, recreate, release, forget or mark them `later` (gone at their place in the moved pool). `agentWorktree.ts`'
-missing-worktree functions answer for an agent's gone slot. `removeFolders` (preview and apply) removes slots and
-copies through their pools' guarded removal (`SlotPool.keepsFromRemoval` first, the lease ended only when nothing would
-be kept) and keeps homes and folders outside the project's worktrees folder. The slots' pass (`settleSlotCards`) and
+missing-worktree functions answer for an agent's gone slot. `removeFolders` (preview and apply; Remove from Hive)
+removes slots and copies through their pools' guarded removal (`SlotPool.keepsFromRemoval` first, the lease ended only
+when nothing would be kept) and keeps homes and folders outside the project's worktrees folder; Delete checks
+`deleteBlocks` before anything, then `trashFolders` once the project folder is in the Recycle Bin. The slots' pass (`settleSlotCards`) and
 reconciliation's `followFolder` wait while the workflow's `movePending` says a move waits for Repair.
 
 **The reviewer pool, built [#1443].** G17 is `WorkflowOptions.reviewerMode` (`lane`, left out of a compiled ruleset so

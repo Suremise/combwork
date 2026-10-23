@@ -287,18 +287,21 @@ interface HiveMessageValues {
   'workspace.removal.colHappens': undefined
   'workspace.removal.colWhat': undefined
   'workspace.removal.delete': undefined
+  'workspace.removal.deleteBlocked': undefined
   'workspace.removal.deleteSummary': undefined
   'workspace.removal.deletedDone': { name: string | number }
   'workspace.removal.deleting': undefined
   'workspace.removal.discard': undefined
   'workspace.removal.discardFailed': undefined
   'workspace.removal.drafts': undefined
+  'workspace.removal.folderBlocks': { why: string | number }
   'workspace.removal.folderGone': undefined
   'workspace.removal.folderHow': { how: string }
   'workspace.removal.folderKept': { why: string | number }
   'workspace.removal.folderLeft': undefined
   'workspace.removal.folderRemoved': undefined
   'workspace.removal.folderThing': undefined
+  'workspace.removal.folderTrashed': undefined
   'workspace.removal.foldersHow': { how: string }
   'workspace.removal.foldersThing': { count: number }
   'workspace.removal.forget': undefined

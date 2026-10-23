@@ -746,9 +746,50 @@ export class SlotStore {
     )
   }
 
-  /** A warming operation taken on a leased slot (#1447: Repair recreating it), only while none holds it. Whether it was. */
+  /** A warming operation taken on a leased slot, only while none holds it (tests). Whether it was. */
   async startWarm(name: string, lease: string, token: string, holder: Holder): Promise<boolean> {
     return this.conn.write((db) => Number(db.prepare("UPDATE slots SET op = ?, op_kind = 'warm', op_lease = ?, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND op IS NULL AND job IS NULL").run(token, lease, holder.pid, holder.started, this.project, name).changes) === 1)
+  }
+
+  /**
+   * A gone leased slot's recreation begun (#1447, Repair's Recreate; HR1's round 1): in one write, a warm-kind operation
+   * taken only while the row is as the plan saw it (that open lease, that folder, no operation, job or writer) and `to`
+   * is no other slot's folder nor reserved by a rename, and its intent recorded (board_meta `slot_recreate:`), so a
+   * recovery finishes or puts back the recreation, never ending the lease as a lend's interrupted warming would. Null: the
+   * slot changed since (another Hive relinked or reassigned it, a resume claimed it).
+   */
+  async startRecreate(name: string, expect: { lease: string; folder: string }, token: string, holder: Holder, to: string, line: string): Promise<RecreateIntent | null> {
+    return this.conn.write((db) => {
+      const s = this.slotIn(db, name)
+      if (!s || s.op || s.job || s.writer || !samePlace(s.folder, expect.folder)) return null
+      if (openLeaseIn(db, this.project, name)?.id !== expect.lease) return null
+      if (this.slotsIn(db).some((x) => x.name.toLowerCase() !== name.toLowerCase() && samePlace(x.folder, to))) return null
+      if (this.renamesIn(db).some((r) => samePlace(r.intent.to, to))) return null
+      if (Number(db.prepare("UPDATE slots SET op = ?, op_kind = 'warm', op_lease = ?, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND op IS NULL").run(token, expect.lease, holder.pid, holder.started, this.project, name).changes) !== 1) return null
+      const intent: RecreateIntent = { lease: expect.lease, from: s.folder, to, line, was: s.state }
+      db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(recreateKey(this.project, name), JSON.stringify(intent))
+      return intent
+    })
+  }
+
+  /** A slot's recreate intent, if one is recorded. */
+  recreateOf(name: string): RecreateIntent | null {
+    return this.conn.read((db) => {
+      const v = (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(recreateKey(this.project, name)) as { value: string } | undefined)?.value
+      return v ? recreateIntentOf(v) : null
+    })
+  }
+
+  /**
+   * A recreation ended by its operation, in one fenced write: made (the row at `to`, lent) or not (the row as it was),
+   * the operation and the intent cleared; its lease kept either way.
+   */
+  async endRecreate(name: string, token: string, intent: RecreateIntent, made: boolean): Promise<void> {
+    await this.fenced(name, token, (db) => {
+      if (made) db.prepare('UPDATE slots SET folder = ? WHERE project = ? AND name = ?').run(intent.to, this.project, name)
+      this.setIn(db, name, made ? 'lent' : intent.was, {}, { op: null })
+      db.prepare('DELETE FROM board_meta WHERE key = ?').run(recreateKey(this.project, name))
+    })
   }
 
   /** A leased slot's folder is gone: marked so (its holder's sessions are refused, #1434). */
@@ -891,6 +932,25 @@ export interface RenameIntent {
   /** The worktree's identity (its git administrative folder, `SlotRenamer.identity`): only that worktree is moved. */
   tree: string
 }
+/** A gone leased slot's recreation (#1447): its lease, where its folder was and is made, its line, and its state before. */
+export interface RecreateIntent {
+  lease: string
+  from: string
+  to: string
+  line: string
+  was: SlotState
+}
+/** board_meta: a slot's recreate intent. */
+export const recreateKey = (project: string, slot: string): string => `slot_recreate:${project}:${slot}`
+function recreateIntentOf(v: string): RecreateIntent | null {
+  try {
+    const i = JSON.parse(v) as Partial<RecreateIntent>
+    return typeof i.lease === 'string' && typeof i.from === 'string' && typeof i.to === 'string' && typeof i.line === 'string' && typeof i.was === 'string' ? (i as RecreateIntent) : null
+  } catch {
+    return null
+  }
+}
+
 /** board_meta: a slot's rename intent. */
 export const renameKey = (project: string, slot: string): string => `slot_rename:${project}:${slot}`
 function intentOf(v: string): RenameIntent | null {
@@ -1205,6 +1265,13 @@ export class SlotPool {
         const settled = !s.job || (await this.deps.settle(s.job))
         if (!settled) log.warn(`Slot ${userText(s.name)}'s job ${s.job} couldn't be emptied: it stays out of the pool`)
         const job = settled ? { job: null } : {}
+        // A gone slot's recreation (#1447, its intent recorded with it): finished if git lists it on its line, else put
+        // back as it was; its lease kept either way (never ended as an interrupted warming).
+        const recreating = was.kind === 'warm' ? this.store.recreateOf(s.name) : null
+        if (recreating) {
+          await this.store.endRecreate(s.name, token, recreating, await this.madeOn(recreating))
+          return
+        }
         // A card's preparation (#1438: a warming of a slot already lent): its lease stays, the slot as it is.
         if (was.kind === 'warm' && s.state === 'lent') {
           await this.store.fenced(s.name, token, (db) => this.store.setIn(db, s.name, 'lent', {}, { op: null, ...job }))
@@ -1452,44 +1519,45 @@ export class SlotPool {
   }
 
   /**
-   * A leased slot whose folder is gone, made again on its line (#1447, Repair's Recreate): its lease kept, under a warming
-   * operation. Git's stale registration of it is pruned only when the prune would drop nothing else (`prunable`: the
-   * folders git would forget), then `git worktree add <folder> <line>` (the line must be a branch), and the row's folder
-   * and state (`lent`) set in the fenced write that ends the operation. Null once made, else why not (English, logged).
+   * A leased slot whose folder is gone, made again on its line (#1447, Repair's Recreate), its lease kept: its operation
+   * and intent taken only while the row is as the plan saw it (`expect`: the lease and the folder; no other holder or
+   * writer), then, inside the operation, `from` must still be absent and `to` too; git's stale registration pruned only
+   * when the prune would drop nothing else (`prunable`), `git worktree add <to> <line>`, and the result checked (git lists
+   * a worktree at `to` on `line`) before the fenced write that ends it. Null once made, else why not (English, logged).
    */
-  async recreateGone(name: string, folder: string, line: string, prunable: () => Promise<string[]>): Promise<string | null> {
-    const s = this.store.slot(name)
-    const open = this.store.openLease(name)
-    if (!s || !open) return 'it is not lent' // i18n-ignore: the log's reason
-    if (existsSync(folder)) return `${folder} is already there` // i18n-ignore: the log's reason
+  async recreateGone(name: string, expect: { lease: string; folder: string }, to: string, line: string, prunable: () => Promise<string[]>): Promise<string | null> {
     const token = newToken()
     return this.op(token, async () => {
-      if (!(await this.store.startWarm(name, open.id, token, await this.deps.holder.self()))) return 'Hive is setting it up or removing it now' // i18n-ignore: the log's reason
-      const end = async (fields: { folder?: string; state?: SlotState }): Promise<void> => {
-        await this.store
-          .fenced(name, token, (db) => {
-            if (fields.folder) db.prepare('UPDATE slots SET folder = ? WHERE project = ? AND name = ?').run(fields.folder, this.store.project, name)
-            this.store.setIn(db, name, fields.state ?? s.state, {}, { op: null })
-          })
-          .catch((e) => {
-            if (!(e instanceof OpLost)) throw e
-          })
-      }
+      const intent = await this.store.startRecreate(name, expect, token, await this.deps.holder.self(), to, line)
+      if (!intent) return 'it changed since Repair looked (relinked, lent or resumed meanwhile)' // i18n-ignore: the log's reason
       try {
-        const others = (await prunable()).filter((p) => !samePlace(p, s.folder))
-        if (others.length) return await end({}).then(() => `git's prune would also forget ${others.join(', ')}`) // i18n-ignore: the log's reason
+        const giveUp = async (why: string): Promise<string> => (await this.store.endRecreate(name, token, intent, false), why)
+        if (existsSync(intent.from) && !samePlace(intent.from, intent.to)) return await giveUp('its folder is there again') // i18n-ignore: the log's reason
+        if (existsSync(intent.to)) return await giveUp(`${intent.to} is already there`) // i18n-ignore: the log's reason
+        const others = (await prunable()).filter((p) => !samePlace(p, intent.from))
+        if (others.length) return await giveUp(`git's prune would also forget ${others.join(', ')}`) // i18n-ignore: the log's reason
         await git(this.deps.project, ['worktree', 'prune'])
-        await mkdir(dirname(folder), { recursive: true })
-        const r = await git(this.deps.project, ['worktree', 'add', folder, line])
-        if (!r.ok) return await end({}).then(() => r.err.trim() || 'git worktree add failed') // i18n-ignore: the log's reason
-        await end({ folder, state: 'lent' })
-        log.info(`Slot ${userText(name)} made again at ${userText(folder)} on ${userText(line)}`)
+        await mkdir(dirname(intent.to), { recursive: true })
+        const r = await git(this.deps.project, ['worktree', 'add', intent.to, intent.line])
+        if (!r.ok) return await giveUp(r.err.trim() || 'git worktree add failed') // i18n-ignore: the log's reason
+        if (!(await this.madeOn(intent))) return await giveUp(`git doesn't list ${intent.to} on ${intent.line}`) // i18n-ignore: the log's reason
+        await this.store.endRecreate(name, token, intent, true)
+        log.info(`Slot ${userText(name)} made again at ${userText(intent.to)} on ${userText(intent.line)}`)
         return null
       } catch (e) {
-        await end({})
+        if (e instanceof OpLost) return 'its operation was taken over' // i18n-ignore: the log's reason
+        await this.store.endRecreate(name, token, intent, false).catch(() => undefined)
         return e instanceof Error ? e.message : String(e)
       }
     })
+  }
+
+  /** Whether git lists a worktree at a recreation's `to`, on its line. */
+  private async madeOn(intent: RecreateIntent): Promise<boolean> {
+    const listed = await listWorktrees(this.deps.project).catch(() => [])
+    if (!listed.some((w) => samePlace(w.path, intent.to))) return false
+    const on = await git(intent.to, ['branch', '--show-current'])
+    return on.ok && on.out.trim().toLowerCase() === intent.line.toLowerCase()
   }
 
   /**

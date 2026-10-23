@@ -8,12 +8,29 @@
 // the CLIs' homes are the test's; no session is started.
 import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
 
+// The Recycle Bin, as a folder of the test's (and one item it refuses, as Windows does when a program holds it open).
+const bin = vi.hoisted(() => ({ dir: '', refuse: '' }))
+vi.mock('../src/main/trash', async (orig) => {
+  const { renameSync: mv, mkdirSync: mk } = await import('fs')
+  const { basename: bn, join: jn } = await import('path')
+  let n = 0
+  return {
+    ...(await orig<object>()),
+    trash: async (p: string) => {
+      if (bin.refuse && p.toLowerCase() === bin.refuse.toLowerCase()) throw new Error('EPERM: a program has it open (test)')
+      mk(bin.dir, { recursive: true })
+      mv(p, jn(bin.dir, `${++n}-${bn(p)}`))
+    }
+  }
+})
+
 const base = tempDir('repairslots-')
+bin.dir = join(base, 'bin')
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
 process.env.CODEX_HOME = join(base, 'codex-home')
 process.env.COPILOT_HOME = join(base, 'copilot-home')
@@ -185,5 +202,190 @@ describe('project removal on slots (#1447)', () => {
     expect(boardRead(ws, (db) => db.prepare("SELECT 1 FROM slot_leases WHERE project = ? AND slot = 'hb1' AND ended_at IS NULL").get(projectId))).toBeDefined()
     expect(existsSync(join(treesAt(after), 'hr1'))).toBe(true)
     expect(existsSync(outside)).toBe(true)
+  })
+})
+
+describe('Repair cut short after a folder was published (#1447, HR1 round 1 finding 1)', () => {
+  const root = join(base, 'cut')
+  const w2 = createWorkspaceService()
+  const run2 = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w2, fn)
+  const treesOf = (r: string): string => join(r, 'ws.worktrees', 'omega')
+  beforeAll(async () => {
+    const p = join(root, 'before', 'ws', 'omega')
+    gitRepo(p)
+    commit(p, { '.gitignore': '.hive/\n', 'o.txt': 'o\n' }, 'first')
+    sh(p, 'worktree', 'add', '-q', '-b', 'hive/ho1', join(treesOf(join(root, 'before')), 'ho1'))
+    mkdirSync(join(p, '.hive'), { recursive: true })
+    const agents = [{ id: 'o1', name: 'O1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: join(treesOf(join(root, 'before')), 'ho1'), branch: 'hive/ho1', base: 'main' } }]
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, agents }))
+    await w2.open(join(root, 'before', 'ws'))
+    const id = (await w2.projectConfig(p)).id
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id, agents }))
+    await w2.refresh()
+    await run2(() => workspace.upsertSession(p, { id: 's-o1', agent: 'claude-code', agentId: 'o1', cwd: join(treesOf(join(root, 'before')), 'ho1'), name: 's-o1', lastActiveAt: new Date().toISOString() }))
+    await migrateSlots(w2)
+    await run2(() => checkMoved(w2))
+    await w2.close()
+    mkdirSync(join(root, 'after'), { recursive: true })
+    renameSync(join(root, 'before', 'ws'), join(root, 'after', 'ws'))
+    renameSync(join(root, 'before', 'ws.worktrees'), join(root, 'after', 'ws.worktrees'))
+    await w2.open(join(root, 'after', 'ws'))
+  })
+  afterAll(async () => {
+    vi.restoreAllMocks()
+    await disposeWorkspaceService(w2)
+  })
+
+  it("the sessions' write fails after the slot's row moved: a fresh Repair moves the same conversation", async () => {
+    const p = join(root, 'after', 'ws', 'omega')
+    const now = join(treesOf(join(root, 'after')), 'ho1')
+    const cwd = async () => ((await run2(() => workspace.sessionsFile(p))).sessions.find((x) => x.id === 's-o1')?.cwd ?? '').toLowerCase()
+    const spy = vi.spyOn(w2, 'mutateSessions').mockRejectedValueOnce(new Error('the database is busy (test)'))
+    const first = await run2(() => repairMove(w2))
+    spy.mockRestore()
+    expect(first.failed.length).toBeGreaterThan(0)
+    // The row moved, the conversation not yet: its move is still pending.
+    expect((await projectFolders(w2, p)).find((f) => f.name === 'ho1')?.folder.toLowerCase()).toBe(now.toLowerCase())
+    expect(await cwd()).not.toBe(now.toLowerCase())
+    expect(((await w2.projectConfig(p)).pendingCopies ?? []).some((m) => m.to.toLowerCase() === now.toLowerCase())).toBe(true)
+    const second = await run2(() => repairMove(w2))
+    expect(second.failed).toEqual([])
+    expect(await cwd()).toBe(now.toLowerCase())
+    expect((await w2.projectConfig(p)).pendingCopies ?? []).toEqual([])
+  })
+})
+
+describe("a gone slot's recreation, guarded and recovered (#1447, HR1 round 1 findings 3 and 4)", () => {
+  /** A slot of its own for each test, carried by an agent of its own, its folder then deleted (gone). */
+  async function goneSlot(name: string): Promise<{ lease: string; folder: string; line: string; to: string }> {
+    const p = project()
+    const folder = join(treesAt(after), name)
+    sh(p, 'worktree', 'add', '-q', '-b', `hive/${name}`, folder)
+    const pool = await run(() => poolFor(ws, p))
+    const lease = (await pool.carry(`a-${name}`, { name, folder, target: 'main' }))!
+    rmSync(folder, { recursive: true, force: true })
+    return { lease: lease.id, folder, line: `hive/${name}`, to: join(treesAt(after), `${name}-again`) }
+  }
+  const noPrune = async (): Promise<string[]> => []
+  const open = (name: string) => boardRead(ws, (db) => (db.prepare('SELECT id FROM slot_leases WHERE project = ? AND slot = ? AND ended_at IS NULL').get(projectId, name) as { id: string } | undefined)?.id ?? null)
+
+  it('refused when the plan is stale (another Hive relinked it meanwhile) or a writer holds it; nothing made', async () => {
+    const g = await goneSlot('rc1')
+    const pool = await run(() => poolFor(ws, project()))
+    // Relinked elsewhere since the plan: its folder isn't the plan's.
+    await pool.deps.store.relocate('rc1', join(base, 'elsewhere-rc1'))
+    expect(await pool.recreateGone('rc1', { lease: g.lease, folder: g.folder }, g.to, g.line, noPrune)).toMatch(/changed since Repair looked/)
+    await pool.deps.store.relocate('rc1', g.folder)
+    // A writer claimed it (a resume, a handover's start).
+    await boardWrite(ws, async () => boardWriteOp(ws, (db) => db.prepare("UPDATE slots SET writer_run = 'run-x', writer_agent = 'a-rc1', writer_lease = ? WHERE project = ? AND name = 'rc1'").run(g.lease, projectId)))
+    expect(await pool.recreateGone('rc1', { lease: g.lease, folder: g.folder }, g.to, g.line, noPrune)).toMatch(/changed since Repair looked/)
+    expect(existsSync(g.to)).toBe(false)
+    expect(open('rc1')).toBe(g.lease)
+  })
+
+  it('cut short before git made it: put back as it was, its lease kept', async () => {
+    const g = await goneSlot('rc2')
+    const pool = await run(() => poolFor(ws, project()))
+    const was = pool.deps.store.slot('rc2')!.state
+    // Another process (gone now) took the recreation and stopped before git's add.
+    expect(await pool.deps.store.startRecreate('rc2', { lease: g.lease, folder: g.folder }, 'o-dead', { pid: 2147483000, started: 1 }, g.to, g.line)).not.toBeNull()
+    await pool.refresh()
+    expect(pool.deps.store.slot('rc2')).toMatchObject({ op: null })
+    expect(pool.deps.store.slot('rc2')?.folder.toLowerCase()).toBe(g.folder.toLowerCase())
+    expect(pool.deps.store.recreateOf('rc2')).toBeNull()
+    expect(open('rc2')).toBe(g.lease)
+    expect(was).toBeDefined()
+    // Then made again for real, still its lease.
+    expect(await pool.recreateGone('rc2', { lease: g.lease, folder: g.folder }, g.to, g.line, noPrune)).toBeNull()
+    expect(pool.deps.store.slot('rc2')).toMatchObject({ state: 'lent' })
+    expect(open('rc2')).toBe(g.lease)
+  })
+
+  it('cut short after git made it: finished, its lease kept', async () => {
+    const g = await goneSlot('rc3')
+    const pool = await run(() => poolFor(ws, project()))
+    expect(await pool.deps.store.startRecreate('rc3', { lease: g.lease, folder: g.folder }, 'o-dead2', { pid: 2147483001, started: 1 }, g.to, g.line)).not.toBeNull()
+    sh(project(), 'worktree', 'prune')
+    sh(project(), 'worktree', 'add', '-q', g.to, g.line)
+    await pool.refresh()
+    expect(pool.deps.store.slot('rc3')).toMatchObject({ op: null, state: 'lent' })
+    expect(pool.deps.store.slot('rc3')?.folder.toLowerCase()).toBe(g.to.toLowerCase())
+    expect(open('rc3')).toBe(g.lease)
+  })
+})
+
+describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
+  /** A project of its own: a dirty slot, an unmerged slot and a reviewer's home. */
+  async function gamma(name: string, cards: [number, number]): Promise<{ p: string; dirty: string; unmerged: string; home: string }> {
+    const p = join(ws.path!, name)
+    const trees = join(`${ws.path!}.worktrees`, name)
+    gitRepo(p)
+    commit(p, { '.gitignore': '.hive/\n', 'g.txt': 'g\n' }, 'first')
+    const home = join(trees, 'hr')
+    sh(p, 'worktree', 'add', '-q', '-b', 'hive/hr', home)
+    mkdirSync(join(p, '.hive'), { recursive: true })
+    const agents = [
+      { id: 'g1', name: 'G1', provider: 'claude-code', workflowRole: 'builder' },
+      { id: 'g2', name: 'G2', provider: 'claude-code', workflowRole: 'builder' },
+      { id: 'gr', name: 'GR', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: home, branch: 'hive/hr', base: 'main' } }
+    ]
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, agents }))
+    await ws.refresh()
+    const id = (await ws.projectConfig(p)).id
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id, agents }))
+    await migrateSlots(ws)
+    const pool = await run(() => poolFor(ws, p))
+    const a = await pool.lend({ card: cards[0], agent: 'g1' }, { install: false })
+    const b = await pool.lend({ card: cards[1], agent: 'g2' }, { install: false })
+    if (!a.ok || !b.ok) throw new Error(`lend failed: ${JSON.stringify([a, b])}`)
+    writeFileSync(join(a.slot.folder, 'draft.txt'), 'draft\n')
+    commit(b.slot.folder, { 'work.txt': 'work\n' }, 'unmerged')
+    return { p, dirty: a.slot.folder, unmerged: b.slot.folder, home }
+  }
+  const removal = () => import('../src/main/projectRemoval')
+
+  it("a project folder that can't go to the Recycle Bin: refused, nothing deleted, every slot as it was", async () => {
+    const g = await gamma('gamma1', [501, 502])
+    bin.refuse = g.p
+    try {
+      const { removeProject } = await removal()
+      await expect(run(() => removeProject(g.p, 'delete'))).rejects.toThrow(/Nothing was deleted/)
+    } finally {
+      bin.refuse = ''
+    }
+    for (const f of [g.p, g.dirty, g.unmerged, g.home]) expect(existsSync(f)).toBe(true)
+    expect((await projectFolders(ws, g.p)).filter((f) => f.of.kind === 'slot')).toHaveLength(2)
+  })
+
+  it('the project and its slots and home go to the Recycle Bin together, their work recoverable', async () => {
+    const g = await gamma('gamma2', [511, 512])
+    const { removeProject } = await removal()
+    const done = await run(() => removeProject(g.p, 'delete'))
+    expect(done.warnings).toEqual([])
+    for (const f of [g.p, g.dirty, g.unmerged, g.home]) expect(existsSync(f)).toBe(false)
+    expect((boardRead(ws, (db) => db.prepare('SELECT count(*) AS n FROM slots WHERE folder LIKE ?').get('%gamma2%')) as { n: number }).n).toBe(0)
+    // Restored from the Recycle Bin together: the unmerged commit and the uncommitted file are there, git working again.
+    const { readdirSync } = await import('fs')
+    const back = (path: string): void => {
+      const name = path.split(/[\\/]/).at(-1)!
+      const item = readdirSync(bin.dir).filter((n) => n.endsWith(`-${name}`)).at(-1)!
+      mkdirSync(join(path, '..'), { recursive: true })
+      renameSync(join(bin.dir, item), path)
+    }
+    for (const f of [g.p, g.dirty, g.unmerged, g.home]) back(f)
+    expect(sh(g.unmerged, 'log', '-1', '--format=%s')).toBe('unmerged')
+    expect(existsSync(join(g.dirty, 'draft.txt'))).toBe(true)
+    expect(sh(g.home, 'branch', '--show-current')).toBe('hive/hr')
+  })
+
+  it("a slot outside the project's worktrees folder stops Delete before anything is done", async () => {
+    const g = await gamma('gamma3', [521, 522])
+    const outside = join(base, 'outside-gamma3')
+    sh(g.p, 'worktree', 'add', '-q', '-b', 'hive/out', outside)
+    const pool = await run(() => poolFor(ws, g.p))
+    expect(await pool.carry('g9', { name: 'out', folder: outside, target: 'main' })).not.toBeNull()
+    const { removeProject } = await removal()
+    await expect(run(() => removeProject(g.p, 'delete'))).rejects.toThrow(/Delete can't go ahead: out \(carried, g9\) \(it isn't in Hive's worktrees folder/)
+    for (const f of [g.p, g.dirty, g.unmerged, g.home, outside]) expect(existsSync(f)).toBe(true)
   })
 })

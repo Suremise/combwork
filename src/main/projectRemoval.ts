@@ -20,7 +20,7 @@ import { boardWrite } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { forgetProjectQueues } from './workflow/queueRunner'
 import { slotsMigrated } from './agentFolders'
-import { removeFolders } from './projectFolders'
+import { deleteBlocks, projectFolders, removeFolders, trashFolders } from './projectFolders'
 import { folderWhat } from '../shared/projectFolders'
 
 const log = createLogger('projects')
@@ -225,9 +225,13 @@ async function removeFromHive(ws: WorkspaceService, p: string, info: ProjectRemo
 
 async function deleteProject(ws: WorkspaceService, p: string, info: ProjectRemovalInfo, agents: AgentDef[]): Promise<{ warnings: string[] }> {
   const name = basename(p)
-  // Its slots and copies (#1447) first, while git can still run in the project: only clean, merged ones go (nothing is
-  // lost); the rest stay, said in the result.
-  const folders = await removeFolders(ws, p, true)
+  // Its slots, copies and old folders (#1447, HR1's round 1): refused before anything is done if one is outside the
+  // project's worktrees folder or held by one of Hive's steps; the rest go to the Recycle Bin after the folder.
+  const folders = await projectFolders(ws, p)
+  // Its id now: its project.json goes with the folder (the slots' rows are kept by it).
+  const id = (await ws.projectConfig(p)).id ?? name
+  const blocks = await deleteBlocks(ws, p, folders)
+  if (blocks.size) throw new Error(tr(msg({ id: 'main.removal.deleteBlocked', defaultMessage: "Delete can't go ahead: {folders}. Nothing was deleted.", description: "Why Delete refused (#1447): the project's slots or old folders that stop it ({folders}: each one's name and why, a list). Nothing was changed." }), { folders: fmt.list(folders.filter((f) => blocks.has(f.key)).map((f) => `${folderWhat(f.of)} (${blocks.get(f.key)})`)) }))
   const { ok, refused } = await checkedWorktrees(ws, p, agents)
   const trees = ok.map((a) => a.worktree!.path).filter((t) => existsSync(t))
   // The folder first: it is what Windows most often can't move (a program has it open), and until it has gone
@@ -246,7 +250,9 @@ async function deleteProject(ws: WorkspaceService, p: string, info: ProjectRemov
     )
   }
   // From here the project is gone: what can't follow is reported, not undone.
-  const warnings = [...keptWarnings(folders), ...refused.map((r) => tr(msg({ id: 'main.removal.leftAlone', defaultMessage: 'Left alone: {worktree}.', description: "A warning after Delete: an agent's worktree Hive didn't delete with the project (main.removal.refusedTree)." }), { worktree: r }))]
+  const warnings = refused.map((r) => tr(msg({ id: 'main.removal.leftAlone', defaultMessage: 'Left alone: {worktree}.', description: "A warning after Delete: an agent's worktree Hive didn't delete with the project (main.removal.refusedTree)." }), { worktree: r }))
+  // Its slots, copies and old folders follow it to the Recycle Bin, with their work (#1447).
+  warnings.push(...(await trashFolders(ws, p, id, folders, trash)))
   for (const t of trees) {
     await trash(t).catch((e) => warnings.push(tr(msg({ id: 'main.removal.notTrashed', defaultMessage: "{path} couldn't be moved to the Recycle Bin: {why}", description: "A warning after Delete: a worktree or handover note of the project couldn't go to the Recycle Bin. {path} is it, {why} the system's message." }), { path: t, why: (e as Error).message })))
   }

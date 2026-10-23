@@ -10,7 +10,8 @@ import { msg, tr } from '../shared/i18n'
 import type { ProjectFolderOf } from '../shared/types'
 import { containsPlace } from './fsutil'
 import { legacyWorktree } from './agentFolders'
-import { boardRead, cardKeys } from './boardStore'
+import { existsSync } from 'original-fs'
+import { boardRead, boardWrite, boardWriteOp, cardKeys } from './boardStore'
 import { createLogger, userText } from './logger'
 import { replaceHome, retiredHomes } from './slotMigration'
 import { workflowFor } from './workflow/service'
@@ -127,7 +128,7 @@ export async function recreateSlot(ws: WorkspaceService, projectPath: string, f:
   if (!f.line) return 'its line is not known' // i18n-ignore: the log's reason
   const { poolFor } = await import('./slotsApp')
   const { prunable } = await import('./agentWorktree')
-  return (await poolFor(ws, projectPath)).recreateGone(f.name, to, f.line, () => prunable(projectPath))
+  return (await poolFor(ws, projectPath)).recreateGone(f.name, { lease: f.lease.id, folder: f.folder }, to, f.line, () => prunable(projectPath))
 }
 
 /** A gone slot's lease released (Repair's Release): the slot is then free, and made again at its next lease. */
@@ -145,10 +146,13 @@ const K = {
   notHives: msg({ id: 'main.removal.folder.notHives', defaultMessage: "left as it is: it isn't in Hive's worktrees folder for the project", description: "Remove Project (#1447): a slot whose folder Hive didn't make (outside <workspace>.worktrees/<project>) stays. A clause." }),
   copyLeased: msg({ id: 'main.removal.folder.copyLeased', defaultMessage: 'a review uses it now', description: "Remove Project (#1447): a review copy is kept because a review or check uses it. A clause." }),
   copyBusy: msg({ id: 'main.removal.folder.copyBusy', defaultMessage: 'Hive is setting it up or removing it now', description: "Remove Project (#1447): a review copy is kept because one of Hive's steps holds it. A clause." }),
+  outsideDelete: msg({ id: 'main.removal.folder.outsideDelete', defaultMessage: "it isn't in Hive's worktrees folder for the project, and would be left without its repository: release its slot and move or remove it first", description: "Why Delete can't go ahead (#1447): a slot outside <workspace>.worktrees/<project> (one Hive didn't make) would keep its files but lose the repository Delete sends to the Recycle Bin. Release its slot is a command in the agent's menu (Release Slot…). A clause." }),
+  notTrashed: msg({ id: 'main.removal.folder.notTrashed', defaultMessage: "{path} couldn't be moved to the Recycle Bin: {why}", description: "A warning after Delete (#1447): one of the project's slots, copies or old folders ({path}) couldn't go to the Recycle Bin ({why}: the system's message)." }),
+  notForgotten: msg({ id: 'main.removal.folder.notForgotten', defaultMessage: "Hive's record of the project's slots couldn't all be cleared: {why}", description: "A warning after Delete (#1447): the project's slot or copy records stayed in Hive's database ({why}: the system's message)." }),
   copyHeld: msg({ id: 'main.removal.folder.copyHeld', defaultMessage: 'it is in use ({by})', description: "Remove Project (#1447): a review copy is kept because something runs in it ({by}: what, in English). A clause." })
 }
 
-type Removal = { of: ProjectFolderOf; path: string; kept: string | null }
+type Removal = { of: ProjectFolderOf; path: string; kept: string | null; blocksDelete?: string }
 
 /**
  * What a project's removal does to its slots, copies and retired homes (#1447), or would do (`apply` false: the dialog's
@@ -165,8 +169,9 @@ export async function removeFolders(ws: WorkspaceService, projectPath: string, a
   const { poolFor } = await import('./slotsApp')
   const { copiesFor } = await import('./copiesApp')
   const { keptText } = await import('./unusedWorktrees')
+  const blocks = apply ? new Map<string, string>() : await deleteBlocks(ws, projectPath, folders)
   for (const f of folders) {
-    const kept = (k: string | null): void => void out.push({ of: f.of, path: f.folder, kept: k })
+    const kept = (k: string | null): void => void out.push({ of: f.of, path: f.folder, kept: k, ...(blocks.has(f.key) ? { blocksDelete: blocks.get(f.key) } : {}) })
     if (f.of.kind === 'home') {
       kept(tr(K.home))
       continue
@@ -202,4 +207,55 @@ export async function removeFolders(ws: WorkspaceService, projectPath: string, a
     }
   }
   return out
+}
+
+/**
+ * What stops Delete (#1447, HR1's round 1), by folder key: a slot or home outside `<Workspace>.worktrees/<Project>/` (not
+ * Hive's to delete, and it would be left without its repository), or a slot or copy one of Hive's steps holds (an
+ * operation, a job, a writer). None: Delete may go ahead.
+ */
+export async function deleteBlocks(ws: WorkspaceService, projectPath: string, folders?: ProjectFolder[]): Promise<Map<string, string>> {
+  const root = join(ws.worktreesRoot, basename(projectPath))
+  const out = new Map<string, string>()
+  const list = folders ?? (await projectFolders(ws, projectPath))
+  if (!list.length) return out
+  const { poolFor } = await import('./slotsApp')
+  const { copiesFor } = await import('./copiesApp')
+  for (const f of list) {
+    if (!containsPlace(root, f.folder)) out.set(f.key, tr(K.outsideDelete))
+    else if (f.of.kind === 'slot') {
+      const s = (await poolFor(ws, projectPath)).deps.store.slot(f.name)
+      if (s && (s.op || s.job || s.writer)) out.set(f.key, tr(K.copyBusy))
+    } else if (f.of.kind === 'copy') {
+      const c = (await copiesFor(ws, projectPath)).deps.store.copy(f.name)
+      if (c && (c.op || c.job)) out.set(f.key, tr(K.copyBusy))
+    }
+  }
+  return out
+}
+
+/**
+ * Delete's step for a project's slots, copies and retired homes (#1447), once the project folder has gone to the
+ * Recycle Bin (so nothing irreversible happens before it can refuse): each folder in the project's worktrees folder goes
+ * to the Recycle Bin too, with whatever work is in it (recoverable with the repository, as agents' worktrees are), then
+ * the project's rows are deleted (their leases with them) and its homes forgotten. What couldn't go is said.
+ */
+export async function trashFolders(ws: WorkspaceService, projectPath: string, id: string, folders: ProjectFolder[], trash: (path: string) => Promise<void>): Promise<string[]> {
+  const root = join(ws.worktreesRoot, basename(projectPath))
+  const warnings: string[] = []
+  for (const f of folders) {
+    if (!containsPlace(root, f.folder) || !existsSync(f.folder)) continue
+    await trash(f.folder).catch((e: Error) => warnings.push(tr(K.notTrashed, { path: f.folder, why: e.message })))
+  }
+  const slots = folders.filter((f) => f.of.kind === 'slot').map((f) => f.name)
+  const copies = folders.filter((f) => f.of.kind === 'copy').map((f) => f.name)
+  await boardWrite(ws, async () =>
+    boardWriteOp(ws, (db) => {
+      for (const n of slots) db.prepare('DELETE FROM slots WHERE project = ? AND name = ?').run(id, n) // i18n-ignore: SQL
+      for (const n of copies) db.prepare('DELETE FROM copies WHERE project = ? AND name = ?').run(id, n) // i18n-ignore: SQL
+    })
+  ).catch((e: Error) => warnings.push(tr(K.notForgotten, { why: e.message })))
+  for (const f of folders) if (f.of.kind === 'home') await replaceHome(ws, projectPath, f.folder, null, id).catch((e: Error) => warnings.push(tr(K.notForgotten, { why: e.message })))
+  if (slots.length || copies.length) log.info(`Deleted ${userText(basename(projectPath))}'s ${slots.length} slot(s) and ${copies.length} copy(ies) with it`)
+  return warnings
 }

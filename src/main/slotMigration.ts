@@ -268,8 +268,8 @@ export async function retiredHomes(ws: WorkspaceService, projectPath: string): P
 }
 
 /** A retired home moved by Repair (#1447) to `to`, or forgotten (null), in one board write. */
-export async function replaceHome(ws: WorkspaceService, projectPath: string, from: string, to: string | null): Promise<void> {
-  const id = await projectId(ws, projectPath)
+export async function replaceHome(ws: WorkspaceService, projectPath: string, from: string, to: string | null, knownId?: string): Promise<void> {
+  const id = knownId ?? (await projectId(ws, projectPath))
   await boardWrite(ws, async () =>
     boardWriteOp(ws, (db) => {
       const all = json<Record<string, string[]>>((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(HOMES) as { value: string } | undefined)?.value ?? null, {}) // i18n-ignore: SQL

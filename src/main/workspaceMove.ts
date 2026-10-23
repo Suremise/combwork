@@ -768,14 +768,16 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
           const what = folderWhat(w.of)
           const failed = (why: string): void => say(report, 'failed', tr(F.failed, { host: h.name, what, path: w.to!, why }), { host: h.name, what: whatOf(w), was: w.from, now: w.to!, result: tr(R.failedWhy, { why }) })
           try {
+            // The move its sessions and data follow is saved first (HR1's round 1): cut short after the record below, the
+            // pending move is still there for this Repair's last step or the next Repair to finish.
+            if (w.of.kind !== 'copy' && !samePath(w.from, w.to!)) {
+              const m = { from: w.from, to: w.to!, ...owned({ kind: 'worktree', agent: w.agentName }) }
+              await ws.mutateProjectConfig(h.path, (cfg) => ({ pendingCopies: withPending(cfg.pendingCopies, m) }))
+            }
             if (w.of.kind === 'slot') await moveCardFolders(h.path, w.from, w.to!)
             if (!f || !(await relocateFolder(ws, h.path, f, w.to!))) {
               failed(tr(F.busy))
               continue
-            }
-            if (w.of.kind !== 'copy' && !samePath(w.from, w.to!)) {
-              const m = { from: w.from, to: w.to!, ...owned({ kind: 'worktree', agent: w.agentName }) }
-              await ws.mutateProjectConfig(h.path, (cfg) => ({ pendingCopies: withPending(cfg.pendingCopies, m) }))
             }
           } catch (e) {
             failed(e instanceof Error ? e.message : String(e))
@@ -815,16 +817,16 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
         // A gone leased slot (#1447): made again on its line by its pool, its lease kept; its cards and sessions follow.
         const f = folderOfRow(w)
         const what = folderWhat(w.of)
+        // The move its sessions and data follow, saved before the slot is made (HR1's round 1), dropped if it isn't.
+        const m = w.to && !samePath(w.from, w.to) ? { from: w.from, to: w.to, ...owned({ kind: 'worktree', agent: w.agentName }) } : null
+        if (m) await ws.mutateProjectConfig(h.path, (cfg) => ({ pendingCopies: withPending(cfg.pendingCopies, m) }))
         const why = f && w.to ? await recreateSlot(ws, h.path, f, w.to) : 'not found' // i18n-ignore: the log's reason
         if (why) {
+          if (m) await ws.mutateProjectConfig(h.path, (cfg) => ({ pendingCopies: (cfg.pendingCopies ?? []).filter((x) => !(samePath(x.from, m.from) && samePath(x.to, m.to))) }))
           say(report, 'failed', tr(F.recreateFailed, { host: h.name, what, why }), { host: h.name, what: whatOf(w), was: w.from, result: tr(R.recreateFailed, { made: 'again', why }) })
           continue
         }
         await moveCardFolders(h.path, w.from, w.to!).catch((e) => log.warn(`moving ${userText(w.agentName)}'s cards to its recreated slot`, e))
-        if (!samePath(w.from, w.to!)) {
-          const m = { from: w.from, to: w.to!, ...owned({ kind: 'worktree', agent: w.agentName }) }
-          await ws.mutateProjectConfig(h.path, (cfg) => ({ pendingCopies: withPending(cfg.pendingCopies, m) }))
-        }
         say(report, 'done', tr(F.recreated, { host: h.name, what, branch: w.branch ?? '', path: w.to! }), { host: h.name, what: whatOf(w), was: w.from, now: w.to!, result: tr(R.recreated, { made: 'again' }) })
         continue
       }

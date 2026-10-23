@@ -2,7 +2,8 @@
 // copy and R1's retired home (its own worktree from before 1.0, adopted at the upgrade, #1441). Remove Project…'s dialog
 // lists them with what Remove from Hive does to each (the kept ones first, with why), screenshots in light and dark;
 // then Remove from Hive removes the clean slot and the copy through their pools' guarded clean-up, keeps the slot with
-// unmerged work and the home, and says so in its result. Dev build, throwaway profile and workspace; no agent runs.
+// unmerged work and the home, and says so in its result. With Delete chosen, the dialog sends every one to the Recycle Bin
+// with the project instead (#1447, HR1's round 1: the repository goes with it), screenshots too. Dev build, throwaway profile and workspace; no agent runs.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -43,11 +44,11 @@ const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@exam
     }, null, 2)
   )
   const { app, page, inv } = await lib.launch({ userData, env: { HIVE_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 900 } })
-  const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 250)
+  const until = (fn, ms) => lib.until(fn, ms, 250)
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
-    check('R1’s worktree is a retired home', !!(await until(async () => (await inv('project:removalInfo', beta)).folders?.some((f) => f.of.kind === 'home'))))
+    check('R1’s worktree is a retired home', !!(await until(async () => (await inv('project:removalInfo', beta)).folders?.some((f) => f.of.kind === 'home'), HUNG_MS)))
     // Two slots lent and given back: slot-a clean, slot-b with a commit its target hasn't.
     const op = (o) => inv('slots:test', beta, o)
     const a = await op({ op: 'lend', agent: 'b1', card: 91 })
@@ -74,7 +75,7 @@ const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@exam
     const info = await until(async () => {
       const i = await inv('project:removalInfo', beta)
       return i.folders?.length === 4 ? i : null
-    })
+    }, HUNG_MS)
     const kept = (name) => info?.folders.find((f) => (f.of.kind === 'home' ? 'home' : f.of.name) === name)?.kept
     check('the clean free slot and the copy would go', kept('slot-a') === null && kept('copy-1') === null, JSON.stringify(info?.folders))
     check('…the slot with unmerged work and the home would stay, with why', /commits that aren't on main/.test(kept('slot-b') ?? '') && /conversations resume there/.test(kept('home') ?? ''), JSON.stringify(info?.folders))
@@ -85,14 +86,22 @@ const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@exam
     await rd.waitFor({ timeout: HUNG_MS })
     await rd.locator('label.choice', { hasText: 'Remove from Hive' }).click()
     const text = async () => (await rd.innerText().catch(() => '')).replace(/\s+/g, ' ')
-    check('the dialog lists them, the kept ones first, with why', !!(await until(async () => /4 slots, copies and old folders/.test(await text()) && /slot-b[^]*kept: it has commits that aren't on main/.test(await text()) && /R1.s old folder[^]*kept: left as it is/.test(await text()) && /slot-a[^]*removed/.test(await text()) && /copy-1[^]*removed/.test(await text()))), await text())
+    check('the dialog lists them, the kept ones first, with why', !!(await until(async () => /4 slots, copies and old folders/.test(await text()) && /slot-b[^]*kept: it has commits that aren't on main/.test(await text()) && /R1.s old folder[^]*kept: left as it is/.test(await text()) && /slot-a[^]*removed/.test(await text()) && /copy-1[^]*removed/.test(await text()), HUNG_MS)), await text())
     for (const theme of ['light', 'dark']) {
       await inv('settings:update', { appearance: { theme } })
-      await until(() => page.evaluate((t) => document.documentElement.dataset.theme === t, theme))
+      await until(() => page.evaluate((t) => document.documentElement.dataset.theme === t, theme), HUNG_MS)
       await page.screenshot({ path: path.join(shots, `removeprojectslots-dialog-${theme}.png`) })
     }
+    // Delete: every one to the Recycle Bin with the project (the repository goes too), none kept behind.
+    await rd.locator('label.choice', { hasText: 'Delete' }).click()
+    check('…with Delete, every one goes to the Recycle Bin with the project', !!(await until(async () => /4 slots, copies and old folders[^]*to the Recycle Bin, with what is in them/.test(await text()) && (await text()).split('to the Recycle Bin').length >= 5 && !/kept:/.test(await text()), HUNG_MS)), await text())
+    for (const theme of ['light', 'dark']) {
+      await inv('settings:update', { appearance: { theme } })
+      await until(() => page.evaluate((t) => document.documentElement.dataset.theme === t, theme), HUNG_MS)
+      await page.screenshot({ path: path.join(shots, `removeprojectslots-delete-${theme}.png`) })
+    }
     await page.keyboard.press('Escape')
-    await until(async () => (await rd.count()) === 0)
+    await until(async () => (await rd.count()) === 0, HUNG_MS)
 
     // Remove from Hive: the guarded clean-up, the rest kept and said.
     const done = await inv('project:remove', beta, 'remove')

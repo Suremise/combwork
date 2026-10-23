@@ -1143,8 +1143,12 @@
     "defaultMessage": "Delete",
     "description": "Remove Project: a choice, and the dialog's button for it."
   },
+  "workspace.removal.deleteBlocked": {
+    "defaultMessage": "Delete can't go ahead while a slot or old folder listed above stops it.",
+    "description": "Remove Project, with Delete chosen (#1447): why its button is off: a slot or old folder in the list says why it stops Delete."
+  },
   "workspace.removal.deleteSummary": {
-    "defaultMessage": "The project folder, its worktrees and its handovers go to the Recycle Bin, and its cards are deleted.",
+    "defaultMessage": "The project folder, its worktrees, slots and copies, and its handovers go to the Recycle Bin, and its cards are deleted.",
     "description": "Remove Project: what Delete does."
   },
   "workspace.removal.deletedDone": {
@@ -1166,6 +1170,10 @@
   "workspace.removal.drafts": {
     "defaultMessage": "Files of this project have unsaved edits in Hive. They are lost.",
     "description": "Remove Project, before Delete."
+  },
+  "workspace.removal.folderBlocks": {
+    "defaultMessage": "stops Delete: {why}",
+    "description": "Remove Project, What it touches, with Delete chosen (#1447): a slot or old folder that stops Delete, and why ({why}: a clause)."
   },
   "workspace.removal.folderGone": {
     "defaultMessage": "The folder is no longer in the workspace.",
@@ -1191,8 +1199,12 @@
     "defaultMessage": "Folder",
     "description": "Remove Project, What it touches, the What column: the project's folder (its name follows; the full path on hover)."
   },
+  "workspace.removal.folderTrashed": {
+    "defaultMessage": "to the Recycle Bin",
+    "description": "Remove Project, What it touches, with Delete chosen (#1447): a slot, copy or old folder goes to the Recycle Bin with the project, with whatever is in it."
+  },
   "workspace.removal.foldersHow": {
-    "defaultMessage": "{how, select, hide {left as they are} other {removed when clean and merged; the rest stay, listed}}",
+    "defaultMessage": "{how, select, hide {left as they are} delete {to the Recycle Bin, with what is in them} other {removed when clean and merged; the rest stay, listed}}",
     "description": "Remove Project, What it touches, what happens to the project's slots, copies and old folders for the choice made (#1447): Hive removes those with nothing to lose, and keeps the others."
   },
   "workspace.removal.foldersThing": {

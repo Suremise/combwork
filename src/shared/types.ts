@@ -984,7 +984,7 @@ export interface ProjectRemovalInfo {
    * Its slots, copies and retired homes (#1447), with what removing the project would do to each: `kept`, why it would
    * stay (the guarded clean-up's reason, or a home's, or a folder Hive didn't make), or null: removed.
    */
-  folders?: { of: ProjectFolderOf; path: string; kept: string | null }[]
+  folders?: { of: ProjectFolderOf; path: string; kept: string | null; blocksDelete?: string }[]
 }
 
 /** A project folder holding what Remove from Hive packed into its .hive/removed. */

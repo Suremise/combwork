@@ -711,6 +711,10 @@
     "defaultMessage": "Its cards couldn't all be deleted: {why}",
     "description": "A warning after Delete: some of the project's cards stayed. {why} is the system's message."
   },
+  "main.removal.deleteBlocked": {
+    "defaultMessage": "Delete can't go ahead: {folders}. Nothing was deleted.",
+    "description": "Why Delete refused (#1447): the project's slots or old folders that stop it ({folders}: each one's name and why, a list). Nothing was changed."
+  },
   "main.removal.dirty": {
     "defaultMessage": "{n, plural, one {# uncommitted file} other {# uncommitted files}}",
     "description": "Work in an agent's worktree that stops Remove from Hive: its files not committed. {n} is how many."
@@ -731,9 +735,21 @@
     "defaultMessage": "left as it is: its conversations resume there",
     "description": "Remove Project (#1447): an old reviewer folder (a reviewer's own worktree from before 1.0) stays where it is. A clause."
   },
+  "main.removal.folder.notForgotten": {
+    "defaultMessage": "Hive's record of the project's slots couldn't all be cleared: {why}",
+    "description": "A warning after Delete (#1447): the project's slot or copy records stayed in Hive's database ({why}: the system's message)."
+  },
   "main.removal.folder.notHives": {
     "defaultMessage": "left as it is: it isn't in Hive's worktrees folder for the project",
     "description": "Remove Project (#1447): a slot whose folder Hive didn't make (outside <workspace>.worktrees/<project>) stays. A clause."
+  },
+  "main.removal.folder.notTrashed": {
+    "defaultMessage": "{path} couldn't be moved to the Recycle Bin: {why}",
+    "description": "A warning after Delete (#1447): one of the project's slots, copies or old folders ({path}) couldn't go to the Recycle Bin ({why}: the system's message)."
+  },
+  "main.removal.folder.outsideDelete": {
+    "defaultMessage": "it isn't in Hive's worktrees folder for the project, and would be left without its repository: release its slot and move or remove it first",
+    "description": "Why Delete can't go ahead (#1447): a slot outside <workspace>.worktrees/<project> (one Hive didn't make) would keep its files but lose the repository Delete sends to the Recycle Bin. Release its slot is a command in the agent's menu (Release Slot…). A clause."
   },
   "main.removal.folderGone": {
     "defaultMessage": "The folder {folder} is no longer in the workspace. Put it back, or forget it.",
