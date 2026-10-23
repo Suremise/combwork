@@ -683,7 +683,7 @@ describe('operations own a slot while it changes (HR1 round 1)', { timeout: 90_0
   /** A session's claim of a slot's writer (#1434, agentFolders.ts's claimIn) for its lease's agent, as a start makes it. */
   const claimFor = (w: World, run: string) => {
     const lease = w.store.leaseOf({ card: 1 })
-    const facts = { projectPath: w.project, migrated: true, homes: [], slots: [] }
+    const facts = { projectPath: w.project, migrated: true, migratedAgents: [], homes: [], slots: [] }
     return w.store.conn
       .write((db) => claimIn(db, w.store, { facts, folder: join(w.root, 'slot-a'), agent: { id: 'a1', role: 'builder', legacy: null }, existing: null, purpose: 'build', auto: false, run, sessionsHost: 'p-test', me: { pid: 1, started: 1001 }, head: null }))
       .then(

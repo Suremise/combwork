@@ -92,6 +92,7 @@ interface HiveMessageValues {
   'panes.menu.moveLeft': undefined
   'panes.menu.moveRight': undefined
   'panes.menu.moveUp': undefined
+  'panes.menu.releaseSlot': undefined
   'panes.menu.remove': undefined
   'panes.menu.reviewChanges': undefined
   'panes.messages.cancel': { n: number }

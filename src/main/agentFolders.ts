@@ -23,13 +23,17 @@ import type { AgentDef, AgentWorktree } from '../shared/types'
 
 const log = createLogger('sessions')
 
-/** Whether #1441 has migrated a project's agents' worktrees into slots: none is until it says so. */
-let migratedCheck: (projectPath: string) => boolean | Promise<boolean> = () => false
-export function setSlotsMigrated(fn: ((projectPath: string) => boolean | Promise<boolean>) | null): void {
-  migratedCheck = fn ?? (() => false)
+/**
+ * The agents of a project whose 0.9 worktree #1441 has migrated (adopted as a slot, or kept as a retired home); null
+ * while it hasn't run on the project. None is until it says so.
+ */
+type Migrated = readonly string[] | null
+let migratedCheck: (projectPath: string) => Migrated | Promise<Migrated> = () => null
+export function setSlotsMigrated(fn: ((projectPath: string) => Migrated | Promise<Migrated>) | null): void {
+  migratedCheck = fn ?? (() => null)
 }
-/** Whether #1441 has migrated a project's agents' worktrees into slots. */
-export const slotsMigrated = async (projectPath: string): Promise<boolean> => !!(await migratedCheck(projectPath))
+/** Whether #1441 has migrated an agent's 0.9 worktree: its `worktree` then no longer counts for where it works. */
+export const slotsMigrated = async (projectPath: string, agentId: string): Promise<boolean> => !!(await migratedCheck(projectPath))?.includes(agentId)
 
 /** A project's retired homes (#1441): folders its agents' conversations resume in, never lent. None until then. */
 let homesOf: (projectPath: string) => readonly string[] | Promise<readonly string[]> = () => []
@@ -110,10 +114,12 @@ async function hostOf(projectPath: string): Promise<{ ws: WorkspaceService; host
 
 /** What the contract decides from for a project now. A board still 0.9's (no slot tables), or the Assistant's home: no slots. */
 export async function folderFacts(projectPath: string): Promise<FolderFacts> {
-  const facts: FolderFacts = { projectPath, migrated: false, homes: [], slots: [] }
+  const facts: FolderFacts = { projectPath, migrated: false, migratedAgents: [], homes: [], slots: [] }
   if (workspace.isAssistantHome(projectPath)) return facts
   const ws = workspaceOf(projectPath)
-  facts.migrated = await migratedCheck(projectPath)
+  const migrated = await migratedCheck(projectPath)
+  facts.migrated = migrated !== null
+  facts.migratedAgents = migrated ?? []
   facts.homes = await homesOf(projectPath)
   try {
     const project = (await ws.projectConfig(projectPath)).id ?? basename(projectPath)

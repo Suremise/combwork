@@ -479,6 +479,26 @@
     "defaultMessage": "Remove from Recent",
     "description": "Button: forgets the recent workspace whose folder is gone."
   },
+  "actions.releaseSlot.confirm": {
+    "defaultMessage": "Release",
+    "description": "Button: releases the agent's slot."
+  },
+  "actions.releaseSlot.detail": {
+    "defaultMessage": "{agent}'s conversations there can be resumed while nothing else uses the slot.",
+    "description": "Under the question before releasing an agent's ({agent}) slot."
+  },
+  "actions.releaseSlot.failed": {
+    "defaultMessage": "Could not release the slot",
+    "description": "An error's title: releasing an agent's slot failed."
+  },
+  "actions.releaseSlot.message": {
+    "defaultMessage": "{slot} stops being kept for {agent}. Its folder and branch stay; Hive lends it to new work once it is clean, and may rename its folder to a slot name.",
+    "description": "The question before releasing an agent's ({agent}) slot ({slot}): what happens to it after."
+  },
+  "actions.releaseSlot.title": {
+    "defaultMessage": "Release {agent}'s slot {slot}?",
+    "description": "Title of the question before releasing an agent's ({agent}) slot ({slot}, such as hb2): its own worktree from before 1.0, kept for it as a slot since the upgrade."
+  },
   "actions.remove.confirm": {
     "defaultMessage": "Remove",
     "description": "Button: removes the agent."

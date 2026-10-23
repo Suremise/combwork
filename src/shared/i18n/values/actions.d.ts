@@ -121,6 +121,11 @@ interface HiveMessageValues {
   'actions.recent.notFoundTitle': undefined
   'actions.recent.removeFailed': undefined
   'actions.recent.removeFromRecent': undefined
+  'actions.releaseSlot.confirm': undefined
+  'actions.releaseSlot.detail': { agent: string | number }
+  'actions.releaseSlot.failed': undefined
+  'actions.releaseSlot.message': { slot: string | number; agent: string | number }
+  'actions.releaseSlot.title': { agent: string | number; slot: string | number }
   'actions.remove.confirm': undefined
   'actions.remove.deleteConfirm': undefined
   'actions.remove.deleteDetail': { branch: string | number }

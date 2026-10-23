@@ -28,11 +28,13 @@ import { taskPrompt } from '../shared/tasks'
 import { agentWorkflowRole, buildsWork } from '../shared/workflow/roles'
 import { workflowText } from '../shared/workflow/texts'
 import type { Fact, FactData, StartedData, StageId } from '../shared/workflow/facts'
-import { SLOTS_DELETE_MERGED } from '../shared/advanced'
+import { SLOTS_DELETE_MERGED, SLOTS_RENAME_ADOPTED } from '../shared/advanced'
+import { basename } from 'path'
 import type { AgentDef } from '../shared/types'
 import { app } from 'electron'
 import { advanced } from './advanced'
 import { exitBy } from './exitLog'
+import { legacyWorktree, rebindSession } from './agentFolders'
 import { boardRead } from './boardStore'
 import { deliveriesOf, deliverNow, launchWith } from './deliveries'
 import { onHiveEvent } from './events'
@@ -46,7 +48,8 @@ import { isUnknown } from './platform/types'
 import { withRepoLock } from './repoLock'
 import { sessions } from './sessions'
 import { holder, poolFor, setSlotFreed } from './slotsApp'
-import { refusalText, setBuilderCount, type SlotLease, type SlotPool } from './slots'
+import { quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool } from './slots'
+import { carriedOf, keptFor, keptGoing } from './slotMigration'
 import { getTask } from './tasks'
 import { onAction } from './workflow/actionWorker'
 import { agentBusy } from './workflow/lineUpdates'
@@ -195,11 +198,62 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
     if (at) return at
   }
   if (held) return { wait: refusalText({ why: 'inUse', slot: held.slot, agent: held.agent, card: held.card, lane: held.lane }, name) } // i18n-ignore: a refusal's code, agent-facing English (refusalText)
+  // The builder's own slot (#1441: its carried lease, kept for nothing now) taken over when it can be; else the card gets
+  // another slot, and the carried one stays protected.
+  const own = await carriedToHand(ws, projectPath, pool, builder, o.target)
+  if (own) {
+    if (o.dry) return { slot: own.slot.name, folder: own.slot.folder, lease: '', fresh: false }
+    const handed = await handOffCarried(ws, projectPath, pool, own, lane ? { lane, agent: builder } : { card: card.id, agent: builder }, name(builder))
+    if (handed) return leaseAt(pool, handed)
+  }
   if (o.dry) return couldLend(pool, projectPath, builder)
   const r = await pool.lend(lane ? { lane, agent: builder } : { card: card.id, agent: builder }, { ...(o.target ? { target: o.target } : {}), install: false })
   if (!r.ok) return { wait: refusalText(r.refusal, name) }
   log.info(`Lent ${userText(r.slot.name)} to ${userText(name(builder))} for ${lane ? `lane ${lane}` : `#${card.id}`} (lease ${r.lease.id})`)
   return leaseAt(pool, r.lease)
+}
+
+/**
+ * A builder's own slot a start or a lane can take over (#1441): its carried lease (its adopted worktree, or a slot its
+ * Resume took) kept for nothing now, the slot clean and its head in the target (merged). Null: none, or not now.
+ */
+async function carriedToHand(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, target: string | null): Promise<{ carried: SlotLease; slot: Slot } | null> {
+  const carried = pool.leasesOf(builder).find((l) => l.kind === 'carried')
+  if (!carried || keptFor(ws, carried.id)) return null
+  const slot = pool.slotOf(carried)
+  return slot && (await cleanAndContained(projectPath, slot.folder, target)) ? { carried, slot } : null
+}
+
+/**
+ * The handover (#1441): in one write, the carried lease ended (`handedOff`), the card's or lane's lease begun on the same
+ * slot, and its conversations rebound to it (#1434's rebindSession: only the binding changes), so the agent's
+ * conversation goes on there. Null when it couldn't be (the slot or lease changed meanwhile): the caller lends another.
+ */
+async function handOffCarried(ws: WorkspaceService, projectPath: string, pool: SlotPool, own: { carried: SlotLease; slot: Slot }, req: { card?: number; lane?: string; agent: string }, agentName: string): Promise<SlotLease | null> {
+  const host = (await ws.sessionScope(projectPath)).scope
+  const id = (await ws.projectConfig(projectPath)).id ?? basename(projectPath)
+  const handed = await pool
+    .handOff(own.carried.id, req, (db, lease) => {
+      const bound = db.prepare('SELECT id FROM sessions WHERE host = ? AND lease = ?').all(host, own.carried.id) as { id: string }[] // i18n-ignore: SQL
+      for (const b of bound) rebindSession(db, host, id, b.id, lease.id)
+    })
+    .catch((e) => (log.warn(`handing ${userText(agentName)}'s slot ${userText(own.slot.name)} over`, e), null))
+  if (handed) log.info(`${userText(agentName)}'s slot ${userText(own.slot.name)} handed over to ${req.lane ? `lane ${req.lane}` : `#${req.card}`} (lease ${handed.id})`)
+  return handed
+}
+
+/** Whether an adopted slot can be taken over by a start: no changes not committed, and its head in the target (merged). */
+async function cleanAndContained(projectPath: string, folder: string, target: string | null): Promise<boolean> {
+  const d = await G.dirty(folder)
+  if (isUnknown(d) || d.length) return false
+  const head = await G.head(folder)
+  const t = target ?? (await G.defaultBranch(projectPath))
+  if (isUnknown(head) || isUnknown(t) || !t) return false
+  const th = await G.lineHead(projectPath, t)
+  if (isUnknown(th) || !th) return false
+  if (head === th) return true
+  const inIt = await G.isAncestor(projectPath, head, th)
+  return !isUnknown(inIt) && inIt
 }
 
 /** A lease where a start can use it: its slot and folder (fresh: a card's own, given back if the start isn't written). */
@@ -358,6 +412,8 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
     const card = cardOf(wf, n)
     if (card) await withRepoLock(projectPath, () => settleDeletion(projectPath, wf, card, n, d), { quiet: true, project: projectPath }).catch((e) => log.warn(`settling #${n}'s begun deletion of ${userText(d.line)}`, e))
   }
+  // 0b. Renames of adopted slots cut short (#1441): their holders gone, finished or given up by the pool.
+  await settleRenames(pool)
   const lanes = new Map((await rawLanes(ws)).map((l) => [l.id, l]))
   // 1. Releases, rules on or off: a card's lease its current cycle doesn't use, a lane's whose lane has ended.
   for (const l of pool.openLeases()) {
@@ -373,6 +429,19 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
       }
       if (!over()) continue
       if (await pool.release(l.id, lane?.state === 'abandoned' ? 'laneAbandoned' : 'laneEnded', over)) log.info(`Lane ${l.lane} ended: its lease ${l.id} on ${userText(l.slot)} ended`)
+    } else if (l.kind === 'carried') {
+      // An adopted worktree (#1441) kept for the lane or card in flight at the upgrade: released once that has ended (its
+      // lane over, its card Done or put back). One kept for nothing stays (a handoff, or the user, ends it).
+      const kept = keptFor(ws, l.id)
+      if (!kept) continue
+      const over = (): boolean => {
+        if ('lane' in kept) return lanes.get(kept.lane)?.state !== 'active'
+        const c = cardOf(wf, kept.card)
+        const st = c ? wf.state(c).stage : null
+        return st === null || st === 'done' || st === 'todo'
+      }
+      if (!over()) continue
+      if (await pool.release(l.id, 'lane' in kept ? 'laneEnded' : 'cardEnded', over)) log.info(`The adopted ${userText(l.slot)}'s carried lease ${l.id} ended with ${'lane' in kept ? `lane ${kept.lane}` : `#${kept.card}`}`)
     }
   }
   if (!workflowEnforced()) return
@@ -403,6 +472,8 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   }
   // 4. Lanes started from the window waiting for a slot.
   await startWaitingLanes(ws, projectPath, pool)
+  // 5. Adopted slots, once free, renamed to generic names (#1441).
+  await renameAdopted(ws, projectPath, pool)
 }
 
 /** A cycle's preparation and placement, one at a time each. */
@@ -641,21 +712,59 @@ async function settleDeletion(projectPath: string, wf: Workflow, card: CardRecor
   return true
 }
 
+// --- Adopted slots renamed (#1441).
+
+/** A slot's generic name (`slot-a`): adopted ones keep their folder's (`hb2`) until renamed. */
+const GENERIC = /^slot-[a-z]+$/
+
+/**
+ * Free adopted slots renamed to the next generic name (#1441) by the pool's rename operation (`SlotPool.rename`: its
+ * destination reserved in the write that takes the slot, Repair's steps, its end in one fenced write), only with the
+ * rules on and Settings → Advanced, Rename adopted worktrees to slot names; a slot with no lease, operation, job or
+ * writer, ready, with no session running there, and nothing else in it (the rename probe).
+ */
+export async function renameAdopted(ws: WorkspaceService, projectPath: string, pool: SlotPool): Promise<void> {
+  const allowed = (): boolean => workflowEnforced() && advanced.get(SLOTS_RENAME_ADOPTED) !== false
+  if (!allowed()) return
+  for (const s of pool.slots()) {
+    if (GENERIC.test(s.name) || s.state !== 'ready' || s.op || s.job || s.writer || pool.openLease(s.name)) continue
+    if (sessions.liveStates().some((x) => x.cwd && samePlace(x.cwd, s.folder))) continue
+    if (!(await quietFolder(s.folder)) || !allowed()) continue
+    const to = await pool.rename(s.name, allowed)
+    if (to) log.info(`The adopted ${userText(s.name)} is now ${userText(to)}`)
+  }
+}
+
+/**
+ * Renames cut short (#1441): each is its operation's, so only `refresh` takes one over, once its holder is gone, and
+ * finishes or gives it up (`SlotPool.recover`); a live one is left to its holder. An intent no operation owns is cleared.
+ */
+export async function settleRenames(pool: SlotPool): Promise<void> {
+  if (!pool.renames().length) return
+  await pool.refresh()
+  await pool.clearOrphanRenames()
+}
+
 // --- Lanes.
 
 /**
  * A lane's slot (#1438, §16.10.2), lent to its builder as Start Lane… starts it, before its agents start, and kept for the
  * whole lane: the slot, or why none is free (English). With none free the caller records the lane's wait (`slotWait`).
  */
-export async function lendLane(ws: WorkspaceService, projectPath: string, lane: string, builder: string): Promise<{ slot: string } | { waiting: string }> {
+export async function lendLane(ws: WorkspaceService, projectPath: string, lane: string, builder: string, target: string | null): Promise<{ slot: string } | { waiting: string }> {
   const pool = await poolFor(ws, projectPath)
+  const agents = projectAgents(await ws.projectConfig(projectPath))
+  const name = (id: string): string => agents.find((a) => a.id === id)?.name ?? id
+  // The builder's own slot, taken over by the lane when it can be (#1441), as a card's start does.
+  const own = await carriedToHand(ws, projectPath, pool, builder, target)
+  const handed = own ? await handOffCarried(ws, projectPath, pool, own, { lane, agent: builder }, name(builder)) : null
+  if (handed) return { slot: handed.slot }
   const r = await pool.lend({ lane, agent: builder }, { install: false })
   if (r.ok) {
     log.info(`Lent ${userText(r.slot.name)} to lane ${lane} (lease ${r.lease.id})`)
     return { slot: r.slot.name }
   }
-  const agents = projectAgents(await ws.projectConfig(projectPath))
-  return { waiting: refusalText(r.refusal, (id) => agents.find((a) => a.id === id)?.name ?? id) }
+  return { waiting: refusalText(r.refusal, name) }
 }
 
 /**
@@ -669,6 +778,11 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
   for (const lane of waiting) {
     if (!workflowEnforced() || ws.lifetime.aborted) return
     let lease = pool.leaseOf({ lane: lane.id })
+    if (!lease) {
+      // The builder's own slot first (#1441), checked against the default branch (the lane's target isn't known here).
+      const own = await carriedToHand(ws, projectPath, pool, lane.builder.id, null)
+      lease = own ? await handOffCarried(ws, projectPath, pool, own, { lane: lane.id, agent: lane.builder.id }, lane.builder.name) : null
+    }
     if (!lease) {
       const r = await pool.lend({ lane: lane.id, agent: lane.builder.id }, { install: false })
       if (!r.ok) return
@@ -690,6 +804,23 @@ function laneSlot(ws: WorkspaceService, lane: string): string | null {
     // A board still 0.9's: no slots.
     return null
   }
+}
+
+/**
+ * After #1441's migration, the stand-in (#1438 item 7): an agent's adopted worktree (its open carried lease's slot) is
+ * its cards' folder, on its own branch, while the lane or card that lease is kept for goes on. Otherwise none.
+ */
+async function standIn(ws: WorkspaceService, projectPath: string, agentId: string): Promise<{ path: string; base: string | null } | null> {
+  const cfg = await ws.projectConfig(projectPath)
+  const c = carriedOf(ws, cfg.id ?? basename(projectPath), agentId)
+  if (!c) return null
+  const wf = await workflowFor(ws, projectPath).catch(() => null)
+  const stage = (n: number): string | null => {
+    const card = wf ? cardOf(wf, n) : null
+    return card && wf ? wf.state(card).stage : null
+  }
+  if (!(await keptGoing(ws, keptFor(ws, c.lease), stage))) return null
+  return { path: c.folder, base: legacyWorktree(projectAgents(cfg).find((a) => a.id === agentId))?.base ?? null }
 }
 
 // --- What asks for a pass.
@@ -729,7 +860,7 @@ export function startSlotCards(): void {
   }
   onAction('prepareSlot', (a, ws) => ask(a.card, ws))
   onAction('releaseSlot', (a, ws) => ask(a.card, ws))
-  setSlotStarts({ leaseFor: (ws, project, card, builder, o) => leaseForStart(ws, project, card, builder, o), unused: slotUnused })
+  setSlotStarts({ leaseFor: (ws, project, card, builder, o) => leaseForStart(ws, project, card, builder, o), unused: slotUnused, standIn })
   // The pool's size: the project's builders (#1430's roles: builders and either), at least one (slots.ts).
   setBuilderCount(async (projectPath) => {
     const ws = workspaceFor(projectPath)

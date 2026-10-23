@@ -342,6 +342,8 @@
   "tips.slotResume.title": "Rozmowa wznawia się tam, gdzie powstała",
   "tips.slots.text": "Gdy Gdzie powstają karty ma wartość Każda karta we własnym folderze, rozpoczęcie karty wypożycza wykonawcy slot, gotowy worktree, i tworzy tam gałąź karty. Tor zachowuje slot od karty do karty; gdy wszystkie są zajęte, czeka na wolny.",
   "tips.slots.title": "Każda karta na własnej gałęzi",
+  "tips.slotsAdopted.text": "Od aktualizacji własne worktree każdego budującego jest slotem zarezerwowanym dla niego, dopóki jego następna karta lub tor go nie przejmie. Zwolnij slot… w menu ⋯ agenta oddaje go; gdy jest wolny, Hive zmienia nazwę jego folderu na nazwę slotu, przenosząc jego rozmowy.",
+  "tips.slotsAdopted.title": "Worktree twoich agentów są teraz slotami",
   "tips.sortTables.text": "Kliknij nagłówek kolumny w tabelach Hive (skróty, Wydajność, Miejsce na dysku, przeglądy), żeby posortować według niej, a ponownie – w drugą stronę. Hive pamięta sortowanie i liczbę wierszy na stronę każdej tabeli.",
   "tips.sortTables.title": "Sortuj dowolną tabelę",
   "tips.staleMessages.text": "Gdy Asystent przekazuje coś o bieżącej rundzie karty, wiąże wiadomość z tą kartą: jeśli karta zostanie zatwierdzona lub zacznie kolejną rundę, zanim agent ją przeczyta, Hive odrzuca ją jako nieaktualną, więc żaden agent nie otworzy ponownie zatwierdzonej karty z powodu starego ustalenia.",

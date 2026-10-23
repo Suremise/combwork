@@ -1371,6 +1371,14 @@
     "defaultMessage": "Each card on a branch of its own",
     "description": "A tip's title. A slot is a working folder (a worktree) Hive lends to a card or a lane."
   },
+  "tips.slotsAdopted.text": {
+    "defaultMessage": "Since the upgrade, each builder's own worktree is a slot kept for it until its next card or lane takes it over. Release Slot… in the agent's ⋯ menu gives one up; once free, Hive renames its folder to a slot name, taking its conversations with it.",
+    "description": "A tip. A slot is a working folder (a worktree) Hive lends to a card or a lane. Release Slot… is a menu item: keep it as Hive shows it; ⋯ is the agent's menu button."
+  },
+  "tips.slotsAdopted.title": {
+    "defaultMessage": "Your agents' worktrees are slots now",
+    "description": "A tip's title, after upgrading from Hive 0.9. A slot is a working folder (a worktree) Hive lends to a card or a lane."
+  },
   "tips.sortTables.text": {
     "defaultMessage": "Click a column's header in Hive's tables (shortcuts, Performance, Storage, the Overviews) to sort by it, again for the other way. Hive remembers each table's sort and rows per page.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

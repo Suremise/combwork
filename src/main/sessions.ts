@@ -1248,7 +1248,9 @@ class SessionManager {
       const folder = workspace.isAssistantHome(projectPath) ? (workspaceOf(projectPath).path ?? projectPath) : projectPath
       const r = l ? null : resumeRecord(folder, a, records.filter((x) => recordProvider(x) === provider), openIds, ids, slotFolders)
       const hold = r && facts ? resumeHold(facts, folderAgent(a), r) : null
-      agents.push({ ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}) } })
+      // Its adopted worktree's slot (#1441), while it holds it carried.
+      const carried = facts?.slots.find((s) => s.open?.kind === 'carried' && s.open.agent === a.id)?.name
+      agents.push({ ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}) }, ...(carried ? { carriedSlot: carried } : {}) })
     }
     const primary = agents.find((a) => a.live)
     return { live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, agents }

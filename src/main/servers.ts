@@ -776,7 +776,7 @@ route('GET', '/v1/projects/:name/usage', async ({ params, query }) => {
   // Where it ran (#1434): its folder, and the slot that is, if any.
   const rec = usage ? await workspace.sessionRecord(p, id).catch(() => undefined) : undefined
   const folder = rec ? (rec.cwd ?? p) : null
-  const slot = folder ? slotAt(await folderFacts(p).catch(() => ({ projectPath: p, migrated: false, homes: [], slots: [] })), folder)?.name : undefined
+  const slot = folder ? slotAt(await folderFacts(p).catch(() => ({ projectPath: p, migrated: false, migratedAgents: [], homes: [], slots: [] })), folder)?.name : undefined
   const where = folder ? { folder, ...(slot ? { slot } : {}) } : {}
   // ?days=false: without the usage by day, which grows with every day the session runs.
   if (usage && query.get('days') === 'false') {
