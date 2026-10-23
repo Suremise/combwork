@@ -386,14 +386,20 @@ export function allLeftovers(which: (projectPath: string) => boolean = () => tru
   return [...keys.values()].map((l) => leftoversOf(l.projectPath, l.agentId))
 }
 
+/** What one launch (`run`) left running, as listed (Release Slot… on its held writer, #1506); null when nothing is listed. */
+export function leftoversOfRun(run: string): { processes: AgentProcess[]; more: number; restored: boolean } | null {
+  const l = left.get(run)
+  return l ? { processes: l.processes, more: l.more, restored: !!l.restored } : null
+}
+
 /**
  * Ends what an agent's stopped launches left running (their jobs, so only processes they started), or keeps it
- * running and stops listing it. Resolves with how many processes were ended or kept. A launch whose processes
+ * running and stops listing it; `run`: only that launch's (#1506). Resolves with how many processes were ended or kept. A launch whose processes
  * couldn't be ended stays listed (to try again, or keep), and the call then fails, saying so.
  */
-export async function settleLeftovers(projectPath: string, agentId: string, how: 'end' | 'keep'): Promise<number> {
+export async function settleLeftovers(projectPath: string, agentId: string, how: 'end' | 'keep', run?: string): Promise<number> {
   const k = agentKey(projectPath, agentId)
-  const mine = [...left.values()].filter((l) => agentKey(l.projectPath, l.agentId) === k)
+  const mine = [...left.values()].filter((l) => agentKey(l.projectPath, l.agentId) === k && (run === undefined || l.runId === run))
   if (!mine.length) return 0
   let done = 0
   let failed = 0

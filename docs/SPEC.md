@@ -2966,6 +2966,21 @@ Whether a conversation may resume there is its **hold** (none: it may):
   - A writer whose Hive is gone is never taken over or cleared from a snapshot of its processes: it stays held until
     the user releases the slot (#1506). A refresh clears only this Hive's own writer whose processes are proven ended
     but whose release couldn't be written.
+  - **Release Slot…** (#1506, the user's recovery, `agentFolders.ts` `heldWriter`/`releaseHeldWriter`): a writer is
+    *held* when its run isn't live in this Hive (its token ended: the session over and its leftovers kept, untracked
+    or unreadable) and its Hive is this one or one known to have gone (`writerHeld`). The agent's ⋯ offers Release
+    Slot… for it (`AgentInfo.heldSlot`, before a carried slot's own Release Slot…, which waits while both name the same
+    slot), and the Version Control tab's slot list marks the slot *Held by B1's ended session* with **Release…**. The
+    question names the slot, the agent, its Hive (this one, or the process that is gone), and what Hive lists of the
+    run's processes (with **End these processes first**, on by default) or that it doesn't know which still run: the
+    run's leftovers, or, its Hive gone and nothing listed for the run, the agent's processes in this project that the
+    notice that Hive closed unexpectedly lists and that still run (`lastUnexpectedClose`, `stillRunningOf`). Once
+    confirmed, the listed processes are ended first if asked (that run's leftovers only, or those exactly, by id and
+    start time; an end Windows refuses releases nothing), then the writer is cleared in a write
+    fenced by its run, and drained (the ended lease's last revision, the slot looked at). Refused, in the dialog,
+    while its run is live here (stop the agent, or End or Keep Running its leftovers, which release it themselves),
+    while another Hive holding it still runs or can't be told, and when the writer is no longer that run (a claim or
+    another release meanwhile: one outcome). A window action only: the Agent API and the Assistant's tool are #1561.
 - **Its environment:** `HIVE_SLOT` and `HIVE_SLOT_PORT_BASE` (#1429's `slotEnv`) while it runs in a slot; like every
   `HIVE_*`, never inherited.
 - **Refused, with offers:** the window says why and offers **Read Transcript** (the Sessions tab, on it) and **Start

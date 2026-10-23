@@ -90,6 +90,7 @@
   "panes.menu.moveLeft": "Déplacer vers la gauche",
   "panes.menu.moveRight": "Déplacer vers la droite",
   "panes.menu.moveUp": "Déplacer vers le haut",
+  "panes.menu.releaseHeld": "Libérer l’emplacement…",
   "panes.menu.releaseSlot": "Libérer l’emplacement…",
   "panes.menu.remove": "Retirer l’agent…",
   "panes.menu.reviewChanges": "Relire les modifications",

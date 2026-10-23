@@ -5,6 +5,7 @@ import type { Text, TextPart } from './advanced'
 import type { AvOffer } from './antivirus'
 import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActivity'
 import type { AttachmentKind } from './attachments'
+import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { TipsState } from './tips'
 import type { SuggestedPreset, TemplateAgent, TemplateScope } from './templates'
@@ -1238,8 +1239,28 @@ export interface SlotView {
   warmError: string | null
   warmLog: string | null
   lease: { id: string; kind: 'card' | 'lane' | 'carried'; agent: string; card: number | null; lane: string | null } | null
-  /** The session run writing in it now (#1434): its agent and the lease it started under, until it has exited. */
-  writer: { agent: string; lease: string } | null
+  /**
+   * The session run writing in it now (#1434): its agent and the lease it started under, until it has exited. `held`
+   * (#1506): its run is over but its processes aren't known to have ended (nor its Hive running), so only Release Slot…
+   * frees it.
+   */
+  writer: { agent: string; lease: string; held: boolean } | null
+}
+
+/** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */
+export interface HeldWriter {
+  slot: string
+  agent: string
+  run: string
+  /** The Hive holding it: this one (`self`), or another and whether that one still runs (null: can't be told). */
+  hive: { pid: number; self: boolean; alive: boolean | null }
+  /** Its run is still live in this Hive (its session, or the processes it left still followed): Release is refused. */
+  live: boolean
+  /**
+   * What Hive lists of the processes its run left running: its leftovers (the agent's ⋯ lists them), or, its Hive gone,
+   * the agent's processes that the notice that Hive closed unexpectedly lists and that still run. Null: not known.
+   */
+  processes: { list: AgentProcess[]; more: number; from: 'leftovers' | 'restart' } | null
 }
 
 /** One of a project's review and check copies as the window reads it (#1435, copies.ts): its state and its lease not freed. */
@@ -1359,6 +1380,8 @@ export interface AgentInfo extends AgentDef {
   resume: ResumeTarget | null
   /** Its adopted worktree's slot, while it holds it under a carried lease (#1441): Release Slot… in its menu ends it. */
   carriedSlot?: string
+  /** A slot its run that is over still holds as writer, its processes not known ended (#1506): Release Slot… frees it. */
+  heldSlot?: string
 }
 
 export interface ResumeTarget {
