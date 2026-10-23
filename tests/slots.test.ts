@@ -1,7 +1,9 @@
 // A project's slot pool (#1429, SPEC §16.10.1–16.10.2; src/main/slots.ts): lending and releasing, one open lease per
 // slot and per agent kept by SQLite's own indexes (two processes on one hive.db lending one slot at once), carried slots
 // protected, dirty slots not lent, the pool's size and idle removal, every guard of a removal, setup and installs as
-// runs, a failed setup, names, a slot gone from disk, and the options read from today's worktree settings.
+// runs, a failed setup, names, a slot gone from disk, and the options read from today's worktree settings. And the
+// operations that own a slot while it changes (HR1's round 1): two pools on one hive.db as two Hives (each its own
+// connection and holder process), commands held at a gate, a holder that dies, jobs that can't be emptied.
 import { spawn, spawn as nodeSpawn, type ChildProcess } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
@@ -13,7 +15,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
-import { fileSlotConn, IDLE_MS, lockHash, nextSlotName, PORT_FLOOR, quiet, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type SlotRun, type SlotRunEnd } from '../src/main/slots'
+import { fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, PORT_FLOOR, quiet, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
 import { commit, gitRepo, sh } from './workflow/harness'
 
@@ -21,6 +23,15 @@ const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 
 const T0 = Date.parse('2026-10-23T08:00:00.000Z')
+
+/** What a world's commands do: held at a gate (by the slot's name and what runs), settled or not, refused to start. */
+interface Steer {
+  gates: Map<string, { entered: () => void; go: Promise<void> }>
+  settled: boolean
+  noSupervisor: boolean
+  settle: boolean
+  settledJobs: string[]
+}
 
 interface World {
   ws: string
@@ -31,7 +42,14 @@ interface World {
   runs: (SlotRun & SlotRunEnd)[]
   opts: { setup: string; archive: string; copy: string }
   set: { builders: number; removeIdle: boolean; sessions: Map<string, string>; inFlight: Set<number> }
+  steer: Steer
   clock: { now: number }
+  /** Pids of holder processes that have ended. */
+  dead: Set<number>
+  /** Another Hive on the same hive.db: its own connection and holder process. */
+  another: (pid: number) => { pool: SlotPool; store: SlotStore }
+  /** Holds the next `what` run of a slot at a gate: resolves once it has started; `open()` lets it go. */
+  hold: (slot: string, what: SlotRun['what']) => { started: Promise<void>; open: () => void }
   close: () => void
 }
 
@@ -57,45 +75,76 @@ function world(o: { setup?: string; builders?: number } = {}): World {
   const dismiss = admitted(ws)
   workspaceDb(ws)
   const clock = { now: T0 }
-  const store = new SlotStore(fileSlotConn(boardFile(ws)), 'p-test', () => new Date(clock.now))
   const runs: World['runs'] = []
   const logs = tempDir('slots-logs-')
   const opts = { setup: o.setup ?? '', archive: '', copy: '.env' }
   const set = { builders: o.builders ?? 2, removeIdle: true, sessions: new Map<string, string>(), inFlight: new Set<number>() }
+  const steer: Steer = { gates: new Map(), settled: true, noSupervisor: false, settle: true, settledJobs: [] }
+  const dead = new Set<number>()
   const root = join(`${ws}.worktrees`, 'project')
-  const pool = new SlotPool({
-    store,
-    project,
-    root,
-    options: async () => ({ ...opts }),
-    builders: () => set.builders,
-    cap: () => 12,
-    runner: async (r) => {
-      const logPath = join(logs, `${runs.length}.log`)
-      const out = new BoundedLog(logPath, FILE_IO)
-      const e = await execCommand({ spawn: nodeSpawn, platform: process.platform, timeoutMs: 60_000, env: () => ({ ...baseEnv(), ...r.env }) }, r.command, r.folder, out)
-      out.close()
-      const end = { ok: !e.spawnError && !e.timedOut && e.exitCode === 0, exitCode: e.exitCode, logPath }
-      runs.push({ ...r, ...end })
-      return end
-    },
-    sessionIn: (f) => set.sessions.get(f.toLowerCase()) ?? null,
-    inFlight: (card) => set.inFlight.has(card),
-    removeIdle: () => set.removeIdle,
-    now: () => clock.now
-  })
+  const stores: SlotStore[] = []
+  const make = (pid: number): { pool: SlotPool; store: SlotStore } => {
+    const store = new SlotStore(fileSlotConn(boardFile(ws)), 'p-test', () => new Date(clock.now))
+    stores.push(store)
+    const holder: OpHolder = { self: async () => ({ pid, started: 1000 + pid }), alive: async (p) => !dead.has(p), live: new Set() }
+    const pool = new SlotPool({
+      store,
+      project,
+      root,
+      options: async () => ({ ...opts }),
+      builders: () => set.builders,
+      cap: () => 12,
+      runner: async (r) => {
+        if (steer.noSupervisor) return { ok: false, exitCode: null, spawnError: true, error: 'no supervisor', logPath: null, settled: true }
+        const gate = steer.gates.get(`${r.slot}:${r.what}`)
+        if (gate) {
+          steer.gates.delete(`${r.slot}:${r.what}`)
+          gate.entered()
+          await gate.go
+        }
+        const logPath = join(logs, `${runs.length}.log`)
+        const out = new BoundedLog(logPath, FILE_IO)
+        const e = r.signal.aborted ? null : await execCommand({ spawn: nodeSpawn, platform: process.platform, timeoutMs: 60_000, env: () => ({ ...baseEnv(), ...r.env }) }, r.command, r.folder, out)
+        out.close()
+        const end: SlotRunEnd = e ? { ok: !e.spawnError && !e.timedOut && e.exitCode === 0 && !r.signal.aborted, exitCode: e.exitCode, logPath, settled: steer.settled } : { ok: false, exitCode: null, error: 'the workspace closed', logPath, settled: true }
+        runs.push({ ...r, ...end })
+        return end
+      },
+      settle: async (job) => {
+        if (steer.settle) steer.settledJobs.push(job)
+        return steer.settle
+      },
+      holder,
+      sessionIn: (f) => set.sessions.get(f.toLowerCase()) ?? null,
+      inFlight: (card) => set.inFlight.has(card),
+      removeIdle: () => set.removeIdle,
+      now: () => clock.now
+    })
+    return { pool, store }
+  }
+  const first = make(1)
   const w: World = {
     ws,
     project,
     root,
-    store,
-    pool,
+    store: first.store,
+    pool: first.pool,
     runs,
     opts,
     set,
+    steer,
     clock,
+    dead,
+    another: make,
+    hold: (slot, what) => {
+      let entered!: () => void
+      let open!: () => void
+      const started = new Promise<void>((r) => (entered = r))
+      steer.gates.set(`${slot}:${what}`, { entered, go: new Promise<void>((r) => (open = r)) })
+      return { started, open: () => open() }
+    },
     close: () => {
-      store.conn.close()
+      for (const s of stores) s.conn.close()
       closeBoard(ws)
       dismiss()
     }
@@ -427,6 +476,245 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
     expect(w.runs.filter((r) => r.what === 'archive').map((r) => r.ok)).toEqual([false, true])
     expect(existsSync(folder)).toBe(false)
     expect(w.pool.slots()).toEqual([])
+  })
+})
+
+describe('operations own a slot while it changes (HR1 round 1)', { timeout: 90_000 }, () => {
+  it('the same card asking during its setup is told the slot is being set up, then gets it once it is ready', async () => {
+    const w = world({ setup: WRITE_ENV })
+    const b = w.another(2)
+    const gate = w.hold('slot-a', 'setup')
+    const lending = w.pool.lend({ agent: 'a1', card: 1 })
+    await gate.started
+    // Another Hive, the same card and builder: not handed a slot still being set up.
+    expect(await b.pool.lend({ agent: 'a1', card: 1 })).toEqual({ ok: false, refusal: { why: 'warming', slot: 'slot-a' } })
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'creating', op: { kind: 'warm', pid: 1 } })
+    gate.open()
+    const r = await lending
+    expect(r.ok).toBe(true)
+    const again = await b.pool.lend({ agent: 'a1', card: 1 })
+    expect(again).toMatchObject({ ok: true, slot: { name: 'slot-a', state: 'lent', op: null, job: null } })
+  })
+
+  it('a Hive that dies mid-setup: its job is settled, the warming failed (never ready), its late writes refused', async () => {
+    const w = world({ setup: WRITE_ENV, builders: 2 })
+    const b = w.another(2)
+    const gate = w.hold('slot-a', 'setup')
+    const lending = w.pool.lend({ agent: 'a1', card: 1 })
+    await gate.started
+    const job = w.store.slot('slot-a')!.job
+    expect(job).toMatch(/^slot-/)
+    // While A lives, B leaves it alone.
+    await b.pool.refresh()
+    expect(w.store.slot('slot-a')?.op?.pid).toBe(1)
+    w.dead.add(1)
+    await b.pool.refresh()
+    expect(w.steer.settledJobs).toEqual([job])
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'creating', warmError: INTERRUPTED, op: null, job: null })
+    expect(w.store.leaseOf({ card: 1 })).toBeNull()
+    // A "comes back" (its command ends): every write it tries is refused, and the slot stays as B left it.
+    gate.open()
+    expect(await lending).toEqual({ ok: false, refusal: { why: 'warming', slot: 'slot-a' } })
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'creating', warmError: INTERRUPTED, op: null })
+    // The card asks again: a new slot, never the interrupted one.
+    expect((await lent({ ...w, pool: b.pool }, { agent: 'a1', card: 1 })).slot.name).toBe('slot-b')
+  })
+
+  it("a dead holder's job that can't be emptied keeps the slot out of the pool until it is", async () => {
+    const w = world({ setup: WRITE_ENV, builders: 1 })
+    const b = w.another(2)
+    const gate = w.hold('slot-a', 'setup')
+    void w.pool.lend({ agent: 'a1', card: 1 })
+    await gate.started
+    w.dead.add(1)
+    w.steer.settle = false
+    await b.pool.refresh()
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'creating', warmError: INTERRUPTED, op: null, job: expect.stringMatching(/^slot-/) })
+    expect(w.store.leaseOf({ card: 1 })).toBeNull()
+    expect(await b.pool.lend({ agent: 'a2', card: 2 })).toEqual({ ok: false, refusal: { why: 'noSlot', size: 1 } })
+    expect(await b.pool.remove('slot-a')).toMatchObject({ why: 'busy' })
+    w.steer.settle = true
+    await b.pool.refresh()
+    expect(w.store.slot('slot-a')?.job).toBeNull()
+    gate.open()
+  })
+
+  it('a leased slot whose folder is gone: marked gone, and the same card asking again is told it is not ready', async () => {
+    const w = world()
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    sh(w.project, 'worktree', 'remove', '--force', r.slot.folder)
+    expect(await w.pool.lend({ agent: 'a1', card: 1 })).toEqual({ ok: false, refusal: { why: 'notReady', slot: 'slot-a', state: 'gone', error: null } })
+  })
+
+  it('released while its install runs: nobody else gets the slot until the operation ends, and a late failure is its own', async () => {
+    const w = world({ setup: WRITE_ENV, builders: 1 })
+    const b = w.another(2)
+    commit(w.project, { 'package-lock.json': '{"v":1}\n' }, 'lock')
+    const first = await lent(w, { agent: 'a1', card: 1 })
+    await w.pool.release(first.lease.id, 'done')
+    commit(w.project, { 'package-lock.json': '{"v":2}\n' }, 'lock 2')
+    sh(first.slot.folder, 'checkout', '-q', '--detach', 'main')
+    // A's lend for card 2 installs again (the lock changed), held, and fails late; B releases that lease meanwhile and lends.
+    w.opts.setup = 'node -e "process.exit(4)"'
+    const gate = w.hold('slot-a', 'install')
+    const lending = w.pool.lend({ agent: 'a1', card: 2 })
+    await gate.started
+    const l2 = w.store.leaseOf({ card: 2 })!
+    expect(await b.pool.release(l2.id, 'putBack')).toBe(true)
+    expect(await b.pool.lend({ agent: 'a2', card: 3 })).toEqual({ ok: false, refusal: { why: 'noSlot', size: 1 } })
+    // The install fails late: the slot is left not ready, and nothing of B's is touched (it never got the slot).
+    gate.open()
+    expect(await lending).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: 'its setup exited with code 4' } })
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'creating', op: null, warmError: 'its setup exited with code 4' })
+    expect(w.store.leaseOf({ card: 3 })).toBeNull()
+  })
+
+  it('released while its setup runs and the setup then succeeds: the slot ends ready, not lent, and is lent next', async () => {
+    const w = world({ setup: WRITE_ENV, builders: 1 })
+    const b = w.another(2)
+    const gate = w.hold('slot-a', 'setup')
+    const lending = w.pool.lend({ agent: 'a1', card: 1 })
+    await gate.started
+    await b.pool.release(w.store.leaseOf({ card: 1 })!.id, 'putBack')
+    expect(await b.pool.lend({ agent: 'a2', card: 2 })).toEqual({ ok: false, refusal: { why: 'noSlot', size: 1 } })
+    gate.open()
+    expect((await lending).ok).toBe(true)
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
+    expect((await lent({ ...w, pool: b.pool }, { agent: 'a2', card: 2 })).slot.name).toBe('slot-a')
+  })
+
+  it('a free slot changed since its release (tracked or untracked) is not handed over: marked dirty, another made', async () => {
+    const w = world({ builders: 3 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    await w.pool.release(r.lease.id, 'done')
+    writeFileSync(join(r.slot.folder, 'left.txt'), 'untracked\n')
+    const next = await lent(w, { agent: 'a2', card: 2 })
+    expect(next.slot.name).toBe('slot-b')
+    expect(w.store.slot('slot-a')?.state).toBe('dirty')
+    expect(readFileSync(join(r.slot.folder, 'left.txt'), 'utf8')).toBe('untracked\n')
+    await w.pool.release(next.lease.id, 'done')
+    writeFileSync(join(next.slot.folder, 'README.md'), 'changed\n')
+    expect((await lent(w, { agent: 'a3', card: 3 })).slot.name).toBe('slot-c')
+    expect(w.store.slot('slot-b')?.state).toBe('dirty')
+  })
+
+  it('a free slot with a session or a process in it is passed over this time, not marked', async () => {
+    const w = world({ builders: 2 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    await w.pool.release(r.lease.id, 'done')
+    w.set.sessions.set(r.slot.folder.toLowerCase(), 'someone')
+    expect((await lent(w, { agent: 'a2', card: 2 })).slot.name).toBe('slot-b')
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
+    expect(w.store.lease(w.store.leaseOf({ card: 2 })!.id)?.slot).toBe('slot-b')
+  })
+
+  it('a carried lease is refused while a removal runs, and the removal finishes', async () => {
+    const w = world({ builders: 1 })
+    const b = w.another(2)
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    await w.pool.release(r.lease.id, 'done')
+    w.opts.archive = 'node -e ""'
+    const gate = w.hold('slot-a', 'archive')
+    const removing = w.pool.remove('slot-a')
+    await gate.started
+    expect(await b.pool.carry('migrated', { name: 'slot-a', folder: r.slot.folder })).toBeNull()
+    gate.open()
+    expect(await removing).toBeNull()
+    expect(w.store.openLease('slot-a')).toBeNull()
+    expect(existsSync(r.slot.folder)).toBe(false)
+  })
+
+  it('a carried lease is refused for a slot recorded at another folder', async () => {
+    const w = world()
+    await w.pool.carry('a1', { name: 'hb1', folder: join(w.root, 'hb1') })
+    await w.pool.release(w.store.leasesOf('a1')[0].id, 'ended')
+    expect(await w.pool.carry('a2', { name: 'hb1', folder: join(w.root, 'elsewhere') })).toBeNull()
+  })
+
+  it('a removal whose Hive died is taken over and the slot looked at again; a live one is left alone', async () => {
+    const w = world({ builders: 1 })
+    const b = w.another(2)
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    await w.pool.release(r.lease.id, 'done')
+    w.opts.archive = 'node -e ""'
+    const gate = w.hold('slot-a', 'archive')
+    const removing = w.pool.remove('slot-a')
+    await gate.started
+    expect(await b.pool.remove('slot-a')).toEqual({ why: 'busy', state: 'removing' })
+    expect(await b.pool.lend({ agent: 'a2', card: 2 })).toEqual({ ok: false, refusal: { why: 'noSlot', size: 1 } })
+    w.dead.add(1)
+    await b.pool.refresh()
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null, job: null })
+    // A's late steps change nothing: its removal is no longer its own.
+    gate.open()
+    expect(await removing).toEqual({ why: 'busy', state: 'ready' })
+    expect(existsSync(r.slot.folder)).toBe(true)
+    expect((await lent({ ...w, pool: b.pool }, { agent: 'a2', card: 2 })).slot.name).toBe('slot-a')
+  })
+
+  it("this Hive's own operation left by a closed workspace is taken over as gone", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    await w.pool.release(r.lease.id, 'done')
+    // A removal's row as a workspace closing mid-removal leaves it: this process's pid, a token it no longer runs.
+    const db = new DatabaseSync(boardFile(w.ws))
+    db.prepare("UPDATE slots SET state = 'removing', op = 'o-old', op_kind = 'remove', op_pid = 1, op_started = 1001 WHERE name = 'slot-a'").run()
+    db.close()
+    await w.pool.refresh()
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
+  })
+
+  it('an exception in a removal keeps the slot and ends the operation', async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    await w.pool.release(r.lease.id, 'done')
+    const pool = new SlotPool({ ...w.pool.deps, inFlight: () => Promise.reject(new Error('the board failed')) })
+    expect(await pool.remove('slot-a')).toEqual({ why: 'cantCheck', detail: 'the board failed' })
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
+  })
+
+  it('with no process supervisor, nothing runs: the setup fails closed', async () => {
+    const w = world({ setup: WRITE_ENV })
+    w.steer.noSupervisor = true
+    expect(await w.pool.lend({ agent: 'a1', card: 1 })).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: 'no supervisor' } })
+    expect(w.runs).toEqual([])
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'creating', op: null, job: null })
+  })
+
+  it("a setup whose processes couldn't be ended isn't ready, and the slot stays out until its job is settled", async () => {
+    const w = world({ setup: WRITE_ENV, builders: 1 })
+    w.steer.settled = false
+    w.steer.settle = false
+    expect(await w.pool.lend({ agent: 'a1', card: 1 })).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: 'processes its setup started could not be ended' } })
+    expect(w.store.slot('slot-a')?.job).toMatch(/^slot-/)
+    expect(await w.pool.tidy()).toEqual([])
+    w.steer.settle = true
+    w.steer.settled = true
+    expect(await w.pool.tidy()).toEqual(['slot-a'])
+  })
+
+  it('an archive command whose processes could not be ended keeps the slot', async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    await w.pool.release(r.lease.id, 'done')
+    w.opts.archive = 'node -e ""'
+    w.steer.settled = false
+    expect(await w.pool.remove('slot-a')).toMatchObject({ why: 'archiveFailed', error: 'processes it started could not be ended' })
+    expect(existsSync(r.slot.folder)).toBe(true)
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null, job: expect.stringMatching(/^slot-/) })
+  })
+
+  it('the workspace closing mid-setup ends the command and awaits the operation: the slot is not ready', async () => {
+    const w = world({ setup: WRITE_ENV })
+    const gate = w.hold('slot-a', 'setup')
+    const lending = w.pool.lend({ agent: 'a1', card: 1 })
+    await gate.started
+    const closing = w.pool.close()
+    gate.open()
+    await closing
+    expect(await lending).toMatchObject({ ok: false, refusal: { why: 'setupFailed', slot: 'slot-a' } })
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'creating', op: null })
+    expect(await w.pool.lend({ agent: 'a2', card: 2 })).toEqual({ ok: false, refusal: { why: 'noSlot', size: 0 } })
   })
 })
 

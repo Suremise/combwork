@@ -594,14 +594,19 @@ never the CLI's config.
 keeps them) and `SlotPool` lends them. One write takes a slot (the builder's last, else the most recently used ready
 one, else a new name reserved while the pool is under its size: the builders, at most the agent cap) and inserts the
 lease; partial unique indexes allow one open lease per slot and one dispatch and one carried lease per agent, so a
-second Hive racing for the slot is refused by SQLite whatever its code does. Warming (a new slot's detached worktree,
-its copied files and setup; an install when its lock files' hash changed) runs outside that write, the slot reserved
-meanwhile, as one of Hive's runs ("Hive (slot slot-b)", `ProgressRun.slot`) in a job of its own on the shared process
-supervisor (`queueJobs.ts`' launcher). `remove` is the only way a slot goes: it takes the slot out of the pool first
-(`removing`, in a write that sees no open lease), then checks every guard (a session there, a queue entry in flight for
+second Hive racing for the slot is refused by SQLite whatever its code does. Whatever changes a slot outside one write
+is an **operation** (`op` on the slot's row: a token, its kind, the lease it warms for, its holder's pid and start):
+started in the write that reserves the slot, every later write fenced on the token (`SlotStore.fenced`, `OpLost`), and
+taken over by another Hive only once the holder process is gone, after its job is settled (a warming then failed, a
+removal looked at again). Warming (a free slot looked at again, a new slot's detached worktree, its copied files and
+setup; an install when its lock files' hash changed) is one, as one of Hive's runs ("Hive (slot slot-b)",
+`ProgressRun.slot`) in a job recorded on the slot (`job`) before it starts, on the shared process supervisor
+(`queueJobs.ts`' launcher), cleared only once its processes are seen ended (`slotsApp.ts` fails closed without a
+supervisor). `remove` is the only way a slot goes: an operation that takes the slot out of the pool first
+(`removing`, in a write that sees it free), then checks every guard (a session there, a queue entry in flight for
 a card it held, a process in it, proved by renaming its folder aside and back, dirty files, a head the target doesn't
-contain by §16.3.2's containment), runs the archive command, checks again, and lets git remove the worktree, never
-forced. `tidy` (hourly, Settings → Advanced, `hive.slots.removeIdle`) removes failed slots and idle ready ones beyond
+contain by §16.3.2's containment), runs the archive command, checks again, checks in a fenced write that it still
+holds the slot, and lets git remove the worktree, never forced. `tidy` (hourly, Settings → Advanced, `hive.slots.removeIdle`) removes failed slots and idle ready ones beyond
 the pool's size. Where an agent works because of a lease is #1434's `agentFolders.ts`; lending for a card's start is
 #1438's.
 

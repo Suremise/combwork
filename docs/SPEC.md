@@ -2739,7 +2739,16 @@ project's builders (`setBuilderCount`; until #1438 its agents), at least one, at
   the stored name stays English), each in a job of its own on the process supervisor, logs in Hive's `logs/slots`,
   bounded by Settings → Advanced, **Slots: longest a setup command runs** (`hive.slots.setupMinutes`, 60 min).
 - **Released:** a slot left with uncommitted or untracked files that aren't ignored is `dirty`, not lent until clean;
-  a free slot gone from disk is recreated when next lent, a leased one marked `gone`.
+  a free slot gone from disk is recreated when next lent, a leased one marked `gone`. A free slot is looked at again
+  when it is next lent (changed since, a session or a process in it: marked or passed over, another tried).
+- **Operations** (HR1's round 1): warming for a lease and removal own the slot from the write that starts them to the
+  write that ends them (`op` on its row: a token every one of their writes checks, and the holder's pid and start).
+  Nothing lends, adopts or removes a slot meanwhile; the same card asking again is told it is being set up. Another
+  Hive takes an operation over only once its holder process is gone (or this Hive's own, left by a workspace closed
+  meanwhile), after settling its job: a warming taken over is failed (*its setup was interrupted*, never ready), a
+  removal looked at again. A command's job on the process supervisor is recorded on the slot before it starts and
+  cleared only once its processes are seen ended; until then the slot isn't lent. With no supervisor nothing runs.
+  A workspace closing ends its slots' commands and awaits their operations.
 - **Clean-up** is guarded as above, a process in the folder proved absent by renaming it aside and back; the archive
   command runs first and a failure keeps the slot; git removes the worktree, never forced. Settings → Advanced,
   **Remove idle slots after a day** (`hive.slots.removeIdle`, on) removes free slots beyond the pool's size unused for

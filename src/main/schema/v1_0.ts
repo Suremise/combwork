@@ -822,8 +822,19 @@ export const SLOTS_STEP: SchemaStep = {
       warm_log   TEXT,
       created_at TEXT    NOT NULL,
       used_at    TEXT    NOT NULL,
+      -- The operation that owns the slot while it changes outside one write (warming for a lease, removal): its token,
+      -- which every write it makes checks, and its holder process (pid and start, Unix ms), taken over only once that
+      -- process is gone. 'job' is a command's job on the process supervisor, recorded before it starts and cleared only
+      -- once its processes are seen ended: while it is set (an operation's or one left by a crash) the slot isn't lent.
+      op         TEXT,
+      op_kind    TEXT    CHECK (op_kind IN ('warm', 'remove')),
+      op_lease   TEXT,
+      op_pid     INTEGER,
+      op_started INTEGER,
+      job        TEXT,
       PRIMARY KEY (project, name),
-      UNIQUE (project, port_base)
+      UNIQUE (project, port_base),
+      CHECK ((op IS NULL) = (op_kind IS NULL))
     ) STRICT, WITHOUT ROWID`,
     // A lease: one loan of a slot to a card or a lane (a dispatch lease) or an agent's migrated worktree (`carried`), from
     // `from_at` until `ended_at`, and why it ended. `agent` is the builder's id.

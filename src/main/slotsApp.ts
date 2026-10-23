@@ -1,13 +1,15 @@
 // The slot pool in the app (#1429, slots.ts): one pool per open workspace and project, on the workspace's board (its
 // writes inside boardWrite, so they wait for and join the board's other changes), keyed by the project's id so a rename
 // keeps its slots. A slot's setup, installs and archive command run as Hive's own runs, attributed to "Hive (slot
-// <name>)" in the Progress panel, each in a job of its own on Hive's process supervisor (shared with agents' launches
-// and the merge queue: what the command leaves running ends with its job), with a session command's environment plus
-// the slot's own (HIVE_SLOT, HIVE_SLOT_PORT_BASE), its output in a bounded log in Hive's own folder. Every hour, each
-// open workspace's pools with slots are tidied (Settings → Advanced, Remove idle slots after a day).
+// <name>)" in the Progress panel, each in the job its operation recorded on the slot, on Hive's process supervisor
+// (shared with agents' launches and the merge queue): with no supervisor nothing runs, and a job counts as settled only
+// once its processes are seen ended. Each run gets a session command's environment plus the slot's own (HIVE_SLOT,
+// HIVE_SLOT_PORT_BASE), its output in a bounded log in Hive's own folder. This process holds its pools' operations
+// (its pid and start: another Hive takes one over only once it is gone). A workspace closing ends its pools' commands
+// and awaits their operations. Every hour, each open workspace's pools with slots are tidied (Settings → Advanced,
+// Remove idle slots after a day).
 
-import { randomBytes } from 'crypto'
-import { spawn as nodeSpawn, type ChildProcess } from 'child_process'
+import { type ChildProcess } from 'child_process'
 import { mkdirSync } from 'original-fs'
 import { basename, join } from 'path'
 import { app } from 'electron'
@@ -21,10 +23,11 @@ import { agentLimit } from './projectAgents'
 import { progress, progressGate } from './progressService'
 import { childEnv } from './ptyHost'
 import { sessions } from './sessions'
-import { builderCountOf, SlotPool, slotOptionsOf, SlotStore, type SlotConn, type SlotRunEnd, type SlotRunner } from './slots'
+import { builderCountOf, SlotPool, slotOptionsOf, SlotStore, type OpHolder, type SlotConn, type SlotRunEnd, type SlotRunner } from './slots'
 import { openWorkspaces, WorkspaceService } from './workspace'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
-import { journalPath, LeaseJob, startLauncher } from './workflow/queueJobs'
+import { clearJournal, endLeaseJob, journalOf, journalPath, LeaseJob, startLauncher } from './workflow/queueJobs'
+import { defaultProbe } from './workflow/queueProcs'
 import { workflowFor } from './workflow/service'
 import { projectAgents } from '../shared/defaults'
 import { openEntry } from '../shared/workflow/facts'
@@ -52,12 +55,10 @@ function boardConn(ws: WorkspaceService): SlotConn {
 }
 
 /**
- * Starts a command in a job of its own on Hive's process supervisor: the launcher is put in the job before it runs the
- * command (queueJobs.ts), and one that can't be is ended having run nothing. With no supervisor (PowerShell refused),
- * the command starts on its own, as agents' launches then do.
+ * Starts a command in its job on Hive's process supervisor: the launcher is put in the job before it runs the command
+ * (queueJobs.ts), and one that can't be is ended having run nothing.
  */
-function jobSpawn(job: LeaseJob | null): Spawn {
-  if (!job) return nodeSpawn
+function jobSpawn(job: LeaseJob): Spawn {
   return (file, args, opts) => {
     const { child, after, before } = startLauncher({ command: file, args, verbatim: !!opts.windowsVerbatimArguments }, { cwd: opts.cwd as string | undefined, env: opts.env })
     const giveUp = (): void => {
@@ -72,7 +73,7 @@ function jobSpawn(job: LeaseJob | null): Spawn {
         child.stdin!.end()
       },
       (e) => {
-        log.warn("putting a slot run in its job", e)
+        log.warn('putting a slot run in its job', e)
         giveUp()
       }
     )
@@ -80,9 +81,22 @@ function jobSpawn(job: LeaseJob | null): Spawn {
   }
 }
 
-/** A project's slot runs: each a run of "Hive (slot <name>)" in the Progress panel, in a job of its own. */
+/** Where a project's slot jobs keep their journals (what their supervisor follows outside them). */
+const journalsOf = (root: string): string => join(root, '.slot-journals')
+
+/**
+ * A project's slot runs: each a run of "Hive (slot <name>)" in the Progress panel, in the job the pool recorded for it.
+ * Fails closed: with no process supervisor, or its job not made, nothing runs. Its job is ended when the command
+ * ends, when the workspace closes (`signal`) or at its time limit, and the run is settled only once the job is seen
+ * empty: otherwise the job stays recorded on the slot for `settle`.
+ */
 function appRunner(ws: WorkspaceService, projectPath: string, root: string): SlotRunner {
   return async (r) => {
+    const host = processSupervisor()
+    if (!host.usable || !(await host.ensure())) return { ok: false, exitCode: null, spawnError: true, error: "Hive's process supervisor isn't running, so it can't run a slot's commands", logPath: null, settled: true } // i18n-ignore: agent-facing and the log
+    const opened = await LeaseJob.open(host, r.job, await journalPath(root, r.job, journalsOf(root)))
+    if ('problem' in opened) return { ok: false, exitCode: null, spawnError: true, error: `its job couldn't be made: ${opened.problem}`, logPath: null, settled: true } // i18n-ignore: agent-facing and the log
+    const job = opened
     const workspacePath = ws.path ?? ''
     const caller = { source: 'hive' as const, workspacePath, projectPath, slot: r.slot }
     let id: string | null = null
@@ -102,25 +116,23 @@ function appRunner(ws: WorkspaceService, projectPath: string, root: string): Slo
       logPath = null
     }
     const out = new BoundedLog(logPath, FILE_IO)
-    const name = `slot-${randomBytes(6).toString('hex')}`
-    const host = processSupervisor()
-    let job: LeaseJob | null = null
-    if (host.usable) {
-      const opened = await LeaseJob.open(host, name, await journalPath(root, name, join(root, '.slot-journals')))
-      if ('problem' in opened) log.warn(`a slot run's job couldn't be made (${opened.problem}): it runs on its own`)
-      else job = opened
-    }
-    let end: SlotRunEnd = { ok: false, exitCode: null, spawnError: true, logPath: null }
+    const onClose = (): void => void job.end().catch(() => false)
+    r.signal.addEventListener('abort', onClose)
+    let end: SlotRunEnd = { ok: false, exitCode: null, spawnError: true, logPath: null, settled: false }
     try {
       const minutes = Math.max(1, Number(advanced.get(SLOTS_SETUP_MINUTES)) || 60)
-      const e = await execCommand({ spawn: jobSpawn(job), platform: process.platform, timeoutMs: minutes * 60_000, env: () => ({ ...checkEnv(childEnv()), ...r.env }) }, r.command, r.folder, out)
-      end = { ok: !e.spawnError && !e.timedOut && e.exitCode === 0, exitCode: e.exitCode, ...(e.timedOut ? { timedOut: true } : {}), ...(e.spawnError ? { spawnError: true } : {}), logPath: null }
+      const e = r.signal.aborted ? null : await execCommand({ spawn: jobSpawn(job), platform: process.platform, timeoutMs: minutes * 60_000, env: () => ({ ...checkEnv(childEnv()), ...r.env }) }, r.command, r.folder, out)
+      end = e ? { ok: !e.spawnError && !e.timedOut && e.exitCode === 0 && !r.signal.aborted, exitCode: e.exitCode, ...(e.timedOut ? { timedOut: true } : {}), ...(e.spawnError ? { spawnError: true } : {}), logPath: null, settled: false } : { ...end, error: 'the workspace closed' } // i18n-ignore: agent-facing and the log
     } finally {
+      r.signal.removeEventListener('abort', onClose)
       out.close()
-      // What the command left running (a watcher it started) ends with its job.
-      if (job) await job.end().catch(() => false)
-      await job?.close().catch(() => undefined)
-      end = { ...end, logPath: out.usable ? logPath : null }
+      // What the command left running (a watcher it started) ends with its job; settled only once it is seen empty.
+      const settled = await job.end().catch(() => false)
+      if (settled) {
+        await job.close().catch(() => undefined)
+        await clearJournal(root, r.job, journalsOf(root)).catch(() => undefined)
+      }
+      end = { ...end, settled, logPath: out.usable ? logPath : null }
       if (id) {
         try {
           progress.finish(caller, id, { ok: end.ok, ...(end.exitCode !== null ? { exitCode: end.exitCode } : {}), ...(end.logPath ? { logPath: end.logPath } : {}) })
@@ -129,9 +141,44 @@ function appRunner(ws: WorkspaceService, projectPath: string, root: string): Slo
         }
       }
     }
-    if (!end.ok) log.warn(`Slot ${userText(r.slot)}'s ${r.what} failed (${end.timedOut ? 'timed out' : end.spawnError ? 'did not start' : `exit ${end.exitCode}`})`)
+    if (!end.ok || !end.settled) log.warn(`Slot ${userText(r.slot)}'s ${r.what} ${end.ok ? 'left processes that could not be ended' : `failed (${end.timedOut ? 'timed out' : end.spawnError ? 'did not start' : `exit ${end.exitCode}`})`}`)
     return end
   }
+}
+
+/**
+ * Settles a job an operation recorded (its holder gone, or a job that couldn't be emptied): the job ended by its name
+ * on this Hive's supervisor (a supervisor that outlived its Hive holds it until then), and every process its journal
+ * names ended exactly (pid and start). True once none runs; its journal is then cleared.
+ */
+function appSettle(root: string): (job: string) => Promise<boolean> {
+  return async (job) => {
+    const host = processSupervisor()
+    if (!host.usable || !(await host.ensure()) || !(await endLeaseJob(host, job))) return false
+    const j = await journalOf(root, job, journalsOf(root))
+    if (j.state === 'unknown') return false
+    if (j.state === 'read' && j.entries.length) {
+      const probe = defaultProbe()
+      const list = await probe.list()
+      if (!list) return false
+      const left = list.filter((p) => j.entries.some((x) => x.pid === p.pid && Math.abs(x.started - p.started) <= 1))
+      if (left.length) {
+        await probe.end(left)
+        for (const p of left) if ((await probe.alive(p.pid, p.started)) !== false) return false
+      }
+    }
+    await clearJournal(root, job, journalsOf(root)).catch(() => undefined)
+    return true
+  }
+}
+
+/** This process as the holder of slot operations: its pid and start, read once, and the operations it runs now. */
+const probe = defaultProbe()
+let self: Promise<{ pid: number; started: number }> | null = null
+const holder: OpHolder = {
+  self: () => (self ??= probe.self()),
+  alive: (pid, started) => probe.alive(pid, started),
+  live: new Set()
 }
 
 /** A running session's agent in a folder (or one inside it), for a removal's guard. */
@@ -160,6 +207,8 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       builders: () => builderCountOf(projectPath, async () => projectAgents(await ws.projectConfig(projectPath)).length),
       cap: () => agentLimit(projectPath),
       runner: appRunner(ws, projectPath, root),
+      settle: appSettle(root),
+      holder,
       sessionIn,
       inFlight: async (card) => {
         const wf = await workflowFor(ws, projectPath).catch(() => null)
@@ -201,7 +250,7 @@ export async function tidyOpenPools(): Promise<void> {
   }
 }
 
-/** Starts the hourly tidy (index.ts, once); a workspace closing forgets its pools. */
+/** Starts the hourly tidy (index.ts, once); a workspace closing closes its pools. */
 export function startSlots(): void {
   if (timer) return
   timer = setInterval(() => void tidyOpenPools(), TIDY_MS)
@@ -209,9 +258,11 @@ export function startSlots(): void {
   WorkspaceService.closingTasks.add(forgetPools)
 }
 
+/** A workspace closing: its pools' running commands ended and their operations awaited, then the pools forgotten. */
 function forgetPools(path: string): Promise<void> {
-  for (const k of [...pools.keys()]) if (k.startsWith(`${path.toLowerCase()}\n`)) pools.delete(k)
-  return Promise.resolve()
+  const mine = [...pools.entries()].filter(([k]) => k.startsWith(`${path.toLowerCase()}\n`))
+  for (const [k] of mine) pools.delete(k)
+  return Promise.allSettled(mine.map(([, v]) => v.pool.then((p) => p.close()))).then(() => undefined)
 }
 
 export function stopSlots(): void {

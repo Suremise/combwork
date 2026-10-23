@@ -10,7 +10,7 @@ const REPLY = 'slots-host: '
 console.log(`${REPLY}${JSON.stringify({ ready: true })}`)
 createInterface({ input: process.stdin }).once('line', (line) => {
   void store
-    .take(JSON.parse(line), { size: 4, root, target: 'main' })
+    .take(JSON.parse(line), { size: 4, root, target: 'main', token: `o-${process.pid}`, holder: { pid: process.pid, started: 1 } })
     .then(
       (r) => console.log(`${REPLY}${JSON.stringify(r)}`),
       (e: Error) => console.log(`${REPLY}${JSON.stringify({ error: e.message })}`)
