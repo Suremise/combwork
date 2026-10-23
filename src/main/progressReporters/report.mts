@@ -353,29 +353,50 @@ interface TimingsFile {
 const KEEP_RUNS = 5
 const KEEP_KEYS = 300
 
-function readTimings(file: string): TimingsFile {
-  try {
-    const raw = JSON.parse(readFileSync(file, 'utf8')) as Partial<TimingsFile>
-    if (raw && raw.version === 1 && raw.runs && typeof raw.runs === 'object') return { version: 1, runs: raw.runs }
-  } catch {
-    // none yet, or damaged: start again
+/** How many times a read that failed is tried again at once: another runner replacing the file (its rename) can fail it. */
+const READ_TRIES = 20
+
+/**
+ * The timings as kept: none yet when there's no file, and a damaged one starts again; null when it can't be read now.
+ * Every runner on the machine shares the file (#1518): while one renames its new copy into place, a read can fail
+ * (ENOENT on Windows, for a moment), which once read as none, losing the estimate and, written back, every other run's.
+ */
+function readTimings(file: string): TimingsFile | null {
+  for (let i = 1; ; i++) {
+    let text: string
+    try {
+      text = readFileSync(file, 'utf8')
+    } catch (e) {
+      if (i < READ_TRIES) continue
+      return (e as NodeJS.ErrnoException).code === 'ENOENT' ? { version: 1, runs: {} } : null
+    }
+    try {
+      const raw = JSON.parse(text) as Partial<TimingsFile>
+      if (raw && raw.version === 1 && raw.runs && typeof raw.runs === 'object') return { version: 1, runs: raw.runs }
+    } catch {
+      // damaged: start again
+    }
+    return { version: 1, runs: {} }
   }
-  return { version: 1, runs: {} }
 }
 
 /** The usual time for `key`: the median of its last few runs, or undefined before its first. */
 export function estimateFor(file: string, key: string): number | undefined {
-  const ms = readTimings(file).runs[key.slice(0, 300)]?.ms
+  const ms = readTimings(file)?.runs[key.slice(0, 300)]?.ms
   if (!Array.isArray(ms)) return undefined
   const ok = ms.filter((x) => typeof x === 'number' && Number.isFinite(x) && x >= 0).sort((a, b) => a - b)
   return ok.length ? ok[Math.floor((ok.length - 1) / 2)] : undefined
 }
 
-/** Remembers one run of `key` (best effort: a failed write only loses the estimate). Keeps the newest keys. */
+/**
+ * Remembers one run of `key` (best effort: a failed write only loses the estimate). Keeps the newest keys. Timings that
+ * can't be read now are left as they are, never written over.
+ */
 export function recordTiming(file: string, key: string, ms: number, now = Date.now()): void {
   if (!Number.isFinite(ms) || ms < 0) return
   try {
     const t = readTimings(file)
+    if (!t) return
     const k = key.slice(0, 300)
     const before = Array.isArray(t.runs[k]?.ms) ? t.runs[k].ms : []
     t.runs[k] = { ms: [...before, Math.round(ms)].slice(-KEEP_RUNS), at: now }
