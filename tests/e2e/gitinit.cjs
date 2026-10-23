@@ -35,7 +35,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitini
   // The suite's own global git config, with no identity in it: the dialog has to ask for one.
   const GLOBAL = '[core]\n\tautocrlf = false\n'
   fs.writeFileSync(globalConfig, GLOBAL)
-  const gitEnv = { ...lib.baseEnv(), GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: '1' }
+  const gitEnv = lib.gitEnv({ GIT_CONFIG_GLOBAL: globalConfig })
   const g = (cwd, ...a) => execFileSync('git', a, { cwd, env: gitEnv, encoding: 'utf8' }).trim()
   fs.mkdirSync(blank, { recursive: true })
   fs.mkdirSync(late, { recursive: true })

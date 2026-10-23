@@ -45,7 +45,7 @@ function commits(wt, n) {
     const text = `${i}\n`
     s += `commit refs/heads/${branch}\ncommitter t <t@t> ${1700000000 + i} +0000\ndata ${msg.length}\n${msg}\n${i === 0 ? `from ${head}\n` : ''}M 644 inline n.txt\ndata ${text.length}\n${text}\n`
   }
-  execFileSync('git', ['fast-import', '--quiet'], { cwd: wt, input: s })
+  execFileSync('git', ['fast-import', '--quiet'], { cwd: wt, input: s, env: lib.gitEnv() })
   git(wt, 'reset', '-q', '--hard', 'HEAD')
 }
 

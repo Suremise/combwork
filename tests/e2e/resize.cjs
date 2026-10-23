@@ -8,7 +8,7 @@ const ws = path.join(scratch, 'resize-ws')
 for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
 fs.mkdirSync(path.join(ws, 'demo'), { recursive: true })
 fs.writeFileSync(path.join(ws, 'demo', 'README.md'), '# Demo\n\nSome text.\n')
-require('child_process').execSync('git init -q', { cwd: path.join(ws, 'demo') })
+require('child_process').execSync('git init -q', { cwd: path.join(ws, 'demo'), env: lib.gitEnv() })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const HUNG_MS = 15000
 let pass = 0, fail = 0

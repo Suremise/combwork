@@ -35,7 +35,7 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note']
   fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
   // The workspace is a repository too (shared with a team), with the project a repository of its own inside it.
   fs.mkdirSync(ws, { recursive: true })
-  require('child_process').execFileSync('git', ['init', '-q', ws])
+  require('child_process').execFileSync('git', ['init', '-q', ws], { env: lib.gitEnv() })
   lib.gitProject(proj)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([proj.toLowerCase(), ws.toLowerCase()]))
   // A folder of the user's where Hive would put its copy of handover for Codex: never touched.

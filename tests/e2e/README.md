@@ -173,7 +173,16 @@ for the build), and the e2e runner, `lib.cjs` and the scenario harness all take 
   the empty gh config hides your GitHub CLI login, which Copilot falls back to) unless the suite gives a test home (the
   fake Claude Code's, `lib.ownClaudeHome`, the Codex test home). `lib.cjs` refuses to start a test Hive with one missing
   or pointing at your own `~/.claude`, `~/.codex`, `~/.copilot` or `%APPDATA%\GitHub CLI` (however the path is spelled),
-  and makes the empty ones.
+  and makes the empty ones. **Its git has the suite's config alone** (#1466): `GIT_CONFIG_GLOBAL` is
+  `<suite folder>\gitconfig` (`runContext.gitConfig`), which `lib.cjs` writes with the test identity (`Hive Test`,
+  `hive-test@example.invalid`, `lib.TEST_GIT_IDENTITY`) and `core.autocrlf = false`, and `GIT_CONFIG_NOSYSTEM=1`, so
+  your name and email never show in its screens or commits and the machine's git settings don't apply. **A suite's own
+  git on its fixtures gets the same** (`lib.gitEnv()`, which `lib.git` uses): Git for Windows' system
+  `core.autocrlf=true` for the suite's checkouts and not for its Hive made Hive take them for uncommitted changes. A
+  unit test fails for a suite's git started with another environment (the exceptions: `evidence`'s on the checkout under
+  test, which keeps `baseEnv` and the machine's settings it was checked out with, and `isolation`'s inside its Hive). A
+  suite that needs no identity, or another, gives its Hive and its git a `GIT_CONFIG_GLOBAL` of its own (`gitinit`,
+  `gitview`, `p5scenarios`); `lib.cjs` refuses one missing or pointing at your own `~/.gitconfig`.
 - **The build, once per worktree** (`build.mjs`): runners started at the same time in one worktree share its `out/`,
   so the first that finds it stale takes the worktree's build lock (`%LOCALAPPDATA%\hive-test\build-locks`, a folder
   per worktree with its holder's process id), looks again, builds once and stamps it; the others wait (`Waited for

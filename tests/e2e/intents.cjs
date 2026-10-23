@@ -31,7 +31,7 @@ const until = async (fn, ms) => {
   while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
   return v
 }
-const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: alpha, env: lib.childEnv({}), encoding: 'utf8' }).trim()
+const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: alpha, env: lib.gitEnv(), encoding: 'utf8' }).trim()
 
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })

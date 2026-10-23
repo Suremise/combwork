@@ -20,6 +20,7 @@
 // - Ports and lane folders: lanes.mjs (each runner claims a lane); each suite's port is HIVE_E2E_PORT, from its runner.
 // - The build: build.mjs, under a lock per worktree, so runners started together build it once.
 // - Load: slots.mjs, at most a few heavy runs at once on the machine (HEAVY_DIR); the others queue.
+const fs = require('fs')
 const os = require('os')
 const path = require('path')
 
@@ -151,6 +152,52 @@ function cliHomes(parent = process.env) {
 }
 
 /**
+ * The commit identity of a test copy of Hive's git (#1466), in the global git config it gets (gitConfig), so its screens
+ * (the Version Control tab's Commit identity, the Initialise dialog's "will commit as") and its commits never show the
+ * machine's. A suite that needs none, or another, gives its Hive a GIT_CONFIG_GLOBAL of its own (gitinit, p5scenarios).
+ */
+const TEST_GIT_IDENTITY = { name: 'Hive Test', email: 'hive-test@example.invalid' }
+
+/** A suite's global git config (#1466): its work folder's `gitconfig`, which lib.cjs writes (writeGitConfig). */
+const gitConfig = (parent = process.env) => path.join(parent.HIVE_E2E_DIR || WORK, 'gitconfig')
+
+/**
+ * Writes a work folder's global git config: the test identity, and line endings as they are stored (core.autocrlf
+ * false, git's own default): with no system config (GIT_CONFIG_NOSYSTEM) nothing else is read, so a suite's git and its
+ * test Hive's check files out the same on any machine; Git for Windows' system autocrlf=true for one and not the other
+ * made Hive take CRLF checkouts for uncommitted changes (#1466 round 1). Only when it says something else (or nothing),
+ * so a test Hive already reading it never finds it half written.
+ */
+function writeGitConfig(file) {
+  const text = `[user]\n\tname = ${TEST_GIT_IDENTITY.name}\n\temail = ${TEST_GIT_IDENTITY.email}\n[core]\n\tautocrlf = false\n`
+  let old = null
+  try {
+    old = fs.readFileSync(file, 'utf8')
+  } catch {
+    // none yet
+  }
+  if (old === text) return
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, text)
+}
+
+/**
+ * A suite's git on its fixtures (lib.git, its repositories and worktrees): the allowlist, and the git config its test
+ * Hive has (gitConfig, no system config), so both read the same settings (#1466). Not the runners' git on the checkout
+ * under test (baseEnv): that worktree is checked out with the machine's settings.
+ */
+function gitEnv(vars = {}, parent = process.env) {
+  return apply(apply(baseEnv(parent), { GIT_CONFIG_GLOBAL: gitConfig(parent), GIT_CONFIG_NOSYSTEM: '1' }), vars)
+}
+
+/** Whether a file is the user's own global git config (~/.gitconfig, or git's XDG one), however its path is spelled. */
+function isUserGitConfig(file, parent = process.env) {
+  const profile = parent.USERPROFILE || os.homedir()
+  const same = (p) => path.win32.resolve(p).toLowerCase()
+  return !!file && [path.win32.join(profile, '.gitconfig'), path.win32.join(profile, '.config', 'git', 'config')].some((f) => same(f) === same(file))
+}
+
+/**
  * Whether a folder is the user's own Claude Code, Codex or Copilot home (~/.claude, ~/.codex, ~/.copilot) or GitHub CLI
  * config (%APPDATA%\GitHub CLI), however its path is spelled.
  */
@@ -167,9 +214,11 @@ function isUserCliHome(dir, parent = process.env) {
  * off (a profile that sets Show a tip turns them on); in English (HIVE_LANG=en, #767: suites find the window by its English
  * text, and dates and numbers format the same on any Windows; `vars` can set another language); its trash folder (HIVE_TEST_TRASH_DIR: the suite's, #414, so it
  * never uses the user's Recycle Bin); the CLI homes (CLAUDE_CONFIG_DIR, CODEX_HOME, COPILOT_HOME, GH_CONFIG_DIR: empty
- * folders of the suite's, cliHomes, #382, #452, so it never reads the user's); the suite's Agent API port from its runner
+ * folders of the suite's, cliHomes, #382, #452, so it never reads the user's); its git's config (GIT_CONFIG_GLOBAL: the
+ * work folder's, with the test identity and line endings, gitConfig, #1466; GIT_CONFIG_NOSYSTEM), so its git never reads
+ * the user's ~/.gitconfig or the machine's, and matches its suite's (gitEnv); the suite's Agent API port from its runner
  * (HIVE_E2E_PORT), and the CARRIED variables; then `vars` (its profile, HIVE_USER_DATA, always; a port, test CLI homes,
- * test hooks), where undefined removes one (lib.cjs refuses to start a test Hive without each home).
+ * test hooks), where undefined removes one (lib.cjs refuses to start a test Hive without each home or a global git config).
  */
 function hiveEnv(vars = {}, parent = process.env) {
   const env = baseEnv(parent)
@@ -178,6 +227,8 @@ function hiveEnv(vars = {}, parent = process.env) {
   env.HIVE_LANG = 'en'
   env.HIVE_TEST_TRASH_DIR = trashDir(parent)
   Object.assign(env, cliHomes(parent))
+  env.GIT_CONFIG_GLOBAL = gitConfig(parent)
+  env.GIT_CONFIG_NOSYSTEM = '1'
   if (parent.HIVE_E2E_PORT) env.HIVE_API_PORT = parent.HIVE_E2E_PORT
   Object.assign(env, pick(parent, CARRIED))
   apply(env, vars)
@@ -208,4 +259,4 @@ function suiteEnv({ name, port = null, work = null, runDir, cliLog = null }, par
   return env
 }
 
-module.exports = { TEST_ROOT, MACHINE_LANES_DIR, LANES_DIR, OWN_LANES, HEAVY_DIR, WORK, CODEX_HOME, CLAUDE_TEST_HOME, ALLOW, PASS_ENV, CARRIED, baseEnv, childEnv, hiveEnv, isHiveEnv, suiteEnv, trashDir, cliHomes, isUserCliHome }
+module.exports = { TEST_ROOT, MACHINE_LANES_DIR, LANES_DIR, OWN_LANES, HEAVY_DIR, WORK, CODEX_HOME, CLAUDE_TEST_HOME, ALLOW, PASS_ENV, CARRIED, baseEnv, childEnv, hiveEnv, isHiveEnv, suiteEnv, trashDir, cliHomes, isUserCliHome, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv, isUserGitConfig }
