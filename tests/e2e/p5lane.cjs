@@ -50,7 +50,7 @@ const ancestor = (x, y) => {
   lib.git(alpha, ['config', 'user.name', fx.identity.name])
   lib.git(alpha, ['config', 'user.email', fx.identity.email])
   // The project's quick check, as the preset offers it from its scripts: `typecheck`, which runs the fixture's check.
-  fs.writeFileSync(path.join(alpha, 'package.json'), JSON.stringify({ name: 'alpha', scripts: { typecheck: `node ${slash(path.join(fx.tools, 'check.js'))}` } }, null, 2) + '\n')
+  fs.writeFileSync(path.join(alpha, 'package.json'), JSON.stringify({ name: 'alpha', scripts: { typecheck: `node "${slash(path.join(fx.tools, 'check.js'))}"` } }, null, 2) + '\n')
   lib.git(alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'add', '-A'])
   lib.git(alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'scripts'])
   const h = await q.startHive(fx, { port: PORT, keepOptions: true })
