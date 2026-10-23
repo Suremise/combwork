@@ -2820,8 +2820,8 @@ Whether a conversation may resume there is its **hold** (none: it may):
   or background task going), then stops its session in the slot, one starting there as it ended too; the pool doesn't
   lend the slot while a session runs in it. No off switch: one writer needs it (with workflow rules off, leases aren't
   ended by rules, so nothing is stopped).
-- **The Agent API:** an agent's row and detail give its running session's `folder` and `slot`, and a session's usage
-  its `folder` and `slot`.
+- **The Agent API:** an agent's row and detail give its running session's `folder` (when not the project folder) and
+  `slot`, and a session's usage its `folder` and `slot`.
 
 #### 16.10.4 Fresh conversations and hand-overs
 

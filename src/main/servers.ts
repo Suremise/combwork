@@ -475,8 +475,8 @@ async function projectSummary(p: string) {
       workflowRole: agentWorkflowRole(a),
       branch: a.worktree?.branch ?? null,
       worktree: a.worktree?.path ?? null,
-      // Where its running session is (#1434): its folder, and its slot while it runs in one.
-      ...(a.live ? { folder: a.live.cwd } : {}),
+      // Where its running session is (#1434), when not the project folder: its folder, and its slot while it runs in one.
+      ...(a.live && !samePlace(a.live.cwd, p) ? { folder: a.live.cwd } : {}),
       ...(a.live?.slot ? { slot: a.live.slot } : {}),
       status: a.live?.status ?? 'stopped',
       sessionId: a.live?.sessionId ?? null,
@@ -1438,7 +1438,7 @@ async function agentActivity(p: string, agentId: string, detail = false) {
     ...(detail ? { runtime: st ? agentRuntime(st) : null } : {}),
     branch: a.worktree?.branch ?? null,
     worktree: a.worktree?.path ?? null,
-    ...(st ? { folder: st.cwd } : {}),
+    ...(st && !samePlace(st.cwd, p) ? { folder: st.cwd } : {}),
     ...(st?.slot ? { slot: st.slot } : {}),
     sessionId: sessionId || null,
     // A long transcript slows the CLI and Hive; handing over to itself (a new conversation) makes it short again.
