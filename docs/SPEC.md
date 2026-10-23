@@ -2845,8 +2845,10 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   preparing, placing or deleting on recorded folders that moved), and a card's folder isn't taken for gone.
 - **A slot gone from disk** outside a move: its agent's Start says so (`agents:missingWorktree` names the slot) and
   offers **Recreate and Start** (on its line, the lease kept) or **Release the Slot**.
-- **Project removal** removes its slots and copies through the pools' guarded clean-up and keeps, listed with why, those
-  with work, retired homes and folders outside `<Workspace>.worktrees/<Project>/` (§6).
+- **Project removal**: Remove from Hive removes its slots and copies through the pools' guarded clean-up and keeps,
+  listed with why, those with work, retired homes and folders outside `<Workspace>.worktrees/<Project>/`. Delete sends
+  every slot, copy and retired home in that folder to the Recycle Bin with the project, work included, and is refused
+  while one is outside it or busy (Darren's decision, 24 Oct; §6).
 
 **Built [#1450], the views that list and merge worktrees** (`unusedWorktrees.ts`, `branchMerge.ts`; they read only #1429's
 `slots` and `slot_leases`, #1435's copies and #1434's folder facts and `legacyWorktree`, never `AgentDef.worktree`):
