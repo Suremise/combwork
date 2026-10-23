@@ -25,7 +25,7 @@ import { childEnv } from './ptyHost'
 import { sessions } from './sessions'
 import { removeCopiesIn } from './skillCopies'
 import { settleSlotJob } from './slotJobs'
-import { builderCountOf, SlotPool, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRunEnd, type SlotRunner } from './slots'
+import { builderCountOf, SlotPool, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner } from './slots'
 import { onHiveEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
@@ -39,7 +39,6 @@ import { projectAgents } from '../shared/defaults'
 import { openEntry } from '../shared/workflow/facts'
 import { SLOTS_REMOVE_IDLE, SLOTS_SETUP_MINUTES } from '../shared/advanced'
 import type { SlotTestOp, SlotView } from '../shared/types'
-import { worktreeRenamer } from './workspaceMove'
 
 const log = createLogger('slots')
 
@@ -181,6 +180,22 @@ function sessionIn(folder: string): string | null {
   return s ? `${s.agentId} (${s.status})` : null
 }
 
+/**
+ * A project's rename steps (#1441): Repair's helpers (workspaceMove.ts' worktreeRenamer), loaded on first use, so the
+ * pool's module doesn't load everything Repair needs.
+ */
+function renamerFor(ws: WorkspaceService, projectPath: string): SlotRenamer {
+  const r = (): Promise<SlotRenamer> => import('./workspaceMove').then((m) => m.worktreeRenamer(ws, projectPath))
+  return {
+    identity: async (f) => (await r()).identity(f),
+    copy: async (a, b, who) => (await r()).copy(a, b, who),
+    move: async (a, b, t) => (await r()).move(a, b, t),
+    follow: async (a, b, t) => (await r()).follow(a, b, t),
+    back: async (a, b, t) => (await r()).back(a, b, t),
+    where: async (a, b, t) => (await r()).where(a, b, t)
+  }
+}
+
 const pools = new Map<string, { life: AbortSignal; pool: Promise<SlotPool> }>()
 const poolKey = (ws: WorkspaceService, projectPath: string): string => `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
 
@@ -216,7 +231,7 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       ended: (lease, slot) => stopLeaseSession(projectPath, lease, slot),
       writerOver: (w) => writerOver(w),
       removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }), // i18n-ignore: the log's reason (English)
-      renamer: worktreeRenamer(ws, projectPath)
+      renamer: renamerFor(ws, projectPath)
     })
   })()
   pools.set(key, { life: ws.lifetime, pool })
