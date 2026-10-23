@@ -100,14 +100,41 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     check('…and the preset it suggests', /Suggests the Team preset/.test(await detail.innerText()))
     await shoot('hive-templates', () => page)
 
+    // --- Export… and Duplicate… of Hive's own, clicked (HR3's round 1, 2), while the workspace has another template in
+    // a file of the same name: the Hive one is the one exported and copied; the workspace's is left as it is.
+    const sameFile = path.join(ws, '.hive', 'templates', 'team-3x3.json')
+    const mine = JSON.stringify({ version: 2, name: 'Mine', savedAt: '2026-10-22T10:00:00.000Z', layout: 'auto', agents: [{ name: 'Solo one', role: 'builder', provider: 'claude-code' }] }, null, 2)
+    fs.writeFileSync(sameFile, mine)
+    await sidebar.locator('[aria-label="Refresh"]').click()
+    await until(async () => (await sidebar.locator('.template-row[data-scope="workspace"][aria-label="Mine"]').count()) === 1, HUNG_MS)
+    await sidebar.locator('.template-row[data-scope="hive"][aria-label="Team 3×3"]').click()
+    const exported = path.join(files, 'Team 3x3.hive-template.json')
+    await app.evaluate(({ dialog }, f) => {
+      dialog.showSaveDialog = async () => ({ canceled: false, filePath: f })
+    }, exported)
+    await detail.getByRole('button', { name: 'Export…' }).click()
+    const out = await until(async () => (fs.existsSync(exported) ? JSON.parse(fs.readFileSync(exported, 'utf8')) : null), HUNG_MS)
+    check("Export… writes Hive's Team 3×3, not the workspace's file of that name", out?.name === 'Team 3×3' && out.agents.length === 6 && out.suggestedPreset === 'team' && out.pairs?.length === 3, JSON.stringify(out).slice(0, 200))
+    await detail.getByRole('button', { name: 'Duplicate…' }).click()
+    const dup = page.locator('.dialog', { hasText: 'Duplicate "Team 3×3"' })
+    await until(async () => (await dup.count()) === 1, HUNG_MS)
+    await dup.locator('select').selectOption({ label: 'The workspace (every project)' })
+    await dup.getByRole('button', { name: 'Duplicate', exact: true }).click()
+    const copy = sidebar.locator('.template-row[data-scope="workspace"][aria-label="Team 3×3"]')
+    check("Duplicate… copies Hive's Team 3×3 into the workspace, as its own file", !!(await until(async () => (await copy.count()) === 1, HUNG_MS)) && fs.readdirSync(path.join(ws, '.hive', 'templates')).some((f) => f !== 'team-3x3.json' && f.endsWith('.json') && JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'templates', f), 'utf8')).name === 'Team 3×3'), JSON.stringify(fs.readdirSync(path.join(ws, '.hive', 'templates'))))
+    check("…the workspace's own file of that name untouched", fs.readFileSync(sameFile, 'utf8') === mine)
+    await sidebar.locator('.template-row[data-scope="hive"][aria-label="Team 3×3"]').click()
+    await until(async () => (await detail.count()) === 1, HUNG_MS)
+
     // --- A 0.9 file imported: refused, saying why; nothing written.
     const old = path.join(files, 'old.hive-template.json')
     fs.writeFileSync(old, v09('From 0.9'))
     await app.evaluate(({ dialog }, f) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [f] })
     }, old)
+    const wsBefore = JSON.stringify(listed(path.join(ws, '.hive', 'templates')))
     await sidebar.locator('[aria-label="Import Template…"]').click()
-    check('importing a 0.9 template is refused, saying why', !!(await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /Could not import the template[\s\S]*This template is from Hive 0\.9 and can't be loaded in 1\.0\. Recreate it from your agents with Save as Template\./.test(t)), HUNG_MS)) && listed(path.join(ws, '.hive', 'templates')).length === 0, (await page.locator('.toast').allInnerTexts()).join(' | '))
+    check('importing a 0.9 template is refused, saying why', !!(await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /Could not import the template[\s\S]*This template is from Hive 0\.9 and can't be loaded in 1\.0\. Recreate it from your agents with Save as Template\./.test(t)), HUNG_MS)) && JSON.stringify(listed(path.join(ws, '.hive', 'templates'))) === wsBefore, (await page.locator('.toast').allInnerTexts()).join(' | '))
 
     // --- Team 3×3 into alpha from the view: six agents named from its key, paired, in a grid, none in a worktree.
     const branches = lib.git(alpha, ['branch', '--list'])

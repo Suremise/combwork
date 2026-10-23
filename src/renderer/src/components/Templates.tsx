@@ -209,7 +209,8 @@ async function saveEdit(key: string, d: TemplateDraft): Promise<TemplateEntry> {
   bump()
   return saved
 }
-const refOf = (t: TemplateEntry): TemplateRef => (t.scope === 'project' ? { scope: 'project', project: t.project, file: t.file } : { scope: 'workspace', file: t.file })
+/** Where a listed template is, to name it in a call: its scope as listed (Hive's own too, #1436), a project's with its project. */
+const refOf = (t: TemplateEntry): TemplateRef => (t.scope === 'project' ? { scope: 'project', project: t.project, file: t.file } : { scope: t.scope, file: t.file })
 /** A layout's name ("Two columns"), and inside a sentence ("two columns layout"). */
 export const layoutText = (l: PageLayout): string => tr(M.layout, { layout: l })
 const layoutPhrase = (l: PageLayout): string => tr(M.layoutPhrase, { layout: l })

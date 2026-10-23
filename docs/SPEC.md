@@ -2860,8 +2860,13 @@ repeating them (#533) [note §8].
   a template the user made stays refused instead. **0.9's at the upgrade** (`templateUpgrade.ts`): once the board is
   upgraded, at each open until done (board_meta `templates.v09`), the workspace's and each project's version 1 files and
   their `.bak` move into `.hive/backups/templates-0.9/workspace` and `…/projects/<project id>` (a name taken there
-  numbered), others left; two Hives at once end with each file there once; one quiet notice (`templates.v09.notice`)
-  counts what the backup holds. Help → Restore the 0.9 Board Backup… moves them back where no file of that name is now.
+  numbered), others left. Each file is published by a hard link (a copy that won't overwrite where there are none),
+  which no process can make over a file already there, then unlinked: nothing is replaced, and with two Hives at once
+  each file ends in one place; in this process each folder's moves hold the templates' lock. The mark is written only
+  once every scan, read and move succeeded (a failure other than a file gone leaves it for the next open, and a `.bak`
+  left behind follows its template then). One quiet notice (`templates.v09.notice`) counts what the backup holds. Help →
+  Restore the 0.9 Board Backup… publishes them back the same way: a template saved there since, in any process, is never
+  replaced, and its 0.9 namesake stays in the backup.
 
 #### 16.10.7 What reaches agents in slots
 

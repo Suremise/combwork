@@ -11,6 +11,7 @@ import {
   readTemplate,
   TEMPLATE_VERSION,
   templateAgentNames,
+  templatePairs,
   namesKey,
   templateFile,
   templateFrom,
@@ -197,7 +198,12 @@ async function newFile(d: TemplateDest, name: string): Promise<string> {
  * (each file is written whole). Never nested for one place.
  */
 function changing<T>(d: TemplateDest, fn: () => Promise<T>): Promise<T> {
-  return withFileLock(`${resolve(folder(d))}|templates`, fn)
+  return withTemplatesLock(folder(d), fn)
+}
+
+/** The lock of one folder of templates (`changing`'s), for what else changes its files: 0.9's set aside and put back (#1436). */
+export function withTemplatesLock<T>(dir: string, fn: () => Promise<T>): Promise<T> {
+  return withFileLock(`${resolve(dir)}|templates`, fn)
 }
 
 /** Writes a template into a place (its file there: a new one, or the one it replaces). */
@@ -261,11 +267,17 @@ export async function updateTemplate(ref: TemplateRef, edited: unknown, savedAt:
   if (!isAgentTemplate(checked)) throw new TemplateError(checked, { kind: 'invalid' })
   return changing(ref, async () => {
     const now = await usable(ref)
-    // What the editor doesn't change (#1436) stays: the preset and reviewer mode it suggests, and its pairs while they
-    // still fit its agents (an agent renamed, removed or given another role drops its pair).
+    // What the editor doesn't change (#1436) stays: the preset and reviewer mode it suggests, and each of its pairs while
+    // it still fits the agents as edited (an agent renamed, removed or given a role on the other side drops its own pair
+    // only: templatePairs keeps the others, each agent in one pair).
     const kept = { ...(now.suggestedPreset ? { suggestedPreset: now.suggestedPreset } : {}), ...(now.reviewerMode ? { reviewerMode: now.reviewerMode } : {}) }
-    const withPairs = now.pairs?.length ? readTemplate({ ...base, ...kept, pairs: now.pairs.filter((p) => [p.builder, p.reviewer].every((n) => checked.agents.some((a) => sameAgentName(a.name, n)))) }) : null
-    const t = withPairs && isAgentTemplate(withPairs) ? withPairs : { ...checked, ...kept }
+    const agent = (n: string): TemplateAgent | undefined => checked.agents.find((a) => sameAgentName(a.name, n))
+    const pairs = templatePairs((now.pairs ?? []).flatMap((p) => {
+      const b = agent(p.builder)
+      const r = agent(p.reviewer)
+      return b && r ? [{ name: b.name, role: b.role, pairedWith: r.name }, { name: r.name, role: r.role }] : []
+    }))
+    const t = { ...checked, ...kept, ...(pairs.length ? { pairs } : {}) }
     if ((now.savedAt ?? null) !== (savedAt ?? null)) throw refusal(msg({ id: 'content.templates.editedMeanwhile', defaultMessage: '"{name}" changed since you started editing it (saved again meanwhile): nothing was saved. Close the editor to see it as it is now.', description: 'An error saving an edited template: it was saved again elsewhere after the editor opened it.' }), { name: now.name }, 'conflict')
     if ((await listIn(ref)).some((e) => e.file !== ref.file && e.name.toLowerCase() === clean.toLowerCase())) throw refusal(M.nameTaken, { name: clean }, 'conflict')
     const saved = await write(ref, ref.file, t)

@@ -493,6 +493,23 @@ describe('saving and loading templates', () => {
     await run(() => templates.deleteTemplate({ scope: 'project', project: beta, file: copy.file }))
   })
 
+  it("an edit drops only the pairs it breaks (HR3's round 1, 4): a copy of Team 3×3 with one builder made a reviewer keeps the other two pairs", async () => {
+    const team = await run(() => templates.duplicateTemplate({ scope: 'hive', file: 'team-3x3.json' }, { scope: 'workspace' }))
+    expect(team.pairs).toHaveLength(3)
+    const ref = { scope: 'workspace' as const, file: team.file }
+    const agents = team.agents.map((a) => (a.name === '{key}-B1' ? { ...a, role: 'reviewer' as const } : a))
+    const edited = await run(() => templates.updateTemplate(ref, { name: team.name, layout: team.layout, agents }, team.savedAt))
+    expect(edited.pairs).toEqual([
+      { builder: '{key}-B2', reviewer: '{key}-R2' },
+      { builder: '{key}-B3', reviewer: '{key}-R3' }
+    ])
+    // A reviewer removed and another renamed: their own pairs go, the third stays.
+    const fewer = edited.agents.filter((a) => a.name !== '{key}-R2').map((a) => (a.name === '{key}-R1' ? { ...a, name: 'Checker' } : a))
+    const again = await run(() => templates.updateTemplate(ref, { name: team.name, layout: team.layout, agents: fewer }, edited.savedAt))
+    expect([again.pairs, again.suggestedPreset]).toEqual([[{ builder: '{key}-B3', reviewer: '{key}-R3' }], 'team'])
+    await run(() => templates.deleteTemplate(ref))
+  })
+
   it('export then import round-trips a template exactly; the file holds no paths, ids, sessions or names of people', async () => {
     const out = join(base, 'exports')
     mkdirSync(out, { recursive: true })
