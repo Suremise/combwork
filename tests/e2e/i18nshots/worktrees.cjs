@@ -19,7 +19,7 @@ const projectOf = (ctx) => path.join(ctx.workspace, 'wtgit')
 const treeOf = (ctx) => path.join(path.dirname(ctx.workspace), `${path.basename(ctx.workspace)}.worktrees`, 'wtgit', 'held')
 
 function git(ctx, cwd, ...args) {
-  return execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'core.autocrlf=false', ...args], { cwd, env: ctx.lib.baseEnv(), stdio: 'pipe', encoding: 'utf8' })
+  return execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'core.autocrlf=false', ...args], { cwd, env: ctx.lib.gitEnv(), stdio: 'pipe', encoding: 'utf8' })
 }
 
 /** Add Agent… in that project, a new worktree on hive/held: the dialog says that branch's unused worktree has work in it, and why. */

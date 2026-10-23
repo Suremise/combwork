@@ -8,7 +8,6 @@
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { execFileSync } = require('child_process')
-const { baseEnv } = require('./runContext.cjs')
 const fs = require('fs')
 const path = require('path')
 const { sessionsOf, putSessions } = require('./storeDocs.cjs')
@@ -18,7 +17,7 @@ const ws = path.join(lib.WORK, 'wtrecreate-ws')
 const proj = path.join(ws, 'gamma')
 const wtRoot = path.join(`${ws}.worktrees`, 'gamma')
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
-const git = (cwd, args) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, env: baseEnv(), encoding: 'utf8' })
+const git = (cwd, args) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, env: lib.gitEnv(), encoding: 'utf8' })
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

@@ -1644,6 +1644,7 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     TEST_GIT_IDENTITY: { name: string; email: string }
     gitConfig: (parent?: Env) => string
     writeGitConfig: (file: string) => void
+    gitEnv: (vars?: Env, parent?: Env) => Env
     isUserGitConfig: (file: string, parent?: Env) => boolean
   }
   const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs') as Ctx
@@ -1745,28 +1746,48 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     expect(lib).toMatch(/for \(const k of \['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'COPILOT_HOME', 'GH_CONFIG_DIR'\]\) \{\s*if \(!env\[k\]\) throw[\s\S]*?if \(isUserCliHome\(env\[k\]\)\) throw/)
   })
 
-  it("every test copy of Hive's git has the suite's global config, with a test identity, never the user's ~/.gitconfig (#1466)", () => {
+  it("every test copy of Hive's git, and its suite's on the fixtures, has the suite's config alone: a test identity, explicit line endings, no user or system config (#1466)", () => {
     const suite = ctx.suiteEnv({ name: 'gitview', port: 47961, work: 'C:\\lanes\\1\\gitview', runDir: 'C:\\lanes\\1\\gitview' }, parent)
-    // The suite's, whatever the shell had; the system config as the suites' own git has it (round 2: their CRLF
-    // checkouts otherwise looked changed to Hive); a suite may give its own.
-    const fromShell = ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p' }, { ...suite, GIT_CONFIG_GLOBAL: 'C:\\Users\\t\\.gitconfig', GIT_CONFIG_NOSYSTEM: '1' })
-    expect(fromShell.GIT_CONFIG_GLOBAL).toBe('C:\\lanes\\1\\gitview\\gitconfig')
-    expect(has(fromShell, 'GIT_CONFIG_NOSYSTEM')).toBe(false)
+    // The suite's, whatever the shell had, and no system config; a suite may give its own global one.
+    const fromShell = ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p' }, { ...suite, GIT_CONFIG_GLOBAL: 'C:\\Users\\t\\.gitconfig', GIT_CONFIG_NOSYSTEM: '0' })
+    expect(fromShell).toMatchObject({ GIT_CONFIG_GLOBAL: 'C:\\lanes\\1\\gitview\\gitconfig', GIT_CONFIG_NOSYSTEM: '1' })
     expect(ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p' }, parent).GIT_CONFIG_GLOBAL).toBe(join(ctx.WORK, 'gitconfig'))
     expect(ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p', GIT_CONFIG_GLOBAL: 'C:\\w\\empty.gitconfig' }, suite).GIT_CONFIG_GLOBAL).toBe('C:\\w\\empty.gitconfig')
-    for (const k of ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM']) expect(has(ctx.childEnv({}, suite), k), k).toBe(false)
+    // The suite's own git on its fixtures gets the same; a child that isn't git, and the runners' git on the checkout
+    // under test (baseEnv, checked out with the machine's settings), get neither.
+    expect(ctx.gitEnv({}, { ...suite, GIT_CONFIG_GLOBAL: 'C:\\Users\\t\\.gitconfig' })).toMatchObject({ GIT_CONFIG_GLOBAL: 'C:\\lanes\\1\\gitview\\gitconfig', GIT_CONFIG_NOSYSTEM: '1' })
+    expect(has(ctx.gitEnv({}, suite), 'GIT_DIR')).toBe(false)
+    for (const env of [ctx.childEnv({}, suite), ctx.baseEnv(suite)]) for (const k of ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM']) expect(has(env, k), k).toBe(false)
     // The user's own, however spelled.
     for (const f of ['C:\\Users\\t\\.gitconfig', 'c:/users/T/.gitconfig', 'C:\\Users\\t\\.config\\git\\config']) expect(ctx.isUserGitConfig(f, parent), f).toBe(true)
     expect(ctx.isUserGitConfig('C:\\lanes\\1\\gitview\\gitconfig', parent)).toBe(false)
-    // What the test Hive's git reads with it: the test identity (git run with hiveEnv's environment, in a work folder).
+    // What git reads with them (run with hiveEnv's and gitEnv's environments, outside any repository): the test identity,
+    // autocrlf false, from the suite's file alone.
     const work = tempDir('hive-gitconfig-')
-    const env = ctx.hiveEnv({ HIVE_USER_DATA: join(work, 'profile') }, { ...process.env, HIVE_E2E_DIR: work })
-    ctx.writeGitConfig(env.GIT_CONFIG_GLOBAL!)
-    const read = (k: string) => execFileSync('git', ['config', '--global', k], { env: env as NodeJS.ProcessEnv, encoding: 'utf8' }).trim()
-    expect([read('user.name'), read('user.email')]).toEqual([ctx.TEST_GIT_IDENTITY.name, ctx.TEST_GIT_IDENTITY.email])
+    const shell = { ...process.env, HIVE_E2E_DIR: work }
+    for (const env of [ctx.hiveEnv({ HIVE_USER_DATA: join(work, 'profile') }, shell), ctx.gitEnv({}, shell)]) {
+      ctx.writeGitConfig(env.GIT_CONFIG_GLOBAL!)
+      const read = (...a: string[]) => execFileSync('git', ['config', ...a], { cwd: work, env: env as NodeJS.ProcessEnv, encoding: 'utf8' }).trim()
+      expect([read('--global', 'user.name'), read('--global', 'user.email'), read('core.autocrlf')]).toEqual([ctx.TEST_GIT_IDENTITY.name, ctx.TEST_GIT_IDENTITY.email, 'false'])
+      // Every setting from the global scope (GIT_CONFIG_GLOBAL, the suite's file): none from the system or the user's.
+      const scopes = new Set(read('--list', '--show-scope').split(/\r?\n/).map((l) => l.split('\t')[0]))
+      expect([...scopes]).toEqual(['global'])
+    }
     // lib.cjs refuses a test Hive without one or with the user's, and writes the suite's.
     const lib = readFileSync(join(root, 'tests', 'e2e', 'lib.cjs'), 'utf8')
     expect(lib).toMatch(/if \(!env\.GIT_CONFIG_GLOBAL\) throw[\s\S]*?if \(isUserGitConfig\(env\.GIT_CONFIG_GLOBAL\)\) throw[\s\S]*?writeGitConfig\(env\.GIT_CONFIG_GLOBAL\)/)
+    // Every git a suite starts on its fixtures has gitEnv (lib.git does): not the shell's, the allowlist's or none. The
+    // exceptions: evidence's on the checkout under test, and isolation's inside its test Hive (which has hiveEnv's).
+    const suiteFiles = [...readdirSync(dir).filter((f) => f.endsWith('.cjs')).map((f) => join(dir, f)), ...readdirSync(join(dir, 'i18nshots')).filter((f) => f.endsWith('.cjs')).map((f) => join(dir, 'i18nshots', f))]
+    const plain: string[] = []
+    for (const f of suiteFiles)
+      readFileSync(f, 'utf8')
+        .split(/\r?\n/)
+        .forEach((line, i) => {
+          if (/(execSync|execFileSync|spawnSync|spawn)\(\s*['"`]git\b/.test(line) && !/gitEnv/.test(line)) plain.push(`${f.slice(dir.length + 1)}:${i + 1}`)
+        })
+    expect(plain.map((p) => p.replace(/:\d+$/, ''))).toEqual(['evidence.cjs', 'isolation.cjs'])
+    expect(lib).toMatch(/execFileSync\('git', cmd, \{ env: gitEnv\(\), \.\.\.o \}\) : execSync\(`git \$\{cmd\}`, \{ env: gitEnv\(\), \.\.\.o \}\)/)
   })
 
   it("the CLIs a suite's Hive selects go to a log of the suite's own; the runner starts no CLI of its own (#365)", () => {

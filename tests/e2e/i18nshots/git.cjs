@@ -33,7 +33,7 @@ const failing = (ctx, calls) => ctx.app.evaluate((_, c) => {
 }, calls)
 
 /** git in the project, with an identity of its own for the commits these cases make (never the machine's config). */
-const git = (ctx, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: ctx.project, env: ctx.lib.baseEnv(), stdio: 'pipe', encoding: 'utf8' })
+const git = (ctx, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: ctx.project, env: ctx.lib.gitEnv(), stdio: 'pipe', encoding: 'utf8' })
 
 const gitView = (ctx) => ctx.page.locator('.git-view').first()
 const section = async (ctx, id, hook, what) => {
@@ -59,7 +59,7 @@ function seedRepo(ctx) {
   git(ctx, 'tag', '-a', 'v1.0.0', '-m', 'First release')
   git(ctx, 'branch', 'feature/greeting')
   const origin = path.join(path.dirname(ctx.workspace), `${path.basename(ctx.workspace)}-origin.git`)
-  if (!fs.existsSync(origin)) execFileSync('git', ['init', '-q', '--bare', origin], { env: ctx.lib.baseEnv(), stdio: 'pipe' })
+  if (!fs.existsSync(origin)) execFileSync('git', ['init', '-q', '--bare', origin], { env: ctx.lib.gitEnv(), stdio: 'pipe' })
   git(ctx, 'remote', 'add', 'origin', origin)
   git(ctx, 'push', '-q', '-u', 'origin', 'HEAD')
   fs.writeFileSync(path.join(dir, 'CHANGES.md'), '# Changes\n\n- A greeting\n')
