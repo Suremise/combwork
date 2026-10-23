@@ -301,6 +301,33 @@ describe("a gone slot's recreation, guarded and recovered (#1447, HR1 round 1 fi
     expect(open('rc2')).toBe(g.lease)
   })
 
+  it("its result can't be recorded after git made it: the intent stays, and the next look finishes it, its lease kept", async () => {
+    const g = await goneSlot('rc4')
+    const pool = await run(() => poolFor(ws, project()))
+    const store = pool.deps.store
+    const real = store.endRecreate.bind(store)
+    let failOnce = true
+    const spy = vi.spyOn(store, 'endRecreate').mockImplementation(async (...a: Parameters<typeof store.endRecreate>) => {
+      if (a[3] && failOnce) {
+        failOnce = false
+        throw new Error('database is locked (test)')
+      }
+      return real(...a)
+    })
+    try {
+      expect(await pool.recreateGone('rc4', { lease: g.lease, folder: g.folder }, g.to, g.line, noPrune)).toMatch(/database is locked/)
+      expect(existsSync(g.to)).toBe(true)
+      expect(store.recreateOf('rc4')).not.toBeNull()
+      await pool.refresh()
+    } finally {
+      spy.mockRestore()
+    }
+    expect(store.slot('rc4')).toMatchObject({ op: null, state: 'lent' })
+    expect(store.slot('rc4')?.folder.toLowerCase()).toBe(g.to.toLowerCase())
+    expect(store.recreateOf('rc4')).toBeNull()
+    expect(open('rc4')).toBe(g.lease)
+  })
+
   it('cut short after git made it: finished, its lease kept', async () => {
     const g = await goneSlot('rc3')
     const pool = await run(() => poolFor(ws, project()))

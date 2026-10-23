@@ -1269,7 +1269,10 @@ export class SlotPool {
         // back as it was; its lease kept either way (never ended as an interrupted warming).
         const recreating = was.kind === 'warm' ? this.store.recreateOf(s.name) : null
         if (recreating) {
-          await this.store.endRecreate(s.name, token, recreating, await this.madeOn(recreating))
+          const made = await this.madeOn(recreating)
+          // Git can't say: left as it is (its operation now this Hive's, looked at again at the next refresh).
+          if (made === null) return void log.warn(`Slot ${userText(s.name)}'s recreation, cut short: git can't say whether it was made; left for the next look`)
+          await this.store.endRecreate(s.name, token, recreating, made)
           return
         }
         // A card's preparation (#1438: a warming of a slot already lent): its lease stays, the slot as it is.
@@ -1530,6 +1533,7 @@ export class SlotPool {
     return this.op(token, async () => {
       const intent = await this.store.startRecreate(name, expect, token, await this.deps.holder.self(), to, line)
       if (!intent) return 'it changed since Repair looked (relinked, lent or resumed meanwhile)' // i18n-ignore: the log's reason
+      let added = false
       try {
         const giveUp = async (why: string): Promise<string> => (await this.store.endRecreate(name, token, intent, false), why)
         if (existsSync(intent.from) && !samePlace(intent.from, intent.to)) return await giveUp('its folder is there again') // i18n-ignore: the log's reason
@@ -1540,24 +1544,30 @@ export class SlotPool {
         await mkdir(dirname(intent.to), { recursive: true })
         const r = await git(this.deps.project, ['worktree', 'add', intent.to, intent.line])
         if (!r.ok) return await giveUp(r.err.trim() || 'git worktree add failed') // i18n-ignore: the log's reason
-        if (!(await this.madeOn(intent))) return await giveUp(`git doesn't list ${intent.to} on ${intent.line}`) // i18n-ignore: the log's reason
+        // From here git may have made it (HR1's round 2): its operation and intent stay unless this records the result,
+        // so a recovery (this Hive's next look, its token no longer running) finishes it from what git says.
+        added = true
+        const made = await this.madeOn(intent)
+        if (made !== true) return `git ${made === null ? "couldn't say whether" : "doesn't list"} ${intent.to} on ${intent.line}: Hive looks again` // i18n-ignore: the log's reason
         await this.store.endRecreate(name, token, intent, true)
         log.info(`Slot ${userText(name)} made again at ${userText(intent.to)} on ${userText(intent.line)}`)
         return null
       } catch (e) {
         if (e instanceof OpLost) return 'its operation was taken over' // i18n-ignore: the log's reason
-        await this.store.endRecreate(name, token, intent, false).catch(() => undefined)
+        if (!added) await this.store.endRecreate(name, token, intent, false).catch(() => undefined)
         return e instanceof Error ? e.message : String(e)
       }
     })
   }
 
-  /** Whether git lists a worktree at a recreation's `to`, on its line. */
-  private async madeOn(intent: RecreateIntent): Promise<boolean> {
-    const listed = await listWorktrees(this.deps.project).catch(() => [])
+  /** Whether git lists a worktree at a recreation's `to`, on its line; null when git can't say (never taken for no). */
+  private async madeOn(intent: RecreateIntent): Promise<boolean | null> {
+    const listed = await listWorktrees(this.deps.project).catch(() => null)
+    if (!listed) return null
     if (!listed.some((w) => samePlace(w.path, intent.to))) return false
     const on = await git(intent.to, ['branch', '--show-current'])
-    return on.ok && on.out.trim().toLowerCase() === intent.line.toLowerCase()
+    if (!on.ok) return null
+    return on.out.trim().toLowerCase() === intent.line.toLowerCase()
   }
 
   /**
