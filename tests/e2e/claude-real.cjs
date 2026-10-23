@@ -51,7 +51,7 @@ const check = (name, ok, extra = '') => {
   const launchLine = (key) => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n').filter((l) => / spawn \W?session:/.test(l) && l.toLowerCase().includes(key)).pop() ?? ''
 
   // --- A session in a worktree.
-  const reviewer = await inv('agents:add', proj, { location: 'new-worktree', name: 'Reviewer' })
+  const reviewer = await inv('agents:testLegacy', proj, { location: 'new-worktree', name: 'Reviewer' })
   const wtPath = reviewer.worktree?.path ?? ''
   await inv('session:start', proj, { agentId: reviewer.id })
   await lib.cliStep('a session starts in the worktree', { session: lib.ptyKey(proj, reviewer.id) }, async () => {

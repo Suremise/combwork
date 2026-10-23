@@ -4,23 +4,17 @@ interface HiveMessageValues {
   'worktrees.agent.badPlacement': undefined
   'worktrees.agent.badWorkflowRole': undefined
   'worktrees.agent.chooseMove': undefined
-  'worktrees.agent.chooseTree': undefined
-  'worktrees.agent.detached': undefined
   'worktrees.agent.enterName': undefined
   'worktrees.agent.gone': undefined
   'worktrees.agent.nameTaken': { name: string | number }
-  'worktrees.agent.noBase': undefined
-  'worktrees.agent.noGitForTree': { problem: string | number }
-  'worktrees.agent.noGitToCheck': { problem: string | number }
   'worktrees.agent.noTree': undefined
-  'worktrees.agent.notATree': undefined
+  'worktrees.agent.notPinned': undefined
   'worktrees.agent.removing': undefined
   'worktrees.agent.roleTooLong': { max: string | number }
   'worktrees.agent.sharedTree': undefined
   'worktrees.agent.stopForProvider': undefined
   'worktrees.agent.stopToMerge': { agent: string | number }
   'worktrees.agent.stopToRemove': undefined
-  'worktrees.agent.treeRemoved': undefined
   'worktrees.agent.treeShared': undefined
   'worktrees.agent.unknownProvider': { provider: string | number }
   'worktrees.badBranchName': { branch: string | number }
@@ -58,17 +52,10 @@ interface HiveMessageValues {
   'worktrees.names.projectGone': undefined
   'worktrees.readBranch': { folder: string | number; why: string | number }
   'worktrees.readOriginHead': { why: string | number }
-  'worktrees.reuse.beingRemoved': undefined
   'worktrees.reuse.cantCheck': { base: string | number }
-  'worktrees.reuse.gitBusy': undefined
-  'worktrees.reuse.inUse': undefined
-  'worktrees.reuse.movedAside': { folder: string | number; aside: string | number }
   'worktrees.reuse.notChecked': undefined
   'worktrees.reuse.notMerged': { n: number; base: string | number }
-  'worktrees.reuse.resetFailed': { base: string | number; why: string | number }
-  'worktrees.reuse.taken': undefined
   'worktrees.reuse.uncommitted': { n: number }
-  'worktrees.reuse.unreadable': undefined
   'worktrees.statusFailed': undefined
   'worktrees.unknownError': undefined
   'worktrees.why.cantCheck': { branch: string | number }

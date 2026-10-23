@@ -14,13 +14,12 @@ const base = tempDir('hive-i18n-worktrees-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { setLanguage } = await import('../../src/shared/i18n')
-const { englishText, shownText } = await import('../../src/shared/advanced')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../../src/main/workspace')
 const wt = await import('../../src/main/worktrees')
 const agents = await import('../../src/main/projectAgents')
 const { PruneBlocked, recreateWorktree, unlinkMissingWorktree } = await import('../../src/main/agentWorktree')
 const { shownError, windowError } = await import('../../src/main/hiveError')
-const { addedForAgents, apiErrorReply } = await import('../../src/main/servers')
+const { apiErrorReply } = await import('../../src/main/servers')
 
 const ROOT = resolve(__dirname, '../..')
 const EN = JSON.parse(readFileSync(join(ROOT, 'locales/en/worktrees.json'), 'utf8')) as Record<string, { defaultMessage: string; description: string }>
@@ -95,8 +94,9 @@ describe("agents' and worktrees' refusals: English for agents as before, the win
     const notRepo = tempDir('hive-not-a-repo-')
     const cases: [Error, string | RegExp, number, string | RegExp | null][] = [
       [await caught(run(() => agents.addAgent(proj, { name: 'P', location: 'project', provider: 'nope' }))), 'Unknown provider "nope".', 400, 'Unbekannter Anbieter „nope“.'],
-      [await caught(run(() => agents.addAgent(proj, { name: 'Q', location: 'existing-worktree' }))), 'Choose a worktree.', 500, 'Wähle einen Worktree.'],
-      [await caught(run(() => agents.addAgent(proj, { name: 'R', location: 'existing-worktree', worktreePath: notRepo }))), 'That folder is not a worktree of this project.', 500, null],
+      // 1.0 (#1451): no agent is pinned to a worktree, new or existing.
+      [await caught(run(() => agents.addAgent(proj, { name: 'Q', location: 'existing-worktree', worktreePath: notRepo }))), 'Agents aren’t pinned to worktrees in 1.0: slots are lent per card or lane.', 400, null],
+      [await caught(run(() => agents.addAgent(proj, { name: 'R', location: 'new-worktree' }))), 'Agents aren’t pinned to worktrees in 1.0: slots are lent per card or lane.', 400, null],
       [await caught(run(() => agents.moveAgent(proj, 'nope', 0))), 'That agent no longer exists.', 404, 'Diesen Agenten gibt es nicht mehr.'],
       [await caught(run(() => agents.moveAgent(proj, 'a1', Number.NaN))), 'Choose where to move the agent.', 500, null],
       [await caught(run(() => agents.updateAgent(proj, 'a1', { name: ' ' }))), 'Enter a name.', 500, 'Gib einen Namen ein.'],
@@ -132,19 +132,13 @@ describe("agents' and worktrees' refusals: English for agents as before, the win
 })
 
 describe('an unused worktree not reused: English for the Agent API, data for the window', () => {
-  it("says why in English (notReused), and the window says it in its language, the Add Agent dialog's look too", async () => {
+  it("the Add Agent dialog's look says why in the window's language (1.0 adds no agent in one: #1451), and so does a removal", async () => {
     setLanguage('de', GERMAN)
     const t = { path: join(treesRoot, 'b1'), branch: 'hive/b1' }
     await wt.createWorktree(proj, t.path, t.branch, 'main')
     commit(t.path, 'ahead.txt')
     const look = await run(() => agents.worktreeMatch(proj, 'hive/b1', 'main', 'B1'))
     expect(look).toMatchObject({ branch: 'hive/b1', reusable: false, why: '1 Commit nicht in main gemergt' })
-    const def = await run(() => agents.addAgent(proj, { name: 'B1', location: 'new-worktree', reuseWorktree: true }))
-    expect(def.reuse).toMatchObject({ branch: 'hive/b1', reused: false, base: 'main', notReused: '1 commit not merged into main' })
-    expect(englishText(def.reuse!.notReusedText!)).toBe('1 commit not merged into main')
-    expect(shownText(def.reuse!.notReusedText!)).toBe('1 Commit nicht in main gemergt')
-    // The Agent API's reply leaves the window's text out.
-    expect(addedForAgents(def).reuse).toEqual({ branch: 'hive/b1', reused: false, base: 'main', notReused: '1 commit not merged into main' })
 
     // Removing that worktree is the window's: why it is kept, in its language (unmerged commits, and a file now too).
     writeFileSync(join(t.path, 'dirty.txt'), 'x')
