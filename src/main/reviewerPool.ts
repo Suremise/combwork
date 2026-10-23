@@ -7,8 +7,8 @@
 //   other card of the project (in a lane or not), it didn't build the card, and with G1b = 2 it isn't the submission's
 //   first reviewer. Recorded as `ReviewerAssigned` in a write that checks again, as hive.db has it then, the submission
 //   still waiting and the agent's leases and reviews (another Hive's or connection's change before it is seen there).
-// - **tell**: the agent given the card is told, once (its delivery's identity is the card, the submission and the
-//   agent): typed into its conversation when it runs, else launched with it, for review (the project folder: #1434's
+// - **tell**: the agent given the card is told, once per assignment (its delivery's identity is the card, the submission, the
+//   agent and its `ReviewerAssigned`): typed into its conversation when it runs, else launched with it, for review (the project folder: #1434's
 //   purpose, with #1439's grant to the review copies). One whose delivery wasn't given is told again at the next pass.
 //   Checked again first: an agent that left, stopped reviewing or took a dispatch lease meanwhile is released from it
 //   (`ReviewerReleased`) and the card given again.
@@ -42,7 +42,7 @@ import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace
 
 const log = createLogger('reviewerPool')
 
-/** What a pool's delivery is made from: its identity is the card, the submission and the agent, so it is made once. */
+/** What a pool's delivery is made from: its identity is the card, the submission, the agent and the assignment, so it is made once per assignment. */
 const POOL_REVIEW = 'pool-review'
 /** A delivery that ended without reaching its agent (never given): made again. */
 const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired', 'stale'])
@@ -172,8 +172,8 @@ function reviewersNow(wf: Workflow, known: (id: string) => boolean, except?: num
 }
 
 /**
- * Tells a pooled reviewer of the card it was given: once (a delivery made before counts while it was given or is still
- * on its way, and its agent not running is started for it), typed into its conversation when it runs and is idle, else
+ * Tells a pooled reviewer of the card it was given: once per assignment (a delivery made before for it counts while it
+ * was given or is still on its way, and its agent not running is started for it), typed into its conversation when it runs and is idle, else
  * launched with it for review. Checked again first, from the project and hive.db as they are now: an agent gone from
  * the project, one whose role no longer reviews, or one that took a dispatch lease (an either agent started a card) is
  * released from it (`ReviewerReleased`, in a write that finds it still given and not started) and the pass gives the
@@ -187,7 +187,11 @@ async function tell(ws: WorkspaceService, projectPath: string, wf: Workflow, slo
   const why = !agent ? 'gone' : !reviewsWork(agentWorkflowRole(agent)) ? 'notReviewer' : leased === true ? 'leased' : null
   if (why) return release(ws, projectPath, wf, c, id, why)
   if (!agent || leased !== false) return
-  const ref = `${c.card}:${c.submission}:${agent.id}`
+  // Its identity is this assignment (its `ReviewerAssigned` fact): an agent released and given the same submission again
+  // is a new assignment, told again (HR3's round 2), while the same one is told once.
+  const assignment = wf.store.facts(c.card).findLast((f) => f.kind === 'ReviewerAssigned' && (f.data as FactData['ReviewerAssigned']).reviewer === id && (f.data as FactData['ReviewerAssigned']).submission === c.submission)
+  if (!assignment) return
+  const ref = `${c.card}:${c.submission}:${agent.id}:${assignment.seq}`
   const made = (await deliveriesOf(projectPath, agent.id)).find((r) => r.source === POOL_REVIEW && r.ref === ref && !NOT_GIVEN.has(r.state))
   const st = sessions.liveFor(projectPath, agent.id)
   if (made) {

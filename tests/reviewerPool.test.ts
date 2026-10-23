@@ -452,4 +452,32 @@ describe("the pool's pass (#1443)", { timeout: 60_000 }, () => {
     await vi.waitFor(() => expect(assignedTo(e, a.id)).toEqual(['E1', 'R1']), { timeout: HUNG_MS })
     expect(poolReviewerOf(e.store.facts(a.id))).toBe('R1')
   })
+
+  it.each([
+    ['offered, its reviewer running', 'offered', true, 'typed to E1'],
+    ['acked, its reviewer stopped since', 'acked', false, 'start E1 for review']
+  ] as const)("a reviewer released and given the same submission again is told again, once (its first delivery %s: HR3's round 2)", async (_what, was, running, told) => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    const agents = [{ id: 'B1', name: 'B1', workflowRole: 'builder' }, { id: 'E1', name: 'E1', workflowRole: 'either' }] as AgentDef[]
+    const a = e.wf.createCard({ title: 'Again' })
+    lane(e, 'L1', [a.id], 'B1', null)
+    await submitted(e, a, B1)
+    state.running = new Set(['E1'])
+    await pass(e, agents)
+    expect([assignedTo(e, a.id), state.calls]).toEqual([['E1'], ['typed to E1']])
+    state.deliveries[0].state = was
+    // E1 takes a lease before it starts the review: released, and nobody else is free.
+    lease(e, 'E1', true)
+    await pass(e, agents)
+    expect(e.store.facts(a.id).map((f) => f.kind).filter((k) => k.startsWith('Reviewer'))).toEqual(['ReviewerAssigned', 'ReviewerReleased'])
+    // Its lease ends (and, with its delivery read, it has stopped): given again, and told again, once.
+    lease(e, 'E1', false)
+    if (!running) state.running = new Set()
+    await pass(e, agents)
+    await pass(e, agents)
+    expect(assignedTo(e, a.id)).toEqual(['E1', 'E1'])
+    expect(state.calls).toEqual(['typed to E1', told])
+    expect(new Set(state.deliveries.map((d) => d.ref)).size).toBe(2)
+  })
 })

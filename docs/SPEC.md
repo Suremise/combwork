@@ -3137,8 +3137,8 @@ repeating them (#533) [note §8].
 - **Telling it**: checked again first, from the project and hive.db as they are then: an agent that left the project,
   whose role no longer reviews, or that took a dispatch lease meanwhile is released from it (`ReviewerReleased
   { reviewer, submission, why }`, in a write that finds it still given and not started) and the card given again; one
-  busy, or whose lease can't be read, is told later. Then once (its delivery's identity is the card, the submission
-  and the agent): typed into its conversation when it runs, else it is launched with it for review (#1434's purpose: the project folder, with #1439's grant to the
+  busy, or whose lease can't be read, is told later. Then once per assignment (its delivery's identity is the card, the submission,
+  the agent and its `ReviewerAssigned`, so one released and given again is told again): typed into its conversation when it runs, else it is launched with it for review (#1434's purpose: the project folder, with #1439's grant to the
   review copies): *#12 (HI-B1's card) is in Review: you review it from the pool…*. Not given: told at a later pass.
   Hive's loop wakes leave a pool card's arrival in Review to the pool, and route its other handoffs (requests, steps,
   verdicts) by its current reviewer: the newest given or started on its latest submission (`loopReviewerOf`).
