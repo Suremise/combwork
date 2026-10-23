@@ -141,6 +141,22 @@ describe("P4's and P5's presets (#1278, #1355, §16.19.1)", () => {
     expect(notOffered(p)).toEqual([])
     expect(checkOptions('git', { project: p }).problems).toEqual([])
   })
+
+  it("Solo (Git) and None's Solo, Pair and Team are §16.6.3's (#1425)", () => {
+    const inputs = { quick: ['typecheck'], tests: ['test'], commands: { typecheck: 'npm run typecheck', test: 'npm test' }, identity: { name: 'Pat', email: 'p@e' } }
+    // Git Solo: no review, Committed is done in the project folder, no checks, no identity, dependencies merged, G16 on.
+    const solo = preset('git', 'solo', inputs)
+    expect(solo).toMatchObject({ review: 'none', reviewers: 1, noSelfReview: false, preChecks: [], sameness: 'change', finish: 'committed', target: '', mergeChecks: [], okBefore: { mode: 'never' }, folder: 'project', identity: null, stopOwnRuns: false, dependenciesDone: true, slotsUpToDate: false, sharedFolderWarning: true, commands: {} })
+    expect(checkOptions('git', { project: solo }).problems).toEqual([])
+    // None: N1 No one / a reviewer agent / a reviewer agent then you; N2 on with a reviewer; N3 none / quick / quick +
+    // tests; accepted where it is, in the project folder; N6 on; N4 as allOff's (#1482: §16.6.1's "the whole folder").
+    const none = (id: 'solo' | 'pair' | 'team') => preset('none', id, inputs)
+    const common = { finish: 'accept', folder: 'project', dependenciesDone: true, okBefore: { mode: 'never' }, excluded: ['node_modules', '.venv'] }
+    expect(none('solo')).toMatchObject({ ...common, review: 'none', noSelfReview: false, preChecks: [], commands: {} })
+    expect(none('pair')).toMatchObject({ ...common, review: 'agent', noSelfReview: true, preChecks: ['typecheck'], commands: { typecheck: 'npm run typecheck' } })
+    expect(none('team')).toMatchObject({ ...common, review: 'agentThenYou', noSelfReview: true, preChecks: ['typecheck', 'test'], commands: { typecheck: 'npm run typecheck', test: 'npm test' } })
+    for (const id of ['solo', 'pair', 'team'] as const) expect(checkOptions('none', { project: none(id) }).problems).toEqual([])
+  })
 })
 
 describe('checking options for a save (#1278)', () => {
