@@ -120,6 +120,7 @@
   "sessions.resume.addsTip": "Resume (adds an agent if none can run it)",
   "sessions.resume.agentDetail": "{where, select, worktree {worktree · {branch}} other {project folder}}{running, select, yes { · running, its current session stops first} other {}}",
   "sessions.resume.menuHeader": "Resume in",
+  "sessions.resume.startFresh": "Start Fresh with a Handover",
   "sessions.row.archived": "archived",
   "sessions.row.backup": "backup",
   "sessions.row.backupTip": "{cli} no longer has this transcript; Hive shows and resumes it from its backup.",

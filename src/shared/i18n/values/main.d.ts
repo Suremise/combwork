@@ -216,6 +216,8 @@ interface HiveMessageValues {
   'main.unexpectedClose.agents': { n: number; projects: string | number }
   'main.unexpectedClose.dump': undefined
   'main.unexpectedClose.failed': { n: number; agents: string | number }
+  'main.unexpectedClose.held': { n: number; agents: string | number }
+  'main.unexpectedClose.heldTitle': { n: number }
   'main.unexpectedClose.merge': { agent: string | number; branch: string | number; folder: string | number }
   'main.unexpectedClose.mergeCards': { agent: string | number; branch: string | number; cards: string | number; folder: string | number }
   'main.unexpectedClose.notChecked': { u: number; ids: string | number }

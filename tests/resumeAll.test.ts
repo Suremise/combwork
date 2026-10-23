@@ -22,7 +22,7 @@ describe('resume all', () => {
       started.push(a.id)
     })
     expect(started).toEqual(['a-Two', 'a-Three'])
-    expect(r).toEqual({ resumed: ['Two', 'Three'], running: ['One', 'Four'], nothing: ['Five'], failed: [] })
+    expect(r).toEqual({ resumed: ['Two', 'Three'], running: ['One', 'Four'], nothing: ['Five'], held: [], failed: [] })
   })
 
   it('reports a failure with its reason and still resumes the others', async () => {

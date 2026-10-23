@@ -21,6 +21,7 @@ import type { SwitchRefusal } from './platform/switching'
 import type { Contradiction, NOT_OFFERED, PresetId, PresetNeeds, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { ReviewerMode, WorkflowRole } from './workflow/roles'
+import type { ResumeHold } from './agentFolders'
 import type { StageNameProblem } from './workflow/stages'
 import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
@@ -1223,6 +1224,8 @@ export interface SlotView {
   warmError: string | null
   warmLog: string | null
   lease: { id: string; kind: 'card' | 'lane' | 'carried'; agent: string; card: number | null; lane: string | null } | null
+  /** The session run writing in it now (#1434): its agent and the lease it started under, until it has exited. */
+  writer: { agent: string; lease: string } | null
 }
 
 /** One of a project's review and check copies as the window reads it (#1435, copies.ts): its state and its lease not freed. */
@@ -1236,7 +1239,7 @@ export interface CopyView {
 }
 
 /** What a test copy asks of a project's slot pool (`slots:test`, unpackaged builds only: #1429's e2e). */
-export type SlotTestOp = { op: 'lend'; agent: string; card?: number; lane?: string } | { op: 'release'; lease: string; why?: string } | { op: 'tidy'; at?: number } | { op: 'remove'; slot: string }
+export type SlotTestOp = { op: 'lend'; agent: string; card?: number; lane?: string; slot?: string } | { op: 'release'; lease: string; why?: string } | { op: 'tidy'; at?: number } | { op: 'remove'; slot: string } | { op: 'carry'; agent: string; slot: string; folder: string }
 
 /** A project's slot options as project.json keeps them (ProjectConfig.slots): each left out falls back (slots.ts). */
 export interface SlotOptions {
@@ -1348,6 +1351,8 @@ export interface ResumeTarget {
   lastActiveAt: string
   createdAt?: string
   titleAtRename?: string | null
+  /** Why it can't resume now in the slot it ran in (#1434): Resume All and startup leave an agent with one. */
+  hold?: ResumeHold
 }
 
 export interface AddAgentOptions {
@@ -1532,9 +1537,14 @@ export interface SessionRecord {
   agentId?: string
   /** That agent's name then, so a session still says whose it was after the agent is removed (absent in older records). */
   agentName?: string
-  /** Folder it ran in, when not the project folder (a worktree). Claude Code files transcripts by folder. */
+  /**
+   * Folder it ran in: always recorded since #1434 (the project folder too); absent in older records, which ran in the project
+   * folder. Claude Code files transcripts by folder.
+   */
   cwd?: string
   branch?: string
+  /** The slot lease it is bound to (#1434, agentFolders.ts): set when it started in a slot. Read only: its own column. */
+  lease?: string
   /** Where the provider keeps the transcript, when it can't be found from the folder (Codex). */
   transcriptPath?: string
   /** The session whose work was handed over to this one ("Hand Over to…"). */
@@ -1677,8 +1687,10 @@ export interface LiveSessionState {
   /** Which of the project's agents this is. */
   agentId: string
   agentName?: string
-  /** Folder the session runs in: the project folder or the agent's worktree. */
+  /** Folder the session runs in: the project folder, a slot (#1434), or the agent's 0.9 worktree. */
   cwd: string
+  /** The slot it runs in (#1434): its name, while it runs under one of its leases. */
+  slot?: string
   /** The provider's session id. Empty until the provider reports it, for providers that choose it themselves. */
   sessionId: string
   /** The mode the session is actually in: from launch, Hive's live switches, Shift+Tab in the terminal (its footer) and hooks. */
@@ -2368,6 +2380,10 @@ export interface SessionListItem extends Partial<SessionRecord> {
   recache: RecacheEstimate | null
   /** The usage history doesn't have it yet (#1106): its figures follow once the worker has read it (the window is told). */
   pending?: boolean
+  /** The slot it ran in (#1434), if it ran in one of the project's. */
+  slot?: string
+  /** Why it can't resume in its slot now, or that only its own Resume takes the slot (`byHand`); absent: it may. */
+  hold?: ResumeHold
 }
 
 /**

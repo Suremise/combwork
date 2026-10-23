@@ -100,6 +100,21 @@ export interface Slot {
   op: SlotOp | null
   /** A command's job whose processes aren't known to have ended: the slot isn't lent while it is set. */
   job: string | null
+  /**
+   * The session that writes in it now (#1434, agentFolders.ts): its run, the lease and agent it started under, and its
+   * Hive (pid and start). Reserved in the write that lets it start, cleared once it has exited: while it is set the slot
+   * isn't lent, adopted, taken by hand or removed, and its lease's end waits for it to drain.
+   */
+  writer: SlotWriter | null
+}
+
+/** A slot's writer (Slot.writer). */
+export interface SlotWriter {
+  run: string
+  lease: string
+  agent: string
+  pid: number
+  started: number
 }
 
 export interface SlotLease {
@@ -114,6 +129,8 @@ export interface SlotLease {
   from: string
   to: string | null
   why: string | null
+  /** The slot's head when it ended (#1434): its conversations may resume by hand while the slot is free and still there. */
+  endRev: string | null
 }
 
 /** Why a lend was refused (#1438 turns `noSlot` and `warming` into "waiting for a slot"). */
@@ -260,7 +277,8 @@ const slotOfRow = (r: Row): Slot => ({
   createdAt: r.created_at as string,
   usedAt: r.used_at as string,
   op: r.op ? { token: r.op as string, kind: r.op_kind as OpKind, lease: (r.op_lease as string | null) ?? null, pid: (r.op_pid as number) ?? 0, started: (r.op_started as number) ?? 0 } : null,
-  job: (r.job as string | null) ?? null
+  job: (r.job as string | null) ?? null,
+  writer: r.writer_run ? { run: r.writer_run as string, lease: r.writer_lease as string, agent: r.writer_agent as string, pid: (r.writer_pid as number) ?? 0, started: (r.writer_started as number) ?? 0 } : null
 })
 const leaseOfRow = (r: Row): SlotLease => ({
   id: r.id as string,
@@ -272,7 +290,8 @@ const leaseOfRow = (r: Row): SlotLease => ({
   agent: r.agent as string,
   from: r.from_at as string,
   to: (r.ended_at as string | null) ?? null,
-  why: (r.why as string | null) ?? null
+  why: (r.why as string | null) ?? null,
+  endRev: (r.end_rev as string | null) ?? null
 })
 
 /** Which unique index a failed insert hit: a slot's open lease, an agent's, or a slot's name or folder. */
@@ -296,7 +315,7 @@ type SlotFields = Partial<Pick<Slot, 'installRev' | 'installHash' | 'warmError' 
 const COLUMN = { installRev: 'install_rev', installHash: 'install_hash', warmError: 'warm_error', warmLog: 'warm_log', target: 'target' } as const
 
 /** A slot free to start an operation on: no operation, no job unsettled, no open lease. */
-const FREE = 'op IS NULL AND job IS NULL AND NOT EXISTS (SELECT 1 FROM slot_leases l WHERE l.project = slots.project AND l.slot = slots.name AND l.ended_at IS NULL)'
+const FREE = 'op IS NULL AND job IS NULL AND writer_run IS NULL AND NOT EXISTS (SELECT 1 FROM slot_leases l WHERE l.project = slots.project AND l.slot = slots.name AND l.ended_at IS NULL)'
 
 /** One project's slots and leases (its id), on a connection. Reads are one snapshot each; writes one transaction each. */
 export class SlotStore {
@@ -372,7 +391,7 @@ export class SlotStore {
         const held = req.card !== undefined ? (db.prepare('SELECT * FROM slot_leases WHERE card = ? AND ended_at IS NULL').get(req.card) as Row | undefined) : (db.prepare('SELECT * FROM slot_leases WHERE lane = ? AND ended_at IS NULL').get(req.lane!) as Row | undefined)
         if (held) return { ok: false as const, refusal: { why: 'inUse' as const, slot: held.slot as string, agent: held.agent as string, card: (held.card as number | null) ?? null, lane: (held.lane as string | null) ?? null } }
         const all = (db.prepare('SELECT * FROM slots WHERE project = ? ORDER BY name').all(this.project) as Row[]).map(slotOfRow)
-        const usable = (s: Slot): boolean => s.state === 'ready' && !s.warmError && !s.op && !s.job && !openLeaseIn(db, this.project, s.name)
+        const usable = (s: Slot): boolean => s.state === 'ready' && !s.warmError && !s.op && !s.job && !s.writer && !openLeaseIn(db, this.project, s.name)
         let slot: Slot | undefined
         let fresh = false
         if (req.slot) {
@@ -425,31 +444,37 @@ export class SlotStore {
 
   private insertLease(db: DatabaseSync, id: string, slot: string, kind: LeaseKind, req: { agent: string; card?: number; lane?: string }, at: string): SlotLease {
     db.prepare('INSERT INTO slot_leases (id, project, slot, kind, card, lane, agent, from_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(id, this.project, slot, kind, kind === 'card' ? req.card! : null, kind === 'lane' ? req.lane! : null, req.agent, at)
-    return { id, project: this.project, slot, kind, card: kind === 'card' ? req.card! : null, lane: kind === 'lane' ? req.lane! : null, agent: req.agent, from: at, to: null, why: null }
+    return { id, project: this.project, slot, kind, card: kind === 'card' ? req.card! : null, lane: kind === 'lane' ? req.lane! : null, agent: req.agent, from: at, to: null, why: null, endRev: null }
   }
 
   /**
    * A carried lease (#1441): an agent's own worktree adopted in place as a slot under its folder's name, protected while
    * the lease is open. The slot's row is made if it has none. Refused (null) when the slot has an operation or a job, is
-   * being removed, or is recorded at another folder, or the slot or the agent has an open lease.
+   * being removed, has a writer, or is recorded at another folder, or the slot or the agent has an open lease.
    */
   async carry(agent: string, slot: { name: string; folder: string; target: string | null }): Promise<SlotLease | null> {
     try {
-      return await this.conn.write((db) => {
-        const at = this.iso()
-        const had = this.slotIn(db, slot.name)
-        if (!had) db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at) VALUES (?, ?, ?, 'lent', ?, ?, ?, ?)").run(this.project, slot.name, slot.folder, freePort(this.slotsIn(db)), slot.target, at, at)
-        else {
-          if (!samePlace(had.folder, slot.folder)) return null
-          const took = db.prepare(`UPDATE slots SET state = 'lent', used_at = ? WHERE project = ? AND name = ? AND state <> 'removing' AND ${FREE}`).run(at, this.project, slot.name)
-          if (Number(took.changes) !== 1) return null
-        }
-        return this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, slot.name, 'carried', { agent }, at)
-      })
+      return await this.conn.write((db) => this.carryIn(db, agent, slot))
     } catch (e) {
       if (constraintOf(e)) return null
       throw e
     }
+  }
+
+  /**
+   * `carry` inside a write of the caller's (#1434: the user's Resume taking a free slot, with the rest of its write). A
+   * unique index refusing it throws, undoing that whole write.
+   */
+  carryIn(db: DatabaseSync, agent: string, slot: { name: string; folder: string; target: string | null }): SlotLease | null {
+    const at = this.iso()
+    const had = this.slotIn(db, slot.name)
+    if (!had) db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at) VALUES (?, ?, ?, 'lent', ?, ?, ?, ?)").run(this.project, slot.name, slot.folder, freePort(this.slotsIn(db)), slot.target, at, at)
+    else {
+      if (!samePlace(had.folder, slot.folder)) return null
+      const took = db.prepare(`UPDATE slots SET state = 'lent', used_at = ? WHERE project = ? AND name = ? AND state <> 'removing' AND ${FREE}`).run(at, this.project, slot.name)
+      if (Number(took.changes) !== 1) return null
+    }
+    return this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, slot.name, 'carried', { agent }, at)
   }
 
   private slotsIn(db: DatabaseSync): Slot[] {
@@ -465,6 +490,46 @@ export class SlotStore {
       db.prepare('UPDATE slot_leases SET ended_at = ?, why = ? WHERE id = ?').run(at, why, lease)
       db.prepare('UPDATE slots SET used_at = ? WHERE project = ? AND name = ?').run(at, this.project, r.slot)
       return { ...leaseOfRow(r), to: at, why }
+    })
+  }
+
+  /**
+   * An ended lease's last revision (#1434): the slot's head once nothing of the lease writes there any more (its lease
+   * ended and its writer gone), where its conversations may resume by hand. Only while it is still the slot's newest
+   * lease, ended, with no writer on the slot and none recorded yet: a slot lent again since keeps its own. Whether it was.
+   */
+  async finalizeEndRev(lease: string, rev: string): Promise<boolean> {
+    return this.conn.write(
+      (db) =>
+        Number(
+          db
+            .prepare(
+              'UPDATE slot_leases SET end_rev = ? WHERE id = ? AND project = ? AND ended_at IS NOT NULL AND end_rev IS NULL AND id = (SELECT l.id FROM slot_leases l WHERE l.project = slot_leases.project AND l.slot = slot_leases.slot ORDER BY l.from_at DESC LIMIT 1) AND NOT EXISTS (SELECT 1 FROM slots s WHERE s.project = slot_leases.project AND s.name = slot_leases.slot AND s.writer_run IS NOT NULL)'
+            )
+            .run(rev, lease, this.project).changes
+        ) === 1
+    )
+  }
+
+  /** A run's writer cleared in every slot still naming it (one write): the slots it was cleared in. */
+  async clearWriterRun(run: string): Promise<string[]> {
+    return this.conn.write((db) => {
+      const names = (db.prepare('SELECT name FROM slots WHERE project = ? AND writer_run = ?').all(this.project, run) as { name: string }[]).map((r) => r.name)
+      db.prepare('UPDATE slots SET writer_run = NULL, writer_lease = NULL, writer_agent = NULL, writer_pid = NULL, writer_started = NULL WHERE project = ? AND writer_run = ?').run(this.project, run)
+      return names
+    })
+  }
+
+  /** A writer whose run has ended (or whose Hive is gone) cleared, only while it is still that run. Whether it was. */
+  async clearWriter(name: string, run: string): Promise<boolean> {
+    return this.conn.write((db) => Number(db.prepare('UPDATE slots SET writer_run = NULL, writer_lease = NULL, writer_agent = NULL, writer_pid = NULL, writer_started = NULL WHERE project = ? AND name = ? AND writer_run = ?').run(this.project, name, run).changes) === 1)
+  }
+
+  /** A slot's newest lease, open or ended (#1434: whose work it holds). */
+  lastLease(slot: string): SlotLease | null {
+    return this.conn.read((db) => {
+      const r = db.prepare('SELECT * FROM slot_leases WHERE project = ? AND slot = ? ORDER BY from_at DESC LIMIT 1').get(this.project, slot) as Row | undefined
+      return r ? leaseOfRow(r) : null
     })
   }
 
@@ -515,9 +580,9 @@ export class SlotStore {
     return this.conn.write((db) => Number(db.prepare('UPDATE slots SET op = ?, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND op = ?').run(token, holder.pid, holder.started, this.project, name, was).changes) === 1)
   }
 
-  /** Sets a free slot's state from what it was (no operation or lease meanwhile): whether it changed. */
+  /** Sets a free slot's state from what it was (no operation, lease or writer meanwhile): whether it changed. */
   async look(name: string, from: SlotState, to: SlotState): Promise<boolean> {
-    return this.conn.write((db) => Number(db.prepare(`UPDATE slots SET state = ? WHERE project = ? AND name = ? AND state = ? AND op IS NULL AND NOT EXISTS (SELECT 1 FROM slot_leases l WHERE l.project = slots.project AND l.slot = slots.name AND l.ended_at IS NULL)`).run(to, this.project, name, from).changes) === 1)
+    return this.conn.write((db) => Number(db.prepare(`UPDATE slots SET state = ? WHERE project = ? AND name = ? AND state = ? AND op IS NULL AND writer_run IS NULL AND NOT EXISTS (SELECT 1 FROM slot_leases l WHERE l.project = slots.project AND l.slot = slots.name AND l.ended_at IS NULL)`).run(to, this.project, name, from).changes) === 1)
   }
 
   /** A leased slot's folder is gone: marked so (its holder's sessions are refused, #1434). */
@@ -624,6 +689,14 @@ export interface PoolDeps {
   inFlight?: (card: number) => boolean | Promise<boolean>
   /** Settings → Advanced, Remove idle slots after a day. */
   removeIdle?: () => boolean
+  /** A lease ended (#1434): its builder's session in the slot (the slot's writer) is stopped once its turn ends. */
+  ended?: (lease: SlotLease, slot: Slot) => void
+  /**
+   * Whether a writer's run is over and its processes are known to have ended (#1434): only then does a refresh clear it
+   * (a release that couldn't be written). A writer of a Hive that is gone is never cleared by a refresh: it stays held
+   * until the user releases the slot.
+   */
+  writerOver?: (w: SlotWriter) => boolean | Promise<boolean>
   now?: () => number
 }
 
@@ -690,6 +763,27 @@ export class SlotPool {
     }
   }
 
+  /**
+   * A start's claim of a slot's writer (#1434), tracked as this pool's work as an operation is: `close` awaits it until
+   * the start has either spawned its process (which its session's exit then releases) or released the writer. Null
+   * once the pool is closing: no claim is made then.
+   */
+  trackWriter(): { done: () => void } | null {
+    if (this.closed) return null
+    let done!: () => void
+    const p = new Promise<void>((r) => (done = r))
+    this.running.add(p)
+    void p.then(() => this.running.delete(p))
+    let once = false
+    return {
+      done: () => {
+        if (once) return
+        once = true
+        done()
+      }
+    }
+  }
+
   /** The workspace closes: running commands are ended (their runs' signal), and the operations awaited. */
   async close(): Promise<void> {
     this.life.abort()
@@ -748,14 +842,32 @@ export class SlotPool {
   async release(lease: string, why: string): Promise<boolean> {
     const ended = await this.store.end(lease, why)
     if (!ended) return false
-    await this.settle(ended.slot)
+    const slot = this.store.slot(ended.slot)
+    // Its writer (the builder's session there) drains, and is stopped once its turn is over (#1434).
+    if (slot) this.deps.ended?.(ended, slot)
+    await this.drained(ended.slot)
     return true
   }
 
-  /** A slot no operation or lease holds, looked at: ready, dirty or gone. Otherwise left to its holder. */
+  /**
+   * After a lease's end or its writer's exit (#1434): with no writer left, the ended lease's last revision recorded
+   * (the slot's head now: nothing of it writes there any more) and the slot looked at. While a writer drains, nothing.
+   */
+  async drained(name: string): Promise<void> {
+    const s = this.store.slot(name)
+    if (!s || s.writer) return
+    const last = this.store.lastLease(name)
+    if (last?.to && !last.endRev && existsSync(s.folder)) {
+      const rev = await G.head(s.folder)
+      if (!isUnknown(rev)) await this.store.finalizeEndRev(last.id, rev)
+    }
+    await this.settle(name)
+  }
+
+  /** A slot no operation, lease or writer holds, looked at: ready, dirty or gone. Otherwise left to its holder. */
   private async settle(name: string): Promise<void> {
     const s = this.store.slot(name)
-    if (!s || s.op || this.store.openLease(name)) return
+    if (!s || s.op || s.writer || this.store.openLease(name)) return
     if (s.state === 'creating' || s.state === 'removing') return
     const to = await this.look(s)
     if (to !== s.state) await this.store.look(name, s.state, to)
@@ -789,6 +901,11 @@ export class SlotPool {
   async refresh(): Promise<void> {
     for (const s of this.store.slots()) {
       if (this.closed) return
+      // A writer whose run is over, its processes known to have ended, but not cleared (its release couldn't be written).
+      if (s.writer && (await this.deps.writerOver?.(s.writer))) {
+        if (await this.store.clearWriter(s.name, s.writer.run)) await this.drained(s.name)
+        continue
+      }
       if (s.op) {
         if (await this.holderGone(s.op)) await this.recover(s)
         continue

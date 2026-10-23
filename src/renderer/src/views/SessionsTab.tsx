@@ -5,7 +5,7 @@ import { useAgentLimit } from '../advanced'
 import { formatDateTime } from '@shared/dates'
 import { isProviderEnabled, providerDescriptor, providerName } from '@shared/providers'
 import { buildSessionTree, countText, countsIn, pathTo, sessionKey, sessionsIn, type TreeNode } from '@shared/sessionTree'
-import { removedAgentNote, resumeBlock, type ResumeContext } from '@shared/sessionResume'
+import { holdText, removedAgentNote, resumeBlock, type ResumeContext } from '@shared/sessionResume'
 import { ProviderIcon } from '../components/ProviderIcon'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
@@ -314,7 +314,8 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
       providerInstalled: install && !install.checking ? install.found : null,
       runners: actions.agentsForSession(project, s),
       canAddAgent: !assistant && (!s.cwd || s.cwd.toLowerCase() === project.path.toLowerCase()) && project.agents.length < limit,
-      assistant
+      assistant,
+      projectPath: project.path
     }
   }
   const whyNot = (s: SessionListItem): string | null => resumeBlock(s, resumeCtx(s))
@@ -592,23 +593,33 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                 })()}
                 {!selected.archived && !isLive(selected.id) && (() => {
                   const block = whyNot(selected)
-                  // Can't be resumed: the buttons stay, disabled, and say why.
+                  // Can't be resumed: the buttons stay, disabled, and say why. One whose slot holds other work now (#1434) can
+                  // start its agent afresh from a handover instead (its transcript is the one shown here).
                   if (block) {
+                    const fresh = !!selected.hold && !!selected.agentId && project.agents.some((a) => a.id === selected.agentId)
                     return (
-                      <Tooltip content={block}>
-                        <span className="resume-blocked">
-                          <button className="btn small act-resume" disabled>
-                            <Icon name="debug-continue" /> {tr(RESUME)}
+                      <>
+                        <Tooltip content={block}>
+                          <span className="resume-blocked">
+                            <button className="btn small act-resume" disabled>
+                              <Icon name="debug-continue" /> {tr(RESUME)}
+                            </button>
+                          </span>
+                        </Tooltip>
+                        {fresh && (
+                          <button className="btn small" data-action="start-fresh-handover" onClick={() => set({ handOverFor: { project: project.path, agentId: selected.agentId! } })}>
+                            <Icon name="arrow-swap" /> {tr(msg({ id: 'sessions.resume.startFresh', defaultMessage: 'Start Fresh with a Handover', description: "Button over a session's transcript that can't resume where it ran (#1434: its slot holds other work): opens Hand Over to… for its agent, which starts a new conversation from a handover." }))}
                           </button>
-                        </span>
-                      </Tooltip>
+                        )}
+                      </>
                     )
                   }
                   const agents = actions.agentsForSession(project, selected)
                   const target = actions.resumeTarget(project, selected)
                   const targetAgent = agents.find((a) => a.id === target) ?? null
                   const targetName = targetAgent?.name
-                  const note = removedAgentNote(selected, project.agents, targetAgent)
+                  // Its slot free and as it left it (#1434): this Resume takes it again, as Resume All doesn't.
+                  const note = (selected.hold?.is === 'byHand' ? shownText(holdText(selected.hold, targetName ?? selected.agentName ?? '')) : null) ?? removedAgentNote(selected, project.agents, targetAgent)
                   if (agents.length < 2) {
                     const button = (
                       <button className="btn small act-resume" disabled={!!resuming || targetStarting} aria-busy={!!resuming || undefined} onClick={() => void actions.resumeSession(project.path, selected)}>

@@ -214,6 +214,8 @@
   "main.unexpectedClose.agents": "{n, plural, =0 {Es liefen keine Agenten.} one {Ein Agent lief in {projects}.} other {# Agenten liefen in {projects}.}}",
   "main.unexpectedClose.dump": "Hive hat einen Absturzbericht davon behalten: Hilfe → Diagnosedaten kopieren nennt ihn.",
   "main.unexpectedClose.failed": "{n, plural, one {Einer konnte nicht fortgesetzt werden: {agents}.} other {# konnten nicht fortgesetzt werden: {agents}.}}",
+  "main.unexpectedClose.held": "{n, plural, one {Einer blieb gestoppt: {agents}.} other {# blieben gestoppt: {agents}.}}",
+  "main.unexpectedClose.heldTitle": "{n, plural, one {Ein Agent blieb gestoppt} other {# Agenten blieben gestoppt}}",
   "main.unexpectedClose.merge": "{agent} war beim Merge von {branch}: Prüfe {folder} vor dem nächsten Merge auf einen halb fertigen Merge (git status dort).",
   "main.unexpectedClose.mergeCards": "{agent} war beim Merge von {branch} ({cards}): Prüfe {folder} vor dem nächsten Merge auf einen halb fertigen Merge (git status dort).",
   "main.unexpectedClose.notChecked": "{u, plural, one {Ein Prozess, den ein Testlauf gestartet hat, läuft womöglich noch: Windows hat Hive ihn weder beenden noch prüfen lassen, darum kann Hive ihn nicht wiederfinden. Suche im Task-Manager auf der Registerkarte „Details“ nach der PID {ids}.} other {# Prozesse, die ein Testlauf gestartet hat, laufen womöglich noch: Windows hat Hive sie weder beenden noch prüfen lassen, darum kann Hive sie nicht wiederfinden. Suche im Task-Manager auf der Registerkarte „Details“ nach den PIDs {ids}.}}",

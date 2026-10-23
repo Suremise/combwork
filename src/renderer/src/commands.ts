@@ -16,7 +16,7 @@ import { noteCommandUsed } from './tips'
 import { requestStripMenu, type StripMenu } from './stripMenus'
 import { showAntivirus } from './components/Antivirus'
 import { focusTileAfter } from './components/AgentTiles'
-import { agentPage, assistantOnLeft, closeTile, showTilePage, tileFocusOf, tilePage, focusedAgentId, get, isAssistantPath, setAssistantSide, notify, openProjectSettings, openVersionControl, revealAgent, set, setActivity, setAssistantOpen, setProgressOpen, progressIsOpen, showAssistantView, showView, showUnusedWorktrees, setProjectTab, showAgent, showPage, panePageCount, shownLayout, toggleCompactSidebar, type ProjectTab } from './store'
+import { agentPage, assistantOnLeft, closeTile, showTilePage, tileFocusOf, tilePage, focusedAgentId, get, isAssistantPath, setAssistantSide, notify, openInSessionsTab, openProjectSettings, openVersionControl, revealAgent, set, setActivity, setAssistantOpen, setProgressOpen, progressIsOpen, showAssistantView, showView, showUnusedWorktrees, setProjectTab, showAgent, showPage, panePageCount, shownLayout, toggleCompactSidebar, type ProjectTab } from './store'
 import { STRIP_TABS } from '@shared/projectTabs'
 
 /** A command's category: an id (CATEGORY_TEXT names it), as Settings → Keyboard Shortcuts groups and filters them. */
@@ -288,6 +288,16 @@ const COMMAND_DEFS: CommandDef[] = [
     internal: true,
     run: (projectPath?: unknown, agentId?: unknown) => {
       if (typeof projectPath === 'string' && typeof agentId === 'string') set({ handOverFor: { project: projectPath, agentId } })
+    }
+  },
+  {
+    id: 'session.showTranscript',
+    name: msg({ id: 'shell.command.session.showTranscript', defaultMessage: "Read a Session's Transcript", description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: notifications and buttons run it by its name. It opens the Sessions tab on one session (#1434)." }),
+    category: 'session',
+    // A refused Resume's notice (#1434), which passes the project and the session.
+    internal: true,
+    run: (projectPath?: unknown, sessionId?: unknown) => {
+      if (typeof projectPath === 'string' && typeof sessionId === 'string') openInSessionsTab(projectPath, sessionId)
     }
   },
   {

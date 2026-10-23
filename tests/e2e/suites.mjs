@@ -237,6 +237,7 @@ export const SUITES = [
   { name: 'skillprefs' },
   { name: 'skills', serial: 'the shared Codex test home', codexHome: 'test' },
   { name: 'slotpool' },
+  { name: 'slotsessions' },
   { name: 'stagenames' },
   { name: 'stalls' },
   { name: 'startall' },

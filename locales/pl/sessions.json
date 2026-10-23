@@ -120,6 +120,7 @@
   "sessions.resume.addsTip": "Wznów (doda agenta, jeśli żaden nie może jej uruchomić)",
   "sessions.resume.agentDetail": "{where, select, worktree {worktree · {branch}} other {folder projektu}}{running, select, yes { · działa, jego bieżąca sesja najpierw się zatrzyma} other {}}",
   "sessions.resume.menuHeader": "Wznów w agencie",
+  "sessions.resume.startFresh": "Zacznij od nowa z przekazaniem",
   "sessions.row.archived": "zarchiwizowana",
   "sessions.row.backup": "kopia",
   "sessions.row.backupTip": "{cli} nie ma już tej transkrypcji; Hive pokazuje i wznawia ją z własnej kopii zapasowej.",

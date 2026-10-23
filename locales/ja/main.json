@@ -214,6 +214,8 @@
   "main.unexpectedClose.agents": "{n, plural, =0 {実行中のエージェントはありませんでした。} other {{projects}で#個のエージェントが実行中でした。}}",
   "main.unexpectedClose.dump": "Hiveはクラッシュダンプを保存しました。「ヘルプ」→「診断情報をコピー」でその場所がわかります。",
   "main.unexpectedClose.failed": "{n, plural, other {#個を再開できませんでした：{agents}。}}",
+  "main.unexpectedClose.held": "{n, plural, other {#個を停止したままにしました：{agents}。}}",
+  "main.unexpectedClose.heldTitle": "{n, plural, other {#個のエージェントを停止したままにしました}}",
   "main.unexpectedClose.merge": "{agent}が{branch}をマージしていました。次のマージの前に、{folder}にマージが途中のまま残っていないか確認してください（そこでgit status）。",
   "main.unexpectedClose.mergeCards": "{agent}が{branch}（{cards}）をマージしていました。次のマージの前に、{folder}にマージが途中のまま残っていないか確認してください（そこでgit status）。",
   "main.unexpectedClose.notChecked": "{u, plural, other {テスト実行が起動した#個のプロセスがまだ実行中の可能性があります。Windowsが終了も確認も許可しなかったため、Hiveはこれらを再び見つけられません。タスク マネージャーの[詳細]タブでPID {ids}を探してください。}}",

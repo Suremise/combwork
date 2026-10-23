@@ -5,7 +5,9 @@ import { agentOf, agentProviderOf, choose, openVersionControl, paneCells, shownL
 import { MANY_AGENTS, agentLimitText, chosenLayout, layoutColumns, layoutPanes, moveAgentTo, projectLayout, projectSessionView, sessionInAgentFolder, swapAgentsIn } from '@shared/defaults'
 import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@shared/paneCells'
 import { defaultProviderPending, isProviderEnabled, projectDefaultProvider, providerName } from '@shared/providers'
-import { agentsToResume, resumeAll, stalledOnSignIn } from '@shared/resumeAll'
+import { agentsToResume, resumeAll, stalledOnSignIn, type ResumeAllResult } from '@shared/resumeAll'
+import { holdShort, holdText } from '@shared/sessionResume'
+import type { ResumeHold } from '@shared/agentFolders'
 import { eachAgent, sessionsToArchive, type BatchResult } from '@shared/startAll'
 import { serverOnIn } from '@shared/agentMcp'
 import { shownText } from '@shared/advanced'
@@ -482,10 +484,12 @@ async function startNew(path: string, id: string, opts: { skipSetup?: boolean })
  * none does). For the project folder: the agent asked for, else one that isn't running — the agent that last ran it,
  * the focused one, another of its provider, any other in the folder — else the agent that ran it.
  */
-export function resumeTarget(p: ProjectInfo | undefined, item: Pick<SessionListItem, 'agentId' | 'cwd'> & { provider?: ProviderId }, preferred?: string): string | null {
+export function resumeTarget(p: ProjectInfo | undefined, item: Pick<SessionListItem, 'agentId' | 'cwd' | 'slot'> & { provider?: ProviderId }, preferred?: string): string | null {
   if (!p) return preferred ?? null
   // The Hive Assistant's sessions ran in the workspace folder, with its one agent.
   if (isAssistantPath(p.path)) return p.agents[0]?.id ?? null
+  // One in a slot resumes with its own agent (#1434: one writer per slot), if it is still there.
+  if (item.slot) return p.agents.find((a) => a.id === item.agentId)?.id ?? null
   if (item.cwd && item.cwd.toLowerCase() !== p.path.toLowerCase()) return p.agents.find((x) => x.worktree?.path.toLowerCase() === item.cwd!.toLowerCase())?.id ?? null
   const inFolder = (id: string | undefined): boolean => !!id && p.agents.some((a) => a.id === id && !a.worktree)
   const free = (id: string | undefined): boolean => inFolder(id) && !agentOf(p, id!)?.live
@@ -499,12 +503,16 @@ export function resumeTarget(p: ProjectInfo | undefined, item: Pick<SessionListI
   return other ?? (inFolder(recorded) ? recorded! : (p.agents.find((a) => !a.worktree)?.id ?? null))
 }
 
-/** Agents that can run a session: those working in the folder it ran in (it runs in its own provider in any of them). */
-export function agentsForSession(p: ProjectInfo, item: Pick<SessionListItem, 'cwd'>): ProjectInfo['agents'] {
+/**
+ * Agents that can run a session: those working in the folder it ran in (it runs in its own provider in any of them); one
+ * in a slot only its own agent (#1434: one writer per slot).
+ */
+export function agentsForSession(p: ProjectInfo, item: Pick<SessionListItem, 'cwd' | 'slot' | 'agentId'>): ProjectInfo['agents'] {
+  if (item.slot) return p.agents.filter((a) => a.id === item.agentId)
   return p.agents.filter((a) => sessionInAgentFolder(p.path, a, item))
 }
 
-type ResumeItem = Pick<SessionListItem, 'id' | 'recache' | 'title' | 'name' | 'agentId' | 'cwd'> & { provider?: ProviderId }
+type ResumeItem = Pick<SessionListItem, 'id' | 'recache' | 'title' | 'name' | 'agentId' | 'agentName' | 'cwd' | 'slot' | 'hold'> & { provider?: ProviderId }
 
 export async function resumeSession(path: string, item: ResumeItem, agentId?: string): Promise<void> {
   // Its buttons show it resuming from the click until it runs (#1177): under its agent, or, with none to run it yet,
@@ -567,9 +575,23 @@ async function resume(path: string, item: ResumeItem, held: string | null, agent
       return
     }
   }
+  // Its slot holds other work, or isn't as it left it (#1434): said with what can be done instead, before anything stops.
+  if (item.hold && item.hold.is !== 'byHand') return heldResume(path, item, item.hold, target)
   if (!(await stopIfRunning(path, target, { what: 'resume' }, 'resume'))) return
   const st = await attempt(tr(msg({ id: 'actions.session.resumeFailed', defaultMessage: 'Could not resume session', description: "An error's title: resuming a session failed." })), () => call('session:start', path, { resumeId: item.id, name: item.name, agentId: target }))
   if (st) reveal(path, target)
+}
+
+/**
+ * A conversation that can't resume where it was made (#1434): why, with its transcript to read (the Sessions tab) or a
+ * fresh start from a handover for its agent (Hand Over to…), whose new conversation starts where the agent works now.
+ */
+function heldResume(path: string, item: ResumeItem, hold: ResumeHold, agentId: string): void {
+  const agent = agentOf(project(path), agentId)?.name ?? item.agentName ?? ''
+  notify('warning', tr(msg({ id: 'actions.resume.heldTitle', defaultMessage: "Can't resume here now", description: "A warning's title (#1434): the conversation can't resume in the slot it ran in (the message says why: its slot holds other work, changed, or its agent builds elsewhere)." })), shownText(holdText(hold, agent)), [
+    { label: tr(msg({ id: 'actions.resume.readTranscript', defaultMessage: 'Read Transcript', description: "A button in the warning that a conversation can't resume where it ran (#1434): opens it in the Sessions tab." })), command: 'session.showTranscript', args: [path, item.id] },
+    { label: tr(msg({ id: 'actions.resume.startFresh', defaultMessage: 'Start Fresh with a Handover', description: "A button in the warning that a conversation can't resume where it ran (#1434): opens Hand Over to… for its agent, which starts a new conversation from a handover." })), command: 'session.handOverTo', args: [path, agentId] }
+  ])
 }
 
 export async function resumeLast(path: string | null = get().selectedProject, agentId?: string): Promise<void> {
@@ -658,10 +680,29 @@ export function resumeAllAgents(path: string): Promise<void> {
   return runOnce(`resumeAll:${path}`, () => resumeAll_(path)).then(() => undefined)
 }
 
+/**
+ * Resume All's report of the agents it left (#1434): their conversations can't resume where they were made now (their
+ * slot is free, so only their own Resume takes it; or it holds other work), one line each with why ("• HB2: its slot is
+ * free. Resume it by hand to take it"), and for each a Show that opens the Sessions tab on that conversation, where its
+ * Resume, its transcript and Start Fresh with a Handover are.
+ */
+function heldReport(path: string, held: ResumeAllResult['held']): { title: string; lines: string; actions: ToastAction[] } {
+  return {
+    title: tr(msg({ id: 'actions.resumeAll.heldTitle', defaultMessage: '{n, plural, one {Resume All left one agent} other {Resume All left # agents}}', description: "A notification's title after Resume All (#1434): it left {n} agents stopped, whose conversations can't resume now where they ran (a slot that is free, so only their own Resume takes it, or holds other work); the lines below say why." }), { n: held.length }),
+    lines: held.map((h) => tr(msg({ id: 'actions.resumeAll.heldLine', defaultMessage: '• {agent}: {why}', description: "A line of Resume All's report of the agents it left (#1434): the agent ({agent}) and why, in plain words ({why}: \"its slot is free. Resume it by hand to take it\", \"its slot now holds AM-14's work\", \"after AM-14\")." }), { agent: h.name, why: shownText(holdShort(h.hold)) })).join('\n'),
+    actions: held.map((h) => ({ label: tr(msg({ id: 'actions.resumeAll.show', defaultMessage: 'Show {agent}', description: "A button in Resume All's report of the agents it left (#1434): opens the Sessions tab on that agent's ({agent}) conversation, where it can be resumed by hand, read, or started fresh with a handover." }), { agent: h.name }), command: 'session.showTranscript', args: [path, h.id] }))
+  }
+}
+
 async function resumeAll_(path: string): Promise<void> {
   const p = project(path)
   if (!p) return
   const stopped = agentsToResume(p.agents)
+  const left = p.agents.flatMap((a) => (!a.live && a.resume?.hold ? [{ name: a.name, hold: a.resume.hold, id: a.resume.id }] : []))
+  if (!stopped.length && left.length) {
+    const r = heldReport(path, left)
+    return notify('info', r.title, r.lines, r.actions)
+  }
   if (!stopped.length) return notify('info', tr(msg({ id: 'actions.resumeAll.nothing', defaultMessage: 'Nothing to resume', description: "A notification's title: Resume All found no agent to resume." })), tr(msg({ id: 'actions.resumeAll.nothingMessage', defaultMessage: 'No stopped agent has a session to resume.', description: 'Under the notification that Resume All found nothing to resume.' })))
   const list = (await attempt(listFailed(), () => call('session:list', path))) ?? []
   const cold = stopped.flatMap((a) => {
@@ -689,7 +730,7 @@ async function resumeAll_(path: string): Promise<void> {
     if (!isProviderEnabled(get().settings, provider)) throw new Error(providerOff(name))
     if (!get().providers[provider]?.found) throw new Error(providerMissing(name))
     try {
-      await whileStarting(path, a.id, { kind: 'resume', sessionId: a.resume!.id }, () => call('session:start', path, { resumeId: a.resume!.id, name: a.resume!.name, agentId: a.id }))
+      await whileStarting(path, a.id, { kind: 'resume', sessionId: a.resume!.id }, () => call('session:start', path, { resumeId: a.resume!.id, name: a.resume!.name, agentId: a.id, auto: true }))
     } catch (e) {
       throw new Error(errorMessage(e), { cause: e })
     }
@@ -699,8 +740,12 @@ async function resumeAll_(path: string): Promise<void> {
     notify(
       'error',
       tr(msg({ id: 'actions.resumeAll.failed', defaultMessage: '{all, select, yes {{tried, plural, one {Could not resume the agent} other {Could not resume the agents}}} other {{failed} of {tried} agents could not resume}}', description: "An error's title after Resume All: none of the {tried} agents resumed (yes), or {failed} of them didn't." }), { all: result.failed.length === tried ? 'yes' : 'no', failed: result.failed.length, tried }),
-      batchReport(result.failed, result.resumed.length ? tr(msg({ id: 'actions.resumeAll.resumed', defaultMessage: 'Resumed: {agents}', description: "Resume All's report: the agents that did resume ({agents}: their names, listed)." }), { agents: fmt.list(result.resumed, 'unit') }) : null)
+      batchReport(result.failed, result.resumed.length ? tr(msg({ id: 'actions.resumeAll.resumed', defaultMessage: 'Resumed: {agents}', description: "Resume All's report: the agents that did resume ({agents}: their names, listed)." }), { agents: fmt.list(result.resumed, 'unit') }) : null, result.held.length ? [heldReport(path, result.held).lines] : []),
+      result.held.length ? heldReport(path, result.held).actions : undefined
     )
+  } else if (result.held.length) {
+    const r = heldReport(path, result.held)
+    notify('info', r.title, r.lines, r.actions)
   }
 }
 

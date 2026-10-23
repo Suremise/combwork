@@ -24,8 +24,12 @@ import { progress, progressGate } from './progressService'
 import { childEnv } from './ptyHost'
 import { sessions } from './sessions'
 import { settleSlotJob } from './slotJobs'
-import { builderCountOf, SlotPool, slotOptionsOf, SlotStore, type OpHolder, type SlotConn, type SlotRunEnd, type SlotRunner } from './slots'
-import { openWorkspaces, WorkspaceService } from './workspace'
+import { builderCountOf, SlotPool, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRunEnd, type SlotRunner } from './slots'
+import { onHiveEvent } from './events'
+import { agentBusy } from './workflow/lineUpdates'
+import { agentRunsGoing } from './workflow/service'
+import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
+import { setWriterHost, writerOver } from './agentFolders'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
 import { endLeaseJob, journalPath, LeaseJob, startLauncher } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
@@ -206,12 +210,49 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
           return false
         }
       },
-      removeIdle: () => advanced.get(SLOTS_REMOVE_IDLE) !== false
+      removeIdle: () => advanced.get(SLOTS_REMOVE_IDLE) !== false,
+      ended: (lease, slot) => stopLeaseSession(projectPath, lease, slot),
+      writerOver: (w) => writerOver(w)
     })
   })()
   pools.set(key, { life: ws.lifetime, pool })
   pool.catch(() => pools.delete(key))
   return pool
+}
+
+/**
+ * A lease ended (#1434, SPEC §16.10.2): the session run writing in its slot under it (the slot's writer, as the lease's
+ * end found it) is stopped once its turn has finished (not in a turn, no prompt waiting, no run or background task
+ * going); a start of it still being prepared gives up. Only that run: the agent's next run, in this slot under a new
+ * lease or anywhere else, isn't this lease's to stop. Looked at again at each change of the agent's status or of the
+ * Progress panel's runs, until that run is stopped or over. Its conversation stays resumable by hand while the slot
+ * isn't lent again, and the slot isn't lent, taken or removed until the run has exited and released it.
+ */
+export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Slot): void {
+  const w = slot.writer
+  if (!w || w.lease !== lease.id) return
+  // This Hive's run of it, still (another Hive's run, or one already over, isn't this Hive's to stop).
+  const mine = (): { run: string; starting: boolean } | null => {
+    const r = sessions.runNow(projectPath, w.agent)
+    return r && r.run === w.run ? r : null
+  }
+  let off: (() => void) | null = null
+  const done = (): void => {
+    off?.()
+    off = null
+  }
+  const look = (): void => {
+    const r = mine()
+    if (!r) return done()
+    if (!r.starting && (agentBusy(projectPath, w.agent) || agentRunsGoing(projectPath, w.agent).length)) return
+    done()
+    log.info(`Stopping ${userText(w.agent)}'s ${r.starting ? 'start' : 'session'} in ${userText(slot.name)}: its lease ${lease.id} ended (${lease.why ?? 'released'})`)
+    sessions.stop(projectPath, w.agent)
+  }
+  off = onHiveEvent((e) => {
+    if ((e.type === 'session-status' && e.state.agentId === w.agent && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
+  })
+  look()
 }
 
 let timer: NodeJS.Timeout | null = null
@@ -244,6 +285,20 @@ export function startSlots(): void {
   timer = setInterval(() => void tidyOpenPools(), TIDY_MS)
   timer.unref()
   WorkspaceService.closingTasks.add(forgetPools)
+  // Slots' writers (#1434, agentFolders.ts): this Hive as their holder, their runs' tokens among its live ones, a claim
+  // tracked as its project's pool's work (close awaits it), and a writer released handed to its pool.
+  setWriterHost({
+    self: holder.self,
+    live: holder.live,
+    track: async (projectPath) => {
+      const ws = workspaceFor(projectPath)
+      return ws ? (await poolFor(ws, projectPath)).trackWriter() : null
+    },
+    drained: async (projectPath, slot) => {
+      const ws = workspaceFor(projectPath)
+      if (ws) await poolFor(ws, projectPath).then((p) => p.drained(slot))
+    }
+  })
 }
 
 /** A workspace closing: its pools' running commands ended and their operations awaited, then the pools forgotten. */
@@ -254,6 +309,7 @@ function forgetPools(path: string): Promise<void> {
 }
 
 export function stopSlots(): void {
+  setWriterHost(null)
   if (timer) clearInterval(timer)
   timer = null
   WorkspaceService.closingTasks.delete(forgetPools)
@@ -263,7 +319,7 @@ export function stopSlots(): void {
 export function slotViews(pool: SlotPool): SlotView[] {
   return pool.slots().map((s) => {
     const l = pool.openLease(s.name)
-    return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null }
+    return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: s.writer ? { agent: s.writer.agent, lease: s.writer.lease } : null }
   })
 }
 
@@ -271,13 +327,16 @@ export function slotViews(pool: SlotPool): SlotView[] {
 export async function slotTest(pool: SlotPool, op: SlotTestOp): Promise<unknown> {
   switch (op?.op) {
     case 'lend':
-      return pool.lend({ agent: op.agent, ...(op.card !== undefined ? { card: op.card } : { lane: op.lane }) })
+      return pool.lend({ agent: op.agent, ...(op.card !== undefined ? { card: op.card } : { lane: op.lane }), ...(op.slot ? { slot: op.slot } : {}) })
     case 'release':
       return pool.release(op.lease, op.why ?? 'released')
     case 'tidy':
       return pool.tidy(op.at)
     case 'remove':
       return pool.remove(op.slot)
+    case 'carry':
+      // #1441's adoption of an agent's own worktree (#1434's suite, until #1441 is built).
+      return pool.carry(op.agent, { name: op.slot, folder: op.folder })
     default:
       throw new Error('unknown slot test op') // i18n-ignore: a test channel, never shown
   }
