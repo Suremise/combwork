@@ -393,7 +393,7 @@
   "tips.unexpectedClose.title": "Savoir quand Hive s’est fermé de façon inattendue",
   "tips.unmerged.text": "L’onglet de l’agent montre combien de commits ne sont pas encore fusionnés, Fusionner… dans son menu ⋯ dit ce qui reste, et Git → Modifications montre tout ce que l’agent a changé depuis la création de sa branche.",
   "tips.unmerged.title": "Voir ce qu’un agent en worktree a à fusionner",
-  "tips.unusedWorktrees.text": "Tu as retiré un agent mais gardé son worktree ? Git → Modifications s’ouvre sur les worktrees qu’aucun agent n’utilise, en indiquant qui a créé chacun : ouvre-en un pour voir son travail et le fusionner, retire ceux qui sont fusionnés avec leurs branches, ou rends-en un à un agent.",
+  "tips.unusedWorktrees.text": "Tu as retiré un agent mais gardé son worktree ? Git → Modifications s’ouvre sur les worktrees qu’aucun agent n’utilise, en indiquant qui a créé chacun : ouvres-en un pour voir son travail et le fusionner, ou retire ceux qui sont fusionnés avec leurs branches.",
   "tips.unusedWorktrees.title": "Faire le tri dans les worktrees conservés",
   "tips.versionControlSwitch.text": "Clique sur Aucune ou Git en haut de l’onglet Gestion de versions pour changer dès la prochaine carte ; les cartes lancées gardent les anciennes règles. Chacune a ses options du flux de travail, et si le dossier change (git init), Hive y propose de changer.",
   "tips.versionControlSwitch.title": "Basculer entre Aucune et Git",

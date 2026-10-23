@@ -4,7 +4,7 @@ import { formatSize } from '@shared/units'
 import { RecentCache } from '@shared/recentCache'
 import { CHANGES_ABOUT, UNUSED_WORKTREES_GUIDE, holdsWork, isSlotRow, kindLabel, lostByRemoving, originLabel, unusedName, unusedState, unusedSummary, unusedWorkNotice } from '@shared/unusedWorktrees'
 import { call, errorMessage } from '../api'
-import { confirm, giveWorktreeToAgent, notify, showUnusedWorktrees, useStore } from '../store'
+import { confirm, notify, showUnusedWorktrees, useStore } from '../store'
 import { openGuideAt } from '../tips'
 import { cx, timeAgo } from '../util'
 import { BusyButton, Icon, InfoTip } from './ui'
@@ -39,7 +39,6 @@ const M = {
   measuring: msg({ id: 'workspace.unusedList.measuring', defaultMessage: 'measuring…', description: "An unused worktree's size while Storage measures it. Lower case." }),
   openTip: msg({ id: 'workspace.unusedList.openTip', defaultMessage: "{work, select, yes {Show {branch}'s changes, and merge them} other {Show {branch}'s changes}}", description: "Tooltip on an unused worktree's Open." }),
   open: msg({ id: 'workspace.unusedList.open', defaultMessage: 'Open', description: "An unused worktree's button: shows its changes." }),
-  give: msg({ id: 'workspace.unusedList.give', defaultMessage: 'Give to an agent…', description: "An unused worktree's button: an agent works in it again." }),
   checking: msg({ id: 'workspace.unusedList.checking', defaultMessage: 'Checking…', description: 'Remove anyway while it checks the worktree.' }),
   removeAnywayButton: msg({ id: 'workspace.unusedList.removeAnywayButton', defaultMessage: 'Remove anyway…', description: "An unused worktree's button when it holds work." }),
   heading: msg({ id: 'workspace.unusedList.heading', defaultMessage: 'Unused worktrees', description: "The Changes tab's Unused worktrees page: its heading (a count follows)." }),
@@ -113,8 +112,8 @@ export function useUnusedWorktrees(project: ProjectInfo): { data: UnusedWorktree
 
 /**
  * The Changes tab's "Unused worktrees (n)" (#353, moved there from the Overview by #400): worktrees no agent works in,
- * each merged and clean (Remove, with its branch) or holding work (what is at stake, Give to an agent…, Remove
- * anyway…), with their last commit and size, and Open to see its changes (and merge them) like an agent's worktree.
+ * each merged and clean (Remove, with its branch) or holding work (what is at stake, Remove anyway…), with their last
+ * commit and size, and Open to see its changes (and merge them) like an agent's worktree.
  * Removing is the user's: the Assistant can only see them.
  */
 export function UnusedWorktreesSection({ project, data, reload, onOpen }: { project: ProjectInfo; data: UnusedWorktrees | null; reload: () => void; onOpen: (path: string) => void }) {
@@ -296,16 +295,13 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
                     {tr(M.remove)}
                   </BusyButton>
                 ) : isSlotRow(w) ? null : (
-                  <>
-                    <button className="btn small" onClick={() => giveWorktreeToAgent(project.path, w.path)}>
-                      {tr(M.give)}
-                    </button>
-                    {lostByRemoving(w) && (
-                      <BusyButton className="btn small danger-text" busy={busy === w.path} busyLabel={tr(M.checking)} disabled={!!busy} onClick={() => void removeAnyway(w)}>
-                        {tr(M.removeAnywayButton)}
-                      </BusyButton>
-                    )}
-                  </>
+                  // Its work is kept by Open (its changes, merged through the Merge dialog) or let go by Remove anyway…;
+                  // no agent is given a worktree in 1.0 (#1555: slots are lent per card or lane, #1451).
+                  lostByRemoving(w) && (
+                    <BusyButton className="btn small danger-text" busy={busy === w.path} busyLabel={tr(M.checking)} disabled={!!busy} onClick={() => void removeAnyway(w)}>
+                      {tr(M.removeAnywayButton)}
+                    </BusyButton>
+                  )
                 )}
               </>
             )

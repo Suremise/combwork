@@ -352,7 +352,10 @@ interface State {
   compactFor: AgentRef | null
   /** Project whose Add Agent dialog is open. */
   addAgentFor: string | null
-  /** Add Agent opened on an existing worktree, chosen (#353's Give to an agent…). */
+  /**
+   * Add Agent opened on an existing worktree, chosen (#353's Give to an agent…). Nothing sets it since #1555 (no agent
+   * is given a worktree in 1.0); it goes with Add Agent's worktree choice (#1442).
+   */
   addAgentPreset: { project: string; worktreePath: string } | null
   /** Agent whose settings dialog (name, model, effort, permission mode) is open. */
   agentSettingsFor: AgentRef | null
@@ -1054,11 +1057,6 @@ export function showUnusedWorktrees(path: string): void {
 /** The project's unused worktrees changed outside their list (#400): it reloads. */
 export function bumpUnused(path: string): void {
   set((s) => ({ unusedVersion: { ...s.unusedVersion, [path]: (s.unusedVersion[path] ?? 0) + 1 } }))
-}
-
-/** Opens Add Agent on one of the project's worktrees (#353). */
-export function giveWorktreeToAgent(path: string, worktreePath: string): void {
-  set({ addAgentPreset: { project: path, worktreePath }, addAgentFor: path })
 }
 
 /** Opens a project's Overview at one agent's session (picked there, and scrolled to). */

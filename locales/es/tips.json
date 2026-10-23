@@ -393,7 +393,7 @@
   "tips.unexpectedClose.title": "Entérate de cuándo Hive se cerró inesperadamente",
   "tips.unmerged.text": "La pestaña del agente muestra cuántos commits faltan por fusionar, Fusionar… en su menú ⋯ dice lo que queda, y Git → Cambios muestra todo lo que cambió el agente desde que creó su rama.",
   "tips.unmerged.title": "Mira lo que un agente con worktree tiene por fusionar",
-  "tips.unusedWorktrees.text": "¿Quitaste un agente pero conservaste su worktree? Git → Cambios se abre con los worktrees que no usa ningún agente, diciendo quién hizo cada uno: abre uno para ver su trabajo y fusionarlo, quita los fusionados con sus ramas, o devuélveselo a un agente.",
+  "tips.unusedWorktrees.text": "¿Quitaste un agente pero conservaste su worktree? Git → Cambios se abre con los worktrees que no usa ningún agente, diciendo quién hizo cada uno: abre uno para ver su trabajo y fusionarlo, o quita los fusionados con sus ramas.",
   "tips.unusedWorktrees.title": "Ordena los worktrees conservados",
   "tips.versionControlSwitch.text": "Haz clic en Ninguno o Git arriba en Control de versiones para cambiar desde la próxima tarjeta; las ya en marcha siguen con las reglas anteriores. Cada uno guarda sus opciones del flujo de trabajo y, si la carpeta cambia (git init), Hive ofrece cambiar ahí.",
   "tips.versionControlSwitch.title": "Cambiar entre Ninguno y Git",

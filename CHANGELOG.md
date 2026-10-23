@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Unused worktrees no longer offer Give to an agent….** Agents aren't given worktrees in 1.0, so the action only led to a refused add. To keep a worktree's work, **Open** it and merge its branch; **Remove anyway…** is still there.
 - **Progress keeps its estimates on a busy machine.** `hive-progress` remembered only its 300 most recent commands, so on a day of many one-off commands (each in a new folder), a command you run daily lost its time estimate within hours. It now keeps 1,000, and commands run only once go first (#1549).
 - **Prompts Hive types aren't held back by an invisible character.** Claude Code 2.1.309 doesn't send a prompt containing an invisible character (a zero-width space, a soft hyphen, a direction mark) until Enter is pressed again. Such a character can come with text pasted from a web page into a task for an agent. Hive now leaves those characters out of every line it types into an agent, and out of Compact's focus, but keeps the ones inside emoji (#1547).
 - **Agents aren't pinned to worktrees any more.** Adding an agent (or starting a card on a new one) puts it in the project folder; a card or lane it builds is lent a slot, and asking for a worktree of its own is refused, saying so. The Agent API's project status and agent detail say where each agent works now (a slot, the project folder or a retired home), with that slot's branch; Storage counts each slot and the review copies once; the branch watch follows the slots' lines (#1451).

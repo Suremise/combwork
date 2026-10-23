@@ -1,7 +1,7 @@
 // Unused worktrees (#353, in the Changes tab since #400): an agent removed with "Keep worktree and branch" leaves its
 // worktree, said once in a notice whose Review opens Changes at "Unused worktrees (n)" (the folder picker's "All unused
 // worktrees"). A merged, clean one is removed there with its branch; one with unmerged work shows its commits, has no
-// plain Remove, offers Give to an agent… (Add Agent on Existing worktree, that one chosen) and Remove anyway… (a danger
+// plain Remove and no Give to an agent… (#1555: no agent is given a worktree in 1.0), offers Remove anyway… (a danger
 // confirm naming what goes), and Open shows its changes like an agent's worktree, with Merge (the Merge dialog). The
 // Overview has one line linking there; Changes' project folder says so only while one holds work; Storage has a line
 // for them; the Agent API's project status counts them for the Assistant (no way to remove them). Without git, nothing is
@@ -91,7 +91,7 @@ function pathWithoutGit() {
   const aheadRow = row(ahead)
   check(`the merged one: "Merged into ${main} · clean", with Remove`, (await mergedRow.innerText()).includes(`Merged into ${main} · clean`) && (await mergedRow.getByRole('button', { name: 'Remove', exact: true }).count()) === 1, await mergedRow.innerText().catch(() => ''))
   check(`the unmerged one: "1 commit not on ${main}", its last commit, no plain Remove`, (await aheadRow.innerText()).includes(`1 commit not on ${main}`) && (await aheadRow.innerText()).includes('Unmerged work') && (await aheadRow.getByRole('button', { name: 'Remove', exact: true }).count()) === 0, await aheadRow.innerText().catch(() => ''))
-  check('…Give to an agent… and Remove anyway…', (await aheadRow.getByRole('button', { name: 'Give to an agent…' }).count()) === 1 && (await aheadRow.getByRole('button', { name: 'Remove anyway…' }).count()) === 1)
+  check('…Remove anyway…, and no Give to an agent… (#1555)', (await aheadRow.getByRole('button', { name: 'Give to an agent…' }).count()) === 0 && (await aheadRow.getByRole('button', { name: 'Remove anyway…' }).count()) === 1)
   check('sizes are measured', !!(await lib.until(async () => /\d+(\.\d+)? (B|KB|MB)/.test(await mergedRow.innerText()), 15000)), await mergedRow.innerText())
   check('Remove all merged (1)…', (await section.getByRole('button', { name: 'Remove all merged (1)…' }).count()) === 1)
   // No badge is ever cut (the Assistant's OK on #1314): each shows its whole text inside its cell, at every width.
@@ -228,19 +228,10 @@ function pathWithoutGit() {
   await mergedRow.getByRole('button', { name: 'Remove', exact: true }).click()
   check('Remove deletes the merged one and its branch', !!(await lib.until(async () => (await mergedRow.count()) === 0 && !fs.existsSync(merged.worktree.path), 10000)) && !branches().includes(merged.worktree.branch), JSON.stringify(branches()))
 
-  // --- The unmerged one: plain removal refused; Give to an agent…; Remove anyway….
+  // --- The unmerged one: plain removal refused; Remove anyway….
   const refused = await inv('worktrees:removeUnused', repo, ahead.worktree.path, {})
   check('a plain removal of the unmerged one is refused', refused.deleted === false && /1 commit not merged/.test(refused.reason ?? '') && fs.existsSync(ahead.worktree.path), JSON.stringify(refused))
-  await aheadRow.getByRole('button', { name: 'Give to an agent…' }).click()
-  const add = page.locator('.dialog', { hasText: 'Add an agent' })
-  await lib.until(async () => (await add.count()) === 1, 5000)
-  // Chosen once git has listed the project's worktrees (the dialog asks as it opens).
-  const select = add.locator('.choice', { hasText: 'Existing worktree' }).locator('select')
-  const chosen = (await lib.until(async () => (await select.inputValue().catch(() => '')) || null, 8000)) ?? ''
-  check('Give to an agent… opens Add Agent on Existing worktree, that one chosen', (await add.locator('.choice.selected', { hasText: 'Existing worktree' }).count()) === 1 && chosen.toLowerCase() === ahead.worktree.path.toLowerCase(), chosen)
-  await shot('give')
-  await page.keyboard.press('Escape')
-  await lib.until(async () => (await add.count()) === 0, HUNG_MS)
+  await shot('holds-work')
   await aheadRow.getByRole('button', { name: 'Remove anyway…' }).click()
   const danger = page.locator('.dialog', { hasText: 'Remove the worktree anyway?' })
   await lib.until(async () => (await danger.count()) === 1, 5000)
