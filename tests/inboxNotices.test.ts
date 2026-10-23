@@ -172,7 +172,10 @@ describe('notices in the hook replies (#650)', () => {
       expect(context(await hook(st, tool('p1', 'c1')))).toContain(m.id)
       expect(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p1', stop_hook_active: false })).toMatchObject({ decision: 'block' })
       // The project's own off, Settings' on: read from project.json as it is now, no refresh needed; inherit again: told.
+      const writes = w.projectConfigWrites(p)
       await run(() => w.updateProjectConfig(p, { inboxCheckpoints: 'off' }))
+      // Each write Hive makes is counted (what an idle wake's typing checks, round 2 finding).
+      expect(w.projectConfigWrites(p)).toBe(writes + 1)
       const own = agent(claude)
       await hook(own, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
       const m2 = await leave(own)

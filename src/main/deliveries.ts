@@ -683,17 +683,27 @@ export const agentReadsInbox = (host: string, agentId: string): boolean => reads
  * home has no project, so it follows Settings'.
  */
 export async function inboxSwitch(host: string, which: InboxSwitch): Promise<boolean> {
-  return inboxSwitchOn(which, await inboxProject(host), advanced.get<boolean>(INBOX_SWITCH_ID[which]))
+  return inboxSwitchOn(which, (await inboxProject(host)).own, advanced.get<boolean>(INBOX_SWITCH_ID[which]))
 }
 
-/** The host's project config, for its own switches (null: none, as the Assistant's home, or it can't be read). */
-let inboxProject = async (host: string): Promise<Partial<ProjectConfig> | null> => {
+/**
+ * The host's project config, for its own switches (own null: none, as the Assistant's home, or it can't be read), and
+ * whether Hive has written it since (`changed`, asked as a line is typed: a project.json changed by hand isn't seen).
+ */
+export interface InboxProject {
+  own: Partial<ProjectConfig> | null
+  changed: () => boolean
+}
+let inboxProject = async (host: string): Promise<InboxProject> => {
   const ws = workspaceFor(host)
-  if (!ws || ws.isAssistantHome(host) || !ws.isProjectPath(host)) return null
-  return ws.projectConfig(host).catch(() => null)
+  if (!ws || ws.isAssistantHome(host) || !ws.isProjectPath(host)) return { own: null, changed: () => false }
+  // Counted before it is read: a write in between counts as a change.
+  const at = ws.projectConfigWrites(host)
+  const own = await ws.projectConfig(host).catch(() => null)
+  return { own, changed: () => ws.projectConfigWrites(host) !== at }
 }
 const ownProject = inboxProject
-export const setInboxProjectForTests = (fn: ((host: string) => Promise<Partial<ProjectConfig> | null>) | null): void => {
+export const setInboxProjectForTests = (fn: ((host: string) => Promise<InboxProject>) | null): void => {
   inboxProject = fn ?? ownProject
 }
 /** Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. */
@@ -1487,10 +1497,12 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
   const o = offer
   // Idle wakes turned off while it was made (#1432 round 1: a refresh, the relevance read and the save all wait): read
   // again once it is ready to type (Settings' and the project's own, read now), and before each key as it is typed
-  // (Settings' as it is then, with the project's own as read here). Not typed: put back, still unread.
+  // (Settings' as it is then; the project's own as read here, unless Hive has written it since). Not typed: put back,
+  // still unread.
   const wake = !only && !asked
-  const own = wake ? await inboxProject(host) : null
-  const wakesOn = (): boolean => inboxSwitchOn('idleWakes', own, advanced.get<boolean>(INBOX_SWITCH_ID.idleWakes))
+  const project = wake ? await inboxProject(host) : null
+  // The project's own changed since it was read: not typed now (made again at the retry, from the config as it is then).
+  const wakesOn = (): boolean => !project?.changed() && inboxSwitchOn('idleWakes', project?.own ?? null, advanced.get<boolean>(INBOX_SWITCH_ID.idleWakes))
   if (wake && !wakesOn()) {
     await unoffer(store, o)
     show(store, agentId)

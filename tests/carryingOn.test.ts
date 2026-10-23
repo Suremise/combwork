@@ -151,7 +151,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     it("the project's own turned off as it is made (Settings' on)", async () => {
       await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: true })
       let own: 'inherit' | 'off' = 'inherit'
-      deliveries.setInboxProjectForTests(async () => ({ inboxIdleWakes: own }))
+      deliveries.setInboxProjectForTests(async () => ({ own: { inboxIdleWakes: own }, changed: () => false }))
       const { m, refreshed } = await pending(async () => (own = 'off'))
       expect(await deliveries.offerNow(alpha, 'b1')).toBe(false)
       expect(refreshed()).toBe(true)
@@ -166,9 +166,33 @@ describe('carrying on: the inbox switches (#1432)', async () => {
       expect(st.typed).toEqual([])
       expect(await unread()).toEqual([m.id])
     })
+    it("the project's own turned off while its line is typed (Hive writes project.json): its last key isn't pressed (round 2 finding)", async () => {
+      await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: true })
+      // project.json as Hive writes it: its own value, and a count of the writes since it was read.
+      const project = { own: 'inherit' as 'inherit' | 'off', writes: 0 }
+      deliveries.setInboxProjectForTests(async () => {
+        const at = project.writes
+        return { own: { inboxIdleWakes: project.own }, changed: () => project.writes !== at }
+      })
+      const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Typed wake.' })
+      // Between the line's first check and its last: Project Settings → Sessions → Wake an idle agent, Off.
+      st.during = () => {
+        project.own = 'off'
+        project.writes++
+        st.during = null
+      }
+      expect(await deliveries.offerNow(alpha, 'b1')).toBe(false)
+      expect(st.typed).toEqual([])
+      expect(await unread()).toEqual([m.id])
+      // The retry reads it again: Off, so nothing is typed then either.
+      st.status = 'ready'
+      expect(await deliveries.offerNow(alpha, 'b1')).toBe(false)
+      expect(st.typed).toEqual([])
+      expect(await unread()).toEqual([m.id])
+    })
     it("a project's own on, Settings' turned off while it is typed: still typed (the project's own wins)", async () => {
       await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: true })
-      deliveries.setInboxProjectForTests(async () => ({ inboxIdleWakes: 'on' }))
+      deliveries.setInboxProjectForTests(async () => ({ own: { inboxIdleWakes: 'on' }, changed: () => false }))
       const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Own on.' })
       st.during = () => advanced.set(INBOX_SWITCH_ID.idleWakes, false)
       expect(await deliveries.offerNow(alpha, 'b1')).toBe(true)
