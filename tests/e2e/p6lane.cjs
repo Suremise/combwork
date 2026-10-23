@@ -352,18 +352,21 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     await showTab('pulse')
     check("Pulse: One's segment says Review, in its accessible name and hover", !!(await waitHung(async () => /· Review/.test((await seg(c1).getAttribute('aria-label').catch(() => '')) ?? ''))) && !!(await hover(seg(c1), (t) => t.includes('Review') && t.includes('One'))), await tipText())
 
+    // G14's card and its builder, ready before the merge is held.
+    const b2 = await q.agent(fx, h, 'B2', { worktree: true })
+    const dep = (await inv('tasks:create', { title: 'Needs One', project: 'alpha' })).number
+    await inv('tasks:update', dep, { blockedBy: [c1] })
+
     // --- Review and pass; the queue tests the merge: Merging.
     await intent('r1', c1, 'start-review')
-    q.steer(fx, 'wait')
+    // Held while the window is shot in two themes and two languages: minutes on a loaded machine.
+    q.steer(fx, 'wait', undefined, 10 * 60000)
     const pass1 = await intent('r1', c1, 'verdict', { pass: true, comment: 'one: PASSED' })
     check('the reviewer passes One', pass1.status === 200, JSON.stringify(pass1.body))
     check("the queue tests One's merge (its check is running)", !!(await waitHung(() => fs.existsSync(fx.started))))
     await showBoard('alpha')
     check('the board: One in Merging', !!(await waitHung(() => inColumn(c1, 'merging'))), await columns())
     // G14 (S12): a card blocked by One, approved and not merged yet, can't start.
-    const b2 = await q.agent(fx, h, 'B2', { worktree: true })
-    const dep = (await inv('tasks:create', { title: 'Needs One', project: 'alpha' })).number
-    await inv('tasks:update', dep, { blockedBy: [c1] })
     const early = await send(b2, dep, 'start')
     check('G14 (S12): a card blocked by One, approved and unmerged, is refused its start', early.status === 409 && early.body?.rule === 'start.dependenciesIntegrated', JSON.stringify(early.body))
     await showTab('pulse')
