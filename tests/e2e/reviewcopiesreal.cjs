@@ -1,8 +1,9 @@
 // S51 (#1439, SPEC §16.10.5 Access), the real tier: a Claude Code, a Codex and a Copilot reviewer each build and run the
 // project's test in a review copy, outside their own folder, within their permission mode. Each reviewer's launch is
 // granted the project's copies folder (--add-dir, seen on its process's command line); its start review leases it a copy
-// at the card's submitted revision; it is asked to write build.txt there and run `node test.js` there (which writes
-// ran.txt beside itself). Passes when both are in the copy and nothing of theirs is in the project folder. An edit there
+// at the card's submitted revision; it is asked to write build.txt there and run the copy's test.js (which writes
+// ran.txt beside itself). Passes when both are in the copy and nothing of theirs is in the project folder (what is there
+// is named, with whose turn left it and its screen, #1546). An edit there
 // is never asked about (granted): a command may be (Claude Code's Accept edits and Copilot's ask before one), and is
 // answered Yes, counted in the output. What each CLI's own home has afterwards never names the copies folder (Hive
 // passes it on the command line only).
@@ -156,6 +157,20 @@ const namingCopies = () => {
       check(`B1 builds and submits ${key} for ${r.def.name}`, s.status === 200 && sub.status === 200 && !!(await until(async () => (await card(n))?.column === 'review', HUNG_MS)), JSON.stringify({ s: s.body, sub: sub.body }))
     }
 
+    // What a turn left in the project folder (#1546): each file with its text (ran.txt says where test.js ran) and the end
+    // of that agent's screen, taken away so the next reviewer's are its own.
+    const strays = []
+    const strayIn = async (who, key) => {
+      const found = ['build.txt', 'ran.txt'].filter((f) => fs.existsSync(path.join(alpha, f)))
+      if (!found.length) return
+      const screen = key ? lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '').slice(-600) : ''
+      for (const f of found) {
+        strays.push(`${who}: ${f} ("${fs.readFileSync(path.join(alpha, f), 'utf8').trim().slice(0, 200)}")${screen ? `; its screen ends: ${screen}` : ''}`)
+        fs.rmSync(path.join(alpha, f))
+      }
+    }
+    await strayIn('the builder, before the reviews')
+
     // --- Each reviewer: start review leases its copy; it builds and runs the test there.
     for (const r of reviewers) {
       const tr = tokenOf(alpha, r.def.id)
@@ -172,7 +187,9 @@ const namingCopies = () => {
       const prompt =
         r.key === 'copilot'
           ? `write ${built} built then shell Set-Location '${folder}'; node test.js then say done`
-          : `Work only in the folder ${folder} (outside your own; you may use it). First create the file build.txt there containing the word built, with your file tools. Then run "node test.js" with that folder as the working directory. Reply done.`
+          : // The test by its full path (#1546): told to run "node test.js" there, Haiku once ran the project folder's own
+            // test.js first (two commands asked, ran.txt left in the project folder).
+            `Work only in the folder ${folder} (outside your own; you may use it). First create the file build.txt there containing the word built, with your file tools. Then run exactly this command, once: node "${path.join(folder, 'test.js')}". Reply done.`
       // Its turn waits on the real CLI answering: an environment failure in its session meanwhile is a SKIP (lib.cliStep).
       let asked = 0
       let askedBeforeEdit = false
@@ -197,8 +214,9 @@ const namingCopies = () => {
       if (r.key === 'copilot') check('…its edit there asked nothing (Accept edits: granted)', !askedBeforeEdit)
       const v = await call(tr, 'PATCH', `/v1/tasks/${r.card}`, { review: 'failed', comment: 'S51: built and tested in the review copy.', reply: 'short' })
       check(`…its verdict`, v.status === 200, JSON.stringify(v.body))
+      await strayIn(r.def.name, key)
     }
-    check('nothing of theirs is in the project folder', !fs.existsSync(path.join(alpha, 'build.txt')) && !fs.existsSync(path.join(alpha, 'ran.txt')))
+    check('nothing of theirs is in the project folder', !strays.length, strays.join(' | '))
     // The copies folder as a file may write it: plain, JSON-escaped or with forward slashes.
     const forms = [copiesDir, JSON.stringify(copiesDir).slice(1, -1), copiesDir.replace(/\\/g, '/')].map((x) => x.toLowerCase())
     const names = (f) => forms.some((x) => fs.readFileSync(f, 'utf8').toLowerCase().includes(x))
