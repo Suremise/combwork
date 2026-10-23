@@ -468,6 +468,14 @@ minutes, the network off and Hive's fake CLIs only: no real CLI, sign-in or cred
   prompt asked for: the old codeword comes back).
   The probe waits for the mode notice's finished turn, then matches the codeword reply to the question's new
   transcript item (#473); an acknowledgement of the notice cannot stand in for that answer.
+- **`reviewcopiesreal`** (#1439, S51) is real: a Claude Code (Haiku, Accept edits, in the **Claude Code test home**,
+  `claudeHome: 'test'`) and a Codex (gpt-6-luna, low effort, Ask, in the Codex test home) reviewer each build and run
+  the project's test in their review copy, outside their own folder, within their permission mode (a few short
+  prompts: tokens); a Copilot reviewer does the same with the real CLI offline against the stand-in model (no sign-in,
+  no cost), which also builds the cards. A question about a command is answered Yes (counted in its output), an edit in
+  the copy is never asked about. It checks each reviewer's process has `--add-dir` the copies folder and no CLI's own
+  settings name it. A reviewer whose CLI isn't signed in is skipped and said; without Copilot the suite is skipped.
+  The fake tier's `reviewcopies` covers the leases, waits and returns.
 - **Codex** for the `codex*` suites, signed in to the **test home** `%LOCALAPPDATA%\hive-test\codex` (never your
   own `~/.codex`). Sign in once:
   ```powershell

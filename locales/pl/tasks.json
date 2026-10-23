@@ -117,6 +117,8 @@
   "tasks.history.repaired": "Projekt: {from} → {to} (zmiana nazwy lub przeniesienie)",
   "tasks.history.restored": "Przywrócono razem z projektem {project}",
   "tasks.history.returned": "Ponownie do recenzji, runda {round}",
+  "tasks.history.reviewCopyLeased": "{agent} recenzuje w {copy} w wersji {revision}",
+  "tasks.history.reviewCopyWaiting": "{agent} czeka na kopię do recenzji",
   "tasks.history.reviewEnded": "Recenzja agenta {agent} przerwana: {why, select, sessionEnded {jego sesja się zakończyła} agentRemoved {agenta usunięto} other {{why}}}",
   "tasks.history.reviewFailed": "Recenzja nie przeszła",
   "tasks.history.reviewPassed": "Recenzja przeszła",
