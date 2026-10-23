@@ -28,7 +28,7 @@ import {
   type InboxItem
 } from '../shared/deliveries'
 import { reviewRounds } from '../shared/laneBar'
-import type { TaskCard } from '../shared/types'
+import type { ProjectConfig, TaskCard } from '../shared/types'
 import { INBOX_SWITCH_ID, inboxSwitchOn, type InboxSwitch } from '../shared/inboxSwitches'
 import { advanced } from './advanced'
 import * as assistant from './assistantControl'
@@ -683,10 +683,18 @@ export const agentReadsInbox = (host: string, agentId: string): boolean => reads
  * home has no project, so it follows Settings'.
  */
 export async function inboxSwitch(host: string, which: InboxSwitch): Promise<boolean> {
-  const global = advanced.get<boolean>(INBOX_SWITCH_ID[which])
+  return inboxSwitchOn(which, await inboxProject(host), advanced.get<boolean>(INBOX_SWITCH_ID[which]))
+}
+
+/** The host's project config, for its own switches (null: none, as the Assistant's home, or it can't be read). */
+let inboxProject = async (host: string): Promise<Partial<ProjectConfig> | null> => {
   const ws = workspaceFor(host)
-  if (!ws || ws.isAssistantHome(host) || !ws.isProjectPath(host)) return global
-  return inboxSwitchOn(which, await ws.projectConfig(host).catch(() => null), global)
+  if (!ws || ws.isAssistantHome(host) || !ws.isProjectPath(host)) return null
+  return ws.projectConfig(host).catch(() => null)
+}
+const ownProject = inboxProject
+export const setInboxProjectForTests = (fn: ((host: string) => Promise<Partial<ProjectConfig> | null>) | null): void => {
+  inboxProject = fn ?? ownProject
 }
 /** Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. */
 const noInbox = (name: string): string => `${name} has no inbox: turn on the Agent API`
@@ -1477,10 +1485,21 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
     return false
   }
   const o = offer
+  // Idle wakes turned off while it was made (#1432 round 1: a refresh, the relevance read and the save all wait): read
+  // again once it is ready to type (Settings' and the project's own, read now), and before each key as it is typed
+  // (Settings' as it is then, with the project's own as read here). Not typed: put back, still unread.
+  const wake = !only && !asked
+  const own = wake ? await inboxProject(host) : null
+  const wakesOn = (): boolean => inboxSwitchOn('idleWakes', own, advanced.get<boolean>(INBOX_SWITCH_ID.idleWakes))
+  if (wake && !wakesOn()) {
+    await unoffer(store, o)
+    show(store, agentId)
+    return false
+  }
   for (const id of o.ids) store.offering.add(id)
   let typed = false
   try {
-    typed = await typeLine(host, agentId, o.line, () => offerHolds(store, o) && o.ids.every((id) => store.offering.has(id)), {
+    typed = await typeLine(host, agentId, o.line, () => offerHolds(store, o) && o.ids.every((id) => store.offering.has(id)) && (!wake || wakesOn()), {
       need: o.need,
       // A line the user typed into before its CLI took it is theirs (#652 round 1 finding 2): what it named waits again.
       follow: { confirming: (before) => confirming(store, o, before), lost: () => lost(store), left: () => void unoffer(store, o) }

@@ -583,6 +583,14 @@
     "defaultMessage": "Default ({name})",
     "description": "Assistant Settings: the mode that follows Settings → Assistant ({name}: that mode)."
   },
+  "assistant.panel.deliverFailed": {
+    "defaultMessage": "Could not deliver the Assistant's inbox",
+    "description": "An error's title: typing the line that tells the Assistant of what waits in its inbox (Deliver Now) failed."
+  },
+  "assistant.panel.deliverNow": {
+    "defaultMessage": "Deliver Now",
+    "description": "Menu item in the Assistant's ⋯ menu, shown while the setting Wake an idle agent is off: types the line telling it of what waits in its inbox into its terminal, once."
+  },
   "assistant.panel.doneBy": {
     "defaultMessage": "Done by the Assistant",
     "description": "The heading of the list of what the Assistant did (a count follows)."
@@ -606,6 +614,18 @@
   "assistant.panel.inactive": {
     "defaultMessage": "{count, plural, one {# inactive project} other {# inactive projects}}",
     "description": "The Assistant's overview: a row that shows the inactive projects folded into it."
+  },
+  "assistant.panel.inboxLine": {
+    "defaultMessage": "{id} from {from}: {text}",
+    "description": "An item of the Assistant's inbox in its ⋯ menu: its id, who it is from ({from}) and the start of its text ({text})."
+  },
+  "assistant.panel.inboxTip": {
+    "defaultMessage": "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.",
+    "description": "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox ({n}: how many). hive_inbox is a tool's name: keep it."
+  },
+  "assistant.panel.inboxTipNoWakes": {
+    "defaultMessage": "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet. Wake an idle agent is off, so nothing is typed by itself: Deliver Now types its line once, or it reads them with hive_inbox.",
+    "description": "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox, when the setting Wake an idle agent (Settings → Advanced) is off ({n}: how many). Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them. hive_inbox is a tool's name: keep it."
   },
   "assistant.panel.listFailed": {
     "defaultMessage": "Could not list conversations",
@@ -698,6 +718,14 @@
   "assistant.panel.noneRunning": {
     "defaultMessage": "no agents running",
     "description": "The Assistant's workspace section: a project none of whose agents run. Lower case."
+  },
+  "assistant.panel.notDelivered": {
+    "defaultMessage": "The Assistant wasn't told now",
+    "description": "A notice's title: Deliver Now couldn't type the line into the Assistant's terminal now."
+  },
+  "assistant.panel.notDeliveredDetail": {
+    "defaultMessage": "It isn't idle, or you are typing in its terminal. What waits stays in its inbox: try again once it's idle.",
+    "description": "The detail of the notice that Deliver Now could not type the line into the Assistant now."
   },
   "assistant.panel.notDone": {
     "defaultMessage": "Not done: {error}",
@@ -874,6 +902,10 @@
   "assistant.panel.transcriptAdvice": {
     "defaultMessage": "Start a new conversation (⋯ → New Conversation) to keep things quick.",
     "description": "The Assistant's footer, in the tooltip of a long conversation's size. ⋯ is the More button; New Conversation its menu item."
+  },
+  "assistant.panel.unreadCount": {
+    "defaultMessage": "{n, plural, one {# unread} other {# unread}}",
+    "description": "Read out with the Assistant's ⋯ button: how many items in its inbox it hasn't fetched or acked yet. Keep it short."
   },
   "assistant.panel.watches": {
     "defaultMessage": "<b>{name}</b> watches over this workspace: ask it what the agents are doing, about any project, or for a plan or a review.",

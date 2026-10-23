@@ -197,6 +197,28 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check('…its pane shows it', !!(await until(async () => /1 unread/.test(await paneSays(claude)), HUNG_MS)), await paneSays(claude))
     const typed = await inv('session:deliverNow', alpha, claude.id)
     check('Deliver Now types it once', typed === true && !!(await until(() => wakes(claude).length === before + 1, HUNG_MS)) && /is in Review/.test(wakes(claude).at(-1) ?? ''), JSON.stringify({ typed, wakes: wakes(claude).slice(before) }))
+
+    // --- 5. The Assistant follows Settings' switch (it has no project): its watch's wake waits in its inbox, its panel's ⋯
+    // shows it unread, and Deliver Now there types its line once.
+    const asst = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase())
+    await inv('pty:write', lib.ptyKey(home, 'assistant'), `hive hive_wait_for_tasks ${JSON.stringify({ cards: [n], changes: ['comment'], wake: true })}`)
+    await lib.sleep(300)
+    await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
+    check('the Assistant watches the card', !!(await until(async () => (await asst())?.status === 'watching', HUNG_MS)), (await asst())?.status)
+    await inv('tasks:update', n, { comment: 'A note for the watch.' })
+    const asstUnread = async () => (await asst())?.inbox?.unread ?? []
+    check("its watch's wake waits in its inbox, not typed", !!(await until(async () => (await asstUnread()).some((m) => m.state === 'queued'), HUNG_MS)), JSON.stringify(await asstUnread()))
+    await page.keyboard.press('Control+Alt+I')
+    const asstMore = page.locator('.assistant-header button[aria-label="More"]')
+    check("…its panel's ⋯ shows it unread", !!(await until(async () => /1 unread/.test((await asstMore.getAttribute('aria-description').catch(() => null)) ?? '') && (await asstMore.locator('.pane-more-badge').count()) === 1, HUNG_MS)))
+    await asstMore.click()
+    const asstDeliver = page.locator('.menu .menu-item', { hasText: 'Deliver Now' })
+    check('…its ⋯ says nothing is typed by itself, and offers Deliver Now', !!(await until(async () => (await asstDeliver.count()) === 1 && (await page.locator('.menu', { hasText: 'Wake an idle agent is off' }).count()) > 0, HUNG_MS)))
+    await page.screenshot({ path: path.join(shots, 'carryingon-assistant.png') })
+    check('…still queued before it is pressed', (await asstUnread()).some((m) => m.state === 'queued'), JSON.stringify(await asstUnread()))
+    await asstDeliver.click()
+    check('Deliver Now types its line: it reads its inbox, and nothing is left unread', !!(await until(async () => (await asstUnread()).length === 0, HUNG_MS)), JSON.stringify(await asstUnread()))
+    await page.keyboard.press('Control+Alt+I')
     await setSwitch('idleWakes', null)
 
     // --- The rows, for the review's screenshots (light and dark): Settings → Advanced's three switches with the link to

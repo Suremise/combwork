@@ -32,7 +32,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
   let n = 0
   let alpha = ''
   /** A stand-in agent b1 of alpha: its status and launch, and what Hive typed into it. */
-  const st = { status: 'ready' as string, runId: 'r1', sessionId: 's1', typed: [] as string[] }
+  const st = { status: 'ready' as string, runId: 'r1', sessionId: 's1', typed: [] as string[], during: null as null | (() => unknown) }
   const live = (): LiveSessionState => ({ projectPath: alpha, agentId: 'b1', status: st.status, runId: st.runId, sessionId: st.sessionId }) as never
   Object.assign(sessions, {
     liveFor: (p: string, id: string) => (p.toLowerCase() === alpha.toLowerCase() && id === 'b1' ? live() : null),
@@ -41,6 +41,8 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     promptsTaken: () => null,
     setInbox: () => undefined,
     sendPrompt: async (_p: string, _id: string, text: string, guard?: () => void) => {
+      guard?.()
+      await st.during?.()
       guard?.()
       st.typed.push(text)
       st.status = 'working'
@@ -56,7 +58,8 @@ describe('carrying on: the inbox switches (#1432)', async () => {
 
   beforeEach(() => {
     alpha = join(base, `alpha${++n}`)
-    Object.assign(st, { status: 'ready', runId: `r${n}`, sessionId: `s${n}`, typed: [] })
+    Object.assign(st, { status: 'ready', runId: `r${n}`, sessionId: `s${n}`, typed: [], during: null })
+    deliveries.setInboxProjectForTests(null)
   })
   afterEach(() => deliveries.settledForTests())
 
@@ -121,6 +124,57 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     expect(tick).toBe(false)
     expect(asked).toBe(true)
     expect(st.typed).toEqual([`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox to read it.`])
+  })
+
+  describe('idle wakes turned off while a wake is made or typed (round 1 finding 1): nothing is typed, and it stays unread', () => {
+    /** A message whose source's refresh (as the offer is made, before its first key) runs `then`. */
+    const pending = async (then: () => Promise<unknown>) => {
+      let refreshed = false
+      deliveries.registerSource('switch-test', {
+        refresh: async () => {
+          refreshed = true
+          await then()
+          return null
+        }
+      })
+      const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Pending wake.', source: 'switch-test' })
+      return { m, refreshed: () => refreshed }
+    }
+    it("Settings' turned off as it is made", async () => {
+      await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: true })
+      const { m, refreshed } = await pending(() => advanced.set(INBOX_SWITCH_ID.idleWakes, false))
+      expect(await deliveries.offerNow(alpha, 'b1')).toBe(false)
+      expect(refreshed()).toBe(true)
+      expect(st.typed).toEqual([])
+      expect(await unread()).toEqual([m.id])
+    })
+    it("the project's own turned off as it is made (Settings' on)", async () => {
+      await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: true })
+      let own: 'inherit' | 'off' = 'inherit'
+      deliveries.setInboxProjectForTests(async () => ({ inboxIdleWakes: own }))
+      const { m, refreshed } = await pending(async () => (own = 'off'))
+      expect(await deliveries.offerNow(alpha, 'b1')).toBe(false)
+      expect(refreshed()).toBe(true)
+      expect(st.typed).toEqual([])
+      expect(await unread()).toEqual([m.id])
+    })
+    it("Settings' turned off while its line is typed: its last key isn't pressed", async () => {
+      await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: true })
+      const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Typed wake.' })
+      st.during = () => advanced.set(INBOX_SWITCH_ID.idleWakes, false)
+      expect(await deliveries.offerNow(alpha, 'b1')).toBe(false)
+      expect(st.typed).toEqual([])
+      expect(await unread()).toEqual([m.id])
+    })
+    it("a project's own on, Settings' turned off while it is typed: still typed (the project's own wins)", async () => {
+      await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: true })
+      deliveries.setInboxProjectForTests(async () => ({ inboxIdleWakes: 'on' }))
+      const m = await deliveries.createDelivery(alpha, { agentId: 'b1', conversation: st.sessionId, kind: 'rebrief', from: hive, body: 'Own on.' })
+      st.during = () => advanced.set(INBOX_SWITCH_ID.idleWakes, false)
+      expect(await deliveries.offerNow(alpha, 'b1')).toBe(true)
+      expect(st.typed).toHaveLength(1)
+      expect(await unread()).toEqual([m.id])
+    })
   })
 
   it('idle wakes off: a task given now (a card started on a running agent, hive_send_task) is no wake, and is typed', async () => {
