@@ -58,6 +58,16 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     const offer = page.locator('[data-vc-offer]')
     const dialog = page.locator('.dialog')
     const workflowLine = () => text(head.locator('[data-action="vc-workflow"]'))
+    /**
+     * An agent's intent (`who`: its token), sent again while Hive answers evidence.changed, whose next step is "Try again:
+     * Hive reads it afresh" (what it read moved as it decided: a merge's reconcile, the folder's commits read), as an agent
+     * does, a few times at most.
+     */
+    const send = async (who, n, name, body = {}) => {
+      let r = await q.intent(h, who, n, name, body)
+      for (let tries = 0; r.body?.rule === 'evidence.changed' && tries < 5; tries++) r = await q.intent(h, who, n, name, body)
+      return r
+    }
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
     const keyOf = async (n) => (await card(n)).key
     const kinds = async (n) => (await h.facts(n)).map((x) => x.kind)
@@ -122,7 +132,8 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
         return want.every((x) => now.includes(x)) ? now : null
       })
       check(`${name}: the Version Control sections ${want.join(', ')}`, !!ids, JSON.stringify(await page.locator('.git-sections [role="tab"]').evaluateAll((b) => b.map((x) => x.getAttribute('data-section')))))
-      for (const id of ids || []) {
+      // The sections the platform always shows: an old queue's section goes once nothing of it is in flight.
+      for (const id of ids ? want : []) {
         await section(id)
         await shoot(`vc-${name}-${id}`, { loc: page.locator('.vc-view') })
       }
@@ -237,14 +248,14 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     }
     /** An agent's intent by its own token; refused as unknown after a restart, its token read again and sent again (p5lane's). */
     const intent = async (who, n, name, body = {}) => {
-      let r = await q.intent(h, { token: tokens[who] }, n, name, body)
+      let r = await send({ token: tokens[who] }, n, name, body)
       for (let tries = 0; r.status === 401 && tries < 3; tries++) {
         const was = tokens[who]
         await waitHung(async () => {
           tokens[who] = await tokenOf(who === 'b1' ? b1.id : r1.id)
           return !!tokens[who] && tokens[who] !== was
         })
-        r = await q.intent(h, { token: tokens[who] }, n, name, body)
+        r = await send({ token: tokens[who] }, n, name, body)
       }
       return r
     }
@@ -353,7 +364,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     const b2 = await q.agent(fx, h, 'B2', { worktree: true })
     const dep = (await inv('tasks:create', { title: 'Needs One', project: 'alpha' })).number
     await inv('tasks:update', dep, { blockedBy: [c1] })
-    const early = await q.intent(h, b2, dep, 'start')
+    const early = await send(b2, dep, 'start')
     check('G14 (S12): a card blocked by One, approved and unmerged, is refused its start', early.status === 409 && early.body?.rule === 'start.dependenciesIntegrated', JSON.stringify(early.body))
     await showTab('pulse')
     const mergingHover = () => hover(seg(c1), async (t) => t.includes('Merging') && t.includes('Approved') && (await page.locator('.tip .lane-seg-stage.own').innerText().catch(() => '')) === 'Merging' && (await page.locator('.tip .lane-stage-divider').count()) === 1)
@@ -372,7 +383,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     check("…Integrated by Hive at the approved revision: a merge commit of B1's line", i1?.data?.by === 'hive' && git(alpha, 'rev-parse', 'main^2') === rev1, JSON.stringify(i1))
     await toTab('alpha')
     await section('branches')
-    const later = await q.intent(h, b2, dep, 'start')
+    const later = await send(b2, dep, 'start')
     check('…and starts once One is merged', later.status === 200, JSON.stringify(later.body))
     check("Branches & remotes: One's branch says merged, with the merge's revision",!!(await waitHung(async () => (await chip.getAttribute('data-stage').catch(() => null)) === 'done' && (await chip.locator('[data-merged]').getAttribute('data-merged').catch(() => null)) === i1?.data?.result)), await text(chip))
 
@@ -442,12 +453,12 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     await page.getByRole('button', { name: 'Task Board' }).click()
     await showTab('pulse')
     check('Pulse shows the Solo lane while it runs', !!(await waitHung(async () => (await laneRow(soloLane).count()) === 1)), await text(panel))
-    const ss = await q.intent(h, s, sc, 'start')
+    const ss = await send(s, sc, 'start')
     check('S44: Solo work starts in the project folder', ss.status === 200 && ss.body?.data?.folder?.toLowerCase() === beta.toLowerCase(), JSON.stringify(ss.body))
     fs.writeFileSync(path.join(beta, 's.txt'), 's\n')
     lib.git(beta, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', 's.txt'])
     lib.git(beta, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'solo work, no trailer'])
-    const ssub = await q.intent(h, s, sc, 'submit', { summary: 'done' })
+    const ssub = await send(s, sc, 'submit', { summary: 'done' })
     const soloIn = await waitHung(async () => (await factsOf(sc, 'Integrated')).at(-1))
     check('…committed with no trailer and submitted: Done, committed is done', ssub.status === 200 && (await done(sc)) && soloIn?.data?.method === 'committed', JSON.stringify({ body: ssub.body, i: soloIn }))
     check('…its ended lane left out of Pulse: no lanes section for Solo', !!(await waitHung(async () => (await laneNow(soloLane))?.state === 'ended' && (await laneRow(soloLane).count()) === 0)), JSON.stringify(await laneNow(soloLane)))
@@ -482,8 +493,8 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     await inv('tasks:update', gc2, { blocked: 'waiting for a reply' })
     const gk1 = await keyOf(gc1)
     const gk2 = await keyOf(gc2)
-    const gs1 = await q.intent(h, g1, gc1, 'start')
-    const gs2 = await q.intent(h, g2, gc2, 'start')
+    const gs1 = await send(g1, gc1, 'start')
+    const gs2 = await send(g2, gc2, 'start')
     check('S39: G1 starts one; G2 starts two, blocked, with a warning, nothing refused', gs1.status === 200 && gs2.status === 200 && (gs2.body?.warnings ?? []).some((w) => w.includes(gk2) && w.includes('blocked')), JSON.stringify({ gs1: gs1.body, gs2: gs2.body }))
     // Both commit in the project folder, each with its card's trailer (S11).
     const gcommit = (file, key) => {
@@ -496,8 +507,8 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     // Once Hive has read the folder's new commits (each attributed to its card by its trailer), as S11's core does before
     // its submits: a submit while they are read is refused to try again (evidence.changed).
     check("S11: each card's commit attributed to it by its trailer", !!(await waitHung(async () => (await kinds(gc1)).includes('CommitAttributed') && (await kinds(gc2)).includes('CommitAttributed'))), JSON.stringify({ one: await kinds(gc1), two: await kinds(gc2) }))
-    const gsub2 = await q.intent(h, g2, gc2, 'submit', { summary: 'two' })
-    const gsub1 = await q.intent(h, g1, gc1, 'submit', { summary: 'one' })
+    const gsub2 = await send(g2, gc2, 'submit', { summary: 'two' })
+    const gsub1 = await send(g1, gc1, 'submit', { summary: 'one' })
     check('S11: both submit in the shared folder: Done, nothing checked', gsub1.status === 200 && gsub2.status === 200 && (await done(gc1)) && (await done(gc2)), JSON.stringify({ gsub1: gsub1.body, gsub2: gsub2.body }))
     check("…two's submission is its own commit only",((await factsOf(gc2, 'Submitted')).at(-1)?.data?.files ?? []).map((x) => x.path).join() === 'two.txt', JSON.stringify((await factsOf(gc2, 'Submitted')).at(-1)?.data))
     // The user moves a card back and forth: nothing asks, nothing is refused.
