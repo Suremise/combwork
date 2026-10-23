@@ -3565,6 +3565,10 @@ switch.
   loop wakes, watches' wakes, decisions, mode notices). A task given now (`deliverNow`: a card started on a running
   agent, hive_send_task) and a launch's own prompt (`launchWith`) are no wakes and are typed as before. The pane's
   unread menu says nothing is typed by itself and offers **Deliver Now** (`session:deliverNow`: one offer, as asked).
+  Its line put off as it is typed because what it was made from changed (#1504: a loop wake's board and lanes, which the
+  card's own arrival in Review updates a moment later) is made again at once from things as they are now and typed, up
+  to OVERTAKEN_TRIES times, never over the user's own typing: the retry a wake gets later types nothing with this switch
+  off, so the ask would be lost. Why an asked line was put off is logged (`whyOfferFails`).
 - **No delivery dropped**: with any of them off an item stays in the inbox, unread, with the overdue rules as before;
   with checkpoints and Stop continuation off an idle wake still tells the agent once its turn ends
   (`tests/carryingOn.test.ts` lists every combination by the agent's state).
