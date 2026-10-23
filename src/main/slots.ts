@@ -1151,17 +1151,25 @@ export class SlotPool {
           await end()
           return { ok: true, revision: await this.headOf(slot.folder) }
         }
-        // The caller's last word, then still this operation's, right before the slot's files change.
-        const notYet = (await p.ready?.()) ?? null
-        if (notYet) {
-          await end()
-          return { retry: notYet }
+        // The caller's last word (its card current, the rules on, its builder quiet) and still this operation's, right
+        // before the slot's files change: inside the caller's guard (the app's: the repository's lock, as merges and branch
+        // deletions take it), after any wait for it, so nothing waited on stands in for a check made before it.
+        const last = async (): Promise<string | null> => {
+          const notYet = (await p.ready?.()) ?? null
+          if (!notYet) await this.store.fenced(name, token, () => undefined)
+          return notYet
         }
-        await this.store.fenced(name, token, () => undefined)
         if (!there) {
-          // The switch under the caller's guard (the app's: the repository's lock, as merges and branch deletions take it).
-          const sw = (): ReturnType<typeof git> => git(slot.folder, had ? ['switch', '--no-guess', p.line] : ['switch', '--no-guess', '-c', p.line, p.base])
+          const sw = async (): Promise<{ notYet: string } | Awaited<ReturnType<typeof git>>> => {
+            const notYet = await last()
+            if (notYet) return { notYet }
+            return git(slot.folder, had ? ['switch', '--no-guess', p.line] : ['switch', '--no-guess', '-c', p.line, p.base])
+          }
           const r = await (p.around ? p.around(sw) : sw())
+          if ('notYet' in r) {
+            await end()
+            return { retry: r.notYet }
+          }
           if (!r.ok) {
             await end()
             return { error: `git switch: ${r.err.trim().split(/\r?\n/)[0] || 'failed'}` }
@@ -1170,6 +1178,12 @@ export class SlotPool {
         }
         const now = p.install ? await lockHash(slot.folder) : null
         if (p.install && now !== null && now !== slot.installHash) {
+          // An install changes the slot's files too: the same last word first.
+          const notYet = await last()
+          if (notYet) {
+            await end()
+            return { retry: notYet }
+          }
           const failed = await this.install(name, token, slot, 'install', (await this.deps.options()).setup, now)
           if (failed) {
             await end({ warmLog: failed.logPath })

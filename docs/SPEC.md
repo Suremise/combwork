@@ -2948,23 +2948,30 @@ Whether a conversation may resume there is its **hold** (none: it may):
   - **Prepare:** once the lease's builder is quiet (not in a turn, nothing typed or queued, no Progress run or background
     task; an idle CLI may stay open), `SlotPool.prepare` as #1429's warming operation on the lent slot (fenced by its token,
     taken over once its holder is gone; only with no writer but the lease's own), under the folder's fence (#646: nothing
-    typed into or started there meanwhile) and, for the switch, the repository's lock. The builder's quiet and the cycle
-    are checked again at the boundary before the files change. A slot already on its line is prepared as it is. With
+    typed into or started there meanwhile) and, for the switch, the repository's lock. The builder's quiet, the cycle and
+    the rules are checked again at the boundary, inside the lock after any wait for it, before the files change (and
+    again before an install). A slot already on its line is prepared as it is. With
     **G15** on it installs again when the lock files differ from its last install (a run of "Hive (slot slot-b)"); off,
     nothing is installed (a lend never reinstalls for a card). Then `SlotPrepared`, in a write that finds the cycle the
     same.
   - **Place:** once quiet again, claimed in a write (`PlacementClaimed`: another Hive's left to it unless its process is
     gone), the card given to the builder there: typed in where it already runs in the slot, else a new conversation
-    started there (`launchWith`; the old one kept). Its delivery's identity is the cycle and lease (`slot-placement`), so
-    one made before a crash is never made again; then `BuilderPlaced`. A window Start hands its prompt (note, Read first)
+    started there (`launchWith`; the old one kept). Its delivery's identity is the cycle and lease (`slot-placement`): one
+    made before a crash counts only while it was given or is still on its way under the deliveries' own policy (queued,
+    offered, uncertain: never made again; its agent not running is started where it is offered), and one that ended
+    without being given (cancelled, refused, expired, stale), or a launch that couldn't start, is made again by a later
+    pass [HR1's round 2]; then `BuilderPlaced`. A window Start hands its prompt (note, Read first)
     to that instead of typing it where the agent is.
   - **Release:** a card's own lease its current cycle doesn't use (Todo, Done, or a later start's), ended in the write
     that reads the card, so a release can never end a later start's lease; a lease lent for a start not written yet is
     left two minutes. A lane's when the lane has ended or been abandoned. Releases run with the rules off too.
   - **Merged lines:** a Done card's line, by the card (never a number read from the line's name), once its target
-    contains it (§16.3.2's containment, squash by its key), under the repository's lock: the worktrees read, the ref
-    removed at the head checked (`update-ref -d`), the worktrees read again, and a checkout that came in between has the
-    branch put back at that head. Recorded as `LineDeleted`; a lane's previous line goes once the next card's line is out.
+    contains it (§16.3.2's containment, squash by its key), under the repository's lock: the worktrees read, the intent
+    recorded (`LineDeleting`, with the head checked), the ref removed at that head (`update-ref -d`), then settled from
+    what is on disk: a checkout of it that came in has the branch put back at that head and checked (`LineDeleteUndone`),
+    none has `LineDeleted`. A deletion cut short by a crash is settled the same way by the next pass, whatever the
+    switches say; a branch that can't be put back leaves the intent for the next pass, never claimed kept [HR1's round 2].
+    A lane's previous line goes once the next card's line is out.
     Off switch: Settings → Advanced **Delete a card's branch once it's merged** (`hive.slots.deleteMergedLines`, on).
 - **The pool's size** is the project's builders and either agents (`setBuilderCount`).
 - **Lanes:** Start Lane lends the lane its slot before starting its agents, and the brief names it ("works in slot-b, a

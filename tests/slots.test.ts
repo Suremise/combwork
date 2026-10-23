@@ -1063,8 +1063,30 @@ describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () =
       }
     })
     expect(ok).toEqual({ ok: true, revision: head })
-    expect(guarded).toEqual(['ready', 'locked', 'unlocked'])
+    // Its last word inside the guard, after any wait for it: what the guard waited on can't stand in for it.
+    expect(guarded).toEqual(['locked', 'ready', 'unlocked'])
     expect(branch(r.slot.folder)).toBe('hive/AM/AM-1-x')
+  })
+
+  it("what changes while the guard is waited for (the rules switched off, the card put back) refuses at the boundary: HEAD unchanged (HR1's round 2)", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', lane: 'lane-1' })
+    const head = sh(r.slot.folder, 'rev-parse', 'HEAD')
+    let ok = true
+    const res = await w.pool.prepare(r.lease.id, {
+      line: 'hive/AM/AM-1-x',
+      base: head,
+      install: false,
+      ready: async () => (ok ? null : 'the rules are off'),
+      // The repository's lock, held by another merge: the state changes while it is waited for.
+      around: async (fn) => {
+        ok = false
+        return fn()
+      }
+    })
+    expect(res).toEqual({ retry: 'the rules are off' })
+    expect([branch(r.slot.folder), sh(r.slot.folder, 'rev-parse', 'HEAD')]).toEqual(['', head])
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null })
   })
 
   it('a slot already on its line is prepared as it is: a repeat changes nothing, its work in progress kept', async () => {

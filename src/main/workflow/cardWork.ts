@@ -190,6 +190,12 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
       }
       case 'BuilderPlaced':
         return (d as FactData['BuilderPlaced']).how
+      case 'LineDeleting':
+        return (d as FactData['LineDeleting']).line
+      case 'LineDeleteUndone': {
+        const x = d as FactData['LineDeleteUndone']
+        return `${x.line} (${x.why})`
+      }
       case 'LineDeleted': {
         const x = d as FactData['LineDeleted']
         return `${x.line} at ${r(x.revision)} (${x.why})`

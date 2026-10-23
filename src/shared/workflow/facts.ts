@@ -167,6 +167,14 @@ export interface FactData {
   /** A Done card's line deleted (#1438): its target contained it at `revision`, and nothing had it checked out. */
   LineDeleted: { line: string; revision: string; why: 'merged' }
   /**
+   * A Done card's merged line about to be deleted (#1438, HR1's round 2): written before its ref is removed, so a deletion
+   * cut short (a crash) is settled by the next pass: `LineDeleted`, or `LineDeleteUndone` with the ref put back at
+   * `revision` where a checkout of it came in meanwhile.
+   */
+  LineDeleting: { line: string; revision: string }
+  /** A deletion begun and not done: kept (`checkedOut`: a checkout of it came in, its ref put back), or never removed. */
+  LineDeleteUndone: { line: string; revision: string; why: 'checkedOut' | 'notDeleted' }
+  /**
    * A card's slot made ready for its start (#1438): the line checked out at `revision` (installed again with G15) under
    * `lease`. Written after the slot's preparation, in a write that finds the card's start the same: until then the start's
    * preparation is owed, and a pass of Hive's (after a restart too) does it.

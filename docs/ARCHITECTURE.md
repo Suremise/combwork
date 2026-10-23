@@ -627,8 +627,9 @@ cycle doesn't use, in the write that reads the card (`SlotPool.release`'s check)
 Prepare waits for the lease's builder to be quiet, then runs `SlotPool.prepare` (#1429's warming operation on the lent
 slot, its `ready` check at the boundary) under `changingFolder` and, for the switch, `withRepoLock`. Place claims the
 placement in a write (`PlacementClaimed`, taken over once its holder process is gone) and delivers with the cycle's
-identity (`slot-placement`), so it happens once. Merged lines are deleted by the card under the repository's lock, with the
-worktrees read before and after the ref's removal. The actions `prepareSlot` and `releaseSlot` only ask for the pass; it
+identity (`slot-placement`), so it happens once (one that ended without being given is made again). Merged lines are
+deleted by the card under the repository's lock, the intent recorded first (`LineDeleting`) and the deletion settled from
+what is on disk (`settleDeletion`), so one cut short by a crash is settled by the next pass. The actions `prepareSlot` and `releaseSlot` only ask for the pass; it
 also runs as a workspace opens, when lanes are written, when a writer drains (`setSlotFreed`), when the rules are
 switched, and hourly; with the rules off it only releases. Start Lane lends the lane's slot first (`lendLane`); a lane
 without one keeps `slotWait` on its record, and the pass lends it one and starts its agents once (laneStart's

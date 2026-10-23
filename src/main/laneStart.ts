@@ -119,6 +119,8 @@ function briefFor(ws: WorkspaceService, cfg: ProjectConfig, project: string, car
 
 /** A lane brief's delivery identity (#1438): one per lane and role, so a lane's agents are started with it once. */
 const BRIEF = 'lane-brief'
+/** A delivery that ended without reaching its agent: made again. */
+const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired', 'stale'])
 
 /**
  * Starts a lane's builder and reviewer, each in a fresh conversation with its brief: one not running is started with it,
@@ -135,7 +137,12 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
       // Still the project's agent, read again after the awaits above.
       if (!projectAgents(await ws.projectConfig(projectPath)).some((x) => x.id === a.id)) throw hiveError(M.unknownAgent, { agent: a.name, project }, { kind: 'notFound' })
       const ref = `${laneId}:${role}`
-      if ((await deliveriesOf(projectPath, a.id)).some((r) => r.source === BRIEF && r.ref === ref)) {
+      // Given before (or still on its way under the deliveries' own policy), only: one that ended without being given
+      // (its launch failed: cancelled; refused, expired, stale) is made again.
+      const made = (await deliveriesOf(projectPath, a.id)).find((r) => r.source === BRIEF && r.ref === ref && !NOT_GIVEN.has(r.state))
+      if (made) {
+        // On its way, its agent not running: started (no prompt of its own), where it is offered.
+        if (!sessions.liveFor(projectPath, a.id) && (made.state === 'queued' || made.state === 'offered' || made.state === 'uncertain')) await sessions.start(projectPath, { agentId: a.id })
         started.push({ agentId: a.id, name: a.name, role, how })
         continue
       }
@@ -146,7 +153,7 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
         const st = sessions.liveFor(projectPath, a.id)
         if (st && BUSY.has(st.status)) throw hiveError(M.busy, { agent: a.name, status: st.status }, { kind: 'conflict' })
       }
-      await launchWith(projectPath, { agentId: a.id, agentName: a.name, kind: 'task', from: { kind: 'user', name: 'the user' }, body: brief(role), source: BRIEF, ref }, (line) => { // i18n-ignore: who the brief is from, as agents read it
+      const launched = await launchWith(projectPath, { agentId: a.id, agentName: a.name, kind: 'task', from: { kind: 'user', name: 'the user' }, body: brief(role), source: BRIEF, ref }, (line) => { // i18n-ignore: who the brief is from, as agents read it
         free()
         if (!sessions.liveFor(projectPath, a.id)) return sessions.start(projectPath, { agentId: a.id, prompt: line })
         how = 'fresh'
@@ -157,6 +164,8 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
           first = false
         })
       })
+      // Made and then ended without being given (its launch failed after the record was saved): not started.
+      if (launched.record && NOT_GIVEN.has(launched.record.state)) throw new Error(`${a.name}'s brief wasn't given (${launched.record.state})`) // i18n-ignore: an error for the log (the lane waits to be started)
       started.push({ agentId: a.id, name: a.name, role, how })
     } catch (e) {
       // The lane is recorded: the user can start the agent themselves, or end the lane from its row.

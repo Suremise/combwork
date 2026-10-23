@@ -76,10 +76,11 @@ const KEEPS: ReadonlySet<StageId> = new Set<StageId>(['active', 'review', 'appro
 
 /**
  * Test copies (unpackaged) only: `HIVE_TEST_SLOT_CRASH=<point>` ends Hive at once there, no quit handler run, so a suite
- * shows what the next start recovers (HR1's #1438 round 1): `afterAction` (a slot action marked done, nothing of it done),
- * `inPrepare` (the line checked out, `SlotPrepared` not written), `inPlacement` (claimed, nothing delivered).
+ * shows what the next start recovers (HR1's #1438 rounds 1 and 2): `afterAction` (a slot action marked done, nothing of
+ * it done), `inPrepare` (the line checked out, `SlotPrepared` not written), `inPlacement` (claimed, nothing delivered),
+ * `inDeletion` (a merged line's ref removed, nothing checked or recorded after it).
  */
-function crashAt(point: 'afterAction' | 'inPrepare' | 'inPlacement'): Promise<never> | null {
+function crashAt(point: 'afterAction' | 'inPrepare' | 'inPlacement' | 'inDeletion'): Promise<never> | null {
   if (app.isPackaged || process.env.HIVE_TEST_SLOT_CRASH !== point) return null
   exitBy('app.exit', `a test crash at a slot's ${point}`, () => app.exit(1)) // i18n-ignore: the exit log's reason
   return new Promise<never>(() => undefined)
@@ -105,6 +106,8 @@ interface Cycle {
   claimed: (FactData['PlacementClaimed'] & { seq: number }) | null
   placed: boolean
   deleted: boolean
+  /** A deletion of its line begun and not settled (a crash cut it short): settled by the next pass. */
+  deleting: FactData['LineDeleting'] | null
 }
 
 export function cycleIn(facts: readonly Fact[]): Cycle | null {
@@ -118,12 +121,17 @@ export function cycleIn(facts: readonly Fact[]): Cycle | null {
   if (at < 0) return null
   const started = facts[at].data as StartedData
   if (!started.lease || !started.slot) return null
-  const c: Cycle = { seq: facts[at].seq, started: started as Cycle['started'], prepared: null, claimed: null, placed: false, deleted: false }
+  const c: Cycle = { seq: facts[at].seq, started: started as Cycle['started'], prepared: null, claimed: null, placed: false, deleted: false, deleting: null }
   for (const f of facts.slice(at + 1)) {
     if (f.kind === 'SlotPrepared' && (f.data as FactData['SlotPrepared']).lease === started.lease) c.prepared = f.data as FactData['SlotPrepared']
     else if (f.kind === 'PlacementClaimed' && (f.data as FactData['PlacementClaimed']).lease === started.lease) c.claimed = { ...(f.data as FactData['PlacementClaimed']), seq: f.seq }
     else if (f.kind === 'BuilderPlaced' && (f.data as FactData['BuilderPlaced']).lease === started.lease) c.placed = true
-    else if (f.kind === 'LineDeleted') c.deleted = true
+    else if (f.kind === 'LineDeleting') c.deleting = f.data as FactData['LineDeleting']
+    else if (f.kind === 'LineDeleteUndone') c.deleting = null
+    else if (f.kind === 'LineDeleted') {
+      c.deleted = true
+      c.deleting = null
+    }
   }
   return c
 }
@@ -290,6 +298,8 @@ function until(projectPath: string, agentId: string, ok: () => boolean, over: ()
 const passes = new Map<string, { again: boolean; done: Promise<void> }>()
 /** Cycles being prepared or placed here now (`<project>#<card>#<seq>`): one at a time each. */
 const ensuring = new Set<string>()
+/** Failed tries of a cycle's step here, by key: each next one waits longer. */
+const attempts = new Map<string, number>()
 /** Cycles whose preparation failed here (told once): tried again only by a restart or a new start. */
 const failed = new Set<string>()
 
@@ -381,11 +391,16 @@ async function ensure(ws: WorkspaceService, projectPath: string, wf: Workflow, p
     if (!cycle.placed) await place(ws, projectPath, wf, n, cycle, l)
   } catch (e) {
     log.warn(`#${n}'s slot ${userText(l.slot)}`, e)
-    // Its workspace opened again meanwhile (another lifetime's runtime), or a write refused: another pass, once this ends.
+    // Its workspace opened again meanwhile (another lifetime's runtime), a write refused, a delivery not given or a launch
+    // that failed: another pass once this ends, after a pause that grows with each try (1 s, doubling, at most a minute).
     retry = !ws.lifetime.aborted && !!ws.path
   } finally {
     ensuring.delete(key)
-    if (retry) setTimeout(() => void settleSlotCards(ws, projectPath), 1000).unref?.()
+    if (retry) {
+      const tries = (attempts.get(key) ?? 0) + 1
+      attempts.set(key, tries)
+      setTimeout(() => void settleSlotCards(ws, projectPath), Math.min(60_000, 1000 * 2 ** (tries - 1))).unref?.()
+    } else attempts.delete(key)
   }
 }
 
@@ -439,12 +454,19 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
   }
 }
 
+/** A delivery that ended without reaching its agent (never given): made again. */
+const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired', 'stale'])
+
 /**
  * The builder given the card in its slot, once: when quiet, claimed by this Hive in a write (one another Hive holds is
- * left to it unless its process is gone), delivered with the cycle's identity (a delivery already made, before a crash,
- * is never made again), recorded as `BuilderPlaced`.
+ * left to it unless its process is gone), delivered with the cycle's identity, recorded as `BuilderPlaced`. A delivery
+ * made before (a crash, an earlier pass) counts only while it was given or is still on its way under the deliveries' own
+ * policy (queued, offered, or uncertain: offered once more when its agent runs, never made again here): its agent not
+ * running, it is started in the slot, where that delivery is offered. One that ended without being given (cancelled,
+ * refused, expired, stale) is made again, as is one whose making failed (a refusal, a launch that couldn't start: it
+ * throws, nothing is recorded, and the pass tries again).
  */
-async function place(ws: WorkspaceService, projectPath: string, first: Workflow, n: number, cycle: Cycle, l: SlotLease): Promise<void> {
+export async function place(ws: WorkspaceService, projectPath: string, first: Workflow, n: number, cycle: Cycle, l: SlotLease): Promise<void> {
   let wf = first
   const agentId = l.agent
   const gone = (): boolean => !workflowEnforced() || ws.lifetime.aborted || !current(wf, n, cycle.seq, l.id)
@@ -471,21 +493,31 @@ async function place(ws: WorkspaceService, projectPath: string, first: Workflow,
   if (!agent || !card) return
   wf = (await workflowFor(ws, projectPath).catch(() => null)) ?? wf
   const ref = `${n}:${cycle.seq}:${l.id}`
-  const made = (await deliveriesOf(projectPath, agentId)).find((r) => r.source === PLACEMENT && r.ref === ref)
-  let how: FactData['BuilderPlaced']['how'] = 'typed'
-  let delivery = made?.id ?? null
-  if (!made) {
-    if (gone() || !quiet(projectPath, agentId)) return
+  const made = (await deliveriesOf(projectPath, agentId)).find((r) => r.source === PLACEMENT && r.ref === ref && !NOT_GIVEN.has(r.state))
+  if (gone() || !quiet(projectPath, agentId)) return
+  const st = sessions.liveFor(projectPath, agentId)
+  const there = !!st && samePlace(st.cwd, cycle.started.folder)
+  let how: FactData['BuilderPlaced']['how'] = there ? 'typed' : st ? 'newConversation' : 'started'
+  let delivery: string | null
+  if (made) {
+    delivery = made.id
+    // On its way, its agent not running: started in its slot (no prompt of its own), where the delivery is offered.
+    if (!st && (made.state === 'queued' || made.state === 'offered' || made.state === 'uncertain')) {
+      log.info(`Starting ${userText(agent.name)} in ${userText(cycle.started.slot)} for #${n}'s delivery ${made.id} (${made.state})`)
+      await sessions.start(projectPath, { agentId })
+      how = 'started'
+    }
+  } else {
     const prompt = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? taskPrompt(card, !!sessions.hiveMcp(projectPath), { from: 'todo' })
-    offered.delete(offerKey(projectPath, n))
     const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: n, body: prompt, source: PLACEMENT, ref } // i18n-ignore: who a delivery is from, as agents read it
-    const st = sessions.liveFor(projectPath, agentId)
-    const there = !!st && samePlace(st.cwd, cycle.started.folder)
-    how = there ? 'typed' : st ? 'newConversation' : 'started'
     log.info(`Giving ${userText(agent.name)} #${n} in ${userText(cycle.started.slot)} (${how})`)
-    delivery = there
-      ? ((await deliverNow(projectPath, { ...nd, need: 'free', conversation: st!.sessionId || null }))?.id ?? null)
-      : ((await launchWith(projectPath, nd, (line) => (st ? sessions.newConversation(projectPath, agentId, line) : sessions.start(projectPath, { agentId, prompt: line })))).record?.id ?? null)
+    // A refusal (NotGiven: its agent got busy) or a launch that couldn't start throws: nothing recorded, tried again.
+    const r = there
+      ? await deliverNow(projectPath, { ...nd, need: 'free', conversation: st!.sessionId || null })
+      : (await launchWith(projectPath, nd, (line) => (st ? sessions.newConversation(projectPath, agentId, line) : sessions.start(projectPath, { agentId, prompt: line })))).record
+    if (!r || NOT_GIVEN.has(r.state)) throw new Error(`#${n}'s delivery to ${agent.name} wasn't given (${r?.state ?? 'none made'})`) // i18n-ignore: an error for the log (the pass tries again)
+    delivery = r.id
+    offered.delete(offerKey(projectPath, n))
   }
   await wf.write(now.card, null, 'hive', (w) => {
     const c = cycleIn(w.tx.facts(n))
@@ -498,16 +530,21 @@ async function place(ws: WorkspaceService, projectPath: string, first: Workflow,
 /**
  * A Done card's line deleted (#1438, §16.10.1), by the card (never a number read from the line's name): only with the
  * rules on and Settings → Advanced, Delete a card's branch once it's merged; only once its target contains it (a squash
- * by its stored key, §16.3.2); under the repository's lock, with the worktrees read before and after the ref's removal
- * (at the head checked): a checkout that came in between has its branch put back at that head. Recorded as `LineDeleted`.
+ * by its stored key, §16.3.2); under the repository's lock; never one checked out. Its intent is written first
+ * (`LineDeleting`, with the head checked), then the ref removed at that head, then the deletion settled from what is on
+ * disk (`settleDeletion`), so one cut short by a crash is settled by the next pass, rules on or off: never a checkout
+ * left without its branch.
  */
 export async function deleteMergedLine(ws: WorkspaceService, projectPath: string, wf: Workflow, n: number): Promise<boolean> {
   const allowed = (): boolean => workflowEnforced() && advanced.get(SLOTS_DELETE_MERGED) !== false
-  if (!allowed()) return false
   const card = cardOf(wf, n)
   const s = card ? wf.state(card) : null
   const c = card ? cycleIn(wf.store.facts(n)) : null
   if (!card || !s || !c || s.stage !== 'done' || c.deleted || !s.started?.line?.startsWith('hive/')) return false
+  // A deletion begun and cut short: settled first, whatever the switches say (it may have left a checkout without its branch).
+  const begun = c.deleting
+  if (begun) return withRepoLock(projectPath, () => settleDeletion(projectPath, wf, card, n, begun), { quiet: true, project: projectPath }).catch(() => false)
+  if (!allowed()) return false
   const line = s.started.line
   const target = s.integrated?.target || s.started.target
   if (!target) return false
@@ -521,21 +558,60 @@ export async function deleteMergedLine(ws: WorkspaceService, projectPath: string
       if (isUnknown(inTarget) || !inTarget) return false
       const before = await listWorktreesOrNull(projectPath).catch(() => null)
       if (!before || before.some((w) => w.branch === line) || !allowed()) return false
+      // The intent, durably, before anything is removed: from here a crash is settled by the next pass.
+      const intent: FactData['LineDeleting'] = { line, revision: head }
+      const meant = await wf.write(card, null, 'hive', (w) => {
+        const now = cycleIn(w.tx.facts(n))
+        if (!now || now.seq !== c.seq || now.deleted || now.deleting) return false
+        w.fact('LineDeleting', intent) // i18n-ignore: a fact's kind and codes, not text
+        return true
+      })
+      if (!meant) return false
       const r = await git(projectPath, ['update-ref', '-d', `refs/heads/${line}`, head])
-      if (!r.ok) return false
-      // Checked out meanwhile (another Hive, a terminal): the branch is put back at the same head, the checkout kept.
-      const after = await listWorktreesOrNull(projectPath).catch(() => null)
-      if (!after || after.some((w) => w.branch === line)) {
-        await git(projectPath, ['update-ref', `refs/heads/${line}`, head, ''])
-        log.warn(`${userText(line)} was checked out as it was deleted: kept`)
-        return false
-      }
-      log.info(`Deleted ${userText(line)} (#${n}, merged into ${userText(target)})`)
-      await wf.write(card, null, 'hive', (w) => void w.fact('LineDeleted', { line, revision: head, why: 'merged' })).catch((e) => log.warn(`recording ${userText(line)}'s deletion`, e)) // i18n-ignore: a fact's kind and codes, not text
-      return true
+      if (r.ok) await crashAt('inDeletion')
+      return settleDeletion(projectPath, wf, card, n, intent)
     },
     { quiet: true, project: projectPath }
   ).catch(() => false)
+}
+
+/**
+ * A begun deletion settled from what is on disk now, under the repository's lock (the caller's): its ref there (never
+ * removed, or put back) is `LineDeleteUndone` (`notDeleted`; a later pass may try again); gone with a worktree that has it
+ * checked out (one came in as it went, or since) has the ref put back at the head the intent recorded, checked, and
+ * `LineDeleteUndone` (`checkedOut`); gone with none, `LineDeleted`. A ref that can't be put back, or worktrees that can't
+ * be read, leave the intent for the next pass: nothing is claimed kept that isn't.
+ */
+async function settleDeletion(projectPath: string, wf: Workflow, card: CardRecord, n: number, d: FactData['LineDeleting']): Promise<boolean> {
+  const head = await G.lineHead(projectPath, d.line)
+  if (isUnknown(head)) return false
+  if (head) {
+    await wf.write(card, null, 'hive', (w) => {
+      if (cycleIn(w.tx.facts(n))?.deleting?.line === d.line) w.fact('LineDeleteUndone', { ...d, why: 'notDeleted' }) // i18n-ignore: a fact's kind and codes, not text
+    })
+    return false
+  }
+  const trees = await listWorktreesOrNull(projectPath).catch(() => null)
+  if (!trees) return false
+  if (trees.some((w) => w.branch === d.line)) {
+    // Checked out as it went (another Hive, a terminal): put back at the head the intent recorded, and checked.
+    const r = await git(projectPath, ['update-ref', `refs/heads/${d.line}`, d.revision, ''])
+    const back = await G.lineHead(projectPath, d.line)
+    if (!r.ok || isUnknown(back) || back !== d.revision) {
+      log.warn(`${userText(d.line)} is checked out but its branch couldn't be put back at ${d.revision.slice(0, 7)}: tried again at the next pass`)
+      return false
+    }
+    log.warn(`${userText(d.line)} was checked out as it was deleted: put back at ${d.revision.slice(0, 7)} and kept`)
+    await wf.write(card, null, 'hive', (w) => {
+      if (cycleIn(w.tx.facts(n))?.deleting?.line === d.line) w.fact('LineDeleteUndone', { ...d, why: 'checkedOut' }) // i18n-ignore: a fact's kind and codes, not text
+    })
+    return false
+  }
+  log.info(`Deleted ${userText(d.line)} (#${n}, merged)`)
+  await wf.write(card, null, 'hive', (w) => {
+    if (cycleIn(w.tx.facts(n))?.deleting?.line === d.line) w.fact('LineDeleted', { line: d.line, revision: d.revision, why: 'merged' }) // i18n-ignore: a fact's kind and codes, not text
+  })
+  return true
 }
 
 // --- Lanes.
