@@ -882,6 +882,9 @@ async function cliStep(name, opts, fn) {
   return value
 }
 
+/** Whether a terminal's output (pty:buffer) last turned bracketed paste on rather than off. */
+const pasteOn = (raw) => raw.lastIndexOf('\x1b[?2004h') > raw.lastIndexOf('\x1b[?2004l')
+
 /**
  * Types a prompt into a CLI's terminal (pty key) and presses Enter until it is submitted: submitted() turns true (the
  * session working, say) within waitMs. Under load a CLI can take the prompt, written at once, as a paste and the Enter
@@ -898,13 +901,12 @@ async function sendPrompt(inv, key, text, { submitted, tries = 3, waitMs = 20000
     const typed = attempt > 1 && attempt < tries && plainText(await raw()).includes(text.slice(0, 30))
     const mark = (await raw()).length
     if (attempt === 1) await inv('pty:write', key, text)
-    else if (!typed) {
-      // Ctrl+U on its own, as Hive presses it: written with a long prompt, Claude Code 2.1.309 reads both as a paste, the
-      // Ctrl+U in it an invisible character it takes out, and leaves the prompt unsent until Enter again (#1547).
-      await inv('pty:write', key, '\x15')
-      await sleep(150)
-      await inv('pty:write', key, text)
-    }
+    // Ctrl+U and the prompt in one write, the prompt as a bracketed paste while the CLI has bracketed paste on, as Hive
+    // writes it: typed, a long prompt read in one go with the Ctrl+U is a paste to Claude Code 2.1.309, the Ctrl+U in it
+    // an invisible character it takes out, leaving the prompt unsent until Enter again (#1547). However the CLI's reads
+    // split or join the write, the Ctrl+U stays outside the paste (tried with the real CLI). A slash command is still
+    // typed (pasted, it would be sent as a message), as is any prompt to a CLI without bracketed paste on.
+    else if (!typed) await inv('pty:write', key, `\x15${pasteOn(await raw()) && !text.startsWith('/') ? `\x1b[200~${text}\x1b[201~` : text}`)
     // Deliberate pause, not a wait for a state: a CLI takes an Enter that comes within its paste window as part of the
     // text (a new line, not a submit), and nothing on screen says when that window ends: Copilot shows the line at once
     // and still takes an Enter right after it as part of the paste (tried in #527). submitted() is the check.
