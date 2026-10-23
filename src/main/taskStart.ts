@@ -119,6 +119,8 @@ async function startReserved(n: number, target: TaskStartTarget, actor: TaskActo
     busyAgents.add(agentKey)
     reserved = agentKey
   } else {
+    // 1.0 (#1451): a new agent gets no worktree of its own. Asking for one (the board's start, until #1442) is passed on so
+    // addAgent refuses it with its note, never ignored.
     const def = await addAgent(p, { name: target.name, location: target.worktree ? 'new-worktree' : 'project', provider: target.provider })
     agentId = def.id
     agentName = def.name
