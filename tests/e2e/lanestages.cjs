@@ -256,6 +256,19 @@ const beta = path.join(fx.ws, 'beta')
     }
     await shootJa('4-ja-legend', () => hover(barJa, (t) => t.includes('各色はカテゴリ')))
     await shootJa('5-ja-old-rules', () => hover(tagJa, (t) => t.includes('旧ルール')))
+
+    // --- pt-BR (#1496): its Todo column is "A\u00a0fazer", its stage "A fazer"; the legend names it once, no stage under it.
+    const ptDir = path.join(lib.ROOT, 'locales', 'pt-BR')
+    const pt = Object.assign({}, ...fs.readdirSync(ptDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(ptDir, f), 'utf8'))))
+    const base = (await h.inv('app:info')).language
+    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: { ...base, code: 'pt-BR', locale: 'pt-BR', messages: pt } })
+    const ptTitle = pt['board.lanes.legendTitle']
+    check('pt-BR: the legend in Portuguese', !!(await hover(barJa, (t) => t.includes(ptTitle))), await tipText())
+    const todoRow = page.locator('.tip .lanes-legend-row[data-category="todo"]')
+    check('pt-BR: the legend\'s Todo row reads "A fazer" once, no stage under it', ((await todoRow.locator('.lanes-legend-name').innerText()).replace(/\s/g, ' ') === 'A fazer') && (await todoRow.locator('.lanes-legend-stage').count()) === 0, await todoRow.innerText().catch(() => ''))
+    const single = await page.locator('.tip .lanes-legend-row').evaluateAll((rows) => rows.filter((el) => el.querySelectorAll('.lanes-legend-stage').length === 1).map((el) => el.innerText))
+    check('pt-BR: no legend row lists a single stage (its own name again)', single.length === 0, JSON.stringify(single))
+    await shootJa('6-pt-BR-legend', () => hover(barJa, (t) => t.includes(ptTitle)))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

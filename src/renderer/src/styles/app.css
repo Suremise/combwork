@@ -8200,9 +8200,13 @@ body.pane-resizing-v .monaco-editor {
 }
 /* A category with several stages (#1420: Approved with Merging): one heading over its stages' columns, which share its
    width as the board's columns do; its flex-grow is how many of them are open (inline). The other columns start lower
-   by the heading's height, so every column's header lines up. */
+   by the heading's height, so every column's header lines up. Its basis is the room inside it that isn't its open
+   columns' shares: the gaps between its stages (10 px each), a folded stage's 34 px strip, and each open column's
+   borders (2 px: a column's least size, which every column outside a category has as its own basis). So each open
+   column gets the same share of the board as the others (#1490: Approved and Merging were 5 px narrower, and Approved's
+   ⋯ wrapped). */
 .board-category {
-  flex: 1 1 0;
+  flex: 1 1 calc((var(--stages, 1) - 1) * 10px + var(--folded, 0) * 34px + (var(--stages, 1) - var(--folded, 0)) * 2px);
   /* As wide as its columns' least widths: they never spill over the next category. */
   min-width: min-content;
   display: flex;
@@ -8240,8 +8244,9 @@ body.pane-resizing-v .monaco-editor {
 .board-category-columns > .board-column:not(.collapsed) {
   min-width: 120px;
 }
+/* The heading's height (its 2 px edge inside it) and margin: 22 px, so the headers line up (#1490: 24 was 2 px low). */
 .board.grouped > .board-column {
-  margin-top: 24px;
+  margin-top: 22px;
   /* Seven columns where six were: each a little narrower at least, so they still fit where six did. */
   min-width: 140px;
 }
@@ -8385,17 +8390,25 @@ body.pane-resizing-v .monaco-editor {
   overflow-wrap: break-word;
   line-height: 16px;
 }
+/* The count, + and ⋯ are one item (#1490): on the name's row while they fit, else together on a row of their own,
+   "count … ⋯", with ⋯ at the inline end. */
+.board-column-header .board-column-tools {
+  flex: 1 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
 .board-column-header .count {
   font-weight: 400;
   color: var(--fg-faint);
-  margin-left: -2px;
-}
-/* The spacer takes no gap of its own, the buttons are a little narrower, the count sits 2 px closer and the right
+  margin-inline-start: -2px;
+}/* The spacer takes no gap of its own, the buttons are a little narrower, the count sits 2 px closer and the right
    padding matches the left (the icons move 2–4 px): that room goes to the column's name, so "Wstrzymane", "À faire" and "A fazer" stay whole beside
    + and ⋯ (#886). */
 .board-column-header .grow {
+  flex: 1;
   min-width: 0;
-  margin-left: -6px;
+  margin-inline-start: -6px;
 }
 .board-column-header .icon-btn {
   width: 20px;
