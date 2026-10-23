@@ -490,21 +490,23 @@ export class GitPlatform implements PlatformAdapter {
   async checkRun(card: CardRecord, s: CardState, run: { command: string | undefined; revision?: string; isolated?: string; exec: (command: string, folder: string) => Promise<{ ok: boolean }> }): Promise<CheckBracket | GuardRefusal> {
     const folder = run.isolated ?? this.wf.folderOf(s)
     const rev = await this.revisionNow(card, s)
-    const h = await G.head(folder)
+    // The folder before the run, its reads at once (#1478: S58's four runs were a long chain of gits): its head from the
+    // uncommitted state's `status --branch` (head() where that can't say), the tracked files, its git dir from `.git`.
+    const [before, ls] = await Promise.all([G.worktreeNow(folder), git(folder, ['ls-files', '-z'])])
+    const h = !isUnknown(before) && before.head ? before.head : await G.head(folder)
     if (isUnknown(rev) || !rev || isUnknown(h)) return unknownRefusal(card, unknown(UNREADABLE.revisionIn, { folder }), 'submit.checksPassed')
     if (run.revision && run.revision !== h) return { rule: 'check.revisionMismatch', values: { revision: run.revision.slice(0, 7) } }
-    const ls = await git(folder, ['ls-files', '-z'])
     const files = ls.out.split('\0').filter(Boolean)
-    const gd = await git(folder, ['rev-parse', '--absolute-git-dir'])
-    const gitDir = gd.ok ? gd.out.trim() : null
-    const dirtyA = await G.dirty(folder)
+    const gitDir = G.gitDirSync(folder) ?? (await git(folder, ['rev-parse', '--absolute-git-dir']).then((r) => (r.ok ? r.out.trim() : null)))
+    const dirtyA = isUnknown(before) ? before : before.dirty
     const snapA = await snapshot(folder, files, gitDir)
     const t0 = Date.now()
     const ok = run.command ? (await run.exec(run.command, folder)).ok : false
     const seen = await observer.changedBetween(folder, t0, Date.now())
     const snapB = await snapshot(folder, files, gitDir)
-    const dirtyB = await G.dirty(folder)
-    const headB = await G.head(folder)
+    const after = await G.worktreeNow(folder)
+    const dirtyB = isUnknown(after) ? after : after.dirty
+    const headB = !isUnknown(after) && after.head ? after.head : await G.head(folder)
     const contained = h === rev || (await G.isAncestor(this.project, rev, h)) === true
     let whyNot: CheckBracket['whyNot']
     if (!run.command) whyNot = 'notCheck'
