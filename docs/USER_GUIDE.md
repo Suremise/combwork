@@ -1150,6 +1150,14 @@ Several agents can update the same note without losing each other's changes. An 
 
 **Long documents by section.** An agent that needs one part of a long plan, design note or spec doesn't have to read all of it: its **hive_doc_outline** tool lists a Markdown file's headings with each section's size, and **hive_read_section** reads just one section (with its subsections), by the heading's text or its slug, the heading in lower case with hyphens (`#core-contracts`; two headings called Setup are `#setup` and `#setup-1`). They work on the project's files (in the agent's worktree when it has one) and on shared notes (`shared:plans/design.md`), for Claude Code, Codex and Copilot agents and the Hive Assistant alike. A heading that isn't there gets the closest ones in reply, never an empty section. An agent reads its own project's documents only.
 
+### Workspace notes
+
+**Workspace notes**, pinned first in Shared Notes, is for what is true of this machine: a full path a command needs, the version of a tool you have installed, a folder that lives somewhere unusual. Such notes don't belong in a committed `AGENTS.md`, and `CLAUDE.local.md` doesn't reach every agent: worktrees don't have it, and Codex and Copilot never read it.
+
+Hive adds the note to every agent's instructions when it starts, on every coding agent and in whichever folder it works (its worktree or slot, or the project folder), and to the Hive Assistant's. A section headed with a project's name (`## alpha`) goes only to that project's agents; everything else goes to all of them, and the Assistant gets the whole note. A change reaches each agent at its next launch or new conversation: running agents keep what they started with.
+
+Agents get at most 4 KB of it (Settings → Advanced → **Workspace notes: most an agent gets**). The editor warns as you type when the note is longer for any project, and a longer note is cut, with a line telling agents to read the note for the rest. You and the Hive Assistant edit the note; project agents can read it but not change it. To stop delivering it, empty the note or turn off Settings → Advanced → **Deliver workspace notes to agents**.
+
 ## Memory
 
 A project's **Memory** tab shows what each provider its agents use reads about it, grouped by provider:

@@ -389,6 +389,8 @@
   "tips.workspaceMoved.title": "Einen Arbeitsbereich verschieben, ohne seine Agenten zu verlieren",
   "tips.workspaceMovedDefender.text": "Hat Hive Defender die Ordner des Arbeitsbereichs überspringen lassen, bietet „Reparieren…“ nach einer Verschiebung an, diese Ausschlüsse mit einer Administratorabfrage in die neuen Ordner zu verschieben, damit keiner auf einem Ordner bleibt, den es nicht mehr gibt. Ausschlüsse, die du selbst angelegt hast, bleiben, wie sie sind.",
   "tips.workspaceMovedDefender.title": "Defender-Ausschlüsse folgen einem verschobenen Arbeitsbereich",
+  "tips.workspaceNotes.text": "Workspace notes, oben in den gemeinsamen Notizen angeheftet, ist für das, was für diesen Rechner gilt, etwa einen vollständigen Pfad. Jeder Agent bekommt sie beim Start, in jedem Ordner, also muss das nicht in eine committete AGENTS.md. Ein Abschnitt mit dem Namen eines Projekts gehört nur diesem Projekt.",
+  "tips.workspaceNotes.title": "Notizen über diesen Rechner für jeden Agenten",
   "tips.worktreeReuse.text": "Du fügst einen Agenten mit einem neuen Worktree hinzu, der wie ein behaltener heißt (B4, und der Worktree von B4 ist unbenutzt)? Ist er gemergt und sauber, gibt Hive dem Agenten diesen Ordner, auf den Stand von main gebracht: Seine node_modules sind schon da.",
   "tips.worktreeReuse.title": "Ein behaltener Worktree wird wiederverwendet",
   "tips.worktrees.text": "Wähle in „Agent hinzufügen…“ „Neuer Worktree“: Der Agent arbeitet auf seinem eigenen Branch, und „Mergen…“ holt seine Arbeit zurück, wenn du zufrieden bist.",

@@ -1566,6 +1566,12 @@ export interface SessionRecord {
    * told it. A resume in another mode (or with none recorded) tells it the mode once (#334).
    */
   mode?: string
+  /**
+   * Hive gave this conversation instructions of its own at a launch (#1433: the Assistant's role and mode, the Workspace
+   * notes note). Never cleared: a resume of it renders its system prompt fresh, whichever agent resumes it and whatever
+   * that launch gives, so instructions switched off or emptied since leave it (Claude Code keeps a conversation's first).
+   */
+  promptAdded?: true
 }
 
 /**

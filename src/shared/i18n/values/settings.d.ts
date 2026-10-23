@@ -178,6 +178,10 @@ interface HiveMessageValues {
   'settings.advanced.hive.mcp.replySeconds.title': undefined
   'settings.advanced.hive.merge.lockWaitSeconds.desc': undefined
   'settings.advanced.hive.merge.lockWaitSeconds.title': undefined
+  'settings.advanced.hive.notes.deliverWorkspaceNotes.desc': undefined
+  'settings.advanced.hive.notes.deliverWorkspaceNotes.title': undefined
+  'settings.advanced.hive.notes.workspaceNotesMax.desc': undefined
+  'settings.advanced.hive.notes.workspaceNotesMax.title': undefined
   'settings.advanced.hive.progress.lanesShown.desc': undefined
   'settings.advanced.hive.progress.lanesShown.title': undefined
   'settings.advanced.hive.prompt.asTyped.desc': undefined
@@ -267,6 +271,7 @@ interface HiveMessageValues {
   'settings.advanced.unit.minutes': { n: number }
   'settings.advanced.unit.seconds': { n: number }
   'settings.advanced.unitLabel.agents': undefined
+  'settings.advanced.unitLabel.bytes': undefined
   'settings.advanced.unitLabel.captures': undefined
   'settings.advanced.unitLabel.lanes': undefined
   'settings.advanced.unitLabel.minutes': undefined

@@ -23,6 +23,7 @@ import { WorkspaceOverviewPanel } from '../views/WorkspaceOverview'
 import { PerformancePanel } from '../views/Performance'
 import { fmt, tr, tRich } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
+import { WORKSPACE_NOTES_PATH, workspaceNotesPath } from '@shared/workspaceNotes'
 
 /** Width of the compact Projects rail, and how narrow a drag has to go before the sidebar snaps to it. */
 const RAIL_WIDTH = 48
@@ -95,6 +96,8 @@ const M = {
   newNoteButton: msg({ id: 'assistant.sidebar.newNoteButton', defaultMessage: 'New Note…', description: "A button over the shared notes: creates a note." }),
   newFolderButton: msg({ id: 'assistant.sidebar.newFolderButton', defaultMessage: 'New Folder…', description: "A button over the shared notes: creates a folder." }),
   openFolder: msg({ id: 'assistant.sidebar.openFolder', defaultMessage: 'Open Folder', description: "Shared Notes: a button that opens .hive/shared in Explorer." }),
+  workspaceNotes: msg({ id: 'assistant.sidebar.workspaceNotes', defaultMessage: 'Workspace notes', description: "The pinned first row of Shared Notes: the note Hive gives every agent when it starts (notes about this machine). Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told." }),
+  workspaceNotesTip: msg({ id: 'assistant.sidebar.workspaceNotesTip', defaultMessage: "Notes about this machine (a full path, a local tool's version) that every agent gets when it starts, on every coding agent and in any folder. Kept in .hive/shared, out of git.", description: 'Tooltip on the pinned Workspace notes row of Shared Notes. Keep .hive/shared as it is.' }),
   noNotes: msg({ id: 'assistant.sidebar.noNotes', defaultMessage: 'No notes yet. Create one, or ask an agent to write a handover with the Hive MCP tools.', description: "The Shared Notes sidebar when the workspace has no notes." }),
   openFirst: msg({ id: 'assistant.sidebar.openFirst', defaultMessage: 'Open a workspace first', description: 'A notice: adding a skill with no workspace open.' }),
   skills: msg({ id: 'assistant.sidebar.skills', defaultMessage: 'Skills', description: "The heading of the Skills sidebar: the workspace's Hive skills." }),
@@ -580,6 +583,10 @@ function NotesPanel() {
     )
   }
 
+  const notesFile = workspaceNotesPath(workspace.path)
+  // The pinned row is the note: the tree lists the others.
+  const others = tree.filter((n) => n.isDir || n.relPath.toLowerCase() !== WORKSPACE_NOTES_PATH.toLowerCase())
+
   const create = async (isDir: boolean, parent = ''): Promise<void> => {
     const name = await prompt({
       title: tr(isDir ? M.newFolder : M.newNote),
@@ -656,7 +663,12 @@ function NotesPanel() {
         </div>
       </div>
       <div className="pane-body">
-        {tree.length === 0 ? <div className="pane-empty">{tr(M.noNotes)}</div> : renderNodes(tree, 0)}
+        {/* Workspace notes (#1433), pinned first whether it exists yet or not: opening it makes it. */}
+        <div className={cx('row', 'pinned-note', selected?.toLowerCase() === notesFile.toLowerCase() && 'selected')} style={{ paddingLeft: 12 }} title={tr(M.workspaceNotesTip)} onClick={() => set({ selectedNote: notesFile })}>
+          <Icon name="pinned" />
+          <span className="label">{tr(M.workspaceNotes)}</span>
+        </div>
+        {others.length === 0 ? <div className="pane-empty">{tr(M.noNotes)}</div> : renderNodes(others, 0)}
       </div>
       {menu.element}
     </>

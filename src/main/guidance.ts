@@ -118,14 +118,15 @@ async function scanRevisions(): Promise<SkillRevision[]> {
 /**
  * The parts of what a launch tells a session, for the performance metrics (exact sizes): the core session contract
  * (hiveInstructions, the same for every session of a role), what Hive adds for the project (the rest of `guidance`: the
- * latest handover's pointer), and for the Assistant its role and its mode (which ends its text). Text that doesn't
- * start or end as expected is counted whole as core or role, never split by guesswork.
+ * latest handover's pointer, and the Workspace notes note given as `notes`, #1433), and for the Assistant its role and
+ * its mode (which ends its text). Text that doesn't start or end as expected is counted whole as core or role, never
+ * split by guesswork.
  */
-export function launchParts(guidance: string, role: 'agent' | 'assistant', project: string, assistant: { text: string; modeText: string } | null): { guidanceBytes: number; guidanceChars: number; customBytes: number; customChars: number; roleBytes: number; roleChars: number; modeBytes: number; modeChars: number } {
+export function launchParts(guidance: string, role: 'agent' | 'assistant', project: string, assistant: { text: string; modeText: string } | null, notes = ''): { guidanceBytes: number; guidanceChars: number; customBytes: number; customChars: number; roleBytes: number; roleChars: number; modeBytes: number; modeChars: number } {
   // The contract as the session got it: with long commands wrapped or not (Settings → General).
   const contract = guidance ? [true, false].map((p) => hiveInstructions(role === 'assistant' ? '' : project, role, p)).find((c) => guidance.startsWith(c)) : ''
   const core = contract || guidance
-  const custom = guidance.slice(core.length)
+  const custom = guidance.slice(core.length) + notes.trim()
   const text = assistant?.text ?? ''
   const mode = assistant?.modeText && text.endsWith(assistant.modeText) ? assistant.modeText : ''
   const roleText = text.slice(0, text.length - mode.length)

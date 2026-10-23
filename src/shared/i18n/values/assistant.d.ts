@@ -344,6 +344,8 @@ interface HiveMessageValues {
   'assistant.sidebar.workingOnTip': undefined
   'assistant.sidebar.workspace': { name: string | number }
   'assistant.sidebar.workspaceGroup': undefined
+  'assistant.sidebar.workspaceNotes': undefined
+  'assistant.sidebar.workspaceNotesTip': undefined
   'assistant.skills.add': undefined
   'assistant.skills.addFailed': undefined
   'assistant.skills.alsoFor': { provider: string | number }

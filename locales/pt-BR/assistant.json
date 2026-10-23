@@ -342,6 +342,8 @@
   "assistant.sidebar.workingOnTip": "Projetos ativos têm uma sessão de terminal, indicadores de status e notificações.",
   "assistant.sidebar.workspace": "Espaço de trabalho: {name}",
   "assistant.sidebar.workspaceGroup": "Espaço de trabalho",
+  "assistant.sidebar.workspaceNotes": "Workspace notes",
+  "assistant.sidebar.workspaceNotesTip": "Notas sobre esta máquina (um caminho completo, a versão de uma ferramenta local) que todo agente recebe ao iniciar, em qualquer agente de código e em qualquer pasta. Ficam em .hive/shared, fora do git.",
   "assistant.skills.add": "Adicionar",
   "assistant.skills.addFailed": "Não foi possível adicionar a skill",
   "assistant.skills.alsoFor": "Adicionar também para o {provider}",
