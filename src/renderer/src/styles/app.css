@@ -1066,6 +1066,10 @@ kbd {
 .agents-table.cols-5 .agents-table-card > span {
   max-width: min(260px, calc(var(--agents-room) * 0.28));
 }
+/* An agent's role in the workflow (#1430): a word ("Reviewer"), so a small share. */
+.agents-table-role > span {
+  max-width: min(110px, calc(var(--agents-room) * 0.12));
+}
 /* What stopping an agent interrupts (#572), in the warning colour as the quit dialog's badges are. */
 .agents-table td.agents-table-warn {
   color: var(--warning);
@@ -6842,6 +6846,12 @@ body.pane-resizing .monaco-editor {
 .provider-choice {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+.workflow-role-choice {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 6px;
   margin-top: 8px;
 }

@@ -1,0 +1,53 @@
+// Agents' workflow roles (#1430, SPEC §16.10.6): which side of the workflow an agent takes, builder, reviewer or either.
+// Lanes, the slot pool's size, the reviewer pool and no-self-review read it here. It isn't #686's guidance role, nor the
+// agent's free-text note (`AgentDef.role`): two fields, kept apart. An agent saved before 1.0 has none, and reads as the
+// guess its name or note gives, stored the first time the user saves its settings (nothing is written at the upgrade).
+
+import { msg, type Msg } from '../i18n/msg'
+
+/** Which side of the workflow an agent takes: it builds cards, reviews them, or either. */
+export type WorkflowRole = 'builder' | 'reviewer' | 'either'
+
+/** G17 (#1443): one reviewer per lane, or a pool of reviewers lanes share. The option's key is `reviewerMode`. */
+export type ReviewerMode = 'lane' | 'pool'
+
+export const WORKFLOW_ROLES: readonly WorkflowRole[] = ['builder', 'reviewer', 'either']
+
+export const isWorkflowRole = (v: unknown): v is WorkflowRole => typeof v === 'string' && (WORKFLOW_ROLES as readonly string[]).includes(v)
+
+/** A reviewer's name as the shipped patterns and Darren's agents give it: HR1, HI-R2 (`{key}-R{n}`, #704). */
+const REVIEWER_NAME = /^[a-z]{0,3}-?r\d+$/i
+
+/**
+ * An agent's workflow role: its own, else the guess from before 1.0. A note that says *review* (or, with no note, a name
+ * that does, or one shaped like HR1 or HI-R2) reads as a reviewer; anything else as a builder.
+ */
+export function agentWorkflowRole(a: { name: string; role?: string; workflowRole?: WorkflowRole }): WorkflowRole {
+  if (isWorkflowRole(a.workflowRole)) return a.workflowRole
+  const note = a.role?.trim()
+  if (note) return /review/i.test(note) ? 'reviewer' : 'builder'
+  return /review/i.test(a.name) || REVIEWER_NAME.test(a.name.trim()) ? 'reviewer' : 'builder'
+}
+
+/** Whether an agent of this role builds cards (an either-role agent does both). */
+export const buildsWork = (role: WorkflowRole): boolean => role !== 'reviewer'
+
+/** Whether an agent of this role reviews cards (an either-role agent does both). */
+export const reviewsWork = (role: WorkflowRole): boolean => role !== 'builder'
+
+/** The window's words for the roles: "Role in the workflow", and each role's name and sentence. */
+export const ROLE_IN_WORKFLOW = msg({ id: 'agents.workflowRole.label', defaultMessage: 'Role in the workflow', description: 'A heading in Add Agent and Agent Settings, above the choice of builder, reviewer or either: which side of the workflow the agent takes (#1430). Glossary: workflow role.' })
+export const WORKFLOW_ROLE_TEXT: Record<WorkflowRole, { name: Msg; text: Msg }> = {
+  builder: {
+    name: msg({ id: 'agents.workflowRole.builder', defaultMessage: 'Builder', description: "A choice of an agent's role in the workflow: it builds cards. Glossary: builder." }),
+    text: msg({ id: 'agents.workflowRole.builderText', defaultMessage: 'Works on cards and sends them to Review.', description: "Under the Builder choice of an agent's role in the workflow. Review is a board column." })
+  },
+  reviewer: {
+    name: msg({ id: 'agents.workflowRole.reviewer', defaultMessage: 'Reviewer', description: "A choice of an agent's role in the workflow: it reviews cards. Glossary: reviewer." }),
+    text: msg({ id: 'agents.workflowRole.reviewerText', defaultMessage: 'Reviews the builders’ cards and passes or fails them.', description: "Under the Reviewer choice of an agent's role in the workflow. Glossary: pass / fail (a verdict)." })
+  },
+  either: {
+    name: msg({ id: 'agents.workflowRole.either', defaultMessage: 'Either', description: "A choice of an agent's role in the workflow: it builds or reviews. Glossary: either." }),
+    text: msg({ id: 'agents.workflowRole.eitherText', defaultMessage: 'Builds or reviews, but never reviews its own work.', description: "Under the Either choice of an agent's role in the workflow." })
+  }
+}

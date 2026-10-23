@@ -34,6 +34,7 @@ import { docOutline, findHeading, sectionText, type DocHeading } from '../shared
 import { providerService } from './providerService'
 import { config } from './config'
 import type { Refusal } from '../shared/workflow/refusals'
+import { agentWorkflowRole, isWorkflowRole, type WorkflowRole } from '../shared/workflow/roles'
 import { deleteEntry, JournalBusy, JournalError, readEntry, recall, updateEntry, writeEntry } from './journal'
 import { journalSettingsOf, journalSuggestion } from './journalService'
 import type { JournalSettings } from '../shared/journal'
@@ -467,6 +468,8 @@ async function projectSummary(p: string) {
       id: a.id,
       name: a.name,
       provider: a.live?.provider ?? agentProvider(a, info.config, config.settings),
+      // Its role in the workflow (#1430): its own, else the guess from its note or name.
+      workflowRole: agentWorkflowRole(a),
       branch: a.worktree?.branch ?? null,
       worktree: a.worktree?.path ?? null,
       status: a.live?.status ?? 'stopped',
@@ -679,7 +682,7 @@ route('GET', '/v1/workspaces', async () => openWorkspaces().map((w) => ({ name: 
 /** A project in a short listing (?view=short): its state and agents, without ids, paths or settings. */
 async function projectRow(p: string): Promise<ProjectRow> {
   const s = await projectSummary(p)
-  return { name: s.name, workspace: s.workspace, active: s.active, branch: s.branch, agents: s.agents.map((a) => ({ name: a.name, provider: a.provider, status: a.status, branch: a.branch, backgroundTasks: a.backgroundTasks, ...(a.watching ? { watching: a.watching.label } : {}), ...(a.progress ? { progress: progressLabel(a.progress) } : {}) })) }
+  return { name: s.name, workspace: s.workspace, active: s.active, branch: s.branch, agents: s.agents.map((a) => ({ name: a.name, provider: a.provider, workflowRole: a.workflowRole, status: a.status, branch: a.branch, backgroundTasks: a.backgroundTasks, ...(a.watching ? { watching: a.watching.label } : {}), ...(a.progress ? { progress: progressLabel(a.progress) } : {}) })) }
 }
 
 route('GET', '/v1/projects', async ({ query }) => {
@@ -1056,6 +1059,12 @@ function agentSettings(body: any): { provider?: ProviderId; model?: string; effo
   return out
 }
 
+/** A workflowRole argument (#1430): builder, reviewer or either. */
+function workflowRoleArg(v: unknown): WorkflowRole {
+  if (isWorkflowRole(v)) return v
+  throw new HttpError(400, 'workflowRole is "builder", "reviewer" or "either".')
+}
+
 route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
   const p = projectByName(params[0])
   const project = basename(p)
@@ -1071,6 +1080,7 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
     if (existing && !tree) throw new HttpError(404, `${project} has no worktree at or on "${existing}".`)
     const def = await addAgent(p, {
       name: body?.name ? String(body.name) : undefined,
+      ...(body?.workflowRole !== undefined ? { workflowRole: workflowRoleArg(body.workflowRole) } : {}),
       location: tree ? 'existing-worktree' : body?.worktree ? 'new-worktree' : 'project',
       ...(tree ? { worktreePath: tree.path } : {}),
       branch: body?.branch ? String(body.branch) : undefined,
@@ -1113,7 +1123,8 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
   return assistantChange('agents', `change ${a.name}'s settings in ${basename(p)}`, { kind: 'update-agent', project: basename(p), agent: actAgent(a) }, async () => {
     // What of its settings changed, for undo (#1282): as saved when the change was made, under the project's lock.
     let was: AgentDef | undefined
-    const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...agentSettings(body) }, { check: (current) => void (was = structuredClone(current)) })
+    const role = body?.workflowRole !== undefined ? { workflowRole: workflowRoleArg(body.workflowRole) } : {}
+    const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...agentSettings(body), ...role }, { check: (current) => void (was = structuredClone(current)) })
     if (was) await noteAgent(requireWorkspace(), basename(p), was, def)
     const live = sessions.liveFor(p, agentId)
     return { done: `Changed ${def.name}'s settings in ${basename(p)}${live ? ' (it applies them when restarted)' : ''}`, act: { agent: actAgent(def) }, result: def }

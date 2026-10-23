@@ -145,7 +145,7 @@ const prose = (seed, n) => {
 
   console.log('\n--- hive tools (as an agent)')
   const projects = measure('hive_list_projects', tool('hive_list_projects', {}), 1000)
-  check('projects: a line each, with their agents', /^alpha \(on, \w+\): Coder \[claude-code\] idle; Tester \[claude-code\] stopped$/m.test(projects), projects)
+  check('projects: a line each, with their agents and their roles in the workflow (#1430)', /^alpha \(on, \w+\): Coder \[claude-code, builder\] idle; Tester \[claude-code, builder\] stopped$/m.test(projects), projects)
   measure('hive_project_status', tool('hive_project_status', {}), 3000)
   const usage = measure('hive_session_usage', tool('hive_session_usage', {}), 1500)
   check('usage leaves out its days unless asked', !usage.includes('"days"') && tool('hive_session_usage', { days: true }).text.includes('"days"'))

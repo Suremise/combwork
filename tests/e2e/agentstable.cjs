@@ -1,6 +1,6 @@
 // A project's agents as a table (#529), on fake Claude Code agents: the project tile's tooltip in the compact sidebar,
 // the agent count and status in the full one, and the project header's status show a table (Agent with its status dot,
-// State, Card cut to one line, Waiting for), a lane's builder beside its reviewer, with 12 agents (working, waiting on a
+// Role in the workflow (#1430), State, Card cut to one line, Waiting for), a lane's builder beside its reviewer, with 12 agents (working, waiting on a
 // background task, watching a card, idle, not running) and with 1 (on a card, and with none); the tooltip never scrolls,
 // every column fits inside it, also narrow and zoomed with a long agent name (cut with an ellipsis); Tab reaches the
 // tile, the sidebar status and the header badge, each showing the table and describing its rows to a screen reader (the
@@ -146,14 +146,20 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   }
   const fits = (t) => !!t && !t.scrolls && t.inside && !t.clipped && t.outside.length === 0
   const fitText = (t) => JSON.stringify(t && { scrolls: t.scrolls, inside: t.inside, clipped: t.clipped, outside: t.outside, width: t.width })
-  const row = (t, n) => t?.rows.find((r) => r.name === n)?.cells ?? []
+  // A row's cells, past its Role (#1430: a project's table has it, the status bar's doesn't): name, state, card, waits.
+  const row = (t, n) => {
+    const c = t?.rows.find((r) => r.name === n)?.cells ?? []
+    return t?.head[1] === 'Role' ? [c[0], ...c.slice(2)] : c
+  }
+  const roleOf = (t, n) => (t?.head[1] === 'Role' ? t.rows.find((r) => r.name === n)?.cells[1] : undefined)
 
   // --- The compact sidebar: the alpha tile's tooltip.
   await page.locator('.pane-header .icon-btn[aria-label^="Compact Sidebar"]').first().click()
   await until(async () => (await page.locator('.rail-project').count()) === 2, HUNG_MS)
   const tile = page.locator('.rail-project[aria-label^="alpha"]')
   const t12 = await hoverTable(tile)
-  check('12 agents: a table with Agent, State, Card and Waiting for', JSON.stringify(t12?.head) === JSON.stringify(['Agent', 'State', 'Card', 'Waiting for']), JSON.stringify(t12?.head))
+  check('12 agents: a table with Agent, Role, State, Card and Waiting for', JSON.stringify(t12?.head) === JSON.stringify(['Agent', 'Role', 'State', 'Card', 'Waiting for']), JSON.stringify(t12?.head))
+  check('…each with its role in the workflow (#1430): HB-style names build, R-named ones review', roleOf(t12, 'B1') === 'Builder' && roleOf(t12, 'R6') === 'Reviewer', JSON.stringify([roleOf(t12, 'B1'), roleOf(t12, 'R6')]))
   check('12 agents: a row each, a builder beside its reviewer (the lanes newest first, as in the Progress panel), then the rest', t12?.rows.map((r) => r.name).join(',') === 'B2,R2,B1,R1,B3,B4,B5,B6,R3,R4,R5,R6', t12?.rows.map((r) => r.name).join(','))
   check('working, with its card', row(t12, 'B1')[1] === 'Working…' && row(t12, 'B1')[2].startsWith(`${K(c1)} Coordinator`), JSON.stringify(row(t12, 'B1')))
   check('waiting on a background task', row(t12, 'B2')[1] === 'Waiting on 1 background task', JSON.stringify(row(t12, 'B2')))
@@ -241,7 +247,7 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   await page.locator('.pane-header .icon-btn[aria-label^="Compact Sidebar"]').first().click()
   await until(async () => (await page.locator('.rail-project').count()) === 2, HUNG_MS)
   const narrow = await hoverTable(page.locator('.rail-project[aria-label^="alpha"]'))
-  check('narrow at 125%: all four columns', JSON.stringify(narrow?.head) === JSON.stringify(['Agent', 'State', 'Card', 'Waiting for']), JSON.stringify(narrow?.head))
+  check('narrow at 125%: all five columns', JSON.stringify(narrow?.head) === JSON.stringify(['Agent', 'Role', 'State', 'Card', 'Waiting for']), JSON.stringify(narrow?.head))
   check('narrow at 125%: every column fits, nothing scrolls', fits(narrow), fitText(narrow))
   check('narrow at 125%: the long name and the long card are cut with an ellipsis', narrow?.cutNames.includes('Builder with a descriptive agent name') && narrow.cut.includes('Builder with a descriptive agent name') && narrow.ellipsis, JSON.stringify(narrow && { cutNames: narrow.cutNames, cut: narrow.cut, ellipsis: narrow.ellipsis }))
   check('narrow at 125%: the watch is still shown', row(narrow, 'R1')[3] === `#${c1} → Review`, JSON.stringify(row(narrow, 'R1')))

@@ -391,6 +391,7 @@
   "board.laneStart.intro": "ビルダーはこの順番でカードを 1 枚ずつ進め、レビュアーがそれぞれをレビューします。どちらも新しい会話で、カード、ビルダーの作業場所、プロジェクトのルールの要件、あなたのメモをまとめた指示とともに開始します。",
   "board.laneStart.name": "内容（任意）",
   "board.laneStart.noAgents": "このプロジェクトにはエージェントがいません。先に追加してください。",
+  "board.laneStart.noBuilders": "このプロジェクトにはビルダーのエージェントがいません。エージェントの設定で「ワークフローでの役割」を「ビルダー」か「どちらも」にしてください。",
   "board.laneStart.noCards": "まだカードがありません。下のプロジェクトの未着手から追加してください。",
   "board.laneStart.noReviewer": "レビュアーなし",
   "board.laneStart.notRunning": "停止中",

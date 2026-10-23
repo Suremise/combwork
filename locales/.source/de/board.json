@@ -391,6 +391,7 @@
   "board.laneStart.intro": "The builder works through the cards in this order, one at a time, and the reviewer reviews each. Both start in a new conversation with a brief: the cards, where the builder works, what the project’s rules ask, and your note.",
   "board.laneStart.name": "What it is about (optional)",
   "board.laneStart.noAgents": "The project has no agents. Add one first.",
+  "board.laneStart.noBuilders": "None of the project’s agents builds. Set Role in the workflow to Builder or Either in an agent’s settings.",
   "board.laneStart.noCards": "No cards yet: add them from the project’s Todo below.",
   "board.laneStart.noReviewer": "No reviewer",
   "board.laneStart.notRunning": "not running",

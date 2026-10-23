@@ -2782,6 +2782,18 @@ repeating them (#533) [note §8].
   one provider, Team 3×3, Team 6×6 (Darren's setup), Team 6 + pool (2 pooled reviewers) [#1123 c].
 - **The workflow role is not #686's guidance role** (None, Generalist, Builder, Reviewer, Researcher, QA, built after
   1.0): two fields, kept apart in the data model [#1117 c2].
+- **Agents' workflow role** [#1430] **Built [#1430]**: `AgentDef.workflowRole` (`builder | reviewer | either`, in
+  `project.json`), apart from the free-text `role`, shown as **Note**. `agentWorkflowRole()` (`shared/workflow/roles.ts`,
+  with `ReviewerMode` for G17) reads it, or, unset, the guess from before 1.0: a note saying *review* is a reviewer and
+  any other note a builder; with no note, a name saying *review* or shaped `{key}-R{n}` / `HR1` is a reviewer, else a
+  builder. `buildsWork` / `reviewsWork`: `either` does both. The upgrade writes nothing; the guess is stored the first
+  time the user saves the agent's settings. Add Agent and Agent Settings choose it (Builder · Reviewer · Either, a
+  sentence each); Start Lane's builder list is builders and either-role agents, its reviewer list reviewers and either;
+  the project hover's agents table has a Role column. The preset step's suggestion and the upgrade's reviewer option
+  count reviewers by it. Agent API: the project status and its short rows give `workflowRole`; adding an agent takes
+  it; changing it (hive_update_agent) is the Assistant's within Control, undoable, like every change to an agent
+  through the Agent API: project agents have neither tool.
+  `review.notAuthor` stays by authorship (who built the card), which the role doesn't change.
 
 #### 16.10.7 What reaches agents in slots
 

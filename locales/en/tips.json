@@ -47,6 +47,14 @@
     "defaultMessage": "Read your agents at a glance",
     "description": "A tip's title."
   },
+  "tips.agentWorkflowRole.text": {
+    "defaultMessage": "Each agent's Role in the workflow, in Agent Settings, says whether it builds cards, reviews them, or either. Start Lane offers builders and reviewers by it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: workflow role."
+  },
+  "tips.agentWorkflowRole.title": {
+    "defaultMessage": "Builders and reviewers",
+    "description": "A tip's title. Glossary: builder, reviewer."
+  },
   "tips.allKeysToCli.text": {
     "defaultMessage": "In an agent's pane, Hive's shortcuts take their keys. Turn on Settings → Advanced → All keys go to the CLI to send every key to the CLI instead, but the command palette's (Show All Commands), so every command is still in reach.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

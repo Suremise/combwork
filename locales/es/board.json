@@ -391,6 +391,7 @@
   "board.laneStart.intro": "El autor trabaja las tarjetas en este orden, una a una, y el revisor revisa cada una. Ambos empiezan en una conversación nueva con unas instrucciones: las tarjetas, dónde trabaja el autor, qué piden las reglas del proyecto y tu nota.",
   "board.laneStart.name": "De qué trata (opcional)",
   "board.laneStart.noAgents": "El proyecto no tiene agentes. Añade uno primero.",
+  "board.laneStart.noBuilders": "Ninguno de los agentes del proyecto es autor. Pon Rol en el flujo de trabajo en Autor o Ambos en la configuración de un agente.",
   "board.laneStart.noCards": "Aún no hay tarjetas: añádelas abajo desde Pendiente del proyecto.",
   "board.laneStart.noReviewer": "Sin revisor",
   "board.laneStart.notRunning": "no está en ejecución",

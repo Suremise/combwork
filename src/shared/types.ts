@@ -20,6 +20,7 @@ import type { PlatformId, ProjectPlatform } from './platform/descriptors'
 import type { SwitchRefusal } from './platform/switching'
 import type { Contradiction, NOT_OFFERED, PresetId, PresetNeeds, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
+import type { WorkflowRole } from './workflow/roles'
 import type { StageNameProblem } from './workflow/stages'
 import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
@@ -1230,8 +1231,10 @@ export interface AgentDef {
   needsSetup?: boolean
   /** The Hive Assistant only: this workspace's mode, over Settings → Assistant. */
   mode?: string
-  /** What the agent is for ("builder", "reviewer"; free text, #126): saved in templates; empty, its name is its role. */
+  /** A note on what the agent is for (free text, #126; shown as Note since #1430): saved in templates. */
   role?: string
+  /** Which side of the workflow it takes (#1430); unset, the guess from its note or name (`agentWorkflowRole`). */
+  workflowRole?: WorkflowRole
   /**
    * Only these of the project's MCP servers (#537, shared/agentMcp.ts), saved in templates; absent: all of them. The
    * built-in hive server is given whatever this says.
@@ -1240,7 +1243,7 @@ export interface AgentDef {
 }
 
 /** A change to an agent's settings: empty values (null for use200kContext and mcpServers) clear an override so it follows the project. */
-export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'model' | 'effort' | 'permissionMode' | 'mode' | 'role'>> & { use200kContext?: boolean | null; mcpServers?: string[] | null }
+export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'model' | 'effort' | 'permissionMode' | 'mode' | 'role'>> & { use200kContext?: boolean | null; mcpServers?: string[] | null; workflowRole?: WorkflowRole | null }
 
 /** What loading a template into a project would do (#126), and what stops it now. */
 /**
@@ -1318,6 +1321,8 @@ export interface AddAgentOptions {
   permissionMode?: PermissionMode
   use200kContext?: boolean
   role?: string
+  /** Which side of the workflow it takes (#1430); absent, the guess from its note or name. */
+  workflowRole?: WorkflowRole
   /** Only these of the project's MCP servers (#537); absent: all of them. */
   mcpServers?: string[]
   /**

@@ -16,6 +16,7 @@ export const SUITES = [
   { name: 'advanced' },
   { name: 'agentguidance' },
   { name: 'agentmessage' },
+  { name: 'agentrole' },
   { name: 'agents' },
   { name: 'agents-ui' },
   { name: 'agents24' },

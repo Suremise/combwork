@@ -391,6 +391,7 @@
   "board.laneStart.intro": "L’auteur traite les cartes dans cet ordre, une à une, et le relecteur relit chacune. Les deux démarrent dans une nouvelle conversation avec des consignes : les cartes, où travaille l’auteur, ce que demandent les règles du projet, et ta note.",
   "board.laneStart.name": "De quoi il s’agit (facultatif)",
   "board.laneStart.noAgents": "Le projet n’a pas d’agent. Ajoutes-en un d’abord.",
+  "board.laneStart.noBuilders": "Aucun des agents du projet n’est auteur. Mets Rôle dans le flux de travail sur Auteur ou Les deux dans les paramètres d’un agent.",
   "board.laneStart.noCards": "Pas encore de carte : ajoute-les ci-dessous depuis À faire du projet.",
   "board.laneStart.noReviewer": "Aucun relecteur",
   "board.laneStart.notRunning": "arrêté",

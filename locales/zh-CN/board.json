@@ -391,6 +391,7 @@
   "board.laneStart.intro": "构建者按此顺序逐张处理卡片，评审者评审每一张。两者都会在新对话中开始，并收到说明：卡片、构建者的工作位置、项目规则的要求以及你的备注。",
   "board.laneStart.name": "主题（可选）",
   "board.laneStart.noAgents": "该项目没有智能体。请先添加一个。",
+  "board.laneStart.noBuilders": "该项目没有构建者智能体。请在某个智能体的设置中将“工作流程中的角色”设为“构建者”或“均可”。",
   "board.laneStart.noCards": "还没有卡片：请在下方从项目的待办中添加。",
   "board.laneStart.noReviewer": "无评审者",
   "board.laneStart.notRunning": "未运行",

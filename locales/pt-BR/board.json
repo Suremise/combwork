@@ -391,6 +391,7 @@
   "board.laneStart.intro": "O executor trabalha os cartões nesta ordem, um de cada vez, e o revisor revisa cada um. Os dois começam em uma conversa nova com instruções: os cartões, onde o executor trabalha, o que as regras do projeto pedem e sua nota.",
   "board.laneStart.name": "Do que se trata (opcional)",
   "board.laneStart.noAgents": "O projeto não tem agentes. Adicione um primeiro.",
+  "board.laneStart.noBuilders": "Nenhum dos agentes do projeto é executor. Defina Papel no fluxo de trabalho como Executor ou Ambos nas configurações de um agente.",
   "board.laneStart.noCards": "Nenhum cartão ainda: adicione-os abaixo de A fazer do projeto.",
   "board.laneStart.noReviewer": "Sem revisor",
   "board.laneStart.notRunning": "não está em execução",

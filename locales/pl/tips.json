@@ -11,6 +11,8 @@
   "tips.agentSettings.title": "Model dla każdego agenta",
   "tips.agentStates.text": "Każdy agent ma jeden z czterech stanów, rozróżnianych kształtem, nie tylko kolorem: romb czeka na Ciebie, kwadrat oznacza zastój, pulsująca kropka pracuje, a pierścień jest bez zajęcia. Nagłówek projektu je liczy: „czeka: 1 · pracuje: 2”.",
   "tips.agentStates.title": "Agenci w jednym spojrzeniu",
+  "tips.agentWorkflowRole.text": "Rola w przepływie pracy każdego agenta, w jego ustawieniach, mówi, czy wykonuje karty, recenzuje je, czy jedno i drugie. Uruchom tor proponuje według niej wykonawców i recenzentów.",
+  "tips.agentWorkflowRole.title": "Wykonawcy i recenzenci",
   "tips.allKeysToCli.text": "W panelu agenta skróty Hive przejmują swoje klawisze. Włącz Ustawienia → Zaawansowane → Wszystkie klawisze trafiają do CLI, by wysyłać każdy klawisz do CLI, poza klawiszem palety poleceń (Pokaż wszystkie polecenia), by każde polecenie było w zasięgu.",
   "tips.allKeysToCli.title": "Daj każdy klawisz CLI agenta",
   "tips.alwaysOnTop.text": "Pinezka na pasku tytułu (lub Ctrl+Alt+O) trzyma okno nad innymi aplikacjami, a pod nim mogą działać testy albo emulator. Każde okno ma własne ustawienie, zapamiętane dla jego obszaru roboczego.",

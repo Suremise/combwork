@@ -7,6 +7,7 @@
 import type { PlatformId } from '../platform/descriptors'
 import type { ProjectConfig } from '../types'
 import type { PresetId } from './options'
+import { agentWorkflowRole, reviewsWork, type WorkflowRole } from './roles'
 
 /**
  * Whether a project asks "How do you work?" for the platform in force. A project with no platform recorded is from
@@ -20,16 +21,13 @@ export function asksPreset(cfg: Pick<ProjectConfig, 'workflow' | 'platform'>, pl
   return !wf.preset && !Object.keys(wf.options ?? {}).length && !wf.presetAsked
 }
 
-/** Whether an agent is a reviewer: its role or, without one, its name says so ("Reviewer", "HR1 (reviewer)"), as the upgrade counts one. */
-export const isReviewer = (a: { name: string; role?: string }): boolean => /review/i.test(a.role || a.name)
-
 /**
  * The preset suggested from the project's agents: Solo for one or none, Pair for a builder and a reviewer, Team for more.
  * Pair is Hive merging for Git (`pair`), as the Pair preset is.
  */
-export function suggestPreset(agents: readonly { name: string; role?: string }[]): PresetId {
+export function suggestPreset(agents: readonly { name: string; role?: string; workflowRole?: WorkflowRole }[]): PresetId {
   if (agents.length <= 1) return 'solo'
-  const reviewers = agents.filter(isReviewer).length
+  const reviewers = agents.filter((a) => reviewsWork(agentWorkflowRole(a))).length
   return agents.length === 2 && reviewers === 1 ? 'pair' : 'team'
 }
 
