@@ -1443,7 +1443,8 @@ async function agentActivity(p: string, agentId: string, detail = false) {
     // With detail, its runtime as separate facts (#648): what the status word stands for, unknown included.
     ...(detail ? { runtime: st ? agentRuntime(st) : null } : {}),
     folder: { at: place.now.at, why: place.now.why },
-    launchFolder: { at: place.launch.at, why: place.launch.why },
+    // Where a new conversation would start, when that isn't where it is now (replies stay short: replysize).
+    ...(place.launch.path !== place.now.path ? { launchFolder: { at: place.launch.at, why: place.launch.why } } : {}),
     ...(place.now.slot ? { slot: place.now.slot } : {}),
     branch: place.branch,
     sessionId: sessionId || null,

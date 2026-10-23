@@ -113,14 +113,14 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     const second = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null), HUNG_MS)
     check('B1 runs in slot-a now', same(second?.cwd, slotA), JSON.stringify(second))
     const act2 = await activity(b1.id)
-    check("…its detail: folder and launchFolder both slot-a", act2?.folder?.at === 'slot-a' && act2.folder.why === 'session' && act2.launchFolder?.at === 'slot-a' && act2.slot === 'slot-a', JSON.stringify(act2))
+    check("…its detail: in slot-a, where it would start too (no launchFolder)", act2?.folder?.at === 'slot-a' && act2.folder.why === 'session' && !('launchFolder' in act2) && act2.slot === 'slot-a', JSON.stringify(act2))
     const t2 = await tokenOf(b1.id)
     check("its own doc read reads slot-a's copy", /The slot copy/.test(await read(t2)), await read(t2))
     check('…from=project reads the project folder', /The project copy/.test(await read(t2, 'project')), await read(t2, 'project'))
     s = await status()
     check('hive_project_status: B1 in slot-a, B2 in its carried hb2 on its branch, R1 in project', s.B1?.folder === 'slot-a' && s.B1.slot === 'slot-a' && s.B2?.folder === 'hb2' && s.B2.slot === 'hb2' && s.B2.branch === 'hive/hb2' && s.R1?.folder === 'project' && !s.R1.slot, JSON.stringify(s))
     const actB2 = await activity(b2.id)
-    check("B2's detail: in hb2, carried", actB2?.folder?.at === 'hb2' && actB2.folder.why === 'carried' && actB2.launchFolder?.why === 'carried' && actB2.branch === 'hive/hb2', JSON.stringify(actB2))
+    check("B2's detail: in hb2, carried", actB2?.folder?.at === 'hb2' && actB2.folder.why === 'carried' && !('launchFolder' in actB2) && actB2.branch === 'hive/hb2', JSON.stringify(actB2))
     check('B1 stopped again', await stop(b1.id))
 
     // --- 3. No agent in a worktree of its own. Only the Assistant adds agents through the Agent API: its token.

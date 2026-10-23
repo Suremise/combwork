@@ -2997,7 +2997,7 @@ Whether a conversation may resume there is its **hold** (none: it may):
 **Built [#1451], the Agent API and main's readers** (the window's are #1442's; `AgentDef.worktree` leaves the type with
 #1452):
 - **No agent is pinned to a worktree.** Adding an agent (the Agent API, the IPC, a template) adds it with its workflow
-  role and no worktree: `location` other than `project`, `worktreePath`, `branch`, `base` and `reuseWorktree` are refused
+  role and no worktree: `location` other than `project`, `worktreePath`, `branch` and `base` are refused
   (*Agents aren't pinned to worktrees in 1.0: slots are lent per card or lane.*, `400`), never ignored; so are the Agent
   API's `worktree`, `existingWorktree`, `branch` and `base`, and a card's start on a new agent with `worktree: true`. Hive's
   making, reusing (#456) and bringing up of an agent's worktree are gone; a 0.9 agent's worktree is still removed,
@@ -3008,7 +3008,7 @@ Whether a conversation may resume there is its **hold** (none: it may):
   with why (`session`, `lease`, `carried`, `project`), and `branch`, the line of the slot it is in (the card last
   started under its open lease; a carried slot's or 0.9 worktree's own branch).
 - **The Agent API:** `hive_project_status`'s agents give `folder`, `slot` and `branch` in place of `worktree`; the agent's
-  detail gives `folder` and `launchFolder` (`{ at, why }`), `slot` and `branch`; add-agent takes `workflowRole`, and its
+  detail gives `folder` and, where it differs, `launchFolder` (`{ at, why }`), `slot` and `branch`; add-agent takes `workflowRole`, and its
   reply says where the agent is. A project agent's own doc reads (`hive_read_section`, `hive_doc_outline`) read the
   folder it works in now; `from=project` the project folder, as before.
 - **Main's readers:** the Git view's agents in the project folder (`folderAgents`) are those whose current folder it

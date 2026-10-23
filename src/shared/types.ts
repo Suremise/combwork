@@ -1387,7 +1387,8 @@ export interface AddAgentOptions {
   /**
    * #456: new-worktree, work in the project's unused worktree on that branch instead when it is merged into the base and
    * clean, brought up to the base; existing-worktree, bring the one chosen up to the base when it is merged and clean.
-   * The Add Agent dialog and the Agent API ask for it; templates reuse their own way (#289).
+   * The Add Agent dialog and the Agent API ask for it; templates reuse their own way (#289). 1.0 (#1451): no agent gets a
+   * worktree, so it does nothing.
    */
   reuseWorktree?: boolean
 }

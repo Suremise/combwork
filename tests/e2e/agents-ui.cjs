@@ -189,7 +189,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await page.screenshot({ path: path.join(scratch, 'ui-7-reuse-moved-part.png') })
   // Adding there is refused in 1.0 (#1451): nothing is pinned to the kept worktree.
   await keeperDialog.locator('.btn.primary', { hasText: 'Add Agent' }).click()
-  check('…and adding in it is refused (1.0 pins no agent to a worktree)', !!(await lib.until(async () => /pinned to worktrees/.test(await keeperDialog.innerText().catch(() => '')), HUNG_MS)) && !(await inv('workspace:refresh')).projects[0].agents.some((a) => a.name === 'Keeper'), await keeperDialog.innerText().catch(() => ''))
+  check('…and adding in it is refused, saying why (1.0 pins no agent to a worktree)', !!(await lib.until(async () => /Could not add agent[\s\S]*pinned to worktrees/.test((await page.locator('.toast').allInnerTexts()).join(' | ')), HUNG_MS)) && !(await inv('workspace:refresh')).projects[0].agents.some((a) => a.name === 'Keeper'), (await page.locator('.toast').allInnerTexts()).join(' | '))
   await page.keyboard.press('Escape')
   await lib.until(async () => (await keeperDialog.count()) === 0, HUNG_MS)
 

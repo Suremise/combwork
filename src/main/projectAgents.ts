@@ -300,8 +300,9 @@ export async function addLegacyAgent(projectPath: string, opts: AddAgentOptions)
  */
 export async function prepareAgent(projectPath: string, cfg: ProjectConfig, opts: AddAgentOptions, name: string, others: AgentDef[], reads?: wt.RepoReads): Promise<{ def: AgentDef; discard: () => Promise<void> }> {
   // 1.0 (#1451): an agent isn't pinned to a worktree (slots are lent per card or lane), so a worktree of its own, new or
-  // existing, is refused, never silently ignored.
-  if ((opts.location && opts.location !== 'project') || opts.worktreePath || opts.branch || opts.base || opts.reuseWorktree) throw hiveError(M.notPinned, undefined, { kind: 'invalid' })
+  // existing, is refused, never silently ignored (`reuseWorktree` alone asks for none: the window's dialog still sends it
+  // until #1442).
+  if ((opts.location && opts.location !== 'project') || opts.worktreePath || opts.branch || opts.base) throw hiveError(M.notPinned, undefined, { kind: 'invalid' })
   void others
   void reads
   // Never reused: sessions of a removed agent keep its id and must not attach to a new one.
