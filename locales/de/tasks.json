@@ -117,6 +117,8 @@
   "tasks.history.repaired": "Projekt: {from} → {to} (umbenannt oder verschoben)",
   "tasks.history.restored": "Zurückgeholt: {project} wurde wiederhergestellt",
   "tasks.history.returned": "Zurück zum Review, Runde {round}",
+  "tasks.history.reviewCopyLeased": "{agent} prüft in {copy} bei {revision}",
+  "tasks.history.reviewCopyWaiting": "{agent} wartet auf eine Review-Kopie",
   "tasks.history.reviewEnded": "Review von Agent {agent} beendet: {why, select, sessionEnded {die Sitzung endete} agentRemoved {der Agent wurde entfernt} other {{why}}}",
   "tasks.history.reviewFailed": "Review fehlgeschlagen",
   "tasks.history.reviewPassed": "Review bestanden",

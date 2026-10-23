@@ -216,7 +216,7 @@ if (!home) {
 }
 
 // Options that take a value, so the first task (the last plain argument) can be told apart.
-const WITH_VALUE = new Set(['--session-id', '--resume', '--name', '--plugin-dir', '--mcp-config', '--settings', '--append-system-prompt-file', '--allowedTools', '--model', '--effort', '--permission-mode', '--system-prompt-snapshot'])
+const WITH_VALUE = new Set(['--session-id', '--resume', '--name', '--plugin-dir', '--mcp-config', '--settings', '--append-system-prompt-file', '--allowedTools', '--model', '--effort', '--permission-mode', '--system-prompt-snapshot', '--add-dir'])
 const opts = {}
 let firstPrompt = ''
 for (let i = 0; i < args.length; i++) {

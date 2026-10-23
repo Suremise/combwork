@@ -269,6 +269,7 @@
   "main.unused.slot.busy": "Hive が今、準備中または削除中です",
   "main.unused.slot.cantCheck": "Hive が確認できませんでした（{detail}）",
   "main.unused.slot.dirty": "コミットされていないファイルが{files, plural, other {#件}}あります",
+  "main.unused.slot.editedSkillCopy": "{copies, plural, other {スキルフォルダー {names} が Hive の変更されていないコピーではありません}}",
   "main.unused.slot.gitRefused": "git が削除しませんでした（{detail}）",
   "main.unused.slot.inFlight": "そこにあったカード #{card} はまだマージ中です",
   "main.unused.slot.leased": "{agent}に貸し出されています",

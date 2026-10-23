@@ -7,7 +7,7 @@
 import { execFileSync } from 'child_process'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -53,6 +53,23 @@ const { Workflow } = await import('../src/main/workflow/runtime')
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
+// Each workspace, intent and pass with its time, said if the test fails (#1479: a timeout under load said only "timed
+// out in 20000ms"): whether one step hung (still running) or every step was slow.
+const steps: string[] = []
+const step = async <T>(what: string, run: () => Promise<T>): Promise<T> => {
+  const t = Date.now()
+  const i = steps.push(`${what}: still running`) - 1
+  try {
+    return await run()
+  } finally {
+    steps[i] = `${what}: ${Date.now() - t} ms`
+  }
+}
+beforeEach(({ onTestFailed }) => {
+  steps.length = 0
+  const began = Date.now()
+  onTestFailed(() => console.error(`Its steps (${Date.now() - began} ms in all): ${steps.join('; ')}`))
+})
 afterEach(async () => {
   await advanced.set(ENFORCE, true)
   await advanced.set(lines.UPDATE_AGENT_BRANCH, true)
@@ -75,7 +92,8 @@ let n = 0
 /** "Pair (the agent merges)": a reviewer agent, the agent merges (squash or merge commit), the builder's own worktree. */
 const PAIR = { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots' } as const
 
-async function workspace(): Promise<{ w: WS; repo: string; wt: string; cards: number[]; lane: string }> {
+const workspace = () => step('workspace', makeWorkspace)
+async function makeWorkspace(): Promise<{ w: WS; repo: string; wt: string; cards: number[]; lane: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
@@ -99,7 +117,7 @@ async function workspace(): Promise<{ w: WS; repo: string; wt: string; cards: nu
 }
 
 type Intent = Parameters<typeof runCardIntent>[2]
-const act = (w: WS, card: number, actor: Parameters<typeof runCardIntent>[1], intent: Intent) => inWorkspace(w, () => runCardIntent({ n: card, plain: false }, actor, intent))
+const act = (w: WS, card: number, actor: Parameters<typeof runCardIntent>[1], intent: Intent) => step(`${intent.kind} #${card}`, () => inWorkspace(w, () => runCardIntent({ n: card, plain: false }, actor, intent)))
 const refused = async (p: Promise<unknown>): Promise<string | null> => {
   try {
     await p
@@ -138,7 +156,7 @@ async function merged(w: WS, repo: string, card: number, how: 'squash' | 'merge'
   expect(foldCard(facts(w, card)).stage).toBe('done')
 }
 
-const update = (w: WS) => inWorkspace(w, () => lines.updateLines(w))
+const update = (w: WS) => step('update', () => inWorkspace(w, () => lines.updateLines(w)))
 const laneStatus = async (w: WS, lane: string) => (await lanes.getLane(w, lane)).status
 
 describe("an agent's branch between a lane's cards (#1271)", () => {
@@ -163,7 +181,10 @@ describe("an agent's branch between a lane's cards (#1271)", () => {
     // And again for the third.
     await merged(w, repo, c2, 'squash')
     await update(w)
-    await approved(w, wt, c3, 'three.txt')
+    // Its submission is what's checked: no review needed (#1479: less work for a test near its bound under load).
+    await act(w, c3, builder, { kind: 'start' })
+    commit(wt, 'three.txt')
+    await act(w, c3, builder, { kind: 'submit', summary: 'three.txt' })
     expect(foldCard(facts(w, c3)).latest?.files.map((f) => f.path)).toEqual(['three.txt'])
     // The builder was told each time.
     const wakes = store.boardRead(w, (db) => db.prepare("SELECT payload FROM card_actions WHERE kind = 'wake'").all() as { payload: string }[]).map((r) => JSON.parse(r.payload) as { agent: string; why: string })

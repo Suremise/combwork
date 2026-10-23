@@ -138,6 +138,11 @@ export interface ProviderCapabilities {
    * (typed or bracketed alike: 0.163); Enter again sends it. Drawn, the line is in its prompt, and the Enter sends it.
    */
   enterOnceDrawn: boolean
+  /**
+   * The CLI can be given folders outside its own to read and write, on its command line (#1439, `LaunchContext.extraDirs`):
+   * how a reviewer reaches the project's review copies. Without it, its reviewers review the builder's folder read-only.
+   */
+  extraDirs: boolean
 }
 
 /** What the CLI said about a model, for modeCaveat. */

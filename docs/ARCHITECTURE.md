@@ -591,8 +591,11 @@ lock. Sessions record their folder and lease; `sessions.ts` resumes a session on
 while its lease is open or the slot is free at its last revision, so a reused slot never resumes the wrong work, and
 Resume All skips the rest. `AgentDef` loses `worktree`. Review copies are detached worktrees from a small warm pool,
 leased to one reviewer for one submission; reviewers' sessions live in the project folder, and their launch grants
-the review-copy pool's folder through the provider adapter (`extraDirs`: `--add-dir`, Codex's writable roots by `-c`),
-never the CLI's config.
+the review-copy pool's folder through the provider adapter (`extraDirs`: `--add-dir` for each CLI; for Codex it adds
+to the user's own writable roots, where a `-c` override would replace them), never the CLI's config. Built [#1439]:
+`reviewCopies.ts` leases a reviewer its copy at start review (servers.ts, once the review mark is set), tells a
+waiting one when it has it, and returns it at the verdict; copiesApp's 30 s look returns a review lease whose review
+is over and lets waiting reviews lease again.
 
 **Slots, built [#1429].** `SlotStore` keeps a project's slots and leases (keyed by the project's id, so a rename
 keeps them) and `SlotPool` lends them. One write takes a slot (the builder's last, else the most recently used ready

@@ -308,6 +308,8 @@
   "tips.removeAll.title": "Alle Agenten auf einmal entfernen",
   "tips.resumeAll.text": "Nach einem Neustart setzt „Alle Agenten fortsetzen“ im Projektkopf die letzte Sitzung jedes gestoppten Agenten in einem Schritt fort.",
   "tips.resumeAll.title": "Alle Agenten auf einmal fortsetzen",
+  "tips.reviewCopies.text": "Ein Reviewer prüft in einer Review-Kopie: einem Ordner genau beim eingereichten Stand, in den sonst nichts schreibt, sodass der Builder derweil weiterarbeiten kann. Seine Checks dort zählen für diese Einreichung. Einstellungen → Erweitert schaltet es aus.",
+  "tips.reviewCopies.title": "Reviewer testen genau das Eingereichte",
   "tips.safeguardStops.text": "Ein Schild neben dem Status eines Agenten heißt, dass der Sicherheitsklassifikator seiner CLI eine Antwort gestoppt hat: Fahre mit der Maus darüber für Zeitpunkt, Modell und die letzten Werkzeugaufrufe des Agenten davor. Orange heißt, dass sich sein Modell seitdem geändert hat oder er auf dich wartet.",
   "tips.safeguardStops.title": "Sehen, wann ein Sicherheitsklassifikator einen Agenten stoppt",
   "tips.saveTemplate.text": "Richte Agenten einmal ein und verwende sie wieder: + Hinzufügen ▾ → Vorlagen → Vorlage speichern… in der Sitzungsleiste speichert ihre Einstellungen, Rollen und das Layout, und dasselbe Menü lädt sie in jedes Projekt.",

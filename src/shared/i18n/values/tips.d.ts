@@ -310,6 +310,8 @@ interface HiveMessageValues {
   'tips.removeAll.title': undefined
   'tips.resumeAll.text': undefined
   'tips.resumeAll.title': undefined
+  'tips.reviewCopies.text': undefined
+  'tips.reviewCopies.title': undefined
   'tips.safeguardStops.text': undefined
   'tips.safeguardStops.title': undefined
   'tips.saveTemplate.text': undefined

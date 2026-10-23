@@ -2818,7 +2818,10 @@ project's builders (`setBuilderCount`; until #1438 its agents), at least one, at
   lent. With no supervisor nothing runs. An operation is its Hive's from before the write that reserves the slot.
   A workspace closing ends its slots' commands and awaits their operations.
 - **Clean-up** is guarded as above, a process in the folder proved absent by renaming it aside and back; the archive
-  command runs first and a failure keeps the slot; git removes the worktree, never forced. Settings → Advanced,
+  command runs first and a failure keeps the slot; git removes the worktree, never forced. Hive's skill copies in
+  `.agents/skills/hive-*` are git-ignored, so the guards don't count them [#1500]: just before git removes the folder,
+  Hive removes its own unchanged copies (`removeCopiesIn`, `always`), and a `hive-*` folder still there (a copy edited
+  since, or the user's own folder with Hive's prefix) keeps the slot (`editedSkillCopy`, naming the folders). Settings → Advanced,
   **Remove idle slots after a day** (`hive.slots.removeIdle`, on) removes free slots beyond the pool's size unused for
   a day, and failed ones, every hour.
 
@@ -3005,6 +3008,41 @@ Leasing and removal are operations owning the copy as slots' are. **Reviewers re
 (`hive.copies.review`, on) is the switch #1439 reads: off, a review lease is refused `off`. Copies beyond the size unused
 for a day go hourly (Remove idle slots after a day).
 
+**Built [#1439], the reviewer's side:** `src/main/reviewCopies.ts`, the grant in `sessions.ts` and the adapters.
+- **The grant** is the adapter capability `extraDirs` (`LaunchContext.extraDirs`): every provider has it, as
+  `--add-dir <copies>` for Claude Code (2.1.309; an option always follows it, since it takes several), Copilot (1.0.100;
+  in Accept edits also `--allow-tool=write(<copies>/**)`) and **Codex** (0.163.0). For Codex the card asked for a `-c`
+  override of `sandbox_workspace_write.writable_roots`: recorded against the installed Codex with test homes
+  (`tests/fixtures/advanced/writable-roots-codex-0.163.0.json`), that override **replaces** the user's own writable
+  roots from their `config.toml`, while `--add-dir` adds to them, so Hive passes `--add-dir` (a flag, like the others it
+  passes: no advanced setting). A launch gets it when its CLI has `extraDirs`, review copies are on, its agent reviews
+  (`reviewsWork`: reviewer or either), it starts in the project folder (not a slot) and isn't the Assistant
+  (`grantsCopies`); the folder is made if new. The session remembers its grant (`grantedDirs`).
+- **Start review** (the old `review: "start"` or `hive_start_review`: any path that sets the card's review mark for an
+  agent) leases a copy for the card's latest submission (`kind: review`, `ref` its submission), only for a session
+  granted the folder (else nothing: it reviews the builder's folder read-only). Ready within 2 s, the reply names it
+  ("Review in … at <revision>: read and run commands there; your session stays where it is": in `changes` of a short
+  reply, `reviewCopy` of a whole card or of an intent's `data`). A first copy's setup takes longer, so otherwise it
+  replies "Waiting for a review copy (why): Hive tells you when one is ready", the card's history says *R1 is waiting for
+  a review copy* (the window's text, a message), and once leased the reviewer is told in its inbox (a message from
+  Hive) and the history says *R1 reviews in copy-2 at <revision>*. Waiting reviews lease again after each look at the
+  pools (30 s); one whose review ended is dropped. Starting again with a copy at that revision keeps it; one at an
+  earlier submission's is returned first. At most 50 wait per project.
+- **Returned:** a verdict returns the reviewer's copies of the card at once. A review that ended otherwise (the card
+  moved on, its review mark gone, the reviewer's session ended, which ends its reviews) is over (`over`), and the pools'
+  next look returns it (projects with a review lease out are looked at). Either way the copy is `returning`, freed by
+  the barrier. A pass made stale by a decision is reviewed again: that start review leases a copy again.
+- **Runs** in the copy are checks of its lease's card and revision (#1435's `copyAt` in runLink.ts), so a reviewer's
+  `hive-progress --check` there counts for the submission.
+- **Off** (HR5's round 1): with review copies off, or **Workflow rules are enforced** (`hive.workflow.enforce`) off, Hive
+  records facts and leases nothing (§16.7's switch): a start review leases no copy (its reply adds nothing), a review
+  waiting for one is dropped and told why, and a copy leased as it was turned off is returned at once, never handed
+  over; the pool itself refuses a review lease `off` then. Copies already out are still returned at the review's end and
+  freed through the barrier. The launch grant stays (a folder made reachable, nothing leased), so turning them on again
+  needs no restart.
+- **Not here:** an either agent building in a slot isn't e2e-tested (lending slots for a card's start is #1438): the
+  grant's rule is unit-tested. The copies' state in the window is #1445's tab.
+
 **G17**: one reviewer per lane, or a shared pool that takes the next
 Submitted card (oldest first). Run records attached to the revision let a reviewer trust the builder's runs instead of
 repeating them (#533) [note §8].
@@ -3126,7 +3164,8 @@ repeating them (#533) [note §8].
     made meanwhile keeps the copy (put back, or kept beside it as a conflict copy), and a crash never leaves a
     half-removed copy without its marker. When: the last session in
     the folder ends (not as Hive quits), at a workspace's opening for folders whose sessions are gone, and through
-    `removeCopiesIn` for a lease's end (#1438) and before a slot or copy is removed (#1429, `always`). Switch: Settings
+    `removeCopiesIn` for a lease's end (#1438) and before a slot or copy is removed (#1429, `always`; a slot with a
+    `hive-*` folder left after that is kept, #1500). Switch: Settings
     → Advanced `hive.skills.removeIdleCopies`, *Slots only* (default: every folder but the project folder; the
     Assistant's workspace folder counts as its project folder) · *Everywhere* · *Never*.
   - **Delivered to agents:** each Hive skill for agents is on unless switched off, in the workspace
@@ -3361,7 +3400,9 @@ running again when the deliverables are quiet, which the refusal says.
 the card's revision apart from the request (`IsolatedRequests`: a first setup takes longer than any request may): resolve
 answers within 2 s, with the copy or 409 `wait` and a ticket, and hive-progress asks again with the ticket every 2 s,
 saying what it waits for once (*waiting for a check copy*, *… to be set up*); a copy leased for a ticket nobody asks
-about for a minute is given back (`abandoned`). The lease's job is opened on the process supervisor (`copy-<lease>`,
+about for a minute is given back (`abandoned`). At most 100 requests wait at once (the oldest is dropped); a request
+dropped that way, or by its workspace closing, while its copy is still being set up gives that copy back once it comes,
+exactly once [#1499]. The lease's job is opened on the process supervisor (`copy-<lease>`,
 recorded on the lease first). hive-progress then starts the command's launcher (#1360's, `workflow/launcher.ts`) in the
 copy and has Hive put it in that job (`POST /v1/progress/isolated`) before it runs anything: only by the lease's agent,
 once per lease, and only a process of that agent's own (in its launch's job, started in the window it names). The run's start takes the lease,

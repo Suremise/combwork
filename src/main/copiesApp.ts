@@ -23,14 +23,14 @@ import { sessions } from './sessions'
 import { appRunner, appSettle, boardConn, holder, journalsOf } from './slotsApp'
 import { slotOptionsOf } from './slots'
 import { openWorkspaces, WorkspaceService } from './workspace'
-import { CopyPool, CopyStore, copyPoolSize, COPIES_DIR, IsolatedRequests, type CopyLease } from './copies'
+import { CopyPool, CopyStore, copiesDirOf, copyPoolSize, IsolatedRequests, type CopyLease } from './copies'
 import { journalPath, LeaseJob } from './workflow/queueJobs'
 import { LINK_TTL_MS } from './workflow/runLink'
 import { projectAgents } from '../shared/defaults'
 import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
 import { isOpenRun } from '../shared/progress'
 import type { CopyView } from '../shared/types'
-import { COPIES_QUIET_WAIT, COPIES_REVIEW, SLOTS_REMOVE_IDLE } from '../shared/advanced'
+import { COPIES_QUIET_WAIT, COPIES_REVIEW, SLOTS_REMOVE_IDLE, WORKFLOW_ENFORCE } from '../shared/advanced'
 
 const log = createLogger('copies')
 
@@ -55,7 +55,7 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
     return new CopyPool({
       store: new CopyStore(boardConn(ws), cfg.id ?? basename(projectPath)),
       project: projectPath,
-      dir: join(root, COPIES_DIR),
+      dir: copiesDirOf(ws.worktreesRoot, projectPath),
       options: async () => slotOptionsOf(await ws.projectConfig(projectPath), config.settings.agents.worktreeCopy),
       size: async () => {
         const c = await ws.projectConfig(projectPath)
@@ -83,8 +83,9 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
         const s = sessions.liveFor(projectPath, agent)
         return s && (s.status === 'working' || s.status === 'waiting' || s.status === 'background') ? `${s.agentName ?? agent} (${s.status})` : null
       },
-      leaseOver: (l) => leaseOver(workspacePath, l),
-      reviewOn: () => advanced.get(COPIES_REVIEW) !== false,
+      leaseOver: (l) => (l.kind === 'review' ? (reviewOver?.(ws, projectPath, l) ?? null) : leaseOver(workspacePath, l)),
+      // Review leases: with review copies on, and workflow rules enforced (off, Hive records facts and leases nothing, #1439).
+      reviewOn: () => advanced.get(COPIES_REVIEW) !== false && advanced.get<boolean>(WORKFLOW_ENFORCE) !== false,
       quietWaitMs: () => Math.max(1, Number(advanced.get(COPIES_QUIET_WAIT)) || 10) * 60_000
     })
   })()
@@ -94,8 +95,18 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
 }
 
 /**
- * Whether a lease's review or run is over, as this Hive knows: a check's run ended (or never started within a link's
- * life); a review is #1439's to return (null: can't tell here).
+ * Whether a review lease's review is over (#1439, reviewCopies.ts: its reviewer's review of the card has ended), as this
+ * Hive knows; null: can't tell. And what runs after each look at the pools (waiting reviews leasing again).
+ */
+let reviewOver: ((ws: WorkspaceService, projectPath: string, l: CopyLease) => Promise<boolean | null>) | null = null
+let afterLook: (() => Promise<void>) | null = null
+export function setReviewCopyHooks(h: { over: typeof reviewOver; afterLook: typeof afterLook } | null): void {
+  reviewOver = h?.over ?? null
+  afterLook = h?.afterLook ?? null
+}
+
+/**
+ * Whether a check lease's run is over, as this Hive knows: its run ended (or never started within a link's life).
  */
 function leaseOver(workspacePath: string, l: CopyLease): boolean | null {
   if (l.kind !== 'check') return null
@@ -140,7 +151,7 @@ const requests = new IsolatedRequests<{ lease: CopyLease; folder: string; copy: 
  * setup outlasts any request's time limit): `wait` with a ticket to ask again with, until the copy is ready.
  */
 export function isolatedRequest(ws: WorkspaceService, projectPath: string, owner: string, req: { card: number; revision: string; agent: string | null }, ticket?: string): Promise<{ lease: CopyLease; folder: string; copy: string } | { wait: string; ticket: string } | { refused: string }> {
-  return requests.ask(owner, projectPath, `${req.card}|${req.revision}`, () => isolatedLease(ws, projectPath, req), ticket)
+  return requests.ask(owner, projectPath, `${req.card}|${req.revision}`, () => isolatedLease(ws, projectPath, req), ticket, ws.lifetime)
 }
 
 /** The link resolve gave out is the lease's run until its run starts. */
@@ -229,7 +240,7 @@ export async function lookAtCopies(tidy = false): Promise<void> {
     if (!ws.path) continue
     let ids: string[]
     try {
-      ids = boardRead(ws, (db) => (db.prepare(tidy ? 'SELECT DISTINCT project FROM copies' : "SELECT DISTINCT project FROM copies WHERE state = 'returning' OR op IS NOT NULL OR job IS NOT NULL").all() as { project: string }[]).map((r) => r.project)) // i18n-ignore: SQL
+      ids = boardRead(ws, (db) => (db.prepare(tidy ? 'SELECT DISTINCT project FROM copies' : "SELECT DISTINCT project FROM copies WHERE state = 'returning' OR op IS NOT NULL OR job IS NOT NULL OR project IN (SELECT project FROM copy_leases WHERE kind = 'review' AND returned_at IS NULL)").all() as { project: string }[]).map((r) => r.project)) // i18n-ignore: SQL
     } catch {
       continue
     }
@@ -245,6 +256,7 @@ export async function lookAtCopies(tidy = false): Promise<void> {
         .catch((e) => log.warn(`looking at the copies of ${userText(path)}`, e))
     }
   }
+  await afterLook?.().catch((e) => log.warn('leasing review copies for waiting reviews', e))
 }
 
 let timer: NodeJS.Timeout | null = null
