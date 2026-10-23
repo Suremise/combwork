@@ -967,7 +967,7 @@ describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () =
     const w = world({ builders: 1 })
     const r = await lent(w, { agent: 'a1', card: 1 })
     const head = sh(w.project, 'rev-parse', 'main')
-    expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-first', base: head, install: false })).toBeNull()
+    expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-first', base: head, install: false })).toMatchObject({ ok: true })
     expect(branch(r.slot.folder)).toBe('hive/AM/AM-1-first')
     expect(sh(r.slot.folder, 'rev-parse', 'HEAD')).toBe(head)
     expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null, job: null })
@@ -975,7 +975,7 @@ describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () =
     commit(r.slot.folder, { 'a.txt': 'a\n' }, 'its work')
     const work = sh(r.slot.folder, 'rev-parse', 'HEAD')
     sh(r.slot.folder, 'switch', '-q', '--detach', 'main')
-    expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-first', base: head, install: false })).toBeNull()
+    expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-first', base: head, install: false })).toMatchObject({ ok: true })
     expect(sh(r.slot.folder, 'rev-parse', 'HEAD')).toBe(work)
   })
 
@@ -984,16 +984,16 @@ describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () =
       const w = world({ builders: 1, setup: WRITE_ENV })
       commit(w.project, { 'package-lock.json': '{"v":1}\n' }, 'lock')
       const r = await lent(w, { agent: 'a1', lane: 'lane-1' })
-      expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-one', base: sh(w.project, 'rev-parse', 'main'), install })).toBeNull()
+      expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-one', base: sh(w.project, 'rev-parse', 'main'), install })).toMatchObject({ ok: true })
       expect(w.runs.map((x) => x.what)).toEqual(['setup'])
       // Card 1 merged with a new lock file; card 2's line from the new main, in the same slot.
       commit(w.project, { 'package-lock.json': '{"v":2}\n' }, 'lock 2')
-      expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-2-two', base: sh(w.project, 'rev-parse', 'main'), install })).toBeNull()
+      expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-2-two', base: sh(w.project, 'rev-parse', 'main'), install })).toMatchObject({ ok: true })
       expect(branch(r.slot.folder)).toBe('hive/AM/AM-2-two')
       expect(w.runs.map((x) => x.what), `install ${install}`).toEqual(install ? ['setup', 'install'] : ['setup'])
       expect(w.store.slot('slot-a')?.installHash === (await lockHash(r.slot.folder))).toBe(install)
       // The same lock again: nothing more.
-      expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-3-three', base: sh(w.project, 'rev-parse', 'main'), install })).toBeNull()
+      expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-3-three', base: sh(w.project, 'rev-parse', 'main'), install })).toMatchObject({ ok: true })
       expect(w.runs).toHaveLength(install ? 2 : 1)
     }
   })
@@ -1015,30 +1015,69 @@ describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () =
     const r = await lent(w, { agent: 'a1', card: 1 })
     const head = sh(w.project, 'rev-parse', 'main')
     writeFileSync(join(r.slot.folder, 'wip.txt'), 'wip\n')
-    expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-x', base: head, install: false })).toBe("slot-a has changes that aren't committed")
+    expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-x', base: head, install: false })).toMatchObject({ error: "slot-a has changes that aren't committed" })
     expect(branch(r.slot.folder)).toBe('')
     expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null })
     rmSync(join(r.slot.folder, 'wip.txt'))
     // A failed install: its error, the slot still lent to the card, no operation left.
     commit(w.project, { 'package-lock.json': '{"v":1}\n' }, 'lock')
     w.opts.setup = 'node -e "process.exit(4)"'
-    expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-x', base: sh(w.project, 'rev-parse', 'main'), install: true })).toBe('its setup exited with code 4')
+    expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-x', base: sh(w.project, 'rev-parse', 'main'), install: true })).toMatchObject({ error: 'its setup exited with code 4' })
     expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null, job: null })
     w.opts.setup = WRITE_ENV
     // Another lease's session still writing there (the slot's writer): busy, tried again by the app.
     const db = new DatabaseSync(boardFile(w.ws))
     try {
       db.prepare("UPDATE slots SET writer_run = 'run-old', writer_lease = 'l-old', writer_agent = 'a0', writer_pid = 1, writer_started = 1 WHERE project = 'p-test' AND name = 'slot-a'").run()
-      expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-x', base: head, install: false })).toMatch(/^slot-a is busy: /)
+      expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-x', base: head, install: false })).toMatchObject({ retry: expect.stringMatching(/^slot-a is busy: /) })
       // Its own lease's session (a lane's builder idle there): prepared.
       db.prepare("UPDATE slots SET writer_lease = ? WHERE project = 'p-test' AND name = 'slot-a'").run(r.lease.id)
     } finally {
       db.close()
     }
-    expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-x', base: head, install: false })).toBeNull()
+    expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-x', base: head, install: false })).toMatchObject({ ok: true })
     await w.store.clearWriter('slot-a', 'run-old')
     await w.pool.release(r.lease.id, 'putBack')
-    expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-y', base: head, install: false })).toBe('its lease has ended')
+    expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-y', base: head, install: false })).toMatchObject({ error: 'its lease has ended' })
+  })
+
+  it("the caller's last word (its builder quiet, the card current) comes right before the files change: refused, nothing changes; the switch runs under its guard", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', lane: 'lane-1' })
+    const head = sh(r.slot.folder, 'rev-parse', 'HEAD')
+    const busy = await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-x', base: head, install: false, ready: async () => 'its builder is busy' })
+    expect(busy).toEqual({ retry: 'its builder is busy' })
+    expect([branch(r.slot.folder), sh(r.slot.folder, 'rev-parse', 'HEAD')]).toEqual(['', head])
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null })
+    const guarded: string[] = []
+    const ok = await w.pool.prepare(r.lease.id, {
+      line: 'hive/AM/AM-1-x',
+      base: head,
+      install: false,
+      ready: async () => (guarded.push('ready'), null),
+      around: async (fn) => {
+        guarded.push('locked')
+        const out = await fn()
+        guarded.push('unlocked')
+        return out
+      }
+    })
+    expect(ok).toEqual({ ok: true, revision: head })
+    expect(guarded).toEqual(['ready', 'locked', 'unlocked'])
+    expect(branch(r.slot.folder)).toBe('hive/AM/AM-1-x')
+  })
+
+  it('a slot already on its line is prepared as it is: a repeat changes nothing, its work in progress kept', async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    const head = sh(w.project, 'rev-parse', 'main')
+    expect(await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-x', base: head, install: false })).toMatchObject({ ok: true })
+    writeFileSync(join(r.slot.folder, 'wip.txt'), 'wip\n')
+    let asked = false
+    const again = await w.pool.prepare(r.lease.id, { line: 'hive/AM/AM-1-x', base: head, install: false, ready: async () => ((asked = true), null) })
+    expect(again).toEqual({ ok: true, revision: head })
+    expect(asked).toBe(false)
+    expect(readFileSync(join(r.slot.folder, 'wip.txt'), 'utf8')).toBe('wip\n')
   })
 
   it('a preparation whose Hive died is taken over: the lease kept, the slot lent, the operation gone', async () => {
@@ -1056,7 +1095,7 @@ describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () =
     expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null })
     expect(w.store.lease(r.lease.id)?.to).toBeNull()
     gate.open()
-    expect(await going).toBe("slot-a's preparation was taken over")
+    expect(await going).toMatchObject({ retry: "slot-a's preparation was taken over" })
   })
 })
 

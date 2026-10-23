@@ -47,6 +47,11 @@ export interface LaneRecord {
   ruleset?: string
   pending?: number[]
   inFlight?: number
+  /**
+   * Started from the window with no slot free (#1438, §16.10.2): its agents start once one is lent to it, with the user's
+   * note in their brief. Kept with the lane (its row's `extra`), so it waits through a restart; cleared once it starts.
+   */
+  slotWait?: { since: string; note: string }
 }
 
 /** At most this many cards in a lane, rounds per card, and minutes of wait (a day, as a card watch's longest). */
@@ -313,7 +318,8 @@ export function readLane(v: unknown): LaneRecord | null {
     ...(snapshot ? { frozen: snapshot } : {}),
     ...(text(v.ruleset, 128) ? { ruleset: v.ruleset } : {}),
     ...(pending ? { pending } : {}),
-    ...(whole(v.inFlight, 1e9) ? { inFlight: v.inFlight as number } : {})
+    ...(whole(v.inFlight, 1e9) ? { inFlight: v.inFlight as number } : {}),
+    ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000) } } : {})
   }
 }
 

@@ -166,6 +166,16 @@ export interface FactData {
   LineRenamed: { from: string; to: string; why: 'repair' }
   /** A Done card's line deleted (#1438): its target contained it at `revision`, and nothing had it checked out. */
   LineDeleted: { line: string; revision: string; why: 'merged' }
+  /**
+   * A card's slot made ready for its start (#1438): the line checked out at `revision` (installed again with G15) under
+   * `lease`. Written after the slot's preparation, in a write that finds the card's start the same: until then the start's
+   * preparation is owed, and a pass of Hive's (after a restart too) does it.
+   */
+  SlotPrepared: { lease: string; line: string; revision: string }
+  /** Its builder's placement in the slot claimed by a Hive (its process), so two never place it; one gone is taken over. */
+  PlacementClaimed: { lease: string; pid: number; started: number }
+  /** Its builder given the card in the slot: typed in, or a new conversation started there; `delivery` the one made. */
+  BuilderPlaced: { lease: string; delivery: string | null; how: 'typed' | 'newConversation' | 'started' }
   /** The card's folder moved (#1343: Repair relinking or recreating the agent's worktree at a new place): its work follows it. */
   FolderMoved: { from: string; to: string; why: 'repair' }
   /**

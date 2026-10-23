@@ -163,8 +163,27 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const lent = (await slots()).find((s) => s.name === 'slot-a')
     check('the lane keeps slot-a after card 1 is Done', !!lent?.lease && lent.lease.lane === started.lane.id, JSON.stringify(lent))
 
-    // --- 2. Card 2 in slot-a from the new target, installed again first; card 1's line, merged, deleted.
+    // --- 2. Card 2 in slot-a from the new target, installed again first; card 1's line, merged, deleted. While B1 has a
+    // run going in slot-a (HR1's round 1 finding 3), nothing of the slot changes: prepared only once it is quiet.
+    const hold = path.join(tools, 'hold.js')
+    const holdGo = path.join(tools, 'hold-go.txt')
+    const holdSaw = path.join(tools, 'hold-saw.txt')
+    // Held until hold-go.txt, bounded against a hang; as it ends it records the branch its folder is on (still card 1's),
+    // read from the worktree's HEAD.
+    fs.writeFileSync(hold, `const fs = require('fs'); const t = Date.now(); const tick = () => { if (fs.existsSync(${JSON.stringify(holdGo)})) { fs.writeFileSync(${JSON.stringify(holdSaw)}, fs.readFileSync(require('path').join(fs.readFileSync('.git', 'utf8').replace('gitdir:', '').trim(), 'HEAD'), 'utf8').replace('ref: refs/heads/', '').trim()); process.exit(0) } if (Date.now() - t > 120000) process.exit(3); setTimeout(tick, 100) }; tick()\n`)
+    const progressRuns = async () => (await inv('progress:snapshot')).runs.filter((r) => r.state === 'running' || r.state === 'queued')
+    await until(async () => ['ready', 'finished'].includes((await live(b1.id))?.status), HUNG_MS)
+    await inv('pty:write', lib.ptyKey(alpha, b1.id), `shell: hive-progress --title "B1 holds slot-a" -- node "${hold}"`)
+    // Typed, then entered (the fake reads a line), as progressreport does.
+    await lib.sleep(300)
+    await inv('pty:write', lib.ptyKey(alpha, b1.id), '\r')
+    check("B1's run is going in slot-a", !!(await until(async () => (await progressRuns()).length > 0, HUNG_MS)), JSON.stringify(await progressRuns()))
+    const headBusy = git(slotA, 'rev-parse', 'HEAD')
     const s2 = await intent(tb1, c2, 'start')
+    const busyFacts = async () => (await inv('tasks:facts', c2)).map((f) => f.kind)
+    check('card 2 started while B1 is busy: the slot not touched yet', s2.status === 200 && !!(await until(async () => (await busyFacts()).includes('Started'), HUNG_MS)) && branchIn(slotA) === line(c1, 'slot-one') && git(slotA, 'rev-parse', 'HEAD') === headBusy && !(await busyFacts()).includes('SlotPrepared'), JSON.stringify({ branch: branchIn(slotA), facts: await busyFacts() }))
+    fs.writeFileSync(holdGo, 'go')
+    check("…B1's run over, slot-a still on card 1's line as it ended", !!(await until(async () => (await progressRuns()).length === 0, HUNG_MS)) && fs.existsSync(holdSaw) && fs.readFileSync(holdSaw, 'utf8') === line(c1, 'slot-one'), fs.existsSync(holdSaw) ? fs.readFileSync(holdSaw, 'utf8') : 'no record')
     check("card 2 starts in the lane's slot-a", s2.status === 200 && same(s2.body?.data?.folder, slotA), JSON.stringify(s2.body))
     const base2 = git(alpha, 'rev-parse', 'integration')
     check(`card 2's line from the target as it is now (card 1 in it)`, !!(await until(() => branchIn(slotA) === line(c2, 'slot-two'), HUNG_MS)) && git(slotA, 'rev-parse', 'HEAD') === base2 && base2 !== base1)

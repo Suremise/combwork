@@ -1,39 +1,58 @@
 // Cards on slots (#1438, SPEC §16.10): G11 = slots made real. A card's start under it asks `leaseForStart` for its
 // builder's slot (a lane's card: the lane's dispatch lease, lent once and kept for the whole lane, OP-10; any other card:
-// its own lease), and its card's line `hive/<KEY>/<KEY>-<n>-<slug>` is made from the target's head in it by the start's
-// `prepareSlot` action (with G15, Slots are brought up to date, its dependencies installed again when its lock files
-// changed). The builder then works there: Hive waits for its turn to end and gives it the card in that slot (a new
-// conversation where it isn't running there, the old one kept). The lease ends at the card's Done or put back
-// (`releaseSlot`), a lane's only with the lane; a merged line is deleted once Done when its target contains it (Settings
-// → Advanced, Delete a card's branch once it's merged). With the rules off (Settings → Advanced, Workflow rules are
-// enforced) or G11 another value, nothing here acts: a card starts where its agent is, as before.
+// its own lease) and records it on its `Started`. What the start then owes is decided from durable state, never from an
+// action's run (HR1's #1438 round 1): one pass per project (`settleSlotCards`) reads the card's facts and the slots'
+// lease rows and does what is still owed, so a crash anywhere leaves it to the next pass (after a restart, at the
+// workspace's opening):
+// - **release**: a card's lease its card's current cycle doesn't use (Todo, Done, or another lease), ended in the write
+//   that reads the card; a lane's once the lane has ended. With the rules off too (data safety).
+// - **prepare**: the card's line `hive/<KEY>/<KEY>-<n>-<slug>` checked out in the slot from the target's head (G15: its
+//   dependencies installed again on a changed lock file), once the lease's builder is quiet (not in a turn, nothing
+//   typed or queued, no run or background task), as #1429's warming operation on the lent slot, under the folder's fence
+//   (#646: nothing typed into or started in it meanwhile) and the repository's lock for the switch; recorded as
+//   `SlotPrepared` for the cycle.
+// - **place**: the builder given the card there once quiet: claimed by this Hive (`PlacementClaimed`, taken over once
+//   its process is gone), delivered once (its delivery's identity is the card's cycle and lease), recorded as
+//   `BuilderPlaced`.
+// - **delete**: a Done card's merged line (containment by key), under the repository's lock, never one checked out.
+// - **waiting lanes**: a lane started from the window with no slot free (`slotWait`, kept with the lane) is lent one and
+//   its agents started, once.
+// The pass runs when a card's slot action asks (`prepareSlot`, `releaseSlot`), as a workspace opens, when lanes change,
+// when a slot's writer drains, when the rules are switched, and hourly. With the rules off (Settings → Advanced, Workflow
+// rules are enforced) it only releases: nothing is lent, prepared, placed or deleted, each step checking again after its
+// waits.
 
 import { projectAgents } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import { taskPrompt } from '../shared/tasks'
 import { agentWorkflowRole, buildsWork } from '../shared/workflow/roles'
 import { workflowText } from '../shared/workflow/texts'
+import type { Fact, FactData, StartedData, StageId } from '../shared/workflow/facts'
 import { SLOTS_DELETE_MERGED } from '../shared/advanced'
 import type { AgentDef } from '../shared/types'
+import { app } from 'electron'
 import { advanced } from './advanced'
+import { exitBy } from './exitLog'
 import { boardRead } from './boardStore'
-import { launchWith, deliverNow } from './deliveries'
+import { deliveriesOf, deliverNow, launchWith } from './deliveries'
 import { onHiveEvent } from './events'
+import { changingFolder } from './folderFence'
 import { samePlace } from './fsutil'
 import { git } from './git'
-import { listLanes, onLanesWritten, setLaneSlots } from './lanes'
+import { lanesWaitingForSlot, onLanesWritten, rawLanes, setLaneSlots, setLaneSlotWait } from './lanes'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
+import { withRepoLock } from './repoLock'
 import { sessions } from './sessions'
-import { poolFor, setSlotFreed } from './slotsApp'
+import { holder, poolFor, setSlotFreed } from './slotsApp'
 import { refusalText, setBuilderCount, type SlotLease, type SlotPool } from './slots'
 import { getTask } from './tasks'
 import { onAction } from './workflow/actionWorker'
 import { agentBusy } from './workflow/lineUpdates'
 import type { CardRecord } from './workflow/factStore'
-import type { SlotForStart } from './workflow/runtime'
-import { agentRunsGoing, setSlotStarts, workflowEnforced, workflowFor } from './workflow/service'
+import type { SlotForStart, Workflow } from './workflow/runtime'
+import { agentRunsGoing, setSlotStarts, workflowEnforced, workflowFor, ENFORCE } from './workflow/service'
 import { listWorktreesOrNull } from './worktrees'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 
@@ -43,6 +62,29 @@ const M = {
   notPrepared: msg({ id: 'service.slots.notPrepared', defaultMessage: "Hive couldn't get {slot} ready for {card}: {why}", description: "A notice: a card was started in a slot (a worktree Hive lends to a card or a lane), and Hive couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English." })
 }
 
+/** What a placement's delivery is made from: its identity is the card's cycle and lease, so it is made once. */
+const PLACEMENT = 'slot-placement'
+/** How long a Done card's merged line is looked for after its lease ended. */
+const DELETE_WITHIN_MS = 14 * 24 * 60 * 60 * 1000
+/**
+ * A card's lease lent for a start that hasn't written its `Started` yet: left this long by the pass (a start refused gives
+ * it back at once, `slotUnused`; one cut short by a crash is given back after this).
+ */
+const START_GRACE_MS = 2 * 60 * 1000
+/** Stages in which a started card keeps its slot (put back: Todo; Done: released). On Hold keeps it too. */
+const KEEPS: ReadonlySet<StageId> = new Set<StageId>(['active', 'review', 'approved', 'merging', 'hold'])
+
+/**
+ * Test copies (unpackaged) only: `HIVE_TEST_SLOT_CRASH=<point>` ends Hive at once there, no quit handler run, so a suite
+ * shows what the next start recovers (HR1's #1438 round 1): `afterAction` (a slot action marked done, nothing of it done),
+ * `inPrepare` (the line checked out, `SlotPrepared` not written), `inPlacement` (claimed, nothing delivered).
+ */
+function crashAt(point: 'afterAction' | 'inPrepare' | 'inPlacement'): Promise<never> | null {
+  if (app.isPackaged || process.env.HIVE_TEST_SLOT_CRASH !== point) return null
+  exitBy('app.exit', `a test crash at a slot's ${point}`, () => app.exit(1)) // i18n-ignore: the exit log's reason
+  return new Promise<never>(() => undefined)
+}
+
 /** The project folder of a card on a workspace's board, by its board name; null for none. */
 function projectOfCard(ws: WorkspaceService, card: number): string | null {
   const name = boardRead(ws, (db) => (db.prepare('SELECT project FROM cards WHERE number = ?').get(card) as { project: string } | undefined)?.project) // i18n-ignore: SQL
@@ -50,34 +92,60 @@ function projectOfCard(ws: WorkspaceService, card: number): string | null {
   return ws.info()?.projects.find((p) => p.name.toLowerCase() === name.toLowerCase())?.path ?? null
 }
 
-/** A project's folder by its id (the slots' `project`), in a workspace; null for none. */
-const projectById = (ws: WorkspaceService, id: string): string | null => ws.projectIdsNow().byId.get(id) ?? null
-
-/**
- * Lanes waiting for a slot now (lent none when they started, or their card's start found none), by id: a lane started
- * from the window starts its agents once one is lent (`start`).
- */
-const laneWaits = new Map<string, { ws: WorkspaceService; project: string; builder: string; start: ((slot: string) => Promise<void>) | null }>()
-
-/** The slot a lane works in now (its open lease's), and whether it waits for one: for the lane's view (lanes.ts). */
-function laneSlot(ws: WorkspaceService, lane: string): { slot: string | null; waiting: boolean } {
-  let slot: string | null = null
-  try {
-    slot = boardRead(ws, (db) => (db.prepare('SELECT slot FROM slot_leases WHERE lane = ? AND ended_at IS NULL').get(lane) as { slot: string } | undefined)?.slot ?? null) // i18n-ignore: SQL
-  } catch {
-    // A board still 0.9's: no slots.
-  }
-  return { slot, waiting: !slot && laneWaits.has(lane) }
-}
-
-/** A lease where a start can use it: its slot and folder (fresh: a card's own, given back if the start isn't written). */
-function leaseAt(pool: SlotPool, l: SlotLease): SlotForStart {
-  const s = pool.slotOf(l)
-  return s ? { slot: s.name, folder: s.folder, lease: l.id, fresh: l.kind === 'card' } : null
-}
-
 /** Whether an agent builds (G11's slots are its builders'): a builder or either, never a reviewer. */
 const builds = (a: AgentDef | undefined): a is AgentDef => !!a && buildsWork(agentWorkflowRole(a))
+
+// --- A card's cycle, from its facts.
+
+/** A card's current cycle in a slot: its last `Started` (with a lease), and what was done for it since. */
+interface Cycle {
+  seq: number
+  started: StartedData & { lease: string; slot: string }
+  prepared: FactData['SlotPrepared'] | null
+  claimed: (FactData['PlacementClaimed'] & { seq: number }) | null
+  placed: boolean
+  deleted: boolean
+}
+
+export function cycleIn(facts: readonly Fact[]): Cycle | null {
+  let at = -1
+  for (let i = facts.length - 1; i >= 0; i--) {
+    if (facts[i].kind === 'Started') {
+      at = i
+      break
+    }
+  }
+  if (at < 0) return null
+  const started = facts[at].data as StartedData
+  if (!started.lease || !started.slot) return null
+  const c: Cycle = { seq: facts[at].seq, started: started as Cycle['started'], prepared: null, claimed: null, placed: false, deleted: false }
+  for (const f of facts.slice(at + 1)) {
+    if (f.kind === 'SlotPrepared' && (f.data as FactData['SlotPrepared']).lease === started.lease) c.prepared = f.data as FactData['SlotPrepared']
+    else if (f.kind === 'PlacementClaimed' && (f.data as FactData['PlacementClaimed']).lease === started.lease) c.claimed = { ...(f.data as FactData['PlacementClaimed']), seq: f.seq }
+    else if (f.kind === 'BuilderPlaced' && (f.data as FactData['BuilderPlaced']).lease === started.lease) c.placed = true
+    else if (f.kind === 'LineDeleted') c.deleted = true
+  }
+  return c
+}
+
+function cardOf(wf: Workflow, n: number): CardRecord | null {
+  try {
+    return wf.store.card(n)
+  } catch {
+    return null
+  }
+}
+
+/** The card's cycle now, and whether it is still the one `seq` names with that lease, at a stage that builds. */
+function current(wf: Workflow, n: number, seq: number, lease: string): { card: CardRecord; cycle: Cycle; stage: StageId } | null {
+  const card = cardOf(wf, n)
+  if (!card) return null
+  const cycle = cycleIn(wf.store.facts(n))
+  const stage = wf.state(card).stage
+  return cycle && cycle.seq === seq && cycle.started.lease === lease && stage === 'active' ? { card, cycle, stage } : null
+}
+
+// --- Starts.
 
 /**
  * The lease a card's start uses (#1438, SPEC §16.10.2), for its builder: a lane's card, the lane's (lent now if the lane
@@ -101,13 +169,15 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
   if (held) return { wait: refusalText({ why: 'inUse', slot: held.slot, agent: held.agent, card: held.card, lane: held.lane }, name) } // i18n-ignore: a refusal's code, agent-facing English (refusalText)
   if (o.dry) return couldLend(pool, projectPath, builder)
   const r = await pool.lend(lane ? { lane, agent: builder } : { card: card.id, agent: builder }, { ...(o.target ? { target: o.target } : {}), install: false })
-  if (!r.ok) {
-    if (lane && (r.refusal.why === 'noSlot' || r.refusal.why === 'warming')) laneWaits.set(lane, { ws, project: projectPath, builder, start: laneWaits.get(lane)?.start ?? null })
-    return { wait: refusalText(r.refusal, name) }
-  }
-  if (lane) laneWaits.delete(lane)
+  if (!r.ok) return { wait: refusalText(r.refusal, name) }
   log.info(`Lent ${userText(r.slot.name)} to ${userText(name(builder))} for ${lane ? `lane ${lane}` : `#${card.id}`} (lease ${r.lease.id})`)
   return leaseAt(pool, r.lease)
+}
+
+/** A lease where a start can use it: its slot and folder (fresh: a card's own, given back if the start isn't written). */
+function leaseAt(pool: SlotPool, l: SlotLease): SlotForStart {
+  const s = pool.slotOf(l)
+  return s ? { slot: s.name, folder: s.folder, lease: l.id, fresh: l.kind === 'card' } : null
 }
 
 /** Whether a lend could be made now, nothing lent (a dry start: the window's Start asking first). */
@@ -120,16 +190,29 @@ async function couldLend(pool: SlotPool, projectPath: string, builder: string): 
   return free || slots.length < size ? { slot: '', folder: projectPath, lease: '', fresh: false } : { wait: refusalText({ why: 'noSlot', size }) } // i18n-ignore: a refusal's code, agent-facing English (refusalText)
 }
 
-/** A lease lent for a start that wasn't written: given back (only a card's own; a lane keeps its). */
-export async function slotUnused(ws: WorkspaceService, projectPath: string, lease: string): Promise<void> {
+/** A card's lease lent for a start that wasn't written: given back, decided in the write that ends it. */
+async function slotUnused(ws: WorkspaceService, projectPath: string, lease: string): Promise<void> {
   const pool = await poolFor(ws, projectPath)
   const l = pool.lease(lease)
-  if (!l || l.to || l.kind !== 'card') return
-  await pool.release(lease, 'notStarted')
-  void retryWaitingLanes(ws, projectPath)
+  if (!l || l.to || l.kind !== 'card' || l.card === null) return
+  const wf = await workflowFor(ws, projectPath).catch(() => null)
+  if (await pool.release(lease, 'notStarted', () => !wf || !uses(wf, l))) void settleSlotCards(ws, projectPath)
 }
 
-// --- The builder in its slot.
+/** Whether any start of the card was written with the lease (one not yet: a start still on its way, given its grace). */
+function startedWith(wf: Workflow, l: SlotLease): boolean {
+  return l.card !== null && !!cardOf(wf, l.card) && wf.store.facts(l.card).some((f) => f.kind === 'Started' && (f.data as StartedData).lease === l.id)
+}
+
+/** Whether a card's current cycle uses a lease of its own (started with it, at a stage that keeps it). */
+function uses(wf: Workflow, l: SlotLease): boolean {
+  const card = l.card !== null ? cardOf(wf, l.card) : null
+  if (!card) return false
+  const s = wf.state(card)
+  return s.started?.lease === l.id && KEEPS.has(s.stage)
+}
+
+// --- The window's Start hands its prompt to the placement.
 
 /** Window Starts handing their card's prompt to the slot's placement (startTask), by project and card. */
 const offered = new Map<string, { prompt: string | null; ready: Promise<void> }>()
@@ -138,7 +221,7 @@ const offerKey = (projectPath: string, n: number): string => `${projectPath.toLo
 /**
  * A window Start of a card that may start in a slot (taskStart.ts): its prompt (with the user's note and the card's
  * Read first) is given to the slot's placement rather than typed where the agent is now. Call before the card moves;
- * the returned function gives the prompt, or null when the Start didn't go through (nothing is placed then).
+ * the returned function gives the prompt, or null when the Start didn't go through (the card's own prompt is used then).
  */
 export function expectStartPrompt(projectPath: string, n: number): (prompt: string | null) => void {
   const key = offerKey(projectPath, n)
@@ -159,233 +242,390 @@ export function expectStartPrompt(projectPath: string, n: number): (prompt: stri
 /** The slot a card was started in (its latest start's), or null: a card outside slots, or not started. */
 export async function startedSlot(ws: WorkspaceService, projectPath: string, n: number): Promise<{ slot: string; lease: string } | null> {
   const wf = await workflowFor(ws, projectPath).catch(() => null)
-  if (!wf) return null
-  try {
-    const s = wf.state(wf.store.card(n))
-    return s.stage !== 'todo' && s.started?.lease && s.started.slot ? { slot: s.started.slot, lease: s.started.lease } : null
-  } catch {
-    return null
-  }
+  const card = wf ? cardOf(wf, n) : null
+  if (!wf || !card) return null
+  const s = wf.state(card)
+  return s.stage !== 'todo' && s.started?.lease && s.started.slot ? { slot: s.started.slot, lease: s.started.lease } : null
 }
 
-/** Placements waiting for their builder's turn to end, by project and agent: a newer one replaces an older one. */
-const placing = new Map<string, () => void>()
+// --- Quiet builders.
+
+/** Whether an agent is quiet: not running, or running with no turn, nothing typed or queued, no run or background task. */
+function quiet(projectPath: string, agentId: string): boolean {
+  const now = sessions.agentNow(projectPath, agentId)
+  if (!now) return true
+  return !agentBusy(projectPath, agentId) && now.status !== 'starting' && now.backgroundTasks === 0 && agentRunsGoing(projectPath, agentId).length === 0
+}
 
 /**
- * Gives a card's builder the card in its slot (#1438): once its turn is over (not in a turn, no prompt waiting, no run or
- * background task going), the card typed in where it already runs in the slot; where it runs elsewhere, a new
- * conversation in the slot (the old one kept, in its Sessions tab); not running, started there. Only while the lease is
- * still open. The prompt is a window Start's (its note and Read first), else the card's own.
+ * Resolves once `ok()` holds or `over()` does, looked at again at each change of the agent's status, of the Progress
+ * panel's runs, and of the slots; and every half minute in case a change went unseen. True: ok.
  */
-async function placeBuilder(ws: WorkspaceService, projectPath: string, n: number, agentId: string, lease: string, folder: string): Promise<void> {
-  const offer = offered.get(offerKey(projectPath, n))
-  if (offer) {
-    await offer.ready
-    offered.delete(offerKey(projectPath, n))
-    if (offer.prompt === null) return
-  }
-  const pool = await poolFor(ws, projectPath)
-  const agent = projectAgents(await ws.projectConfig(projectPath)).find((a) => a.id === agentId)
-  if (!agent) return
-  const card = await getTask(n, ws).catch(() => null)
-  if (!card) return
-  const prompt = offer?.prompt ?? taskPrompt(card, !!sessions.hiveMcp(projectPath), { from: 'todo' })
-  const key = `${projectPath.toLowerCase()}|${agentId}`
-  placing.get(key)?.()
-  let off: (() => void) | null = null
-  let going = false
-  const done = (): void => {
-    off?.()
-    off = null
-    if (placing.get(key) === done) placing.delete(key)
-  }
-  const look = (): void => {
-    if (going || !off) return
-    const l = pool.lease(lease)
-    if (!l || l.to) return done()
-    const st = sessions.liveFor(projectPath, agentId)
-    if (st && (st.status === 'starting' || agentBusy(projectPath, agentId) || agentRunsGoing(projectPath, agentId).length)) return
-    going = true
-    done()
-    const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: n, body: prompt } // i18n-ignore: who a delivery is from, as agents read it
-    const there = !!st && samePlace(st.cwd, folder)
-    const go = there
-      ? deliverNow(projectPath, { ...nd, need: 'free', conversation: st!.sessionId || null })
-      : launchWith(projectPath, nd, (line) => (st ? sessions.newConversation(projectPath, agentId, line) : sessions.start(projectPath, { agentId, prompt: line })))
-    log.info(`Giving ${userText(agent.name)} #${n} in ${userText(folder)} (${there ? 'typed in' : st ? 'a new conversation' : 'started'})`)
-    void Promise.resolve(go).catch((e) => log.warn(`giving ${userText(agent.name)} #${n} in its slot`, e))
-  }
-  off = onHiveEvent((e) => {
-    if ((e.type === 'session-status' && e.state.agentId === agentId && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
+function until(projectPath: string, agentId: string, ok: () => boolean, over: () => boolean): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false
+    const look = (): void => {
+      if (settled) return
+      if (over()) return finish(false)
+      if (ok()) finish(true)
+    }
+    const off = onHiveEvent((e) => {
+      if ((e.type === 'session-status' && e.state.agentId === agentId && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
+    })
+    const timer = setInterval(look, 30_000)
+    timer.unref?.()
+    const finish = (v: boolean): void => {
+      settled = true
+      off()
+      clearInterval(timer)
+      resolve(v)
+    }
+    look()
   })
-  placing.set(key, done)
-  look()
 }
 
-// --- The actions.
+// --- The pass.
 
-/**
- * A card's start in a slot (`prepareSlot`, written with its `Started`): its line checked out in the slot from the
- * target's head (G15: installed again on a changed lock file), then its builder given the card there. A slot busy for a
- * moment (its setup settling, a session of the lease's draining) is tried again while the lease is open; a failure is
- * told to the user and the builder.
- */
-async function prepareSlot(n: number, payload: Record<string, unknown>, ws: WorkspaceService): Promise<void> {
-  const lease = typeof payload.lease === 'string' ? payload.lease : null
-  if (!lease) return
-  const project = projectOfCard(ws, n)
-  if (!project) return
-  const pool = await poolFor(ws, project)
-  const folder = String(payload.folder)
-  const line = String(payload.line)
-  const was = await G.branch(folder)
-  let err: string | null = null
-  for (let tries = 0; ; tries++) {
-    err = await pool.prepare(lease, { line, base: String(payload.base), install: payload.upToDate === true })
-    // Busy for a moment (a job settling, a session of the lease draining): looked at again, while its lease is open.
-    if (!err || !/ is busy: /.test(err) || tries >= 150 || pool.lease(lease)?.to) break
+/** Each project's pass, one at a time in this Hive (another asked while one runs: once more after it). */
+const passes = new Map<string, { again: boolean; done: Promise<void> }>()
+/** Cycles being prepared or placed here now (`<project>#<card>#<seq>`): one at a time each. */
+const ensuring = new Set<string>()
+/** Cycles whose preparation failed here (told once): tried again only by a restart or a new start. */
+const failed = new Set<string>()
+
+/** Asks for a project's pass (coalesced): resolves when no pass of it runs. Never throws. */
+export function settleSlotCards(ws: WorkspaceService, projectPath: string): Promise<void> {
+  const key = `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
+  const running = passes.get(key)
+  if (running) {
+    running.again = true
+    return running.done
+  }
+  const pass = { again: false, done: Promise.resolve() }
+  pass.done = (async () => {
+    try {
+      do {
+        pass.again = false
+        await settleOnce(ws, projectPath).catch((e) => log.warn(`settling the slots of ${userText(projectPath)}`, e))
+      } while (pass.again && !ws.lifetime.aborted)
+    } finally {
+      passes.delete(key)
+    }
+  })()
+  passes.set(key, pass)
+  return pass.done
+}
+
+async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<void> {
+  if (!ws.path || ws.lifetime.aborted) return
+  const wf = await workflowFor(ws, projectPath).catch(() => null)
+  if (!wf) return
+  const pool = await poolFor(ws, projectPath)
+  if (pool.closed) return
+  const lanes = new Map((await rawLanes(ws)).map((l) => [l.id, l]))
+  // 1. Releases, rules on or off: a card's lease its current cycle doesn't use, a lane's whose lane has ended.
+  for (const l of pool.openLeases()) {
+    if (l.kind === 'card' && l.card !== null) {
+      if (uses(wf, l) || (Date.now() - Date.parse(l.from) < START_GRACE_MS && !startedWith(wf, l))) continue
+      const stage = cardOf(wf, l.card) ? wf.state(cardOf(wf, l.card)!).stage : null
+      if (await pool.release(l.id, stage === 'done' ? 'done' : 'putBack', () => !uses(wf, l))) log.info(`#${l.card}'s lease ${l.id} on ${userText(l.slot)} ended (${stage ?? 'gone'})`)
+    } else if (l.kind === 'lane' && l.lane) {
+      const lane = lanes.get(l.lane)
+      const over = (): boolean => {
+        const now = lanes.get(l.lane!)
+        return !now || now.state !== 'active'
+      }
+      if (!over()) continue
+      if (await pool.release(l.id, lane?.state === 'abandoned' ? 'laneAbandoned' : 'laneEnded', over)) log.info(`Lane ${l.lane} ended: its lease ${l.id} on ${userText(l.slot)} ended`)
+    }
+  }
+  if (!workflowEnforced()) return
+  // 2. Each current cycle in a lease: prepared, then its builder placed.
+  for (const l of pool.openLeases()) {
+    const cards = l.kind === 'card' && l.card !== null ? [l.card] : l.kind === 'lane' && l.lane ? (lanes.get(l.lane)?.cards ?? []) : []
+    for (const n of cards) {
+      const card = cardOf(wf, n)
+      const cycle = card ? cycleIn(wf.store.facts(n)) : null
+      if (!card || !cycle || cycle.started.lease !== l.id || wf.state(card).stage !== 'active') continue
+      if (cycle.prepared && cycle.placed) continue
+      void ensure(ws, projectPath, wf, pool, n, cycle, l)
+    }
+  }
+  // 3. Done cards' merged lines, from leases still open or ended within DELETE_WITHIN_MS.
+  if (advanced.get(SLOTS_DELETE_MERGED) !== false) {
+    const since = new Date(Date.now() - DELETE_WITHIN_MS).toISOString()
+    const done = new Set<number>()
+    for (const l of [...pool.openLeases(), ...pool.endedSince(since)]) {
+      const cards = l.kind === 'card' && l.card !== null ? [l.card] : l.kind === 'lane' && l.lane ? (lanes.get(l.lane)?.cards ?? []) : []
+      for (const n of cards) {
+        const card = cardOf(wf, n)
+        const c = card ? cycleIn(wf.store.facts(n)) : null
+        if (card && c && c.started.lease === l.id && !c.deleted && wf.state(card).stage === 'done') done.add(n)
+      }
+    }
+    for (const n of done) await deleteMergedLine(ws, projectPath, wf, n).catch((e) => log.warn(`deleting #${n}'s merged line`, e))
+  }
+  // 4. Lanes started from the window waiting for a slot.
+  await startWaitingLanes(ws, projectPath, pool)
+}
+
+/** A cycle's preparation and placement, one at a time each. */
+async function ensure(ws: WorkspaceService, projectPath: string, wf: Workflow, pool: SlotPool, n: number, cycle: Cycle, l: SlotLease): Promise<void> {
+  const key = `${projectPath.toLowerCase()}#${n}#${cycle.seq}`
+  if (ensuring.has(key) || failed.has(key)) return
+  ensuring.add(key)
+  let retry = false
+  try {
+    const prepared = cycle.prepared ?? (await prepare(ws, projectPath, wf, pool, n, cycle, l, key))
+    if (!prepared) return
+    if (!cycle.placed) await place(ws, projectPath, wf, n, cycle, l)
+  } catch (e) {
+    log.warn(`#${n}'s slot ${userText(l.slot)}`, e)
+    // Its workspace opened again meanwhile (another lifetime's runtime), or a write refused: another pass, once this ends.
+    retry = !ws.lifetime.aborted && !!ws.path
+  } finally {
+    ensuring.delete(key)
+    if (retry) setTimeout(() => void settleSlotCards(ws, projectPath), 1000).unref?.()
+  }
+}
+
+/** The cycle's line made in its slot once its builder is quiet, and `SlotPrepared` written; null: not now, or not possible. */
+async function prepare(ws: WorkspaceService, projectPath: string, first: Workflow, pool: SlotPool, n: number, cycle: Cycle, l: SlotLease, key: string): Promise<FactData['SlotPrepared'] | null> {
+  // The workspace's runtime as it is after each wait (it opened again meanwhile: a new lifetime's).
+  let wf = first
+  const st = cycle.started
+  const builder = l.agent
+  const gone = (): boolean => !workflowEnforced() || ws.lifetime.aborted || !current(wf, n, cycle.seq, l.id) || !!pool.lease(l.id)?.to
+  for (;;) {
+    if (!(await until(projectPath, builder, () => quiet(projectPath, builder), gone))) return null
+    wf = (await workflowFor(ws, projectPath).catch(() => null)) ?? wf
+    const card = current(wf, n, cycle.seq, l.id)
+    if (!card) return null
+    const install = wf.rulesetOf(card.card, wf.state(card.card)).options.slotsUpToDate
+    const r = await changingFolder(st.folder, 'preparing a slot', () => // i18n-ignore: what fences the folder, for the log
+      pool.prepare(l.id, {
+        line: st.line!,
+        base: st.base!,
+        install,
+        // At the boundary: the card still this cycle's, the rules on, its builder quiet.
+        ready: async () => (gone() ? 'the card moved on, or the rules are off' : quiet(projectPath, builder) ? null : 'its builder is busy'), // i18n-ignore: why a preparation waits, for the log
+        around: (fn) => withRepoLock(projectPath, fn, { quiet: true, project: projectPath })
+      })
+    )
+    if ('ok' in r) {
+      await crashAt('inPrepare')
+      const fact: FactData['SlotPrepared'] = { lease: l.id, line: st.line!, revision: r.revision }
+      await wf.write(card.card, null, 'hive', (w) => {
+        const now = cycleIn(w.tx.facts(n))
+        if (now?.seq === cycle.seq && now.started.lease === l.id && !now.prepared) w.fact('SlotPrepared', fact) // i18n-ignore: a fact's kind and codes, not text
+      })
+      // A line the slot was on before (the lane's last card's) may go now that nothing has it out.
+      void settleSlotCards(ws, projectPath)
+      return fact
+    }
+    if ('error' in r) {
+      failed.add(key)
+      log.warn(`Slot ${userText(st.slot)} couldn't be prepared for #${n}: ${userText(r.error)}`)
+      await wf.write(card.card, null, 'hive', (w) => {
+        const english = `Hive couldn't get ${st.slot} ready for ${card.card.key}: ${r.error}` // i18n-ignore: agent-facing, and the notice's English
+        w.action('notify', { text: english, shown: workflowText(M.notPrepared, { slot: st.slot, card: card.card.key, why: r.error }) })
+        wf.wake(w, st.builder, english)
+      })
+      return null
+    }
+    // Not now (busy, not quiet at the boundary): looked at again at the next change.
+    log.info(`Slot ${userText(st.slot)} for #${n}: not yet (${userText(r.retry)})`)
     await new Promise((res) => setTimeout(res, 2000))
   }
-  if (err) {
-    log.warn(`Slot ${userText(String(payload.slot))} couldn't be prepared for #${n}: ${userText(err)}`)
-    const wf = await workflowFor(ws, project).catch(() => null)
-    if (wf) {
-      const card = wf.store.card(n)
-      await wf.write(card, null, 'hive', (w) => {
-        const english = `Hive couldn't get ${String(payload.slot)} ready for ${card.key}: ${err}` // i18n-ignore: agent-facing, and the notice's English
-        w.action('notify', { text: english, shown: workflowText(M.notPrepared, { slot: String(payload.slot), card: card.key, why: err! }) })
-        wf.wake(w, typeof payload.builder === 'string' ? payload.builder : null, english)
-      })
-    }
-    return
-  }
-  // The line it was on before (the lane's last card's): deleted now that nothing has it out, once merged.
-  if (!isUnknown(was) && was && was !== line) void deleteMergedLine(ws, project, was)
-  if (typeof payload.builder === 'string') void placeBuilder(ws, project, n, payload.builder, lease, folder)
 }
 
 /**
- * A card's slot given back (`releaseSlot`: its Done, or put back): its own lease ends (a lane's stays until the lane
- * ends); at Done, its line deleted once merged. Then a lane waiting for a slot may get it.
+ * The builder given the card in its slot, once: when quiet, claimed by this Hive in a write (one another Hive holds is
+ * left to it unless its process is gone), delivered with the cycle's identity (a delivery already made, before a crash,
+ * is never made again), recorded as `BuilderPlaced`.
  */
-async function releaseSlot(n: number, ws: WorkspaceService): Promise<void> {
-  const project = projectOfCard(ws, n)
-  if (!project) return
-  const wf = await workflowFor(ws, project).catch(() => null)
-  const pool = await poolFor(ws, project)
-  const stage = wf ? wf.state(wf.store.card(n)).stage : null
-  const l = pool.leaseOf({ card: n })
-  if (l) await pool.release(l.id, stage === 'done' ? 'done' : 'putBack')
-  if (stage === 'done' && wf) {
-    const line = wf.state(wf.store.card(n)).started?.line
-    if (line) await deleteMergedLine(ws, project, line)
+async function place(ws: WorkspaceService, projectPath: string, first: Workflow, n: number, cycle: Cycle, l: SlotLease): Promise<void> {
+  let wf = first
+  const agentId = l.agent
+  const gone = (): boolean => !workflowEnforced() || ws.lifetime.aborted || !current(wf, n, cycle.seq, l.id)
+  const offer = offered.get(offerKey(projectPath, n))
+  if (offer) await offer.ready
+  if (!(await until(projectPath, agentId, () => quiet(projectPath, agentId), gone))) return
+  wf = (await workflowFor(ws, projectPath).catch(() => null)) ?? wf
+  const now = current(wf, n, cycle.seq, l.id)
+  if (!now || now.cycle.placed) return
+  const me = await holder.self()
+  const claim = now.cycle.claimed
+  const mine = !!claim && claim.pid === me.pid && claim.started === me.started
+  if (claim && !mine && (await holder.alive(claim.pid, claim.started)) !== false) return
+  const took = await wf.write(now.card, null, 'hive', (w) => {
+    const c = cycleIn(w.tx.facts(n))
+    if (!c || c.seq !== cycle.seq || c.placed || (c.claimed?.seq ?? null) !== (claim?.seq ?? null)) return false
+    if (!mine) w.fact('PlacementClaimed', { lease: l.id, pid: me.pid, started: me.started }) // i18n-ignore: a fact's kind and codes, not text
+    return true
+  })
+  if (!took) return
+  await crashAt('inPlacement')
+  const agent = projectAgents(await ws.projectConfig(projectPath)).find((a) => a.id === agentId)
+  const card = await getTask(n, ws).catch(() => null)
+  if (!agent || !card) return
+  wf = (await workflowFor(ws, projectPath).catch(() => null)) ?? wf
+  const ref = `${n}:${cycle.seq}:${l.id}`
+  const made = (await deliveriesOf(projectPath, agentId)).find((r) => r.source === PLACEMENT && r.ref === ref)
+  let how: FactData['BuilderPlaced']['how'] = 'typed'
+  let delivery = made?.id ?? null
+  if (!made) {
+    if (gone() || !quiet(projectPath, agentId)) return
+    const prompt = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? taskPrompt(card, !!sessions.hiveMcp(projectPath), { from: 'todo' })
+    offered.delete(offerKey(projectPath, n))
+    const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: n, body: prompt, source: PLACEMENT, ref } // i18n-ignore: who a delivery is from, as agents read it
+    const st = sessions.liveFor(projectPath, agentId)
+    const there = !!st && samePlace(st.cwd, cycle.started.folder)
+    how = there ? 'typed' : st ? 'newConversation' : 'started'
+    log.info(`Giving ${userText(agent.name)} #${n} in ${userText(cycle.started.slot)} (${how})`)
+    delivery = there
+      ? ((await deliverNow(projectPath, { ...nd, need: 'free', conversation: st!.sessionId || null }))?.id ?? null)
+      : ((await launchWith(projectPath, nd, (line) => (st ? sessions.newConversation(projectPath, agentId, line) : sessions.start(projectPath, { agentId, prompt: line })))).record?.id ?? null)
   }
-  await retryWaitingLanes(ws, project)
+  await wf.write(now.card, null, 'hive', (w) => {
+    const c = cycleIn(w.tx.facts(n))
+    if (c?.seq === cycle.seq && !c.placed) w.fact('BuilderPlaced', { lease: l.id, delivery, how }) // i18n-ignore: a fact's kind and codes, not text
+  })
 }
 
+// --- Merged lines.
+
 /**
- * A card's line deleted (#1438, §16.10.1) once its card is Done and its target contains it (a squash by its stored key,
- * §16.3.2), and nothing has it checked out: never otherwise. Recorded on the card (`LineDeleted`). Off: Settings →
- * Advanced, Delete a card's branch once it's merged.
+ * A Done card's line deleted (#1438, §16.10.1), by the card (never a number read from the line's name): only with the
+ * rules on and Settings → Advanced, Delete a card's branch once it's merged; only once its target contains it (a squash
+ * by its stored key, §16.3.2); under the repository's lock, with the worktrees read before and after the ref's removal
+ * (at the head checked): a checkout that came in between has its branch put back at that head. Recorded as `LineDeleted`.
  */
-export async function deleteMergedLine(ws: WorkspaceService, projectPath: string, line: string): Promise<boolean> {
-  if (advanced.get(SLOTS_DELETE_MERGED) === false || !line.startsWith('hive/')) return false
-  const wf = await workflowFor(ws, projectPath).catch(() => null)
-  if (!wf) return false
-  // Its card, by the number its name carries (hive/<KEY>/<KEY>-<n>-…): Done, its start (in a slot) the one that made it.
-  const n = Number(/^hive\/[^/]+\/[^/]+?-(\d+)(?:-|$)/.exec(line)?.[1])
-  if (!Number.isInteger(n)) return false
-  let card: CardRecord
-  try {
-    card = wf.store.card(n)
-  } catch {
-    return false
-  }
-  const s = wf.state(card)
-  if (s.stage !== 'done' || !s.started?.lease || s.started.line !== line) return false
-  const head = await G.lineHead(projectPath, line)
-  if (isUnknown(head) || !head || !s.started) return false
+export async function deleteMergedLine(ws: WorkspaceService, projectPath: string, wf: Workflow, n: number): Promise<boolean> {
+  const allowed = (): boolean => workflowEnforced() && advanced.get(SLOTS_DELETE_MERGED) !== false
+  if (!allowed()) return false
+  const card = cardOf(wf, n)
+  const s = card ? wf.state(card) : null
+  const c = card ? cycleIn(wf.store.facts(n)) : null
+  if (!card || !s || !c || s.stage !== 'done' || c.deleted || !s.started?.line?.startsWith('hive/')) return false
+  const line = s.started.line
   const target = s.integrated?.target || s.started.target
   if (!target) return false
-  const c = await wf.platformOf(card).contains(target, { base: s.started.base ?? head, revision: head, key: s.latest?.key ?? null })
-  if (isUnknown(c) || !c) return false
-  const out = await listWorktreesOrNull(projectPath).catch(() => null)
-  if (!out || out.some((w) => w.branch === line)) return false
-  // Only from the head the check read (a commit added meanwhile keeps it).
-  const r = await git(projectPath, ['update-ref', '-d', `refs/heads/${line}`, head])
-  if (!r.ok) return false
-  log.info(`Deleted ${userText(line)} (#${card.id}, merged into ${userText(target)})`)
-  await wf.write(card, null, 'hive', (w) => void w.fact('LineDeleted', { line, revision: head, why: 'merged' })).catch((e) => log.warn(`recording ${userText(line)}'s deletion`, e)) // i18n-ignore: a fact's kind and codes, not text
-  return true
+  return withRepoLock(
+    projectPath,
+    async () => {
+      if (!allowed()) return false
+      const head = await G.lineHead(projectPath, line)
+      if (isUnknown(head) || !head) return false
+      const inTarget = await wf.platformOf(card).contains(target, { base: s.started!.base ?? head, revision: head, key: s.latest?.key ?? null })
+      if (isUnknown(inTarget) || !inTarget) return false
+      const before = await listWorktreesOrNull(projectPath).catch(() => null)
+      if (!before || before.some((w) => w.branch === line) || !allowed()) return false
+      const r = await git(projectPath, ['update-ref', '-d', `refs/heads/${line}`, head])
+      if (!r.ok) return false
+      // Checked out meanwhile (another Hive, a terminal): the branch is put back at the same head, the checkout kept.
+      const after = await listWorktreesOrNull(projectPath).catch(() => null)
+      if (!after || after.some((w) => w.branch === line)) {
+        await git(projectPath, ['update-ref', `refs/heads/${line}`, head, ''])
+        log.warn(`${userText(line)} was checked out as it was deleted: kept`)
+        return false
+      }
+      log.info(`Deleted ${userText(line)} (#${n}, merged into ${userText(target)})`)
+      await wf.write(card, null, 'hive', (w) => void w.fact('LineDeleted', { line, revision: head, why: 'merged' })).catch((e) => log.warn(`recording ${userText(line)}'s deletion`, e)) // i18n-ignore: a fact's kind and codes, not text
+      return true
+    },
+    { quiet: true, project: projectPath }
+  ).catch(() => false)
 }
 
 // --- Lanes.
 
 /**
- * A lane's slot (#1438, §16.10.2): lent to its builder as the lane starts from the window (`laneStart.ts`), before its
- * agents start, and kept for the whole lane. None free: the lane waits ("waiting for a slot"), and `start` starts its
- * agents once a lease's end frees one. The slot, or why it waits (English).
+ * A lane's slot (#1438, §16.10.2), lent to its builder as Start Lane… starts it, before its agents start, and kept for the
+ * whole lane: the slot, or why none is free (English). With none free the caller records the lane's wait (`slotWait`).
  */
-export async function lendLane(ws: WorkspaceService, projectPath: string, lane: string, builder: string, start: (slot: string) => Promise<void>): Promise<{ slot: string } | { waiting: string }> {
+export async function lendLane(ws: WorkspaceService, projectPath: string, lane: string, builder: string): Promise<{ slot: string } | { waiting: string }> {
   const pool = await poolFor(ws, projectPath)
   const r = await pool.lend({ lane, agent: builder }, { install: false })
   if (r.ok) {
-    laneWaits.delete(lane)
     log.info(`Lent ${userText(r.slot.name)} to lane ${lane} (lease ${r.lease.id})`)
     return { slot: r.slot.name }
   }
-  laneWaits.set(lane, { ws, project: projectPath, builder, start })
   const agents = projectAgents(await ws.projectConfig(projectPath))
   return { waiting: refusalText(r.refusal, (id) => agents.find((a) => a.id === id)?.name ?? id) }
 }
 
-/** A project's lanes waiting for a slot, in the order they began waiting, lent one each while one is free (a lease ended). */
-async function retryWaitingLanes(ws: WorkspaceService, projectPath: string): Promise<void> {
-  for (const [id, w] of [...laneWaits]) {
-    if (w.ws !== ws || w.project.toLowerCase() !== projectPath.toLowerCase() || !w.start) continue
-    if (ws.lifetime.aborted) return void laneWaits.delete(id)
-    const pool = await poolFor(ws, projectPath)
-    const r = await pool.lend({ lane: id, agent: w.builder }, { install: false })
-    if (!r.ok) return
-    laneWaits.delete(id)
-    log.info(`Lent ${userText(r.slot.name)} to lane ${id}, which waited for a slot (lease ${r.lease.id})`)
-    await w.start(r.slot.name).catch((e) => log.warn(`starting lane ${id} in ${userText(r.slot.name)}`, e))
+/**
+ * A project's lanes waiting for a slot (`slotWait`), in the order they began waiting: each lent one while one is free,
+ * its agents (its builder and reviewer now) started once (laneStart's, by their brief's delivery identity), then its
+ * wait cleared. Only with the rules on; a lane ended or abandoned meanwhile isn't running, so it is never started.
+ */
+async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool: SlotPool): Promise<void> {
+  const name = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.name
+  const waiting = (await lanesWaitingForSlot(ws)).filter((l) => l.project.toLowerCase() === name?.toLowerCase()).sort((a, b) => a.slotWait!.since.localeCompare(b.slotWait!.since))
+  for (const lane of waiting) {
+    if (!workflowEnforced() || ws.lifetime.aborted) return
+    let lease = pool.leaseOf({ lane: lane.id })
+    if (!lease) {
+      const r = await pool.lend({ lane: lane.id, agent: lane.builder.id }, { install: false })
+      if (!r.ok) return
+      lease = r.lease
+      log.info(`Lent ${userText(r.slot.name)} to lane ${lane.id}, which waited for a slot (lease ${r.lease.id})`)
+    }
+    if (!workflowEnforced()) return
+    const { startWaitingLane } = await import('./laneStart')
+    const started = await startWaitingLane(ws, projectPath, lane.id, lease.slot).catch((e) => (log.warn(`starting lane ${lane.id} in ${userText(lease!.slot)}`, e), false))
+    if (started) await setLaneSlotWait(ws, lane.id, null)
   }
 }
 
-/**
- * Lanes' leases ended with their lanes (#1438): a lane ended or abandoned, or gone, gives its slot back. Looked at when
- * the lanes change, and as the hourly tidy runs.
- */
-export async function releaseEndedLanes(ws: WorkspaceService): Promise<void> {
-  if (!ws.path) return
-  let open: { id: string; project: string; lane: string }[]
+/** The slot a lane works in now (its open lease's): for the lane's view (lanes.ts). */
+function laneSlot(ws: WorkspaceService, lane: string): string | null {
   try {
-    open = boardRead(ws, (db) => db.prepare('SELECT id, project, lane FROM slot_leases WHERE lane IS NOT NULL AND ended_at IS NULL').all() as { id: string; project: string; lane: string }[]) // i18n-ignore: SQL
+    return boardRead(ws, (db) => (db.prepare('SELECT slot FROM slot_leases WHERE lane = ? AND ended_at IS NULL').get(lane) as { slot: string } | undefined)?.slot ?? null) // i18n-ignore: SQL
   } catch {
-    return
+    // A board still 0.9's: no slots.
+    return null
   }
-  if (!open.length) return
-  const lanes = new Map((await listLanes(ws, { all: true })).map((l) => [l.id, l]))
-  for (const o of open) {
-    const l = lanes.get(o.lane)
-    if (l && !l.endedAt) continue
-    const project = projectById(ws, o.project)
-    if (!project) continue
-    const pool = await poolFor(ws, project)
-    if (await pool.release(o.id, l?.state === 'abandoned' ? 'laneAbandoned' : 'laneEnded')) log.info(`Lane ${o.lane} ended: its slot's lease ${o.id} ended`)
-    laneWaits.delete(o.lane)
-    await retryWaitingLanes(ws, project)
+}
+
+// --- What asks for a pass.
+
+/** Every open workspace's projects with slots or lanes waiting for one: their passes. */
+async function settleAll(): Promise<void> {
+  for (const ws of openWorkspaces()) {
+    if (!ws.path) continue
+    const paths = new Set<string>()
+    try {
+      const ids = boardRead(ws, (db) => (db.prepare('SELECT DISTINCT project FROM slots').all() as { project: string }[]).map((r) => r.project)) // i18n-ignore: SQL
+      for (const id of ids) {
+        const p = ws.projectIdsNow().byId.get(id)
+        if (p) paths.add(p)
+      }
+    } catch {
+      // A board still 0.9's (no slot tables), or none open.
+    }
+    for (const l of await lanesWaitingForSlot(ws).catch(() => [])) {
+      const p = ws.info()?.projects.find((x) => x.name.toLowerCase() === l.project.toLowerCase())?.path
+      if (p) paths.add(p)
+    }
+    for (const p of paths) await settleSlotCards(ws, p)
   }
 }
 
 let stop: (() => void) | null = null
 
-/** Starts cards on slots (index.ts, once): the actions, lanes' leases ending with them, the lanes' view of their slot. */
+/** Starts cards on slots (index.ts, once): the actions, the passes and what asks for them, the lanes' view of their slot. */
 export function startSlotCards(): void {
   if (stop) return
-  onAction('prepareSlot', (a, ws) => prepareSlot(a.card, a.payload, ws))
-  onAction('releaseSlot', (a, ws) => releaseSlot(a.card, ws))
+  // A card's slot action asks for its project's pass: the pass, not the action's run, does what is owed.
+  const ask = (n: number, ws: WorkspaceService): void => {
+    if (crashAt('afterAction')) return
+    const p = projectOfCard(ws, n)
+    if (p) void settleSlotCards(ws, p)
+  }
+  onAction('prepareSlot', (a, ws) => ask(a.card, ws))
+  onAction('releaseSlot', (a, ws) => ask(a.card, ws))
   setSlotStarts({ leaseFor: (ws, project, card, builder, o) => leaseForStart(ws, project, card, builder, o), unused: slotUnused })
   // The pool's size: the project's builders (#1430's roles: builders and either), at least one (slots.ts).
   setBuilderCount(async (projectPath) => {
@@ -393,17 +633,48 @@ export function startSlotCards(): void {
     return ws ? projectAgents(await ws.projectConfig(projectPath)).filter(builds).length : 0
   })
   setLaneSlots(laneSlot)
-  setSlotFreed((ws, project) => void retryWaitingLanes(ws, project).catch((e) => log.warn('lanes waiting for a slot', e)))
-  const off = onLanesWritten(() => {
-    for (const ws of openWorkspaces()) void releaseEndedLanes(ws).catch((e) => log.warn('ending lanes\' slots', e))
+  setSlotFreed((ws, project) => void settleSlotCards(ws, project))
+  const offLanes = onLanesWritten(() => void settleAll().catch((e) => log.warn("settling the lanes' slots", e)))
+  // A workspace opening (Hive's start, a restart after a crash): what its cards are owed is done.
+  const seen = new WeakSet<AbortSignal>()
+  const offOpen = onHiveEvent((e) => {
+    if (e.type !== 'workspace-changed') return
+    for (const ws of openWorkspaces()) {
+      if (!ws.path || seen.has(ws.lifetime)) continue
+      seen.add(ws.lifetime)
+      void settleAll().catch((x) => log.warn('settling the slots of a workspace', x))
+    }
   })
+  let enforced = workflowEnforced()
+  const offAdvanced = advanced.onChange(() => {
+    if (workflowEnforced() === enforced) return
+    enforced = workflowEnforced()
+    void settleAll().catch((e) => log.warn(`settling the slots (${ENFORCE})`, e))
+  })
+  // A board change (a card put back or Done outside the rules writes no slot action): its leases looked at, at most once
+  // a second per workspace.
+  let boardSoon: NodeJS.Timeout | null = null
+  const offBoard = onHiveEvent((e) => {
+    if (e.type !== 'tasks-changed' || boardSoon) return
+    boardSoon = setTimeout(() => {
+      boardSoon = null
+      void settleAll().catch((x) => log.warn('settling the slots after a board change', x))
+    }, 1000)
+    boardSoon.unref?.()
+  })
+  const hourly = setInterval(() => void settleAll().catch((e) => log.warn('settling the slots', e)), 60 * 60 * 1000)
+  hourly.unref?.()
   stop = () => {
-    off()
+    offLanes()
+    offOpen()
+    offAdvanced()
+    offBoard()
+    if (boardSoon) clearTimeout(boardSoon)
+    clearInterval(hourly)
     setLaneSlots(null)
     setSlotFreed(null)
     setSlotStarts(null)
     setBuilderCount(null)
-    for (const p of placing.values()) p()
   }
 }
 

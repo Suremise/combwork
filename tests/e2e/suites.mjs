@@ -240,6 +240,7 @@ export const SUITES = [
   { name: 'skills', serial: 'the shared Codex test home', codexHome: 'test' },
   { name: 'slotcards' },
   { name: 'slotpool' },
+  { name: 'slotrecovery' },
   { name: 'slotsessions' },
   { name: 'stagenames' },
   { name: 'stalls' },

@@ -184,6 +184,12 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
         const x = d as FactData['FolderMoved']
         return `${x.from} to ${x.to}`
       }
+      case 'SlotPrepared': {
+        const x = d as FactData['SlotPrepared']
+        return `${x.line} at ${r(x.revision)}`
+      }
+      case 'BuilderPlaced':
+        return (d as FactData['BuilderPlaced']).how
       case 'LineDeleted': {
         const x = d as FactData['LineDeleted']
         return `${x.line} at ${r(x.revision)} (${x.why})`
