@@ -2915,6 +2915,12 @@ for a day go hourly (Remove idle slots after a day).
   the barrier. A pass made stale by a decision is reviewed again: that start review leases a copy again.
 - **Runs** in the copy are checks of its lease's card and revision (#1435's `copyAt` in runLink.ts), so a reviewer's
   `hive-progress --check` there counts for the submission.
+- **Off** (HR5's round 1): with review copies off, or **Workflow rules are enforced** (`hive.workflow.enforce`) off, Hive
+  records facts and leases nothing (§16.7's switch): a start review leases no copy (its reply adds nothing), a review
+  waiting for one is dropped and told why, and a copy leased as it was turned off is returned at once, never handed
+  over; the pool itself refuses a review lease `off` then. Copies already out are still returned at the review's end and
+  freed through the barrier. The launch grant stays (a folder made reachable, nothing leased), so turning them on again
+  needs no restart.
 - **Not here:** an either agent building in a slot isn't e2e-tested (lending slots for a card's start is #1438): the
   grant's rule is unit-tested. The copies' state in the window is #1445's tab.
 

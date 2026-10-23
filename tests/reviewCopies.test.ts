@@ -139,6 +139,8 @@ interface World {
   notes: { card: number; id: string; values?: Record<string, unknown> }[]
   rc: InstanceType<typeof ReviewCopies>
   size: { n: number }
+  /** Why review copies are off (a switch: review copies, or workflow rules not enforced), or null; `afterLease` turns it so as a lease comes back. */
+  sw: { off: string | null; afterLease: string | null }
 }
 
 const closers: (() => void)[] = []
@@ -182,19 +184,28 @@ function world(size = 2): World {
   const reviews: World['reviews'] = new Map()
   const told: World['told'] = []
   const notes: World['notes'] = []
+  const sw: World['sw'] = { off: null, afterLease: null }
+  // The pool as the review copies see it: a switch turned off while a lease is being set up (`afterLease`).
+  const seen = Object.create(pool) as Pool
+  seen.leaseCopy = async (r) => {
+    const got = await pool.leaseCopy(r)
+    if (sw.afterLease) sw.off = sw.afterLease
+    return got
+  }
   const rc = new ReviewCopies({
-    pool: async () => pool,
+    pool: async () => seen,
     review: async (card, agent) => reviews.get(`${card}|${agent}`) ?? { going: false, submission: null, revision: null },
     tell: async (agent, card, text) => void told.push({ agent: agent.id, card, text }),
     note: async (card, text) => void notes.push({ card, id: text.id, ...(text.values ? { values: text.values } : {}) }),
-    firstWaitMs: 60_000
+    firstWaitMs: 60_000,
+    off: () => sw.off
   })
   closers.push(() => {
     store.conn.close()
     closeBoard(ws)
     dismiss()
   })
-  return { project, pool, reviews, busy, told, notes, rc, size: sz }
+  return { project, pool, reviews, busy, told, notes, rc, size: sz, sw }
 }
 
 const R1 = { id: 'r-1', name: 'R1' }
@@ -349,5 +360,67 @@ describe('waiting when none is free', () => {
     expect(w.rc.waits()).toEqual([])
     expect(leaseOf(w, 13, R2.id)).toBeUndefined()
     expect(w.told).toEqual([])
+  })
+})
+
+// HR5's round 1: off means off. With workflow rules not enforced (or review copies off), Hive records facts and leases
+// nothing; a copy already out is still returned and freed.
+const NOT_ENFORCED = "workflow rules aren't enforced (Settings → Advanced, Workflow rules are enforced)"
+
+describe("switched off (Workflow rules are enforced, Reviewers review in review copies)", () => {
+  it('off before start review: none, nothing leased or noted', async () => {
+    const w = world()
+    review(w, 12, R1.id, 1, head(w.project))
+    w.sw.off = NOT_ENFORCED
+    expect(await w.rc.start(12, R1)).toEqual({ is: 'none', why: NOT_ENFORCED })
+    expect(w.pool.unfreed()).toEqual([])
+    expect(w.pool.copies()).toEqual([])
+    expect(w.notes).toEqual([])
+  })
+
+  it('off while a review waits: dropped and told, never leased once a copy is free', async () => {
+    const w = world(1)
+    const rev = head(w.project)
+    review(w, 12, R1.id, 1, rev)
+    review(w, 13, R2.id, 1, rev)
+    await w.rc.start(12, R1)
+    expect((await w.rc.start(13, R2)).is).toBe('waiting')
+    w.sw.off = NOT_ENFORCED
+    await w.rc.retry()
+    expect(w.rc.waits()).toEqual([])
+    expect(w.told).toEqual([{ agent: R2.id, card: 13, text: `#13: No review copy (${NOT_ENFORCED}): review the builder's work read-only from where you are.` }])
+    // R1's verdict frees copy-1 (returning and freeing still work while off); the next look leases R2 nothing.
+    stop(w, 12, R1.id)
+    expect(await w.rc.end(12, R1.id, 'verdict')).toBe(1)
+    await w.pool.refresh()
+    await w.rc.retry()
+    expect(w.pool.copies().find((c) => c.name === 'copy-1')?.state).toBe('free')
+    expect(leaseOf(w, 13, R2.id)).toBeUndefined()
+    expect(w.told).toHaveLength(1)
+  })
+
+  it('off while its copy is being set up: the copy is returned, never handed over', async () => {
+    const w = world()
+    review(w, 12, R1.id, 1, head(w.project))
+    w.sw.afterLease = NOT_ENFORCED
+    expect(await w.rc.start(12, R1)).toEqual({ is: 'none', why: NOT_ENFORCED })
+    expect(leaseOf(w, 12, R1.id)).toBeUndefined()
+    expect(w.pool.unfreed()).toEqual([])
+    expect(w.pool.copies().find((c) => c.name === 'copy-1')?.state).toBe('free')
+    expect(w.notes.filter((x) => x.id === 'tasks.history.reviewCopyLeased')).toEqual([])
+    expect(w.rc.waits()).toEqual([])
+  })
+
+  it('a copy leased before it was turned off is still returned at the verdict, and freed', async () => {
+    const w = world()
+    review(w, 12, R1.id, 1, head(w.project))
+    expect((await w.rc.start(12, R1)).is).toBe('ready')
+    w.sw.off = NOT_ENFORCED
+    stop(w, 12, R1.id)
+    expect(await w.rc.over(leaseOf(w, 12, R1.id)!)).toBe(true)
+    expect(await w.rc.end(12, R1.id, 'verdict')).toBe(1)
+    await w.pool.refresh()
+    expect(w.pool.unfreed()).toEqual([])
+    expect(w.pool.copies().find((c) => c.name === 'copy-1')?.state).toBe('free')
   })
 })

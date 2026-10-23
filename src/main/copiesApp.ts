@@ -30,7 +30,7 @@ import { projectAgents } from '../shared/defaults'
 import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
 import { isOpenRun } from '../shared/progress'
 import type { CopyView } from '../shared/types'
-import { COPIES_QUIET_WAIT, COPIES_REVIEW, SLOTS_REMOVE_IDLE } from '../shared/advanced'
+import { COPIES_QUIET_WAIT, COPIES_REVIEW, SLOTS_REMOVE_IDLE, WORKFLOW_ENFORCE } from '../shared/advanced'
 
 const log = createLogger('copies')
 
@@ -84,7 +84,8 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
         return s && (s.status === 'working' || s.status === 'waiting' || s.status === 'background') ? `${s.agentName ?? agent} (${s.status})` : null
       },
       leaseOver: (l) => (l.kind === 'review' ? (reviewOver?.(ws, projectPath, l) ?? null) : leaseOver(workspacePath, l)),
-      reviewOn: () => advanced.get(COPIES_REVIEW) !== false,
+      // Review leases: with review copies on, and workflow rules enforced (off, Hive records facts and leases nothing, #1439).
+      reviewOn: () => advanced.get(COPIES_REVIEW) !== false && advanced.get<boolean>(WORKFLOW_ENFORCE) !== false,
       quietWaitMs: () => Math.max(1, Number(advanced.get(COPIES_QUIET_WAIT)) || 10) * 60_000
     })
   })()

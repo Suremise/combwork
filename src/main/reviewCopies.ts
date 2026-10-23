@@ -11,8 +11,10 @@
 // - The review's end returns it: a verdict at once; the review given up (the card moved on, its review mark gone, the
 //   reviewer's session ended: tasks.ts ends its reviews) at the pools' next look (`over`). A pass made stale by a
 //   decision (§16.4.6) is reviewed again: that start review leases one again.
-// - Not leased: with review copies off (Settings → Advanced, Reviewers review in review copies), or for a session that
-//   wasn't granted the folder (a provider without `extraDirs`, a session started before it was on): its reviewer reviews
+// - Not leased: with review copies off (Settings → Advanced, Reviewers review in review copies) or workflow rules not
+//   enforced (Workflow rules are enforced: off, Hive records facts and acts on none, so nothing is leased, a review
+//   waiting for one is dropped and told, and one leased as it was turned off is returned; copies out are still returned
+//   and freed), or for a session that wasn't granted the folder (a provider without `extraDirs`, a session started before it was on): its reviewer reviews
 //   the builder's folder read-only as before.
 //
 // What it tells agents is English; what the window shows is the card's history, as messages.
@@ -25,7 +27,7 @@ import { samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { openWorkspaces, type WorkspaceService } from './workspace'
-import { COPIES_REVIEW } from '../shared/advanced'
+import { COPIES_REVIEW, WORKFLOW_ENFORCE } from '../shared/advanced'
 import { HISTORY, storedText } from '../shared/taskHistory'
 import type { StoredText } from '../shared/types'
 
@@ -60,6 +62,8 @@ export interface ReviewCopyDeps {
   note: (card: number, text: StoredText) => Promise<void>
   /** How long a start waits for a copy before replying that it waits (a first copy's setup takes minutes). */
   firstWaitMs?: number
+  /** Why review copies are off now (a switch), read at each step; null while they are on. */
+  off: () => string | null
 }
 
 interface Waiting {
@@ -103,6 +107,8 @@ export class ReviewCopies {
    * that revision keeps it; one at an earlier submission's is returned first.
    */
   async start(card: number, agent: Reviewer): Promise<ReviewCopyAnswer> {
+    const off = this.deps.off()
+    if (off) return { is: 'none', why: off }
     const now = await this.deps.review(card, agent.id)
     if (!now.going) return { is: 'none', why: 'the review is not going' } // i18n-ignore: agent-facing
     if (!now.revision || now.submission === null) return { is: 'none', why: 'the card has no submitted revision' } // i18n-ignore: agent-facing
@@ -156,12 +162,15 @@ export class ReviewCopies {
         if (w.told) await this.deps.tell(w.agent, w.card, `#${w.card}: ${reviewCopyText(none)}`).catch(() => undefined)
         return none
       }
-      // Its review may have ended while the copy was set up: returned, never handed over.
+      // Its review may have ended while the copy was set up, or review copies been turned off: returned, never handed over.
       const still = await this.deps.review(w.card, w.agent.id).catch(() => null)
-      if (this.waiting.get(k) !== w || !still?.going || still.revision !== w.revision) {
-        await pool.returnCopy(r.lease.id, 'abandoned')
+      const off = this.deps.off()
+      if (this.waiting.get(k) !== w || !still?.going || still.revision !== w.revision || off) {
+        await pool.returnCopy(r.lease.id, off ? 'off' : 'abandoned')
         if (this.waiting.get(k) === w) this.waiting.delete(k)
-        return { is: 'none', why: 'the review ended' } // i18n-ignore: agent-facing
+        const none: ReviewCopyAnswer = { is: 'none', why: off ?? 'the review ended' } // i18n-ignore: agent-facing
+        if (off && w.told) await this.deps.tell(w.agent, w.card, `#${w.card}: ${reviewCopyText(none)}`).catch(() => undefined)
+        return none
       }
       this.waiting.delete(k)
       const got: ReviewCopyAnswer = { is: 'ready', copy: r.copy.name, folder: r.copy.folder, revision: w.revision }
@@ -178,8 +187,15 @@ export class ReviewCopies {
 
   /** After a look at the pools: each waiting review whose review still goes tries again; one that ended is dropped. */
   async retry(): Promise<void> {
+    const off = this.deps.off()
     for (const [k, w] of [...this.waiting]) {
       if (w.leasing) continue
+      // Turned off while it waited: dropped, and told (a lease under way is handled where it ends).
+      if (off) {
+        this.waiting.delete(k)
+        if (w.told) await this.deps.tell(w.agent, w.card, `#${w.card}: ${reviewCopyText({ is: 'none', why: off })}`).catch(() => undefined)
+        continue
+      }
       const now = await this.deps.review(w.card, w.agent.id).catch(() => null)
       if (!now?.going || now.revision !== w.revision) {
         this.waiting.delete(k)
@@ -228,6 +244,13 @@ async function reviewOf(ws: WorkspaceService, projectPath: string, card: number,
   return { going, submission: latest?.id ?? null, revision: latest?.revision ?? null }
 }
 
+/** Why review copies are off now (agent-facing): either switch in Settings → Advanced. Null while both are on. */
+function reviewCopiesOff(): string | null {
+  if (advanced.get(COPIES_REVIEW) === false) return 'review copies are off (Settings → Advanced, Reviewers review in review copies)' // i18n-ignore: agent-facing
+  if (advanced.get<boolean>(WORKFLOW_ENFORCE) === false) return "workflow rules aren't enforced (Settings → Advanced, Workflow rules are enforced)" // i18n-ignore: agent-facing
+  return null
+}
+
 /** A project's review copies in a workspace (made on first use, for the workspace's life). */
 export function reviewCopiesFor(ws: WorkspaceService, projectPath: string): ReviewCopies {
   const k = instanceKey(ws, projectPath)
@@ -240,7 +263,8 @@ export function reviewCopiesFor(ws: WorkspaceService, projectPath: string): Revi
     note: async (card, text) => {
       const { noteOnCard } = await import('./tasks')
       await noteOnCard(card, text, ws)
-    }
+    },
+    off: reviewCopiesOff
   })
   instances.set(k, { life: ws.lifetime, rc })
   return rc
@@ -251,7 +275,7 @@ export function reviewCopiesFor(ws: WorkspaceService, projectPath: string): Revi
  * null when it gets none (review copies off, or its session wasn't granted the copies folder).
  */
 export async function reviewCopyOnStart(ws: WorkspaceService, projectPath: string, card: number, agent: Reviewer): Promise<string | null> {
-  if (advanced.get(COPIES_REVIEW) === false) return null
+  if (reviewCopiesOff()) return null
   const folder = copiesDirOf(ws.worktreesRoot, projectPath)
   if (!sessions.grantedDirs(projectPath, agent.id).some((d) => samePlace(d, folder))) return null
   const a = await reviewCopiesFor(ws, projectPath)
