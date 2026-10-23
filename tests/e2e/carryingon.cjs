@@ -47,7 +47,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
+  // The Assistant's fake runs in the workspace's folder: trusted too, so a line typed into it isn't taken as the answer.
+  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), ws.toLowerCase()]))
   // Both follow Hive's notices, as a model does: they read their inbox and ack what they listed.
   fs.writeFileSync(path.join(claudeHome, 'fake-follow-notices.txt'), '')
   fs.writeFileSync(path.join(codexHome, 'fake-follow-notices.txt'), '')
@@ -205,7 +206,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await lib.sleep(300)
     await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
     check('the Assistant watches the card', !!(await until(async () => (await asst())?.status === 'watching', HUNG_MS)), (await asst())?.status)
-    await inv('tasks:update', n, { comment: 'A note for the watch.' })
+    await inv('tasks:comment', n, 'A note for the watch.')
     const asstUnread = async () => (await asst())?.inbox?.unread ?? []
     check("its watch's wake waits in its inbox, not typed", !!(await until(async () => (await asstUnread()).some((m) => m.state === 'queued'), HUNG_MS)), JSON.stringify(await asstUnread()))
     await page.keyboard.press('Control+Alt+I')
