@@ -801,11 +801,6 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return slotTest(await poolFor(workspace, workspace.assertProject(p)), op)
     },
     'queue:history': (p, target) => queueHistory(workspace, workspace.assertProject(p), queueTarget(target)),
-    'queue:branchCard': async (p, agentId) => {
-      const path = workspace.assertProject(p)
-      const agent = agentsOf(await workspace.projectConfig(path)).find((a) => a.id === agentId)
-      return agent?.worktree?.branch ? branchQueueCard(workspace, path, agent.worktree.branch) : null
-    },
     'queue:seen': (p, target, entries) => markQueueSeen(workspace, workspace.assertProject(p), queueTarget(target), Array.isArray(entries) ? entries.filter((e): e is string => typeof e === 'string').slice(0, 100) : []),
     'queue:pause': (p, target) => pauseQueue(workspace, workspace.assertProject(p), queueTarget(target), 'user'),
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),

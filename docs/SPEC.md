@@ -2743,7 +2743,7 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   revision, the result or why, and when). A target shows by #1356's rule, or while it has a history. The panel's
   *Queue in Version Control* opens it.
 - **The Merge dialog** (OP-13): for an agent's worktree branch whose card in flight has Hive merge it under its own
-  ruleset, with the rules enforced (`queue:branchCard`), it says so and where the card stands (not queued yet,
+  ruleset, with the rules enforced (`worktrees:branchCards`), it says so and where the card stands (not queued yet,
   queued with its place, testing; the queue paused), and Merge is off with why. **Merge anyway…** (a confirmation)
   merges it and records an override on the card (`merge outside the queue`); the merge is then observed (§16.4.4).
   Merge stays off until that lookup has answered, and when it fails (said, with Retry); main decides again at the
