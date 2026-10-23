@@ -679,12 +679,15 @@ export function resumeAllAgents(path: string): Promise<void> {
 
 /**
  * Resume All's report of the agents it left (#1434): their conversations can't resume where they were made now (their
- * slot is free, so only their own Resume takes it; or it holds other work), one line each: "• HB2 — resume by hand".
+ * slot is free, so only their own Resume takes it; or it holds other work), one line each with why ("• HB2: its slot is
+ * free. Resume it by hand to take it"), and for each a Show that opens the Sessions tab on that conversation, where its
+ * Resume, its transcript and Start Fresh with a Handover are.
  */
-function heldReport(held: ResumeAllResult['held']): { title: string; lines: string } {
+function heldReport(path: string, held: ResumeAllResult['held']): { title: string; lines: string; actions: ToastAction[] } {
   return {
     title: tr(msg({ id: 'actions.resumeAll.heldTitle', defaultMessage: '{n, plural, one {Resume All left one agent} other {Resume All left # agents}}', description: "A notification's title after Resume All (#1434): it left {n} agents stopped, whose conversations can't resume now where they ran (a slot that is free, so only their own Resume takes it, or holds other work); the lines below say why." }), { n: held.length }),
-    lines: held.map((h) => tr(msg({ id: 'actions.resumeAll.heldLine', defaultMessage: '• {agent} — {why}', description: "A line of Resume All's report of the agents it left (#1434): the agent ({agent}) and why, in a few words ({why}: \"resume by hand\", \"slot reused\", \"after AM-14\")." }), { agent: h.name, why: shownText(holdShort(h.hold)) })).join('\n')
+    lines: held.map((h) => tr(msg({ id: 'actions.resumeAll.heldLine', defaultMessage: '• {agent}: {why}', description: "A line of Resume All's report of the agents it left (#1434): the agent ({agent}) and why, in plain words ({why}: \"its slot is free. Resume it by hand to take it\", \"its slot now holds AM-14's work\", \"after AM-14\")." }), { agent: h.name, why: shownText(holdShort(h.hold)) })).join('\n'),
+    actions: held.map((h) => ({ label: tr(msg({ id: 'actions.resumeAll.show', defaultMessage: 'Show {agent}', description: "A button in Resume All's report of the agents it left (#1434): opens the Sessions tab on that agent's ({agent}) conversation, where it can be resumed by hand, read, or started fresh with a handover." }), { agent: h.name }), command: 'session.showTranscript', args: [path, h.id] }))
   }
 }
 
@@ -692,10 +695,10 @@ async function resumeAll_(path: string): Promise<void> {
   const p = project(path)
   if (!p) return
   const stopped = agentsToResume(p.agents)
-  const left = p.agents.flatMap((a) => (!a.live && a.resume?.hold ? [{ name: a.name, hold: a.resume.hold }] : []))
+  const left = p.agents.flatMap((a) => (!a.live && a.resume?.hold ? [{ name: a.name, hold: a.resume.hold, id: a.resume.id }] : []))
   if (!stopped.length && left.length) {
-    const r = heldReport(left)
-    return notify('info', r.title, r.lines)
+    const r = heldReport(path, left)
+    return notify('info', r.title, r.lines, r.actions)
   }
   if (!stopped.length) return notify('info', tr(msg({ id: 'actions.resumeAll.nothing', defaultMessage: 'Nothing to resume', description: "A notification's title: Resume All found no agent to resume." })), tr(msg({ id: 'actions.resumeAll.nothingMessage', defaultMessage: 'No stopped agent has a session to resume.', description: 'Under the notification that Resume All found nothing to resume.' })))
   const list = (await attempt(listFailed(), () => call('session:list', path))) ?? []
@@ -734,11 +737,12 @@ async function resumeAll_(path: string): Promise<void> {
     notify(
       'error',
       tr(msg({ id: 'actions.resumeAll.failed', defaultMessage: '{all, select, yes {{tried, plural, one {Could not resume the agent} other {Could not resume the agents}}} other {{failed} of {tried} agents could not resume}}', description: "An error's title after Resume All: none of the {tried} agents resumed (yes), or {failed} of them didn't." }), { all: result.failed.length === tried ? 'yes' : 'no', failed: result.failed.length, tried }),
-      batchReport(result.failed, result.resumed.length ? tr(msg({ id: 'actions.resumeAll.resumed', defaultMessage: 'Resumed: {agents}', description: "Resume All's report: the agents that did resume ({agents}: their names, listed)." }), { agents: fmt.list(result.resumed, 'unit') }) : null, result.held.length ? [heldReport(result.held).lines] : [])
+      batchReport(result.failed, result.resumed.length ? tr(msg({ id: 'actions.resumeAll.resumed', defaultMessage: 'Resumed: {agents}', description: "Resume All's report: the agents that did resume ({agents}: their names, listed)." }), { agents: fmt.list(result.resumed, 'unit') }) : null, result.held.length ? [heldReport(path, result.held).lines] : []),
+      result.held.length ? heldReport(path, result.held).actions : undefined
     )
   } else if (result.held.length) {
-    const r = heldReport(result.held)
-    notify('info', r.title, r.lines)
+    const r = heldReport(path, result.held)
+    notify('info', r.title, r.lines, r.actions)
   }
 }
 

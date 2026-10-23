@@ -148,8 +148,8 @@ describe('Resume All and the Sessions tab with holds', () => {
     expect(shownText(holdText({ is: 'after', slot: 'slot-a', card: 14, lane: null }, 'HB2'))).toBe('HB2 is on #14 in slot-a: resume this after #14.')
     expect(shownText(holdText({ is: 'reused', slot: 'slot-b', card: 14, lane: null }, 'HB2'))).toBe("This conversation's slot (slot-b) now holds #14's work. Read its transcript, or start fresh with a handover.")
     expect(shownText(holdText({ is: 'reused', slot: 'slot-b', card: null, lane: 'l' }, 'HB2'))).toBe("This conversation's slot (slot-b) now holds a lane's work. Read its transcript, or start fresh with a handover.")
-    expect(shownText(holdShort({ is: 'byHand', slot: 'slot-b', how: 'take', lease: 'l1' }))).toBe('resume by hand')
-    expect(shownText(holdShort({ is: 'reused', slot: 'slot-b', card: 14, lane: null }))).toBe('slot reused')
+    expect(shownText(holdShort({ is: 'byHand', slot: 'slot-b', how: 'take', lease: 'l1' }))).toBe('its slot is free. Resume it by hand to take it')
+    expect(shownText(holdShort({ is: 'reused', slot: 'slot-b', card: 14, lane: null }))).toBe("its slot now holds #14's work")
     expect(shownText(holdShort({ is: 'after', slot: 'slot-a', card: 14, lane: null }))).toBe('after #14')
   })
 

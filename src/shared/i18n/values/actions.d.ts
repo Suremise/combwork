@@ -174,6 +174,7 @@ interface HiveMessageValues {
   'actions.resumeAll.nothing': undefined
   'actions.resumeAll.nothingMessage': undefined
   'actions.resumeAll.resumed': { agents: string | number }
+  'actions.resumeAll.show': { agent: string | number }
   'actions.resumeAll.title': { n: number }
   'actions.session.listFailed': undefined
   'actions.session.resumeFailed': undefined

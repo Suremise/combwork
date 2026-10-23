@@ -19,8 +19,8 @@ export interface ResumeAllResult {
   running: string[]
   /** Stopped, with no conversation to resume. */
   nothing: string[]
-  /** Stopped, with a conversation that can't resume now where it was made (#1434): resumed by hand, or later. */
-  held: { name: string; hold: ResumeHold }[]
+  /** Stopped, with a conversation (`id`) that can't resume now where it was made (#1434): resumed by hand, or later. */
+  held: { name: string; hold: ResumeHold; id: string }[]
   failed: { name: string; error: string }[]
 }
 
@@ -59,7 +59,7 @@ export async function resumeAll<A extends ResumeAllAgent>(agents: readonly A[], 
       continue
     }
     if (!a.live && a.resume?.hold) {
-      result.held.push({ name: a.name, hold: a.resume.hold })
+      result.held.push({ name: a.name, hold: a.resume.hold, id: a.resume.id })
       continue
     }
     try {

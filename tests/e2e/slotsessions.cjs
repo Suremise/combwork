@@ -4,10 +4,11 @@
 //    the lease. The lease ends while B1 is in a turn: its session is stopped once the turn is over. #13's lease ends
 //    while B1's next run there is still starting (its CLI asking to trust the folder): slot-a isn't lent meanwhile, and
 //    is free once that run is idle and stopped.
-// 2. slot-a free at that revision: Resume All resumes R1 (the project folder) and leaves B1, listing it "resume by hand".
+// 2. slot-a free at that revision: Resume All resumes R1 (the project folder) and leaves B1, listing it with why ("its
+//    slot is free. Resume it by hand to take it") and a Show that opens the Sessions tab on its conversation.
 // 3. A new card (#14, B2) gets slot-a meanwhile: B1's Resume is refused with why ("now holds #14's work"), offering Read
 //    Transcript and Start Fresh with a Handover; two launches for slot-a at once: B2's runs, B1's is refused.
-// 4. A restart with #14's lease open: Resume All resumes B2 in slot-a, and lists B1 ("slot reused").
+// 4. A restart with #14's lease open: Resume All resumes B2 in slot-a, and lists B1 ("its slot now holds #14's work").
 // 5. #14 ends and slot-a stays free: Resume All leaves B2, and B2's own Resume takes slot-a again under a new lease.
 // 6. B1 keeps a dirty carried slot (hb1, #1441's adoption) and gets card #15 in slot-b: its new conversation starts in
 //    slot-b, and its hb1 conversation is refused ("on #15 in slot-b: resume this after #15") until #15 ends, then resumes.
@@ -134,8 +135,11 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     await until(async () => (await resumeAll.count()) === 1, HUNG_MS)
     await resumeAll.click()
     check('Resume All resumes R1', !!(await until(() => idle(r1.id), HUNG_MS)))
-    check('…and leaves B1 stopped, listed "resume by hand"', (await stopped(b1.id)) && !!(await until(async () => (await toastText()).includes('Resume All left one agent') && (await toastText()).includes('B1 — resume by hand'), HUNG_MS)), await toastText())
-    await themed('resume-all-left', (file) => h.page.locator('.toast', { hasText: 'B1 — resume by hand' }).first().screenshot({ path: file }))
+    const leftNote = h.page.locator('.toast', { hasText: 'B1: its slot is free. Resume it by hand to take it' }).first()
+    check('…and leaves B1 stopped, listed with why', (await stopped(b1.id)) && !!(await until(async () => (await toastText()).includes('Resume All left one agent') && (await leftNote.count()) === 1, HUNG_MS)), await toastText())
+    await themed('resume-all-left', (file) => leftNote.screenshot({ path: file }))
+    await leftNote.locator('button', { hasText: 'Show B1' }).click()
+    check("…its Show opens the Sessions tab on B1's conversation", !!(await until(async () => (await h.page.locator('text=Ran in B1').count()) > 0, HUNG_MS)))
     check('…slot-a still free', !(await slotList()).find((s) => s.name === 'slot-a')?.lease)
 
     // --- 3. A new card gets slot-a meanwhile: B1's conversation is refused with why; two launches for slot-a at once.
@@ -175,8 +179,9 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     await resumeAll2.click()
     const back = await until(async () => ((await idle(b2.id)) ? live(b2.id) : null), HUNG_MS)
     check("after a restart, Resume All resumes B2's conversation in slot-a under #14's open lease", back?.sessionId === conv2 && same(back?.cwd, folderA) && back?.slot === 'slot-a', JSON.stringify(back))
-    check('…and lists B1 "slot reused"', !!(await until(async () => (await toastText()).includes('B1 — slot reused'), HUNG_MS)) && (await stopped(b1.id)), await toastText())
-    await themed('resume-all-reused', (file) => h.page.locator('.toast', { hasText: 'B1 — slot reused' }).first().screenshot({ path: file }))
+    const reusedNote = h.page.locator('.toast', { hasText: "B1: its slot now holds #14's work" }).first()
+    check("…and lists B1 with why: its slot now holds #14's work, with Show B1", !!(await until(async () => (await reusedNote.count()) === 1 && (await reusedNote.locator('button', { hasText: 'Show B1' }).count()) === 1, HUNG_MS)) && (await stopped(b1.id)), await toastText())
+    await themed('resume-all-reused', (file) => reusedNote.screenshot({ path: file }))
     await inv('settings:update', { appearance: { theme: 'light' } })
 
     // --- 5. #14 ends, slot-a stays free: Resume All leaves B2; B2's own Resume takes slot-a under a new lease.

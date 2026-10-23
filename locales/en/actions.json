@@ -668,8 +668,8 @@
     "description": "An error's title after Resume All: none of the {tried} agents resumed (yes), or {failed} of them didn't."
   },
   "actions.resumeAll.heldLine": {
-    "defaultMessage": "• {agent} — {why}",
-    "description": "A line of Resume All's report of the agents it left (#1434): the agent ({agent}) and why, in a few words ({why}: \"resume by hand\", \"slot reused\", \"after AM-14\")."
+    "defaultMessage": "• {agent}: {why}",
+    "description": "A line of Resume All's report of the agents it left (#1434): the agent ({agent}) and why, in plain words ({why}: \"its slot is free. Resume it by hand to take it\", \"its slot now holds AM-14's work\", \"after AM-14\")."
   },
   "actions.resumeAll.heldTitle": {
     "defaultMessage": "{n, plural, one {Resume All left one agent} other {Resume All left # agents}}",
@@ -690,6 +690,10 @@
   "actions.resumeAll.resumed": {
     "defaultMessage": "Resumed: {agents}",
     "description": "Resume All's report: the agents that did resume ({agents}: their names, listed)."
+  },
+  "actions.resumeAll.show": {
+    "defaultMessage": "Show {agent}",
+    "description": "A button in Resume All's report of the agents it left (#1434): opens the Sessions tab on that agent's ({agent}) conversation, where it can be resumed by hand, read, or started fresh with a handover."
   },
   "actions.resumeAll.title": {
     "defaultMessage": "{n, plural, one {Resume the agent?} other {Resume all agents?}}",

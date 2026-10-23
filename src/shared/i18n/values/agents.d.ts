@@ -318,7 +318,7 @@ interface HiveMessageValues {
   'agents.resume.short.after': { kind: string; work: string | number }
   'agents.resume.short.byHand': undefined
   'agents.resume.short.other': undefined
-  'agents.resume.short.reused': undefined
+  'agents.resume.short.reused': { kind: string; work: string | number }
   'agents.resume.sub': { kind: string | number; cli: string | number }
   'agents.session.unnamed': { id: string | number }
   'agents.settings.appliesNext': { agent: string | number }

@@ -59,15 +59,18 @@ export function holdText(h: ResumeHold, agent: string): Text {
   }
 }
 
-/** A hold in a few words, for Resume All's list of what it left (#1434): "resume by hand", "slot reused", "after AM-14". */
+/**
+ * A hold in plain words, short, for the lists of agents Resume All and Hive's start left (#1434): "its slot is free.
+ * Resume it by hand to take it", "its slot now holds AM-14's work", "after AM-14".
+ */
 export function holdShort(h: ResumeHold): Text {
   switch (h.is) {
     case 'byHand':
-      return msg({ id: 'agents.resume.short.byHand', defaultMessage: 'resume by hand', description: "Resume All's list of agents it left (#1434): this one's conversation resumes only with its own Resume (its slot is free)." })
+      return msg({ id: 'agents.resume.short.byHand', defaultMessage: 'its slot is free. Resume it by hand to take it', description: "Resume All's list of agents it left (#1434), after the agent's name: this one's conversation resumes only with its own Resume, which takes its slot again (the slot is free)." })
     case 'after':
-      return withValues(msg({ id: 'agents.resume.short.after', defaultMessage: 'after {kind, select, card {{work}} other {its lane}}', description: "Resume All's list of agents it left (#1434): this one's conversation resumes after the card ({work}: \"AM-14\"; kind card) or lane (kind lane) its agent builds now." }), workOf(h))
+      return withValues(msg({ id: 'agents.resume.short.after', defaultMessage: 'after {kind, select, card {{work}} other {its lane}}', description: "Resume All's list of agents it left (#1434), after the agent's name: this one's conversation resumes after the card ({work}: \"AM-14\"; kind card) or lane (kind lane) its agent builds now." }), workOf(h))
     case 'reused':
-      return msg({ id: 'agents.resume.short.reused', defaultMessage: 'slot reused', description: "Resume All's list of agents it left (#1434): this one's conversation's slot holds other work now." })
+      return withValues(msg({ id: 'agents.resume.short.reused', defaultMessage: "its slot now holds {kind, select, card {{work}'s work} other {a lane's work}}", description: "Resume All's list of agents it left (#1434), after the agent's name: this one's conversation's slot was lent to other work since, a card's ({work}: \"AM-14\"; kind card) or a lane's (kind lane)." }), workOf(h))
     default:
       return msg({ id: 'agents.resume.short.other', defaultMessage: "can't resume in its slot", description: "Resume All's list of agents it left (#1434): this one's conversation can't resume in the slot it ran in (changed, gone, or its agent reviews now)." })
   }
