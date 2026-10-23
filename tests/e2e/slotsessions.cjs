@@ -227,6 +227,9 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     check('…B1 stopped', await stop(b1.id))
     await op({ op: 'release', lease: l15.lease.id, why: 'put back' })
     check('#15 put back: the hb1 conversation may resume now', !!(await until(async () => !(await sessionOf(conv3))?.hold, HUNG_MS)))
+    // Its earlier run there has handed hb1 back (its writer released once its processes are seen ended): a resume before
+    // that is refused, as two runs never write in one slot.
+    check('…its earlier run in hb1 has ended there', !!(await until(async () => !(await slotList()).find((s) => s.name === 'hb1')?.writer, HUNG_MS)), JSON.stringify((await slotList()).find((s) => s.name === 'hb1')))
     await inv('session:start', alpha, { agentId: b1.id, resumeId: conv3 })
     const resumed = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null), HUNG_MS)
     check('…and resumes in hb1, its files as they were', resumed?.sessionId === conv3 && same(resumed?.cwd, hb1) && fs.existsSync(path.join(hb1, 'unfinished.txt')), JSON.stringify(resumed))
