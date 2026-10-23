@@ -48,6 +48,11 @@ describe('agentWorkflowRole (#1430)', () => {
     for (const name of ['HB1', 'HI-B1', 'Agent 1', 'Builder', 'Claude', 'R2D2', 'HRX1']) expect(agentWorkflowRole({ name }), name).toBe('builder')
   })
 
+  it('{key}-R{n} reads as a reviewer for every project key length (2–4 letters), and nothing longer or shorter', () => {
+    for (const name of ['AB-R1', 'ABC-R2', 'ABCD-R1', 'abcd-r12', 'HIVR1']) expect(agentWorkflowRole({ name }), name).toBe('reviewer')
+    for (const name of ['ABCDE-R1', 'A-R1', 'ABCDR1', 'ABCD-B1', 'ABCD-R', '-R1']) expect(agentWorkflowRole({ name }), name).toBe('builder')
+  })
+
   it('an unknown stored value reads as the guess', () => {
     expect(agentWorkflowRole({ name: 'HR1', workflowRole: 'boss' as never })).toBe('reviewer')
     expect(isWorkflowRole('boss')).toBe(false)

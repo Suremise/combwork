@@ -15,8 +15,9 @@ export const WORKFLOW_ROLES: readonly WorkflowRole[] = ['builder', 'reviewer', '
 
 export const isWorkflowRole = (v: unknown): v is WorkflowRole => typeof v === 'string' && (WORKFLOW_ROLES as readonly string[]).includes(v)
 
-/** A reviewer's name as the shipped patterns and Darren's agents give it: HR1, HI-R2 (`{key}-R{n}`, #704). */
-const REVIEWER_NAME = /^[a-z]{0,3}-?r\d+$/i
+/** A reviewer's name as the shipped patterns and Darren's agents give it: HR1 (up to three letters), HI-R2 and ABCD-R1
+ * (`{key}-R{n}`, a project key's 2–4 letters: `KEY_FORM`, #704). */
+const REVIEWER_NAME = /^(?:[a-z]{0,3}|[a-z]{2,4}-)r\d+$/i
 
 /**
  * An agent's workflow role: its own, else the guess from before 1.0. A note that says *review* (or, with no note, a name
