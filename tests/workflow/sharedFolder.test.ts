@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
-import { B1, B2, B3, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
+import { B1, B2, B3, commit, locked, moved, R1, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { reconcile, attributeFolder } from '../../src/main/workflow/reconcile'
 import { checkCopy, runCheck } from '../../src/main/workflow/checks'
@@ -17,10 +17,11 @@ afterEach(() => {
 
 describe('workflow scenarios, several agents in one folder', () => {
   it('S11: all off, three agents on one branch with trailers → cards move freely, facts recorded, G16 warns, nothing refused', async () => {
-    const locks: Record<string, string[]> = { B1: ['one.txt'], B2: ['two.txt'], B3: ['three.txt'] }
-    const e = (env = setup({ platform: 'git', sharedFolderWarning: true }, { locksOf: (a) => locks[a] ?? [] }))
+    const e = (env = setup({ platform: 'git', sharedFolderWarning: true }))
     const cards = ['One', 'Two', 'Three'].map((t) => e.wf.createCard({ title: t }))
     for (const [i, a] of [B1, B2, B3].entries()) moved(await e.wf.start(cards[i].key, a))
+    // Each agent's file locks, recorded on its card (#1481).
+    for (const [a, f] of [[B1, 'one.txt'], [B2, 'two.txt'], [B3, 'three.txt']] as const) expect(await locked(e.wf, a, [f])).toBe(true)
     commit(e.project, { 'one.txt': '1\n' }, 'one', { trailer: cards[0].key })
     commit(e.project, { 'two.txt': '2\n' }, 'two', { trailer: cards[1].key })
     // B3's commit sweeps in B1's file.
@@ -142,5 +143,29 @@ describe('workflow scenarios, several agents in one folder', () => {
     const c = commit(e.project, { 'who.txt': '?\n' }, 'whose?')
     await attributeFolder(e.wf)
     expect(e.store.folderCommits(e.project).find((x) => x.sha === c)).toMatchObject({ card: null, how: 'unattributed' })
+  })
+
+  it("G16's lock records (#1481): each path once a cycle, on the agent's current card only; its next start, Done or a reopening ends a card's", async () => {
+    const e = (env = setup({ platform: 'git', sharedFolderWarning: true }))
+    const [x, y] = ['X', 'Y'].map((t) => e.wf.createCard({ title: t }))
+    moved(await e.wf.start(x.key, B1))
+    const onX = { card: x.id, cycle: e.wf.state(x).cycle }
+    expect(await locked(e.wf, B1, ['one.txt', 'one.txt', 'two.txt'])).toBe(true)
+    expect(await locked(e.wf, B1, ['two.txt'])).toBe(false)
+    expect(e.wf.state(x).locked).toEqual(['one.txt', 'two.txt'])
+    expect(e.kinds(x.id).filter((k) => k === 'FilesLocked')).toHaveLength(1)
+    // B1 starts Y with X unfinished: Y is its current card, and a lock seen on X isn't put on either.
+    moved(await e.wf.start(y.key, B1))
+    expect([...e.wf.currentCards()].map(([a, c]) => [a, c.card.id])).toEqual([['B1', y.id]])
+    expect(await e.wf.recordLocks('B1', ['late.txt'], onX)).toBe(false)
+    expect(await locked(e.wf, B1, ['one.txt'])).toBe(true)
+    expect([e.wf.state(x).locked, e.wf.state(y).locked]).toEqual([['one.txt', 'two.txt'], ['one.txt']])
+    // Done: B1 has no current card; X reopened and started again: a new cycle, its record empty.
+    expect(await e.wf.move(y.key, 'done', 'user')).toMatchObject({ ok: true })
+    expect(e.wf.currentCards().size).toBe(0)
+    expect(await locked(e.wf, B1, ['after.txt'])).toBe(false)
+    expect(await e.wf.move(x.key, 'todo', 'user')).toMatchObject({ ok: true })
+    moved(await e.wf.start(x.key, B1))
+    expect(e.wf.state(x).locked).toEqual([])
   })
 })

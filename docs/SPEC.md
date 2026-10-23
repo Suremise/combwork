@@ -1328,6 +1328,7 @@ that can't be written fails the change whole.
 | `Blocked` / `Unblocked` | reason | As today's `blocked`. |
 | `Decision` | decision id, **generation** (1, 2, 3… per card) | A decision is recorded (the decision itself stays on the card). |
 | `DecisionsReceived` | agent, generation | The agent received the card's decisions up to that generation (§16.4.6). |
+| `FilesLocked` | agent, paths (relative to the project folder) | The card's builder took file locks on paths not yet recorded this cycle, while the card was its current one (G16, §16.6.4, #1481). |
 | `CannotWithinRules` | rule, why | The agent's "I couldn't do it within the rules" intent (#686) [#1120 c]. |
 | `ReviewerRequest` | text | The reviewer's request to the builder mid-review (#912) [#1120 c]. |
 | `HeadMoved` (observed) | line, from, to, candidate key of the new change | A new revision in the card's folder outside an intent. |
@@ -1752,7 +1753,10 @@ The Version Control tab documents each preset's choices and why (P6, from this t
   `index.lock`, no destructive git (checkout, reset, branch switch, pull) while an agent works in the folder (§8's
   fence, #646), and the merge queue's compare-and-swap on the target (§16.9) [note "What all off means"].
 - **Several agents in one folder.** File locks stop two agents editing one file. The remaining risks and helpers:
-  commits sweeping in another agent's half-done files (G16 warns, from file-lock records); which card a commit
+  commits sweeping in another agent's half-done files (G16 warns, from file-lock records: the paths each agent locks
+  while it works a card are recorded on that card, `FilesLocked`, and count while it is the agent's current card, the
+  one it started last, until it is Done or back in Todo or on hold; with file locks Off nothing is locked, so G16 has
+  nothing to warn of, #1481; `submit.clean` there leaves another agent's recorded files out too); which card a commit
   belongs to (the `Hive-Card:` trailer, §16.3.2); builds and tests seeing others' unfinished changes (inherent: the
   option's description says so and suggests slots); branch switches and pulls (already held, #646).
 
