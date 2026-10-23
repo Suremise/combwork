@@ -23,7 +23,7 @@ const form = await import('../src/main/workflow/optionsForm')
 const levels = await import('../src/main/workflow/levels')
 const { workflowFor } = await import('../src/main/workflow/service')
 const { checkOptions } = await import('../src/main/workflow/rulesets')
-const { allOff, CONTRADICTION_ROWS, CONTRADICTIONS, FORM_GROUPS, FORM_OPTIONS, formShows, liveContradictions, notOffered, preset, PRESETS } = await import('../src/shared/workflow/options')
+const { allOff, contradictions, CONTRADICTION_ROWS, CONTRADICTIONS, FORM_GROUPS, FORM_OPTIONS, formShows, liveContradictions, notOffered, preset, PRESETS, setOption } = await import('../src/shared/workflow/options')
 const { OPTION_TEXT, OPTION_WHY, optionTitle, PRESET_SUMMARY } = await import('../src/shared/workflow/optionTexts')
 const { englishText } = await import('../src/shared/advanced')
 const { cardLabel } = await import('../src/shared/projectKeys')
@@ -149,7 +149,7 @@ describe("P4's and P5's presets (#1278, #1355, §16.19.1)", () => {
     expect(solo).toMatchObject({ review: 'none', reviewers: 1, noSelfReview: false, preChecks: [], sameness: 'change', finish: 'committed', target: '', mergeChecks: [], okBefore: { mode: 'never' }, folder: 'project', identity: null, stopOwnRuns: false, dependenciesDone: true, slotsUpToDate: false, sharedFolderWarning: true, commands: {} })
     expect(checkOptions('git', { project: solo }).problems).toEqual([])
     // None: N1 No one / a reviewer agent / a reviewer agent then you; N2 on with a reviewer; N3 none / quick / quick +
-    // tests; accepted where it is, in the project folder; N6 on; N4 as allOff's (#1482: §16.6.1's "the whole folder").
+    // tests; accepted where it is, in the project folder; N6 on; N4 as allOff's (§16.6.1).
     const none = (id: 'solo' | 'pair' | 'team') => preset('none', id, inputs)
     const common = { finish: 'accept', folder: 'project', dependenciesDone: true, okBefore: { mode: 'never' }, excluded: ['node_modules', '.venv'] }
     expect(none('solo')).toMatchObject({ ...common, review: 'none', noSelfReview: false, preChecks: [], commands: {} })
@@ -332,6 +332,23 @@ describe("the Version Control tab's Workflow section (#1418)", () => {
       for (const key of CONTRADICTION_ROWS[c]) expect(live[key], `${c} under ${key}`).toContain(c)
     }
     expect(liveContradictions(preset('git', 'pair'))).toEqual({})
+  })
+
+  it('choosing a reviewer agent from All off turns "Nobody reviews their own work" on in the draft, so it saves (#1508)', async () => {
+    const { platform: _p, ...off } = allOff('git')
+    for (const review of ['agent', 'agentThenYou'] as const) {
+      const own = setOption(off, allOff('git'), 'review', review)
+      expect(own).toMatchObject({ review, noSelfReview: true })
+      expect(contradictions({ ...allOff('git'), ...own })).toEqual([])
+    }
+    // Held on where it already was (inherited), the draft's own options gain nothing; other choices leave it as it is.
+    expect(setOption({}, { ...allOff('git'), noSelfReview: true }, 'review', 'agent')).toEqual({ review: 'agent' })
+    expect(setOption(off, allOff('git'), 'review', 'you')).toMatchObject({ review: 'you', noSelfReview: false })
+    // Saved from the form's draft: the project's options take it.
+    const { w, repo } = await workspace()
+    await form.setWorkflowOptions(w, repo, { preset: null, options: off })
+    await form.setWorkflowOptions(w, repo, { preset: null, options: setOption(off, allOff('git'), 'review', 'agent'), base: { preset: null, options: off } })
+    expect((await w.projectConfig(repo)).workflow?.options).toMatchObject({ review: 'agent', noSelfReview: true })
   })
 
   it("refuses a save read before another change (the Assistant's tool, another window), never writing over it", async () => {

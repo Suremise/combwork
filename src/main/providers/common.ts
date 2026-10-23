@@ -190,6 +190,13 @@ export function hookIds(body: Record<string, any>, fields: { turn: string; call:
   return { turn: id(body[fields.turn]), call: id(body[fields.call]), sub: fields.sub ? id(body[fields.sub]) : null, continued: body.stop_hook_active === true }
 }
 
+/** Remembers `value` for a launch (`key`), keeping only the latest 16: a launch stopped part-way never takes its own. */
+export function keepBounded<V>(map: Map<string, V>, key: string, value: V): void {
+  map.delete(key)
+  map.set(key, value)
+  while (map.size > 16) map.delete(map.keys().next().value!)
+}
+
 /** Estimates how many tokens resuming a session will write to the prompt cache (providers with a cache TTL). */
 export function recacheEstimate(usage: SessionUsage, ttlOverride: 'auto' | '5m' | '1h', now = Date.now()): RecacheEstimate {
   const ttlSeconds = ttlOverride === '5m' ? 300 : ttlOverride === '1h' ? 3600 : usage.cacheTtlSeconds

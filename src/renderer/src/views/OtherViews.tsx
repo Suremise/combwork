@@ -13,6 +13,8 @@ import { call, errorMessage } from '../api'
 import { clearEditorDraft, editorDraft, onEditorDrafts, setEditorDraft } from '../editorDrafts'
 import { runCommand, commandKeybinding } from '../commands'
 import { DocEditor } from '../components/DocEditor'
+import { workspaceNotesNotice, workspaceNotesTemplate, workspaceNotesTitle } from '../components/WorkspaceNotes'
+import { workspaceNotesPath } from '@shared/workspaceNotes'
 import { CodeEditor } from '../components/Editors'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { Icon, IconButton, LoadFailed, Markdown, StaleNote, Switch, useContextMenu } from '../components/ui'
@@ -233,6 +235,14 @@ export function NotesView() {
       <div className="empty-state" style={{ paddingTop: '18vh' }}>
         <Icon name="notebook" />
         {rich(M.selectNote)}
+      </div>
+    )
+  }
+  // Workspace notes (#1433): titled, started from a template, and saying as you type who gets it and whether it is cut.
+  if (selected.toLowerCase() === workspaceNotesPath(workspace.path).toLowerCase()) {
+    return (
+      <div className="split">
+        <DocEditor key={selected} path={selected} title={workspaceNotesTitle()} createIfMissing={workspaceNotesTemplate()} notice={workspaceNotesNotice} toolbarExtra={<IconButton icon="trash" title={tr(M.deleteNote)} onClick={() => void actions.deleteNote(selected, basename(selected), false)} />} />
       </div>
     )
   }

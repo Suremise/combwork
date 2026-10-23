@@ -36,6 +36,8 @@ let busy: (project: string, agent: string) => boolean = () => false
 export function setAgentBusy(fn: ((project: string, agent: string) => boolean) | null): void {
   busy = fn ?? (() => false)
 }
+/** Whether an agent is in a turn now (setAgentBusy's): a lease's end waits for it too (#1434). */
+export const agentBusy = (project: string, agent: string): boolean => busy(project, agent)
 
 /**
  * The lanes waiting while their builder's branch is brought up to date, per workspace (its board's path, lower case;

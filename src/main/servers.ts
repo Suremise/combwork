@@ -60,6 +60,8 @@ import { laneCards, laneName, laneNumber } from '../shared/lanes'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
 import { writePty } from './ptyHost'
 import { sessions } from './sessions'
+import { folderFacts } from './agentFolders'
+import { slotAt } from '../shared/agentFolders'
 import { cardStall, laneOrderView, stepWaitOf } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
 import { ackDeliveries, deliveriesOf, deliverNow, deliveryView, launchWith, NotGiven, readInbox } from './deliveries'
@@ -74,6 +76,8 @@ import { startTask } from './taskStart'
 import { hiveSkills, listSkills, skillFiles, validSkillName } from './skills'
 import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
+import { workspaceNotesFile } from './workspaceNotes'
+import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
 import { cardFacts, cardKind, factRow } from './workflow/cardWork'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket } from './workflow/runChecks'
@@ -473,6 +477,9 @@ async function projectSummary(p: string) {
       workflowRole: agentWorkflowRole(a),
       branch: a.worktree?.branch ?? null,
       worktree: a.worktree?.path ?? null,
+      // Where its running session is (#1434), when not the project folder: its folder, and its slot while it runs in one.
+      ...(a.live && !samePlace(a.live.cwd, p) ? { folder: a.live.cwd } : {}),
+      ...(a.live?.slot ? { slot: a.live.slot } : {}),
       status: a.live?.status ?? 'stopped',
       sessionId: a.live?.sessionId ?? null,
       statusMessage: statusMessageOf(a.live),
@@ -764,12 +771,17 @@ route('GET', '/v1/projects/:name/usage', async ({ params, query }) => {
   const id = query.get('sessionId') ?? sessions.liveFor(p, agent ? await agentParam(p, agent) : undefined)?.sessionId ??(await sessions.list(p)).find((s) => s.source === 'hive')?.id
   if (!id) throw new HttpError(404, 'No sessions for this project')
   const usage = await sessions.usage(p, id)
+  // Where it ran (#1434): its folder, and the slot that is, if any.
+  const rec = usage ? await workspace.sessionRecord(p, id).catch(() => undefined) : undefined
+  const folder = rec ? (rec.cwd ?? p) : null
+  const slot = folder ? slotAt(await folderFacts(p).catch(() => ({ projectPath: p, migrated: false, homes: [], slots: [] })), folder)?.name : undefined
+  const where = folder ? { folder, ...(slot ? { slot } : {}) } : {}
   // ?days=false: without the usage by day, which grows with every day the session runs.
   if (usage && query.get('days') === 'false') {
     const { days: _days, ...rest } = usage
-    return rest
+    return { ...rest, ...where }
   }
-  return usage
+  return usage && { ...usage, ...where }
 })
 
 route('POST', '/v1/projects/:name/input', async ({ params, body }) => {
@@ -1428,6 +1440,8 @@ async function agentActivity(p: string, agentId: string, detail = false) {
     ...(detail ? { runtime: st ? agentRuntime(st) : null } : {}),
     branch: a.worktree?.branch ?? null,
     worktree: a.worktree?.path ?? null,
+    ...(st && !samePlace(st.cwd, p) ? { folder: st.cwd } : {}),
+    ...(st?.slot ? { slot: st.slot } : {}),
     sessionId: sessionId || null,
     // A long transcript slows the CLI and Hive; handing over to itself (a new conversation) makes it short again.
     transcriptMB: st?.transcriptBytes !== undefined ? Math.round((st.transcriptBytes / (1024 * 1024)) * 10) / 10 : null,
@@ -1890,6 +1904,10 @@ route('PUT', '/v1/shared/file', async ({ query, body }) => {
   const rel = query.get('path') ?? body?.path
   if (!rel) throw new HttpError(400, 'path is required')
   const abs = inWorkspace(requireWorkspace(), () => assertInShared(rel))
+  // Workspace notes reach every agent at launch (#1433): the user's and the Assistant's to write, never a project agent's.
+  if (agentCaller() && resolvePath(abs).toLowerCase() === resolvePath(inWorkspace(requireWorkspace(), () => workspaceNotesFile(workspace.sharedDir))).toLowerCase()) {
+    throw new HttpError(403, `The shared note "${WORKSPACE_NOTES_PATH}" is the user's and the Hive Assistant's: project agents read it but don't change it. Tell the user what it should say.`)
+  }
   const content = String(body?.content ?? '')
   // Only a write that leaves it out is unguarded: one given (null, empty, not a string) must be a revision.
   const expected: unknown = body && typeof body === 'object' && 'expectedRevision' in body ? body.expectedRevision : undefined

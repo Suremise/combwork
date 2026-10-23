@@ -7,6 +7,7 @@
 // unread ones in English and German) and the badges. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
+const { showBoard, openByTitle } = require('./queueFixture.cjs')
 const { _electron } = require('playwright-core')
 const { DatabaseSync } = require('node:sqlite')
 const fs = require('fs')
@@ -91,7 +92,7 @@ const commit = (dir, file, text, message) => {
   check('its work records the revision submitted and the pass', work?.revisions[0]?.revision === rev && work?.verdicts[0]?.pass === true, JSON.stringify(work && { revisions: work.revisions, verdicts: work.verdicts }))
 
   // --- Its badges on the board.
-  await page.getByRole('button', { name: 'Task Board' }).click()
+  await showBoard(page)
   const tile = page.locator(`.task-card[data-task="${g}"]`)
   const badges = tile.locator('.task-work')
   check('the board card shows its revision and its verdict, each with an accessible name', !!(await lib.until(async () => (await badges.locator('code').innerText().catch(() => '')) === rev.slice(0, 7) && (await badges.locator('[aria-label^="Revision: "]').count()) === 1 && (await badges.locator('[aria-label^="Last verdict: passed"]').count()) === 1, HUNG_MS)), await badges.innerHTML().catch(() => ''))
@@ -135,8 +136,8 @@ const commit = (dir, file, text, message) => {
     }, HUNG_MS)
   const openCard = async (n) => {
     await closeDialogs()
-    await page.getByRole('button', { name: 'Task Board' }).click()
-    await page.locator(`.task-card[data-task="${n}"]`).click()
+    await showBoard(page)
+    await openByTitle(page, n)
     const d = page.locator('.dialog', { hasText: `(#${n})` })
     await d.waitFor({ timeout: HUNG_MS })
     return d
@@ -249,8 +250,8 @@ const commit = (dir, file, text, message) => {
     if (await page.locator('.dialog').count()) await page.keyboard.press('Escape')
     return (await page.locator('.dialog').count()) === 0
   }, HUNG_MS)
-  await page.getByRole('button', { name: 'Task Board' }).click()
-  await page.locator(`.task-card[data-task="${nn}"]`).click()
+  await showBoard(page)
+  await openByTitle(page, nn)
   const noneDialog = page.locator('.dialog', { hasText: `(#${nn})` })
   await noneDialog.waitFor({ timeout: HUNG_MS })
   const noneSection = noneDialog.locator('.card-work[data-work="recorded"]')
@@ -278,8 +279,8 @@ const commit = (dir, file, text, message) => {
     await lib.appReady(page)
     inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     await lib.until(async () => (await inv('workspace:get'))?.path?.toLowerCase() === ws.toLowerCase(), HUNG_MS)
-    await page.getByRole('button', { name: 'Task Board' }).click()
-    await page.locator(`.task-card[data-task="${old}"]`).click()
+    await showBoard(page)
+    await openByTitle(page, old)
     const oldSection = page.locator('.dialog', { hasText: `(#${old})` }).locator('.card-work[data-work="before-1.0"]')
     check('a card from before 1.0 says it has no work record', !!(await lib.until(async () => (await oldSection.innerText().catch(() => '')).includes('Before 1.0: this card has no work record.'), HUNG_MS)), await oldSection.innerText().catch(() => ''))
   } finally {

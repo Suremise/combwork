@@ -34,14 +34,15 @@ const check = (name, ok, extra = '') => {
   lib.gitProject(beta)
   lib.gitProject(gamma)
   // Alpha: a reviewer agent, the agent merges, each builder in its own worktree (B1's, on its branch). Beta: every rule
-  // off (S39), its agents in the project folder.
+  // off (S39), its agents in the project folder: two builders, since the upgrade turns review on for a reviewer, and a
+  // name shaped like R1 reads as one (SPEC §16.10.6, #1430; #1501).
   const main = String(lib.git(alpha, ['branch', '--show-current'])).trim()
   lib.git(alpha, ['worktree', 'add', '-q', '-b', 'b1-work', alphaWt, main])
   const b1 = { id: 'b1', name: 'B1' }
   const r1 = { id: 'r1', name: 'R1' }
   const projects = [
     [alpha, [{ ...b1, worktree: { path: alphaWt, branch: 'b1-work', base: main } }, r1], { review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots', dependenciesDone: true }],
-    [beta, [b1, r1], null],
+    [beta, [b1, { id: 'b2', name: 'B2' }], null],
     // Gamma: a reviewer agent, nothing checked, its agents in the project folder (HR3's card-dialog repro).
     [gamma, [b1, r1], { review: 'agent', noSelfReview: true, finish: 'notChecked', folder: 'project' }]
   ]

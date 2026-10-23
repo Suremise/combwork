@@ -8,6 +8,9 @@ import { leftoversSummary, progressRunsIn, type AgentProcess } from './agentProc
 import { formatDate, formatTime } from './dates'
 import { fmt, msg, tr } from './i18n'
 import type { ProviderId } from './types'
+import type { ResumeHold } from './agentFolders'
+import { shownText } from './advanced'
+import { holdShort } from './sessionResume'
 
 /** An agent running when the marker was last written. */
 export interface RunningAgent {
@@ -118,11 +121,19 @@ export interface LeftMerge {
   folder: string
 }
 
-/** What resuming the agents that were running came to: the names resumed, and those that failed with why. */
+/**
+ * What resuming the agents that were running came to: the names resumed, those that failed with why, and those left
+ * (#1434: their conversations can't resume where they were made now, or only by hand).
+ */
 export interface ResumeReport {
   resumed: string[]
   failed: { name: string; error: string }[]
+  held?: { name: string; hold: ResumeHold }[]
 }
+
+/** The agents left to resume by hand, with why in a few words (#1434). */
+export const resumeHeldLine = (held: NonNullable<ResumeReport['held']>): string =>
+  tr(msg({ id: 'main.unexpectedClose.held', defaultMessage: '{n, plural, one {One was left stopped: {agents}.} other {# were left stopped: {agents}.}}', description: "In the notice that Hive closed unexpectedly (#1434): agents whose conversations can't resume now where they ran (their slot is free, or holds other work), left for the user ({agents}: their names, each with why in a few words)." }), { n: held.length, agents: fmt.list(held.map((h) => `${h.name} (${shownText(holdShort(h.hold))})`)) })
 
 /** The agents that couldn't resume, with why. */
 export const resumeFailedLine = (r: ResumeReport): string =>
@@ -234,6 +245,7 @@ export function unexpectedCloseText(c: { lastSeen: string; agents: readonly Runn
   if (r) {
     lines.push(tr(msg({ id: 'main.unexpectedClose.resumed', defaultMessage: '{n, plural, =0 {None was resumed.} one {One was resumed, as Settings → Sessions says.} other {# were resumed, as Settings → Sessions says.}}', description: 'The notice that Hive closed unexpectedly, with "Resume agents after an unexpected close" on: how many of the agents Hive resumed ({n}).' }), { n: r.resumed.length }))
     if (r.failed.length) lines.push(resumeFailedLine(r))
+    if (r.held?.length) lines.push(resumeHeldLine(r.held))
   } else if (c.agents.length) lines.push(tr(msg({ id: 'main.unexpectedClose.notResumed', defaultMessage: 'Nothing was resumed.', description: 'The notice that Hive closed unexpectedly: Hive did not resume the agents that were running (the user chooses).' })))
   if (c.stillRunning?.length) lines.push(stillRunningLine(c.stillRunning, c.kept))
   if (c.dump) lines.push(tr(msg({ id: 'main.unexpectedClose.dump', defaultMessage: 'Hive kept a crash dump of it: Help → Copy Diagnostics names it.', description: 'The notice that Hive closed unexpectedly: a crash dump of that run was saved on this PC.' })))

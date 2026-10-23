@@ -7,6 +7,7 @@ import { AUTO_PROVIDER, DEFAULT_PROVIDER, PROVIDERS, defaultProviderSettings, is
 import { chosenName, effortName, modelIdName, resolvedModel, runsAsName, type ModelInfo } from './models'
 import { msg, tr as trNow, type Msg } from './i18n'
 import type { Tr } from './tasks'
+import { samePath } from './movePaths'
 
 export const HIVE_DIR = '.hive'
 
@@ -770,18 +771,21 @@ export function sessionInAgentFolder(projectPath: string, a: Pick<AgentDef, 'wor
 /**
  * The session an agent's Resume opens: its last session, else the latest one it ran, else the latest
  * one no current agent owns (its agent was removed, e.g. by the 0.2 upgrade). Archived sessions,
- * sessions from another folder and sessions open in another agent are skipped. Callers pass only
- * records of the agent's provider.
+ * sessions from another folder and sessions open in another agent are skipped; the agent's own in the
+ * project's slots (`slotFolders`, #1434) count, wherever they are (whether they may resume there is
+ * agentFolders' hold). Callers pass only records of the agent's provider.
  */
 export function resumeRecord<R extends Pick<SessionRecord, 'id' | 'archived' | 'lastActiveAt'> & Partial<Pick<SessionRecord, 'cwd' | 'agentId' | 'sub'>>>(
   projectPath: string,
   a: Pick<AgentDef, 'id' | 'worktree' | 'lastSessionId'>,
   records: R[],
   open: Set<string>,
-  agentIds: Set<string> = new Set([a.id])
+  agentIds: Set<string> = new Set([a.id]),
+  slotFolders: readonly string[] = []
 ): R | null {
+  const inSlot = (r: R): boolean => !!r.cwd && r.agentId === a.id && slotFolders.some((f) => samePath(f, r.cwd!))
   const usable = records
-    .filter((r) => !r.archived && !r.sub && !open.has(r.id) && sessionInAgentFolder(projectPath, a, r))
+    .filter((r) => !r.archived && !r.sub && !open.has(r.id) && (sessionInAgentFolder(projectPath, a, r) || inSlot(r)))
     .sort((x, y) => (y.lastActiveAt ?? '').localeCompare(x.lastActiveAt ?? ''))
   return (
     usable.find((r) => r.id === a.lastSessionId) ??

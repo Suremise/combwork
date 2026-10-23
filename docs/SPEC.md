@@ -1127,8 +1127,8 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
 
 [P1, answering HB3's round 1 finding 6 and round 2 finding C, HR2's round 2 finding 6]
 - **Deliverables** (N4, §16.6.1): where a None project's work may be. By default the project folder except `.hive`
-  and folders the option excludes (pre-filled with `node_modules`, `.venv`, build output folders it finds); a card can
-  narrow it to paths (OP-17).
+  and folders the option excludes (`node_modules` and `.venv` by default; no build output folders are found, #1482); a
+  card can narrow it to paths (OP-17).
 - **A card's paths** are **declared, not guessed**: the card's list of files and folders its work covers, kept on the
   card from its start, which the builder sets at any time (the **declare paths** intent, §16.8.1, or `submit`'s
   `paths`) and the user can edit on the card. Hive **pre-fills** it from what
@@ -1679,7 +1679,7 @@ into the 7 locales per `locales/glossary-1.0.md` §2.6.
 | N1 | **Who checks the work before it's done** | No one · A reviewer agent · You · A reviewer agent, then you | Produces Review (and Approved when "then you"). |
 | N2 | **Nobody reviews their own work** | On (fixed while a reviewer agent checks) | Off only with no reviewer. |
 | N3 | **Checks pass before review** | A list of named commands (empty: none) | Each a check (§16.13). |
-| N4 | **What the work is** (deliverables) | Paths and patterns in the project; default the whole folder except `.hive` | OP-17. |
+| N4 | **What the work is** (deliverables) | Paths and patterns in the project; default the whole folder except `.hive`, `node_modules` and `.venv` (no build output folders are found) | OP-17 [#1482]. |
 | N5 | **Stage names** | Rename any shown stage | OP-30. |
 | N6 | **Cards start only when the cards they wait for are done** | On / Off | `start.dependenciesIntegrated`. |
 | N7 | **File locks** | Today's setting (§5 Agents), shown here | Its owner stays Settings → Agents & Worktrees; shown read-only with a link [#966: one owner per switch]. |
@@ -1728,7 +1728,7 @@ afterwards makes it **Custom** (the header says which preset it started from). T
 | G4 carry-over | Same change | Same change | Same change | [#1112 B]. |
 | G5 who merges | Committed is done | Hive merges | Hive merges | Note q1: two red merges reached main through hand merges. |
 | G6 style | — | Merge commit | Merge commit | Today's default (§5 Agents, §15.12). |
-| G7 target | The branch the project is on | `main` | `main` | **Built [#1355]:** the repository's default branch, by name (`main`, else `master`, else the branch it is on; `main` when it can't be read), filled in when the preset is chosen and shown before saving, so a repository whose default is another branch isn't given one it lacks. |
+| G7 target | The repository's default branch (the folder's own line) [#1482] | `main` | `main` | **Built [#1355]:** the repository's default branch, by name (`main`, else `master`, else the branch it is on; `main` when it can't be read), filled in when the preset is chosen and shown before saving, so a repository whose default is another branch isn't given one it lacks. |
 | G8 strict | — | Off | Off | The queue tests target + change anyway and a clean update keeps the pass, so strict mostly changes the history's shape; it is on offer for teams that want every merge up to date (OP-18; HB3's round 1 finding 4). |
 | G9 merge checks | — | Quick checks | Quick checks + unit + each card's focused tests, dependencies installed clean | #1010's merge gate; #187 (§16.9.1 step 5). **Built [#1361], narrowed for now** (Darren, point 1 on #1121): Team's G9 is quick checks + unit tests, installed from scratch before every merge (`mergeInstall: always`); each card's focused tests come with #1367. |
 | G10 your OK | Never | Never | Cards labelled `ui` or `release` | Darren's practice (screenshots, release steps). |
@@ -1740,7 +1740,7 @@ afterwards makes it **Custom** (the header says which preset it started from). T
 | G16 shared-folder warning | On | — | — | Only matters in a shared folder. |
 | G17 reviewers | — | One per lane | One per lane | A pool is the 6+pool template's choice (§16.10.6). |
 
-None's presets fill every option: Solo = N1 No one, N2 —, N3 none, N4 the whole folder, N5 default names, N6 On, N7 as set; Pair = N1 A reviewer agent, N2 On, N3 the quick checks, the rest as Solo; Team = N1 A reviewer agent, then you, N2 On, N3 quick checks + tests, the rest as Solo. (N7 is shown, not set: its owner is Settings → Agents & Worktrees.)
+None's presets fill every option: Solo = N1 No one, N2 —, N3 none, N4 the whole folder except `.hive`, `node_modules` and `.venv`, N5 default names, N6 On, N7 as set; Pair = N1 A reviewer agent, N2 On, N3 the quick checks, the rest as Solo; Team = N1 A reviewer agent, then you, N2 On, N3 quick checks + tests, the rest as Solo. (N7 is shown, not set: its owner is Settings → Agents & Worktrees.)
 
 The Version Control tab documents each preset's choices and why (P6, from this table) [#1122].
 
@@ -2833,6 +2833,70 @@ Hive records each session's provider, folder **and lease** [answering HR2's roun
 - **Reviewers have a stable home:** their sessions run in the project folder (never a slot), and they read and run
   commands in review copies by path (§16.10.5), so their conversations always resume.
 
+**Built [#1434], the folder contract** (`shared/agentFolders.ts`, decided there only; `main/agentFolders.ts` reads what
+it decides from: the project's slots and leases in hive.db, #1441's migration and retired homes):
+
+| | Where |
+|---|---|
+| A new conversation (`launchFolder(agent, purpose)`) | `review`: the project folder. `build`: the agent's open dispatch lease's slot, else its carried slot, else the project folder. Before #1441 has migrated a project, an agent with a 0.9 worktree keeps working there. Reviewer-role agents never start in a slot. A start's purpose is its role's (builder and either: `build`) unless its caller says. |
+| A conversation (`resumeFolder(session)`) | Always the folder it recorded (an older row without one: the project folder). Never moved. |
+| Where the agent works now (`currentFolder`) | Its running session's folder (a retired home included), else where a new conversation would start. |
+
+Whether a conversation may resume there is its **hold** (none: it may):
+
+| Its slot, now | `canResumeNow` (Resume All, startup) | `canResumeByUser` (its own Resume) |
+|---|---|---|
+| The project folder, a retired home, or no slot | yes | yes |
+| Its bound lease open, the agent's | yes | yes |
+| The agent's own under a later lease | no | yes: the session is rebound to that lease |
+| Free, set up, clean and at the head its lease ended at (recorded once its last writer has drained), no other lease since | no ("resume by hand") | yes: a new carried lease of it for the agent, and the session rebound to it, in one write |
+| Its carried slot while the agent builds a card or lane elsewhere | no ("HB2 is on AM-14 in slot-a: resume this after AM-14") | no, until that lease ends |
+| Lent to other work (open, or since), or another agent's session still draining there | no ("This conversation's slot now holds AM-14's work") | no |
+| Free but changed (files, revision, not set up), gone, or the agent a reviewer now | no | no |
+
+- **What a session records:** its folder always (the project folder too), and `lease`, the lease it is **bound** to
+  (hive.db's `sessions.lease`, the 1.0 group's `session leases` step, with `slot_leases.end_rev`, the slot's head once
+  its ended lease's last session has drained): set when it starts in a slot. `rebindSession` changes only that column, never the folder or the
+  provider's id, only to a lease of the same agent whose slot is the session's folder, and only inside the same board
+  write as the lease change that needs it (the user's Resume taking a free slot; #1441's carried → dispatch handoff).
+  A record's save never writes it.
+- **One writer:** a session starts or resumes in a slot only through one board write (`claimPlace`) that decides again
+  from hive.db as it is then (the slot's lease is its agent's; the resume authority, the agent's leases included; the
+  user's Resume's new lease or rebinding) and reserves the slot's **writer** for that start's run: its run id, lease,
+  agent and Hive. [#1434 round 3, the design agreed with HR2 on the card:]
+  - Its run's token is among this Hive's live ones (the pools' `holder.live`, as #1429's operations') from before its
+    claim can be seen; the claim is the project's pool's tracked work, so a closing workspace's pool waits until the
+    start has spawned its process or released the writer, and makes no claim once closing.
+  - The claim needs the slot set up and lent, with no operation (warming, installing, removal) and no unsettled job:
+    a slot still being set up is refused ("slot-b is still being set up"). No operation starts while a writer is set.
+  - The writer stays through the start's preparation, the launch and the session's whole run. A start given up before
+    any process of it ran releases it at once. Once a process ran (its CLI, or the agent's own worktree's first setup,
+    which runs in its carried slot but never in a slot the pool set up), it is released only when its launch's process
+    job shows everything it started has ended (`ended`: the job's whole membership seen empty, a member not described
+    counting as one; after End, only once a later look sees the job empty, since a kill is only asked, and `unknown`
+    after 30 looks): leftovers kept running by the user, a launch that couldn't be tracked, or a job that couldn't be
+    read leave it **held**. A run counts as having a process only once `spawnPty` has returned one.
+  - While it is set the slot isn't lent, adopted, taken by hand or removed, and another start there is refused ("slot-b
+    still has another session in it, or processes one left running there"); two at once give one writer.
+  - A writer whose Hive is gone is never taken over or cleared from a snapshot of its processes: it stays held until
+    the user releases the slot (#1506). A refresh clears only this Hive's own writer whose processes are proven ended
+    but whose release couldn't be written.
+- **Its environment:** `HIVE_SLOT` and `HIVE_SLOT_PORT_BASE` (#1429's `slotEnv`) while it runs in a slot; like every
+  `HIVE_*`, never inherited.
+- **Refused, with offers:** the window says why and offers **Read Transcript** (the Sessions tab, on it) and **Start
+  Fresh with a Handover** (Hand Over to… for its agent; the new conversation starts where the agent works now).
+- **Resume All and startup** use `canResumeNow` only: the rest are left and listed after them ("B1 — resume by hand",
+  "slot reused", "after AM-14"), so a free slot stays for new work.
+- **A lease's end** (#1429's `release`): the slot's writer under that lease drains. Hive lets its turn finish (not in a
+  turn, no prompt waiting, no run or background task going), then stops that run (a start of it still being prepared
+  gives up); never another run of the agent's, in that slot under a new lease or elsewhere. Once the run's processes
+  are known to have ended and its writer is released, the lease's last revision is recorded (its final commit
+  included) and the slot looked at.
+  A run of another Hive is that Hive's to stop; the slot stays its until it exits. No off switch: one writer needs it
+  (with workflow rules off, leases aren't ended by rules, so nothing is stopped).
+- **The Agent API:** an agent's row and detail give its running session's `folder` (when not the project folder) and
+  `slot`, and a session's usage its `folder` and `slot`.
+
 #### 16.10.4 Fresh conversations and hand-overs
 
 Designed in P7 with Darren [#1123 c]: start fresh for idle agents (#1086), a fresh conversation after an idle gap
@@ -2963,7 +3027,29 @@ repeating them (#533) [note §8].
 #### 16.10.7 What reaches agents in slots
 
 - **Workspace notes** (#873): git-ignored, machine-specific notes must reach agents in slots and review copies on every
-  CLI; designed in P7 with Darren [#1123 c].
+  CLI; designed in P7 with Darren [#1123 c]. **Built [#1433]** (Darren, 22 Oct: as recommended):
+  - One note per workspace, `Workspace notes.md` in `.hive/shared` (git-excluded), pinned first in Shared Notes. The user
+    edits it in the window and the Assistant with the notes tools; a project agent's write is refused (403), its read
+    isn't. A `## <project name>` section (any case, a project of the workspace, hidden ones included) is that project's
+    alone; the rest, other headings included, is everyone's, and the Assistant gets the whole note (`notesFor`). A
+    heading inside a code block is text (Markdown's fences: the same character, at least as many, close one), and only
+    `#`/`##` headings up to three spaces in start a section.
+  - Delivered inline at each launch, as the note is then, after Hive's guidance and the launch's own instructions, to
+    every agent and the Assistant in any folder, whatever its tools: Claude Code `--append-system-prompt-file` (with
+    `--system-prompt-snapshot off` on resume, as for the Assistant's mode, and on every resume of a conversation Hive
+    appended to before, by any agent, so notes switched off or emptied since leave it: the conversation's own session
+    record says so, `promptAdded`, never cleared), Codex `developer_instructions` after the
+    user's own (when Codex can't say what those are, an agent's are left alone, without the notes), Copilot its
+    instruction file. Under "Workspace notes (this machine), from the shared note "Workspace notes":"; reviewers get it
+    through their own session.
+  - Bounded: at most `hive.notes.workspaceNotesMax` bytes (4096, UTF-8, header included); over it, cut at a line and
+    ended with "(cut: read the shared note Workspace notes for the rest)". The editor says who gets it and when, and
+    warns as you type for each project (or the Assistant) it would be cut for.
+  - Off: the note empty or missing, or Settings → Advanced **Deliver workspace notes to agents**
+    (`hive.notes.deliverWorkspaceNotes`, on). An edit or the switch reaches each agent's next launch or new
+    conversation. Counted in the launch metrics' custom part.
+  - Where notes go (project rules → AGENTS.md, allow rules → `.claude/settings.json`, lane specifics → the brief,
+    machine or personal notes → Workspace notes) is the bundled `workspace-note` skill's, not the session contract's.
 - **Skill delivery** (#966 row 15, group C, P7): slots get their own skill copies (Codex, Copilot), Hive's owned copies
   are cleaned up safely, and the user chooses which skills are delivered [#966]. **Built [#1431]:**
   - Delivery follows the session's folder (`ctx.cwd`: a slot, the project folder, a carried worktree); reviewers'

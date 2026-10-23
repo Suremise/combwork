@@ -115,6 +115,7 @@
   "shell.command.session.resume": "Retomar última sessão",
   "shell.command.session.resumeAfterClose": "Retomar os agentes em execução quando o Hive fechou",
   "shell.command.session.settleLeftovers": "Encerrar ou manter os processos que um agente deixou em execução",
+  "shell.command.session.showTranscript": "Ler a transcrição de uma sessão",
   "shell.command.session.startNewAll": "Começar de novo (todos)…",
   "shell.command.session.startNewAllLive": "{several, select, yes {Começar de novo ({n})…} other {Começar de novo…}}",
   "shell.command.session.stop": "Parar sessão",

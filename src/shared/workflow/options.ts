@@ -226,6 +226,17 @@ export const reviewerAgent = (r: ReviewBy): boolean => r === 'agent' || r === 'a
 export const reviewByYou = (r: ReviewBy): boolean => r === 'you' || r === 'agentThenYou'
 
 /**
+ * A draft's own options after the form sets one (`effective`: the options the form shows). Choosing a reviewer agent
+ * turns "Nobody reviews their own work" on where it is off, as the form shows it held (#1508): from All off, the switch
+ * that would clear the contradiction is held on and can't be clicked.
+ */
+export function setOption<K extends OptionKey>(own: Partial<WorkflowOptions>, effective: WorkflowOptions, key: K, value: WorkflowOptions[K]): Partial<WorkflowOptions> {
+  const next: Partial<WorkflowOptions> = { ...own, [key]: value }
+  if (key === 'review' && reviewerAgent(value as ReviewBy) && !effective.noSelfReview) next.noSelfReview = true
+  return next
+}
+
+/**
  * The rows each contradiction is about (#1418): the window shows its reason under each of them as the options are
  * chosen, before Save (which checks again under the project's lock).
  */

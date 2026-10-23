@@ -45,8 +45,8 @@ const f = q.folderHelpers(fx)
     const column = async (n) => (await h.card(n))?.column
     const dialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
     const openCard = async (n) => {
-      await page.getByRole('button', { name: 'Task Board' }).click()
-      await page.locator(`.task-card[data-task="${n}"]`).click()
+      await q.showBoard(page)
+      await q.openByTitle(page, n)
       await until(async () => (await dialog.count()) === 1, HUNG_MS)
       return dialog.locator('.card-work-queue')
     }

@@ -117,6 +117,7 @@ interface HiveMessageValues {
   'shell.command.session.resume': undefined
   'shell.command.session.resumeAfterClose': undefined
   'shell.command.session.settleLeftovers': undefined
+  'shell.command.session.showTranscript': undefined
   'shell.command.session.startNewAll': undefined
   'shell.command.session.startNewAllLive': { several: string; n: string | number }
   'shell.command.session.stop': undefined

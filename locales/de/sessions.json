@@ -120,6 +120,7 @@
   "sessions.resume.addsTip": "Fortsetzen (fügt einen Agenten hinzu, wenn keiner sie ausführen kann)",
   "sessions.resume.agentDetail": "{where, select, worktree {Worktree · {branch}} other {Projektordner}}{running, select, yes { · läuft, die aktuelle Sitzung wird zuerst gestoppt} other {}}",
   "sessions.resume.menuHeader": "Fortsetzen in",
+  "sessions.resume.startFresh": "Mit einer Übergabe neu beginnen",
   "sessions.row.archived": "archiviert",
   "sessions.row.backup": "Sicherung",
   "sessions.row.backupTip": "{cli} hat dieses Transkript nicht mehr; Hive zeigt es aus dem eigenen Sicherung an und setzt es von dort fort.",

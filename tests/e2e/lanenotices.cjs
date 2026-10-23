@@ -4,6 +4,7 @@
 // Review, and nothing when Settings → Notifications has notifications off. A quiet test copy records each notice in
 // HIVE_TEST_NOTIFY_LOG, which this reads. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
+const { showBoard, openByTitle } = require('./queueFixture.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
@@ -138,8 +139,8 @@ const check = (name, ok, extra = '') => {
 
     // The durable notice (#1266): each notice is a line in its card's history, there to read whatever became of the
     // notification. The card whose review failed says so, in its dialog's History.
-    await page.getByRole('button', { name: 'Task Board' }).click()
-    await page.locator(`.task-card[data-task="${a}"]`).click()
+    await showBoard(page)
+    await openByTitle(page, a)
     const dialog = page.locator('.dialog', { hasText: `(#${a})` })
     await dialog.waitFor({ timeout: HUNG_MS })
     await dialog.getByText(/History \(\d+\)/).first().click()

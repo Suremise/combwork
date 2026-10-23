@@ -236,6 +236,16 @@ An agent's header, its **⋯** and the **Session** menu let you:
 - **Hand Over to…** (agent menu) — hand this agent's work to another agent of the project, which may use another provider, or to the agent itself **in a new conversation** (see [Long conversations](#long-conversations)). Hive asks this agent to write a handover (if it's running and idle; untick to use the latest handover instead), then starts the other agent, or messages it if it's already running, and tells it to read that handover and carry on. Hive waits for a handover from that agent's own conversation, so one another agent writes meanwhile isn't picked up. Every handover an agent writes starts with a header Hive fills in: the project, the **author** (the agent and its CLI, e.g. *Claude (Claude Code)*), the **session** it was written in (to resume it with questions) and the date, in your time with UTC in brackets. The new session shows a **handed over** badge in the Sessions tab that links back. It needs **Settings → Agent API → Provide Hive tools to sessions**. If the other agent's CLI asks something first (for example whether to trust the folder), answer it in its terminal.
 - **Archive and Start New…** (in the agent's **⋯** menu, or **Archive Session and Start New…** in the command palette) — archive the current conversation and start a clean one. This is the cheapest way to continue after a long session: the new session starts with an empty context instead of re-caching the old one. Write a handover first (see below) so the new session knows where to pick up.
 
+### Resuming in slots
+
+A project's **slots** are worktrees Hive lends to a card or a lane, one builder at a time. A builder's new conversation starts in its card's slot (a reviewer's in the project folder, never a slot), with `HIVE_SLOT` and `HIVE_SLOT_PORT_BASE` (the slot's name and its block of ports) in its environment. A conversation always resumes in the folder it was made in, because the CLIs keep conversations by folder:
+
+- **While its card's slot is still its own**, Resume, Resume All and a restart resume it there.
+- **When the card ends** (Done, put back, or its lane ends), Hive lets the builder finish its turn, then stops its session in the slot. Its conversation stays in the Sessions tab. The slot is lent again only once everything that session started has ended: processes it left running that you keep (**Keep Running**), or that Hive can't confirm have ended (after Hive itself closed unexpectedly), keep the slot out of use until they end or you release it.
+- **While that slot is free and unchanged**, only the agent's own **Resume** takes it again (under a new lease). **Resume All** and Hive's start leave it, and say so afterwards (*B1 — resume by hand*), so free slots stay for new work.
+- **Once the slot holds other work** (*This conversation's slot (slot-a) now holds AM-14's work*), or it changed since, the conversation can't resume there. Hive says why and offers **Read Transcript** (the Sessions tab, on that conversation) and **Start Fresh with a Handover** (Hand Over to… for its agent). Resume All lists it as *slot reused*.
+- **An agent that kept its own worktree** (from before slots) and is given a card in another slot builds the card there; its older conversation waits until that card ends (*B1 is on AM-15 in slot-b: resume this after AM-15*).
+
 ### Agent states
 
 Hive sums up what each agent is doing in one of four states, each drawn with its own shape as well as its own colour, so they read apart without colour too:
@@ -1149,6 +1159,14 @@ The **Shared Notes** view edits the markdown files in `.hive/shared`. Use it for
 Several agents can update the same note without losing each other's changes. An agent rewriting a note says which version it read, and if someone changed the note meanwhile, its write is refused, so it reads the note again and merges its change in. Notes that many agents add to, such as status logs, get one appended entry each, dated and signed. Saving a note in the Shared Notes view that an agent changed since you opened it asks before overwriting it.
 
 **Long documents by section.** An agent that needs one part of a long plan, design note or spec doesn't have to read all of it: its **hive_doc_outline** tool lists a Markdown file's headings with each section's size, and **hive_read_section** reads just one section (with its subsections), by the heading's text or its slug, the heading in lower case with hyphens (`#core-contracts`; two headings called Setup are `#setup` and `#setup-1`). They work on the project's files (in the agent's worktree when it has one) and on shared notes (`shared:plans/design.md`), for Claude Code, Codex and Copilot agents and the Hive Assistant alike. A heading that isn't there gets the closest ones in reply, never an empty section. An agent reads its own project's documents only.
+
+### Workspace notes
+
+**Workspace notes**, pinned first in Shared Notes, is for what is true of this machine: a full path a command needs, the version of a tool you have installed, a folder that lives somewhere unusual. Such notes don't belong in a committed `AGENTS.md`, and `CLAUDE.local.md` doesn't reach every agent: worktrees don't have it, and Codex and Copilot never read it.
+
+Hive adds the note to every agent's instructions when it starts, on every coding agent and in whichever folder it works (its worktree or slot, or the project folder), and to the Hive Assistant's. A section headed with a project's name (`## alpha`) goes only to that project's agents; everything else goes to all of them, and the Assistant gets the whole note. A change reaches each agent at its next launch or new conversation: running agents keep what they started with.
+
+Agents get at most 4 KB of it (Settings → Advanced → **Workspace notes: most an agent gets**). The editor warns as you type when the note is longer for any project, and a longer note is cut, with a line telling agents to read the note for the rest. You and the Hive Assistant edit the note; project agents can read it but not change it. To stop delivering it, empty the note or turn off Settings → Advanced → **Deliver workspace notes to agents**.
 
 ## Memory
 

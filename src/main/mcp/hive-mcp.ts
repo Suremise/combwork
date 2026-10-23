@@ -293,7 +293,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_write_shared_note',
-    description: "Create or overwrite a shared note (markdown) in .hive/shared; append=true adds to the end. expectedRevision (from reading it): written only if the note hasn't changed since, else refused with its current revision. Replies with the path, size and new revision.",
+    description: "Create or overwrite a shared note (markdown) in .hive/shared; append=true adds to the end. expectedRevision (from reading it): written only if the note hasn't changed since, else refused with its current revision. \"Workspace notes.md\", which Hive gives every agent at launch, only the user and the Assistant write. Replies with the path, size and new revision.",
     inputSchema: {
       type: 'object',
       properties: { path: { type: 'string' }, content: { type: 'string' }, append: { type: 'boolean' }, expectedRevision: { type: 'string' } },

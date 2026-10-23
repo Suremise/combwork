@@ -943,8 +943,29 @@ export const SKILL_COPIES_STEP: SchemaStep = {
   ]
 }
 
+/**
+ * Sessions on leases (#1434, SPEC §16.10.3): `sessions.lease`, the slot lease a session is bound to (set when it starts in
+ * a slot; null in the project folder or a home; changed only by `rebindSession`, agentFolders.ts, in the lease change's
+ * own write); `slot_leases.end_rev`, the slot's head once its ended lease's writer has drained (a free slot still there
+ * is where its conversations may resume by hand); and a slot's writer, the session run that writes in it (its lease,
+ * agent and Hive), reserved in the write that lets it start and cleared once it has exited: while it is set the slot
+ * isn't lent, adopted, taken by hand or removed. `lease` isn't in the sessions' codec: a record's save leaves it as it is.
+ */
+export const SESSION_LEASES_STEP: SchemaStep = {
+  name: 'session leases',
+  ddl: [
+    'ALTER TABLE sessions ADD COLUMN lease TEXT',
+    'ALTER TABLE slot_leases ADD COLUMN end_rev TEXT',
+    'ALTER TABLE slots ADD COLUMN writer_run TEXT',
+    'ALTER TABLE slots ADD COLUMN writer_lease TEXT',
+    'ALTER TABLE slots ADD COLUMN writer_agent TEXT',
+    'ALTER TABLE slots ADD COLUMN writer_pid INTEGER',
+    'ALTER TABLE slots ADD COLUMN writer_started INTEGER'
+  ]
+}
+
 /** The 1.0 group's steps (P3's, then P4's, then P5's, then P7's), in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP, SLOTS_STEP, COPIES_STEP, SKILL_COPIES_STEP]
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP, SLOTS_STEP, COPIES_STEP, SKILL_COPIES_STEP, SESSION_LEASES_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {

@@ -334,6 +334,8 @@ interface HiveMessageValues {
   'tips.silentUnknown.title': undefined
   'tips.skillsDelivered.text': undefined
   'tips.skillsDelivered.title': undefined
+  'tips.slotResume.text': undefined
+  'tips.slotResume.title': undefined
   'tips.sortTables.text': undefined
   'tips.sortTables.title': undefined
   'tips.staleMessages.text': undefined
@@ -395,6 +397,8 @@ interface HiveMessageValues {
   'tips.workspaceMoved.title': undefined
   'tips.workspaceMovedDefender.text': undefined
   'tips.workspaceMovedDefender.title': undefined
+  'tips.workspaceNotes.text': undefined
+  'tips.workspaceNotes.title': undefined
   'tips.worktreeReuse.text': undefined
   'tips.worktreeReuse.title': undefined
   'tips.worktrees.text': undefined

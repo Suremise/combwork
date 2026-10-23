@@ -120,6 +120,7 @@
   "sessions.resume.addsTip": "Retomar (adiciona um agente se nenhum puder executá-la)",
   "sessions.resume.agentDetail": "{where, select, worktree {worktree · {branch}} other {pasta do projeto}}{running, select, yes { · em execução, a sessão atual dele para antes} other {}}",
   "sessions.resume.menuHeader": "Retomar em",
+  "sessions.resume.startFresh": "Começar de novo com uma passagem de trabalho",
   "sessions.row.archived": "arquivada",
   "sessions.row.backup": "backup",
   "sessions.row.backupTip": "{cli} não tem mais esta transcrição; o Hive a mostra e retoma a partir do backup.",

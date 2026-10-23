@@ -37,6 +37,7 @@ export function DocEditor({
   toolbarExtra,
   defaultPreview,
   editingNote,
+  notice,
   onSaved
 }: {
   path: string
@@ -47,6 +48,8 @@ export function DocEditor({
   defaultPreview?: boolean
   /** Shown above the editor while the file is being edited (not in preview, not read-only). */
   editingNote?: React.ReactNode
+  /** Shown above the file, in preview and while editing, from its text as it is in the editor now (as you type). */
+  notice?: (text: string) => React.ReactNode
   onSaved?: () => void
 }) {
   const [text, setText] = useState('')
@@ -154,6 +157,7 @@ export function DocEditor({
           </button>
         )}
       </div>
+      {notice && !loading && notice(text)}
       {editingNote && !readOnly && !preview && !loading && editingNote}
       <div className="editor-host">
         {loading ? null : preview ? (

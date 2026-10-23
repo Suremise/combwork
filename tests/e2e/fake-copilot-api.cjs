@@ -174,9 +174,10 @@ function stream(res, model, id, d) {
 
 /**
  * Starts the stand-in on 127.0.0.1 (`port` 0: any free port). Resolves { port, url (…/v1, for COPILOT_PROVIDER_BASE_URL),
- * requests (how many chat requests it answered), close() }.
+ * requests (how many chat requests it answered), close() }. `systems`: every request's system prompt in full in the log,
+ * not only the first's (several sessions' instructions, #1433).
  */
-function startFakeCopilotApi({ port = 0, log = null } = {}) {
+function startFakeCopilotApi({ port = 0, log = null, systems = false } = {}) {
   let n = 0
   const server = http.createServer((req, res) => {
     let raw = ''
@@ -200,9 +201,9 @@ function startFakeCopilotApi({ port = 0, log = null } = {}) {
       const d = decide(body)
       if (log) {
         const system = (body.messages ?? []).find((m) => m.role === 'system')
-        // The system prompt (about 27 KB) in full only with the first request; its length with each.
+        // The system prompt (about 27 KB) in full only with the first request (each, with `systems`); its length with each.
         const sys = textOf(system)
-        fs.appendFileSync(log, `${JSON.stringify({ at: new Date().toISOString(), id, prompt: d.prompt, step: d.step, reply: d.tool ? { tool: d.tool, args: d.args } : { text: d.text }, tools: (body.tools ?? []).map((t) => t.function?.name ?? t.name), systemLength: sys.length, ...(n === 1 ? { system: sys } : {}) })}\n`)
+        fs.appendFileSync(log, `${JSON.stringify({ at: new Date().toISOString(), id, prompt: d.prompt, step: d.step, reply: d.tool ? { tool: d.tool, args: d.args } : { text: d.text }, tools: (body.tools ?? []).map((t) => t.function?.name ?? t.name), systemLength: sys.length, ...(n === 1 || systems ? { system: sys } : {}) })}\n`)
       }
       if (d.wait) await sleep(d.wait)
       if (body.stream) return stream(res, body.model, id, d)

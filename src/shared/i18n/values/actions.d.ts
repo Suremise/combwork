@@ -160,15 +160,21 @@ interface HiveMessageValues {
   'actions.resume.cantFolder': { cli: string }
   'actions.resume.cantTitle': undefined
   'actions.resume.cantWorktree': { folder: string | number }
+  'actions.resume.heldTitle': undefined
   'actions.resume.noneMessage': { agent: string }
   'actions.resume.noneTitle': undefined
+  'actions.resume.readTranscript': undefined
+  'actions.resume.startFresh': undefined
   'actions.resumeAll.coldLine': { agent: string | number; tokens: string | number }
   'actions.resumeAll.confirm': { n: number }
   'actions.resumeAll.failed': { all: string; tried: number; failed: string | number }
+  'actions.resumeAll.heldLine': { agent: string | number; why: string | number }
+  'actions.resumeAll.heldTitle': { n: number }
   'actions.resumeAll.message': { who: string; cold: number }
   'actions.resumeAll.nothing': undefined
   'actions.resumeAll.nothingMessage': undefined
   'actions.resumeAll.resumed': { agents: string | number }
+  'actions.resumeAll.show': { agent: string | number }
   'actions.resumeAll.title': { n: number }
   'actions.session.listFailed': undefined
   'actions.session.resumeFailed': undefined
