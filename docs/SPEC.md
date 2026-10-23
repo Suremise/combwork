@@ -2743,7 +2743,7 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   revision, the result or why, and when). A target shows by #1356's rule, or while it has a history. The panel's
   *Queue in Version Control* opens it.
 - **The Merge dialog** (OP-13): for an agent's worktree branch whose card in flight has Hive merge it under its own
-  ruleset, with the rules enforced (`queue:branchCard`), it says so and where the card stands (not queued yet,
+  ruleset, with the rules enforced (`worktrees:branchCards`), it says so and where the card stands (not queued yet,
   queued with its place, testing; the queue paused), and Merge is off with why. **Merge anyway…** (a confirmation)
   merges it and records an override on the card (`merge outside the queue`); the merge is then observed (§16.4.4).
   Merge stays off until that lookup has answered, and when it fails (said, with Retry); main decides again at the
@@ -3024,7 +3024,7 @@ card" means after its Done fact; its merge-slot case goes away with P5). They ar
   compared. A completion is kept, one per project, from before it is checked: one seen while the work is still
   finishing (the usual order: the agent marks its last card Done in its turn) is considered again as the project's
   agents go quiet (never while they are busy), until it is told, a lane of the project runs again or the switch is off.
-  The banner's button runs in the window that has the project, with the project shown, whatever was shown. Off switch: Settings → Notifications, **Suggest a fresh start when work finishes** (on), and the project's own
+  The banner's button runs in the window that has the project, with the project shown, whatever was shown. Off switch: Settings → Notifications, **Suggest a fresh start** (on), and the project's own
   (Project Settings → Sessions).
 - **Stay On Hold** (Darren's answer): #1087 (a fresh conversation after an idle gap: lanes already start fresh, and the
   rest needs a cache-lifetime threshold per provider), #1089 (the Assistant's save and start fresh: about the Assistant,

@@ -8,6 +8,7 @@
 //   once, nothing typed into it (the Agent API says why), and its lane paused: "paused: Builder's hooks aren't arriving";
 // - an agent started with its hooks off shows it from its start; a Codex agent (the fake, whose first hook comes with its
 //   first prompt) started on a task with its hooks off shows it after that task, watched though it was still starting;
+// - a Codex agent whose hooks worked and then stop while it is idle shows it after the next line Hive types (#1520);
 // - Restart session from the banner with working hooks clears it, and the lane goes on.
 // Screenshots of the pane and the banner in both themes. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -177,6 +178,21 @@ const hooksOff = (agent, off) => {
     const deafCx = await until(async () => (await live(cx))?.hooksMissing, HUNG_MS)
     check("a Codex agent's launch task with no hook after it, at work on its screen: its hooks are missing", deafCx?.after === 'prompt', JSON.stringify(deafCx ?? (await live(cx))))
     await inv('session:stop', alpha, cx.id)
+
+    // --- A Codex agent whose hooks reached Hive (a turn heard) and then stop while it is idle (#1520: on 23 Oct its hooks'
+    // PowerShell went): the next line Hive types into it, a task's doorbell as a wake's is, shows its hooks missing once
+    // the turn that line starts works, though nothing came since.
+    const cy = await lib.addAgent(inv, alpha, { name: 'Cy', provider: 'codex', permissionMode: 'full-access' })
+    await inv('session:start', alpha, { agentId: cy.id })
+    check('a second Codex agent starts', !!(await until(async () => (await live(cy))?.status === 'ready', 45000)))
+    check('…and takes a turn with its hooks working', (await say(cy, 'hh-cy healthy')) > 0 && !!(await until(async () => (await live(cy))?.status === 'finished', HUNG_MS)) && !(await live(cy))?.hooksMissing, JSON.stringify(await live(cy)))
+    fs.writeFileSync(path.join(codexHome, 'fake-nohooks-Cy'), '')
+    const cyCard = await inv('tasks:create', { title: 'Hooks gone', project: 'alpha', column: 'todo' })
+    const given = await inv('tasks:start', cyCard.number, { kind: 'agent', agentId: cy.id })
+    check('its hooks off while idle, a card started on it: Hive types its line', given?.agentId === cy.id, JSON.stringify(given))
+    const deafCy = await until(async () => (await live(cy))?.hooksMissing, HUNG_MS)
+    check('…and the turn it starts, with no hook, shows its hooks missing', ['transcript', 'prompt'].includes(deafCy?.after), JSON.stringify(deafCy ?? (await live(cy))))
+    await inv('session:stop', alpha, cy.id)
 
     // --- Restart session with working hooks clears it, and the lane goes on.
     hooksOff('Builder', false)

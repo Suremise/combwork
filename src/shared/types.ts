@@ -1136,7 +1136,7 @@ export interface ProjectConfig {
   /** The Hive skills this project's agents aren't given (#1431, its Skills tab → Delivered to agents), over the workspace's. */
   skillDelivery?: SkillDeliveryChoice
   chime: 'inherit' | 'on' | 'off'
-  /** This project's own Suggest a fresh start when work finishes (#1437), over Settings → Notifications'. */
+  /** This project's own Suggest a fresh start (#1437), over Settings → Notifications'. */
   suggestFreshStart: 'inherit' | 'on' | 'off'
   /** Carrying on (#1432, shared/inboxSwitches.ts): this project's own inbox switches over Settings → Advanced's; inherit uses those. */
   inboxCheckpoints: 'inherit' | 'on' | 'off'

@@ -54,7 +54,8 @@ import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { releaseQueueRunners } from './workflow/queueRunner'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
-import { startSlots, stopSlots } from './slotsApp'
+import { poolFor, startSlots, stopSlots } from './slotsApp'
+import { setSlotPools } from './unusedWorktrees'
 import { startSlotCards, stopSlotCards } from './slotCards'
 import { startReviewerPool, stopReviewerPool } from './reviewerPool'
 import { startFreshNudges } from './freshStarts'
@@ -998,6 +999,8 @@ app.whenReady().then(async () => {
   startQueueHosts()
   // The slot pools (#1429): their idle slots tidied every hour.
   startSlots()
+  // Unused Worktrees reads the slots through those pools (#1450, #1519).
+  setSlotPools(poolFor)
   // Cards on slots (#1438): a start lends its builder a slot and makes its line there, Done or put back gives it back.
   startSlotCards()
   startReviewerPool()

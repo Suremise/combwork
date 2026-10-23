@@ -307,8 +307,8 @@ slot's cards (`ProgressMerge.tsx`), Pulse's lines and the polite live region. A 
 **The queue on the card, in the Git tab and in the Merge dialog** (#1357): the card dialog's Work section adds
 `CardQueue.tsx` (the work view's `queue`, with a return's details, beside its target's `queue:list` for the place, step,
 pause and a stuck advance's state); the Git tab's `queue` section is `GitQueueSection.tsx` (the panel's `QueueCard` and
-`queue:history`); the Merge dialog asks `queue:branchCard` (queueControls.ts: a card in flight on the agent's line under
-a Hive-merges ruleset), and `agents:merge`'s `outsideQueue` records Merge anyway's override after the merge
+`queue:history`); the Merge dialog asks `worktrees:branchCards` (queueControls.ts: a card in flight on the branch under
+a Hive-merges ruleset; since #1450 also the unfinished card whose line it is), and `agents:merge`'s `outsideQueue` records Merge anyway's override after the merge
 (`Workflow.mergedOutsideQueue`). Both read again on each `queue-changed` (the store's `queueVersion`), the Progress
 panel on or off.
 

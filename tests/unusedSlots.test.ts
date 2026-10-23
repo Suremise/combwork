@@ -17,7 +17,9 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace 
 const { boardFile } = await import('../src/main/boardStore')
 const { SlotStore, fileSlotConn } = await import('../src/main/slots')
 const { setRetiredHomes } = await import('../src/main/agentFolders')
-const { removeUnusedWorktree, removalPreview, unusedWorktrees } = await import('../src/main/unusedWorktrees')
+const { removeUnusedWorktree, removalPreview, setSlotPools, unusedWorktrees } = await import('../src/main/unusedWorktrees')
+// The pools as the app gives them (index.ts).
+setSlotPools((await import('../src/main/slotsApp')).poolFor)
 const { branchMergeStatus, mergeBranch, mergeBranches } = await import('../src/main/branchMerge')
 const { DEFAULT_PROJECT_CONFIG } = await import('../src/shared/defaults')
 
