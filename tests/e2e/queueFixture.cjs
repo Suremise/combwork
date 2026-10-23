@@ -188,10 +188,19 @@ const head = (fx, ref = 'integration') => lib.git(fx.alpha, ['rev-parse', ref]).
 
 /**
  * The Task Board shown, its button clicked only when it isn't (#1459): clicking it on a shown board toggles the sidebar,
- * which moves the board's cards (280 px in S14) after Playwright has read where to click one, so the click misses.
+ * which moves the board's cards (280 px in S14) as the next step clicks one.
  */
 async function showBoard(page) {
   if (!(await page.locator('.board').isVisible())) await page.getByRole('button', { name: 'Task Board' }).click()
+}
+
+/**
+ * A card's dialog opened by a click on its title (#1459): a click on the card's middle can land on its reviewer or agent
+ * line, which shows that agent instead (stopping the click), and under load the board can still show the review line
+ * of a card just reviewed.
+ */
+async function openByTitle(page, n) {
+  await page.locator(`.task-card[data-task="${n}"] .task-title`).click()
 }
 
 /**
@@ -215,7 +224,7 @@ function folderHelpers(fx) {
     },
     forYouSection: async (h, n) => {
       await showBoard(h.page)
-      await h.page.locator(`.task-card[data-task="${n}"]`).click()
+      await openByTitle(h.page, n)
       const d = h.page.locator('.dialog').filter({ has: h.page.locator('.task-title-input') })
       await d.waitFor({ timeout: HUNG_MS })
       return { dialog: d, section: d.locator('[data-section="for-you"]') }
@@ -272,4 +281,4 @@ function otherProfile(fx, suffix) {
   return { ...fx, userData }
 }
 
-module.exports = { HUNG_MS, queueProject, prepare, steer, queueOptions, startHive, agent, rejoin, intent, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, checkWith, restoreCheck, mergesTab, otherProfile }
+module.exports = { HUNG_MS, queueProject, prepare, steer, queueOptions, startHive, agent, rejoin, intent, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }

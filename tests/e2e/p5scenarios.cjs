@@ -71,7 +71,7 @@ const slash = (p) => p.replace(/\\/g, '/')
     const dialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
     const openCard = async (n) => {
       await q.showBoard(page)
-      await page.locator(`.task-card[data-task="${n}"]`).click()
+      await q.openByTitle(page, n)
       await waitHung(async () => (await dialog.count()) === 1)
       return dialog.locator('.card-work-queue')
     }
