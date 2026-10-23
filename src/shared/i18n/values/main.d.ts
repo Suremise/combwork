@@ -19,6 +19,9 @@ interface HiveMessageValues {
   'main.board.foundBody': { folder: string | number }
   'main.board.foundTitle': { n: number }
   'main.board.review': undefined
+  'main.branchMerge.cardWork': { branch: string | number; card: string | number }
+  'main.branchMerge.notBranch': { branch: string | number }
+  'main.branchMerge.same': { branch: string | number }
   'main.console.noWorkspace': undefined
   'main.console.title': { workspace: string | number }
   'main.corrupt.damaged': { file: string | number }
@@ -260,6 +263,16 @@ interface HiveMessageValues {
   'main.unused.read.head': undefined
   'main.unused.read.status': undefined
   'main.unused.refused': { why: string | number }
+  'main.unused.slot.archiveFailed': { error: string | number }
+  'main.unused.slot.busy': undefined
+  'main.unused.slot.cantCheck': { detail: string | number }
+  'main.unused.slot.dirty': { files: number }
+  'main.unused.slot.gitRefused': { detail: string | number }
+  'main.unused.slot.inFlight': { card: string | number }
+  'main.unused.slot.leased': { agent: string | number }
+  'main.unused.slot.process': undefined
+  'main.unused.slot.session': { detail: string | number }
+  'main.unused.slot.unmerged': { target: string | number }
   'main.unused.stale': { n: number }
   'main.unused.tooBig': { n: number }
   'main.unused.tooMany': { n: number }
@@ -268,6 +281,8 @@ interface HiveMessageValues {
   'main.unused.why.notListed': undefined
   'main.unused.why.otherProject': undefined
   'main.unused.why.owned': undefined
+  'main.unused.why.slotGuarded': undefined
+  'main.unused.why.slotInUse': undefined
   'main.update.checksum': undefined
   'main.update.devBuild': undefined
   'main.update.noRelease': undefined

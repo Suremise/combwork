@@ -1239,7 +1239,7 @@ export interface CopyView {
 }
 
 /** What a test copy asks of a project's slot pool (`slots:test`, unpackaged builds only: #1429's e2e). */
-export type SlotTestOp = { op: 'lend'; agent: string; card?: number; lane?: string; slot?: string } | { op: 'release'; lease: string; why?: string } | { op: 'tidy'; at?: number } | { op: 'remove'; slot: string } | { op: 'carry'; agent: string; slot: string; folder: string }
+export type SlotTestOp = { op: 'lend'; agent: string; card?: number; lane?: string; slot?: string } | { op: 'release'; lease: string; why?: string } | { op: 'tidy'; at?: number } | { op: 'remove'; slot: string } | { op: 'carry'; agent: string; slot: string; folder: string } | { op: 'homes'; folders: string[] }
 
 /** A project's slot options as project.json keeps them (ProjectConfig.slots): each left out falls back (slots.ts). */
 export interface SlotOptions {
@@ -1474,6 +1474,37 @@ export interface UnusedWorktree {
    * worktrees folder), or not Hive (an agent's own `git worktree add`, a CLI subagent's isolation, the user's).
    */
   origin?: UnusedWorktreeOrigin
+  /**
+   * What it is to Hive's pools (#1450): a free slot beyond the pool's size (`slot`), a slot left with changes and no
+   * lease (`dirtySlot`), a carried folder whose lease ended (`carried`), or a retired home no conversation resumes in
+   * any more (`home`). Absent: a worktree no agent works in, as before. A slot's kinds are removed only through the
+   * pool's guarded clean-up (never Remove anyway), and aren't given to an agent.
+   */
+  kind?: UnusedWorktreeKind
+  /** Its slot's name (a slot's kinds). */
+  slot?: string
+}
+
+export type UnusedWorktreeKind = 'slot' | 'dirtySlot' | 'carried' | 'home'
+
+/**
+ * A branch the Merge dialog can merge outside cards (#1450, OP-13): a card's line, a carried slot's branch, or any
+ * other local branch; where it is checked out (its slot, when that is one), and the card whose line it is while that
+ * card isn't Done (merged through its card, or here after a confirmation).
+ */
+export interface MergeBranch {
+  name: string
+  kind: 'line' | 'carried' | 'branch'
+  folder?: string
+  slot?: string
+  card?: { number: number; key: string; title: string }
+}
+
+/** The Merge dialog's choices (#1450): the branches to merge, the targets, and the project folder's branch (the default target). */
+export interface MergeBranchList {
+  branches: MergeBranch[]
+  targets: string[]
+  checkedOut: string | null
 }
 
 export type UnusedWorktreeOrigin = { madeBy: 'hive'; agentName?: string } | { madeBy: 'other' }

@@ -27,6 +27,10 @@
     "defaultMessage": "the branches and remotes",
     "description": "What could not be read in Git → Branches & remotes: shown in \"Could not load {what}: {error}\" and \"Could not refresh {what}; last updated …\"."
   },
+  "git.branches.merge": {
+    "defaultMessage": "Merge {branch} into another branch…",
+    "description": "A branch row's button in Git → Branches & remotes (#1450): opens the Merge dialog on that branch."
+  },
   "git.branches.merged": {
     "defaultMessage": "{has, select, yes {merged: {revision}} other {merged}}",
     "description": "Beside a branch's card that is Done (Version Control → Branches & remotes), lower case: its work was merged, with the commit that merged it ({revision}: a short commit id) when it is known (has yes). Keep the select keys."
@@ -1294,6 +1298,10 @@
   "git.worktree.badge": {
     "defaultMessage": "worktree",
     "description": "Badge on a branch checked out in a worktree that isn't an agent's."
+  },
+  "git.worktree.slotLease": {
+    "defaultMessage": "{kind, select, card {{slot}: {agent} on {card}} lane {{slot}: {agent}, lane {lane}} carried {{slot}: carried for {agent}} other {{slot}: not lent}}",
+    "description": "A slot's row in Git → Branches & remotes, Worktrees (#1450): its name and its lease: lent to an agent ({agent}) for a card ({card}: its key) or a lane ({lane}: its name), carried for an agent (its old worktree, adopted), or not lent."
   },
   "git.worktree.unused": {
     "defaultMessage": "Unused worktree",

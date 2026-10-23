@@ -222,6 +222,8 @@
   "tips.mcpPerProject.title": "Serwery MCP tylko tam, gdzie są potrzebne",
   "tips.memorySnapshot.text": "Włącz Ustawienia → Zaawansowane → Zapisz zrzut pamięci, gdy Hive’owi ma zabraknąć pamięci, aby sprawdzić, co ją zapełniło. Zrzuty mogą mieć gigabajty, zawierają to, co Hive miał w pamięci (teksty kart, transkrypcje, możliwe, że tokeny), i zostają na tym komputerze.",
   "tips.memorySnapshot.title": "Hive zamknął się z braku pamięci?",
+  "tips.mergeBranch.text": "⑂ obok gałęzi w Kontroli wersji → Gałęzie i zdalne repozytoria scala ją z wybraną gałęzią, po jednym scaleniu naraz. Gałąź karty, która nie jest gotowa, najpierw pyta, a karta zostaje oznaczona jako scalona poza regułami.",
+  "tips.mergeBranch.title": "Scal gałąź ręcznie",
   "tips.mergeQueueFolder.text": "Gdy kolejka scalania scala do gałęzi wybranej w folderze (main w folderze projektu), aktualizuje też ten folder, ale wstrzymuje się, zamiast ruszać plik, który właśnie zmieniasz. W Ustawienia → Zaawansowane możesz sprawić, by najpierw pytała w sekcji Dla Ciebie.",
   "tips.mergeQueueFolder.title": "Scalanie do folderu, w którym pracujesz",
   "tips.mergeQueuePanel.text": "Karta Scalenia w panelu postępu pokazuje każdą kolejkę scalania: kartę, którą testuje, i ile zwykle trwają jej sprawdzenia, karty, które czekają, oraz kartę, którą zwróciła, dopóki jej nie zobaczysz. Są tam też Wstrzymaj kolejkę i Wznów kolejkę.",

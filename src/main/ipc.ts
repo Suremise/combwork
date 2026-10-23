@@ -30,6 +30,7 @@ import { checkGit, gitTool } from './gitTool'
 import { refreshPath, refreshPathBeforeStart } from './freshPath'
 import { openExternalTerminal } from './externalTerminal'
 import { mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchStatus, unusedWorktrees } from './unusedWorktrees'
+import { branchMergeStatus, lineCard, mergeBranch, mergeBranches } from './branchMerge'
 import { createLogger, logsDir, userText } from './logger'
 import { diagnostics } from './diagnostics'
 import { resumeAfterClose, startupStep, stopLeftAfterClose } from './lastRun'
@@ -940,6 +941,22 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return r
     },
     'worktrees:removalPreview': (p, path) => removalPreview(p, path),
+    'worktrees:mergeBranches': (p) => mergeBranches(p),
+    'worktrees:branchMergeStatus': (p, branch, target) => branchMergeStatus(p, branch, target),
+    'worktrees:branchCards': async (p, branch) => {
+      const path = workspace.assertProject(p)
+      return { queue: await branchQueueCard(workspace, path, branch), line: await lineCard(path, branch) }
+    },
+    'worktrees:mergeBranch': async (p, branch, opts) => {
+      // As agents:merge (#1357): a card Hive merges is merged here only as Merge anyway for that card, decided now.
+      const path = workspace.assertProject(p)
+      const card = await branchQueueCard(workspace, path, branch)
+      const out = opts?.outsideQueue
+      if (card && (!out || out.card !== card.card)) throw hiveError(M.queueMerges, { card: card.key }, { kind: 'conflict' })
+      const r = await mergeBranch(path, branch, { target: opts.target, squash: opts.squash, message: opts.message, ...(opts.card !== undefined ? { card: opts.card } : {}) })
+      if (r.ok && card && out) await mergedOutsideQueue(workspace, path, card.card, typeof out.reason === 'string' ? out.reason.slice(0, 2000) : '').catch((e) => log.warn('recording a merge outside the queue', e))
+      return r
+    },
     'worktrees:removeUnused': async (p, path, opts) => {
       const r = await removeUnusedWorktree(p, path, opts ?? {})
       if (r.deleted) {

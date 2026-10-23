@@ -224,6 +224,8 @@ interface HiveMessageValues {
   'tips.mcpPerProject.title': undefined
   'tips.memorySnapshot.text': undefined
   'tips.memorySnapshot.title': undefined
+  'tips.mergeBranch.text': undefined
+  'tips.mergeBranch.title': undefined
   'tips.mergeQueueFolder.text': undefined
   'tips.mergeQueueFolder.title': undefined
   'tips.mergeQueuePanel.text': undefined

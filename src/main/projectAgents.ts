@@ -643,8 +643,9 @@ export function setUserMergeSlot(fn: typeof userMergeSlot): void {
  * branch it merges into (#350), so an agent's merge doesn't land in the middle. An agent's merge and an unused
  * worktree's (#400) both go through it.
  */
-export async function mergeInProject(projectPath: string, worktree: AgentWorktree, opts: { squash: boolean; message: string; moveBranch?: boolean }): Promise<MergeResult> {
-  const into = await workspace.branch(projectPath)
+export async function mergeInProject(projectPath: string, worktree: AgentWorktree, opts: { squash: boolean; message: string; moveBranch?: boolean; target?: string }): Promise<MergeResult> {
+  // The merge slot of the branch merged into: the target named (#1450's branch merges), else the project folder's.
+  const into = opts.target ?? (await workspace.branch(projectPath))
   const run = (): Promise<MergeResult> => withRepoLock(projectPath, () => wt.mergeWorktree(projectPath, worktree, opts), { project: projectPath })
   return into ? await userMergeSlot(projectPath, into, run) : await run()
 }

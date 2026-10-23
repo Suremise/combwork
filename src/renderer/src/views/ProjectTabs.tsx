@@ -34,7 +34,7 @@ import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNot
 import { languageFor } from '../monacoLang'
 import { useScopedLoad } from '../scopedLoad'
 import { addSkill, deleteSkill, DeliveredSwitch, editInWorkspace, otherLocal, SKILL_LEVEL_TIP, SkillDetail, SkillRow } from '../components/Skills'
-import { CHANGES_ABOUT, unusedPickerLabel } from '@shared/unusedWorktrees'
+import { CHANGES_ABOUT, unusedName, unusedPickerLabel } from '@shared/unusedWorktrees'
 import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, openVersionControl, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
 import { rememberProjectPref } from '../projectPrefs'
 import { keyProblemText } from '../projectKeys'
@@ -883,7 +883,7 @@ function ChangesPicker({ project, value, onChange, unused, looking, listed }: { 
           <optgroup label={tr(C.unusedGroup)}>
             <option value={UNUSED_ROOT}>{looking ? tr(C.unusedLooking) : listed ? tr(C.unusedCount, { count: unused.length }) : tr(C.unusedFailed)}</option>
             {unused
-              .filter((w) => w.branch)
+              .filter((w) => w.branch || w.slot)
               .map((w) => (
                 <option key={w.path} value={unusedRoot(w.path)}>
                   {unusedPickerLabel(w)}
@@ -931,7 +931,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   const resolving = !hasWorktrees && !unusedData
   const shownId = rootId ?? (hasWorktrees || resolving ? UNUSED_ROOT : '')
   const listingUnused = shownId === UNUSED_ROOT
-  const spare = shownId.startsWith(`${UNUSED_ROOT}:`) ? (unusedList.find((w) => unusedRoot(w.path) === shownId && w.branch) ?? null) : null
+  const spare = shownId.startsWith(`${UNUSED_ROOT}:`) ? (unusedList.find((w) => unusedRoot(w.path) === shownId && (w.branch || w.slot)) ?? null) : null
   // A worktree agent's changes are everything on its branch since it left its base branch; an unused one's, since the
   // branch it would merge into.
   const agent = owner.agents.find((a) => a.id === shownId && a.worktree)
@@ -939,7 +939,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   const base = agent?.worktree?.base ?? spare?.check.into ?? undefined
   const project = agent || spare ? { ...owner, path: root } : owner
   // Who the worktree is, in its labels: the agent, or the unused worktree's branch.
-  const whose = agent ? tr(C.worktreeOf, { agent: agent.name }) : spare ? spare.branch! : null
+  const whose = agent ? tr(C.worktreeOf, { agent: agent.name }) : spare ? unusedName(spare) : null
 
   const [statusError, setStatusError] = useState<string | null>(null)
   const [diffTry, setDiffTry] = useState(0)
@@ -1011,7 +1011,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   // unused worktrees page has its own header, UnusedHeading).
   const about = (
     <div className="changes-about changes-page-head" data-about={spare ? 'unused-one' : agent ? 'agent' : 'project'}>
-      {spare ? CHANGES_ABOUT.unusedOne(spare.branch!, spare.check.into ?? tr(C.mainBranch)) : agent ? CHANGES_ABOUT.agent(agent.name, agent.worktree!.branch, agent.worktree!.base) : CHANGES_ABOUT.project}
+      {spare ? CHANGES_ABOUT.unusedOne(unusedName(spare), spare.check.into ?? tr(C.mainBranch)) : agent ? CHANGES_ABOUT.agent(agent.name, agent.worktree!.branch, agent.worktree!.base) : CHANGES_ABOUT.project}
     </div>
   )
 
@@ -1098,7 +1098,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
           {tr(C.changes)} <span className="badge" style={{ marginLeft: 6 }}>{status.files.length}</span>
           <div className="actions">
             {agent && <IconButton icon="git-merge" title={mergeBlocked(agent.name, agent.live?.status) ?? tr(C.mergeAgent, { agent: agent.name })} disabled={!!mergeBlocked(agent.name, agent.live?.status)} onClick={() => set({ mergeFor: { project: owner.path, agentId: agent.id } })} />}
-            {spare && !spare.check.removable && <IconButton icon="git-merge" title={tr(C.mergeBranch, { branch: spare.branch! })} onClick={() => set({ mergeFor: { project: owner.path, agentId: '', worktree: { path: spare.path, branch: spare.branch! } } })} />}
+            {spare?.branch && !spare.check.removable && <IconButton icon="git-merge" title={tr(C.mergeBranch, { branch: spare.branch! })} onClick={() => set({ mergeFor: { project: owner.path, agentId: '', worktree: { path: spare.path, branch: spare.branch! } } })} />}
             <IconButton icon="refresh" title={tr(M.refresh)} onClick={load} />
           </div>
         </div>
@@ -1116,7 +1116,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
           <Icon name="git-branch" /> {status.branch} {whose ? <span className="faint">{tr(C.sinceLeft, { base: base ?? '' })}</span> : <>{status.ahead > 0 && `↑${status.ahead}`} {status.behind > 0 && `↓${status.behind}`}</>}
         </div>
         <div className="pane-body">
-          {status.files.length === 0 && <div className="pane-empty">{agent ? tr(C.noAgentChanges, { branch: agent.worktree!.branch }) : spare ? tr(C.nothingOn, { branch: spare.branch ?? '', base: base ?? '' }) : tr(C.clean)}</div>}
+          {status.files.length === 0 && <div className="pane-empty">{agent ? tr(C.noAgentChanges, { branch: agent.worktree!.branch }) : spare ? tr(C.nothingOn, { branch: unusedName(spare), base: base ?? '' }) : tr(C.clean)}</div>}
           {status.files.map((f) => (
             <Tooltip block key={f.path} content={tr(f.staged ? C.staged : C.unstaged, { status: tr(C.gitStatus, { status: f.status === '?' ? 'untracked' : f.status }), path: f.path })}>
               <div className={cx('row', file === f.path && 'selected')} style={{ width: '100%' }} onClick={() => setFile(f.path)}>

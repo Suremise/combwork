@@ -1073,7 +1073,7 @@ const QUEUE_LOOKUP_FAILED = msg({ id: 'agents.mergeDialog.queueLookupFailed', de
 const QUEUE_MERGES = msg({ id: 'agents.mergeDialog.queueMerges', defaultMessage: 'Hive merges {card} through the merge queue. Merge anyway merges it here instead.', description: "Why Merge is disabled in the Merge dialog: the branch's card ({card}: its key) is merged by Hive's merge queue under its rules. Glossary 2.5: merge queue." })
 
 /** The card on the branch when Hive merges it (#1357, OP-13): where it stands in the queue. */
-function QueueCardNote({ c }: { c: BranchQueueCard }) {
+export function QueueCardNote({ c }: { c: BranchQueueCard }) {
   const where =
     c.where === 'testing'
       ? tr(msg({ id: 'agents.mergeDialog.queueTesting', defaultMessage: 'The queue for {target} is testing it now.', description: "In the Merge dialog: the merge queue for the branch {target} is testing the card now (its merge checks)." }), { target: c.target })

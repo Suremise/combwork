@@ -222,6 +222,8 @@
   "tips.mcpPerProject.title": "MCP servers only where they are needed",
   "tips.memorySnapshot.text": "Turn on Settings → Advanced → Save a memory snapshot if Hive is about to run out of memory, to find out what filled it. Snapshots can be gigabytes, hold what Hive had in memory (card text, transcripts, possibly tokens) and stay on this PC.",
   "tips.memorySnapshot.title": "Hive closed running out of memory?",
+  "tips.mergeBranch.text": "⑂ beside a branch in Version Control → Branches & remotes merges it into the branch you pick, one merge at a time. A card's branch that isn't Done asks first, and the card is marked merged outside the rules.",
+  "tips.mergeBranch.title": "Merge a branch by hand",
   "tips.mergeQueueFolder.text": "When the merge queue merges into a branch checked out in a folder (main in the project folder), it updates the folder too, but pauses rather than touch a file you are changing. Settings → Advanced can have it ask you under For you first.",
   "tips.mergeQueueFolder.title": "Merging into the folder you work in",
   "tips.mergeQueuePanel.text": "The Progress panel's Merges tab shows each merge queue: the card it is testing and how long its checks usually take, the cards waiting, and a card it returned until you've seen it. Pause queue and Resume queue are there too.",

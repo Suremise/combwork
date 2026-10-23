@@ -2762,6 +2762,27 @@ project's builders (`setBuilderCount`; until #1438 its agents), at least one, at
   **Remove idle slots after a day** (`hive.slots.removeIdle`, on) removes free slots beyond the pool's size unused for
   a day, and failed ones, every hour.
 
+**Built [#1450], the views that list and merge worktrees** (`unusedWorktrees.ts`, `branchMerge.ts`; they read only #1429's
+`slots` and `slot_leases`, #1435's copies and #1434's folder facts and `legacyWorktree`, never `AgentDef.worktree`):
+- **Unused Worktrees** lists, besides worktrees no agent works in (as before): a slot left `dirty` with no open lease
+  (with Open: the Changes tab shows a detached slot's changes too); free `ready` slots beyond the pool's size, least
+  recently used first; a slot whose newest lease is an ended `carried` one; a retired home once no session record of an
+  agent the project still has is in it. Never a lent slot, one with an open carried lease, one with an operation, an
+  unsettled job or a writer, anything in the project's `copies` folder, or a queue folder with a living lease. A slot
+  row's Remove is `SlotPool.remove` (the archive command first; kept with the guard's reason, worded in the window's
+  language), its verdict shown before as `SlotPool.check` (the same guards without the rename probe); never Remove
+  anyway (its preview is refused) or Give to an agent. "Remove all merged" takes the same rows.
+- **The Merge dialog for merges outside cards** (OP-13) picks a branch, a card's line (with its slot), a carried slot's
+  branch or any other local branch, and a target (any local branch, the project folder's by default), and merges it as
+  an agent's merge (`mergeWorktree` with the target, the target's merge slot, #350): committed work only, refused while
+  a session in the branch's folder is mid-task. A line whose card isn't Done (`started.line`, any stage but done) says
+  so with a link, and main merges it only when the request names that card, after the window's confirmation; the merge
+  is then observed as one outside the rules (§16.4.4). A card the queue merges takes Merge anyway (#1357). The older
+  Merge dialog (an agent's 0.9 worktree, an unused worktree's Open) stays until #1452 removes the field.
+- **Branches & remotes** reads `slots:list`: a slot's row names its lease (card or lane, its agent; carried for whom; not
+  lent), a branch checked out in a slot shows the slot's name, and a folder's agent is its slot lease's, else the agent
+  whose session runs there (#1424's worktree badge becomes the slot's).
+
 #### 16.10.3 Agents unbound from folders, and resuming
 
 [note §7, #1123] Agents lose their `worktree` field (`AgentDef.worktree`, `types.ts:964`) and gain "in slot X" while

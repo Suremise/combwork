@@ -4,8 +4,12 @@ import { createReadStream, existsSync } from 'original-fs'
 import { lstat, readdir, readlink } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
-import type { AgentBranchStatus, AgentWorktree, MergeResult, SessionRecord, UnusedWorktree, UnusedWorktreeOrigin, UnusedWorktreePreview, UnusedWorktreeRemoval, UnusedWorktrees } from '../shared/types'
-import { lostLines } from '../shared/unusedWorktrees'
+import type { AgentBranchStatus, AgentWorktree, MergeResult, SessionRecord, UnusedWorktree, UnusedWorktreeKind, UnusedWorktreeOrigin, UnusedWorktreePreview, UnusedWorktreeRemoval, UnusedWorktrees } from '../shared/types'
+import { homeListed, lostLines, slotsListed } from '../shared/unusedWorktrees'
+import { folderFacts, legacyWorktree } from './agentFolders'
+import { COPIES_DIR } from './copies'
+import type { SlotKept, SlotPool } from './slots'
+import { poolFor } from './slotsApp'
 import { containsPlace, placeKey, realPath } from './fsutil'
 import { git, gitReading } from './git'
 import { gitProblem } from './gitTool'
@@ -69,21 +73,118 @@ const running = (pid: number): boolean => {
   }
 }
 
-/** The worktrees git lists for the project that no agent works in, as they are now (no check yet). */
-async function candidates(projectPath: string, reads?: wt.RepoReads): Promise<{ listed: { path: string; branch: string | null }[]; problem?: string }> {
+/** A listed worktree before its check: its folder and branch, and what it is to Hive's pools (#1450). */
+interface Candidate {
+  path: string
+  branch: string | null
+  kind?: UnusedWorktreeKind
+  slot?: string
+}
+
+/**
+ * What Hive's pools hold among a project's worktrees (#1450), read from #1429's `slots` and `slot_leases`, #1435's
+ * copies and #1434's folder facts: each slot by its folder, with how it is listed (null: never, lent, protected by a
+ * carried lease, or busy); the copies' folder (never listed: the pool tidies them); each retired home, listed or not.
+ */
+interface Places {
+  pool: SlotPool | null
+  slots: Map<string, { name: string; kind: 'slot' | 'dirtySlot' | 'carried' | null }>
+  copies: string | null
+  homes: Map<string, boolean>
+}
+
+async function placesOf(projectPath: string): Promise<Places> {
+  const ws = workspaceOf(projectPath)
+  const out: Places = { pool: null, slots: new Map(), copies: ws.path ? join(ws.worktreesRoot, basename(projectPath), COPIES_DIR) : null, homes: new Map() }
+  const facts = await folderFacts(projectPath).catch(() => null)
+  if (!facts) return out
+  if (facts.homes.length) {
+    const agents = new Set(projectAgents(await workspace.projectConfig(projectPath)).map((a) => a.id))
+    const sessions = (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions ?? []
+    for (const h of facts.homes) out.homes.set(key(h), homeListed(h, sessions, agents, (a, b) => key(a) === key(b)))
+  }
+  // A slot is never an ordinary unused worktree, even when its pool can't be read: then none is listed.
+  for (const s of facts.slots) out.slots.set(key(s.folder), { name: s.name, kind: null })
+  if (!facts.slots.length || !ws.path) return out
+  try {
+    const pool = await poolFor(ws, projectPath)
+    const rows = pool.slots()
+    const seen = rows.map((s) => {
+      const f = facts.slots.find((x) => x.name === s.name)
+      return { name: s.name, state: s.state, usedAt: s.usedAt, leased: !!f?.open, busy: !!(s.op || s.job || s.writer), carriedEnded: !f?.open && f?.last?.kind === 'carried' && f.last.ended }
+    })
+    const listed = slotsListed(seen, await pool.size())
+    for (const s of rows) out.slots.set(key(s.folder), { name: s.name, kind: listed.get(s.name) ?? null })
+    out.pool = pool
+  } catch (e) {
+    log.warn(`reading ${userText(basename(projectPath))}'s slots for its unused worktrees`, e)
+  }
+  return out
+}
+
+/**
+ * The worktrees git lists for the project that no agent works in, as they are now (no check yet): of Hive's pools,
+ * only the slots and homes `placesOf` lists, never a copy; never an agent's 0.9 worktree (`legacyWorktree`) or a queue
+ * folder with a living lease.
+ */
+async function candidates(projectPath: string, reads?: wt.RepoReads): Promise<{ listed: Candidate[]; places: Places | null; problem?: string }> {
   const all = await (reads ? reads.worktrees() : wt.listWorktrees(projectPath))
   if (!all.length) {
     const problem = gitProblem()
-    return problem ? { listed: [], problem } : { listed: [] }
+    return problem ? { listed: [], places: null, problem } : { listed: [], places: null }
   }
-  const used = new Set([...projectAgents(await workspace.projectConfig(projectPath)).flatMap((a) => (a.worktree ? [key(a.worktree.path)] : [])), ...queueFoldersInUse(projectPath)])
-  const listed: { path: string; branch: string | null }[] = []
+  const places = await placesOf(projectPath)
+  const legacy = projectAgents(await workspace.projectConfig(projectPath)).flatMap((a) => {
+    const w = legacyWorktree(a)
+    return w ? [key(w.path)] : []
+  })
+  const used = new Set([...legacy, ...queueFoldersInUse(projectPath)])
+  const listed: Candidate[] = []
   for (const w of all) {
     if (key(w.path) === key(projectPath) || used.has(key(w.path)) || !existsSync(w.path)) continue
     if (await unsafe(projectPath, w.path)) continue
-    listed.push(w)
+    const slot = places.slots.get(key(w.path))
+    if (slot) {
+      if (slot.kind) listed.push({ ...w, kind: slot.kind, slot: slot.name })
+      continue
+    }
+    if (places.copies && contains(places.copies, w.path)) continue
+    const home = places.homes.get(key(w.path))
+    if (home === false) continue
+    listed.push(home ? { ...w, kind: 'home' } : w)
   }
-  return { listed }
+  return { listed, places }
+}
+
+/** Why a slot has no Remove anyway (#1450): only the pool's guarded clean-up removes it. */
+const SLOT_GUARDED = msg({ id: 'main.unused.why.slotGuarded', defaultMessage: 'it is a slot, which Hive removes only when it is clean and its work is merged', description: "Why Hive won't remove a slot anyway from Unused worktrees (#1450): slots go only through the guarded clean-up. A clause." })
+
+/** Why the pool keeps a slot (#1450), in the window's language: a row's reason, and Remove's refusal. */
+async function keptText(projectPath: string, k: SlotKept): Promise<string> {
+  switch (k.why) {
+    case 'leased': {
+      const agent = projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === k.agent)?.name ?? k.agent
+      return tr(msg({ id: 'main.unused.slot.leased', defaultMessage: 'it is lent to {agent}', description: "Why Hive won't remove a slot listed in Unused worktrees (#1450): it is lent to the agent {agent} now. A clause." }), { agent })
+    }
+    case 'session':
+      return tr(msg({ id: 'main.unused.slot.session', defaultMessage: 'a session runs in it ({detail})', description: "Why Hive won't remove a slot listed in Unused worktrees: an agent's session runs in it ({detail}: the agent and its state). A clause." }), { detail: k.detail })
+    case 'process':
+      return tr(msg({ id: 'main.unused.slot.process', defaultMessage: 'a process still has it open', description: "Why Hive won't remove a slot listed in Unused worktrees: a program still uses its folder. A clause." }))
+    case 'inFlight':
+      return tr(msg({ id: 'main.unused.slot.inFlight', defaultMessage: 'card #{card}, which it held, is still being merged', description: "Why Hive won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its number) that worked in it. A clause." }), { card: k.card })
+    case 'dirty':
+      return tr(msg({ id: 'main.unused.slot.dirty', defaultMessage: "{files, plural, one {# file in it isn't committed} other {# files in it aren't committed}}", description: "Why Hive won't remove a slot listed in Unused worktrees: it has uncommitted or untracked files ({files}: how many). A clause." }), { files: k.files })
+    case 'unmerged':
+      return tr(msg({ id: 'main.unused.slot.unmerged', defaultMessage: "it has commits that aren't on {target}", description: "Why Hive won't remove a slot listed in Unused worktrees: its commit isn't contained in its target branch ({target}). A clause." }), { target: k.target })
+    case 'cantCheck':
+      return tr(msg({ id: 'main.unused.slot.cantCheck', defaultMessage: "Hive couldn't check it ({detail})", description: "Why Hive won't remove a slot listed in Unused worktrees: git couldn't say what it holds ({detail}: why, in English). A clause." }), { detail: k.detail })
+    case 'archiveFailed':
+      return tr(msg({ id: 'main.unused.slot.archiveFailed', defaultMessage: 'its archive command failed ({error})', description: "Why Hive didn't remove a slot listed in Unused worktrees: the project's archive command, run first, failed ({error}: why, in English). A clause." }), { error: k.error })
+    case 'busy':
+      return tr(msg({ id: 'main.unused.slot.busy', defaultMessage: 'Hive is setting it up or removing it now', description: "Why Hive won't remove a slot listed in Unused worktrees: another operation of Hive's has it. A clause." }))
+    case 'gitRefused':
+      return tr(msg({ id: 'main.unused.slot.gitRefused', defaultMessage: "git didn't remove it ({detail})", description: "Why Hive didn't remove a slot listed in Unused worktrees: git worktree remove refused ({detail}: git's message). A clause." }), { detail: k.detail })
+  }
 }
 
 /**
@@ -116,8 +217,19 @@ export function worktreeOrigin(path: string, sessions: readonly Pick<SessionReco
   return hiveFolder && contains(hiveFolder, path) ? { madeBy: 'hive' } : { madeBy: 'other' }
 }
 
-async function describe(projectPath: string, w: { path: string; branch: string | null }, origin: UnusedWorktreeOrigin, reads: wt.RepoReads): Promise<UnusedWorktree> {
-  const check = w.branch ? await wt.worktreeCheck(projectPath, { path: w.path, branch: w.branch, base: '' }, reads) : await detachedCheck(projectPath, w.path, reads)
+async function describe(projectPath: string, w: Candidate, origin: UnusedWorktreeOrigin, reads: wt.RepoReads, pool: SlotPool | null): Promise<UnusedWorktree> {
+  let check = w.branch ? await wt.worktreeCheck(projectPath, { path: w.path, branch: w.branch, base: '' }, reads) : await detachedCheck(projectPath, w.path, reads)
+  // A slot is removable as its pool's guarded clean-up says (#1450): its counts stay git's, its verdict the pool's.
+  if (w.slot) {
+    // A detached slot's commits count against its target branch (the guard's question), not "on no branch".
+    if (!w.branch && check.into) {
+      const [tip, head] = await Promise.all([wt.tipOf(projectPath, check.into), git(w.path, ['rev-parse', '--verify', '--quiet', 'HEAD'])])
+      const ahead = tip && head.ok && head.out.trim() ? await wt.unmergedCommits(projectPath, tip, head.out.trim()) : null
+      if (ahead !== null) check = { ...check, ahead }
+    }
+    const kept = pool ? await pool.check(w.slot).catch((e: Error) => ({ why: 'cantCheck' as const, detail: e.message })) : ({ why: 'busy', state: 'ready' } as const) // i18n-ignore: a SlotKept's codes, worded by keptText
+    check = { ...check, removable: !kept, reason: kept ? await keptText(projectPath, kept) : undefined }
+  }
   const [head, last] = await Promise.all([git(w.path, ['rev-parse', '--verify', '--quiet', 'HEAD']), git(w.path, ['log', '-1', '--format=%cI%x00%s'])])
   const [at, subject] = last.ok ? last.out.trim().split('\0') : []
   return {
@@ -126,13 +238,15 @@ async function describe(projectPath: string, w: { path: string; branch: string |
     check,
     ...(head.ok && head.out.trim() ? { head: head.out.trim() } : {}),
     ...(at ? { lastCommit: { at, subject: subject ?? '' } } : {}),
-    origin
+    origin,
+    ...(w.kind ? { kind: w.kind } : {}),
+    ...(w.slot ? { slot: w.slot } : {})
   }
 }
 
 /** The folders of the project's unused worktrees, unchecked (Storage measures them). */
 export async function unusedWorktreeFolders(projectPath: string): Promise<{ path: string; branch: string | null }[]> {
-  return (await candidates(projectPath).catch(() => ({ listed: [] }))).listed
+  return (await candidates(projectPath).catch(() => ({ listed: [] as Candidate[] }))).listed.map((w) => ({ path: w.path, branch: w.branch }))
 }
 
 /**
@@ -142,7 +256,7 @@ export async function unusedWorktreeFolders(projectPath: string): Promise<{ path
 export async function unusedWorktrees(projectPath: string): Promise<UnusedWorktrees> {
   projectPath = workspace.assertProject(projectPath)
   const reads = new wt.RepoReads(projectPath)
-  const { listed, problem } = await candidates(projectPath, reads)
+  const { listed, places, problem } = await candidates(projectPath, reads)
   if (problem) return { worktrees: [], gitProblem: problem }
   const worktrees: UnusedWorktree[] = []
   const ws = workspaceOf(projectPath)
@@ -150,7 +264,7 @@ export async function unusedWorktrees(projectPath: string): Promise<UnusedWorktr
   const sessions = (await workspace.sessionsFile(projectPath).catch((e) => void log.warn(`reading ${userText(basename(projectPath))}'s session records for its unused worktrees`, e)))?.sessions ?? []
   // Where Hive makes the project's agent worktrees (projectAgents.ts).
   const hiveFolder = ws.path ? join(ws.worktreesRoot, basename(projectPath)) : null
-  for (const w of listed) worktrees.push(await describe(projectPath, w, worktreeOrigin(w.path, sessions, hiveFolder), reads))
+  for (const w of listed) worktrees.push(await describe(projectPath, w, worktreeOrigin(w.path, sessions, hiveFolder), reads, places?.pool ?? null))
   // The Changes tab may read these (and only these) now (#400).
   workspaceOf(projectPath).noteUnusedWorktrees(projectPath, worktrees.map((w) => w.path))
   return { worktrees }
@@ -194,7 +308,7 @@ export async function mergeUnused(projectPath: string, path: string, opts: { squ
     // Under the project file's lock, after the fence: an agent given it before keeps it, and none can be from now on.
     let owned = false
     await workspace.mutateProjectConfig(projectPath, (now) => {
-      owned = projectAgents(now).some((a) => a.worktree && key(a.worktree.path) === key(path))
+      owned = projectAgents(now).some((a) => key(legacyWorktree(a)?.path ?? '') === key(path))
       return {}
     })
     if (owned) throw new Error(tr(msg({ id: 'main.unused.ownedMerge', defaultMessage: 'An agent works in it now: merge it from that agent.', description: "An error merging one of the Overview's unused worktrees (Remove, Remove anyway, Merge): an agent was given it meanwhile." })))
@@ -350,7 +464,7 @@ export async function removalPreview(projectPath: string, path: string): Promise
   projectPath = workspace.assertProject(projectPath)
   const listed = (await wt.listWorktrees(projectPath)).find((w) => key(w.path) === key(path))
   if (!listed || key(listed.path) === key(projectPath)) throw new Error(gitProblem() ?? tr(msg({ id: 'main.unused.why.notListed', defaultMessage: "git doesn't list it as one of the project's worktrees", description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." })))
-  const why = await unsafe(projectPath, listed.path)
+  const why = (await unsafe(projectPath, listed.path)) ?? ((await placesOf(projectPath)).slots.has(key(listed.path)) ? tr(SLOT_GUARDED) : null)
   if (why) throw new Error(tr(msg({ id: 'main.unused.refused', defaultMessage: "Hive doesn't remove it: {why}.", description: "An error asking to Remove anyway one of the Overview's unused worktrees (Remove, Remove anyway, Merge). {why} says why (main.unused.why.*)." }), { why }))
   const snap = await snapshot(projectPath, listed.path)
   const now = Date.now()
@@ -395,6 +509,18 @@ export async function removeUnusedWorktree(projectPath: string, path: string, op
     return { deleted: false, reason: (e as Error).message }
   }
   try {
+    // A slot goes only through its pool's guarded clean-up (#1450, §16.10.2: the archive command first), and only while
+    // Unused Worktrees lists it; never forced.
+    const places = await placesOf(projectPath)
+    const slot = places.slots.get(key(path))
+    if (slot) {
+      if (opts.force !== undefined) return { deleted: false, reason: tr(SLOT_GUARDED) }
+      if (!slot.kind || !places.pool) return { deleted: false, reason: tr(msg({ id: 'main.unused.why.slotInUse', defaultMessage: 'it is a slot in use', description: "Why Hive won't remove a slot from Unused worktrees (#1450): it is lent, protected or busy now (it changed since it was listed). A clause." })) }
+      const kept = await places.pool.remove(slot.name)
+      if (kept) return { deleted: false, reason: await keptText(projectPath, kept) }
+      log.info(`Removed slot ${userText(slot.name)} from Unused Worktrees`)
+      return { deleted: true }
+    }
     const listed = (await wt.listWorktrees(projectPath)).find((w) => key(w.path) === key(path))
     if (!listed || key(listed.path) === key(projectPath)) return { deleted: false, reason: gitProblem() ?? tr(msg({ id: 'main.unused.why.notListed', defaultMessage: "git doesn't list it as one of the project's worktrees", description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." })) }
     const why = await unsafe(projectPath, listed.path)
@@ -402,7 +528,7 @@ export async function removeUnusedWorktree(projectPath: string, path: string, op
     // Under the project file's lock, after the reservation: an agent given it before keeps it; none can be from now on.
     let owned = false
     await workspace.mutateProjectConfig(projectPath, (now) => {
-      owned = projectAgents(now).some((a) => a.worktree && key(a.worktree.path) === key(listed.path))
+      owned = projectAgents(now).some((a) => key(legacyWorktree(a)?.path ?? '') === key(listed.path))
       return {}
     })
     if (owned) return { deleted: false, reason: tr(msg({ id: 'main.unused.why.owned', defaultMessage: 'an agent works in it now', description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." })) }
