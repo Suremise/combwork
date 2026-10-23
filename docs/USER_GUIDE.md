@@ -1199,7 +1199,7 @@ If the version control changed while the dialog was open (switched in another wi
 **When the folder changes**, Hive notices on its next look at the project (opening it, a refresh, switching back to Hive) and offers the switch in the tab, under the header, with a notice once while Hive runs (**Open Version Control** shows the tab):
 
 - **Git found** (someone ran `git init`, or you used **Initialise repository…**): *Git found at …: switch to Git?* with **Switch…** and **Not Now**.
-- **The Git repository is gone** (`.git` removed or moved): Git's rules hold until you switch, because what they check can't be read: a card's start or submit is refused, saying so, with the switch to None as the next step. **Switch to None…**, or put the repository back.
+- **The Git repository is gone** (`.git` removed or moved): Git's rules hold until you switch, because what they check can't be read: a card's start or submit is refused, saying so, with the switch to None as the next step. **Switch to None…**, or put the repository back. The tab notices as soon as you come back to Hive's window, even while it's open on the project.
 - **Mercurial or Jujutsu found** in a Git project (a colocated `.jj` beside `.git` counts as Jujutsu): not supported yet, so **Switch to None…** is offered and Git can't be chosen.
 
 While an offer shows, it says what Hive found; **Not Now** hides it until Hive starts again, and the line beside the choice says it instead. A project has one notice at a time: a later change replaces the one before.
