@@ -1,7 +1,7 @@
 import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { ASSISTANT_OTHER_MCP, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { ASSISTANT_OTHER_MCP, COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { capturedText, hiveError, HiveError, shownError } from './hiveError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
@@ -22,6 +22,8 @@ import { defaultPurpose, resumeHold, slotAt, type FolderPurpose, type FolderSlot
 import { holdText } from '../shared/sessionResume'
 import { bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, releaseWriter, settleWriter } from './agentFolders'
 import { slotEnv } from './slots'
+import { copiesDirOf, grantsCopies } from './copies'
+import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
 import { agentLaunchSettings, canSwitchModeLive, defaultProviderPending, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
 import { resolvedModel } from '../shared/models'
@@ -330,6 +332,8 @@ interface LiveSession {
   lease?: string
   /** Its slot's environment (HIVE_SLOT, HIVE_SLOT_PORT_BASE) while it runs in one. */
   slotEnv?: Record<string, string>
+  /** The folders its launch was granted outside its own (#1439: its project's review copies). */
+  extraDirs?: string[]
   /** Throws if whoever asked for this launch may no longer have it (the Assistant's authority), checked just before spawning. */
   startAllowed?: () => void
   /** The CLI asked something before it started (e.g. whether to trust the folder): shown as waiting for the user. */
@@ -1129,6 +1133,11 @@ class SessionManager {
     return this.projectStates(projectPath)[0] ?? null
   }
 
+  /** The folders a running agent's launch was granted outside its own (#1439: its project's review copies); none if not running. */
+  grantedDirs(projectPath: string, agentId: string): readonly string[] {
+    return this.live.get(liveId(projectPath, agentId))?.extraDirs ?? []
+  }
+
   projectStates(projectPath: string): LiveSessionState[] {
     const prefix = `${projectPath.toLowerCase()}#`
     return [...this.live.entries()].filter(([k]) => k.startsWith(prefix)).map(([, l]) => l.state)
@@ -1722,6 +1731,12 @@ class SessionManager {
     // Instructions of Hive's own given to this conversation at an earlier launch, by any agent (SessionRecord.promptAdded).
     const promptAddedBefore = resume && (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions.find((s) => s.id === sessionId)?.promptAdded === true
     if (assistantText?.text.trim() || notes.trim()) l.promptAdded = true
+    // A reviewer's grant of the project's review copies (#1439): one fixed folder, made if new, so it never changes
+    // between submissions. Never in a slot (either building there) nor with review copies off.
+    const copies = copiesDirOf(workspaceOf(projectPath).worktreesRoot, projectPath)
+    const granted = grantsCopies({ capable: adapter.descriptor.capabilities.extraDirs, on: advanced.get(COPIES_REVIEW) !== false, reviews: reviewsWork(agentWorkflowRole(agent)), inProjectFolder: !l.slotEnv && samePlace(cwd, projectPath), assistant: workspace.isAssistantHome(projectPath) })
+    const extraDirs = granted && (await mkdir(copies, { recursive: true }).then(() => true, () => false)) ? [copies] : []
+    l.extraDirs = extraDirs
     times?.mark('guidance')
     const ctx = {
       projectPath,
@@ -1743,6 +1758,7 @@ class SessionManager {
       use200kContext: eff.use200kContext,
       copies: copyBook(workspaceOf(projectPath)),
       othersHere: () => this.othersIn(cwd, id),
+      extraDirs,
       hookUrl: `${this.hookUrl}?run=${state.runId}`,
       hookAuthFile: hookAuth.file,
       privateDir: hookAuth.dir,

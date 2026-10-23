@@ -116,6 +116,8 @@
   "tasks.history.repaired": "项目：{from} → {to}（已重命名或移动）",
   "tasks.history.restored": "已恢复：{project} 已还原",
   "tasks.history.returned": "退回评审，第 {round} 轮",
+  "tasks.history.reviewCopyLeased": "{agent} 在 {copy}（{revision}）中评审",
+  "tasks.history.reviewCopyWaiting": "{agent} 正在等待评审副本",
   "tasks.history.reviewEnded": "{agent} 的评审已停止：{why, select, sessionEnded {它的会话已结束} agentRemoved {该智能体已被删除} other {{why}}}",
   "tasks.history.reviewFailed": "评审未通过",
   "tasks.history.reviewPassed": "评审通过",

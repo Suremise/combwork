@@ -277,7 +277,13 @@ export class CopilotAdapter implements ProviderAdapter {
     }
     if (ctx.model) args.push('--model', ctx.model)
     if (ctx.effort) args.push('--reasoning-effort', ctx.effort)
-    args.push(...copilotModeFlags(ctx.permissionMode || COPILOT_DESCRIPTOR.defaultPermissionMode, ctx.cwd))
+    const mode = ctx.permissionMode || COPILOT_DESCRIPTOR.defaultPermissionMode
+    args.push(...copilotModeFlags(mode, ctx.cwd))
+    // Folders it may also work in (#1439: a reviewer's review copies), its edits there approved as in its own folder.
+    for (const d of ctx.extraDirs ?? []) {
+      args.push('--add-dir', d)
+      if (mode === 'accept-edits') args.push(...copilotModeFlags(mode, d))
+    }
     args.push(...noAutoUpdateArgs(launchOverrides(ctx.overrides, COPILOT, 'noAutoUpdate')))
     // Never --mouse or --no-mouse (#737): Copilot saves either into the user's own settings (~/.copilot/settings.json),
     // changing their Copilot outside Hive. It keeps its own mouse handling: Shift+drag makes the terminal's selection.

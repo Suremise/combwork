@@ -2889,6 +2889,35 @@ Leasing and removal are operations owning the copy as slots' are. **Reviewers re
 (`hive.copies.review`, on) is the switch #1439 reads: off, a review lease is refused `off`. Copies beyond the size unused
 for a day go hourly (Remove idle slots after a day).
 
+**Built [#1439], the reviewer's side:** `src/main/reviewCopies.ts`, the grant in `sessions.ts` and the adapters.
+- **The grant** is the adapter capability `extraDirs` (`LaunchContext.extraDirs`): every provider has it, as
+  `--add-dir <copies>` for Claude Code (2.1.309; an option always follows it, since it takes several), Copilot (1.0.100;
+  in Accept edits also `--allow-tool=write(<copies>/**)`) and **Codex** (0.163.0). For Codex the card asked for a `-c`
+  override of `sandbox_workspace_write.writable_roots`: recorded against the installed Codex with test homes
+  (`tests/fixtures/advanced/writable-roots-codex-0.163.0.json`), that override **replaces** the user's own writable
+  roots from their `config.toml`, while `--add-dir` adds to them, so Hive passes `--add-dir` (a flag, like the others it
+  passes: no advanced setting). A launch gets it when its CLI has `extraDirs`, review copies are on, its agent reviews
+  (`reviewsWork`: reviewer or either), it starts in the project folder (not a slot) and isn't the Assistant
+  (`grantsCopies`); the folder is made if new. The session remembers its grant (`grantedDirs`).
+- **Start review** (the old `review: "start"` or `hive_start_review`: any path that sets the card's review mark for an
+  agent) leases a copy for the card's latest submission (`kind: review`, `ref` its submission), only for a session
+  granted the folder (else nothing: it reviews the builder's folder read-only). Ready within 2 s, the reply names it
+  ("Review in … at <revision>: read and run commands there; your session stays where it is": in `changes` of a short
+  reply, `reviewCopy` of a whole card or of an intent's `data`). A first copy's setup takes longer, so otherwise it
+  replies "Waiting for a review copy (why): Hive tells you when one is ready", the card's history says *R1 is waiting for
+  a review copy* (the window's text, a message), and once leased the reviewer is told in its inbox (a message from
+  Hive) and the history says *R1 reviews in copy-2 at <revision>*. Waiting reviews lease again after each look at the
+  pools (30 s); one whose review ended is dropped. Starting again with a copy at that revision keeps it; one at an
+  earlier submission's is returned first. At most 50 wait per project.
+- **Returned:** a verdict returns the reviewer's copies of the card at once. A review that ended otherwise (the card
+  moved on, its review mark gone, the reviewer's session ended, which ends its reviews) is over (`over`), and the pools'
+  next look returns it (projects with a review lease out are looked at). Either way the copy is `returning`, freed by
+  the barrier. A pass made stale by a decision is reviewed again: that start review leases a copy again.
+- **Runs** in the copy are checks of its lease's card and revision (#1435's `copyAt` in runLink.ts), so a reviewer's
+  `hive-progress --check` there counts for the submission.
+- **Not here:** an either agent building in a slot isn't e2e-tested (lending slots for a card's start is #1438): the
+  grant's rule is unit-tested. The copies' state in the window is #1445's tab.
+
 **G17**: one reviewer per lane, or a shared pool that takes the next
 Submitted card (oldest first). Run records attached to the revision let a reviewer trust the builder's runs instead of
 repeating them (#533) [note §8].

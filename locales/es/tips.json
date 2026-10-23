@@ -302,6 +302,8 @@
   "tips.removeAll.title": "Quita todos los agentes a la vez",
   "tips.resumeAll.text": "Tras un reinicio, Reanudar todos los agentes, en el encabezado del proyecto, reanuda de una vez la última sesión de cada agente detenido.",
   "tips.resumeAll.title": "Reanuda todos los agentes a la vez",
+  "tips.reviewCopies.text": "Un revisor revisa en una copia de revisión: una carpeta justo en la revisión entregada, en la que nada más escribe, así que el constructor puede seguir mientras tanto. Sus comprobaciones allí cuentan para esa entrega. Configuración → Avanzado lo desactiva.",
+  "tips.reviewCopies.title": "Los revisores prueban justo lo que se entregó",
   "tips.safeguardStops.text": "Un escudo junto al estado de un agente significa que el clasificador de seguridad de su CLI detuvo una respuesta: pasa el puntero por él para ver cuándo, el modelo y las últimas llamadas a herramientas del agente antes de eso. Naranja significa que su modelo cambió desde entonces, o que te espera.",
   "tips.safeguardStops.title": "Mira cuándo un clasificador de seguridad detiene a un agente",
   "tips.saveTemplate.text": "Configura los agentes una vez y reutilízalos: + Agregar ▾ → Plantillas → Guardar plantilla…, en la barra de la sesión, guarda su configuración, sus roles y su diseño, y el mismo menú los carga en cualquier proyecto.",

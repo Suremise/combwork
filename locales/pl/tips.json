@@ -302,6 +302,8 @@
   "tips.removeAll.title": "Usuń wszystkich agentów naraz",
   "tips.resumeAll.text": "Po ponownym uruchomieniu Wznów wszystkich agentów w nagłówku projektu wznawia za jednym razem ostatnią sesję każdego zatrzymanego agenta.",
   "tips.resumeAll.title": "Wznów wszystkich agentów naraz",
+  "tips.reviewCopies.text": "Recenzent recenzuje w kopii do recenzji: folderze dokładnie w przesłanej wersji, do którego nic innego nie pisze, więc budujący może w tym czasie pracować dalej. Jego sprawdzenia tam liczą się dla tego przesłania. Ustawienia → Zaawansowane to wyłączają.",
+  "tips.reviewCopies.title": "Recenzenci testują dokładnie to, co przesłano",
   "tips.safeguardStops.text": "Tarcza obok stanu agenta oznacza, że klasyfikator bezpieczeństwa jego CLI zatrzymał odpowiedź: najedź na nią, żeby zobaczyć kiedy, jaki model i ostatnie wywołania narzędzi agenta przed nią. Pomarańczowa oznacza, że model od tego czasu się zmienił lub agent czeka na Ciebie.",
   "tips.safeguardStops.title": "Zobacz, kiedy klasyfikator bezpieczeństwa zatrzymuje agenta",
   "tips.saveTemplate.text": "Skonfiguruj agentów raz i używaj ich ponownie: + Dodaj ▾ → Szablony → Zapisz szablon… na pasku sesji zachowuje ich ustawienia, role i układ, a to samo menu wczytuje je do dowolnego projektu.",

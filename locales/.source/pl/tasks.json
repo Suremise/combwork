@@ -116,6 +116,8 @@
   "tasks.history.repaired": "Project: {from} → {to} (renamed or moved)",
   "tasks.history.restored": "Brought back: {project} was restored",
   "tasks.history.returned": "Returned for review, round {round}",
+  "tasks.history.reviewCopyLeased": "{agent} reviews in {copy} at {revision}",
+  "tasks.history.reviewCopyWaiting": "{agent} is waiting for a review copy",
   "tasks.history.reviewEnded": "Review by {agent} stopped: {why, select, sessionEnded {its session ended} agentRemoved {the agent was removed} other {{why}}}",
   "tasks.history.reviewFailed": "Review failed",
   "tasks.history.reviewPassed": "Review passed",

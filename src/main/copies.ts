@@ -27,7 +27,7 @@ import { randomBytes } from 'crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { existsSync } from 'original-fs'
 import { mkdir } from 'original-fs/promises'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { samePlace } from './fsutil'
 import { git } from './git'
 import { createLogger, userText } from './logger'
@@ -118,6 +118,19 @@ export const copyName = (n: number): string => `copy-${n}`
 /** The pool's size (OP-32): the larger of 2 and the agents that review plus one, unless the project sets its own. */
 export function copyPoolSize(reviewers: number, own?: number | null): number {
   return own && Number.isInteger(own) && own > 0 ? own : Math.max(2, reviewers + 1)
+}
+
+/** A project's copies folder (`<Workspace>.worktrees/<Project>/copies`): what a reviewer's launch is granted. */
+export const copiesDirOf = (worktreesRoot: string, projectPath: string): string => join(worktreesRoot, basename(projectPath), COPIES_DIR)
+
+/**
+ * Whether a launch is granted the project's copies folder (#1439, SPEC §16.10.5 Access): its CLI can be given folders
+ * (`extraDirs`), review copies are on, and its agent reviews (a reviewer, or either) in the project folder, where its
+ * sessions are when it reviews (#1434). Either building in its slot isn't: when it next reviews, it is in the project
+ * folder again. Never the Assistant.
+ */
+export function grantsCopies(g: { capable: boolean; on: boolean; reviews: boolean; inProjectFolder: boolean; assistant: boolean }): boolean {
+  return g.capable && g.on && g.reviews && g.inProjectFolder && !g.assistant
 }
 
 type Row = Record<string, string | number | null>
@@ -362,7 +375,7 @@ export interface CopyPoolDeps {
   /** The holder agent in a turn or with background tasks running: its name, or null (idle, stopped, gone). */
   holderBusy: (agent: string) => string | null
   /** Whether a lease's review or run is over (a check's run ended, its link never started), as this Hive knows; null: can't tell. */
-  leaseOver: (lease: CopyLease) => boolean | null
+  leaseOver: (lease: CopyLease) => boolean | null | Promise<boolean | null>
   /** Settings → Advanced, Reviewers review in review copies. */
   reviewOn: () => boolean
   /** How long a returning copy is held back before it shows as still in use (Settings → Advanced). */
@@ -400,6 +413,11 @@ export class CopyPool {
 
   leaseByRef(ref: string): CopyLease | null {
     return this.store.leaseByRef(ref)
+  }
+
+  /** The leases not freed yet (returning ones too). */
+  unfreed(): CopyLease[] {
+    return this.store.unfreed()
   }
 
   /** The copy a folder is in (its own folder or inside it), with its lease not freed, if any. */
@@ -636,7 +654,7 @@ export class CopyPool {
     for (const l of this.store.unfreed()) {
       if (l.returned) continue
       const mine = l.pid === me.pid && l.started === me.started
-      const over = mine ? this.deps.leaseOver(l) : (await this.deps.holder.alive(l.pid, l.started)) === false
+      const over = mine ? await this.deps.leaseOver(l) : (await this.deps.holder.alive(l.pid, l.started)) === false
       if (over === true) await this.store.returnLease(l.id, mine ? 'over' : 'hiveGone')
     }
     for (const c of this.store.copies()) {

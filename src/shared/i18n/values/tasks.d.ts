@@ -118,6 +118,8 @@ interface HiveMessageValues {
   'tasks.history.repaired': { from: string | number; to: string | number }
   'tasks.history.restored': { project: string | number }
   'tasks.history.returned': { round: string | number }
+  'tasks.history.reviewCopyLeased': { agent: string | number; copy: string | number; revision: string | number }
+  'tasks.history.reviewCopyWaiting': { agent: string | number }
   'tasks.history.reviewEnded': { agent: string | number; why: string }
   'tasks.history.reviewFailed': undefined
   'tasks.history.reviewPassed': undefined
