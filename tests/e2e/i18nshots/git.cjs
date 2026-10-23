@@ -80,7 +80,7 @@ async function gitSetup(ctx) {
   return gitView(ctx)
 }
 
-/** Its Initialise dialog: what it will do, the starter .gitignore, and the identity git lacks here. */
+/** Its Initialise dialog: what it will do, the starter .gitignore, and who it will commit as (the test identity, #1466). */
 async function initDialog(ctx) {
   await ctx.page.locator('[data-git-setup] [data-git-init]').first().click()
   return shown(ctx, ctx.page.locator('.dialog', { has: ctx.page.locator('[data-git-init-form]') }).last(), 'the Initialise dialog')

@@ -1641,6 +1641,10 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     hiveEnv: (vars?: Env, parent?: Env) => Env
     isHiveEnv: (env: unknown) => boolean
     suiteEnv: (o: { name: string; port?: number | null; work?: string | null; runDir: string; cliLog?: string | null }, parent?: Env) => Env
+    TEST_GIT_IDENTITY: { name: string; email: string }
+    gitConfig: (parent?: Env) => string
+    writeGitConfig: (file: string) => void
+    isUserGitConfig: (file: string, parent?: Env) => boolean
   }
   const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs') as Ctx
   /** An agent's shell in Hive, inside an outer hive-progress, in a suite of a runner, with a person's settings. */
@@ -1739,6 +1743,27 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     // lib.cjs refuses to start a test Hive with any home missing or the user's own.
     const lib = readFileSync(join(root, 'tests', 'e2e', 'lib.cjs'), 'utf8')
     expect(lib).toMatch(/for \(const k of \['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'COPILOT_HOME', 'GH_CONFIG_DIR'\]\) \{\s*if \(!env\[k\]\) throw[\s\S]*?if \(isUserCliHome\(env\[k\]\)\) throw/)
+  })
+
+  it("every test copy of Hive's git has the suite's global config, with a test identity, never the user's ~/.gitconfig (#1466)", () => {
+    const suite = ctx.suiteEnv({ name: 'gitview', port: 47961, work: 'C:\\lanes\\1\\gitview', runDir: 'C:\\lanes\\1\\gitview' }, parent)
+    // The suite's, whatever the shell had; no system config; a suite may give its own.
+    expect(ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p' }, { ...suite, GIT_CONFIG_GLOBAL: 'C:\\Users\\t\\.gitconfig', GIT_CONFIG_NOSYSTEM: '0' })).toMatchObject({ GIT_CONFIG_GLOBAL: 'C:\\lanes\\1\\gitview\\gitconfig', GIT_CONFIG_NOSYSTEM: '1' })
+    expect(ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p' }, parent).GIT_CONFIG_GLOBAL).toBe(join(ctx.WORK, 'gitconfig'))
+    expect(ctx.hiveEnv({ HIVE_USER_DATA: 'C:\\p', GIT_CONFIG_GLOBAL: 'C:\\w\\empty.gitconfig' }, suite).GIT_CONFIG_GLOBAL).toBe('C:\\w\\empty.gitconfig')
+    for (const k of ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM']) expect(has(ctx.childEnv({}, suite), k), k).toBe(false)
+    // The user's own, however spelled.
+    for (const f of ['C:\\Users\\t\\.gitconfig', 'c:/users/T/.gitconfig', 'C:\\Users\\t\\.config\\git\\config']) expect(ctx.isUserGitConfig(f, parent), f).toBe(true)
+    expect(ctx.isUserGitConfig('C:\\lanes\\1\\gitview\\gitconfig', parent)).toBe(false)
+    // What the test Hive's git reads with it: the test identity (git run with hiveEnv's environment, in a work folder).
+    const work = tempDir('hive-gitconfig-')
+    const env = ctx.hiveEnv({ HIVE_USER_DATA: join(work, 'profile') }, { ...process.env, HIVE_E2E_DIR: work })
+    ctx.writeGitConfig(env.GIT_CONFIG_GLOBAL!)
+    const read = (k: string) => execFileSync('git', ['config', '--global', k], { env: env as NodeJS.ProcessEnv, encoding: 'utf8' }).trim()
+    expect([read('user.name'), read('user.email')]).toEqual([ctx.TEST_GIT_IDENTITY.name, ctx.TEST_GIT_IDENTITY.email])
+    // lib.cjs refuses a test Hive without one or with the user's, and writes the suite's.
+    const lib = readFileSync(join(root, 'tests', 'e2e', 'lib.cjs'), 'utf8')
+    expect(lib).toMatch(/if \(!env\.GIT_CONFIG_GLOBAL\) throw[\s\S]*?if \(isUserGitConfig\(env\.GIT_CONFIG_GLOBAL\)\) throw[\s\S]*?writeGitConfig\(env\.GIT_CONFIG_GLOBAL\)/)
   })
 
   it("the CLIs a suite's Hive selects go to a log of the suite's own; the runner starts no CLI of its own (#365)", () => {
