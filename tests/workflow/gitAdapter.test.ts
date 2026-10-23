@@ -264,6 +264,42 @@ describe('Git adapter', () => {
     expect(sub).toEqual({ value: main, ran: [`rev-parse --verify -q refs/heads/main`] })
   })
 
+  it("a name that isn't a plain branch, or a symbolic ref, is git's to answer, never a file read as a path (HR6's #1491 round 1)", async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    const [, rev] = branchWith('one', { 'one.txt': '1\n' })
+    const main = sh(repo, 'rev-parse', 'main')
+    /** Git's own answer in `cwd`, as lineHead asks it: the commit, or null. */
+    const gitSays = (cwd: string, line: string): string | null => {
+      try {
+        return execFileSync('git', ['rev-parse', '--verify', '-q', `refs/heads/${line}`], { cwd, encoding: 'utf8', stdio: 'pipe' }).trim()
+      } catch {
+        return null
+      }
+    }
+    // Files a path would find: a tag, a ref under another name, a lock file holding an id.
+    sh(repo, 'tag', 'v1', rev)
+    sh(repo, 'update-ref', 'refs/heads/a/b', rev)
+    const heads = join(repo, '.git', 'refs', 'heads')
+    writeFileSync(join(heads, 'x.lock'), `${rev}\n`)
+    writeFileSync(join(heads, '.hidden'), `${rev}\n`)
+    for (const line of ['../tags/v1', 'a\\b', 'a/./b', 'a//b', './one', 'one/', 'x.lock', '.hidden', 'one.', '-one', 'con', 'aux.txt', 'with space', 'one:x', 'one~1', 'one^', '@', 'a/../one', '']) {
+      const r = await counted(() => G.lineHead(repo, line))
+      expect(r.ran, line).toEqual([`rev-parse --verify -q refs/heads/${line}`])
+      expect(r.value, line).toBe(gitSays(repo, line))
+    }
+    // A symbolic ref naming a linked worktree's own HEAD: git, in that worktree, says its head, not the project's.
+    const wt = join(repo, '..', 'wt')
+    sh(repo, 'worktree', 'add', '-q', '-b', 'hive/card', wt, 'one')
+    sh(wt, 'symbolic-ref', 'refs/heads/alias', 'HEAD')
+    const alias = await counted(() => G.lineHead(wt, 'alias'))
+    expect(alias.ran).toHaveLength(1)
+    expect(alias.value).toBe(rev)
+    expect(alias.value).toBe(gitSays(wt, 'alias'))
+    // To a branch: git too (never followed from the files), the same answer.
+    sh(repo, 'symbolic-ref', 'refs/heads/also', 'refs/heads/main')
+    expect(await counted(() => G.lineHead(wt, 'also'))).toEqual({ value: main, ran: ['rev-parse --verify -q refs/heads/also'] })
+  })
+
   it("a step's answers are its repository's: another repository, without those commits, is asked and answers unknown (HR2's #1376 round 1)", async () => {
     repo = gitRepo(join(tempDir('git-'), 'r'))
     const [base, rev] = branchWith('one', { 'one.txt': '1\n' })
