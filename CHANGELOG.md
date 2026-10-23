@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Loop agents aren't left waiting on finished work, and the Assistant hears of a block's news.** An agent waiting for a card that has since been merged (Done), or whose lane ended or was abandoned, is told its wait is over and goes idle, ready for its next lane, instead of waiting for a card that will never come back (off with Project Settings → Card loops → **Wake reviewers and builders**). A lane watch now also wakes for a card that stays blocked but has news: its builder commented (new screenshots for your OK, say) or changed why it's blocked (#1475).
 - **A design checked before building, without stalls.** In a card loop, a builder asked for a design first posts it on its card, and Hive wakes the reviewer to check it, even one waiting only for the card to reach Review; the reviewer's OK or gaps wakes the builder. With no answer within the project's new **Design check wait** (Project Settings → Card loops, 30 minutes), the builder goes ahead as posted, and a design left waiting longer shows its card as stalled.
 - **Follow-ups checked, without stalls.** When a change is asked of a card in Review or Approved for its reviewer to check (a screenshot OK with changes), the builder posts it as a follow-up, and Hive wakes the reviewer even when it waits only for the card to come back to Review; its OK or gaps wakes the builder. A follow-up left unanswered for 15 minutes shows its card as stalled.
 

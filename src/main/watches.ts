@@ -2,11 +2,11 @@ import { randomBytes } from 'crypto'
 import { rename, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import { projectAgents } from '../shared/defaults'
-import { cardChange, carriedOver, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, type Released, type ReplyNote, alreadyThere, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
+import { cardChange, carriedOver, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
 import { agentBusy, agentEvent, agentLimitLine, agentMarkOf, agentPart, agentWakeLine, agentWatchLabel, readSavedAgentCondition, readSavedAgentMark, replyFirstLine, replyPart, REPLY_CHARS, type AgentEvent, type AgentMark, type AgentNow, type AgentWatchCondition, type WatchedAgent } from '../shared/agentWatch'
 import { isProjectId, type ProjectIdIndex } from '../shared/projectIds'
 import { rebase } from '../shared/movePaths'
-import type { LiveSessionState, StoredText, TaskCard, TaskColumn, TaskWatchInfo } from '../shared/types'
+import type { LaneInfo, LiveSessionState, StoredText, TaskCard, TaskColumn, TaskWatchInfo } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { config } from './config'
@@ -583,7 +583,7 @@ function readRecord(v: unknown): WatchRecord | null {
     if (!Array.isArray(r.released) || r.released.length > WATCH_MAX_CARDS) return null
     released = []
     for (const x of r.released as { number?: unknown; why?: unknown; detail?: unknown }[]) {
-      if (!x || !Number.isInteger(x.number) || (x.number as number) <= 0 || !['reassigned', 'reviewer', 'blocked'].includes(x.why as string) || !(x.detail === null || text(x.detail, 300))) return null
+      if (!x || !Number.isInteger(x.number) || (x.number as number) <= 0 || !RELEASE_REASONS.includes(x.why as Released['why']) || !(x.detail === null || text(x.detail, 300))) return null
       released.push({ number: x.number as number, why: x.why as Released['why'], detail: x.detail as string | null })
     }
   }
@@ -2009,7 +2009,7 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
 }
 
 /** Checks one watch against the board: whether it fires now. Its cards are read as its scope sees them. */
-async function check(store: Store, rec: WatchRecord, cards?: CardReads): Promise<{ moved: boolean; hits: CardChange[]; told: Record<string, Baseline>; replies: { seq: number; note: ReplyNote }[]; released: Released[] }> {
+async function check(store: Store, rec: WatchRecord, cards?: CardReads, ctx: ReleaseContext = NO_CONTEXT): Promise<{ moved: boolean; hits: CardChange[]; told: Record<string, Baseline>; replies: { seq: number; note: ReplyNote }[]; released: Released[] }> {
   const hits: CardChange[] = []
   // Cards the watcher's part in has ended (#420).
   const released: Released[] = []
@@ -2021,7 +2021,7 @@ async function check(store: Store, rec: WatchRecord, cards?: CardReads): Promise
   let moved = false
   for (const n of rec.cond.cards) {
     const card = await cardIn(store, n, rec.scope, cards)
-    const gone = releaseOf(rec, n, card)
+    const gone = releaseOf(rec, n, card, ctx)
     if (gone) {
       released.push(gone)
       continue
@@ -2067,7 +2067,7 @@ async function check(store: Store, rec: WatchRecord, cards?: CardReads): Promise
  * to arrive in Review. Null: it stays. A card that is gone is told as gone, as before. A blocked card stays too (#481):
  * it is paused, not gone, and its loop waits for it (a reviewer that moved on deadlocked with its builder).
  */
-function releaseOf(rec: WatchRecord, n: number, card: TaskCard | null): Released | null {
+function releaseOf(rec: WatchRecord, n: number, card: TaskCard | null, ctx: ReleaseContext = NO_CONTEXT): Released | null {
   const on = rec.on?.[n]
   if (!on || !card || card.archived) return null
   const me = rec.agentId
@@ -2082,12 +2082,61 @@ function releaseOf(rec: WatchRecord, n: number, card: TaskCard | null): Released
   // Waiting for it in Review: its agent was replaced by another, or by none (its work goes to another lane, or nowhere).
   const was = rec.marks[n]?.agent
   if (on.role === 'awaiting' && was && card.agent !== was && card.agent !== me) return { number: n, why: 'reassigned', detail: card.agentName ?? card.agent ?? null }
+  // #1475: nothing more can come of it (the project's card-loop wakes off: kept, as before).
+  if (!ctx.loopWakes) return null
+  // Merged (Done) since the watch began, which the watch doesn't count: a reviewer waiting for it in Review, a builder for its verdict.
+  if (card.column === 'done' && rec.marks[n]?.column !== 'done' && !countsDone(rec.cond)) return { number: n, why: 'done', detail: null }
+  const lane = laneEndedOn(rec, n, on, ctx.lanes)
+  if (lane) return { number: n, why: 'laneEnded', detail: lane.state === 'abandoned' ? 'abandoned' : null }
   return null
+}
+
+/** What #1475's releases read once per evaluation: the lanes (null: none read), and whether the project wakes card loops. */
+interface ReleaseContext {
+  lanes: readonly LaneInfo[] | null
+  loopWakes: boolean
+}
+
+const NO_CONTEXT: ReleaseContext = { lanes: null, loopWakes: false }
+
+/** Whether a watch counts a card's move into Done: it waits for Done, or for any column change. */
+const countsDone = (cond: WatchCondition): boolean => (cond.column ? cond.column === 'done' : !cond.changes.length || cond.changes.includes('column'))
+
+/**
+ * The watcher's lane on a card that ended or was abandoned since the watch began (#1475), with no running lane of its
+ * project having the card with the watcher in the same part (a lane started again with it): null otherwise. Its builder
+ * for a card it has, its reviewer for one it reviews or waits for.
+ */
+function laneEndedOn(rec: WatchRecord, n: number, on: OnCard, lanes: readonly LaneInfo[] | null): LaneInfo | null {
+  if (!lanes || !rec.scope) return null
+  const me = rec.agentId
+  const mine = (l: LaneInfo): boolean => same(l.project, rec.scope!) && l.cards.some((c) => c.number === n) && (on.role === 'agent' ? l.builder.id === me : l.reviewer?.id === me)
+  if (lanes.some((l) => (l.state === 'active' || l.state === 'paused') && mine(l))) return null
+  const since = Date.parse(rec.since)
+  return lanes.find((l) => (l.state === 'ended' || l.state === 'abandoned') && mine(l) && Date.parse(l.endedAt ?? '') > since) ?? null
+}
+
+/** The lanes and the setting a round of card watches' releases reads (#1475): read only when a watch has a part in a card. */
+async function releaseContexts(store: Store): Promise<(rec: WatchRecord) => Promise<ReleaseContext>> {
+  const any = store.list.some((r) => !r.fired && !r.agents && !r.lanes && r.on && Object.keys(r.on).length)
+  if (!any) return async () => NO_CONTEXT
+  const lanes = await listLanes(store.ws, { all: true }).catch((e) => {
+    log.warn('reading lanes for card watches', e)
+    return null
+  })
+  const wakes = new Map<string, Promise<boolean>>()
+  const loopWakesIn = (projectPath: string): Promise<boolean> => {
+    const k = resolve(projectPath).toLowerCase()
+    let p = wakes.get(k)
+    if (!p) wakes.set(k, (p = store.ws.projectConfig(projectPath).then((c) => c.loopWakes !== false, () => true)))
+    return p
+  }
+  return async (rec) => (rec.on && Object.keys(rec.on).length ? { lanes, loopWakes: await loopWakesIn(rec.projectPath) } : NO_CONTEXT)
 }
 
 /** What ended a watch on a card (#420), for its history: the line's reason, and who reviews it or has it now. */
 const releasedWhy = (r: Released): { why: string; agent: string } =>
-  r.why === 'blocked' ? { why: 'blocked', agent: '' } : r.why === 'reviewer' ? (r.detail ? { why: 'reviewer', agent: r.detail } : { why: 'reviewTaken', agent: '' }) : r.detail ? { why: 'reassigned', agent: r.detail } : { why: 'unassigned', agent: '' }
+  r.why === 'blocked' || r.why === 'done' ? { why: r.why, agent: '' } : r.why === 'laneEnded' ? { why: r.detail === 'abandoned' ? 'laneAbandoned' : 'laneEnded', agent: '' } : r.why === 'reviewer' ? (r.detail ? { why: 'reviewer', agent: r.detail } : { why: 'reviewTaken', agent: '' }) : r.detail ? { why: 'reassigned', agent: r.detail } : { why: 'unassigned', agent: '' }
 
 /**
  * Takes released cards out of a watch (#420), under the store's lock: they join what its next line tells (`released`),
@@ -2255,11 +2304,12 @@ async function evaluate(ws: WorkspaceService): Promise<void> {
     let changed = followProjects(store, await store.ws.projectIds({ fresh: true }))
     // Each card read once for all the watches on it (#321).
     const reads: CardReads = new Map()
+    const contextOf = await releaseContexts(store)
     for (const rec of [...store.list]) {
       if (rec.fired || rec.agents || rec.lanes) continue
       // One watch that can't be checked doesn't stop the others.
       try {
-        const r = await check(store, rec, reads)
+        const r = await check(store, rec, reads, await contextOf(rec))
         if (r.moved) moved = true
         if (r.released.length) {
           // Released cards leave the watch (#420), told with its next line; when none is left, it is woken now.
@@ -2360,6 +2410,8 @@ export function initWatches(): void {
     } else if (e.type === 'lanes-changed') {
       const store = [...stores.values()].find((x) => same(x.path, e.workspacePath))
       if (store) laneCheckSoon(store)
+      // A lane's end writes no card (an abandoned one): card watches on its cards look again (#1475).
+      if (store && store.list.some((r) => !r.fired && r.on)) inBackground('checking watches', coalesced(`watches:${e.workspacePath.toLowerCase()}`, () => evaluate(store.ws).catch((err) => log.warn('checking watches', err))))
     } else if (e.type === 'session-status') {
       noteAgentStatus(e.state)
       const store = storeFor(e.state.projectPath)

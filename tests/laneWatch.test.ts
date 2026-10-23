@@ -7,7 +7,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { LANE_CARD_CHANGES, LANE_DEFAULT_EVENTS, MERGE_STALL_MS, laneHits, laneWakeLine, mergeStallReason, readLaneCards, readLaneCondition, readSavedLaneMark, type LaneMark, type LaneNow } from '../src/shared/laneWatch'
+import { LANE_CARD_CHANGES, LANE_DEFAULT_EVENTS, MERGE_STALL_MS, blockNewsAt, laneHits, laneWakeLine, mergeStallReason, readLaneCards, readLaneCondition, readSavedLaneMark, type LaneMark, type LaneNow } from '../src/shared/laneWatch'
 import { WAKE_MAX_BYTES, type CardChange } from '../src/shared/watch'
 import { taskWaitText } from '../src/shared/toolReplies'
 import { REVIEW_WAIT_STALL_MS } from '../src/shared/tasks'
@@ -45,6 +45,32 @@ describe('what a lane watch counts (#531)', () => {
     expect(laneHits({ ...before, cards: { 1: card() } }, now(passed), LANE_DEFAULT_EVENTS)!.parts.map((p) => p.event)).toEqual(['merge-due'])
     expect(laneHits(passed, now({ ...passed, state: 'ended', mergeDue: false }), LANE_DEFAULT_EVENTS)!.parts.map((p) => p.text)).toEqual(['ended (merged)'])
     expect(laneHits(passed, now({ ...passed, state: 'abandoned' }), LANE_DEFAULT_EVENTS)!.parts.map((p) => p.text)).toEqual(['was abandoned'])
+  })
+
+  it("a card still blocked with news (its reason changed, its agent commented) is told as reblocked by default; a fresh block as blocked; a mark from before never (#1475)", () => {
+    const now = (mark: LaneMark): LaneNow => ({ id: 'lane-1', label: 'B1 / R1', mark, cards: Object.keys(mark.cards).map((n) => ({ number: Number(n), blocked: mark.cards[n].b ? 'Screenshots for your OK' : null, stalled: null, failedBy: null, passedBy: null })) })
+    const t1 = '2026-10-23T06:00:00.000Z'
+    const t2 = '2026-10-23T06:52:00.000Z'
+    const was: LaneMark = { state: 'active', mergeDue: false, cards: { 1: card({ c: 'passed', b: true, r: t1 }) } }
+    const news: LaneMark = { ...was, cards: { 1: card({ c: 'passed', b: true, r: t2 }) } }
+    expect(LANE_DEFAULT_EVENTS).toContain('reblocked')
+    expect(laneHits(was, now(news), LANE_DEFAULT_EVENTS)!.parts).toEqual([{ n: 1, event: 'reblocked', text: '#1 is still blocked, with news', detail: 'Screenshots for your OK' }])
+    expect(laneHits(was, now(news), ['blocked', 'unblocked'])).toBeNull()
+    expect(laneHits(was, now(was), LANE_DEFAULT_EVENTS)).toBeNull()
+    // A fresh block is one event (blocked), and a mark saved before #1475 (no r) never fires it.
+    expect(laneHits({ ...was, cards: { 1: card({ c: 'passed' }) } }, now(news), LANE_DEFAULT_EVENTS)!.parts.map((p) => p.event)).toEqual(['blocked'])
+    expect(laneHits({ ...was, cards: { 1: card({ c: 'passed', b: true }) } }, now(news), LANE_DEFAULT_EVENTS)).toBeNull()
+    // The news: the reason last set, or the card's agent's latest comment, whichever is later; others' comments aren't news.
+    const history = [{ at: t1, by: 'HB2 (hive)', what: 'Blocked: Screenshots for your OK' }]
+    const base = { blocked: 'Screenshots for your OK', history, agentName: 'HB2', comments: [{ at: t2, by: 'Assistant', text: 'Looking' }] } as unknown as Parameters<typeof blockNewsAt>[0]
+    expect(blockNewsAt(base)).toBe(t1)
+    expect(blockNewsAt({ ...base, comments: [{ at: t2, by: 'HB2 (hive)', text: 'Re-shot' }] } as typeof base)).toBe(t2)
+    expect(blockNewsAt({ ...base, history: [...history, { at: t2, by: 'HB2 (hive)', what: 'Blocked: Re-shot: your OK please' }] } as typeof base)).toBe(t2)
+    expect(blockNewsAt({ ...base, blocked: null } as typeof base)).toBe('')
+    // Saved and read back with its news; one from before reads without.
+    expect(readSavedLaneMark(JSON.parse(JSON.stringify(news)))).toEqual(news)
+    expect(readSavedLaneMark(JSON.parse(JSON.stringify(was)))!.cards[1].r).toBe(t1)
+    expect(readSavedLaneMark({ ...was, cards: { 1: { ...card(), r: 'soon' } } })).toBeNull()
   })
 
   it('a block lifted is told by default (#922, #1272); a lane ended with its merge commit names it (#1270), else as before', () => {
