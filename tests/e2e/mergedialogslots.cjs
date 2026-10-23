@@ -135,6 +135,10 @@ const git = (cwd, args) => lib.git(cwd, ['-c', `user.name=${fx.identity.name}`, 
     const unusedRefused = await refusal(inv('worktrees:mergeUnused', fx.alpha, b2.folder, { squash: false, message: 'x', cleanup: false }))
     check("worktrees:mergeUnused refuses the card's line unconfirmed", !!unusedRefused && cardWork.test(unusedRefused), unusedRefused)
     await picker.selectOption('unused')
+    // Carried and given up by the test channel, which tells the window nothing: read the list again, as its ⟳ does.
+    const again = page.locator('.split-list .pane-header .icon-btn').first()
+    await until(async () => (await again.isEnabled().catch(() => false)), HUNG_MS)
+    await again.click()
     const zrow = page.locator('.unused-wt[data-slot="slot-z"]')
     check('slot-z is listed, given up, with its line', !!(await until(async () => (await zrow.locator('[data-unused-kind="carried"]').count()) === 1, HUNG_MS)) && (await text(zrow)).includes(line), await text(zrow))
     await zrow.getByRole('button', { name: 'Open' }).click()
