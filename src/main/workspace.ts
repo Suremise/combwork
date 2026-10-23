@@ -1013,7 +1013,11 @@ export class WorkspaceService {
         await writeKeptJson(file, withLegacyProjectFields(updated))
         // As it is written: a read begun before now may have found the config from before.
         ticket = ++this.rootTickets
-        this.configWrites.set(projectPath.toLowerCase(), { stamp: ++this.configStamp, ticket })
+        // Kept only for the workspace it was asked in (#1498): one that closed (or gave way to another) meanwhile keeps
+        // no path of it; the floor takes its stamp instead, so a snapshot from before still reads it as a change.
+        const stamp = ++this.configStamp
+        if (gen === this.generation) this.configWrites.set(projectPath.toLowerCase(), { stamp, ticket })
+        else this.configFloor = Math.max(this.configFloor, stamp)
         return updated
       })
     const next =

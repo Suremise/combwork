@@ -4,9 +4,39 @@
 // reads as a change (never as none), whatever closes, reopens, goes or comes back meanwhile. Real workspace service.
 import { mkdirSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+
+/** A project.json write held at the file (writeKeptJson) until a test lets it go: a save still under way. */
+const gate = vi.hoisted(() => ({ file: '', reached: () => {}, hold: Promise.resolve() }))
+vi.mock('../src/main/fsutil', async (original) => {
+  const fs = await original<typeof import('../src/main/fsutil')>()
+  return {
+    ...fs,
+    writeKeptJson: (async (file: string, ...rest: unknown[]) => {
+      if (gate.file && file.toLowerCase() === gate.file.toLowerCase()) {
+        gate.reached()
+        await gate.hold
+      }
+      return (fs.writeKeptJson as (...a: unknown[]) => Promise<unknown>)(file, ...rest)
+    }) as typeof fs.writeKeptJson
+  }
+})
+/** Holds the next write of this file: resolves `reached` once it is under way; `release` lets it finish. */
+function holdWrite(file: string): { reached: Promise<void>; release: () => void } {
+  let release!: () => void
+  const reached = new Promise<void>((r) => (gate.reached = r))
+  gate.hold = new Promise<void>((r) => (release = r))
+  gate.file = file
+  return {
+    reached,
+    release: () => {
+      gate.file = ''
+      release()
+    }
+  }
+}
 
 describe('project-config write stamps (#1498)', async () => {
   const base = tempDir('hive-configwrites-')
@@ -80,6 +110,34 @@ describe('project-config write stamps (#1498)', async () => {
     expect(w.projectConfigWrites(alpha)).not.toBe(old)
     await disposeWorkspaceService(w)
   })
+
+  for (const then of ['close', 'open another'] as const)
+    it(`a save that finishes after its workspace's ${then === 'close' ? 'close' : 'giving way to another'} keeps no path of it, and still reads as a change`, async () => {
+      const w = createWorkspaceService()
+      const path = folder('alpha')
+      await w.open(path)
+      const alpha = join(path, 'alpha')
+      const old = w.projectConfigWrites(alpha)
+      const held = holdWrite(join(alpha, '.hive', 'project.json'))
+      const saving = w.updateProjectConfig(alpha, { chime: 'on' })
+      try {
+        await held.reached
+        if (then === 'close') await w.close()
+        else await w.open(folder('gamma'))
+        expect(writes(w).has(alpha.toLowerCase())).toBe(false)
+        held.release()
+        await saving
+        // Finished: written, but its path not kept for a workspace that has gone.
+        expect(writes(w).has(alpha.toLowerCase())).toBe(false)
+        if (then === 'close') expect(kept(w)).toBe(0)
+        // The snapshot from before the save reads it as a change.
+        expect(w.projectConfigWrites(alpha)).not.toBe(old)
+      } finally {
+        held.release()
+        await saving.catch(() => undefined)
+        await disposeWorkspaceService(w)
+      }
+    })
 
   it("the stamps don't grow across closed workspaces: only the open one's written projects are kept", async () => {
     const w = createWorkspaceService()
