@@ -116,6 +116,7 @@
   "shell.command.session.resumeAfterClose": "Agenten fortsetzen, die beim Schließen von Hive liefen",
   "shell.command.session.settleLeftovers": "Weiterlaufende Prozesse eines Agenten beenden oder behalten",
   "shell.command.session.showTranscript": "Transkript einer Sitzung lesen",
+  "shell.command.session.startFreshIdle": "Neu beginnen (untätige Agenten)…",
   "shell.command.session.startNewAll": "Neu beginnen (alle)…",
   "shell.command.session.startNewAllLive": "{several, select, yes {Neu beginnen ({n})…} other {Neu beginnen…}}",
   "shell.command.session.stop": "Sitzung stoppen",

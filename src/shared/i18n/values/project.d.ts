@@ -163,6 +163,7 @@ interface HiveMessageValues {
   'project.header.resumeOneTip': { agent: string | number }
   'project.header.resumeShort': { count: string | number }
   'project.header.resuming': undefined
+  'project.header.startFreshIdle': undefined
   'project.header.startNew': { many: string; count: string | number }
   'project.header.stopAgent': undefined
   'project.header.stopAllTip': { count: number }
@@ -289,6 +290,8 @@ interface HiveMessageValues {
   'project.settings.saveFailed': undefined
   'project.settings.search': { project: string | number }
   'project.settings.sessionsIn': { project: string | number }
+  'project.settings.stepWait': undefined
+  'project.settings.stepWaitDefault': { count: number }
   'project.settings.waitHours': undefined
   'project.settings.wake': undefined
   'project.settings.warnOver': undefined

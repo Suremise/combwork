@@ -3177,8 +3177,16 @@ p.hint {
 .notice-banner .lead { margin-top: 1px; color: var(--info); }
 .notice-banner.finished .lead { color: var(--success); }
 .notice-banner.waiting .lead { color: var(--warning); }
-.notice-text {
+.notice-main {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.notice-text {
+  align-self: stretch;
   min-width: 0;
 }
 .notice-open {
@@ -9238,6 +9246,32 @@ textarea.input.task-blocked-input {
 }
 .git-queue-title {
   overflow-wrap: anywhere;
+}
+/* The Merge dialog for merges outside cards (#1450): the branch and its target side by side, each as wide as it can be. */
+.branch-merge-pick {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.branch-merge-pick > label {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.branch-merge-pick .select {
+  width: 100%;
+}
+.branch-merge-card {
+  margin-bottom: 8px;
+}
+.branch-merge-card .link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--info);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
 }
 /* The Merge dialog on a branch whose card Hive merges (#1357). */
 .merge-queue-note {

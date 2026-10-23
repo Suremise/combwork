@@ -140,6 +140,8 @@ interface HiveMessageValues {
   'tips.dateFormat.title': undefined
   'tips.defaultProvider.text': undefined
   'tips.defaultProvider.title': undefined
+  'tips.designCheck.text': undefined
+  'tips.designCheck.title': undefined
   'tips.developerConsole.text': undefined
   'tips.developerConsole.title': undefined
   'tips.editTemplates.text': undefined
@@ -150,6 +152,8 @@ interface HiveMessageValues {
   'tips.filesTab.title': undefined
   'tips.flightRecorder.text': undefined
   'tips.flightRecorder.title': undefined
+  'tips.followUpCheck.text': undefined
+  'tips.followUpCheck.title': undefined
   'tips.forYou.text': undefined
   'tips.forYou.title': undefined
   'tips.gitCheck.text': undefined
@@ -224,6 +228,8 @@ interface HiveMessageValues {
   'tips.mcpPerProject.title': undefined
   'tips.memorySnapshot.text': undefined
   'tips.memorySnapshot.title': undefined
+  'tips.mergeBranch.text': undefined
+  'tips.mergeBranch.title': undefined
   'tips.mergeQueueFolder.text': undefined
   'tips.mergeQueueFolder.title': undefined
   'tips.mergeQueuePanel.text': undefined
@@ -338,6 +344,8 @@ interface HiveMessageValues {
   'tips.sortTables.title': undefined
   'tips.staleMessages.text': undefined
   'tips.staleMessages.title': undefined
+  'tips.startFreshIdle.text': undefined
+  'tips.startFreshIdle.title': undefined
   'tips.startNewAll.text': undefined
   'tips.startNewAll.title': undefined
   'tips.storageCleanup.text': undefined

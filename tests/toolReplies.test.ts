@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_ROWS,
+  messageQueuedText,
   changedText,
   createdText,
   noteText,
@@ -164,5 +165,28 @@ describe('projects and notes', () => {
   it('a release that finds no hold says which slots the agent does hold or wait for, or that it has none (#586)', () => {
     expect(releaseText({ none: true, branch: 'feature', holder: null, yours: [{ branch: 'main', held: true }, { branch: 'release', held: false }] })).toBe("You don't hold the merge slot for feature (it is free). Yours: main (held), release (waiting); release with its branch.")
     expect(releaseText({ none: true, branch: 'feature', holder: null, yours: [] })).toBe("You don't hold the merge slot for feature (it is free). You hold and wait for no other merge slot of this project.")
+  })
+})
+
+describe("hive_message_agent's queued reply (#1497)", () => {
+  const queued = (tells: ('checkpoints' | 'stopContinuation' | 'idleWakes')[]) => messageQueuedText({ who: 'B1', id: 'm7', tied: '', status: 'working', queued: 2, tells })
+  const said = (how: string) => `Queued for B1 (m7, working): ${how}; 2 waiting. hive_agent_activity says when it is received and acked.`
+  it('names only the ways the carrying-on switches on for the agent tell it, in their order, for each combination', () => {
+    const cases: [('checkpoints' | 'stopContinuation' | 'idleWakes')[], string][] = [
+      [['checkpoints', 'stopContinuation', 'idleWakes'], "Hive tells it at its next tool call, at its turn's end or once it is idle"],
+      [['checkpoints', 'stopContinuation'], "Hive tells it at its next tool call or at its turn's end"],
+      [['checkpoints', 'idleWakes'], 'Hive tells it at its next tool call or once it is idle'],
+      [['stopContinuation', 'idleWakes'], "Hive tells it at its turn's end or once it is idle"],
+      [['checkpoints'], 'Hive tells it at its next tool call'],
+      [['stopContinuation'], "Hive tells it at its turn's end"],
+      [['idleWakes'], 'Hive tells it once it is idle'],
+      [[], 'it waits in its inbox until it reads it with hive_inbox (the user can Deliver Now)']
+    ]
+    for (const [tells, how] of cases) expect(queued(tells), tells.join('+') || 'none').toBe(said(how))
+    // Given in any order, said in the switches' own.
+    expect(queued(['idleWakes', 'checkpoints'])).toBe(said('Hive tells it at its next tool call or once it is idle'))
+  })
+  it("says the card's round it is tied to", () => {
+    expect(messageQueuedText({ who: 'B1', id: 'm7', tied: ', for HI-12 (#40) round 2', status: 'watching', queued: 1, tells: ['idleWakes'] })).toBe('Queued for B1 (m7, for HI-12 (#40) round 2, watching): Hive tells it once it is idle; 1 waiting. hive_agent_activity says when it is received and acked.')
   })
 })

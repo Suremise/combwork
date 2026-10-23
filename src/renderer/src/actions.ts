@@ -7,6 +7,7 @@ import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@sh
 import { defaultProviderPending, isProviderEnabled, projectDefaultProvider, providerName } from '@shared/providers'
 import { agentsToResume, resumeAll, stalledOnSignIn, type ResumeAllResult } from '@shared/resumeAll'
 import { holdShort, holdText } from '@shared/sessionResume'
+import type { FreshRow } from '@shared/freshStarts'
 import type { ResumeHold } from '@shared/agentFolders'
 import { eachAgent, sessionsToArchive, type BatchResult } from '@shared/startAll'
 import { serverOnIn } from '@shared/agentMcp'
@@ -28,7 +29,7 @@ import { McpProjectPicker } from './components/McpProjectPicker'
 import { AgentsDetail, batchAgentsData, projectAgentsData, tableText } from './components/AgentsTable'
 import { clearEditorDraft, clearEditorDraftsUnder } from './editorDrafts'
 import { keyProblemText, keysHeld } from './projectKeys'
-import { cardLabel, normalKey, suggestKey } from '@shared/projectKeys'
+import { cardLabel, cardRef, normalKey, suggestKey } from '@shared/projectKeys'
 
 /** Runs an async action and shows a toast if it fails. */
 /**
@@ -756,6 +757,73 @@ async function resumeAll_(path: string): Promise<void> {
  * and only agents with one are listed. One at a time; failures are reported together. A second click while it runs is
  * ignored (the button shows a spinner).
  */
+/**
+ * Start Fresh (Idle Agents) (#1437, #1086): one confirmed step giving each idle running agent of the project a new
+ * conversation (its old one stays in the Sessions tab). The question lists who will and who won't, with why: busy,
+ * waiting, watching, with background tasks, with a card's slot in flight, or stopped (left stopped). Each is checked
+ * again as it starts (main), so one that started work meanwhile is left as it is, and said so.
+ */
+export function startFreshIdle(path: string): Promise<void> {
+  return runOnce(`startFreshIdle:${path}`, () => startFreshIdle_(path)).then(() => undefined)
+}
+
+/** Why an agent doesn't start fresh, in a few words, for Start Fresh's question and report. */
+function freshWhyText(r: FreshRow): string {
+  switch (r.why) {
+    case 'stopped':
+      return tr(msg({ id: 'actions.startFresh.why.stopped', defaultMessage: 'stopped: left stopped', description: "Start Fresh (Idle Agents)' list (#1437): this agent isn't running, and stays stopped." }))
+    case 'working':
+    case 'starting':
+      return tr(msg({ id: 'actions.startFresh.why.working', defaultMessage: 'working: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): this agent is in a turn (or starting), so it keeps its conversation." }))
+    case 'waiting':
+      return tr(msg({ id: 'actions.startFresh.why.waiting', defaultMessage: 'waiting for you: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): this agent is asking the user something, so it keeps its conversation." }))
+    case 'watching':
+      return tr(msg({ id: 'actions.startFresh.why.watching', defaultMessage: 'watching cards: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): this agent waits on a card watch, so it keeps its conversation." }))
+    case 'background':
+      return tr(msg({ id: 'actions.startFresh.why.background', defaultMessage: 'background tasks running: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): this agent has background tasks running, so it keeps its conversation." }))
+    case 'pending':
+      return tr(msg({ id: 'actions.startFresh.why.pending', defaultMessage: 'a prompt not taken yet: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): Hive typed a prompt this agent's CLI hasn't taken yet, so it keeps its conversation." }))
+    case 'lease':
+      return tr(msg({ id: 'actions.startFresh.why.lease', defaultMessage: '{card, select, none {its lane is still in flight} other {{card} is still in flight}}: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): this agent holds a slot for a card ({card}: \"AM-12\") or a lane (none) whose work isn't finished, so it keeps its conversation." }), { card: r.card ? cardRef(r.card) : 'none' })
+    default:
+      return tr(msg({ id: 'actions.startFresh.why.fresh', defaultMessage: 'idle: starts fresh', description: "Start Fresh (Idle Agents)' list (#1437): this agent is idle and gets a new conversation." }))
+  }
+}
+
+async function startFreshIdle_(path: string): Promise<void> {
+  const p = project(path)
+  if (!p?.agents.length) return notify('info', tr(msg({ id: 'actions.startAll.noAgents', defaultMessage: 'No agents', description: "A notification's title: the project has no agents to start." })), tr(msg({ id: 'actions.startAll.noAgentsMessage', defaultMessage: 'Add an agent first.', description: 'Under the notification that the project has no agents.' })))
+  const plan = await attempt(listFailed(), () => call('session:freshPlan', path))
+  if (!plan) return
+  const fresh = plan.filter((r) => !r.why)
+  const line = (r: FreshRow): string => tr(msg({ id: 'actions.startFresh.line', defaultMessage: '• {agent}: {why}', description: "A line of Start Fresh (Idle Agents)' question (#1437): an agent ({agent}) and what happens to it ({why}: \"idle: starts fresh\", \"working: left as it is\")." }), { agent: r.name, why: freshWhyText(r) })
+  if (!fresh.length) return notify('info', tr(msg({ id: 'actions.startFresh.noneTitle', defaultMessage: 'No idle agent to start fresh', description: "A notification's title (#1437): Start Fresh (Idle Agents) found no idle running agent." })), plan.map(line).join('\n'))
+  const ok = await confirm({
+    title: tr(msg({ id: 'actions.startFresh.title', defaultMessage: '{n, plural, one {Start the idle agent fresh?} other {Start # idle agents fresh?}}', description: "Title of Start Fresh (Idle Agents)' question (#1437): {n} idle agents get new conversations." }), { n: fresh.length }),
+    message: tr(msg({ id: 'actions.startFresh.message', defaultMessage: 'Idle agents in {project} start new conversations; their old ones stay in the Sessions tab. The others are left as they are:', description: "Start Fresh (Idle Agents)' question (#1437), above the list of the project's ({project}) agents and what happens to each." }), { project: p.name }),
+    detail: plan.map(line).join('\n'),
+    confirmLabel: tr(msg({ id: 'actions.startFresh.confirm', defaultMessage: 'Start Fresh', description: "Start Fresh (Idle Agents)' button (#1437)." })),
+    action: 'start'
+  })
+  if (!ok) return
+  const left: FreshRow[] = []
+  const result = await eachAgent(
+    fresh.map((r) => ({ ...agentOf(project(path), r.agentId)!, row: r })).filter((a) => a.id),
+    async (a) => {
+      const why = await whileStarting(path, a.id, { kind: 'start' }, () => call('session:startFresh', path, a.id))
+      // Busy again (or stopped) since the question: left as it is.
+      if (why) left.push({ ...a.row, why })
+    }
+  )
+  if (result.failed.length || left.length) {
+    notify(
+      result.failed.length ? 'error' : 'info',
+      tr(msg({ id: 'actions.startFresh.reportTitle', defaultMessage: '{n, plural, one {Started one agent fresh} other {Started # agents fresh}}', description: "A notification's title after Start Fresh (Idle Agents) (#1437): {n} agents got new conversations; the lines say which didn't, and why." }), { n: result.done.length - left.length }),
+      batchReport(result.failed, null, left.map(line))
+    )
+  }
+}
+
 export function startNewAll(path: string, archive = false): Promise<void> {
   return runOnce(`${archive ? 'archiveAll' : 'startNewAll'}:${path}`, () => startNewAll_(path, archive)).then(() => undefined)
 }

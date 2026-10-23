@@ -63,9 +63,10 @@ import { writePty } from './ptyHost'
 import { sessions } from './sessions'
 import { folderFacts } from './agentFolders'
 import { slotAt } from '../shared/agentFolders'
-import { cardStall, laneOrderView } from './cardStall'
+import { cardStall, laneOrderView, stepWaitOf } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
-import { ackDeliveries, deliveriesOf, deliverNow, deliveryView, launchWith, NotGiven, readInbox } from './deliveries'
+import { ackDeliveries, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
+import { INBOX_SWITCHES, type InboxSwitch } from '../shared/inboxSwitches'
 import { isDoorbell } from '../shared/doorbell'
 import type { DeliverySender } from '../shared/deliveries'
 import * as tasks from './tasks'
@@ -85,7 +86,7 @@ import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRe
 import { workflowSummary } from './workflow/optionsForm'
 import { detect, projectPlatform } from './platform/registry'
 import { revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
-import { CATEGORY_STAGE, type ForYouKind } from '../shared/workflow/facts'
+import { CATEGORY_STAGE, LOOP_STEPS, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
 import { actorOf, recordDecisionsReceived } from './workflow/recorder'
 import { workflowFor } from './workflow/service'
@@ -1256,7 +1257,7 @@ route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body 
   // Tied to a card's round (#652): stale, never given, once the card has moved on.
   const card = body?.card === undefined || body?.card === null ? undefined : Number(cardRefIn(body.card))
   if (card !== undefined && !(Number.isInteger(card) && card > 0)) throw new HttpError(400, 'card must be a card: its number or key (12 or HI-12)')
-  return assistantChange<{ id: string; typed: boolean; queued: number; status: string; round?: number; card?: number; names?: Record<string, string> }>('agents', `leave ${a.name} in ${basename(p)} a message`, { kind: 'message-agent', project: basename(p), agent: actAgent(a), ...(card !== undefined ? { card } : {}) }, async (guard) => {
+  return assistantChange<{ id: string; typed: boolean; queued: number; status: string; tells?: InboxSwitch[]; round?: number; card?: number; names?: Record<string, string> }>('agents', `leave ${a.name} in ${basename(p)} a message`, { kind: 'message-agent', project: basename(p), agent: actAgent(a), ...(card !== undefined ? { card } : {}) }, async (guard) => {
     const st = sessions.liveFor(p, agentId)
     if (!st) throw new HttpError(409, `${a.name} isn't running. Start it with the message as its task instead (hive_start_agent with prompt).`)
     guard()
@@ -1267,7 +1268,10 @@ route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body 
     if (r.fate === 'cancelled' || r.fate === 'expired' || r.fate === 'refused' || r.fate === 'stale') throw new HttpError(409, `The message wasn't typed into ${a.name}: ${r.fate === 'cancelled' ? (r.detail ?? 'cancelled') : `${r.fate}, ${r.detail ?? ''}`}.`)
     const typed = r.fate === 'typed'
     const tied = r.round && card !== undefined ? ` for ${cardRef(card)} round ${r.round}` : ''
-    return { done: `${typed ? 'Gave' : 'Left'} ${a.name} in ${basename(p)} a message (${r.id})${tied}${typed ? '' : ' (queued)'}`, said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { id: r.id, typed, queued: r.queued, status: typed ? (sessions.liveFor(p, agentId)?.status ?? 'stopped') : st.status, ...(r.round ? { round: r.round, ...(card !== undefined ? { card, ...withNames([card]) } : {}) } : {}) } }
+    // Queued: the ways Hive tells it, by the carrying-on switches on for it now (#1497: its project's own, else Settings').
+    const on = typed ? null : await Promise.all(INBOX_SWITCHES.map((s) => inboxSwitch(p, s)))
+    const tells = on ? INBOX_SWITCHES.filter((_s, i) => on[i]) : null
+    return { done: `${typed ? 'Gave' : 'Left'} ${a.name} in ${basename(p)} a message (${r.id})${tied}${typed ? '' : ' (queued)'}`, said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { id: r.id, typed, queued: r.queued, status: typed ? (sessions.liveFor(p, agentId)?.status ?? 'stopped') : st.status, ...(tells ? { tells } : {}), ...(r.round ? { round: r.round, ...(card !== undefined ? { card, ...withNames([card]) } : {}) } : {}) } }
   })
 })
 
@@ -2116,8 +2120,8 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
     history: c.history.map(entryForAgents),
     agent,
     // A Doing card nobody works on, a card an agent was looping on and left with no watch (#376), or one in Review its
-    // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410).
-    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null)
+    // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410), or a design nobody checks (#1382).
+    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c))
   }
   // A review whose reviewer has gone or isn't running (Hive ends those, but one can show while that happens).
   if (c.review && c.project) {
@@ -2667,6 +2671,7 @@ const INTENT_WORDS: Record<CardIntent['kind'], string> = {
   ask: 'ask the user about',
   cannot: 'report a rule blocking',
   request: 'ask the builder of',
+  loopStep: 'take a card loop step on',
   removeFromQueue: 'take out of the merge queue',
   retryMerge: 'retry the merge of'
 }
@@ -2683,6 +2688,7 @@ const INTENT_DONE: Record<CardIntent['kind'], string> = {
   ask: 'asked the user',
   cannot: 'reported a rule blocking it',
   request: 'asked its builder',
+  loopStep: 'took a card loop step',
   removeFromQueue: 'taken out of the merge queue',
   retryMerge: 'queued again (Retry merge)'
 }
@@ -2816,7 +2822,15 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
     return { kind: 'ask', askKind, text: textField(body, 'text', true), ...(revision ? { revision } : {}), ...checklistField(body) }
   },
   cannot: (body) => ({ kind: 'cannot', rule: textField(body, 'rule', true), why: textField(body, 'why', true) }),
-  request: (body) => ({ kind: 'request', text: textField(body, 'text', true) })
+  request: (body) => ({ kind: 'request', text: textField(body, 'text', true) }),
+  'loop-step': (body) => {
+    const step = body?.step
+    if (!LOOP_STEPS.includes(step)) throw new HttpError(400, `Unknown step "${String(step)}": ${LOOP_STEPS.join(', ')}.`)
+    // An answer and going ahead name the design or follow-up they are about (its reply's `design`), so a late one never
+    // settles another.
+    const design = step === 'design' || step === 'followUp' ? undefined : textField(body, 'design', true)
+    return { kind: 'loopStep', step, text: textField(body, 'text', true), ...(design ? { design } : {}) }
+  }
 }
 for (const [path, intentOf] of Object.entries(INTENT_ROUTES)) route('POST', `/v1/tasks/:n/${path}`, async ({ params, body }) => cardIntent(params[0], intentOf(body)))
 

@@ -41,7 +41,7 @@
 import { createHash, randomBytes } from 'crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { existsSync } from 'original-fs'
-import { readFile, rename } from 'original-fs/promises'
+import { readdir, readFile, rename } from 'original-fs/promises'
 import { join } from 'path'
 import { BOARD_MIGRATIONS } from './boardStore'
 import { openDb } from './db'
@@ -157,6 +157,8 @@ export type SlotKept =
   | { why: 'archiveFailed'; error: string; log: string | null }
   | { why: 'busy'; state: SlotState }
   | { why: 'gitRefused'; detail: string }
+  /** Hive's skill copies removed first (#1500), `.agents/skills` still holds a `hive-*` folder: an edited copy, or the user's own. */
+  | { why: 'editedSkillCopy'; copies: string[] }
 
 /** A refusal in English, for agents and the log (the window words its own from the same fields). */
 export function refusalText(r: SlotRefusal, name: (agent: string) => string = (a) => a, card: (n: number) => string = (n) => `#${n}`): string {
@@ -697,6 +699,8 @@ export interface PoolDeps {
    * until the user releases the slot.
    */
   writerOver?: (w: SlotWriter) => boolean | Promise<boolean>
+  /** Removes Hive's own unchanged skill copies from a folder (skillCopies.ts removeCopiesIn), before a slot goes (#1500). */
+  removeSkillCopies?: (folder: string) => Promise<unknown>
   now?: () => number
 }
 
@@ -708,6 +712,18 @@ export function setBuilderCount(fn: ((projectPath: string) => number | Promise<n
 export const builderCountOf = (projectPath: string, fallback: () => number | Promise<number>): number | Promise<number> => (builderCount ? builderCount(projectPath) : fallback())
 
 const newToken = (): string => `o-${randomBytes(8).toString('hex')}`
+/**
+ * The `hive-*` entries in a folder's `.agents/skills` (where Hive puts its skill copies), by name: folders, and links
+ * or anything else with that name too (never followed). None only when the skills folder is proved absent; any other
+ * error reading it throws, so the slot is kept (cantCheck) rather than removed unseen.
+ */
+async function hiveSkillFolders(folder: string): Promise<string[]> {
+  const entries = await readdir(join(folder, '.agents', 'skills'), { withFileTypes: true }).catch((e: NodeJS.ErrnoException) => {
+    if (e.code === 'ENOENT') return []
+    throw e
+  })
+  return entries.filter((e) => e.name.toLowerCase().startsWith('hive-')).map((e) => e.name)
+}
 const newJob = (): string => `slot-${randomBytes(6).toString('hex')}`
 
 export class SlotPool {
@@ -1105,6 +1121,11 @@ export class SlotPool {
           // The archive command may have left files or processes: the guards again.
           kept = await this.guard(slot)
           if (kept) return await keep(kept)
+          // Hive's skill copies are git-ignored, so the guards don't count them (#1500): its own unchanged ones go first,
+          // and a `hive-*` folder left (an edited copy, or the user's own) keeps the slot.
+          await this.deps.removeSkillCopies?.(slot.folder)
+          const copies = await hiveSkillFolders(slot.folder)
+          if (copies.length) return await keep({ why: 'editedSkillCopy', copies })
           // Still ours, nothing leased meanwhile, right before the one step that can't be undone.
           if (!(await this.store.fenced(name, token, (db, now) => !openLeaseIn(db, this.store.project, name) && !now.job))) return await keep({ why: 'busy', state: from })
           const r = await git(this.deps.project, ['worktree', 'remove', slot.folder])
@@ -1120,13 +1141,27 @@ export class SlotPool {
     })
   }
 
-  /** The guards a removal checks, in order; null when nothing holds the slot. */
-  private async guard(s: Slot): Promise<SlotKept | null> {
+  /**
+   * What would keep a slot if it were removed now (#1450, Unused Worktrees' rows): its lease, an operation, then the
+   * removal's guards, without the rename probe (a listing doesn't touch the folder; the removal probes it). Null: it
+   * would go.
+   */
+  async check(name: string): Promise<SlotKept | null> {
+    const s = this.store.slot(name)
+    if (!s) return null
+    const open = this.store.openLease(name)
+    if (open) return { why: 'leased', agent: open.agent }
+    if (s.op || s.job || s.writer) return { why: 'busy', state: s.state }
+    return this.guard(s, false)
+  }
+
+  /** The guards a removal checks, in order; null when nothing holds the slot. `probe`: also prove no process holds it. */
+  private async guard(s: Slot, probe = true): Promise<SlotKept | null> {
     const session = this.deps.sessionIn?.(s.folder)
     if (session) return { why: 'session', detail: session }
     for (const card of this.store.cardsOf(s.name)) if (await this.deps.inFlight?.(card)) return { why: 'inFlight', card }
     if (!existsSync(s.folder)) return null
-    if (!(await quiet(s.folder))) return { why: 'process' }
+    if (probe && !(await quiet(s.folder))) return { why: 'process' }
     const d = await G.dirty(s.folder)
     if (isUnknown(d)) return { why: 'cantCheck', detail: d.what }
     if (d.length) return { why: 'dirty', files: d.length }

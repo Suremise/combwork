@@ -126,6 +126,36 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     expect(st.typed).toEqual([`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox to read it.`])
   })
 
+  it('idle wakes off: Deliver Now whose line is overtaken as it is typed (its source no longer wants it as made) makes it again at once and types it, a bounded number of times (#1504)', async () => {
+    await setSwitches({ checkpoints: true, stopContinuation: true, idleWakes: false })
+    // A loop wake's way: held while the board and lanes haven't changed since it was made (rolesSeq).
+    let seq = 0
+    deliveries.registerSource('overtaken-as-typed', { refresh: async () => ({ body: `[Hive] #1504 is in Review (${seq}).`, meta: { seq } }), holds: (r) => r.meta?.seq === seq })
+    const { deliverWaiting } = await import('../src/main/agentMessages')
+    // The card's arrival in Review updates its lane as the line is typed, once: made again from the board now, typed.
+    const e = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, card: 1504, body: '[Hive] #1504 is in Review.', source: 'overtaken-as-typed', ref: '#1504' })
+    let changes = 0
+    st.during = () => {
+      if (++changes === 1) seq++
+    }
+    expect(await deliverWaiting(alpha, 'b1')).toBe(true)
+    expect(st.typed).toEqual([`[Hive] New in your inbox: 1 card event (#1504) (${e.id}). Call hive_inbox to read it.`])
+    expect(changes).toBe(2)
+    // Overtaken on every try: given up after a few, nothing typed, still unread.
+    await deliveries.readInbox(alpha, 'b1')
+    Object.assign(st, { status: 'ready', typed: [] })
+    const f = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, card: 1505, body: '[Hive] #1505 is in Review.', source: 'overtaken-as-typed', ref: '#1505' })
+    changes = 0
+    st.during = () => {
+      changes++
+      seq++
+    }
+    expect(await deliverWaiting(alpha, 'b1')).toBe(false)
+    expect(st.typed).toEqual([])
+    expect(changes).toBe(3)
+    expect(await unread()).toEqual([f.id])
+  })
+
   describe('idle wakes turned off while a wake is made or typed (round 1 finding 1): nothing is typed, and it stays unread', () => {
     /** A message whose source's refresh (as the offer is made, before its first key) runs `then`. */
     const pending = async (then: () => Promise<unknown>) => {

@@ -1,8 +1,8 @@
 import { join } from 'path'
 import type { StoredText, TaskCard, TaskPatch } from '../shared/types'
 import type { IntentDone } from '../shared/toolReplies'
-import type { ForYouKind } from '../shared/workflow/facts'
-import { boardLock, readTask, requestNote, runIntent, WorkflowRefusedError, type TaskActor } from './tasks'
+import type { ForYouKind, LoopStepId } from '../shared/workflow/facts'
+import { boardLock, getTask, loopStepNote, readTask, requestNote, runIntent, WorkflowRefusedError, type TaskActor } from './tasks'
 import { actorOf } from './workflow/recorder'
 import { isRefusal, type Moved, type Reply, type Workflow } from './workflow/runtime'
 import { refusal } from '../shared/workflow/refusals'
@@ -10,10 +10,12 @@ import { workflowFor } from './workflow/service'
 import { workspace } from './workspace'
 import { hiveError } from './hiveError'
 import { msg } from '../shared/i18n'
+import { loopStepWaitMinutes } from '../shared/lanes'
+import { loopReviewerOf } from './loopReviewer'
 
 /**
  * Agents act by intent (#1267, SPEC §16.8.1): start, put back, submit, declare paths, start review, verdict, report
- * merge, ask the user, couldn't within the rules, request to builder. Each runs the card's runtime intent on the board's
+ * merge, ask the user, couldn't within the rules, request to builder, a card loop's step. Each runs the card's runtime intent on the board's
  * one intent path (tasks.ts' runIntent, #1265), so its guards decide and its facts are written, and in each of its writes
  * the card's 0.9 fields follow (column, agent, its review, a comment), for the board, watches, lanes and the Agent API's
  * card. A refusal is the runtime's (§16.8.3), thrown as WorkflowRefusedError: the Agent API's 409 with the rule, what to
@@ -33,6 +35,8 @@ export type CardIntent =
   | { kind: 'ask'; askKind: ForYouKind; text: string; revision?: string; checklist?: string[] }
   | { kind: 'cannot'; rule: string; why: string }
   | { kind: 'request'; text: string }
+  /** A card loop's step (#1382, #1467): a design or a follow-up for the reviewer's check, its answer, or going ahead unchecked. */
+  | { kind: 'loopStep'; step: LoopStepId; text: string; design?: string }
   /** The merge queue's controls (#1353): the user's, or the Assistant's with a reason (OP-9); never an agent's. */
   /** `guard`: the Assistant's change boundary, checked again inside the write. */
   | { kind: 'removeFromQueue'; reason: string; guard?: () => void }
@@ -42,6 +46,9 @@ const M = {
   queueNotAgents: msg({ id: 'service.intent.queueNotAgents', defaultMessage: 'Only the user, or the Hive Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.', description: "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Hive Assistant (within its Control setting, a setting name: use it as Hive shows it) can do." }),
   noWorkflow: msg({ id: 'service.intent.noWorkflow', defaultMessage: '#{n} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.', description: "An error: an intent (a card's start, submission, verdict…) was asked for a card that has no workflow, because it belongs to no project or its project's version control (Git or None) isn't chosen yet. {n} is the card's number." })
 }
+
+/** For unit tests (#1382): a pause before a card loop step's write, and inside it, before its reviewer is read. */
+export const testHooks: { beforeDesignWrite?: () => Promise<void>; inDesignWrite?: () => Promise<void> } = {}
 
 /** The card's number from a reference as the Agent API got it: `HI-12`, `#12`, or a plain number (`12`), and whether it was plain. */
 export interface CardRefIn {
@@ -60,6 +67,16 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   const wf = ws.path && before.project ? await workflowFor(ws, join(ws.path, before.project)) : null
   if (!wf) throw hiveError(M.noWorkflow, { n: ref.n }, { kind: 'conflict' })
   const who = actorOf(actor)
+  // How long a design waits for its check (#1382): the project's Card loops → Design check wait, read before the write.
+  const cfg = (intent.kind === 'loopStep' || intent.kind === 'start') && ws.path ? await ws.projectConfig(join(ws.path, before.project)).catch(() => null) : null
+  const stepWait = loopStepWaitMinutes(cfg)
+  // A design's reviewer (#1382): the one rule loop wakes deliver by (loopReviewer.ts), read inside the step's own board
+  // change (the runtime's prepare), where an agent's removal, published under the same lock, can't come between.
+  const designReviewer = async (): Promise<string | null> => {
+    await testHooks.inDesignWrite?.()
+    const card = await getTask(ref.n, ws).catch(() => null)
+    return card ? ((await loopReviewerOf(ws, card))?.id ?? null) : null
+  }
   const self = actor.kind === 'agent' ? actor.self : undefined
   // An agent's plain number is refused, naming this card's own forms (S48, §16.12); a key or #N, and anyone else's number, aren't.
   if (ref.plain && self) throw new WorkflowRefusedError(refusal('card.plainNumber', { key: before.key ?? `#${ref.n}`, alias: `#${ref.n}` }, null))
@@ -86,6 +103,8 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
         return w.cannotWithinRules(named, who, { rule: intent.rule, why: intent.why })
       case 'request':
         return w.requestToBuilder(named, who, intent.text)
+      case 'loopStep':
+        return w.loopStep(named, who, intent.step, intent.text, { waitMinutes: stepWait, reviewer: designReviewer, ...(intent.design ? { design: intent.design } : {}) })
       case 'removeFromQueue':
         return w.removeFromQueue(named, intent.reason, by, intent.guard)
       case 'retryMerge':
@@ -106,7 +125,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   // Every write keeps the card's agent as it is then, under the board's lock (an agent moving a card into Doing would take
   // it: a reviewer's failed verdict), but the start's, which gives the card to the agent that starts it. What else each
   // intent changes of the card's 0.9 fields (its review, a comment) goes with its first write.
-  const zero9 = (_w: unknown, first: boolean): { patch?: TaskPatch; opts?: { comment?: string; keepAgent?: boolean; note?: StoredText[] } } => {
+  const zero9 = (w: { written: readonly { kind: string; data: unknown }[] }, first: boolean): { patch?: TaskPatch; opts?: { comment?: string; keepAgent?: boolean; note?: StoredText[] } } => {
     if (intent.kind === 'start') return first && self ? { patch: { agent: self.agentId } } : {}
     const keepAgent = true
     if (!first) return { opts: { keepAgent } }
@@ -123,13 +142,25 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'request':
         // Its history line too, which the builder's watch counts (#1272).
         return { opts: { keepAgent, comment: intent.text, note: [requestNote(intent.text)] } }
+      case 'loopStep': {
+        const step = w.written.findLast((f) => f.kind === 'LoopStep')?.data as { design?: string; until?: string; of?: string } | undefined
+        // A design's or a follow-up's comment names it first (#1382, #1467): its first line is what a watch's wake and
+        // latestComment show, so the reviewer has the id its answer names whichever way it is woken. A design's history line
+        // keeps when its check is due, which the stall check reads (shared/tasks.ts' pendingStep); an answer's says what it checked.
+        const asks = intent.step === 'design' ? 'Design' : intent.step === 'followUp' ? 'Follow-up' : null // i18n-ignore: Hive's line atop an agent's comment, agent-facing
+        const comment = asks && step?.design ? `${asks} ${step.design}, for the reviewer's check (an answer names ${step.design}):\n\n${intent.text}` : intent.text // i18n-ignore: Hive's line atop an agent's comment, agent-facing
+        return { opts: { keepAgent, comment, note: [loopStepNote(intent.step, intent.text, step?.until, step?.of)] } }
+      }
       default:
         return { opts: { keepAgent } }
     }
   }
+  if (intent.kind === 'loopStep') await testHooks.beforeDesignWrite?.()
   const { reply, saved } = await runIntent(wf, ref.n, actor, call, zero9)
   if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
   const card = saved ?? (await readTask(ref.n, actor))
   const m = reply as Moved
+  // A start: how long a design waits for its check here (Card loops → Design check wait), for a watch set before posting one.
+  if (intent.kind === 'start') m.data = { ...m.data, designWaitMinutes: stepWait }
   return { done: { ok: true, card: card.key ?? `#${ref.n}`, from: m.from, to: m.to, ...(m.data ? { data: m.data } : {}), ...(m.warnings?.length ? { warnings: m.warnings } : {}) }, card }
 }

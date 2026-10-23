@@ -38,12 +38,29 @@ interface Primed {
   gitDir: string | null
   folder: string | null
   files: string[]
-  /** A shared folder's own paths (what the evidence covers there), or null: the whole folder. */
-  own: string[] | null
+  /** A shared folder's paths other agents locked (#1481), left out of what the evidence covers; null: none, the whole folder. */
+  others: string[] | null
   /** The index as prime read it (`ls-files --stage`, the whole folder's), for content's first answer only (#1373). */
   staged?: Awaited<ReturnType<typeof git>>
   /** A card in Todo: the target its start plans on (startTarget, #1401), whose ref the evidence covers. */
   target?: string | null
+}
+
+/** A path another agent's current card locked (G16, #1481), and that card. */
+interface Locked {
+  path: string
+  agent: string
+  card: CardRecord
+}
+
+/** Whether a path is `p` or inside it. */
+const under = (f: string, p: string): boolean => f === p || f.startsWith(`${p}/`)
+
+/** G16: files of the change that another agent's current card locked (a warning, never a refusal), each with that card. */
+function othersFiles(others: Locked[], files: string[]): string[] {
+  const out: string[] = []
+  for (const f of files) for (const x of others) if (under(f, x.path)) out.push(`${f} is ${x.agent}'s (${x.card.key})`) // i18n-ignore: agent-facing warning in the submit's reply
+  return out
 }
 
 export class GitPlatform implements PlatformAdapter {
@@ -130,7 +147,7 @@ export class GitPlatform implements PlatformAdapter {
     if (!s.started || s.stage === 'todo') {
       const target = await this.startTarget(card, o, builder)
       if (isUnknown(target)) return null
-      return { gitDir: null, folder: null, files: [], own: null, target } satisfies Primed
+      return { gitDir: null, folder: null, files: [], others: null, target } satisfies Primed
     }
     const folder = this.wf.folderOf(s)
     // Its git dir from its `.git` where it has one (no git process: #1373), else git's answer.
@@ -144,11 +161,13 @@ export class GitPlatform implements PlatformAdapter {
     // answer where it covers the whole folder.
     const ls = await git(folder, ['ls-files', '--stage', '-z'])
     if (!ls.ok) return null
-    // In a shared folder only the builder's own paths count (others' edits are "not yours", §16.3.2's dirty).
-    const own = !this.wf.ownLine(s) && this.wf.cfg.locksOf ? this.wf.cfg.locksOf(s.started.builder) : null
+    // In a shared folder other agents' locked paths don't count (their edits are "not yours", §16.3.2's dirty, #1481),
+    // unless this card recorded them too: ls-files gives paths relative to the folder, as the records are.
+    const locked = this.wf.ownLine(s) ? [] : this.notMine(card, s).map((x) => x.path)
+    const others = locked.length ? locked : null
     const all = [...new Set(ls.out.split('\0').filter(Boolean).map((rec) => rec.slice(rec.indexOf('\t') + 1)))]
-    const files = own ? all.filter((f) => own.some((p) => f === p || f.startsWith(`${p}/`))) : all
-    return { gitDir, folder, files, own, ...(own ? {} : { staged: ls }) } satisfies Primed
+    const files = others ? all.filter((f) => !others.some((p) => under(f, p))) : all
+    return { gitDir, folder, files, others, ...(others ? {} : { staged: ls }) } satisfies Primed
   }
 
   /**
@@ -194,9 +213,9 @@ export class GitPlatform implements PlatformAdapter {
     if (p.gitDir && p.folder) {
       parts.push(`HEAD:${G.refSync(p.gitDir, 'HEAD') ?? ''}`)
       for (const m of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']) parts.push(existsSync(join(p.gitDir, m)) ? m : '')
-      // A shared folder with no paths of the builder's: nothing of the index or files is covered.
-      if (!p.own || p.own.length) {
-        const spec = p.own ? ['--', ...p.own] : []
+      // In a shared folder, all but other agents' locked paths (#1481).
+      {
+        const spec = p.others ? ['--', '.', ...p.others.map((x) => `:(exclude,literal)${x}`)] : []
         // Prime's read of the index, just before, answers the first time (evidenceOf's); asked again (revalidate), git.
         const first = p.staged
         delete p.staged
@@ -293,11 +312,18 @@ export class GitPlatform implements PlatformAdapter {
     // The guards' platform inputs, gathered only for the guards the ruleset holds.
     const inputs: Partial<GuardInputs> = {}
     const shared = !this.wf.ownLine(s)
-    if (args.guards.includes('submit.clean')) inputs.dirty = dirty ?? await G.dirty(folder,!shared || !args.agent || !this.wf.cfg.locksOf ? undefined : this.wf.cfg.locksOf(args.agent))
+    // In a shared folder, other agents' locked changes aren't this card's, unless it recorded them too (#1481); git's
+    // paths are the repository's. G16 warns of every other agent's recorded file the change includes.
+    const others = shared ? await this.inRepo(this.othersLocked(card, s)) : []
+    const notMine = shared ? await this.inRepo(this.notMine(card, s)) : []
+    if (args.guards.includes('submit.clean')) {
+      const all = dirty ?? (await G.dirty(folder))
+      inputs.dirty = isUnknown(all) || !notMine.length ? all : all.filter((f) => f.startsWith('(') || !notMine.some((x) => under(f, x.path)))
+    }
     if (args.guards.includes('submit.ready')) inputs.conflicts = [] // a Git commit can't store unresolved conflicts
     if (args.guards.includes('submit.trailer')) inputs.untrailered = this.untrailered(card, s)
     if (args.guards.includes('submit.identity')) inputs.badIdentity = await this.badIdentity(base!, revision, commits, o)
-    const warnings = o.sharedFolderWarning && shared ? this.othersFiles(card, s, files.map((f) => f.path)) : []
+    const warnings = o.sharedFolderWarning && shared ? othersFiles(others, files.map((f) => f.path)) : []
     return { ok: true, revision, base, key, files, ...(commits ? { commits } : {}), inputs, warnings }
   }
 
@@ -326,17 +352,45 @@ export class GitPlatform implements PlatformAdapter {
     return since.find((x) => x.card === null)?.sha ?? null
   }
 
-  /** G16: files of the change that another agent holds or held file locks on (a warning, never a refusal). */
-  private othersFiles(card: CardRecord, s: CardState, files: string[]): string[] {
-    if (!this.wf.cfg.locksOf) return []
-    const out: string[] = []
-    for (const c of this.wf.store.cards()) {
-      const b = c.id === card.id ? null : this.wf.state(c).started?.builder
-      if (!b || b === s.started?.builder) continue
-      const theirs = this.wf.cfg.locksOf(b)
-      for (const f of files) if (theirs.includes(f)) out.push(`${f} is ${b}'s (${c.key})`) // i18n-ignore: agent-facing warning in the spike's reply
+  /**
+   * Other agents' lock records (G16, #1481): the paths each other agent's current card locked this cycle, relative to the
+   * project folder, with that card; never this card's nor its builder's.
+   */
+  private othersLocked(card: CardRecord, s: CardState): Locked[] {
+    const out: Locked[] = []
+    for (const [agent, c] of this.wf.currentCards()) {
+      if (c.card.id === card.id || agent === s.started?.builder) continue
+      for (const path of c.s.locked) out.push({ path, agent, card: c.card })
     }
     return out
+  }
+
+  /**
+   * What a shared folder leaves out of this card's own (its dirty files, its evidence): other agents' recorded paths,
+   * except those this card recorded too (HR6's #1481 round 2: both agents locked one file in turn, and the submitter's
+   * own uncommitted edit to it still counts).
+   */
+  private notMine(card: CardRecord, s: CardState): Locked[] {
+    return this.othersLocked(card, s).filter((x) => !s.locked.some((p) => under(x.path, p) || under(p, x.path)))
+  }
+
+  /** Locked paths as git's status and diffs give them: relative to the repository's root. */
+  private async inRepo(locked: Locked[]): Promise<Locked[]> {
+    if (!locked.length) return locked
+    const prefix = await this.repoPrefix()
+    return locked.map((x) => ({ ...x, path: prefix + x.path }))
+  }
+
+  private prefix: string | null = null
+
+  /** The project folder's place in its repository (`sub/dir/`; '' at its root), read once. */
+  private async repoPrefix(): Promise<string> {
+    if (this.prefix === null) {
+      const r = await git(this.project, ['rev-parse', '--show-prefix'])
+      if (!r.ok) return ''
+      this.prefix = r.out.trim()
+    }
+    return this.prefix
   }
 
   private async badIdentity(base: string, revision: string, commits: string[] | undefined, o: WorkflowOptions): Promise<Maybe<string | null>> {

@@ -1,4 +1,5 @@
 import type { AgentLeftovers } from './agentProcesses'
+import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
@@ -18,6 +19,7 @@ import type {
   WorktreeCheck,
   UnusedWorktrees,
   UnusedWorktreeRemoval,
+  MergeBranchList,
   UnusedWorktreePreview,
   RemovedAgent,
   MoveOptions,
@@ -195,6 +197,8 @@ export interface HiveRequests {
   'window:showing': (projectPath: string | null) => void
   /** A banner was clicked: brings up the window showing its project, and the project (as a Windows notification's click). */
   'notice:open': (projectPath: string | null) => void
+  /** A banner's button (#1437): brings up the window that has its project, shows the project and runs the command there. */
+  'notice:action': (projectPath: string, command: string, args: unknown[]) => void
 
   'settings:get': () => AppSettings
   'settings:update': (patch: SettingsPatch) => AppSettings
@@ -248,6 +252,10 @@ export interface HiveRequests {
   'session:cancelMessages': (projectPath: string, agentId: string) => number
   /** Deliver Now (#1432): the line telling an agent of what waits in its inbox, typed once. Whether it was typed. */
   'session:deliverNow': (projectPath: string, agentId: string) => boolean
+  /** Start Fresh (Idle Agents) (#1437): each agent of the project, and why it doesn't start fresh now (null: it does). */
+  'session:freshPlan': (projectPath: string) => FreshRow[]
+  /** Starts one agent fresh if it is still idle: null when it was, else why not. */
+  'session:startFresh': (projectPath: string, agentId: string) => FreshWhy | null
   /** Kept comparisons (Performance → Compare), for a scope only: a project's page sees its own project's. */
   'benchmarks:list': (scope: CompareScope) => { entries: KeptEntry[]; base: string | null; run: string | null; notice?: string }
   /** Imports a benchmark or export (an open dialog; or, with `token`, a file an earlier answer asked about). Null if cancelled. */
@@ -575,13 +583,24 @@ export interface HiveRequests {
   'worktrees:unused': (projectPath: string) => UnusedWorktrees
   /** An unused worktree's branch as the Merge dialog shows it, and its merge (#400): as an agent's, by its folder. */
   'worktrees:unusedBranchStatus': (projectPath: string, path: string) => AgentBranchStatus
-  'worktrees:mergeUnused': (projectPath: string, path: string, opts: { squash: boolean; message: string; cleanup: boolean }) => MergeResult
+  'worktrees:mergeUnused': (projectPath: string, path: string, opts: { squash: boolean; message: string; cleanup: boolean; card?: number; outsideQueue?: { card: number; reason: string } }) => MergeResult
   /** What removing one anyway loses, checked now, under a token the removal presents; throws when git can't say. */
   'worktrees:removalPreview': (projectPath: string, path: string) => UnusedWorktreePreview
   /** Removes one (the user's choice): a merged, clean one; or with `force`, a preview's token, only while nothing in it changed since. */
   'worktrees:removeUnused': (projectPath: string, path: string, opts: { expectInto?: string | null; force?: string }) => UnusedWorktreeRemoval
-  /** `outsideQueue`: merged anyway, though Hive merges the card on this branch (#1357): an override on it, with the reason. */
-  'agents:merge': (projectPath: string, agentId: string, opts: { squash: boolean; message: string; cleanup: boolean; moveBranch?: boolean; outsideQueue?: { card: number; reason: string } }) => MergeResult
+  /** The Merge dialog's merges outside cards (#1450): the branches it offers and the targets. */
+  'worktrees:mergeBranches': (projectPath: string) => MergeBranchList
+  /** What a branch holds that the target doesn't. */
+  'worktrees:branchMergeStatus': (projectPath: string, branch: string, target: string) => AgentBranchStatus
+  /** The card a branch is: the one Hive's merge queue merges (Merge anyway), and the card whose line it is while not Done. */
+  'worktrees:branchCards': (projectPath: string, branch: string) => { queue: BranchQueueCard | null; line: { number: number; key: string; title: string } | null }
+  /** Merges a branch into a target; `card`: confirmed for that unfinished card's line; `outsideQueue` as agents:merge's. */
+  'worktrees:mergeBranch': (projectPath: string, branch: string, opts: { target: string; squash: boolean; message: string; card?: number; outsideQueue?: { card: number; reason: string } }) => MergeResult
+  /**
+   * `outsideQueue`: merged anyway, though Hive merges the card on this branch (#1357): an override on it, with the reason.
+   * `card`: confirmed for that unfinished card's line (#1450); every merge route refuses one without it.
+   */
+  'agents:merge': (projectPath: string, agentId: string, opts: { squash: boolean; message: string; cleanup: boolean; moveBranch?: boolean; card?: number; outsideQueue?: { card: number; reason: string } }) => MergeResult
 
   /** The conversation for the transcript viewer; null when the file has not changed since knownVersion (a Transcript's `version`). Long tool input/output is shortened. */
   /** The conversation from item `from` on (default: the last TRANSCRIPT_WINDOW items); null when the file hasn't changed since knownVersion and `from` is unchanged. */

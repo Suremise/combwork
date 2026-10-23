@@ -68,6 +68,7 @@ const M = {
   stopAgent: msg({ id: 'project.header.stopAgent', defaultMessage: 'Stop Agent', description: "The project header's button when one agent is running." }),
   stopMany: msg({ id: 'project.header.stopMany', defaultMessage: 'Stop ({count})', description: "The project header's button: stops every running agent. {count} is how many." }),
   stopTip: msg({ id: 'project.header.stopAllTip', defaultMessage: '{count, plural, one {Stop the running agent} other {Stop all # running agents}}', description: "Tooltip and accessible name of the project header's Stop ({count}) button." }),
+  startFreshIdle: msg({ id: 'project.header.startFreshIdle', defaultMessage: 'Start Fresh (Idle Agents)…', description: "The project header's Agents ▾ menu (#1437): gives each idle running agent a new conversation, after one question listing who will and who won't. The … says it asks first: keep it." }),
   startNew: msg({ id: 'project.header.startNew', defaultMessage: '{many, select, yes {Start New ({count})} other {Start New}}', description: "The project header's Agents ▾ menu: starts a fresh session for each agent. {count} is how many (shown with several agents)." }),
   archiveNew: msg({ id: 'project.header.archiveNew', defaultMessage: '{many, select, yes {Archive and Start New ({count})} other {Archive and Start New}}', description: "The project header's Agents ▾ menu: archives each agent's session and starts a fresh one." }),
   removeAllMenu: msg({ id: 'project.header.removeAllMenu', defaultMessage: '{many, select, yes {Remove All ({count})…} other {Remove Agent…}}', description: "The project header's Agents ▾ menu (or its ⋯ menu when narrow): removes every agent (it asks first)." }),
@@ -465,6 +466,8 @@ export function ProjectView({ visible }: { visible: boolean }) {
   // agent, no count. In ⋯ when cramped.
   const batch: MenuEntry[] = [
     ...(counts.startNew ? [{ label: tr(M.startNew, { many: yes, count: counts.startNew }), icon: 'add', action: 'start' as const, disabled: startingAll || anyStarting, onClick: () => void actions.startNewAll(project.path) }] : []),
+    // Start Fresh (Idle Agents) (#1437): only the idle running ones, after one question saying who and why not.
+    ...(running.length ? [{ label: tr(M.startFreshIdle), icon: 'refresh', action: 'start' as const, disabled: !!runningActions[`startFreshIdle:${project.path}`] || anyStarting, onClick: () => void actions.startFreshIdle(project.path) }] : []),
     ...(counts.archive ? [{ label: tr(M.archiveNew, { many: yes, count: counts.archive }), icon: 'archive', action: 'archive-start' as const, disabled: archivingAll || anyStarting, onClick: () => void actions.startNewAll(project.path, true) }] : []),
     ...(project.agents.length
       ? [...(counts.startNew || counts.archive ? [{ separator: true as const }] : []), { label: tr(M.removeAllMenu, { many: yes, count: project.agents.length }), icon: 'trash', action: 'remove' as const, disabled: removingAll, onClick: () => void actions.removeAllAgents(project.path) }]

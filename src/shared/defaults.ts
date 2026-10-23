@@ -75,7 +75,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     bannerSeconds: 6,
     waitingBannerStays: true,
     taskbarCount: true,
-    flashOnWaiting: true
+    flashOnWaiting: true,
+    suggestFreshStart: true
   },
   sessions: {
     backupTranscripts: true,
@@ -151,6 +152,7 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   version: 2,
   mcp: { disabled: [], enabled: [] },
   chime: 'inherit',
+  suggestFreshStart: 'inherit',
   inboxCheckpoints: 'inherit',
   inboxStopContinuation: 'inherit',
   inboxIdleWakes: 'inherit',
@@ -165,7 +167,8 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   worktreeSetup: '',
   loopWakes: true,
   loopRounds: null,
-  loopWaitHours: null
+  loopWaitHours: null,
+  loopStepWaitMinutes: null
 }
 
 /** The transcript viewer loads this many items at a time (the latest first, earlier ones as you scroll up). */

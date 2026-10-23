@@ -105,6 +105,7 @@ interface HiveMessageValues {
   'tasks.history.labelsTakenOff': { labels: string | number }
   'tasks.history.linked': { cards: string | number }
   'tasks.history.linksRemoved': undefined
+  'tasks.history.loopStep': { step: string; text: string | number }
   'tasks.history.loopWake': { agent: string | number; kind: string }
   'tasks.history.moved': { column: string }
   'tasks.history.movedBefore': { column: string; before: string | number }

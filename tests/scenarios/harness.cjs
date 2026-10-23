@@ -402,6 +402,16 @@ async function runScenario(sc, providerKey, opts = {}) {
         if (res.status !== 200) throw new Error(`${key}'s merge slot ${action}: ${res.status} ${JSON.stringify(reply)}`)
         return reply
       },
+      /**
+       * A call of the Agent API as another of alpha's running agents ('implementer', started with startAgent), with its own
+       * token (#1382: a builder's design posted for the subject to check): { status, body }.
+       */
+      as: async (key, method, route, body) => {
+        const file = path.join(userData, 'agent-api', `${require('crypto').createHash('sha256').update(`${alpha.toLowerCase()}#${ctx.agents[key].id}`).digest('hex').slice(0, 16)}.json`)
+        const token = JSON.parse(fs.readFileSync(file, 'utf8')).token
+        const res = await fetch(`http://127.0.0.1:${port}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
+        return { status: res.status, body: await res.json().catch(() => null) }
+      },
       /** alpha's merge slot now, as a script reads it. */
       slotNow: async () => (await api('GET', '/v1/projects/alpha/merge-slot')).body,
       /**

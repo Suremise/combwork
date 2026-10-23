@@ -17,8 +17,8 @@
 //   Steps combine with " then " ("question then review deny").
 //   The scenarios' steps, as the fake Claude Code takes them: "skill NAME" (a shell read of its SKILL.md),
 //   "boardmove", "boardreview", "boardcomment" and "hive TOOL {json}" (through the launch's real hive MCP server),
-//   "work N", and "shell: <command line>" (run in cmd with the session's environment, recorded in fake-shell.jsonl in
-//   CODEX_HOME, as the fake Claude Code does). Anything else: a short turn.
+//   "work N" and "shell: <command line>" (run in cmd with the session's environment, between its PreToolUse and
+//   PostToolUse; fake-shell.jsonl in CODEX_HOME records it, #1486). Anything else: a short turn.
 //   The turn ledger's cases (#648): "latetool" (a command whose PostToolUse reaches Hive after the turn's Stop),
 //   "loststop" (no Stop reaches Hive; its rollout records the turn's end, task_complete) and "silent" (neither).
 //   Notices (#650), as Codex 0.162.1 takes them: context in a PostToolUse reply reaches "the model", and a Stop blocked
@@ -344,8 +344,6 @@ async function scripted(step) {
   if (call) await hiveCall(call.tool, call.args)
   const pause = /\bwork\s+(\d+)/i.exec(step)
   if (pause) await sleep(Number(pause[1]) * 1000)
-  const sh = /\bshell:\s*(.+)$/i.exec(step)
-  if (sh) await shell(sh[1].trim())
   // "checkpoint": a command of its own, whose PostToolUse reply may carry Hive's notice (#650).
   const check = /\bcheckpoint\b/i.test(step)
   if (check) {
@@ -353,11 +351,19 @@ async function scripted(step) {
     await hook('PreToolUse', c)
     if (noticeIn(await hook('PostToolUse', c), 'checkpoint') && followsNotices()) await readInbox()
   }
+  // "shell: <command line>": runs it in cmd as its shell tool would, reported by its hooks (#1486: a scenario's commit).
+  const sh = /\bshell:\s*(.+)$/i.exec(step)
+  if (sh) {
+    const c = { ...bash(sh[1].trim()), tool_use_id: `exec-${randomUUID()}` }
+    await hook('PreToolUse', c)
+    await shellRun(sh[1].trim())
+    await hook('PostToolUse', c)
+  }
   return any || !!(move || rev || comment || call || pause || check || sh)
 }
 
-/** "shell: <command line>": run in cmd in its folder with the session's environment; agent, command, code and output recorded. */
-function shell(cmd) {
+/** A shell step's command, in cmd with the session's environment; the agent, command, exit code and output go to fake-shell.jsonl. */
+function shellRun(cmd) {
   return new Promise((resolve) => {
     const p = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${cmd}"`], { cwd: process.cwd(), env: process.env, windowsVerbatimArguments: true, windowsHide: true })
     let stdout = ''

@@ -55,9 +55,11 @@ import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { releaseQueueRunners } from './workflow/queueRunner'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { startSlots, stopSlots } from './slotsApp'
+import { startFreshNudges } from './freshStarts'
 import { startCopies, stopCopies } from './copiesApp'
 import { startReviewCopies, stopReviewCopies } from './reviewCopies'
 import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
+import { startLockRecords } from './workflow/lockRecord'
 import { setQueueLive, setRunsGoing } from './workflow/service'
 import { isOpenRun } from '../shared/progress'
 import { createLogger, userText, logsDir } from './logger'
@@ -994,6 +996,8 @@ app.whenReady().then(async () => {
   startQueueHosts()
   // The slot pools (#1429): their idle slots tidied every hour.
   startSlots()
+  // The nudge to start fresh when a project's work has finished (#1437).
+  startFreshNudges()
   // Review and check copies (#1435): returning ones looked at again every 30 s, idle ones tidied every hour.
   startCopies()
   startReviewCopies()
@@ -1007,6 +1011,8 @@ app.whenReady().then(async () => {
     return !!now && (now.pending || ['starting', 'working', 'waiting', 'background'].includes(now.status))
   })
   startLineUpdates()
+  // G16 (#1481): each agent's file locks recorded on its current card.
+  startLockRecords()
   // What an agent has going, which its submission waits for with "its own runs stopped" (#1265, G13): its open
   // Progress runs and its CLI's background tasks.
   setRunsGoing((project, agent) => {
