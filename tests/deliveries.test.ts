@@ -756,7 +756,21 @@ describe('the delivery service (#647)', async () => {
     expect(await states()).toEqual([`${m.id} offered`])
     st.status = 'working'
     await deliveries.readInbox(alpha, 'b1')
-    await vi.waitFor(() => expect(taken).toHaveBeenCalledWith(alpha, 'b1', 'r1', `${m.id}, which it rang for, was read`), { timeout: 5000 })
+    await vi.waitFor(() => expect(taken).toHaveBeenCalledWith(alpha, 'b1', 'r1', m.id, `${m.id}, which it rang for, was read`), { timeout: 5000 })
+    // Two lines in the launch, each offering its own delivery, read together later: each read names its own delivery, so
+    // only the line that rang for it is cleared (round 1 finding: never another line's mark).
+    taken.mockClear()
+    const a = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] #170 changed.', ref: 'a' })
+    st.status = 'ready'
+    await deliveries.offerAllForTests()
+    const b = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] #171 changed.', ref: 'b' })
+    st.status = 'ready'
+    await deliveries.offerAllForTests()
+    expect(await states()).toEqual(expect.arrayContaining([`${a.id} offered`, `${b.id} offered`]))
+    st.status = 'working'
+    await deliveries.readInbox(alpha, 'b1')
+    await vi.waitFor(() => expect(taken).toHaveBeenCalledTimes(2), { timeout: 5000 })
+    expect(taken.mock.calls.map((c) => c[3]).sort()).toEqual([a.id, b.id].sort())
     // Read without having been offered (queued): no line rang for it, nothing to clear.
     taken.mockClear()
     const q = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: hive, body: '[Hive] #167 changed.', ref: 'y' })

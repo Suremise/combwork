@@ -181,18 +181,38 @@ describe("a line whose CLI took it with no prompt seen: what it rang for was rea
     expect(marks).toHaveBeenCalledTimes(1)
   })
 
-  it('marked not taken, then read: the mark goes in the launch it was typed into, never another', () => {
+  it("marked not taken, then what it rang for read: the mark goes, in the launch it was typed into, never another; another line's delivery read leaves it (round 1 finding)", () => {
     const e: Entry = { state: withFacts({ projectPath: project, agentId: id, agentName: 'Reviewer', runId: 'run1', status: 'ready' }), prompts: 0 }
     live.set(key, e)
-    e.state.untakenLine = { since: new Date().toISOString(), text: '[Hive] New in your inbox: 1 card event (#166) (m157).' }
     // The window is told of its state (a hand-made state has no provider to show it by).
     const told = vi.spyOn(sessions as unknown as { emitState: (s: unknown) => void }, 'emitState').mockImplementation(() => undefined)
-    sessions.lineTaken(project, id, 'run0', 'm157 was read')
-    expect(told).not.toHaveBeenCalled()
+    // Line B rang for mB and is marked; mA, an older line's (taken by a prompt, its delivery read only now), says nothing of B.
+    sessions.lineNotTaken(project, id, 'run1', '[Hive] New in your inbox: 1 card event (#166) (mB).', true, ['mB'])
     expect(sessions.lineUntaken(project, id)).toBe(true)
-    sessions.lineTaken(project, id, 'run1', 'm157 was read')
+    told.mockClear()
+    sessions.lineTaken(project, id, 'run1', 'mA', 'mA, which it rang for, was read')
+    expect(sessions.lineUntaken(project, id)).toBe(true)
+    // mB read, but in another launch's name: left.
+    sessions.lineTaken(project, id, 'run0', 'mB', 'mB, which it rang for, was read')
+    expect(sessions.lineUntaken(project, id)).toBe(true)
+    expect(told).not.toHaveBeenCalled()
+    // mB read in its own launch: B was taken.
+    sessions.lineTaken(project, id, 'run1', 'mB', 'mB, which it rang for, was read')
     expect(sessions.lineUntaken(project, id)).toBe(false)
     expect(sessions.lineWaiting(project, id)).toBe(false)
+    // A line that rang for nothing Hive knows (its mark has no deliveries): no read clears it.
+    sessions.lineNotTaken(project, id, 'run1', 'A TASK', true)
+    sessions.lineTaken(project, id, 'run1', 'mB', 'mB, which it rang for, was read')
+    expect(sessions.lineUntaken(project, id)).toBe(true)
+  })
+
+  it("a confirmation that ends not taken marks the line with the deliveries it rang for (round 1 finding)", async () => {
+    writer.testHooks.takeMs = 0
+    vi.spyOn(sessions, 'promptsTaken').mockReturnValue({ runId: 'run1', count: 0 })
+    vi.spyOn(sessions, 'submitAgain').mockReturnValue(true)
+    const marks = vi.spyOn(sessions, 'lineNotTaken').mockImplementation(() => undefined)
+    expect(await writer.confirmTaken(project, id, { runId: 'run1', count: 0 }, 'WAKE', { read: () => false, ids: ['m7', 'm8'] })).toBe(false)
+    expect(marks).toHaveBeenCalledWith(project, id, 'run1', 'WAKE', true, ['m7', 'm8'])
   })
 })
 

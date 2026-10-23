@@ -97,6 +97,8 @@ export interface LineFollow {
    * marked the line not taken, which then blocked every prompt until the user pressed Enter on an empty composer.
    */
   read?: () => boolean
+  /** The deliveries the line rang for (its doorbell's ids): kept with a mark that it wasn't taken, which only their read clears. */
+  ids?: readonly string[]
   settled?: () => void
   taken?: () => void
   lost?: () => void
@@ -147,7 +149,7 @@ export async function confirmTaken(projectPath: string, agentId: string, before:
   follow?.confirming?.(before)
   confirmsRunning++
   try {
-    const r = await confirming(projectPath, agentId, before, line, follow?.read)
+    const r = await confirming(projectPath, agentId, before, line, follow?.read, follow?.ids)
     if (r === 'taken') follow?.taken?.()
     else if (r === 'gone') follow?.lost?.()
     else if (r === 'left') follow?.left?.()
@@ -162,7 +164,7 @@ let confirmsRunning = 0
 /** How many typed lines are being checked for being taken now: tests wait for none, after which no Enter comes. */
 export const confirmsInFlight = (): number => confirmsRunning
 
-async function confirming(projectPath: string, agentId: string, before: { runId: string; count: number }, line: string, read?: () => boolean): Promise<'taken' | 'gone' | 'left' | false> {
+async function confirming(projectPath: string, agentId: string, before: { runId: string; count: number }, line: string, read?: () => boolean, ids: readonly string[] = []): Promise<'taken' | 'gone' | 'left' | false> {
   const t0 = Date.now()
   const taken = (): 'taken' | 'gone' | false => {
     const now = sessions.promptsTaken(projectPath, agentId)
@@ -222,6 +224,6 @@ async function confirming(projectPath: string, agentId: string, before: { runId:
     log.warn(`The wake typed into ${userText(agentId)} still wasn't taken: it may be waiting in its prompt`)
   } else log.warn(`The wake typed into ${userText(agentId)} wasn't taken, and Enter couldn't be pressed again (busy, or the user typing there)`)
   // Shown in its pane, the user told once, and nothing more typed into it until it is taken (#430).
-  sessions.lineNotTaken(projectPath, agentId, before.runId, line, retried)
+  sessions.lineNotTaken(projectPath, agentId, before.runId, line, retried, ids)
   return false
 }
