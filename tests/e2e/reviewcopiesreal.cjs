@@ -95,7 +95,9 @@ const namingCopies = () => {
   copilotEnv.PATH = lib.pathWithoutStoreAliases({ PATH: copilotEnv.PATH })
   // Copilot asks whether to trust a new folder: the project folder is, as "Yes, and remember this folder" saves it.
   fs.writeFileSync(path.join(copilotDir, 'copilot-home', 'config.json'), JSON.stringify({ trustedFolders: [alpha] }, null, 2))
-  const homeFiles = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /\.(json|toml)$/i.test(f)).map((f) => path.join(dir, f)) : [])
+  // Each CLI's own settings (Claude Code's settings.json and .claude.json, Codex's config.toml, Copilot's config.json and
+  // settings.json): not its records of what ran (Copilot's command-history-state.json holds the prompts, paths and all).
+  const homeFiles = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /^(config|settings)\.(json|toml)$|^\.claude\.json$/i.test(f)).map((f) => path.join(dir, f)) : [])
   const homesBefore = new Map([...homeFiles(CLAUDE_TEST_HOME), ...homeFiles(CODEX_HOME), ...homeFiles(path.join(copilotDir, 'copilot-home'))].map((f) => [f, fs.readFileSync(f, 'utf8')]))
 
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME, CODEX_HOME, ...copilotEnv, HIVE_TEST_TIPS: 'off' }) })
