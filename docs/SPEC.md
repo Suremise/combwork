@@ -2137,7 +2137,11 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   answers (`ok`, `gaps`, naming it; history "Checked the follow-up: OK: …"). It has no due time and no going ahead:
   `proceed` on a follow-up is refused (`loop.followUpChecked`). A design or follow-up waits until answered, replaced,
   returned for review, given a verdict or moved to another column (`pendingStep`, by its history lines' columns): a
-  change of its place in its column ("Moved to the bottom of Approved") keeps it, its wake and its stall's age. Unanswered, it is a stall (`loopStepWait`): the card in
+  change of its place in its column ("Moved to the bottom of Approved") keeps it, its wake and its stall's age. The
+  column it was posted in is kept on its history line (`column`, a value its words don't show, #1495): the history keeps
+  only its last 300 lines, so the line saying where the card was may be gone, and a move into another column at its top
+  ("Moved to the top of Review", the same words as a reorder there) then still ends it; a line from before keeps reading
+  the lines before it. Unanswered, it is a stall (`loopStepWait`): the card in
   Review or Approved, not blocked, its builder only watching it REVIEW_WAIT_STALL_MS (15 minutes) after the follow-up
   ("B1 posted a follow-up on #333 for its reviewer to check and has waited 20 min: nobody has answered it"; the board's
   hint asks the reviewer to answer it). The card-loop skill has the builder post it, and the reviewer watch comments as
