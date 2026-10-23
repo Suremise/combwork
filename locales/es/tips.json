@@ -340,6 +340,8 @@
   "tips.sortTables.title": "Ordena cualquier tabla",
   "tips.staleMessages.text": "Cuando el Asistente transmite algo sobre la ronda actual de una tarjeta, vincula el mensaje a esa tarjeta: si la tarjeta se aprueba o empieza otra ronda antes de que el agente lo lea, Hive lo descarta por obsoleto, para que ningún agente reabra una tarjeta aprobada por un hallazgo antiguo.",
   "tips.staleMessages.title": "Un mensaje sobre una ronda caduca, no llega tarde",
+  "tips.startFreshIdle.text": "Las conversaciones largas cuestan más. Empezar de nuevo (agentes inactivos), en el menú Agentes de la cabecera del proyecto, da a cada agente inactivo una nueva en un solo paso, y Hive lo sugiere cuando el trabajo de un proyecto ha terminado.",
+  "tips.startFreshIdle.title": "Empieza de nuevo con los agentes inactivos al terminar el trabajo",
   "tips.startNewAll.text": "Empezar de nuevo, en el menú Agentes del encabezado del proyecto, da a cada agente una sesión nueva tras una pregunta; Archivar y empezar de nuevo archiva antes las anteriores. Sus conversaciones siguen en la pestaña Sesiones.",
   "tips.startNewAll.title": "Sesiones nuevas para todos los agentes",
   "tips.storageCleanup.text": "Configuración del proyecto → Almacenamiento muestra cuánto espacio ocupan las copias de seguridad, el archivo, los adjuntos y los worktrees de un proyecto. Limpiar… mueve los adjuntos y las copias antiguas a la Papelera de reciclaje, y antes te muestra exactamente qué se va.",

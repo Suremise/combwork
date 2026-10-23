@@ -245,6 +245,7 @@ export const SUITES = [
   { name: 'startall' },
   { name: 'startbusy' },
   { name: 'startfail' },
+  { name: 'startfresh' },
   { name: 'statemarks' },
   { name: 'stopswitch' },
   { name: 'storage' },

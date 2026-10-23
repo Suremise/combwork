@@ -47,7 +47,8 @@ export interface CommandDef {
   /** The default shortcut. Users change it in Settings → Keyboard Shortcuts (projects for Project and Session commands). */
   keybinding?: string
   run: (...args: any[]) => unknown
-  when?: () => boolean
+  /** Whether it can run now; given the arguments it runs with (a notice's button names its project, #1437). */
+  when?: (...args: unknown[]) => boolean
   /** Needs arguments (e.g. a path), so it can't have a shortcut or appear in the palette. */
   internal?: boolean
   /** A toggle: shown with a checkmark in the menus and the palette while it is on. */
@@ -449,6 +450,18 @@ const COMMAND_DEFS: CommandDef[] = [
   },
   { id: 'session.archive', name: msg({ id: 'shell.command.session.archive', defaultMessage: 'Archive Session and Start New…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it.' }), category: 'session', when: hasProject, run: () => actions.archiveCurrent() },
   // Every agent of the project at once, after one confirmation (#216); the menus and the palette say how many (#275).
+  {
+    id: 'session.startFreshIdle',
+    name: msg({ id: 'shell.command.session.startFreshIdle', defaultMessage: 'Start Fresh (Idle Agents)…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category (#1437): gives each idle running agent of the project a new conversation, after one question. The … says it opens a dialog first: keep it." }),
+    category: 'session',
+    // The nudge's button passes its project (in this window: main sends it to the window that has it), whatever is
+    // selected; otherwise the selected one, with an agent running.
+    when: (projectPath?: unknown) => (typeof projectPath === 'string' ? !!get().workspace?.projects.some((p) => p.path.toLowerCase() === projectPath.toLowerCase()) : hasProject() && !!selected()?.agents.some((a) => a.live)),
+    run: (projectPath?: unknown) => {
+      const path = typeof projectPath === 'string' ? projectPath : selected()?.path
+      if (path) void actions.startFreshIdle(path)
+    }
+  },
   { id: 'session.startNewAll', name: msg({ id: 'shell.command.session.startNewAll', defaultMessage: 'Start New (All)…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it.' }), category: 'session', when: () => hasProject() && !!selected()?.agents.length, liveLabel: () => batchLabel(msg({ id: 'shell.command.session.startNewAllLive', defaultMessage: '{several, select, yes {Start New ({n})…} other {Start New…}}', description: 'The command that gives every agent of the project a new session, as the menus and the palette show it: with several agents, how many it acts on ({n}). The … says it asks first: keep it.' }), 'startNew'), run: () => void actions.startNewAll(get().selectedProject!) },
   // The project's agents and layout as a template (#126); loading one and adding one of its agents open the agent strip's menus (#286).
   { id: 'template.save', name: msg({ id: 'shell.command.template.save', defaultMessage: 'Save Agents as Template…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it.' }), category: 'session', when: () => hasProject() && !!selected()?.agents.length, run: () => void actions.saveTemplate(get().selectedProject!) },
@@ -634,7 +647,7 @@ export const commands: Command[] = COMMAND_DEFS.map((d) => Object.defineProperty
 export function runCommand(id: string, ...args: unknown[]): void {
   const c = commands.find((x) => x.id === id)
   if (!c || c.hidden?.()) return
-  if (c.when && !c.when()) return
+  if (c.when && !c.when(...args)) return
   // Tips skip what the user already does.
   noteCommandUsed(id)
   void Promise.resolve(c.run(...args)).catch((e) => console.error(e))

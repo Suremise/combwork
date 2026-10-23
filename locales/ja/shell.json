@@ -116,6 +116,7 @@
   "shell.command.session.resumeAfterClose": "Hive終了時に実行中だったエージェントを再開",
   "shell.command.session.settleLeftovers": "エージェントが残したプロセスを終了または維持",
   "shell.command.session.showTranscript": "セッションのトランスクリプトを読む",
+  "shell.command.session.startFreshIdle": "新しく始める（待機中のエージェント）…",
   "shell.command.session.startNewAll": "新規開始（すべて）…",
   "shell.command.session.startNewAllLive": "{several, select, yes {新規開始（{n}）…} other {新規開始…}}",
   "shell.command.session.stop": "セッションを停止",

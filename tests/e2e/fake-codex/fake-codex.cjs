@@ -17,7 +17,8 @@
 //   Steps combine with " then " ("question then review deny").
 //   The scenarios' steps, as the fake Claude Code takes them: "skill NAME" (a shell read of its SKILL.md),
 //   "boardmove", "boardreview", "boardcomment" and "hive TOOL {json}" (through the launch's real hive MCP server),
-//   "work N". Anything else: a short turn.
+//   "work N" and "shell: <command line>" (run in cmd with the session's environment, between its PreToolUse and
+//   PostToolUse; fake-shell.jsonl in CODEX_HOME records it, #1486). Anything else: a short turn.
 //   The turn ledger's cases (#648): "latetool" (a command whose PostToolUse reaches Hive after the turn's Stop),
 //   "loststop" (no Stop reaches Hive; its rollout records the turn's end, task_complete) and "silent" (neither).
 //   Notices (#650), as Codex 0.162.1 takes them: context in a PostToolUse reply reaches "the model", and a Stop blocked
@@ -37,6 +38,7 @@
 const fs = require('fs')
 const path = require('path')
 const { randomUUID } = require('crypto')
+const { spawn } = require('child_process')
 const { callHiveTool, connectHive, fromCodexTable, parseHiveStep, isDoorbell, doorbellIsWork, inboxRows } = require('../fake-bridge.cjs')
 
 const args = process.argv.slice(2)
@@ -349,7 +351,30 @@ async function scripted(step) {
     await hook('PreToolUse', c)
     if (noticeIn(await hook('PostToolUse', c), 'checkpoint') && followsNotices()) await readInbox()
   }
-  return any || !!(move || rev || comment || call || pause || check)
+  // "shell: <command line>": runs it in cmd as its shell tool would, reported by its hooks (#1486: a scenario's commit).
+  const sh = /\bshell:\s*(.+)$/i.exec(step)
+  if (sh) {
+    const c = { ...bash(sh[1].trim()), tool_use_id: `exec-${randomUUID()}` }
+    await hook('PreToolUse', c)
+    await shellRun(sh[1].trim())
+    await hook('PostToolUse', c)
+  }
+  return any || !!(move || rev || comment || call || pause || check || sh)
+}
+
+/** A shell step's command, in cmd with the session's environment; the agent, command, exit code and output go to fake-shell.jsonl. */
+function shellRun(cmd) {
+  return new Promise((resolve) => {
+    const p = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${cmd}"`], { cwd: process.cwd(), env: process.env, windowsVerbatimArguments: true, windowsHide: true })
+    let stdout = ''
+    let stderr = ''
+    p.stdout.on('data', (d) => (stdout += d))
+    p.stderr.on('data', (d) => (stderr += d))
+    p.on('close', (code) => {
+      if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-shell.jsonl'), JSON.stringify({ agent: process.env.HIVE_AGENT || 'agent', cmd, code, stdout, stderr }) + '\n')
+      resolve()
+    })
+  })
 }
 
 /**

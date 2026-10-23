@@ -13,6 +13,7 @@ import { shortDuration } from './progress'
 import { LANE_DEFAULT_EVENTS, type LaneEvent, type LaneWatchCards } from './laneWatch'
 import type { StageId } from './workflow/facts'
 import type { QueuePublic } from './workflow/queue'
+import { INBOX_SWITCHES, type InboxSwitch } from './inboxSwitches'
 
 /** A card as the Agent API shows it: with what its agent is doing now, and why it is stalled. */
 export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'> {
@@ -747,4 +748,17 @@ export function queuesText(qs: QueuePublic[], project: string): string {
 /** What Resume did: resumed, or still paused (its cause still there), with the queue as it is now. */
 export function queueResumedText(r: { resumed: boolean; queue: QueuePublic }): string {
   return r.resumed ? queueText(r.queue) : `Still paused: its cause is still there. ${queueText(r.queue)}`
+}
+
+/** How Hive tells an agent of what waits for it, by the carrying-on switch that does it (#1432, shared/inboxSwitches.ts). */
+const TELLS: Record<InboxSwitch, string> = { checkpoints: 'at its next tool call', stopContinuation: "at its turn's end", idleWakes: 'once it is idle' }
+
+/**
+ * hive_message_agent's reply for a message queued (#1497): how Hive tells the agent of it, only by the switches on for it
+ * (`tells`, in INBOX_SWITCHES' order), or, with none, that it waits in its inbox.
+ */
+export function messageQueuedText(r: { who: string; id: string; tied: string; status: string; queued: number; tells: readonly InboxSwitch[] }): string {
+  const ways = INBOX_SWITCHES.filter((s) => r.tells.includes(s)).map((s) => TELLS[s])
+  const how = ways.length ? `Hive tells it ${ways.length > 1 ? `${ways.slice(0, -1).join(', ')} or ${ways.at(-1)}` : ways[0]}` : 'it waits in its inbox until it reads it with hive_inbox (the user can Deliver Now)'
+  return `Queued for ${r.who} (${r.id}${r.tied}, ${r.status}): ${how}; ${r.queued} waiting. hive_agent_activity says when it is received and acked.`
 }

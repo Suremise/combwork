@@ -44,7 +44,7 @@
   "providers.codex.sandbox.setUpAction": "设置",
   "providers.codex.sandbox.upgrade": "**升级**会将 Codex 切换到默认沙盒，它在独立的 Windows 账户而不是你自己的账户下运行命令。Windows 会请求一次管理员权限。正在运行的 Codex 智能体在重启前保持原有沙盒。",
   "providers.codex.sandbox.upgradeAction": "升级",
-  "providers.codex.storePwsh.fix": "要避免此问题，请用安装程序而不是 Store 安装 PowerShell 7（`winget install --id Microsoft.PowerShell --source winget`），卸载 Store 版本，然后重启 Hive 及其 Codex 智能体。Hive 不会更改你的 shell。",
+  "providers.codex.storePwsh.fix": "要避免此问题，请按以下顺序把 Store 版 PowerShell 7 换成安装程序版。先卸载 Store 版（设置 → 应用 → 已安装的应用 → PowerShell → 卸载，或 `Get-AppxPackage Microsoft.PowerShell | Remove-AppxPackage`）：只要它还在，winget 就会把它当作同一个应用，什么也不安装。然后安装 PowerShell 7（`winget install --id Microsoft.PowerShell --source winget --installer-type wix`）。最后重启 Hive 及其 Codex 智能体：重启之前它们沿用旧的 PATH。Hive 不会更改你的 shell。",
   "providers.codex.storePwsh.label": "已安装 Microsoft Store 中的 PowerShell 7",
   "providers.codex.storePwsh.symptom": "症状：Codex 命令立即失败并显示 `CreateProcessAsUserW failed: 5`（拒绝访问），关闭所有 PowerShell 7 窗口和命令后又能正常运行。",
   "providers.codex.storePwsh.warning": "当 Microsoft Store 中的 PowerShell 7 处于打开状态时，Codex 智能体的命令可能会失败：只要该 PowerShell 的另一个副本在运行，Codex 的 Windows 沙盒就无法启动它。",
