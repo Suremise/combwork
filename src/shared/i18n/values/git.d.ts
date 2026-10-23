@@ -159,6 +159,7 @@ interface HiveMessageValues {
   'git.queue.none': undefined
   'git.queue.open': { card: string | number }
   'git.queue.outcome': undefined
+  'git.queue.reading': undefined
   'git.queue.region': undefined
   'git.queue.returned': { why: string | number }
   'git.queue.revision': undefined
