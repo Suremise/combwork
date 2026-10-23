@@ -6,7 +6,6 @@ import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { confirm, notify, set, useLanguage, useStore } from '../store'
 import { cx } from '../util'
-import { QueueCardNote } from './AgentDialogs'
 import { MergeSlotNote, projectSlots, useMergeSlots } from './MergeSlots'
 import { Icon, Modal } from './ui'
 
@@ -55,6 +54,48 @@ const M = {
   conflict: msg({ id: 'agents.branchMerge.conflict', defaultMessage: 'Merging would conflict. Nothing was changed. These files were changed on both {branch} and {into}:', description: 'The Merge dialog after a merge that would conflict: Hive tried it and changed nothing; the files follow.' }),
   merged: msg({ id: 'agents.branchMerge.merged', defaultMessage: 'Merged {branch} into {into}', description: "A notification's title after a merge from the Merge dialog for merges outside cards." }),
   failed: msg({ id: 'agents.branchMerge.failed', defaultMessage: 'Could not merge', description: "An error's title: merging a branch from the Merge dialog failed." })
+}
+
+export const QUEUE_MERGES = msg({ id: 'agents.mergeDialog.queueMerges', defaultMessage: 'Hive merges {card} through the merge queue. Merge anyway merges it here instead.', description: "Why Merge is disabled in the Merge dialog: the branch's card ({card}: its key) is merged by Hive's merge queue under its rules. Glossary 2.5: merge queue." })
+
+/** The card on the branch when Hive merges it (#1357, OP-13): where it stands in the queue. */
+export function QueueCardNote({ c }: { c: BranchQueueCard }) {
+  const where =
+    c.where === 'testing'
+      ? tr(msg({ id: 'agents.mergeDialog.queueTesting', defaultMessage: 'The queue for {target} is testing it now.', description: "In the Merge dialog: the merge queue for the branch {target} is testing the card now (its merge checks)." }), { target: c.target })
+      : c.where === 'queued'
+        ? c.position
+          ? tr(msg({ id: 'agents.mergeDialog.queueQueued', defaultMessage: 'It waits in the queue for {target}: {position, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in line.', description: "In the Merge dialog: the card waits in the merge queue for the branch {target}, at place {position} (1st: next; the card testing counts)." }), { target: c.target, position: c.position })
+          : tr(msg({ id: 'agents.mergeDialog.queueQueuedNoPlace', defaultMessage: 'It waits in the queue for {target}.', description: "In the Merge dialog: the card waits in the merge queue for the branch {target}." }), { target: c.target })
+        : tr(msg({ id: 'agents.mergeDialog.queueNotYet', defaultMessage: 'It goes into the queue for {target} once it is approved.', description: "In the Merge dialog: the card isn't in the merge queue yet (in review, say); it is queued for the branch {target} once approved. Glossary 2.2: Approved." }), { target: c.target })
+  return (
+    <div className="banner info merge-queue-note" data-queue-card={c.card}>
+      <Icon name="git-merge" />
+      <span>
+        <strong>{tr(QUEUE_MERGES, { card: c.key })}</strong> {where}
+        {c.paused && <> {tr(msg({ id: 'agents.mergeDialog.queuePaused', defaultMessage: 'The queue is paused.', description: 'In the Merge dialog, after where the card stands in the merge queue: that queue is paused.' }))}</>}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * The note that a branch is an unfinished card's work (#1450), with a link to the card: both Merge dialogs show it.
+ */
+export function LineCardNote({ card }: { card: NonNullable<MergeBranch['card']> }) {
+  return (
+    <div className="banner info branch-merge-card" data-line-card={card.number}>
+      <Icon name="info" />
+      <span>
+        <strong>{tRich<ReactNode>(M.cardWork, { card: card.key, link: CARD_LINK(card) })}</strong> {tr(M.cardWorkMore)}
+      </span>
+    </div>
+  )
+}
+
+/** The confirmation before merging an unfinished card's line (#1450): both Merge dialogs ask it. */
+export function confirmLineMerge(card: NonNullable<MergeBranch['card']>, branch: string, into: string): Promise<boolean> {
+  return confirm({ title: tr(M.confirmTitle, { card: card.key }), message: tr(M.confirmMessage, { card: card.key, branch, into }), confirmLabel: tr(M.confirmButton), danger: true })
 }
 
 /**
@@ -144,13 +185,10 @@ export function BranchMergeDialog() {
     if (anyway && queueCard) {
       const ok = await confirm({ title: tr(M.anywayTitle, { card: queueCard.key }), message: tr(M.anywayMessage), confirmLabel: tr(M.anywayConfirm), danger: true })
       if (!ok) return
-    } else if (lineCard) {
-      const ok = await confirm({ title: tr(M.confirmTitle, { card: lineCard.key }), message: tr(M.confirmMessage, { card: lineCard.key, branch, into: target }), confirmLabel: tr(M.confirmButton), danger: true })
-      if (!ok) return
-    }
+    } else if (lineCard && !(await confirmLineMerge(lineCard, branch, target))) return
     setBusy(true)
     try {
-      const r = await call('worktrees:mergeBranch', project.path, branch, { target, squash, message, ...(lineCard ? { card: lineCard.number } : {}), ...(anyway && queueCard ? { outsideQueue: { card: queueCard.card, reason: '' } } : {}) })
+      const r = await call('worktrees:mergeBranch', project.path, branch, { target, squash, message, ...(lineCard && !queueCard ? { card: lineCard.number } : {}), ...(anyway && queueCard ? { outsideQueue: { card: queueCard.card, reason: '' } } : {}) })
       setResult(r)
       if (r.ok) {
         notify('success', tr(M.merged, { branch, into: target }))
@@ -237,20 +275,7 @@ export function BranchMergeDialog() {
               </label>
             </div>
             {queueCard && <QueueCardNote c={queueCard} />}
-            {lineCard && !queueCard && (
-              <div className="banner info branch-merge-card" data-line-card={lineCard.number}>
-                <Icon name="info" />
-                <span>
-                  <strong>
-                    {tRich<ReactNode>(M.cardWork, {
-                      card: lineCard.key,
-                      link: CARD_LINK(lineCard)
-                    })}
-                  </strong>{' '}
-                  {tr(M.cardWorkMore)}
-                </span>
-              </div>
-            )}
+            {lineCard && !queueCard && <LineCardNote card={lineCard} />}
             {readError ? (
               <div className="banner warn">
                 <Icon name="warning" /> {readError}

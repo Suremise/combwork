@@ -1111,6 +1111,10 @@
     "defaultMessage": "git doesn't list it as one of the project's worktrees",
     "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
   },
+  "main.unused.why.notUnused": {
+    "defaultMessage": "it isn't one of the project's unused worktrees now (an agent's conversation, a review copy or the merge queue may use it)",
+    "description": "Why Hive won't remove or merge a folder from Unused worktrees (#1450): it isn't listed any more, as a conversation can resume there, it is one of Hive's copies, or the merge queue holds it. A clause."
+  },
   "main.unused.why.otherProject": {
     "defaultMessage": "it is another project of the workspace",
     "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
@@ -1118,6 +1122,10 @@
   "main.unused.why.owned": {
     "defaultMessage": "an agent works in it now",
     "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
+  },
+  "main.unused.why.session": {
+    "defaultMessage": "a session runs in it",
+    "description": "Why Hive won't remove a folder from Unused worktrees (#1450): an agent's session runs in it now. A clause."
   },
   "main.unused.why.slotGuarded": {
     "defaultMessage": "it is a slot, which Hive removes only when it is clean and its work is merged",

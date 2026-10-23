@@ -28,6 +28,17 @@ const M = {
   cardWork: msg({ id: 'main.branchMerge.cardWork', defaultMessage: "{branch} is {card}'s work: merge it through its card, or confirm merging it here.", description: "An error merging from the Merge dialog: the branch ({branch}) is the line of a card ({card}: its key) that isn't Done, and the merge wasn't confirmed for that card (the dialog asks first)." })
 }
 
+/**
+ * Every merge route's rule for a card's line (#1450, HR3's round 1 finding 2): a line whose card isn't Done merges only
+ * when the request names that card, which the window sends after its confirmation. The Merge a branch dialog, the older
+ * Merge dialog (an agent's 0.9 worktree, an unused worktree) and their main routes all pass through here (ipc.ts).
+ */
+export async function lineConfirmed(projectPath: string, branch: string | null | undefined, card: number | undefined): Promise<void> {
+  if (!branch) return
+  const line = await lineCard(projectPath, branch)
+  if (line && card !== line.number) throw hiveError(M.cardWork, { branch, card: line.key }, { kind: 'conflict' })
+}
+
 /** The card whose line `branch` is, while it isn't Done (started, any stage but done; put back too). Null otherwise. */
 export async function lineCard(projectPath: string, branch: string): Promise<{ number: number; key: string; title: string } | null> {
   const wf = await workflowFor(workspaceOf(projectPath), projectPath).catch(() => null)
@@ -89,13 +100,13 @@ export async function branchMergeStatus(projectPath: string, branch: string, tar
 
 /**
  * Merges `branch` into `target` (#1450), as committed: refused while a session in its folder is in the middle of a task
- * (it may still commit), and for an unfinished card's line unless the user confirmed it for that card (`card`).
+ * (it may still commit). An unfinished card's line is the route's to authorize first (lineConfirmed).
  */
-export async function mergeBranch(projectPath: string, branch: string, opts: { target: string; squash: boolean; message: string; card?: number }): Promise<MergeResult> {
+export async function mergeBranch(projectPath: string, branch: string, opts: { target: string; squash: boolean; message: string }): Promise<MergeResult> {
   projectPath = workspace.assertProject(projectPath)
   const folder = await picked(projectPath, branch, opts.target)
+  // The card's confirmation is checked by the route (lineConfirmed, with the queue's Merge anyway): here only logged.
   const card = await lineCard(projectPath, branch)
-  if (card && opts.card !== card.number) throw hiveError(M.cardWork, { branch, card: card.key }, { kind: 'conflict' })
   if (folder) {
     const live = sessions.liveStates().find((s) => s.cwd && samePlace(s.cwd, folder) && s.projectPath.toLowerCase() === projectPath.toLowerCase())
     const name = live ? (projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === live.agentId)?.name ?? live.agentId) : ''

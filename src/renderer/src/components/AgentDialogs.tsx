@@ -5,6 +5,7 @@ import { useAgentLimit } from '../advanced'
 import { shownText as inLanguage } from '@shared/advanced'
 import { PROVIDERS, agentProvider, chosenDefaultProvider, defaultProviderPending, isProviderEnabled, modeCaveat, modeOption, offeredModes, projectDefaultProvider, projectProviderConfig, projectUse200k, providerDescriptor, providerName, providerSettings, shownText } from '@shared/providers'
 import type { BranchQueueCard } from '@shared/workflow/queue'
+import type { MergeBranch } from '@shared/types'
 import type { AddAgentOptions, AgentBranchStatus, EffortLevel, MergeResult, PermissionMode, ProjectConfig, ProjectGitInfo, ProjectInfo, ProviderId, WorktreeMatch } from '@shared/types'
 import { serverOnIn } from '@shared/agentMcp'
 import { reuseNote } from '@shared/unusedWorktrees'
@@ -22,6 +23,7 @@ import { ProviderIcon } from './ProviderIcon'
 import { cx } from '../util'
 import { formatSize } from '@shared/units'
 import { MergeSlotNote, projectSlots, useMergeSlots } from './MergeSlots'
+import { confirmLineMerge, LineCardNote, QUEUE_MERGES, QueueCardNote } from './BranchMerge'
 import { EffortPicker, ModelPicker } from './ModelPicker'
 import { cliDefaultEffort, effortName, effortText, effortUnknown, modelCaps } from '@shared/models'
 import { pasteIntoTerminal } from './TerminalView'
@@ -1070,28 +1072,6 @@ export function HandOverDialog() {
 
 const QUEUE_LOOKUP = msg({ id: 'agents.mergeDialog.queueLookup', defaultMessage: 'Checking whether Hive merges this branch’s card through the merge queue…', description: "Why Merge is off for a moment in the Merge dialog: Hive is reading whether its merge queue merges the branch's card. Glossary 2.5: merge queue." })
 const QUEUE_LOOKUP_FAILED = msg({ id: 'agents.mergeDialog.queueLookupFailed', defaultMessage: "Couldn't read whether Hive merges this branch's card through the merge queue, so Merge stays off: {why}", description: "The Merge dialog when Hive couldn't read whether its merge queue merges the branch's card ({why}: the error). Merge is a button: keep it as Hive shows it." })
-const QUEUE_MERGES = msg({ id: 'agents.mergeDialog.queueMerges', defaultMessage: 'Hive merges {card} through the merge queue. Merge anyway merges it here instead.', description: "Why Merge is disabled in the Merge dialog: the branch's card ({card}: its key) is merged by Hive's merge queue under its rules. Glossary 2.5: merge queue." })
-
-/** The card on the branch when Hive merges it (#1357, OP-13): where it stands in the queue. */
-export function QueueCardNote({ c }: { c: BranchQueueCard }) {
-  const where =
-    c.where === 'testing'
-      ? tr(msg({ id: 'agents.mergeDialog.queueTesting', defaultMessage: 'The queue for {target} is testing it now.', description: "In the Merge dialog: the merge queue for the branch {target} is testing the card now (its merge checks)." }), { target: c.target })
-      : c.where === 'queued'
-        ? c.position
-          ? tr(msg({ id: 'agents.mergeDialog.queueQueued', defaultMessage: 'It waits in the queue for {target}: {position, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in line.', description: "In the Merge dialog: the card waits in the merge queue for the branch {target}, at place {position} (1st: next; the card testing counts)." }), { target: c.target, position: c.position })
-          : tr(msg({ id: 'agents.mergeDialog.queueQueuedNoPlace', defaultMessage: 'It waits in the queue for {target}.', description: "In the Merge dialog: the card waits in the merge queue for the branch {target}." }), { target: c.target })
-        : tr(msg({ id: 'agents.mergeDialog.queueNotYet', defaultMessage: 'It goes into the queue for {target} once it is approved.', description: "In the Merge dialog: the card isn't in the merge queue yet (in review, say); it is queued for the branch {target} once approved. Glossary 2.2: Approved." }), { target: c.target })
-  return (
-    <div className="banner info merge-queue-note" data-queue-card={c.card}>
-      <Icon name="git-merge" />
-      <span>
-        <strong>{tr(QUEUE_MERGES, { card: c.key })}</strong> {where}
-        {c.paused && <> {tr(msg({ id: 'agents.mergeDialog.queuePaused', defaultMessage: 'The queue is paused.', description: 'In the Merge dialog, after where the card stands in the merge queue: that queue is paused.' }))}</>}
-      </span>
-    </div>
-  )
-}
 
 export function MergeDialog() {
   useLanguage()
@@ -1111,6 +1091,8 @@ export function MergeDialog() {
   const [result, setResult] = useState<MergeResult | null>(null)
   /** The card on this branch when Hive merges it (#1357, OP-13): its queue state; Merge waits for Merge anyway. */
   const [queueCard, setQueueCard] = useState<BranchQueueCard | null>(null)
+  /** The card whose line the branch is, while it isn't Done (#1450): merged here only after asking. */
+  const [lineCard, setLineCard] = useState<MergeBranch['card'] | null>(null)
   /** Whether that is known yet (HR3's round 1 finding 1): Merge stays off until it is, and when it can't be read. */
   const [lookup, setLookup] = useState<{ state: 'pending' | 'done' | 'failed'; error?: string }>({ state: 'pending' })
   const [lookups, setLookups] = useState(0)
@@ -1139,13 +1121,17 @@ export function MergeDialog() {
   // Whether Hive merges the branch's card, read when the dialog opens and on Retry; only the latest read counts.
   useEffect(() => {
     setQueueCard(null)
-    if (!target || unused) return void setLookup({ state: 'done' })
+    setLineCard(null)
+    const branch = unused?.branch ?? found?.worktree?.branch
+    if (!target || !branch) return void setLookup({ state: 'done' })
     setLookup({ state: 'pending' })
     let live = true
-    void call('queue:branchCard', target.project, target.agentId).then(
+    // Both cards (#1450): the one the queue merges (Merge anyway), else the unfinished card whose line it is (asks first).
+    void call('worktrees:branchCards', target.project, branch).then(
       (c) => {
         if (!live) return
-        setQueueCard(c)
+        setQueueCard(c.queue)
+        setLineCard(c.line)
         setLookup({ state: 'done' })
       },
       (e) => live && setLookup({ state: 'failed', error: errorMessage(e) })
@@ -1177,13 +1163,14 @@ export function MergeDialog() {
         danger: true
       })
       if (!ok) return
-    }
+    } else if (lineCard && !(await confirmLineMerge(lineCard, agent.worktree!.branch, status?.into ?? ''))) return
     setBusy(true)
     try {
       const removing = cleanup && !running
+      const confirmed = lineCard && !queueCard ? { card: lineCard.number } : {}
       const r = unused
-        ? await call('worktrees:mergeUnused', project.path, unused.path, { squash, message, cleanup: removing })
-        : await call('agents:merge', project.path, agent.id, { squash, message, cleanup: removing, moveBranch: squash && !removing && moveBranch, ...(anyway && queueCard ? { outsideQueue: { card: queueCard.card, reason: '' } } : {}) })
+        ? await call('worktrees:mergeUnused', project.path, unused.path, { squash, message, cleanup: removing, ...confirmed, ...(anyway && queueCard ? { outsideQueue: { card: queueCard.card, reason: '' } } : {}) })
+        : await call('agents:merge', project.path, agent.id, { squash, message, cleanup: removing, moveBranch: squash && !removing && moveBranch, ...confirmed, ...(anyway && queueCard ? { outsideQueue: { card: queueCard.card, reason: '' } } : {}) })
       setResult(r)
       if (r.ok) {
         // Where it went: the branch the project folder is on, or the folder itself when git didn't say.
@@ -1248,6 +1235,7 @@ export function MergeDialog() {
       }
     >
       {queueCard && <QueueCardNote c={queueCard} />}
+      {lineCard && !queueCard && <LineCardNote card={lineCard} />}
       {lookup.state === 'failed' && (
         <div className="banner warn merge-queue-note" data-queue-lookup="failed">
           <Icon name="warning" />

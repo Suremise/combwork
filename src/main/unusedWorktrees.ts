@@ -10,6 +10,7 @@ import { folderFacts, legacyWorktree } from './agentFolders'
 import { COPIES_DIR } from './copies'
 import type { SlotKept, SlotPool } from './slots'
 import { poolFor } from './slotsApp'
+import { sessions as liveSessions } from './sessions'
 import { containsPlace, placeKey, realPath } from './fsutil'
 import { git, gitReading } from './git'
 import { gitProblem } from './gitTool'
@@ -96,8 +97,8 @@ interface Places {
 async function placesOf(projectPath: string): Promise<Places> {
   const ws = workspaceOf(projectPath)
   const out: Places = { pool: null, slots: new Map(), copies: ws.path ? join(ws.worktreesRoot, basename(projectPath), COPIES_DIR) : null, homes: new Map() }
-  const facts = await folderFacts(projectPath).catch(() => null)
-  if (!facts) return out
+  // Not known: nothing is listed, removed or merged from here (HR3's round 1 finding 1: fail closed).
+  const facts = await folderFacts(projectPath)
   if (facts.homes.length) {
     const agents = new Set(projectAgents(await workspace.projectConfig(projectPath)).map((a) => a.id))
     const sessions = (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions ?? []
@@ -156,6 +157,42 @@ async function candidates(projectPath: string, reads?: wt.RepoReads): Promise<{ 
   return { listed, places }
 }
 
+/** Why a folder isn't removed or merged from here once it stopped being an unused worktree (#1450, HR3's round 1). */
+const NOT_UNUSED = msg({ id: 'main.unused.why.notUnused', defaultMessage: "it isn't one of the project's unused worktrees now (an agent's conversation, a review copy or the merge queue may use it)", description: "Why Hive won't remove or merge a folder from Unused worktrees (#1450): it isn't listed any more, as a conversation can resume there, it is one of Hive's copies, or the merge queue holds it. A clause." })
+const SESSION_IN = msg({ id: 'main.unused.why.session', defaultMessage: 'a session runs in it', description: "Why Hive won't remove a folder from Unused worktrees (#1450): an agent's session runs in it now. A clause." })
+
+/** Why a folder an agent's 0.9 worktree is isn't removed or merged from here. */
+const OWNED = msg({ id: 'main.unused.why.owned', defaultMessage: 'an agent works in it now', description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." })
+
+/** Whether a session of this Hive runs in a folder (or one inside it) now. */
+const sessionIn = (folder: string): boolean => liveSessions.liveStates().some((s) => !!s.cwd && contains(folder, s.cwd))
+
+/**
+ * Whether a folder is one of the project's unused worktrees now, as the list decides (#1450, HR3's round 1 finding 1):
+ * every protected place (a retired home a conversation resumes in, a copy, a live queue folder, an agent's 0.9
+ * worktree, a slot not listed) checked again, never only at listing time. Null when it is; else why not. Facts that
+ * can't be read refuse it.
+ */
+async function stillUnused(projectPath: string, path: string): Promise<string | null> {
+  try {
+    const { listed, problem } = await candidates(projectPath)
+    if (listed.some((w) => key(w.path) === key(path))) return null
+    if (projectAgents(await workspace.projectConfig(projectPath)).some((a) => key(legacyWorktree(a)?.path ?? '') === key(path))) return tr(OWNED)
+    return problem ?? tr(NOT_UNUSED)
+  } catch (e) {
+    return tr(CANT_CHECK, { detail: (e as Error).message })
+  }
+}
+
+/** An unused worktree's branch now (the merge routes' card checks, ipc.ts); null: not one, or detached. */
+export async function unusedBranchOf(projectPath: string, path: string): Promise<string | null> {
+  const { listed } = await candidates(projectPath)
+  return listed.find((w) => key(w.path) === key(path))?.branch ?? null
+}
+
+/** Why the pool or Hive couldn't check a slot or folder (#1450), a clause. */
+const CANT_CHECK = msg({ id: 'main.unused.slot.cantCheck', defaultMessage: "Hive couldn't check it ({detail})", description: "Why Hive won't remove a slot listed in Unused worktrees: git couldn't say what it holds ({detail}: why, in English). A clause." })
+
 /** Why a slot has no Remove anyway (#1450): only the pool's guarded clean-up removes it. */
 const SLOT_GUARDED = msg({ id: 'main.unused.why.slotGuarded', defaultMessage: 'it is a slot, which Hive removes only when it is clean and its work is merged', description: "Why Hive won't remove a slot anyway from Unused worktrees (#1450): slots go only through the guarded clean-up. A clause." })
 
@@ -177,7 +214,7 @@ async function keptText(projectPath: string, k: SlotKept): Promise<string> {
     case 'unmerged':
       return tr(msg({ id: 'main.unused.slot.unmerged', defaultMessage: "it has commits that aren't on {target}", description: "Why Hive won't remove a slot listed in Unused worktrees: its commit isn't contained in its target branch ({target}). A clause." }), { target: k.target })
     case 'cantCheck':
-      return tr(msg({ id: 'main.unused.slot.cantCheck', defaultMessage: "Hive couldn't check it ({detail})", description: "Why Hive won't remove a slot listed in Unused worktrees: git couldn't say what it holds ({detail}: why, in English). A clause." }), { detail: k.detail })
+      return tr(CANT_CHECK, { detail: k.detail })
     case 'archiveFailed':
       return tr(msg({ id: 'main.unused.slot.archiveFailed', defaultMessage: 'its archive command failed ({error})', description: "Why Hive didn't remove a slot listed in Unused worktrees: the project's archive command, run first, failed ({error}: why, in English). A clause." }), { error: k.error })
     case 'busy':
@@ -464,7 +501,11 @@ export async function removalPreview(projectPath: string, path: string): Promise
   projectPath = workspace.assertProject(projectPath)
   const listed = (await wt.listWorktrees(projectPath)).find((w) => key(w.path) === key(path))
   if (!listed || key(listed.path) === key(projectPath)) throw new Error(gitProblem() ?? tr(msg({ id: 'main.unused.why.notListed', defaultMessage: "git doesn't list it as one of the project's worktrees", description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." })))
-  const why = (await unsafe(projectPath, listed.path)) ?? ((await placesOf(projectPath)).slots.has(key(listed.path)) ? tr(SLOT_GUARDED) : null)
+  const isSlot = await placesOf(projectPath).then(
+    (p) => p.slots.has(key(listed.path)),
+    () => true
+  )
+  const why = (await unsafe(projectPath, listed.path)) ?? (isSlot ? tr(SLOT_GUARDED) : await stillUnused(projectPath, listed.path))
   if (why) throw new Error(tr(msg({ id: 'main.unused.refused', defaultMessage: "Hive doesn't remove it: {why}.", description: "An error asking to Remove anyway one of the Overview's unused worktrees (Remove, Remove anyway, Merge). {why} says why (main.unused.why.*)." }), { why }))
   const snap = await snapshot(projectPath, listed.path)
   const now = Date.now()
@@ -511,7 +552,12 @@ export async function removeUnusedWorktree(projectPath: string, path: string, op
   try {
     // A slot goes only through its pool's guarded clean-up (#1450, §16.10.2: the archive command first), and only while
     // Unused Worktrees lists it; never forced.
-    const places = await placesOf(projectPath)
+    let places: Places
+    try {
+      places = await placesOf(projectPath)
+    } catch (e) {
+      return { deleted: false, reason: tr(CANT_CHECK, { detail: (e as Error).message }) }
+    }
     const slot = places.slots.get(key(path))
     if (slot) {
       if (opts.force !== undefined) return { deleted: false, reason: tr(SLOT_GUARDED) }
@@ -523,7 +569,8 @@ export async function removeUnusedWorktree(projectPath: string, path: string, op
     }
     const listed = (await wt.listWorktrees(projectPath)).find((w) => key(w.path) === key(path))
     if (!listed || key(listed.path) === key(projectPath)) return { deleted: false, reason: gitProblem() ?? tr(msg({ id: 'main.unused.why.notListed', defaultMessage: "git doesn't list it as one of the project's worktrees", description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." })) }
-    const why = await unsafe(projectPath, listed.path)
+    // Still listed (a home whose conversation can resume, a copy or a live queue folder never is), checked now.
+    const why = (await unsafe(projectPath, listed.path)) ?? (await stillUnused(projectPath, listed.path))
     if (why) return { deleted: false, reason: why }
     // Under the project file's lock, after the reservation: an agent given it before keeps it; none can be from now on.
     let owned = false
@@ -531,7 +578,9 @@ export async function removeUnusedWorktree(projectPath: string, path: string, op
       owned = projectAgents(now).some((a) => key(legacyWorktree(a)?.path ?? '') === key(listed.path))
       return {}
     })
-    if (owned) return { deleted: false, reason: tr(msg({ id: 'main.unused.why.owned', defaultMessage: 'an agent works in it now', description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause." })) }
+    if (owned) return { deleted: false, reason: tr(OWNED) }
+    // Right before anything is deleted: a conversation resumed there meanwhile (a retired home's) keeps it (#1450).
+    if (sessionIn(listed.path)) return { deleted: false, reason: tr(SESSION_IN) }
     let done: UnusedWorktreeRemoval
     if (opts.force !== undefined) {
       // Refusals a new look settles are marked `lookAgain` (#377): the window checks again and asks again.

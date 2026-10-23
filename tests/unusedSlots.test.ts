@@ -138,6 +138,32 @@ describe('Unused Worktrees and the Merge dialog on slots (#1450)', { timeout: 12
     expect(Object.keys(await kinds())).not.toContain('slot-e')
   })
 
+  it('Remove checks every protected place again, never only the list (HR3, round 1 finding 1)', async () => {
+    tree('home-r3', 'hive/r3-old')
+    tree(join('copies', 'copy-2'), 'hive/copy-2')
+    setRetiredHomes(() => [at('home-r1'), at('home-r2'), at('home-r3')])
+    const r3 = (await run(() => unusedWorktrees(project))).worktrees.find((w) => w.path.toLowerCase().endsWith('home-r3'))
+    expect(r3).toMatchObject({ kind: 'home', check: { removable: true } })
+    // A conversation of R1's in it now (listed before that): a stale Remove, plain or forced, removes nothing.
+    await run(() => workspace.upsertSession(project, { id: 'conv-r3', agent: 'claude-code', name: 'review', cwd: at('home-r3'), agentId: 'r1' }))
+    expect(Object.keys(await kinds())).not.toContain('home-r3')
+    expect(await run(() => removeUnusedWorktree(project, at('home-r3'), { expectInto: 'main' }))).toMatchObject({ deleted: false, reason: expect.stringMatching(/isn't one of the project's unused worktrees now/) })
+    await expect(run(() => removalPreview(project, at('home-r3')))).rejects.toThrow(/isn't one of the project's unused worktrees now/)
+    expect((await run(() => removeUnusedWorktree(project, at('home-r3'), { force: 'stale-token' }))).deleted).toBe(false)
+    expect(existsSync(at('home-r3'))).toBe(true)
+    // A copy, merged and clean, is never removed from here either.
+    expect(await run(() => removeUnusedWorktree(project, at(join('copies', 'copy-2'))))).toMatchObject({ deleted: false })
+    await expect(run(() => removalPreview(project, at(join('copies', 'copy-2'))))).rejects.toThrow(/isn't one of the project's unused worktrees now/)
+    expect(existsSync(at(join('copies', 'copy-2')))).toBe(true)
+    // Facts that can't be read: nothing is listed or removed (fail closed).
+    setRetiredHomes(() => {
+      throw new Error('homes unreadable')
+    })
+    await expect(run(() => unusedWorktrees(project))).rejects.toThrow(/homes unreadable/)
+    expect(await run(() => removeUnusedWorktree(project, at('other')))).toMatchObject({ deleted: false, reason: expect.stringMatching(/couldn't check it \(homes unreadable\)/) })
+    setRetiredHomes(() => [at('home-r1'), at('home-r2'), at('home-r3')])
+  })
+
   it("the Merge dialog's branches: a slot's line, a carried slot's branch, any other local branch; the project folder's only a target", async () => {
     const list = await run(() => mergeBranches(project))
     expect(list.checkedOut).toBe('main')
@@ -146,7 +172,9 @@ describe('Unused Worktrees and the Merge dialog on slots (#1450)', { timeout: 12
       ['hive/AL/AL-7-a-line', 'line', 'slot-a'],
       ['hive/b2-old', 'carried', 'slot-b'],
       ['hive/b3-old', 'carried', 'slot-d'],
-      ['feature', 'branch', null]
+      ['feature', 'branch', null],
+      ['hive/copy-2', 'branch', null],
+      ['hive/r3-old', 'branch', null]
     ])
   })
 

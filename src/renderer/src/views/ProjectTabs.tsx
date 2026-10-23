@@ -1097,8 +1097,8 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
         <div className="pane-header" style={{ paddingLeft: 14 }}>
           {tr(C.changes)} <span className="badge" style={{ marginLeft: 6 }}>{status.files.length}</span>
           <div className="actions">
-            {agent && <IconButton icon="git-merge" title={mergeBlocked(agent.name, agent.live?.status) ?? tr(C.mergeAgent, { agent: agent.name })} disabled={!!mergeBlocked(agent.name, agent.live?.status)} onClick={() => set({ mergeFor: { project: owner.path, agentId: agent.id } })} />}
-            {spare?.branch && !spare.check.removable && <IconButton icon="git-merge" title={tr(C.mergeBranch, { branch: spare.branch! })} onClick={() => set({ mergeFor: { project: owner.path, agentId: '', worktree: { path: spare.path, branch: spare.branch! } } })} />}
+            {agent && <IconButton icon="git-merge" action="merge-agent" title={mergeBlocked(agent.name, agent.live?.status) ?? tr(C.mergeAgent, { agent: agent.name })} disabled={!!mergeBlocked(agent.name, agent.live?.status)} onClick={() => set({ mergeFor: { project: owner.path, agentId: agent.id } })} />}
+            {spare?.branch && !spare.check.removable && <IconButton icon="git-merge" action="merge-unused" title={tr(C.mergeBranch, { branch: spare.branch! })} onClick={() => set(spare.slot ? { branchMergeFor: { project: owner.path, branch: spare.branch! } } : { mergeFor: { project: owner.path, agentId: '', worktree: { path: spare.path, branch: spare.branch! } } })} />}
             <IconButton icon="refresh" title={tr(M.refresh)} onClick={load} />
           </div>
         </div>
