@@ -169,7 +169,7 @@ const check = (name, ok, extra = '') => {
 
   // --- A run for a card (#1220): it defaults to the agent's card in Doing and what's checked out in its folder; the row
   // shows "#N · a3f2c1d" under the agent (the card opens it), and its details the card and the whole revision.
-  const gitIn = (...a) => require('child_process').execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: alpha, env: lib.baseEnv(), encoding: 'utf8' }).trim()
+  const gitIn = (...a) => require('child_process').execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: alpha, env: lib.gitEnv(), encoding: 'utf8' }).trim()
   fs.writeFileSync(path.join(alpha, 'b.ts'), 'export const b = 2\n')
   // What the checks below write is ignored (#1222: an ignored output doesn't count against a check).
   fs.writeFileSync(path.join(alpha, '.gitignore'), 'check-ran.txt\n')

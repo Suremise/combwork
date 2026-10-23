@@ -479,8 +479,6 @@ interface HiveMessageValues {
   'workspace.unused.commitsNoBranch': { count: number }
   'workspace.unused.commitsNotOn': { count: number; known: string; into: string | number }
   'workspace.unused.detached': undefined
-  'workspace.unused.hintDetail': undefined
-  'workspace.unused.hintTitle': { count: number; many: string; projects: number; project: string | number }
   'workspace.unused.lostCommits': { count: number; branch: string | number; known: string; into: string | number }
   'workspace.unused.lostDetached': { count: number }
   'workspace.unused.lostFiles': { count: number; path: string | number }

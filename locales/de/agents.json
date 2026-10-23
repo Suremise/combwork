@@ -310,7 +310,6 @@
   "agents.settings.appliesNext": "Änderungen gelten ab dem nächsten Start von {agent}; die laufende Sitzung behält bis dahin ihre Einstellungen.",
   "agents.settings.note": "Notiz",
   "agents.settings.noteNone": "Optional: wofür er da ist, in deinen Worten",
-  "agents.settings.ownWorktree": "Eigener Worktree",
   "agents.settings.save": "Speichern",
   "agents.settings.saving": "Wird gespeichert…",
   "agents.settings.stopToChange": "– zum Ändern {agent} stoppen",

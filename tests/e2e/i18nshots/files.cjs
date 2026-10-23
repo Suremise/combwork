@@ -37,7 +37,7 @@ function seedFiles(ctx) {
   fs.mkdirSync(path.join(dir, 'src'), { recursive: true })
   fs.writeFileSync(path.join(dir, 'README.md'), '# Alpha\n\nA project for the screenshots.\n')
   fs.writeFileSync(path.join(dir, 'src', 'app.ts'), 'export const app = 1\n')
-  const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: dir, env: ctx.lib.baseEnv(), stdio: 'pipe' })
+  const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: dir, env: ctx.lib.gitEnv(), stdio: 'pipe' })
   if (!fs.existsSync(path.join(dir, '.git'))) git('init', '-q')
   git('add', 'README.md', 'src/app.ts')
   git('commit', '-qm', 'init')

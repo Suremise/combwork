@@ -1,4 +1,52 @@
 {
+  "assistant.hiveTemplates.pair": {
+    "defaultMessage": "Pair",
+    "description": "Name of one of Hive's own agent templates: a builder and a reviewer. Like the preset Pair."
+  },
+  "assistant.hiveTemplates.pairOne": {
+    "defaultMessage": "Pair: one provider",
+    "description": "Name of one of Hive's own agent templates: a builder and a reviewer on the same coding agent (provider: Claude Code, Codex…)."
+  },
+  "assistant.hiveTemplates.pairOneText": {
+    "defaultMessage": "A builder and a reviewer, both Claude Code: for when only one coding agent is installed.",
+    "description": "Description of Hive's template Pair: one provider (glossary: builder, reviewer)."
+  },
+  "assistant.hiveTemplates.pairText": {
+    "defaultMessage": "A builder (Claude Code) and a reviewer (Codex) that reviews its cards.",
+    "description": "Description of Hive's template Pair (glossary: builder, reviewer)."
+  },
+  "assistant.hiveTemplates.solo": {
+    "defaultMessage": "Solo",
+    "description": "Name of one of Hive's own agent templates: one builder (glossary: builder). Like the preset Solo."
+  },
+  "assistant.hiveTemplates.soloText": {
+    "defaultMessage": "One builder (Claude Code), working alone.",
+    "description": "Description of Hive's template Solo (glossary: builder)."
+  },
+  "assistant.hiveTemplates.team3": {
+    "defaultMessage": "Team 3×3",
+    "description": "Name of one of Hive's own agent templates: three builders and three reviewers. Keep 3×3."
+  },
+  "assistant.hiveTemplates.team3Text": {
+    "defaultMessage": "Three builders (Claude Code), each with its own reviewer (Codex).",
+    "description": "Description of Hive's template Team 3×3 (glossary: builder, reviewer)."
+  },
+  "assistant.hiveTemplates.team6": {
+    "defaultMessage": "Team 6×6",
+    "description": "Name of one of Hive's own agent templates: six builders and six reviewers. Keep 6×6."
+  },
+  "assistant.hiveTemplates.team6Pool": {
+    "defaultMessage": "Team 6 + pool",
+    "description": "Name of one of Hive's own agent templates: six builders and a shared pool of reviewers."
+  },
+  "assistant.hiveTemplates.team6PoolText": {
+    "defaultMessage": "Six builders (Claude Code) and two reviewers (Codex) shared by all of them.",
+    "description": "Description of Hive's template Team 6 + pool (glossary: builder, reviewer)."
+  },
+  "assistant.hiveTemplates.team6Text": {
+    "defaultMessage": "Six builders (Claude Code, medium effort), each with its own reviewer (Codex), on two pages.",
+    "description": "Description of Hive's template Team 6×6 (glossary: builder, reviewer, effort)."
+  },
   "assistant.journal.allKinds": {
     "defaultMessage": "All kinds",
     "description": "The journal browser's kind filter: every kind of entry."
@@ -335,6 +383,10 @@
     "defaultMessage": "Agent names are unique across the workspace: change the marked names first.",
     "description": "Load template: why its button can't be used yet."
   },
+  "assistant.loadNames.filledNote": {
+    "defaultMessage": "Agent names are unique across the workspace, and {projects} already {count, plural, one {has an agent} other {has agents}} called {names}: {count, plural, one {a free name is} other {free names are}} filled in below. Change any name you like.",
+    "description": "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them."
+  },
   "assistant.loadNames.sameTwice": {
     "defaultMessage": "Another of its agents has this name.",
     "description": "Load template, under a name box: another of the template's agents is given the same name."
@@ -342,10 +394,6 @@
   "assistant.loadNames.taken": {
     "defaultMessage": "{project} has an agent called {name}.",
     "description": "Load template, under a name box: an agent of another project has that name."
-  },
-  "assistant.loadNames.takenNote": {
-    "defaultMessage": "Agent names are unique across the workspace, and {projects} already {count, plural, one {has an agent} other {has agents}} called {names}: give {count, plural, one {it} other {them}} other names below.",
-    "description": "Load template, above the plan: some of the template's names are taken. {projects} lists the projects, {names} the names; {count} is how many names."
   },
   "assistant.mcpSecret.argument": {
     "defaultMessage": "An argument starting \"{start}…\" looks like a literal secret.",
@@ -1743,17 +1791,33 @@
     "defaultMessage": "Its name is missing or longer than {max} characters.",
     "description": "Why a template file can't be used: the template's name."
   },
+  "assistant.template.badPairs": {
+    "defaultMessage": "Its pairs of builders and reviewers name agents it doesn’t have, or an agent twice.",
+    "description": "Why a template file can't be used: its list of builders paired with reviewers (glossary: builder, reviewer) doesn't match its agents."
+  },
   "assistant.template.badProvider": {
     "defaultMessage": "{name}'s coding agent isn't one Hive can use ({given, select, yes {{provider}} other {none}}).",
     "description": "Why a template file can't be used: an agent's coding agent (Claude Code, Codex…) is no id Hive could know. {name} is the agent; {provider} what the file says; none when it says nothing."
+  },
+  "assistant.template.badRole": {
+    "defaultMessage": "{name}'s role in the workflow isn't builder, reviewer or either.",
+    "description": "Why a template file can't be used: an agent's role in the workflow (glossary: builder, reviewer, either) is none of the three. Keep builder, reviewer and either as they are (the file's values)."
   },
   "assistant.template.badSetting": {
     "defaultMessage": "{name}'s {setting, select, model {model} effort {effort} other {permissionMode}} isn't one Hive can use.",
     "description": "Why a template file can't be used: an agent's model, effort or permission mode is no value a coding agent takes. Keep permissionMode as it is (the file's field)."
   },
-  "assistant.template.longRole": {
-    "defaultMessage": "{name}'s role is over {max} characters.",
-    "description": "Why a template file can't be used: an agent's role is too long."
+  "assistant.template.badToken": {
+    "defaultMessage": "{name} uses {token}: an agent’s name may only hold '{key}' (the project’s key) and '{n}' (its number among the agents with that name).",
+    "description": "Why a template file can't be used: an agent's name pattern ({name}) holds {token}, a token Hive doesn't know. The quoted '{key}' and '{n}' are shown as {key} and {n}: keep them, with their straight quotes, as they are."
+  },
+  "assistant.template.from09": {
+    "defaultMessage": "This template is from Hive 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.",
+    "description": "Why a template file can't be used: Hive 0.9 made it (its agents had worktrees of their own; 1.0's don't). Save as Template is a command: as Hive names it."
+  },
+  "assistant.template.longNote": {
+    "defaultMessage": "{name}'s note is over {max} characters.",
+    "description": "Why a template file can't be used: an agent's note (what it is for, in the user's words) is too long."
   },
   "assistant.template.newer": {
     "defaultMessage": "It was made by a newer version of Hive: update Hive to use it.",
@@ -1787,10 +1851,6 @@
     "defaultMessage": "{removed, select, yes {Their conversations stay in the Sessions tab, and their open cards go back (Active ones to Todo). The layout becomes the template's.} other {The layout becomes the template's.}}",
     "description": "Load template, the last note: what happens to the agents that go (when some do) and to the project's layout. Sessions, Active and Todo as Hive names them."
   },
-  "assistant.templateLoad.branchKeptTitle": {
-    "defaultMessage": "{count, plural, one {An old worktree's branch was kept} other {# old worktrees' branches were kept}}",
-    "description": "After loading a template: old worktrees whose folder went but whose branch stayed."
-  },
   "assistant.templateLoad.createdHeading": {
     "defaultMessage": "Created:",
     "description": "Load template's confirmation, as text: the heading over the template's agents."
@@ -1799,45 +1859,17 @@
     "defaultMessage": "{name}{hasRole, select, yes { — {role}} other {}}{replaces, select, yes { (new)} other {}}: {provider}, {settings}",
     "description": "Load template's confirmation, as text: an agent the template brings, after a bullet: its role, (new) when it replaces an agent of the same name, its coding agent ({provider}) and its model · effort · mode ({settings})."
   },
-  "assistant.templateLoad.folderOnly": {
-    "defaultMessage": "{branch}: its folder was removed, but the branch was kept{hasWhy, select, yes { ({why})} other {}}.",
-    "description": "After loading a template, a line of the details: an old worktree whose branch stayed, and why."
-  },
   "assistant.templateLoad.isDefault": {
     "defaultMessage": "{setting} (default)",
     "description": "A new agent's model, effort or mode that the template leaves to the project's or Hive's defaults: {setting} is what it comes to here (\"Opus 5.5\", \"High\")."
-  },
-  "assistant.templateLoad.keptLine": {
-    "defaultMessage": "{branch}: kept{hasWhy, select, yes { ({why})} other {}}.",
-    "description": "After loading a template, a line of the details: an old worktree that stayed, and why."
-  },
-  "assistant.templateLoad.keptTitle": {
-    "defaultMessage": "{count, plural, one {An old worktree was kept} other {# old worktrees were kept}}",
-    "description": "After loading a template: some old worktrees you chose to remove couldn't be."
-  },
-  "assistant.templateLoad.newLine": {
-    "defaultMessage": "own worktree on {branch} (from {base}) in {path}{hasNote, select, yes { ({note})} other {}}",
-    "description": "Load template's confirmation, as text, under a new agent: its own new worktree, on branch {branch} made from {base}, in folder {path}."
-  },
-  "assistant.templateLoad.newWhy": {
-    "defaultMessage": "new: {why}",
-    "description": "Load template, after a new agent's worktree: why it gets a new one rather than the old one of its name ({why}: \"hive/claude has 1 uncommitted file\")."
   },
   "assistant.templateLoad.oldKept": {
     "defaultMessage": "its worktree and branch {branch} stay{hasWhy, select, yes {: {why}} other {}}",
     "description": "Load template, beside an agent that goes: its worktree is kept. {why} says why (\"2 commits not merged into main\"). Lower case: it follows the agent's name in brackets."
   },
-  "assistant.templateLoad.oldRemovable": {
-    "defaultMessage": "its worktree and branch {branch}, merged into {known, select, yes {{into}} other {the main branch}} and clean, stay unless you tick below",
-    "description": "Load template, beside an agent that goes: its worktree could be removed (a tick box below the list). {into} is the branch its work is merged into. Lower case: it follows the agent's name in brackets."
-  },
-  "assistant.templateLoad.oldReused": {
-    "defaultMessage": "its worktree on {branch} goes on with the new {name}",
-    "description": "Load template, beside an agent that goes: a new agent of the same name ({name}) works in its worktree (on branch {branch}) again. Lower case: it follows the agent's name in brackets."
-  },
-  "assistant.templateLoad.ownLine": {
-    "defaultMessage": "own worktree",
-    "description": "Load template's confirmation, as text, under a new agent: it works in a worktree of its own."
+  "assistant.templateLoad.pairedWith": {
+    "defaultMessage": "with {name}",
+    "description": "Load template, under an agent's role: the agent it is paired with ({name}): a builder's reviewer, or a reviewer's builder. Lower case."
   },
   "assistant.templateLoad.removedHeading": {
     "defaultMessage": "Removed:",
@@ -1847,25 +1879,13 @@
     "defaultMessage": "{name}{hasNote, select, yes { ({note})} other {}}{replaced, select, yes {: replaced by a new agent with the same name} other {}}",
     "description": "Load template's confirmation, as text: an agent that goes, after a bullet. {note} is what happens to its worktree."
   },
-  "assistant.templateLoad.removedWith": {
-    "defaultMessage": "Removed with {count, plural, one {its branch} other {their branches}}: {branches}.",
-    "description": "After loading a template, a line of the details: the worktrees that went whole, by branch."
+  "assistant.templateLoad.roleLine": {
+    "defaultMessage": "{role}{paired, select, yes {, with {name}} other {}}",
+    "description": "Load template's confirmation, as text: an agent's role in the workflow ({role}: Builder, Reviewer, Either) and the agent it is paired with ({name})."
   },
-  "assistant.templateLoad.reuseLine": {
-    "defaultMessage": "reuses its worktree on {branch} in {path} (clean; its branch is left as it is)",
-    "description": "Load template's confirmation, as text, under a new agent: it works in an old worktree again."
-  },
-  "assistant.templateLoad.setup": {
-    "defaultMessage": "Each new worktree runs the project's setup command ({command}) before its agent first starts.",
-    "description": "Load template, a note under the list: {command} is the project's setup command (\"npm install\")."
-  },
-  "assistant.templateLoad.wholeDetail": {
-    "defaultMessage": "{branches}, with {count, plural, one {its branch} other {their branches}}: merged and clean.",
-    "description": "After loading a template: {branches} lists the removed worktrees by branch."
-  },
-  "assistant.templateLoad.wholeTitle": {
-    "defaultMessage": "Removed {count, plural, one {an old worktree} other {# old worktrees}}",
-    "description": "After loading a template: the old worktrees you chose to remove went, with their branches."
+  "assistant.templateLoad.swapped": {
+    "defaultMessage": "{problem, select, off {{from} is turned off (Settings → Providers): {to} instead.} other {{from} isn’t installed: {to} instead.}}",
+    "description": "Load template, on the row of an agent of one of Hive's own templates: the coding agent the template gives it ({from}, \"Codex\") can't run here, so it gets another ({to}, \"Claude Code\"). {problem} is why: off (turned off in Settings → Providers) or not installed."
   },
   "assistant.templatePlan.agent": {
     "defaultMessage": "Agent",
@@ -1883,10 +1903,6 @@
     "defaultMessage": "Effort",
     "description": "Load template's table: a column (the model's reasoning effort)."
   },
-  "assistant.templatePlan.folder": {
-    "defaultMessage": "project folder",
-    "description": "Load template's table, Where: the agent works in the project's folder."
-  },
   "assistant.templatePlan.fromTip": {
     "defaultMessage": "Its name in the template",
     "description": "Load template's table: tooltip on an agent's name as the template has it, beside the box for its new name."
@@ -1903,29 +1919,13 @@
     "defaultMessage": "Name of agent {n}",
     "description": "Load template's table: the accessible name of the box for agent number {n}'s name."
   },
-  "assistant.templatePlan.newTip": {
-    "defaultMessage": "A new worktree in {path}, from {base}",
-    "description": "Load template's table: tooltip on a new worktree ({path}: its folder; {base}: the branch it starts from)."
-  },
   "assistant.templatePlan.noteSentence": {
     "defaultMessage": "{note}.",
     "description": "Load template, under an agent that goes: what happens to its worktree ({note}), as a sentence (its first letter made a capital). Use your language's full stop."
   },
-  "assistant.templatePlan.ownOn": {
-    "defaultMessage": "own worktree {branch}",
-    "description": "Load template's table, Where: the agent's new worktree, on branch {branch}."
-  },
-  "assistant.templatePlan.ownWorktree": {
-    "defaultMessage": "own worktree",
-    "description": "Load template's table, Where: the agent gets a worktree of its own."
-  },
-  "assistant.templatePlan.reuseTip": {
-    "defaultMessage": "Works in its worktree again: {path} (clean; its branch is left as it is)",
-    "description": "Load template's table: tooltip on a worktree worked in again ({path}: its folder)."
-  },
-  "assistant.templatePlan.reuses": {
-    "defaultMessage": "reuses {branch}",
-    "description": "Load template's table, Where: the agent works in an old worktree again, on branch {branch}."
+  "assistant.templatePlan.role": {
+    "defaultMessage": "Role",
+    "description": "Load template's table: the column of each agent's role in the workflow (Builder, Reviewer, Either; glossary: workflow role)."
   },
   "assistant.templatePlan.state": {
     "defaultMessage": "Change",
@@ -1954,10 +1954,6 @@
   "assistant.templatePlan.stateReplacedTip": {
     "defaultMessage": "A new agent with these settings replaces the agent of the same name.",
     "description": "Load template's table: tooltip on replaced."
-  },
-  "assistant.templatePlan.where": {
-    "defaultMessage": "Where",
-    "description": "Load template's table: a column (the folder or worktree each agent works in)."
   },
   "assistant.templatePlan.withNote": {
     "defaultMessage": "{thing} <faint>{note}</faint>",
@@ -2062,10 +2058,6 @@
   "assistant.templates.colRole": {
     "defaultMessage": "Role",
     "description": "A template's table: each agent's role."
-  },
-  "assistant.templates.colWorksIn": {
-    "defaultMessage": "Works in",
-    "description": "A template's table: where each agent works."
   },
   "assistant.templates.context200k": {
     "defaultMessage": "200K context",
@@ -2196,7 +2188,7 @@
     "description": "A notice after a template was saved as a file; the file's path follows."
   },
   "assistant.templates.exportedDetail": {
-    "defaultMessage": "It holds the agents' settings and roles and the layout: no paths, sessions or names. Import it into any Hive.",
+    "defaultMessage": "It holds the agents' roles, notes and settings and the layout: no paths, sessions or names of people. Import it into any Hive.",
     "description": "Under Template exported, after the file's path."
   },
   "assistant.templates.fullTip": {
@@ -2206,6 +2198,14 @@
   "assistant.templates.gone": {
     "defaultMessage": "That template is no longer there.",
     "description": "The Templates view: the selected template was deleted or moved."
+  },
+  "assistant.templates.hive": {
+    "defaultMessage": "Hive",
+    "description": "A badge, a group and a filter: Hive's own templates (#1436, shipped with Hive, read-only)."
+  },
+  "assistant.templates.hiveSummary": {
+    "defaultMessage": "{count, plural, one {# agent} other {# agents}}, {layout}. One of Hive's own templates: read-only. <b>Duplicate…</b> copies it into the workspace or a project to change it.",
+    "description": "Over one of Hive's own templates' agents: how many, its layout (\"two columns layout\"). <b> is bold; Duplicate… is the button."
   },
   "assistant.templates.import": {
     "defaultMessage": "Import",
@@ -2289,7 +2289,7 @@
   },
   "assistant.templates.mcpServers": {
     "defaultMessage": "MCP servers: {servers}",
-    "description": "A template's table, under Works in: the MCP servers an agent chose."
+    "description": "A template's table, under an agent's coding agent: the MCP servers it chose."
   },
   "assistant.templates.moveDown": {
     "defaultMessage": "Move {name} down",
@@ -2335,6 +2335,10 @@
     "defaultMessage": "No workspace templates.",
     "description": "Under Workspace, when the workspace has no templates."
   },
+  "assistant.templates.noneHive": {
+    "defaultMessage": "Hive's own templates couldn't be listed.",
+    "description": "The Templates view, under Hive, when none of Hive's own templates is listed (shouldn't happen)."
+  },
   "assistant.templates.noneOfItsOwn": {
     "defaultMessage": "No templates of its own.",
     "description": "The Templates view, under a project with no templates."
@@ -2347,9 +2351,9 @@
     "defaultMessage": "Not saved",
     "description": "A badge on a template open in its editor with unsaved changes."
   },
-  "assistant.templates.ownWorktree": {
-    "defaultMessage": "Its own worktree",
-    "description": "A template's table, Works in: the agent gets a worktree of its own."
+  "assistant.templates.pairedWith": {
+    "defaultMessage": "with {name}",
+    "description": "A template's table, under an agent's role: the agent it is paired with ({name}). Lower case."
   },
   "assistant.templates.panelHint": {
     "defaultMessage": "Save a project's agents as a template from its Session tab (<b>Save Template…</b>). Export one to share it; Import brings one in.",
@@ -2362,10 +2366,6 @@
   "assistant.templates.project": {
     "defaultMessage": "Project",
     "description": "Load into Project: the label of the list of projects."
-  },
-  "assistant.templates.projectFolder": {
-    "defaultMessage": "The project folder",
-    "description": "A template's table, Works in: the agent works in the project's folder."
   },
   "assistant.templates.refresh": {
     "defaultMessage": "Refresh",
@@ -2398,10 +2398,6 @@
   "assistant.templates.replace": {
     "defaultMessage": "Replace",
     "description": "Import, a template of that name is there: replace it."
-  },
-  "assistant.templates.review": {
-    "defaultMessage": "Review",
-    "description": "A button on the notice of unused worktrees left by a deleted template's agents: opens the list."
   },
   "assistant.templates.rowDesc": {
     "defaultMessage": "{count, plural, one {# agent} other {# agents}} · {layout} layout",
@@ -2439,6 +2435,10 @@
     "defaultMessage": "\"{name}\" was saved again since you started editing it, so these changes can't be saved over it.",
     "description": "The template editor, when the template was saved elsewhere meanwhile."
   },
+  "assistant.templates.suggests": {
+    "defaultMessage": "Suggests the {preset} preset: loading it offers to switch the project’s workflow options to it.{pool, select, yes { Its reviewers are a pool shared by every builder.} other {}}",
+    "description": "Over a template's agents: the workflow preset it suggests ({preset}: Solo, Pair, Team); pool when its reviewers are shared by all builders rather than one per lane. Glossary: preset, workflow, reviewer, builder, lane."
+  },
   "assistant.templates.summary": {
     "defaultMessage": "{count, plural, one {# agent} other {# agents}}, {layout}{hasSaved, select, yes {, saved {when}} other {}}. Kept in {scope, select, workspace {the workspace, for every project} other {{project}, for that project only}}. Change it with <b>Edit…</b>, or save a project's agents again under the same name.",
     "description": "Over a template's agents: how many, its layout (\"two columns layout\"), when it was saved ({when}: \"3 days ago\"), and where it is kept. <b> is bold; Edit… is the button."
@@ -2456,8 +2456,8 @@
     "description": "Where to keep a template: a project, in a list."
   },
   "assistant.templates.tip": {
-    "defaultMessage": "A template is a project's agents (settings and roles) and layout, saved under a name: the workspace's are for every project, a project's are its own (kept in its .hive, out of git). Export one to share it as a file.",
-    "description": "Tooltip on Templates (the Templates view and a project's Templates tab). Keep .hive as it is."
+    "defaultMessage": "A template is a project's agents (their roles in the workflow and settings) and layout, saved under a name. Hive's own are read-only: duplicate one to change it. The workspace's are for every project, a project's are its own (kept in its .hive, out of git). Export one to share it as a file.",
+    "description": "Tooltip on Templates (the Templates view and a project's Templates tab). Keep .hive as it is. Glossary: workflow role."
   },
   "assistant.templates.title": {
     "defaultMessage": "Templates",

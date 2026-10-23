@@ -21,7 +21,7 @@ w('src/app.ts', 'export const a = 1\n')
 w('src/util.ts', 'export const b = 2\n')
 w('.gitignore', 'dist/\n')
 w('dist/out.js', 'x')
-execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm init', { cwd: proj })
+execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm init', { cwd: proj, env: lib.gitEnv() })
 w('src/app.ts', 'export const a = 2\n') // modified
 w('src/new.ts', 'new\n') // untracked
 // Fake session attachments: one live-ish group, one archived. Written where Hive kept them before #387, .hive/images,

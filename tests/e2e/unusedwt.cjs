@@ -4,9 +4,8 @@
 // plain Remove, offers Give to an agent… (Add Agent on Existing worktree, that one chosen) and Remove anyway… (a danger
 // confirm naming what goes), and Open shows its changes like an agent's worktree, with Merge (the Merge dialog). The
 // Overview has one line linking there; Changes' project folder says so only while one holds work; Storage has a line
-// for them; the Agent API's project status counts them for the Assistant (no way to remove them). Deleting a template
-// whose worktree agents left worktrees says so once. Without git, nothing is removed. Then one is merged from Changes and
-// removed after (its commit on the main branch, its folder and branch gone). A throwaway repository with worktree agents
+// for them; the Agent API's project status counts them for the Assistant (no way to remove them). Without git, nothing is
+// removed. Then one is merged from Changes and removed after (its commit on the main branch, its folder and branch gone). A throwaway repository with worktree agents
 // added through Hive (not started), fake Claude Code configured, throwaway profile and workspace, quiet.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -66,7 +65,6 @@ function pathWithoutGit() {
   fs.writeFileSync(path.join(ahead.worktree.path, 'work.txt'), 'work\n')
   lib.git(ahead.worktree.path, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'add', '-A'])
   lib.git(ahead.worktree.path, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'Unmerged work'])
-  await inv('templates:save', repo, 'workspace', 'Trio', false)
   check('three worktree agents, and none unused yet', (await inv('worktrees:unused', repo)).worktrees.length === 0)
 
   // --- Remove Merged from its tab, keeping its worktree: one notice, with Review.
@@ -279,19 +277,8 @@ function pathWithoutGit() {
   await lib.sleep(500)
   check('…and the Changes notice', (await notice.count()) === 0)
 
-  // --- Deleting the template whose worktree agent left one: said once.
+  // Claudette removed keeping its worktree: the unused one the steps below use.
   await inv('agents:remove', repo, claudette.id, { deleteWorktree: false })
-  await page.keyboard.press('Control+Shift+P')
-  await page.locator('.palette input').fill('Show Templates')
-  await page.keyboard.press('Enter')
-  await page.locator('.sidebar .template-row[aria-label="Trio"]').click()
-  await page.locator('.main-area > .tab-body .template-detail [aria-label="Delete template"]').click()
-  await page.locator('.dialog', { hasText: 'Delete "Trio"?' }).getByRole('button', { name: 'Delete' }).click()
-  const hint = /1 unused worktree in repo/
-  check('deleting the template says its worktree agents left one, once', !!(await lib.until(async () => (await toasts(hint)) === 1, 10000)), (await page.locator('.toast').allInnerTexts()).join(' | '))
-  check('…and touches no worktree', fs.existsSync(claudette.worktree.path))
-  await lib.sleep(500)
-  check('…once only', (await toasts(hint)) === 1)
   await app.close()
 
   // --- Without git: nothing is removed.

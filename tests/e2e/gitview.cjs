@@ -31,7 +31,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   for (const d of [userData, ws, remote, other, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   // The suite's own global git config: a personal address, as most users have (the GitHub warning's case).
   fs.writeFileSync(globalConfig, '[user]\n\tname = Test User\n\temail = test.user@example.com\n[init]\n\tdefaultBranch = main\n[core]\n\tautocrlf = false\n')
-  const gitEnv = { ...lib.baseEnv(), GIT_CONFIG_GLOBAL: globalConfig }
+  const gitEnv = lib.gitEnv({ GIT_CONFIG_GLOBAL: globalConfig })
   const g = (cwd, ...a) => execFileSync('git', a, { cwd, env: gitEnv, encoding: 'utf8' }).trim()
   fs.mkdirSync(alpha, { recursive: true })
   fs.mkdirSync(path.join(ws, 'beta'), { recursive: true })

@@ -477,8 +477,6 @@
   "workspace.unused.commitsNoBranch": "{count, plural, other {# 个提交}}不在任何分支上",
   "workspace.unused.commitsNotOn": "{count, plural, other {# 个提交}}不在{known, select, yes { {into} } other {主分支}}上",
   "workspace.unused.detached": "（detached）",
-  "workspace.unused.hintDetail": "模板中使用工作树的智能体曾在其中工作。删除模板时它们保持原样：请在“更改”中查看。",
-  "workspace.unused.hintTitle": "{many, select, yes {{projects, plural, other {# 个项目}}} other {{project}}} 中有 {count, plural, other {# 个未使用的工作树}}",
   "workspace.unused.lostCommits": "{branch} 上有 {count, plural, other {# 个提交}}不在{known, select, yes { {into} } other {任何其他分支}}上",
   "workspace.unused.lostDetached": "{count, plural, other {# 个不在任何分支上的提交（只有它的 detached HEAD 有）}}",
   "workspace.unused.lostFiles": "{path} 中的 {count, plural, other {# 个未提交的文件}}",

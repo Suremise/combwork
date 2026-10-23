@@ -2904,6 +2904,13 @@ p.hint {
   width: 12px;
   height: 12px;
 }
+/* The agent an agent is paired with (#1436): a name like HI-R1 kept whole. A setting's name too (#1440): "Opus 5.5" and
+   its "(default)" each whole, wrapping only between them (two lines at most, never three). */
+.template-plan-role [data-paired-with],
+.template-plan-setting,
+.template-plan-default {
+  white-space: nowrap;
+}
 .template-plan-default {
   font-size: 11px;
 }
@@ -2920,8 +2927,13 @@ p.hint {
   vertical-align: middle;
 }
 .template-plan-name-input {
-  width: 140px;
+  width: 120px;
   font-weight: 600;
+}
+/* The dialog naming a template's agents (#1440): wider, so every column shows in German and Polish without scrolling
+   sideways (narrower windows still cap it). */
+.dialog.wide:has(.template-plan-name-input) {
+  width: 880px;
 }
 .template-plan-note {
   margin: 8px 0 0;

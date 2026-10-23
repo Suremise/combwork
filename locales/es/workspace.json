@@ -477,8 +477,6 @@
   "workspace.unused.commitsNoBranch": "{count, plural, one {# commit} many {# commits} other {# commits}} sin rama",
   "workspace.unused.commitsNotOn": "{count, plural, one {# commit que no está} many {# commits que no están} other {# commits que no están}} en {known, select, yes {{into}} other {la rama principal}}",
   "workspace.unused.detached": "(desacoplado)",
-  "workspace.unused.hintDetail": "Los agentes con worktree de la plantilla trabajaban en ellos. Al eliminar la plantilla se dejaron como estaban: revísalos en Cambios.",
-  "workspace.unused.hintTitle": "{count, plural, one {# worktree sin usar} many {# worktrees sin usar} other {# worktrees sin usar}} en {many, select, yes {{projects, plural, one {# proyecto} many {# proyectos} other {# proyectos}}} other {{project}}}",
   "workspace.unused.lostCommits": "{count, plural, one {# commit en {branch} que no está} many {# commits en {branch} que no están} other {# commits en {branch} que no están}} en {known, select, yes {{into}} other {ninguna otra rama}}",
   "workspace.unused.lostDetached": "{count, plural, one {# commit sin rama (solo lo tiene su HEAD desacoplado)} many {# commits sin rama (solo los tiene su HEAD desacoplado)} other {# commits sin rama (solo los tiene su HEAD desacoplado)}}",
   "workspace.unused.lostFiles": "{count, plural, one {# archivo sin commit} many {# archivos sin commit} other {# archivos sin commit}} en {path}",

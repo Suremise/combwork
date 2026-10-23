@@ -275,10 +275,6 @@
     "defaultMessage": "• {item}",
     "description": "A line of a list of reasons: a bullet, then the reason {item}."
   },
-  "content.templates.cantCheck": {
-    "defaultMessage": "Hive couldn't check {branch} ({error})",
-    "description": "Why a template's agent gets a new worktree: git couldn't read the state of the one of its name, on {branch}; {error} is why (often git's own words)."
-  },
   "content.templates.cantLoad": {
     "defaultMessage": "The template can't be loaded yet:",
     "description": "An error loading a template, above the list of what stops it (each line a reason)."
@@ -299,10 +295,6 @@
     "defaultMessage": "Hive couldn't check {agent}'s worktree ({folder}): {error}",
     "description": "Why a template can't be loaded: git couldn't tell whether the worktree {folder} of the agent {agent} it would remove has uncommitted work; {error} is why (often git's own words)."
   },
-  "content.templates.dirty": {
-    "defaultMessage": "{branch} has {n, plural, one {# uncommitted file} other {# uncommitted files}}",
-    "description": "Why a template's agent gets a new worktree: the one of its name, on {branch}, has work not committed. A clause."
-  },
   "content.templates.editedMeanwhile": {
     "defaultMessage": "\"{name}\" changed since you started editing it (saved again meanwhile): nothing was saved. Close the editor to see it as it is now.",
     "description": "An error saving an edited template: it was saved again elsewhere after the editor opened it."
@@ -319,13 +311,13 @@
     "defaultMessage": "A template is being loaded into this project",
     "description": "Why an agent can't start (followed by \", so its agents can't start now.\"): a template is replacing the project's agents. A sentence without its full stop."
   },
-  "content.templates.gitBroken": {
-    "defaultMessage": "{problem}, so its worktree {count, plural, one {agent} other {agents}} ({names}) can't have worktrees of their own: fix git (Agent Setup), or edit the template to put them in the project folder.",
-    "description": "Why a template can't be loaded: git can't run ({problem}: \"Git isn't installed (or isn't on Hive's PATH)\"), so its {count} agents with worktrees of their own ({names}) can't have them. Agent Setup is a Help window."
-  },
   "content.templates.gone": {
     "defaultMessage": "That template is no longer there.",
     "description": "An error: the template was deleted or renamed meanwhile."
+  },
+  "content.templates.hiveOnly": {
+    "defaultMessage": "Hive's own templates can't be changed: duplicate one into the workspace or a project to change it.",
+    "description": "An error: saving, renaming, editing, importing into or deleting one of Hive's own templates (the Hive scope, read-only). Duplicate is a button: as Hive names it."
   },
   "content.templates.importNotJson": {
     "defaultMessage": "It isn't a Hive agent template (not JSON).",
@@ -334,14 +326,6 @@
   "content.templates.importTooLarge": {
     "defaultMessage": "It isn't a Hive agent template (over {kb} KB).",
     "description": "An error importing a template: the file is larger than {kb} KB, more than any template."
-  },
-  "content.templates.inUse": {
-    "defaultMessage": "another agent works in {branch}'s worktree",
-    "description": "Why a template's agent gets a new worktree: another agent works in the one of its name, on {branch}. A clause, lower case."
-  },
-  "content.templates.inUseNow": {
-    "defaultMessage": "an agent works in it now",
-    "description": "Why a worktree the user chose to remove with a template's load was kept: one of the new agents works in it. A clause, lower case."
   },
   "content.templates.loading": {
     "defaultMessage": "A template is already being loaded into this project.",
@@ -379,61 +363,37 @@
     "defaultMessage": "This project has no agents to save.",
     "description": "An error saving a project's agents as a template: it has none."
   },
-  "content.templates.noBranch": {
-    "defaultMessage": "its worktree is on no branch, not {branch}",
-    "description": "Why a template's agent gets a new worktree: the one of its name has no branch checked out (a detached HEAD), not its own {branch}. A clause, lower case."
-  },
   "content.templates.noFile": {
     "defaultMessage": "That file isn't there.",
     "description": "An error importing a template: the file chosen is gone."
+  },
+  "content.templates.noKey": {
+    "defaultMessage": "Hive couldn't read {project}'s key, and this template's agent names are made from it. Try again, or check the key in Project Settings → Agents & Worktrees.",
+    "description": "An error loading a template, or adding one of its agents, whose names hold the project's key (HI-B1 in a project whose key is HI): the key of the project ({project}, its name) couldn't be read. Project Settings → Agents & Worktrees is where the key is changed: use its translation."
+  },
+  "content.templates.noKeySave": {
+    "defaultMessage": "Hive couldn't read {project}'s key, so the names can't be saved with it. Try again, or save without Use the project key in names.",
+    "description": "An error saving a project's agents as a template with \"Use the project key in names\" ticked: the key of the project ({project}, its name) couldn't be read. \"Use the project key in names\" is the tick box's label: use its translation."
   },
   "content.templates.noWorkspace": {
     "defaultMessage": "Open a workspace first.",
     "description": "An error: the workspace's templates need a workspace open."
   },
-  "content.templates.notChecked": {
-    "defaultMessage": "not checked",
-    "description": "Why a worktree the template's load would leave can't be removed with it: Hive couldn't check it. A clause, lower case."
-  },
-  "content.templates.notListed": {
-    "defaultMessage": "git doesn't list {folder} as a worktree any more",
-    "description": "Why a template's agent gets a new worktree, not the one of its name: git no longer lists that folder as a worktree. A clause, lower case."
-  },
-  "content.templates.notOnBranch": {
-    "defaultMessage": "{project} isn't on a branch (a detached HEAD, or no commit yet), so its worktree {count, plural, one {agent} other {agents}} ({names}) have nothing to branch from. Check out a branch or make a first commit, or edit the template to put them in the project folder.",
-    "description": "Why a template can't be loaded into the project {project}: it has no branch checked out, so the template's {count} agents with worktrees of their own ({names}) have no branch to start theirs from."
-  },
-  "content.templates.notRepo": {
-    "defaultMessage": "{project} isn't a git repository, so its worktree {count, plural, one {agent} other {agents}} ({names}) can't have worktrees of their own. Make it a repository with a first commit, or edit the template to put them in the project folder.",
-    "description": "Why a template can't be loaded into the project {project}: it isn't a git repository, so the template's {count} agents with worktrees of their own ({names}) can't have them."
-  },
   "content.templates.nothing": {
     "defaultMessage": "{problem} Nothing was changed.",
     "description": "An error loading a template, nothing changed: {problem} is why, a sentence of its own (how many agents a project can have)."
   },
-  "content.templates.otherBranch": {
-    "defaultMessage": "its worktree is on {current}, not {branch}",
-    "description": "Why a template's agent gets a new worktree: the one of its name has another branch checked out ({current}) than its own ({branch}). A clause, lower case."
-  },
   "content.templates.provider": {
     "defaultMessage": "{problem, select, unknown {This Hive doesn't know the coding agent \"{provider}\" (update Hive)} off {{provider} is turned off (Settings → Providers)} other {{provider} isn't installed (Agent Setup)}}",
     "description": "Why a template can't be loaded: a coding agent CLI it needs. {problem} is why: unknown ({provider} is the id the template gives, which this version of Hive doesn't know), off (turned off in Settings → Providers), or not installed (Agent Setup is a Help window). {provider} is otherwise its name (\"Codex\")."
-  },
-  "content.templates.removing": {
-    "defaultMessage": "A worktree it would work in again is being removed, or was just removed: nothing was changed. Open the template again.",
-    "description": "An error loading a template: a worktree one of its agents would work in again was removed while it loaded, so nothing changed."
   },
   "content.templates.running": {
     "defaultMessage": "{agent} is running or starting: stop it first.",
     "description": "Why a template can't be loaded: the agent {agent} it would replace is running."
   },
   "content.templates.scope": {
-    "defaultMessage": "Unknown scope \"{scope}\": workspace or project.",
-    "description": "An error: where a template is kept must be workspace or project (keep those two words: they are the values to use)."
-  },
-  "content.templates.several": {
-    "defaultMessage": "several clean worktrees could be its ({branches})",
-    "description": "Why a template's agent gets a new worktree: more than one unused worktree made for its name could be its own ({branches}: their branches, listed in the language's way), so Hive takes none. A clause, lower case."
+    "defaultMessage": "Unknown scope \"{scope}\": hive, workspace or project.",
+    "description": "An error: where a template is kept must be hive, workspace or project (keep those three words: they are the values to use)."
   },
   "content.templates.started": {
     "defaultMessage": "An agent started meanwhile: nothing was changed. Stop it first.",

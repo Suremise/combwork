@@ -1243,10 +1243,6 @@
     "defaultMessage": "Optional: what it is for, in your words",
     "description": "Placeholder of an agent's empty note (Agent Settings)."
   },
-  "agents.settings.ownWorktree": {
-    "defaultMessage": "Its own worktree",
-    "description": "A choice of where a template's agent works (Agent Settings): a worktree of its own. Keep it short."
-  },
   "agents.settings.save": {
     "defaultMessage": "Save",
     "description": "Agent Settings' button: saves the agent's settings."
