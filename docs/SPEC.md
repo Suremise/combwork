@@ -2818,7 +2818,10 @@ project's builders (`setBuilderCount`; until #1438 its agents), at least one, at
   lent. With no supervisor nothing runs. An operation is its Hive's from before the write that reserves the slot.
   A workspace closing ends its slots' commands and awaits their operations.
 - **Clean-up** is guarded as above, a process in the folder proved absent by renaming it aside and back; the archive
-  command runs first and a failure keeps the slot; git removes the worktree, never forced. Settings → Advanced,
+  command runs first and a failure keeps the slot; git removes the worktree, never forced. Hive's skill copies in
+  `.agents/skills/hive-*` are git-ignored, so the guards don't count them [#1500]: just before git removes the folder,
+  Hive removes its own unchanged copies (`removeCopiesIn`, `always`), and a `hive-*` folder still there (a copy edited
+  since, or the user's own folder with Hive's prefix) keeps the slot (`editedSkillCopy`, naming the folders). Settings → Advanced,
   **Remove idle slots after a day** (`hive.slots.removeIdle`, on) removes free slots beyond the pool's size unused for
   a day, and failed ones, every hour.
 
@@ -3126,7 +3129,8 @@ repeating them (#533) [note §8].
     made meanwhile keeps the copy (put back, or kept beside it as a conflict copy), and a crash never leaves a
     half-removed copy without its marker. When: the last session in
     the folder ends (not as Hive quits), at a workspace's opening for folders whose sessions are gone, and through
-    `removeCopiesIn` for a lease's end (#1438) and before a slot or copy is removed (#1429, `always`). Switch: Settings
+    `removeCopiesIn` for a lease's end (#1438) and before a slot or copy is removed (#1429, `always`; a slot with a
+    `hive-*` folder left after that is kept, #1500). Switch: Settings
     → Advanced `hive.skills.removeIdleCopies`, *Slots only* (default: every folder but the project folder; the
     Assistant's workspace folder counts as its project folder) · *Everywhere* · *Never*.
   - **Delivered to agents:** each Hive skill for agents is on unless switched off, in the workspace

@@ -271,6 +271,7 @@ interface HiveMessageValues {
   'main.unused.slot.busy': undefined
   'main.unused.slot.cantCheck': { detail: string | number }
   'main.unused.slot.dirty': { files: number }
+  'main.unused.slot.editedSkillCopy': { copies: number; names: string | number }
   'main.unused.slot.gitRefused': { detail: string | number }
   'main.unused.slot.inFlight': { card: string | number }
   'main.unused.slot.leased': { agent: string | number }

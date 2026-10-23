@@ -522,6 +522,36 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
     expect(await w.pool.remove('slot-a')).toBeNull()
   })
 
+  it("removes Hive's own unchanged skill copies first, and keeps a slot whose .agents/skills still holds a hive-* folder (#1500)", async () => {
+    const { w, folder } = await freeSlot()
+    // Hive's copies are git-ignored (info/exclude, as Hive keeps them), so the dirty guard doesn't count them.
+    writeFileSync(join(w.project, '.git', 'info', 'exclude'), '.agents/\n')
+    const skills = join(folder, '.agents', 'skills')
+    for (const name of ['hive-merge-ready', 'hive-edited']) {
+      mkdirSync(join(skills, name), { recursive: true })
+      writeFileSync(join(skills, name, 'SKILL.md'), name)
+    }
+    // skillCopies' stand-in: removes the unchanged copy only.
+    const removedIn: string[] = []
+    const pool = new SlotPool({
+      ...w.pool.deps,
+      removeSkillCopies: async (f) => {
+        removedIn.push(f)
+        rmSync(join(f, '.agents', 'skills', 'hive-merge-ready'), { recursive: true, force: true })
+      }
+    })
+    expect(await pool.remove('slot-a')).toEqual({ why: 'editedSkillCopy', copies: ['hive-edited'] })
+    expect(removedIn).toEqual([folder])
+    expect(existsSync(join(skills, 'hive-merge-ready'))).toBe(false)
+    expect(existsSync(join(skills, 'hive-edited'))).toBe(true)
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
+    // Only unchanged copies left (here none): the slot goes.
+    rmSync(join(skills, 'hive-edited'), { recursive: true, force: true })
+    expect(await pool.remove('slot-a')).toBeNull()
+    expect(existsSync(folder)).toBe(false)
+    expect(w.store.slot('slot-a')).toBeNull()
+  })
+
   it('keeps a slot whose card has a merge queue entry in flight', async () => {
     const { w } = await freeSlot()
     w.set.inFlight.add(7)
