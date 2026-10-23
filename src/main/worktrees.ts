@@ -84,7 +84,7 @@ export async function listWorktrees(cwd: string): Promise<{ path: string; branch
 }
 
 /** `listWorktrees`, or null when git can't list them (#734: a failed listing isn't an empty one). */
-async function listWorktreesOrNull(cwd: string): Promise<{ path: string; branch: string | null }[] | null> {
+export async function listWorktreesOrNull(cwd: string): Promise<{ path: string; branch: string | null }[] | null> {
   const r = await git(cwd, ['worktree', 'list', '--porcelain'])
   if (!r.ok) return null
   const out: { path: string; branch: string | null }[] = []

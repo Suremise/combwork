@@ -184,6 +184,22 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
         const x = d as FactData['FolderMoved']
         return `${x.from} to ${x.to}`
       }
+      case 'SlotPrepared': {
+        const x = d as FactData['SlotPrepared']
+        return `${x.line} at ${r(x.revision)}`
+      }
+      case 'BuilderPlaced':
+        return (d as FactData['BuilderPlaced']).how
+      case 'LineDeleting':
+        return (d as FactData['LineDeleting']).line
+      case 'LineDeleteUndone': {
+        const x = d as FactData['LineDeleteUndone']
+        return `${x.line} (${x.why})`
+      }
+      case 'LineDeleted': {
+        const x = d as FactData['LineDeleted']
+        return `${x.line} at ${r(x.revision)} (${x.why})`
+      }
       case 'Stale': {
         const x = d as FactData['Stale']
         return `approved ${r(x.approved)}, now ${r(x.current)} (${x.why})`

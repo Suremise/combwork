@@ -338,6 +338,8 @@
   "tips.skillsDelivered.title": "Choisis les compétences que reçoivent les agents",
   "tips.slotResume.text": "La conversation d’un auteur reste dans l’emplacement de sa carte. Une fois la carte terminée, Tout reprendre la laisse, pour que l’emplacement reste libre pour du nouveau travail ; son propre Reprendre récupère l’emplacement tant que rien d’autre ne l’a utilisé.",
   "tips.slotResume.title": "Une conversation reprend là où elle a été créée",
+  "tips.slots.text": "Avec Où les cartes sont réalisées sur Chaque carte dans son propre dossier, démarrer une carte prête à son auteur un emplacement, un worktree prêt, et y crée la branche de la carte. Un couloir garde son emplacement de carte en carte ; tous pris, il en attend un.",
+  "tips.slots.title": "Chaque carte sur sa propre branche",
   "tips.sortTables.text": "Clique sur l’en-tête d’une colonne dans les tableaux de Hive (raccourcis, Performances, Stockage, les vues d’ensemble) pour trier dessus, une deuxième fois pour l’ordre inverse. Hive mémorise le tri et le nombre de lignes par page de chaque tableau.",
   "tips.sortTables.title": "Trier n’importe quel tableau",
   "tips.staleMessages.text": "Quand l’Assistant transmet quelque chose sur le tour en cours d’une carte, il lie le message à cette carte : si la carte est validée ou commence un autre tour avant que l’agent le lise, Hive l’abandonne comme périmé, pour qu’aucun agent ne rouvre une carte validée pour un ancien constat.",

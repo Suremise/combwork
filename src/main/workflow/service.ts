@@ -9,7 +9,7 @@
 // here; and whether reconciliation acts on what it observes is the Advanced switch "Workflow rules are enforced"
 // (`hive.workflow.enforce`), read at each use: off, Hive is as P3 left it (facts recorded, nothing refused or moved).
 
-import { join, resolve as resolvePath } from 'path'
+import { resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
 import { WORKFLOW_ENFORCE } from '../../shared/advanced'
@@ -27,7 +27,9 @@ import { FactStore } from './factStore'
 import { locksSettled } from './lockRecord'
 import { resolvedOf, type ResolvedOptions } from './rulesets'
 import { lastActionId, noteRequestsSince } from '../workflowNotices'
-import { Workflow } from './runtime'
+import { Workflow, type SlotForStart } from './runtime'
+import type { CardRecord } from './factStore'
+import { legacyWorktree, slotsMigrated } from '../agentFolders'
 import { NOT_RUN_HERE, type QueueLive } from './queueState'
 
 /** The Advanced switch every gate answers to at once (#1120's table): off, nothing is refused and reconciliation records only. */
@@ -55,6 +57,19 @@ export const agentRunsGoing = (project: string, agent: string): string[] => runs
 let queueLiveOf: ((ws: WorkspaceService, project: string, target: string) => QueueLive) | null = null
 export function setQueueLive(fn: ((ws: WorkspaceService, project: string, target: string) => QueueLive) | null): void {
   queueLiveOf = fn
+}
+
+/**
+ * Cards on slots (#1438): the slot a card's start lends its builder, and a lease given back when the start wasn't
+ * written (slotCards.ts's). Given by the app as it starts (none in unit tests: no slots, a card starts where its agent is).
+ */
+export interface SlotStarts {
+  leaseFor: (ws: WorkspaceService, project: string, card: CardRecord, builder: string, o: { dry: boolean; target: string | null }) => Promise<SlotForStart>
+  unused: (ws: WorkspaceService, project: string, lease: string) => Promise<void>
+}
+let slotStarts: SlotStarts | null = null
+export function setSlotStarts(s: SlotStarts | null): void {
+  slotStarts = s
 }
 
 /** Whether workflow rules are enforced (Settings → Advanced): read at each use, so a change applies at once. */
@@ -166,13 +181,14 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
       return store.projectKey()
     },
     options,
-    slots: join(ws.hiveDir, 'slots'),
+    // Slots (#1438, SPEC §16.10): the card's builder's slot, lent by slotCards.ts (none set: no slots).
+    slotFor: (card, builder, o) => slotStarts?.leaseFor(ws, project.path, card, builder, o) ?? Promise.resolve(null),
+    slotUnused: (lease) => slotStarts?.unused(ws, project.path, lease) ?? Promise.resolve(),
     // Actions run by the actions worker after the commit, never here.
     autoRun: false,
     runsOf: (agent) => runsGoing?.(project.path, agent) ?? [],
     // G16 (#1481): the file locks seen before an intent are in the cards' records before it reads them.
     locksSettled: () => locksSettled(ws, project.path),
-    // Before P7's slots, an agent's own worktree is a card's folder (SPEC §16.19.1), as project.json has it.
     // A branch rename Repair recorded and hasn't finished (#1305): its new name, which a card on the old line follows.
     pendingRename: async (line) => (await ws.projectConfig(project.path)).pendingBranchRenames?.find((r) => r.from.toLowerCase() === line.toLowerCase())?.to ?? null,
     // A move Repair hasn't recorded (#1343): the workspace's or the project's last folder isn't where it is now.
@@ -182,9 +198,12 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
       const moved = (last: string | undefined, now: string): boolean => !!last && !samePlace(last, now)
       return moved(ws.config.lastPath, wsPath) || moved((await ws.projectConfig(project.path)).lastPath, project.path)
     },
+    // An agent's 0.9 worktree is a card's folder (SPEC §16.19.1's stand-in) only until #1441 migrates the project into
+    // slots (agentFolders.ts's legacyWorktree; a carried lease after, #1441's).
     agentFolder: async (agent) => {
-      const a = projectAgents(await ws.projectConfig(project.path)).find((x) => x.id === agent)
-      return a?.worktree?.path ? { path: a.worktree.path, base: a.worktree.base ?? null } : null
+      if (await slotsMigrated(project.path)) return null
+      const w = legacyWorktree(projectAgents(await ws.projectConfig(project.path)).find((x) => x.id === agent))
+      return w ? { path: w.path, base: w.base ?? null } : null
     },
     get reconcileActs() {
       return workflowEnforced()

@@ -145,6 +145,9 @@ export type SlotRefusal =
 
 export type LendResult = { ok: true; lease: SlotLease; slot: Slot } | { ok: false; refusal: SlotRefusal }
 
+/** What a card's preparation came to (#1438): done at a revision, not now (tried again), or not possible (why). */
+export type PrepareResult = { ok: true; revision: string } | { retry: string } | { error: string; logPath?: string | null }
+
 /** Why a slot was kept rather than removed (its guards, §16.6.4 data safety). */
 export type SlotKept =
   | { why: 'leased'; agent: string }
@@ -364,6 +367,16 @@ export class SlotStore {
     })
   }
 
+  /** The project's open leases. */
+  openLeases(): SlotLease[] {
+    return this.conn.read((db) => (db.prepare('SELECT * FROM slot_leases WHERE project = ? AND ended_at IS NULL').all(this.project) as Row[]).map(leaseOfRow))
+  }
+
+  /** Leases of cards and lanes ended since `iso` (#1438: their merged lines are deleted once Done). */
+  endedSince(iso: string): SlotLease[] {
+    return this.conn.read((db) => (db.prepare('SELECT * FROM slot_leases WHERE project = ? AND ended_at IS NOT NULL AND ended_at >= ?').all(this.project, iso) as Row[]).map(leaseOfRow))
+  }
+
   /** An agent's open leases: its dispatch lease and its carried lease, each at most one. */
   leasesOf(agent: string): SlotLease[] {
     return this.conn.read((db) => (db.prepare('SELECT * FROM slot_leases WHERE project = ? AND agent = ? AND ended_at IS NULL').all(this.project, agent) as Row[]).map(leaseOfRow))
@@ -484,10 +497,11 @@ export class SlotStore {
   }
 
   /** Ends an open lease: the lease as ended, or null when it wasn't open. The slot is looked at by the pool. */
-  async end(lease: string, why: string): Promise<SlotLease | null> {
+  async end(lease: string, why: string, check?: () => boolean): Promise<SlotLease | null> {
     return this.conn.write((db) => {
       const r = db.prepare('SELECT * FROM slot_leases WHERE id = ? AND project = ? AND ended_at IS NULL').get(lease, this.project) as Row | undefined
-      if (!r) return null
+      // The caller's condition, decided in this write (#1438: the card's cycle as the board has it now).
+      if (!r || (check && !check())) return null
       const at = this.iso()
       db.prepare('UPDATE slot_leases SET ended_at = ?, why = ? WHERE id = ?').run(at, why, lease)
       db.prepare('UPDATE slots SET used_at = ? WHERE project = ? AND name = ?').run(at, this.project, r.slot)
@@ -575,6 +589,21 @@ export class SlotStore {
   /** Whether a lease is open (in a write). */
   openIn(db: DatabaseSync, lease: string): boolean {
     return !!db.prepare('SELECT 1 FROM slot_leases WHERE id = ? AND ended_at IS NULL').get(lease)
+  }
+
+  /**
+   * Starts a card's preparation on its lease's slot (#1438), as a warming of that lease: only while the slot is lent
+   * under it, with no operation or job, and no session writing there but the lease's own. Whether it started.
+   */
+  async startPrepare(name: string, lease: string, token: string, holder: Holder): Promise<boolean> {
+    return this.conn.write(
+      (db) =>
+        Number(
+          db
+            .prepare("UPDATE slots SET op = ?, op_kind = 'warm', op_lease = ?, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND state = 'lent' AND op IS NULL AND job IS NULL AND (writer_run IS NULL OR writer_lease = ?) AND EXISTS (SELECT 1 FROM slot_leases l WHERE l.id = ? AND l.project = slots.project AND l.slot = slots.name AND l.ended_at IS NULL)")
+            .run(token, lease, holder.pid, holder.started, this.project, name, lease, lease).changes
+        ) === 1
+    )
   }
 
   /** Takes over an operation whose holder is gone: only while `was` still holds it. Whether it was taken. */
@@ -758,8 +787,20 @@ export class SlotPool {
     return this.store.leaseOf(of)
   }
 
+  lease(id: string): SlotLease | null {
+    return this.store.lease(id)
+  }
+
   leasesOf(agent: string): SlotLease[] {
     return this.store.leasesOf(agent)
+  }
+
+  openLeases(): SlotLease[] {
+    return this.store.openLeases()
+  }
+
+  endedSince(iso: string): SlotLease[] {
+    return this.store.endedSince(iso)
   }
 
   openLease(slot: string): SlotLease | null {
@@ -816,7 +857,7 @@ export class SlotPool {
    * agent already builds in another, the card's slot is being set up, or a new slot's setup failed (its lease then ended
    * `setupFailed`).
    */
-  async lend(req: LeaseRequest, o: { target?: string } = {}): Promise<LendResult> {
+  async lend(req: LeaseRequest, o: { target?: string; install?: boolean } = {}): Promise<LendResult> {
     if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane')
     if (this.closed) return { ok: false, refusal: { why: 'noSlot', size: 0 } }
     await this.refresh()
@@ -838,7 +879,7 @@ export class SlotPool {
           if (s.state !== 'lent' || s.job || s.warmError) return { ok: false, refusal: { why: 'notReady', slot: s.name, state: s.state, error: s.warmError } }
           return { ok: true, lease: taken.lease, slot: s }
         }
-        const done = await this.warm(taken.slot, taken.lease, token, taken.fresh, target)
+        const done = await this.warm(taken.slot, taken.lease, token, taken.fresh, target, o.install !== false)
         if (done === 'ready') return { ok: true, lease: this.store.lease(taken.lease.id)!, slot: this.store.slot(taken.slot.name)! }
         if (done !== 'skip') return { ok: false, refusal: done }
         skip.add(taken.slot.name)
@@ -854,9 +895,12 @@ export class SlotPool {
     return this.store.carry(agent, { ...slot, target: slot.target ?? null })
   }
 
-  /** Ends a lease and looks at its slot once no operation holds it. Whether the lease was open. */
-  async release(lease: string, why: string): Promise<boolean> {
-    const ended = await this.store.end(lease, why)
+  /**
+   * Ends a lease and looks at its slot once no operation holds it. Whether it was ended. `check`: the caller's condition,
+   * decided in the write that ends it (false: it stays open).
+   */
+  async release(lease: string, why: string, check?: () => boolean): Promise<boolean> {
+    const ended = await this.store.end(lease, why, check)
     if (!ended) return false
     const slot = this.store.slot(ended.slot)
     // Its writer (the builder's session there) drains, and is stopped once its turn is over (#1434).
@@ -956,6 +1000,11 @@ export class SlotPool {
         const settled = !s.job || (await this.deps.settle(s.job))
         if (!settled) log.warn(`Slot ${userText(s.name)}'s job ${s.job} couldn't be emptied: it stays out of the pool`)
         const job = settled ? { job: null } : {}
+        // A card's preparation (#1438: a warming of a slot already lent): its lease stays, the slot as it is.
+        if (was.kind === 'warm' && s.state === 'lent') {
+          await this.store.fenced(s.name, token, (db) => this.store.setIn(db, s.name, 'lent', {}, { op: null, ...job }))
+          return
+        }
         if (was.kind === 'warm') {
           await this.store.fenced(s.name, token, (db) => {
             if (was.lease) this.store.endIn(db, was.lease, 'interrupted')
@@ -994,7 +1043,7 @@ export class SlotPool {
    * `ready` (the slot `lent`, or looked at if the lease ended meanwhile). A failure leaves the slot not ready with why,
    * its lease ended `setupFailed`; an operation taken over meanwhile stops (`warming`).
    */
-  private async warm(slot: Slot, lease: SlotLease, token: string, fresh: boolean, target: string | null): Promise<'ready' | 'skip' | SlotRefusal> {
+  private async warm(slot: Slot, lease: SlotLease, token: string, fresh: boolean, target: string | null, install = true): Promise<'ready' | 'skip' | SlotRefusal> {
     const name = slot.name
     const fail = async (error: string, logPath: string | null = null): Promise<SlotRefusal> => {
       log.warn(`Slot ${userText(name)} of ${userText(this.deps.project)} isn't ready: ${userText(error)}`)
@@ -1044,14 +1093,11 @@ export class SlotPool {
         if (opts.copy.trim()) await copyIgnored(this.deps.project, slot.folder, opts.copy).catch((e) => log.warn(`Could not copy files into slot ${userText(name)}`, e))
       }
       const hash = await lockHash(slot.folder)
-      const needed = made || (hash !== null && hash !== slot.installHash)
+      // An existing slot is installed again only when asked (#1438: with G15 off nothing is installed for a card).
+      const needed = made || (install && hash !== null && hash !== slot.installHash)
       if (needed) {
-        const command = opts.setup.trim() || (hash !== null && existsSync(join(slot.folder, 'package-lock.json')) ? 'npm ci' : '')
-        if (command) {
-          const end = await this.run(name, token, { slot: name, what: made ? 'setup' : 'install', command, folder: slot.folder, env: slotEnv(slot) })
-          if (!end.settled) return await fail('processes its setup started could not be ended', end.logPath)
-          if (!end.ok) return await fail(end.error ?? (end.timedOut ? 'its setup ran out of time' : end.spawnError ? `its setup couldn't start: ${command}` : `its setup exited with code ${end.exitCode}`), end.logPath)
-        }
+        const failed = await this.install(name, token, slot, made ? 'setup' : 'install', opts.setup, hash)
+        if (failed) return await fail(failed.error, failed.logPath)
       }
       const rev = await G.head(slot.folder)
       const fields: SlotFields = { warmError: null, warmLog: null, ...(needed ? { installRev: isUnknown(rev) ? null : rev, installHash: hash } : {}), ...(made && target ? { target } : {}) }
@@ -1064,6 +1110,118 @@ export class SlotPool {
       // Anything else: the slot left not ready, never half made and lent.
       return fail(e instanceof Error ? e.message : String(e)).catch(() => ({ why: 'warming' as const, slot: name }))
     }
+  }
+
+  /** A slot's setup or install run (the project's setup, else `npm ci` for a package lock): why it failed, or null. */
+  private async install(name: string, token: string, slot: Slot, what: 'setup' | 'install', setup: string, hash: string | null): Promise<{ error: string; logPath: string | null } | null> {
+    const command = setup.trim() || (hash !== null && existsSync(join(slot.folder, 'package-lock.json')) ? 'npm ci' : '')
+    if (!command) return null
+    const end = await this.run(name, token, { slot: name, what, command, folder: slot.folder, env: slotEnv(slot) })
+    if (!end.settled) return { error: 'processes its setup started could not be ended', logPath: end.logPath }
+    if (!end.ok) return { error: end.error ?? (end.timedOut ? 'its setup ran out of time' : end.spawnError ? `its setup couldn't start: ${command}` : `its setup exited with code ${end.exitCode}`), logPath: end.logPath }
+    return null
+  }
+
+  /**
+   * Prepares a lent slot for its card (#1438, SPEC §16.10.1): the card's line checked out, made from `base` (the target's
+   * head) or the line it already has (a card started again), and with `install` (G15, Slots are brought up to date)
+   * its dependencies installed again when its lock files differ from its last install's. A warming operation of the
+   * lease while it runs (#1429's: fenced by its token, taken over once its holder is gone), so nothing lends, removes or
+   * starts a session in the slot meanwhile; only on the lease's own slot, with no session writing there but the lease's
+   * own. `ready` is the caller's last word right before the slot's files change (its card still current, its builder
+   * quiet): a reason, and nothing changes. A slot already on the line is prepared (a repeat changes nothing). `retry`:
+   * not now (busy, or not ready); `error`: it can't be (changes not committed, git or the install failed).
+   */
+  async prepare(leaseId: string, p: { line: string; base: string; install: boolean; ready?: () => Promise<string | null>; around?: <T>(fn: () => Promise<T>) => Promise<T> }): Promise<PrepareResult> {
+    const lease = this.store.lease(leaseId)
+    if (!lease || lease.to) return { error: 'its lease has ended' }
+    const name = lease.slot
+    const token = newToken()
+    return this.op(token, async (): Promise<PrepareResult> => {
+      if (!(await this.store.startPrepare(name, leaseId, token, await this.deps.holder.self()))) return { retry: `${name} is busy: being set up, a command of its still running, or another session in it` }
+      const end = async (fields: SlotFields = {}): Promise<void> => {
+        await this.store.fenced(name, token, (db, s) => this.store.setIn(db, name, s.state, fields, { op: null }))
+      }
+      try {
+        const slot = this.store.slot(name)!
+        const on = await G.branch(slot.folder)
+        if (isUnknown(on)) {
+          await end()
+          return { error: `git couldn't read ${name}'s branch` }
+        }
+        const there = on === p.line
+        if (!there) {
+          const d = await G.dirty(slot.folder)
+          if (isUnknown(d) || d.length) {
+            await end()
+            return { error: isUnknown(d) ? `git couldn't read ${name}'s files` : `${name} has changes that aren't committed` }
+          }
+        }
+        const had = there ? null : await G.lineHead(slot.folder, p.line)
+        if (isUnknown(had)) {
+          await end()
+          return { error: `git couldn't read ${p.line}` }
+        }
+        const hash = p.install ? await lockHash(slot.folder) : null
+        if (there && !(p.install && hash !== null && hash !== slot.installHash)) {
+          await end()
+          return { ok: true, revision: await this.headOf(slot.folder) }
+        }
+        // The caller's last word (its card current, the rules on, its builder quiet) and still this operation's, right
+        // before the slot's files change: inside the caller's guard (the app's: the repository's lock, as merges and branch
+        // deletions take it), after any wait for it, so nothing waited on stands in for a check made before it.
+        const last = async (): Promise<string | null> => {
+          const notYet = (await p.ready?.()) ?? null
+          if (!notYet) await this.store.fenced(name, token, () => undefined)
+          return notYet
+        }
+        if (!there) {
+          const sw = async (): Promise<{ notYet: string } | Awaited<ReturnType<typeof git>>> => {
+            const notYet = await last()
+            if (notYet) return { notYet }
+            return git(slot.folder, had ? ['switch', '--no-guess', p.line] : ['switch', '--no-guess', '-c', p.line, p.base])
+          }
+          const r = await (p.around ? p.around(sw) : sw())
+          if ('notYet' in r) {
+            await end()
+            return { retry: r.notYet }
+          }
+          if (!r.ok) {
+            await end()
+            return { error: `git switch: ${r.err.trim().split(/\r?\n/)[0] || 'failed'}` }
+          }
+          log.info(`Slot ${userText(name)} is on ${userText(p.line)} for lease ${leaseId}`)
+        }
+        const now = p.install ? await lockHash(slot.folder) : null
+        if (p.install && now !== null && now !== slot.installHash) {
+          // An install changes the slot's files too: the same last word first.
+          const notYet = await last()
+          if (notYet) {
+            await end()
+            return { retry: notYet }
+          }
+          const failed = await this.install(name, token, slot, 'install', (await this.deps.options()).setup, now)
+          if (failed) {
+            await end({ warmLog: failed.logPath })
+            return { error: failed.error, logPath: failed.logPath }
+          }
+          const rev = await this.headOf(slot.folder)
+          await end({ installRev: rev || null, installHash: now })
+          return { ok: true, revision: rev }
+        }
+        await end()
+        return { ok: true, revision: await this.headOf(slot.folder) }
+      } catch (e) {
+        if (e instanceof OpLost) return { retry: `${name}'s preparation was taken over` }
+        await end().catch(() => undefined)
+        return { error: e instanceof Error ? e.message : String(e) }
+      }
+    })
+  }
+
+  private async headOf(folder: string): Promise<string> {
+    const h = await G.head(folder)
+    return isUnknown(h) ? '' : h
   }
 
   /** A reservation given back untouched (the workspace closed before anything was done): its lease ended, the slot as it was. */

@@ -85,6 +85,8 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     const b2 = await lib.addAgent(inv, alpha, { name: 'B2', workflowRole: 'builder' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
+    // The pool is the project's builders (#1438): a third, never started, so step 6 has slot-a, hb1 and slot-b.
+    await lib.addAgent(inv, alpha, { name: 'B3', workflowRole: 'builder' })
 
     // --- 1. #12's lease on slot-a: B1's new conversation there, with its environment, bound; stopped at the lease's end.
     const l12 = await op({ op: 'lend', agent: b1.id, card: 12 })
@@ -225,6 +227,9 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     check('…B1 stopped', await stop(b1.id))
     await op({ op: 'release', lease: l15.lease.id, why: 'put back' })
     check('#15 put back: the hb1 conversation may resume now', !!(await until(async () => !(await sessionOf(conv3))?.hold, HUNG_MS)))
+    // Its earlier run there has handed hb1 back (its writer released once its processes are seen ended): a resume before
+    // that is refused, as two runs never write in one slot.
+    check('…its earlier run in hb1 has ended there', !!(await until(async () => !(await slotList()).find((s) => s.name === 'hb1')?.writer, HUNG_MS)), JSON.stringify((await slotList()).find((s) => s.name === 'hb1')))
     await inv('session:start', alpha, { agentId: b1.id, resumeId: conv3 })
     const resumed = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null), HUNG_MS)
     check('…and resumes in hb1, its files as they were', resumed?.sessionId === conv3 && same(resumed?.cwd, hb1) && fs.existsSync(path.join(hb1, 'unfinished.txt')), JSON.stringify(resumed))

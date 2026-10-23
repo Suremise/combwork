@@ -46,6 +46,9 @@ export interface StartedData {
   target: string | null
   builder: string
   cardKind: CardKind
+  /** Slots (#1438): the slot the card is built in, and the lease it holds it by (a lane's, or the card's own). */
+  slot?: string
+  lease?: string
   /** None: the card's paths and their hashes at the start. */
   manifest?: Manifest
   /** None: every deliverable's hash at the start, which unclaimed changes are found against (§16.4.2). */
@@ -161,6 +164,26 @@ export interface FactData {
   LineMoved: { line: string; from: string; to: string; why: 'squashContinuation' }
   /** The card's line renamed (#1305: Repair renaming an agent's branch named after an old place): its work follows it. */
   LineRenamed: { from: string; to: string; why: 'repair' }
+  /** A Done card's line deleted (#1438): its target contained it at `revision`, and nothing had it checked out. */
+  LineDeleted: { line: string; revision: string; why: 'merged' }
+  /**
+   * A Done card's merged line about to be deleted (#1438, HR1's round 2): written before its ref is removed, so a deletion
+   * cut short (a crash) is settled by the next pass: `LineDeleted`, or `LineDeleteUndone` with the ref put back at
+   * `revision` where a checkout of it came in meanwhile.
+   */
+  LineDeleting: { line: string; revision: string }
+  /** A deletion begun and not done: kept (`checkedOut`: a checkout of it came in, its ref put back), or never removed. */
+  LineDeleteUndone: { line: string; revision: string; why: 'checkedOut' | 'notDeleted' }
+  /**
+   * A card's slot made ready for its start (#1438): the line checked out at `revision` (installed again with G15) under
+   * `lease`. Written after the slot's preparation, in a write that finds the card's start the same: until then the start's
+   * preparation is owed, and a pass of Hive's (after a restart too) does it.
+   */
+  SlotPrepared: { lease: string; line: string; revision: string }
+  /** Its builder's placement in the slot claimed by a Hive (its process), so two never place it; one gone is taken over. */
+  PlacementClaimed: { lease: string; pid: number; started: number }
+  /** Its builder given the card in the slot: typed in, or a new conversation started there; `delivery` the one made. */
+  BuilderPlaced: { lease: string; delivery: string | null; how: 'typed' | 'newConversation' | 'started' }
   /** The card's folder moved (#1343: Repair relinking or recreating the agent's worktree at a new place): its work follows it. */
   FolderMoved: { from: string; to: string; why: 'repair' }
   /**

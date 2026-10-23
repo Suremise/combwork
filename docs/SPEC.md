@@ -2795,7 +2795,7 @@ last had, then the most recently used; a slot named that is in use is refused "s
 (in English to agents; #1438 words the window's). A new slot is a detached worktree at the target's head, with the
 project's copied files and its setup run; a slot whose lock files changed since its last install is installed again;
 a failed setup leaves it `creating` with the error and the run's log, and lending skips it. The pool's size is the
-project's builders (`setBuilderCount`; until #1438 its agents), at least one, at most Agents per project.
+project's builders (`setBuilderCount`: its builder and either agents, #1438), at least one, at most Agents per project.
 - **Options:** `project.json` `slots: { setup, archive, copy }`, each left out read from `worktreeSetup`, none and
   `worktreeCopy` (left as they are). Settings → Agents & Worktrees edits the old fields until #1445's tab.
 - **Environment:** `HIVE_SLOT` and `HIVE_SLOT_PORT_BASE` (from 41000, 10 ports a slot, unique in the project) for its
@@ -2934,6 +2934,65 @@ Whether a conversation may resume there is its **hold** (none: it may):
   (with workflow rules off, leases aren't ended by rules, so nothing is stopped).
 - **The Agent API:** an agent's row and detail give its running session's `folder` (when not the project folder) and
   `slot`, and a session's usage its `folder` and `slot`.
+
+**Built [#1438], cards on slots** (`src/main/slotCards.ts`; the runtime's start in `gitPlatform.start`):
+- **Start:** under G11 = slots, with the rules enforced, a card's start asks `leaseForStart(card, builder)`, the one
+  function that chooses its lease: a lane's card, the lane's dispatch lease (lent if the lane has none yet, kept for the
+  whole lane, OP-10); any other card, its own `card` lease. Only a builder or either agent gets one (#1430's roles); a
+  reviewer's start, or the rules off, starts where the agent is, as P3. None free (or a slot being set up):
+  `start.slotAvailable` refuses, *waiting for a slot* (the lend's reason in English for agents). A user's start across
+  it works where the agent is. A lease lent for a start that isn't written (refused, undone) is given back; a window
+  Start that only asks lends nothing. `Started` records the slot and lease; the start's reply tells an agent where it
+  continues and to end its turn.
+- **The line** is `hive/<KEY>/<card key>-<slug>` (slug: the title folded to ASCII, lower case letters, digits and
+  hyphens, at most 40), from the target's head; a line the card already has (started again after being put back) is
+  checked out as it is, its base where it left the target. The spike's `.hive/slots` folders are its unit tests' only.
+- **What a start owes is decided from durable state** [HR1's round 1]: the card's facts and the slots' lease rows, read by
+  one pass per project (`settleSlotCards`), never by an action's run. `prepareSlot` and `releaseSlot` only ask for it; it
+  also runs as a workspace opens (after a crash: what was owed is done then), when lanes change, when a slot's writer
+  drains, when the rules are switched, and hourly. Per card cycle (its last `Started`): `SlotPrepared` → `PlacementClaimed`
+  → `BuilderPlaced`; the lease row's end; `LineDeleted` after Done.
+  - **Prepare:** once the lease's builder is quiet (not in a turn, nothing typed or queued, no Progress run or background
+    task; an idle CLI may stay open), `SlotPool.prepare` as #1429's warming operation on the lent slot (fenced by its token,
+    taken over once its holder is gone; only with no writer but the lease's own), under the folder's fence (#646: nothing
+    typed into or started there meanwhile) and, for the switch, the repository's lock. The builder's quiet, the cycle and
+    the rules are checked again at the boundary, inside the lock after any wait for it, before the files change (and
+    again before an install). A slot already on its line is prepared as it is. With
+    **G15** on it installs again when the lock files differ from its last install (a run of "Hive (slot slot-b)"); off,
+    nothing is installed (a lend never reinstalls for a card). Then `SlotPrepared`, in a write that finds the cycle the
+    same.
+  - **Place:** once quiet again, claimed in a write (`PlacementClaimed`: another Hive's left to it unless its process is
+    gone), the card given to the builder there: typed in where it already runs in the slot, else a new conversation
+    started there (`launchWith`; the old one kept). Its delivery's identity is the cycle and lease (`slot-placement`): one
+    made before a crash counts only while it was given or is still on its way under the deliveries' own policy (queued,
+    offered, uncertain: never made again; its agent not running is started where it is offered), and one that ended
+    without being given (cancelled, refused, expired, stale), or a launch that couldn't start, is made again by a later
+    pass [HR1's round 2]; then `BuilderPlaced`. A window Start hands its prompt (note, Read first)
+    to that instead of typing it where the agent is.
+  - **Release:** a card's own lease its current cycle doesn't use (Todo, Done, or a later start's), ended in the write
+    that reads the card, so a release can never end a later start's lease; a lease lent for a start not written yet is
+    left two minutes. A lane's when the lane has ended or been abandoned. Releases run with the rules off too.
+  - **Merged lines:** a Done card's line, by the card (never a number read from the line's name), once its target
+    contains it (§16.3.2's containment, squash by its key), under the repository's lock: the worktrees read, the intent
+    recorded (`LineDeleting`, with the head checked), the ref removed at that head (`update-ref -d`), then settled from
+    what is on disk: a checkout of it that came in has the branch put back at that head and checked (`LineDeleteUndone`),
+    none has `LineDeleted`. A deletion cut short by a crash is settled the same way by the next pass, first and whatever
+    the switches say (they gate new deletions only), found from the project's facts whatever the card has done since or
+    how long ago it began [HR1's round 3]; a branch that can't be put back leaves the intent for the next pass, never claimed kept [HR1's round 2].
+    A lane's previous line goes once the next card's line is out.
+    Off switch: Settings → Advanced **Delete a card's branch once it's merged** (`hive.slots.deleteMergedLines`, on).
+- **The pool's size** is the project's builders and either agents (`setBuilderCount`).
+- **Lanes:** Start Lane lends the lane its slot before starting its agents, and the brief names it ("works in slot-b, a
+  new branch per card"); none free, the lane is recorded with its wait (`slotWait`, kept with the lane, so through a
+  restart), shows *waiting for a slot* (`LaneWaitReason` `slot`, pausing) and is lent one by the pass once one is free,
+  its agents (the lane's builder and reviewer then, re-read) started once (their brief's delivery identity is the lane
+  and role) and its wait cleared. A lane ended or abandoned while it waits is never started. `hive_lane` names the
+  lane's slot.
+- **The stand-in** (an agent's 0.9 worktree as the card's folder, `existing: true`, the line updater) acts only for an
+  agent whose `legacyWorktree` is still its folder: until #1441 migrates the project (then its carried lease).
+- **Off switches:** G11 another value: nothing of this. `hive.workflow.enforce` off: nothing is lent, refused,
+  prepared, placed or deleted, and a waiting lane stays waiting (each step checks it again after its waits); leases still
+  end (data safety).
 
 #### 16.10.4 Fresh conversations and hand-overs
 
@@ -4009,7 +4068,7 @@ later phase. Lanes keep working, and everything works with the Assistant off, in
 | P4 | **An agent's worktree stands in for a slot**: a builder's existing worktree (one branch per agent, as today) is the card's folder; a card's base is the merge base of that branch with the target when the card starts, which is sound because a lane's next card starts only once the previous one is Done (§16.11.2). Or everyone in the project folder. | Not checked · Committed is done · **The agent merges, Hive checks** (the builder merges each card through today's merge-ready, then reports it; `done.contained` checks it). Hive merges isn't offered. After a squash merge (by the agent or the Merge dialog), Hive brings the agent's branch to the target before the next card starts (§16.19.2). | "Pair (the agent merges)": a reviewer agent, the agent merges, agent worktrees, quick checks before review | S54 |
 | P5 | As P4. | Adds **Hive merges**: the queue merges the agent's branch at the approved revision; after Done the agent's branch carries on, and the next card's base is the new merge base. After a **squash** (G6) the branch isn't an ancestor of the target, so the next card's base would still include the squashed work: before the next card starts, Hive **brings the agent's branch to the target** (§16.19.2) [HB3's round 3 finding 2, HR2's round 3 finding 3]. **Built [#1355]:** the form offers Hive merges and G9 with its install (§16.6.6). | Pair (Hive merges), offered in the form beside Pair (the agent merges) [#1355]; the hive project keeps its options until an RC is installed (Darren, #1121 point 2) | S55 |
 | P6 | As P4. | As P5. | Pair, set through the Version Control tab; Team offered (in the plain form since P5: #1361) | — |
-| P7 | **Slots**: per-card lines in leased slots; agent worktrees become slots (§16.10.8): a running lane keeps its folder until it ends. | As P5. | Team (6×6) | S56 |
+| P7 | **Slots**: per-card lines in leased slots; agent worktrees become slots (§16.10.8): a running lane keeps its folder until it ends. **Built [#1438]:** cards and lanes on slots (§16.10.3's Built [#1438]). | As P5. | Team (6×6) | S56 |
 
 #### 16.19.2 Agent worktrees between cards (P4–P6)
 

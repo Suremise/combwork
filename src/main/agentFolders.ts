@@ -28,6 +28,8 @@ let migratedCheck: (projectPath: string) => boolean | Promise<boolean> = () => f
 export function setSlotsMigrated(fn: ((projectPath: string) => boolean | Promise<boolean>) | null): void {
   migratedCheck = fn ?? (() => false)
 }
+/** Whether #1441 has migrated a project's agents' worktrees into slots. */
+export const slotsMigrated = async (projectPath: string): Promise<boolean> => !!(await migratedCheck(projectPath))
 
 /** A project's retired homes (#1441): folders its agents' conversations resume in, never lent. None until then. */
 let homesOf: (projectPath: string) => readonly string[] | Promise<readonly string[]> = () => []

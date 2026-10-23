@@ -617,6 +617,28 @@ holds the slot, and lets git remove the worktree, never forced. `tidy` (hourly, 
 the pool's size. Where an agent works because of a lease is #1434's `agentFolders.ts`; lending for a card's start is
 #1438's.
 
+**Cards on slots, built [#1438].** `slotCards.ts` is the app's side of G11 = slots. The runtime's start asks
+`WorkflowConfig.slotFor` (set by `service.ts` from `setSlotStarts`; none in the spike's unit tests, which keep their
+`.hive/slots` stand-in) from `GitPlatform.start`, after an agent's 0.9 worktree (`agentFolder`, `legacyWorktree` until
+#1441 migrates the project): `leaseForStart` gives the lane's lease (lent once, kept for the lane) or the card's own,
+or why none is free (the plan's `slotWait`: `start.slotAvailable` refuses). A card lease lent for a start that isn't
+written is given back (`slotUnused`, decided in the write that ends it). Everything after the start is one pass per
+project, `settleSlotCards`, which decides from durable state what is still owed and does it (so a crash anywhere is
+picked up by the next pass, at the workspace's opening): it reads each open lease's cards' current cycle (`cycleIn`: the
+last `Started`, then `SlotPrepared`, `PlacementClaimed`, `BuilderPlaced`, `LineDeleted`). Release ends a card's lease its
+cycle doesn't use, in the write that reads the card (`SlotPool.release`'s check), and a lane's once the lane has ended.
+Prepare waits for the lease's builder to be quiet, then runs `SlotPool.prepare` (#1429's warming operation on the lent
+slot, its `ready` check at the boundary) under `changingFolder` and, for the switch, `withRepoLock`. Place claims the
+placement in a write (`PlacementClaimed`, taken over once its holder process is gone) and delivers with the cycle's
+identity (`slot-placement`), so it happens once (one that ended without being given is made again). Merged lines are
+deleted by the card under the repository's lock, the intent recorded first (`LineDeleting`) and the deletion settled from
+what is on disk (`settleDeletion`), so one cut short by a crash is settled by the next pass. The actions `prepareSlot` and `releaseSlot` only ask for the pass; it
+also runs as a workspace opens, when lanes are written, when a writer drains (`setSlotFreed`), when the rules are
+switched, and hourly; with the rules off it only releases. Start Lane lends the lane's slot first (`lendLane`); a lane
+without one keeps `slotWait` on its record, and the pass lends it one and starts its agents once (laneStart's
+`startWaitingLane`, by their brief's delivery identity). Test copies can end Hive at the pass's seams
+(`HIVE_TEST_SLOT_CRASH`). The pool's size counts builders and either agents (`setBuilderCount`).
+
 **Storage (P3's one migration, #1025, designed in #1208).** The DDL is `src/main/schema/v1_0.ts`: five steps, registered
 in `BOARD_MIGRATIONS` in this order by their cards, each taking the next version number when it merges, and run by
 #1207's 1.0 group in one transaction after one ask, one backup and one exclusive lock. All tables are STRICT; a card's
