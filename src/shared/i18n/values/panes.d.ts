@@ -99,6 +99,7 @@ interface HiveMessageValues {
   'panes.messages.deliverFailed': undefined
   'panes.messages.deliverNow': undefined
   'panes.messages.line': { id: string | number; from: string | number; state: string; text: string | number }
+  'panes.messages.noWakesHint': undefined
   'panes.messages.notDelivered': { agent: string | number }
   'panes.messages.notDeliveredDetail': undefined
   'panes.messages.overdue': { n: number }

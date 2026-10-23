@@ -44,7 +44,8 @@ const M = {
   // Its inbox in ⋯ (#1432), as an agent's pane shows it.
   unreadCount: msg({ id: 'assistant.panel.unreadCount', defaultMessage: '{n, plural, one {# unread} other {# unread}}', description: "Read out with the Assistant's ⋯ button: how many items in its inbox it hasn't fetched or acked yet. Keep it short." }),
   inboxTip: msg({ id: 'assistant.panel.inboxTip', defaultMessage: "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.", description: "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox ({n}: how many). hive_inbox is a tool's name: keep it." }),
-  inboxTipNoWakes: msg({ id: 'assistant.panel.inboxTipNoWakes', defaultMessage: "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet. Wake an idle agent is off, so nothing is typed by itself: Deliver Now types its line once, or it reads them with hive_inbox.", description: "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox, when the setting Wake an idle agent (Settings → Advanced) is off ({n}: how many). Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them. hive_inbox is a tool's name: keep it." }),
+  inboxTipNoWakes: msg({ id: 'assistant.panel.inboxTipNoWakes', defaultMessage: "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet", description: "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox, when the setting Wake an idle agent (Settings → Advanced) is off (a hint line under it says so; {n}: how many)." }),
+  noWakesHint: msg({ id: 'assistant.panel.noWakesHint', defaultMessage: 'Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.', description: "A hint line under the heading of the Assistant's ⋯ menu's list of its unread inbox, when the setting Wake an idle agent (Settings → Advanced) is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them." }),
   inboxLine: msg({ id: 'assistant.panel.inboxLine', defaultMessage: '{id} from {from}: {text}', description: "An item of the Assistant's inbox in its ⋯ menu: its id, who it is from ({from}) and the start of its text ({text})." }),
   deliverNow: msg({ id: 'assistant.panel.deliverNow', defaultMessage: 'Deliver Now', description: "Menu item in the Assistant's ⋯ menu, shown while the setting Wake an idle agent is off: types the line telling it of what waits in its inbox into its terminal, once." }),
   deliverFailed: msg({ id: 'assistant.panel.deliverFailed', defaultMessage: "Could not deliver the Assistant's inbox", description: "An error's title: typing the line that tells the Assistant of what waits in its inbox (Deliver Now) failed." }),
@@ -559,6 +560,7 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
   const inboxEntries: MenuEntry[] = unread.length
     ? [
         { header: true, label: tr(wakes ? M.inboxTip : M.inboxTipNoWakes, { n: unread.length }) },
+        ...(wakes ? [] : [{ label: tr(M.noWakesHint), disabled: true }]),
         ...unread.map((m) => ({ label: tr(M.inboxLine, { id: m.id, from: m.from, text: m.text }), disabled: true })),
         ...(waiting && !wakes && live ? [{ label: tr(M.deliverNow), icon: 'send', onClick: deliver } as MenuEntry] : []),
         { separator: true }

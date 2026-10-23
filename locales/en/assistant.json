@@ -624,8 +624,8 @@
     "description": "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox ({n}: how many). hive_inbox is a tool's name: keep it."
   },
   "assistant.panel.inboxTipNoWakes": {
-    "defaultMessage": "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet. Wake an idle agent is off, so nothing is typed by itself: Deliver Now types its line once, or it reads them with hive_inbox.",
-    "description": "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox, when the setting Wake an idle agent (Settings → Advanced) is off ({n}: how many). Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them. hive_inbox is a tool's name: keep it."
+    "defaultMessage": "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet",
+    "description": "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox, when the setting Wake an idle agent (Settings → Advanced) is off (a hint line under it says so; {n}: how many)."
   },
   "assistant.panel.listFailed": {
     "defaultMessage": "Could not list conversations",
@@ -714,6 +714,10 @@
   "assistant.panel.noProjects": {
     "defaultMessage": "No projects in this workspace yet.",
     "description": "The Assistant's overview with no projects."
+  },
+  "assistant.panel.noWakesHint": {
+    "defaultMessage": "Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.",
+    "description": "A hint line under the heading of the Assistant's ⋯ menu's list of its unread inbox, when the setting Wake an idle agent (Settings → Advanced) is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them."
   },
   "assistant.panel.noneRunning": {
     "defaultMessage": "no agents running",

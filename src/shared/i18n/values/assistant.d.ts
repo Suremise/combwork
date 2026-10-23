@@ -180,6 +180,7 @@ interface HiveMessageValues {
   'assistant.panel.noConversations': undefined
   'assistant.panel.noEdits': undefined
   'assistant.panel.noProjects': undefined
+  'assistant.panel.noWakesHint': undefined
   'assistant.panel.noneRunning': undefined
   'assistant.panel.notDelivered': undefined
   'assistant.panel.notDeliveredDetail': undefined

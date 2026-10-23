@@ -391,6 +391,10 @@
     "defaultMessage": "{id} from {from} ({state, select, queued {waiting} offered {typed, not fetched or acked yet} other {its offer not confirmed}}): {text}",
     "description": "A message left for an agent, in the menu of its unread messages: its id, who from ({from}), its state (waiting; typed into the agent but not fetched or acked; or offered but not confirmed), and the start of its text ({text}, the sender's own words)."
   },
+  "panes.messages.noWakesHint": {
+    "defaultMessage": "Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.",
+    "description": "A hint line under the heading of an agent's unread messages menu, when the setting Wake an idle agent is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them."
+  },
   "panes.messages.notDelivered": {
     "defaultMessage": "{agent} wasn't told now",
     "description": "A notice's title: Deliver Now couldn't type the line into the agent's terminal now. {agent} is its name."
@@ -412,8 +416,8 @@
     "description": "The heading of the menu of an agent's unread messages, above the list of them: how many ({n}) for the agent ({agent}: its name). hive_inbox is a tool's name: keep it."
   },
   "panes.messages.tipNoWakes": {
-    "defaultMessage": "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet. Wake an idle agent is off, so nothing is typed by itself: Deliver Now types its line once, or it reads them with hive_inbox.",
-    "description": "The heading of the menu of an agent's unread messages when the setting Wake an idle agent is off: how many ({n}) for the agent ({agent}: its name). Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them. hive_inbox is a tool's name: keep it."
+    "defaultMessage": "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet",
+    "description": "The heading of the menu of an agent's unread messages when the setting Wake an idle agent is off (a hint line under it says so): how many ({n}) for the agent ({agent}: its name)."
   },
   "panes.messages.unread": {
     "defaultMessage": "{n, plural, one {# unread} other {# unread}}",
