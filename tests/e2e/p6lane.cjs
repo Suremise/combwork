@@ -139,6 +139,8 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
       // The sections the platform always shows: an old queue's section goes once nothing of it is in flight.
       for (const id of ids ? want : []) {
         await section(id)
+        // The Merge queue once its queues are read (#1484: a shot taken before showed the section empty).
+        if (id === 'queue') await waitHung(async () => (await page.locator('.git-queue').count()) === 1 && (await page.locator('[data-queue-reading]').count()) === 0)
         await shoot(`vc-${name}-${id}`, { loc: page.locator('.vc-view') })
       }
       return ids
@@ -581,6 +583,23 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     const nStarted = (await factsOf(nc, 'Started')).at(-1)?.data
     check("a new card starts under None's rules (a manifest, no line)", ns.status === 200 && !!nStarted?.manifest && !nStarted?.line, JSON.stringify({ ns: ns.body, nStarted }))
     await shootSections('none', ['workflow'])
+    // The old Git queue's section (#1356's rule) with the repository gone (#1484): never empty.
+    const queueTab = page.locator('.git-sections [data-section="queue"]')
+    check('None, a Git card still in flight: the Merge queue section stays', (await queueTab.count()) === 1, JSON.stringify(await page.locator('.git-sections [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section')))))
+    if ((await queueTab.count()) === 1) {
+      // Read slowly (as under load): the section says it's reading, never nothing.
+      await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'queue:list=3000' })
+      await section('workflow')
+      await section('queue')
+      const reading = page.locator('.git-body [data-queue-reading]')
+      check('the Merge queue section, while its queues are read, says so', !!(await waitHung(async () => (await reading.count()) === 1 && (await text(reading)) === 'Reading the merge queues…')), (await page.locator('.git-body').innerHTML().catch(() => '')).slice(0, 600))
+      await page.locator('.vc-view').screenshot({ path: path.join(fx.shots, 'p6lane-vc-none-queue-reading-en-dark.png') })
+      await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
+      // Then the old queue as the board has it, with its history: the repository gone takes none of it away.
+      const body = page.locator('.git-body')
+      check('None, the repository gone: the Merge queue section shows the queue and its history', !!(await waitHung(async () => (await body.locator('.git-queue-target[data-target="main"]').count()) === 1 && (await body.locator('.git-queue-table tr[data-outcome="merged"]').count()) >= 2)), JSON.stringify({ html: (await body.innerHTML().catch(() => '')).slice(0, 600) }))
+      await shootSections('none-queue', ['queue'])
+    }
   } catch (e) {
     check('no exception', false, e.stack)
     await page.screenshot({ path: path.join(fx.shots, 'p6lane-failure.png') }).catch(() => {})
