@@ -396,7 +396,7 @@ describe('a card by intent (#1267)', () => {
           config.settings.providers['claude-code'].enabled = true
           providerService.info = ((id: string) => ({ provider: id, found: true })) as never
           mkdirSync(join(w.path!, '.hive', 'templates'), { recursive: true })
-          writeFileSync(join(w.path!, '.hive', 'templates', `solo-${n}.json`), JSON.stringify({ version: 1, name: 'Solo', layout: 'auto', agents: [{ name: `Solo${n}`, provider: 'claude-code', worktree: false }] }))
+          writeFileSync(join(w.path!, '.hive', 'templates', `solo-${n}.json`), JSON.stringify({ version: 2, name: 'Solo', layout: 'auto', agents: [{ name: `Solo${n}`, role: 'builder', provider: 'claude-code' }] }))
           return templates.loadTemplate(p, 'workspace', `solo-${n}.json`, await agentIds(w))
         })
     ],
