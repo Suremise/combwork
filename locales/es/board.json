@@ -22,6 +22,7 @@
   "board.archiveAll.messageColumn": "¿Archivar {n, plural, one {# tarjeta} many {# tarjetas} other {# tarjetas}} de la columna {column}? Puedes desarchivarlas desde Archivadas.",
   "board.archiveAll.messageShown": "¿Archivar {n, plural, one {la # tarjeta mostrada} many {las # tarjetas mostradas} other {las # tarjetas mostradas}} (de {total, number})? Puedes desarchivarlas desde Archivadas.",
   "board.archiveAll.messageShownIn": "¿Archivar {n, plural, one {la # tarjeta mostrada} many {las # tarjetas mostradas} other {las # tarjetas mostradas}} en la columna {column} (de {total, number})? Puedes desarchivarlas desde Archivadas.",
+  "board.archiveAll.noneLeft": "{hasColumn, select, yes {No quedan tarjetas que archivar en la columna {column}: se movieron mientras esto estaba abierto.} other {No quedan tarjetas que archivar: se movieron mientras esto estaba abierto.}}",
   "board.archiveAll.titleAll": "¿Archivar todas las tarjetas?",
   "board.archiveAll.titleColumn": "¿Archivar toda la columna {column}?",
   "board.archiveAll.titleShown": "{n, plural, one {¿Archivar la # tarjeta mostrada?} many {¿Archivar las # tarjetas mostradas?} other {¿Archivar las # tarjetas mostradas?}}",

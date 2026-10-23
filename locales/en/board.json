@@ -91,6 +91,10 @@
     "defaultMessage": "Archive the {n, plural, one {# card} other {# cards}} shown in {column} (of {total, number})? You can unarchive them from Archived.",
     "description": "The Archive All dialog for a column a search narrows: archives the {n} cards shown in {column} (its name), of its {total}. Archived is the checkbox that shows archived cards."
   },
+  "board.archiveAll.noneLeft": {
+    "defaultMessage": "{hasColumn, select, yes {No cards are left in {column} to archive: they moved on while this was open.} other {No cards are left to archive: they moved on while this was open.}}",
+    "description": "In the Archive All dialog when every card it would have archived left while it was open (moved to another column or stage, or archived): nothing is left to archive. With hasColumn yes, {column} is the column's or stage's name (select: translate each sentence)."
+  },
   "board.archiveAll.titleAll": {
     "defaultMessage": "Archive All Cards?",
     "description": "Title of the Archive All dialog for the whole board."

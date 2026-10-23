@@ -22,6 +22,7 @@
   "board.archiveAll.messageColumn": "Arquivar {n, plural, =0 {# cartões} one {# cartão} other {# cartões}} em {column}? Você pode desarquivá-los em Arquivados.",
   "board.archiveAll.messageShown": "Arquivar {n, plural, =0 {os # cartões mostrados} one {o # cartão mostrado} other {os # cartões mostrados}} (de {total, number})? Você pode desarquivá-los em Arquivados.",
   "board.archiveAll.messageShownIn": "Arquivar {n, plural, =0 {os # cartões mostrados} one {o # cartão mostrado} other {os # cartões mostrados}} em {column} (de {total, number})? Você pode desarquivá-los em Arquivados.",
+  "board.archiveAll.noneLeft": "{hasColumn, select, yes {Não há mais cartões para arquivar em {column}: eles foram movidos enquanto isto estava aberto.} other {Não há mais cartões para arquivar: eles foram movidos enquanto isto estava aberto.}}",
   "board.archiveAll.titleAll": "Arquivar todos os cartões?",
   "board.archiveAll.titleColumn": "Arquivar todos em {column}?",
   "board.archiveAll.titleShown": "{n, plural, =0 {Arquivar os # cartões mostrados?} one {Arquivar o # cartão mostrado?} other {Arquivar os # cartões mostrados?}}",

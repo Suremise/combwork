@@ -22,6 +22,7 @@
   "board.archiveAll.messageColumn": "{column}の{n, plural, other {#件のカード}}をアーカイブしますか？「アーカイブ済み」から戻せます。",
   "board.archiveAll.messageShown": "表示中の{n, plural, other {#件のカード}}（全{total, number}件）をアーカイブしますか？「アーカイブ済み」から戻せます。",
   "board.archiveAll.messageShownIn": "{column}に表示中の{n, plural, other {#件のカード}}（全{total, number}件）をアーカイブしますか？「アーカイブ済み」から戻せます。",
+  "board.archiveAll.noneLeft": "{hasColumn, select, yes {{column}にアーカイブできるカードは残っていません。このダイアログを開いている間に移動しました。} other {アーカイブできるカードは残っていません。このダイアログを開いている間に移動しました。}}",
   "board.archiveAll.titleAll": "すべてのカードをアーカイブしますか？",
   "board.archiveAll.titleColumn": "{column}のカードをすべてアーカイブしますか？",
   "board.archiveAll.titleShown": "{n, plural, other {表示中の#件のカードをアーカイブしますか？}}",

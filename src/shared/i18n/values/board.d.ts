@@ -24,6 +24,7 @@ interface HiveMessageValues {
   'board.archiveAll.messageColumn': { n: number; column: string | number }
   'board.archiveAll.messageShown': { n: number; total: number }
   'board.archiveAll.messageShownIn': { n: number; column: string | number; total: number }
+  'board.archiveAll.noneLeft': { hasColumn: string; column: string | number }
   'board.archiveAll.titleAll': undefined
   'board.archiveAll.titleColumn': { column: string | number }
   'board.archiveAll.titleShown': { n: number }

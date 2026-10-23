@@ -22,6 +22,7 @@
   "board.archiveAll.messageColumn": "Archiver {n, plural, one {# carte} many {# cartes} other {# cartes}} de la colonne {column} ? Tu peux les désarchiver depuis Archivées.",
   "board.archiveAll.messageShown": "Archiver {n, plural, one {la carte affichée} many {les # cartes affichées} other {les # cartes affichées}} (sur {total, number}) ? Tu peux les désarchiver depuis Archivées.",
   "board.archiveAll.messageShownIn": "Archiver {n, plural, one {la carte affichée} many {les # cartes affichées} other {les # cartes affichées}} dans la colonne {column} (sur {total, number}) ? Tu peux les désarchiver depuis Archivées.",
+  "board.archiveAll.noneLeft": "{hasColumn, select, yes {Il ne reste aucune carte à archiver dans la colonne {column} : elles ont bougé pendant que cette fenêtre était ouverte.} other {Il ne reste aucune carte à archiver : elles ont bougé pendant que cette fenêtre était ouverte.}}",
   "board.archiveAll.titleAll": "Archiver toutes les cartes ?",
   "board.archiveAll.titleColumn": "Tout archiver dans la colonne {column} ?",
   "board.archiveAll.titleShown": "{n, plural, one {Archiver la carte affichée ?} many {Archiver les # cartes affichées ?} other {Archiver les # cartes affichées ?}}",

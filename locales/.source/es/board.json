@@ -22,6 +22,7 @@
   "board.archiveAll.messageColumn": "Archive {n, plural, one {# card} other {# cards}} in {column}? You can unarchive them from Archived.",
   "board.archiveAll.messageShown": "Archive the {n, plural, one {# card} other {# cards}} shown (of {total, number})? You can unarchive them from Archived.",
   "board.archiveAll.messageShownIn": "Archive the {n, plural, one {# card} other {# cards}} shown in {column} (of {total, number})? You can unarchive them from Archived.",
+  "board.archiveAll.noneLeft": "{hasColumn, select, yes {No cards are left in {column} to archive: they moved on while this was open.} other {No cards are left to archive: they moved on while this was open.}}",
   "board.archiveAll.titleAll": "Archive All Cards?",
   "board.archiveAll.titleColumn": "Archive All in {column}?",
   "board.archiveAll.titleShown": "{n, plural, one {Archive the # Shown Card?} other {Archive the # Shown Cards?}}",
