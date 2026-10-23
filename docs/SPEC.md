@@ -3632,8 +3632,8 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
 - **P7** [#1123 c]: lane rows name their slot ("HI-B1 / HI-R1 · slot-b"); pooled reviewers ("HI-B1 / pool"); review
   copies' runs as checks of the revision; slot warming as runs; "waiting for a slot". **Built [#1446]:**
   - **The lane row's slot:** "HI-B1 / HI-R1 · slot-b" (its builder's carried slot, #1441: "· hb2"), a link to Version
-    Control → Branches & remotes, where the slots are listed. `LaneInfo.slotInfo` (main's `laneSlot`: the lane's open
-    lease, else the builder's carried one) gives the hover: ready or being prepared (a warming operation or a slot being
+    Control → Branches & remotes, where the slots are listed. `LaneInfo.slotInfo` (main's `laneSlot`: of the lane's
+    project's leases only, the lane's open lease, else the builder's carried one) gives the hover: ready or being prepared (a warming operation or a slot being
     created), since when it was lent (or kept), and the current card's line there (the last `Started` under the lease).
   - **Pooled reviewers:** "HI-B1 / pool" (#1443). The hover names who reviews the current card now and who gave its last
     verdict, passed or failed (`LaneInfo.poolReview`, from the cards' facts); a reviewer serving several lanes is in each
