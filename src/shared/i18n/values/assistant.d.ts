@@ -159,12 +159,17 @@ interface HiveMessageValues {
   'assistant.panel.counts': { running: string | number; projects: number }
   'assistant.panel.default': undefined
   'assistant.panel.defaultMode': { name: string | number }
+  'assistant.panel.deliverFailed': undefined
+  'assistant.panel.deliverNow': undefined
   'assistant.panel.doneBy': undefined
   'assistant.panel.ended': undefined
   'assistant.panel.fold': undefined
   'assistant.panel.foldTip': { hasKey: string; key: string | number }
   'assistant.panel.forWorkspace': undefined
   'assistant.panel.inactive': { count: number }
+  'assistant.panel.inboxLine': { id: string | number; from: string | number; text: string | number }
+  'assistant.panel.inboxTip': { n: number }
+  'assistant.panel.inboxTipNoWakes': { n: number }
   'assistant.panel.listFailed': undefined
   'assistant.panel.manageModes': undefined
   'assistant.panel.markLabel': { name: string | number; state: string | number; running: string; hasDetail: string; detail: string | number }
@@ -187,7 +192,10 @@ interface HiveMessageValues {
   'assistant.panel.noConversations': undefined
   'assistant.panel.noEdits': undefined
   'assistant.panel.noProjects': undefined
+  'assistant.panel.noWakesHint': undefined
   'assistant.panel.noneRunning': undefined
+  'assistant.panel.notDelivered': undefined
+  'assistant.panel.notDeliveredDetail': undefined
   'assistant.panel.notDone': { error: string | number }
   'assistant.panel.nothingToCompact': undefined
   'assistant.panel.openCard': { known: string; number: string | number; column: string | number }
@@ -232,6 +240,7 @@ interface HiveMessageValues {
   'assistant.panel.theAssistant': undefined
   'assistant.panel.title': undefined
   'assistant.panel.transcriptAdvice': undefined
+  'assistant.panel.unreadCount': { n: number }
   'assistant.panel.watches': { name: string | number }
   'assistant.panel.workingOn': { number: string | number; title: string | number }
   'assistant.panel.workspace': undefined

@@ -2805,6 +2805,26 @@ Code `--add-dir <pool>`; Codex a `-c` override adding the pool to the workspace-
 reviewers review in the slot read-only as today, which the option row says. Builds and tests in the copy then run
 within the CLI's own permission mode.
 
+**Built [#1435], the pool (main; the reviewer's side is #1439):** `src/main/copies.ts` and `copiesApp.ts`, tables `copies`
+and `copy_leases` (the 1.0 group's `copies` step). A copy is `creating`, `free`, `leased`, `returning`, `dirty` or `gone`;
+at most one lease per copy that isn't freed (a partial unique index). Leasing reserves a free copy (or makes `copy-N`
+while under the size: the larger of 2 and the reviewing agents plus one, or `project.json` `copies.size`), then resets
+it to the revision (`git checkout --detach --force`, `git clean -fd`; a new or gone one made with `git worktree add
+--detach` and the project's copied files), installing when its lock files changed (Hive's run, "Hive (copy copy-1)").
+A lease carries the holder Hive's profile, pid and start. **Returning** makes it `returning`; the **quiescence barrier**
+frees it only when, in order, no Progress run has its folder in the copy, its lease's job (an isolated run's processes)
+is settled (#1429's `slotJobs.ts`: ended, journal sealed and read, seen gone), its holder agent isn't in a turn or
+running background tasks, and a rename of its folder aside and back succeeds; otherwise it stays returning, looked at
+again every 30 s and on each lease. Past Settings → Advanced, **Copies: wait for one to be free**
+(`hive.copies.quietWaitMinutes`, 10), a lease that finds none free says which copy is still in use and by what. At a
+restart a lease whose Hive is gone, or (this Hive's) whose run is over, is returned and goes through the barrier. A free
+copy is looked at again under its next reservation (a run or a process in it since: passed over, never reset under
+it), and a lease returned while its copy is being reset is never handed over: the copy is returning when the reset
+ends. An operation taken over keeps its kind, so a taker that is itself interrupted leaves the same recovery.
+Leasing and removal are operations owning the copy as slots' are. **Reviewers review in review copies**
+(`hive.copies.review`, on) is the switch #1439 reads: off, a review lease is refused `off`. Copies beyond the size unused
+for a day go hourly (Remove idle slots after a day).
+
 **G17**: one reviewer per lane, or a shared pool that takes the next
 Submitted card (oldest first). Run records attached to the revision let a reviewer trust the builder's runs instead of
 repeating them (#533) [note §8].
@@ -2877,7 +2897,7 @@ repeating them (#533) [note §8].
 - **Skill delivery** (#966 row 15, group C, P7): slots get their own skill copies (Codex, Copilot), Hive's owned copies
   are cleaned up safely, and the user chooses which skills are delivered [#966].
 - **Carrying on** (#966 row 16, P7): a switch that separates inbox availability, checkpoints, Stop continuation and
-  idle wakes, without dropping deliveries [#966].
+  idle wakes, without dropping deliveries [#966]. **Built [#1432]**: §16.15, group C's row 16.
 
 #### 16.10.8 Migration
 
@@ -3096,7 +3116,21 @@ runs the check in a **check copy**, a detached worktree at the card's revision f
 copies (§16.10.5), leased to that run and written by nothing else, so it counts whatever happens in the folder. The
 refusal's next step names it ("another agent changed files during your run: run it isolated"). A reviewer's runs in a
 review copy count for the revision it holds (§16.10.5). None has no check copies (no isolation, OP-16): its remedy is
-running again when the deliverables are quiet, which the refusal says. Hive running pre-review checks itself is OP-27.
+running again when the deliverables are quiet, which the refusal says.
+**Built [#1435]:** `--isolated` (with `--check` only, by an agent, on Git) asks resolve for a check copy. It is leased at
+the card's revision apart from the request (`IsolatedRequests`: a first setup takes longer than any request may): resolve
+answers within 2 s, with the copy or 409 `wait` and a ticket, and hive-progress asks again with the ticket every 2 s,
+saying what it waits for once (*waiting for a check copy*, *… to be set up*); a copy leased for a ticket nobody asks
+about for a minute is given back (`abandoned`). The lease's job is opened on the process supervisor (`copy-<lease>`,
+recorded on the lease first). hive-progress then starts the command's launcher (#1360's, `workflow/launcher.ts`) in the
+copy and has Hive put it in that job (`POST /v1/progress/isolated`) before it runs anything: only by the lease's agent,
+once per lease, and only a process of that agent's own (in its launch's job, started in the window it names). The run's start takes the lease,
+its finish returns it after its `CheckRan` (`isolated: true`), and **Stop** on its row in the Progress panel
+(`progress:stop`) ends the job, so the whole tree ends, and the run is recorded as stopped. Any run whose folder is in a leased copy of the caller's own
+project is linked to the lease's card and revision (runLink's `copyAt`), never the agent's card in Doing; naming another
+card there is refused. Another project's copy is no copy to an agent: nothing of its lease is read or shown.
+The run's details name the copy (`ProgressRun.copy`). A lane waiting for a copy has the status `checkCopy` (*waiting
+for a check copy for HI-12*). Hive running pre-review checks itself is OP-27.
 
 **The queue's runs, attributed to Hive** (§16.9.1 step 5). **Built [#1349]:** a run Hive starts itself has
 `source: 'hive'`, is the card's project's, and shows as **Hive (merge queue)** (`defaultName: 'mergeQueue'`, in the
@@ -3303,9 +3337,26 @@ it can't. One owner per switch; each defaults to today's behaviour; never writte
 | E (24, 26–30) | Ctrl+C/V passthrough; all-keys passthrough; the OSC 52 policy; prompt fidelity (Ctrl+U clearing a draft, collapsed whitespace, stripped characters); raw variants of Hive's wrapped prompts | P4 |
 | #1167 (19–23, 25, 34) | Copilot auto-update (both suppressors, every path); right-click for Claude Code and Codex; Codex terminal title omitted; `--system-prompt-snapshot off`; `--allow-all-mcp-server-instructions`; Codex `--no-daemon` (only if verified); model/effort flags (check first) | P4 |
 | #1174 | Codex: the Assistant pre-approves only its Control subset of Hive tools (parity; built in #1281, §9.3) | P4 |
-| C (15, 16) | Skill delivery per slot and choice of skills; carrying on (inbox, checkpoints, Stop continuation, idle wakes) | P7 |
+| C (15, 16) | Skill delivery per slot and choice of skills; carrying on (inbox, checkpoints, Stop continuation, idle wakes): row 16 **Built [#1432]** (below) | P7 |
 | F (31–33, 35–38), probes (39–42) | No switch: they are the integration itself (reasons on #966) | — |
 | 9, 17, 18 | Already switchable (file locks, background sessions, 200K): one owner, no duplicate | — |
+
+**Group C's row 16, carrying on** (#1432; `shared/inboxSwitches.ts`): how Hive gets an agent to read its inbox, three
+booleans in Advanced under Hive, each on by default and read at each use, with a project's own in Project Settings →
+Sessions (`inboxCheckpoints`, `inboxStopContinuation`, `inboxIdleWakes` in project.json: inherit, on or off; the
+Assistant's home has no project, so it follows Settings', which its Control tip says). Whether an agent can read an
+inbox at all stays the Agent API's (its hive tools, `agentReadsInbox`): Advanced links to it beside them, no second
+switch.
+- `hive.inbox.checkpoints`: off, `noticeFor` gives no notice at the end of a tool (and doesn't count one as told).
+- `hive.inbox.stopContinuation`: off, no drain: the Stop gets no reply, so Codex and Copilot aren't blocked and Claude
+  Code gets no context; the turn ends as the CLI ends it.
+- `hive.inbox.idleWakes`: off, `offerOnce` types no doorbell for what waits, of any kind (messages, card events and
+  loop wakes, watches' wakes, decisions, mode notices). A task given now (`deliverNow`: a card started on a running
+  agent, hive_send_task) and a launch's own prompt (`launchWith`) are no wakes and are typed as before. The pane's
+  unread menu says nothing is typed by itself and offers **Deliver Now** (`session:deliverNow`: one offer, as asked).
+- **No delivery dropped**: with any of them off an item stays in the inbox, unread, with the overdue rules as before;
+  with checkpoints and Stop continuation off an idle wake still tells the agent once its turn ends
+  (`tests/carryingOn.test.ts` lists every combination by the agent's state).
 
 **Group E's plain switches** (#1286; rows 24, 28, 29): Hive's own handling, the same for every CLI, so each is one row
 under Hive in Advanced (no CLI's recording to check it against), defaulting to what Hive did before:

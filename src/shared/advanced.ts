@@ -21,6 +21,7 @@ import { CLAUDE_FOOTER_MODES } from './claude'
 import { COPILOT_FOOTER_MODES } from './copilot'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from './defaults'
 import { fmt, language, msg, tr, type Msg } from './i18n'
+import { INBOX_SWITCH_ID } from './inboxSwitches'
 import { SAFEGUARD_DEFAULTS } from './safeguards'
 import type { ProviderId } from './types'
 
@@ -183,6 +184,12 @@ export const SLOTS_REMOVE_IDLE = 'hive.slots.removeIdle'
 
 /** The longest a slot's setup, install or archive command runs, in minutes (#1429): read by main's slotsApp. */
 export const SLOTS_SETUP_MINUTES = 'hive.slots.setupMinutes'
+
+/** Whether reviewers review in review copies (#1435, SPEC §16.10.5): read by main's copiesApp. */
+export const COPIES_REVIEW = 'hive.copies.review'
+
+/** How long a returned copy waits to be quiet before it shows as still in use, in minutes (#1435): read by main's copiesApp. */
+export const COPIES_QUIET_WAIT = 'hive.copies.quietWaitMinutes'
 
 /** Ctrl+C and Ctrl+V in an agent's pane go to its CLI rather than Hive's copy and paste (#1286, #966 row 24): read by TerminalView. */
 export const CTRL_CV_TO_CLI = 'hive.terminal.ctrlCVToCli'
@@ -634,6 +641,36 @@ const SOURCES: readonly AdvancedSource[] = [
     unit: 'min',
     applies: 'now'
   },
+  // Review and check copies (#1435, SPEC §16.10.5, §16.13): reviewers read and run commands in a copy at the exact revision.
+  {
+    id: COPIES_REVIEW,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.copies.review.title', defaultMessage: 'Reviewers review in review copies', description: "An advanced setting's title (Settings → Advanced), listed under Hive. A review copy is a folder Hive keeps at the exact revision a reviewer reviews, which nothing else writes." }),
+    desc: msg({
+      id: 'settings.advanced.hive.copies.review.desc',
+      defaultMessage: "A reviewer reads a card's work, and runs its commands, in a review copy: a folder at exactly the revision under review, which nothing else writes, so what it checks is what was submitted. Turned off, reviewers read the builder's folder as before. Isolated checks (hive-progress --check with --isolated) use the same copies either way.",
+      description: 'What the advanced setting "Reviewers review in review copies" does (Settings → Advanced, under Hive). hive-progress --check and --isolated are a command and its options: keep them as they are.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
+  {
+    id: COPIES_QUIET_WAIT,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.copies.quietWaitMinutes.title', defaultMessage: 'Copies: wait for one to be free', description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"10 min\"). A copy is a folder Hive keeps at one revision for a review or an isolated check." }),
+    desc: msg({
+      id: 'settings.advanced.hive.copies.quietWaitMinutes.desc',
+      defaultMessage: 'A returned review or check copy is used again only once nothing is running in it: no run, no process its check started, its reviewer idle. Past this many minutes, a check waiting for a copy says which copy is still in use and by what. Hive never resets a copy something is still running in.',
+      description: 'What the advanced setting "Copies: wait for one to be free" does (Settings → Advanced, under Hive).'
+    }),
+    kind: 'number',
+    default: 10,
+    min: 1,
+    max: 1440,
+    unit: 'min',
+    applies: 'now'
+  },
   // Switches for what Hive does with the pane's keys and with what it types (#1286, #966 rows 24, 28, 29): Hive's own
   // handling, the same for every CLI, so one row each. Each defaults to what Hive did before.
   {
@@ -763,6 +800,47 @@ const SOURCES: readonly AdvancedSource[] = [
     kind: 'boolean',
     default: true,
     applies: 'sessions'
+  },
+  // Carrying on (#1432, #966 row 16; shared/inboxSwitches.ts): how Hive gets an agent to read its inbox, one switch each,
+  // apart from whether it can read one (its hive tools). None drops an item: off, it stays in the inbox.
+  {
+    id: INBOX_SWITCH_ID.checkpoints,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.inbox.checkpoints.title', defaultMessage: 'Tell a working agent at the end of a tool', description: "An advanced setting's title (Settings → Advanced), listed under Hive: Hive tells a busy agent what has arrived in its inbox each time one of its tool calls ends." }),
+    desc: msg({
+      id: 'settings.advanced.hive.inbox.checkpoints.desc',
+      defaultMessage: "When something arrives in a working agent's inbox, Hive tells it at the end of its next tool call, in that tool's reply, so it can read it without stopping. Turned off, a working agent isn't told until its turn ends or it is idle; nothing is lost, as it stays in the inbox. A project can set its own in Project Settings → Sessions.",
+      description: 'What the advanced setting "Tell a working agent at the end of a tool" does (Settings → Advanced, under Hive). Project Settings → Sessions names a section of the project\'s settings: use its name as Hive shows it.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
+  {
+    id: INBOX_SWITCH_ID.stopContinuation,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.inbox.stopContinuation.title', defaultMessage: 'Keep an agent going when it stops with unread items', description: "An advanced setting's title (Settings → Advanced), listed under Hive: when an agent is about to end its turn with items in its inbox it hasn't read, Hive makes it carry on and read them." }),
+    desc: msg({
+      id: 'settings.advanced.hive.inbox.stopContinuation.desc',
+      defaultMessage: "When an agent is about to end its turn with items in its inbox it hasn't read, Hive keeps it going to read them first, once a turn: Codex and Copilot by holding their stop back, Claude Code by adding a line to its stop. Turned off, the turn ends as the CLI ends it, and the items wait in the inbox for an idle wake. A project can set its own in Project Settings → Sessions.",
+      description: 'What the advanced setting "Keep an agent going when it stops with unread items" does (Settings → Advanced, under Hive). Codex, Copilot and Claude Code are CLIs\' names: keep them. Project Settings → Sessions names a section of the project\'s settings: use its name as Hive shows it.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
+  {
+    id: INBOX_SWITCH_ID.idleWakes,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.inbox.idleWakes.title', defaultMessage: 'Wake an idle agent', description: "An advanced setting's title (Settings → Advanced), listed under Hive: Hive types a short line into an idle agent's terminal to tell it something has arrived in its inbox." }),
+    desc: msg({
+      id: 'settings.advanced.hive.inbox.idleWakes.desc',
+      defaultMessage: "When something arrives in an idle agent's inbox, Hive types one short line into its terminal saying so, which wakes it. Card loops' wakes (Project Settings → Card loops → Wake reviewers and builders) and card watches' are such wakes. Turned off, nothing is typed for anything waiting: it stays in the inbox, the agent's pane shows how many, and its Deliver Now types the line once. A card started on an agent, or a task given to it now, is still typed. A project can set its own in Project Settings → Sessions.",
+      description: 'What the advanced setting "Wake an idle agent" does (Settings → Advanced, under Hive). Project Settings → Card loops → Wake reviewers and builders names a setting and Project Settings → Sessions a section, Deliver Now a menu item: use their names as Hive shows them.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
   },
   // Claude Code
   {

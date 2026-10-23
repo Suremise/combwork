@@ -178,6 +178,8 @@ export class WorkspaceService {
    * moves back.
    */
   private savedAt = new Map<string, number>()
+  /** How many times Hive has written each project's project.json (#1432): a reader can tell it changed since it read. */
+  private configWrites = new Map<string, number>()
   private readAt = new WeakMap<ProjectInfo, number>()
   /** The projects the last refresh reported (lower-cased) and its listing's ticket: one missing was gone by then (#784). */
   private listedAt: { ticket: number; known: Set<string> } | null = null
@@ -944,6 +946,11 @@ export class WorkspaceService {
     return this.isAssistantHome(projectPath) ? assistantProjectConfig(cfg, config.settings) : cfg
   }
 
+  /** How many times Hive has written this project's project.json since it started (#1432): compared, whether it changed since a read. */
+  projectConfigWrites(projectPath: string): number {
+    return this.configWrites.get(projectPath.toLowerCase()) ?? 0
+  }
+
   async updateProjectConfig(projectPath: string, patch: Partial<ProjectConfig>): Promise<ProjectConfig> {
     return this.mutateProjectConfig(projectPath, () => patch)
   }
@@ -965,6 +972,7 @@ export class WorkspaceService {
       // every agent keeps its cell (not one worked out again from the order on each read).
       if ('agents' in patch && updated.placement) updated = { ...updated, placement: settlePlacements(updated.placement, projectAgents(updated).map((a) => a.id)) }
       await writeKeptJson(file, withLegacyProjectFields(updated))
+      this.configWrites.set(projectPath.toLowerCase(), this.projectConfigWrites(projectPath) + 1)
       // As it is written: a read begun before now may have found the config from before.
       ticket = ++this.rootTickets
       return updated

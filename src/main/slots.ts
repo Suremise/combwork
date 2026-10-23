@@ -556,7 +556,9 @@ export interface LeaseRequest {
 
 /** One of Hive's runs for a slot: its setup, an install, its archive command, in the job recorded for it. */
 export interface SlotRun {
+  /** The slot's name (or the copy's, with `of: 'copy'`: #1435's copies run theirs the same way). */
   slot: string
+  of?: 'copy'
   what: 'setup' | 'install' | 'archive'
   command: string
   folder: string

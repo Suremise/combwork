@@ -5,10 +5,11 @@ import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
 import { delimiter, extname, isAbsolute, join } from 'node:path'
-import { estimateFor, ProgressRun, progressTarget, recordTiming, resolveRun, type Fetch, type ProgressStart, type RunLink } from './report.mts'
+import { assignIsolated, estimateFor, ProgressRun, progressTarget, recordTiming, resolveRun, type Fetch, type ProgressStart, type RunLink } from './report.mts'
+import { startLauncher } from '../workflow/launcher'
 
 export const USAGE = `Usage: hive-progress [--title <title>] [--card <card>] [--revision <commit>] -- <command> [args...]
-       hive-progress --check <name> [--title <title>] [--card <card>] [--revision <commit>]
+       hive-progress --check <name> [--isolated] [--title <title>] [--card <card>] [--revision <commit>]
 
 Runs the command, passing its output through and returning its exit code, and shows it in Hive's Progress panel
 with the time it usually takes, and the card and revision it ran for.
@@ -16,6 +17,8 @@ with the time it usually takes, and the card and revision it ran for.
   --revision <commit> the commit it runs on: it must be what is checked out here, or nothing runs; without it,
                       what is checked out when it starts
   --check <name>      runs the project's command for that check (the project's options name it), not one of yours
+  --isolated          with --check: runs it in a check copy of its own at the card's revision, which nothing else
+                      writes, so another agent's edits here can't spoil it (waits for a copy when none is free)
 A line the command prints like
   ##hive-progress step=4 total=12 name=carddialog
 says step 4 of 12 (carddialog) is starting, and isn't shown. The first total given is the run's: give it within the
@@ -32,6 +35,8 @@ export interface WrapperOptions {
   card?: string
   revision?: string
   check?: string
+  /** Run the check in a check copy (#1435). */
+  isolated?: true
 }
 
 /** The command to run (empty with --check: the project's command for it runs), or help, or what's wrong. */
@@ -43,6 +48,7 @@ export function parseArgs(argv: string[]): WrapperArgs {
   const opts: WrapperOptions = {}
   const done = (command: string[], afterDashes: boolean): WrapperArgs => {
     if (opts.check !== undefined) return command.length ? { error: `--check runs the project's command for ${opts.check || 'the check'}: give no command of your own.` } : { ...opts, command }
+    if (opts.isolated) return { error: '--isolated runs a check in a copy of its own: use it with --check <name>.' }
     if (command.length) return { ...opts, command }
     return { error: afterDashes ? 'No command after --.' : 'No command given.' }
   }
@@ -52,10 +58,10 @@ export function parseArgs(argv: string[]): WrapperArgs {
     if (a === '--help' || a === '-h') return { help: true }
     const v = VALUED.exec(a)
     if (v) {
-      const name = v[1] as keyof WrapperOptions
+      const name = v[1] as 'title' | 'card' | 'revision' | 'check'
       if (v[2] === undefined && i + 1 >= argv.length) return { error: name === 'card' ? '--card needs a value: quote it, as in --card "#1061" (a shell takes an unquoted # for the start of a comment).' : `--${name} needs a value.` }
       opts[name] = v[2] ?? argv[++i]
-    } else if (a === '--isolated') return { error: '--isolated (a check run in a copy of its own) comes with check copies in a later Hive: run the check without it.' }
+    } else if (a === '--isolated') opts.isolated = true
     else if (a.startsWith('-')) return { error: `Unknown option ${a}.` }
     else return done(argv.slice(i), false)
   }
@@ -262,7 +268,12 @@ export interface WrapperIo {
   viaElectron?: boolean
   /** The stop signals it listens for (default STOP_SIGNALS); tests pass none, or their own. */
   signals?: NodeJS.Signals[]
+  /** How often an isolated check waiting for a check copy asks again (default ISOLATED_POLL_MS). */
+  isolatedPollMs?: number
 }
+
+/** How often an isolated check waiting for a check copy asks Hive again (#1435). */
+const ISOLATED_POLL_MS = 2000
 
 /**
  * The command's run as reported: it starts at the first step line that gives the total, or after `waitMs`, so steps
@@ -472,13 +483,25 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
   // with no command is refused here. An older Hive, or one that doesn't answer, just doesn't link it.
   let link: RunLink | null = null
   if (target) {
-    const r = await resolveRun(target, { folder: io.cwd, ...(parsed.card !== undefined ? { card: parsed.card } : {}), ...(parsed.revision !== undefined ? { revision: parsed.revision } : {}), ...(parsed.check !== undefined ? { check: parsed.check } : {}) }, { fetch: io.fetch, timeoutMs: io.resolveTimeoutMs })
+    const ask = { folder: io.cwd, ...(parsed.card !== undefined ? { card: parsed.card } : {}), ...(parsed.revision !== undefined ? { revision: parsed.revision } : {}), ...(parsed.check !== undefined ? { check: parsed.check } : {}), ...(parsed.isolated ? { isolated: true as const } : {}) }
+    let r = await resolveRun(target, ask, { fetch: io.fetch, timeoutMs: io.resolveTimeoutMs })
+    // No check copy free (#1435): said once, then asked again until one is (Ctrl+C stops waiting).
+    let said = ''
+    while ('wait' in r) {
+      if (r.wait !== said) io.stderr.write(`hive-progress: waiting for ${(said = r.wait)}\n`)
+      await new Promise((res) => setTimeout(res, io.isolatedPollMs ?? ISOLATED_POLL_MS))
+      // Asked again with its ticket: the copy Hive is setting up for this run (none: a new ask).
+      r = await resolveRun(target, { ...ask, ...(r.ticket ? { ticket: r.ticket } : {}) }, { fetch: io.fetch, timeoutMs: io.resolveTimeoutMs })
+    }
     if ('refused' in r) {
       io.stderr.write(`hive-progress: ${r.refused}\n`)
       return 2
     }
     if ('link' in r) link = r.link
-    else if (parsed.check !== undefined) {
+    else if (parsed.isolated) {
+      io.stderr.write(`hive-progress: Hive couldn't be reached to lend a check copy, so nothing was run.\n`)
+      return 2
+    } else if (parsed.check !== undefined) {
       io.stderr.write(`hive-progress: Hive couldn't be reached to look up the command for ${parsed.check}, so nothing was run.\n`)
       return 2
     }
@@ -537,7 +560,9 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
     }
   })
   const ended = { signal: null as NodeJS.Signals | null }
-  const code = await run(spec, env, io, (u) => report.onStep(u), (c) => (child = c), ended, forced)
+  // An isolated check (#1435): in its copy, its launcher put in the copy's job before the command exists.
+  const isolated = link?.isolated && link.folder ? { folder: link.folder, assign: (a: { pid: number; after: number; before: number }) => assignIsolated(target, { lease: link!.isolated!.lease, ...a }, { fetch: io.fetch }) } : undefined
+  const code = await run(spec, env, io, (u) => report.onStep(u), (c) => (child = c), ended, forced, isolated)
   for (const s of signals) process.off(s, onSignal)
   // Told to stop, it is stopped however it then ended (a server shutting down cleanly exits 0); a command that ended by
   // an interrupt of its own is stopped too. Its exit code is passed on as it was.
@@ -556,21 +581,44 @@ function run(
   onStep: ((u: StepLine) => void) | null,
   onChild?: (c: ChildProcess) => void,
   ended?: { signal: NodeJS.Signals | null },
-  forced?: { at: number }
+  forced?: { at: number },
+  isolated?: { folder: string; assign: (a: { pid: number; after: number; before: number }) => Promise<true | string> }
 ): Promise<number> {
   return new Promise((resolve) => {
     let child: ChildProcess
     try {
-      child = spawn(spec.file, spec.args, {
-        cwd: io.cwd,
-        env,
-        stdio: [io.stdin ?? 'inherit', onStep ? 'pipe' : 'inherit', onStep ? 'pipe' : 'inherit'],
-        windowsVerbatimArguments: spec.verbatim,
-        // The wrapper runs as Electron (a GUI program) with no console of its own, so the command gets a new one: shown,
-        // it is a terminal window popping up (Windows Terminal, when it is the default). Hidden, the output still comes
-        // through, and windows the command opens itself still show (only cmd's own window is hidden).
-        windowsHide: true
-      })
+      if (isolated) {
+        // Its launcher, waiting: put in the copy's job by Hive, then told to run the command (its output is the command's).
+        const l = startLauncher({ command: spec.file, args: spec.args, verbatim: spec.verbatim }, { cwd: isolated.folder, env: env as NodeJS.ProcessEnv })
+        child = l.child
+        const giveUp = (why: string): void => {
+          io.stderr.write(`hive-progress: ${why}\n`)
+          child.stdin?.end()
+          if (child.exitCode === null) child.kill()
+        }
+        child.stdin?.on('error', () => undefined)
+        if (!child.pid) giveUp("the check's launcher didn't start")
+        else
+          void isolated.assign({ pid: child.pid, after: l.after, before: l.before }).then(
+            (ok) => {
+              if (ok !== true) return giveUp(`the check wasn't run: ${ok}`)
+              child.stdin!.write('go\n')
+              child.stdin!.end()
+            },
+            (e: Error) => giveUp(`the check wasn't run: ${e.message}`)
+          )
+      } else {
+        child = spawn(spec.file, spec.args, {
+          cwd: io.cwd,
+          env,
+          stdio: [io.stdin ?? 'inherit', onStep ? 'pipe' : 'inherit', onStep ? 'pipe' : 'inherit'],
+          windowsVerbatimArguments: spec.verbatim,
+          // The wrapper runs as Electron (a GUI program) with no console of its own, so the command gets a new one: shown,
+          // it is a terminal window popping up (Windows Terminal, when it is the default). Hidden, the output still comes
+          // through, and windows the command opens itself still show (only cmd's own window is hidden).
+          windowsHide: true
+        })
+      }
     } catch (e) {
       io.stderr.write(`hive-progress: ${(e as Error).message}\n`)
       return resolve(127)

@@ -52,6 +52,9 @@ export function onLineComing(fn: (projectPath: string, agentId: string) => boole
   lineComing = fn
 }
 
+/** Whether another line of Hive's has an agent now: one being typed, or a watch's being made (#1432: Deliver Now waits for it). */
+export const lineBusy = (projectPath: string, agentId: string): boolean => writing.has(agentKey(projectPath, agentId)) || lineComing(projectPath, agentId)
+
 /**
  * Whether a line of Hive's could be typed into an agent now (typeLine's own conditions, before it asks what is wanted):
  * it can take one (`need`), nobody types there, no earlier line is waiting there, no line is being typed and none of a

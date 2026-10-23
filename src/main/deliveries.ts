@@ -28,7 +28,9 @@ import {
   type InboxItem
 } from '../shared/deliveries'
 import { reviewRounds } from '../shared/laneBar'
-import type { TaskCard } from '../shared/types'
+import type { ProjectConfig, TaskCard } from '../shared/types'
+import { INBOX_SWITCH_ID, inboxSwitchOn, type InboxSwitch } from '../shared/inboxSwitches'
+import { advanced } from './advanced'
 import * as assistant from './assistantControl'
 import { config } from './config'
 import { onHiveEvent } from './events'
@@ -37,7 +39,7 @@ import { openTable, readStore, saveTable, storeValue } from './storeRows'
 import { boardLock, dbGenerationAt, onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
 import { transaction } from './db'
 import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, readDeliveriesWithBases, saveDeliveryChanges, StaleDeliveries } from './schema/sessionDeliveryTables'
-import { canTypeLine, typeLine, whyNoLine } from './lineWriter'
+import { canTypeLine, lineBusy, typeLine, whyNoLine } from './lineWriter'
 import { createLogger, userText } from './logger'
 import { readyFor } from './readiness'
 import { sessions } from './sessions'
@@ -674,6 +676,36 @@ let senderRefusal = (from: DeliverySender): string | null => {
  */
 let readsInbox = (_host: string, agentId: string): boolean => agentId === ASSISTANT_AGENT_ID || (config.settings.agentApi.enabled && config.settings.agentApi.provideHiveMcp)
 export const agentReadsInbox = (host: string, agentId: string): boolean => readsInbox(host, agentId)
+
+/**
+ * Whether one of the carrying-on switches is on for a host's agents (#1432, shared/inboxSwitches.ts): its project's own
+ * over Settings → Advanced's, both read at each use (project.json as it is now, as loop wakes read it); the Assistant's
+ * home has no project, so it follows Settings'.
+ */
+export async function inboxSwitch(host: string, which: InboxSwitch): Promise<boolean> {
+  return inboxSwitchOn(which, (await inboxProject(host)).own, advanced.get<boolean>(INBOX_SWITCH_ID[which]))
+}
+
+/**
+ * The host's project config, for its own switches (own null: none, as the Assistant's home, or it can't be read), and
+ * whether Hive has written it since (`changed`, asked as a line is typed: a project.json changed by hand isn't seen).
+ */
+export interface InboxProject {
+  own: Partial<ProjectConfig> | null
+  changed: () => boolean
+}
+let inboxProject = async (host: string): Promise<InboxProject> => {
+  const ws = workspaceFor(host)
+  if (!ws || ws.isAssistantHome(host) || !ws.isProjectPath(host)) return { own: null, changed: () => false }
+  // Counted before it is read: a write in between counts as a change.
+  const at = ws.projectConfigWrites(host)
+  const own = await ws.projectConfig(host).catch(() => null)
+  return { own, changed: () => ws.projectConfigWrites(host) !== at }
+}
+const ownProject = inboxProject
+export const setInboxProjectForTests = (fn: ((host: string) => Promise<InboxProject>) | null): void => {
+  inboxProject = fn ?? ownProject
+}
 /** Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. */
 const noInbox = (name: string): string => `${name} has no inbox: turn on the Agent API`
 /** A delivery refused because its agent can't read an inbox: the message says so, and what to do. */
@@ -1390,30 +1422,49 @@ async function refreshAll(store: Store, items: readonly DeliveryRecord[]): Promi
 
 const trying = new Map<string, Promise<boolean>>()
 
-/** Offers an agent's waiting deliveries now if it can take a line (one try at a time per agent); `only`: that one alone. Whether a line was typed. */
-export function offerNow(host: string, agentId: string, only?: string): Promise<boolean> {
+/**
+ * Offers an agent's waiting deliveries now if it can take a line (one try at a time per agent); `only`: that one alone.
+ * With idle wakes off (#1432) nothing waiting is offered but a task given now (`only`, deliverNow's) or what the user
+ * asks for with Deliver now (`asked`). Whether a line was typed.
+ */
+export function offerNow(host: string, agentId: string, only?: string, asked = false): Promise<boolean> {
   // Its workspace closed: nothing is offered there until a window opens it again (#1391).
   if (hostClosed(host)) return Promise.resolve(false)
   const k = `${keyOf(host)}#${agentId}`
   const going = trying.get(k)
-  if (going) return going.then(() => false)
-  const run = offerOnce(host, agentId, only).finally(() => trying.delete(k))
+  // Another try under way (the tick's, which with idle wakes off types nothing): Deliver Now is the user's own, so it
+  // waits for that one and then makes its own, rather than being lost.
+  if (going) return going.then((typed) => (asked && !typed ? offerNow(host, agentId, only, asked) : false))
+  const run = offerOnce(host, agentId, only, 1, asked).finally(() => trying.delete(k))
   trying.set(k, run)
   return run
 }
 
+/** How many moments Deliver Now waits for another line of Hive's that has its agent (RETRY_MS each). */
+const ASKED_TRIES = 10
+
 /** How many times an offer overtaken before its first key (what it was made from changed as it was planned) is made again at once. */
 const OVERTAKEN_TRIES = 3
 
-async function offerOnce(host: string, agentId: string, only?: string, tries = 1): Promise<boolean> {
+async function offerOnce(host: string, agentId: string, only?: string, tries = 1, asked = false): Promise<boolean> {
   const store = await load(host)
   const st = sessions.liveFor(host, agentId)
   if (!st) return false
   // What may no longer be given out (its sender's permission gone, too old, another conversation) ends now, not later.
   if (store.records.some((r) => r.agentId === agentId && isUnread(r) && whyNot(store, r))) await transact(store, (d) => recheck(store, d, agentId)).catch((e) => log.warn('checking deliveries', e))
+  // Idle wakes off (#1432): no doorbell for what waits, of any kind; it stays in the inbox, unread, for hive_inbox, the
+  // agent's hooks (if their switches are on) or Deliver now. A task given now isn't a wake.
+  if (!only && !asked && !(await inboxSwitch(host, 'idleWakes'))) return false
   let items = pickOffer(store, store.records, agentId, only)
   if (!items.length) return false
   if (!canTypeLine(host, agentId, needOf(items))) {
+    // Deliver Now (#1432) while another line of Hive's has the agent (being typed, or a watch's being made): it waits
+    // for that one, a moment at a time, rather than being lost; anything else that stops it is logged.
+    if (asked && lineBusy(host, agentId) && tries < ASKED_TRIES) {
+      await new Promise((r) => setTimeout(r, RETRY_MS))
+      return offerOnce(host, agentId, only, tries + 1, asked)
+    }
+    if (asked) log.info(`Deliver Now for ${userText(agentId)} not typed: ${whyNoLine(host, agentId, needOf(items)) ?? 'nothing to type'}`)
     // The user may still be writing there: nothing says when they stop, so it is tried again in a moment.
     if (sessions.userMayBeTyping(host, agentId)) retrySoon(host, agentId)
     return false
@@ -1449,15 +1500,28 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
     // Overtaken as it was saved (#1036: the board changed after its line was made, by another agent or, seen by the
     // board's poll, another process): made again from things as they are now, at once; still overtaken, tried in a
     // moment, never left for the tick.
-    if (tries < OVERTAKEN_TRIES) return offerOnce(host, agentId, only, tries + 1)
+    if (tries < OVERTAKEN_TRIES) return offerOnce(host, agentId, only, tries + 1, asked)
     retrySoon(host, agentId)
     return false
   }
   const o = offer
+  // Idle wakes turned off while it was made (#1432 round 1: a refresh, the relevance read and the save all wait): read
+  // again once it is ready to type (Settings' and the project's own, read now), and before each key as it is typed
+  // (Settings' as it is then; the project's own as read here, unless Hive has written it since). Not typed: put back,
+  // still unread.
+  const wake = !only && !asked
+  const project = wake ? await inboxProject(host) : null
+  // The project's own changed since it was read: not typed now (made again at the retry, from the config as it is then).
+  const wakesOn = (): boolean => !project?.changed() && inboxSwitchOn('idleWakes', project?.own ?? null, advanced.get<boolean>(INBOX_SWITCH_ID.idleWakes))
+  if (wake && !wakesOn()) {
+    await unoffer(store, o)
+    show(store, agentId)
+    return false
+  }
   for (const id of o.ids) store.offering.add(id)
   let typed = false
   try {
-    typed = await typeLine(host, agentId, o.line, () => offerHolds(store, o) && o.ids.every((id) => store.offering.has(id)), {
+    typed = await typeLine(host, agentId, o.line, () => offerHolds(store, o) && o.ids.every((id) => store.offering.has(id)) && (!wake || wakesOn()), {
       need: o.need,
       // A line the user typed into before its CLI took it is theirs (#652 round 1 finding 2): what it named waits again.
       follow: { confirming: (before) => confirming(store, o, before), lost: () => lost(store), left: () => void unoffer(store, o) }

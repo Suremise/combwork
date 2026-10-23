@@ -9,7 +9,7 @@ import { modelCaps } from '@shared/models'
 import { agentChoosesMcp, agentMcpText } from '@shared/agentMcp'
 import { SESSION_LAYOUTS, agentLimitText, agentsPerPage, compactThreshold, contextPercent, agentModelShown, effortLabel, isCompacting, layoutPanes, mergeBlocked, mostUrgent, projectLayout, sessionInAgentFolder, transcriptWarnLimit, unmergedWork } from '@shared/defaults'
 import { cellPage, cellPageCount, neighbourCell, pageCells, pageIds, type CellDirection } from '@shared/paneCells'
-import { agentLimit, useAgentLimit } from '../advanced'
+import { agentLimit, inboxSwitchNow, useAgentLimit } from '../advanced'
 import type { AgentInfo, LiveSessionState, PageLayout, ProjectInfo, SessionLayout, SessionListItem, SessionUsage, SessionView } from '@shared/types'
 import { namesKey, shownProblem, templateAgentNames, type TemplateEntry, type TemplateScope } from '@shared/templates'
 import { templateTitle } from '@shared/templateDefaults'
@@ -614,6 +614,12 @@ function paneItems(project: ProjectInfo, a: AgentInfo, left: AgentLeftovers | un
       .join(' · ')
     const overdue = inbox.overdue ? tr(msg({ id: 'panes.messages.overdueTip', defaultMessage: "{n, plural, one {One delivery was not acked in time: the agent hasn't said it acted on it.} other {# deliveries were not acked in time: the agent hasn't said it acted on them.}}", description: "In the menu of an agent's unread messages: how many deliveries ({n}) it didn't ack in time." }), { n: inbox.overdue }) : null
     const cancel = () => void actions.attempt(tr(msg({ id: 'panes.messages.cancelFailed', defaultMessage: 'Could not cancel the messages', description: "An error's title: cancelling messages left for an agent failed." })), () => call('session:cancelMessages', project.path, a.id))
+    // Idle wakes off (#1432): nothing waiting is typed by itself; Deliver Now types its line once.
+    const wakes = inboxSwitchNow('idleWakes', project.config)
+    const deliver = () =>
+      void actions.attempt(tr(msg({ id: 'panes.messages.deliverFailed', defaultMessage: 'Could not deliver the messages', description: "An error's title: typing the line that tells an agent of its waiting messages (Deliver Now) failed." })), async () => {
+        if (!(await call('session:deliverNow', project.path, a.id))) notify('info', tr(msg({ id: 'panes.messages.notDelivered', defaultMessage: "{agent} wasn't told now", description: "A notice's title: Deliver Now couldn't type the line into the agent's terminal now. {agent} is its name." }), { agent: a.name }), tr(msg({ id: 'panes.messages.notDeliveredDetail', defaultMessage: "It isn't idle, or you are typing in its terminal. Its messages stay in its inbox: try again once it's idle.", description: 'The detail of the notice that Deliver Now could not type the line into an agent now.' })))
+      })
     items.push({
       label,
       icon: 'mail',
@@ -621,9 +627,11 @@ function paneItems(project: ProjectInfo, a: AgentInfo, left: AgentLeftovers | un
       onClick: (k) =>
         sub(
           [
-            ...(n ? [{ header: true, label: tr(msg({ id: 'panes.messages.tip', defaultMessage: "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.", description: "The heading of the menu of an agent's unread messages, above the list of them: how many ({n}) for the agent ({agent}: its name). hive_inbox is a tool's name: keep it." }), { n, agent: a.name }) }] : []),
+            ...(n ? [{ header: true, label: wakes ? tr(msg({ id: 'panes.messages.tip', defaultMessage: "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.", description: "The heading of the menu of an agent's unread messages, above the list of them: how many ({n}) for the agent ({agent}: its name). hive_inbox is a tool's name: keep it." }), { n, agent: a.name }) : tr(msg({ id: 'panes.messages.tipNoWakes', defaultMessage: "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet", description: "The heading of the menu of an agent's unread messages when the setting Wake an idle agent is off (a hint line under it says so): how many ({n}) for the agent ({agent}: its name)." }), { n, agent: a.name }) }] : []),
+            ...(n && !wakes ? [{ label: tr(msg({ id: 'panes.messages.noWakesHint', defaultMessage: 'Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.', description: "A hint line under the heading of an agent's unread messages menu, when the setting Wake an idle agent is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them." })), disabled: true }] : []),
             ...inbox.unread.map((m) => ({ label: tr(msg({ id: 'panes.messages.line', defaultMessage: '{id} from {from} ({state, select, queued {waiting} offered {typed, not fetched or acked yet} other {its offer not confirmed}}): {text}', description: "A message left for an agent, in the menu of its unread messages: its id, who from ({from}), its state (waiting; typed into the agent but not fetched or acked; or offered but not confirmed), and the start of its text ({text}, the sender's own words)." }), { id: m.id, from: m.from, state: m.state, text: m.text }), disabled: true })),
             ...(overdue ? [{ label: overdue, disabled: true }] : []),
+            ...(waiting && !wakes && a.live ? [{ separator: true }, { label: tr(msg({ id: 'panes.messages.deliverNow', defaultMessage: 'Deliver Now', description: "Menu item on an agent's unread messages, shown while the setting Wake an idle agent is off: types the line telling the agent of them into its terminal, once." })), icon: 'send', onClick: deliver }] : []),
             ...(waiting ? [{ separator: true }, { label: tr(msg({ id: 'panes.messages.cancel', defaultMessage: '{n, plural, one {Cancel the Message} other {Cancel the # Messages}}', description: "Menu item on an agent's unread messages: cancels the {n} still waiting to be delivered." }), { n: waiting }), icon: 'close', onClick: cancel }] : [])
           ],
           k

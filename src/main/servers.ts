@@ -21,7 +21,8 @@ import { timeLeft } from '../shared/progress'
 import { ProgressError, admitReport, type ProgressCaller } from './progress'
 import { progress, progressGate } from './progressService'
 import { cardOfRef, isCardRef, withCardNames } from './projectKeys'
-import { admitLinked, commitIn, folderHead, IssuedLinks, linkOwner, publicLink, resolveRunLink, type RunLinkDeps } from './workflow/runLink'
+import { admitLinked, commitIn, folderHead, IssuedLinks, linkOwner, publicLink, resolveRunLink, type RunLink, type RunLinkDeps } from './workflow/runLink'
+import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, isolatedRunEnded, takeStopped } from './copiesApp'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
 import { newestComments, progressLabel, taskRow, withoutHistory, type IntentDone, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
@@ -3093,6 +3094,17 @@ const runLinkDeps: RunLinkDeps = {
   commitOf: commitIn,
   projectName: (projectPath) => basename(projectPath),
   keyCard: (key, scope) => cardOfRef(requireWorkspace(), key, scope),
+  // A folder in a review or check copy (#1435): its lease's card and revision, whatever the agent's card is. A project
+  // agent's own project's copies only.
+  copyAt: async (folder, scope) => {
+    const ws = requireWorkspace()
+    const projects = scope !== null ? [join(ws.path!, scope)] : await ws.listProjectPaths()
+    for (const p of projects) {
+      const got = await copyAt(ws, p, folder).catch(() => null)
+      if (got) return got.lease && !got.lease.returned ? { copy: got.copy, card: got.lease.card, revision: got.lease.revision } : { copy: got.copy, card: null, revision: null }
+    }
+    return null
+  },
   // The options' check commands (SPEC §16.6.6: project.json's `workflow.options`), until #1218 resolves them with defaults.
   checkCommand: async (project, name) => {
     const cfg = (await workspace.projectConfig(join(requireWorkspace().path!, project)).catch(() => null)) as { workflow?: { options?: { commands?: Record<string, unknown> } } } | null
@@ -3119,13 +3131,53 @@ async function runLinkOf(body: Record<string, unknown>) {
 // start: the only way a start gets the checkout seen here rather than read again.
 route('POST', '/v1/progress/resolve', async ({ body }) => {
   const ws = requireWorkspace()
-  const { caller, link } = await runLinkOf(bodyObject(body))
+  const b = bodyObject(body)
+  const resolved = await runLinkOf(b)
+  const caller = resolved.caller
+  let link: RunLink = resolved.link
+  // An isolated check (#1435, `--isolated`): leased a check copy at the card's revision, the run's folder that copy.
+  const iso = b.isolated === true ? await isolatedFor(ws, caller, link, typeof b.ticket === 'string' ? b.ticket : undefined) : null
+  if (iso) link = { ...link, folder: iso.folder, testedCheckout: link.revision, copy: iso.copy, isolated: true }
   const id = issuedLinks.issue(linkOwner(caller), link)
+  if (iso) await isolatedLinked(ws, iso.project, iso.lease, id)
   // What a run for a card is checked against (#1222), read now: hive-progress starts its command after this reply, and
   // reports its start up to 2 s later. Its start takes it with the link.
   const bracket = await bracketFor(ws, link).catch((e) => (log.warn('could not read what a run is checked against', e), null))
   if (bracket) bracketResolved(id, bracket)
-  return publicLink(link, id)
+  return { ...publicLink(link, id), ...(iso ? { isolated: { lease: iso.lease, copy: iso.copy } } : {}) }
+})
+
+/**
+ * An isolated check's copy (#1435): an agent's check for a card of its own project on Git, leased at the card's revision.
+ * Refused (400) for anything else, with what to do; 409 with `wait` while no copy is free (hive-progress asks again).
+ */
+async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: RunLink, ticket?: string): Promise<{ project: string; lease: string; folder: string; copy: string }> {
+  if (caller.source !== 'agent') throw new HttpError(400, "--isolated runs an agent's check in a copy of its own: run it in an agent's session")
+  if (!link.check) throw new HttpError(400, '--isolated runs a check in a copy of its own: use it with --check <name>')
+  if (link.card === null || !link.revision) throw new HttpError(400, "--isolated runs a check at its card's revision: name the card (--card), or work on one in Doing")
+  const cfg = await ws.projectConfig(caller.projectPath).catch(() => null)
+  // None has no check copies (OP-16): its remedy is running again once the deliverables are quiet.
+  if (projectPlatform(caller.projectPath, cfg?.platform).id !== 'git') throw new HttpError(400, "This project has no version control, so there are no check copies: run the check again without --isolated once nobody is changing the card's files")
+  // Leased and set up apart from this request (a first setup takes minutes): `wait` with a ticket to ask again with.
+  const got = await isolatedRequest(ws, caller.projectPath, linkOwner(caller), { card: link.card, revision: link.revision, agent: caller.agentId }, ticket)
+  if ('wait' in got) throw new HttpError(409, `waiting for ${got.wait}`, { wait: got.wait, ...(got.ticket ? { ticket: got.ticket } : {}) })
+  if ('refused' in got) throw new HttpError(400, got.refused)
+  return { project: caller.projectPath, lease: got.lease.id, folder: got.folder, copy: got.copy }
+}
+
+// An isolated check's launcher put in its check copy's job before it runs the command (#1435): only by the agent the
+// lease is for, while the lease is out.
+route('POST', '/v1/progress/isolated', async ({ body }) => {
+  const ws = requireWorkspace()
+  const a = agentCaller()
+  if (!a) throw new HttpError(403, "Only an agent's isolated check puts its launcher in a check copy's job")
+  const b = bodyObject(body)
+  const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : NaN)
+  const req = { lease: typeof b.lease === 'string' ? b.lease : '', pid: num(b.pid), after: num(b.after), before: num(b.before) }
+  if (!req.lease || !Number.isInteger(req.pid) || req.pid <= 0 || Number.isNaN(req.after) || Number.isNaN(req.before)) throw new HttpError(400, 'lease, pid, after and before are required')
+  const why = await assignIsolated(ws, a.projectPath, a.agentId, req)
+  if (why) throw new HttpError(409, why)
+  return { ok: true }
 })
 
 // A start resolves what it runs for inside its admission (admitLinked): a panel turned off, or off and on, while its
@@ -3159,6 +3211,8 @@ route('POST', '/v1/progress', async ({ body }) => {
       (caller, link) => {
         const run = progress.start(caller, b, { ...link, check: link.check?.name ?? null })
         if (bracket) bracketStarted(run.id, bracket)
+        // An isolated check's lease is its run's from now on (#1435): its finish returns the copy.
+        if (link.copy && caller.source === 'agent' && typeof b.link === 'string') void retakeIsolated(ws, caller.projectPath, b.link, run.id)
         return { id: run.id }
       }
     )
@@ -3176,11 +3230,21 @@ route('PATCH', '/v1/progress/:id', async ({ params, body }) =>
 
 route('POST', '/v1/progress/:id/finish', async ({ params, body }) =>
   progressCall<{ ok: true; ignored?: true }>({ ok: true, ignored: true }, (caller) => {
-    const run = progress.finish(caller, decodeURIComponent(params[0]), bodyObject(body))
-    void recordCheck(run)
+    const id = decodeURIComponent(params[0])
+    // Ended by Stop in the Progress panel (#1435): stopped, whatever its command's exit says.
+    const run = progress.finish(caller, id, takeStopped(id) ? { ...bodyObject(body), ok: false, stopped: true } : bodyObject(body))
+    // Recorded as a check first (its copy still at the revision), then its isolated check's copy returned (#1435).
+    void recordCheck(run).then(() => isolatedRunEnded(requireWorkspace(), run.id)).catch((e) => log.warn('returning a check copy', e))
     return { ok: true }
   })
 )
+
+/** An isolated check's lease, held by the link resolve gave out, taken by the run that started with it. */
+async function retakeIsolated(ws: WorkspaceService, projectPath: string, linkId: string, runId: string): Promise<void> {
+  const pool = await copiesFor(ws, projectPath)
+  const l = pool.leaseByRef(linkId)
+  if (l) await pool.setRef(l.id, runId)
+}
 
 /** A finished run for a card: its `CheckRan` in the card's facts (#1222), and how it counted on the run's row. */
 async function recordCheck(run: ProgressRun): Promise<void> {

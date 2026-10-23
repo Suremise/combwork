@@ -44,7 +44,7 @@ const TIDY_MS = 60 * 60 * 1000
 export const slotLogDir = (): string => join(app.getPath('userData'), 'logs', 'slots')
 
 /** The board's database as a pool's connection: reads its readers', writes inside boardWrite (quiet: the window shows no slots yet). */
-function boardConn(ws: WorkspaceService): SlotConn {
+export function boardConn(ws: WorkspaceService): SlotConn {
   const life = ws.lifetime
   const wsPath = ws.path
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === wsPath
@@ -86,7 +86,7 @@ function jobSpawn(job: LeaseJob): Spawn {
 const probe = defaultProbe()
 
 /** Where a project's slot jobs keep their journals (what their supervisor follows outside them). */
-const journalsOf = (root: string): string => join(root, '.slot-journals')
+export const journalsOf = (root: string): string => join(root, '.slot-journals')
 
 /**
  * A project's slot runs: each a run of "Hive (slot <name>)" in the Progress panel, in the job the pool recorded for it.
@@ -94,7 +94,7 @@ const journalsOf = (root: string): string => join(root, '.slot-journals')
  * ends, when the workspace closes (`signal`) or at its time limit, and the run is settled only once the job is seen
  * empty: otherwise the job stays recorded on the slot for `settle`.
  */
-function appRunner(ws: WorkspaceService, projectPath: string, root: string): SlotRunner {
+export function appRunner(ws: WorkspaceService, projectPath: string, root: string): SlotRunner {
   return async (r) => {
     const host = processSupervisor()
     if (!host.usable || !(await host.ensure())) return { ok: false, exitCode: null, spawnError: true, error: "Hive's process supervisor isn't running, so it can't run a slot's commands", logPath: null, settled: true } // i18n-ignore: agent-facing and the log
@@ -102,7 +102,7 @@ function appRunner(ws: WorkspaceService, projectPath: string, root: string): Slo
     if ('problem' in opened) return { ok: false, exitCode: null, spawnError: true, error: `its job couldn't be made: ${opened.problem}`, logPath: null, settled: true } // i18n-ignore: agent-facing and the log
     const job = opened
     const workspacePath = ws.path ?? ''
-    const caller = { source: 'hive' as const, workspacePath, projectPath, slot: r.slot }
+    const caller = { source: 'hive' as const, workspacePath, projectPath, ...(r.of === 'copy' ? { copy: r.slot } : { slot: r.slot }) }
     let id: string | null = null
     if (workspacePath && progressGate.on()) {
       try {
@@ -153,7 +153,7 @@ function appRunner(ws: WorkspaceService, projectPath: string, root: string): Slo
  * (slotJobs.ts): ended by its name on this Hive's supervisor, its journal sealed and read, what it names ended. True
  * once none of it runs; its journal is then cleared, and the pool clears the slot's job.
  */
-function appSettle(root: string): (job: string) => Promise<boolean> {
+export function appSettle(root: string): (job: string) => Promise<boolean> {
   return async (job) => {
     const host = processSupervisor()
     if (!host.usable || !(await host.ensure())) return false
@@ -163,7 +163,7 @@ function appSettle(root: string): (job: string) => Promise<boolean> {
 
 /** This process as the holder of slot operations: its pid and start, read once, and the operations it runs now. */
 let self: Promise<{ pid: number; started: number }> | null = null
-const holder: OpHolder = {
+export const holder: OpHolder = {
   self: () => (self ??= probe.self()),
   alive: (pid, started) => probe.alive(pid, started),
   live: new Set()
