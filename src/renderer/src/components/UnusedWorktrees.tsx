@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ProjectInfo, UnusedWorktree, UnusedWorktreePreview, UnusedWorktreeRemoval, UnusedWorktrees } from '@shared/types'
 import { formatSize } from '@shared/units'
 import { RecentCache } from '@shared/recentCache'
-import { CHANGES_ABOUT, UNUSED_WORKTREES_GUIDE, holdsWork, lostByRemoving, originLabel, unusedState, unusedSummary, unusedWorkNotice } from '@shared/unusedWorktrees'
+import { CHANGES_ABOUT, UNUSED_WORKTREES_GUIDE, holdsWork, isSlotRow, kindLabel, lostByRemoving, originLabel, unusedName, unusedState, unusedSummary, unusedWorkNotice } from '@shared/unusedWorktrees'
 import { call, errorMessage } from '../api'
 import { confirm, giveWorktreeToAgent, notify, showUnusedWorktrees, useStore } from '../store'
 import { openGuideAt } from '../tips'
@@ -150,7 +150,7 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
     setBusy(w.path)
     try {
       const r = await call('worktrees:removeUnused', project.path, w.path, { expectInto: w.check.into })
-      if (!r.deleted) notify('warning', tr(M.keptTitle, { name: w.branch ?? w.path }), r.reason)
+      if (!r.deleted) notify('warning', tr(M.keptTitle, { name: w.slot ?? w.branch ?? w.path }), r.reason)
       else if (r.branchKept) notify('warning', tr(M.branchKept, { path: w.path }), r.reason)
     } catch (e) {
       notify('error', tr(M.removeFailed), errorMessage(e))
@@ -165,13 +165,13 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
     const ok = await confirm({
       title: tr(M.removeMergedTitle, { count: merged.length }),
       message: tr(M.removeMergedMessage, { into }),
-      content: <ItemTable first={M.colBranch} columns={[{ label: M.colFolder }]} rows={merged.map((w) => ({ key: w.path, item: <strong title={w.branch ?? undefined}>{w.branch ?? tr(M.detached)}</strong>, text: w.branch ?? tr(M.detached), cells: [{ content: <ShortPath path={w.path} />, text: w.path }] }))} className="fill unused-merged-table" />,
+      content: <ItemTable first={M.colBranch} columns={[{ label: M.colFolder }]} rows={merged.map((w) => ({ key: w.path, item: <strong title={w.branch ?? undefined}>{unusedName(w)}</strong>, text: unusedName(w), cells: [{ content: <ShortPath path={w.path} />, text: w.path }] }))} className="fill unused-merged-table" />,
       confirmLabel: tr(M.remove),
       busyLabel: tr(M.removing),
       run: async () => {
         for (const w of merged) {
           const r = await call('worktrees:removeUnused', project.path, w.path, { expectInto: w.check.into }).catch((e: unknown) => ({ deleted: false, reason: errorMessage(e) }))
-          if (!r.deleted) kept.push(`${w.branch}: ${r.reason ?? tr(M.keptReason)}`)
+          if (!r.deleted) kept.push(`${unusedName(w)}: ${r.reason ?? tr(M.keptReason)}`)
         }
       }
     })
@@ -224,7 +224,7 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
         break
       }
       if (!r.lookAgain) {
-        notify('warning', tr(M.keptTitle, { name: w.branch ?? w.path }), r.reason)
+        notify('warning', tr(M.keptTitle, { name: w.slot ?? w.branch ?? w.path }), r.reason)
         break
       }
       // Looking again is what follows: the question says why the first try removed nothing (#848: main's reason is just that).
@@ -253,28 +253,32 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
           return {
             key: w.path,
             className: 'unused-wt',
-            data: { path: w.path },
+            data: { path: w.path, ...(w.kind ? { kind: w.kind } : {}), ...(w.slot ? { slot: w.slot } : {}) },
             item: (
               <span className="unused-wt-branch">
-                <Icon name="git-branch" /> <strong title={w.branch ?? undefined}>{w.branch ?? tr(M.detached)}</strong>
+                <Icon name={isSlotRow(w) ? 'repo' : 'git-branch'} /> <strong title={w.branch ?? undefined}>{unusedName(w)}</strong>
               </span>
             ),
-            text: w.branch ?? tr(M.detached),
+            text: unusedName(w),
             cells: [
               {
                 content: (
                   <span className="unused-wt-badges">
-                    <span className={cx('badge', w.check.removable ? 'success' : holdsWork(w) ? 'warn' : '')} title={unusedState(w)}>
+                    <span className={cx('badge', w.check.removable ? 'success' : holdsWork(w) ? 'warn' : '')} title={w.check.reason && isSlotRow(w) ? `${unusedState(w)} (${w.check.reason})` : unusedState(w)}>
                       {unusedState(w)}
                     </span>
-                    {w.origin && (
+                    {w.kind ? (
+                      <span className="badge accent" data-unused-kind={w.kind} title={kindLabel(w)}>
+                        {kindLabel(w)}
+                      </span>
+                    ) : w.origin && (
                       <span className={cx('badge', w.origin.madeBy === 'other' && 'accent')} data-origin={w.origin.madeBy} title={originLabel(w)}>
                         {originLabel(w)}
                       </span>
                     )}
                   </span>
                 ),
-                text: [unusedState(w), originLabel(w)].filter(Boolean).join(' · ')
+                text: [unusedState(w), kindLabel(w) || originLabel(w)].filter(Boolean).join(' · ')
               },
               { content: <ShortPath path={w.path} className="muted" />, text: w.path },
               { content: <span className="faint" title={last || undefined}>{last}</span>, text: last, className: 'unused-wt-last' },
@@ -282,8 +286,8 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
             ],
             actions: (
               <>
-                {w.branch && (
-                  <button className="btn small subtle" title={tr(M.openTip, { branch: w.branch, work: holdsWork(w) ? 'yes' : 'no' })} onClick={() => onOpen(w.path)}>
+                {(w.branch || isSlotRow(w)) && (
+                  <button className="btn small subtle" title={tr(M.openTip, { branch: unusedName(w), work: holdsWork(w) && w.branch ? 'yes' : 'no' })} onClick={() => onOpen(w.path)}>
                     {tr(M.open)}
                   </button>
                 )}
@@ -291,7 +295,7 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
                   <BusyButton className="btn small" busy={busy === w.path} busyLabel={tr(M.removing)} disabled={!!busy} onClick={() => void removeOne(w)}>
                     {tr(M.remove)}
                   </BusyButton>
-                ) : (
+                ) : isSlotRow(w) ? null : (
                   <>
                     <button className="btn small" onClick={() => giveWorktreeToAgent(project.path, w.path)}>
                       {tr(M.give)}
@@ -307,7 +311,7 @@ export function UnusedWorktreesSection({ project, data, reload, onOpen }: { proj
             )
           }
         })}
-        className={cx(/* i18n-ignore: class names */ 'unused-wt-table', list.some((w) => !w.check.removable && lostByRemoving(w)) && 'has-work')}
+        className={cx(/* i18n-ignore: class names */ 'unused-wt-table', list.some((w) => !w.check.removable && !isSlotRow(w) && lostByRemoving(w)) && 'has-work')}
       />
     </div>
   )

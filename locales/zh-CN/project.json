@@ -288,6 +288,8 @@
   "project.settings.saveFailed": "无法保存项目设置",
   "project.settings.search": "搜索 {project} 的设置",
   "project.settings.sessionsIn": "{project} 中的会话将运行所有命令、编辑和网络请求，从不询问。",
+  "project.settings.stepWait": "设计检查等待时间（分钟）",
+  "project.settings.stepWaitDefault": "默认（{count, number} 分钟）",
   "project.settings.waitHours": "等待（小时）",
   "project.settings.wake": "唤醒评审者和构建者",
   "project.settings.warnOver": "会话记录超过此大小时发出警告",

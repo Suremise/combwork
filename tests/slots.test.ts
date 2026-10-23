@@ -561,6 +561,35 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
     expect(existsSync(folder)).toBe(false)
     expect(w.pool.slots()).toEqual([])
   })
+
+  it("check says what would keep a slot, by the same guards, without probing or removing it (#1450's Unused Worktrees)", async () => {
+    const w = world()
+    const r = await lent(w, { agent: 'a1', card: 7 })
+    expect(await w.pool.check('slot-a')).toEqual({ why: 'leased', agent: 'a1' })
+    await w.pool.release(r.lease.id, 'done')
+    const folder = r.slot.folder
+    expect(await w.pool.check('slot-a')).toBeNull()
+    w.set.sessions.set(folder.toLowerCase(), 'a1 (working)')
+    expect(await w.pool.check('slot-a')).toEqual({ why: 'session', detail: 'a1 (working)' })
+    w.set.sessions.clear()
+    w.set.inFlight.add(7)
+    expect(await w.pool.check('slot-a')).toEqual({ why: 'inFlight', card: 7 })
+    w.set.inFlight.clear()
+    writeFileSync(join(folder, 'new.txt'), 'new\n')
+    expect(await w.pool.check('slot-a')).toEqual({ why: 'dirty', files: 1 })
+    sh(folder, 'checkout', '-q', '-b', 'hive/HI/HI-7-work')
+    commit(folder, { 'new.txt': 'new\n' }, 'work')
+    expect(await w.pool.check('slot-a')).toEqual({ why: 'unmerged', target: 'main' })
+    // A process in it: only the removal's rename probe finds that; check never renames the folder.
+    const p = spawn(process.execPath, ['-e', 'console.log("up"); setInterval(() => {}, 1000)'], { cwd: folder, env: baseEnv(), stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true })
+    procs.push(p)
+    await new Promise<void>((res) => p.stdout!.once('data', () => res()))
+    expect(await w.pool.check('slot-a')).toEqual({ why: 'unmerged', target: 'main' })
+    p.kill()
+    await new Promise<void>((res) => p.once('exit', () => res()))
+    expect(existsSync(folder)).toBe(true)
+    expect(w.store.slot('slot-a')?.state).toBe('ready')
+  })
 })
 
 describe('operations own a slot while it changes (HR1 round 1)', { timeout: 90_000 }, () => {

@@ -415,9 +415,13 @@
     "defaultMessage": "Removed the links",
     "description": "A line in a card's history: the card's links to related cards were all removed."
   },
+  "tasks.history.loopStep": {
+    "defaultMessage": "{step, select, design {Posted a design for the reviewer to check} followUp {Posted a follow-up for the reviewer to check} ok {Checked the design: OK} gaps {Checked the design: gaps} okFollowUp {Checked the follow-up: OK} gapsFollowUp {Checked the follow-up: gaps} other {Went ahead with the design unchecked}}: \"{text}\"",
+    "description": "A line in a card's history (#1382, #1467), a step of a card loop: its builder (named beside it) posted a design for its reviewer to check before building (design), or a follow-up of reviewed work for its check, such as a change asked of a screenshot (followUp); the reviewer checked a design and found it OK (ok) or found gaps (gaps), or checked a follow-up so (okFollowUp, gapsFollowUp); or, with no answer in time, the builder went ahead with its design as posted (other). {text} is what they said (cut short). Select keys: translate each sentence."
+  },
   "tasks.history.loopWake": {
-    "defaultMessage": "Woke {agent} {kind, select, review {to review it} other {with its verdict}} (a loop wake)",
-    "description": "A line in a card's history: in a card loop, Hive woke the agent {agent} (its name), as the card arrived in Review for it to review (review), or with its review's verdict (other). \"Card loop\" and \"loop wake\" are Hive's terms."
+    "defaultMessage": "Woke {agent} {kind, select, review {to review it} step {with a card loop step} other {with its verdict}} (a loop wake)",
+    "description": "A line in a card's history: in a card loop, Hive woke the agent {agent} (its name), as the card arrived in Review for it to review (review), with a step of the loop for it (step: its builder's design to check, or its reviewer's answer, #1382), or with its review's verdict (other). \"Card loop\" and \"loop wake\" are Hive's terms."
   },
   "tasks.history.moved": {
     "defaultMessage": "Moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
@@ -528,8 +532,8 @@
     "description": "A line in a card's history: the card's blocked reason was cleared."
   },
   "tasks.history.watchEnded": {
-    "defaultMessage": "Ended {watcher}'s watch on it: {why, select, blocked {the card is blocked} reviewer {{agent} reviews it} reviewTaken {its review was taken from it} reassigned {reassigned to {agent}} unassigned {reassigned to no agent} other {{why}}}",
-    "description": "A line in a card's history: Hive stopped the agent {watcher} (its name) waiting for the card to change, because the card is blocked, another agent ({agent}) now reviews it, the review it waited for was taken from it, or the card was given to another agent ({agent}) or to none ({why}, select: translate each)."
+    "defaultMessage": "Ended {watcher}'s watch on it: {why, select, blocked {the card is blocked} reviewer {{agent} reviews it} reviewTaken {its review was taken from it} reassigned {reassigned to {agent}} unassigned {reassigned to no agent} done {the card is in Done} laneEnded {its lane ended} laneAbandoned {its lane was abandoned} other {{why}}}",
+    "description": "A line in a card's history: Hive stopped the agent {watcher} (its name) waiting for the card to change, because the card is blocked, another agent ({agent}) now reviews it, the review it waited for was taken from it, the card was given to another agent ({agent}) or to none, the card reached the Done column (its work merged), or the card loop (lane) the agent waited in ended or was abandoned ({why}, select: translate each)."
   },
   "tasks.skipped.movedColumn": {
     "defaultMessage": "moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",

@@ -445,9 +445,11 @@ export class FactStore {
     return this.conn.read((db) => (db.prepare('SELECT * FROM card_facts WHERE card = ? ORDER BY seq').all(card) as Record<string, string | number | null>[]).map(factOf))
   }
 
-  /** This project's facts of a kind, in the order written (the queue's order). */
-  factsOfKind(kind: FactKind): Fact[] {
-    return this.conn.read((db) => (db.prepare('SELECT f.* FROM card_facts f JOIN cards c ON c.number = f.card WHERE f.kind = ? AND c.project = ? ORDER BY f.rowid').all(kind, this.scope.project) as Record<string, string | number | null>[]).map(factOf))
+  /** This project's facts of a kind (or of any of these), in the order written (the queue's order). */
+  factsOfKind(kind: FactKind | readonly FactKind[]): Fact[] {
+    const kinds = typeof kind === 'string' ? [kind] : kind
+    const sql = `SELECT f.* FROM card_facts f JOIN cards c ON c.number = f.card WHERE f.kind IN (${kinds.map(() => '?').join(', ')}) AND c.project = ? ORDER BY f.rowid`
+    return this.conn.read((db) => (db.prepare(sql).all(...kinds, this.scope.project) as Record<string, string | number | null>[]).map(factOf))
   }
 
   ruleset(id: string): Ruleset {

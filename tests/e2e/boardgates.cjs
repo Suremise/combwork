@@ -73,9 +73,20 @@ const check = (name, ok, extra = '') => {
     await page.getByRole('button', { name: 'Task Board' }).click()
     const column = (label) => page.locator('.board-column', { has: page.locator('.board-column-label', { hasText: label }) })
     const tile = (n) => page.locator(`.task-card[data-task="${n}"]`)
-    const drag = async (n, label) => {
-      await lib.until(async () => (await tile(n).count()) === 1, HUNG_MS)
-      await tile(n).dragTo(column(label).locator('.board-column-body'))
+    /** The column a card's tile shows in now (its `data-column`: Merging's cards are `passed` cards), or null. */
+    const shownIn = (n) => tile(n).evaluate((e) => e.closest('.board-column')?.getAttribute('data-column') ?? null).catch(() => null)
+    let dragSaid = ''
+    // Dragged only once the window shows the card where it is (#1505): a tile the board hasn't moved yet (a move just
+    // made through IPC) is moved into its column mid-drag, and the drop never comes.
+    const drag = (n, label) => dragInto(n, column(label))
+    const dragInto = async (n, into) => {
+      const at = await lib.until(async () => {
+        const now = (await card(n))?.column
+        const shown = await shownIn(n)
+        return now && (shown === now || (shown === 'merging' && now === 'passed')) ? shown : null
+      }, HUNG_MS)
+      dragSaid = `card #${n} in ${(await card(n))?.column}, shown in ${await shownIn(n)}${at ? '' : ' (never shown where it is)'}`
+      await tile(n).dragTo(into.locator('.board-column-body'))
     }
     const dialog = page.locator('.dialog', { hasText: 'anyway?' })
     const themes = async (name, target) => {
@@ -91,7 +102,7 @@ const check = (name, ok, extra = '') => {
     await inv('tasks:move', a, 'doing', { agent: 'b1' })
     check('the card starts with its agent (Move to Active through the rules)', (await card(a))?.column === 'doing' && (await facts(a)).includes('Started'), JSON.stringify(await facts(a)))
     await drag(a, 'Done')
-    check('a drag to Done with no merge asks first', !!(await lib.until(async () => (await dialog.count()) === 1, HUNG_MS)))
+    check('a drag to Done with no merge asks first', !!(await lib.until(async () => (await dialog.count()) === 1, HUNG_MS)), dragSaid)
     const asked = (await dialog.innerText().catch(() => '')).replace(/\s+/g, ' ')
     check('…naming the card, the column and each rule it skips by name', asked.includes(`Move ${(await card(a)).key} to Done anyway?`) && asked.includes('Reason (optional)') && /This skips \d+ rules of its project:/.test(asked) && !asked.includes('integrate.approved'), asked)
     check('…nothing recorded while it asks', !(await facts(a)).includes('Override'))
@@ -210,7 +221,7 @@ const check = (name, ok, extra = '') => {
     const plDialog = page.locator('.dialog', { hasText: 'mimo to?' })
     const plDone = page.locator('.board-column', { has: page.locator('.board-column-label', { hasText: 'Gotowe' }) })
     await lib.until(async () => (await plDone.count()) === 1, HUNG_MS)
-    await tile(b).dragTo(plDone.locator('.board-column-body'))
+    await dragInto(b, plDone)
     check('the question in Polish', !!(await lib.until(async () => (await plDialog.count()) === 1, HUNG_MS)), await page.locator('.dialog').innerText().catch(() => ''))
     await plDialog.screenshot({ path: path.join(lib.WORK, 'boardgates-ask-pl.png') })
     await plDialog.getByRole('button', { name: 'Anuluj' }).click().catch(() => page.keyboard.press('Escape'))

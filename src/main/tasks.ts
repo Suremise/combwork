@@ -883,6 +883,13 @@ const clip = (s: string, max = 80): string => {
 /** A reviewer's request to its builder (#912) as its history line, which watches count (#1272). */
 export const requestNote = (asked: string): StoredText => storedText(HISTORY.reviewerRequest, { text: clip(asked) })
 
+/** A card loop's step (#1382) as its history line, which watches count (shared/watch.ts' handoffs); an answer says what it checked (`of`, #1467). */
+export const loopStepNote = (step: string, said: string, until?: string, of?: string): StoredText => {
+  const s = storedText(HISTORY.loopStep, { step: of === 'followUp' && (step === 'ok' || step === 'gaps') ? `${step}FollowUp` : step, text: clip(said) })
+  // A design's line keeps when its check is due (#1382), a value its words don't show: what the stall check reads.
+  return until ? { ...s, values: { ...s.values, until } } : s
+}
+
 /**
  * Whether a comment counts as its reviewer's request to the builder (#1410): a plain comment (no move, no verdict) by
  * the reviewer of the card's running lane, on its card in Review that it hasn't started reviewing ("waiting for #12
@@ -1725,7 +1732,9 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
       said.push(card.links.length ? storedText(HISTORY.linked, { cards: card.links.map((x) => `#${x}`).join(', ') }) : storedText(HISTORY.linksRemoved))
     }
     // History lines of the caller's own (#1272: a reviewer's request, which watches count).
-    if (opts.note) said.push(...opts.note)
+    // A loop step's line keeps the column it was written in (#1495), a value its words don't show: what pendingStep reads
+    // when the history that said so has been trimmed.
+    if (opts.note) said.push(...opts.note.map((s) => (s.id === HISTORY.loopStep.id ? { ...s, values: { ...s.values, column: card.column } } : s)))
     else if (comment && (await laneReviewerAsks(ws, card, patch, actor, said))) said.push(requestNote(comment))
     // What changed, in the history's words (English), for a caller that confirms it (the hive tools' short replies).
     opts.said?.push(...said.map(englishSaid))

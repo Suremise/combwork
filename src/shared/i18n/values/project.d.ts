@@ -290,6 +290,8 @@ interface HiveMessageValues {
   'project.settings.saveFailed': undefined
   'project.settings.search': { project: string | number }
   'project.settings.sessionsIn': { project: string | number }
+  'project.settings.stepWait': undefined
+  'project.settings.stepWaitDefault': { count: number }
   'project.settings.waitHours': undefined
   'project.settings.wake': undefined
   'project.settings.warnOver': undefined

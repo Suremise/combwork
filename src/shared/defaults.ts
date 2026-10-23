@@ -167,7 +167,8 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   worktreeSetup: '',
   loopWakes: true,
   loopRounds: null,
-  loopWaitHours: null
+  loopWaitHours: null,
+  loopStepWaitMinutes: null
 }
 
 /** The transcript viewer loads this many items at a time (the latest first, earlier ones as you scroll up). */

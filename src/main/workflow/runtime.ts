@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { agentActor, agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, loopStepSide, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
@@ -123,8 +123,11 @@ export interface WorkflowConfig {
    * instead): a Git card's refusal for what couldn't be read then offers the switch to None as its next step.
    */
   repositoryGone?: () => boolean
-  /** Paths an agent holds or held file locks on since its card started (a shared folder's own changes, G16). */
-  locksOf?: (agent: string) => string[]
+  /**
+   * The lock records still being written for the project (#1481: a lock taken before an intent is recorded before the
+   * intent reads the cards' records); left out, none are.
+   */
+  locksSettled?: () => Promise<void>
   /** Run the actions after each write (false: leave them pending, as a crash right after the commit would). */
   autoRun?: boolean
   effects?: Effects
@@ -163,6 +166,14 @@ export function slugOf(title: string): string {
 }
 
 const ORDER: StageId[] = ['todo', 'active', 'review', 'approved', 'merging', 'done']
+/**
+ * Where file locks were seen (recordLocks, #1481): on that cycle of the agent's current card then, or, when the cards
+ * weren't read then (the runtime not made yet this launch), at that time (ISO).
+ */
+export type LockSeen = { card: number; cycle: number } | { at: string }
+
+/** The stages in which a card's lock record counts (G16, #1481): started and not finished. */
+const LOCK_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'merging']
 
 /** The user's choice at the round limit, as an agent's wake says it (English). */
 const CHOICE_WORDS: Record<RoundChoice, string> = { carryOn: 'carry on', split: 'split it', accept: 'accept it with follow-ups', takeOver: 'the user takes it over' } // i18n-ignore: a wake, agent-facing
@@ -364,18 +375,70 @@ export class Workflow {
 
   ownLine = (s: CardState): boolean => !!s.started && s.started.folder !== 'project'
 
+  // --- File-lock records (G16, #1481).
+
+  /**
+   * Each agent's current card, by agent: the card it started last (the project's starts in the order written), while
+   * that cycle runs and the card isn't finished (Active to Merging). Its lock record (`locked`) is the agent's own changes
+   * in a shared folder; an earlier card's stops counting once the agent starts another, and a card's once it is Done,
+   * back in Todo or on hold.
+   */
+  currentCards(): Map<string, { card: CardRecord; s: CardState }> {
+    const last = new Map<string, Fact>()
+    for (const f of this.store.factsOfKind(['Started', 'Adopted'])) { // i18n-ignore: fact kinds, not text
+      const b = (f.data as FactData['Started']).builder
+      if (b && b !== 'user') last.set(b, f)
+    }
+    const out = new Map<string, { card: CardRecord; s: CardState }>()
+    for (const [b, f] of last) {
+      if (this.store.isArchived(f.card)) continue
+      const card = this.store.card(f.card)
+      if (!LOCK_STAGES.includes(card.stage)) continue
+      const s = this.state(card)
+      if (s.cycle === f.seq && LOCK_STAGES.includes(s.stage)) out.set(b, { card, s })
+    }
+    return out
+  }
+
+  /**
+   * Records paths an agent held file locks on, on its current card when the locks were seen (`seen`). Decided in the
+   * write, against the cards as they are then: the card must still be the agent's current one in that cycle (a lock seen
+   * before the agent started its next card is never put on that one), and only paths not recorded this cycle are.
+   * Returns whether anything was written.
+   */
+  async recordLocks(agent: string, paths: string[], seen: LockSeen): Promise<boolean> {
+    const first = this.currentCards().get(agent)
+    if (!first || ('card' in seen && (first.card.id !== seen.card || first.s.cycle !== seen.cycle))) return false
+    return this.write(first.card, null, agentActor(agent), (w) => {
+      const now = this.currentCards().get(agent)
+      if (!now || now.card.id !== first.card.id || now.s.cycle !== first.s.cycle) return false
+      // Seen when the cards weren't read: only a card started before then.
+      const startedAt = 'at' in seen ? this.store.facts(now.card.id).find((f) => f.seq === now.s.cycle)?.at : null
+      if ('at' in seen && (!startedAt || startedAt >= seen.at)) return false
+      const fresh = [...new Set(paths)].filter((p) => !now.s.locked.includes(p))
+      if (!fresh.length) return false
+      w.fact('FilesLocked', { agent, paths: fresh })
+      return true
+    })
+  }
+
   // --- Writing.
 
-  /** One write for a card, in one transaction; then the actions run (unless left pending). */
-  async write<T>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write) => T): Promise<T> {
+  /**
+   * One write for a card, in one transaction; then the actions run (unless left pending). `prepare`: what the write
+   * decides on that lives outside the card's facts (a design's reviewer, #1382), read inside the same lock (in the app,
+   * the same board change) just before the transaction, so nothing that change orders against comes between.
+   */
+  async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>): Promise<T> {
     const also = alongsideOf.getStore()
     const out = await this.locked(async () => {
+      const prepared = (prepare ? await prepare() : undefined) as P
       let w: Write | null = null
       const r = this.store.tx((tx) => {
         // The ruleset its facts name, stored with them.
         if (ruleset) tx.saveRuleset(ruleset)
         w = new Write(tx, tx.card(card.id), ruleset, actor, tx.card(card.id).stage)
-        return fn(w)
+        return fn(w, prepared)
       })
       // What the call runs alongside (the board's 0.9 fields), in the same transaction, once this write changed the card.
       if (also && w && (w as Write).written.length) await also.written(w)
@@ -998,6 +1061,8 @@ export class Workflow {
     let paths: string[] | undefined
     const inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'> = { agent, folder: this.folderOf(s) }
     const warnings: string[] = []
+    // A lock taken before the submission is in the cards' records before it reads them (G16, submit.clean: #1481).
+    await this.cfg.locksSettled?.()
     // The card's declared paths (None) are its data: what the evidence and the revision are read with (args, else the
     // pre-fill), written with the submission.
     const setPaths = args.paths ?? (card.kind === 'code' && o.platform === 'none' && !card.paths ? this.prefill(card) : null)
@@ -1332,6 +1397,73 @@ export class Workflow {
       this.wake(w, s.started?.builder, `${card.key}: the reviewer asks: ${text}`) // i18n-ignore: a wake, agent-facing
     })
     return this.ok(card, s.stage, s.stage)
+  }
+
+  /**
+   * A card loop's step (#1382, #1467): the builder's design posted for its reviewer's check (in Doing), or its going ahead
+   * with it unchecked once the check is due (`proceed`), or a follow-up of its work ready for the reviewer's check (in
+   * Review or Passed: a change asked of it, such as a screenshot's; never gone ahead with unchecked), or the reviewer's
+   * answer (`ok`, `gaps`). A design or a follow-up is named (`<key>/s<seq>`); a design is due `waitMinutes` after its post
+   * (Card loops → Design check wait, the caller's), kept in its fact: an answer or `proceed` names the step it is about,
+   * and one for an earlier step is refused, so a late reply never settles a newer one. Moves nothing; wakes the other side: the builder's steps its reviewer (the lane's, else the
+   * agent that last reviewed it), an answer its builder. A design or follow-up with no reviewer to check it is refused. With the rules
+   * off, nothing is checked. `reviewer`: the card's loop reviewer as it is when the write decides (loopReviewer.ts), read
+   * inside its board change: an agent's removal publishes under the same lock, so it is either before (refused) or after.
+   */
+  async loopStep(ref: unknown, actor: Actor, step: LoopStepId, text: string, opts: { design?: string; waitMinutes: number; reviewer: () => Promise<string | null>; now?: number }): Promise<Reply> {
+    const card = this.resolve(ref, actor)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    let posted: { design: string; until?: string } | null = null
+    const refused = await this.write(
+      card,
+      s.started ? this.rulesetOf(card, s) : null,
+      actor,
+      (w, reviewer): GuardRefusal | null => {
+        // Read under the transaction: the step waiting, the card's builder and reviewer now, not when the call began.
+        const now = w.state()
+        const agent = agentOf(actor)
+        const side = loopStepSide(step)
+        const at = opts.now ?? Date.now()
+        if (this.enforced()) {
+          const builder = now.started?.builder ?? null
+          // Each side its own (an agent; the user and the Assistant take either): the builder's steps by the card's
+          // builder, an answer by its reviewer, never its builder.
+          if (agent && (side === 'builder' ? agent !== builder : agent !== reviewer || agent === builder)) return { rule: 'loop.stepNotYours', values: { card: card.key, side } } as GuardRefusal
+          if (step === 'design' || step === 'followUp') {
+            // A design before the work goes to review; a follow-up of work reviewed or under review.
+            const here = step === 'design' ? now.stage === 'active' : now.stage === 'review' || now.stage === 'approved'
+            if (!here) return { rule: 'loop.stepNotHere', values: { card: card.key, stage: now.stage, step } } as GuardRefusal
+            if (!reviewer || reviewer === builder) return { rule: 'loop.noReviewer', values: { card: card.key } } as GuardRefusal
+          } else {
+            if (!now.step) return { rule: 'loop.noStep', values: { card: card.key } } as GuardRefusal
+            if (opts.design !== now.step.id) return { rule: 'loop.staleStep', values: { card: card.key, design: opts.design ?? '', waiting: now.step.id } } as GuardRefusal
+            // A follow-up was asked for: it waits for its check, with no going ahead unchecked.
+            if (step === 'proceed' && now.step.step === 'followUp') return { rule: 'loop.followUpChecked', values: { card: card.key } } as GuardRefusal
+            const due = now.step.until ? Date.parse(now.step.until) : NaN
+            if (step === 'proceed' && due > at) return { rule: 'loop.tooEarly', values: { card: card.key, minutes: Math.ceil((due - at) / 60_000) } } as GuardRefusal
+          }
+        }
+        if (step === 'design') {
+          posted = { design: `${card.key}/s${now.lastSeq + 1}`, until: new Date(at + opts.waitMinutes * 60_000).toISOString() }
+          w.fact('LoopStep', { step, text, ...posted, waitMinutes: opts.waitMinutes })
+        } else if (step === 'followUp') {
+          posted = { design: `${card.key}/s${now.lastSeq + 1}` }
+          w.fact('LoopStep', { step, text, ...posted })
+        } else {
+          const about = opts.design ?? now.step?.id
+          w.fact('LoopStep', { step, text, ...(about ? { design: about } : {}), ...(now.step ? { of: now.step.step } : {}) })
+        }
+        // Its words are the fact's (loopWakes.ts' aboutOf); `why` is the action's own note.
+        if (side === 'builder') this.wake(w, reviewer ?? 'reviewers', `${card.key}: ${step}`) // i18n-ignore: a wake, agent-facing
+        else this.wake(w, now.started?.builder, `${card.key}: ${step}`) // i18n-ignore: a wake, agent-facing
+        return null
+      },
+      opts.reviewer
+    )
+    if (refused) return this.refuse(card, actor, 'loop step', refused) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    const p = posted as { design: string; until?: string } | null
+    return this.ok(card, s.stage, s.stage, p ? { design: p.design, ...(p.until ? { until: p.until, waitMinutes: opts.waitMinutes } : {}) } : undefined)
   }
 
   /**

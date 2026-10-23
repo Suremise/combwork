@@ -288,6 +288,8 @@
   "project.settings.saveFailed": "Impossible d’enregistrer les paramètres du projet",
   "project.settings.search": "Rechercher dans les paramètres du projet {project}",
   "project.settings.sessionsIn": "Les sessions du projet {project} exécuteront chaque commande, modification et requête réseau sans demander.",
+  "project.settings.stepWait": "Attente de la vérification de conception (minutes)",
+  "project.settings.stepWaitDefault": "Par défaut ({count, number} min)",
   "project.settings.waitHours": "Attente (heures)",
   "project.settings.wake": "Réveiller relecteurs et auteurs",
   "project.settings.warnOver": "Avertir quand une transcription dépasse",

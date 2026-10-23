@@ -24,6 +24,15 @@ const { advanced } = await import('../src/main/advanced')
 const service = await import('../src/main/workflow/service')
 const { ENFORCE } = service
 const { runCardIntent } = await import('../src/main/cardIntents')
+const lanes = await import('../src/main/lanes')
+const projectAgents = await import('../src/main/projectAgents')
+const templates = await import('../src/main/templates')
+const { testHooks: intentHooks } = await import('../src/main/cardIntents')
+const { configTestHooks } = await import('../src/main/workspace')
+const { loopReviewerOf } = await import('../src/main/loopReviewer')
+const { config } = await import('../src/main/config')
+const { pendingStep } = await import('../src/shared/tasks')
+const { providerService } = await import('../src/main/providerService')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { INTENT_ROUTES } = await import('../src/main/servers')
@@ -43,6 +52,7 @@ afterAll(async () => {
 const user = { kind: 'user' } as const
 const builder = { kind: 'agent', name: 'Builder (p)', self: { project: 'p', agentId: 'a1' }, scope: 'p' } as const
 const reviewer = { kind: 'agent', name: 'Reviewer (p)', self: { project: 'p', agentId: 'a2' }, scope: 'p' } as const
+const other = { kind: 'agent', name: 'Other (p)', self: { project: 'p', agentId: 'a3' }, scope: 'p' } as const
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8' }).trim()
 let n = 0
 
@@ -61,7 +71,7 @@ async function workspace(options: object = PAIR): Promise<{ w: WS; repo: string;
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
   git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
-  const agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }]
+  const agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Other' }]
   writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
   const w = createWorkspaceService()
   await w.open(ws)
@@ -229,6 +239,347 @@ describe('a card by intent (#1267)', () => {
     expect(wakes.some((p) => p.agent === 'a1')).toBe(true)
   })
 
+  /** A card of a lane (builder a1, reviewer a2), started by its builder. */
+  const inLane = async (w: WS): Promise<number> => {
+    const card = await create(w)
+    await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [card], by: 'Builder (p)' })
+    await act(w, card, builder, { kind: 'start' })
+    return card
+  }
+  const wakesOf = (w: WS, card: number): string[] => store.boardRead(w, (db) => db.prepare("SELECT payload FROM card_actions WHERE card = ? AND kind = 'wake'").all(card) as { payload: string }[]).map((r) => (JSON.parse(r.payload) as { agent: string }).agent)
+  const design = (text: string) => ({ kind: 'loopStep', step: 'design', text }) as const
+  const answer = (step: 'ok' | 'gaps' | 'proceed', id: string | undefined, text = 'x') => ({ kind: 'loopStep', step, text, ...(id ? { design: id } : {}) }) as const
+
+  it("a card loop's design step (#1382): named and due, it wakes the reviewer; the reviewer's answer to it wakes the builder", async () => {
+    const { w } = await workspace()
+    const card = await create(w)
+    // Before it starts, the card has no builder: a design isn't anyone's yet.
+    expect(await refused(act(w, card, builder, design('Plan')))).toBe('loop.stepNotYours')
+    await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [card], by: 'Builder (p)' })
+    const started = await act(w, card, builder, { kind: 'start' })
+    // The start says how long a design would wait for its check here, for a watch set before posting one.
+    expect(started.done.data).toMatchObject({ designWaitMinutes: 30 })
+    // Nothing waits for an answer yet; the reviewer doesn't post the builder's design.
+    expect(await refused(act(w, card, reviewer, answer('ok', 'p/s1')))).toBe('loop.noStep')
+    expect(await refused(act(w, card, reviewer, design('Plan')))).toBe('loop.stepNotYours')
+    const t0 = Date.now()
+    const posted = await act(w, card, builder, design('Design: a LoopStep fact and its wake.'))
+    // Nothing moves; the reply names the design and when its check is due (Card loops → Design check wait, 30 by default).
+    const id = String(posted.done.data?.design)
+    expect(id).toMatch(/\/s\d+$/)
+    expect(posted.done).toMatchObject({ from: 'active', to: 'active', data: { waitMinutes: 30 } })
+    const due = Date.parse(String(posted.done.data?.until))
+    expect(due - t0).toBeGreaterThanOrEqual(30 * 60_000 - 1000)
+    expect(due - t0).toBeLessThanOrEqual(30 * 60_000 + 60_000)
+    expect(posted.card).toMatchObject({ column: 'doing', agent: 'a1' })
+    // Its comment names it first: what a watch's wake and latestComment show (HR4's round 2 finding 1).
+    expect(posted.card.comments.at(-1)).toMatchObject({ text: `Design ${id}, for the reviewer's check (an answer names ${id}):\n\nDesign: a LoopStep fact and its wake.` })
+    // Its line, with when the check is due (a value its words don't show, for the stall check).
+    expect(posted.card.history.at(-1)).toMatchObject({ what: 'Posted a design for the reviewer to check: "Design: a LoopStep fact and its wake."', whatText: { values: { until: posted.done.data?.until } } })
+    expect(foldCard(facts(w, card)).step).toMatchObject({ step: 'design', id, by: 'a1', until: posted.done.data?.until })
+    // The lane's reviewer is woken.
+    expect(wakesOf(w, card)).toEqual(['a2'])
+    // The builder doesn't check its own design, nor does another agent of the project: only its reviewer.
+    expect(await refused(act(w, card, builder, answer('ok', id)))).toBe('loop.stepNotYours')
+    expect(await refused(act(w, card, other, answer('ok', id)))).toBe('loop.stepNotYours')
+    // An answer names the design it is about: none, or another, is refused.
+    expect(await refused(act(w, card, reviewer, answer('ok', 'p/s1')))).toBe('loop.staleStep')
+    const gaps = await act(w, card, reviewer, answer('gaps', id, 'What bounds the wait?'))
+    expect(gaps.card.history.at(-1)?.what).toBe('Checked the design: gaps: "What bounds the wait?"')
+    expect(facts(w, card).at(-1)).toMatchObject({ kind: 'LoopStep', data: { step: 'gaps', of: 'design', design: id, text: 'What bounds the wait?' } })
+    expect(wakesOf(w, card)).toEqual(['a2', 'a1'])
+    expect(foldCard(facts(w, card)).step).toBeNull()
+    // Answered: going ahead has nothing to go ahead from until a design is posted again.
+    expect(await refused(act(w, card, builder, answer('proceed', id)))).toBe('loop.noStep')
+    // The user and the Assistant can take either side, naming the design too.
+    const v2 = String((await act(w, card, builder, design('Design v2.'))).done.data?.design)
+    expect(await refused(act(w, card, user, answer('ok', v2, 'Go.')))).toBeNull()
+  })
+
+  it("a late answer never settles a newer design: posting again replaces the one waiting (#1382, HR4's round 1 finding 2)", async () => {
+    const { w } = await workspace()
+    const card = await inLane(w)
+    const old = String((await act(w, card, builder, design('Design v1'))).done.data?.design)
+    const now = String((await act(w, card, builder, design('Design v2, materially different'))).done.data?.design)
+    expect(now).not.toBe(old)
+    // The OK prepared for v1, delivered late: refused, and v2 still waits.
+    expect(await refused(act(w, card, reviewer, answer('ok', old, 'v1 holds')))).toBe('loop.staleStep')
+    expect(foldCard(facts(w, card)).step).toMatchObject({ id: now })
+    expect(await refused(act(w, card, reviewer, answer('ok', now, 'v2 holds')))).toBeNull()
+    expect(facts(w, card).at(-1)).toMatchObject({ kind: 'LoopStep', data: { step: 'ok', design: now } })
+  })
+
+  it('going ahead waits for the check to be due, which a posted design keeps (#1382, finding 1)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const { w } = await workspace()
+      const card = await inLane(w)
+      const t0 = Date.now()
+      const posted = await act(w, card, builder, design('Plan'))
+      const id = String(posted.done.data?.design)
+      // Before it is due: refused, saying how long is left; a minute before, still.
+      expect(await refused(act(w, card, builder, answer('proceed', id)))).toBe('loop.tooEarly')
+      vi.setSystemTime(t0 + 29 * 60_000)
+      expect(await refused(act(w, card, builder, answer('proceed', id)))).toBe('loop.tooEarly')
+      // The setting changed meanwhile doesn't move a posted design's deadline.
+      await w.mutateProjectConfig(join(w.path!, 'p'), () => ({ loopStepWaitMinutes: 120 }))
+      vi.setSystemTime(t0 + 30 * 60_000 + 1000)
+      expect(await refused(act(w, card, builder, answer('proceed', id, 'No answer: building as posted.')))).toBeNull()
+      expect(foldCard(facts(w, card)).step).toBeNull()
+      // A newer design is due by the setting as it is then.
+      const later = await act(w, card, builder, design('Plan v2'))
+      expect(later.done.data).toMatchObject({ waitMinutes: 120 })
+      // An answer that comes before going ahead settles it; going ahead after is refused.
+      await act(w, card, reviewer, answer('ok', String(later.done.data?.design)))
+      vi.setSystemTime(t0 + 4 * 3600_000)
+      expect(await refused(act(w, card, builder, answer('proceed', String(later.done.data?.design))))).toBe('loop.noStep')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a posted design keeps its name and deadline when Hive opens the workspace again (#1382, finding 1: restart)', async () => {
+    const { w } = await workspace()
+    const card = await inLane(w)
+    const posted = await act(w, card, builder, design('Plan'))
+    const path = w.path!
+    await disposeWorkspaceService(w)
+    opened.splice(opened.indexOf(w), 1)
+    const again = createWorkspaceService()
+    await again.open(path)
+    opened.push(again)
+    expect(foldCard(facts(again, card)).step).toMatchObject({ id: posted.done.data?.design, until: posted.done.data?.until })
+    expect(await refused(act(again, card, builder, answer('proceed', String(posted.done.data?.design))))).toBe('loop.tooEarly')
+  })
+
+  it("a design whose last reviewer was removed from the project is refused: nobody could be woken (#1382, HR4's round 2 finding 2)", async () => {
+    const { w, wt } = await workspace()
+    const card = await create(w)
+    // No lane: a1 builds, a2 reviews and fails it.
+    await act(w, card, builder, { kind: 'start' })
+    commit(wt, 'h.txt')
+    await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    await act(w, card, reviewer, { kind: 'startReview' })
+    await act(w, card, reviewer, { kind: 'verdict', pass: false, comment: 'Round 1: FAILED. 1. Post a design first.' })
+    // With a2 still in the project it is the reviewer; once removed, nobody is.
+    const id = String((await act(w, card, builder, design('Revised design'))).done.data?.design)
+    await act(w, card, reviewer, answer('gaps', id, 'Bounds?'))
+    await w.mutateProjectConfig(join(w.path!, 'p'), (cfg) => ({ agents: (cfg.agents ?? []).filter((a: { id: string }) => a.id !== 'a2') }))
+    expect(await refused(act(w, card, builder, design('Revised design v2')))).toBe('loop.noReviewer')
+    expect(foldCard(facts(w, card)).step).toBeNull()
+  })
+
+  /**
+   * A card a1 built and a2 last reviewed (no lane), back in Doing: a2 is its reviewer while it is one of the project's
+   * agents (HR4's round 3 finding: a removal racing a design's write).
+   */
+  const reviewedByA2 = async () => {
+    const { w, wt } = await workspace()
+    const card = await create(w)
+    await act(w, card, builder, { kind: 'start' })
+    commit(wt, `r${card}.txt`)
+    await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    await act(w, card, reviewer, { kind: 'startReview' })
+    await act(w, card, reviewer, { kind: 'verdict', pass: false, comment: 'Round 1: FAILED. 1. Post a design first.' })
+    return { w, card, p: join(w.path!, 'p') }
+  }
+  /** How long a condition here may take before the test has hung (a template's load under load takes seconds), never a wait. */
+  const HUNG = { timeout: 15_000 }
+  const agentIds = (w: WS) => inWorkspace(w, async () => (await w.projectConfig(join(w.path!, 'p'))).agents.map((a) => a.id))
+  /** The ways a2 leaves the project: Hive's removal, a template's load replacing every agent, a change of project.json. */
+  const leaving: [string, (w: WS, p: string) => Promise<unknown>][] = [
+    ['removeAgent', (w, p) => inWorkspace(w, () => projectAgents.removeAgent(p, 'a2', { deleteWorktree: false }))],
+    [
+      "a template's load",
+      (w, p) =>
+        inWorkspace(w, async () => {
+          // Its agents' CLI turned on and found, as a template's load checks.
+          config.settings.providers['claude-code'].enabled = true
+          providerService.info = ((id: string) => ({ provider: id, found: true })) as never
+          mkdirSync(join(w.path!, '.hive', 'templates'), { recursive: true })
+          writeFileSync(join(w.path!, '.hive', 'templates', `solo-${n}.json`), JSON.stringify({ version: 2, name: 'Solo', layout: 'auto', agents: [{ name: `Solo${n}`, role: 'builder', provider: 'claude-code' }] }))
+          return templates.loadTemplate(p, 'workspace', `solo-${n}.json`, await agentIds(w))
+        })
+    ],
+    ['a direct change of project.json', (w, p) => w.mutateProjectConfig(p, (cfg) => ({ agents: cfg.agents.filter((a) => a.id !== 'a2') }))]
+  ]
+  for (const [how, leave] of leaving) {
+    it(`a design whose reviewer leaves before it is written is refused (#1382, by ${how})`, async () => {
+      const { w, card, p } = await reviewedByA2()
+      // The post paused before its write; a2 leaves meanwhile, all the way.
+      let release!: () => void
+      const gate = new Promise<void>((r) => (release = r))
+      let paused = false
+      intentHooks.beforeDesignWrite = async () => {
+        paused = true
+        await gate
+      }
+      try {
+        const post = refused(act(w, card, builder, design('Revised design')))
+        await vi.waitFor(() => expect(paused).toBe(true), HUNG)
+        await leave(w, p)
+        expect(await agentIds(w)).not.toContain('a2')
+        release()
+        // Refused: nobody to check it (a template's load takes its builder too and moves the card out of Doing: refused for that first).
+        expect(await post).toBe(how === "a template's load" ? 'loop.stepNotHere' : 'loop.noReviewer')
+        expect(foldCard(facts(w, card)).step).toBeNull()
+      } finally {
+        intentHooks.beforeDesignWrite = undefined
+        release()
+      }
+    })
+
+    it(`a reviewer leaving while a design is being written waits for it: the design is taken, the leaving comes after (#1382, by ${how})`, async () => {
+      const { w, card, p } = await reviewedByA2()
+      // The post inside its write, holding the board's lock, paused before it reads its reviewer.
+      let release!: () => void
+      const gate = new Promise<void>((r) => (release = r))
+      let inside = false
+      let waiting = false
+      intentHooks.inDesignWrite = async () => {
+        inside = true
+        await gate
+      }
+      configTestHooks.beforeBoardRetry = () => {
+        waiting = true
+      }
+      try {
+        const post = act(w, card, builder, design('Revised design'))
+        await vi.waitFor(() => expect(inside).toBe(true), HUNG)
+        let left = false
+        const leavingNow = leave(w, p).then(() => (left = true))
+        // It reached its write of project.json, found an agent leaving, and waits for the board's lock: not written.
+        await vi.waitFor(() => expect(waiting).toBe(true), HUNG)
+        expect(left).toBe(false)
+        expect(await agentIds(w)).toContain('a2')
+        release()
+        const done = await post
+        expect(done.done.data?.design).toBeTruthy()
+        await leavingNow
+        expect(await agentIds(w)).not.toContain('a2')
+        // The design stands, written while a2 was the card's reviewer (a template's load, taking its builder too, then
+        // moves the card on, which ends it: still written first).
+        expect(facts(w, card).some((f) => f.kind === 'LoopStep' && (f.data as { design?: string }).design === done.done.data?.design)).toBe(true)
+        if (how !== "a template's load") expect(foldCard(facts(w, card)).step).toMatchObject({ id: done.done.data?.design })
+      } finally {
+        intentHooks.inDesignWrite = undefined
+        configTestHooks.beforeBoardRetry = undefined
+        release()
+      }
+    })
+  }
+
+  it('the reviewer is found by its id: renamed, it is still the reviewer; a lane whose reviewer left has none (#1382)', async () => {
+    const { w, card, p } = await reviewedByA2()
+    await w.updateAgent(p, 'a2', { name: 'Checker' })
+    const id = String((await act(w, card, builder, design('Plan'))).done.data?.design)
+    expect(await refused(act(w, card, reviewer, answer('ok', id)))).toBeNull()
+    const board = await inWorkspace(w, () => tasks.getTask(card, w))
+    expect(await inWorkspace(w, () => loopReviewerOf(w, board))).toEqual({ id: 'a2', name: 'Checker (p)' })
+    // A running lane with a3 reviewing, a3 then gone from project.json while the lane still names it: nobody, for
+    // delivery and for a design alike (never a2 instead).
+    const reviewerNow = () => inWorkspace(w, async () => loopReviewerOf(w, await tasks.getTask(card, w)))
+    await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a3', cards: [card], by: 'Builder (p)' })
+    expect(await reviewerNow()).toEqual({ id: 'a3', name: 'Other (p)' })
+    await w.mutateProjectConfig(p, (cfg) => ({ agents: cfg.agents.filter((a) => a.id !== 'a3') }))
+    expect(await reviewerNow()).toBeNull()
+    expect(await refused(act(w, card, builder, design('Plan v2')))).toBe('loop.noReviewer')
+  })
+
+  it("Hive's removal of a lane's reviewer abandons its lane: the card's last reviewer is its reviewer again (#1382)", async () => {
+    const { w, card, p } = await reviewedByA2()
+    await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a3', cards: [card], by: 'Builder (p)' })
+    await inWorkspace(w, () => projectAgents.removeAgent(p, 'a3', { deleteWorktree: false }))
+    expect(await inWorkspace(w, async () => loopReviewerOf(w, await tasks.getTask(card, w)))).toEqual({ id: 'a2', name: 'Reviewer (p)' })
+  })
+
+  it('a design with no reviewer to check it is refused, and an answer is the current reviewer\'s (#1382, findings 3 and 4)', async () => {
+    const { w } = await workspace()
+    const card = await create(w)
+    await act(w, card, builder, { kind: 'start' })
+    // No lane, nobody has reviewed it: nobody could be woken.
+    expect(await refused(act(w, card, builder, design('Plan')))).toBe('loop.noReviewer')
+    expect(kinds(w, card)).not.toContain('LoopStep')
+    // A lane with a reviewer: posted, and that reviewer is woken. The lane's reviewer changed while it waits: the new one
+    // answers it, the old one can't.
+    const { lane } = await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [card], by: 'Builder (p)' })
+    const id = String((await act(w, card, builder, design('Plan'))).done.data?.design)
+    await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a3', cards: [card], by: 'Builder (p)' })
+    expect(lane.reviewer?.id).toBe('a2')
+    expect(await refused(act(w, card, reviewer, answer('ok', id)))).toBe('loop.stepNotYours')
+    expect(await refused(act(w, card, other, answer('ok', id)))).toBeNull()
+  })
+
+  it('a design is posted in Doing, and a submission ends the one waiting (#1382)', async () => {
+    const { w, wt } = await workspace()
+    const card = await inLane(w)
+    const id = String((await act(w, card, builder, design('Plan'))).done.data?.design)
+    commit(wt, 'g.txt')
+    await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    expect(foldCard(facts(w, card)).step).toBeNull()
+    expect(await refused(act(w, card, reviewer, answer('ok', id)))).toBe('loop.noStep')
+    expect(await refused(act(w, card, builder, design('Plan v2')))).toBe('loop.stepNotHere')
+    // With the workflow rules off, nothing guards it.
+    await advanced.set(ENFORCE, false)
+    expect(await refused(act(w, card, reviewer, design('Plan v3')))).toBeNull()
+  })
+
+  it("a follow-up of a passed card (#1467): named, it wakes the reviewer; only the reviewer's answer settles it, never going ahead", async () => {
+    const { w, wt } = await workspace()
+    const card = await inLane(w)
+    const followUp = (text: string) => ({ kind: 'loopStep', step: 'followUp', text }) as const
+    // Not while the work is being done: that is a design's place.
+    expect(await refused(act(w, card, builder, followUp('Fixes')))).toBe('loop.stepNotHere')
+    commit(wt, 'h.txt')
+    await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    await act(w, card, reviewer, { kind: 'startReview' })
+    await act(w, card, reviewer, { kind: 'verdict', pass: true, comment: 'Round 1: PASSED.' })
+    const before = wakesOf(w, card).length
+    // In Passed (the Assistant's screenshot OK asked for changes for the reviewer to check): posted, nothing moves.
+    const posted = await act(w, card, builder, followUp('Fixes: the dark theme at 1093e21.'))
+    const id = String(posted.done.data?.design)
+    expect(id).toMatch(/\/s\d+$/)
+    expect(posted.done).toMatchObject({ from: 'approved', to: 'approved' })
+    expect(posted.done.data).not.toHaveProperty('until')
+    expect(posted.card).toMatchObject({ column: 'passed', agent: 'a1' })
+    expect(posted.card.comments.at(-1)).toMatchObject({ text: `Follow-up ${id}, for the reviewer's check (an answer names ${id}):\n\nFixes: the dark theme at 1093e21.` })
+    expect(posted.card.history.at(-1)?.what).toBe('Posted a follow-up for the reviewer to check: "Fixes: the dark theme at 1093e21."')
+    // Its line keeps the column it was posted in (#1495): with the lines before it trimmed, a reorder in Passed keeps it waiting.
+    expect(posted.card.history.at(-1)?.whatText?.values).toMatchObject({ column: 'passed' })
+    expect(pendingStep({ history: [posted.card.history.at(-1)!, { at: new Date().toISOString(), by: 'You', what: 'Moved to the top of Approved', whatText: { id: 'tasks.history.movedTop', values: { column: 'passed' } } }] })?.step).toBe('followUp')
+    expect(pendingStep({ history: [posted.card.history.at(-1)!, { at: new Date().toISOString(), by: 'You', what: 'Moved to the top of Review', whatText: { id: 'tasks.history.movedTop', values: { column: 'review' } } }] })).toBeNull()
+    expect(foldCard(facts(w, card)).step).toMatchObject({ step: 'followUp', id, until: null })
+    // Its reviewer is woken, whatever it watches.
+    expect(wakesOf(w, card).slice(before)).toEqual(['a2'])
+    // No going ahead with it unchecked, however long it waits.
+    expect(await refused(act(w, card, builder, answer('proceed', id)))).toBe('loop.followUpChecked')
+    expect(await refused(act(w, card, builder, answer('ok', id)))).toBe('loop.stepNotYours')
+    // Gaps: not checked; the builder fixes them and posts it again, and the late answer to the first is refused.
+    const gaps = await act(w, card, reviewer, answer('gaps', id, 'The light theme too.'))
+    expect(gaps.card.history.at(-1)?.what).toBe('Checked the follow-up: gaps: "The light theme too."')
+    expect(facts(w, card).at(-1)).toMatchObject({ kind: 'LoopStep', data: { step: 'gaps', of: 'followUp', design: id } })
+    expect(wakesOf(w, card).slice(before)).toEqual(['a2', 'a1'])
+    expect(foldCard(facts(w, card)).step).toBeNull()
+    const again = String((await act(w, card, builder, followUp('Both themes at 77ab3c1.'))).done.data?.design)
+    expect(await refused(act(w, card, reviewer, answer('ok', id)))).toBe('loop.staleStep')
+    const ok = await act(w, card, reviewer, answer('ok', again, 'Both fine.'))
+    expect(ok.card.history.at(-1)?.what).toBe('Checked the follow-up: OK: "Both fine."')
+    expect(ok.card.column).toBe('passed')
+  })
+
+  it('a follow-up in Review wakes the reviewer too; with no reviewer it is refused (#1467)', async () => {
+    const { w, wt } = await workspace()
+    const card = await create(w)
+    await act(w, card, builder, { kind: 'start' })
+    commit(wt, 'i.txt')
+    await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    // No lane, nobody has reviewed it: nobody could be woken.
+    expect(await refused(act(w, card, builder, { kind: 'loopStep', step: 'followUp', text: 'Fixes' }))).toBe('loop.noReviewer')
+    await act(w, card, reviewer, { kind: 'startReview' })
+    expect(await refused(act(w, card, builder, { kind: 'loopStep', step: 'followUp', text: 'Fixes' }))).toBeNull()
+    expect(wakesOf(w, card).at(-1)).toBe('a2')
+  })
+
   it('a no-code card is submitted with a summary and no revision (S25, S38)', async () => {
     const { w } = await workspace()
     const card = await create(w, 'A design note')
@@ -269,7 +620,10 @@ describe("the intents' routes and tools (#1267)", () => {
   }
 
   it("each route takes its intent's arguments and refuses missing or wrong ones (400)", () => {
-    expect(Object.keys(INTENT_ROUTES).sort()).toEqual(['ask', 'cannot', 'declare-paths', 'put-back', 'report-merge', 'request', 'start-review', 'submit', 'verdict'])
+    expect(Object.keys(INTENT_ROUTES).sort()).toEqual(['ask', 'cannot', 'declare-paths', 'loop-step', 'put-back', 'report-merge', 'request', 'start-review', 'submit', 'verdict'])
+    expect(parse('loop-step', { step: 'design', text: ' Plan ' })).toEqual({ kind: 'loopStep', step: 'design', text: 'Plan' })
+    expect(parse('loop-step', { step: 'review', text: 'x' })).toBe(400)
+    expect(parse('loop-step', { step: 'ok' })).toBe(400)
     expect(parse('put-back', undefined)).toBe(400)
     expect(parse('put-back', { why: ' Blocked by #3 ' })).toEqual({ kind: 'putBack', why: 'Blocked by #3' })
     expect(parse('submit', { summary: ' Done ', paths: ['a.ts'] })).toEqual({ kind: 'submit', summary: 'Done', revision: undefined, note: undefined, paths: ['a.ts'] })

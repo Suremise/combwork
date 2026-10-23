@@ -4,9 +4,11 @@
 // Passed alone still hears of a failed verdict); a wake waiting while the lane's reviewer changes goes to the new one;
 // one waiting while its round is reviewed and failed is dropped;
 // a card nobody reviews wakes no one; a project that turned it off (Project Settings → Card loops) wakes no one. Each wake is noted on its
-// card. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// card. #1475: a blocked lane card's news (its builder's comment) wakes a lane watch, and a lane abandoned ends its
+// reviewer's card watch, leaving it idle for a new conversation. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
+const { createHash } = require('crypto')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -180,6 +182,50 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await card(c3))?.column === 'review', 10000)
   await lib.sleep(3000) // A fixed wait on purpose: this checks that nothing comes.
   check('turned off in Project Settings: no one is woken', wakes('Reviewer').length === 3 && wakes('Other').length === 1 && !(await said(c3)).some((x) => x.startsWith('Hive: Woke')), JSON.stringify({ wakes: [...wakes('Reviewer').slice(3), ...wakes('Other').slice(1)], history: await said(c3) }))
+
+  // #1475, on again: a blocked card's news wakes a lane watch, and a lane abandoned ends its reviewer's card watch, which
+  // leaves it idle for the next lane's prompt in a new conversation.
+  await inv('project:updateConfig', alpha, { loopWakes: true })
+  await until(() => idle(builder.id), 15000)
+  const c7 = await newCard('Seventh')
+  const n7 = await named(c7)
+  // The first lane has a card in flight, so a new list would queue: it is abandoned first.
+  for (const l of (await inv('lanes:list')).filter((x) => x.state === 'active' || x.state === 'paused')) await inv('lanes:end', l.id, true)
+  await say(builder.id, `hive hive_lane ${JSON.stringify({ action: 'start', cards: [c7], reviewer: 'Other' })}`)
+  const lane2 = await until(async () => (await inv('lanes:list')).find((l) => l.state === 'active' && l.cards.some((c) => c.number === c7)), 15000)
+  check('a second lane starts with a new card', !!lane2)
+  await until(() => idle(builder.id), 15000)
+  const watchLanes = async () => {
+    await say(reviewer.id, `hive hive_wait_for_tasks ${JSON.stringify({ lanes: ['all'], wake: true })}`)
+    return !!(await until(async () => (await live(reviewer.id))?.status === 'watching', 15000))
+  }
+  check('Reviewer watches the lanes', await watchLanes())
+  await inv('tasks:update', c7, { blocked: 'Screenshots for your OK' })
+  check('a block wakes the lane watch', !!(await until(async () => wakes('Reviewer').length === 4, 20000)) && /is blocked/.test(wakes('Reviewer')[3]), JSON.stringify(wakes('Reviewer').slice(3)))
+  await until(() => idle(reviewer.id), 15000)
+  check('…which watches the lanes again', await watchLanes())
+  await say(builder.id, `boardcomment ${c7}`)
+  check("its builder's comment on the card still blocked wakes it (reblocked)", !!(await until(async () => wakes('Reviewer').length === 5, 20000)) && wakes('Reviewer')[4].includes(`#${c7} is still blocked, with news: "Screenshots for your OK"`), JSON.stringify(wakes('Reviewer').slice(4)))
+  await until(async () => (await idle(reviewer.id)) && (await idle(builder.id)), 15000)
+  // Other, the new lane's reviewer, waits for the card in Review; the lane is abandoned with the card still in Doing.
+  await say(other.id, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [c7], column: 'review', wake: true })}`)
+  check('Other waits for the card in Review', !!(await until(async () => (await live(other.id))?.status === 'watching', 15000)))
+  await inv('lanes:end', lane2.id, true)
+  check("an abandoned lane ends its reviewer's card watch, saying there's nothing more to wait for", !!(await until(async () => wakes('Other').length === 2, 20000)) && wakes('Other')[1] === `[Hive] ${n7}'s lane was abandoned (your watch on it ended). Your card watch has ended: there is nothing more to wait for on it. Don't watch it again; end your turn unless you have other work.`, JSON.stringify(wakes('Other').slice(1)))
+  check('…noted on the card', !!(await until(async () => (await said(c7)).includes("Hive: Ended Other (alpha)'s watch on it: its lane was abandoned"), 10000)), JSON.stringify(await said(c7)))
+  check('…and leaves it idle with no watch', !!(await until(async () => (await idle(other.id)) && !(await live(other.id))?.watch, 15000)), JSON.stringify(await live(other.id)))
+  // The next lane's prompt reaches it in a new conversation (the Assistant's hive_prompt_agent, with its token).
+  const home = (await inv('workspace:refresh')).assistant.path
+  await inv('session:start', home, { agentId: 'assistant' })
+  const assistantLive = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase() && s.agentId === 'assistant')
+  await until(async () => (await assistantLive())?.status === 'waiting', HUNG_MS)
+  await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
+  await until(async () => (await assistantLive())?.status === 'ready', HUNG_MS)
+  const token = JSON.parse(fs.readFileSync(path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`), 'utf8')).token
+  const runBefore = (await live(other.id))?.runId
+  const res = await fetch(`http://127.0.0.1:${PORT}/v1/projects/alpha/agents/Other/prompt`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'work 1', newConversation: true }) })
+  const body = await res.json().catch(() => null)
+  check('…so the next lane is given to it in a new conversation', res.status === 200 && body?.newConversation === true && !!(await until(async () => (await live(other.id))?.runId !== runBefore, HUNG_MS)), JSON.stringify({ status: res.status, body }))
 
   await app.close()
   console.log(failed ? `\n${failed} FAILED` : '\nALL PASSED')
