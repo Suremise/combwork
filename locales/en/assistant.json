@@ -383,6 +383,10 @@
     "defaultMessage": "Agent names are unique across the workspace: change the marked names first.",
     "description": "Load template: why its button can't be used yet."
   },
+  "assistant.loadNames.filledNote": {
+    "defaultMessage": "Agent names are unique across the workspace, and {projects} already {count, plural, one {has an agent} other {has agents}} called {names}: {count, plural, one {a free name is} other {free names are}} filled in below. Change any name you like.",
+    "description": "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them."
+  },
   "assistant.loadNames.sameTwice": {
     "defaultMessage": "Another of its agents has this name.",
     "description": "Load template, under a name box: another of the template's agents is given the same name."
@@ -390,10 +394,6 @@
   "assistant.loadNames.taken": {
     "defaultMessage": "{project} has an agent called {name}.",
     "description": "Load template, under a name box: an agent of another project has that name."
-  },
-  "assistant.loadNames.takenNote": {
-    "defaultMessage": "Agent names are unique across the workspace, and {projects} already {count, plural, one {has an agent} other {has agents}} called {names}: give {count, plural, one {it} other {them}} other names below.",
-    "description": "Load template, above the plan: some of the template's names are taken. {projects} lists the projects, {names} the names; {count} is how many names."
   },
   "assistant.mcpSecret.argument": {
     "defaultMessage": "An argument starting \"{start}…\" looks like a literal secret.",
@@ -1798,6 +1798,10 @@
   "assistant.template.badSetting": {
     "defaultMessage": "{name}'s {setting, select, model {model} effort {effort} other {permissionMode}} isn't one Hive can use.",
     "description": "Why a template file can't be used: an agent's model, effort or permission mode is no value a coding agent takes. Keep permissionMode as it is (the file's field)."
+  },
+  "assistant.template.badToken": {
+    "defaultMessage": "{name} uses {token}: an agent’s name may only hold '{key}' (the project’s key) and '{n}' (its number among the agents with that name).",
+    "description": "Why a template file can't be used: an agent's name pattern ({name}) holds {token}, a token Hive doesn't know. The quoted '{key}' and '{n}' are shown as {key} and {n}: keep them, with their straight quotes, as they are."
   },
   "assistant.template.from09": {
     "defaultMessage": "This template is from Hive 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.",

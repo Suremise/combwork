@@ -1,7 +1,7 @@
 // Hive's own agent templates (#1436, OP-19; Darren's 19 Oct decision on #1123: templates from 0.9 are wiped and Hive
 // ships these instead). Read-only, listed under the Hive scope; Duplicate… copies one into the workspace or a project to
 // change it. Models are left to the provider's default, so they don't go stale; names are patterns of the project's key
-// (`{key}-B1`, #1123 names), expanded where the template is loaded; the layout fits the count.
+// (`{key}-B{n}`, #1123 names, #1440), made where the template is loaded (HI-B1…); the layout fits the count.
 import { msg, type Msg } from './i18n/msg'
 import { tr } from './i18n'
 import { TEMPLATE_VERSION, type AgentTemplate, type SuggestedPreset, type TemplateAgent, type TemplatePair } from './templates'
@@ -16,9 +16,9 @@ export interface HiveTemplate {
   template: AgentTemplate
 }
 
-const builders = (n: number, extra: Partial<TemplateAgent> = {}): TemplateAgent[] => Array.from({ length: n }, (_, i) => ({ name: `{key}-B${i + 1}`, role: 'builder', provider: 'claude-code', ...extra }))
-const reviewers = (n: number, provider = 'codex'): TemplateAgent[] => Array.from({ length: n }, (_, i) => ({ name: `{key}-R${i + 1}`, role: 'reviewer', provider }))
-/** Builder n with reviewer n, for each n both have. */
+const builders = (n: number, extra: Partial<TemplateAgent> = {}): TemplateAgent[] => Array.from({ length: n }, () => ({ name: '{key}-B{n}', role: 'builder', provider: 'claude-code', ...extra }))
+const reviewers = (n: number, provider = 'codex'): TemplateAgent[] => Array.from({ length: n }, () => ({ name: '{key}-R{n}', role: 'reviewer', provider }))
+/** Builder n with reviewer n, for each n both have (by their numbered names, `pairNames`). */
 const paired = (n: number): TemplatePair[] => Array.from({ length: n }, (_, i) => ({ builder: `{key}-B${i + 1}`, reviewer: `{key}-R${i + 1}` }))
 
 function hive(file: string, name: Msg, description: Msg, layout: PageLayout, agents: TemplateAgent[], suggestedPreset: SuggestedPreset, extra: { pairs?: TemplatePair[]; reviewerMode?: ReviewerMode } = {}): HiveTemplate {

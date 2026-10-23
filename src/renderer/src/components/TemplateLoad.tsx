@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { agentNameProblem, nameTaken, sameAgentName, workspaceAgentList } from '@shared/agentNames'
+import { agentNameProblem, nameTaken, sameAgentName, suggestTemplateAgentName, workspaceAgentList } from '@shared/agentNames'
 import { templateLoadView } from '@shared/templateLoad'
 import type { TemplateScope } from '@shared/templates'
 import type { TemplateLoadPlan } from '@shared/types'
@@ -9,18 +9,20 @@ import { set, useStore } from '../store'
 import { TemplatePlan } from './TemplatePlan'
 
 /**
- * The Load template dialog's plan with its agents' names to choose (#702, Darren's decision of 12 Oct): beside each of
- * the template's names (a reference, never changed) a box for the name the agent will get. A name another project's
- * agent has, one used twice or an empty one is marked, saying what it clashes with, and the dialog's button stays greyed
- * out (`dialogBlocked`) until none is; this project's own agents don't count, as the load replaces them. No patterns or
- * prefixes are filled in. The plan (worktrees reused or new, who replaces whom) is asked for again once typing pauses.
+ * The Load template dialog's plan with its agents' names to choose (#702, Darren's decision of 12 Oct; #1440): beside
+ * each of the template's names (made with this project's key, a reference never changed) a box for the name the agent
+ * will get. A name another project's agent has, or one used twice, starts as a free one (`suggestTemplateAgentName`:
+ * the other project's key swapped for this one's, else suggestAgentName's), so loading is one click; any name can be
+ * edited to any free one. One another project's agent has, one used twice or an empty one is marked, saying what it
+ * clashes with, and the dialog's button stays greyed out (`dialogBlocked`) until none is; this project's own agents
+ * don't count, as the load replaces them. The plan (who replaces whom) is asked for again once typing pauses.
  * `onChange` hears the names the button loads.
  */
 const M = {
   sameTwice: msg({ id: 'assistant.loadNames.sameTwice', defaultMessage: 'Another of its agents has this name.', description: "Load template, under a name box: another of the template's agents is given the same name." }),
   taken: msg({ id: 'assistant.loadNames.taken', defaultMessage: '{project} has an agent called {name}.', description: 'Load template, under a name box: an agent of another project has that name.' }),
   blocked: msg({ id: 'assistant.loadNames.blocked', defaultMessage: 'Agent names are unique across the workspace: change the marked names first.', description: "Load template: why its button can't be used yet." }),
-  takenNote: msg({ id: 'assistant.loadNames.takenNote', defaultMessage: 'Agent names are unique across the workspace, and {projects} already {count, plural, one {has an agent} other {has agents}} called {names}: give {count, plural, one {it} other {them}} other names below.', description: "Load template, above the plan: some of the template's names are taken. {projects} lists the projects, {names} the names; {count} is how many names." })
+  takenNote: msg({ id: 'assistant.loadNames.filledNote', defaultMessage: 'Agent names are unique across the workspace, and {projects} already {count, plural, one {has an agent} other {has agents}} called {names}: {count, plural, one {a free name is} other {free names are}} filled in below. Change any name you like.', description: "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them." })
 }
 
 export function TemplateLoadNames({ path, scope, file, from, initial, onChange }: { path: string; scope: TemplateScope; file: string; from?: string; initial: TemplateLoadPlan; onChange: (names: string[]) => void }) {
@@ -29,7 +31,19 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange }
   const settings = useStore((s) => s.settings)
   const providers = useStore((s) => s.providers)
   const [plan, setPlan] = useState(initial)
-  const [names, setNames] = useState(() => initial.create.map((a) => a.name))
+  const keys = useStore((s) => s.projectKeys)
+  // A name taken, or used twice, starts as a free one (#1440): loading is then one click.
+  const [names, setNames] = useState(() => {
+    const own = initial.create.map((a) => a.name)
+    const key = keys.find((k) => k.projectPath.toLowerCase() === path.toLowerCase())?.key
+    const theirs = workspaceAgentList(projects).filter((a) => a.project.toLowerCase() !== (project?.name ?? '').toLowerCase())
+    const chosen: string[] = []
+    for (const n of own) {
+      const clash = !!nameTaken(n, theirs) || chosen.some((c) => sameAgentName(c, n))
+      chosen.push(clash ? suggestTemplateAgentName(n, project?.name ?? '', key, [...theirs.map((a) => a.name), ...chosen, ...own]) : n)
+    }
+    return chosen
+  })
   const [planError, setPlanError] = useState<string | null>(null)
   // This project's agents don't count: the load replaces them.
   const others = useMemo(() => workspaceAgentList(projects).filter((a) => a.project.toLowerCase() !== (project?.name ?? '').toLowerCase()), [projects, project])

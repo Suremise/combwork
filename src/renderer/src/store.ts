@@ -58,7 +58,8 @@ export type { ProjectTab } from '@shared/projectTabs'
  * Templates tab; none in the Templates view), and where the answer goes (the agent as saved, or null: cancelled).
  */
 /** A template being edited (#510): its revision and content as saved (what a save expects there), and the draft. */
-export type TemplateDraft = { name: string; description: string; layout: PageLayout; agents: TemplateAgent[] }
+/** A template being edited: `pairs` by the agents' places (#1440), so they follow a move, a removal or a renumbering. */
+export type TemplateDraft = { name: string; description: string; layout: PageLayout; agents: TemplateAgent[]; pairs?: { builder: number; reviewer: number }[] }
 export interface TemplateEdit {
   /** The template (where it is kept). */
   ref: TemplateRef
@@ -143,6 +144,8 @@ export interface PromptRequest {
   fieldLabel?: string
   /** A tick box under the field; `set` gets the user's choice before the dialog resolves. */
   check?: { label: string; initial: boolean; set: (checked: boolean) => void }
+  /** A second tick box under the first (Save Template's "Use the project key in names", #1440), alike. */
+  check2?: { label: string; initial: boolean; set: (checked: boolean) => void }
   /** A drop-down under the field (where to turn a new MCP server on, #713); `set` gets the pick before the dialog resolves with a value. */
   select?: { label: string; options: { label: string; value: string }[]; initial: string; set: (value: string) => void }
   /**

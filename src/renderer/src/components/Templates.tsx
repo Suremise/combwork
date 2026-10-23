@@ -3,9 +3,9 @@ import { SESSION_LAYOUTS } from '@shared/defaults'
 import { useAgentLimit } from '../advanced'
 import { agentChoosesMcp, agentMcpText } from '@shared/agentMcp'
 import { isKnownProvider, providerDescriptor, providerName } from '@shared/providers'
-import { TEMPLATE_DESCRIPTION_MAX, TEMPLATE_NAME_MAX, namesKey, shownProblem, templateAgentNames, uniqueName, unknownProviders, type TemplateAgent, type TemplateDest, type TemplateEntry, type TemplateRef } from '@shared/templates'
+import { TEMPLATE_DESCRIPTION_MAX, TEMPLATE_NAME_MAX, namesKey, pairIndex, pairNames, shownProblem, templateAgentNames, type TemplatePair, uniqueName, unknownProviders, type TemplateAgent, type TemplateDest, type TemplateEntry, type TemplateRef } from '@shared/templates'
 import { templateDescription, templateTitle } from '@shared/templateDefaults'
-import { WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
+import { WORKFLOW_ROLE_TEXT, buildsWork, reviewsWork } from '@shared/workflow/roles'
 import { PRESET_TEXT } from '@shared/workflow/optionTexts'
 import type { PageLayout, ProjectInfo } from '@shared/types'
 import * as actions from '../actions'
@@ -167,7 +167,19 @@ const templatesViewLink = (c: React.ReactNode[]): React.ReactNode => <a onClick=
 export const templateKey = (t: TemplateRef): string => `${t.scope}|${(t.project ?? '').toLowerCase()}|${t.file}`
 /** The key of a template's open editor (#510): the workspace's folder and the template. */
 const editKey = (t: TemplateRef): string => `${(get().workspace?.path ?? '').toLowerCase()}|${templateKey(t)}`
-const draftOf = (t: TemplateEntry): TemplateDraft => ({ name: t.name, description: t.description ?? '', layout: t.layout, agents: t.agents.map((a) => ({ ...a })) })
+const draftOf = (t: TemplateEntry): TemplateDraft => ({ name: t.name, description: t.description ?? '', layout: t.layout, agents: t.agents.map((a) => ({ ...a })), pairs: (t.pairs ?? []).map((p) => ({ builder: pairIndex(t.agents, p.builder), reviewer: pairIndex(t.agents, p.reviewer) })).filter((p) => p.builder >= 0 && p.reviewer >= 0) })
+
+/**
+ * A draft's pairs as a template keeps them (#1440): by the agents' numbered names as the draft has them now, each only
+ * while its builder builds and its reviewer reviews (a role changed drops its own pair).
+ */
+function draftPairs(d: TemplateDraft): TemplatePair[] {
+  const names = pairNames(d.agents)
+  return (d.pairs ?? []).filter((p) => d.agents[p.builder] && d.agents[p.reviewer] && p.builder !== p.reviewer && buildsWork(d.agents[p.builder].role) && reviewsWork(d.agents[p.reviewer].role)).map((p) => ({ builder: names[p.builder], reviewer: names[p.reviewer] }))
+}
+
+/** A draft's pairs after an agent is put at `at` (the others there and after move down one). */
+const pairsInserted = (d: TemplateDraft, at: number): TemplateDraft['pairs'] => (d.pairs ?? []).map((p) => ({ builder: p.builder >= at ? p.builder + 1 : p.builder, reviewer: p.reviewer >= at ? p.reviewer + 1 : p.reviewer }))
 const changed = (e: TemplateEdit | undefined): boolean => !!e && JSON.stringify(e.draft) !== JSON.stringify(e.saved)
 const putEdit = (key: string, e: TemplateEdit | null): void => {
   set((s) => {
@@ -203,7 +215,7 @@ onEditorDrafts(() => {
 async function saveEdit(key: string, d: TemplateDraft): Promise<TemplateEntry> {
   const now = get().templateEdits[key]
   if (!now) throw new Error(tr(M.noLongerEdited))
-  const saved = await call('templates:update', now.ref, { name: d.name, description: d.description.trim() || undefined, layout: d.layout, agents: d.agents }, now.savedAt ?? null)
+  const saved = await call('templates:update', now.ref, { name: d.name, description: d.description.trim() || undefined, layout: d.layout, agents: d.agents, pairs: draftPairs(d) }, now.savedAt ?? null)
   const after = get().templateEdits[key] ?? now
   putEdit(key, { ...after, savedAt: saved.savedAt, was: now.savedAt ?? null, saved: draftOf(saved), draft: JSON.stringify(after.draft) === JSON.stringify(d) ? draftOf(saved) : after.draft })
   bump()
@@ -325,15 +337,16 @@ function partnerOf(t: Pick<TemplateEntry, 'pairs'>, name: string): string | unde
 }
 
 /**
- * One of Hive's own as a project would get it (#1123 names): its agents' and pairs' names made with that project's key
- * (`{key}-B1` as HI-B1), so what is shown is what loading makes; any other template as it is.
+ * A template whose names are patterns (Hive's own, one saved with "Use the project key in names") as a project would
+ * get it (#1123 names, #1440): its agents' and pairs' names made with that project's key (`{key}-B{n}` as HI-B1), so what
+ * is shown is what loading makes; any other template as it is.
  */
 function asLoaded(t: TemplateEntry, projectPath: string | null | undefined): TemplateEntry {
-  if (t.scope !== 'hive') return t
+  if (!t.agents.some((a) => /\{(key|n)\}/.test(a.name))) return t
   const p = projectsNow().find((x) => sameProject(x.path, projectPath ?? undefined))
   const key = namesKey(get().projectKeys.find((k) => sameProject(k.projectPath, p?.path))?.key, p?.name ?? '')
   const names = templateAgentNames(t.agents, key)
-  const of = (n: string): string => names[t.agents.findIndex((a) => a.name === n)] ?? n
+  const of = (n: string): string => names[pairIndex(t.agents, n)] ?? n
   return { ...t, agents: t.agents.map((a, i) => ({ ...a, name: names[i] })), ...(t.pairs ? { pairs: t.pairs.map((x) => ({ builder: of(x.builder), reviewer: of(x.reviewer) })) } : {}) }
 }
 
@@ -438,14 +451,19 @@ function TemplateEditor({ t, project, onDone }: { t: TemplateEntry; project?: Pr
   const busy = !!action.busy
   const edit = async (i: number | null, copy = false): Promise<void> => {
     const base = i === null ? null : agents[i]
-    const seed = copy && base ? { ...base, name: uniqueName(base.name, agents.map((a) => a.name)) } : base
+    // A copy of a pattern (`{key}-B{n}`) is the same pattern: it makes the next number.
+    const seed = copy && base ? { ...base, name: base.name.includes('{n}') ? base.name : uniqueName(base.name, agents.map((a) => a.name)) } : base
     const others = agents.filter((_, j) => copy || j !== i)
     const got = await editTemplateAgent(draft.name.trim() || t.name, seed, others, where)
     if (!got) return
     setDraft((d) => {
       const next = [...d.agents]
-      if (i === null || copy) next.splice(i === null ? next.length : i + 1, 0, got)
-      else next[i] = got
+      if (i === null || copy) {
+        const at = i === null ? next.length : i + 1
+        next.splice(at, 0, got)
+        return { ...d, agents: next, pairs: pairsInserted(d, at) }
+      }
+      next[i] = got
       return { ...d, agents: next }
     })
     // Save means save (#510): the template is saved with it, unless it can't be yet (the draft says why).
@@ -456,14 +474,21 @@ function TemplateEditor({ t, project, onDone }: { t: TemplateEntry; project?: Pr
       notify('success', tr(M.saved), tr(M.agentSaved, { name: saved.name, agent: got.name }))
     })
   }
+  // Pairs follow their agents (#1440): by place, swapped with a move, gone with a removal.
   const move = (i: number, by: number): void =>
     setDraft((d) => {
       const next = [...d.agents]
       const [a] = next.splice(i, 1)
       next.splice(i + by, 0, a)
-      return { ...d, agents: next }
+      const to = (x: number): number => (x === i ? i + by : x === i + by ? i : x)
+      return { ...d, agents: next, pairs: (d.pairs ?? []).map((p) => ({ builder: to(p.builder), reviewer: to(p.reviewer) })) }
     })
-  const remove = (i: number): void => setDraft((d) => ({ ...d, agents: d.agents.filter((_, j) => j !== i) }))
+  const remove = (i: number): void =>
+    setDraft((d) => ({
+      ...d,
+      agents: d.agents.filter((_, j) => j !== i),
+      pairs: (d.pairs ?? []).filter((p) => p.builder !== i && p.reviewer !== i).map((p) => ({ builder: p.builder > i ? p.builder - 1 : p.builder, reviewer: p.reviewer > i ? p.reviewer - 1 : p.reviewer }))
+    }))
   const close = (): void => {
     putEdit(key, null)
     onDone()

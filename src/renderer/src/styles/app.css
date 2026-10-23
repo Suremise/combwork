@@ -2904,8 +2904,11 @@ p.hint {
   width: 12px;
   height: 12px;
 }
-/* An agent's role and the agent it is paired with (#1436): a name like HI-R1 kept whole. */
-.template-plan-role {
+/* The agent an agent is paired with (#1436): a name like HI-R1 kept whole. A setting's name too (#1440): "Opus 5.5" and
+   its "(default)" each whole, wrapping only between them (two lines at most, never three). */
+.template-plan-role [data-paired-with],
+.template-plan-setting,
+.template-plan-default {
   white-space: nowrap;
 }
 .template-plan-default {

@@ -1,0 +1,182 @@
+// Agent names from patterns (#1440, SPEC §16.10.6), fake Claude Code, the Assistant off: two projects keyed AM
+// (amberlight) and AP (apiary) each load Hive's Team 3×3 without a rename (AM-B1… and AP-B1…, Load template ready at
+// once); amberlight's agents saved as a template with "Use the project key in names" keep patterns ({key}-B{n}), and
+// without it fixed names; the fixed-name one loaded into apiary has every name taken by amberlight's, so free names are
+// filled in (AP-B1…, the key swapped), one edited to a taken name greys Load template out until it is fixed; loaded,
+// apiary's agents have apiary's names. Add Agent from Template asks for its name, filled in free. Screenshots of the
+// names table with a clash in English and German, light and dark. Dev build, throwaway profile, workspace and
+// CLAUDE_CONFIG_DIR; a quiet test copy.
+const lib = require('./lib.cjs')
+const { _electron } = require('playwright-core')
+const fs = require('fs')
+const path = require('path')
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
+const HUNG_MS = 30000
+
+const userData = path.join(lib.WORK, 'templatenames-profile')
+const ws = path.join(lib.WORK, 'templatenames-ws')
+const claudeHome = path.join(lib.WORK, 'templatenames-claude-home')
+const shots = path.join(lib.WORK, 'templatenames-shots')
+const amber = path.join(ws, 'amberlight')
+const apiary = path.join(ws, 'apiary')
+let failed = 0
+const check = (name, ok, extra = '') => {
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
+}
+const until = (fn, ms) => lib.until(fn, ms, 200)
+
+;(async () => {
+  for (const d of [userData, ws, ws + '.worktrees', claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [claudeHome, shots]) fs.mkdirSync(d, { recursive: true })
+  for (const p of [amber, apiary]) {
+    lib.gitProject(p)
+    lib.git(p, ['branch', '-M', 'main'])
+  }
+  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), amber.toLowerCase(), apiary.toLowerCase()]))
+  // Claude Code only: Codex stays off, so Hive's templates' reviewers run on Claude Code (#1436).
+  lib.enableProviders(userData)
+  const cfgFile = path.join(userData, 'config.json')
+  const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
+  cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
+  cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
+  cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
+  fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
+  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47801), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
+  try {
+    const page = await app.firstWindow()
+    page.on('pageerror', (e) => check('no page errors', false, e.message))
+    await lib.fitWindow(app, page, { width: 1500, height: 900 })
+    await lib.appReady(page)
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    await lib.openWorkspace(inv, page, ws)
+    await lib.waitForProvider(inv)
+    const agentsOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8')).agents ?? []
+    const names = (p) => agentsOf(p).map((a) => a.name)
+    const keys = async () => Object.fromEntries((await inv('project:keys')).map((k) => [path.basename(k.projectPath), k.key]))
+    check('the projects have their keys: amberlight AM, apiary AP', !!(await until(async () => JSON.stringify(await keys()) === JSON.stringify({ amberlight: 'AM', apiary: 'AP' }), HUNG_MS)), JSON.stringify(await keys()))
+    const select = async (name) => {
+      // (Clicking Projects while it shows would hide the sidebar.)
+      if ((await page.locator('.project-row', { hasText: name }).count()) === 0) await page.locator('.activity-btn[aria-label="Projects"]').click()
+      await page.locator('.project-row', { hasText: name }).first().click()
+      await until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')) === name, HUNG_MS)
+    }
+    const menuItem = (label) => page.locator('.menu .menu-item').filter({ has: page.getByText(label, { exact: true }) }).first()
+    const openLoad = async (template) => {
+      await lib.addMenuRun(page, 'Templates')
+      await until(async () => (await menuItem(template).count()) === 1, HUNG_MS)
+      await menuItem(template).click()
+      const d = page.locator('.dialog', { hasText: `Load "${template}"?` })
+      await until(async () => (await d.locator('.template-plan-name-input').count()) > 0, HUNG_MS)
+      return d
+    }
+    const boxes = (d) => d.locator('.template-plan-name-input').evaluateAll((l) => l.map((x) => x.value))
+    const loadButton = (d) => d.getByRole('button', { name: 'Load template' })
+    const shoot = async (name, target) => {
+      for (const theme of ['dark', 'light']) {
+        await inv('settings:update', { appearance: { theme } })
+        await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+        await target().screenshot({ path: path.join(shots, `${name}-${theme}.png`) })
+      }
+      await inv('settings:update', { appearance: { theme: 'dark' } })
+    }
+    const team = ['B1', 'B2', 'B3', 'R1', 'R2', 'R3']
+
+    // --- Hive's Team 3×3 into each project: its key's names, nothing to rename, Load template ready at once.
+    for (const [p, name, key] of [[amber, 'amberlight', 'AM'], [apiary, 'apiary', 'AP']]) {
+      await select(name)
+      const d = await openLoad('Team 3×3')
+      const want = team.map((n) => `${key}-${n}`)
+      check(`${name}: Team 3×3's names are ${key}-B1…, none marked, Load template ready`, JSON.stringify(await boxes(d)) === JSON.stringify(want) && (await d.locator('.template-plan-table .field-error').count()) === 0 && (await loadButton(d).isEnabled()), JSON.stringify(await boxes(d)))
+      await loadButton(d).click()
+      check(`${name}: loaded with those names`, !!(await until(async () => JSON.stringify(names(p)) === JSON.stringify(want), HUNG_MS)), JSON.stringify(names(p)))
+    }
+
+    // --- amberlight saved as a template: with the key in names (offered, ticked), patterns; without, fixed names.
+    await select('amberlight')
+    const save = async (name, patterns) => {
+      await lib.addMenuRun(page, 'Templates')
+      await until(async () => (await menuItem('Save Template…').count()) === 1, HUNG_MS)
+      await menuItem('Save Template…').click()
+      const d = page.locator('.dialog', { hasText: 'Save as template' })
+      await until(async () => (await d.count()) === 1, HUNG_MS)
+      const keyBox = d.locator('[data-check2] input')
+      const offered = (await keyBox.count()) === 1 && (await keyBox.isChecked())
+      await d.locator('input.input').fill(name)
+      await d.locator('label.flex', { hasText: 'For every project' }).locator('input').check()
+      if (!patterns) await keyBox.uncheck()
+      await d.getByRole('button', { name: 'Save', exact: true }).click()
+      await until(async () => (await d.count()) === 0, HUNG_MS)
+      return offered
+    }
+    check('Save Template offers "Use the project key in names", ticked, for names that follow the key', await save('AM team', true))
+    await save('AM fixed', false)
+    const file = (f) => JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'templates', f), 'utf8'))
+    check('…ticked: patterns, and the pairs by numbered name', !!(await until(async () => fs.existsSync(path.join(ws, '.hive', 'templates', 'am-team.json')), HUNG_MS)) && JSON.stringify(file('am-team.json').agents.map((a) => a.name)) === JSON.stringify(['{key}-B{n}', '{key}-B{n}', '{key}-B{n}', '{key}-R{n}', '{key}-R{n}', '{key}-R{n}']) && file('am-team.json').pairs?.[0]?.builder === '{key}-B1', JSON.stringify(file('am-team.json').agents.map((a) => a.name)))
+    check('…unticked: fixed names', JSON.stringify(file('am-fixed.json').agents.map((a) => a.name)) === JSON.stringify(team.map((n) => `AM-${n}`)))
+
+    // --- The fixed-name template into apiary: every name is amberlight's, so free ones are filled in (AP-B1…).
+    await select('apiary')
+    let d = await openLoad('AM fixed')
+    check('every name taken by amberlight: free names filled in (the key swapped), none marked, Load template ready', JSON.stringify(await boxes(d)) === JSON.stringify(team.map((n) => `AP-${n}`)) && (await d.locator('.template-plan-table .field-error').count()) === 0 && (await loadButton(d).isEnabled()) && /free names are filled in below/.test(await d.locator('[data-names-taken]').innerText()), JSON.stringify(await boxes(d)))
+    // One edited to a name amberlight has: marked, Load template greyed out; fixed, ready again.
+    const second = d.locator('.template-plan-name-input').nth(1)
+    await second.fill('AM-B2')
+    check('a name edited to one amberlight has is marked, and Load template greyed out', !!(await until(async () => JSON.stringify(await d.locator('.template-plan-table .field-error').allInnerTexts()) === '["amberlight has an agent called AM-B2."]' && (await loadButton(d).isDisabled()), HUNG_MS)), JSON.stringify(await d.locator('.template-plan-table .field-error').allInnerTexts()))
+    await shoot('names-clash-en', () => d)
+    // The same in German (the dialog opened again, in that language: its text is set as it opens).
+    await d.getByRole('button', { name: 'Cancel' }).click()
+    const base = (await inv('app:info')).language
+    const deDir = path.join(lib.ROOT, 'locales', 'de')
+    const deMessages = Object.assign({}, ...fs.readdirSync(deDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(deDir, f), 'utf8'))))
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    await speak({ ...base, code: 'de', locale: 'de', messages: deMessages })
+    await until(async () => (await page.locator('.session-toolbar .add-menu').innerText().catch(() => '')).includes('Hinzufügen'), HUNG_MS)
+    await lib.addMenuRun(page, 'Vorlagen')
+    await until(async () => (await menuItem('AM fixed').count()) === 1, HUNG_MS)
+    await menuItem('AM fixed').click()
+    const de = page.locator('.dialog', { has: page.locator('.template-plan') }).last()
+    await until(async () => (await de.locator('.template-plan-name-input').count()) === 6, HUNG_MS)
+    await de.locator('.template-plan-name-input').nth(1).fill('AM-B2')
+    check('German: the clash said in German', !!(await until(async () => /amberlight hat einen Agenten namens AM-B2|AM-B2/.test(await de.locator('.template-plan-table .field-error').innerText().catch(() => '')) && /eindeutig/.test(await de.innerText()), HUNG_MS)), await de.innerText().catch(() => ''))
+    await shoot('names-clash-de', () => de)
+    await page.keyboard.press('Escape')
+    await until(async () => (await de.count()) === 0, HUNG_MS)
+    await speak(base)
+    await until(async () => (await page.locator('.session-toolbar .add-menu').innerText().catch(() => '')).includes('Add'), HUNG_MS)
+    // Back in English: fixed, then loaded with apiary's names.
+    d = await openLoad('AM fixed')
+    await d.locator('.template-plan-name-input').nth(1).fill('AM-B2')
+    await until(async () => await loadButton(d).isDisabled(), HUNG_MS)
+    await d.locator('.template-plan-name-input').nth(1).fill('AP-B2')
+    check('…fixed: Load template ready again', !!(await until(async () => (await d.locator('.template-plan-table .field-error').count()) === 0 && (await loadButton(d).isEnabled()), HUNG_MS)))
+    await loadButton(d).click()
+    check('loaded into apiary with its own names', !!(await until(async () => JSON.stringify(names(apiary)) === JSON.stringify(team.map((n) => `AP-${n}`)), HUNG_MS)), JSON.stringify(names(apiary)))
+
+    // --- Add Agent from Template: its name asked for, filled in free (AM-B1 is amberlight's: AP's taken too, so another).
+    await lib.addMenuRun(page, 'Add Agent from Template')
+    await until(async () => (await page.locator('.menu .menu-item').count()) > 3, HUNG_MS)
+    const amFixed = page.locator('.menu .menu-header', { hasText: 'AM fixed' })
+    await until(async () => (await amFixed.count()) === 1, HUNG_MS)
+    await page.locator('.menu .menu-item').filter({ has: page.getByText('AM-B1', { exact: true }) }).last().click()
+    const ask = page.locator('.dialog', { hasText: 'Add an agent from a template' })
+    await until(async () => (await ask.count()) === 1, HUNG_MS)
+    const box = ask.locator('#dialog-prompt-field')
+    const filled = await box.inputValue()
+    check('Add Agent from Template asks for its name, filled in free, with its role and coding agent', !['AM-B1', 'AP-B1'].includes(filled) && /Builder · Claude Code/.test(await ask.innerText()), `${filled} | ${await ask.innerText()}`)
+    await box.fill('AM-B1')
+    await ask.getByRole('button', { name: 'Add Agent' }).click()
+    check('…a name another agent has is refused there, naming whose', !!(await until(async () => /There is already an agent called "AM-B1" in amberlight/.test(await ask.innerText().catch(() => '')), HUNG_MS)))
+    await box.fill('Extra builder')
+    await ask.getByRole('button', { name: 'Add Agent' }).click()
+    check('…a free one is added', !!(await until(async () => names(apiary).includes('Extra builder'), HUNG_MS)), JSON.stringify(names(apiary)))
+  } finally {
+    await app.close()
+  }
+  console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
+  process.exit(failed ? 1 : 0)
+})().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})

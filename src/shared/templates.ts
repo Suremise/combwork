@@ -113,16 +113,21 @@ export interface TemplateEntry {
  * A template of a project's agents and layout. `provider` gives each agent's provider as it runs now (stored on the
  * agent since 0.2, else the project's or the app's default), so a template is the same wherever it is loaded.
  */
-export function templateFrom(name: string, agents: AgentDef[], layout: PageLayout, provider: (a: AgentDef) => ProviderId, now = new Date(), suggestedPreset?: SuggestedPreset): AgentTemplate {
+export function templateFrom(name: string, agents: AgentDef[], layout: PageLayout, provider: (a: AgentDef) => ProviderId, now = new Date(), suggestedPreset?: SuggestedPreset, patternKey?: string): AgentTemplate {
   const list = projectAgents({ agents })
-  const pairs = templatePairs(list.map((a) => ({ name: a.name, role: agentWorkflowRole(a), pairedWith: a.pairedWith })))
+  const roles = list.map((a) => ({ name: a.name, role: agentWorkflowRole(a) }))
+  // The project's key in its names kept as a pattern (#1440), when asked: HI-B1 as {key}-B{n}.
+  const names = patternKey ? namePatterns(roles, patternKey) : list.map((a) => a.name)
+  // Pairs by the names as kept, numbered (`{key}-B1`).
+  const byPair = pairNames(names.map((n, i) => ({ name: n, role: roles[i].role })))
+  const pairs = templatePairs(list.map((a, i) => ({ ...roles[i], pairedWith: a.pairedWith }))).map((p) => ({ builder: byPair[roles.findIndex((r) => r.name === p.builder)], reviewer: byPair[roles.findIndex((r) => r.name === p.reviewer)] }))
   return {
     version: TEMPLATE_VERSION,
     name: name.trim(),
     savedAt: now.toISOString(),
     layout,
-    agents: list.map((a) => ({
-      name: a.name,
+    agents: list.map((a, i) => ({
+      name: names[i],
       // Its role as it reads now (the guess, for an agent from before 1.0: #1430).
       role: agentWorkflowRole(a),
       ...(a.role ? { note: a.role } : {}),
@@ -174,6 +179,7 @@ const M = {
   badProvider: msg({ id: 'assistant.template.badProvider', defaultMessage: "{name}'s coding agent isn't one Hive can use ({given, select, yes {{provider}} other {none}}).", description: "Why a template file can't be used: an agent's coding agent (Claude Code, Codex…) is no id Hive could know. {name} is the agent; {provider} what the file says; none when it says nothing." }),
   badRole: msg({ id: 'assistant.template.badRole', defaultMessage: "{name}'s role in the workflow isn't builder, reviewer or either.", description: "Why a template file can't be used: an agent's role in the workflow (glossary: builder, reviewer, either) is none of the three. Keep builder, reviewer and either as they are (the file's values)." }),
   longNote: msg({ id: 'assistant.template.longNote', defaultMessage: "{name}'s note is over {max} characters.", description: "Why a template file can't be used: an agent's note (what it is for, in the user's words) is too long." }),
+  badToken: msg({ id: 'assistant.template.badToken', defaultMessage: "{name} uses {token}: an agent’s name may only hold '{key}' (the project’s key) and '{n}' (its number among the agents with that name).", description: "Why a template file can't be used: an agent's name pattern ({name}) holds {token}, a token Hive doesn't know. The quoted '{key}' and '{n}' are shown as {key} and {n}: keep them, with their straight quotes, as they are." }),
   badPairs: msg({ id: 'assistant.template.badPairs', defaultMessage: 'Its pairs of builders and reviewers name agents it doesn’t have, or an agent twice.', description: "Why a template file can't be used: its list of builders paired with reviewers (glossary: builder, reviewer) doesn't match its agents." }),
   badSetting: msg({ id: 'assistant.template.badSetting', defaultMessage: "{name}'s {setting, select, model {model} effort {effort} other {permissionMode}} isn't one Hive can use.", description: "Why a template file can't be used: an agent's model, effort or permission mode is no value a coding agent takes. Keep permissionMode as it is (the file's field)." }),
   badContext: msg({ id: 'assistant.template.badContext', defaultMessage: "{name}'s context setting isn't one Hive can use.", description: "Why a template file can't be used: an agent's 200K context setting isn't on or off." }),
@@ -208,7 +214,10 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
   for (const [i, a] of raw.agents.entries()) {
     if (!isObj(a) || !text(a.name, 60)) return withValues(M.agentNoName, { n: i + 1 })
     const name = a.name.trim()
-    if (agents.some((x) => x.name.toLowerCase() === name.toLowerCase())) return withValues(M.sameName, { name })
+    // A pattern (#1440): only {key} and {n} (what they make is never longer than the pattern: a key's 4 letters at most,
+    // a number's 2 digits).
+    const token = /\{[^}]*\}/.exec(name.replace(NAME_TOKENS, ''))?.[0]
+    if (token) return withValues(M.badToken, { name, token })
     // One this Hive doesn't know is kept (flagged where it is shown; loading it is refused), as long as it looks like one.
     if (!isProviderId(a.provider)) return withValues(M.badProvider, { name, given: typeof a.provider === 'string' ? 'yes' : 'no', provider: typeof a.provider === 'string' ? a.provider.slice(0, 40) : '' })
     if (a.role !== undefined && !isWorkflowRole(a.role)) return withValues(M.badRole, { name })
@@ -235,6 +244,10 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
       ...(mcpServers ? { mcpServers } : {})
     })
   }
+  // Two agents named alike once their patterns are made (`{key}-B{n}` twice is HI-B1 and HI-B2: different).
+  const made = templateAgentNames(agents, 'KEY')
+  const twice = made.findIndex((n, i) => made.findIndex((m) => m.toLowerCase() === n.toLowerCase()) !== i)
+  if (twice >= 0) return withValues(M.sameName, { name: agents[twice].name })
   const pairs = readPairs(raw.pairs, agents)
   if (pairs === null) return M.badPairs
   const layout: PageLayout = raw.layout === 'auto' || SESSION_LAYOUTS.some((l) => l.value === raw.layout) ? (raw.layout as PageLayout) : 'auto'
@@ -248,26 +261,34 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
 }
 
 /**
- * A template's pairs as read (untrusted): each a builder and a reviewer among its agents (by name, any case, given as the
- * agents have them), the builder building and the reviewer reviewing, no agent in two pairs; null when they aren't.
+ * A template's pairs as read (untrusted): each a builder and a reviewer among its agents, by their numbered names
+ * (`pairName`: `{key}-B1` for the first `{key}-B{n}`; a fixed name as it is; any case), the builder building and the
+ * reviewer reviewing, no agent in two pairs; null when they aren't.
  */
 function readPairs(raw: unknown, agents: readonly TemplateAgent[]): TemplatePair[] | null {
   if (raw === undefined) return []
   if (!Array.isArray(raw) || raw.length > agents.length) return null
-  const of = (n: unknown): TemplateAgent | undefined => (typeof n === 'string' ? agents.find((a) => a.name.toLowerCase() === n.trim().toLowerCase()) : undefined)
+  const names = pairNames(agents)
+  const at = (n: unknown): number => (typeof n === 'string' ? names.findIndex((x) => x.toLowerCase() === n.trim().toLowerCase()) : -1)
   const out: TemplatePair[] = []
-  const used = new Set<string>()
+  const used = new Set<number>()
   for (const p of raw) {
-    const b = isObj(p) ? of(p.builder) : undefined
-    const r = isObj(p) ? of(p.reviewer) : undefined
-    if (!b || !r || b === r || !buildsWork(b.role) || !reviewsWork(r.role)) return null
-    if (used.has(b.name.toLowerCase()) || used.has(r.name.toLowerCase())) return null
-    used.add(b.name.toLowerCase())
-    used.add(r.name.toLowerCase())
-    out.push({ builder: b.name, reviewer: r.name })
+    const b = isObj(p) ? at(p.builder) : -1
+    const r = isObj(p) ? at(p.reviewer) : -1
+    if (b < 0 || r < 0 || b === r || !buildsWork(agents[b].role) || !reviewsWork(agents[r].role)) return null
+    if (used.has(b) || used.has(r)) return null
+    used.add(b)
+    used.add(r)
+    out.push({ builder: names[b], reviewer: names[r] })
   }
   return out
 }
+
+/** The names a template's pairs give its agents by (#1440): each name with `{n}` made, `{key}` kept (`{key}-B1`). */
+export const pairNames = (agents: readonly Pick<TemplateAgent, 'name' | 'role'>[]): string[] => templateAgentNames(agents, '{key}')
+
+/** Where a pair's agent is among a template's agents (by its numbered name, any case), or -1. */
+export const pairIndex = (agents: readonly Pick<TemplateAgent, 'name' | 'role'>[], name: string): number => pairNames(agents).findIndex((n) => n.toLowerCase() === name.toLowerCase())
 
 /** A provider's id as Hive writes one: known to this Hive or not. */
 const isProviderId = (v: unknown): v is string => typeof v === 'string' && /^[a-z][a-z0-9-]{0,39}$/.test(v)
@@ -304,18 +325,42 @@ const NAME_TOKENS = /\{(key|n)\}/g
  */
 export const namesKey = (key: string | null | undefined, projectName: string): string => key || normalKey(projectName.replace(/[^A-Za-z]/g, '')).slice(0, 2) || 'AG'
 
+/** A name pattern made for a project (#1440): `{key}` its key, `{n}` the agent's number among those of that pattern. */
+export const expandName = (pattern: string, key: string, n: number): string => pattern.replace(NAME_TOKENS, (_m, t: string) => (t === 'key' ? key : String(n)))
+
 /**
- * A template's agent names for a project (#1123 names): `{key}` becomes the project's key (`HI-B1` in hive) and `{n}`
- * the agent's number among the agents of its role, from 1. A name without tokens is itself. #1440 builds the names
- * table on these; until then the load dialog shows them expanded.
+ * A template's agent names for a project (#1123 names, #1440): each pattern made with the project's key (`HI-B1` in hive)
+ * and the agent's number among the agents of the same pattern, from 1 (in Hive's own, `{key}-B{n}` is every builder:
+ * its number among its role), so agents of one pattern never share a name. A name without tokens is itself.
  */
 export function templateAgentNames(agents: readonly Pick<TemplateAgent, 'name' | 'role'>[], key: string): string[] {
-  const count: Partial<Record<WorkflowRole, number>> = {}
+  const count = new Map<string, number>()
   return agents.map((a) => {
-    const n = (count[a.role] = (count[a.role] ?? 0) + 1)
-    return a.name.replace(NAME_TOKENS, (_m, t: string) => (t === 'key' ? key : String(n)))
+    const n = (count.get(a.name.toLowerCase()) ?? 0) + 1
+    count.set(a.name.toLowerCase(), n)
+    return expandName(a.name, key, n)
   })
 }
+
+/**
+ * A project's agent names as a template keeps them (#1440, Save Template's "Use the project key in names"): a name
+ * `<KEY>-<letters><number>` (HI-B2) as `{key}-B{n}` when its number is the agent's among those named `<KEY>-B…` (so
+ * loading makes it again), else `{key}-B2`; any other name (Darren's HB1, "Docs") as it is.
+ */
+export function namePatterns(agents: readonly Pick<TemplateAgent, 'name' | 'role'>[], key: string): string[] {
+  const count = new Map<string, number>()
+  const shape = new RegExp(`^${key.replace(/[^A-Za-z]/g, '')}-([A-Za-z]+)(\\d+)$`, 'i')
+  return agents.map((a) => {
+    const m = shape.exec(a.name)
+    if (!m) return a.name
+    const n = (count.get(m[1].toLowerCase()) ?? 0) + 1
+    count.set(m[1].toLowerCase(), n)
+    return `{key}-${m[1]}${Number(m[2]) === n ? '{n}' : m[2]}`
+  })
+}
+
+/** Whether a project's agent names follow its key (#1440: HI-B1…), so Save Template offers to keep them as patterns. */
+export const namesFollowKey = (names: readonly string[], key: string | null | undefined): boolean => !!key && names.some((n) => new RegExp(`^${key.replace(/[^A-Za-z]/g, '')}-[A-Za-z]+\\d+$`, 'i').test(n))
 
 /** A template's export file name: its name, made safe for a file name ("Build and review.hive-template.json"). */
 export function exportFileName(name: string): string {

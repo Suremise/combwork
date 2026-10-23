@@ -2883,6 +2883,20 @@ repeating them (#533) [note §8].
   Once the board is upgraded, at each open until done (board_meta `templates.v09`), each version-1 template of the
   workspace's and each project's `.hive/templates` is **copied** into `.hive/backups/templates-0.9/workspace` and
   `…/projects/<project id>`; the originals are never moved, deleted or rewritten, and `.bak` files aren't copied.
+- **Names: patterns and the names table** [#1440] **Built [#1440]**: an agent's name in a template may hold `{key}` (the
+  project's key, else its name's first two letters) and `{n}` (its number among the template's agents with the same
+  name, in order: `expandName`, `templateAgentNames`); any other `{token}` is refused, and the expanded names must be unique
+  and fit (checked with `KEY`). Pairs name the numbered agents (`{key}-B1` with `{key}-R1`; `pairNames`, `pairIndex`), and
+  the editor keeps them by place, sending them with the save (`templates:update`'s `pairs`), so moving, copying or renaming
+  never mis-pairs. **Save Template…** offers **Use the project key in names** when the agents' names follow the
+  project's key (`namesFollowKey`): `KEY-<letters><n>` becomes `{key}-<letters>{n}` when `n` is its place among those
+  letters, else `{key}-<letters><n>` (`namePatterns`); other names stay fixed; not ticked, names are saved as they are.
+  **The load dialog's names table** fills a free name in for each name another project's agent has, or that two agents
+  would share (`suggestTemplateAgentName`: another project's key swapped for this one's, else `suggestAgentName`'s), and
+  says so above the table; a name typed back into a clash is marked and Load template greyed out, as before. **Add Agent
+  from Template** asks for the agent's name (a prompt, its free name filled in, checked as Add Agent's); `templates:addAgent`
+  takes it and refuses a taken one. No Agent API or Assistant tool loads a template yet (§16.10.6 above: none for
+  templates); the Assistant was asked on #1440 whether 1.0 needs one.
   Idempotent with no state to recover: bytes the backup already has (under its name or a numbered one) are copied
   already; a copy is written under a temporary name of its own (`.<name>.<random>.part`, removed by the run that made
   it; one a crash left is harmless and left alone, as it may be another run's) and published at the first free name (`pair.json`, `pair-2.json`…) by a link that never replaces a file. A

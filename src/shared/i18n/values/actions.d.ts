@@ -199,6 +199,11 @@ interface HiveMessageValues {
   'actions.stopFirst.message': { named: string; agent: string | number; project: string | number }
   'actions.stopFirst.title': { what: string; agent: string | number }
   'actions.template.addAgentFailed': undefined
+  'actions.template.addConfirm': undefined
+  'actions.template.addDefaultModel': undefined
+  'actions.template.addMessage': { role: string | number; provider: string | number; model: string | number }
+  'actions.template.addName': undefined
+  'actions.template.addTitle': undefined
   'actions.template.blockedMessage': { project: string }
   'actions.template.blockedTitle': { name: string | number }
   'actions.template.everyProject': undefined
@@ -228,6 +233,7 @@ interface HiveMessageValues {
   'actions.template.saved': undefined
   'actions.template.savedMessage': { name: string | number; n: number; scope: string }
   'actions.template.switchPreset': { preset: string | number }
+  'actions.template.usePatterns': { example: string | number; pattern: string | number }
   'actions.unsaved.changedMessage': { action: string }
   'actions.unsaved.changedTitle': undefined
   'actions.unsaved.message': { n: number; file: string | number; action: string }
