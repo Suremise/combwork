@@ -131,6 +131,8 @@
   "service.laneStart.needsReviewer": "{project} 的规则要求由评审者智能体评审每张卡片：请选择评审者。",
   "service.laneStart.noCards": "请选择通道的卡片。",
   "service.laneStart.notTheProjects": "{card} 不是 {project} 的卡片，或已归档。",
+  "service.laneStart.poolEmpty": "{project} 中除构建者外没有负责评审的智能体，因此评审者池中没有人评审这些卡片。",
+  "service.laneStart.poolNotOffered": "{project} 的规则是每个通道一个评审者：请选择评审者，或将“评审者”设为共享池。",
   "service.laneStart.sameAgent": "构建者不能评审自己。",
   "service.laneStart.starting": "{agent} 的通道已在启动中。",
   "service.laneStart.unknownAgent": "{agent} 不是 {project} 的智能体。",

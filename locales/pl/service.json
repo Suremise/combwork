@@ -131,6 +131,8 @@
   "service.laneStart.needsReviewer": "Według reguł projektu {project} agent recenzent recenzuje każdą kartę: wybierz recenzenta.",
   "service.laneStart.noCards": "Wybierz karty dla toru.",
   "service.laneStart.notTheProjects": "{card} nie jest kartą projektu {project} albo jest zarchiwizowana.",
+  "service.laneStart.poolEmpty": "Poza wykonawcą żaden agent projektu {project} nie recenzuje, więc w puli nie ma nikogo, kto zrecenzowałby karty.",
+  "service.laneStart.poolNotOffered": "Według reguł projektu {project} każdy tor ma jednego recenzenta: wybierz recenzenta albo ustaw Recenzentów na wspólną pulę.",
   "service.laneStart.sameAgent": "Wykonawca nie może być własnym recenzentem.",
   "service.laneStart.starting": "Tor agenta {agent} jest już uruchamiany.",
   "service.laneStart.unknownAgent": "{agent} nie jest agentem projektu {project}.",

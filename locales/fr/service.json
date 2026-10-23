@@ -131,6 +131,8 @@
   "service.laneStart.needsReviewer": "Les règles de {project} font relire chaque carte par un agent relecteur : choisis un relecteur.",
   "service.laneStart.noCards": "Choisis les cartes du couloir.",
   "service.laneStart.notTheProjects": "{card} n’est pas une carte de {project}, ou elle est archivée.",
+  "service.laneStart.poolEmpty": "Aucun agent de {project} hormis l’auteur ne relit : le groupe n’a personne pour relire les cartes.",
+  "service.laneStart.poolNotOffered": "Les règles de {project} prévoient un relecteur par couloir : choisis un relecteur, ou règle Relecteurs sur un groupe partagé.",
   "service.laneStart.sameAgent": "L’auteur ne peut pas être son propre relecteur.",
   "service.laneStart.starting": "Le couloir de {agent} est déjà en cours de démarrage.",
   "service.laneStart.unknownAgent": "{agent} n’est pas un agent de {project}.",

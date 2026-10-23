@@ -158,6 +158,16 @@ export interface FactData {
   Submitted: SubmittedData
   CheckRan: CheckRanData
   ReviewStarted: { reviewer: string; submission: number; revision: string | null; reviewCopy?: string }
+  /**
+   * The reviewer pool (#1443, G17) gave the card's submission to a free pooled reviewer: it reviews that submission. With
+   * G1b = 2, a second one after the first passes.
+   */
+  ReviewerAssigned: { reviewer: string; submission: number }
+  /**
+   * A pool's assignment given up before its review started (#1443): its reviewer stopped being free for it (it took a
+   * dispatch lease, its role no longer reviews, it left the project). The submission waits for the pool again.
+   */
+  ReviewerReleased: { reviewer: string; submission: number; why: 'leased' | 'notReviewer' | 'gone' }
   Verdict: { reviewer: string; submission: number; revision: string | null; pass: boolean; failKind?: 'content' | 'explanation'; round: number; generation: number; comment: string }
   CarriedOver: { from: string; to: string; toBase: string | null; how: 'replay' | 'sameRevision' }
   Updated: { entry: string; from: string; to: string; how: 'mergedTarget' | 'rebased'; carried: boolean }

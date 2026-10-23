@@ -6,7 +6,7 @@ import { HISTORY, storedText } from '../shared/taskHistory'
 import { cardChange, LOOP_WAKE_KINDS, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
 import { onHiveEvent } from './events'
 import { onLanesWritten } from './lanes'
-import { loopReviewerOf } from './loopReviewer'
+import { loopReviewerOf, poolCard } from './loopReviewer'
 import { createLogger, userText } from './logger'
 import { getTask, noteOnCard } from './tasks'
 import { actionsRunning, actionsSettled, onAction } from './workflow/actionWorker'
@@ -194,6 +194,8 @@ async function wakeFromAction(a: ActionRow, from: WorkspaceService): Promise<voi
   // A builder's loop step (#1382) goes to the reviewer too, as itself; `named`: a lane's reviewer the runtime named.
   const kind: LoopWakeKind = toReviewer(about.kind) ? about.kind : p.agent === 'reviewers' ? 'review' : about.kind
   const named = kind !== 'review' && typeof p.agent === 'string' && p.agent !== 'builder' && p.agent !== 'reviewers' ? p.agent : undefined
+  // A lane reviewed by the pool (#1443): the pool gives each submission to a reviewer and tells it (reviewerPool.ts).
+  if (kind === 'review' && poolCard(ws, card)) return
   const to = await targetOf(ws, projectPath, card, kind, named)
   if (!to || p.by === `agent:${to.id}`) return
   const since = p.since && typeof p.since === 'object' ? (p.since as TaskHistoryEntry) : (card.history.at(-1) ?? null)

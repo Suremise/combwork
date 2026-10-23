@@ -4,11 +4,11 @@ import { msg } from '../shared/i18n'
 import { laneBrief, type LaneRole } from '../shared/laneBrief'
 import { loopDefaults } from '../shared/lanes'
 import { cardLabel } from '../shared/projectKeys'
-import type { LaneInfo, LaneStartRequest, LaneStartResult } from '../shared/types'
+import type { LaneInfo, LaneStartInfo, LaneStartRequest, LaneStartResult } from '../shared/types'
 import { deliveriesOf, launchWith } from './deliveries'
 import { legacyWorktree, slotsMigrated } from './agentFolders'
 import { lendLane } from './slotCards'
-import { agentWorkflowRole, buildsWork } from '../shared/workflow/roles'
+import { agentWorkflowRole, buildsWork, reviewsWork } from '../shared/workflow/roles'
 import { hiveError } from './hiveError'
 import { rawLanes, setLaneSlotWait, startLane } from './lanes'
 import { createLogger, userText } from './logger'
@@ -18,7 +18,7 @@ import { resolvedOf } from './workflow/rulesets'
 import { workflowEnforced } from './workflow/service'
 import type { WorkspaceService } from './workspace'
 import type { AgentDef, ProjectConfig } from '../shared/types'
-import type { WorkflowOptions } from '../shared/workflow/options'
+import { reviewerModeOf, type WorkflowOptions } from '../shared/workflow/options'
 
 const log = createLogger('lanes')
 
@@ -41,6 +41,8 @@ const M = {
   sameAgent: msg({ id: 'service.laneStart.sameAgent', defaultMessage: "The builder can't be its own reviewer.", description: 'An error starting a lane from the window: the same agent was chosen as builder and reviewer.' }),
   needsReviewer: msg({ id: 'service.laneStart.needsReviewer', defaultMessage: "{project}'s rules have a reviewer agent review each card: choose a reviewer.", description: "An error starting a lane from the window: the project's workflow options have a reviewer agent review the work, and no reviewer was chosen." }),
   busy: msg({ id: 'service.laneStart.busy', defaultMessage: "{agent} {status, select, working {is working} starting {is starting} waiting {is waiting for your answer} background {is waiting on background tasks it started} signin {needs you to sign in again} other {is waiting on cards (a card watch)}}. Start the lane once it's idle, or choose another agent.", description: "An error starting a lane from the window: the agent {agent} can't start in a new conversation now, because of what it is doing ({status}; keep the select keys). The window offers to wait until it's idle." }),
+  poolNotOffered: msg({ id: 'service.laneStart.poolNotOffered', defaultMessage: "{project}'s rules have one reviewer per lane: choose a reviewer, or set Reviewers to a shared pool.", description: "An error starting a lane from the window with the reviewer pool chosen: the project's workflow options (G17, “Reviewers”, a value “A shared pool”) don't have a pool, or workflow rules are off." }),
+  poolEmpty: msg({ id: 'service.laneStart.poolEmpty', defaultMessage: "None of {project}'s agents besides the builder reviews, so the pool has nobody to review the cards.", description: "An error starting a lane from the window with the reviewer pool chosen: no agent of the project other than the builder has a role that reviews (Reviewer or Either)." }),
   starting: msg({ id: 'service.laneStart.starting', defaultMessage: "{agent}'s lane is being started already.", description: 'An error starting a lane from the window: one with the same builder ({agent}) is being started right now.' })
 }
 
@@ -57,7 +59,7 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
     return a
   }
   const builder = agentOf(req.builder)
-  const reviewer = req.reviewer ? agentOf(req.reviewer) : null
+  const reviewer = req.reviewer && !req.pool ? agentOf(req.reviewer) : null
   if (reviewer && reviewer.id === builder.id) throw hiveError(M.sameAgent, undefined, { kind: 'invalid' })
   if (!req.cards.length) throw hiveError(M.noCards, undefined, { kind: 'invalid' })
   const cards: { number: number; key: string; title: string }[] = []
@@ -70,7 +72,13 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   // What the project's rules ask (none while they are off): a reviewer agent's review needs a reviewer.
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
-  if (options && !reviewer && (options.review === 'agent' || options.review === 'agentThenYou')) throw hiveError(M.needsReviewer, { project }, { kind: 'invalid' })
+  if (options && !reviewer && !req.pool && (options.review === 'agent' || options.review === 'agentThenYou')) throw hiveError(M.needsReviewer, { project }, { kind: 'invalid' })
+  // The pool (#1443): only where the rules have it (with them off, the lane's reviewer is whoever the user names), and
+  // only with someone in it besides the builder.
+  const pool = req.pool ? poolOf(cfg, options) : null
+  if (req.pool && !pool) throw hiveError(M.poolNotOffered, { project }, { kind: 'invalid' })
+  if (pool && !pool.some((a) => a.id !== builder.id)) throw hiveError(M.poolEmpty, { project }, { kind: 'invalid' })
+  const pooled = pool?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? null
   // Both free now, checked before anything is recorded (again by each start below).
   for (const a of [builder, reviewer]) {
     const st = a ? sessions.liveFor(projectPath, a.id) : null
@@ -80,7 +88,7 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   if (starting.has(key)) throw hiveError(M.starting, { agent: builder.name }, { kind: 'conflict' })
   starting.add(key)
   try {
-    const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: 'the user' }) // i18n-ignore: who started it, as the lane records it (agents read it)
+    const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: 'the user' }) // i18n-ignore: who started it, as the lane records it (agents read it)
     const where = await builderWhere(projectPath, builder, options)
     if (where.inSlots) {
       // Its slot, lent before its agents start and kept for the whole lane (§16.10.2). None free: the lane is recorded
@@ -91,10 +99,10 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
         await setLaneSlotWait(ws, recorded.lane.id, { since: new Date().toISOString(), note: req.note ?? '' })
         return { lane: recorded.lane as LaneInfo, started: [], waitingForSlot: got.waiting }
       }
-      const brief = briefFor(ws, cfg, project, cards, builder, reviewer, options, where, got.slot, req.note ?? '')
+      const brief = briefFor(ws, cfg, project, cards, builder, reviewer, pooled, options, where, got.slot, req.note ?? '')
       return { lane: recorded.lane as LaneInfo, started: await launchAgents(ws, projectPath, recorded.lane.id, builder, reviewer, brief), slot: got.slot }
     }
-    const brief = briefFor(ws, cfg, project, cards, builder, reviewer, options, where, null, req.note ?? '')
+    const brief = briefFor(ws, cfg, project, cards, builder, reviewer, pooled, options, where, null, req.note ?? '')
     return { lane: recorded.lane as LaneInfo, started: await launchAgents(ws, projectPath, recorded.lane.id, builder, reviewer, brief) }
   } finally {
     starting.delete(key)
@@ -110,10 +118,27 @@ async function builderWhere(projectPath: string, builder: AgentDef, options: Wor
   return { inSlots: options?.folder === 'slots' && buildsWork(agentWorkflowRole(builder)) && !legacy, legacy: legacy ? { path: legacy.path, branch: legacy.branch } : null }
 }
 
+/**
+ * The project's reviewer pool (#1443, G17): its agents whose role reviews, while the rules are on and have a shared pool;
+ * null otherwise (one reviewer per lane, or rules off).
+ */
+function poolOf(cfg: ProjectConfig, options: WorkflowOptions | null): AgentDef[] | null {
+  if (!options || reviewerModeOf(options) !== 'pool') return null
+  return projectAgents(cfg).filter((a) => reviewsWork(agentWorkflowRole(a)))
+}
+
+/** What Start Lane… offers for a project (#1443): Pool in its reviewer list, with the pool's agents, where the rules have one. */
+export async function laneStartInfo(ws: WorkspaceService, projectPath: string): Promise<LaneStartInfo> {
+  const cfg = await ws.projectConfig(projectPath)
+  const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
+  const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
+  return { pool: poolOf(cfg, options)?.map((a) => ({ id: a.id, name: a.name })) ?? null }
+}
+
 /** The brief of a lane's builder or reviewer: the cards, where the builder works (its slot, or folder), the rules, the note. */
-function briefFor(ws: WorkspaceService, cfg: ProjectConfig, project: string, cards: { key: string; title: string }[], builder: AgentDef, reviewer: AgentDef | null, options: WorkflowOptions | null, where: { legacy: { path: string; branch: string } | null }, slot: string | null, note: string): (role: LaneRole) => string {
+function briefFor(ws: WorkspaceService, cfg: ProjectConfig, project: string, cards: { key: string; title: string }[], builder: AgentDef, reviewer: AgentDef | null, pool: string[] | null, options: WorkflowOptions | null, where: { legacy: { path: string; branch: string } | null }, slot: string | null, note: string): (role: LaneRole) => string {
   const rounds = loopDefaults(ws.config, cfg).rounds
-  const input = { project, cards: cards.map(({ key, title }) => ({ key, title })), builder: { name: builder.name, folder: where.legacy?.path ?? null, branch: where.legacy?.branch ?? null, slot }, reviewer: reviewer ? { name: reviewer.name } : null, options, rounds, note }
+  const input = { project, cards: cards.map(({ key, title }) => ({ key, title })), builder: { name: builder.name, folder: where.legacy?.path ?? null, branch: where.legacy?.branch ?? null, slot }, reviewer: reviewer ? { name: reviewer.name } : null, pool, options, rounds, note }
   return (role) => laneBrief(input, role)
 }
 
@@ -197,7 +222,8 @@ export async function startWaitingLane(ws: WorkspaceService, projectPath: string
   }
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
-  const brief = briefFor(ws, cfg, basename(projectPath), cards, builder, reviewer, options, { legacy: null }, slot, lane.slotWait?.note ?? '')
+  const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
+  const brief = briefFor(ws, cfg, basename(projectPath), cards, builder, reviewer, pooled, options, { legacy: null }, slot, lane.slotWait?.note ?? '')
   const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief)
   log.info(`Lane ${laneId} got ${userText(slot)}: ${started.map((s) => `${userText(s.name)} ${s.how}`).join(', ')}`)
   return started.every((s) => s.how !== 'failed')

@@ -28,6 +28,14 @@ describe("a lane's brief on slots (#1438)", () => {
   })
 })
 
+describe("a lane's brief on the reviewer pool (#1443)", () => {
+  it("names the pool's reviewers and tells the builder to give hive_lane no reviewer", () => {
+    const b = laneBrief(input({ reviewer: null, pool: ['HI-R1', 'HI-R2'] }), 'builder')
+    expect(b).toContain('use the card-loop skill as the builder, reviewed by the pool (HI-R1 and HI-R2): Hive gives each card you submit to a free reviewer of it, and its lane is registered already, so give hive_lane no reviewer; rounds: 10.')
+    expect(laneBrief(input({ reviewer: null, pool: [] }), 'builder')).toContain('reviewed by the pool (nobody in it yet)')
+  })
+})
+
 describe("a lane's brief (#1280)", () => {
   it("the builder's: card-loop as the builder with its reviewer, the cards in order, where it works, the rules, the intents, the note", () => {
     const b = laneBrief(input(), 'builder')

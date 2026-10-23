@@ -53,7 +53,9 @@ const PITCH_PX = 61
 const stateWord = (state: Lane['state']): string | null =>
   state === 'active' ? null : tr(msg({ id: 'board.lanes.state', defaultMessage: '{state, select, paused {paused} ended {merged} other {abandoned}}', description: "A lane's state in its header in the Progress panel, lower case (a lane: a builder and its reviewer working through cards in turn): paused, merged (it ended: its cards were merged) or abandoned." }), { state })
 
-const lanePair = (l: Lane): string => (l.reviewer ? `${l.builder.name} / ${l.reviewer.name}` : l.builder.name)
+/** A lane's builder and reviewer: "B1 / R1", "B1 / pool" (#1443), or the builder alone. */
+const lanePair = (l: Lane): string => (l.reviewer ? `${l.builder.name} / ${l.reviewer.name}` : l.pool ? tr(POOL_PAIR, { builder: l.builder.name }) : l.builder.name)
+const POOL_PAIR = msg({ id: 'board.lanes.poolPair', defaultMessage: '{builder} / pool', description: "A lane's agents in its header in the Progress panel when its cards are reviewed by the project's reviewer pool (#1443): its builder's name ({builder}), then the pool, short (the header is narrow). Glossary: pool (of reviewers)." })
 
 /** Waits for the user's answer (#1279): counted in the Lanes bar. */
 const waitsForYou = (l: Lane): boolean => laneRunning(l.state) && (l.status?.reason === 'you' || l.status?.reason === 'roundLimit')
@@ -400,7 +402,7 @@ const START_LANE = msg({ id: 'board.lanes.start', defaultMessage: 'Start Lane…
 
 /** Ends a lane from its row (#1280): at once, or abandoned after asking; a failure says why. */
 async function endLane(l: Lane, abandoned: boolean): Promise<void> {
-  const pair = l.reviewer ? `${l.builder.name} / ${l.reviewer.name}` : l.builder.name
+  const pair = lanePair(l)
   const lane = l.name ? `${pair} (${l.name})` : pair
   if (abandoned) {
     await confirm({
