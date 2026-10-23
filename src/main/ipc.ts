@@ -1,4 +1,5 @@
-import { checkDocRef } from './docSections'
+import { checkDocRef } from './docSections'
+import { legacyWorktree } from '../shared/agentFolders'
 import { BrowserWindow, ClipboardItem, app, clipboard, dialog, ipcMain, nativeImage, shell } from 'electron'
 import { freemem, totalmem } from 'os'
 import { AsyncLocalStorage } from 'async_hooks'
@@ -895,6 +896,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'session:attach': (p, sources, agentId) => sessions.attach(p, sources, agentId),
 
     'agents:add': (p, opts) => projectAgents.addAgent(p, opts),
+    'agents:testLegacy': (p, opts) => {
+      if (app.isPackaged) throw new Error('agents:testLegacy is for test copies') // i18n-ignore: a test channel, never shown
+      return projectAgents.addLegacyAgent(p, opts)
+    },
     'agents:memory': async () => ({ running: await agentsMemory(), total: totalmem(), free: freemem() }),
     'agents:update': (p, id, patch) => projectAgents.updateAgent(p, id, patch),
     'agents:remove': (p, id, opts) => projectAgents.removeAgent(p, id, opts),
@@ -950,7 +955,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'agents:branchStatuses': () => branchWatch.statuses(),
     'agents:merge': async (p, id, opts) => {
       const path = workspace.assertProject(p)
-      const branch = agentsOf(await workspace.projectConfig(path)).find((a) => a.id === id)?.worktree?.branch
+      const branch = legacyWorktree(agentsOf(await workspace.projectConfig(path)).find((a) => a.id === id))?.branch
       return authorizedMerge(path, branch, opts, () => projectAgents.merge(p, id, opts))
     },
     'worktrees:unused': (p) => unusedWorktrees(p),

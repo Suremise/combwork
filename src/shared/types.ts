@@ -961,7 +961,8 @@ export interface TaskPatch {
 export type TaskMoveResult = { moved: TaskCard; stopped?: Refusal } | { ask: string[] } | { refused: Refusal }
 
 /** Which agent Start gives a card to. */
-export type TaskStartTarget = { kind: 'agent'; agentId: string } | { kind: 'new-agent'; worktree: boolean; name?: string; provider?: ProviderId }
+/** `worktree` (0.9's own worktree for a new agent) is refused since 1.0 (#1451); the window stops sending it (#1442). */
+export type TaskStartTarget = { kind: 'agent'; agentId: string } | { kind: 'new-agent'; worktree?: boolean; name?: string; provider?: ProviderId }
 
 /** How a project leaves Hive (the main menu's Project → Remove Project…). */
 export type ProjectRemoval = 'hide' | 'remove' | 'delete'
@@ -2317,8 +2318,13 @@ export interface ProjectStorage {
   archiveRaw?: number
   /** Files pasted or dropped into sessions (.hive/attachments). */
   attachments: number
-  /** The agents' worktree folders. */
-  worktrees: { agent: string; path: string; bytes: number }[]
+  /**
+   * The folders agents work in (#1451): each slot lent now (`slot`, and the agent it is lent to), and an agent's 0.9
+   * worktree while its project isn't migrated; each folder once.
+   */
+  worktrees: { agent: string; path: string; bytes: number; slot?: string }[]
+  /** The project's review and check copies (#1435), one folder, when it has any. */
+  copies?: { path: string; bytes: number }
   /** Worktrees no agent works in (#353), counted in the total. */
   unusedWorktrees?: { path: string; branch: string | null; bytes: number }[]
   total: number

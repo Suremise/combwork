@@ -524,7 +524,7 @@ describe('in the Changes tab (#400)', () => {
     expect(branches()).not.toContain(t.branch)
   })
 
-  it('fenced while it waits its turn: an agent given it meanwhile is refused, and the merge goes on unchanged', async () => {
+  it('fenced while it waits its turn: an agent given it meanwhile is refused (1.0: always, #1451), and the merge goes on unchanged', async () => {
     agents([])
     const t = await tree(`fenced${++n}`)
     commit(t.path, `f${n}.txt`)
@@ -533,8 +533,9 @@ describe('in the Changes tab (#400)', () => {
     let done!: () => void
     const other = withFileLock(join(w.assertProject(proj), '.git', 'hive-merge'), () => new Promise<void>((r) => (done = r)))
     const merging = run(() => mergeUnused(proj, t.path, { squash: false, message: `Work from ${t.branch}`, cleanup: false }))
-    // Meanwhile Add Agent picks it as an existing worktree: refused, the project's agents unchanged.
-    await expect(run(() => addAgent(proj, { name: 'Late', location: 'existing-worktree', worktreePath: t.path }))).rejects.toThrow(/being removed, or was just removed/)
+    // Meanwhile Add Agent picks it as an existing worktree: refused (no agent is pinned to a worktree in 1.0), the
+    // project's agents unchanged.
+    await expect(run(() => addAgent(proj, { name: 'Late', location: 'existing-worktree', worktreePath: t.path }))).rejects.toThrow(/aren’t pinned to worktrees/)
     expect(JSON.parse(readFileSync(join(proj, '.hive', 'project.json'), 'utf8')).agents).toEqual([])
     // A second merge or a removal of it waits for neither: refused while this one has it.
     await expect(run(() => mergeUnused(proj, t.path, { squash: false, message: 'twice', cleanup: false }))).rejects.toThrow(/already being removed or merged/)
@@ -546,9 +547,6 @@ describe('in the Changes tab (#400)', () => {
     expect(existsSync(join(proj, `f${n}.txt`))).toBe(true)
     expect(existsSync(t.path)).toBe(true)
     expect(branches()).toContain(t.branch)
-    // Once over, it can be given to an agent again.
-    const late = await run(() => addAgent(proj, { name: 'Later', location: 'existing-worktree', worktreePath: t.path }))
-    expect(placeKey(late.worktree!.path)).toBe(placeKey(t.path))
     agents([])
   })
 

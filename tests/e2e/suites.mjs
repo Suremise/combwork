@@ -14,6 +14,7 @@
 export const SUITES = [
   { name: 'about' },
   { name: 'advanced' },
+  { name: 'agentapislots' },
   { name: 'agentguidance' },
   { name: 'agentmessage' },
   { name: 'agentrole' },
@@ -301,5 +302,4 @@ export const SUITES = [
   { name: 'wsmove' },
   { name: 'wsoverview' },
   { name: 'wtrecreate' },
-  { name: 'wtreuse' }
 ]

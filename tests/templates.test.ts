@@ -276,6 +276,19 @@ describe('saving and loading templates', () => {
   const beta = join(wsPath, 'beta')
   const git = (cwd: string, ...a: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd, stdio: 'pipe' })
   const cfgOf = (p: string) => JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8'))
+  let legacyNo = 0
+  /**
+   * An agent with a 0.9 worktree, as a project upgraded from 0.9 has one (#1451: 1.0 adds none): a worktree on its own
+   * branch from main, and the agent written into project.json with it (its setup still to run when the project has one).
+   */
+  const legacyAgent = (p: string, name: string, branch = `hive/legacy-${++legacyNo}`): AgentDef => {
+    const path = join(p, '..', `${basename(p)}-wt-${legacyNo}-${name.replace(/\W+/g, '-').toLowerCase()}`)
+    git(p, 'worktree', 'add', '-q', '-b', branch, path, 'main')
+    const cfg = cfgOf(p)
+    const def: AgentDef = { id: `a-legacy${legacyNo}`, name, provider: 'claude-code', worktree: { path, branch, base: 'main' }, ...(cfg.worktreeSetup?.trim() ? { needsSetup: true } : {}) }
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ ...cfg, agents: [...cfg.agents, def] }))
+    return def
+  }
   const names = (p: string) => cfgOf(p).agents.map((a: AgentDef) => a.name)
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
   // Pair's agents loaded into beta: alpha has Builder and Reviewer, and names are unique across the workspace (#702).
@@ -619,8 +632,8 @@ describe('saving and loading templates', () => {
   })
 
   gitIt("a project's template loads into another project (from the Templates view), every agent in that project's folder (#268, #1436)", async () => {
-    // alpha has a worktree agent of its own; beta has a setup command (which a load no longer runs: no worktrees).
-    const source = await run(() => addAgent(alpha, { name: 'Alpha tree', location: 'new-worktree', branch: 'hive/tree-a' }))
+    // alpha has a worktree agent of its own (from 0.9); beta has a setup command (which a load no longer runs: no worktrees).
+    const source = legacyAgent(alpha, 'Alpha tree', 'hive/tree-a')
     writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), worktreeSetup: 'npm install' }))
     const ids = cfgOf(beta).agents.map((a: AgentDef) => a.id)
     const branches = git(beta, 'branch', '--list').toString()
@@ -734,46 +747,38 @@ describe('saving and loading templates', () => {
     expect(renamedAway.pairs).toBeUndefined()
   })
 
-  gitIt("Remove Agent keeping its worktree keeps a setup that never ran (#319): the next agent there runs it; a done one isn't run again; a deleted worktree is forgotten", async () => {
+  gitIt("Remove Agent keeping a 0.9 worktree keeps a setup that never ran (#319); a done one isn't, a deleted one is forgotten (#1451: none is added in one)", async () => {
     const { removeAgent } = await import('../src/main/projectAgents')
     const pending = (): string[] => (cfgOf(beta).setupPending ?? []).map((p: string) => placeKey(p))
-    const agent = (name: string): AgentDef => cfgOf(beta).agents.find((a: AgentDef) => a.name === name)
     expect(cfgOf(beta).worktreeSetup).toBe('npm install')
-    // Never started: its setup is still to run. Removed, its worktree kept: remembered, and run by the next agent there.
-    const keeper = await run(() => addAgent(beta, { name: 'Keeper', location: 'new-worktree' }))
+    // Never started: its setup is still to run. Removed, its worktree kept: remembered.
+    const keeper = legacyAgent(beta, 'Keeper')
     expect(keeper.needsSetup).toBe(true)
     await run(() => removeAgent(beta, keeper.id, { deleteWorktree: false }))
     expect(pending()).toContain(placeKey(keeper.worktree!.path))
-    const again = await run(() => addAgent(beta, { name: 'Keeper again', location: 'existing-worktree', worktreePath: keeper.worktree!.path }))
-    expect(again.needsSetup).toBe(true)
-    expect(pending()).not.toContain(placeKey(keeper.worktree!.path))
-    // Its setup done (its first start): removed and given again, it doesn't run again.
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), agents: cfgOf(beta).agents.map((a: AgentDef) => (a.id === again.id ? { ...a, needsSetup: false } : a)) }))
-    await run(() => removeAgent(beta, again.id, { deleteWorktree: false }))
-    expect(pending()).not.toContain(placeKey(keeper.worktree!.path))
-    const third = await run(() => addAgent(beta, { name: 'Keeper 3', location: 'existing-worktree', worktreePath: keeper.worktree!.path }))
-    expect(!!third.needsSetup).toBe(false)
+    // Its setup done: removed, its worktree kept, nothing remembered.
+    const done = legacyAgent(beta, 'Done')
+    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), agents: cfgOf(beta).agents.map((a: AgentDef) => (a.id === done.id ? { ...a, needsSetup: false } : a)) }))
+    await run(() => removeAgent(beta, done.id, { deleteWorktree: false }))
+    expect(pending()).not.toContain(placeKey(done.worktree!.path))
     // A worktree another agent still works in is that agent's: nothing is remembered for it.
-    const shared = await run(() => addAgent(beta, { name: 'Sharer', location: 'new-worktree' }))
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), agents: [...cfgOf(beta).agents, { ...agent('Sharer'), id: 'a-twin', name: 'Twin' }] }))
+    const shared = legacyAgent(beta, 'Sharer')
+    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), agents: [...cfgOf(beta).agents, { ...shared, id: 'a-twin', name: 'Twin' }] }))
     await run(() => removeAgent(beta, shared.id, { deleteWorktree: false }))
     expect(pending()).not.toContain(placeKey(shared.worktree!.path))
     // Remove All (#291): one with work of its own is kept, so remembered; a merged, clean one is deleted, and forgotten.
-    const busy = await run(() => addAgent(beta, { name: 'Busy', location: 'new-worktree' }))
+    const busy = legacyAgent(beta, 'Busy')
     writeFileSync(join(busy.worktree!.path, 'own.txt'), 'work')
     git(busy.worktree!.path, 'add', '.')
     git(busy.worktree!.path, 'commit', '-qm', 'own work')
     const busyGone = await run(() => removeAgent(beta, busy.id, { deleteWorktree: 'merged-clean', mergedInto: 'main' }))
     expect(busyGone.worktree?.deleted).toBe(false)
     expect(pending()).toContain(placeKey(busy.worktree!.path))
-    const neat = await run(() => addAgent(beta, { name: 'Neat', location: 'new-worktree' }))
-    await run(() => removeAgent(beta, neat.id, { deleteWorktree: false }))
-    expect(pending()).toContain(placeKey(neat.worktree!.path))
-    const neatAgain = await run(() => addAgent(beta, { name: 'Neat again', location: 'existing-worktree', worktreePath: neat.worktree!.path }))
-    // (Listed again, as a worktree kept from before would be: deleting it takes it off the list.)
+    const neat = legacyAgent(beta, 'Neat')
+    // (Listed, as a worktree kept from before would be: deleting it takes it off the list.)
     writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), setupPending: [...(cfgOf(beta).setupPending ?? []), neat.worktree!.path] }))
     expect(pending()).toContain(placeKey(neat.worktree!.path))
-    const neatGone = await run(() => removeAgent(beta, neatAgain.id, { deleteWorktree: 'merged-clean', mergedInto: 'main' }))
+    const neatGone = await run(() => removeAgent(beta, neat.id, { deleteWorktree: 'merged-clean', mergedInto: 'main' }))
     expect(neatGone.worktree?.deleted).toBe(true)
     expect(pending()).not.toContain(placeKey(neat.worktree!.path))
   })

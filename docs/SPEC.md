@@ -2994,6 +2994,33 @@ Whether a conversation may resume there is its **hold** (none: it may):
   prepared, placed or deleted, and a waiting lane stays waiting (each step checks it again after its waits); leases still
   end (data safety).
 
+**Built [#1451], the Agent API and main's readers** (the window's are #1442's; `AgentDef.worktree` leaves the type with
+#1452):
+- **No agent is pinned to a worktree.** Adding an agent (the Agent API, the IPC, a template) adds it with its workflow
+  role and no worktree: `location` other than `project`, `worktreePath`, `branch`, `base` and `reuseWorktree` are refused
+  (*Agents aren't pinned to worktrees in 1.0: slots are lent per card or lane.*, `400`), never ignored; so are the Agent
+  API's `worktree`, `existingWorktree`, `branch` and `base`, and a card's start on a new agent with `worktree: true`. Hive's
+  making, reusing (#456) and bringing up of an agent's worktree are gone; a 0.9 agent's worktree is still removed,
+  checked and merged as before, read through `legacyWorktree`.
+- **Where an agent is** (`agentPlaces` in `shared/agentFolders.ts`, `agentPlace` in main): where it is now (`currentFolder`:
+  its running session's folder, else where a new conversation would start) and where its next new conversation starts
+  (`launchFolder` for its role), each named short (a slot's name, `project`, `home: <name>`, or a 0.9 worktree's path)
+  with why (`session`, `lease`, `carried`, `project`), and `branch`, the line of the slot it is in (the card last
+  started under its open lease; a carried slot's or 0.9 worktree's own branch).
+- **The Agent API:** `hive_project_status`'s agents give `folder`, `slot` and `branch` in place of `worktree`; the agent's
+  detail gives `folder` and `launchFolder` (`{ at, why }`), `slot` and `branch`; add-agent takes `workflowRole`, and its
+  reply says where the agent is. A project agent's own doc reads (`hive_read_section`, `hive_doc_outline`) read the
+  folder it works in now; `from=project` the project folder, as before.
+- **Main's readers:** the Git view's agents in the project folder (`folderAgents`) are those whose current folder it
+  is; Storage counts each folder once (the slots lent now, by the agent they are lent to, a 0.9 worktree while its
+  project isn't migrated, and the review and check copies' folder), leaving them out of Unused worktrees; diagnostics
+  count agents in slots and redact their folders; the branch watch follows the lines of open leases (dispatch, else
+  carried: `leasedLine`), else a 0.9 worktree; the workspace finds a project by a 0.9 worktree's folder through
+  `legacyWorktree`.
+- **Tests:** suites that need a 0.9 agent with its worktree make it as an upgraded project has one (test copies'
+  `agents:testLegacy`, through `lib.addAgent`); `wtreuse` (reusing an unused worktree for a new agent) is retired with
+  the feature.
+
 #### 16.10.4 Fresh conversations and hand-overs
 
 Designed in P7 with Darren [#1123 c]: start fresh for idle agents (#1086), a fresh conversation after an idle gap

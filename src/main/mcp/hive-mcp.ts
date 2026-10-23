@@ -235,7 +235,7 @@ const docQuery = (a: Record<string, any>): string => {
   return `path=${enc(String(a.path ?? ''))}${p ? `&project=${enc(p)}` : ''}${a.from === 'project' ? '&from=project' : ''}`
 }
 /** Which copy of a project file (#818): the agent's own folder's by default, or the project folder's. */
-const fromArg = { type: 'string', enum: ['project'], description: "project: read the project folder's copy, not your worktree's (as a card's Read first references are given)." }
+const fromArg = { type: 'string', enum: ['project'], description: "project: read the project folder's copy, not the one in the folder you work in (as a card's Read first references are given)." }
 
 /** A card's context (#818): the doc sections its agent reads first, given in its start prompt. */
 const contextArg = {
@@ -253,7 +253,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_project_status',
-    description: "One project's status and settings, its workflow options in force (workflow: which the project, the workspace or Hive's settings set), and its agents (each in the project folder or a git worktree) with their ids, branches and running sessions, as JSON.",
+    description: "One project's status and settings, its workflow options in force (workflow: which the project, the workspace or Hive's settings set), and its agents (each with its folder: a slot, the project folder or a retired home) with their ids, branches and running sessions, as JSON.",
     inputSchema: { type: 'object', properties: { project: projectArg } },
     run: (a) => api('GET', `/v1/projects/${proj(a)}`)
   },
@@ -281,7 +281,7 @@ const tools: Tool[] = [
   {
     name: 'hive_doc_outline',
     description:
-      'The headings of a Markdown document, each with its slug and its section\'s size in characters (subsections included), to read only the sections you need with hive_read_section. path: a file of your project, relative to the folder you work in ("docs/PLAN.md"), or a shared note as "shared:<path>" ("shared:plans/i18n.md"). from: "project" reads the project folder\'s copy instead of your worktree\'s. depth: only headings down to that level (2: # and ##).',
+      'The headings of a Markdown document, each with its slug and its section\'s size in characters (subsections included), to read only the sections you need with hive_read_section. path: a file of your project, relative to the folder you work in ("docs/PLAN.md"), or a shared note as "shared:<path>" ("shared:plans/i18n.md"). from: "project" reads the project folder\'s copy instead of the one in the folder you work in. depth: only headings down to that level (2: # and ##).',
     inputSchema: { type: 'object', properties: { path: { type: 'string' }, depth: { type: 'number' }, from: fromArg, project: projectArg }, required: ['path'] },
     run: async (a) => docOutlineText((await api('GET', `/v1/docs/outline?${docQuery(a)}`)) as { path: string; size: number; headings: DocHeadingRow[] }, Number(a.depth) || undefined)
   },
@@ -413,7 +413,7 @@ const tools: Tool[] = [
   {
     name: 'hive_add_agent',
     description:
-      "Add an agent to a project. It works in the project folder, or with worktree in its own git worktree and branch (only if the user asked for one or agreed): an unused worktree already on that branch is reused when merged and clean (brought up to the base), else a new one is made. existingWorktree gives it an unused worktree instead (its folder or branch; one merged and clean is brought up to the base, otherwise it keeps its work). With prompt it starts at once on that task; with start and no prompt it starts idle. Replies with its name, id, provider, folder and status.",
+      "Add an agent to a project. It starts in the project folder; a card or lane it builds is lent a slot. With prompt it starts at once on that task; with start and no prompt it starts idle. Replies with its name, id, provider, folder and status.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -421,24 +421,19 @@ const tools: Tool[] = [
         name: { type: 'string', description: 'Default: "Agent n".' },
         workflowRole: workflowRoleArg,
         ...settingsArgs,
-        worktree: { type: 'boolean' },
-        branch: { type: 'string', description: 'Worktree branch (default hive/<workspace>/<project>/<name>).' },
-        base: { type: 'string', description: 'Branch the worktree starts from (default the current one).' },
-        existingWorktree: { type: 'string', description: 'An unused worktree to work in: its folder or branch.' },
         start: { type: 'boolean' },
         prompt: { type: 'string', description: 'The first task, in full: it reads nothing else from you.' }
       },
       required: ['project']
     },
     run: async (a) => {
-      const r = (await api('POST', `/v1/projects/${proj(a)}/agents`, { name: a.name, workflowRole: a.workflowRole, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers, worktree: a.worktree, existingWorktree: a.existingWorktree, branch: a.branch, base: a.base, start: a.start, prompt: a.prompt })) as {
-        agent: { id: string; name: string; worktree?: { path: string; branch: string } | null }
-        project: { name: string; agents: { id: string; provider: string; status: string }[] }
-        reuse?: string
+      const r = (await api('POST', `/v1/projects/${proj(a)}/agents`, { name: a.name, workflowRole: a.workflowRole, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers, start: a.start, prompt: a.prompt })) as {
+        agent: { id: string; name: string }
+        project: { name: string; agents: { id: string; provider: string; status: string; folder?: string }[] }
       }
       const now = r.project.agents.find((x) => x.id === r.agent.id)
-      const where = r.agent.worktree ? `its worktree ${r.agent.worktree.path} (branch ${r.agent.worktree.branch})` : 'the project folder'
-      return `Added ${r.agent.name} (id ${r.agent.id}) to ${r.project.name}: ${now?.provider ?? 'its provider'}, in ${where}, ${now?.status ?? 'stopped'}.${r.reuse ? ` Hive ${r.reuse}.` : ''}`
+      const where = !now?.folder || now.folder === 'project' ? 'the project folder' : now.folder
+      return `Added ${r.agent.name} (id ${r.agent.id}) to ${r.project.name}: ${now?.provider ?? 'its provider'}, in ${where}, ${now?.status ?? 'stopped'}.`
     }
   },
   {
@@ -757,14 +752,14 @@ const tools: Tool[] = [
   {
     name: 'hive_start_task',
     description:
-      'Start a card on an agent of its project: Hive moves it to doing, gives it to the agent and sends the card as its prompt. For any work on a card, also more on one in review or done: note says what to do now. agent: one that is stopped or idle; without it, Hive adds a new agent (worktree=true for its own git worktree, only if the user asked). Follow with hive_wait_for_agents. Replies with the agent that has it.',
+      'Start a card on an agent of its project: Hive moves it to doing, gives it to the agent and sends the card as its prompt. For any work on a card, also more on one in review or done: note says what to do now. agent: one that is stopped or idle; without it, Hive adds a new agent. Follow with hive_wait_for_agents. Replies with the agent that has it.',
     inputSchema: {
       type: 'object',
-      properties: { number: cardArg, agent: agentArg, note: { type: 'string', description: 'What to do now, added to the card in the prompt.' }, worktree: { type: 'boolean' }, name: { type: 'string', description: "A new agent's name." }, provider: settingsArgs.provider },
+      properties: { number: cardArg, agent: agentArg, note: { type: 'string', description: 'What to do now, added to the card in the prompt.' }, name: { type: 'string', description: "A new agent's name." }, provider: settingsArgs.provider },
       required: ['number']
     },
     run: async (a) => {
-      const r = (await api('POST', `/v1/tasks/${enc(String(a.number))}/start`, { agent: a.agent, note: a.note, worktree: a.worktree, name: a.name, provider: a.provider, reply: 'short' })) as { agent: string; added: boolean; card: TaskRow }
+      const r = (await api('POST', `/v1/tasks/${enc(String(a.number))}/start`, { agent: a.agent, note: a.note, name: a.name, provider: a.provider, reply: 'short' })) as { agent: string; added: boolean; card: TaskRow }
       return `Started ${cardName(r.card)} ${r.card.title} on ${r.added ? 'a new agent, ' : ''}${r.agent}${r.card.project ? ` in ${r.card.project}` : ''}; the card is in ${r.card.column === 'doing' ? 'Doing' : r.card.column}. Follow it with hive_wait_for_agents.`
     }
   },

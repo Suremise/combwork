@@ -1,4 +1,7 @@
-import type { AgentBranchStatus, HiveEvent, ProjectInfo } from '../shared/types'
+import { basename } from 'path'
+import type { AgentBranchStatus, AgentWorktree, HiveEvent, ProjectInfo } from '../shared/types'
+import { leasedLine, legacyWorktree } from './agentFolders'
+import { boardRead } from './boardStore'
 import { emit, onHiveEvent } from './events'
 import { createLogger, userText } from './logger'
 import { openWorkspaces, workspaceFor } from './workspace'
@@ -8,8 +11,10 @@ import { gitProblem } from './gitTool'
 const log = createLogger('branches')
 
 /**
- * What each worktree agent has not merged (commits ahead of the project folder's branch, uncommitted files),
- * for the Merge… button and the agent's tab. Git is asked when an agent's turn ends or it stops, when a window
+ * What each agent's line has not merged (commits ahead of the project folder's branch, uncommitted files), for the
+ * Merge… button and the agent's tab. An agent's line (#1451) is its open lease's in that slot (a card's or a lane's,
+ * else its carried one's: the card last started there, a carried slot's own branch), else its 0.9 worktree's while the
+ * project isn't migrated; an agent with none isn't watched. Git is asked when an agent's turn ends or it stops, when a window
  * gets focus, when an agent is added, after a merge or the Merge dialog's own check, and every minute for
  * agents that still have something to merge. Each change is sent as a `branch-status` event.
  */
@@ -32,12 +37,29 @@ function projectsOf(ws = openWorkspaces()): ProjectInfo[] {
   return ws.flatMap((w) => w.info()?.projects ?? [])
 }
 
-function findAgent(projectPath: string, agentId: string): { project: ProjectInfo; worktree: NonNullable<ProjectInfo['agents'][number]['worktree']> } | null {
+/**
+ * The line an agent's status is about (#1451): its open lease's (dispatch, else carried) in that slot, counted against
+ * the slot's target when it has one; else its 0.9 worktree. Null: none to watch.
+ */
+function findAgent(projectPath: string, agentId: string): { project: ProjectInfo; worktree: AgentWorktree; target?: string } | null {
   const p = projectPath.toLowerCase()
   const ws = workspaceFor(projectPath)
   const project = projectsOf(ws ? [ws] : undefined).find((x) => x.path.toLowerCase() === p)
-  const worktree = project?.agents.find((a) => a.id === agentId)?.worktree
-  return project && worktree ? { project, worktree } : null
+  const agent = project?.agents.find((a) => a.id === agentId)
+  if (!ws || !project || !agent) return null
+  const legacy = legacyWorktree(agent)
+  let leased: { folder: string; target: string | null; line: string | null; carried: boolean } | null = null
+  try {
+    const slotProject = project.config?.id ?? basename(project.path)
+    leased = boardRead(ws, (db) => leasedLine(db, slotProject, agentId))
+  } catch {
+    // A board still 0.9's: no slots.
+  }
+  if (leased) {
+    const branch = leased.line ?? (leased.carried ? (legacy?.branch ?? null) : null)
+    return branch ? { project, worktree: { path: leased.folder, branch, base: leased.target ?? legacy?.base ?? '' }, ...(leased.target ? { target: leased.target } : {}) } : null
+  }
+  return legacy ? { project, worktree: legacy } : null
 }
 
 /** Records a status (from a check here or the Merge dialog's) and tells the window when it changed. */
@@ -60,7 +82,7 @@ export function check(projectPath: string, agentId: string): Promise<void> {
     return Promise.resolve()
   }
   const p = wt
-    .branchStatus(found.project.path, found.worktree)
+    .branchStatus(found.project.path, found.worktree, undefined, found.target)
     .then(
       (st) => record(found.project.path, agentId, st),
       (e) => {
@@ -87,18 +109,18 @@ function soon(projectPath: string, agentId: string, ms = 1500): void {
   )
 }
 
-/** Every worktree agent of a project: a merge changes the branch they are all compared with. */
+/** Every agent of a project with a line (`findAgent`): a merge changes the branch they are all compared with. */
 export function checkProject(projectPath: string): Promise<void> {
   const p = projectPath.toLowerCase()
   const project = projectsOf().find((x) => x.path.toLowerCase() === p)
-  return Promise.all((project?.agents ?? []).filter((a) => a.worktree).map((a) => check(project!.path, a.id))).then(() => undefined)
+  return Promise.all((project?.agents ?? []).filter((a) => findAgent(project!.path, a.id)).map((a) => check(project!.path, a.id))).then(() => undefined)
 }
 
 function checkAll(onlyNew = false): void {
   const live = new Set<string>()
   for (const project of projectsOf()) {
     for (const a of project.agents) {
-      if (!a.worktree) continue
+      if (!findAgent(project.path, a.id)) continue
       const key = keyOf(project.path, a.id)
       live.add(key)
       if (!onlyNew || !known.has(key)) void check(project.path, a.id)

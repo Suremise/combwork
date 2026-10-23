@@ -48,8 +48,6 @@ import { agentBusy, AGENT_WATCH_MAX_AGENTS, type AgentNow, type WatchedAgent } f
 import { alreadyThere, cardChange, changesBetween, decodeSince, handoffsSince, markOf, movedIntoSince, readCondition, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_LIMIT_MINUTES, type CardChange, type CardMark } from '../shared/watch'
 import { waitMaxSeconds } from './advanced'
 import { insideReal, placeMatcher, placeRelative, readCapped, readJson, samePlace, writeJsonAtomic } from './fsutil'
-import { listWorktrees } from './worktrees'
-import { reuseNote } from '../shared/unusedWorktrees'
 import { GUIDANCE_REVISION, skillRevisions } from './guidance'
 import agentApiDoc from '../../docs/AGENT_API.md?raw'
 import { createLogger } from './logger'
@@ -61,7 +59,7 @@ import { laneCards, laneName, laneNumber } from '../shared/lanes'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
 import { writePty } from './ptyHost'
 import { sessions } from './sessions'
-import { folderFacts } from './agentFolders'
+import { agentPlace, folderFacts } from './agentFolders'
 import { slotAt } from '../shared/agentFolders'
 import { cardStall, laneOrderView, stepWaitOf } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
@@ -457,6 +455,9 @@ const statusMessageOf = (live: LiveSessionState | null | undefined): string | nu
 
 async function projectSummary(p: string) {
   const info = await workspace.projectInfo(p)
+  // Where each agent is (#1451, #1434's contract): read once for all of them.
+  const facts = await folderFacts(p)
+  const places = new Map(await Promise.all(info.agents.map(async (a) => [a.id, await agentPlace(p, a, a.live ? { cwd: a.live.cwd } : null, facts)] as const)))
   // The workspace's servers, available to every project, and those this project has on (#713): each agent gets them
   // all, or those of them it was given (#537).
   const servers = await inWorkspace(workspaceOf(p), () => listMcp()).catch(() => [])
@@ -477,11 +478,11 @@ async function projectSummary(p: string) {
       provider: a.live?.provider ?? agentProvider(a, info.config, config.settings),
       // Its role in the workflow (#1430): its own, else the guess from its note or name.
       workflowRole: agentWorkflowRole(a),
-      branch: a.worktree?.branch ?? null,
-      worktree: a.worktree?.path ?? null,
-      // Where its running session is (#1434), when not the project folder: its folder, and its slot while it runs in one.
-      ...(a.live && !samePlace(a.live.cwd, p) ? { folder: a.live.cwd } : {}),
-      ...(a.live?.slot ? { slot: a.live.slot } : {}),
+      // Where it works now (#1451): its running session's folder, else where a new conversation would start, short (a
+      // slot's name, project, or home: <name>); its slot, and that slot's line.
+      folder: places.get(a.id)!.now.at,
+      ...(places.get(a.id)!.now.slot ? { slot: places.get(a.id)!.now.slot } : {}),
+      branch: places.get(a.id)!.branch,
       status: a.live?.status ?? 'stopped',
       sessionId: a.live?.sessionId ?? null,
       statusMessage: statusMessageOf(a.live),
@@ -1080,6 +1081,9 @@ function workflowRoleArg(v: unknown): WorkflowRole {
   throw new HttpError(400, 'workflowRole is "builder", "reviewer" or "either".')
 }
 
+/** Why a worktree of an agent's own is refused (#1451): the Agent API's short note. */
+const NOT_PINNED = "Agents aren't pinned to worktrees in 1.0: slots are lent per card or lane." // i18n-ignore: an Agent API refusal (agents read it)
+
 route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
   const p = projectByName(params[0])
   const project = basename(p)
@@ -1089,18 +1093,12 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
     if (!set.provider && defaultProviderPending(cfg, config.settings)) await providerService.settle()
     const provider = set.provider ?? projectDefaultProvider(cfg, config.settings)
     if (!isProviderEnabled(config.settings, provider)) throw new HttpError(409, `${PROVIDERS.find((x) => x.id === provider)?.name ?? provider} is turned off in Settings → Providers.`)
-    // An unused worktree, by its folder or branch (#456): checked as the dialog's Existing worktree is.
-    const existing = typeof body?.existingWorktree === 'string' ? body.existingWorktree.trim() : ''
-    const tree = existing ? (await listWorktrees(p)).find((w) => !samePlace(w.path, p) && (w.branch === existing || samePlace(w.path, existing))) : undefined
-    if (existing && !tree) throw new HttpError(404, `${project} has no worktree at or on "${existing}".`)
+    // 1.0 (#1451): no agent has a worktree of its own (slots are lent per card or lane): the old arguments are refused.
+    if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, NOT_PINNED)
     const def = await addAgent(p, {
       name: body?.name ? String(body.name) : undefined,
       ...(body?.workflowRole !== undefined ? { workflowRole: workflowRoleArg(body.workflowRole) } : {}),
-      location: tree ? 'existing-worktree' : body?.worktree ? 'new-worktree' : 'project',
-      ...(tree ? { worktreePath: tree.path } : {}),
-      branch: body?.branch ? String(body.branch) : undefined,
-      base: body?.base ? String(body.base) : undefined,
-      reuseWorktree: true,
+      location: 'project',
       ...set,
       use200kContext: set.use200kContext ?? undefined,
       mcpServers: set.mcpServers ?? undefined,
@@ -1123,11 +1121,10 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
         didStart = false
       }
     }
-    const reuse = def.reuse ? reuseNote(def.reuse) : ''
     const said = prompt && didStart ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined
-    // The stream's line is Hive's own words: neither why it didn't start nor the reuse note (git's words) goes there.
-    const brief = `Added ${def.name} to ${project}${def.worktree ? ` (worktree, branch ${def.worktree.branch})` : ''}${didStart === true ? ' and started it' : didStart === false ? "; it didn't start" : ''}`
-    return { done: `Added ${def.name} to ${project}${def.worktree ? ` (worktree, branch ${def.worktree.branch}${reuse ? `: ${reuse}` : ''})` : ''}${started}`, said, brief, act: { agent: actAgent(def) }, ...(launched ? { started: { project, agentId: def.id, run: launched } } : {}), result: { agent: addedForAgents(def), project: await projectSummary(p), ...(reuse ? { reuse } : {}) } }
+    // The stream's line is Hive's own words: never why it didn't start.
+    const brief = `Added ${def.name} to ${project}${didStart === true ? ' and started it' : didStart === false ? "; it didn't start" : ''}`
+    return { done: `Added ${def.name} to ${project}${started}`, said, brief, act: { agent: actAgent(def) }, ...(launched ? { started: { project, agentId: def.id, run: launched } } : {}), result: { agent: addedForAgents(def), project: await projectSummary(p) } }
   })
 })
 
@@ -1425,7 +1422,9 @@ async function agentActivity(p: string, agentId: string, detail = false) {
     toolCalls = turn.length
     recentTools = turn.slice(-lim.tools)
   }
-  const folder = a.worktree?.path ?? p
+  // Where it is now and where a new conversation would start (#1451), each with why in a word.
+  const place = await agentPlace(p, a, st ? { cwd: st.cwd } : null)
+  const folder = place.now.path
   const typed = sessions.userTypedAt(p, agentId)
   const provider = st?.provider ?? agentProvider(a, info.config, config.settings)
   // What was left for it (#530, #647): unread and overdue, and its latest deliveries with their states and times.
@@ -1443,10 +1442,10 @@ async function agentActivity(p: string, agentId: string, detail = false) {
     backgroundTasks: st?.backgroundTasks ?? 0,
     // With detail, its runtime as separate facts (#648): what the status word stands for, unknown included.
     ...(detail ? { runtime: st ? agentRuntime(st) : null } : {}),
-    branch: a.worktree?.branch ?? null,
-    worktree: a.worktree?.path ?? null,
-    ...(st && !samePlace(st.cwd, p) ? { folder: st.cwd } : {}),
-    ...(st?.slot ? { slot: st.slot } : {}),
+    folder: { at: place.now.at, why: place.now.why },
+    launchFolder: { at: place.launch.at, why: place.launch.why },
+    ...(place.now.slot ? { slot: place.now.slot } : {}),
+    branch: place.branch,
     sessionId: sessionId || null,
     // A long transcript slows the CLI and Hive; handing over to itself (a new conversation) makes it short again.
     transcriptMB: st?.transcriptBytes !== undefined ? Math.round((st.transcriptBytes / (1024 * 1024)) * 10) / 10 : null,
@@ -1951,11 +1950,13 @@ async function docOf(query: URLSearchParams): Promise<{ ref: string; text: strin
     const p = name ? projectByName(name) : own!.projectPath
     // An agent: its own project only. The Assistant: its own workspace's (projectByName).
     ownProjectOnly(p, "Reading a project's documents")
-    // A project agent reads its own copy: its worktree, if it works in one. from=project: the project folder's, the copy a
-    // card's Read first references (#818) were written against, as its dialog and start prompt read them.
+    // A project agent reads its own copy: the folder it works in now (#1451: its running session's, its slot). from=project:
+    // the project folder's, the copy a card's Read first references (#818) were written against, as its dialog and start
+    // prompt read them.
     const fromProject = query.get('from') === 'project'
     const def = own && !fromProject && resolvePath(own.projectPath).toLowerCase() === resolvePath(p).toLowerCase() ? projectAgents(await workspace.projectConfig(p)).find((a) => a.id === own.agentId) : undefined
-    root = def?.worktree?.path ?? p
+    const live = def ? sessions.liveFor(p, def.id) : null
+    root = def ? (await agentPlace(p, def, live ? { cwd: live.cwd } : null)).now.path : p
     rel = path
   }
   const r = await readDoc(root, rel)
@@ -2840,9 +2841,11 @@ route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
   if (agentCaller()) return cardIntent(params[0], { kind: 'start' })
   const n = taskNumber(params[0])
   const card = await tasks.readTask(n, await taskActor())
+  // 1.0 (#1451): a new agent gets no worktree of its own: asking for one is refused, never ignored.
+  if (!body?.agent && body?.worktree) throw new HttpError(400, NOT_PINNED)
   const target: TaskStartTarget = body?.agent
     ? { kind: 'agent', agentId: String(body.agent) }
-    : { kind: 'new-agent', worktree: body?.worktree === true, name: body?.name ? String(body.name) : undefined, provider: body?.provider && isKnownProvider(String(body.provider)) ? (String(body.provider) as ProviderId) : undefined }
+    : { kind: 'new-agent', name: body?.name ? String(body.name) : undefined, provider: body?.provider && isKnownProvider(String(body.provider)) ? (String(body.provider) as ProviderId) : undefined }
   // The agent it is started on, when it exists (a new one is named once added).
   const named = target.kind === 'agent' ? await knownAgent(card.project, target.agentId) : undefined
   return assistantChange('agents', `start #${n} ${target.kind === 'agent' ? `on ${named?.name ?? 'an agent'}` : 'on a new agent'}${card.project ? ` in ${card.project}` : ''}`, { kind: 'start-task', card: n, ...(card.project ? { project: card.project } : {}), ...(named ? { agent: named } : {}) }, async () => {
@@ -3552,7 +3555,7 @@ function errorStatus(e: unknown): number {
 
 function statusFor(e: Error): number {
   const m = String(e?.message ?? '')
-  if (/Invalid session id|URI malformed|Unknown provider|Project names cannot/i.test(m)) return 400
+  if (/Invalid session id|URI malformed|Unknown provider|Project names cannot|pinned to worktrees/i.test(m)) return 400
   if (/already running|already open|already being opened|is starting|Stop it first|Stop the|archived|No session is running|ran in .* Resume it|is required to run|is turned off|no agents yet|No workspace|busy|no handover|changed while the cards|workspace was closed|card watches|not a conversation/i.test(m)) return 409
   if (/several agents: choose/i.test(m)) return 400
   if (/Not a project|Unknown (project|agent|task)|no longer exists/i.test(m)) return 404

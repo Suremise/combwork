@@ -328,8 +328,13 @@ async function waitForProvider(inv, provider = 'claude-code', timeoutMs = 60000)
 }
 
 /** Adds an agent (Claude Code in the project folder unless told otherwise); returns its definition. */
+/**
+ * Adds an agent. One in a worktree of its own (`location`: new-worktree or existing-worktree) is a 0.9 agent, as an
+ * upgraded project has one: 1.0 adds none (#1451), so the test copies' channel makes it (`agents:testLegacy`).
+ */
 function addAgent(inv, proj, opts = {}) {
-  return inv('agents:add', proj, { location: 'project', provider: 'claude-code', ...opts })
+  const legacy = opts.location === 'new-worktree' || opts.location === 'existing-worktree'
+  return inv(legacy ? 'agents:testLegacy' : 'agents:add', proj, { location: 'project', provider: 'claude-code', ...opts })
 }
 
 /** Makes a project's only agent (removing any others first): for suites that reuse a workspace. */

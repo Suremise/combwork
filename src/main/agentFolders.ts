@@ -17,9 +17,9 @@ import { isUnknown } from './platform/types'
 import { onRunOutcome, runOutcome, type RunOutcome } from './agentProcesses'
 import { SlotStore, type SlotConn } from './slots'
 import { workspace, workspaceOf, type WorkspaceService } from './workspace'
-import { launchPlace, resumeFolder, resumeHold, slotAt, type FolderAgent, type FolderFacts, type FolderLease, type FolderPurpose, type FolderSession, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
+import { agentPlaces, launchPlace, legacyWorktree, resumeFolder, resumeHold, slotAt, type AgentPlace, type FolderAgent, type FolderFacts, type FolderLease, type FolderPurpose, type FolderSession, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { agentWorkflowRole } from '../shared/workflow/roles'
-import type { AgentDef, AgentWorktree } from '../shared/types'
+import type { AgentDef } from '../shared/types'
 
 const log = createLogger('sessions')
 
@@ -59,14 +59,8 @@ export function setWriterHost(h: WriterHost | null): void {
   writerHost = h ?? standIn()
 }
 
-/**
- * An agent's 0.9 worktree, as project.json stores it (`worktree`). Only the migration (#1441), Repair (#1447) and the
- * folder contract read it: everything else asks agentFolders where an agent works.
- */
-export function legacyWorktree(raw: { worktree?: AgentWorktree | null } | null | undefined): AgentWorktree | null {
-  const w = raw?.worktree
-  return w && typeof w.path === 'string' && w.path ? w : null
-}
+// An agent's 0.9 worktree (shared/agentFolders.ts's: workspace.ts reads it too, which this module can't be imported by).
+export { legacyWorktree }
 
 /** An agent as the contract reads it. */
 export const folderAgent = (a: Pick<AgentDef, 'id' | 'name' | 'role' | 'workflowRole' | 'worktree'>): FolderAgent => {
@@ -128,6 +122,45 @@ export async function folderFacts(projectPath: string): Promise<FolderFacts> {
     // A board still 0.9's, or none open: no slots.
   }
   return facts
+}
+
+/**
+ * Where an agent works, for the Agent API and main's readers (#1451): where it is now (its running session's folder, else
+ * where a new conversation would start) and where its next new conversation starts, each named and with why
+ * (`agentPlaces`), and `branch`, the line of the slot it is in now: the card last started under that slot's open lease,
+ * else a carried slot's or 0.9 worktree's own branch. `facts`: read once for several agents.
+ */
+export async function agentPlace(projectPath: string, agent: Pick<AgentDef, 'id' | 'name' | 'role' | 'workflowRole' | 'worktree'>, running: { cwd: string } | null, facts?: FolderFacts): Promise<{ now: AgentPlace; launch: AgentPlace; branch: string | null }> {
+  const f = facts ?? (await folderFacts(projectPath))
+  const places = agentPlaces(f, folderAgent(agent), running)
+  const slot = places.now.slot ? (f.slots.find((s) => s.name === places.now.slot) ?? null) : null
+  const legacy = legacyWorktree(agent)
+  let branch: string | null = null
+  if (slot?.open) {
+    try {
+      branch = boardRead(workspaceOf(projectPath), (db) => leaseLine(db, slot.open!.id))
+    } catch {
+      // A board still 0.9's: no lines.
+    }
+  }
+  if (!branch && legacy && (slot?.open?.kind === 'carried' || samePlace(places.now.path, legacy.path))) branch = legacy.branch
+  return { ...places, branch }
+}
+
+/**
+ * An agent's open lease in a project's slots and its line (#1451: branchWatch's): its dispatch lease (a card's or a
+ * lane's), else its carried one, with the slot's folder and target; null: none open.
+ */
+export function leasedLine(db: DatabaseSync, project: string, agentId: string): { folder: string; target: string | null; line: string | null; carried: boolean } | null {
+  const l = db
+    .prepare("SELECT l.id, l.kind, s.folder, s.target FROM slot_leases l JOIN slots s ON s.project = l.project AND s.name = l.slot WHERE l.project = ? AND l.agent = ? AND l.ended_at IS NULL ORDER BY l.kind = 'carried' LIMIT 1") // i18n-ignore: SQL
+    .get(project, agentId) as { id: string; kind: string; folder: string; target: string | null } | undefined
+  return l ? { folder: l.folder, target: l.target, line: leaseLine(db, l.id), carried: l.kind === 'carried' } : null
+}
+
+/** The line of the card last started under a lease (its `Started` fact's), or null. */
+export function leaseLine(db: DatabaseSync, lease: string): string | null {
+  return (db.prepare("SELECT json_extract(data, '$.line') AS line FROM card_facts WHERE kind = 'Started' AND json_extract(data, '$.lease') = ? ORDER BY at DESC LIMIT 1").get(lease) as { line: string | null } | undefined)?.line ?? null // i18n-ignore: SQL
 }
 
 /** Why a bind or rebind was refused (in English: the log and agents). */

@@ -15,7 +15,8 @@ import { sessions, type ListContext } from './sessions'
 import { workspace, workspaceOf } from './workspace'
 import { usageHistory } from './usageHistory'
 import { hiveError, shownError } from './hiveError'
-import { insideReal } from './fsutil'
+import { insideReal, placeKey } from './fsutil'
+import { folderFacts, legacyWorktree } from './agentFolders'
 import { unusedWorktreeFolders } from './unusedWorktrees'
 import { trash } from './trash'
 import { attachmentsDir } from './attachmentsFolder'
@@ -206,15 +207,34 @@ async function measure(projectPath: string, refresh: boolean, signal: AbortSigna
   const sessionsRaw = await beforeCompression(join(hive, 'sessions'), backups)
   const archiveRaw = await beforeCompression(join(hive, 'archive'), archive)
   const attachments = await folderSize(await attachmentsDir(projectPath), cache, signal)
+  // The folders agents work in (#1451), each once by its real path: the slots lent now (to the agent with the lease),
+  // and an agent's 0.9 worktree while its project isn't migrated.
   const worktrees: ProjectStorage['worktrees'] = []
+  const counted = new Set<string>()
+  let copies: ProjectStorage['copies']
   if (!assistant) {
-    for (const a of projectAgents(await workspace.projectConfig(projectPath))) {
-      if (a.worktree) worktrees.push({ agent: a.name, path: a.worktree.path, bytes: await folderSize(a.worktree.path, cache, signal) })
+    const agents = projectAgents(await workspace.projectConfig(projectPath))
+    const facts = await folderFacts(projectPath)
+    const nameOf = (id: string): string => agents.find((a) => a.id === id)?.name ?? id
+    for (const s of facts.slots) {
+      if (!s.open || counted.has(placeKey(s.folder))) continue
+      counted.add(placeKey(s.folder))
+      worktrees.push({ agent: nameOf(s.open.agent), slot: s.name, path: s.folder, bytes: await folderSize(s.folder, cache, signal) })
     }
+    for (const a of agents) {
+      const w = legacyWorktree(a)
+      if (!w || facts.migratedAgents.includes(a.id) || counted.has(placeKey(w.path))) continue
+      counted.add(placeKey(w.path))
+      worktrees.push({ agent: a.name, path: w.path, bytes: await folderSize(w.path, cache, signal) })
+    }
+    // The review and check copies (#1435): their folder, once.
+    const copiesDir = join(workspaceOf(projectPath).worktreesRoot, basename(projectPath), 'copies')
+    const copiesBytes = await folderSize(copiesDir, cache, signal)
+    if (copiesBytes) copies = { path: copiesDir, bytes: copiesBytes }
   }
-  // Worktrees no agent works in any more (#353): on disk all the same.
+  // Worktrees no agent works in any more (#353): on disk all the same; a folder counted above isn't counted again.
   const unused: NonNullable<ProjectStorage['unusedWorktrees']> = []
-  if (!assistant) for (const w of await unusedWorktreeFolders(projectPath)) unused.push({ ...w, bytes: await folderSize(w.path, cache, signal) })
+  if (!assistant) for (const w of await unusedWorktreeFolders(projectPath)) if (!counted.has(placeKey(w.path))) unused.push({ ...w, bytes: await folderSize(w.path, cache, signal) })
   const result: ProjectStorage = {
     path: projectPath,
     name: assistant ? ASSISTANT_NAME : basename(projectPath),
@@ -225,8 +245,9 @@ async function measure(projectPath: string, refresh: boolean, signal: AbortSigna
     ...(archiveRaw !== archive ? { archiveRaw } : {}),
     attachments,
     worktrees,
+    ...(copies ? { copies } : {}),
     ...(unused.length ? { unusedWorktrees: unused } : {}),
-    total: backups + archive + attachments + [...worktrees, ...unused].reduce((n, w) => n + w.bytes, 0),
+    total: backups + archive + attachments + (copies?.bytes ?? 0) + [...worktrees, ...unused].reduce((n, w) => n + w.bytes, 0),
     computedAt: new Date().toISOString()
   }
   results.set(projectPath.toLowerCase(), result)
