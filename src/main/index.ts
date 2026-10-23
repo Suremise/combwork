@@ -55,6 +55,7 @@ import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { releaseQueueRunners } from './workflow/queueRunner'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { startSlots, stopSlots } from './slotsApp'
+import { startFreshNudges } from './freshStarts'
 import { startCopies, stopCopies } from './copiesApp'
 import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
 import { startLockRecords } from './workflow/lockRecord'
@@ -994,6 +995,8 @@ app.whenReady().then(async () => {
   startQueueHosts()
   // The slot pools (#1429): their idle slots tidied every hour.
   startSlots()
+  // The nudge to start fresh when a project's work has finished (#1437).
+  startFreshNudges()
   // Review and check copies (#1435): returning ones looked at again every 30 s, idle ones tidied every hour.
   startCopies()
   // The queue's order as agents read it (#1354): this Hive's entry testing now, at its step.

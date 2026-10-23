@@ -44,6 +44,7 @@ import type {
   Attached,
   AttachmentPlan,
   SessionListItem,
+  Notice,
   SessionRecord,
   SessionSkipReason,
   SubSession,
@@ -2917,6 +2918,21 @@ class SessionManager {
     return this.start(projectPath, { agentId, prompt, allowed })
   }
 
+  /**
+   * Start Fresh (#1437): an idle running agent's conversation ended (it stays in the Sessions tab) and a new one started,
+   * where its new conversations start (agentFolders.ts): null, or why not. `whyNot` (freshStarts.ts) says why it isn't
+   * idle now; it is asked, and Hive typing into it checked, just before the stop with no wait between them
+   * (stopWhereAndWait marks the run stopping before its first wait), so the run stopped is the idle one checked.
+   */
+  async startFresh<W extends string>(projectPath: string, agentId: string, whyNot: () => W | null): Promise<W | 'pending' | null> {
+    projectPath = workspace.assertProject(projectPath)
+    const why = this.delivering.has(this.key(projectPath, agentId)) ? 'pending' : whyNot()
+    if (why) return why
+    if (!(await this.endConversation(projectPath, agentId))) throw hiveError(msg({ id: 'session.newConversation.didntStop', defaultMessage: "It didn't stop, so no new conversation was started.", description: "Giving an agent a task in a new conversation failed: it didn't stop." }))
+    await this.start(projectPath, { agentId })
+    return null
+  }
+
   /** Stops a running agent to end its conversation (kept in the Sessions tab): whether it has stopped. */
   private async endConversation(projectPath: string, agentId: string): Promise<boolean> {
     await this.stopWhereAndWait((s) => s.projectPath.toLowerCase() === projectPath.toLowerCase() && (s as { agentId?: string }).agentId === agentId, 15_000)
@@ -4811,7 +4827,7 @@ class SessionManager {
    * notification (route()). A notice is a warning that needs no sound. Its title and body are formatted in the language
    * Hive shows; the Agent API's stream gets the title in English (`apiTitle`, #796), and never the body.
    */
-  private notify(projectPath: string, titleText: Text, bodyText: TextPart, kind: 'finished' | 'waiting' | 'notice', agentName?: string, agentId?: string): void {
+  private notify(projectPath: string, titleText: Text, bodyText: TextPart, kind: 'finished' | 'waiting' | 'notice', agentName?: string, agentId?: string, action?: { label: Text; command: string; args?: unknown[] }): void {
     const title = shownText(titleText)
     const apiTitle = englishText(titleText)
     const body = shownText(bodyText)
@@ -4834,15 +4850,17 @@ class SessionManager {
       this.finishes.add({ projectPath, project: assistant ? ASSISTANT_NAME : basename(projectPath), agent: assistant ? ASSISTANT_NAME : (agentName ?? 'Agent'), title, apiTitle, body })
       return
     }
-    this.deliver(projectPath, title, body, kind, agentId, apiTitle)
+    this.deliver(projectPath, title, body, kind, agentId, apiTitle, action && { label: shownText(action.label), command: action.command, ...(action.args ? { args: action.args } : {}) })
   }
 
   /**
    * A notice about a project's work that no one agent gives (#1266: a card's request for the user, a lane's events), told
    * as every notice is (notify): a banner in the window the user is using or a Windows notification, as the settings say.
+   * `action`: a banner's button (#1437: Start Fresh (Idle Agents)), a command of the window's; a Windows notification
+   * shows the project.
    */
-  notice(projectPath: string, title: Text, body: TextPart): void {
-    this.notify(projectPath, title, body, 'notice')
+  notice(projectPath: string, title: Text, body: TextPart, action?: { label: Text; command: string; args?: unknown[] }): void {
+    this.notify(projectPath, title, body, 'notice', undefined, undefined, action)
   }
 
   /** Where a notice about this project goes now: the settings, and the Hive window the user is using (noticeRoute). */
@@ -4851,9 +4869,9 @@ class SessionManager {
   }
 
   /** A banner in the focused window, or a Windows notification, as route() says now; `apiTitle`: its title in English, when `title` is translated. */
-  private deliver(projectPath: string, title: string, body: string, kind: 'finished' | 'waiting' | 'notice', agentId?: string, apiTitle?: string): void {
+  private deliver(projectPath: string, title: string, body: string, kind: 'finished' | 'waiting' | 'notice', agentId?: string, apiTitle?: string, action?: Notice['action']): void {
     const route = this.route(projectPath, kind)
-    const notice = { id: randomUUID(), kind, title, ...(apiTitle && apiTitle !== title ? { apiTitle } : {}), body, projectPath, ...(agentId ? { agentId } : {}) }
+    const notice: Notice = { id: randomUUID(), kind, title, ...(apiTitle && apiTitle !== title ? { apiTitle } : {}), body, projectPath, ...(agentId ? { agentId } : {}), ...(action ? { action } : {}) }
     if (route === 'windows') {
       // The Agent API's stream hears of every notice Hive tells, as a banner or a Windows notification (#620).
       tellListeners({ type: 'notice', notice, windows: true })

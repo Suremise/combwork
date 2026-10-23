@@ -190,6 +190,20 @@ interface HiveMessageValues {
   'actions.startAll.startMessage': { n: number; project: string | number }
   'actions.startAll.started': { agents: string | number }
   'actions.startAll.title': { kind: string; n: number }
+  'actions.startFresh.confirm': undefined
+  'actions.startFresh.line': { agent: string | number; why: string | number }
+  'actions.startFresh.message': { project: string | number }
+  'actions.startFresh.noneTitle': undefined
+  'actions.startFresh.reportTitle': { n: number }
+  'actions.startFresh.title': { n: number }
+  'actions.startFresh.why.background': undefined
+  'actions.startFresh.why.fresh': undefined
+  'actions.startFresh.why.lease': { card: string }
+  'actions.startFresh.why.pending': undefined
+  'actions.startFresh.why.stopped': undefined
+  'actions.startFresh.why.waiting': undefined
+  'actions.startFresh.why.watching': undefined
+  'actions.startFresh.why.working': undefined
   'actions.stop.confirm': undefined
   'actions.stop.detail': undefined
   'actions.stop.failed': undefined

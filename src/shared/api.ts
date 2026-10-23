@@ -1,4 +1,5 @@
 import type { AgentLeftovers } from './agentProcesses'
+import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
@@ -196,6 +197,8 @@ export interface HiveRequests {
   'window:showing': (projectPath: string | null) => void
   /** A banner was clicked: brings up the window showing its project, and the project (as a Windows notification's click). */
   'notice:open': (projectPath: string | null) => void
+  /** A banner's button (#1437): brings up the window that has its project, shows the project and runs the command there. */
+  'notice:action': (projectPath: string, command: string, args: unknown[]) => void
 
   'settings:get': () => AppSettings
   'settings:update': (patch: SettingsPatch) => AppSettings
@@ -249,6 +252,10 @@ export interface HiveRequests {
   'session:cancelMessages': (projectPath: string, agentId: string) => number
   /** Deliver Now (#1432): the line telling an agent of what waits in its inbox, typed once. Whether it was typed. */
   'session:deliverNow': (projectPath: string, agentId: string) => boolean
+  /** Start Fresh (Idle Agents) (#1437): each agent of the project, and why it doesn't start fresh now (null: it does). */
+  'session:freshPlan': (projectPath: string) => FreshRow[]
+  /** Starts one agent fresh if it is still idle: null when it was, else why not. */
+  'session:startFresh': (projectPath: string, agentId: string) => FreshWhy | null
   /** Kept comparisons (Performance → Compare), for a scope only: a project's page sees its own project's. */
   'benchmarks:list': (scope: CompareScope) => { entries: KeptEntry[]; base: string | null; run: string | null; notice?: string }
   /** Imports a benchmark or export (an open dialog; or, with `token`, a file an earlier answer asked about). Null if cancelled. */

@@ -75,7 +75,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     bannerSeconds: 6,
     waitingBannerStays: true,
     taskbarCount: true,
-    flashOnWaiting: true
+    flashOnWaiting: true,
+    suggestFreshStart: true
   },
   sessions: {
     backupTranscripts: true,
@@ -151,6 +152,7 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   version: 2,
   mcp: { disabled: [], enabled: [] },
   chime: 'inherit',
+  suggestFreshStart: 'inherit',
   inboxCheckpoints: 'inherit',
   inboxStopContinuation: 'inherit',
   inboxIdleWakes: 'inherit',

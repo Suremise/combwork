@@ -90,6 +90,7 @@ import { beginWork } from './mainStalls'
 import { metricsExport, metricsReport } from './metricsUsage'
 import { cancelWatch, stampWatchProjects } from './watches'
 import { cancelMessages, deliverWaiting } from './agentMessages'
+import { freshPlan, startFreshIfIdle } from './freshStarts'
 import { cardBusy } from './cardBusy'
 import { devConsole } from './devConsole'
 import { consoleSources } from './devConsoleSources'
@@ -431,6 +432,13 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       presentWindow(target)
       if (projectPath) emitTo(target, { type: 'menu-command', command: 'project.focus', args: [projectPath] })
     },
+    'notice:action': (projectPath, command, args) => {
+      // The window that has the project, which may not be the one the banner was in.
+      const target = windowForPath(projectPath)?.win ?? win()
+      presentWindow(target)
+      emitTo(target, { type: 'menu-command', command: 'project.focus', args: [projectPath] })
+      emitTo(target, { type: 'menu-command', command, args: Array.isArray(args) ? args : [] })
+    },
     'window:edit': (role) => {
       const wc = win().webContents
       ;({ undo: () => wc.undo(), redo: () => wc.redo(), cut: () => wc.cut(), copy: () => wc.copy(), paste: () => wc.paste(), selectAll: () => wc.selectAll() })[role]()
@@ -595,6 +603,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'watch:cancel': (projectPath, agentId) => cancelWatch(workspaceOf(projectPath), projectPath, agentId),
     'session:cancelMessages': (projectPath, agentId) => cancelMessages(projectPath, agentId, 'the user'), // i18n-ignore: who cancelled them, as their agent is told (English)
     'session:deliverNow': (projectPath, agentId) => deliverWaiting(projectPath, agentId),
+    'session:freshPlan': (projectPath) => freshPlan(projectPath),
+    'session:startFresh': (projectPath, agentId) => startFreshIfIdle(projectPath, agentId),
     'benchmarks:list': (scope) => listBenchmarks(benchContext(currentWorkspace()), scope),
     'benchmarks:import': async (scope, answer) => {
       const ctx = benchContext(currentWorkspace())
