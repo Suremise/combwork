@@ -632,12 +632,16 @@
     "description": "Starting an agent is refused while Repair… fixes a moved workspace's paths."
   },
   "session.start.slotBusy": {
-    "defaultMessage": "{slot} still has another session running in it. {agent} can start there once that session has stopped.",
-    "description": "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): another session (of a card that has ended, or of another Hive) still runs in it. {slot} is the slot's name (\"slot-b\"), {agent} the agent's."
+    "defaultMessage": "{slot} still has another session in it, or processes one left running there. {agent} can start there once they have ended.",
+    "description": "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): another session (of a card that has ended, or of another Hive) still runs in it, or processes a session left running there aren't known to have ended. {slot} is the slot's name (\"slot-b\"), {agent} the agent's."
   },
   "session.start.slotChanged": {
     "defaultMessage": "{slot} isn't {agent}'s any more: its card or lane ended, or another agent's work has it. Start or resume {agent} again.",
     "description": "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): the slot's lease ended or changed hands while the start was getting ready. {slot} is the slot's name (\"slot-b\"), {agent} the agent's."
+  },
+  "session.start.slotSetup": {
+    "defaultMessage": "{slot} is still being set up. {agent} can start there once it is ready.",
+    "description": "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): Hive is still setting the slot up (its setup or install command runs), or a command of it hasn't ended yet. {slot} is the slot's name (\"slot-b\"), {agent} the agent's."
   },
   "session.start.subSession": {
     "defaultMessage": "That session is a {kind} {provider} ran for another session, not a conversation: it can't be resumed.",

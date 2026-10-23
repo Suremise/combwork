@@ -161,6 +161,7 @@ interface HiveMessageValues {
   'session.start.repairing': undefined
   'session.start.slotBusy': { slot: string | number; agent: string | number }
   'session.start.slotChanged': { slot: string | number; agent: string | number }
+  'session.start.slotSetup': { slot: string | number; agent: string | number }
   'session.start.subSession': { kind: string | number; provider: string | number }
   'session.start.turnedOff': { provider: string | number; agent: string | number }
   'session.start.worktreeMissing': { agent: string | number; folder: string | number }

@@ -29,7 +29,7 @@ import { onHiveEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
-import { setWriterDrained, setWriterHost } from './agentFolders'
+import { setWriterHost, writerOver } from './agentFolders'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
 import { endLeaseJob, journalPath, LeaseJob, startLauncher } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
@@ -212,7 +212,7 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       },
       removeIdle: () => advanced.get(SLOTS_REMOVE_IDLE) !== false,
       ended: (lease, slot) => stopLeaseSession(projectPath, lease, slot),
-      runLive: (run) => sessions.runLive(run)
+      writerOver: (w) => writerOver(w)
     })
   })()
   pools.set(key, { life: ws.lifetime, pool })
@@ -285,11 +285,19 @@ export function startSlots(): void {
   timer = setInterval(() => void tidyOpenPools(), TIDY_MS)
   timer.unref()
   WorkspaceService.closingTasks.add(forgetPools)
-  // Slots' writers (#1434, agentFolders.ts): this Hive as theirs, and a writer released handed to its pool.
-  setWriterHost({ self: holder.self, alive: holder.alive, runLive: (run) => sessions.runLive(run) })
-  setWriterDrained(async (projectPath, slot) => {
-    const ws = workspaceFor(projectPath)
-    if (ws) await poolFor(ws, projectPath).then((p) => p.drained(slot))
+  // Slots' writers (#1434, agentFolders.ts): this Hive as their holder, their runs' tokens among its live ones, a claim
+  // tracked as its project's pool's work (close awaits it), and a writer released handed to its pool.
+  setWriterHost({
+    self: holder.self,
+    live: holder.live,
+    track: async (projectPath) => {
+      const ws = workspaceFor(projectPath)
+      return ws ? (await poolFor(ws, projectPath)).trackWriter() : null
+    },
+    drained: async (projectPath, slot) => {
+      const ws = workspaceFor(projectPath)
+      if (ws) await poolFor(ws, projectPath).then((p) => p.drained(slot))
+    }
   })
 }
 
@@ -302,7 +310,6 @@ function forgetPools(path: string): Promise<void> {
 
 export function stopSlots(): void {
   setWriterHost(null)
-  setWriterDrained(null)
   if (timer) clearInterval(timer)
   timer = null
   WorkspaceService.closingTasks.delete(forgetPools)

@@ -14,6 +14,7 @@ import { samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
+import { onRunOutcome, runOutcome, type RunOutcome } from './agentProcesses'
 import { SlotStore, type SlotConn } from './slots'
 import { workspace, workspaceOf, type WorkspaceService } from './workspace'
 import { launchPlace, resumeFolder, resumeHold, slotAt, type FolderAgent, type FolderFacts, type FolderLease, type FolderPurpose, type FolderSession, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
@@ -35,24 +36,21 @@ export function setRetiredHomes(fn: ((projectPath: string) => readonly string[] 
 }
 
 /**
- * Who writes: this Hive (its pid and start, as slot operations' holders are known), whether another Hive's process still
- * runs, and whether a session run of this Hive still runs. The app gives its own (slotsApp.ts); unset (unit tests),
- * this process with an unknown start, every other process running, every run of its own running.
+ * Who writes (#1434): this Hive (its pid and start, as slot operations' holders are known), its live tokens (the pools'
+ * `holder.live`: a writer's run is live from before its claim can be seen until it is released), its pools (a claim is
+ * a pool's tracked work, which `close` awaits), and what a pool does once a writer is released (the ended lease's last
+ * revision, the slot looked at). The app gives its own (slotsApp.ts); unset (unit tests), stand-ins.
  */
 export interface WriterHost {
   self(): Promise<{ pid: number; started: number }>
-  alive(pid: number, started: number): Promise<boolean | null>
-  runLive(run: string): boolean
+  live: Set<string>
+  track(projectPath: string): Promise<{ done: () => void } | null>
+  drained(projectPath: string, slot: string): Promise<void>
 }
-let writerHost: WriterHost = { self: async () => ({ pid: process.pid, started: 0 }), alive: async () => null, runLive: () => true }
+const standIn = (): WriterHost => ({ self: async () => ({ pid: process.pid, started: 0 }), live: new Set(), track: async () => ({ done: () => undefined }), drained: async () => undefined })
+let writerHost: WriterHost = standIn()
 export function setWriterHost(h: WriterHost | null): void {
-  writerHost = h ?? { self: async () => ({ pid: process.pid, started: 0 }), alive: async () => null, runLive: () => true }
-}
-
-/** After a writer is released: the pool records the ended lease's last revision and looks at the slot (slotsApp.ts). */
-let drainedHook: ((projectPath: string, slot: string) => Promise<void>) | null = null
-export function setWriterDrained(fn: ((projectPath: string, slot: string) => Promise<void>) | null): void {
-  drainedHook = fn
+  writerHost = h ?? standIn()
 }
 
 /**
@@ -166,15 +164,22 @@ export interface Claim {
   lease: string | null
   slot: FolderSlot | null
   foreign: boolean
+  /**
+   * In a slot: ends the claim's tracked work (the pool's `close` awaits it), once its start has spawned its process or
+   * has released the writer. Called once; outside a slot, nothing.
+   */
+  done: () => void
 }
 
 /**
- * Why `claimPlace` refused: its hold now (in its write), its slot still written by another run (`busy`), or changed
- * meanwhile so the user's Resume can't take it (`changed`). Nothing was written.
+ * Why `claimPlace` refused: its hold now (in its write), its slot still written by another run or held by one whose
+ * processes aren't known to have ended (`busy`), being set up or installed (`setup`: an operation, an unsettled job, or
+ * not ready), changed meanwhile so the user's Resume can't take it (`changed`), or its workspace closing (`closing`).
+ * Nothing was written.
  */
 export class ClaimRefused extends Error {
   constructor(
-    readonly why: { is: 'hold'; hold: ResumeHold } | { is: 'busy'; slot: string; agent: string } | { is: 'changed'; slot: string }
+    readonly why: { is: 'hold'; hold: ResumeHold } | { is: 'busy'; slot: string; agent: string } | { is: 'setup'; slot: string } | { is: 'changed'; slot: string } | { is: 'closing' }
   ) {
     super(`refused: ${JSON.stringify(why)}`) // i18n-ignore: the log; sessions.ts words it
   }
@@ -187,51 +192,51 @@ async function headNow(folder: string): Promise<string | null> {
   return isUnknown(head) || isUnknown(dirty) || dirty.length ? null : head
 }
 
-/** A writer whose run is over: this Hive's run no longer running, or another Hive gone. */
-async function writerGone(w: { run: string }, row: { pid: number; started: number }): Promise<boolean> {
-  const me = await writerHost.self()
-  if (row.pid === me.pid && row.started === me.started) return !writerHost.runLive(w.run)
-  return (await writerHost.alive(row.pid, row.started)) === false
-}
-
 /**
  * Where a start runs, and its slot claimed for it (#1434). A new conversation: where its purpose has the agent work (a
  * reviewer never in a slot). A conversation: where it was made; outside the slots the project folder and a retired
  * home are any agent's, a 0.9 worktree only its agent's (`foreign` otherwise), a slot's only its own agent's.
  *
- * In a slot, one board write decides again from hive.db as it is then and claims the slot: the resume authority
- * (`resumeHold`: the agent's leases now, the slot's), the user's Resume (`auto` false) of one it lets resume by hand
- * (binding it to the agent's own later lease, or taking the free slot under a new carried lease at the head its
- * conversation's lease ended at, clean), and the slot's writer reserved for `run`, only while no other run writes there
- * (one whose Hive is gone, or whose run of this Hive has ended, is taken over). Refused with ClaimRefused, writing nothing.
+ * In a slot, its run's token is live from here (before its claim can be seen) and the claim is its pool's tracked work
+ * (`done`); then one board write decides again from hive.db as it is then and claims the slot (`claimIn`). Refused with
+ * ClaimRefused, writing nothing; the token and the tracked work end with the refusal.
  */
 export async function claimPlace(projectPath: string, agent: FolderAgent, existing: (FolderSession & { id: string; agentId?: string }) | null, o: { purpose: FolderPurpose; auto: boolean; run: string }): Promise<Claim> {
   const facts = await folderFacts(projectPath)
+  const none = (): void => undefined
   let folder: string
   if (existing) {
     folder = resumeFolder(projectPath, existing)
     const slot = slotAt(facts, folder)
     if (!slot) {
       const own = samePlace(folder, projectPath) || facts.homes.some((h) => samePlace(h, folder)) || (!!agent.legacy && samePlace(agent.legacy.path, folder))
-      return { cwd: folder, lease: null, slot: null, foreign: !own }
+      return { cwd: folder, lease: null, slot: null, foreign: !own, done: none }
     }
-    if (existing.agentId && existing.agentId !== agent.id) return { cwd: folder, lease: null, slot: null, foreign: true }
+    if (existing.agentId && existing.agentId !== agent.id) return { cwd: folder, lease: null, slot: null, foreign: true, done: none }
   } else {
     const p = launchPlace(facts, agent, o.purpose)
-    if (!p.lease) return { cwd: p.folder, lease: null, slot: null, foreign: false }
+    if (!p.lease) return { cwd: p.folder, lease: null, slot: null, foreign: false, done: none }
     folder = p.folder
   }
-  const { ws, host: sessionsHost, project } = await hostOf(projectPath)
-  const store = new SlotStore(boardConn(ws), project)
-  // What the write compares against, read before it (git, other processes): the folder's head, and a writer to take over.
-  const head = existing && !o.auto ? await headNow(folder) : null
-  const before = slotAt(facts, folder)
-  const row = before?.writer ? store.slot(before.name) : null
-  const stale = before?.writer && row?.writer && (await writerGone(before.writer, row.writer)) ? before.writer.run : null
-  const me = await writerHost.self()
-  const claimed = await store.conn.write((db) => claimIn(db, store, { facts, folder, agent, existing, ...o, sessionsHost, me, head, stale }))
-  if (existing && claimed.lease !== existing.lease) log.info(`Session ${existing.id} resumes in ${userText(claimed.slot.name)} under lease ${claimed.lease}`)
-  return { cwd: claimed.slot.folder, lease: claimed.lease, slot: claimed.slot, foreign: false }
+  writerHost.live.add(o.run)
+  let tracked: { done: () => void } | null = null
+  try {
+    tracked = await writerHost.track(projectPath)
+    if (!tracked) throw new ClaimRefused({ is: 'closing' })
+    const { ws, host: sessionsHost, project } = await hostOf(projectPath)
+    const store = new SlotStore(boardConn(ws), project)
+    // What the write compares against, read before it (git): the folder's head, for the user's Resume taking a free slot.
+    const head = existing && !o.auto ? await headNow(folder) : null
+    const me = await writerHost.self()
+    const claimed = await store.conn.write((db) => claimIn(db, store, { facts, folder, agent, existing, ...o, sessionsHost, me, head }))
+    if (existing && claimed.lease !== existing.lease) log.info(`Session ${existing.id} resumes in ${userText(claimed.slot.name)} under lease ${claimed.lease}`)
+    return { cwd: claimed.slot.folder, lease: claimed.lease, slot: claimed.slot, foreign: false, done: tracked.done }
+  } catch (e) {
+    // Nothing was claimed: the run's token and the claim's tracked work end here.
+    writerHost.live.delete(o.run)
+    tracked?.done()
+    throw e
+  }
 }
 
 /** What `claimIn` decides from, besides hive.db: what was read before its write. */
@@ -251,8 +256,6 @@ export interface ClaimInput {
   me: { pid: number; started: number }
   /** The folder's head now, clean (null: dirty or unknown): what the user's Resume taking a free slot compares. */
   head: string | null
-  /** A writer's run that is over (its Hive gone, or this Hive's run ended), which this claim may take over. */
-  stale: string | null
 }
 
 /**
@@ -297,25 +300,71 @@ export function claimIn(db: DatabaseSync, store: SlotStore, c: ClaimInput): { le
     if (!p.lease || !samePlace(p.folder, folder)) throw new ClaimRefused({ is: 'changed', slot: slot.name })
     lease = p.lease.id
   }
-  // One writer: this run's from now until it has exited, unless another run (still going) writes there.
+  // One writer: this run's from now until its processes are known to have ended. Only into a slot set up and lent, with
+  // no operation (warming, installing, removal) or unsettled job, and no other writer (a writer whose Hive is gone stays
+  // until the user releases the slot): #1429's operations and a writer exclude each other both ways.
   const took = db
-    .prepare('UPDATE slots SET writer_run = ?, writer_lease = ?, writer_agent = ?, writer_pid = ?, writer_started = ? WHERE project = ? AND name = ? AND (writer_run IS NULL OR writer_run = ? OR writer_run = ?)') // i18n-ignore: SQL
-    .run(c.run, lease, agent.id, c.me.pid, c.me.started, project, slot.name, c.run, c.stale ?? '')
-  if (Number(took.changes) !== 1) throw new ClaimRefused({ is: 'busy', slot: slot.name, agent: slot.writer?.agent ?? '' })
+    .prepare("UPDATE slots SET writer_run = ?, writer_lease = ?, writer_agent = ?, writer_pid = ?, writer_started = ? WHERE project = ? AND name = ? AND state = 'lent' AND op IS NULL AND job IS NULL AND (writer_run IS NULL OR writer_run = ?)") // i18n-ignore: SQL
+    .run(c.run, lease, agent.id, c.me.pid, c.me.started, project, slot.name, c.run)
+  if (Number(took.changes) !== 1) {
+    const row = db.prepare('SELECT state, op, job, writer_run, writer_agent FROM slots WHERE project = ? AND name = ?').get(project, slot.name) as { state: string; op: string | null; job: string | null; writer_run: string | null; writer_agent: string | null } | undefined // i18n-ignore: SQL
+    if (row?.writer_run && row.writer_run !== c.run) throw new ClaimRefused({ is: 'busy', slot: slot.name, agent: row.writer_agent ?? '' })
+    throw new ClaimRefused({ is: 'setup', slot: slot.name })
+  }
   return { lease, slot: slotsIn(db, project).find((s) => s.name === slot.name)! }
 }
 
 /**
- * A run's writer released once it has exited, or its start given up (#1434): only while the slot still names that run.
- * Then the pool records the ended lease's last revision, if its lease ended meanwhile, and looks at the slot.
+ * A run's writer released at once (#1434): its start never spawned a process, so nothing of it can run. Cleared in each
+ * slot still naming that run (fenced by it), then drained; the run's token ends only after that.
  */
-export async function releaseWriter(projectPath: string, slot: string, run: string): Promise<void> {
+export async function releaseWriter(projectPath: string, run: string): Promise<void> {
   try {
     const { ws, project } = await hostOf(projectPath)
-    if (!(await new SlotStore(boardConn(ws), project).clearWriter(slot, run))) return
-    await drainedHook?.(projectPath, slot)
+    for (const slot of await new SlotStore(boardConn(ws), project).clearWriterRun(run)) await writerHost.drained(projectPath, slot)
   } catch (e) {
-    // Its workspace closed meanwhile: the pool clears it at its next refresh (the run is over).
-    log.warn(`Slot ${userText(slot)}'s writer ${run} not released: ${userText(e instanceof Error ? e.message : String(e))}`)
+    // Its workspace closed meanwhile: the row stays, held, until a refresh of this Hive clears it (writerOver).
+    log.warn(`The slot writer ${run} wasn't released: ${userText(e instanceof Error ? e.message : String(e))}`)
+    released.add(run)
+  } finally {
+    writerHost.live.delete(run)
   }
+}
+
+/** Runs whose processes are known to have ended but whose writer couldn't be cleared (a refresh of this Hive clears it). */
+const released = new Set<string>()
+
+/**
+ * A run that spawned processes has exited (#1434): its writer is released only once its launch's job has shown them
+ * all ended (`ended`, agentProcesses.ts), its token live until then, so nothing else recovers it meanwhile. Kept running
+ * by the user, or not known (untracked, the job unreadable, the tracker lost): it stays held, its token ended, until
+ * the user releases the slot; nothing is taken from a snapshot.
+ */
+export async function settleWriter(projectPath: string, run: string): Promise<void> {
+  const outcome =
+    runOutcome(run) ??
+    (await new Promise<RunOutcome>((resolve) => {
+      const off = onRunOutcome((r, o) => {
+        if (r !== run) return
+        off()
+        resolve(o)
+      })
+      const now = runOutcome(run)
+      if (now) {
+        off()
+        resolve(now)
+      }
+    }))
+  if (outcome === 'ended') return releaseWriter(projectPath, run)
+  log.warn(`The slot writer ${run} stays held: its processes ${outcome === 'kept' ? 'were kept running' : "aren't known to have ended"}`)
+  writerHost.live.delete(run)
+}
+
+/**
+ * Whether a refresh may clear this writer (#1434): this Hive's, its run over (its token ended) and its processes known
+ * to have ended, though its release couldn't be written. Never another Hive's, nor one whose processes aren't known.
+ */
+export async function writerOver(w: { run: string; pid: number; started: number }): Promise<boolean> {
+  const me = await writerHost.self()
+  return w.pid === me.pid && w.started === me.started && !writerHost.live.has(w.run) && released.has(w.run) && runOutcome(w.run) !== 'kept'
 }

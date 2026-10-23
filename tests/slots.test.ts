@@ -17,6 +17,7 @@ import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, PORT_FLOOR, quiet, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
+import { claimIn, type ClaimRefused } from '../src/main/agentFolders'
 import { commit, gitRepo, sh } from './workflow/harness'
 
 const req = createRequire(import.meta.url)
@@ -41,7 +42,7 @@ interface World {
   pool: SlotPool
   runs: (SlotRun & SlotRunEnd)[]
   opts: { setup: string; archive: string; copy: string }
-  set: { builders: number; removeIdle: boolean; sessions: Map<string, string>; inFlight: Set<number>; ended: string[] }
+  set: { builders: number; removeIdle: boolean; sessions: Map<string, string>; inFlight: Set<number>; ended: string[]; writersOver: Set<string> }
   steer: Steer
   clock: { now: number }
   /** Pids of holder processes that have ended. */
@@ -78,7 +79,7 @@ function world(o: { setup?: string; builders?: number } = {}): World {
   const runs: World['runs'] = []
   const logs = tempDir('slots-logs-')
   const opts = { setup: o.setup ?? '', archive: '', copy: '.env' }
-  const set = { builders: o.builders ?? 2, removeIdle: true, sessions: new Map<string, string>(), inFlight: new Set<number>(), ended: [] as string[] }
+  const set = { builders: o.builders ?? 2, removeIdle: true, sessions: new Map<string, string>(), inFlight: new Set<number>(), ended: [] as string[], writersOver: new Set<string>() }
   const steer: Steer = { gates: new Map(), settled: true, noSupervisor: false, settle: true, settledJobs: [] }
   const dead = new Set<number>()
   const root = join(`${ws}.worktrees`, 'project')
@@ -119,6 +120,7 @@ function world(o: { setup?: string; builders?: number } = {}): World {
       inFlight: (card) => set.inFlight.has(card),
       removeIdle: () => set.removeIdle,
       ended: (l, s) => void set.ended.push(`${l.id} ${s.name}`),
+      writerOver: (wr) => set.writersOver.has(wr.run),
       now: () => clock.now
     })
     return { pool, store }
@@ -170,6 +172,22 @@ async function lent(w: World, ask: { agent: string; card?: number; lane?: string
 }
 
 describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
+  it("a start's claim of a writer is the pool's tracked work: close waits for it, and a closing pool makes none (#1434)", async () => {
+    const w = world()
+    const t = w.pool.trackWriter()!
+    expect(t).not.toBeNull()
+    let closed = false
+    const closing = w.pool.close().then(() => (closed = true))
+    // Nothing is waited for by time: the pool is closing, and its close waits for the claim's work.
+    expect(w.pool.trackWriter()).toBeNull()
+    await Promise.resolve()
+    expect(closed).toBe(false)
+    t.done()
+    t.done()
+    await closing
+    expect(closed).toBe(true)
+  })
+
   it("records the slot's head as its lease ends, and tells the app (#1434: its builder's session is stopped)", async () => {
     const w = world()
     const r = await lent(w, { agent: 'a1', card: 1 })
@@ -206,7 +224,7 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     expect(w.store.slot('slot-a')?.state).toBe('ready')
   })
 
-  it('a writer left by a run that has ended (its Hive gone) is cleared by a refresh, and the slot drained then (#1434)', async () => {
+  it("a writer is cleared by a refresh only once its processes are proven ended (writerOver): never just because its Hive is gone (#1434)", async () => {
     const w = world()
     const r = await lent(w, { agent: 'a1', card: 1 })
     const db = new DatabaseSync(boardFile(w.ws))
@@ -219,7 +237,15 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     writeFileSync(join(r.slot.folder, 'left.txt'), 'untracked\n')
     await w.pool.refresh()
     expect(w.store.slot('slot-a')?.writer).not.toBeNull()
+    // Its Hive gone: still held (its processes aren't known to have ended), not lent, not removed.
     w.dead.add(77)
+    await w.pool.refresh()
+    expect(w.store.slot('slot-a')?.writer).toMatchObject({ run: 'run-1' })
+    expect(w.store.lease(r.lease.id)?.endRev).toBeNull()
+    expect((await w.pool.lend({ agent: 'a2', card: 2, slot: 'slot-a' })).ok).toBe(false)
+    expect(await w.pool.remove('slot-a')).not.toBeNull()
+    // Proven ended (its own Hive's release that couldn't be written): cleared, and drained.
+    w.set.writersOver.add('run-1')
     await w.pool.refresh()
     expect(w.store.slot('slot-a')?.writer).toBeNull()
     expect(w.store.lease(r.lease.id)?.endRev).toBe(sh(r.slot.folder, 'rev-parse', 'HEAD'))
@@ -538,6 +564,58 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
 })
 
 describe('operations own a slot while it changes (HR1 round 1)', { timeout: 90_000 }, () => {
+  /** A session's claim of a slot's writer (#1434, agentFolders.ts's claimIn) for its lease's agent, as a start makes it. */
+  const claimFor = (w: World, run: string) => {
+    const lease = w.store.leaseOf({ card: 1 })
+    const facts = { projectPath: w.project, migrated: true, homes: [], slots: [] }
+    return w.store.conn
+      .write((db) => claimIn(db, w.store, { facts, folder: join(w.root, 'slot-a'), agent: { id: 'a1', role: 'builder', legacy: null }, existing: null, purpose: 'build', auto: false, run, sessionsHost: 'p-test', me: { pid: 1, started: 1001 }, head: null }))
+      .then(
+        (c) => ({ ok: true as const, lease: c.lease, leaseNow: lease?.id }),
+        (e) => ({ ok: false as const, why: (e as ClaimRefused).why })
+      )
+  }
+
+  it("a session's claim while its slot's setup runs (#1434): refused, nothing written, until the slot is ready", async () => {
+    const w = world({ setup: WRITE_ENV })
+    const gate = w.hold('slot-a', 'setup')
+    const lending = w.pool.lend({ agent: 'a1', card: 1 })
+    await gate.started
+    // The lease is there, the slot being set up (its operation and job): the agent's start can't claim it.
+    expect(w.store.leaseOf({ card: 1 })?.agent).toBe('a1')
+    expect(await claimFor(w, 'run-1')).toEqual({ ok: false, why: { is: 'setup', slot: 'slot-a' } })
+    expect(w.store.slot('slot-a')?.writer).toBeNull()
+    gate.open()
+    expect((await lending).ok).toBe(true)
+    expect(await claimFor(w, 'run-1')).toMatchObject({ ok: true })
+    expect(w.store.slot('slot-a')?.writer).toMatchObject({ run: 'run-1', agent: 'a1' })
+  })
+
+  it("…its setup failing ends its lease: no writer is ever claimed there; a job left unsettled keeps claims out (#1434)", async () => {
+    const w = world({ setup: 'node -e "process.exit(3)"', builders: 1 })
+    const gate = w.hold('slot-a', 'setup')
+    const lending = w.pool.lend({ agent: 'a1', card: 1 })
+    await gate.started
+    expect(await claimFor(w, 'run-1')).toEqual({ ok: false, why: { is: 'setup', slot: 'slot-a' } })
+    gate.open()
+    expect(await lending).toMatchObject({ ok: false, refusal: { why: 'setupFailed' } })
+    expect(w.store.leaseOf({ card: 1 })).toBeNull()
+    expect((await claimFor(w, 'run-1')).ok).toBe(false)
+    expect(w.store.slot('slot-a')?.writer).toBeNull()
+    // A ready, lent slot with a job left unsettled (a command whose processes couldn't be ended): still no claim.
+    const u = world({ builders: 1 })
+    const r = await lent(u, { agent: 'a1', card: 1 })
+    const db = new DatabaseSync(boardFile(u.ws))
+    try {
+      db.prepare("UPDATE slots SET job = 'slot-left' WHERE project = 'p-test' AND name = 'slot-a'").run()
+    } finally {
+      db.close()
+    }
+    expect(await claimFor(u, 'run-2')).toEqual({ ok: false, why: { is: 'setup', slot: 'slot-a' } })
+    await u.store.jobSettled('slot-a', 'slot-left')
+    expect(await claimFor(u, 'run-2')).toMatchObject({ ok: true, lease: r.lease.id })
+  })
+
   it('the same card asking during its setup is told the slot is being set up, then gets it once it is ready', async () => {
     const w = world({ setup: WRITE_ENV })
     const b = w.another(2)

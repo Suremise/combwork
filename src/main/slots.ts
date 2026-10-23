@@ -511,6 +511,15 @@ export class SlotStore {
     )
   }
 
+  /** A run's writer cleared in every slot still naming it (one write): the slots it was cleared in. */
+  async clearWriterRun(run: string): Promise<string[]> {
+    return this.conn.write((db) => {
+      const names = (db.prepare('SELECT name FROM slots WHERE project = ? AND writer_run = ?').all(this.project, run) as { name: string }[]).map((r) => r.name)
+      db.prepare('UPDATE slots SET writer_run = NULL, writer_lease = NULL, writer_agent = NULL, writer_pid = NULL, writer_started = NULL WHERE project = ? AND writer_run = ?').run(this.project, run)
+      return names
+    })
+  }
+
   /** A writer whose run has ended (or whose Hive is gone) cleared, only while it is still that run. Whether it was. */
   async clearWriter(name: string, run: string): Promise<boolean> {
     return this.conn.write((db) => Number(db.prepare('UPDATE slots SET writer_run = NULL, writer_lease = NULL, writer_agent = NULL, writer_pid = NULL, writer_started = NULL WHERE project = ? AND name = ? AND writer_run = ?').run(this.project, name, run).changes) === 1)
@@ -682,8 +691,12 @@ export interface PoolDeps {
   removeIdle?: () => boolean
   /** A lease ended (#1434): its builder's session in the slot (the slot's writer) is stopped once its turn ends. */
   ended?: (lease: SlotLease, slot: Slot) => void
-  /** Whether a session run of this Hive still runs (#1434): a writer of this process whose run doesn't is cleared. */
-  runLive?: (run: string) => boolean
+  /**
+   * Whether a writer's run is over and its processes are known to have ended (#1434): only then does a refresh clear it
+   * (a release that couldn't be written). A writer of a Hive that is gone is never cleared by a refresh: it stays held
+   * until the user releases the slot.
+   */
+  writerOver?: (w: SlotWriter) => boolean | Promise<boolean>
   now?: () => number
 }
 
@@ -747,6 +760,27 @@ export class SlotPool {
     } finally {
       this.running.delete(p)
       this.deps.holder.live.delete(token)
+    }
+  }
+
+  /**
+   * A start's claim of a slot's writer (#1434), tracked as this pool's work as an operation is: `close` awaits it until
+   * the start has either spawned its process (which its session's exit then releases) or released the writer. Null
+   * once the pool is closing: no claim is made then.
+   */
+  trackWriter(): { done: () => void } | null {
+    if (this.closed) return null
+    let done!: () => void
+    const p = new Promise<void>((r) => (done = r))
+    this.running.add(p)
+    void p.then(() => this.running.delete(p))
+    let once = false
+    return {
+      done: () => {
+        if (once) return
+        once = true
+        done()
+      }
     }
   }
 
@@ -852,13 +886,6 @@ export class SlotPool {
     return !listed || listed.some((l) => samePlace(l.path, s.folder))
   }
 
-  /** Whether a writer's run is over: of this process and not running (runLive), or of another that has ended. */
-  private async writerGone(w: SlotWriter): Promise<boolean> {
-    const me = await this.deps.holder.self()
-    if (w.pid === me.pid && w.started === me.started) return !!this.deps.runLive && !this.deps.runLive(w.run)
-    return (await this.deps.holder.alive(w.pid, w.started)) === false
-  }
-
   /** Whether an operation's holder is gone: another process that ended, or this one, no longer running that token. */
   private async holderGone(op: SlotOp): Promise<boolean> {
     const me = await this.deps.holder.self()
@@ -874,8 +901,8 @@ export class SlotPool {
   async refresh(): Promise<void> {
     for (const s of this.store.slots()) {
       if (this.closed) return
-      // A writer whose session run has ended without clearing it (its Hive gone, or this one's run no longer running).
-      if (s.writer && (await this.writerGone(s.writer))) {
+      // A writer whose run is over, its processes known to have ended, but not cleared (its release couldn't be written).
+      if (s.writer && (await this.deps.writerOver?.(s.writer))) {
         if (await this.store.clearWriter(s.name, s.writer.run)) await this.drained(s.name)
         continue
       }

@@ -20,7 +20,7 @@ import { assistantTools } from '../shared/assistantTools'
 import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, resumeHold, slotAt, type FolderPurpose, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
-import { bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, releaseWriter } from './agentFolders'
+import { bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, releaseWriter, settleWriter } from './agentFolders'
 import { slotEnv } from './slots'
 import { agentLaunchSettings, canSwitchModeLive, defaultProviderPending, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
@@ -1060,8 +1060,11 @@ class SessionManager {
    * agent, closing its workspace or quitting can cancel a start that hasn't spawned its process yet.
    */
   private starting = new Map<string, PendingStart>()
-  /** Each run's slot whose writer it holds (#1434), from its claim until it is released. */
-  private writers = new Map<string, { projectPath: string; slot: string }>()
+  /**
+   * Each run holding a slot's writer (#1434), from its claim until its release is handed on: whether it has spawned a
+   * process (setup or its CLI), and its claim's tracked work, ended once it has (or once its start is given up).
+   */
+  private writers = new Map<string, { projectPath: string; spawned: boolean; done: () => void }>()
   /** Hive is quitting: no new agent starts. */
   private shuttingDown = false
   /** The window showing a project (several windows each show one workspace). */
@@ -1302,8 +1305,8 @@ class SessionManager {
     try {
       return await run
     } catch (e) {
-      // Given up before its process ran, or that process has already exited: its slot's writer released (#1434).
-      this.releaseWriterOf(pending.runId)
+      // Given up before any process of it ran: its slot's writer released now (#1434). One that ran is its exit's.
+      if (!this.writers.get(pending.runId)?.spawned) this.settleWriterOf(pending.runId)
       throw e
     } finally {
       this.starting.delete(id)
@@ -1370,29 +1373,41 @@ class SessionManager {
     const fa = folderAgent(agent)
     try {
       const c = await claimPlace(projectPath, fa, existing ?? null, { purpose: fa.role === 'reviewer' ? 'review' : (opts.purpose ?? defaultPurpose(fa.role)), auto: !!opts.auto, run })
-      // Its slot's writer is this run's from now: released once it has exited, or its start is given up.
-      if (c.lease && c.slot) this.writers.set(run, { projectPath, slot: c.slot.name })
+      // Its slot's writer is this run's from now: released once its processes are known to have ended, or its start is
+      // given up before any ran.
+      if (c.lease && c.slot) this.writers.set(run, { projectPath, spawned: false, done: c.done })
+      else c.done()
       return c
     } catch (e) {
       if (!(e instanceof ClaimRefused)) throw e
       const w = e.why
       if (w.is === 'hold') throw new HiveError(holdText(w.hold, agent.name), { kind: 'conflict' })
-      if (w.is === 'busy') throw hiveError(msg({ id: 'session.start.slotBusy', defaultMessage: '{slot} still has another session running in it. {agent} can start there once that session has stopped.', description: "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): another session (of a card that has ended, or of another Hive) still runs in it. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
+      if (w.is === 'closing') throw hiveError(M.stoppedBeforeStart)
+      if (w.is === 'setup') throw hiveError(msg({ id: 'session.start.slotSetup', defaultMessage: '{slot} is still being set up. {agent} can start there once it is ready.', description: "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): Hive is still setting the slot up (its setup or install command runs), or a command of it hasn't ended yet. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
+      if (w.is === 'busy') throw hiveError(msg({ id: 'session.start.slotBusy', defaultMessage: '{slot} still has another session in it, or processes one left running there. {agent} can start there once they have ended.', description: "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): another session (of a card that has ended, or of another Hive) still runs in it, or processes a session left running there aren't known to have ended. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
       throw hiveError(msg({ id: 'session.start.slotChanged', defaultMessage: "{slot} isn't {agent}'s any more: its card or lane ended, or another agent's work has it. Start or resume {agent} again.", description: "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): the slot's lease ended or changed hands while the start was getting ready. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
     }
   }
 
-  /** A run's slot writer released (#1434), once: when its start was given up, or once its process has exited. */
-  private releaseWriterOf(run: string): void {
+  /**
+   * A run's slot writer handed on, once (#1434): its claim's tracked work ends; with no process of it ever spawned it is
+   * released now, else once its launch's job shows its processes ended (settleWriter), held otherwise.
+   */
+  private settleWriterOf(run: string): void {
     const w = this.writers.get(run)
-    if (!w || this.runs.has(run)) return
+    if (!w) return
     this.writers.delete(run)
-    void releaseWriter(w.projectPath, w.slot, run)
+    // Its claim's tracked work (which a closing pool awaits) ends once its release is written, when nothing of it ran.
+    if (w.spawned) void settleWriter(w.projectPath, run)
+    else void releaseWriter(w.projectPath, run).finally(() => w.done())
   }
 
-  /** Whether a run of this Hive still holds its slot (#1434: a writer of a run that doesn't is cleared by the pool). */
-  runLive(run: string): boolean {
-    return this.writers.has(run)
+  /** A process of a run holding a slot's writer has spawned (#1434): its exit settles it, and its claim's tracked work ends. */
+  private writerSpawned(run: string): void {
+    const w = this.writers.get(run)
+    if (!w) return
+    w.spawned = true
+    w.done()
   }
 
   /** The agent's run now (#1434): its live session's, else its start's while being prepared. */
@@ -1521,7 +1536,8 @@ class SessionManager {
     this.runs.set(runId, id)
 
     const setup = cfg.worktreeSetup.trim()
-    if (agent.worktree && agent.needsSetup && setup && !opts.skipSetup) {
+    // The agent's own worktree's first setup (also adopted as its carried slot, #1441), never a slot the pool set up.
+    if (agent.worktree && agent.needsSetup && setup && !opts.skipSetup && (!place.slot || samePlace(place.slot.folder, agent.worktree.path))) {
       // The worktree's setup command runs in the agent's terminal first, then the agent starts there.
       state.settingUp = true
       setStatus(state, withValues(msg({ id: 'session.status.settingUp', defaultMessage: 'Setting up the worktree: {command}', description: "An agent's status while the project's worktree setup command runs in its terminal. {command} is that command, as written." }), { command: setup }))
@@ -1531,6 +1547,7 @@ class SessionManager {
         // The same last check as before an agent's own launch.
         if (this.starting.get(id)?.cancelled || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
         opts.allowed?.()
+        this.writerSpawned(runId)
         spawnPty(key, {
           file: sh.file,
           args: sh.args,
@@ -1569,6 +1586,8 @@ class SessionManager {
     if (l && basename(l.state.projectPath) === ASSISTANT_DIR) this.onAssistantExit(l.state.projectPath)
     else if (l) endAgentToken(l.state.projectPath, l.state.agentId, l.state.runId)
     if (l) this.launchEnded(l.state.projectPath, l.state.agentId, l.state.runId)
+    // Its slot's writer (#1434): released now if no process of it ran, else once they are known to have ended.
+    if (l) this.settleWriterOf(l.state.runId)
     if (l?.state.hooksMissing) noteHooksMissing(l.state.projectPath, l.state.agentId, false)
     this.live.delete(id)
     this.recheckTools(id)
@@ -1793,6 +1812,8 @@ class SessionManager {
     // The developer console (#636): how it was started (launchEvent: never its arguments).
     devConsole.capture([sessionSourceId(projectPath, agent.id)], () => launchEvent({ provider: adapter.id, name: adapter.descriptor.name, file: cmd.file, args: cmd.args, cwd, version: info.version, state, resumed: !!l.resumed }))
     flightRecorder.launched(l.state, () => this.label(l.state), info.version)
+    // A process of this run from now: its slot's writer is its exit's to settle (#1434).
+    this.writerSpawned(state.runId)
     spawnPty(key, {
       ...size,
       file: cmd.file,
@@ -3041,8 +3062,8 @@ class SessionManager {
       if (l.state.hooksMissing) noteHooksMissing(projectPath, agentId, false)
     }
     this.runs.delete(runId)
-    // Its slot's writer released: the slot may be lent or taken again, and its ended lease's revision recorded (#1434).
-    this.releaseWriterOf(runId)
+    // Its slot's writer released once its processes are known to have ended (#1434).
+    this.settleWriterOf(runId)
     // Its hook token ends with it: hooks of an ended launch were ignored anyway (findLaunch).
     endHookToken(runId)
     this.releaseLocks(id)

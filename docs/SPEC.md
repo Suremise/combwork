@@ -2811,10 +2811,22 @@ Whether a conversation may resume there is its **hold** (none: it may):
 - **One writer:** a session starts or resumes in a slot only through one board write (`claimPlace`) that decides again
   from hive.db as it is then (the slot's lease is its agent's; the resume authority, the agent's leases included; the
   user's Resume's new lease or rebinding) and reserves the slot's **writer** for that start's run: its run id, lease,
-  agent and Hive. The writer stays through the start's preparation, the launch and the session's whole run, and is
-  released once its process has exited (or its start is given up). While it is set the slot isn't lent, adopted, taken
-  by hand or removed, and another start there is refused ("slot-b still has another session running in it"); two at
-  once give one writer. A writer whose Hive is gone, or whose run of this Hive has ended, is taken over or cleared.
+  agent and Hive. [#1434 round 3, the design agreed with HR2 on the card:]
+  - Its run's token is among this Hive's live ones (the pools' `holder.live`, as #1429's operations') from before its
+    claim can be seen; the claim is the project's pool's tracked work, so a closing workspace's pool waits until the
+    start has spawned its process or released the writer, and makes no claim once closing.
+  - The claim needs the slot set up and lent, with no operation (warming, installing, removal) and no unsettled job:
+    a slot still being set up is refused ("slot-b is still being set up"). No operation starts while a writer is set.
+  - The writer stays through the start's preparation, the launch and the session's whole run. A start given up before
+    any process of it ran releases it at once. Once a process ran (its CLI, or the agent's own worktree's first setup,
+    which runs in its carried slot but never in a slot the pool set up), it is released only when its launch's process
+    job shows everything it started has ended (`ended`): leftovers kept running by the user, a launch that couldn't be
+    tracked, or a job that couldn't be read leave it **held**.
+  - While it is set the slot isn't lent, adopted, taken by hand or removed, and another start there is refused ("slot-b
+    still has another session in it, or processes one left running there"); two at once give one writer.
+  - A writer whose Hive is gone is never taken over or cleared from a snapshot of its processes: it stays held until
+    the user releases the slot (#1506). A refresh clears only this Hive's own writer whose processes are proven ended
+    but whose release couldn't be written.
 - **Its environment:** `HIVE_SLOT` and `HIVE_SLOT_PORT_BASE` (#1429's `slotEnv`) while it runs in a slot; like every
   `HIVE_*`, never inherited.
 - **Refused, with offers:** the window says why and offers **Read Transcript** (the Sessions tab, on it) and **Start
@@ -2823,8 +2835,9 @@ Whether a conversation may resume there is its **hold** (none: it may):
   "slot reused", "after AM-14"), so a free slot stays for new work.
 - **A lease's end** (#1429's `release`): the slot's writer under that lease drains. Hive lets its turn finish (not in a
   turn, no prompt waiting, no run or background task going), then stops that run (a start of it still being prepared
-  gives up); never another run of the agent's, in that slot under a new lease or elsewhere. Once the run has exited
-  and released the slot, the lease's last revision is recorded (its final commit included) and the slot looked at.
+  gives up); never another run of the agent's, in that slot under a new lease or elsewhere. Once the run's processes
+  are known to have ended and its writer is released, the lease's last revision is recorded (its final commit
+  included) and the slot looked at.
   A run of another Hive is that Hive's to stop; the slot stays its until it exits. No off switch: one writer needs it
   (with workflow rules off, leases aren't ended by rules, so nothing is stopped).
 - **The Agent API:** an agent's row and detail give its running session's `folder` (when not the project folder) and

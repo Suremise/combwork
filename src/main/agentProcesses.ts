@@ -126,6 +126,38 @@ const running = new Map<string, Launch>()
 const left = new Map<string, Launch & { processes: AgentProcess[]; more: number; since: string; restored?: boolean }>()
 let poll: ReturnType<typeof setInterval> | null = null
 
+/**
+ * How a launch's processes came to an end, as its job showed it (#1434: a slot's writer is released only on `ended`):
+ * `ended`, its job seen empty (at its CLI's exit, or its leftovers since, or ended by Hive); `kept`, its leftovers kept
+ * running by the user and no longer followed; `unknown`, it wasn't tracked, its job couldn't be listed, or the tracker
+ * lost it. A run with none yet is still going (or has leftovers being followed). Bounded: the oldest are forgotten.
+ */
+export type RunOutcome = 'ended' | 'kept' | 'unknown'
+const outcomes = new Map<string, RunOutcome>()
+const outcomeListeners = new Set<(runId: string, outcome: RunOutcome) => void>()
+const MAX_OUTCOMES = 500
+function settleRun(runId: string, outcome: RunOutcome): void {
+  if (outcomes.has(runId)) return
+  outcomes.set(runId, outcome)
+  while (outcomes.size > MAX_OUTCOMES) outcomes.delete(outcomes.keys().next().value!)
+  for (const f of outcomeListeners) {
+    try {
+      f(runId, outcome)
+    } catch (e) {
+      log.warn('after a launch settled', e)
+    }
+  }
+}
+/** A launch's outcome, once known (RunOutcome). */
+export const runOutcome = (runId: string): RunOutcome | null => outcomes.get(runId) ?? null
+/** Told each launch's outcome as it becomes known. */
+export function onRunOutcome(fn: (runId: string, outcome: RunOutcome) => void): () => void {
+  outcomeListeners.add(fn)
+  return () => outcomeListeners.delete(fn)
+}
+/** For tests: an outcome as the tracker would give it. */
+export const settleRunForTests = (runId: string, outcome: RunOutcome): void => settleRun(runId, outcome)
+
 const agentKey = (projectPath: string, agentId: string): string => `${projectPath.toLowerCase()}\n${agentId}`
 
 /** Why a launch doesn't start: stopped while it was being tracked (the launch gate prints it in English, launchGate.ts). */
@@ -230,12 +262,16 @@ export async function leftoversSettled(): Promise<void> {
 
 async function findLeftovers(runId: string): Promise<AgentLeftovers | null> {
   const launch = running.get(runId)
-  if (!launch) return null
+  if (!launch) {
+    settleRun(runId, 'unknown')
+    return null
+  }
   await new Promise((r) => setTimeout(r, SETTLE_MS))
   running.delete(runId)
   const list = await listJob(runId)
   if (!list || !list.processes.length) {
     void host.request('forget', runId)
+    settleRun(runId, list ? 'ended' : 'unknown')
     return null
   }
   left.set(runId, { ...launch, processes: list.processes, more: list.more, since: new Date().toISOString() })
@@ -272,6 +308,7 @@ function bound(launch: Launch): void {
   for (const l of over) {
     left.delete(l.runId)
     if (!l.restored) void host.request('forget', l.runId)
+    settleRun(l.runId, 'unknown')
   }
 }
 
@@ -290,6 +327,7 @@ async function refresh(): Promise<void> {
     if (list && !list.processes.length) {
       left.delete(l.runId)
       if (!l.restored) void host.request('forget', l.runId)
+      settleRun(l.runId, 'ended')
       changed.add(agentKey(l.projectPath, l.agentId))
     } else if (list && (list.processes.length !== l.processes.length || list.more !== l.more || list.processes.some((p, i) => p.pid !== l.processes[i]?.pid))) {
       left.set(l.runId, { ...l, processes: list.processes, more: list.more })
@@ -347,6 +385,7 @@ export async function settleLeftovers(projectPath: string, agentId: string, how:
     }
     left.delete(l.runId)
     if (!l.restored) void host.request('forget', l.runId)
+    settleRun(l.runId, how === 'end' ? 'ended' : 'kept')
     done += l.processes.length + l.more
   }
   persist()
@@ -434,6 +473,7 @@ function jobsLost(why: string): void {
     return
   }
   const launches = running.size
+  for (const runId of running.keys()) settleRun(runId, 'unknown')
   running.clear()
   let listed = 0
   const agents = new Map<string, { projectPath: string; agentId: string }>()
@@ -442,6 +482,8 @@ function jobsLost(why: string): void {
     const known = l.processes.filter((p) => p.created)
     listed += l.processes.length - known.length + l.more
     agents.set(agentKey(l.projectPath, l.agentId), { projectPath: l.projectPath, agentId: l.agentId })
+    // No longer its job: what it left can't be told complete any more.
+    settleRun(l.runId, 'unknown')
     if (known.length) left.set(l.runId, { ...l, processes: known, more: 0, restored: true })
     else left.delete(l.runId)
   }

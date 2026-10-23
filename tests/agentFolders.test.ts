@@ -205,8 +205,8 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
   const leaseOf = (db: DatabaseSync, id = 's1'): string | null => (db.prepare("SELECT lease FROM sessions WHERE host = 'p1' AND id = ?").get(id) as { lease: string | null }).lease
   const writerOf = (store: SlotStore, name = 'slot-b') => store.slot(name)?.writer ?? null
   /** A claim as claimPlace makes it, its facts read before the write (as `before` has them). */
-  const claim = (store: SlotStore, o: { run: string; existing?: { id: string; cwd: string; lease?: string } | null; auto?: boolean; head?: string | null; stale?: string | null; folder?: string; agent?: FolderAgent }) =>
-    store.conn.write((db) => claimIn(db, store, { facts: facts([]), folder: o.folder ?? slotFolder('slot-b'), agent: o.agent ?? builder, existing: o.existing === undefined ? null : o.existing, purpose: 'build', auto: o.auto ?? false, run: o.run, sessionsHost: 'p1', me: ME, head: o.head ?? null, stale: o.stale ?? null }))
+  const claim = (store: SlotStore, o: { run: string; existing?: { id: string; cwd: string; lease?: string } | null; auto?: boolean; head?: string | null; folder?: string; agent?: FolderAgent }) =>
+    store.conn.write((db) => claimIn(db, store, { facts: facts([]), folder: o.folder ?? slotFolder('slot-b'), agent: o.agent ?? builder, existing: o.existing === undefined ? null : o.existing, purpose: 'build', auto: o.auto ?? false, run: o.run, sessionsHost: 'p1', me: ME, head: o.head ?? null }))
   const refusal = (p: Promise<unknown>) =>
     p.then(
       () => null,
@@ -293,17 +293,36 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
     expect(leaseOf(b.db)).toBe('l3')
   })
 
-  it("another agent's run still draining in a free slot: the slot holds its work, and a writer whose run is over is taken over", async () => {
+  it("another agent's run still draining in a free slot: the slot holds its work, and a writer left by a Hive that is gone is never taken over by a claim", async () => {
     const b = board()
     await claim(b.store, { run: 'run-1' })
     await b.store.end('l1', 'done')
     const s2 = { id: 's2', cwd: slotFolder('slot-b'), lease: 'l0' }
     const b2: FolderAgent = { id: 'b2', role: 'builder', legacy: null }
     expect(resumeHold({ ...facts([]), slots: b.store.conn.read((db) => slotsIn(db, 'p1')) }, b2, s2)).toMatchObject({ is: 'reused', card: 12 })
-    // b1 lent slot-b again (#13) while run-1 is gone without releasing it (its Hive crashed): taken over only as stale.
+    // A lease of slot-b again (#13) while run-1's writer stays (its Hive crashed, its processes not known to have ended).
     b.db.prepare("INSERT INTO slot_leases (id, project, slot, kind, card, agent, from_at) VALUES ('l2', 'p1', 'slot-b', 'card', 13, 'b1', '2026-10-23T09:00:00.000Z')").run()
-    expect(await refusal(claim(b.store, { run: 'run-2' }))).toMatchObject({ is: 'busy' })
-    expect(await claim(b.store, { run: 'run-2', stale: 'run-1' })).toMatchObject({ lease: 'l2', slot: { writer: { run: 'run-2' } } })
+    b.db.prepare("UPDATE slots SET writer_pid = 999999 WHERE project = 'p1' AND name = 'slot-b'").run()
+    expect(await refusal(claim(b.store, { run: 'run-2' }))).toEqual({ is: 'busy', slot: 'slot-b', agent: 'b1' })
+    expect(writerOf(b.store)).toMatchObject({ run: 'run-1' })
+  })
+
+  it('a slot being set up or installed (an operation, an unsettled job, or not ready) is never claimed; nothing is written', async () => {
+    const b = board()
+    const check = async (set: string, undo: string): Promise<void> => {
+      b.db.prepare(`UPDATE slots SET ${set} WHERE project = 'p1' AND name = 'slot-b'`).run()
+      expect(await refusal(claim(b.store, { run: 'run-1' }))).toEqual({ is: 'setup', slot: 'slot-b' })
+      expect(writerOf(b.store)).toBeNull()
+      b.db.prepare(`UPDATE slots SET ${undo} WHERE project = 'p1' AND name = 'slot-b'`).run()
+    }
+    await check("op = 'o-warm', op_kind = 'warm', op_lease = 'l1', op_pid = 1, op_started = 1", 'op = NULL, op_kind = NULL, op_lease = NULL, op_pid = NULL, op_started = NULL')
+    await check("job = 'setup-job'", 'job = NULL')
+    await check("state = 'creating'", "state = 'lent'")
+    await check("state = 'gone'", "state = 'lent'")
+    // Set up, and lent: claimed.
+    expect(await claim(b.store, { run: 'run-1' })).toMatchObject({ lease: 'l1', slot: { writer: { run: 'run-1' } } })
+    // And the other way: no operation starts on it while it is written (FREE needs no writer).
+    expect(await b.store.startRemoval('slot-b', 'lent', 'o-r', { pid: 1, started: 1 })).toBe(false)
   })
 
   it('binds and rebinds only within the rules, and a failure inside the write changes neither', async () => {
