@@ -2,8 +2,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import type { QueueView } from '@shared/workflow/queue'
 import { msg, tr } from '@shared/i18n'
-import { gitStatusText, gitStatusTip, VC_SECTIONS, vcSections, vcSectionShown } from '@shared/gitRepo'
+import { gitStatusText, gitStatusTip, VC_SECTIONS, vcSections, vcSectionShown, type GitRepoSummary } from '@shared/gitRepo'
 import { showVersionControl, useStore } from '../store'
+import { refreshWorkspace } from '../actions'
 import { cx } from '../util'
 import { Icon, Tooltip } from '../components/ui'
 import { INIT_TEXT, InitRepoButton, InitRepoHost } from '../components/InitRepo'
@@ -32,6 +33,26 @@ const M = {
   initHint: msg({ id: 'git.vc.initHint', defaultMessage: 'Initialise repository… makes this folder a Git repository on a branch called main, keeps its .hive out of git and commits its files.', description: 'Under the header of the Version Control tab of a project whose folder has no repository, beside the button. Initialise repository… is the button’s name: keep it as translated there. Keep main (the branch name).' })
 }
 
+/**
+ * The tab's own read of git (on focus, on a change) finds a repository where the project's detection, read at the last
+ * workspace refresh, has none, or none where it has one (#1492: `.git` moved away): the workspace is read again, once
+ * for each such answer, so the header's fact, its offer and the notice follow at once (§16.3.5), never a header saying
+ * "is a Git repository" over a page saying there's none. Another system found (a jj repository colocated with git) is
+ * detection's call, so the two may differ there for good.
+ */
+function useDetectionCatchUp(project: ProjectInfo, s: GitRepoSummary | null): void {
+  const asked = useRef<string | null>(null)
+  const detected = project.platform?.detected
+  const readGit = !!s && s.isRepo && !s.gitProblem
+  const differ = !!s && !s.gitProblem && !!detected && !detected.other && readGit !== (detected.platform === 'git')
+  const key = `${project.path}:${readGit}`
+  useEffect(() => {
+    if (!differ || asked.current === key) return
+    asked.current = key
+    void refreshWorkspace().catch(() => undefined)
+  }, [differ, key])
+}
+
 export function VersionControl({ project }: { project: ProjectInfo }) {
   const summary = useGitRead('git:summary', project)
   const s = summary.data
@@ -45,6 +66,7 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
   // None's page offers Initialise repository… while the folder has no repository of its own (none, or one around it).
   const noRepo = platform === 'none' && !!s && (!s.isRepo || !!s.parentRepo) && !s.gitProblem && !project.platform?.detected.other
   const status = platform === 'git' && !!s?.isRepo
+  useDetectionCatchUp(project, s)
   const sectionsShown = VC_SECTIONS.filter((x) => shown.includes(x.id))
   const headRef = useRef<HTMLDivElement>(null)
   const tabsRef = useRef<HTMLDivElement>(null)

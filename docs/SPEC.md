@@ -1215,6 +1215,11 @@ Everything is visible in the Version Control tab itself, not only through the As
   this folder: not supported yet." while Git is in force). The once-per-start notice (`sayPlatform`) gains **Open
   Version Control**, one per project (`platform:<path>`): a newer detection replaces the one before it. Initialise repository… on None's page brings the
   `gitFound` offer without a restart (the refresh after it). Each switch goes through §16.6.5's warning.
+- **The tab never contradicts itself [#1492]:** detection is the workspace refresh's, but the tab reads git again on
+  window focus. When that read finds a repository where detection has none, or none where it has one (`.git` moved
+  away, then back to Hive), the tab asks for one refresh, so its fact, its offer and the notice follow at once, never
+  "This folder is a Git repository" over a page saying there's none. Once per answer: where detection decides
+  otherwise for good (a jj repository colocated with git, Mercurial beside it) nothing more is asked.
 - **The repository gone (S20):** Git's rules hold. A Git card's start or submit refused for what can't be read
   (`platform.unknown`) carries `offer: repositoryGone` while detection finds no Git repository, and its next step is
   the offer: "The project's Git repository is gone: ask the user to restore it, or to switch the project to None in its
