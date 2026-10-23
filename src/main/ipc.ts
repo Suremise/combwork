@@ -414,6 +414,13 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       presentWindow(target)
       if (projectPath) emitTo(target, { type: 'menu-command', command: 'project.focus', args: [projectPath] })
     },
+    'notice:action': (projectPath, command, args) => {
+      // The window that has the project, which may not be the one the banner was in.
+      const target = windowForPath(projectPath)?.win ?? win()
+      presentWindow(target)
+      emitTo(target, { type: 'menu-command', command: 'project.focus', args: [projectPath] })
+      emitTo(target, { type: 'menu-command', command, args: Array.isArray(args) ? args : [] })
+    },
     'window:edit': (role) => {
       const wc = win().webContents
       ;({ undo: () => wc.undo(), redo: () => wc.redo(), cut: () => wc.cut(), copy: () => wc.copy(), paste: () => wc.paste(), selectAll: () => wc.selectAll() })[role]()

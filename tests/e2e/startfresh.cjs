@@ -6,6 +6,8 @@
 //    one are left as they are (listed with why); the old conversations stay in the Sessions tab.
 // 3. With no lane running, a solo card Done: one banner. A card still in Review: none (until it is Done itself).
 // 4. Settings → Notifications' switch off: none.
+// 5. A lane ends, or a solo card is Done, while its agent is still in its turn: not yet; told once the turn ends.
+// 6. The banner's button with another project shown (beta, nothing running): alpha's question all the same.
 // Screenshots of the question and the banner, light and dark. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -18,6 +20,7 @@ const ws = path.join(lib.WORK, 'startfresh-ws')
 const home = path.join(lib.WORK, 'startfresh-claude-home')
 const shots = path.join(lib.WORK, 'startfresh-shots')
 const alpha = path.join(ws, 'alpha')
+const beta = path.join(ws, 'beta')
 const PORT = Number(lib.port(47818))
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -29,7 +32,8 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws, shots]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(shots, { recursive: true })
   lib.gitProject(alpha)
-  const env = lib.fakeClaude(userData, home, [alpha, ws])
+  lib.gitProject(beta)
+  const env = lib.fakeClaude(userData, home, [alpha, beta, ws])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
@@ -56,6 +60,13 @@ const check = (name, ok, extra = '') => {
     /** The decisions not to suggest one, by what ended and why. */
     const notNudged = () => [...hiveLog().matchAll(/No fresh-start suggestion in .*?\((.+?)\): (.+)/g)].map((m) => `${m[1]}: ${m[2].trim()}`)
     const banner = page.locator('.notice-banner', { hasText: 'A good moment to start fresh' })
+    /** Closes the fresh-start banners shown (one at a time, each seen gone). */
+    const closeBanners = async () => {
+      for (let n = await banner.count(); n > 0; n = await banner.count()) {
+        await banner.first().locator('.notice-close').click()
+        await until(async () => (await banner.count()) < n, HUNG_MS)
+      }
+    }
     const themed = async (name, shoot) => {
       for (const theme of ['light', 'dark']) {
         await inv('settings:update', { appearance: { theme } })
@@ -130,6 +141,38 @@ const check = (name, ok, extra = '') => {
     const on = (await inv('tasks:create', { title: 'Done with it on again', project: 'alpha', agent: builder.id, column: 'doing' })).number
     await inv('tasks:update', on, { column: 'done' })
     check('the switch off: none for its card; on again: the next one only', !!(await until(async () => nudges().length === 3, HUNG_MS)) && nudges()[2] === `card:${on}` && !nudges().includes(`card:${off}`), JSON.stringify(nudges()))
+    await closeBanners()
+
+    // --- 5. The usual order: the work is marked Done while its agent is still in its turn. Not yet; told as it ends.
+    const finishing = async (go, done, trigger) => {
+      await say(builder.id, `holduntil ${go}`)
+      await until(async () => (await live(builder.id))?.status === 'working', HUNG_MS)
+      await done()
+      const waited = !!(await until(async () => notNudged().includes(`${trigger()}: its work hasn't finished`), HUNG_MS))
+      fs.writeFileSync(path.join(home, go), '')
+      return waited
+    }
+    const b = (await inv('tasks:create', { title: 'Greeting says Hello', project: 'alpha', agent: builder.id, column: 'doing' })).number
+    await say(builder.id, `hive hive_lane ${JSON.stringify({ action: 'start', cards: [b], reviewer: 'Reviewer', name: 'hellos' })}`)
+    const lane2 = await until(async () => (await inv('lanes:list')).find((l) => l.state === 'active' && l.cards.some((x) => x.number === b)), HUNG_MS)
+    await until(() => idle(builder.id), HUNG_MS)
+    const laneWaited = await finishing('lane-go', () => inv('tasks:update', b, { column: 'done' }), () => `lane:${lane2.id}`)
+    check('a lane ends while its builder finishes its turn: not yet', laneWaited, JSON.stringify(notNudged()))
+    check('…told once the turn ends, for the lane', !!(await until(async () => nudges().length === 4, HUNG_MS)) && nudges()[3] === `lane:${lane2.id}`, JSON.stringify(nudges()))
+    await until(() => idle(builder.id), HUNG_MS)
+    await closeBanners()
+    const c = (await inv('tasks:create', { title: 'Solo finish', project: 'alpha', agent: builder.id, column: 'doing' })).number
+    check('a solo card Done while its agent finishes its turn: not yet', await finishing('solo-go', () => inv('tasks:update', c, { column: 'done' }), () => `card:${c}`), JSON.stringify(notNudged()))
+    check('…told once the turn ends, for the card', !!(await until(async () => nudges().length === 5 && (await banner.count()) === 1, HUNG_MS)) && nudges()[4] === `card:${c}`, JSON.stringify(nudges()))
+
+    // --- 6. Its button with another project shown (beta, no agent running): alpha's question, alpha shown.
+    const shown = (name) => page.locator('.sidebar .project-row.selected', { hasText: name })
+    await page.locator('.sidebar .project-row', { hasText: 'beta' }).first().click()
+    check('beta shown', !!(await until(async () => (await shown('beta').count()) === 1, HUNG_MS)))
+    await banner.locator('button.notice-action').click()
+    const alphaQuestion = page.locator('.modal, [role="dialog"]').filter({ hasText: /idle agents? fresh\?/ }).first()
+    check("the button with beta shown: alpha's question, alpha shown", !!(await until(async () => (await alphaQuestion.count()) === 1 && /in alpha start/.test(await alphaQuestion.innerText()) && (await shown('alpha').count()) === 1, HUNG_MS)))
+    await alphaQuestion.locator('button', { hasText: 'Cancel' }).click()
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

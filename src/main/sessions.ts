@@ -2920,16 +2920,17 @@ class SessionManager {
 
   /**
    * Start Fresh (#1437): an idle running agent's conversation ended (it stays in the Sessions tab) and a new one started,
-   * where its new conversations start (agentFolders.ts). Its caller has checked it is idle (freshStarts.ts); refused, as
-   * newConversation is, while Hive is typing into it or its CLI hasn't taken a prompt Hive typed.
+   * where its new conversations start (agentFolders.ts): null, or why not. `whyNot` (freshStarts.ts) says why it isn't
+   * idle now; it is asked, and Hive typing into it checked, just before the stop with no wait between them
+   * (stopWhereAndWait marks the run stopping before its first wait), so the run stopped is the idle one checked.
    */
-  async startFresh(projectPath: string, agentId: string): Promise<LiveSessionState> {
+  async startFresh<W extends string>(projectPath: string, agentId: string, whyNot: () => W | null): Promise<W | 'pending' | null> {
     projectPath = workspace.assertProject(projectPath)
-    const now = this.agentNow(projectPath, agentId)
-    if (!now) throw hiveError(msg({ id: 'session.newConversation.notRunning', defaultMessage: "It isn't running.", description: 'Giving an agent a task in a new conversation is refused: it isn\'t running.' }))
-    if (now.pending || this.delivering.has(this.key(projectPath, agentId))) throw hiveError(msg({ id: 'session.newConversation.pending', defaultMessage: 'It has just been given a prompt that its CLI has not taken yet.', description: "Giving an agent a task in a new conversation is refused: a prompt Hive typed hasn't been taken yet." }))
+    const why = this.delivering.has(this.key(projectPath, agentId)) ? 'pending' : whyNot()
+    if (why) return why
     if (!(await this.endConversation(projectPath, agentId))) throw hiveError(msg({ id: 'session.newConversation.didntStop', defaultMessage: "It didn't stop, so no new conversation was started.", description: "Giving an agent a task in a new conversation failed: it didn't stop." }))
-    return this.start(projectPath, { agentId })
+    await this.start(projectPath, { agentId })
+    return null
   }
 
   /** Stops a running agent to end its conversation (kept in the Sessions tab): whether it has stopped. */

@@ -125,14 +125,17 @@ function Banner({ notice }: { notice: Notice }) {
         ) : (
           <div className="notice-text">{text}</div>
         )}
-        {/* Its button (#1437), under the text: a command of the window's, which closes the banner. */}
+        {/* Its button (#1437), under the text: a command, which closes the banner. With a project, it runs in the
+            window that has the project, with the project shown, whatever this window shows. */}
         {notice.action && (
           <button
             className="btn small notice-action"
             onClick={(e) => {
               e.stopPropagation()
               dismissNotice(notice.id)
-              runCommand(notice.action!.command, ...(notice.action!.args ?? []))
+              const { command, args = [] } = notice.action!
+              if (notice.projectPath) void call('notice:action', notice.projectPath, command, args).catch(() => undefined)
+              else runCommand(command, ...args)
             }}
           >
             {notice.action.label}

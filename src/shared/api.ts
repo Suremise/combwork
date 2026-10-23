@@ -196,6 +196,8 @@ export interface HiveRequests {
   'window:showing': (projectPath: string | null) => void
   /** A banner was clicked: brings up the window showing its project, and the project (as a Windows notification's click). */
   'notice:open': (projectPath: string | null) => void
+  /** A banner's button (#1437): brings up the window that has its project, shows the project and runs the command there. */
+  'notice:action': (projectPath: string, command: string, args: unknown[]) => void
 
   'settings:get': () => AppSettings
   'settings:update': (patch: SettingsPatch) => AppSettings
