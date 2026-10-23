@@ -140,7 +140,7 @@ const requests = new IsolatedRequests<{ lease: CopyLease; folder: string; copy: 
  * setup outlasts any request's time limit): `wait` with a ticket to ask again with, until the copy is ready.
  */
 export function isolatedRequest(ws: WorkspaceService, projectPath: string, owner: string, req: { card: number; revision: string; agent: string | null }, ticket?: string): Promise<{ lease: CopyLease; folder: string; copy: string } | { wait: string; ticket: string } | { refused: string }> {
-  return requests.ask(owner, projectPath, `${req.card}|${req.revision}`, () => isolatedLease(ws, projectPath, req), ticket)
+  return requests.ask(owner, projectPath, `${req.card}|${req.revision}`, () => isolatedLease(ws, projectPath, req), ticket, ws.lifetime)
 }
 
 /** The link resolve gave out is the lease's run until its run starts. */

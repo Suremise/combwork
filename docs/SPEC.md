@@ -3365,7 +3365,9 @@ running again when the deliverables are quiet, which the refusal says.
 the card's revision apart from the request (`IsolatedRequests`: a first setup takes longer than any request may): resolve
 answers within 2 s, with the copy or 409 `wait` and a ticket, and hive-progress asks again with the ticket every 2 s,
 saying what it waits for once (*waiting for a check copy*, *… to be set up*); a copy leased for a ticket nobody asks
-about for a minute is given back (`abandoned`). The lease's job is opened on the process supervisor (`copy-<lease>`,
+about for a minute is given back (`abandoned`). At most 100 requests wait at once (the oldest is dropped); a request
+dropped that way, or by its workspace closing, while its copy is still being set up gives that copy back once it comes,
+exactly once [#1499]. The lease's job is opened on the process supervisor (`copy-<lease>`,
 recorded on the lease first). hive-progress then starts the command's launcher (#1360's, `workflow/launcher.ts`) in the
 copy and has Hive put it in that job (`POST /v1/progress/isolated`) before it runs anything: only by the lease's agent,
 once per lease, and only a process of that agent's own (in its launch's job, started in the window it names). The run's start takes the lease,

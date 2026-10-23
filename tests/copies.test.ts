@@ -558,5 +558,50 @@ describe('copies: isolated requests apart from the request (HR1 round 1)', () =>
     expect(reqs.size).toBe(0)
     expect(first.ticket).toMatch(/^t-/)
   })
+
+  it('a request evicted past the cap while its copy is still being set up gives that copy back once it comes, exactly once (#1499)', async () => {
+    let now = 1000
+    const back: string[] = []
+    const reqs = new IsolatedRequests<{ lease: CopyLease }>((_, l) => back.push(l.id), () => now, 0)
+    let done!: (v: { lease: CopyLease }) => void
+    const oldest = (await reqs.ask('agent|a', 'p', '0|r', () => new Promise((r) => (done = r)))) as { ticket: string }
+    const never = (): Promise<{ lease: CopyLease }> => new Promise(() => undefined)
+    // Up to the cap (100), then one more: the oldest is evicted, still being set up.
+    for (let i = 1; i <= 100; i++) await reqs.ask('agent|a', 'p', `${i}|r`, never)
+    expect(reqs.size).toBe(100)
+    expect(back).toEqual([])
+    // Its set-up finishes: the late copy is given back, once.
+    done({ lease: lease('c-late') })
+    await vi.waitFor(() => expect(back).toEqual(['c-late']), { timeout: 10_000, interval: 10 })
+    // Nothing gives it back again: its ticket is unknown, and abandoning the rest finds it gone.
+    expect(await reqs.ask('agent|a', 'p', '0|r', never, oldest.ticket)).toMatchObject({ wait: 'a check copy to be set up' })
+    now += ABANDON_MS + 1
+    reqs.abandon()
+    expect(back).toEqual(['c-late'])
+  })
+
+  it("its workspace closing drops a request: a copy that comes after is given back once; a request delivered first isn't (#1499)", async () => {
+    const back: string[] = []
+    const reqs = new IsolatedRequests<{ lease: CopyLease }>((_, l) => back.push(l.id), Date.now, 0)
+    const life = new AbortController()
+    let done!: (v: { lease: CopyLease }) => void
+    await reqs.ask('agent|a', 'p', '1|r', () => new Promise((r) => (done = r)), undefined, life.signal)
+    // Delivered before the close: the asker has it; the close gives nothing back.
+    const other = new AbortController()
+    const got = await reqs.ask('agent|b', 'p', '2|r', async () => ({ lease: lease('c-mine') }), undefined, other.signal)
+    expect(got).toEqual({ lease: lease('c-mine') })
+    other.abort()
+    life.abort()
+    expect(reqs.size).toBe(0)
+    done({ lease: lease('c-closed') })
+    await vi.waitFor(() => expect(back).toEqual(['c-closed']), { timeout: 10_000, interval: 10 })
+    // A closed workspace's new request is refused, nothing leased.
+    let leasedAgain = false
+    expect(
+      await reqs.ask('agent|a', 'p', '3|r', async () => ((leasedAgain = true), { lease: lease('c-no') }), undefined, life.signal)
+    ).toEqual({ refused: 'the workspace closed' })
+    expect(leasedAgain).toBe(false)
+    expect(back).toEqual(['c-closed'])
+  })
 })
 
