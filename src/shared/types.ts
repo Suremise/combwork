@@ -18,7 +18,7 @@ import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
 import type { PlatformId, ProjectPlatform } from './platform/descriptors'
 import type { SwitchRefusal } from './platform/switching'
-import type { Contradiction, NOT_OFFERED, PresetId, PresetNeeds, WorkflowOptions } from './workflow/options'
+import type { Contradiction, PresetId, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { ReviewerMode, WorkflowRole } from './workflow/roles'
 import type { ResumeHold } from './agentFolders'
@@ -1047,7 +1047,7 @@ export interface WorkflowForm {
   inherited: WorkflowOptions
   inheritedOrigins: Record<keyof WorkflowOptions, WorkflowOptionOrigin>
   /** The presets offered, in order, each with its options for this project; `needs`: shown unavailable, with why. */
-  presets: { id: PresetId; needs?: PresetNeeds; options: WorkflowOptions }[]
+  presets: { id: PresetId; options: WorkflowOptions }[]
   /** The project's commit identity from its git config (G12), or null. */
   identity: { name: string; email: string } | null
   /** Settings → Advanced → Workflow rules are enforced: off, the options are saved but no rule applies. */
@@ -1072,7 +1072,7 @@ export type WorkflowProblem = OwnWorkflowProblem | { kind: 'inheritor'; project:
  * A problem of the options being saved themselves; an inheritor's (#1422): a project inheriting a level's change would
  * have that problem in its own options.
  */
-export type OwnWorkflowProblem = { kind: 'contradiction'; id: Contradiction } | { kind: 'notOffered'; id: keyof typeof NOT_OFFERED } | ({ kind: 'stageName' } & StageNameProblem) | { kind: 'bad'; why: string }
+export type OwnWorkflowProblem = { kind: 'contradiction'; id: Contradiction } | ({ kind: 'stageName' } & StageNameProblem) | { kind: 'bad'; why: string }
 
 /** The levels of workflow defaults the window edits (#1422): Hive's (config) and the workspace's (workspace.json). */
 export type WorkflowLevel = 'global' | 'workspace'
@@ -1202,6 +1202,11 @@ export interface ProjectConfig {
    * read-only in P3 (P4's Version Control tab edits them).
    */
   workflow?: ProjectWorkflow
+  /**
+   * The one-time upgrade steps settled in this project (#1445's `workflow.slotsUpToDateFromBeforeP7`), each recorded in
+   * the same write as its change, so a later run can tell it from a choice the user made since, after a failure too.
+   */
+  stepsDone?: string[]
   fileLocks: Inherit<FileLockMode>
   /** Overrides settings.agents.worktreeCopy; null inherits. */
   worktreeCopy: string | null

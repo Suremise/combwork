@@ -104,6 +104,7 @@ import { deleteJournalEntry, deleteWorkspaceJournal, editJournalEntry, forgetJou
 import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
+import { settleSlotsUpToDate } from './workflow/slotsUpToDateStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
 import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
 import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
@@ -112,6 +113,7 @@ import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesetsNow } from './workflow/rulesets'
 import { poolFor, slotTest, slotViews } from './slotsApp'
+import { setSlotSetting } from './slotSettings'
 import { copyViews, stopIsolated } from './copiesApp'
 import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
@@ -342,7 +344,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     // then what changed in its projects while it was closed, recorded as observed facts (#1217): the cards adopted too.
     const opening = contextWorkspace()!
     // Then its agents' worktrees become slots (#1441), each project once, before what changed is observed.
+    // And G15 saved before P7 settled once (#1445), so a Pair or Team project gets its preset's On.
     void adoptWorkspace(opening)
+      .then(() => settleSlotsUpToDate(opening))
       .then(() => migrateSlots(opening))
       .finally(() => reconcileWorkspace(opening))
     // 0.9's agent templates copied into the 0.9 backup once after the upgrade (#1436), and a quiet notice saying so.
@@ -672,7 +676,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const out = await upgradeBoard(ws)
       // Then the upgrade's adoption, in the background (#1218), its agents' worktrees adopted as slots after it (#1441),
       // and 0.9's templates copied aside (#1436).
-      void adoptWorkspace(ws).then(() => migrateSlots(ws))
+      void adoptWorkspace(ws)
+        .then(() => settleSlotsUpToDate(ws))
+        .then(() => migrateSlots(ws))
       void copyV09Templates(ws)
         .then(() => sayV09TemplatesOnce(ws))
         .catch((e) => log.warn("copying 0.9's agent templates (tried again at the next open)", e))
@@ -801,6 +807,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workflow:setLevel': (level, platform, change) => setLevelOptions(workspace, level, platform, change),
     'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined, true),
     'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
+    'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
     'slots:releaseCarried': (p, agentId) => releaseCarried(workspace, workspace.assertProject(p), String(agentId)),
     'copies:list': (p) => copyViews(workspace, workspace.assertProject(p)),
     'slots:test': async (p, op) => {

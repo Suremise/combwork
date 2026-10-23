@@ -12175,6 +12175,16 @@ button.progress-lane-why:focus-visible,
   font-weight: 600;
   color: var(--fg-strong);
 }
+
+/* The Slots and copies group's slots list (#1445): name, state, what it's lent to. */
+.workflow-slots-table {
+  border-collapse: collapse;
+  margin: 4px 0 8px;
+}
+.workflow-slots-table td {
+  padding: 2px 16px 2px 0;
+  vertical-align: top;
+}
 .workflow-preset-now {
   font-weight: 400;
   font-size: 12px;

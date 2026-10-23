@@ -730,6 +730,8 @@
   "settings.project.metadata.title": "Einstellungsdatei",
   "settings.project.reset.desc": "Alles auf dieser Seite wird wieder auf „Geerbt“ gesetzt. Agenten sowie abgewählte Skills und MCP-Server bleiben erhalten.",
   "settings.project.reset.title": "Projekteinstellungen zurücksetzen",
+  "settings.project.slotOptions.desc": "Das Setup- und das Archivskript, die in neue Slots kopierten Dateien und die Review-Kopien werden im Tab „Versionsverwaltung“ des Projekts festgelegt, unter Workflow → Slots und Kopien.",
+  "settings.project.slotOptions.title": "Slots und Kopien",
   "settings.project.storage.desc": "Im Hintergrund gemessen; „Aktualisieren“ misst neu. Die eigenen Transkripte der Coding-Agenten (in ~/.claude, ~/.codex und ~/.copilot) werden nicht mitgezählt, und weder „Aufräumen…“ noch „Bereinigen…“ fasst sie je an.",
   "settings.project.storage.title": "Was Hive speichert",
   "settings.project.suggestFreshStart.desc": "Ein Hinweis, wenn die Arbeit dieses Projekts fertig ist, mit „Neu beginnen (untätige Agenten)“.",

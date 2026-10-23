@@ -6,7 +6,7 @@
 
 import { createLogger, userText } from '../logger'
 import { compile } from '../../shared/workflow/compile'
-import { allOff, contradictions, CONTRADICTIONS, NAME_OPTIONS, NOT_OFFERED, notOffered, ownsTarget, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, contradictions, CONTRADICTIONS, NAME_OPTIONS, ownsTarget, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
 import { detect } from '../platform/registry'
 import { stageNameProblems, stageNameProblemText, type StageNameProblem } from '../../shared/workflow/stages'
 import { englishText, type Text } from '../../shared/advanced'
@@ -101,15 +101,14 @@ export function resolveOptions(platform: PlatformId, levels: OptionLevels): Reso
 }
 
 /**
- * Why options can't be saved (#1278): a level that can't be read, a contradiction, a value this version doesn't offer
- * yet, or a stage's name (N5, #1417).
+ * Why options can't be saved (#1278): a level that can't be read, a contradiction, or a stage's name (N5, #1417). Every
+ * option is offered since P7 (#1445: G15 was the last).
  */
-export type OptionsProblem = { kind: 'bad'; why: string } | { kind: 'contradiction'; id: Contradiction } | { kind: 'notOffered'; id: ReturnType<typeof notOffered>[number] } | ({ kind: 'stageName' } & StageNameProblem)
+export type OptionsProblem = { kind: 'bad'; why: string } | { kind: 'contradiction'; id: Contradiction } | ({ kind: 'stageName' } & StageNameProblem)
 
 /**
  * Options as a save would leave them (the Workflow section, the Assistant's settings tool): resolved, and every reason
- * they can't be saved, which a read would only log and fall back from. A project's values this version doesn't offer
- * (§16.19.1) count only when the project sets them.
+ * they can't be saved, which a read would only log and fall back from.
  */
 export function checkOptions(platform: PlatformId, levels: OptionLevels): { resolved: ResolvedOptions; problems: OptionsProblem[] } {
   const resolved = resolveOptions(platform, { ...levels, project: null })
@@ -126,7 +125,6 @@ export function checkOptions(platform: PlatformId, levels: OptionLevels): { reso
   const subfolder = !!levels.folder && options.platform === 'git' && !!detect(levels.folder).subfolder
   const problems: OptionsProblem[] = [
     ...contradictions(options, { subfolder }).map((id) => ({ kind: 'contradiction' as const, id })),
-    ...notOffered(own.set).map((id) => ({ kind: 'notOffered' as const, id })),
     // Each stage's name (N5) against every other's, in English and in the language Hive shows.
     ...stageNameProblems(options.stageNames, tr).map((p) => ({ kind: 'stageName' as const, ...p }))
   ]
@@ -136,7 +134,7 @@ export function checkOptions(platform: PlatformId, levels: OptionLevels): { reso
 /** A problem as text for the window (its message, in the user's language), or its English reason. */
 export function problemShownOf(p: OptionsProblem): Text {
   if (p.kind === 'bad') return { shown: p.why, english: p.why }
-  return p.kind === 'contradiction' ? CONTRADICTIONS[p.id] : p.kind === 'notOffered' ? NOT_OFFERED[p.id] : stageNameProblemText(p)
+  return p.kind === 'contradiction' ? CONTRADICTIONS[p.id] : stageNameProblemText(p)
 }
 
 /** A problem in English, for the Assistant's tools and the log. */

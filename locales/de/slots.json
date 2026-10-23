@@ -1,0 +1,5 @@
+{
+  "slots.setting.bad": "Diese Slot-Einstellung gibt es in Hive nicht.",
+  "slots.setting.badSize": "Die Zahl der Review- und Prüfkopien ist eine ganze Zahl von 1 bis 32.",
+  "slots.setting.badText": "Ein Slot-Skript oder eine Dateiliste ist Text mit höchstens 4.000 Zeichen."
+}

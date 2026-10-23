@@ -1,0 +1,5 @@
+{
+  "slots.setting.bad": "Hive にそのスロット設定はありません。",
+  "slots.setting.badSize": "レビュー用とチェック用のコピーの数は 1 から 32 までの整数です。",
+  "slots.setting.badText": "スロットのスクリプトやファイルの一覧は 4,000 文字以内のテキストです。"
+}
