@@ -151,7 +151,7 @@ const f = q.folderHelpers(fx)
       await until(async () => (await merge.count()) === 1, HUNG_MS)
     }
     // While the card's queue is still being read (HR3's round 1 finding 1): Merge stays off, nothing says Hive merges.
-    await h.app.evaluate(() => (process.env.HIVE_TEST_SLOW_IPC = 'queue:branchCard=4000*1'))
+    await h.app.evaluate(() => (process.env.HIVE_TEST_SLOW_IPC = 'worktrees:branchCards=4000*1'))
     await openMerge()
     const branchRead = async () => !!(await merge.locator('code').count()) && /Merges 1 commit/.test(await text(merge))
     check('Merge dialog, its card still being read: the branch read, Merge off, no note yet', !!(await until(branchRead, HUNG_MS)) && (await primary.isDisabled()) && (await note.count()) === 0 && (await anyway.count()) === 0, await text(merge))
@@ -161,7 +161,7 @@ const f = q.folderHelpers(fx)
     // Its read failing: said, Merge off, Retry reads it again.
     await h.app.evaluate(() => {
       delete process.env.HIVE_TEST_SLOW_IPC
-      process.env.HIVE_TEST_FAIL_IPC = 'queue:branchCard*1'
+      process.env.HIVE_TEST_FAIL_IPC = 'worktrees:branchCards*1'
     })
     await openMerge()
     const failedNote = merge.locator('[data-queue-lookup="failed"]')

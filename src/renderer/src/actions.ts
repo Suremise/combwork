@@ -1505,6 +1505,24 @@ async function removeAllAgents_(path: string): Promise<void> {
 }
 
 /** Removes a worktree agent together with its worktree and branch. */
+/**
+ * Release Slot… (#1441): an agent's adopted worktree (its carried slot) no longer kept for it, asked first. The folder
+ * and its branch stay; Hive lends it to new work once it is clean, and may rename it to a slot's name.
+ */
+export async function releaseCarriedSlot(path: string, agentId: string): Promise<void> {
+  const a = agentOf(project(path), agentId)
+  if (!a?.carriedSlot) return
+  const ok = await confirm({
+    title: tr(msg({ id: 'actions.releaseSlot.title', defaultMessage: "Release {agent}'s slot {slot}?", description: "Title of the question before releasing an agent's ({agent}) slot ({slot}, such as hb2): its own worktree from before 1.0, kept for it as a slot since the upgrade." }), { agent: a.name, slot: a.carriedSlot }),
+    message: tr(msg({ id: 'actions.releaseSlot.message', defaultMessage: '{slot} stops being kept for {agent}. Its folder and branch stay; Hive lends it to new work once it is clean, and may rename its folder to a slot name.', description: "The question before releasing an agent's ({agent}) slot ({slot}): what happens to it after." }), { agent: a.name, slot: a.carriedSlot }),
+    detail: tr(msg({ id: 'actions.releaseSlot.detail', defaultMessage: "{agent}'s conversations there can be resumed while nothing else uses the slot.", description: "Under the question before releasing an agent's ({agent}) slot." }), { agent: a.name }),
+    confirmLabel: tr(msg({ id: 'actions.releaseSlot.confirm', defaultMessage: 'Release', description: "Button: releases the agent's slot." }))
+  })
+  if (!ok) return
+  await attempt(tr(msg({ id: 'actions.releaseSlot.failed', defaultMessage: "Could not release the slot", description: "An error's title: releasing an agent's slot failed." })), () => call('slots:releaseCarried', path, agentId))
+  await refreshWorkspace()
+}
+
 export async function discardAgent(path: string, agentId: string): Promise<void> {
   const p = project(path)
   const a = agentOf(p, agentId)

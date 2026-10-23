@@ -463,6 +463,7 @@ function agentMenu(project: ProjectInfo, a: AgentInfo, pick: () => void, usage?:
     ...sessionItems(project, a.live, usage?.session),
     { label: tr(msg({ id: 'panes.menu.handOver', defaultMessage: 'Hand Over to…', description: "Menu item (an agent's menu): hands its work over to another agent or a new conversation." })), icon: 'arrow-swap', onClick: () => set({ handOverFor: { project: project.path, agentId: a.id } }) },
     ...moveItems(project, a),
+    ...(a.carriedSlot ? [{ label: tr(msg({ id: 'panes.menu.releaseSlot', defaultMessage: 'Release Slot…', description: "Menu item (an agent's menu): its own worktree from before 1.0, kept for it as a slot since the upgrade, stops being kept for it (asks first)." })), icon: 'unlock', detail: a.carriedSlot, onClick: () => void actions.releaseCarriedSlot(project.path, a.id) }] : []),
     { separator: true },
     { label: tr(AGENT_SETTINGS), icon: 'settings', onClick: () => set({ agentSettingsFor: { project: project.path, agentId: a.id } }) },
     ...(a.worktree

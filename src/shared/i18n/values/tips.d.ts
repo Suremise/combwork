@@ -312,6 +312,8 @@ interface HiveMessageValues {
   'tips.resumeAll.title': undefined
   'tips.reviewCopies.text': undefined
   'tips.reviewCopies.title': undefined
+  'tips.reviewerPool.text': undefined
+  'tips.reviewerPool.title': undefined
   'tips.safeguardStops.text': undefined
   'tips.safeguardStops.title': undefined
   'tips.saveTemplate.text': undefined
@@ -342,6 +344,8 @@ interface HiveMessageValues {
   'tips.slotResume.title': undefined
   'tips.slots.text': undefined
   'tips.slots.title': undefined
+  'tips.slotsAdopted.text': undefined
+  'tips.slotsAdopted.title': undefined
   'tips.sortTables.text': undefined
   'tips.sortTables.title': undefined
   'tips.staleMessages.text': undefined

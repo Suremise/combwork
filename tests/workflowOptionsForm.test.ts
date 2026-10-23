@@ -317,6 +317,7 @@ describe("the Version Control tab's Workflow section (#1418)", () => {
     const cases: Record<Contradiction, WorkflowOptions> = {
       selfReview: { ...allOff('git'), review: 'agent', noSelfReview: false },
       quorumNeedsAgent: { ...allOff('git'), reviewers: 2 },
+      poolNeedsAgent: { ...allOff('git'), reviewerMode: 'pool' },
       mergeNeedsSlots: { ...allOff('git'), finish: 'hiveMerges', folder: 'project' },
       committedNeedsFolder: { ...allOff('git'), finish: 'committed', folder: 'slots' },
       okWithReview: { ...allOff('git'), review: 'you', okBefore: { mode: 'every', labels: [] } },

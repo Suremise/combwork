@@ -90,6 +90,7 @@
   "panes.menu.moveLeft": "Nach links verschieben",
   "panes.menu.moveRight": "Nach rechts verschieben",
   "panes.menu.moveUp": "Nach oben verschieben",
+  "panes.menu.releaseSlot": "Slot freigeben…",
   "panes.menu.remove": "Agent entfernen…",
   "panes.menu.reviewChanges": "Änderungen prüfen",
   "panes.messages.cancel": "{n, plural, one {Nachricht zurückziehen} other {Die # Nachrichten zurückziehen}}",

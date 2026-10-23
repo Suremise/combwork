@@ -66,6 +66,11 @@ export function setQueueLive(fn: ((ws: WorkspaceService, project: string, target
 export interface SlotStarts {
   leaseFor: (ws: WorkspaceService, project: string, card: CardRecord, builder: string, o: { dry: boolean; target: string | null }) => Promise<SlotForStart>
   unused: (ws: WorkspaceService, project: string, lease: string) => Promise<void>
+  /**
+   * After #1441's migration: an agent's adopted worktree (its carried slot) while what it is kept for (the lane running at
+   * the upgrade, or its card then in flight) goes on, so those finish where they started (the stand-in path).
+   */
+  standIn?: (ws: WorkspaceService, project: string, agent: string) => Promise<{ path: string; base: string | null } | null>
 }
 let slotStarts: SlotStarts | null = null
 export function setSlotStarts(s: SlotStarts | null): void {
@@ -198,10 +203,10 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
       const moved = (last: string | undefined, now: string): boolean => !!last && !samePlace(last, now)
       return moved(ws.config.lastPath, wsPath) || moved((await ws.projectConfig(project.path)).lastPath, project.path)
     },
-    // An agent's 0.9 worktree is a card's folder (SPEC §16.19.1's stand-in) only until #1441 migrates the project into
-    // slots (agentFolders.ts's legacyWorktree; a carried lease after, #1441's).
+    // An agent's 0.9 worktree is a card's folder (SPEC §16.19.1's stand-in) until #1441 migrates it into a slot
+    // (agentFolders.ts's legacyWorktree); after, its carried slot while the lane or card it is kept for goes on.
     agentFolder: async (agent) => {
-      if (await slotsMigrated(project.path)) return null
+      if (await slotsMigrated(project.path, agent)) return (await slotStarts?.standIn?.(ws, project.path, agent)) ?? null
       const w = legacyWorktree(projectAgents(await ws.projectConfig(project.path)).find((x) => x.id === agent))
       return w ? { path: w.path, base: w.base ?? null } : null
     },

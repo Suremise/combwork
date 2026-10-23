@@ -1243,6 +1243,14 @@
     "defaultMessage": "Reviewers test exactly what was submitted",
     "description": "A tip's title."
   },
+  "tips.reviewerPool.text": {
+    "defaultMessage": "With the workflow option Reviewers set to A shared pool, Start Lane offers the reviewer pool: each card submitted goes to the next free reviewer, oldest first, never to its own builder.",
+    "description": "A tip. Reviewers and A shared pool are a workflow option and its value; Start Lane is a dialog: keep them as Hive shows them. Glossary: reviewer pool, builder."
+  },
+  "tips.reviewerPool.title": {
+    "defaultMessage": "Share reviewers between lanes",
+    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
+  },
   "tips.safeguardStops.text": {
     "defaultMessage": "A shield beside an agent's status means its CLI's safety classifier stopped a response: hover it for when, the model, and the agent's last tool calls before it. Orange means its model changed since, or it waits on you.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1362,6 +1370,14 @@
   "tips.slots.title": {
     "defaultMessage": "Each card on a branch of its own",
     "description": "A tip's title. A slot is a working folder (a worktree) Hive lends to a card or a lane."
+  },
+  "tips.slotsAdopted.text": {
+    "defaultMessage": "Since the upgrade, each builder's own worktree is a slot kept for it until its next card or lane takes it over. Release Slot… in the agent's ⋯ menu gives one up; once free, Hive renames its folder to a slot name, taking its conversations with it.",
+    "description": "A tip. A slot is a working folder (a worktree) Hive lends to a card or a lane. Release Slot… is a menu item: keep it as Hive shows it; ⋯ is the agent's menu button."
+  },
+  "tips.slotsAdopted.title": {
+    "defaultMessage": "Your agents' worktrees are slots now",
+    "description": "A tip's title, after upgrading from Hive 0.9. A slot is a working folder (a worktree) Hive lends to a card or a lane."
   },
   "tips.sortTables.text": {
     "defaultMessage": "Click a column's header in Hive's tables (shortcuts, Performance, Storage, the Overviews) to sort by it, again for the other way. Hive remembers each table's sort and rows per page.",

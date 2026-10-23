@@ -69,6 +69,7 @@ import type {
   MergeSlotInfo,
   LaneInfo,
   LaneStartRequest,
+  LaneStartInfo,
   LaneStartResult,
   ModelPrice,
   MemorySource,
@@ -334,6 +335,8 @@ export interface HiveRequests {
   'queue:list': (projectPath: string, target?: string) => QueueView[]
   /** The project's slots (#1429, SPEC §16.10.1), each with its open lease. */
   'slots:list': (projectPath: string) => SlotView[]
+  /** Ends an agent's carried lease (#1441, Release Slot… in its menu): its adopted worktree stops being its own. Whether it did. */
+  'slots:releaseCarried': (projectPath: string, agentId: string) => boolean
   /** The project's review and check copies (#1435, SPEC §16.10.5), each with its lease not freed. */
   'copies:list': (projectPath: string) => CopyView[]
   /** Test copies only (unpackaged): lend, release, tidy or remove in the project's slot pool, as #1438 and #1447 will. */
@@ -341,7 +344,6 @@ export interface HiveRequests {
   /** A target's queue history (#1357, the Git tab's Merge queue section): its latest 50 outcomes, newest first. */
   'queue:history': (projectPath: string, target: string) => QueueRecent[]
   /** The card an agent's worktree branch is for, when Hive merges it (#1357, the Merge dialog), and where it stands in the queue. */
-  'queue:branchCard': (projectPath: string, agentId: string) => BranchQueueCard | null
   /** The user saw these returned entries of a target's queue (#1356, the Progress panel): they leave its card. */
   'queue:seen': (projectPath: string, target: string, entries: string[]) => void
   /** Pause queue (the user's): the target's queue stops before its next entry; saved. A queue paused already keeps its pause. */
@@ -703,6 +705,8 @@ export interface HiveRequests {
    * fresh conversation with the generated brief. Refused (nothing recorded) while either agent is busy.
    */
   'lanes:start': (projectPath: string, req: LaneStartRequest) => LaneStartResult
+  /** What Start Lane… offers for a project (#1443): the reviewer pool's agents when its rules have G17 a shared pool, else null. */
+  'lanes:startInfo': (projectPath: string) => LaneStartInfo
   /**
    * Cost per card (#602): the cards named, or every card (a project's, by its folder name) held at some time in [from, to)
    * (ms since the epoch).

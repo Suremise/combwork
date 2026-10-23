@@ -101,6 +101,7 @@
   "panes.menu.moveLeft": "Move Left",
   "panes.menu.moveRight": "Move Right",
   "panes.menu.moveUp": "Move Up",
+  "panes.menu.releaseSlot": "Release Slot…",
   "panes.menu.remove": "Remove Agent…",
   "panes.menu.reviewChanges": "Review Changes",
   "panes.messages.cancel": "{n, plural, one {Cancel the Message} other {Cancel the # Messages}}",

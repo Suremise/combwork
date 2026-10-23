@@ -19,7 +19,7 @@
 //   - A completion is kept, one per project, from before it is checked: one seen while the work hasn't finished yet
 //     (the agent marks its last card Done from inside its turn) is considered again as the project's agents go quiet,
 //     until it is told, a lane of the project runs again, or the switch is off.
-//   Off switch: Settings → Notifications, Suggest a fresh start when work finishes, and a project's own (Project
+//   Off switch: Settings → Notifications, Suggest a fresh start, and a project's own (Project
 //   Settings → Sessions).
 
 import { randomUUID } from 'crypto'
@@ -74,7 +74,7 @@ function whyNotNow(ws: WorkspaceService, projectPath: string, project: string, a
   } catch {
     // A board still 0.9's, or none open: no slots.
   }
-  return freshWhy(nowOf(projectPath, agentId), leasesOf({ projectPath, migrated: false, homes: [], slots }, agentId).dispatch)
+  return freshWhy(nowOf(projectPath, agentId), leasesOf({ projectPath, migrated: false, migratedAgents: [], homes: [], slots }, agentId).dispatch)
 }
 
 /**
