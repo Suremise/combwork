@@ -227,6 +227,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.slots.deleteMergedLines.title': undefined
   'settings.advanced.hive.slots.removeIdle.desc': undefined
   'settings.advanced.hive.slots.removeIdle.title': undefined
+  'settings.advanced.hive.slots.renameAdopted.desc': undefined
+  'settings.advanced.hive.slots.renameAdopted.title': undefined
   'settings.advanced.hive.slots.setupMinutes.desc': undefined
   'settings.advanced.hive.slots.setupMinutes.title': undefined
   'settings.advanced.hive.terminal.allKeysToCli.desc': undefined

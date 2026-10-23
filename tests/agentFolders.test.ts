@@ -32,7 +32,7 @@ const slot = (name: string, o: { open?: FolderLease | null; last?: FolderLease |
   last: o.open ? { ...o.open, ended: false } : o.last ? { ...o.last, ended: true } : null,
   writer: o.writer ?? null
 })
-const facts = (slots: FolderSlot[], o: Partial<FolderFacts> = {}): FolderFacts => ({ projectPath: P, migrated: true, homes: [], slots, ...o })
+const facts = (slots: FolderSlot[], o: Partial<FolderFacts> = {}): FolderFacts => ({ projectPath: P, migrated: true, migratedAgents: [], homes: [], slots, ...o })
 const builder: FolderAgent = { id: 'b1', role: 'builder', legacy: null }
 const reviewer: FolderAgent = { id: 'r1', role: 'reviewer', legacy: null }
 const either: FolderAgent = { id: 'e1', role: 'either', legacy: null }
@@ -67,11 +67,13 @@ describe('where a new conversation starts, and where an agent works now', () => 
     expect(launchFolder(after, either, 'build')).toBe(P)
   })
 
-  it('before the migration an agent with a 0.9 worktree keeps working there; after it, its worktree no longer counts', () => {
+  it('until the migration takes it over an agent with a 0.9 worktree keeps working there; after, its worktree no longer counts', () => {
     const legacy: FolderAgent = { id: 'b1', role: 'builder', legacy: { path: 'C:\\ws.worktrees\\project\\hb1', branch: 'hive/hb1' } }
     expect(launchFolder(facts([], { migrated: false }), legacy, 'build')).toBe('C:\\ws.worktrees\\project\\hb1')
     expect(launchFolder(facts([], { migrated: false }), legacy, 'review')).toBe('C:\\ws.worktrees\\project\\hb1')
-    expect(launchFolder(facts([]), legacy, 'build')).toBe(P)
+    expect(launchFolder(facts([], { migratedAgents: ['b1'] }), legacy, 'build')).toBe(P)
+    // Its project migrated, but not this agent (its worktree missing then, or made since): still its worktree.
+    expect(launchFolder(facts([], { migratedAgents: ['b2'] }), legacy, 'build')).toBe('C:\\ws.worktrees\\project\\hb1')
     // A card's slot wins over it even before the migration.
     expect(launchFolder(facts([slot('slot-a', { open: lease('l1', 'slot-a', 'b1') })], { migrated: false }), legacy, 'build')).toBe(slotFolder('slot-a'))
     expect(legacyWorktree({ worktree: { path: 'C:\\x', branch: 'b', base: 'main' } })).toEqual({ path: 'C:\\x', branch: 'b', base: 'main' })

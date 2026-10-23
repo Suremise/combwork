@@ -90,6 +90,7 @@
   "panes.menu.moveLeft": "Przesuń w lewo",
   "panes.menu.moveRight": "Przesuń w prawo",
   "panes.menu.moveUp": "Przesuń w górę",
+  "panes.menu.releaseSlot": "Zwolnij slot…",
   "panes.menu.remove": "Usuń agenta…",
   "panes.menu.reviewChanges": "Przejrzyj zmiany",
   "panes.messages.cancel": "{n, plural, one {Anuluj wiadomość} few {Anuluj # wiadomości} many {Anuluj # wiadomości} other {Anuluj # wiadomości}}",
