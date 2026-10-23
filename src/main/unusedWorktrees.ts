@@ -9,7 +9,6 @@ import { homeListed, lostLines, slotsListed } from '../shared/unusedWorktrees'
 import { folderFacts, legacyWorktree } from './agentFolders'
 import { COPIES_DIR } from './copies'
 import type { SlotKept, SlotPool } from './slots'
-import { poolFor } from './slotsApp'
 import { sessions as liveSessions } from './sessions'
 import { containsPlace, placeKey, realPath } from './fsutil'
 import { git, gitReading } from './git'
@@ -17,7 +16,7 @@ import { gitProblem } from './gitTool'
 import { createLogger, userText } from './logger'
 import { checkProject } from './branchWatch'
 import { mergeInProject, reserveForRemoval } from './projectAgents'
-import { workspace, workspaceOf } from './workspace'
+import { workspace, workspaceOf, type WorkspaceService } from './workspace'
 import * as wt from './worktrees'
 import { FactStore } from './workflow/factStore'
 
@@ -94,6 +93,16 @@ interface Places {
   homes: Map<string, boolean>
 }
 
+/**
+ * A project's slot pool. The app gives its own (slotsApp.ts's `poolFor`, set in index.ts), so this module never loads
+ * the app's wiring (#1519); unset (unit tests), none, and no slot is listed.
+ */
+type PoolSource = (ws: WorkspaceService, projectPath: string) => Promise<SlotPool>
+let poolOf: PoolSource | null = null
+export function setSlotPools(fn: PoolSource | null): void {
+  poolOf = fn
+}
+
 async function placesOf(projectPath: string): Promise<Places> {
   const ws = workspaceOf(projectPath)
   const out: Places = { pool: null, slots: new Map(), copies: ws.path ? join(ws.worktreesRoot, basename(projectPath), COPIES_DIR) : null, homes: new Map() }
@@ -111,9 +120,9 @@ async function placesOf(projectPath: string): Promise<Places> {
   }
   // A slot is never an ordinary unused worktree, even when its pool can't be read: then none is listed.
   for (const s of facts.slots) out.slots.set(key(s.folder), { name: s.name, kind: null })
-  if (!facts.slots.length || !ws.path) return out
+  if (!facts.slots.length || !ws.path || !poolOf) return out
   try {
-    const pool = await poolFor(ws, projectPath)
+    const pool = await poolOf(ws, projectPath)
     const rows = pool.slots()
     const seen = rows.map((s) => {
       const f = facts.slots.find((x) => x.name === s.name)
