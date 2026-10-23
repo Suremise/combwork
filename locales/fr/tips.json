@@ -202,6 +202,8 @@
   "tips.laneGates.title": "Vois pourquoi un couloir n’avance pas",
   "tips.laneNotices.text": "Hive te prévient quand une relecture d’un couloir est refusée, qu’une carte est bloquée ou à l’arrêt, ou que toutes les cartes sont validées et que la fusion peut commencer, avec une notification par couloir. Paramètres → Notifications décide où elles s’affichent.",
   "tips.laneNotices.title": "Suis un couloir, même sans l’Assistant",
+  "tips.laneSlots.text": "Dans le panneau Progression, un couloir nomme son emplacement après ses agents (· slot-b) : survole-le pour la branche construite là et savoir s’il est prêt, ou clique pour ouvrir Branches et dépôts distants.",
+  "tips.laneSlots.title": "Voir où un couloir construit",
   "tips.laneStart.text": "Fais un clic droit sur la colonne À faire et choisis Démarrer un couloir avec ces cartes… : choisis l’auteur et le relecteur, mets les cartes dans l’ordre, et les deux démarrent avec des consignes. Termine ou abandonne un couloir depuis sa ligne dans le panneau Progression.",
   "tips.laneStart.title": "Démarre un couloir toi-même",
   "tips.lanesLegend.text": "Survole la barre Couloirs du panneau Progression pour voir sa légende : chaque couleur est une catégorie, avec ses étapes. Un couloir marqué anciennes règles garde les options du flux de travail avec lesquelles il a démarré jusqu’à sa fin.",

@@ -237,6 +237,8 @@ export function segmentMarks(lane: { frozen: unknown }, b: WorkBadge | undefined
  */
 export function laneWaitText(s: LaneStatus, name: (n: number) => string, tr: Tr): string {
   const card = s.card !== null ? name(s.card) : ''
+  // Its slot being prepared (#1446): not a pause, said with the slot's name.
+  if (s.reason === 'preparing') return tr(msg({ id: 'board.lanes.waitsPreparing', defaultMessage: 'waiting: preparing {slot}', description: "Why a lane waits, in its header in the Progress panel, lower case: Hive is preparing its slot (a working folder it lends to the lane: its setup command or a dependency install before the next card). {slot} is the slot's name, such as slot-b: keep it as it is. The lane isn't paused." }), { slot: s.slot ?? '' })
   return tr(
     msg({
       id: 'board.lanes.waits',

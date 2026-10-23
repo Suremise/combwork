@@ -180,6 +180,7 @@ export const AREAS = [
   // Branches next to their cards (#1424).
   { paths: ['src/shared/branchCards.ts', 'tests/e2e/gitbranchcards.cjs'], suites: ['gitbranchcards'] },
   // The Progress panel's stages, legend, Solo's lanes, links and old rules marks (#1421).
+  { paths: ['tests/e2e/lanesslots.cjs', 'src/renderer/src/components/ProgressLanes.tsx', 'src/renderer/src/laneSource.ts', 'src/shared/laneBar.ts', 'src/shared/lanes.ts', 'src/main/lanes.ts', 'src/main/slotCards.ts', 'src/shared/progressTabs.ts', 'src/renderer/src/components/Progress.tsx'], suites: ['lanesslots'] },
   { paths: ['src/shared/laneStages.ts', 'src/renderer/src/projectStages.ts', 'tests/e2e/lanestages.cjs'], suites: ['lanestages', 'progresslanes'] },
   { paths: ['src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'tests/e2e/lanestart.cjs'], suites: ['agentrole', 'lanestart'] },
   // The shared list's other user: the Assistant's "Done by the Assistant" (#312).

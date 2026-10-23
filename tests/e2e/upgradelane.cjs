@@ -145,8 +145,11 @@ function driver(app, page) {
     check('the upgrade runs', !!(await lib.until(async () => (await ask.count()) === 0 && (await d.page.locator('.toast', { hasText: 'Board upgraded to 1.0' }).count()) === 1, HUNG_MS)))
     const adopted = await lib.until(() => rows("SELECT value FROM board_meta WHERE key = 'adoption'").length === 1, HUNG_MS)
     check('…then the adoption, once', !!adopted)
-    check('c1 (Review): Adopted, and an adopted submission', kinds(n1).join() === 'Adopted,Submitted', kinds(n1).join())
-    check('c2 (Doing): Adopted, with its builder', kinds(n2).join() === 'Adopted' && JSON.parse(rows("SELECT data FROM card_facts WHERE card = ? AND kind = 'Adopted'", n2)[0]?.data ?? '{}').builder === builder.id)
+    // What the adoption wrote, without the target's observations: a reconcile records its first look at the target in
+    // the cycle (TargetMoved from null, #1217) whenever it runs, at times before these are read (#1543).
+    const adoptedKinds = (n) => kinds(n).filter((k) => k !== 'TargetMoved')
+    check('c1 (Review): Adopted, and an adopted submission', adoptedKinds(n1).join() === 'Adopted,Submitted', kinds(n1).join())
+    check('c2 (Doing): Adopted, with its builder', adoptedKinds(n2).join() === 'Adopted' && JSON.parse(rows("SELECT data FROM card_facts WHERE card = ? AND kind = 'Adopted'", n2)[0]?.data ?? '{}').builder === builder.id, kinds(n2).join())
     check('c3 (Todo): no facts, from before 1.0', kinds(n3).length === 0 && rows('SELECT pre_workflow FROM cards WHERE number = ?', n3)[0]?.pre_workflow === 1)
     const cfg = JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8'))
     check('the project has its options as it works today: Git, a reviewer agent, its folder', cfg.platform === 'git' && cfg.workflow?.platform === 'git' && cfg.workflow?.options?.review === 'agent' && cfg.workflow?.options?.folder === 'project', JSON.stringify(cfg.workflow))

@@ -10245,6 +10245,11 @@ button.progress-run-show:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Under a finished run in a copy (#1446): lined up with its title, after its icon. */
+.progress-recent-item > .progress-run-for {
+  margin-top: 0;
+  padding: 0 12px 3px 32px;
+}
 /* A failed check that blocks its card's Review (#1279). */
 .progress-run-blocks {
   margin-top: 2px;
@@ -11213,6 +11218,42 @@ button.progress-run-show:focus-visible {
 }
 .progress-lane-why.paused {
   color: var(--warning);
+}
+/* Why it waits as a link to what it waits for (#1446): the same look, underlined on hover. */
+button.progress-lane-why {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+button.progress-lane-why:hover {
+  text-decoration: underline;
+}
+button.progress-lane-why:focus-visible,
+.progress-lane-slot:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+/* A lane's slot after its pair (#1446): "· slot-b", a link to Branches & remotes. */
+.progress-lane-slot {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.progress-lane-slot:hover {
+  color: var(--info);
+  text-decoration: underline;
+}
+/* A lane's slot and pool reviewers in its hover (#1446), above its cost. */
+.lane-slot-tip,
+.lane-pool-tip {
+  margin-bottom: 6px;
 }
 /* The lanes waiting for your answer, after the Lanes bar's count. */
 .progress-lanes-you {

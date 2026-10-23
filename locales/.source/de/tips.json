@@ -202,6 +202,8 @@
   "tips.laneGates.title": "See why a lane isn’t moving",
   "tips.laneNotices.text": "Hive notifies you when a lane's review fails, a card is blocked or stalls, or every card has passed so its merge is due, one notice per lane. Settings → Notifications decides where they appear.",
   "tips.laneNotices.title": "Hear how a lane goes, without the Assistant",
+  "tips.laneSlots.text": "In the Progress panel, a lane names its slot after its agents (· slot-b): point at it for the branch being built there and whether the slot is ready, or click it for Branches & remotes.",
+  "tips.laneSlots.title": "See where a lane builds",
   "tips.laneStart.text": "Right-click the Todo column and choose Start Lane with These Cards…: pick the builder and the reviewer, put the cards in order, and both start with a brief. End or abandon a lane from its row in the Progress panel.",
   "tips.laneStart.title": "Start a lane yourself",
   "tips.lanesLegend.text": "Hover over the Lanes bar in the Progress panel for its legend: each colour is a category, with the stages in it. A lane marked old rules keeps the workflow options it started with until it ends.",

@@ -2954,6 +2954,13 @@ export interface LaneInfo {
   stages: StageId[] | null
   /** The slot a running lane's builder works in (#1438: its lease's), or null (none yet, or slots don't apply). */
   slot: string | null
+  /** That slot as its row's hover tells it (#1446): its line, ready or being prepared, its lease's start; null with none. */
+  slotInfo?: LaneSlotInfo | null
+  /**
+   * A lane reviewed by the pool (#1443, #1446): who gave its current card's last verdict (and whether it passed), and who
+   * reviews it now, by name; absent for other lanes, or with no current card.
+   */
+  poolReview?: { lastVerdict: { name: string; pass: boolean } | null; reviewing: string | null }
 }
 
 /**
@@ -2963,8 +2970,22 @@ export interface LaneInfo {
  * (#1336): its builder's or reviewer's hooks aren't arriving, so Hive can't tell what it does and types nothing into it.
  * `checkCopy` (#1435): its card's review or isolated check waits for a review or check copy to be free. `slot` (#1438):
  * the lane has no slot yet (every one is lent), so its builder can't start; it pauses the lane until one is free.
+ * `preparing` (#1446): its slot is being prepared (G15's warming: its setup or an install), which doesn't pause it.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing'
+
+/**
+ * A running lane's slot as its row shows it (#1446): its name, whether the lane works in its builder's carried slot (a
+ * 0.9 worktree adopted at the upgrade, #1441) rather than one lent to the lane, the current card's line (its branch
+ * there), whether the slot is ready or being prepared (G15's warming, its setup or install), and when its lease began.
+ */
+export interface LaneSlotInfo {
+  name: string
+  carried: boolean
+  line: string | null
+  state: 'ready' | 'preparing'
+  since: string
+}
 
 /** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */
 export interface LaneStartRequest {
@@ -3004,6 +3025,8 @@ export interface LaneStatus {
   ask?: 'approve' | 'decide' | 'test' | 'signIn' | 'other'
   /** hooks: the agent whose hooks aren't arriving, by name. */
   agent?: string
+  /** preparing (#1446): the slot being prepared. */
+  slot?: string
 }
 
 /**

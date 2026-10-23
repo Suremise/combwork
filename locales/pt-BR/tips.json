@@ -202,6 +202,8 @@
   "tips.laneGates.title": "Veja por que uma raia não avança",
   "tips.laneNotices.text": "O Hive avisa quando a revisão de uma raia é reprovada, um cartão fica bloqueado ou travado, ou todos os cartões tiveram revisão bem-sucedida e é hora do merge, com um aviso por raia. Configurações → Notificações define onde eles aparecem.",
   "tips.laneNotices.title": "Saiba como vai uma raia, sem o Assistente",
+  "tips.laneSlots.text": "No painel Progresso, uma raia mostra seu slot depois dos agentes (· slot-b): passe o ponteiro para ver a branch construída ali e se o slot está pronto, ou clique para abrir Branches e remotes.",
+  "tips.laneSlots.title": "Veja onde uma raia constrói",
   "tips.laneStart.text": "Clique com o botão direito na coluna A fazer e escolha Iniciar raia com estes cartões…: escolha o executor e o revisor, coloque os cartões em ordem e os dois começam com instruções. Encerre ou abandone uma raia pela linha dela no painel Progresso.",
   "tips.laneStart.title": "Inicie uma raia você mesmo",
   "tips.lanesLegend.text": "Passe o mouse sobre a barra Raias no painel Progresso para ver a legenda: cada cor é uma categoria, com as etapas dela. Uma raia marcada com regras antigas mantém as opções do fluxo de trabalho com que começou até terminar.",

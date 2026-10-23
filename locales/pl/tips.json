@@ -202,6 +202,8 @@
   "tips.laneGates.title": "Zobacz, dlaczego tor stoi",
   "tips.laneNotices.text": "Hive powiadamia Cię, gdy recenzja na torze jest niezaliczona, karta zostaje zablokowana lub utknie albo wszystkie karty zaliczyły recenzję i czas na scalenie, jednym powiadomieniem na tor. Gdzie się pojawiają, decyduje Ustawienia → Powiadomienia.",
   "tips.laneNotices.title": "Wiesz, jak idzie tor, także bez Asystenta",
+  "tips.laneSlots.text": "W panelu Postęp tor podaje po swoich agentach swój slot (· slot-b): wskaż go, aby zobaczyć budowaną tam gałąź i czy slot jest gotowy, albo kliknij, aby otworzyć Gałęzie i zdalne repozytoria.",
+  "tips.laneSlots.title": "Zobacz, gdzie tor buduje",
   "tips.laneStart.text": "Kliknij prawym przyciskiem kolumnę Do zrobienia i wybierz Uruchom tor z tymi kartami…: wybierz wykonawcę i recenzenta, ułóż karty po kolei, a obaj zaczną z instrukcją. Zakończ lub porzuć tor z jego wiersza w panelu Postęp.",
   "tips.laneStart.title": "Uruchom tor samodzielnie",
   "tips.lanesLegend.text": "Najedź na pasek Tory w panelu Postęp, aby zobaczyć legendę: każdy kolor to kategoria, z etapami w niej. Tor oznaczony jako stare reguły zachowuje opcje przepływu pracy, z którymi się zaczął, do swojego końca.",

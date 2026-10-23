@@ -56,6 +56,34 @@ const card = (number: number, column: TaskCard['column'], over: Partial<TaskCard
 describe('a lane on slots (#1438)', () => {
   const cards = new Map([[1, card(1, 'done')], [2, card(2, 'todo')], [3, card(3, 'todo')]])
 
+  it("its slot's details for the row's hover (#1446): lent or carried, its line, ready or preparing, waiting while preparing", () => {
+    const info = { name: 'slot-b', carried: false, line: 'hive/HI/HI-2-lane-hover', state: 'ready' as const, since: '2026-10-23T10:00:00.000Z' }
+    const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false, info })
+    expect([v.slot, v.slotInfo, v.status]).toEqual(['slot-b', info, null])
+    // Its builder's carried slot (a 0.9 worktree, #1441): named the same way.
+    const carried = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'hb2', waiting: false, info: { ...info, name: 'hb2', carried: true } })
+    expect([carried.slot, carried.slotInfo?.carried]).toEqual(['hb2', true])
+    // Being prepared (G15's warming): said, never pausing, and nothing more pressing hidden by it.
+    const preparing = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false, info: { ...info, state: 'preparing' } })
+    expect([preparing.status, preparing.state]).toEqual([{ reason: 'preparing', card: 2, slot: 'slot-b' }, 'active'])
+    expect(laneLine(preparing)).toContain('waiting: preparing slot-b')
+    const blocked = laneView(rec(), new Map([[1, card(1, 'done')], [2, card(2, 'doing', { blocked: 'Asked the user' })], [3, card(3, 'todo')]]), undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false, info: { ...info, state: 'preparing' } })
+    expect(blocked.status?.reason).toBe('blocked')
+    // Ended: none.
+    expect(laneView(rec({ state: 'ended', endedAt: '2026-10-09T11:00:00.000Z' }), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false, info }).slotInfo).toBeNull()
+  })
+
+  it("a pool lane's current card (#1446): who gave its last verdict and who reviews it now, by name; other lanes have none", () => {
+    const pool = rec({ reviewer: null, pool: true })
+    const names = new Map([['r1', 'HI-R1'], ['r2', 'HI-R2'], ['b1', 'B1']])
+    const facts = new Map([[2, { stage: 'review' as const, forYou: false, stale: false, rounds: 1, lastVerdict: { reviewer: 'r1', pass: false }, reviewing: 'r2' }]])
+    const live = new Map([[1, card(1, 'done')], [2, card(2, 'review')], [3, card(3, 'todo')]])
+    expect(laneView(pool, live, names, facts).poolReview).toEqual({ lastVerdict: { name: 'HI-R1', pass: false }, reviewing: 'HI-R2' })
+    const waiting = new Map([[2, { ...facts.get(2)!, reviewing: null }]])
+    expect(laneView(pool, live, names, waiting).poolReview).toEqual({ lastVerdict: { name: 'HI-R1', pass: false }, reviewing: null })
+    expect(laneView(rec(), live, names, facts).poolReview).toBeUndefined()
+  })
+
   it("names its slot, and while it has none and waits for one: paused, 'waiting for a slot'; what waits for the user says more", () => {
     const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false })
     expect([v.slot, v.status, v.state]).toEqual(['slot-b', null, 'active'])
