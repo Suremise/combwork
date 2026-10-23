@@ -1,7 +1,7 @@
 // The runners' timings file, which every runner on the machine shares (#1518): a read that fails while another runner
 // renames its new copy into place (ENOENT on Windows, for a moment) is tried again, and timings that can't be read are
 // never written over. Real files; the read's failures injected.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
@@ -54,6 +54,17 @@ describe("the runners' timings (#1518)", () => {
     expect(estimateFor(folder, 'e2e:about')).toBeUndefined()
     recordTiming(folder, 'e2e:about', 1000)
     expect(existsSync(join(folder, 'e2e:about'))).toBe(false)
+  })
+
+  it("every read saying there's no file while the table is there (a replacement under way) never replaces it (HR6's round 1)", () => {
+    recordTiming(file, 'e2e:about', 1000)
+    recordTiming(file, 'e2e:board', 2000)
+    fault.codes = Array(40).fill('ENOENT')
+    recordTiming(file, 'e2e:new', 3000)
+    fault.codes = []
+    expect(Object.keys(kept().runs).sort()).toEqual(['e2e:about', 'e2e:board'])
+    // Nothing left of its new copy beside it.
+    expect(readdirSync(join(dir, `t${n}`))).toEqual(['progress-timings.json'])
   })
 
   it('no file yet is none, and a damaged one starts again', () => {
