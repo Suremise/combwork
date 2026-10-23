@@ -712,10 +712,17 @@ export function setBuilderCount(fn: ((projectPath: string) => number | Promise<n
 export const builderCountOf = (projectPath: string, fallback: () => number | Promise<number>): number | Promise<number> => (builderCount ? builderCount(projectPath) : fallback())
 
 const newToken = (): string => `o-${randomBytes(8).toString('hex')}`
-/** The `hive-*` folders in a folder's `.agents/skills` (where Hive puts its skill copies), by name. */
+/**
+ * The `hive-*` entries in a folder's `.agents/skills` (where Hive puts its skill copies), by name: folders, and links
+ * or anything else with that name too (never followed). None only when the skills folder is proved absent; any other
+ * error reading it throws, so the slot is kept (cantCheck) rather than removed unseen.
+ */
 async function hiveSkillFolders(folder: string): Promise<string[]> {
-  const entries = await readdir(join(folder, '.agents', 'skills'), { withFileTypes: true }).catch(() => [])
-  return entries.filter((e) => e.isDirectory() && e.name.toLowerCase().startsWith('hive-')).map((e) => e.name)
+  const entries = await readdir(join(folder, '.agents', 'skills'), { withFileTypes: true }).catch((e: NodeJS.ErrnoException) => {
+    if (e.code === 'ENOENT') return []
+    throw e
+  })
+  return entries.filter((e) => e.name.toLowerCase().startsWith('hive-')).map((e) => e.name)
 }
 const newJob = (): string => `slot-${randomBytes(6).toString('hex')}`
 

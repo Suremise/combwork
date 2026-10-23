@@ -5,7 +5,7 @@
 // operations that own a slot while it changes (HR1's round 1): two pools on one hive.db as two Hives (each its own
 // connection and holder process), commands held at a gate, a holder that dies, jobs that can't be emptied.
 import { spawn, spawn as nodeSpawn, type ChildProcess } from 'child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { createInterface } from 'readline'
@@ -19,6 +19,18 @@ import { fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, PORT_FLOOR,
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
 import { claimIn, type ClaimRefused } from '../src/main/agentFolders'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { junction } from './pathAliases'
+
+/** A read of one folder refused (#1500's guard: a skills folder that can't be listed), set by a test and cleared after. */
+const fault = vi.hoisted(() => ({ readdir: null as string | null }))
+vi.mock('fs/promises', async (original) => {
+  const fs = await original<typeof import('fs/promises')>()
+  return {
+    ...fs,
+    readdir: ((...a: Parameters<typeof fs.readdir>) =>
+      fault.readdir && String(a[0]).toLowerCase() === fault.readdir.toLowerCase() ? Promise.reject(Object.assign(new Error('refused for the test'), { code: 'EPERM' })) : fs.readdir(...a)) as typeof fs.readdir
+  }
+})
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -550,6 +562,51 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
     expect(await pool.remove('slot-a')).toBeNull()
     expect(existsSync(folder)).toBe(false)
     expect(w.store.slot('slot-a')).toBeNull()
+  })
+
+  it("keeps a slot whose .agents/skills can't be listed (nothing inferred from a failed read), and removes one whose skills folder is gone (#1500)", async () => {
+    const { w, folder } = await freeSlot()
+    writeFileSync(join(w.project, '.git', 'info', 'exclude'), '.agents/\n')
+    const skills = join(folder, '.agents', 'skills')
+    mkdirSync(join(skills, 'hive-edited'), { recursive: true })
+    writeFileSync(join(skills, 'hive-edited', 'SKILL.md'), 'edited')
+    const pool = new SlotPool({ ...w.pool.deps, removeSkillCopies: async () => undefined })
+    fault.readdir = skills
+    try {
+      expect(await pool.remove('slot-a')).toEqual({ why: 'cantCheck', detail: 'refused for the test' })
+    } finally {
+      fault.readdir = null
+    }
+    expect(readFileSync(join(skills, 'hive-edited', 'SKILL.md'), 'utf8')).toBe('edited')
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
+    // The skills folder proved absent: nothing left to keep it.
+    rmSync(join(folder, '.agents'), { recursive: true, force: true })
+    expect(await pool.remove('slot-a')).toBeNull()
+    expect(existsSync(folder)).toBe(false)
+  })
+
+  it('keeps a slot whose .agents/skills holds a hive-* junction or link, never following it (#1500)', async () => {
+    const { w, folder } = await freeSlot()
+    writeFileSync(join(w.project, '.git', 'info', 'exclude'), '.agents/\n')
+    const skills = join(folder, '.agents', 'skills')
+    mkdirSync(skills, { recursive: true })
+    const target = join(tempDir('slots-skill-target-'), 'mine')
+    mkdirSync(target, { recursive: true })
+    writeFileSync(join(target, 'SKILL.md'), 'mine')
+    junction(target, join(skills, 'hive-user'))
+    const pool = new SlotPool({ ...w.pool.deps, removeSkillCopies: async () => undefined })
+    expect(await pool.remove('slot-a')).toEqual({ why: 'editedSkillCopy', copies: ['hive-user'] })
+    expect(existsSync(join(skills, 'hive-user'))).toBe(true)
+    // A symbolic link too, where this machine lets a test make one (Developer Mode or admin).
+    let linked = true
+    try {
+      symlinkSync(target, join(skills, 'hive-linked'), 'dir')
+    } catch {
+      linked = false
+    }
+    if (linked) expect(await pool.remove('slot-a')).toEqual({ why: 'editedSkillCopy', copies: ['hive-linked', 'hive-user'] })
+    expect(readFileSync(join(target, 'SKILL.md'), 'utf8')).toBe('mine')
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'ready', op: null })
   })
 
   it('keeps a slot whose card has a merge queue entry in flight', async () => {
