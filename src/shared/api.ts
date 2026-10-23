@@ -524,6 +524,8 @@ export interface HiveRequests {
 
   /** Adds an agent to the project (up to Agents per project, #562), creating its worktree if asked, or reusing one (#456: `reuse` says how). */
   'agents:add': (projectPath: string, opts: AddAgentOptions) => AddedAgent
+  /** Test copies only (#1451): an agent with a 0.9 worktree of its own, as an upgraded project has (1.0 adds none). */
+  'agents:testLegacy': (projectPath: string, opts: AddAgentOptions) => AgentDef
   /** What more agents would cost (#562): the memory the running agents take now (null: can't be told) and the computer's. */
   'agents:memory': () => { running: { agents: number; bytes: number } | null; total: number; free: number }
   /** Changing provider clears the agent's model, effort and mode, and its session to resume (conversations can't move between providers). */

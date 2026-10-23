@@ -11,14 +11,6 @@
     "defaultMessage": "Choose where to move the agent.",
     "description": "An error: an agent was to be moved in the project's order, with no place given."
   },
-  "worktrees.agent.chooseTree": {
-    "defaultMessage": "Choose a worktree.",
-    "description": "An error: a new agent was to work in an existing worktree, and none was chosen."
-  },
-  "worktrees.agent.detached": {
-    "defaultMessage": "That worktree is not on a branch (detached HEAD).",
-    "description": "An error: the worktree chosen for a new agent has no branch checked out. detached HEAD is git's term."
-  },
   "worktrees.agent.enterName": {
     "defaultMessage": "Enter a name.",
     "description": "An error: an agent's name was emptied."
@@ -31,25 +23,13 @@
     "defaultMessage": "There is already an agent called \"{name}\".",
     "description": "An error: the project already has an agent with the name {name}."
   },
-  "worktrees.agent.noBase": {
-    "defaultMessage": "The project folder is not on a branch. Choose the branch to start from.",
-    "description": "An error: a new agent's worktree needs a branch to start from, and the project folder has none checked out."
-  },
-  "worktrees.agent.noGitForTree": {
-    "defaultMessage": "{problem}, so Hive can't make a worktree.",
-    "description": "An error: a new agent's worktree can't be made because git can't run ({problem} says why)."
-  },
-  "worktrees.agent.noGitToCheck": {
-    "defaultMessage": "{problem}, so Hive can't check that worktree.",
-    "description": "An error: the worktree chosen for a new agent can't be checked because git can't run ({problem} says why)."
-  },
   "worktrees.agent.noTree": {
     "defaultMessage": "This agent works in the project folder, not a worktree.",
     "description": "An error: something only a worktree agent has (its branch's state, a merge) was asked of an agent working in the project folder."
   },
-  "worktrees.agent.notATree": {
-    "defaultMessage": "That folder is not a worktree of this project.",
-    "description": "An error: the folder chosen for a new agent to work in isn't one of the project's git worktrees."
+  "worktrees.agent.notPinned": {
+    "defaultMessage": "Agents aren’t pinned to worktrees in 1.0: slots are lent per card or lane.",
+    "description": "An error: an agent was to be added in a worktree of its own (a new or an existing one), which 1.0 doesn't do: Hive lends a working folder (a slot) to each card or lane instead (glossary 2.5: slot, lane)."
   },
   "worktrees.agent.removing": {
     "defaultMessage": "That worktree is already being removed or merged.",
@@ -74,10 +54,6 @@
   "worktrees.agent.stopToRemove": {
     "defaultMessage": "Stop the agent before removing it.",
     "description": "An error: a running agent can't be removed."
-  },
-  "worktrees.agent.treeRemoved": {
-    "defaultMessage": "That worktree is being removed, or was just removed.",
-    "description": "An error: the worktree a new agent was to work in is being removed, or was removed while it was being added."
   },
   "worktrees.agent.treeShared": {
     "defaultMessage": "another agent works in it",
@@ -227,25 +203,9 @@
     "defaultMessage": "git couldn't read origin/HEAD ({why})",
     "description": "An error: git couldn't read which branch is the remote's main branch (origin/HEAD, git's name: keep it); {why} is git's reason."
   },
-  "worktrees.reuse.beingRemoved": {
-    "defaultMessage": "it is being removed or merged",
-    "description": "Why an unused worktree isn't reused for a new agent: it is being removed or merged right now. A clause, lower case."
-  },
   "worktrees.reuse.cantCheck": {
     "defaultMessage": "git couldn't check it against {base}",
     "description": "Why an unused worktree isn't reused for a new agent: git couldn't check whether it is merged into the branch {base}. A clause, lower case."
-  },
-  "worktrees.reuse.gitBusy": {
-    "defaultMessage": "git is busy in it",
-    "description": "Why an unused worktree isn't reused for a new agent: git is working in it (a lock file). A clause, lower case."
-  },
-  "worktrees.reuse.inUse": {
-    "defaultMessage": "a program is using it",
-    "description": "Why an unused worktree isn't reused for a new agent: a program has it open (Windows won't let it be moved). A clause, lower case."
-  },
-  "worktrees.reuse.movedAside": {
-    "defaultMessage": "Hive moved {folder} aside to check it and couldn't move it back: it is at {aside}.",
-    "description": "An error: to check nothing used an unused worktree, Hive renamed its folder {folder} and couldn't rename it back; it is now at {aside}."
   },
   "worktrees.reuse.notChecked": {
     "defaultMessage": "not checked",
@@ -255,21 +215,9 @@
     "defaultMessage": "{n, plural, one {# commit} other {# commits}} not merged into {base}",
     "description": "Why an unused worktree isn't reused for a new agent: commits on its branch that the branch {base} doesn't have. A clause, lower case; it may be joined with the uncommitted files in a list."
   },
-  "worktrees.reuse.resetFailed": {
-    "defaultMessage": "git couldn't bring it up to {base} ({why})",
-    "description": "Why an unused worktree isn't reused for a new agent: git couldn't move it to the branch {base}; {why} is git's message. A clause, lower case."
-  },
-  "worktrees.reuse.taken": {
-    "defaultMessage": "another agent is taking it",
-    "description": "Why an unused worktree isn't reused for a new agent: another agent being added is taking it. A clause, lower case."
-  },
   "worktrees.reuse.uncommitted": {
     "defaultMessage": "{n, plural, one {# uncommitted file} other {# uncommitted files}}",
     "description": "Why an unused worktree isn't reused for a new agent: files changed in it and not committed. A clause, lower case; it may be joined with the unmerged commits in a list."
-  },
-  "worktrees.reuse.unreadable": {
-    "defaultMessage": "git couldn't read it",
-    "description": "Why an unused worktree isn't reused for a new agent: git couldn't read where its locks are. A clause, lower case."
   },
   "worktrees.statusFailed": {
     "defaultMessage": "git status failed in its folder",

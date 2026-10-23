@@ -1,4 +1,5 @@
 import { app, screen } from 'electron'
+import { legacyWorktree } from './agentFolders'
 import { existsSync } from 'original-fs'
 import { open, readdir } from 'original-fs/promises'
 import { homedir, release, version as osVersion } from 'os'
@@ -118,7 +119,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     '### Counts',
     '',
     `- Windows: ${windows.length}; projects: ${projects.filter((p) => p.active).length} active of ${projects.length}`,
-    `- Agents: ${agents.length}, ${agents.filter((a) => a.live).length} running, ${agents.filter((a) => a.worktree).length} in worktrees`,
+    `- Agents: ${agents.length}, ${agents.filter((a) => a.live).length} running, ${agents.filter((a) => a.live?.slot).length} in slots`,
     `- Hive Assistant: ${assistants.some((a) => a.agents.some((x) => x.live)) ? 'running' : 'not running'}`,
     '',
     '### Guidance',
@@ -158,11 +159,12 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
   const ctx: RedactContext = {
     home: homedir(),
     app: app.isPackaged ? undefined : app.getAppPath(),
-    folders: [...workspaces.map((w) => w.path), ...agents.flatMap((a) => (a.worktree ? [a.worktree.path] : [])), ...earlier.folders],
+    // Where agents work (#1451): their running sessions' folders (a slot, a retired home), and a 0.9 worktree not migrated yet.
+    folders: [...workspaces.map((w) => w.path), ...agents.flatMap((a) => [...(a.live?.cwd ? [a.live.cwd] : []), ...(legacyWorktree(a) ? [legacyWorktree(a)!.path] : [])]), ...earlier.folders],
     names: [
       ...workspaces.map((w) => ({ name: w.name, as: '<workspace>' })),
       ...projects.map((p) => ({ name: p.name, as: '<project>' })),
-      ...agents.flatMap((a) => [{ name: a.name, as: '<agent>' }, { name: a.id, as: '<agent>' }, ...(a.worktree ? [{ name: a.worktree.branch, as: '<branch>' }] : [])]),
+      ...agents.flatMap((a) => [{ name: a.name, as: '<agent>' }, { name: a.id, as: '<agent>' }, ...(legacyWorktree(a) ? [{ name: legacyWorktree(a)!.branch, as: '<branch>' }] : [])]),
       ...earlier.names.map((name) => ({ name, as: '<name>' }))
     ]
   }
