@@ -481,7 +481,10 @@ describe('drags run the intents they stand for (#1290)', () => {
       writeFileSync(join(wt, 'b.txt'), 'b\n')
       git(wt, 'add', '-A')
       git(wt, 'commit', '-qm', 'b')
-      expect(await move(w, card, 'review')).toMatchObject({ moved: { column: 'review' } })
+      const r = await move(w, card, 'review')
+      // A refusal once said "no change to review" under load (#1460): what the submit had to go on, should it again.
+      const seen = () => JSON.stringify({ via, started: facts(w, card).filter((f) => f.kind === 'Started').map((f) => f.data), kinds: kinds(w, card), head: git(wt, 'rev-parse', 'HEAD'), line: git(wt, 'branch', '--show-current'), main: git(repo, 'rev-parse', 'main'), log: git(wt, 'log', '--oneline', '-3'), status: git(wt, 'status', '--porcelain') })
+      expect(r, 'moved' in r ? '' : seen()).toMatchObject({ moved: { column: 'review' } })
     }
   })
 
