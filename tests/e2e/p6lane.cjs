@@ -158,12 +158,28 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     const seg = (n) => panel.locator(`.lane-seg[data-card="${n}"]`).first()
     const tips = () => page.locator('.tip')
     const tipText = async () => ((await tips().first().innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
-    /** Hovers `target` until its tooltip shows `want` (a tooltip shows after its delay). */
+    /**
+     * Hovers `target` until its tooltip shows `want` (a tooltip shows after its delay; `want` may read the tooltip's parts
+     * too). A tooltip closed by the panel drawing again (the queue moving on) is hovered for again.
+     */
     const hover = async (target, want) => {
-      await page.mouse.move(5, 5)
-      await waitHung(async () => (await tips().count()) === 0)
-      await target.hover()
-      return waitHung(async () => want(await tipText()))
+      const enter = async () => {
+        await page.mouse.move(5, 5)
+        await waitHung(async () => (await tips().count()) === 0)
+        await target.hover()
+      }
+      await enter()
+      let seen = false
+      return waitHung(async () => {
+        const shown = (await tips().count()) > 0
+        if (seen && !shown) {
+          seen = false
+          await enter()
+          return false
+        }
+        seen = shown
+        return shown && (await want(await tipText()))
+      })
     }
     const laneNow = async (id) => (await inv('lanes:list')).find((l) => l.id === id)
     const integrated = async (n) => (await factsOf(n, 'Integrated')).at(-1)
@@ -340,13 +356,13 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     const early = await q.intent(h, b2, dep, 'start')
     check('G14 (S12): a card blocked by One, approved and unmerged, is refused its start', early.status === 409 && early.body?.rule === 'start.dependenciesIntegrated', JSON.stringify(early.body))
     await showTab('pulse')
-    const mergingHover = () => hover(seg(c1), (t) => t.includes('Merging') && t.includes('Approved'))
-    check("Pulse: One's hover says Approved | Merging, its own (Merging) marked", !!(await mergingHover()) && (await page.locator('.tip .lane-seg-stage.own').innerText().catch(() => '')) === 'Merging' && (await page.locator('.tip .lane-stage-divider').count()) === 1, await tipText())
+    const mergingHover = () => hover(seg(c1), async (t) => t.includes('Merging') && t.includes('Approved') && (await page.locator('.tip .lane-seg-stage.own').innerText().catch(() => '')) === 'Merging' && (await page.locator('.tip .lane-stage-divider').count()) === 1)
+    check("Pulse: One's hover says Approved | Merging, its own (Merging) marked", !!(await mergingHover()), await tipText())
     await shoot('4-pulse-merging', { show: () => hover(seg(c1), (t) => t.length > 0 && !!t.match(/One/)) })
     // The legend on the Lanes bar's hover.
     const bar = panel.locator('.progress-lanes-bar')
     const legendRow = (c) => page.locator(`.tip .lanes-legend-row[data-category="${c}"]`)
-    check('the legend: Approved with Approved and Merging', !!(await hover(bar, (t) => t.includes('Each colour is a category'))) && JSON.stringify(await legendRow('passed').locator('.lanes-legend-stage').allInnerTexts()) === '["Approved","Merging"]', await tipText())
+    check('the legend: Approved with Approved and Merging', !!(await hover(bar, async (t) => t.includes('Each colour is a category') && JSON.stringify(await legendRow('passed').locator('.lanes-legend-stage').allInnerTexts()) === '["Approved","Merging"]')), await tipText())
     await shoot('5-legend', { show: () => hover(bar, () => true).then(() => waitHung(async () => (await page.locator('.tip .lanes-legend').count()) === 1)) })
 
     // --- Merged: Done; the branch's card says merged.
