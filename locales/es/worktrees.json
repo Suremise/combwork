@@ -1,5 +1,6 @@
 {
   "worktrees.agent.badPlacement": "Los paneles no se pueden colocar así en este diseño.",
+  "worktrees.agent.badWorkflowRole": "Un rol en el flujo de trabajo es builder, reviewer o either.",
   "worktrees.agent.chooseMove": "Elige adónde mover el agente.",
   "worktrees.agent.chooseTree": "Elige un worktree.",
   "worktrees.agent.detached": "Ese worktree no está en ninguna rama (HEAD desacoplado).",

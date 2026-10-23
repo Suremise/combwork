@@ -675,6 +675,14 @@
     "defaultMessage": "in {value}",
     "description": "The agent's project in a line of text (screen readers, a dialog's copy): {value} is its name (\"in hive\"). Lower case."
   },
+  "panes.table.role": {
+    "defaultMessage": "Role",
+    "description": "An agents table's column heading: the agent's role in the workflow (Builder, Reviewer, Either). Glossary: workflow role."
+  },
+  "panes.table.rolePrefix": {
+    "defaultMessage": "role {value}",
+    "description": "The agent's role in the workflow in a line of text (screen readers): {value} is its name (\"Reviewer\"). Lower case."
+  },
   "panes.table.state": {
     "defaultMessage": "State",
     "description": "An agents table's column heading: what the agent is doing."

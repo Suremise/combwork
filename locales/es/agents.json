@@ -308,9 +308,9 @@
   "agents.resume.sub": "Es un {kind} de {cli} que se ejecutó para otra sesión, no una conversación propia: no se puede reanudar.",
   "agents.session.unnamed": "Sesión {id}",
   "agents.settings.appliesNext": "Los cambios se aplican la próxima vez que se inicie el agente {agent}; hasta entonces, la sesión en ejecución mantiene su configuración.",
+  "agents.settings.note": "Nota",
+  "agents.settings.noteNone": "Opcional: para qué sirve, con tus palabras",
   "agents.settings.ownWorktree": "Su propio worktree",
-  "agents.settings.role": "Rol",
-  "agents.settings.roleNone": "Ninguno (su nombre: {name})",
   "agents.settings.save": "Guardar",
   "agents.settings.saving": "Guardando…",
   "agents.settings.stopToChange": "— detén el agente {agent} para cambiarlo",
@@ -329,5 +329,12 @@
   "agents.tested.older": "Es anterior a la probada; considera actualizar.",
   "agents.tested.summary": "Versión probada: {tested} · instalada: {installed}",
   "agents.tested.summaryUnknown": "Versión probada: {tested} · instalada: desconocida",
-  "agents.tested.unknown": "Hive no pudo saber qué versión está instalada, así que no puede compararla con la probada."
+  "agents.tested.unknown": "Hive no pudo saber qué versión está instalada, así que no puede compararla con la probada.",
+  "agents.workflowRole.builder": "Autor",
+  "agents.workflowRole.builderText": "Trabaja en las tarjetas y las envía a Revisión.",
+  "agents.workflowRole.either": "Ambos",
+  "agents.workflowRole.eitherText": "Trabaja o revisa, pero nunca revisa su propio trabajo.",
+  "agents.workflowRole.label": "Rol en el flujo de trabajo",
+  "agents.workflowRole.reviewer": "Revisor",
+  "agents.workflowRole.reviewerText": "Revisa las tarjetas de los autores y las da por superadas o no superadas."
 }

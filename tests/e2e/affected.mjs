@@ -176,7 +176,7 @@ export const AREAS = [
   { paths: ['src/shared/branchCards.ts', 'tests/e2e/gitbranchcards.cjs'], suites: ['gitbranchcards'] },
   // The Progress panel's stages, legend, Solo's lanes, links and old rules marks (#1421).
   { paths: ['src/shared/laneStages.ts', 'src/renderer/src/projectStages.ts', 'tests/e2e/lanestages.cjs'], suites: ['lanestages', 'progresslanes'] },
-  { paths: ['src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'tests/e2e/lanestart.cjs'], suites: ['lanestart'] },
+  { paths: ['src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'tests/e2e/lanestart.cjs'], suites: ['agentrole', 'lanestart'] },
   // The shared list's other user: the Assistant's "Done by the Assistant" (#312).
   { paths: ['src/renderer/src/components/ShowAllList.tsx'], suites: ['assistantpanel', 'assistantundo'] },
   { paths: ['src/main/progressReporters/'], suites: ['progressreport', 'progressstates', 'packaged-progress'] },
@@ -202,6 +202,8 @@ export const AREAS = [
   { paths: ['tests/e2e/p6lane.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/presetStep.ts', 'src/renderer/src/components/PresetStep.tsx', 'src/main/workflow/platformSwitch.ts', 'src/renderer/src/boardStages.ts', 'src/main/laneStart.ts', 'src/main/workflow/optionsForm.ts'], suites: ['p6lane'] },
   { paths: ['tests/e2e/p5scenarios.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueChecks.ts', 'src/main/workflow/queueChecksApp.ts', 'src/shared/progressQueue.ts'], suites: ['p5scenarios'] },
   { paths: ['tests/e2e/queuelease.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueHost.ts'], suites: ['queuelease'] },
+  { paths: ['tests/e2e/isolatedcheck.cjs', 'src/main/copies.ts', 'src/main/copiesApp.ts', 'src/main/workflow/launcher.ts', 'src/main/progressReporters/wrapper.ts', 'src/main/progressReporters/report.mts', 'src/main/workflow/runLink.ts', 'src/main/workflow/runChecks.ts'], suites: ['isolatedcheck', 'progressreport'] },
+  { paths: ['tests/e2e/slotpool.cjs', 'src/main/slots.ts', 'src/main/slotsApp.ts', 'src/main/slotJobs.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts'], suites: ['slotpool'] },
   { paths: ['tests/e2e/p4lane.cjs','src/main/workflow/lineUpdates.ts', 'src/main/workflow/runtime.ts', 'src/main/cardIntents.ts', 'src/main/laneStart.ts', 'src/main/workflow/optionsForm.ts'], suites: ['p4lane'] },
   // The workspace database's small stores (#1018): lanes, card watches and deliveries.
   { paths: ['src/main/storeRows.ts'], suites: ['progresslanes', 'cardloop', 'deliveries', 'agentmessage', 'inbox', 'lanewatch', 'agentwatch', 'loopwatch', 'watchrelease', 'unexpectedclose'] },
@@ -269,7 +271,8 @@ export const AREAS = [
   { paths: ['src/main/tray.ts', 'src/renderer/src/chime.ts', 'src/shared/bursts.ts'], suites: ['bursts', 'bell', 'banners'] },
   { paths: ['src/main/notices.ts', 'src/renderer/src/components/NoticeBanners.tsx', 'src/main/planUsage.ts'], suites: ['banners'] },
   { paths: ['src/main/updater.ts', 'src/renderer/src/components/Updates.tsx'], suites: ['update', 'about'] },
-  { paths: ['src/renderer/src/components/AgentDialogs.tsx', 'src/renderer/src/components/PermissionMode.tsx'], suites: ['agents-ui', 'agents', 'mode', 'context', 'codex-handover', 'footerfit', 'dialogs', 'wtreuse', 'mcpagents'] },
+  { paths: ['src/shared/workflow/roles.ts', 'tests/e2e/agentrole.cjs'], suites: ['agentrole', 'agentstable', 'lanestart'] },
+  { paths: ['src/renderer/src/components/AgentDialogs.tsx', 'src/renderer/src/components/PermissionMode.tsx'], suites: ['agentrole', 'agents-ui', 'agents', 'mode', 'context', 'codex-handover', 'footerfit', 'dialogs', 'wtreuse', 'mcpagents'] },
   { paths: ['src/renderer/src/components/AgentPanes.tsx'], suites: ['paneheader', 'pages', 'reorder', 'unmerged', 'sessionname', 'ctxpercent', 'footerfit', 'longsession', 'startfail', 'cardchip', 'agents-ui', 'unpricedcost', 'swap', 'templates', 'narrowmain', 'placement'] },
   { paths: ['src/shared/paneCells.ts'], suites: ['placement', 'swap', 'reorder', 'pages', 'agents'] },
   { paths: ['src/renderer/src/pendingMoves.ts'], suites: ['placement', 'tilesview', 'reorder', 'swap'] },
@@ -297,7 +300,7 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/AgentTiles.tsx', 'src/shared/tiles.ts', 'src/renderer/src/views/ProjectView.tsx', 'src/renderer/src/commands.ts'], suites: ['tilesview'] },
   // The agent-state marks (#973).
   { paths: ['src/renderer/src/components/StateMark.tsx', 'src/shared/agentState.ts'], suites: ['statemarks', 'contrast'] },
-  { paths: ['src/renderer/src/components/AgentsTable.tsx', 'src/shared/agentTable.ts'], suites: ['agentstable', 'cardchip'] },
+  { paths: ['src/renderer/src/components/AgentsTable.tsx', 'src/shared/agentTable.ts'], suites: ['agentrole', 'agentstable', 'cardchip'] },
   { paths: ['src/renderer/src/components/Tips.tsx', 'src/renderer/src/tips.ts', 'src/shared/tips.ts', 'src/shared/corner.ts', 'docs/USER_GUIDE.md'], suites: ['tips', 'tipcorner'] },
   { paths: ['src/renderer/src/tips.ts', 'src/shared/tips.ts'], suites: ['tipwindows'] },
   { paths: ['src/renderer/src/startupReplay.ts'], suites: ['tips', 'tipwindows', 'skillprefs', 'sessiontree'] },

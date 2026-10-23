@@ -3,6 +3,9 @@ import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestio
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
   ArchiveBatch,
+  CopyView,
+  SlotTestOp,
+  SlotView,
   BoardState,
   SetAsideCard,
   ArchiveRequest,
@@ -322,6 +325,12 @@ export interface HiveRequests {
    * show). Each change comes as a `queue-changed` event.
    */
   'queue:list': (projectPath: string, target?: string) => QueueView[]
+  /** The project's slots (#1429, SPEC §16.10.1), each with its open lease. */
+  'slots:list': (projectPath: string) => SlotView[]
+  /** The project's review and check copies (#1435, SPEC §16.10.5), each with its lease not freed. */
+  'copies:list': (projectPath: string) => CopyView[]
+  /** Test copies only (unpackaged): lend, release, tidy or remove in the project's slot pool, as #1438 and #1447 will. */
+  'slots:test': (projectPath: string, op: SlotTestOp) => unknown
   /** A target's queue history (#1357, the Git tab's Merge queue section): its latest 50 outcomes, newest first. */
   'queue:history': (projectPath: string, target: string) => QueueRecent[]
   /** The card an agent's worktree branch is for, when Hive merges it (#1357, the Merge dialog), and where it stands in the queue. */
@@ -689,6 +698,8 @@ export interface HiveRequests {
   'progress:snapshot': () => ProgressSnapshot
   /** Moves a finished or stale run to Recent. */
   'progress:dismiss': (id: string) => void
+  /** Stop for an isolated check (#1435): its check copy's job ended, so its command and all it started end. Whether it was one. */
+  'progress:stop': (id: string) => boolean
   /** The user looked at the Progress panel: the taskbar stops showing a failure in red. */
   'progress:seen': () => void
   /** Opens the log a run reported (a text log or report, in its default app); an error says why it can't. */

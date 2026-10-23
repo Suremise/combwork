@@ -168,6 +168,8 @@
   "panes.table.notRunning": "Parado",
   "panes.table.project": "Projeto",
   "panes.table.projectPrefix": "no projeto {value}",
+  "panes.table.role": "Papel",
+  "panes.table.rolePrefix": "papel {value}",
   "panes.table.state": "Estado",
   "panes.table.waiting": "Aguardando",
   "panes.table.waitingFor": "Aguardando {what}",

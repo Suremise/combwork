@@ -3,6 +3,10 @@
     "defaultMessage": "The panes can't be placed like that in this layout.",
     "description": "An error: saving where the user put the agents' panes in a layout (dragging a pane to another cell) was given a layout or places Hive doesn't know."
   },
+  "worktrees.agent.badWorkflowRole": {
+    "defaultMessage": "A role in the workflow is builder, reviewer or either.",
+    "description": "An error: an agent's role in the workflow was given as something else. builder, reviewer and either are values: keep them in English."
+  },
   "worktrees.agent.chooseMove": {
     "defaultMessage": "Choose where to move the agent.",
     "description": "An error: an agent was to be moved in the project's order, with no place given."

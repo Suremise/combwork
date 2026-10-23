@@ -10,6 +10,7 @@ import { updateAgent } from './projectAgents'
 import { sessions } from './sessions'
 import { applySetting, entryOf, removedPrices } from './settingsTools'
 import * as tasks from './tasks'
+import { isWorkflowRole } from '../shared/workflow/roles'
 import { inWorkspace, workspaceOf, type WorkspaceService } from './workspace'
 
 /**
@@ -341,6 +342,7 @@ function agentPatch(back: readonly FieldChange[]): AgentPatch {
     const old = v.old as Value
     if (v.field === 'use200kContext') p.use200kContext = typeof old === 'boolean' ? old : null
     else if (v.field === 'mcpServers') p.mcpServers = Array.isArray(old) ? (old as string[]) : null
+    else if (v.field === 'workflowRole') p.workflowRole = isWorkflowRole(old) ? old : null
     else if (v.field === 'name' || v.field === 'model' || v.field === 'effort' || v.field === 'permissionMode') (p as Record<string, unknown>)[v.field] = old ?? ''
   }
   return p

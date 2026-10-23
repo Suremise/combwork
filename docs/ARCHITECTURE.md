@@ -358,7 +358,8 @@ runner's worktree while an entry, an unfinished advance or an in-flight card's r
 | Options and rulesets | `src/shared/workflow/options.ts` (option defs, presets, contradictions), `pieces.ts` (guard and action ids, params, required capabilities), `compile.ts` (options → ruleset, hashed) | `src/main/workflow/rulesets.ts` (stored rulesets, resolution global → workspace → project) |
 | Runtime | `src/shared/workflow/refusals.ts` (refusal messages: `msg()` ids shared by the Agent API's English and the window) | `src/main/workflow/service.ts` (one runtime per project of an open workspace, #1263), `runtime.ts` (evaluate a move: load facts and ruleset, run guards, then actions, in one `boardWrite`), `reconcile.ts`, `intents.ts` (the Agent API routes' handlers) |
 | Merge queue | — | `src/main/workflow/mergeQueue.ts` (per target; replaces `mergeSlots.ts`' role for cards), `queueRunner.ts` (the target's runner, below), `queueJobs.ts` (its job object and launcher), `queueProcs.ts` (process identity by pid and start time), `repoLock.ts` (cross-process lock in the common git dir, shared with `gitRepo.ts`) |
-| Slots | `src/shared/slots.ts` | `src/main/slots.ts` (pool, lending, warming runs, guarded clean-up; takes over `agentWorktree.ts`), `reviewCopies.ts` |
+| Slots | `src/shared/slots.ts` | `src/main/slots.ts` (the pool: `slots` and `slot_leases` rows, lending, warming, guarded clean-up; #1429), `slotsApp.ts` (a pool per open project on the board, warming runs on the process supervisor, the hourly tidy), `slotJobs.ts` (settling a slot command's job: #1360's sealed-journal protocol), `copies.ts` and `copiesApp.ts` (review
+and check copies: leases at a revision, the quiescence barrier, isolated checks' jobs; #1435), `reviewCopies.ts` |
 | Undo | `src/shared/assistantUndo.ts` (grouping) | `src/main/assistantUndo.ts` (replays the Assistant's facts backwards, skips "changed since") |
 
 **The one path.** An intent (Agent API route or hive tool) or a user move (IPC) calls `runtime.move(card, request,
@@ -589,6 +590,26 @@ Resume All skips the rest. `AgentDef` loses `worktree`. Review copies are detach
 leased to one reviewer for one submission; reviewers' sessions live in the project folder, and their launch grants
 the review-copy pool's folder through the provider adapter (`extraDirs`: `--add-dir`, Codex's writable roots by `-c`),
 never the CLI's config.
+
+**Slots, built [#1429].** `SlotStore` keeps a project's slots and leases (keyed by the project's id, so a rename
+keeps them) and `SlotPool` lends them. One write takes a slot (the builder's last, else the most recently used ready
+one, else a new name reserved while the pool is under its size: the builders, at most the agent cap) and inserts the
+lease; partial unique indexes allow one open lease per slot and one dispatch and one carried lease per agent, so a
+second Hive racing for the slot is refused by SQLite whatever its code does. Whatever changes a slot outside one write
+is an **operation** (`op` on the slot's row: a token, its kind, the lease it warms for, its holder's pid and start):
+started in the write that reserves the slot, every later write fenced on the token (`SlotStore.fenced`, `OpLost`), and
+taken over by another Hive only once the holder process is gone, after its job is settled (a warming then failed, a
+removal looked at again). Warming (a free slot looked at again, a new slot's detached worktree, its copied files and
+setup; an install when its lock files' hash changed) is one, as one of Hive's runs ("Hive (slot slot-b)",
+`ProgressRun.slot`) in a job recorded on the slot (`job`) before it starts, on the shared process supervisor
+(`queueJobs.ts`' launcher), cleared only once its processes are seen ended (`slotsApp.ts` fails closed without a
+supervisor). `remove` is the only way a slot goes: an operation that takes the slot out of the pool first
+(`removing`, in a write that sees it free), then checks every guard (a session there, a queue entry in flight for
+a card it held, a process in it, proved by renaming its folder aside and back, dirty files, a head the target doesn't
+contain by §16.3.2's containment), runs the archive command, checks again, checks in a fenced write that it still
+holds the slot, and lets git remove the worktree, never forced. `tidy` (hourly, Settings → Advanced, `hive.slots.removeIdle`) removes failed slots and idle ready ones beyond
+the pool's size. Where an agent works because of a lease is #1434's `agentFolders.ts`; lending for a card's start is
+#1438's.
 
 **Storage (P3's one migration, #1025, designed in #1208).** The DDL is `src/main/schema/v1_0.ts`: five steps, registered
 in `BOARD_MIGRATIONS` in this order by their cards, each taking the next version number when it merges, and run by

@@ -611,6 +611,22 @@
     "defaultMessage": "Developer console: show prompt, reply and command text",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.copies.quietWaitMinutes.desc": {
+    "defaultMessage": "A returned review or check copy is used again only once nothing is running in it: no run, no process its check started, its reviewer idle. Past this many minutes, a check waiting for a copy says which copy is still in use and by what. Hive never resets a copy something is still running in.",
+    "description": "What the advanced setting \"Copies: wait for one to be free\" does (Settings → Advanced, under Hive)."
+  },
+  "settings.advanced.hive.copies.quietWaitMinutes.title": {
+    "defaultMessage": "Copies: wait for one to be free",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"10 min\"). A copy is a folder Hive keeps at one revision for a review or an isolated check."
+  },
+  "settings.advanced.hive.copies.review.desc": {
+    "defaultMessage": "A reviewer reads a card's work, and runs its commands, in a review copy: a folder at exactly the revision under review, which nothing else writes, so what it checks is what was submitted. Turned off, reviewers read the builder's folder as before. Isolated checks (hive-progress --check with --isolated) use the same copies either way.",
+    "description": "What the advanced setting \"Reviewers review in review copies\" does (Settings → Advanced, under Hive). hive-progress --check and --isolated are a command and its options: keep them as they are."
+  },
+  "settings.advanced.hive.copies.review.title": {
+    "defaultMessage": "Reviewers review in review copies",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. A review copy is a folder Hive keeps at the exact revision a reviewer reviews, which nothing else writes."
+  },
   "settings.advanced.hive.disableHardwareAcceleration.desc": {
     "defaultMessage": "Draw Hive without the graphics card, for a graphics driver that leaves Hive's window blank, flickering or crashing. Terminals then draw without WebGL. Takes effect when Hive restarts; to start once without it, run Hive with --disable-gpu.",
     "description": "What the advanced setting \"Disable hardware acceleration\" is for, and what goes wrong when it is wrong (Settings → Advanced). --disable-gpu is a command-line option: keep it."
@@ -834,6 +850,22 @@
   "settings.advanced.hive.showDeveloperFeatures.title": {
     "defaultMessage": "Show developer features",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.slots.removeIdle.desc": {
+    "defaultMessage": "A project keeps as many slots as it has builders. A free slot beyond that, unused for a day, is removed: its archive command runs first, and it is kept if that fails. Hive never removes one with an agent or a process in it, a lease, a merge in flight, or work that isn't committed and merged. Turned off, idle slots stay until you remove them.",
+    "description": "What the advanced setting \"Remove idle slots after a day\" does (Settings → Advanced, under Hive). A slot is a worktree Hive lends to a card or a lane; a lease is one loan of it."
+  },
+  "settings.advanced.hive.slots.removeIdle.title": {
+    "defaultMessage": "Remove idle slots after a day",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. A slot is a worktree Hive lends to a card or a lane and gets back when it ends; free ones are kept ready."
+  },
+  "settings.advanced.hive.slots.setupMinutes.desc": {
+    "defaultMessage": "How long Hive lets a slot's setup command, a dependency install or its archive command run before it ends it. A slot whose setup was ended this way isn't lent until it is set up again; an archive command ended so keeps its slot.",
+    "description": "What the advanced setting \"Slots: longest a setup command runs\" does (Settings → Advanced, under Hive). A slot is a worktree Hive lends to a card or a lane."
+  },
+  "settings.advanced.hive.slots.setupMinutes.title": {
+    "defaultMessage": "Slots: longest a setup command runs",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"60 min\"). A slot is a worktree Hive lends to a card or a lane."
   },
   "settings.advanced.hive.terminal.allKeysToCli.desc": {
     "defaultMessage": "In an agent's pane, Hive's own shortcuts (Settings → Keyboard Shortcuts) take their keys, apart from those the CLI uses itself. Turned on, every key goes to the CLI, except the command palette's shortcut (Show All Commands), which stays Hive's so every command is still in reach. Ctrl+C and Ctrl+V have their own setting.",

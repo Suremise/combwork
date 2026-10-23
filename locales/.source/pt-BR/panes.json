@@ -184,6 +184,8 @@
   "panes.table.notRunning": "Not running",
   "panes.table.project": "Project",
   "panes.table.projectPrefix": "in {value}",
+  "panes.table.role": "Role",
+  "panes.table.rolePrefix": "role {value}",
   "panes.table.state": "State",
   "panes.table.waiting": "Waiting for",
   "panes.table.waitingFor": "Waiting for {what}",

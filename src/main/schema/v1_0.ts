@@ -797,8 +797,134 @@ export const QUEUE_SEEN_STEP: SchemaStep = {
   ]
 }
 
-/** The 1.0 group's steps (P3's, then P4's, then P5's), in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP]
+/**
+ * A project's slots and their leases (#1429, SPEC §16.10.1–16.10.2; slots.ts): the worktrees Hive lends to a card or a
+ * lane, and each loan of one. At most one open lease per slot, one open dispatch lease (`card`, `lane`: where the agent
+ * builds now) and one open carried lease (#1441's migrated worktree) per agent: partial unique indexes, so a second one
+ * fails in SQLite whichever Hive or process writes it, not only in code.
+ */
+export const SLOTS_STEP: SchemaStep = {
+  name: 'slots',
+  ddl: [
+    // A slot: its generic name (`slot-a`…, or a migrated worktree's own), folder, state, its port block (HIVE_SLOT_PORT_BASE,
+    // unique in the project), the branch it was made from, and its last install's revision and lock files' hash. A setup
+    // or install that failed leaves `warm_error` (its exit, in English) and `warm_log` (the run's log): lending skips it.
+    `CREATE TABLE slots (
+      project    TEXT    NOT NULL COLLATE NOCASE,
+      name       TEXT    NOT NULL COLLATE NOCASE,
+      folder     TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+      state      TEXT    NOT NULL CHECK (state IN ('creating', 'ready', 'lent', 'dirty', 'gone', 'removing')),
+      port_base  INTEGER NOT NULL,
+      target     TEXT,
+      install_rev  TEXT,
+      install_hash TEXT,
+      warm_error TEXT,
+      warm_log   TEXT,
+      created_at TEXT    NOT NULL,
+      used_at    TEXT    NOT NULL,
+      -- The operation that owns the slot while it changes outside one write (warming for a lease, removal): its token,
+      -- which every write it makes checks, and its holder process (pid and start, Unix ms), taken over only once that
+      -- process is gone. 'job' is a command's job on the process supervisor, recorded before it starts and cleared only
+      -- once its processes are seen ended: while it is set (an operation's or one left by a crash) the slot isn't lent.
+      op         TEXT,
+      op_kind    TEXT    CHECK (op_kind IN ('warm', 'remove')),
+      op_lease   TEXT,
+      op_pid     INTEGER,
+      op_started INTEGER,
+      job        TEXT,
+      PRIMARY KEY (project, name),
+      UNIQUE (project, port_base),
+      CHECK ((op IS NULL) = (op_kind IS NULL))
+    ) STRICT, WITHOUT ROWID`,
+    // A lease: one loan of a slot to a card or a lane (a dispatch lease) or an agent's migrated worktree (`carried`), from
+    // `from_at` until `ended_at`, and why it ended. `agent` is the builder's id.
+    `CREATE TABLE slot_leases (
+      id       TEXT    PRIMARY KEY,
+      project  TEXT    NOT NULL COLLATE NOCASE,
+      slot     TEXT    NOT NULL COLLATE NOCASE,
+      kind     TEXT    NOT NULL CHECK (kind IN ('card', 'lane', 'carried')),
+      card     INTEGER,
+      lane     TEXT,
+      agent    TEXT    NOT NULL,
+      from_at  TEXT    NOT NULL,
+      ended_at TEXT,
+      why      TEXT,
+      CHECK ((kind = 'card') = (card IS NOT NULL) AND (kind = 'lane') = (lane IS NOT NULL)),
+      FOREIGN KEY (project, slot) REFERENCES slots (project, name) ON DELETE CASCADE
+    ) STRICT, WITHOUT ROWID`,
+    'CREATE UNIQUE INDEX slot_leases_open ON slot_leases (project, slot) WHERE ended_at IS NULL',
+    "CREATE UNIQUE INDEX slot_leases_dispatch ON slot_leases (project, agent) WHERE ended_at IS NULL AND kind <> 'carried'",
+    "CREATE UNIQUE INDEX slot_leases_carried ON slot_leases (project, agent) WHERE ended_at IS NULL AND kind = 'carried'",
+    'CREATE INDEX slot_leases_agent ON slot_leases (project, agent) WHERE ended_at IS NULL',
+    'CREATE INDEX slot_leases_card ON slot_leases (card) WHERE card IS NOT NULL',
+    'CREATE INDEX slot_leases_lane ON slot_leases (lane) WHERE lane IS NOT NULL',
+    'CREATE INDEX slot_leases_slot ON slot_leases (project, slot, from_at)'
+  ]
+}
+
+/**
+ * A project's review and check copies (#1435, SPEC §16.10.5, §16.13; copies.ts): detached worktrees in one fixed folder
+ * per project (`<Workspace>.worktrees/<Project>/copies/copy-N`), each leased to one reviewer for one submission or to one
+ * isolated check run, at the exact revision. A lease is open until it is freed: returned (its review or run over) it
+ * stays `returning` until nothing is left in the copy (the quiescence barrier), so at most one lease per copy that isn't
+ * freed, by a partial unique index. Operations own a copy while it changes, as slots' do (#1429).
+ */
+export const COPIES_STEP: SchemaStep = {
+  name: 'copies',
+  ddl: [
+    // A copy: its name and folder, state, the revision it was last reset to, its last install's lock files' hash, a
+    // failed warming's error and log, when it was last used, and the operation that owns it while it changes (its
+    // token, kind, holder pid and start) with a command's job, as slots have them.
+    `CREATE TABLE copies (
+      project    TEXT    NOT NULL COLLATE NOCASE,
+      name       TEXT    NOT NULL COLLATE NOCASE,
+      folder     TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+      state      TEXT    NOT NULL CHECK (state IN ('creating', 'free', 'leased', 'returning', 'dirty', 'gone')),
+      revision   TEXT,
+      install_hash TEXT,
+      warm_error TEXT,
+      warm_log   TEXT,
+      created_at TEXT    NOT NULL,
+      used_at    TEXT    NOT NULL,
+      op         TEXT,
+      op_kind    TEXT    CHECK (op_kind IN ('lease', 'remove', 'recover')),
+      op_pid     INTEGER,
+      op_started INTEGER,
+      job        TEXT,
+      PRIMARY KEY (project, name),
+      CHECK ((op IS NULL) = (op_kind IS NULL))
+    ) STRICT, WITHOUT ROWID`,
+    // A lease: one review (its card and submission) or one isolated run (its card and run, or the link that will start
+    // it) by a holder agent, through a Hive (its profile, pid and start: a lease whose Hive is gone is returned), from
+    // `from_at`; `returned_at` once its review or run is over (why), `freed_at` once the copy was quiet. `job` is the
+    // supervisor job its run's processes are put in (an isolated check), settled before the copy is freed.
+    `CREATE TABLE copy_leases (
+      id          TEXT    PRIMARY KEY,
+      project     TEXT    NOT NULL COLLATE NOCASE,
+      copy        TEXT    NOT NULL COLLATE NOCASE,
+      kind        TEXT    NOT NULL CHECK (kind IN ('review', 'check')),
+      card        INTEGER NOT NULL,
+      revision    TEXT    NOT NULL,
+      ref         TEXT,
+      agent       TEXT,
+      profile     TEXT    NOT NULL,
+      pid         INTEGER NOT NULL,
+      started     INTEGER NOT NULL,
+      job         TEXT,
+      from_at     TEXT    NOT NULL,
+      returned_at TEXT,
+      why         TEXT,
+      freed_at    TEXT,
+      FOREIGN KEY (project, copy) REFERENCES copies (project, name) ON DELETE CASCADE
+    ) STRICT, WITHOUT ROWID`,
+    'CREATE UNIQUE INDEX copy_leases_open ON copy_leases (project, copy) WHERE freed_at IS NULL',
+    'CREATE INDEX copy_leases_unfreed ON copy_leases (project) WHERE freed_at IS NULL',
+    'CREATE INDEX copy_leases_ref ON copy_leases (ref) WHERE ref IS NOT NULL'
+  ]
+}
+
+/** The 1.0 group's steps (P3's, then P4's, then P5's, then P7's), in the order they are registered. */
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP, SLOTS_STEP, COPIES_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {
@@ -902,6 +1028,19 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'queueRunnerProcs.of': { sql: 'SELECT pid, start_after, start_before, what FROM queue_runner_procs WHERE lease = ?', args: ['l1'], index: 'PRIMARY KEY' },
   'queueRunnerProcs.ofTarget': { sql: 'SELECT * FROM queue_runner_procs WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'queue_runner_procs_target' },
   'queueWorktrees.of': { sql: 'SELECT folder, lease FROM queue_worktrees WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'queue_worktrees_target' },
+  // slots.ts (#1429): a project's slots, one by name, a slot's open lease, a card's or a lane's, an agent's, a slot's last.
+  'slots.ofProject': { sql: 'SELECT * FROM slots WHERE project = ? ORDER BY name', args: ['p'], index: 'PRIMARY KEY' },
+  'slots.byName': { sql: 'SELECT * FROM slots WHERE project = ? AND name = ?', args: ['p', 'slot-a'], index: 'PRIMARY KEY' },
+  'slotLeases.openOf': { sql: 'SELECT * FROM slot_leases WHERE project = ? AND slot = ? AND ended_at IS NULL', args: ['p', 'slot-a'], index: ['slot_leases_open', 'slot_leases_slot'] },
+  'slotLeases.ofCard': { sql: 'SELECT * FROM slot_leases WHERE card = ? AND ended_at IS NULL', args: [1], index: 'slot_leases_card' },
+  'slotLeases.ofLane': { sql: 'SELECT * FROM slot_leases WHERE lane = ? AND ended_at IS NULL', args: ['l1'], index: 'slot_leases_lane' },
+  'slotLeases.ofAgent': { sql: 'SELECT * FROM slot_leases WHERE project = ? AND agent = ? AND ended_at IS NULL', args: ['p', 'a1'], index: 'slot_leases_agent' },
+  // copies.ts (#1435): a project's copies, its leases not freed, a copy's, a lease by its run or link.
+  'copies.ofProject': { sql: 'SELECT * FROM copies WHERE project = ? ORDER BY name', args: ['p'], index: 'PRIMARY KEY' },
+  'copyLeases.unfreed': { sql: 'SELECT * FROM copy_leases WHERE project = ? AND freed_at IS NULL', args: ['p'], index: ['copy_leases_unfreed', 'copy_leases_open'] },
+  'copyLeases.openOf': { sql: 'SELECT * FROM copy_leases WHERE project = ? AND copy = ? AND freed_at IS NULL', args: ['p', 'copy-1'], index: 'copy_leases_open' },
+  'copyLeases.byRef': { sql: 'SELECT * FROM copy_leases WHERE ref = ?', args: ['r1'], index: 'copy_leases_ref' },
+  'slotLeases.lastOf': { sql: 'SELECT * FROM slot_leases WHERE project = ? AND slot = ? ORDER BY from_at DESC LIMIT 1', args: ['p', 'slot-a'], index: 'slot_leases_slot' },
   // cardRefs.ts: a key to its card (current key, an old key of the project, a moved card's alias), a project's key.
   'keys.resolve': { sql: 'SELECT c.number FROM project_keys k JOIN cards c ON c.project_id = k.project_id AND c.project_number = ? WHERE k.key = ?', args: [12, 'am'], index: 'cards_project_number' },
   'keys.alias': { sql: 'SELECT a.card FROM project_keys k JOIN card_aliases a ON a.project_id = k.project_id AND a.number = ? WHERE k.key = ?', args: [12, 'am'], index: 'PRIMARY KEY' },

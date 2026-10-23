@@ -106,6 +106,8 @@ import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
 import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesetsNow } from './workflow/rulesets'
+import { poolFor, slotTest, slotViews } from './slotsApp'
+import { copyViews, stopIsolated } from './copiesApp'
 import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
@@ -755,6 +757,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workflow:levelCheck': (level, platform, change) => checkLevelChange(workspace, level, platform, change),
     'workflow:setLevel': (level, platform, change) => setLevelOptions(workspace, level, platform, change),
     'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined, true),
+    'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
+    'copies:list': (p) => copyViews(workspace, workspace.assertProject(p)),
+    'slots:test': async (p, op) => {
+      if (app.isPackaged) throw new Error('slots:test is for test copies') // i18n-ignore: a test channel, never shown
+      return slotTest(await poolFor(workspace, workspace.assertProject(p)), op)
+    },
     'queue:history': (p, target) => queueHistory(workspace, workspace.assertProject(p), queueTarget(target)),
     'queue:branchCard': async (p, agentId) => {
       const path = workspace.assertProject(p)
@@ -1156,6 +1164,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'progress:dismiss': (id) => {
       if (workspace.path) progress.dismiss(workspace.path, String(id))
     },
+    'progress:stop': (id) => stopIsolated(workspace, String(id)),
     'progress:seen': () => {
       if (workspace.path) progress.seen(workspace.path)
     },

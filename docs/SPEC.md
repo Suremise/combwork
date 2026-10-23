@@ -1215,6 +1215,11 @@ Everything is visible in the Version Control tab itself, not only through the As
   this folder: not supported yet." while Git is in force). The once-per-start notice (`sayPlatform`) gains **Open
   Version Control**, one per project (`platform:<path>`): a newer detection replaces the one before it. Initialise repository… on None's page brings the
   `gitFound` offer without a restart (the refresh after it). Each switch goes through §16.6.5's warning.
+- **The tab never contradicts itself [#1492]:** detection is the workspace refresh's, but the tab reads git again on
+  window focus. When that read finds a repository where detection has none, or none where it has one (`.git` moved
+  away, then back to Hive), the tab asks for one refresh, so its fact, its offer and the notice follow at once, never
+  "This folder is a Git repository" over a page saying there's none. Once per answer: where detection decides
+  otherwise for good (a jj repository colocated with git, Mercurial beside it) nothing more is asked.
 - **The repository gone (S20):** Git's rules hold. A Git card's start or submit refused for what can't be read
   (`platform.unknown`) carries `offer: repositoryGone` while detection finds no Git repository, and its next step is
   the offer: "The project's Git repository is gone: ask the user to restore it, or to switch the project to None in its
@@ -2721,6 +2726,42 @@ at most 40 characters) [P1].
 - **Pool size:** as many slots as the project has builder agents, at most the project's agent cap; idle slots beyond
   that are removed after a day [P1].
 
+**Built [#1429], the pool (main only; #1438 lends for a card's start):** `src/main/slots.ts`, tables `slots` and
+`slot_leases` (the 1.0 group's `slots` step). A slot's state is `creating`, `ready`, `lent`, `dirty`, `gone` or `removing`.
+A lease's kind is `card` or `lane` (a dispatch lease) or `carried` (#1441's adopted worktree, which protects its slot
+while open, even while its agent holds a dispatch lease elsewhere). One open lease per slot, and one dispatch and one
+carried lease per agent, are partial unique indexes: a second fails in SQLite. Lending prefers the slot the builder
+last had, then the most recently used; a slot named that is in use is refused "slot-b is in use by HI-B1 for AM-12"
+(in English to agents; #1438 words the window's). A new slot is a detached worktree at the target's head, with the
+project's copied files and its setup run; a slot whose lock files changed since its last install is installed again;
+a failed setup leaves it `creating` with the error and the run's log, and lending skips it. The pool's size is the
+project's builders (`setBuilderCount`; until #1438 its agents), at least one, at most Agents per project.
+- **Options:** `project.json` `slots: { setup, archive, copy }`, each left out read from `worktreeSetup`, none and
+  `worktreeCopy` (left as they are). Settings → Agents & Worktrees edits the old fields until #1445's tab.
+- **Environment:** `HIVE_SLOT` and `HIVE_SLOT_PORT_BASE` (from 41000, 10 ports a slot, unique in the project) for its
+  runs now and its sessions from #1434.
+- **Runs:** setup, install and archive are Hive's runs attributed to "Hive (slot slot-b)" (the window's language;
+  the stored name stays English), each in a job of its own on the process supervisor, logs in Hive's `logs/slots`,
+  bounded by Settings → Advanced, **Slots: longest a setup command runs** (`hive.slots.setupMinutes`, 60 min).
+- **Released:** a slot left with uncommitted or untracked files that aren't ignored is `dirty`, not lent until clean;
+  a free slot gone from disk is recreated when next lent, a leased one marked `gone`. A free slot is looked at again
+  when it is next lent (changed since, a session or a process in it: marked or passed over, another tried; a slot
+  asked for by name is refused once, *busy*).
+- **Operations** (HR1's round 1): warming for a lease and removal own the slot from the write that starts them to the
+  write that ends them (`op` on its row: a token every one of their writes checks, and the holder's pid and start).
+  Nothing lends, adopts or removes a slot meanwhile; the same card asking again is told it is being set up. Another
+  Hive takes an operation over only once its holder process is gone (or this Hive's own, left by a workspace closed
+  meanwhile), after settling its job: a warming taken over is failed (*its setup was interrupted*, never ready), a
+  removal looked at again. A command's job on the process supervisor is recorded on the slot before it starts and
+  cleared only once its processes are seen ended, by #1360's protocol (`slotJobs.ts`: the job ended by name, its
+  journal sealed before its one read, what it names ended and seen gone, only then cleared); until then the slot isn't
+  lent. With no supervisor nothing runs. An operation is its Hive's from before the write that reserves the slot.
+  A workspace closing ends its slots' commands and awaits their operations.
+- **Clean-up** is guarded as above, a process in the folder proved absent by renaming it aside and back; the archive
+  command runs first and a failure keeps the slot; git removes the worktree, never forced. Settings → Advanced,
+  **Remove idle slots after a day** (`hive.slots.removeIdle`, on) removes free slots beyond the pool's size unused for
+  a day, and failed ones, every hour.
+
 #### 16.10.3 Agents unbound from folders, and resuming
 
 [note §7, #1123] Agents lose their `worktree` field (`AgentDef.worktree`, `types.ts:964`) and gain "in slot X" while
@@ -2764,6 +2805,26 @@ Code `--add-dir <pool>`; Codex a `-c` override adding the pool to the workspace-
 reviewers review in the slot read-only as today, which the option row says. Builds and tests in the copy then run
 within the CLI's own permission mode.
 
+**Built [#1435], the pool (main; the reviewer's side is #1439):** `src/main/copies.ts` and `copiesApp.ts`, tables `copies`
+and `copy_leases` (the 1.0 group's `copies` step). A copy is `creating`, `free`, `leased`, `returning`, `dirty` or `gone`;
+at most one lease per copy that isn't freed (a partial unique index). Leasing reserves a free copy (or makes `copy-N`
+while under the size: the larger of 2 and the reviewing agents plus one, or `project.json` `copies.size`), then resets
+it to the revision (`git checkout --detach --force`, `git clean -fd`; a new or gone one made with `git worktree add
+--detach` and the project's copied files), installing when its lock files changed (Hive's run, "Hive (copy copy-1)").
+A lease carries the holder Hive's profile, pid and start. **Returning** makes it `returning`; the **quiescence barrier**
+frees it only when, in order, no Progress run has its folder in the copy, its lease's job (an isolated run's processes)
+is settled (#1429's `slotJobs.ts`: ended, journal sealed and read, seen gone), its holder agent isn't in a turn or
+running background tasks, and a rename of its folder aside and back succeeds; otherwise it stays returning, looked at
+again every 30 s and on each lease. Past Settings → Advanced, **Copies: wait for one to be free**
+(`hive.copies.quietWaitMinutes`, 10), a lease that finds none free says which copy is still in use and by what. At a
+restart a lease whose Hive is gone, or (this Hive's) whose run is over, is returned and goes through the barrier. A free
+copy is looked at again under its next reservation (a run or a process in it since: passed over, never reset under
+it), and a lease returned while its copy is being reset is never handed over: the copy is returning when the reset
+ends. An operation taken over keeps its kind, so a taker that is itself interrupted leaves the same recovery.
+Leasing and removal are operations owning the copy as slots' are. **Reviewers review in review copies**
+(`hive.copies.review`, on) is the switch #1439 reads: off, a review lease is refused `off`. Copies beyond the size unused
+for a day go hourly (Remove idle slots after a day).
+
 **G17**: one reviewer per lane, or a shared pool that takes the next
 Submitted card (oldest first). Run records attached to the revision let a reviewer trust the builder's runs instead of
 repeating them (#533) [note §8].
@@ -2782,6 +2843,18 @@ repeating them (#533) [note §8].
   one provider, Team 3×3, Team 6×6 (Darren's setup), Team 6 + pool (2 pooled reviewers) [#1123 c].
 - **The workflow role is not #686's guidance role** (None, Generalist, Builder, Reviewer, Researcher, QA, built after
   1.0): two fields, kept apart in the data model [#1117 c2].
+- **Agents' workflow role** [#1430] **Built [#1430]**: `AgentDef.workflowRole` (`builder | reviewer | either`, in
+  `project.json`), apart from the free-text `role`, shown as **Note**. `agentWorkflowRole()` (`shared/workflow/roles.ts`,
+  with `ReviewerMode` for G17) reads it, or, unset, the guess from before 1.0: a note saying *review* is a reviewer and
+  any other note a builder; with no note, a name saying *review* or shaped `{key}-R{n}` / `HR1` is a reviewer, else a
+  builder. `buildsWork` / `reviewsWork`: `either` does both. The upgrade writes nothing; the guess is stored the first
+  time the user saves the agent's settings. Add Agent and Agent Settings choose it (Builder · Reviewer · Either, a
+  sentence each); Start Lane's builder list is builders and either-role agents, its reviewer list reviewers and either;
+  the project hover's agents table has a Role column. The preset step's suggestion and the upgrade's reviewer option
+  count reviewers by it. Agent API: the project status and its short rows give `workflowRole`; adding an agent takes
+  it; changing it (hive_update_agent) is the Assistant's within Control, undoable, like every change to an agent
+  through the Agent API: project agents have neither tool.
+  `review.notAuthor` stays by authorship (who built the card), which the role doesn't change.
 
 #### 16.10.7 What reaches agents in slots
 
@@ -3009,7 +3082,21 @@ runs the check in a **check copy**, a detached worktree at the card's revision f
 copies (§16.10.5), leased to that run and written by nothing else, so it counts whatever happens in the folder. The
 refusal's next step names it ("another agent changed files during your run: run it isolated"). A reviewer's runs in a
 review copy count for the revision it holds (§16.10.5). None has no check copies (no isolation, OP-16): its remedy is
-running again when the deliverables are quiet, which the refusal says. Hive running pre-review checks itself is OP-27.
+running again when the deliverables are quiet, which the refusal says.
+**Built [#1435]:** `--isolated` (with `--check` only, by an agent, on Git) asks resolve for a check copy. It is leased at
+the card's revision apart from the request (`IsolatedRequests`: a first setup takes longer than any request may): resolve
+answers within 2 s, with the copy or 409 `wait` and a ticket, and hive-progress asks again with the ticket every 2 s,
+saying what it waits for once (*waiting for a check copy*, *… to be set up*); a copy leased for a ticket nobody asks
+about for a minute is given back (`abandoned`). The lease's job is opened on the process supervisor (`copy-<lease>`,
+recorded on the lease first). hive-progress then starts the command's launcher (#1360's, `workflow/launcher.ts`) in the
+copy and has Hive put it in that job (`POST /v1/progress/isolated`) before it runs anything: only by the lease's agent,
+once per lease, and only a process of that agent's own (in its launch's job, started in the window it names). The run's start takes the lease,
+its finish returns it after its `CheckRan` (`isolated: true`), and **Stop** on its row in the Progress panel
+(`progress:stop`) ends the job, so the whole tree ends, and the run is recorded as stopped. Any run whose folder is in a leased copy of the caller's own
+project is linked to the lease's card and revision (runLink's `copyAt`), never the agent's card in Doing; naming another
+card there is refused. Another project's copy is no copy to an agent: nothing of its lease is read or shown.
+The run's details name the copy (`ProgressRun.copy`). A lane waiting for a copy has the status `checkCopy` (*waiting
+for a check copy for HI-12*). Hive running pre-review checks itself is OP-27.
 
 **The queue's runs, attributed to Hive** (§16.9.1 step 5). **Built [#1349]:** a run Hive starts itself has
 `source: 'hive'`, is the card's project's, and shows as **Hive (merge queue)** (`defaultName: 'mergeQueue'`, in the

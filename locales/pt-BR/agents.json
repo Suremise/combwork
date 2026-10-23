@@ -308,9 +308,9 @@
   "agents.resume.sub": "Um {kind} do {cli} rodou para outra sessão, não como conversa própria: não pode ser retomado.",
   "agents.session.unnamed": "Sessão {id}",
   "agents.settings.appliesNext": "As alterações valem a partir do próximo início do agente {agent}; até lá, a sessão em execução mantém as configurações dela.",
+  "agents.settings.note": "Nota",
+  "agents.settings.noteNone": "Opcional: para que serve, com suas palavras",
   "agents.settings.ownWorktree": "Worktree próprio",
-  "agents.settings.role": "Função",
-  "agents.settings.roleNone": "Nenhuma (usa o nome: {name})",
   "agents.settings.save": "Salvar",
   "agents.settings.saving": "Salvando…",
   "agents.settings.stopToChange": "— pare o agente {agent} para alterá-lo",
@@ -329,5 +329,12 @@
   "agents.tested.older": "Mais antiga que a testada; considere atualizar.",
   "agents.tested.summary": "Testado com {tested} · instalado: {installed}",
   "agents.tested.summaryUnknown": "Testado com {tested} · versão instalada desconhecida",
-  "agents.tested.unknown": "O Hive não conseguiu identificar a versão instalada, então não pode compará-la com a testada."
+  "agents.tested.unknown": "O Hive não conseguiu identificar a versão instalada, então não pode compará-la com a testada.",
+  "agents.workflowRole.builder": "Executor",
+  "agents.workflowRole.builderText": "Trabalha nos cartões e os envia para Revisão.",
+  "agents.workflowRole.either": "Ambos",
+  "agents.workflowRole.eitherText": "Executa ou revisa, mas nunca revisa o próprio trabalho.",
+  "agents.workflowRole.label": "Papel no fluxo de trabalho",
+  "agents.workflowRole.reviewer": "Revisor",
+  "agents.workflowRole.reviewerText": "Revisa os cartões dos executores e os marca como bem-sucedidos ou reprovados."
 }

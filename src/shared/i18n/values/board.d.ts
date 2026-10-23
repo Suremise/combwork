@@ -160,6 +160,7 @@ interface HiveMessageValues {
   'board.details.card': undefined
   'board.details.check': undefined
   'board.details.command': undefined
+  'board.details.copy': undefined
   'board.details.countsAsCheck': { name: string | number }
   'board.details.ended': undefined
   'board.details.exitCode': undefined
@@ -393,6 +394,7 @@ interface HiveMessageValues {
   'board.laneStart.intro': undefined
   'board.laneStart.name': undefined
   'board.laneStart.noAgents': undefined
+  'board.laneStart.noBuilders': undefined
   'board.laneStart.noCards': undefined
   'board.laneStart.noReviewer': undefined
   'board.laneStart.notRunning': undefined
@@ -494,6 +496,7 @@ interface HiveMessageValues {
   'board.progress.copyDetails': undefined
   'board.progress.copyFailed': { what: string }
   'board.progress.copyRevision': { revision: string | number }
+  'board.progress.copyRun': { copy: string | number }
   'board.progress.detailsOf': { run: string | number }
   'board.progress.dismiss': undefined
   'board.progress.empty': undefined
@@ -530,8 +533,10 @@ interface HiveMessageValues {
   'board.progress.showLog': undefined
   'board.progress.showLogFailed': undefined
   'board.progress.showTheAgent': undefined
+  'board.progress.slotRun': { slot: string | number }
   'board.progress.stepOf': { step: number; total: number }
   'board.progress.stepOfNamed': { step: number; total: number; name: string | number }
+  'board.progress.stopIsolated': undefined
   'board.progress.tab': { tab: string }
   'board.progress.tabs': undefined
   'board.progress.title': undefined
