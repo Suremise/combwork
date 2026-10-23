@@ -77,7 +77,7 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     }
 
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
-    const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
+    await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
     // B2: a 0.9 agent with its own worktree, as an upgraded project has one, adopted as its carried slot hb2.
     const b2 = await lib.addAgent(inv, alpha, { location: 'new-worktree', name: 'B2', branch: 'hive/hb2', workflowRole: 'builder' })
     const hb2 = (await inv('workspace:refresh')).projects.find((p) => same(p.path, alpha)).agents.find((a) => a.id === b2.id)?.worktree?.path

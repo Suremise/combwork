@@ -279,7 +279,7 @@ export async function addLegacyAgent(projectPath: string, opts: AddAgentOptions)
     tree = { path: found.path, branch: found.branch, base: (await wt.currentBranch(projectPath)) ?? found.branch }
   } else {
     const base = opts.base || (await wt.currentBranch(projectPath)) || 'main'
-    const name = opts.name?.trim() || 'Agent'
+    const name = opts.name?.trim() || 'Agent' // i18n-ignore: a test channel's fallback for a worktree's folder name
     const { branch, path: dest, newSpace } = await newWorktreePlace(projectPath, name, opts.branch)
     await wt.createWorktree(projectPath, dest, branch, base)
     if (newSpace) await recordSpace(projectPath, newSpace)

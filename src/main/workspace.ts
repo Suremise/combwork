@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'crypto'
+import { randomBytes, randomUUID } from 'crypto'
 import { legacyWorktree } from '../shared/agentFolders'
 import { basename, dirname, join, resolve, sep } from 'path'
 import { mkdir, readdir, readFile, stat, writeFile } from 'original-fs/promises'

@@ -1,4 +1,4 @@
-import { checkDocRef } from './docSections'
+import { checkDocRef } from './docSections'
 import { legacyWorktree } from '../shared/agentFolders'
 import { BrowserWindow, ClipboardItem, app, clipboard, dialog, ipcMain, nativeImage, shell } from 'electron'
 import { freemem, totalmem } from 'os'
