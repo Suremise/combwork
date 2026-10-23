@@ -204,6 +204,11 @@ interface HiveMessageValues {
   'settings.advanced.hive.recorder.version.title': undefined
   'settings.advanced.hive.showDeveloperFeatures.desc': undefined
   'settings.advanced.hive.showDeveloperFeatures.title': undefined
+  'settings.advanced.hive.skills.removeIdleCopies.desc': undefined
+  'settings.advanced.hive.skills.removeIdleCopies.everywhere': undefined
+  'settings.advanced.hive.skills.removeIdleCopies.never': undefined
+  'settings.advanced.hive.skills.removeIdleCopies.slots': undefined
+  'settings.advanced.hive.skills.removeIdleCopies.title': undefined
   'settings.advanced.hive.terminal.allKeysToCli.desc': undefined
   'settings.advanced.hive.terminal.allKeysToCli.title': undefined
   'settings.advanced.hive.terminal.ctrlCVToCli.desc': undefined

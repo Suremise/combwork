@@ -49,6 +49,7 @@
   "content.skill.cantDelete": "Seules les compétences Hive et les compétences locales d’un projet peuvent être supprimées dans Hive.",
   "content.skill.chooseFile": "Choisis un fichier .md ou un .zip.",
   "content.skill.copyExists": "L’espace de travail a déjà une compétence nommée « {name} »",
+  "content.skill.deliveredName": "Ce n’est pas un nom de compétence.",
   "content.skill.exists": "Une compétence nommée « {name} » existe déjà dans {folder}",
   "content.skill.isCopy": "C’est la copie, faite par Hive, d’une compétence de l’espace de travail ; supprime plutôt la compétence dans l’espace de travail.",
   "content.skill.metadata": "ses metadata ne sont pas un ensemble de champs (`metadata:`, puis `audience: …` en retrait en dessous)",

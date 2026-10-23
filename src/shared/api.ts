@@ -610,6 +610,8 @@ export interface HiveRequests {
   /** Puts back a bundled skill as this version of Hive ships it. */
   'skills:restoreBundled': (name: string) => SkillInfo
   'skills:copyToWorkspace': (skillPath: string) => SkillInfo
+  /** A Hive skill delivered to agents or not (#1431, Skills → Delivered to agents): in the workspace (no project), or one project's. */
+  'skills:setDelivered': (projectPath: string | null, name: string, on: boolean) => void
   'skills:openFolder': () => void
 
   'mcp:list': () => McpServerInfo[]

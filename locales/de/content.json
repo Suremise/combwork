@@ -49,6 +49,7 @@
   "content.skill.cantDelete": "In Hive lassen sich nur Hive-Skills und die lokalen Skills eines Projekts löschen.",
   "content.skill.chooseFile": "Wähle eine .md-Datei oder eine .zip.",
   "content.skill.copyExists": "Der Arbeitsbereich hat bereits einen Skill namens „{name}“",
+  "content.skill.deliveredName": "Das ist kein Skill-Name.",
   "content.skill.exists": "Ein Skill namens „{name}“ existiert bereits in {folder}",
   "content.skill.isCopy": "Das ist eine Kopie, die Hive von einem Skill des Arbeitsbereichs angelegt hat. Lösche stattdessen den Skill im Arbeitsbereich.",
   "content.skill.metadata": "die Metadaten sind keine Gruppe von Feldern (`metadata:`, darunter eingerückt `audience: …`)",

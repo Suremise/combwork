@@ -1002,7 +1002,7 @@ It uses the same model and effort as your agents (each provider's defaults in Se
 
 ## Skills
 
-Skills are instructions an agent loads when they're relevant. There are no switches: every skill an agent can see is always available to it. Hive shows where each one comes from:
+Skills are instructions an agent loads when they're relevant. Every skill an agent can see is available to it; Hive's own skills can also be switched off for agents (below, **Choosing the skills agents get**). Hive shows where each one comes from:
 
 | Level | Where | Who gets it | In Hive |
 |---|---|---|---|
@@ -1035,6 +1035,12 @@ metadata:
 ```
 
 When a session starts, Hive copies the Hive skills into the agent's own launch folder in the project's `.hive` and points Claude Code at it (Claude Code shows them as `hive:<name>`), so a running Claude Code agent keeps the version it started with. Codex only reads skills from the folder it works in (`.agents/skills`), so for Codex agents Hive copies them there as `hive-<name>` folders (and keeps them out of git); those copies aren't listed as local skills. Codex agents sharing a folder share those copies, so after one starts with a changed skill, the others use the new version too. Either way, a restarted session has the current skills.
+
+### Choosing the skills agents get
+
+Every Hive skill for agents is delivered to them, unless you switch it off. **Delivered to agents** is the switch beside each Hive skill: in the **Skills** view it is the workspace's (off there, no project's agents get the skill), and in a project's **Skills** tab the project's own (off there, that project's agents don't; a skill the workspace has off shows off and can't be turned on there). A change reaches each agent's next session: Claude Code's launch folder and the Codex and Copilot copies both follow it, Hive removes its copy of a skill switched off at the agent's next launch, and Hive's guidance stops naming it. The Hive Assistant's own skills aren't chosen here.
+
+**Where Codex and Copilot copies go, and when they're removed.** Codex and Copilot read Hive's skills from copies in the folder an agent works in (its worktree, a slot, or the project folder), and those copies stay after the session, so a CLI you start there yourself would still see them. Hive records each copy it makes, and once the last of Hive's agents in a folder stops, it removes its copies there as **Settings → Advanced → Remove Hive's skill copies when no agent works in the folder** says: **Slots only** (the default) removes them in every folder but the project folder, **Everywhere** in the project folder too, **Never** nowhere (as before). Hive also tidies them as a workspace opens, for folders whose agents have gone. It only removes a copy its record and the copy's own marker both say it made, and that nobody has changed since: never a skill of yours, and never a copy you've edited. Reviewers' sessions run in the project folder, so the review copies they read get none. Claude Code's launch folder leaves nothing in your folders.
 
 ## MCP servers
 

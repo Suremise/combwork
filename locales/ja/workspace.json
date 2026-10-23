@@ -387,7 +387,7 @@
   "workspace.skillView.loadTarget": "スキル",
   "workspace.skillView.ok": "OK",
   "workspace.skillView.refreshTarget": "スキル",
-  "workspace.skillView.select": "表示または編集するHiveスキルを選んでください。このワークスペースのすべてのプロジェクトのエージェントがこれらのスキルを使えます（Hive Assistant用のものを除く）。",
+  "workspace.skillView.select": "Hiveスキルを選ぶと表示または編集できます。このワークスペースのすべてのプロジェクトのエージェントがこれらのスキルを受け取ります。ただし、Hive Assistant用と示されたものと、横のスイッチでオフにしたもの（エージェントに提供）は除きます。",
   "workspace.statusBar.api": "API",
   "workspace.statusBar.apiError": "Agent API：{error}",
   "workspace.statusBar.apiOff": "Agent APIはオフです",

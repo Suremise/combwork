@@ -1100,6 +1100,18 @@ export async function removePath(path: string): Promise<void> {
   if (existsSync(path)) await rm(path, { recursive: true, force: true })
 }
 
+/**
+ * Removes a folder whole (#1431, Hive's skill copies): renamed aside first, named as a swap's new copy is, so a crash
+ * part way leaves only a dot-folder cleanSwaps tidies, never a half-removed folder under its own name (which would no
+ * longer carry its marker). Throws when it can't be renamed (a file in it open): it stays as it was.
+ */
+export async function retireDir(dest: string): Promise<void> {
+  const parent = dirname(dest)
+  const aside = join(parent, `.${dest.slice(parent.length + 1)}.hive-new-${process.pid}-${++swapCounter}`)
+  await rename(dest, aside)
+  await rm(aside, { recursive: true, force: true }).catch(() => undefined)
+}
+
 export function hashText(text: string): string {
   return createHash('sha256').update(text).digest('hex').slice(0, 16)
 }

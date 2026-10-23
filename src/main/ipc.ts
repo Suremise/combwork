@@ -110,6 +110,7 @@ import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCa
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
+import { withSkillDelivered } from '../shared/skillDelivery'
 
 /**
  * What the window is told when a call is refused (#845): thrown as HiveErrors, so the window reads them in its language
@@ -1033,6 +1034,13 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return s
     },
     'skills:openFolder': () => void shell.openPath(workspace.skillsDir),
+    'skills:setDelivered': async (p, name, on) => {
+      if (typeof name !== 'string' || !skills.validSkillName(name)) throw hiveError(msg({ id: 'content.skill.deliveredName', defaultMessage: 'That is not a skill name.', description: 'An error switching a skill on or off for agents (Skills → Delivered to agents): the name given is not a valid skill name.' }))
+      if (p) await workspace.mutateProjectConfig(workspace.assertProject(p), (cfg) => ({ skillDelivery: withSkillDelivered(cfg.skillDelivery, name, on === true) }))
+      else await workspace.saveWorkspaceConfigWith((c) => ({ skillDelivery: withSkillDelivered(c.skillDelivery, name, on === true) }))
+      emit({ type: 'skills-changed' })
+      workspace.scheduleRefresh()
+    },
 
     'mcp:list': () => mcp.listMcp(),
     'mcp:setGlobal': async (name, enabled, expected, projects) => {

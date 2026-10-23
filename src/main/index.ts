@@ -3,6 +3,8 @@ import { initLoopWakes } from './loopWakes'
 import { initLoopCheck } from './loopCheck'
 import { initDeliveries } from './deliveries'
 import { initReviewsOnOpen } from './reviewsOnOpen'
+import { initSkillCopies } from './skillCopies'
+import { offNames } from '../shared/skillDelivery'
 import { initInboxNotices } from './inboxNotices'
 import { initDecisionWakes } from './decisionWakes'
 import { initWorkflowNotices } from './workflowNotices'
@@ -904,6 +906,8 @@ app.whenReady().then(async () => {
   initLoopCheck()
   initDeliveries()
   initReviewsOnOpen()
+  // Hive's skill copies in folders no session of Hive's works in (#1431), as each workspace opens.
+  initSkillCopies((folder) => sessions.runningIn(folder))
   initInboxNotices()
   initDecisionWakes()
   initWorkflowNotices()
@@ -922,7 +926,9 @@ app.whenReady().then(async () => {
       if (!advanced.get<boolean>(HIVE_GUIDANCE)) return ''
       const project = basename(projectPath)
       const latest = (await handoversFor(workspace, project))[0]
-      return withLatestHandover(hiveInstructions(project, 'agent', wrapsLongCommands(config.settings.general)), latest?.relPath)
+      // Naming only the skills its agents get (#1431).
+      const off = new Set([...offNames(workspace.config.skillDelivery), ...offNames((await workspace.projectConfig(projectPath)).skillDelivery)])
+      return withLatestHandover(hiveInstructions(project, 'agent', wrapsLongCommands(config.settings.general), off), latest?.relPath)
     })
   // The Assistant's state view at each start and after each compaction, while its journal is on (#1032).
   sessions.startContext = async (state, source) => {

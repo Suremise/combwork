@@ -51,6 +51,7 @@ interface HiveMessageValues {
   'content.skill.cantDelete': undefined
   'content.skill.chooseFile': undefined
   'content.skill.copyExists': { name: string | number }
+  'content.skill.deliveredName': undefined
   'content.skill.exists': { name: string | number; folder: string | number }
   'content.skill.isCopy': undefined
   'content.skill.metadata': undefined

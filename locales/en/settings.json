@@ -811,6 +811,26 @@
     "defaultMessage": "Show developer features",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.skills.removeIdleCopies.desc": {
+    "defaultMessage": "Codex and Copilot read Hive's skills from copies Hive puts in the folder an agent works in (.agents/skills/hive-…); Claude Code gets them at each launch and leaves nothing behind. Once the last of Hive's agents in a folder stops, Hive can remove its copies, so a CLI you run there yourself doesn't see them. Slots only removes them in every folder but the project folder (slots and agents' worktrees), Everywhere in the project folder too, Never nowhere. Only copies Hive made and nobody changed since are removed, never your own skills.",
+    "description": "What the advanced setting \"Remove Hive's skill copies when no agent works in the folder\" does (Settings → Advanced, under Hive). Codex, Copilot and Claude Code are CLIs' names and .agents/skills/hive-… a folder: keep them. Slots only, Everywhere and Never are the setting's choices: use the words its list shows."
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.everywhere": {
+    "defaultMessage": "Everywhere",
+    "description": "A choice of the advanced setting \"Remove Hive's skill copies when no agent works in the folder\": in the project folder too."
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.never": {
+    "defaultMessage": "Never",
+    "description": "A choice of the advanced setting \"Remove Hive's skill copies when no agent works in the folder\": copies stay, as before."
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.slots": {
+    "defaultMessage": "Slots only",
+    "description": "A choice of the advanced setting \"Remove Hive's skill copies when no agent works in the folder\": in every folder but the project folder."
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.title": {
+    "defaultMessage": "Remove Hive's skill copies when no agent works in the folder",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: the copies of Hive's skills it puts in a folder for Codex and Copilot."
+  },
   "settings.advanced.hive.terminal.allKeysToCli.desc": {
     "defaultMessage": "In an agent's pane, Hive's own shortcuts (Settings → Keyboard Shortcuts) take their keys, apart from those the CLI uses itself. Turned on, every key goes to the CLI, except the command palette's shortcut (Show All Commands), which stays Hive's so every command is still in reach. Ctrl+C and Ctrl+V have their own setting.",
     "description": "What the advanced setting \"All keys go to the CLI\" does (Settings → Advanced, under Hive). Show All Commands is a command's name and Settings → Keyboard Shortcuts a place in Hive: use them as Hive shows them. Ctrl+C and Ctrl+V name keys."

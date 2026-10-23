@@ -49,6 +49,7 @@
   "content.skill.cantDelete": "在 Hive 中只能删除 Hive 技能和项目的本地技能。",
   "content.skill.chooseFile": "请选择 .md 文件或 .zip。",
   "content.skill.copyExists": "工作区已有名为“{name}”的技能",
+  "content.skill.deliveredName": "这不是技能名称。",
   "content.skill.exists": "{folder} 中已存在名为“{name}”的技能",
   "content.skill.isCopy": "这是 Hive 为工作区技能放置的副本；请改为删除工作区中的技能。",
   "content.skill.metadata": "其 metadata 不是一组字段（应先写 `metadata:`，再在其下缩进写 `audience: …`）",

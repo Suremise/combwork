@@ -12,7 +12,7 @@ import { commandKeybinding, runCommand } from '../commands'
 import { get, notify, projectKeyOf, projectStarting, projectState, startingLabel, prompt, set, setProjectTab, toggleCompactSidebar, useStore } from '../store'
 import { cx, formatKeybinding } from '../util'
 import { Icon, IconButton, InfoTip, LoadFailed, OneLineTitle, SearchInput, StaleNote, StatusDot, STATUS_TEXT, Switch, Tooltip, useContextMenu, type MenuEntry } from './ui'
-import { addSkill, deleteSkill, HiveSkillsWarning, restoreBundled, SKILL_LEVEL_TIP, skillDescription, SkillRow } from './Skills'
+import { addSkill, deleteSkill, DeliveredSwitch, HiveSkillsWarning, restoreBundled, SKILL_LEVEL_TIP, skillDescription, SkillRow } from './Skills'
 import { TemplatesPanel } from './Templates'
 import { hasEditorDraftsUnder } from '../editorDrafts'
 import { useInbox } from '../inbox'
@@ -728,6 +728,7 @@ function SkillsPanel() {
               skill={s}
               selected={selectedSkill === s.path}
               onSelect={() => set({ selectedSkill: s.path })}
+              delivered={s.audience !== 'assistant' && !s.problem && s.bundled !== 'missing' ? <DeliveredSwitch skill={s} /> : undefined}
               actionsFor={
                 s.bundled === 'missing' ? (
                   <IconButton icon="history" title={tr(M.restoreSkill)} onClick={() => void restoreBundled(s).then((r) => r && set({ selectedSkill: r.path }))} />

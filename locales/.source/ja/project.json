@@ -303,6 +303,7 @@
   "project.skills.addLocal": "Add a local skill for {provider} from a file (.md or .zip)…",
   "project.skills.assistantOnly": "{count, plural, one {# Hive skill is for the Hive Assistant only, so it isn't listed: this project's agents don't get it.} other {# Hive skills are for the Hive Assistant only, so they aren't listed: this project's agents don't get them.}}",
   "project.skills.delete": "Delete skill",
+  "project.skills.deliveredNote": "Each switch says whether this project's agents get the skill (Delivered to agents), from their next session. A skill switched off in the Skills view is off in every project.",
   "project.skills.editInWorkspace": "Edit in the workspace's Skills view (Hive skills are shared by every project)",
   "project.skills.heading": "Skills available to agents",
   "project.skills.hive": "Hive",

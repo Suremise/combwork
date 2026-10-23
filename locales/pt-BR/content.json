@@ -49,6 +49,7 @@
   "content.skill.cantDelete": "No Hive, só é possível excluir skills do Hive e skills locais de um projeto.",
   "content.skill.chooseFile": "Escolha um arquivo .md ou um .zip.",
   "content.skill.copyExists": "O espaço de trabalho já tem uma skill chamada “{name}”",
+  "content.skill.deliveredName": "Isso não é um nome de skill.",
   "content.skill.exists": "Já existe uma skill chamada “{name}” em {folder}",
   "content.skill.isCopy": "Esta é a cópia do Hive de uma skill do espaço de trabalho; exclua a skill no espaço de trabalho.",
   "content.skill.metadata": "os metadados não são um conjunto de campos (`metadata:`, e `audience: …` recuado abaixo dele)",

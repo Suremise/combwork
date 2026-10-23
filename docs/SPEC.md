@@ -2788,7 +2788,23 @@ repeating them (#533) [note §8].
 - **Workspace notes** (#873): git-ignored, machine-specific notes must reach agents in slots and review copies on every
   CLI; designed in P7 with Darren [#1123 c].
 - **Skill delivery** (#966 row 15, group C, P7): slots get their own skill copies (Codex, Copilot), Hive's owned copies
-  are cleaned up safely, and the user chooses which skills are delivered [#966].
+  are cleaned up safely, and the user chooses which skills are delivered [#966]. **Built [#1431]:**
+  - Delivery follows the session's folder (`ctx.cwd`: a slot, the project folder, a carried worktree); reviewers'
+    sessions run in the project folder, so review copies get none. Each copy Hive makes is recorded in `skill_copies`
+    (folder, skill, revision: the copy's content hash, its marker left out; made at), beside the copy's marker.
+  - A copy is removed only when the record and its marker both say Hive made it, its content is still the recorded
+    revision, and no session of Hive's runs in the folder (asked inside `syncAgentsSkills`' lock, so a launch meanwhile
+    wins). A marked copy from before records, unchanged since, is recorded then. Removal is a rename aside (a swap's
+    dot-folder) then delete, so a crash never leaves a half-removed copy without its marker. When: the last session in
+    the folder ends (not as Hive quits), at a workspace's opening for folders whose sessions are gone, and through
+    `removeCopiesIn` for a lease's end (#1438) and before a slot or copy is removed (#1429, `always`). Switch: Settings
+    → Advanced `hive.skills.removeIdleCopies`, *Slots only* (default: every folder but the project folder; the
+    Assistant's workspace folder counts as its project folder) · *Everywhere* · *Never*.
+  - **Delivered to agents:** each Hive skill for agents is on unless switched off, in the workspace
+    (`workspace.json` `skillDelivery.off`, the Skills view) or a project (`project.json` `skillDelivery.off`, its Skills
+    tab); a project can't turn on one the workspace has off. The launch's skills follow it (Claude Code's plugin and
+    the copies alike; a copy no longer given goes under the same rules), and the session contract names only delivered
+    skills (`boardSkillsLine`; the hive server reads `HIVE_SKILLS_OFF`). The Assistant's skills aren't chosen.
 - **Carrying on** (#966 row 16, P7): a switch that separates inbox availability, checkpoints, Stop continuation and
   idle wakes, without dropping deliveries [#966].
 
@@ -3216,7 +3232,7 @@ it can't. One owner per switch; each defaults to today's behaviour; never writte
 | E (24, 26–30) | Ctrl+C/V passthrough; all-keys passthrough; the OSC 52 policy; prompt fidelity (Ctrl+U clearing a draft, collapsed whitespace, stripped characters); raw variants of Hive's wrapped prompts | P4 |
 | #1167 (19–23, 25, 34) | Copilot auto-update (both suppressors, every path); right-click for Claude Code and Codex; Codex terminal title omitted; `--system-prompt-snapshot off`; `--allow-all-mcp-server-instructions`; Codex `--no-daemon` (only if verified); model/effort flags (check first) | P4 |
 | #1174 | Codex: the Assistant pre-approves only its Control subset of Hive tools (parity; built in #1281, §9.3) | P4 |
-| C (15, 16) | Skill delivery per slot and choice of skills; carrying on (inbox, checkpoints, Stop continuation, idle wakes) | P7 |
+| C (15, 16) | Skill delivery per slot and choice of skills (row 15 **Built [#1431]**, §16.10.7); carrying on (inbox, checkpoints, Stop continuation, idle wakes) | P7 |
 | F (31–33, 35–38), probes (39–42) | No switch: they are the integration itself (reasons on #966) | — |
 | 9, 17, 18 | Already switchable (file locks, background sessions, 200K): one owner, no duplicate | — |
 

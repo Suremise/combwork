@@ -74,6 +74,29 @@ export interface LaunchContext {
   allowBackgroundSessions: boolean
   /** A 200K context window instead of the model's 1M one (capabilities.contextLimit). */
   use200kContext: boolean
+  /**
+   * Hive's record of the skill copies it made in folders (#1431, skillCopies.ts), for CLIs that read copies in the folder
+   * (syncAgentsSkills). Missing: nothing is recorded, and no copy is removed but by its marker and content (tests).
+   */
+  copies?: SkillCopyBook
+}
+
+/** One skill copy Hive recorded making in a folder (#1431): its revision is the copy's contentHash, its marker left out. */
+export interface SkillCopyRecord {
+  skill: string
+  project: string
+  revision: string
+}
+
+/**
+ * Hive's record of its skill copies (#1431, the `skill_copies` table): what it made in a folder, at which revision. A
+ * failure to read or write it never stops a launch: unrecorded copies are only kept, never removed.
+ */
+export interface SkillCopyBook {
+  /** The folder's recorded copies, by skill name in lower case. */
+  of(folder: string): Promise<Map<string, SkillCopyRecord>>
+  record(folder: string, project: string, skill: string, revision: string): Promise<void>
+  forget(folder: string, skill: string): Promise<void>
 }
 
 export interface UpdateRetry {
