@@ -10,12 +10,13 @@
 //   last running lane ends verified (`lane-ended`), or, with no lane running, a card of it reaches Done, and its work has
 //   finished (no agent busy, waiting, watching or with background tasks; no card in Review or Passed). A notice, as the
 //   user's notification settings say, with Start Fresh (Idle Agents).
-//   - Once per spell, across windows and Hives: the board keeps the spell told (`fresh_nudge:<project id>`, with when),
-//     claimed in one write that also checks again that the work has finished; one of the project's agents getting busy
-//     afterwards ends the spell (the record is removed if it was made before that).
-//   - A completion seen while the work hasn't finished yet (the agent marks its last card Done from inside its turn) is
-//     kept, one per project, and considered again as the project's agents go quiet, until it is told, a lane of the
-//     project runs again, or the switch is off.
+//   - Once per spell, across windows and Hives: the board keeps the spell's mark (`fresh_nudge:<project id>`), claimed in
+//     one write that also checks again that the work has finished. One of the project's agents getting busy ends the
+//     spell: the mark goes, in the first board write after it (the claim's or the reset's; `spellEnded`), never by
+//     comparing times.
+//   - A completion is kept, one per project, from before it is checked: one seen while the work hasn't finished yet
+//     (the agent marks its last card Done from inside its turn) is considered again as the project's agents go quiet,
+//     until it is told, a lane of the project runs again, or the switch is off.
 //   Off switch: Settings → Notifications, Suggest a fresh start when work finishes, and a project's own (Project
 //   Settings → Sessions).
 
@@ -93,12 +94,19 @@ async function suggestOn(projectPath: string): Promise<boolean> {
 
 const BUSY = new Set(['starting', 'working', 'waiting', 'background', 'watching'])
 
-/** A completion seen before the work had finished, per project (by path, lower case): considered again as it goes quiet. */
-const pending = new Map<string, { ws: WorkspaceService; projectPath: string; trigger: string }>()
-/** Whether this Hive may have told a project's spell on the board (by path, lower case; unknown: maybe, from before). */
-const toldHere = new Map<string, boolean>()
-/** When one of a project's agents last got busy (by path, lower case). */
-const busyAt = new Map<string, number>()
+/**
+ * A completion not told yet, per project (by path, lower case): kept from before its check, so a quiet moment while it
+ * is being checked isn't missed (it is considered again then), and gone once it is told or isn't to be.
+ */
+type Pending = { ws: WorkspaceService; projectPath: string; trigger: string }
+const pending = new Map<string, Pending>()
+/**
+ * Projects (by path, lower case) one of whose agents got busy since their spell's mark was last removed: set at the
+ * event, and taken (the mark removed with it) only inside a board write, by the claim or the reset, whichever writes
+ * first. So the order is the events' and writes' own: a reset coming late for an earlier busy moment finds it taken
+ * and leaves the next spell's mark alone.
+ */
+const spellEnded = new Set<string>()
 
 /** Whether a project's agents are all quiet now (workFinished), read with no wait. */
 function agentsQuiet(projectPath: string, agentIds: readonly string[]): boolean {
@@ -111,18 +119,22 @@ type Told = 'told' | 'already' | 'unfinished'
 export async function considerNudge(ws: WorkspaceService, projectPath: string, trigger: string): Promise<boolean> {
   const key = projectPath.toLowerCase()
   const name = basename(projectPath)
+  // Kept before the first wait: a project going quiet from now on considers it again (a later completion replaces it).
+  const mine: Pending = { ws, projectPath, trigger }
+  pending.set(key, mine)
+  const drop = (): void => void (pending.get(key) === mine && pending.delete(key))
   // Each decision not to suggest is logged, with why (what a test waits for before its next step).
   const not = (why: string): false => {
     log.info(`No fresh-start suggestion in ${userText(name)} (${trigger}): ${why}`)
     return false
   }
   if (!(await suggestOn(projectPath))) {
-    pending.delete(key)
+    drop()
     return not('turned off') // i18n-ignore: the log
   }
   // A lane of the project running again: its own end is the next natural break.
   if ((await listLanes(ws).catch(() => [])).some((l) => (l.state === 'active' || l.state === 'paused') && l.project.toLowerCase() === name.toLowerCase())) {
-    pending.delete(key)
+    drop()
     return not('a lane of it is running') // i18n-ignore: the log
   }
   const cfg = await ws.projectConfig(projectPath)
@@ -135,50 +147,39 @@ export async function considerNudge(ws: WorkspaceService, projectPath: string, t
       const waiting = (db.prepare("SELECT count(*) AS n FROM cards WHERE archived = 0 AND col IN ('review', 'passed') AND lower(coalesce(project, '')) = ?").get(name.toLowerCase()) as { n: number }).n // i18n-ignore: SQL
       if (waiting > 0 || !agentsQuiet(projectPath, agents)) return 'unfinished'
       const k = `fresh_nudge:${id}`
+      // An agent was busy since the mark: that spell has ended (its reset, if still to come, then has nothing to do).
+      if (spellEnded.delete(key)) db.prepare('DELETE FROM board_meta WHERE key = ?').run(k) // i18n-ignore: SQL
       if (db.prepare('SELECT 1 FROM board_meta WHERE key = ?').get(k)) return 'already' // i18n-ignore: SQL
-      db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?)').run(k, JSON.stringify({ trigger, at: Date.now() })) // i18n-ignore: SQL
+      db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?)').run(k, JSON.stringify({ trigger })) // i18n-ignore: SQL
       return 'told'
     })
   ).catch((e) => {
     log.warn('suggesting a fresh start', e)
     return null
   })
-  if (told === 'unfinished') {
-    pending.set(key, { ws, projectPath, trigger })
-    return not("its work hasn't finished") // i18n-ignore: the log
-  }
-  pending.delete(key)
+  // Unfinished: still kept, for the project's next quiet moment.
+  if (told === 'unfinished') return not("its work hasn't finished") // i18n-ignore: the log
+  drop()
   if (told !== 'told') return told === 'already' ? not('suggested already since its agents were last busy') : false // i18n-ignore: the log
-  toldHere.set(key, true)
   log.info(`Suggested a fresh start in ${userText(name)} (${trigger})`)
   sessions.notice(projectPath, M.title, { m: M.body, values: { project: name } }, { label: M.action, command: 'session.startFreshIdle', args: [projectPath] })
   return true
 }
 
-/** One of a project's agents got busy at `at`: its spell ends (the board's record of it, if made before then, goes). */
-async function endSpell(projectPath: string, at: number): Promise<void> {
+/**
+ * One of a project's agents got busy: its spell ends, and the mark on the board goes (whichever Hive made it), unless a
+ * claim has taken that busy moment already (and removed the mark itself).
+ */
+async function endSpell(projectPath: string): Promise<void> {
   const key = projectPath.toLowerCase()
-  if (toldHere.get(key) === false) return
+  if (!spellEnded.has(key)) return
   const ws = workspaceOf(projectPath)
-  const id = (await ws.projectConfig(projectPath)).id ?? basename(projectPath)
-  const kept = await boardWrite(ws, async () =>
+  const k = `fresh_nudge:${(await ws.projectConfig(projectPath)).id ?? basename(projectPath)}`
+  await boardWrite(ws, async () =>
     boardWriteOp(ws, (db) => {
-      const k = `fresh_nudge:${id}`
-      const had = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(k) as { value: string } | undefined // i18n-ignore: SQL
-      if (!had) return false
-      let told = 0
-      try {
-        told = Number((JSON.parse(had.value) as { at?: unknown }).at) || 0
-      } catch {
-        // Not a record of when (a bare trigger): from before this, so it goes.
-      }
-      // Told after the agent got busy: the next spell's, which stays.
-      if (told > at) return true
-      db.prepare('DELETE FROM board_meta WHERE key = ?').run(k) // i18n-ignore: SQL
-      return false
+      if (spellEnded.delete(key)) db.prepare('DELETE FROM board_meta WHERE key = ?').run(k) // i18n-ignore: SQL
     })
   )
-  toldHere.set(key, kept)
 }
 
 /** The cards known Done, per workspace (by path, lower case), so that only a card newly Done is a trigger. */
@@ -209,8 +210,8 @@ export function startFreshNudges(): void {
       const key = e.state.projectPath.toLowerCase()
       // Each run reads the latest (a run asked for meanwhile runs once more, after it).
       if (BUSY.has(e.state.status)) {
-        busyAt.set(key, Date.now())
-        void coalesced(`freshSpell:${key}`, () => endSpell(e.state.projectPath, busyAt.get(key)!)).catch((err) => log.warn('ending a fresh-start spell', err))
+        spellEnded.add(key)
+        void coalesced(`freshSpell:${key}`, () => endSpell(e.state.projectPath)).catch((err) => log.warn('ending a fresh-start spell', err))
         return
       }
       // Quiet again: a completion kept for this project is considered now.
@@ -233,7 +234,6 @@ export function startFreshNudges(): void {
 /** For tests: forgets what this Hive was told and saw (the board keeps its records). */
 export function resetFreshNudgesForTests(): void {
   pending.clear()
-  toldHere.clear()
-  busyAt.clear()
+  spellEnded.clear()
   doneSeen.clear()
 }

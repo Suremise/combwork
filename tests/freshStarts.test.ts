@@ -55,6 +55,9 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
   const fresh = await import('../src/main/freshStarts')
   const { boardRead, boardWrite, boardWriteOp } = await import('../src/main/boardStore')
   const { tellListeners } = await import('../src/main/events')
+  const { onBoardCommitted } = await import('../src/main/boardStore')
+  const { coalescing } = await import('../src/main/coalesce')
+  const lanes = await import('../src/main/lanes')
   let n = 0
   /** A workspace with project alpha (agents a1, a2, a3), its agents' states as `states` says, and the notices told. */
   const open = async (own?: 'on' | 'off') => {
@@ -131,7 +134,13 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
     }
   })
 
-  it('the nudge once per quiet spell: two triggers or two watchers at once, one; another Hive (or a restart), none; after an agent was busy, the next', async () => {
+  // The races of the nudge's lifecycle (#1437 round 3's design): one gated test each.
+  const status = (alpha: string, agentId: string, st: string): void => tellListeners({ type: 'session-status', state: { projectPath: alpha, agentId, status: st } } as unknown as HiveEvent)
+  const markOf = (w: Awaited<ReturnType<typeof open>>['w'], project: string) => boardRead(w, (db) => db.prepare('SELECT value FROM board_meta WHERE key = ?').get(`fresh_nudge:${project}`) as { value: string } | undefined)
+  /** Waits for the reset of a project's spell (coalesced) to have run, however it ended. */
+  const resetRun = (alpha: string) => vi.waitFor(() => expect(coalescing(`freshSpell:${alpha.toLowerCase()}`)).toBe(false), { timeout: HUNG_MS })
+
+  it('race 1: two triggers, or two watchers, at once: one notice', async () => {
     fresh.resetFreshNudgesForTests()
     fresh.startFreshNudges()
     const { w, alpha, told } = await open()
@@ -140,35 +149,141 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
     expect(told).toEqual([{ project: alpha, action: 'session.startFreshIdle' }])
     // The same spell: not again, whatever ends next.
     expect(await fresh.considerNudge(w, alpha, 'card:7')).toBe(false)
-    // Another window or Hive, or this one restarted (no memory of its own), with no agent busy since: the board's spell.
-    fresh.resetFreshNudgesForTests()
-    expect(await fresh.considerNudge(w, alpha, 'card:8')).toBe(false)
-    // An agent of the project gets busy: the spell ends, and the next trigger is told.
-    const project = (await w.projectConfig(alpha)).id ?? 'alpha'
-    tellListeners({ type: 'session-status', state: { projectPath: alpha, agentId: 'a1', status: 'working' } } as unknown as HiveEvent)
-    await vi.waitFor(() => expect(boardRead(w, (db) => db.prepare('SELECT 1 FROM board_meta WHERE key = ?').get(`fresh_nudge:${project}`))).toBeUndefined(), { timeout: HUNG_MS })
-    expect(await fresh.considerNudge(w, alpha, 'card:9')).toBe(true)
-    expect(told).toHaveLength(2)
+    expect(told).toHaveLength(1)
     await disposeWorkspaceService(w)
   })
 
-  it('a completion while the work is still finishing (the agent marks its card Done in its turn) is told once it goes quiet', async () => {
+  for (const trigger of ['lane:l6', 'card:61'])
+    it(`race 2 (${trigger.split(':')[0]}): the agent goes quiet just after the check found it working, before the check returns: told once`, async () => {
+      fresh.resetFreshNudgesForTests()
+      fresh.startFreshNudges()
+      const { w, alpha, states, told } = await open()
+      states.set('a1', now('working'))
+      // Once the check's write (unfinished) has committed, and before considerNudge carries on: a1's turn ends.
+      let gated = false
+      const off = onBoardCommitted((ws) => {
+        if (ws !== w || gated) return
+        gated = true
+        states.set('a1', now('finished'))
+        status(alpha, 'a1', 'finished')
+      })
+      try {
+        expect(await fresh.considerNudge(w, alpha, trigger)).toBe(false)
+        expect(gated).toBe(true)
+        await vi.waitFor(() => expect(told).toHaveLength(1), { timeout: HUNG_MS })
+        // Once: going quiet again tells nothing more.
+        status(alpha, 'a2', 'finished')
+        expect(await fresh.considerNudge(w, alpha, trigger)).toBe(false)
+        expect(told).toHaveLength(1)
+      } finally {
+        off()
+        await disposeWorkspaceService(w)
+      }
+    })
+
+  it("race 3: a restart in the spell (this Hive's memory gone, the mark on the board): no repeat until an agent is busy", async () => {
     fresh.resetFreshNudgesForTests()
     fresh.startFreshNudges()
-    const { w, alpha, states, told } = await open()
-    states.set('a1', now('working'))
-    expect(await fresh.considerNudge(w, alpha, 'lane:l5')).toBe(false)
-    // Another agent going quiet while a1 still works: still not finished, still kept.
-    tellListeners({ type: 'session-status', state: { projectPath: alpha, agentId: 'a2', status: 'ready' } } as unknown as HiveEvent)
-    // a1's turn ends: told, for the lane.
-    states.set('a1', now('finished'))
-    tellListeners({ type: 'session-status', state: { projectPath: alpha, agentId: 'a1', status: 'finished' } } as unknown as HiveEvent)
-    await vi.waitFor(() => expect(told).toHaveLength(1), { timeout: HUNG_MS })
-    // Kept no longer: going quiet again tells nothing more.
-    tellListeners({ type: 'session-status', state: { projectPath: alpha, agentId: 'a2', status: 'finished' } } as unknown as HiveEvent)
-    expect(await fresh.considerNudge(w, alpha, 'lane:l5')).toBe(false)
+    const { w, alpha, told } = await open()
+    expect(await fresh.considerNudge(w, alpha, 'lane:l3')).toBe(true)
+    fresh.resetFreshNudgesForTests()
+    expect(await fresh.considerNudge(w, alpha, 'card:8')).toBe(false)
     expect(told).toHaveLength(1)
     await disposeWorkspaceService(w)
+  })
+
+  it('race 4: another Hive marks the spell after this one saw none: its next busy moment ends it, and the next completion is told', async () => {
+    fresh.resetFreshNudgesForTests()
+    fresh.startFreshNudges()
+    const { w, alpha, told } = await open()
+    const project = (await w.projectConfig(alpha)).id ?? 'alpha'
+    // Busy here with no mark: nothing to remove.
+    status(alpha, 'a1', 'working')
+    await resetRun(alpha)
+    // The other Hive tells it (its own write on the board).
+    await boardWrite(w, async () => boardWriteOp(w, (db) => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?)').run(`fresh_nudge:${project}`, JSON.stringify({ trigger: 'lane:other' }))))
+    expect(await fresh.considerNudge(w, alpha, 'card:1')).toBe(false)
+    // Busy here again: that spell ends; the next completion is told here.
+    status(alpha, 'a1', 'working')
+    await vi.waitFor(() => expect(markOf(w, project)).toBeUndefined(), { timeout: HUNG_MS })
+    expect(await fresh.considerNudge(w, alpha, 'card:2')).toBe(true)
+    expect(told).toHaveLength(1)
+    await disposeWorkspaceService(w)
+  })
+
+  it('race 5: new work in the spell: an agent busy ends it (the next completion told); a lane started while a completion waits drops it, and its end is told', async () => {
+    fresh.resetFreshNudgesForTests()
+    fresh.startFreshNudges()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-23T12:00:00.000Z'))
+    const { w, alpha, states, told } = await open()
+    try {
+      const project = (await w.projectConfig(alpha)).id ?? 'alpha'
+      expect(await fresh.considerNudge(w, alpha, 'card:50')).toBe(true)
+      // Busy (the same millisecond): the mark goes; the next completion is told.
+      status(alpha, 'a1', 'working')
+      await vi.waitFor(() => expect(markOf(w, project)).toBeUndefined(), { timeout: HUNG_MS })
+      expect(await fresh.considerNudge(w, alpha, 'card:51')).toBe(true)
+      expect(told).toHaveLength(2)
+      // A completion while a1 works; then a lane starts: as a1 goes quiet, the completion is dropped, not told.
+      status(alpha, 'a1', 'working')
+      await resetRun(alpha)
+      states.set('a1', now('working'))
+      expect(await fresh.considerNudge(w, alpha, 'card:52')).toBe(false)
+      const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Lane work', project: 'alpha', agent: 'a1', column: 'doing' }, { kind: 'user' }))).number
+      const laneId = (await lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'a2', cards: [card], by: 'Builder (alpha)' })).lane.id
+      states.set('a1', now('finished'))
+      status(alpha, 'a1', 'finished')
+      await vi.waitFor(() => expect(coalescing(`freshPending:${alpha.toLowerCase()}`)).toBe(false), { timeout: HUNG_MS })
+      // Dropped: quiet again, still nothing.
+      status(alpha, 'a2', 'finished')
+      expect(coalescing(`freshPending:${alpha.toLowerCase()}`)).toBe(false)
+      expect(told).toHaveLength(2)
+      // The lane's end is told.
+      await lanes.endLane(w, laneId, {})
+      expect(await fresh.considerNudge(w, alpha, `lane:${laneId}`)).toBe(true)
+      expect(told).toHaveLength(3)
+    } finally {
+      clock.mockRestore()
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  it('race 6 (the clock frozen): a reset held from an earlier busy moment, finishing after the next spell is told, leaves that mark', async () => {
+    fresh.resetFreshNudgesForTests()
+    fresh.startFreshNudges()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-23T12:00:00.000Z'))
+    const { w, alpha, told } = await open()
+    const real = w.projectConfig.bind(w)
+    try {
+      const project = (await w.projectConfig(alpha)).id ?? 'alpha'
+      expect(await fresh.considerNudge(w, alpha, 'card:70')).toBe(true)
+      // The reset for the busy moment is held at its first read.
+      let release!: () => void
+      const held = new Promise<void>((r) => (release = r))
+      let hold = true
+      w.projectConfig = (async (...a: Parameters<typeof real>) => {
+        if (hold) {
+          hold = false
+          await held
+        }
+        return real(...a)
+      }) as typeof w.projectConfig
+      status(alpha, 'a1', 'working')
+      expect(hold).toBe(false)
+      // Quiet again, a new completion: the busy moment ended the old spell, so it is told (the old mark replaced).
+      expect(await fresh.considerNudge(w, alpha, 'card:71')).toBe(true)
+      expect(JSON.parse(markOf(w, project)!.value)).toEqual({ trigger: 'card:71' })
+      // The held reset finishes: the new spell's mark stays, and the next trigger isn't told.
+      release()
+      await resetRun(alpha)
+      expect(JSON.parse(markOf(w, project)!.value)).toEqual({ trigger: 'card:71' })
+      expect(await fresh.considerNudge(w, alpha, 'card:72')).toBe(false)
+      expect(told).toHaveLength(2)
+    } finally {
+      w.projectConfig = real
+      clock.mockRestore()
+      await disposeWorkspaceService(w)
+    }
   })
 
   it("no nudge while the work isn't finished: an agent busy, or a card in Review", async () => {
