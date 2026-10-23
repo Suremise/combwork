@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ProjectInfo } from '@shared/types'
+import type { ProjectInfo, SlotView } from '@shared/types'
 import { fmt, msg, tr } from '@shared/i18n'
 import {
   aheadBehindText,
@@ -98,6 +98,8 @@ const M = {
   agentWorktree: msg({ id: 'git.worktree.agent', defaultMessage: "{agent}'s worktree", description: "A worktree that belongs to an agent. {agent} is the agent's name." }),
   worktreeBadge: msg({ id: 'git.worktree.badge', defaultMessage: 'worktree', description: "Badge on a branch checked out in a worktree that isn't an agent's." }),
   unusedWorktree: msg({ id: 'git.worktree.unused', defaultMessage: 'Unused worktree', description: 'A worktree of the repository that belongs to no agent.' }),
+  slotLease: msg({ id: 'git.worktree.slotLease', defaultMessage: '{kind, select, card {{slot}: {agent} on {card}} lane {{slot}: {agent}, lane {lane}} carried {{slot}: carried for {agent}} other {{slot}: not lent}}', description: "A slot's row in Git → Branches & remotes, Worktrees (#1450): its name and its lease: lent to an agent ({agent}) for a card ({card}: its key) or a lane ({lane}: its name), carried for an agent (its old worktree, adopted), or not lent." }),
+  mergeBranch: msg({ id: 'git.branches.merge', defaultMessage: 'Merge {branch} into another branch…', description: "A branch row's button in Git → Branches & remotes (#1450): opens the Merge dialog on that branch." }),
   switchTip: msg({ id: 'git.switch.tip', defaultMessage: 'Switch the project folder to {branch}', description: 'Tooltip on a branch\'s Switch button.' }),
   remoteBranches: msg({ id: 'git.branches.remote', defaultMessage: 'Remote branches ({count, number})', description: 'Button in Git → Branches & remotes that shows or hides the remote branches with no local one.' }),
   trackLocal: msg({ id: 'git.branches.trackLocal', defaultMessage: 'A local {branch} tracking {remote}, and switch to it', description: "Tooltip on a remote branch's Switch button. {branch} is the local branch it makes; {remote} the remote branch, such as origin/feature." }),
@@ -176,6 +178,20 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
   // The project's names for its stages, read once for every row (HR4's #1424 round 1).
   const names = useProjectStages().get(project.path.toLowerCase())?.names
   useNow(60000)
+  // The project's slots and their leases (#1450), read with the branches: each slot row names its lease, each line its slot.
+  const [slots, setSlots] = useState<SlotView[]>([])
+  const lanes = useStore((st) => st.lanes)
+  useEffect(() => {
+    if (read.loading) return
+    let live = true
+    void call('slots:list', project.path).then(
+      (v) => live && setSlots(v),
+      () => live && setSlots([])
+    )
+    return () => {
+      live = false
+    }
+  }, [project.path, read.loading])
 
   const act = (name: string, title: string, fn: () => Promise<string>): void => void run(name, () => gitAction(project, title, fn))
 
@@ -281,7 +297,20 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
         const fetched = at(s.fetchedAt)
         const remoteOnly = info.remoteBranches.filter((r) => !info.branches.some((b) => b.name === r.slice(r.indexOf('/') + 1)))
         const warnings = identityWarnings(info.identity, info.remotes)
-        const agentOf = (path: string | null) => (path ? project.agents.find((a) => a.worktree && samePath(a.worktree.path, path)) : undefined)
+        // A folder's slot (#1450), and its agent: the slot's lease's, else the agent whose session runs there.
+        const slotOf = (path: string | null): SlotView | undefined => (path ? slots.find((x) => samePath(x.folder, path)) : undefined)
+        const agentOf = (path: string | null) => {
+          if (!path) return undefined
+          const lease = slotOf(path)?.lease
+          return project.agents.find((a) => (lease ? a.id === lease.agent : !!a.live?.cwd && samePath(a.live.cwd, path)))
+        }
+        const leaseText = (v: SlotView): string => {
+          const l = v.lease
+          const agent = l ? (project.agents.find((a) => a.id === l.agent)?.name ?? l.agent) : ''
+          const card = l && l.card !== null ? cardLabelOf({ tasks }, l.card) : ''
+          const lane = l?.lane ? (lanes.find((x) => x.id === l.lane)?.name ?? l.lane) : ''
+          return tr(M.slotLease, { kind: l ? (l.kind === 'carried' ? 'carried' : l.card !== null ? 'card' : 'lane') : 'none', slot: v.name, agent, card, lane })
+        }
         const cardsOf = (branch: string | null) => (branch ? (onBranch.get(branch) ?? []) : [])
         // A worktree names the card its agent is on, whatever its folder has checked out (HR4's #1424 round 1).
         const agentsCard = (path: string) => agentCard(project.name, agentOf(path)?.id, tasks, badges)
@@ -372,12 +401,22 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
             <div className="git-rows">
               {info.branches.map((b) => {
                 const agent = agentOf(b.worktree)
+                const slot = slotOf(b.worktree)
                 const why = b.current ? null : b.worktree ? tr(M.checkedOutIn, { where: agent ? 'agent' : 'other', agent: agent?.name ?? '' }) : switchBlocked
                 return (
                   <div key={b.name} className={cx('git-row', 'git-branch', b.current && 'current')} data-branch={b.name}>
                     <Icon name={b.current ? 'check' : b.worktree ? 'repo' : 'git-branch'} />
                     <span className="git-name">{b.name}</span>
-                    {b.worktree && <span className="badge" data-worktree="">{agent ? tr(M.agentWorktree, { agent: agent.name }) : tr(M.worktreeBadge)}</span>}
+                    {b.worktree &&
+                      (slot ? (
+                        <span className="badge" data-worktree="" data-slot={slot.name} title={leaseText(slot)}>
+                          {slot.name}
+                        </span>
+                      ) : (
+                        <span className="badge" data-worktree="">
+                          {agent ? tr(M.agentWorktree, { agent: agent.name }) : tr(M.worktreeBadge)}
+                        </span>
+                      ))}
                     <BranchCards cards={cardsOf(b.name)} project={project} names={names} />
                     {b.upstream && (
                       <span className="faint git-track">
@@ -392,6 +431,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                         {b.upstream && <IconButton icon="debug-disconnect" title={tr(M.untrackTip, { upstream: b.upstream })} action="untrack" disabled={off} onClick={() => void untrack(b.name, b.upstream!)} />}
                       </span>
                     )}
+                    {!b.current && <IconButton icon="git-merge" title={tr(M.mergeBranch, { branch: b.name })} action="merge-branch" disabled={!!ro} onClick={() => set({ branchMergeFor: { project: project.path, branch: b.name } })} />}
                     {!b.current && (
                       <Tooltip content={why ?? tr(M.switchTip, { branch: b.name })}>
                         <span>
@@ -462,17 +502,18 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                 <div className="git-rows">
                   {info.worktrees.map((w) => {
                     const agent = agentOf(w.path)
+                    const slot = slotOf(w.path)
                     return (
-                      <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path}>
+                      <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} {...(slot ? { 'data-slot': slot.name } : {})}>
                         <Icon name="repo" />
-                        <span className="git-name">{agent ? tr(M.agentWorktree, { agent: agent.name }) : tr(M.unusedWorktree)}</span>
+                        <span className="git-name">{slot ? leaseText(slot) : agent ? tr(M.agentWorktree, { agent: agent.name }) : tr(M.unusedWorktree)}</span>
                         <span className="faint">{w.branch ?? (w.head ? headText({ branch: null, head: w.head }) : '')}</span>
                         <BranchCards cards={agentsCard(w.path)} project={project} names={names} />
                         <span className="git-url faint">{w.path}</span>
                         <button
                           className="btn small subtle"
                           onClick={() => {
-                            set((st) => ({ changesRoot: { ...st.changesRoot, [project.path]: agent?.id ?? UNUSED_ROOT } }))
+                            set((st) => ({ changesRoot: { ...st.changesRoot, [project.path]: !slot && agent ? agent.id : UNUSED_ROOT } }))
                             showVersionControl(project.path, 'changes')
                           }}
                         >
