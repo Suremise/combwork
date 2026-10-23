@@ -184,6 +184,8 @@
   "tips.imagesTab.title": "Wszystko, co załączono, w jednym miejscu",
   "tips.improveTranslation.text": "Widzisz w swoim języku niezgrabne lub błędne słowo? Pomoc → Popraw to tłumaczenie pokazuje, jak je poprawić lub dodać język, przez pull request na GitHubie.",
   "tips.improveTranslation.title": "Niech Hive brzmi lepiej w Twoim języku",
+  "tips.inboxCarryingOn.text": "Hive informuje pracującego agenta o nowych wiadomościach po wywołaniu narzędzia, każe mu je przeczytać przed zatrzymaniem i wybudza bezczynnego. Każde ma przełącznik w Ustawienia → Zaawansowane i w projekcie; bez wybudzeń wiersz wpisuje Dostarcz teraz.",
+  "tips.inboxCarryingOn.title": "Wybierz, jak agenci dowiadują się o swojej skrzynce",
   "tips.inboxNotices.text": "Wiadomość, którą Asystent zostawia pracującemu agentowi, dociera do niego przy następnym wywołaniu narzędzia lub przed końcem jego tury, jako krótki komunikat od Hive: nic nie jest wpisywane w trakcie jego pracy. Agent czyta ją ze skrzynki odbiorczej i potwierdza; do tego czasu jego panel pokazuje ją jako nieprzeczytaną (✉).",
   "tips.inboxNotices.title": "Wiadomości docierają do zajętego agenta między krokami",
   "tips.isolatedChecks.text": "We wspólnym folderze sprawdzenie się nie liczy, jeśli w trakcie inny agent coś zmieni. hive-progress --check typecheck --isolated uruchamia je we własnej kopii na rewizji karty, do której nic innego nie zapisuje. Zatrzymaj w panelu Postęp kończy je razem ze wszystkim, co uruchomiło.",

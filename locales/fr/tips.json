@@ -184,6 +184,8 @@
   "tips.imagesTab.title": "Tout ce que tu as joint, au même endroit",
   "tips.improveTranslation.text": "Un mot maladroit ou faux dans ta langue ? Aide → Améliorer cette traduction explique comment le corriger, ou ajouter une langue, avec une pull request sur GitHub.",
   "tips.improveTranslation.title": "Rendre Hive plus agréable à lire dans ta langue",
+  "tips.inboxCarryingOn.text": "Hive prévient un agent au travail des nouveaux messages à la fin d’un outil, les lui fait lire avant l’arrêt et le réveille s’il est inactif. Chacun se règle dans Paramètres → Avancé et par projet ; sans réveils, « Transmettre maintenant » tape la ligne.",
+  "tips.inboxCarryingOn.title": "Choisis comment les agents apprennent ce qui arrive dans leur boîte",
   "tips.inboxNotices.text": "Un message que l’Assistant laisse à un agent au travail lui parvient à son prochain appel d’outil, ou avant la fin de son tour, sous forme d’un court avis de Hive : rien n’est tapé par-dessus son travail. L’agent le lit dans sa boîte de réception et en accuse réception ; son volet l’affiche comme non lu (✉) jusque-là.",
   "tips.inboxNotices.title": "Les messages joignent un agent occupé entre deux étapes",
   "tips.isolatedChecks.text": "Dans un dossier partagé, une vérification ne compte pas si un autre agent modifie quelque chose pendant qu’elle tourne. hive-progress --check typecheck --isolated la lance dans une copie à elle, à la révision de la carte, où rien d’autre n’écrit. Arrêter, dans le panneau Progression, l’arrête avec tout ce qu’elle a lancé.",

@@ -2863,7 +2863,7 @@ repeating them (#533) [note §8].
 - **Skill delivery** (#966 row 15, group C, P7): slots get their own skill copies (Codex, Copilot), Hive's owned copies
   are cleaned up safely, and the user chooses which skills are delivered [#966].
 - **Carrying on** (#966 row 16, P7): a switch that separates inbox availability, checkpoints, Stop continuation and
-  idle wakes, without dropping deliveries [#966].
+  idle wakes, without dropping deliveries [#966]. **Built [#1432]**: §16.15, group C's row 16.
 
 #### 16.10.8 Migration
 
@@ -3303,9 +3303,26 @@ it can't. One owner per switch; each defaults to today's behaviour; never writte
 | E (24, 26–30) | Ctrl+C/V passthrough; all-keys passthrough; the OSC 52 policy; prompt fidelity (Ctrl+U clearing a draft, collapsed whitespace, stripped characters); raw variants of Hive's wrapped prompts | P4 |
 | #1167 (19–23, 25, 34) | Copilot auto-update (both suppressors, every path); right-click for Claude Code and Codex; Codex terminal title omitted; `--system-prompt-snapshot off`; `--allow-all-mcp-server-instructions`; Codex `--no-daemon` (only if verified); model/effort flags (check first) | P4 |
 | #1174 | Codex: the Assistant pre-approves only its Control subset of Hive tools (parity; built in #1281, §9.3) | P4 |
-| C (15, 16) | Skill delivery per slot and choice of skills; carrying on (inbox, checkpoints, Stop continuation, idle wakes) | P7 |
+| C (15, 16) | Skill delivery per slot and choice of skills; carrying on (inbox, checkpoints, Stop continuation, idle wakes): row 16 **Built [#1432]** (below) | P7 |
 | F (31–33, 35–38), probes (39–42) | No switch: they are the integration itself (reasons on #966) | — |
 | 9, 17, 18 | Already switchable (file locks, background sessions, 200K): one owner, no duplicate | — |
+
+**Group C's row 16, carrying on** (#1432; `shared/inboxSwitches.ts`): how Hive gets an agent to read its inbox, three
+booleans in Advanced under Hive, each on by default and read at each use, with a project's own in Project Settings →
+Sessions (`inboxCheckpoints`, `inboxStopContinuation`, `inboxIdleWakes` in project.json: inherit, on or off; the
+Assistant's home has no project, so it follows Settings', which its Control tip says). Whether an agent can read an
+inbox at all stays the Agent API's (its hive tools, `agentReadsInbox`): Advanced links to it beside them, no second
+switch.
+- `hive.inbox.checkpoints`: off, `noticeFor` gives no notice at the end of a tool (and doesn't count one as told).
+- `hive.inbox.stopContinuation`: off, no drain: the Stop gets no reply, so Codex and Copilot aren't blocked and Claude
+  Code gets no context; the turn ends as the CLI ends it.
+- `hive.inbox.idleWakes`: off, `offerOnce` types no doorbell for what waits, of any kind (messages, card events and
+  loop wakes, watches' wakes, decisions, mode notices). A task given now (`deliverNow`: a card started on a running
+  agent, hive_send_task) and a launch's own prompt (`launchWith`) are no wakes and are typed as before. The pane's
+  unread menu says nothing is typed by itself and offers **Deliver Now** (`session:deliverNow`: one offer, as asked).
+- **No delivery dropped**: with any of them off an item stays in the inbox, unread, with the overdue rules as before;
+  with checkpoints and Stop continuation off an idle wake still tells the agent once its turn ends
+  (`tests/carryingOn.test.ts` lists every combination by the agent's state).
 
 **Group E's plain switches** (#1286; rows 24, 28, 29): Hive's own handling, the same for every CLI, so each is one row
 under Hive in Advanced (no CLI's recording to check it against), defaulting to what Hive did before:

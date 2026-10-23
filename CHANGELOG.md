@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Choose how agents hear of their inbox.** Settings → Advanced has a switch for each way Hive gets an agent to read what arrives in its inbox: telling a working agent at the end of a tool, keeping it going when it would stop with items unread, and waking it when it's idle (card loops' wakes included). Each is on as before, and a project can set its own in Project Settings → Sessions. Nothing is lost with any of them off: items wait in the inbox, the agent's pane shows how many, and with wakes off its **Deliver Now** types the line once.
 - **Isolated checks.** `hive-progress --check <name> --isolated` runs a check in a copy of its own at the card's revision, so another agent's edits in a shared folder can't spoil it, and it counts. It waits for a copy when all are in use, and **Stop** in the Progress panel ends it with everything it started (#1435).
 - **Role in the workflow** for each agent: Builder, Reviewer or Either, in Add Agent and Agent Settings. Start Lane offers builders and reviewers by it, and the project's agents table shows it. Agents from before 1.0 read as their names suggest (HR1 is a reviewer); the free-text role is now the agent's Note. (#1430)
 

@@ -184,6 +184,8 @@
   "tips.imagesTab.title": "Todo lo que adjuntaste, en un solo sitio",
   "tips.improveTranslation.text": "¿Viste una palabra torpe o incorrecta en tu idioma? Ayuda → Mejorar esta traducción explica cómo corregirla, o cómo agregar un idioma, con un pull request en GitHub.",
   "tips.improveTranslation.title": "Haz que Hive suene mejor en tu idioma",
+  "tips.inboxCarryingOn.text": "Hive avisa al agente que trabaja de mensajes nuevos al terminar una herramienta, se los hace leer antes de parar y despierta al inactivo. Cada cosa tiene interruptor en Configuración → Avanzado y por proyecto; sin avisos, Entregar ahora escribe la línea.",
+  "tips.inboxCarryingOn.title": "Elige cómo se enteran los agentes de su bandeja de entrada",
   "tips.inboxNotices.text": "Un mensaje que el Asistente deja a un agente que trabaja le llega en su siguiente llamada a una herramienta, o antes de que termine su turno, como un breve aviso de Hive: no se escribe nada encima de su trabajo. El agente lo lee en su bandeja de entrada y confirma que lo recibió; su panel lo muestra como sin leer (✉) hasta entonces.",
   "tips.inboxNotices.title": "Los mensajes llegan a un agente ocupado entre pasos",
   "tips.isolatedChecks.text": "En una carpeta compartida, una comprobación no cuenta si otro agente edita algo mientras se ejecuta. hive-progress --check typecheck --isolated la ejecuta en una copia propia en la revisión de la tarjeta, donde nada más escribe. Detener, en el panel Progreso, la termina con todo lo que inició.",
