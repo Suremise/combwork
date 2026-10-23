@@ -157,6 +157,7 @@
   "git.queue.none": "マージキューはありません。プロジェクトのワークフローで Hive がカードをマージする設定（バージョン管理 → ワークフロー：マージする人）のとき、各ターゲットブランチのキューと履歴がここに表示されます。",
   "git.queue.open": "{card} を開く",
   "git.queue.outcome": "結果",
+  "git.queue.reading": "マージキューを読み込み中…",
   "git.queue.region": "マージキュー",
   "git.queue.returned": "差し戻し：{why}",
   "git.queue.revision": "リビジョン",
