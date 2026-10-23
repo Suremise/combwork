@@ -93,6 +93,8 @@ interface HiveMessageValues {
   'content.templates.needsIt': { problem: string; provider: string | number; agent: string | number }
   'content.templates.noAgents': undefined
   'content.templates.noFile': undefined
+  'content.templates.noKey': { project: string | number }
+  'content.templates.noKeySave': { project: string | number }
   'content.templates.noWorkspace': undefined
   'content.templates.nothing': { problem: string | number }
   'content.templates.provider': { problem: string; provider: string | number }

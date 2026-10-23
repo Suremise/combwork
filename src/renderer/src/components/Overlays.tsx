@@ -51,6 +51,7 @@ export function Dialogs() {
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [checked, setChecked] = useState(false)
+  const [checked2, setChecked2] = useState(false)
   const [picked, setPicked] = useState('')
   // The prompt's second box (a new project's key) and whether the user has typed in it.
   const [second, setSecond] = useState('')
@@ -70,6 +71,7 @@ export function Dialogs() {
       setSecond(dialog.second?.follow(dialog.initial ?? '') ?? '')
       setSecondOwn(false)
       setChecked(dialog.check?.initial ?? false)
+      setChecked2(dialog.check2?.initial ?? false)
       setError(null)
       // Its box takes the focus as it opens, from wherever it was (a search box or a terminal behind the dialog too),
       // unless the user has already gone into one of this dialog's own boxes (#1221: run late, on a busy machine, the
@@ -96,6 +98,7 @@ export function Dialogs() {
       dialog.resolve(result === true)
     } else if (dialog.kind === 'prompt') {
       dialog.check?.set(checked)
+      dialog.check2?.set(checked2)
       if (typeof result === 'string') dialog.select?.set(picked)
       if (typeof result === 'string') dialog.second?.set(second)
       dialog.resolve(typeof result === 'string' ? result : null)
@@ -241,6 +244,11 @@ export function Dialogs() {
       {dialog.check && (
         <label className="flex" style={{ marginTop: 10 }}>
           <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} /> {dialog.check.label}
+        </label>
+      )}
+      {dialog.check2 && (
+        <label className="flex" style={{ marginTop: 6 }} data-check2>
+          <input type="checkbox" checked={checked2} onChange={(e) => setChecked2(e.target.checked)} /> {dialog.check2.label}
         </label>
       )}
     </Modal>

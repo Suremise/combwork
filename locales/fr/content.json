@@ -91,6 +91,8 @@
   "content.templates.needsIt": "{problem, select, unknown {Cette version de Hive ne connaît pas l’agent de code « {provider} » (mets Hive à jour) : l’agent {agent} en a besoin.} off {Le fournisseur {provider} est désactivé (Paramètres → Fournisseurs) : l’agent {agent} en a besoin.} other {Le fournisseur {provider} n’est pas installé (Configuration des agents) : l’agent {agent} en a besoin.}}",
   "content.templates.noAgents": "Ce projet n’a aucun agent à enregistrer.",
   "content.templates.noFile": "Ce fichier n’existe plus.",
+  "content.templates.noKey": "Hive n’a pas pu lire la clé de {project}, et les noms d’agents de ce modèle en sont formés. Réessaie, ou vérifie la clé dans Paramètres du projet → Agents et worktrees.",
+  "content.templates.noKeySave": "Hive n’a pas pu lire la clé de {project}, donc les noms ne peuvent pas être enregistrés avec elle. Réessaie, ou enregistre sans « Utiliser la clé du projet dans les noms ».",
   "content.templates.noWorkspace": "Ouvre d’abord un espace de travail.",
   "content.templates.nothing": "{problem} Rien n’a été modifié.",
   "content.templates.provider": "{problem, select, unknown {Cette version de Hive ne connaît pas l’agent de code « {provider} » (mets Hive à jour)} off {Le fournisseur {provider} est désactivé (Paramètres → Fournisseurs)} other {Le fournisseur {provider} n’est pas installé (Configuration des agents)}}",
