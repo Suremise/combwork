@@ -30,8 +30,10 @@ import { workflowText } from '../shared/workflow/texts'
 import type { Fact, FactData, StartedData, StageId } from '../shared/workflow/facts'
 import { SLOTS_DELETE_MERGED, SLOTS_RENAME_ADOPTED } from '../shared/advanced'
 import { basename } from 'path'
-import type { AgentDef } from '../shared/types'
+import type { AgentDef, LaneSlotInfo } from '../shared/types'
+import type { LaneRecord } from '../shared/lanes'
 import { app } from 'electron'
+import type { DatabaseSync } from 'node:sqlite'
 import { advanced } from './advanced'
 import { exitBy } from './exitLog'
 import { legacyWorktree, rebindSession } from './agentFolders'
@@ -797,13 +799,31 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
 }
 
 /** The slot a lane works in now (its open lease's): for the lane's view (lanes.ts). */
-function laneSlot(ws: WorkspaceService, lane: string): string | null {
+function laneSlot(ws: WorkspaceService, lane: LaneRecord): LaneSlotInfo | null {
   try {
-    return boardRead(ws, (db) => (db.prepare('SELECT slot FROM slot_leases WHERE lane = ? AND ended_at IS NULL').get(lane) as { slot: string } | undefined)?.slot ?? null) // i18n-ignore: SQL
+    // The lane's project as its slots name it (slotsApp's poolFor: its id, else its folder name). Agents' ids are a
+    // project's own (copied configs can share one), so only this project's leases count (HR3's #1446 round 1).
+    const path = ws.info()?.projects.find((p) => p.name.toLowerCase() === lane.project.toLowerCase())?.path
+    const project = (path ? ws.projectIdsNow().byPath.get(path.toLowerCase()) : undefined) ?? lane.project
+    return boardRead(ws, (db) => laneSlotIn(db, project, lane))
   } catch {
     // A board still 0.9's: no slots.
     return null
   }
+}
+
+/**
+ * A running lane's slot in hive.db (#1446): of `project`'s leases only (its slots' project id), the lane's own, else its
+ * builder's carried one (#1441: a 0.9 worktree adopted at the upgrade); none of the project's: null.
+ */
+export function laneSlotIn(db: DatabaseSync, project: string, lane: Pick<LaneRecord, 'id' | 'builder'>): LaneSlotInfo | null {
+  const l = db
+    .prepare("SELECT l.id, l.slot, l.kind, l.from_at AS since, s.state, s.op_kind AS op FROM slot_leases l JOIN slots s ON s.project = l.project AND s.name = l.slot WHERE l.ended_at IS NULL AND l.project = ? AND (l.lane = ? OR (l.kind = 'carried' AND l.agent = ?)) ORDER BY l.kind = 'carried' LIMIT 1") // i18n-ignore: SQL
+    .get(project, lane.id, lane.builder.id) as { id: string; slot: string; kind: string; since: string; state: string; op: string | null } | undefined
+  if (!l) return null
+  // The current card's line there: the last card started under this lease.
+  const line = (db.prepare("SELECT json_extract(data, '$.line') AS line FROM card_facts WHERE kind = 'Started' AND json_extract(data, '$.lease') = ? ORDER BY at DESC LIMIT 1").get(l.id) as { line: string | null } | undefined)?.line ?? null // i18n-ignore: SQL
+  return { name: l.slot, carried: l.kind === 'carried', line, state: l.state === 'creating' || l.op === 'warm' ? 'preparing' : 'ready', since: l.since }
 }
 
 /**

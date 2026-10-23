@@ -14,6 +14,8 @@ import { tempDir } from './tempDir'
 import { join } from 'path'
 import { lineName } from '../src/main/workflow/runtime'
 import type { Fact } from '../src/shared/workflow/facts'
+import { DatabaseSync } from 'node:sqlite'
+import { boardFile } from '../src/main/boardStore'
 
 /** What the stand-ins do: the switches, git's and the worktree list's hooks, the agent, its deliveries and launches. */
 const state = vi.hoisted(() => ({
@@ -123,7 +125,7 @@ vi.mock('../src/main/deliveries', async (orig) => {
   }
 })
 
-const { cycleIn, deleteMergedLine, place, settleSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
+const { cycleIn, deleteMergedLine, laneSlotIn, place, settleSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
 
 let env: Env | null = null
 afterEach(() => {
@@ -367,5 +369,38 @@ describe("a card's cycle in a slot (#1438)", () => {
     expect(cycleIn([...facts, f(6, 'LineDeleting', { line: 'x', revision: 'r' })])).toMatchObject({ deleting: { line: 'x' }, deleted: false })
     expect(cycleIn([...facts, f(6, 'LineDeleting', { line: 'x', revision: 'r' }), f(7, 'LineDeleteUndone', { line: 'x', revision: 'r', why: 'checkedOut' })])).toMatchObject({ deleting: null, deleted: false })
     expect(cycleIn([...facts, f(6, 'LineDeleting', { line: 'x', revision: 'r' }), f(7, 'LineDeleted', { line: 'x', revision: 'r', why: 'merged' })])).toMatchObject({ deleting: null, deleted: true })
+  })
+})
+
+describe("a lane's slot in the Progress panel (#1446)", () => {
+  it("is its own project's: another project's carried slot, its builder's id the same, is never its slot (HR3's round 1)", () => {
+    const e = (env = setup({ platform: 'git' }, { autoRun: false }))
+    const card = e.wf.createCard({ title: 'Own line' })
+    const db = new DatabaseSync(boardFile(e.home))
+    try {
+      db.exec('PRAGMA foreign_keys = ON')
+      const at = '2026-10-23T10:00:00.000Z'
+      let port = 51000
+      const slot = (project: string, name: string, slotState = 'lent'): void => void db.prepare('INSERT INTO slots (project, name, folder, state, port_base, created_at, used_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(project, name, join(e.home, project, name), slotState, (port += 10), at, at)
+      const lease = (id: string, project: string, name: string, kind: 'lane' | 'carried', agent: string, lane: string | null = null): void =>
+        void db.prepare('INSERT INTO slot_leases (id, project, slot, kind, lane, agent, from_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, project, name, kind, lane, agent, at)
+      // beta's builder, with the same local id as alpha's, carries beta-home.
+      slot('beta-id', 'beta-home')
+      lease('l-beta', 'beta-id', 'beta-home', 'carried', 'b1')
+      const alphaLane = { id: 'lane-a', builder: { id: 'b1', name: 'B1' } }
+      expect(laneSlotIn(db, 'alpha-id', alphaLane)).toBeNull()
+      expect(laneSlotIn(db, 'beta-id', { id: 'lane-b', builder: { id: 'b1', name: 'B1' } })).toMatchObject({ name: 'beta-home', carried: true })
+      // alpha's own carried slot is its slot, with the line of the card last started under that lease.
+      slot('alpha-id', 'hb1')
+      lease('l-alpha', 'alpha-id', 'hb1', 'carried', 'b1')
+      db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (?, 99, 'Started', ?, 'hive', 'recorded', ?)").run(card.id, at, JSON.stringify({ lease: 'l-alpha', line: 'hive/AM/AM-1-own-line' }))
+      expect(laneSlotIn(db, 'alpha-id', alphaLane)).toEqual({ name: 'hb1', carried: true, line: 'hive/AM/AM-1-own-line', state: 'ready', since: at })
+      // A slot lent to the lane wins over the carried one; one being made reads as being prepared.
+      slot('alpha-id', 'slot-a', 'creating')
+      lease('l-lane', 'alpha-id', 'slot-a', 'lane', 'b2', 'lane-a')
+      expect(laneSlotIn(db, 'alpha-id', alphaLane)).toMatchObject({ name: 'slot-a', carried: false, line: null, state: 'preparing' })
+    } finally {
+      db.close()
+    }
   })
 })

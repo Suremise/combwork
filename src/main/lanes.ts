@@ -3,7 +3,8 @@ import { join } from 'path'
 import { existsSync } from 'original-fs'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { allDone, isFrozen, loopDefaults, keptLanes, laneView, listedLanes, readLanes, running, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord } from '../shared/lanes'
-import type { HiveErrorKind, LaneCard, LaneInfo, TaskCard } from '../shared/types'
+import type { HiveErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
+import { reviewingNow } from '../shared/workflow/reviewerPool'
 import { withValues, type Text } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { HiveError } from './hiveError'
@@ -381,9 +382,12 @@ async function factsOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Prom
       const store = FactStore.forBoard(ws, { project: l.project, key: l.project })
       const m = new Map<number, LaneCardFacts>()
       for (const n of l.cards) {
-        const s = foldCard(store.facts(n))
+        const all = store.facts(n)
+        const s = foldCard(all)
         const asks = forYou(s)
-        m.set(n, { stage: s.stage, forYou: asks.length > 0, ...(asks[0] ? { ask: asks[0].kind } : {}), stale: !!s.stale, rounds: s.rounds })
+        // Who reviewed and reviews it (#1446: a pool lane's hover names them).
+        const last = s.verdicts.at(-1)
+        m.set(n, { stage: s.stage, forYou: asks.length > 0, ...(asks[0] ? { ask: asks[0].kind } : {}), stale: !!s.stale, rounds: s.rounds, lastVerdict: last ? { reviewer: last.reviewer, pass: last.pass } : null, reviewing: reviewingNow(all, () => true)?.reviewing ?? null })
       }
       out.set(l.id, m)
     } catch (e) {
@@ -413,9 +417,11 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
 }
 
 /** A running lane's slot, and whether it waits for one (Start Lane… found none free, `slotWait`, and it has none yet). */
-function slotView(ws: WorkspaceService, l: LaneRecord): { slot: string | null; waiting: boolean } {
-  const slot = slotOf ? slotOf(ws, l.id) : null
-  return { slot, waiting: !slot && !!l.slotWait }
+function slotView(ws: WorkspaceService, l: LaneRecord): { slot: string | null; waiting: boolean; info: LaneSlotInfo | null } {
+  const info = slotOf ? slotOf(ws, l) : null
+  // A lane waits for a slot only for one lent to it: its builder's carried slot doesn't end the wait.
+  const lent = info && !info.carried ? info.name : null
+  return { slot: info?.name ?? null, waiting: !lent && !!l.slotWait, info }
 }
 
 /**
@@ -442,8 +448,11 @@ export async function lanesWaitingForSlot(ws: WorkspaceService): Promise<LaneRec
   return (await read(ws)).filter((l) => running(l) && !!l.slotWait)
 }
 
-/** A lane's slot (#1438: slotCards.ts gives it; none, no slots). */
-let slotOf: ((ws: WorkspaceService, lane: string) => string | null) | null = null
+/**
+ * A running lane's slot (#1438: slotCards.ts gives it; none, no slots): the one lent to the lane, else its builder's
+ * carried slot (#1441), with what its row's hover tells (#1446).
+ */
+let slotOf: ((ws: WorkspaceService, lane: LaneRecord) => LaneSlotInfo | null) | null = null
 export function setLaneSlots(fn: typeof slotOf): void {
   slotOf = fn
 }
