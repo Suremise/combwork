@@ -176,6 +176,8 @@
   "tips.hiveSkills.title": "Habilidades para trabajar con Hive",
   "tips.hooksMissing.text": "Si una actualización de la CLI o una directiva impide que los hooks de un agente lleguen a Hive, su panel dice Estado desconocido en lugar de un estado que puede ser incorrecto, no se escribe nada en él y su carril se pausa. El banner sobre su panel dice por qué cuando Hive lo sabe.",
   "tips.hooksMissing.title": "Cuando dejan de llegar los hooks de un agente",
+  "tips.howDoYouWork.text": "La pestaña Control de versiones de un proyecto nuevo pregunta «¿Cómo trabajas?»: Individual, Pareja o Equipo, y sugiere el que encaja con sus agentes. Elegir lo configura con un clic; Ahora no mantiene tus valores predeterminados.",
+  "tips.howDoYouWork.title": "Empieza un proyecto nuevo con un ajuste predefinido",
   "tips.imagesTab.text": "La pestaña Adjuntos guarda cada captura y archivo pegado o soltado en las sesiones del proyecto, agrupados por sesión, con vistas previas y un filtro por tipo, listos para volver a insertarlos.",
   "tips.imagesTab.title": "Todo lo que adjuntaste, en un solo sitio",
   "tips.improveTranslation.text": "¿Viste una palabra torpe o incorrecta en tu idioma? Ayuda → Mejorar esta traducción explica cómo corregirla, o cómo agregar un idioma, con un pull request en GitHub.",

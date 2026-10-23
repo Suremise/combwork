@@ -134,5 +134,31 @@ export function workflowText<Id extends string>(m: Msg<Id>, ...values: MessageAr
 /** A stored workflow text by `format` (the window's language, or English); null when this Hive doesn't know its message. */
 export const workflowLine = (s: unknown, format: (m: Msg, values?: Record<string, string | number>) => string): string | null => storedLineText(s, format, workflowMessage)
 
+/**
+ * The notes main records in a fact's `platform.unknown` for a field it read nothing of (recorder.ts), in English for
+ * agents: the window words each itself (`unreadWhy`, #1477), for facts recorded before and since alike.
+ */
+export const UNREAD_NOTES = {
+  /** The reads weren't made for the card's agent before the change (it had none, or another's): nothing was read. */
+  beforeChange: 'not read before the change', // i18n-ignore: a fact's note, in English for agents
+  /** A start with no head or target to find its base from. */
+  noTarget: 'no target to start from', // i18n-ignore: a fact's note, in English for agents
+  /** A submission with no base or head, so no files to compare. */
+  noBaseOrHead: 'no base or head to compare' // i18n-ignore: a fact's note, in English for agents
+} as const
+
+/**
+ * Why a fact's field wasn't read, for the window's messages that say so (the card dialog's Work section, #1477): one of
+ * UNREAD_NOTES by its key (`note`: the message words it), else `other` with what couldn't be read by `format`, from the
+ * reason kept as data (`platform.unknownText`), or its English for a fact without one.
+ */
+export function unreadWhy(field: string, of: { unknown: Record<string, string>; unknownText: Record<string, StoredText> }, format: (m: Msg, values?: Record<string, string | number>) => string): { note: string; why: string } {
+  const english = of.unknown[field] ?? ''
+  const note = (Object.keys(UNREAD_NOTES) as (keyof typeof UNREAD_NOTES)[]).find((k) => UNREAD_NOTES[k] === english)
+  if (note) return { note, why: '' }
+  const t = of.unknownText[field]
+  return { note: 'other', why: (t && workflowLine(t, format)) || english }
+}
+
 /** A stored workflow text in English (agents, the Agent API, the log); its id when this Hive doesn't know it. */
 export const workflowEnglish = (s: StoredText): string => workflowLine(s, (m, values) => englishText(values ? { m, values } : m)) ?? s.id

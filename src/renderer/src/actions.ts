@@ -1,7 +1,7 @@
 import { basename } from './util'
 import { call, errorMessage } from './api'
 import { agentLimit } from './advanced'
-import { agentOf, agentProviderOf, choose, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
+import { agentOf, agentProviderOf, choose, openVersionControl, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
 import { MANY_AGENTS, agentLimitText, chosenLayout, layoutColumns, layoutPanes, moveAgentTo, projectLayout, projectSessionView, sessionInAgentFolder, swapAgentsIn } from '@shared/defaults'
 import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@shared/paneCells'
 import { defaultProviderPending, isProviderEnabled, projectDefaultProvider, providerName } from '@shared/providers'
@@ -221,6 +221,11 @@ export async function createProject(): Promise<void> {
   const created = ws.projects.find((p) => p.name === name.trim())
   set({ workspace: ws, selectedProject: created?.path ?? get().selectedProject })
   showView('projects')
+  // Its Version Control tab, at "How do you work?" (#1423): no notice for it, the step is in front of the user.
+  if (created) {
+    set({ presetStepShown: [...get().presetStepShown, created.path] })
+    openVersionControl(created.path, 'workflow')
+  }
   notify('success', tr(msg({ id: 'actions.project.created', defaultMessage: 'Project "{name}" created', description: 'A notification: a new project ({name}) was created.' }), { name: name.trim() }))
 }
 

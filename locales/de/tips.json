@@ -176,6 +176,8 @@
   "tips.hiveSkills.title": "Skills für die Arbeit mit Hive",
   "tips.hooksMissing.text": "Hält ein CLI-Update oder eine Richtlinie die Hooks eines Agenten von Hive fern, zeigt sein Bereich „Status unbekannt“ statt eines womöglich falschen Status, Hive tippt nichts hinein, und seine Lane pausiert. Das Banner über seinem Bereich sagt, warum, wenn Hive es erkennen kann.",
   "tips.hooksMissing.title": "Wenn die Hooks eines Agenten ausbleiben",
+  "tips.howDoYouWork.text": "Der Tab „Versionsverwaltung“ eines neuen Projekts fragt „Wie arbeitest du?“: Solo, Paar oder Team, und schlägt das zu seinen Agenten passende vor. „Wählen“ richtet es mit einem Klick ein; „Nicht jetzt“ behält deine Standardwerte.",
+  "tips.howDoYouWork.title": "Ein neues Projekt mit einer Voreinstellung beginnen",
   "tips.imagesTab.text": "Der Tab „Anhänge“ bewahrt jeden Screenshot und jede Datei auf, die in die Sitzungen des Projekts eingefügt oder gezogen wurden, nach Sitzung gruppiert, mit Vorschau und Filter nach Art, bereit zum erneuten Einfügen.",
   "tips.imagesTab.title": "Alles, was du angehängt hast, an einem Ort",
   "tips.improveTranslation.text": "Ein holpriges oder falsches Wort in deiner Sprache entdeckt? Hilfe → Diese Übersetzung verbessern zeigt, wie du es mit einem Pull Request auf GitHub korrigierst oder eine Sprache hinzufügst.",

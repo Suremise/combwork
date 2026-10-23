@@ -176,6 +176,8 @@
   "tips.hiveSkills.title": "Skills for working with Hive",
   "tips.hooksMissing.text": "If a CLI update or a policy stops an agent’s hooks reaching Hive, its pane says Status unknown instead of a status that may be wrong, nothing is typed into it and its lane pauses. The banner over its pane says why when Hive can tell.",
   "tips.hooksMissing.title": "When an agent’s hooks stop arriving",
+  "tips.howDoYouWork.text": "A new project’s Version Control tab asks “How do you work?”: Solo, Pair or Team, the one that fits its agents suggested. Choose sets it up in one click; Not Now keeps your defaults.",
+  "tips.howDoYouWork.title": "Start a new project with a preset",
   "tips.imagesTab.text": "The Attachments tab keeps each screenshot and file pasted or dropped into the project's sessions, grouped by session, with previews and a filter by kind, ready to insert again.",
   "tips.imagesTab.title": "Everything you attached, in one place",
   "tips.improveTranslation.text": "Spotted a clumsy or wrong word in your language? Help → Improve This Translation shows how to fix it, or add a language, with a pull request on GitHub.",
