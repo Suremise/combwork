@@ -320,8 +320,8 @@ const prose = (seed, n) => {
   // added the workspace's Card loop rounds and wait (about 100 characters); 7,400 since #636 added Let agents read the
   // developer console (about 70 characters); 7,500 since #767 added Language (about 30 characters); 7,800 since #975
   // added Default view, #984 Resume agents after an unexpected close (about 85 characters each) and #976 Tile order
-  // (about 40 characters); 7,900 since #1443 added project.workflow.reviewerMode (G17, Reviewers: about 50 characters).
-  const settingsList = measure('hive_list_settings', tool('hive_list_settings', {}, 'assistant'), 7900)
+  // (about 40 characters).
+  const settingsList = measure('hive_list_settings', tool('hive_list_settings', {}, 'assistant'), 7800)
   check('settings: a line each, id = value, read-only ones marked', /^sessions\.compactSuggestTokens = 200000 · Suggest compacting above$/m.test(settingsList) && /^agentApi\.port = \d+ \[read-only\] · /m.test(settingsList) && /^advanced\.showDeveloperFeatures = off · /m.test(settingsList) && !/^advanced\.(logs|data|reset) /m.test(settingsList), settingsList.slice(0, 300))
   // 1,800 and 11 lines since #1286's Advanced switches The Assistant starts with Hive's start view and Clear the CLI's
   // draft before Hive types, whose text names compaction and Compact (about 120 characters each).
