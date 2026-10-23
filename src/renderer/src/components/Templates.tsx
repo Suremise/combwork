@@ -3,7 +3,7 @@ import { SESSION_LAYOUTS } from '@shared/defaults'
 import { useAgentLimit } from '../advanced'
 import { agentChoosesMcp, agentMcpText } from '@shared/agentMcp'
 import { isKnownProvider, providerDescriptor, providerName } from '@shared/providers'
-import { TEMPLATE_DESCRIPTION_MAX, TEMPLATE_NAME_MAX, namesKey, pairIndex, pairNames, shownProblem, templateAgentNames, type TemplatePair, uniqueName, unknownProviders, type TemplateAgent, type TemplateDest, type TemplateEntry, type TemplateRef } from '@shared/templates'
+import { TEMPLATE_DESCRIPTION_MAX, TEMPLATE_NAME_MAX, pairIndex, pairNames, shownProblem, templateAgentNames, type TemplatePair, uniqueName, unknownProviders, type TemplateAgent, type TemplateDest, type TemplateEntry, type TemplateRef } from '@shared/templates'
 import { templateDescription, templateTitle } from '@shared/templateDefaults'
 import { WORKFLOW_ROLE_TEXT, buildsWork, reviewsWork } from '@shared/workflow/roles'
 import { PRESET_TEXT } from '@shared/workflow/optionTexts'
@@ -339,12 +339,12 @@ function partnerOf(t: Pick<TemplateEntry, 'pairs'>, name: string): string | unde
 /**
  * A template whose names are patterns (Hive's own, one saved with "Use the project key in names") as a project would
  * get it (#1123 names, #1440): its agents' and pairs' names made with that project's key (`{key}-B{n}` as HI-B1), so what
- * is shown is what loading makes; any other template as it is.
+ * is shown is what loading makes; with no project, or its key not known, `{key}` stays (`{key}-B1`), never a guessed
+ * key. Any other template as it is. Only for showing: the editor changes the template as it is kept.
  */
 function asLoaded(t: TemplateEntry, projectPath: string | null | undefined): TemplateEntry {
   if (!t.agents.some((a) => /\{(key|n)\}/.test(a.name))) return t
-  const p = projectsNow().find((x) => sameProject(x.path, projectPath ?? undefined))
-  const key = namesKey(get().projectKeys.find((k) => sameProject(k.projectPath, p?.path))?.key, p?.name ?? '')
+  const key = (projectPath && get().projectKeys.find((k) => sameProject(k.projectPath, projectPath))?.key) || '{key}'
   const names = templateAgentNames(t.agents, key)
   const of = (n: string): string => names[pairIndex(t.agents, n)] ?? n
   return { ...t, agents: t.agents.map((a, i) => ({ ...a, name: names[i] })), ...(t.pairs ? { pairs: t.pairs.map((x) => ({ builder: of(x.builder), reviewer: of(x.reviewer) })) } : {}) }
@@ -628,7 +628,8 @@ export function TemplateDetail({ t: entry, project, onGone, onSelect }: { t: Tem
   // Hive's own (#1436): loaded, duplicated and exported, never changed where they are.
   const readOnly = t.scope === 'hive'
   const description = templateDescription(t)
-  if (editing && !t.problem && !readOnly) return <TemplateEditor t={t} project={project} onDone={() => setEditing(false)} />
+  // The editor has the template as it is kept (#1440: its patterns, never the names they make here).
+  if (editing && !t.problem && !readOnly) return <TemplateEditor t={entry} project={project} onDone={() => setEditing(false)} />
   return (
     <div className="template-detail" data-scope={t.scope}>
       <div className="template-detail-head">

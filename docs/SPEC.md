@@ -2873,8 +2873,7 @@ repeating them (#533) [note §8].
   the window's name for it and the time): Solo (1 builder, Claude Code, single), Pair (builder Claude Code + reviewer
   Codex, columns2), Pair: one provider (both Claude Code), Team 3×3 (3 + 3, paired, grid6), Team 6×6 (6 builders on medium
   effort + 6 reviewers, paired, grid6 on two pages), Team 6 + pool (6 + 2, `reviewerMode: pool`, grid6 and a page of two);
-  models the provider's default; names `{key}-B{n}` / `{key}-R{n}` (expanded with the project's key, else its name's first
-  two letters, `templateAgentNames`; #1440 builds the names table on it); names and descriptions in 7 locales. A
+  models the provider's default; names `{key}-B{n}` / `{key}-R{n}` (expanded with the project's key, `templateAgentNames`; #1440 builds the names table on it); names and descriptions in 7 locales. A
   provider of Hive's own that is off or not installed is swapped for the first one that runs here (Claude Code first) with
   its model, effort and mode left to that one's defaults, said on the row (`swaps`), so Pair loads as Pair: one provider;
   a template the user made stays refused instead. **0.9's at the upgrade** (`templateUpgrade.ts`; the Assistant's 23 Oct scope call: copy
@@ -2884,13 +2883,18 @@ repeating them (#533) [note §8].
   workspace's and each project's `.hive/templates` is **copied** into `.hive/backups/templates-0.9/workspace` and
   `…/projects/<project id>`; the originals are never moved, deleted or rewritten, and `.bak` files aren't copied.
 - **Names: patterns and the names table** [#1440] **Built [#1440]**: an agent's name in a template may hold `{key}` (the
-  project's key, else its name's first two letters) and `{n}` (its number among the template's agents with the same
+  project's key, `projectKeyOf`; never guessed: a plan, load or added agent whose names hold `{key}` is refused when the
+  key can't be read, `content.templates.noKey`, and the window shows `{key}` unexpanded) and `{n}` (its number among the template's agents with the same
   name, in order: `expandName`, `templateAgentNames`); any other `{token}` is refused, and the expanded names must be unique
   and fit (checked with `KEY`). Pairs name the numbered agents (`{key}-B1` with `{key}-R1`; `pairNames`, `pairIndex`), and
   the editor keeps them by place, sending them with the save (`templates:update`'s `pairs`), so moving, copying or renaming
   never mis-pairs. **Save Template…** offers **Use the project key in names** when the agents' names follow the
-  project's key (`namesFollowKey`): `KEY-<letters><n>` becomes `{key}-<letters>{n}` when `n` is its place among those
-  letters, else `{key}-<letters><n>` (`namePatterns`); other names stay fixed; not ticked, names are saved as they are.
+  project's key (`namesFollowKey`): `KEY-<letters><n>` becomes `{key}-<letters>{n}` when those letters' numbers run 1, 2,
+  3… in the agents' order, else each keeps its number, `{key}-<letters><n>` (`namePatterns`: a `{n}` beside fixed numbers
+  could make a name twice); other names stay fixed; not ticked, names are saved as they are. A save is read back as a
+  file is before it is written (a template that couldn't load is never saved), and refused when asked for patterns and
+  the key can't be read. The editor edits the template as kept (its patterns); the view shows it with the selected
+  project's names.
   **The load dialog's names table** fills a free name in for each name another project's agent has, or that two agents
   would share (`suggestTemplateAgentName`: another project's key swapped for this one's, else `suggestAgentName`'s), and
   says so above the table; a name typed back into a clash is marked and Load template greyed out, as before. **Add Agent

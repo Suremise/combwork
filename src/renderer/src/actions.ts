@@ -13,7 +13,7 @@ import { fmt, tr } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
 import { HAND_OVER_TEXT } from '@shared/handOver'
 import type { McpServerInfo, ProjectInfo, ProjectProviderConfig, ProviderId, SessionLayout, SessionListItem, SessionView, ToastAction } from '@shared/types'
-import { TEMPLATE_NAME_MAX, namesFollowKey, namesKey, templateAgentNames, type TemplateEntry, type TemplateScope } from '@shared/templates'
+import { TEMPLATE_NAME_MAX, namesFollowKey, templateAgentNames, usesKey, type TemplateEntry, type TemplateScope } from '@shared/templates'
 import { templateLoadDetail } from '@shared/templateLoad'
 import { PRESET_TEXT } from '@shared/workflow/optionTexts'
 import { WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
@@ -1221,8 +1221,14 @@ export async function addAgentFromTemplate(path: string, entry: Pick<TemplateEnt
   const a = entry.agents[index]
   if (!p || !a) return
   const key = get().projectKeys.find((k) => k.projectPath.toLowerCase() === path.toLowerCase())?.key ?? null
+  const failed = tr(msg({ id: 'actions.template.addAgentFailed', defaultMessage: 'Could not add the agent', description: "An error's title: adding an agent from a template failed." }))
+  // Names made from the project's key that isn't known here: Hive says why (never a guessed key).
+  if (!key && usesKey(entry.agents)) {
+    if (await attempt(failed, () => call('templates:addAgent', path, entry.scope, entry.file, index))) await refreshWorkspace()
+    return
+  }
   const everyone = workspaceAgentList(get().workspace?.projects)
-  const own = templateAgentNames(entry.agents, namesKey(key, p.name))[index]
+  const own = templateAgentNames(entry.agents, key ?? '')[index]
   const initial = nameTaken(own, everyone) ? suggestTemplateAgentName(own, p.name, key, everyone.map((x) => x.name)) : own
   const name = await prompt({
     title: tr(msg({ id: 'actions.template.addTitle', defaultMessage: 'Add an agent from a template', description: 'Title of the dialog that adds one agent of a template to the project (#1440).' })),
@@ -1238,7 +1244,7 @@ export async function addAgentFromTemplate(path: string, entry: Pick<TemplateEnt
     }
   })
   if (name === null) return
-  const def = await attempt(tr(msg({ id: 'actions.template.addAgentFailed', defaultMessage: 'Could not add the agent', description: "An error's title: adding an agent from a template failed." })), () => call('templates:addAgent', path, entry.scope, entry.file, index, undefined, name.trim()))
+  const def = await attempt(failed, () => call('templates:addAgent', path, entry.scope, entry.file, index, undefined, name.trim()))
   if (!def) return
   await refreshWorkspace()
   const now = project(path)

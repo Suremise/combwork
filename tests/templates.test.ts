@@ -150,7 +150,15 @@ describe('the template format', () => {
 
   it("saving as patterns (#1440): names that follow the project's key become {key}-B{n}, others stay; pairs by numbered name", () => {
     const named = (names: string[]) => names.map((name) => ({ name, role: agentWorkflowRole({ name }) }))
-    expect(namePatterns(named(['HI-B1', 'HI-B2', 'HI-R1', 'Docs', 'HB1', 'HI-B4']), 'HI')).toEqual(['{key}-B{n}', '{key}-B{n}', '{key}-R{n}', 'Docs', 'HB1', '{key}-B4'])
+    // A group numbered 1, 2, 3… in order: {n}; any other (a gap, another order) keeps its numbers (HR3, #1440 round 1),
+    // so its names are made again, each once.
+    expect(namePatterns(named(['HI-B1', 'HI-R1', 'HI-B2', 'Docs', 'HB1', 'HI-R2']), 'HI')).toEqual(['{key}-B{n}', '{key}-R{n}', '{key}-B{n}', 'Docs', 'HB1', '{key}-R{n}'])
+    expect(namePatterns(named(['HI-B1', 'HI-B2', 'HI-R1', 'HI-B4']), 'HI')).toEqual(['{key}-B1', '{key}-B2', '{key}-R{n}', '{key}-B4'])
+    for (const order of [['AM-B2', 'AM-B1', 'AM-B3', 'AM-R1', 'AM-R2', 'AM-R3'], ['AM-B3', 'AM-R1', 'AM-B1', 'AM-R3', 'AM-b2', 'AM-R2'], ['AM-B1', 'AM-B3', 'AM-R2']]) {
+      const kept = namePatterns(named(order), 'AM')
+      expect(templateAgentNames(kept.map((name, i) => ({ name, role: named(order)[i].role })), 'AM')).toEqual(order)
+      expect(templateAgentNames(kept.map((name, i) => ({ name, role: named(order)[i].role })), 'AP')).toEqual(order.map((n) => n.replace('AM', 'AP')))
+    }
     expect([namesFollowKey(['HB1', 'HR1'], 'HI'), namesFollowKey(['HI-B1', 'Docs'], 'HI'), namesFollowKey(['HI-B1'], null), namesFollowKey(['AM-B1'], 'HI')]).toEqual([false, true, false, false])
     const team: AgentDef[] = [
       { id: 'b1', name: 'HI-B1', workflowRole: 'builder', pairedWith: 'HI-R1', provider: 'claude-code' },
@@ -633,10 +641,16 @@ describe('saving and loading templates', () => {
 
   gitIt("Hive's Team 3×3 (#1436): six agents named from the project's key, paired both ways, in a grid, none in a worktree; a provider that can't run is swapped, said on its row", async () => {
     const ids = cfgOf(beta).agents.map((a: AgentDef) => a.id)
-    const plan = await run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))
-    // Beta's key (or, before it has one, its name's first letters).
-    const key = plan.create[0].name.split('-')[0]
+    // Names made from the key that can't be read (beta has none yet): refused, never a guessed key (#1440).
+    await expect(run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))).rejects.toThrow(/couldn't read beta's key/)
+    await expect(run(() => templates.addAgentFromTemplate(beta, 'hive', 'team-3x3.json', 0))).rejects.toThrow(/couldn't read beta's key/)
+    await expect(run(() => templates.saveTemplate(beta, 'workspace', 'Unkeyed', false, true))).rejects.toThrow(/couldn't read beta's key/)
+    expect(cfgOf(beta).agents.map((a: AgentDef) => a.id)).toEqual(ids)
+    const { keyProjects, projectKeyOf } = await import('../src/main/projectKeys')
+    await run(() => keyProjects(w))
+    const key = (await run(() => projectKeyOf(w, beta)))!
     expect(key).toMatch(/^[A-Z]{2,4}$/)
+    const plan = await run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))
     const want = ['B1', 'B2', 'B3', 'R1', 'R2', 'R3'].map((n) => `${key}-${n}`)
     expect([plan.name, plan.blocked, plan.create.map((a) => a.name), plan.templateNames, plan.layout, plan.suggestedPreset, plan.swaps]).toEqual(['Team 3×3', [], want, want, 'grid6', 'team', []])
     expect(plan.pairs).toEqual([{ builder: 0, reviewer: 3 }, { builder: 1, reviewer: 4 }, { builder: 2, reviewer: 5 }])

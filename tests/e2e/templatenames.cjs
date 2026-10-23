@@ -3,7 +3,8 @@
 // once); amberlight's agents saved as a template with "Use the project key in names" keep patterns ({key}-B{n}), and
 // without it fixed names; the fixed-name one loaded into apiary has every name taken by amberlight's, so free names are
 // filled in (AP-B1…, the key swapped), one edited to a taken name greys Load template out until it is fixed; loaded,
-// apiary's agents have apiary's names. Add Agent from Template asks for its name, filled in free. Screenshots of the
+// apiary's agents have apiary's names. Editing the pattern template's description only keeps its patterns and pairs (HR3,
+// round 1), and it loads into apiary with apiary's names. Add Agent from Template asks for its name, filled in free. Screenshots of the
 // names table with a clash in English and German, light and dark. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR; a quiet test copy.
 const lib = require('./lib.cjs')
@@ -116,6 +117,24 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     check('…ticked: patterns, and the pairs by numbered name', !!(await until(async () => fs.existsSync(path.join(ws, '.hive', 'templates', 'am-team.json')), HUNG_MS)) && JSON.stringify(file('am-team.json').agents.map((a) => a.name)) === JSON.stringify(['{key}-B{n}', '{key}-B{n}', '{key}-B{n}', '{key}-R{n}', '{key}-R{n}', '{key}-R{n}']) && file('am-team.json').pairs?.[0]?.builder === '{key}-B1', JSON.stringify(file('am-team.json').agents.map((a) => a.name)))
     check('…unticked: fixed names', JSON.stringify(file('am-fixed.json').agents.map((a) => a.name)) === JSON.stringify(team.map((n) => `AM-${n}`)))
 
+    // --- The pattern template edited in the Templates view, its description only: shown with amberlight's names, edited
+    // as its patterns, saved with them and its pairs unchanged (HR3, #1440 round 1: the editor once saved the names shown).
+    const patterns = JSON.stringify(file('am-team.json').agents.map((a) => a.name))
+    const pairsBefore = JSON.stringify(file('am-team.json').pairs)
+    await page.locator('.activitybar [aria-label="Templates"]').click()
+    await page.locator('.sidebar .template-row:not([data-scope="hive"])[aria-label="AM team"]').first().click()
+    const detail = page.locator('.main-area > .tab-body .template-detail')
+    await until(async () => (await detail.count()) === 1, HUNG_MS)
+    check("the view shows the pattern template with the selected project's names", !!(await until(async () => /AM-B1/.test(await detail.innerText().catch(() => '')) && !/\{key\}/.test(await detail.innerText().catch(() => '')), HUNG_MS)), await detail.innerText().catch(() => ''))
+    await detail.getByRole('button', { name: 'Edit…' }).click()
+    const editor = page.locator('.main-area > .tab-body .template-editor')
+    await until(async () => (await editor.count()) === 1, HUNG_MS)
+    const rows = () => editor.locator('tbody tr').evaluateAll((l) => l.map((r) => r.dataset.agent))
+    check('…the editor has its patterns', JSON.stringify(await rows()) === patterns, JSON.stringify(await rows()))
+    await editor.locator('#template-description').fill('Three builders, three reviewers.')
+    await editor.getByRole('button', { name: 'Save Template' }).click()
+    check('…saved with the description: its patterns and pairs as they were', !!(await until(async () => file('am-team.json').description === 'Three builders, three reviewers.', HUNG_MS)) && JSON.stringify(file('am-team.json').agents.map((a) => a.name)) === patterns && JSON.stringify(file('am-team.json').pairs) === pairsBefore, JSON.stringify(file('am-team.json')))
+
     // --- The fixed-name template into apiary: every name is amberlight's, so free ones are filled in (AP-B1…).
     await select('apiary')
     let d = await openLoad('AM fixed')
@@ -153,6 +172,11 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     check('…fixed: Load template ready again', !!(await until(async () => (await d.locator('.template-plan-table .field-error').count()) === 0 && (await loadButton(d).isEnabled()), HUNG_MS)))
     await loadButton(d).click()
     check('loaded into apiary with its own names', !!(await until(async () => JSON.stringify(names(apiary)) === JSON.stringify(team.map((n) => `AP-${n}`)), HUNG_MS)), JSON.stringify(names(apiary)))
+    // The edited pattern template into apiary: apiary's key, paired the same, Load template ready at once.
+    d = await openLoad('AM team')
+    check('the edited pattern template loads into apiary with its names', JSON.stringify(await boxes(d)) === JSON.stringify(team.map((n) => `AP-${n}`)) && (await loadButton(d).isEnabled()), JSON.stringify(await boxes(d)))
+    await loadButton(d).click()
+    check('…paired as saved', !!(await until(async () => JSON.stringify(agentsOf(apiary).map((a) => a.pairedWith ?? null)) === JSON.stringify(['AP-R1', 'AP-R2', 'AP-R3', 'AP-B1', 'AP-B2', 'AP-B3']), HUNG_MS)), JSON.stringify(agentsOf(apiary).map((a) => a.pairedWith ?? null)))
 
     // --- Add Agent from Template: its name asked for, filled in free (AM-B1 is amberlight's: AP's taken too, so another).
     await lib.addMenuRun(page, 'Add Agent from Template')

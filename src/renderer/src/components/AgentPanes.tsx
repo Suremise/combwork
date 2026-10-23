@@ -11,7 +11,7 @@ import { SESSION_LAYOUTS, agentLimitText, agentsPerPage, compactThreshold, conte
 import { cellPage, cellPageCount, neighbourCell, pageCells, pageIds, type CellDirection } from '@shared/paneCells'
 import { agentLimit, inboxSwitchNow, useAgentLimit } from '../advanced'
 import type { AgentInfo, LiveSessionState, PageLayout, ProjectInfo, SessionLayout, SessionListItem, SessionUsage, SessionView } from '@shared/types'
-import { namesKey, shownProblem, templateAgentNames, type TemplateEntry, type TemplateScope } from '@shared/templates'
+import { shownProblem, templateAgentNames, type TemplateEntry, type TemplateScope } from '@shared/templates'
 import { templateTitle } from '@shared/templateDefaults'
 import { WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
 import type { StartFailure } from '@shared/startFailure'
@@ -689,8 +689,8 @@ const templateList = (path: string): Promise<TemplateEntry[] | null> =>
 function addFromTemplateItems(project: ProjectInfo, list: TemplateEntry[]): MenuEntry[] {
   const all = list.filter((t) => !t.problem)
   const full = project.agents.length >= agentLimit()
-  // Their names as this project's (#1123 names: Hive's own are patterns of its key, HI-B1).
-  const key = namesKey(get().projectKeys.find((k) => k.projectPath.toLowerCase() === project.path.toLowerCase())?.key, project.name)
+  // Their names as this project's (#1123 names: Hive's own are patterns of its key, HI-B1); its key not known, `{key}` stays.
+  const key = get().projectKeys.find((k) => k.projectPath.toLowerCase() === project.path.toLowerCase())?.key || '{key}'
   return all.length
     ? all.flatMap((t) => [
         { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, hive {Hive} workspace {workspace} other {this project}}', description: "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Hive: one of Hive's own templates, #1436)." }), { template: templateTitle(t), scope: t.scope }) },

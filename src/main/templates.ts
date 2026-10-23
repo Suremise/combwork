@@ -14,7 +14,7 @@ import {
   templatePairs,
   pairIndex,
   pairNames,
-  namesKey,
+  usesKey,
   templateFile,
   templateFrom,
   uniqueName,
@@ -79,6 +79,8 @@ const M = {
   taken: msg({ id: 'content.templates.taken', defaultMessage: '{names} {count, plural, one {is already an agent} other {are already agents}} in {projects}: agent names are unique across the workspace, so rename {count, plural, one {it} other {them}}.', description: "Why a template can't be loaded: agents of other projects ({projects}) have its agents' names {names} ({count} of them). {names} and {projects} are lists, in the language's way (\"B1 and R1\")." }),
   takenNothing: msg({ id: 'content.templates.takenNothing', defaultMessage: '{names} {count, plural, one {is already an agent} other {are already agents}} in {projects}: agent names are unique across the workspace, so rename {count, plural, one {it} other {them}}. Nothing was changed.', description: "An error loading a template: agents of other projects ({projects}) took its agents' names {names} ({count} of them) while it loaded, so nothing changed. {names} and {projects} are lists, in the language's way (\"B1 and R1\")." }),
   nothing: msg({ id: 'content.templates.nothing', defaultMessage: '{problem} Nothing was changed.', description: "An error loading a template, nothing changed: {problem} is why, a sentence of its own (how many agents a project can have)." }),
+  noKey: msg({ id: 'content.templates.noKey', defaultMessage: "Hive couldn't read {project}'s key, and this template's agent names are made from it. Try again, or check the key in Project Settings → Agents & Worktrees.", description: "An error loading a template, or adding one of its agents, whose names hold the project's key (HI-B1 in a project whose key is HI): the key of the project ({project}, its name) couldn't be read. Project Settings → Agents & Worktrees is where the key is changed: use its translation." }),
+  noKeySave: msg({ id: 'content.templates.noKeySave', defaultMessage: "Hive couldn't read {project}'s key, so the names can't be saved with it. Try again, or save without Use the project key in names.", description: "An error saving a project's agents as a template with \"Use the project key in names\" ticked: the key of the project ({project}, its name) couldn't be read. \"Use the project key in names\" is the tick box's label: use its translation." }),
   hiveOnly: msg({ id: 'content.templates.hiveOnly', defaultMessage: "Hive's own templates can't be changed: duplicate one into the workspace or a project to change it.", description: "An error: saving, renaming, editing, importing into or deleting one of Hive's own templates (the Hive scope, read-only). Duplicate is a button: as Hive names it." })
 }
 
@@ -241,9 +243,14 @@ export async function saveTemplate(projectPath: string, scope: TemplateScope, na
   const cfg = await workspace.projectConfig(projectPath)
   const agents = projectAgents(cfg)
   if (!agents.length) throw refusal(msg({ id: 'content.templates.noAgents', defaultMessage: 'This project has no agents to save.', description: "An error saving a project's agents as a template: it has none." }))
-  // The project's key in its names kept as a pattern (#1440), when asked and it has one: HI-B1 as {key}-B{n}.
-  const key = usePatterns ? await projectKeyOf(workspaceOf(projectPath), projectPath).catch(() => null) : null
+  // The project's key in its names kept as a pattern (#1440), when asked: HI-B1 as {key}-B{n}; refused when the key
+  // can't be read, never saved with fixed names unasked.
+  const key = usePatterns ? await keyFor(projectPath) : null
+  if (usePatterns && !key) throw refusal(M.noKeySave, { project: basename(projectPath) })
   const t = templateFrom(clean, agents, cfg.layout, (a) => agentProvider(a, cfg, config.settings), new Date(), presetOf(cfg), key ?? undefined)
+  // What is saved must load: read as a file is.
+  const checked = readTemplate(JSON.parse(JSON.stringify(t)))
+  if (!isAgentTemplate(checked)) throw new TemplateError(checked, { kind: 'invalid' })
   return changing(d, async () => {
     // The same name: its file (replaced when asked). Another name whose file name would be the same: a file of its own.
     const same = (await listIn(d)).find((e) => e.name.toLowerCase() === clean.toLowerCase())
@@ -412,9 +419,19 @@ function statusReads(projectPath: string, reads: wt.RepoReads): StatusOf {
   }
 }
 
-/** The key a template's names are expanded with in a project (`namesKey`, #1123 names). */
-async function keyFor(projectPath: string): Promise<string> {
-  return namesKey(await projectKeyOf(workspaceOf(projectPath), projectPath).catch(() => null), basename(projectPath))
+/** A project's key (#704), as a template's names are made with it (#1123 names); null when it can't be read. */
+async function keyFor(projectPath: string): Promise<string | null> {
+  return projectKeyOf(workspaceOf(projectPath), projectPath).catch(() => null)
+}
+
+/**
+ * A template's agents' names in a project (#1123 names, #1440): its patterns made with the project's key, refused when
+ * they hold `{key}` and the key can't be read (never a guessed one).
+ */
+async function namesIn(projectPath: string, agents: readonly TemplateAgent[]): Promise<string[]> {
+  const key = await keyFor(projectPath)
+  if (!key && usesKey(agents)) throw refusal(M.noKey, { project: basename(projectPath) })
+  return templateAgentNames(agents, key ?? '')
 }
 
 /**
@@ -452,7 +469,7 @@ async function planFor(projectPath: string, scope: TemplateScope, file: string, 
   const status = statusReads(projectPath, repo)
   const original = await usable(refFor(projectPath, scope, file, from))
   // Its patterns as this project's names (#1123 names), then the names chosen in the dialog.
-  const expanded = templateAgentNames(original.agents, await keyFor(projectPath))
+  const expanded = await namesIn(projectPath, original.agents)
   const t = { ...original, agents: withNames(original.agents.map((a, i) => ({ ...a, name: expanded[i] })), names) }
   const cfg = await workspace.projectConfig(projectPath)
   const current = projectAgents(cfg)
@@ -646,7 +663,7 @@ export async function addAgentFromTemplate(projectPath: string, scope: TemplateS
   const why = providerProblem(a.provider)
   if (why) throw refusal(M.needsIt, { ...why, agent: a.name })
   // Unique across the workspace (#702): a name any agent of it has gets a number ("Builder 2"), never a prefix.
-  const own = templateAgentNames(t.agents, await keyFor(projectPath))[index]
+  const own = (await namesIn(projectPath, t.agents))[index]
   const name = typeof chosen === 'string' && chosen.trim() ? withNames([{ ...a, name: own }], [chosen])[0].name : uniqueName(own, (await workspaceAgents(projectPath)).map((x) => x.name))
   return addAgent(projectPath, { name, role: a.note, workflowRole: a.role, provider: a.provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext, mcpServers: a.mcpServers, location: 'project' })
 }

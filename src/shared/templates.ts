@@ -10,7 +10,6 @@ import type { AgentDef, EffortLevel, PageLayout, PermissionMode, ProviderId } fr
 import { msg } from './i18n/msg'
 import { shownText, withValues, type Text } from './advanced'
 import { agentWorkflowRole, buildsWork, isWorkflowRole, reviewsWork, type ReviewerMode, type WorkflowRole } from './workflow/roles'
-import { normalKey } from './projectKeys'
 
 /** The format's version: a template made by a newer Hive (a higher one) is refused rather than half read; 0.9's (1) too (#1436). */
 export const TEMPLATE_VERSION = 2
@@ -319,11 +318,8 @@ export function exportable(t: AgentTemplate): AgentTemplate {
 /** The tokens a template's agent names may hold (#1123 names): the project's key, and the agent's number among its role. */
 const NAME_TOKENS = /\{(key|n)\}/g
 
-/**
- * The key a template's agent names are made with in a project (#1123 names): its key (#704), or, before it has one, its
- * name's first two letters in upper case.
- */
-export const namesKey = (key: string | null | undefined, projectName: string): string => key || normalKey(projectName.replace(/[^A-Za-z]/g, '')).slice(0, 2) || 'AG'
+/** Whether a template's agent names hold the project's key (#1440): made only with a project's key, never a guess. */
+export const usesKey = (agents: readonly Pick<TemplateAgent, 'name'>[]): boolean => agents.some((a) => a.name.includes('{key}'))
 
 /** A name pattern made for a project (#1440): `{key}` its key, `{n}` the agent's number among those of that pattern. */
 export const expandName = (pattern: string, key: string, n: number): string => pattern.replace(NAME_TOKENS, (_m, t: string) => (t === 'key' ? key : String(n)))
@@ -343,19 +339,20 @@ export function templateAgentNames(agents: readonly Pick<TemplateAgent, 'name' |
 }
 
 /**
- * A project's agent names as a template keeps them (#1440, Save Template's "Use the project key in names"): a name
- * `<KEY>-<letters><number>` (HI-B2) as `{key}-B{n}` when its number is the agent's among those named `<KEY>-B…` (so
- * loading makes it again), else `{key}-B2`; any other name (Darren's HB1, "Docs") as it is.
+ * A project's agent names as a template keeps them (#1440, Save Template's "Use the project key in names"): names
+ * `<KEY>-<letters><number>` (HI-B1, HI-B2…) as `{key}-B{n}` when those of the letters are numbered 1, 2, 3… in the
+ * agents' order, so loading makes them again; else each keeps its number (`{key}-B2`), as a `{n}` among fixed numbers
+ * could make one of them twice. Any other name (Darren's HB1, "Docs") as it is.
  */
 export function namePatterns(agents: readonly Pick<TemplateAgent, 'name' | 'role'>[], key: string): string[] {
-  const count = new Map<string, number>()
   const shape = new RegExp(`^${key.replace(/[^A-Za-z]/g, '')}-([A-Za-z]+)(\\d+)$`, 'i')
-  return agents.map((a) => {
-    const m = shape.exec(a.name)
-    if (!m) return a.name
-    const n = (count.get(m[1].toLowerCase()) ?? 0) + 1
-    count.set(m[1].toLowerCase(), n)
-    return `{key}-${m[1]}${Number(m[2]) === n ? '{n}' : m[2]}`
+  const found = agents.map((a) => shape.exec(a.name))
+  const numbers = new Map<string, number[]>()
+  for (const m of found) if (m) numbers.set(m[1].toLowerCase(), [...(numbers.get(m[1].toLowerCase()) ?? []), Number(m[2])])
+  const counted = new Set([...numbers].filter(([, ns]) => ns.every((n, i) => n === i + 1)).map(([letters]) => letters))
+  return agents.map((a, i) => {
+    const m = found[i]
+    return m ? `{key}-${m[1]}${counted.has(m[1].toLowerCase()) ? '{n}' : m[2]}` : a.name
   })
 }
 
