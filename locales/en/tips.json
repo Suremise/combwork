@@ -1243,6 +1243,14 @@
     "defaultMessage": "Reviewers test exactly what was submitted",
     "description": "A tip's title."
   },
+  "tips.reviewerPool.text": {
+    "defaultMessage": "With the workflow option Reviewers set to A shared pool, Start Lane offers the reviewer pool: each card submitted goes to the next free reviewer, oldest first, never to its own builder.",
+    "description": "A tip. Reviewers and A shared pool are a workflow option and its value; Start Lane is a dialog: keep them as Hive shows them. Glossary: reviewer pool, builder."
+  },
+  "tips.reviewerPool.title": {
+    "defaultMessage": "Share reviewers between lanes",
+    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
+  },
   "tips.safeguardStops.text": {
     "defaultMessage": "A shield beside an agent's status means its CLI's safety classifier stopped a response: hover it for when, the model, and the agent's last tool calls before it. Orange means its model changed since, or it waits on you.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

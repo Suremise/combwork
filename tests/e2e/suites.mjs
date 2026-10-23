@@ -224,6 +224,7 @@ export const SUITES = [
   { name: 'review' },
   { name: 'reviewcopies' },
   { name: 'reviewcopiesreal', needs: ['claude', 'codex', 'copilot'], claudeHome: 'test' },
+  { name: 'reviewerpool' },
   { name: 'safeguards' },
   { name: 'scenarioteardown' },
   { name: 'searchclear' },

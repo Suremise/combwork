@@ -307,8 +307,8 @@ slot's cards (`ProgressMerge.tsx`), Pulse's lines and the polite live region. A 
 **The queue on the card, in the Git tab and in the Merge dialog** (#1357): the card dialog's Work section adds
 `CardQueue.tsx` (the work view's `queue`, with a return's details, beside its target's `queue:list` for the place, step,
 pause and a stuck advance's state); the Git tab's `queue` section is `GitQueueSection.tsx` (the panel's `QueueCard` and
-`queue:history`); the Merge dialog asks `queue:branchCard` (queueControls.ts: a card in flight on the agent's line under
-a Hive-merges ruleset), and `agents:merge`'s `outsideQueue` records Merge anyway's override after the merge
+`queue:history`); the Merge dialog asks `worktrees:branchCards` (queueControls.ts: a card in flight on the branch under
+a Hive-merges ruleset; since #1450 also the unfinished card whose line it is), and `agents:merge`'s `outsideQueue` records Merge anyway's override after the merge
 (`Workflow.mergedOutsideQueue`). Both read again on each `queue-changed` (the store's `queueVersion`), the Progress
 panel on or off.
 
@@ -657,6 +657,18 @@ its git administrative folder) in one write (`take` and `carryIn` skip reserved 
 the pass's `settleRenames` asks for one when an intent is there): given up when git still lists the worktree at its
 old folder, finished or put back when at its new one. `relocateWorktree` composes the same steps outside an operation.
 Release Slot… is `slots:releaseCarried`.
+
+**The reviewer pool, built [#1443].** G17 is `WorkflowOptions.reviewerMode` (`lane`, left out of a compiled ruleset so
+older rulesets keep their ids, or `pool`). A lane started with the pool keeps `pool` on its record (its row's `extra`);
+`FactStore` reads it into a card's `reviewerPool`. The runtime then writes `assignReviewer` for a submission or a verdict
+instead of waking a lane reviewer, and `reviewerPool.ts` (one pass per project, like `settleSlotCards`, also on agents'
+status changes, lanes, board changes, the workspace opening, the rules switched and hourly) gives each waiting card, oldest
+submission first, to a free reviewer (`shared/workflow/reviewerPool.ts`'s `poolAssignments`: role, no dispatch lease,
+idle, reviewing no other card of the project, not its builder). It records `ReviewerAssigned` in a write that checks
+again inside that transaction (`FactStore.dispatchLeased` on `slot_leases`, `cardsAt('review')`'s reviewers), and tells
+the reviewer once (delivery source `pool-review`; typed in, or started with purpose `review`), first releasing one that
+took a lease, left or stopped reviewing (`ReviewerReleased`). `loopReviewer.ts` routes a
+pool card's other handoffs to its current reviewer, and `loopWakes.ts` leaves its arrivals in Review to the pool.
 
 **Storage (P3's one migration, #1025, designed in #1208).** The DDL is `src/main/schema/v1_0.ts`: five steps, registered
 in `BOARD_MIGRATIONS` in this order by their cards, each taking the next version number when it merges, and run by

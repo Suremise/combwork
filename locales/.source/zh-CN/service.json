@@ -131,6 +131,8 @@
   "service.laneStart.needsReviewer": "{project}'s rules have a reviewer agent review each card: choose a reviewer.",
   "service.laneStart.noCards": "Choose the cards for the lane.",
   "service.laneStart.notTheProjects": "{card} isn't one of {project}'s cards, or it is archived.",
+  "service.laneStart.poolEmpty": "None of {project}'s agents besides the builder reviews, so the pool has nobody to review the cards.",
+  "service.laneStart.poolNotOffered": "{project}'s rules have one reviewer per lane: choose a reviewer, or set Reviewers to a shared pool.",
   "service.laneStart.sameAgent": "The builder can't be its own reviewer.",
   "service.laneStart.starting": "{agent}'s lane is being started already.",
   "service.laneStart.unknownAgent": "{agent} isn't one of {project}'s agents.",

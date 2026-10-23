@@ -1136,7 +1136,7 @@ export interface ProjectConfig {
   /** The Hive skills this project's agents aren't given (#1431, its Skills tab → Delivered to agents), over the workspace's. */
   skillDelivery?: SkillDeliveryChoice
   chime: 'inherit' | 'on' | 'off'
-  /** This project's own Suggest a fresh start when work finishes (#1437), over Settings → Notifications'. */
+  /** This project's own Suggest a fresh start (#1437), over Settings → Notifications'. */
   suggestFreshStart: 'inherit' | 'on' | 'off'
   /** Carrying on (#1432, shared/inboxSwitches.ts): this project's own inbox switches over Settings → Advanced's; inherit uses those. */
   inboxCheckpoints: 'inherit' | 'on' | 'off'
@@ -2911,6 +2911,8 @@ export interface LaneInfo {
   name: string | null
   builder: { id: string; name: string }
   reviewer: { id: string; name: string } | null
+  /** Reviewed by the project's reviewer pool (#1443, G17): `reviewer` is null, and each card goes to a free pooled reviewer. */
+  pool?: boolean
   /** In the lane's order. */
   cards: LaneCard[]
   /** The first card not in Passed or Done (null: none left). */
@@ -2963,9 +2965,19 @@ export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMer
 export interface LaneStartRequest {
   builder: string
   reviewer: string | null
+  /** Reviewed by the project's reviewer pool (#1443: G17 a shared pool), with `reviewer` null. */
+  pool?: boolean
   cards: number[]
   note?: string
   name?: string | null
+}
+
+/**
+ * What Start Lane… offers for a project (#1443): with workflow rules on and G17 a shared pool, Pool in its reviewer list
+ * (`pool`: the agents whose role reviews, by id and name); null: one reviewer per lane.
+ */
+export interface LaneStartInfo {
+  pool: { id: string; name: string }[] | null
 }
 
 /** What Start lane… did: the lane recorded, and how each agent started (failed: the lane stays, why said). */

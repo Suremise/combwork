@@ -133,6 +133,8 @@ interface HiveMessageValues {
   'service.laneStart.needsReviewer': { project: string | number }
   'service.laneStart.noCards': undefined
   'service.laneStart.notTheProjects': { card: string | number; project: string | number }
+  'service.laneStart.poolEmpty': { project: string | number }
+  'service.laneStart.poolNotOffered': { project: string | number }
   'service.laneStart.sameAgent': undefined
   'service.laneStart.starting': { agent: string | number }
   'service.laneStart.unknownAgent': { agent: string | number; project: string | number }

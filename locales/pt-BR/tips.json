@@ -310,6 +310,8 @@
   "tips.resumeAll.title": "Retome todos os agentes de uma vez",
   "tips.reviewCopies.text": "Um revisor revisa numa cópia de revisão: uma pasta exatamente na revisão enviada, onde nada mais escreve, então o construtor pode continuar enquanto isso. As verificações dele ali contam para esse envio. Configurações → Avançado desativa isso.",
   "tips.reviewCopies.title": "Revisores testam exatamente o que foi enviado",
+  "tips.reviewerPool.text": "Com a opção de fluxo de trabalho Revisores em Um grupo compartilhado, Iniciar raia oferece o grupo de revisores: cada cartão enviado vai para o próximo revisor livre, o mais antigo primeiro, nunca para o próprio executor.",
+  "tips.reviewerPool.title": "Compartilhe revisores entre raias",
   "tips.safeguardStops.text": "Um escudo ao lado do status de um agente significa que o classificador de segurança da CLI dele interrompeu uma resposta: passe o mouse para ver quando, o modelo e as últimas chamadas de ferramenta do agente antes disso. Laranja significa que o modelo mudou desde então, ou que o agente espera por você.",
   "tips.safeguardStops.title": "Veja quando um classificador de segurança interrompe um agente",
   "tips.saveTemplate.text": "Configure os agentes uma vez e reutilize: + Adicionar ▾ → Modelos → Salvar modelo…, na barra da sessão, guarda as configurações, as funções e o layout deles, e o mesmo menu os carrega em qualquer projeto.",

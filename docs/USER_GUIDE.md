@@ -263,7 +263,7 @@ A project's **slots** are worktrees Hive lends to a card or a lane, one builder 
 
 A long conversation gets slower and costs more with every message, so a finished piece of work is a good moment for a fresh one. **Start Fresh (Idle Agents)…**, in the project header's **Agents ▾** menu, gives each idle running agent a new conversation in one step. Its old conversation stays in the Sessions tab. First it lists every agent and what happens to it: an idle one starts fresh. One that is working, waiting for you, watching cards, has background tasks running, or still has a card or lane in flight is left as it is, and a stopped one stays stopped. Each is checked again as it starts, so one that started work meanwhile is left alone.
 
-Hive also suggests it by itself: when a project's last lane ends, or (with no lane running) one of its cards is done, and none of its agents is busy and no card waits in Review or Passed, a notice says **A good moment to start fresh**, with **Start Fresh (Idle Agents)**. It comes once each time the work finishes, with or without the Assistant; when an agent marks its last card done while still finishing its turn, it comes as that turn ends. Its button opens the question for that project, whichever project you are looking at. Turn it off in **Settings → Notifications → Suggest a fresh start when work finishes**, or for one project in Project Settings → Sessions.
+Hive also suggests it by itself: when a project's last lane ends, or (with no lane running) one of its cards is done, and none of its agents is busy and no card waits in Review or Passed, a notice says **A good moment to start fresh**, with **Start Fresh (Idle Agents)**. It comes once each time the work finishes, with or without the Assistant; when an agent marks its last card done while still finishing its turn, it comes as that turn ends. Its button opens the question for that project, whichever project you are looking at. Turn it off in **Settings → Notifications → Suggest a fresh start**, or for one project in Project Settings → Sessions.
 
 ### Agent states
 
@@ -709,6 +709,16 @@ When agents work in pairs, a builder and a reviewer taking cards in turn (the **
 - **End or abandon a lane** from its row: right-click it for **End Lane** (the loop is over; the cards stay where they are) and **Abandon Lane…** (it stops here, unmerged), which asks first.
 
 With no lanes and no merge going on, the panel is just the runs, as before.
+
+#### A reviewer pool
+
+Lanes can share their reviewers instead of each having its own. A project whose workflow option **Reviewers** is **A shared pool** (the **Team 6 + pool** template suggests it; until the Version Control tab has its row, ask the Hive Assistant to set it, `project.workflow.reviewerMode`) offers **The reviewer pool (HI-R1 and HI-R2)** in **Start Lane**'s reviewer list. Its agents are the project's reviewers and either-role agents. A lane started with it has no reviewer of its own, so only its builder starts, and its brief says the pool reviews its cards.
+
+- **Each card submitted** in a pool lane goes to the next free reviewer, oldest submission first, across all the pool's lanes. Free means: its role reviews, it isn't in a turn, waiting for you, watching cards or running something, it isn't reviewing another card, and it isn't building in a slot (an either-role agent mid-card is left alone until its card is Done). A reviewer never gets a card it built.
+- **Hive tells it**: *#12 (HI-B1's card) is in Review: you review it from the pool*, typed into its conversation, or it is started for the review in the project folder (it reviews in a review copy).
+- **Nobody free:** the card waits, and its lane says *waiting for a reviewer*. A verdict frees the reviewer for the next card.
+- **Two reviewers per card** (**Reviewers per card: 2**): a second reviewer, another agent, gets the card once the first has passed it.
+- With **Workflow rules are enforced** off (Settings → Advanced), nothing is given out: name a reviewer for each lane yourself.
 
 #### The merge queue in the Progress panel
 

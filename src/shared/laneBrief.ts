@@ -14,6 +14,8 @@ export interface LaneBriefInput {
   /** Where the builder works: its slot (#1438: a new branch per card), else its folder and branch. */
   builder: { name: string; folder: string | null; branch: string | null; slot?: string | null }
   reviewer: { name: string } | null
+  /** Reviewed by the project's reviewer pool (#1443, G17): its agents' names (`reviewer` null). */
+  pool?: string[] | null
   /** The options in force, or null while workflow rules are off. */
   options: Pick<WorkflowOptions, 'review' | 'preChecks' | 'finish' | 'okBefore' | 'target'> | null
   rounds: number
@@ -56,7 +58,8 @@ export function laneBrief(i: LaneBriefInput, role: LaneRole): string {
   const target = i.options?.target ? `; work goes to ${i.options.target}` : ''
   const lines: string[] = []
   if (role === 'builder') {
-    lines.push(`You are the builder of a lane in ${i.project} that the user started: use the card-loop skill as the builder${i.reviewer ? `, with ${i.reviewer.name} as the reviewer` : ', with no reviewer'}; rounds: ${i.rounds}.`)
+    const reviewer = i.reviewer ? `, with ${i.reviewer.name} as the reviewer` : i.pool ? `, reviewed by the pool (${i.pool.length ? list(i.pool) : 'nobody in it yet'}): Hive gives each card you submit to a free reviewer of it, and its lane is registered already, so give hive_lane no reviewer` : ', with no reviewer'
+    lines.push(`You are the builder of a lane in ${i.project} that the user started: use the card-loop skill as the builder${reviewer}; rounds: ${i.rounds}.`)
   } else {
     lines.push(`You are the reviewer of ${i.builder.name}'s lane in ${i.project} that the user started: use the card-loop skill as the reviewer; rounds: ${i.rounds}.`)
   }

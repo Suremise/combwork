@@ -2743,7 +2743,7 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   revision, the result or why, and when). A target shows by #1356's rule, or while it has a history. The panel's
   *Queue in Version Control* opens it.
 - **The Merge dialog** (OP-13): for an agent's worktree branch whose card in flight has Hive merge it under its own
-  ruleset, with the rules enforced (`queue:branchCard`), it says so and where the card stands (not queued yet,
+  ruleset, with the rules enforced (`worktrees:branchCards`), it says so and where the card stands (not queued yet,
   queued with its place, testing; the queue paused), and Merge is off with why. **Merge anyway…** (a confirmation)
   merges it and records an override on the card (`merge outside the queue`); the merge is then observed (§16.4.4).
   Merge stays off until that lookup has answered, and when it fails (said, with Retry); main decides again at the
@@ -3024,7 +3024,7 @@ card" means after its Done fact; its merge-slot case goes away with P5). They ar
   compared. A completion is kept, one per project, from before it is checked: one seen while the work is still
   finishing (the usual order: the agent marks its last card Done in its turn) is considered again as the project's
   agents go quiet (never while they are busy), until it is told, a lane of the project runs again or the switch is off.
-  The banner's button runs in the window that has the project, with the project shown, whatever was shown. Off switch: Settings → Notifications, **Suggest a fresh start when work finishes** (on), and the project's own
+  The banner's button runs in the window that has the project, with the project shown, whatever was shown. Off switch: Settings → Notifications, **Suggest a fresh start** (on), and the project's own
   (Project Settings → Sessions).
 - **Stay On Hold** (Darren's answer): #1087 (a fresh conversation after an idle gap: lanes already start fresh, and the
   rest needs a cache-lifetime threshold per provider), #1089 (the Assistant's save and start fresh: about the Assistant,
@@ -3105,6 +3105,49 @@ for a day go hourly (Remove idle slots after a day).
 **G17**: one reviewer per lane, or a shared pool that takes the next
 Submitted card (oldest first). Run records attached to the revision let a reviewer trust the builder's runs instead of
 repeating them (#533) [note §8].
+
+**G17 Built [#1443]** (`shared/workflow/reviewerPool.ts`, `main/reviewerPool.ts`):
+- **The option** is `reviewerMode: 'lane' | 'pool'` (#1430's `ReviewerMode`), never G1b's `reviewers` (its key, values
+  and saved data unchanged). Git only: None has no G17 (no level can set it there). Default `lane` in every preset. In
+  the ruleset (it decides who reviews), so a lane keeps its value; `lane` is left out of the compiled options, so a
+  ruleset stored before P7 (none) reads as `lane` and keeps its id. A pool without a reviewer agent (G1) is a
+  contradiction (`poolNeedsAgent`). It doesn't depend on G11: with everyone in the project folder the pool works the same.
+  The Assistant sets it (`project.workflow.reviewerMode`); `hive_project_status` shows it. The Version Control tab's row
+  is #1445's: until then the form keeps what the project inherits or set.
+- **One per lane**, as before: Start Lane's reviewer list, pre-filled from the builder's `pairedWith` (#1436).
+- **A shared pool**: with the rules on and G17 a pool, Start Lane's reviewer list offers *The reviewer pool (HI-R1 and
+  HI-R2)* (`lanes:startInfo`: the agents whose role reviews), pre-chosen for a builder that isn't paired; refused where
+  the rules don't have one or nobody but the builder reviews. The lane records `pool` with no reviewer (its row's
+  `extra`), only its builder starts, and its brief says *reviewed by the pool (…)*, with no reviewer for `hive_lane`.
+  Nobody joins it (`hive_lane join` is refused); a builder's own `hive_lane start` naming no reviewer keeps the pool, one
+  naming a reviewer makes it one per lane.
+- **Assignment**: a pool lane's submission writes `assignReviewer` (`card_actions`) instead of waking a reviewer, and so
+  does every verdict on its cards. One pass per project (`settleReviewerPool`) decides from durable state, also as an
+  agent's turn ends, as lanes or the board change, as a workspace opens, as the rules are switched, and hourly. Each pool
+  card in Review whose latest submission nobody reviews, with fewer passes than G1b asks, oldest submission first, goes
+  to the first free agent: its role reviews (#1430's `reviewsWork`), no open dispatch lease (#1434: an either agent
+  building in a slot is never taken, and is once its lease ends; a lease that can't be read counts as held), idle (not
+  in a turn, waiting, watching, with background tasks or runs), not reviewing another card of the project (given or
+  started its latest submission with no verdict: any card in Review, in a running lane, an ended one or none), not the
+  card's builder (`review.notAuthor`'s builders), and with G1b = 2 not one who has seen this submission: the second is
+  given it once the first has passed. Recorded as `ReviewerAssigned { reviewer, submission }` in a write that checks
+  again, from hive.db inside that transaction, the submission still waiting and the agent's dispatch leases and reviews
+  (HR3's round 1: another Hive's or connection's review start or lease committed first is seen there, never a snapshot
+  from before it).
+- **Telling it**: checked again first, from the project and hive.db as they are then: an agent that left the project,
+  whose role no longer reviews, or that took a dispatch lease meanwhile is released from it (`ReviewerReleased
+  { reviewer, submission, why }`, in a write that finds it still given and not started) and the card given again; one
+  busy, or whose lease can't be read, is told later. Then once per assignment (its delivery's identity is the card, the submission,
+  the agent and its `ReviewerAssigned`, so one released and given again is told again): typed into its conversation when it runs, else it is launched with it for review (#1434's purpose: the project folder, with #1439's grant to the
+  review copies): *#12 (HI-B1's card) is in Review: you review it from the pool…*. Not given: told at a later pass.
+  Hive's loop wakes leave a pool card's arrival in Review to the pool, and route its other handoffs (requests, steps,
+  verdicts) by its current reviewer: the newest given or started on its latest submission (`loopReviewerOf`).
+- **None free**: the card waits, *waiting for a reviewer on HI-12* (the existing reason). A verdict frees its reviewer;
+  a pooled reviewer serves every pool lane of its project.
+- **Card loops**: the builder's watch and wakes are unchanged; the reviewer joins nothing, the assignment is its start.
+  The card-loop skill's line for pools is #1444's.
+- **Off switch**: the option itself (`lane`). With workflow rules off nothing is given out or told, Start Lane offers no
+  pool, and the lane's reviewer is whoever the user names.
 
 #### 16.10.6 Agent templates and roles
 

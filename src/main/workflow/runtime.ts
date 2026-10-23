@@ -1173,7 +1173,10 @@ export class Workflow {
     }
     w.move('review', cause)
     w.action('prepareReviewCopy', { revision: g.revision })
-    if (reviewerAgent(g.o.review) && ahead) {
+    // A lane reviewed by the pool (#1443, G17): the pool's pass gives the submission to a free pooled reviewer and wakes
+    // it, so no lane reviewer is woken here.
+    if (reviewerAgent(g.o.review) && g.card.reviewerPool) w.action('assignReviewer', { submission: sub.seq })
+    else if (reviewerAgent(g.o.review) && ahead) {
       const keys = ahead.map((c) => c.key).join(', ')
       this.wake(w, this.reviewerOf(g.card), `${g.card.key} is in Review ahead of ${keys}, earlier in its lane, which nobody has started: Hive moved it before them in the lane. Review ${g.card.key} now; the lane goes on to ${ahead[0].key} after it`, 'review') // i18n-ignore: a wake, agent-facing
     } else if (reviewerAgent(g.o.review)) this.wake(w, this.reviewerOf(g.card), `${g.card.key} is in Review`) // i18n-ignore: a wake, agent-facing
@@ -1230,6 +1233,8 @@ export class Workflow {
       if (bad) return args.startReview ? undo(bad) : bad
       const st = w.state()
       w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment }) // i18n-ignore: a fact's kind and codes, not text
+      // A verdict frees its pooled reviewer for the next card, and with G1b = 2 a pass asks for the second (#1443).
+      if (card.reviewerPool) w.action('assignReviewer', { submission: subId! })
       if (!args.pass) {
         w.move('active', 'intent')
         this.wake(w, st.started?.builder, `${card.key} failed review`) // i18n-ignore: a wake, agent-facing

@@ -2943,9 +2943,10 @@ class SessionManager {
    * handover. The caller has checked it is idle; refused while Hive is typing into it or its CLI hasn't taken a prompt
    * Hive typed (ending it would lose that prompt). Nothing awaits before the stop, so the caller's checks still hold.
    * `allowed` throws if the caller may no longer have it (the Assistant's Control or session): checked before the stop,
-   * after it, and just before the new launch spawns.
+   * after it, and just before the new launch spawns. `purpose` (#1434): where the new conversation has the agent work, as
+   * a start's (#1443: a pooled reviewer's review, in the project folder, whatever slot it builds in).
    */
-  async newConversation(projectPath: string, agentId: string, prompt: string, allowed?: () => void): Promise<LiveSessionState> {
+  async newConversation(projectPath: string, agentId: string, prompt: string, allowed?: () => void, purpose?: FolderPurpose): Promise<LiveSessionState> {
     projectPath = workspace.assertProject(projectPath)
     const now = this.agentNow(projectPath, agentId)
     if (!now) throw hiveError(msg({ id: 'session.newConversation.notRunning', defaultMessage: "It isn't running.", description: 'Giving an agent a task in a new conversation is refused: it isn\'t running.' }))
@@ -2953,7 +2954,7 @@ class SessionManager {
     allowed?.()
     if (!(await this.endConversation(projectPath, agentId))) throw hiveError(msg({ id: 'session.newConversation.didntStop', defaultMessage: "It didn't stop, so no new conversation was started.", description: "Giving an agent a task in a new conversation failed: it didn't stop." }))
     allowed?.()
-    return this.start(projectPath, { agentId, prompt, allowed })
+    return this.start(projectPath, { agentId, prompt, allowed, ...(purpose ? { purpose } : {}) })
   }
 
   /**

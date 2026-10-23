@@ -310,6 +310,8 @@
   "tips.resumeAll.title": "Wznów wszystkich agentów naraz",
   "tips.reviewCopies.text": "Recenzent recenzuje w kopii do recenzji: folderze dokładnie w przesłanej wersji, do którego nic innego nie pisze, więc budujący może w tym czasie pracować dalej. Jego sprawdzenia tam liczą się dla tego przesłania. Ustawienia → Zaawansowane to wyłączają.",
   "tips.reviewCopies.title": "Recenzenci testują dokładnie to, co przesłano",
+  "tips.reviewerPool.text": "Gdy opcja przepływu pracy Recenzenci jest ustawiona na Wspólna pula, okno Uruchom tor oferuje pulę recenzentów: każda zgłoszona karta trafia do następnego wolnego recenzenta, najstarsza najpierw, nigdy do jej własnego wykonawcy.",
+  "tips.reviewerPool.title": "Wspólni recenzenci dla torów",
   "tips.safeguardStops.text": "Tarcza obok stanu agenta oznacza, że klasyfikator bezpieczeństwa jego CLI zatrzymał odpowiedź: najedź na nią, żeby zobaczyć kiedy, jaki model i ostatnie wywołania narzędzi agenta przed nią. Pomarańczowa oznacza, że model od tego czasu się zmienił lub agent czeka na Ciebie.",
   "tips.safeguardStops.title": "Zobacz, kiedy klasyfikator bezpieczeństwa zatrzymuje agenta",
   "tips.saveTemplate.text": "Skonfiguruj agentów raz i używaj ich ponownie: + Dodaj ▾ → Szablony → Zapisz szablon… na pasku sesji zachowuje ich ustawienia, role i układ, a to samo menu wczytuje je do dowolnego projektu.",

@@ -131,6 +131,8 @@
   "service.laneStart.needsReviewer": "Las reglas de {project} hacen que un agente revisor revise cada tarjeta: elige un revisor.",
   "service.laneStart.noCards": "Elige las tarjetas del carril.",
   "service.laneStart.notTheProjects": "{card} no es una tarjeta de {project} o está archivada.",
+  "service.laneStart.poolEmpty": "Ningún agente de {project} aparte del autor revisa, así que el grupo no tiene a nadie que revise las tarjetas.",
+  "service.laneStart.poolNotOffered": "Las reglas de {project} tienen un revisor por carril: elige un revisor o cambia Revisores a un grupo compartido.",
   "service.laneStart.sameAgent": "El autor no puede ser su propio revisor.",
   "service.laneStart.starting": "El carril de {agent} ya se está iniciando.",
   "service.laneStart.unknownAgent": "{agent} no es un agente de {project}.",

@@ -155,8 +155,50 @@ export async function branch(folder: string): Promise<Maybe<string | null>> {
   return unknown(U.branch, { folder })
 }
 
-/** A line's head (refs/heads/<line>), or null when the line doesn't exist. */
+/**
+ * A branch name the ref files can be read by as a path, as git reads them (HR6's #1491 round 1): each component plain
+ * ASCII, not starting with a dot or dash, no `..`, not ending in `.` or `.lock`, no Windows device name. Anything else
+ * (valid for git or not) is git's to answer.
+ */
+const PLAIN_COMPONENT = /^[A-Za-z0-9_+][A-Za-z0-9_+.-]*$/
+const DEVICE = /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i
+const plainBranch = (line: string): boolean => line.split('/').every((c) => PLAIN_COMPONENT.test(c) && !c.includes('..') && !c.endsWith('.') && !c.endsWith('.lock') && !DEVICE.test(c))
+
+/**
+ * A branch's commit from the common dir's ref files, with no git process: the loose ref when it holds a commit id, else
+ * its packed-refs line when there is no loose ref. Null whenever git must say: a symbolic ref (it may name a worktree's
+ * own HEAD, HR6's #1491 round 1), a file that isn't an id, a folder, an error reading, or no entry in either.
+ */
+function branchRefSync(common: string, line: string): string | null {
+  const ref = `refs/heads/${line}`
+  try {
+    const v = readFileSync(join(common, ref), 'utf8').trim()
+    return SHA.test(v) ? v : null
+  } catch (e) {
+    const code = (e as { code?: string }).code
+    if (code !== 'ENOENT' && code !== 'ENOTDIR') return null
+  }
+  try {
+    for (const l of readFileSync(join(common, 'packed-refs'), 'utf8').split(/\r?\n/)) {
+      const [sha, name] = l.split(' ')
+      if (name === ref) return SHA.test(sha) ? sha : null
+    }
+  } catch {
+    // No packed refs.
+  }
+  return null
+}
+
+/**
+ * A line's head (refs/heads/<line>), or null when the line doesn't exist. Read from the ref files with no git process
+ * where they name a commit (#1491: a step reads its target's head four or five times, each a git), read again each time
+ * as git would; git where they can't say (no such line, a symbolic ref, a name that isn't plain, a reftable, a folder
+ * whose `.git` doesn't name its repository).
+ */
 export async function lineHead(repo: string, line: string): Promise<Maybe<string | null>> {
+  const common = plainBranch(line) ? commonDirSync(repo) : null
+  const known = common ? branchRefSync(common, line) : null
+  if (known) return known
   const r = await git(repo, ['rev-parse', '--verify', '-q', `refs/heads/${line}`])
   if (r.ok) return r.out.trim()
   if (r.code === 1) return null

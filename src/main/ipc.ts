@@ -40,7 +40,7 @@ import { mergeSlots, recoverMergeSlots, workspaceSlots } from './mergeSlotHost'
 import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
 import { endLane, listLanes, stampLaneProjects } from './lanes'
-import { startLaneFromWindow } from './laneStart'
+import { laneStartInfo, startLaneFromWindow } from './laneStart'
 import { sweepWorkspaceLeftovers } from './leftovers'
 import { boardState, cardHeads, exportBoard, movedNames, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
@@ -807,11 +807,6 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return slotTest(await poolFor(workspace, workspace.assertProject(p)), op)
     },
     'queue:history': (p, target) => queueHistory(workspace, workspace.assertProject(p), queueTarget(target)),
-    'queue:branchCard': async (p, agentId) => {
-      const path = workspace.assertProject(p)
-      const agent = agentsOf(await workspace.projectConfig(path)).find((a) => a.id === agentId)
-      return agent?.worktree?.branch ? branchQueueCard(workspace, path, agent.worktree.branch) : null
-    },
     'queue:seen': (p, target, entries) => markQueueSeen(workspace, workspace.assertProject(p), queueTarget(target), Array.isArray(entries) ? entries.filter((e): e is string => typeof e === 'string').slice(0, 100) : []),
     'queue:pause': (p, target) => pauseQueue(workspace, workspace.assertProject(p), queueTarget(target), 'user'),
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
@@ -1190,8 +1185,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const r = req && typeof req === 'object' ? req : ({} as LaneStartRequest)
       const cards = Array.isArray(r.cards) ? r.cards.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) > 0).slice(0, 200) : []
       if (typeof r.builder !== 'string' || !r.builder) throw hiveError(M.laneBuilderRequired, undefined, { kind: 'invalid' })
-      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null })
+      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null })
     },
+    'lanes:startInfo': (p) => laneStartInfo(currentWorkspace(), workspace.assertProject(p)),
     'costs:cards': (q) => {
       if (!workspace.path) return []
       const numbers = Array.isArray(q?.numbers) ? q.numbers.filter((n) => Number.isInteger(n) && n > 0).slice(0, 1000) : undefined

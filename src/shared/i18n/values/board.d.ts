@@ -401,6 +401,8 @@ interface HiveMessageValues {
   'board.laneStart.notStarted': { agent: string | number }
   'board.laneStart.notStartedText': { why: string | number; agent: string | number }
   'board.laneStart.note': undefined
+  'board.laneStart.pool': { agents: string | number }
+  'board.laneStart.poolNobody': undefined
   'board.laneStart.project': undefined
   'board.laneStart.remove': { card: string | number }
   'board.laneStart.reviewer': undefined
@@ -437,6 +439,7 @@ interface HiveMessageValues {
   'board.lanes.none': undefined
   'board.lanes.oldRules': undefined
   'board.lanes.oldRulesTip': { enforced: string }
+  'board.lanes.poolPair': { builder: string | number }
   'board.lanes.projectLink': { project: string | number }
   'board.lanes.show': undefined
   'board.lanes.stalled': undefined

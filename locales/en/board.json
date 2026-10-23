@@ -1599,6 +1599,14 @@
     "defaultMessage": "Note for the agents (optional)",
     "description": "A field label in the Start Lane dialog: anything the user wants both agents to know, added to their brief."
   },
+  "board.laneStart.pool": {
+    "defaultMessage": "The reviewer pool ({agents})",
+    "description": "A choice of the Start Lane dialog’s reviewer (#1443): the lane is reviewed by the project’s pool of reviewer agents ({agents}: their names, joined), each card going to the next free one. Glossary: reviewer pool."
+  },
+  "board.laneStart.poolNobody": {
+    "defaultMessage": "nobody yet",
+    "description": "In the Start Lane dialog’s reviewer choice “The reviewer pool (…)”, in place of the names: no agent of the project reviews yet."
+  },
   "board.laneStart.project": {
     "defaultMessage": "Project",
     "description": "A field label in the Start Lane dialog: the project whose cards the lane works through."
@@ -1742,6 +1750,10 @@
   "board.lanes.oldRulesTip": {
     "defaultMessage": "Old rules: this lane started under the workflow options from before they changed, and keeps them until it ends. New lanes and cards use the new options.{enforced, select, no { Workflow rules aren’t enforced now (Settings → Advanced).} other {}}",
     "description": "Tooltip and accessible name of a lane's \"old rules\" mark (Progress panel): the project's workflow options changed while the lane ran; it keeps the ones it started with until it ends. enforced no: the switch \"Workflow rules are enforced\" (Settings → Advanced) is off. Keep the select keys. Glossary: lane, workflow options."
+  },
+  "board.lanes.poolPair": {
+    "defaultMessage": "{builder} / pool",
+    "description": "A lane's agents in its header in the Progress panel when its cards are reviewed by the project's reviewer pool (#1443): its builder's name ({builder}), then the pool, short (the header is narrow). Glossary: pool (of reviewers)."
   },
   "board.lanes.projectLink": {
     "defaultMessage": "{project}: open its workflow in Version Control",
