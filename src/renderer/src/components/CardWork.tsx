@@ -3,9 +3,9 @@ import { fmt, msg, tr } from '@shared/i18n'
 import { formatDateTime } from '@shared/dates'
 import { columnName } from '@shared/tasks'
 import { revisionShort } from '@shared/platform/descriptors'
-import type { ProjectInfo, TaskCard } from '@shared/types'
+import type { ProjectInfo, StoredText, TaskCard } from '@shared/types'
 import { checksOn, type WorkBadge, type WorkCheck, type WorkOverride, type WorkRevision, type WorkVerdict, type WorkView } from '@shared/workflow/workView'
-import { RULE_NAMES } from '@shared/workflow/texts'
+import { RULE_NAMES, unreadWhy } from '@shared/workflow/texts'
 import { refusalLines, type RuleId } from '@shared/workflow/refusals'
 import { overrideNote, type OverrideNames } from '@shared/laneBar'
 import { useCardWork } from '../cardWork'
@@ -37,9 +37,9 @@ const M = {
   round: msg({ id: 'board.work.round', defaultMessage: 'Round {round, number}', description: "Beside a revision in the card dialog's Work section: the review round it was submitted in (1, 2…)." }),
   noCode: msg({ id: 'board.work.noCode', defaultMessage: 'Submitted without code', description: "In place of a revision in the card dialog's Work section: a no-code card's submission (design, investigation), which has no revision. Glossary: no-code card." }),
   noRevision: msg({ id: 'board.work.noRevision', defaultMessage: 'No revision recorded', description: "In place of a revision in the card dialog's Work section: the card's revision couldn't be read when it was submitted (a project without version control, before Hive reads its revisions). Glossary: revision." }),
-  notRead: msg({ id: 'board.work.notRead', defaultMessage: 'Not read: {why}', description: "In the card dialog's Work section, in place of a branch, base or target Hive couldn't read when the card's work started. {why} is the reason as Hive recorded it (in English, as agents read it)." }),
-  revisionNotRead: msg({ id: 'board.work.revisionNotRead', defaultMessage: 'Revision not read when it was submitted: {why}. Its next submission reads it again.', description: "In place of a revision in the card dialog's Work section: Hive couldn't read the revision when the builder submitted it (the repository couldn't be read). {why} is the reason as Hive recorded it (in English, as agents read it). Glossary: revision." }),
-  filesNotRead: msg({ id: 'board.work.filesNotRead', defaultMessage: 'Files not read: {why}', description: "In the card dialog's Work section, in place of a revision's changed files: Hive couldn't read which files changed when it was submitted. {why} is the reason as Hive recorded it (in English, as agents read it)." }),
+  notRead: msg({ id: 'board.work.notRead', defaultMessage: '{note, select, beforeChange {Not read when its work started} noTarget {Not read: there was no target branch to start from} other {Hive couldn\'t read {why}}}', description: "In the card dialog's Work section, in place of a branch, base or target Hive couldn't read when the card's work started. {note} picks why: Hive read nothing as the work started (beforeChange), it had no target branch to find the base from (noTarget), or another reason, {why}: what Hive couldn't read (such as \"the latest commit in …\", already translated). Keep the select keys. Glossary: target branch." }),
+  revisionNotRead: msg({ id: 'board.work.revisionNotRead', defaultMessage: "{note, select, beforeChange {No revision recorded: Hive didn't read one when the card went to Review.} other {Revision not read when it was submitted: Hive couldn't read {why}.}} Its next submission reads it again.", description: "In place of a revision in the card dialog's Work section. {note} picks why: Hive read nothing when the card was moved into Review (beforeChange; the card had no agent then, say), or it couldn't read the revision when the builder submitted it, {why}: what it couldn't read (such as \"the latest commit in …\", already translated). Then: the next submission reads it again. Keep the select keys. Glossary: revision." }),
+  filesNotRead: msg({ id: 'board.work.filesNotRead', defaultMessage: '{note, select, beforeChange {Files not read} noBaseOrHead {Files not read: there was no base or revision to compare} other {Files not read: Hive couldn\'t read {why}}}', description: "In the card dialog's Work section, in place of a revision's changed files: Hive couldn't read which files changed when it was submitted. {note} picks why: Hive read nothing then (beforeChange: the revision's line above says why), it had no base or revision to compare (noBaseOrHead), or another reason, {why}: what it couldn't read (already translated). Keep the select keys. Glossary: revision." }),
   folderGone: msg({ id: 'board.work.folderGone', defaultMessage: 'Its folder, {folder}, is no longer an agent’s worktree: its files can’t be opened here.', description: "Under a revision's files in the card dialog's Work section: the folder the work was done in ({folder}, a path) isn't any agent's worktree now, so its files aren't opened in another folder instead." }),
   files: msg({ id: 'board.work.files', defaultMessage: '{n, plural, =0 {No files changed} one {# file changed} other {# files changed}}', description: "A button in the card dialog's Work section: how many files the revision changed; a click shows them." }),
   openFile: msg({ id: 'board.work.openFile', defaultMessage: 'Open {path} in Files', description: "Tooltip of a file a revision changed (card dialog's Work section): opens it in the project's Files tab. {path} is the file's path." }),
@@ -70,6 +70,9 @@ const COPY = {
   failed: msg({ id: 'board.progress.revisionCopyFailed', defaultMessage: "Could not copy the revision", description: "A notification: copying a run's revision (a commit id) from the Progress panel failed." })
 }
 const NOT_COUNTED = msg({ id: 'board.details.notCounted', defaultMessage: "Doesn't count as check {name}: {why, select, notCheck {it wasn't started as a check (hive-progress --check), and its command isn't one the project has for a check} notContained {what was checked out doesn't contain the card's revision} dirty {the folder had uncommitted changes when it started or ended} moved {something else was checked out when it ended} changed {files changed in the folder while it ran} revisionChanged {the card's files changed while it ran} other {it can't be told whether its files changed}}", description: "A run's details in the Progress panel: why the run doesn't count as the card's check named {name} (\"typecheck\", or the run's title when it wasn't a check). {why} picks the reason: keep each branch's key as it is." })
+
+/** Why a field wasn't read (#1477), in the window's language. */
+const unread = (field: string, of: { unknown: Record<string, string>; unknownText: Record<string, StoredText> }): { note: string; why: string } => unreadWhy(field, of, (m, values) => tr(m, values))
 
 /** A card's project, and its revisions as that project's platform shows them. */
 function useProjectOf(card: { project: string }): { project: ProjectInfo | null; short: (id: string) => string } {
@@ -150,7 +153,7 @@ export function CardWork({ card }: { card: TaskCard }) {
 function WorkDetails({ card, view: v, project, short, agentName, reveal }: { card: TaskCard; view: WorkView; project: ProjectInfo | null; short: (id: string) => string; agentName: (id: string | null) => string; reveal: number }) {
   const rows: [string, React.ReactNode][] = []
   // A field that couldn't be read when the work started says so, with why (never shown as none).
-  const notRead = (field: string): React.ReactNode => <span className="card-work-unread">{tr(M.notRead, { why: v.unknown[field] })}</span>
+  const notRead = (field: string): React.ReactNode => <span className="card-work-unread">{tr(M.notRead, unread(field, v))}</span>
   if (v.line) rows.push([tr(M.branch), <code key="line">{v.line}</code>])
   else if (v.unknown.line) rows.push([tr(M.branch), notRead('line')])
   if (v.base) rows.push([tr(M.base), <RevisionCode key="base" id={v.base} short={short} />])
@@ -233,7 +236,7 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agen
   return (
     <div className="card-work-rev" data-submission={r.submission}>
       {/* A revision not read says so on a line of its own (its reason can be long). */}
-      {!r.revision && r.unknown.revision && <div className="card-work-unread">{tr(M.revisionNotRead, { why: r.unknown.revision })}</div>}
+      {!r.revision && r.unknown.revision && <div className="card-work-unread">{tr(M.revisionNotRead, unread('revision', r))}</div>}
       <div className="card-work-rev-head">
         {/* Its parts with middle dots between them; the time relative, the date and time in full on hover, as elsewhere. */}
         {r.revision ? <RevisionCode id={r.revision} short={short} /> : !r.unknown.revision && <span>{tr(noCode ? M.noCode : M.noRevision)}</span>}
@@ -249,7 +252,7 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agen
           </button>
         ) : r.unknown.files ? (
           // Never read: not "no files changed" (#1224 round 1, finding 2).
-          <span className="card-work-unread">{tr(M.filesNotRead, { why: r.unknown.files })}</span>
+          <span className="card-work-unread">{tr(M.filesNotRead, unread('files', r))}</span>
         ) : (
           <span className="faint">{tr(M.files, { n: 0 })}</span>
         )}
