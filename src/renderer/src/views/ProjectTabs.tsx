@@ -1929,7 +1929,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       )
     },
     {
-      // Suggest a fresh start when work finishes (#1437): this project's own of Settings → Notifications'.
+      // Suggest a fresh start (#1437): this project's own of Settings → Notifications'.
       section: 'sessions',
       key: 'suggestFreshStart',
       ...rowText('project.suggestFreshStart'),
