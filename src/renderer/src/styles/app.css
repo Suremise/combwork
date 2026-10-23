@@ -799,6 +799,12 @@ kbd {
 .row:hover .row-actions {
   display: flex;
 }
+/* A Hive skill's Delivered to agents switch (#1431): always shown, after the hover actions. */
+.skill-row .skill-delivered {
+  display: flex;
+  align-self: center;
+  margin-left: 6px;
+}
 .row.tall {
   height: auto;
   padding-top: 6px;

@@ -387,7 +387,7 @@
   "workspace.skillView.loadTarget": "技能",
   "workspace.skillView.ok": "确定",
   "workspace.skillView.refreshTarget": "技能",
-  "workspace.skillView.select": "选择一个 Hive 技能以查看或编辑。此工作区中每个项目的智能体都会获得这些技能，标记为 Hive Assistant 专用的除外。",
+  "workspace.skillView.select": "选择一个 Hive 技能以查看或编辑。此工作区所有项目的智能体都会获得这些技能，但标记为供 Hive Assistant 使用的和在旁边关闭的（向智能体提供）除外。",
   "workspace.statusBar.api": "API",
   "workspace.statusBar.apiError": "Agent API：{error}",
   "workspace.statusBar.apiOff": "Agent API 已关闭",

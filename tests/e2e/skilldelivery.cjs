@@ -2,7 +2,10 @@
 // (work-on-card, review-agent-work…) and Hive's session contract; the Assistant gets the skills for it
 // (coordinate-agents…) and its role, never the agents'. Codex agents get copies in their folder (.agents/skills/hive-*,
 // marked, out of git), the Assistant's in the workspace folder; a changed skill reaches the next launch, swapped in
-// whole; a folder of the user's with the same name is left alone. Runs the fake Claude Code and fake Codex. Dev build,
+// whole; a folder of the user's with the same name is left alone. #1431: a session in a folder of its own (an agent's
+// worktree, as a slot is) gets the copies there, removed once it stops (Slots only); the project folder keeps its own
+// unless Everywhere; a skill switched off isn't copied, in Claude Code's plugin or named. Codex and Copilot share the
+// copies' code (syncAgentsSkills), so the fake Codex runs it. Runs the fake Claude Code and fake Codex. Dev build,
 // throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -130,8 +133,58 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note']
   check('the Assistant gets the skills for it, in the workspace folder', [...ASSISTANT_ONLY, ...BOTH].every((n) => wsCopies.includes(n)) && !AGENT_ONLY.some((n) => wsCopies.includes(n)), wsCopies.join(','))
   check("…kept out of the workspace's git too", fs.readFileSync(path.join(ws, '.git', 'info', 'exclude'), 'utf8').includes('/.agents/skills/hive-*/'))
 
-  for (const id of [claude.id, codex.id]) await inv('session:stop', proj, id).catch(() => undefined)
   await inv('session:stop', home, 'assistant').catch(() => undefined)
+
+  // --- #1431: copies per folder, removed safely once no agent works there (Settings → Advanced), and a choice of skills.
+  const stopped = async (p, id) => {
+    await inv('session:stop', p, id)
+    return !!(await until(async () => !(await live(p, id)), HUNG_MS))
+  }
+  // Copies go only once no agent of Hive's works in the folder: Clara's session in the project folder is stopped first.
+  check('the Claude Code agent stops', await stopped(proj, claude.id))
+  // A folder of Hive's other than the project folder (a slot; today an agent's worktree), with a skill of the user's in it.
+  const tree = await lib.addAgent(inv, proj, { name: 'Treva', provider: 'codex', location: 'new-worktree' })
+  const treeDir = (await inv('workspace:refresh')).projects.find((p) => p.name === 'alpha').agents.find((a) => a.id === tree.id).worktree.path
+  const treeSkills = path.join(treeDir, '.agents', 'skills')
+  fs.mkdirSync(path.join(treeSkills, 'mine'), { recursive: true })
+  fs.writeFileSync(path.join(treeSkills, 'mine', 'SKILL.md'), '---\nname: mine\ndescription: Mine.\n---\nMY OWN\n')
+  await inv('session:start', proj, { agentId: tree.id })
+  check('a session in a folder of its own gets the copies there', !!(await ready(proj, tree.id)) && copies(treeSkills).includes('work-on-card'), copies(treeSkills).join(','))
+  check('…and they are gone once it stops (Slots only, the default)', (await stopped(proj, tree.id)) && !!(await until(async () => copies(treeSkills).length === 0, HUNG_MS)), copies(treeSkills).join(','))
+  check("…leaving the user's own skill there", fs.readFileSync(path.join(treeSkills, 'mine', 'SKILL.md'), 'utf8').includes('MY OWN'))
+  check('the project folder keeps its copies when its agent stops', (await stopped(proj, codex.id)) && copies(codexDir).includes('work-on-card'), copies(codexDir).join(','))
+
+  // Everywhere: the project folder's go too, and the user's folder named like a copy stays.
+  await inv('advanced:set', 'hive.skills.removeIdleCopies', 'everywhere')
+  await inv('session:start', proj, { agentId: codex.id })
+  await ready(proj, codex.id)
+  check('Everywhere: the project folder loses them too once its last agent stops', (await stopped(proj, codex.id)) && !!(await until(async () => copies(codexDir).join(',') === 'handover', HUNG_MS)), copies(codexDir).join(','))
+  check("…but never the user's folder named like a copy", fs.readFileSync(path.join(codexDir, 'hive-handover', 'SKILL.md'), 'utf8').includes('MY OWN'))
+  await inv('advanced:set', 'hive.skills.removeIdleCopies', null)
+
+  // A skill switched off for the project isn't delivered at the next launch: not copied, not in Claude Code's plugin, not
+  // named in the guidance. Its copy stays while another agent of Hive's works in the folder (it may be reading it), and
+  // goes at a launch with the folder to itself.
+  const other = await lib.addAgent(inv, proj, { name: 'Sena', provider: 'codex' })
+  await inv('session:start', proj, { agentId: other.id })
+  check('another agent in the project folder gets every skill', !!(await ready(proj, other.id)) && copies(codexDir).includes('card-loop'), copies(codexDir).join(','))
+  await inv('skills:setDelivered', proj, 'card-loop', false)
+  await inv('session:start', proj, { agentId: codex.id })
+  await ready(proj, codex.id)
+  check("a skill switched off isn't named in the next launch's guidance", /work-on-card skill/.test(developer(codexLaunch(proj))) && !/card-loop/.test(developer(codexLaunch(proj))))
+  check('…and its copy stays while the other agent there still runs', !!(await live(proj, other.id)) && fs.existsSync(path.join(codexDir, 'hive-card-loop', 'SKILL.md')), copies(codexDir).join(','))
+  check('the other agent stops', await stopped(proj, other.id))
+  check('the agent stops', await stopped(proj, codex.id))
+  await inv('session:start', proj, { agentId: codex.id })
+  await ready(proj, codex.id)
+  check('a launch with the folder to itself no longer has it copied', copies(codexDir).includes('work-on-card') && !copies(codexDir).includes('card-loop'), copies(codexDir).join(','))
+  await inv('session:start', proj, { agentId: claude.id })
+  await ready(proj, claude.id)
+  const pluginNow = fs.readdirSync(plugin)
+  check("…nor in Claude Code's launch plugin", pluginNow.includes('work-on-card') && !pluginNow.includes('card-loop'), pluginNow.join(','))
+  await page.screenshot({ path: path.join(lib.WORK, 'skilldelivery-advanced.png') })
+
+  for (const id of [claude.id, codex.id]) await inv('session:stop', proj, id).catch(() => undefined)
   await lib.until(async () => (await inv('session:live')).length === 0, 15000)
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

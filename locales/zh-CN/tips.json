@@ -326,6 +326,8 @@
   "tips.signInExpired.title": "登录过期时",
   "tips.silentUnknown.text": "Hive 从不猜测智能体是否空闲：如果它的一轮已沉默一段时间且没有结束的迹象，它的窗格会说明这一点。如果它的终端正停在提示符处等待，“标记为空闲”即可纠正。",
   "tips.silentUnknown.title": "智能体沉默，状态未知",
+  "tips.skillsDelivered.text": "在“技能”视图或项目的“技能”选项卡中，Hive 每个技能旁的开关表示智能体是否获得它（向智能体提供）。Hive 为 Codex 和 Copilot 放在文件夹中的副本，会在那里不再有智能体工作时按“设置”→“高级”的设定删除。",
+  "tips.skillsDelivered.title": "选择智能体获得哪些技能",
   "tips.sortTables.text": "在 Hive 的表格（快捷键、“性能”、“存储”、各个概览）中点击列标题即可按该列排序，再点一次则反向排序。Hive 会记住每个表格的排序方式和每页行数。",
   "tips.sortTables.title": "为任何表格排序",
   "tips.staleMessages.text": "助手转达与卡片当前轮次有关的内容时，会把消息与该卡片关联：如果智能体读取之前卡片已通过或开始了新一轮，Hive 会将消息作为过时消息丢弃，这样就不会有智能体为旧的发现重新打开已通过的卡片。",

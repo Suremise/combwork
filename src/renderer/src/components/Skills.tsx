@@ -6,12 +6,13 @@ import { call } from '../api'
 import { clearEditorDraftsUnder } from '../editorDrafts'
 import { DocEditor } from './DocEditor'
 import { AssistantMark } from './AssistantMark'
-import { Icon, IconButton, Tooltip } from './ui'
+import { Icon, IconButton, Switch, Tooltip } from './ui'
 import { confirm, notify, prompt, set, showView, useStore } from '../store'
 import { cx } from '../util'
 import { msg, tr, tRich, type Msg } from '@shared/i18n'
 import { shownText } from '@shared/advanced'
 import { shippedSkillDescription } from '@shared/skillDescriptions'
+import { skillOff } from '@shared/skillDelivery'
 
 /**
  * Skills in Hive: the workspace's Hive skills (given to project agents, the Assistant or both, as each one's
@@ -261,7 +262,7 @@ export function skillDescription(s: SkillInfo): string {
 }
 
 /** One skill in a list: icon, name, description and its actions. */
-export function SkillRow({ skill, selected, onSelect, actionsFor }: { skill: SkillInfo; selected: boolean; onSelect: () => void; actionsFor?: React.ReactNode }) {
+export function SkillRow({ skill, selected, onSelect, actionsFor, delivered }: { skill: SkillInfo; selected: boolean; onSelect: () => void; actionsFor?: React.ReactNode; delivered?: React.ReactNode }) {
   const missing = skill.bundled === 'missing'
   return (
     <div className={cx(/* i18n-ignore: class names */ 'row tall skill-row', selected && 'selected', missing && 'missing')} onClick={onSelect}>
@@ -286,7 +287,38 @@ export function SkillRow({ skill, selected, onSelect, actionsFor }: { skill: Ski
           {actionsFor}
         </div>
       )}
+      {delivered && (
+        <div className="skill-delivered" onClick={(e) => e.stopPropagation()}>
+          {delivered}
+        </div>
+      )}
     </div>
+  )
+}
+
+const DELIVERY = {
+  on: msg({ id: 'assistant.skills.delivered.switch', defaultMessage: '{name} delivered to agents', description: "A Hive skill's switch in the Skills view and a project's Skills tab (Delivered to agents), for screen readers: whether agents are given the skill. {name} is the skill." }),
+  tipWorkspace: msg({ id: 'assistant.skills.delivered.tipWorkspace', defaultMessage: "Delivered to agents: on, every project's agents get this skill from their next session; off, none of them do, and Hive removes its copies at their next launch.", description: "Tooltip on a Hive skill's switch in the workspace's Skills view." }),
+  tipProject: msg({ id: 'assistant.skills.delivered.tipProject', defaultMessage: "Delivered to agents: on, this project's agents get this skill from their next session; off, they don't, and Hive removes its copies at their next launch.", description: "Tooltip on a Hive skill's switch in a project's Skills tab." }),
+  offInWorkspace: msg({ id: 'assistant.skills.delivered.offInWorkspace', defaultMessage: "Off in the workspace's Skills view, so no project's agents get it. Turn it on there first.", description: "Tooltip on a Hive skill's switch in a project's Skills tab, shown off and disabled: the skill is switched off for the whole workspace." }),
+  failed: msg({ id: 'assistant.skills.delivered.failed', defaultMessage: "Couldn't change whether agents get {name}", description: 'A notice: switching a skill on or off for agents (Delivered to agents) failed. {name} is the skill.' })
+}
+
+/**
+ * A Hive skill's Delivered to agents switch (#1431): in the workspace (no `projectPath`), or in one project, where a skill
+ * the workspace has off shows off and can't be turned on.
+ */
+export function DeliveredSwitch({ skill, projectPath }: { skill: SkillInfo; projectPath?: string }) {
+  const ws = useStore((s) => s.workspace?.config.skillDelivery)
+  const project = useStore((s) => (projectPath ? s.workspace?.projects.find((p) => p.path === projectPath)?.config.skillDelivery : undefined))
+  const offHere = skillOff(skill.name, { skillDelivery: ws })
+  const on = !skillOff(skill.name, { skillDelivery: ws }, { skillDelivery: project })
+  const blocked = !!projectPath && offHere
+  const change = (v: boolean): void => void actions.attempt(tr(DELIVERY.failed, { name: skill.name }), () => call('skills:setDelivered', projectPath ?? null, skill.name, v))
+  return (
+    <Tooltip content={blocked ? tr(DELIVERY.offInWorkspace) : tr(projectPath ? DELIVERY.tipProject : DELIVERY.tipWorkspace)}>
+      <Switch small checked={on} disabled={blocked || !!skill.problem || skill.bundled === 'missing'} label={tr(DELIVERY.on, { name: skill.name })} onChange={change} />
+    </Tooltip>
   )
 }
 

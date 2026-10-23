@@ -86,6 +86,9 @@ import { TerminalScreen } from './terminalScreen'
 import { KeysStopped, PickNotFound, typeKeySteps } from './keySteps'
 import { withBinOnPath } from './progressReporters/shims'
 import { hiveSkills, parseSkillFrontmatter, skillFor } from './skills'
+import { copyBook, sessionEnded } from './skillCopies'
+import { skillOff } from '../shared/skillDelivery'
+import { samePath } from '../shared/movePaths'
 import { GUIDANCE_REVISION, launchParts, launchRecord } from './guidance'
 import { notificationIcon } from './paths'
 import { reportPlanUsage } from './planUsage'
@@ -1062,6 +1065,16 @@ class SessionManager {
     return [...this.live.values()].map((l) => l.state)
   }
 
+  /** Whether a session of Hive's runs, or is starting, in a folder (#1431: its skill copies stay while one does). */
+  runningIn(folder: string): boolean {
+    return [...this.live.values()].some((l) => samePath(l.state.cwd, folder))
+  }
+
+  /** runningIn, leaving out one session (by liveId): the launch asking whether another session reads the folder. */
+  othersIn(folder: string, except: string): boolean {
+    return [...this.live].some(([id, l]) => id !== except && samePath(l.state.cwd, folder))
+  }
+
   /** How many agents of a workspace (its projects', its worktrees', its Assistant's) run or are starting. */
   agentsIn(workspacePath: string): number {
     const mine = (p: string): boolean => workspaceFor(p)?.path?.toLowerCase() === workspacePath.toLowerCase()
@@ -1101,15 +1114,19 @@ class SessionManager {
     const pc = readPc ?? (await workspace.projectConfig(projectPath))
     const assistant = workspace.isAssistantHome(projectPath)
     // Every Hive skill for its audience (SKILL.md's metadata.audience) reaches the session: project agents get those for
-    // agents, the Assistant those for it. There are no skill switches.
+    // agents, unless the workspace or the project switched one off (#1431, Skills → Delivered to agents); the Assistant
+    // gets those for it.
     // A skill whose header is broken or whose audience is unknown reaches nobody: the launch says why (its problems).
     const skills: LaunchSkill[] = []
     const skillHashes: Record<string, string> = {}
     const skillProblems: Record<string, string> = {}
+    const skillsOff: string[] = []
     for (const sk of await reads.skills()) {
       if (sk.problem) {
         skillProblems[sk.name] = sk.problem
         skillHashes[sk.name] = ''
+      } else if (!assistant && skillFor(sk.audience, 'agent') && skillOff(sk.name, workspace.config, pc)) {
+        skillsOff.push(sk.name)
       } else if (skillFor(sk.audience, assistant ? 'assistant' : 'agent')) {
         skills.push({ name: sk.name, sourcePath: sk.path })
         skillHashes[sk.name] = await reads.revision(sk.path)
@@ -1127,7 +1144,8 @@ class SessionManager {
       if (on && m.def && agentGetsMcp(forAgent, m.name) && m.name.toLowerCase() !== 'hive') mcpServers[m.name] = toLaunchDef(m.def, workspace.mcpDir)
     }
     const hive = this.hiveMcp(projectPath, agent?.id)
-    if (hive) mcpServers.hive = hive
+    // Its instructions name only the skills the session gets (#1431).
+    if (hive) mcpServers.hive = skillsOff.length ? { ...hive, env: { ...hive.env, HIVE_SKILLS_OFF: skillsOff.sort().join(',') } } : hive
 
     const l = agentLaunchSettings(forAgent, pc, s)
     const extraArgs = l.extraArgs.flatMap((a) => splitArgs(a))
@@ -1587,6 +1605,8 @@ class SessionManager {
       permissionMode: mode,
       extraArgs: eff.extraArgs,
       use200kContext: eff.use200kContext,
+      copies: copyBook(workspaceOf(projectPath)),
+      othersHere: () => this.othersIn(cwd, id),
       hookUrl: `${this.hookUrl}?run=${state.runId}`,
       hookAuthFile: hookAuth.file,
       privateDir: hookAuth.dir,
@@ -2925,6 +2945,9 @@ class SessionManager {
       this.noteExit(l.state.sessionId)
       this.live.delete(id)
       this.recheckTools(id)
+      // The last of Hive's sessions in its folder: Hive's skill copies there go, as Settings → Advanced says (#1431). Not
+      // as Hive quits: the next start's sweep does it, unless sessions resume there first.
+      if (!this.shuttingDown && !this.runningIn(l.state.cwd)) void sessionEnded(projectPath, l.state.cwd)
       // Its hooks missing were this launch's (#1336): its lanes go on (a stopped agent is the lane's own business).
       if (l.state.hooksMissing) noteHooksMissing(projectPath, agentId, false)
     }

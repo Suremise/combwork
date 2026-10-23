@@ -326,6 +326,8 @@
   "tips.signInExpired.title": "Wenn eine Anmeldung abläuft",
   "tips.silentUnknown.text": "Hive rät nie, dass ein Agent untätig ist: Ist sein Durchgang eine Weile still, ohne Anzeichen für sein Ende, sagt sein Bereich das. Wartet sein Terminal an der Eingabeaufforderung, stellt „Als untätig markieren“ es richtig.",
   "tips.silentUnknown.title": "Ein stiller Agent mit unbekanntem Zustand",
+  "tips.skillsDelivered.text": "Der Schalter neben jedem Skill von Hive, in der Skills-Ansicht oder im Skills-Tab eines Projekts, sagt, ob die Agenten ihn bekommen (An Agenten ausgeliefert). Kopien, die Hive für Codex und Copilot in einen Ordner legt, werden entfernt, sobald dort kein Agent mehr arbeitet, wie es Einstellungen → Erweitert sagt.",
+  "tips.skillsDelivered.title": "Wähle, welche Skills Agenten bekommen",
   "tips.sortTables.text": "Klicke in den Tabellen von Hive (Tastenkombinationen, Leistung, Speicher, die Übersichten) auf den Kopf einer Spalte, um danach zu sortieren, und erneut für die umgekehrte Richtung. Hive merkt sich Sortierung und Zeilen pro Seite jeder Tabelle.",
   "tips.sortTables.title": "Jede Tabelle sortieren",
   "tips.staleMessages.text": "Gibt der Assistent etwas zur aktuellen Runde einer Karte weiter, verknüpft er die Nachricht mit dieser Karte: Besteht die Karte oder beginnt sie eine neue Runde, bevor der Agent die Nachricht liest, verwirft Hive sie als veraltet. So öffnet kein Agent eine geprüfte Karte wegen eines alten Befunds erneut.",

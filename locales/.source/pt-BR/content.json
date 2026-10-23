@@ -49,6 +49,7 @@
   "content.skill.cantDelete": "Only Hive skills and a project's local skills can be deleted in Hive.",
   "content.skill.chooseFile": "Choose a .md file or a .zip.",
   "content.skill.copyExists": "The workspace already has a skill named \"{name}\"",
+  "content.skill.deliveredName": "That is not a skill name.",
   "content.skill.exists": "A skill named \"{name}\" already exists in {folder}",
   "content.skill.isCopy": "That's Hive's own copy of a workspace skill; delete the skill in the workspace instead.",
   "content.skill.metadata": "its metadata isn't a set of fields (`metadata:`, then `audience: …` indented under it)",

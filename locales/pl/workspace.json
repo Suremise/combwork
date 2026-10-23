@@ -387,7 +387,7 @@
   "workspace.skillView.loadTarget": "umiejętności",
   "workspace.skillView.ok": "OK",
   "workspace.skillView.refreshTarget": "umiejętności",
-  "workspace.skillView.select": "Wybierz umiejętność Hive, aby ją wyświetlić lub edytować. Agenci w każdym projekcie tego obszaru roboczego dostają te umiejętności, oprócz oznaczonych dla Hive Assistant.",
+  "workspace.skillView.select": "Wybierz umiejętność Hive, aby ją wyświetlić lub edytować. Agenci każdego projektu tego obszaru roboczego dostają te umiejętności, z wyjątkiem oznaczonych dla Hive Assistant i wyłączonych obok (Dostarczana agentom).",
   "workspace.statusBar.api": "API",
   "workspace.statusBar.apiError": "Agent API: {error}",
   "workspace.statusBar.apiOff": "Agent API jest wyłączone",

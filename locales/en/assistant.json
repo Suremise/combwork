@@ -1431,6 +1431,26 @@
     "defaultMessage": "Deleted from this workspace",
     "description": "A badge over a skill of Hive's own that was deleted from the workspace."
   },
+  "assistant.skills.delivered.failed": {
+    "defaultMessage": "Couldn't change whether agents get {name}",
+    "description": "A notice: switching a skill on or off for agents (Delivered to agents) failed. {name} is the skill."
+  },
+  "assistant.skills.delivered.offInWorkspace": {
+    "defaultMessage": "Off in the workspace's Skills view, so no project's agents get it. Turn it on there first.",
+    "description": "Tooltip on a Hive skill's switch in a project's Skills tab, shown off and disabled: the skill is switched off for the whole workspace."
+  },
+  "assistant.skills.delivered.switch": {
+    "defaultMessage": "{name} delivered to agents",
+    "description": "A Hive skill's switch in the Skills view and a project's Skills tab (Delivered to agents), for screen readers: whether agents are given the skill. {name} is the skill."
+  },
+  "assistant.skills.delivered.tipProject": {
+    "defaultMessage": "Delivered to agents: on, this project's agents get this skill from their next session; off, they don't, and Hive removes its copies at their next launch.",
+    "description": "Tooltip on a Hive skill's switch in a project's Skills tab."
+  },
+  "assistant.skills.delivered.tipWorkspace": {
+    "defaultMessage": "Delivered to agents: on, every project's agents get this skill from their next session; off, none of them do, and Hive removes its copies at their next launch.",
+    "description": "Tooltip on a Hive skill's switch in the workspace's Skills view."
+  },
   "assistant.skills.editInWorkspace": {
     "defaultMessage": "Edit in workspace",
     "description": "A button over a Hive skill in a project: opens it in the Skills view."

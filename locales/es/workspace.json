@@ -387,7 +387,7 @@
   "workspace.skillView.loadTarget": "la habilidad",
   "workspace.skillView.ok": "Aceptar",
   "workspace.skillView.refreshTarget": "la habilidad",
-  "workspace.skillView.select": "Selecciona una habilidad de Hive para verla o editarla. Los agentes de todos los proyectos de este espacio de trabajo reciben estas habilidades, salvo las marcadas para el Hive Assistant.",
+  "workspace.skillView.select": "Selecciona una habilidad de Hive para verla o editarla. Los agentes de todos los proyectos de este espacio de trabajo reciben estas habilidades, salvo las marcadas para el Hive Assistant y las desactivadas a su lado (Entregada a los agentes).",
   "workspace.statusBar.api": "API",
   "workspace.statusBar.apiError": "Agent API: {error}",
   "workspace.statusBar.apiOff": "La Agent API está desactivada",
