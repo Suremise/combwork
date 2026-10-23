@@ -229,6 +229,8 @@ const proj = (a: Record<string, any>): string => {
   if (!p) throw new Error('project is required')
   return enc(p)
 }
+/** 0.9's worktree arguments a call still gives (#1451): passed on as given, for the Agent API to refuse. */
+const legacyWorktreeArgs = (a: Record<string, any>): Record<string, unknown> => Object.fromEntries(['location', 'worktree', 'existingWorktree', 'branch', 'base'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
 /** A document read by section (#817): its path, and the project (this one unless named). */
 const docQuery = (a: Record<string, any>): string => {
   const p = a.project || PROJECT
@@ -427,7 +429,8 @@ const tools: Tool[] = [
       required: ['project']
     },
     run: async (a) => {
-      const r = (await api('POST', `/v1/projects/${proj(a)}/agents`, { name: a.name, workflowRole: a.workflowRole, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers, start: a.start, prompt: a.prompt })) as {
+      // 0.9's worktree arguments are passed on, not dropped, so the Agent API refuses them (#1451) and nothing is added.
+      const r = (await api('POST', `/v1/projects/${proj(a)}/agents`, { name: a.name, workflowRole: a.workflowRole, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers, start: a.start, prompt: a.prompt, ...legacyWorktreeArgs(a) })) as {
         agent: { id: string; name: string }
         project: { name: string; agents: { id: string; provider: string; status: string; folder?: string }[] }
       }
@@ -759,7 +762,7 @@ const tools: Tool[] = [
       required: ['number']
     },
     run: async (a) => {
-      const r = (await api('POST', `/v1/tasks/${enc(String(a.number))}/start`, { agent: a.agent, note: a.note, name: a.name, provider: a.provider, reply: 'short' })) as { agent: string; added: boolean; card: TaskRow }
+      const r = (await api('POST', `/v1/tasks/${enc(String(a.number))}/start`, { agent: a.agent, note: a.note, name: a.name, provider: a.provider, reply: 'short', ...legacyWorktreeArgs(a) })) as { agent: string; added: boolean; card: TaskRow }
       return `Started ${cardName(r.card)} ${r.card.title} on ${r.added ? 'a new agent, ' : ''}${r.agent}${r.card.project ? ` in ${r.card.project}` : ''}; the card is in ${r.card.column === 'doing' ? 'Doing' : r.card.column}. Follow it with hive_wait_for_agents.`
     }
   },

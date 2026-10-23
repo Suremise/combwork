@@ -427,6 +427,7 @@
   "workspace.storage.cleanUp": "Limpar…",
   "workspace.storage.copies": "Cópias de revisão e de verificação",
   "workspace.storage.deletedSession": "Sessão excluída {id}",
+  "workspace.storage.freeSlot": "{slot}, não emprestado",
   "workspace.storage.goneBackups": "Backups de sessões arquivadas que a CLI não tem mais",
   "workspace.storage.goneBackupsDesc": "A cópia do Hive é a última: as sessões são excluídas, como faz Excluir sessão.",
   "workspace.storage.goneWarning": "Depois disso, essas sessões não podem ser retomadas nem lidas: o backup do Hive é a única cópia restante. Elas saem da aba Sessões; o que usaram continua contando nos totais.",

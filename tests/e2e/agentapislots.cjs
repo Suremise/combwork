@@ -7,7 +7,9 @@
 //    own reads read the slot's copy, `from=project` the project folder's.
 // 3. Adding an agent in a worktree is refused, saying why (`location`, `worktree`, `existingWorktree`, `branch`), by
 //    the Agent API (the Assistant's: only it adds agents) and the IPC, and so is a card's start on a new agent with
-//    `worktree: true`; an agent added plainly is in the project folder; hive_add_agent offers no worktree arguments.
+//    `worktree: true`; an agent added plainly is in the project folder; hive_add_agent offers no worktree arguments, and
+//    its tools/call (and hive_start_task's) given them anyway is refused too, adding nothing and leaving the card as it was.
+// 4. Storage counts each slot on disk once: lent (to its agent), and still once its lease ends and it waits free.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -123,6 +125,18 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     check("B2's detail: in hb2, carried", actB2?.folder?.at === 'hb2' && actB2.folder.why === 'carried' && !('launchFolder' in actB2) && actB2.branch === 'hive/hb2', JSON.stringify(actB2))
     check('B1 stopped again', await stop(b1.id))
 
+    // --- Storage: slot-a lent to B1, then free once its lease ends (kept on disk for the next card): counted both times.
+    const PAYLOAD = 131072
+    fs.writeFileSync(path.join(slotA, 'payload.bin'), Buffer.alloc(PAYLOAD))
+    const slotRow = async () => (await inv('storage:project', alpha, true)).worktrees.find((w) => w.slot === 'slot-a')
+    const lentRow = await slotRow()
+    check('Storage counts slot-a, lent to B1', lentRow?.agent === 'B1' && lentRow.bytes >= PAYLOAD, JSON.stringify(lentRow))
+    check("B1's card's lease ends", (await op({ op: 'release', lease: l12.lease.id, why: 'done' })) === true)
+    check('…slot-a is still on disk, lent to no one', fs.existsSync(slotA) && !!(await until(async () => (await inv('slots:list', alpha)).find((x) => x.name === 'slot-a' && !x.lease), HUNG_MS)))
+    const store = await inv('storage:project', alpha, true)
+    const freeRow = store.worktrees.find((w) => w.slot === 'slot-a')
+    check('…and Storage still counts it once, with no agent', !!freeRow && !freeRow.agent && freeRow.bytes >= PAYLOAD && store.worktrees.filter((w) => same(w.path, slotA)).length === 1 && !(store.unusedWorktrees ?? []).some((w) => same(w.path, slotA)) && store.total >= freeRow.bytes, JSON.stringify(store))
+
     // --- 3. No agent in a worktree of its own. Only the Assistant adds agents through the Agent API: its token.
     const assistantHome = (await inv('workspace:refresh')).assistant.path
     await inv('session:start', assistantHome, { agentId: 'assistant' })
@@ -139,11 +153,26 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     const n = (await inv('tasks:create', { title: 'A card', project: 'alpha' })).number
     const started = await api('POST', `/v1/tasks/${encodeURIComponent(`#${n}`)}/start`, { worktree: true })
     check("a card's start on a new agent with worktree: true is refused", started.status === 400 && /pinned to worktrees/.test(JSON.stringify(started.body)), JSON.stringify(started))
+    // The hive tools as the Assistant calls them, given 0.9's worktree arguments anyway: passed on, so refused.
+    const mcp = (method, params) => JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) + '\n', env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' }), timeout: 60000 }).toString().split('\n')[0]).result
+    const call = (name, args) => {
+      const r = mcp('tools/call', { name, arguments: args })
+      return { text: r.content[0].text, isError: !!r.isError }
+    }
+    for (const args of [{ worktree: true, branch: 'legacy-wanted' }, { location: 'new-worktree' }, { existingWorktree: hb2 }, { base: 'main' }]) {
+      const r = call('hive_add_agent', { project: 'alpha', name: 'Unexpected MCP', ...args })
+      check(`hive_add_agent given ${Object.keys(args).join(', ')} is refused, saying why`, r.isError && /pinned to worktrees/.test(r.text), JSON.stringify(r))
+    }
+    for (const args of [{ worktree: true }, { agent: 'B1', worktree: true }]) {
+      const r = call('hive_start_task', { number: n, ...args })
+      check(`hive_start_task given ${Object.keys(args).join(', ')} is refused, saying why`, r.isError && /pinned to worktrees/.test(r.text), JSON.stringify(r))
+    }
+    const cardNow = (await inv('tasks:list')).find((c) => c.number === n)
+    check('…the card is left in Todo with no agent', cardNow?.column === 'todo' && !cardNow.agent, JSON.stringify(cardNow))
     check('…no agent was added by any of them', (await inv('workspace:refresh')).projects.find((p) => same(p.path, alpha)).agents.length === before)
     const added = await api('POST', '/v1/projects/alpha/agents', { name: 'B3', workflowRole: 'builder' }, asToken)
     const b3 = added.body?.project?.agents?.find((a) => a.name === 'B3')
-    const listed = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }) + '\n', env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' }), timeout: 60000 }).toString()
-    const tools = JSON.parse(listed.split('\n')[0]).result.tools
+    const tools = mcp('tools/list', {}).tools
     const addTool = tools.find((t) => t.name === 'hive_add_agent')
     const startTool = tools.find((t) => t.name === 'hive_start_task')
     check('hive_add_agent and hive_start_task offer no worktree arguments', !!addTool && !!startTool && !['worktree', 'existingWorktree', 'branch', 'base'].some((k) => k in addTool.inputSchema.properties) && !('worktree' in startTool.inputSchema.properties) && !/worktree/i.test(addTool.description), JSON.stringify({ add: Object.keys(addTool?.inputSchema?.properties ?? {}), start: Object.keys(startTool?.inputSchema?.properties ?? {}) }))

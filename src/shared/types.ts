@@ -2320,10 +2320,10 @@ export interface ProjectStorage {
   /** Files pasted or dropped into sessions (.hive/attachments). */
   attachments: number
   /**
-   * The folders agents work in (#1451): each slot lent now (`slot`, and the agent it is lent to), and an agent's 0.9
-   * worktree while its project isn't migrated; each folder once.
+   * The folders agents work in (#1451): each of the project's slots on disk (`slot`, and the agent it is lent to now, if
+   * any), and an agent's 0.9 worktree while its project isn't migrated; each folder once.
    */
-  worktrees: { agent: string; path: string; bytes: number; slot?: string }[]
+  worktrees: { agent?: string; path: string; bytes: number; slot?: string }[]
   /** The project's review and check copies (#1435), one folder, when it has any. */
   copies?: { path: string; bytes: number }
   /** Worktrees no agent works in (#353), counted in the total. */

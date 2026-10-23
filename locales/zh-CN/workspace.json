@@ -427,6 +427,7 @@
   "workspace.storage.cleanUp": "清理…",
   "workspace.storage.copies": "评审副本与检查副本",
   "workspace.storage.deletedSession": "已删除的会话 {id}",
+  "workspace.storage.freeSlot": "{slot}，未借出",
   "workspace.storage.goneBackups": "CLI 中已不存在的已归档会话的备份",
   "workspace.storage.goneBackupsDesc": "Hive 的副本是最后一份：这些会话会被删除，与“删除会话”的效果相同。",
   "workspace.storage.goneWarning": "这些会话之后将无法恢复或查看：Hive 的备份是仅剩的副本。它们会从“会话历史”标签页中消失；它们的用量仍计入总数。",

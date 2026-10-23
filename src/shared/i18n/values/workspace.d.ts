@@ -429,6 +429,7 @@ interface HiveMessageValues {
   'workspace.storage.cleanUp': undefined
   'workspace.storage.copies': undefined
   'workspace.storage.deletedSession': { id: string | number }
+  'workspace.storage.freeSlot': { slot: string | number }
   'workspace.storage.goneBackups': undefined
   'workspace.storage.goneBackupsDesc': undefined
   'workspace.storage.goneWarning': undefined

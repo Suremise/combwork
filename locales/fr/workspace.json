@@ -427,6 +427,7 @@
   "workspace.storage.cleanUp": "Nettoyer…",
   "workspace.storage.copies": "Copies de relecture et de vérification",
   "workspace.storage.deletedSession": "Session supprimée {id}",
+  "workspace.storage.freeSlot": "{slot}, non prêté",
   "workspace.storage.goneBackups": "Sauvegardes des sessions archivées que la CLI n’a plus",
   "workspace.storage.goneBackupsDesc": "La copie de Hive est la dernière : les sessions sont supprimées, comme avec Supprimer la session.",
   "workspace.storage.goneWarning": "Ces sessions ne pourront plus être reprises ni lues ensuite : la sauvegarde de Hive est la seule copie restante. Elles quittent l’onglet Sessions ; ce qu’elles ont utilisé compte toujours dans les totaux.",

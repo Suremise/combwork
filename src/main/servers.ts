@@ -2842,8 +2842,8 @@ route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
   if (agentCaller()) return cardIntent(params[0], { kind: 'start' })
   const n = taskNumber(params[0])
   const card = await tasks.readTask(n, await taskActor())
-  // 1.0 (#1451): a new agent gets no worktree of its own: asking for one is refused, never ignored.
-  if (!body?.agent && body?.worktree) throw new HttpError(400, NOT_PINNED)
+  // 1.0 (#1451): no agent gets a worktree of its own: asking for one is refused, never ignored.
+  if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, NOT_PINNED)
   const target: TaskStartTarget = body?.agent
     ? { kind: 'agent', agentId: String(body.agent) }
     : { kind: 'new-agent', name: body?.name ? String(body.name) : undefined, provider: body?.provider && isKnownProvider(String(body.provider)) ? (String(body.provider) as ProviderId) : undefined }

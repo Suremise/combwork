@@ -207,8 +207,9 @@ async function measure(projectPath: string, refresh: boolean, signal: AbortSigna
   const sessionsRaw = await beforeCompression(join(hive, 'sessions'), backups)
   const archiveRaw = await beforeCompression(join(hive, 'archive'), archive)
   const attachments = await folderSize(await attachmentsDir(projectPath), cache, signal)
-  // The folders agents work in (#1451), each once by its real path: the slots lent now (to the agent with the lease),
-  // and an agent's 0.9 worktree while its project isn't migrated.
+  // The folders agents work in (#1451), each once by its real path: the project's slots on disk, lent now (to the agent
+  // with the lease) or not (a free slot is kept for the next card), and an agent's 0.9 worktree while its project isn't
+  // migrated.
   const worktrees: ProjectStorage['worktrees'] = []
   const counted = new Set<string>()
   let copies: ProjectStorage['copies']
@@ -217,9 +218,9 @@ async function measure(projectPath: string, refresh: boolean, signal: AbortSigna
     const facts = await folderFacts(projectPath)
     const nameOf = (id: string): string => agents.find((a) => a.id === id)?.name ?? id
     for (const s of facts.slots) {
-      if (!s.open || counted.has(placeKey(s.folder))) continue
+      if (counted.has(placeKey(s.folder))) continue
       counted.add(placeKey(s.folder))
-      worktrees.push({ agent: nameOf(s.open.agent), slot: s.name, path: s.folder, bytes: await folderSize(s.folder, cache, signal) })
+      worktrees.push({ ...(s.open ? { agent: nameOf(s.open.agent) } : {}), slot: s.name, path: s.folder, bytes: await folderSize(s.folder, cache, signal) })
     }
     for (const a of agents) {
       const w = legacyWorktree(a)

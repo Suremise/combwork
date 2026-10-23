@@ -427,6 +427,7 @@
   "workspace.storage.cleanUp": "Wyczyść…",
   "workspace.storage.copies": "Kopie do recenzji i do sprawdzeń",
   "workspace.storage.deletedSession": "Usunięta sesja {id}",
+  "workspace.storage.freeSlot": "{slot}, niewypożyczony",
   "workspace.storage.goneBackups": "Kopie zapasowe zarchiwizowanych sesji, których CLI już nie ma",
   "workspace.storage.goneBackupsDesc": "Kopia Hive jest ostatnia: sesje zostaną usunięte, tak jak robi to „Usuń sesję”.",
   "workspace.storage.goneWarning": "Tych sesji nie będzie można potem wznowić ani przeczytać: kopia zapasowa Hive jest jedyną pozostałą. Znikną z zakładki Sesje; to, co zużyły, nadal liczy się do sum.",

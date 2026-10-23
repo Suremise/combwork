@@ -427,6 +427,7 @@
   "workspace.storage.cleanUp": "Limpiar…",
   "workspace.storage.copies": "Copias de revisión y de comprobación",
   "workspace.storage.deletedSession": "Sesión eliminada {id}",
+  "workspace.storage.freeSlot": "{slot}, sin prestar",
   "workspace.storage.goneBackups": "Copias de sesiones archivadas que la CLI ya no tiene",
   "workspace.storage.goneBackupsDesc": "La copia de Hive es la última: las sesiones se eliminan, como hace Eliminar sesión.",
   "workspace.storage.goneWarning": "Estas sesiones no se podrán reanudar ni leer después: la copia de Hive es la única que queda. Desaparecen de la pestaña Sesiones; lo que usaron sigue contando en los totales.",
