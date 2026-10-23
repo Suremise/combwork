@@ -50,7 +50,9 @@ const check = (name, ok, extra = '') => {
     fs.mkdirSync(path.join(dir, '.hive'), { recursive: true })
     fs.writeFileSync(path.join(dir, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, ...(options ? { workflow: { platform: 'git', preset: null, options } } : {}) }))
   }
-  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha, alphaWt, beta, gamma].map((x) => x.toLowerCase())))
+  // Alpha's cards start in its pool's slots since P7 (#1548: B1 started in slot-a, untrusted, sat on its trust screen).
+  const slots = ['slot-a', 'slot-b', 'slot-c', 'slot-d'].map((s) => path.join(`${ws}.worktrees`, 'alpha', s))
+  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha, alphaWt, beta, gamma, ...slots].map((x) => x.toLowerCase())))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -135,12 +137,17 @@ const check = (name, ok, extra = '') => {
     // --- Cancel leaves the card where it was, nothing recorded.
     const b = await create('Tidy the menu', 'alpha')
     await inv('tasks:move', b, 'doing', { agent: 'b1' })
-    const before = await facts(b)
+    // Its start's slot work recorded first (#1548: SlotPrepared, PlacementClaimed, then BuilderPlaced, its last, come
+    // after the move's reply; slotCards.ts), so what follows compares only what the drag records: the facts Hive
+    // records, not what a reconcile observes of the folder and its target meanwhile (TargetMoved, #1543).
+    const recorded = async (n) => (await inv('tasks:facts', n)).filter((f) => f.source === 'recorded').map((f) => f.kind)
+    await lib.until(async () => (await facts(b)).includes('BuilderPlaced'), HUNG_MS)
+    const before = await recorded(b)
     await drag(b, 'Done')
     check('another drag past the rules asks', !!(await lib.until(async () => (await dialog.count()) === 1, HUNG_MS)))
     await dialog.getByRole('button', { name: 'Cancel' }).click()
     check('Cancel leaves the card where it was', !!(await lib.until(async () => (await dialog.count()) === 0 && (await column('Active').locator(`.task-card[data-task="${b}"]`).count()) === 1, HUNG_MS)) && (await card(b))?.column === 'doing')
-    check('…with nothing recorded', JSON.stringify(await facts(b)) === JSON.stringify(before), JSON.stringify(await facts(b)))
+    check('…with nothing recorded', JSON.stringify(await recorded(b)) === JSON.stringify(before), JSON.stringify({ before, now: await facts(b) }))
 
     // --- A drag to Review with nothing to submit: refused for what no override makes true, said; the card stays.
     await drag(b, 'Review')
@@ -180,17 +187,21 @@ const check = (name, ok, extra = '') => {
       await doingDialog.locator('label.choice', { has: page.locator('strong', { hasText: /^\s*B1$/ }) }).click()
       await doingDialog.locator('.dialog-footer .btn.primary').click()
     }
-    const live = async () => (await inv('session:live')).some((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === 'b1')
+    // B1's sessions in alpha, each by its id: since P7 the cards above started B1 in its slot (#1548), so Cancel's "no
+    // agent started" is none started by it, not none running.
+    const live = async () => (await inv('session:live')).filter((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === 'b1').map((x) => x.runId).sort().join()
+    const liveBefore = await live()
     await assignAndStart()
     const startAsk = page.locator('.dialog', { hasText: 'to Active anyway?' })
     check('Assign and start on a blocked card asks first', !!(await lib.until(async () => (await startAsk.count()) === 1, HUNG_MS)))
     const startAsked = (await startAsk.innerText().catch(() => '')).replace(/\s+/g, ' ')
-    check('…naming the rule it skips by its name', /This skips a rule of its project:/.test(startAsked) && !startAsked.includes('start.notBlocked'), startAsked)
+    // Among what it skips (since P7 also "Each card in its own folder": B1 already holds slot-a with the cards above).
+    check('…naming the rule it skips by its name', /This skips (a rule|\d+ rules) of its project:/.test(startAsked) && startAsked.includes("Blocked cards don't start") && !startAsked.includes('start.notBlocked'), startAsked)
     await startAsk.screenshot({ path: path.join(lib.WORK, 'boardgates-start-ask-dark.png') })
     await startAsk.getByRole('button', { name: 'Cancel' }).click()
     await lib.until(async () => (await startAsk.count()) === 0, HUNG_MS)
     await lib.sleep(1500) // A fixed wait on purpose: this checks that nothing starts after Cancel.
-    check('Cancel: nothing done, no agent started', (await card(s))?.column === 'todo' && !(await facts(s)).includes('Started') && !(await facts(s)).includes('Override') && !(await live()), JSON.stringify({ column: (await card(s))?.column, facts: await facts(s) }))
+    check('Cancel: nothing done, no agent started', (await card(s))?.column === 'todo' && !(await facts(s)).includes('Started') && !(await facts(s)).includes('Override') && (await live()) === liveBefore, JSON.stringify({ column: (await card(s))?.column, facts: await facts(s), live: await live(), liveBefore }))
     // The Move to Active dialog may still be open behind it (the start didn't happen): close it.
     if (await doingDialog.count()) await doingDialog.getByRole('button', { name: 'Cancel' }).click()
     await lib.until(async () => (await doingDialog.count()) === 0, HUNG_MS)
