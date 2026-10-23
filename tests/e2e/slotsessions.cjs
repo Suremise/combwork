@@ -85,6 +85,8 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     const b2 = await lib.addAgent(inv, alpha, { name: 'B2', workflowRole: 'builder' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
+    // The pool is the project's builders (#1438): a third, never started, so step 6 has slot-a, hb1 and slot-b.
+    await lib.addAgent(inv, alpha, { name: 'B3', workflowRole: 'builder' })
 
     // --- 1. #12's lease on slot-a: B1's new conversation there, with its environment, bound; stopped at the lease's end.
     const l12 = await op({ op: 'lend', agent: b1.id, card: 12 })
