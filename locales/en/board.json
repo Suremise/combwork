@@ -2932,8 +2932,8 @@
     "description": "Under the upgrade dialog's text: the upgrade is refused while another copy of Hive has the workspace open; declining leaves the board readable but not changeable in this Hive, and no agent (nor the Assistant) can start."
   },
   "board.upgrade.askMessage": {
-    "defaultMessage": "Hive 1.0 needs to upgrade this workspace's data. A 0.9 Hive can then no longer open it; a backup is kept, and Help → Restore the 0.9 Board Backup… puts it back.",
-    "description": "The upgrade dialog's text: why (Hive 1.0 keeps the workspace's data in a new format), then what follows: an older Hive (0.9) can't open the board any more, and a copy of the board as it was is kept. Help → Restore the 0.9 Board Backup… is a command in the Help menu: keep its name as Hive shows it."
+    "defaultMessage": "Hive 1.0 needs to upgrade this workspace's data. A 0.9 Hive can then no longer open it; a backup of the board is kept, and Help → Restore the 0.9 Board Backup… puts it back. Back up first: there's no going back to 0.9.3 once your agents' worktrees become slots.",
+    "description": "The upgrade dialog's text: why (Hive 1.0 keeps the workspace's data in a new format), then what follows: an older Hive (0.9) can't open the board any more, and a copy of the board as it was is kept; but the agents' own worktrees become slots (working folders Hive lends to cards), which Hive 0.9.3 can't use again, so the user should back up first. Help → Restore the 0.9 Board Backup… is a command in the Help menu: keep its name as Hive shows it. Keep 0.9.3 as it is (a version)."
   },
   "board.upgrade.askTitle": {
     "defaultMessage": "Upgrade this workspace's board to 1.0?",

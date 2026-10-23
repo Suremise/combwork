@@ -340,6 +340,8 @@
   "tips.slotResume.title": "A conversation resumes where it was made",
   "tips.slots.text": "With Where cards are built set to Each card in its own folder, starting a card lends its builder a slot, a ready worktree, and makes the card's branch there. A lane keeps its slot from card to card; with every slot in use, it waits for one.",
   "tips.slots.title": "Each card on a branch of its own",
+  "tips.slotsAdopted.text": "Since the upgrade, each builder's own worktree is a slot kept for it until its next card or lane takes it over. Release Slot… in the agent's ⋯ menu gives one up; once free, Hive renames its folder to a slot name, taking its conversations with it.",
+  "tips.slotsAdopted.title": "Your agents' worktrees are slots now",
   "tips.sortTables.text": "Click a column's header in Hive's tables (shortcuts, Performance, Storage, the Overviews) to sort by it, again for the other way. Hive remembers each table's sort and rows per page.",
   "tips.sortTables.title": "Sort any table",
   "tips.staleMessages.text": "When the Assistant relays something about a card's current round, it ties the message to that card: if the card passes or starts another round before the agent reads it, Hive drops it as stale, so no agent reopens a passed card for an old finding.",

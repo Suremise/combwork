@@ -1,5 +1,5 @@
 import { existsSync } from 'original-fs'
-import { readFile, stat } from 'original-fs/promises'
+import { mkdir, readFile, stat } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import type { MoveBranch, MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MovePlan, MoveReport, MoveReportRow, MoveWorktree, PathDataCopy, ProjectConfig, WorkspaceMoved } from '../shared/types'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
@@ -388,6 +388,51 @@ async function pathData(moves: Move[], apply: boolean): Promise<PathDataCopy[]> 
   const out: PathDataCopy[] = []
   for (const m of moves) out.push(...(await copyFor(m, apply)))
   return out
+}
+
+/**
+ * A worktree's folder moved with Repair's own steps (#1441: an adopted worktree renamed to a slot's name, once nothing
+ * holds it): each CLI's per-folder data tried first without copying (a conversation that couldn't follow: nothing moves,
+ * and why), then git's move, its cards' work following it (`FolderMoved`), its sessions' recorded folder repointed, and
+ * the CLIs' data copied (kept as a pending copy, finished later as Repair's are, until it is). A step failing part way
+ * puts back what was done (git's move too): nothing is lost. Repair's own flow uses the same steps, unchanged.
+ */
+export async function relocateWorktree(ws: WorkspaceService, projectPath: string, from: string, to: string, owner: MoveOwner): Promise<{ ok: true } | { ok: false; why: string }> {
+  const m: Move = { from, to, ...owned(owner) }
+  const dry = await copyFor(m, false)
+  const blocked = dry.filter((f) => f.failed?.length)
+  if (blocked.length) return { ok: false, why: blocked.map((f) => `${f.provider}: ${f.failed!.join(', ')}`).join('; ') }
+  // Git moves a worktree into a folder that is already there (to/<name>): refused instead.
+  if (existsSync(to)) return { ok: false, why: `${to} is already there` } // i18n-ignore: the log's reason
+  // Its new parent made first (a pool's root before its first slot): git doesn't.
+  await mkdir(dirname(to), { recursive: true })
+  const moved = await git(projectPath, ['worktree', 'move', from, to])
+  if (!moved.ok) return { ok: false, why: (moved.err || 'git worktree move').trim() } // i18n-ignore: a git command's name
+  try {
+    await relocateSteps(ws, projectPath, from, to, owner)
+  } catch (e) {
+    // Put back as it was (each step undone where it was done: repointing back is a no-op where nothing moved), then git's move.
+    await sessionCwds(ws, projectPath, [{ from: to, to: from }], true).catch((x) => log.warn(`putting ${userText(from)}'s sessions back`, x))
+    await moveCardFolders(projectPath, to, from).catch((x) => log.warn(`putting ${userText(from)}'s cards back`, x))
+    const back = await git(projectPath, ['worktree', 'move', to, from])
+    if (!back.ok) log.warn(`${userText(to)} couldn't be moved back to ${userText(from)}: ${userText(back.err)}`)
+    return { ok: false, why: e instanceof Error ? e.message : String(e) }
+  }
+  log.info(`Moved ${userText(from)} to ${userText(to)} with its cards, sessions and conversations`)
+  return { ok: true }
+}
+
+/**
+ * Repair's steps after git has moved a worktree (`relocateWorktree`'s, and a rename cut short after git's move, finished
+ * by the next pass): its cards' work follows it (`FolderMoved`), its sessions' recorded folder is repointed, and the
+ * CLIs' per-folder data is copied (a pending copy until it is). Each step is a no-op where it was done already.
+ */
+export async function relocateSteps(ws: WorkspaceService, projectPath: string, from: string, to: string, owner: MoveOwner): Promise<void> {
+  const m: Move = { from, to, ...owned(owner) }
+  await moveCardFolders(projectPath, from, to)
+  await sessionCwds(ws, projectPath, [{ from, to }], true)
+  await ws.mutateProjectConfig(projectPath, (cfg) => ({ pendingCopies: withPending(cfg.pendingCopies, m) }))
+  if (!(await copyFor(m, true)).some((f) => f.failed?.length)) await donePending(ws, projectPath, m)
 }
 
 /** Agents running in the workspace (the Assistant too), as "project · agent". */

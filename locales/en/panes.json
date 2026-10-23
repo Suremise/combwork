@@ -363,6 +363,10 @@
     "defaultMessage": "Move Up",
     "description": "Menu item (an agent's menu, a grid layout): moves the agent's pane one cell up."
   },
+  "panes.menu.releaseSlot": {
+    "defaultMessage": "Release Slot…",
+    "description": "Menu item (an agent's menu): its own worktree from before 1.0, kept for it as a slot since the upgrade, stops being kept for it (asks first)."
+  },
   "panes.menu.remove": {
     "defaultMessage": "Remove Agent…",
     "description": "Menu item (an agent's menu): removes the agent from the project (asks first)."

@@ -90,6 +90,7 @@
   "panes.menu.moveLeft": "Mover a la izquierda",
   "panes.menu.moveRight": "Mover a la derecha",
   "panes.menu.moveUp": "Mover arriba",
+  "panes.menu.releaseSlot": "Liberar slot…",
   "panes.menu.remove": "Quitar agente…",
   "panes.menu.reviewChanges": "Revisar los cambios",
   "panes.messages.cancel": "{n, plural, one {Cancelar el mensaje} many {Cancelar los # mensajes} other {Cancelar los # mensajes}}",

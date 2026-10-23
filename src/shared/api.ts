@@ -334,6 +334,8 @@ export interface HiveRequests {
   'queue:list': (projectPath: string, target?: string) => QueueView[]
   /** The project's slots (#1429, SPEC §16.10.1), each with its open lease. */
   'slots:list': (projectPath: string) => SlotView[]
+  /** Ends an agent's carried lease (#1441, Release Slot… in its menu): its adopted worktree stops being its own. Whether it did. */
+  'slots:releaseCarried': (projectPath: string, agentId: string) => boolean
   /** The project's review and check copies (#1435, SPEC §16.10.5), each with its lease not freed. */
   'copies:list': (projectPath: string) => CopyView[]
   /** Test copies only (unpackaged): lend, release, tidy or remove in the project's slot pool, as #1438 and #1447 will. */

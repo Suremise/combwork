@@ -492,6 +492,51 @@ export class SlotStore {
     return this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, slot.name, 'carried', { agent }, at)
   }
 
+  /**
+   * A carried lease handed off to a card or lane of its agent's on the same slot (#1441, SPEC §16.10.8), in one write:
+   * the carried lease ended (`handedOff`), a dispatch lease begun on the slot, the slot's writer (the agent's running
+   * session there) moved to it, and `also` (the caller's rebinding of the carried lease's sessions, #1434's
+   * `rebindSession`) in the same write, so all of it lands or none. Null when it can't be now: the carried lease not open
+   * or another agent's, the slot under an operation or a job, or another agent writing there; an index refusing it (the
+   * agent leased meanwhile) too.
+   */
+  async handOff(carried: string, req: { card?: number; lane?: string; agent: string }, also?: (db: DatabaseSync, lease: SlotLease) => void): Promise<SlotLease | null> {
+    if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane')
+    try {
+      return await this.conn.write((db) => {
+        const r = db.prepare("SELECT * FROM slot_leases WHERE id = ? AND project = ? AND ended_at IS NULL AND kind = 'carried'").get(carried, this.project) as Row | undefined
+        if (!r || r.agent !== req.agent) return null
+        const s = this.slotIn(db, r.slot as string)
+        if (!s || s.op || s.job || s.state === 'removing' || (s.writer && s.writer.agent !== req.agent)) return null
+        const at = this.iso()
+        db.prepare("UPDATE slot_leases SET ended_at = ?, why = 'handedOff' WHERE id = ?").run(at, carried)
+        const lease = this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, s.name, req.card !== undefined ? 'card' : 'lane', req, at)
+        if (s.writer) db.prepare('UPDATE slots SET writer_lease = ? WHERE project = ? AND name = ? AND writer_run = ?').run(lease.id, this.project, s.name, s.writer.run)
+        db.prepare('UPDATE slots SET used_at = ? WHERE project = ? AND name = ?').run(at, this.project, s.name)
+        also?.(db, lease)
+        return lease
+      })
+    } catch (e) {
+      if (constraintOf(e)) return null
+      throw e
+    }
+  }
+
+  /**
+   * A slot's row (and its leases' history) renamed to where its folder was moved (#1441, a rename cut short after git's
+   * move: the next pass finishes it), only while no operation holds it. Whether it was.
+   */
+  async renameRow(name: string, toName: string, to: string): Promise<boolean> {
+    return this.conn.write((db) => {
+      const s = this.slotIn(db, name)
+      if (!s || s.op || this.slotIn(db, toName)) return false
+      db.exec('PRAGMA defer_foreign_keys = ON')
+      db.prepare("UPDATE slots SET name = ?, folder = ?, state = 'ready' WHERE project = ? AND name = ?").run(toName, to, this.project, name)
+      db.prepare('UPDATE slot_leases SET slot = ? WHERE project = ? AND slot = ?').run(toName, this.project, name)
+      return true
+    })
+  }
+
   private slotsIn(db: DatabaseSync): Slot[] {
     return (db.prepare('SELECT * FROM slots WHERE project = ?').all(this.project) as Row[]).map(slotOfRow)
   }
@@ -890,6 +935,28 @@ export class SlotPool {
     }
   }
 
+  /** A carried lease handed off to a card or lane of its agent's (#1441), `also` in the same write (SlotStore.handOff). */
+  handOff(carried: string, req: { card?: number; lane?: string; agent: string }, also?: (db: DatabaseSync, lease: SlotLease) => void): Promise<SlotLease | null> {
+    return this.store.handOff(carried, req, also)
+  }
+
+  renameRow(name: string, toName: string, to: string): Promise<boolean> {
+    return this.store.renameRow(name, toName, to)
+  }
+
+  lastLease(name: string): SlotLease | null {
+    return this.store.lastLease(name)
+  }
+
+  /** The next generic slot name free in the pool (#1441's renames), and where a slot of a name has its folder. */
+  nextName(): string {
+    return nextSlotName(new Set(this.store.slots().map((x) => x.name.toLowerCase())), this.deps.root)
+  }
+
+  folderFor(name: string): string {
+    return join(this.deps.root, name)
+  }
+
   /** A carried lease for an agent's adopted worktree (#1441); null when it can't be adopted now (see SlotStore.carry). */
   carry(agent: string, slot: { name: string; folder: string; target?: string | null }): Promise<SlotLease | null> {
     return this.store.carry(agent, { ...slot, target: slot.target ?? null })
@@ -1231,6 +1298,40 @@ export class SlotPool {
       this.store.setIn(db, name, state, {}, { op: null })
     })
     return { why: 'notReady', slot: name, state, error: 'the workspace closed' }
+  }
+
+  /**
+   * A free slot renamed (#1441: an adopted worktree given the next generic name once nothing holds it), as an operation
+   * that takes it out of the pool (`removing`) while `move` moves its folder (Repair's steps, the app's). Moved: its row,
+   * and its leases' history, are the new name's and folder's, in one fenced write. Not moved: the slot as it was. Only
+   * while it is free as `startRemoval` checks. Whether it was renamed.
+   */
+  async rename(name: string, toName: string, move: (from: string, to: string) => Promise<boolean>): Promise<boolean> {
+    const s = this.store.slot(name)
+    if (!s || s.state === 'removing') return false
+    const token = newToken()
+    return this.op(token, async () => {
+      if (!(await this.store.startRemoval(name, s.state, token, await this.deps.holder.self()))) return false
+      const to = this.folderFor(toName)
+      let moved = false
+      try {
+        moved = await move(s.folder, to)
+      } finally {
+        await this.store
+          .fenced(name, token, (db) => {
+            if (!moved) return this.store.setIn(db, name, s.state, {}, { op: null })
+            // The row and its leases renamed together: the leases' key checked at the write's end, once both are.
+            db.exec('PRAGMA defer_foreign_keys = ON')
+            db.prepare('UPDATE slots SET name = ?, folder = ?, state = ?, op = NULL, op_kind = NULL, op_lease = NULL, op_pid = NULL, op_started = NULL WHERE project = ? AND name = ?').run(toName, to, s.state, this.store.project, name)
+            db.prepare('UPDATE slot_leases SET slot = ? WHERE project = ? AND slot = ?').run(toName, this.store.project, name)
+          })
+          .catch((e) => {
+            if (!(e instanceof OpLost)) throw e
+          })
+      }
+      if (moved) log.info(`Slot ${userText(name)} renamed ${userText(toName)} (${userText(to)})`)
+      return moved
+    })
   }
 
   /**

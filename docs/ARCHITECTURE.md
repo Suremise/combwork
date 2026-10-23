@@ -361,7 +361,7 @@ runner's worktree while an entry, an unfinished advance or an in-flight card's r
 | Options and rulesets | `src/shared/workflow/options.ts` (option defs, presets, contradictions), `pieces.ts` (guard and action ids, params, required capabilities), `compile.ts` (options → ruleset, hashed) | `src/main/workflow/rulesets.ts` (stored rulesets, resolution global → workspace → project) |
 | Runtime | `src/shared/workflow/refusals.ts` (refusal messages: `msg()` ids shared by the Agent API's English and the window) | `src/main/workflow/service.ts` (one runtime per project of an open workspace, #1263), `runtime.ts` (evaluate a move: load facts and ruleset, run guards, then actions, in one `boardWrite`), `reconcile.ts`, `intents.ts` (the Agent API routes' handlers) |
 | Merge queue | — | `src/main/workflow/mergeQueue.ts` (per target; replaces `mergeSlots.ts`' role for cards), `queueRunner.ts` (the target's runner, below), `queueJobs.ts` (its job object and launcher), `queueProcs.ts` (process identity by pid and start time), `repoLock.ts` (cross-process lock in the common git dir, shared with `gitRepo.ts`) |
-| Slots | `src/shared/slots.ts` | `src/main/slots.ts` (the pool: `slots` and `slot_leases` rows, lending, warming, guarded clean-up; #1429), `slotsApp.ts` (a pool per open project on the board, warming runs on the process supervisor, the hourly tidy), `slotJobs.ts` (settling a slot command's job: #1360's sealed-journal protocol), `copies.ts` and `copiesApp.ts` (review
+| Slots | `src/shared/slots.ts` | `src/main/slots.ts` (the pool: `slots` and `slot_leases` rows, lending, warming, guarded clean-up; #1429), `slotMigration.ts` (agents' worktrees adopted as carried slots at the upgrade; #1441), `slotsApp.ts` (a pool per open project on the board, warming runs on the process supervisor, the hourly tidy), `slotJobs.ts` (settling a slot command's job: #1360's sealed-journal protocol), `copies.ts` and `copiesApp.ts` (review
 and check copies: leases at a revision, the quiescence barrier, isolated checks' jobs; #1435), `reviewCopies.ts` |
 | Undo | `src/shared/assistantUndo.ts` (grouping) | `src/main/assistantUndo.ts` (replays the Assistant's facts backwards, skips "changed since") |
 
@@ -638,6 +638,20 @@ switched, and hourly; with the rules off it only releases. Start Lane lends the 
 without one keeps `slotWait` on its record, and the pass lends it one and starts its agents once (laneStart's
 `startWaitingLane`, by their brief's delivery identity). Test copies can end Hive at the pass's seams
 (`HIVE_TEST_SLOT_CRASH`). The pool's size counts builders and either agents (`setBuilderCount`).
+
+**Agents' worktrees become slots, built [#1441].** `slotMigration.ts` runs after the upgrade's adoption at each opening
+(`ipc.ts`' `onOpened`, and `board:upgrade`), per agent (board_meta `slot_migration`: each project's agents migrated,
+which #1434's `slotsMigrated` and `FolderFacts.migratedAgents` read: an agent not in it keeps its 0.9 worktree; test
+copies skip it with `HIVE_TEST_SLOT_MIGRATION=off`): in one board write per agent, its record with it, its
+worktree carried in (`SlotStore.carryIn`), what the carried lease is kept for beside it (board_meta `carried:<lease>`:
+a lane, a card, or nothing), and its sessions in the folder bound (`rebindSession`); reviewers' worktrees become retired
+homes (`setRetiredHomes`). Kept for a lane or card, the runtime's `agentFolder` gives the carried slot as the stand-in
+(`SlotStarts.standIn`) and the pass releases the lease once that ends. Kept for nothing, `carriedToHand` and
+`handOffCarried` (in `leaseForStart`, `lendLane` and lanes waiting for a slot) hand the slot over to the card or lane in
+one write (`SlotStore.handOff`, its sessions rebound in it). The pass's last step, `renameAdopted`, renames a free adopted
+slot to a generic name through `SlotPool.rename` (a removal-kind operation) with `workspaceMove.ts`' `relocateWorktree`
+(Repair's steps: `relocateSteps` after git's move), its intent recorded first (board_meta `slot_rename:`) so
+`settleRenames` finishes or forgets one a crash cut short. Release Slot… is `slots:releaseCarried`.
 
 **Storage (P3's one migration, #1025, designed in #1208).** The DDL is `src/main/schema/v1_0.ts`: five steps, registered
 in `BOARD_MIGRATIONS` in this order by their cards, each taking the next version number when it merges, and run by

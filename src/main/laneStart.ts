@@ -86,7 +86,7 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
       // Its slot, lent before its agents start and kept for the whole lane (§16.10.2). None free: the lane is recorded
       // with its wait (kept with the lane, through a restart) and shows "waiting for a slot"; its agents start once a
       // slot is free (slotCards' pass).
-      const got = await lendLane(ws, projectPath, recorded.lane.id, builder.id)
+      const got = await lendLane(ws, projectPath, recorded.lane.id, builder.id, options?.target || null)
       if ('waiting' in got) {
         await setLaneSlotWait(ws, recorded.lane.id, { since: new Date().toISOString(), note: req.note ?? '' })
         return { lane: recorded.lane as LaneInfo, started: [], waitingForSlot: got.waiting }
@@ -106,7 +106,7 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
  * folder any more, #1434's legacyWorktree), else its 0.9 worktree or the project folder, as before.
  */
 async function builderWhere(projectPath: string, builder: AgentDef, options: WorkflowOptions | null): Promise<{ inSlots: boolean; legacy: { path: string; branch: string } | null }> {
-  const legacy = (await slotsMigrated(projectPath)) ? null : legacyWorktree(builder)
+  const legacy = (await slotsMigrated(projectPath, builder.id)) ? null : legacyWorktree(builder)
   return { inSlots: options?.folder === 'slots' && buildsWork(agentWorkflowRole(builder)) && !legacy, legacy: legacy ? { path: legacy.path, branch: legacy.branch } : null }
 }
 

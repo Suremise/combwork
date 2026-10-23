@@ -74,7 +74,7 @@ function whyNotNow(ws: WorkspaceService, projectPath: string, project: string, a
   } catch {
     // A board still 0.9's, or none open: no slots.
   }
-  return freshWhy(nowOf(projectPath, agentId), leasesOf({ projectPath, migrated: false, homes: [], slots }, agentId).dispatch)
+  return freshWhy(nowOf(projectPath, agentId), leasesOf({ projectPath, migrated: false, migratedAgents: [], homes: [], slots }, agentId).dispatch)
 }
 
 /**

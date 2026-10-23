@@ -340,6 +340,8 @@
   "tips.slotResume.title": "Una conversación se reanuda donde se creó",
   "tips.slots.text": "Con Dónde se trabaja cada tarjeta en Cada tarjeta en su propia carpeta, iniciar una tarjeta presta a su autor un slot, un worktree listo, y crea allí la rama de la tarjeta. Un carril conserva su slot de tarjeta en tarjeta; con todos los slots en uso, espera uno.",
   "tips.slots.title": "Cada tarjeta en su propia rama",
+  "tips.slotsAdopted.text": "Desde la actualización, el worktree propio de cada constructor es un slot reservado para él hasta que su siguiente tarjeta o carril lo tome. Liberar slot… en el menú ⋯ del agente renuncia a uno; una vez libre, Hive cambia el nombre de su carpeta por un nombre de slot y se lleva sus conversaciones.",
+  "tips.slotsAdopted.title": "Los worktrees de tus agentes ahora son slots",
   "tips.sortTables.text": "Haz clic en el encabezado de una columna en las tablas de Hive (atajos, Rendimiento, Almacenamiento, los resúmenes) para ordenar por ella, y otra vez para invertir el orden. Hive recuerda el orden y las filas por página de cada tabla.",
   "tips.sortTables.title": "Ordena cualquier tabla",
   "tips.staleMessages.text": "Cuando el Asistente transmite algo sobre la ronda actual de una tarjeta, vincula el mensaje a esa tarjeta: si la tarjeta se aprueba o empieza otra ronda antes de que el agente lo lea, Hive lo descarta por obsoleto, para que ningún agente reabra una tarjeta aprobada por un hallazgo antiguo.",

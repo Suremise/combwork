@@ -150,7 +150,8 @@ async function themes(dev, name) {
     await lib.openWorkspace(dev.inv, dev.page, ws)
     const ask = dialogWith(dev.page, ASK)
     check('the dev build asks before upgrading', !!(await lib.until(async () => (await ask.count()) === 1, HUNG_MS)))
-    check('…saying why, that a 0.9 Hive can then no longer open it, and that a backup is kept', /Hive 1\.0 needs to upgrade this workspace's data\. A 0\.9 Hive can then no longer open it; a backup is kept/.test(await ask.innerText().catch(() => '')), await ask.innerText().catch(() => ''))
+    check('…saying why, that a 0.9 Hive can then no longer open it, and that a backup is kept', /Hive 1\.0 needs to upgrade this workspace's data\. A 0\.9 Hive can then no longer open it; a backup of the board is kept/.test(await ask.innerText().catch(() => '')), await ask.innerText().catch(() => ''))
+    check("…and to back up first: no going back to 0.9.3 once agents' worktrees become slots (#1441)", /Back up first: there's no going back to 0\.9\.3 once your agents' worktrees become slots\./.test(await ask.innerText().catch(() => '')), await ask.innerText().catch(() => ''))
     await themes(dev, '1-ask')
 
     // 3. Upgrade while the 0.9 Hive has it open: refused, nothing changed.
