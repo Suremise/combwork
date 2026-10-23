@@ -1911,7 +1911,8 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
     } else if (rec.fired.cards.length) {
       // Told as the cards are now, every change since the watch began (#224): one that landed after the line was made
       // is in it too, and a card that has left the agent's view is told as gone.
-      const r = await check(store, rec)
+      // With the releases' lanes and setting now (#1475): a lane ended, or a card merged, before the line is handed over.
+      const r = await check(store, rec, undefined, await (await releaseContexts(store, [rec]))(rec))
       // A card released since the line was made (#420: reassigned before it was handed over) is told as released, not
       // as the change that fired it.
       let left = rec.cond.cards.length
@@ -2086,6 +2087,10 @@ function releaseOf(rec: WatchRecord, n: number, card: TaskCard | null, ctx: Rele
   if (!ctx.loopWakes) return null
   // Merged (Done) since the watch began, which the watch doesn't count: a reviewer waiting for it in Review, a builder for its verdict.
   if (card.column === 'done' && rec.marks[n]?.column !== 'done' && !countsDone(rec.cond)) return { number: n, why: 'done', detail: null }
+  // A watch for the card's Done that sees it there has what it waited for (HR4's #1475 round 1): told as that change,
+  // never as its lane's end. Anything else waited for on a lane that has ended is obsolete, also a change that fired the
+  // watch before the lane ended but wasn't handed over yet (an arrival in Review of an abandoned lane's card).
+  if (card.column === 'done' && countsDone(rec.cond)) return null
   const lane = laneEndedOn(rec, n, on, ctx.lanes)
   if (lane) return { number: n, why: 'laneEnded', detail: lane.state === 'abandoned' ? 'abandoned' : null }
   return null
@@ -2116,9 +2121,12 @@ function laneEndedOn(rec: WatchRecord, n: number, on: OnCard, lanes: readonly La
   return lanes.find((l) => (l.state === 'ended' || l.state === 'abandoned') && mine(l) && Date.parse(l.endedAt ?? '') > since) ?? null
 }
 
-/** The lanes and the setting a round of card watches' releases reads (#1475): read only when a watch has a part in a card. */
-async function releaseContexts(store: Store): Promise<(rec: WatchRecord) => Promise<ReleaseContext>> {
-  const any = store.list.some((r) => !r.fired && !r.agents && !r.lanes && r.on && Object.keys(r.on).length)
+/**
+ * The lanes and the setting a round of card watches' releases reads (#1475): read only when one of `recs` has a part in a
+ * card. A round's unfired watches, or a fired one checked again as it is delivered (its line made from the cards now).
+ */
+async function releaseContexts(store: Store, recs: readonly WatchRecord[]): Promise<(rec: WatchRecord) => Promise<ReleaseContext>> {
+  const any = recs.some((r) => !r.agents && !r.lanes && r.on && Object.keys(r.on).length)
   if (!any) return async () => NO_CONTEXT
   const lanes = await listLanes(store.ws, { all: true }).catch((e) => {
     log.warn('reading lanes for card watches', e)
@@ -2304,7 +2312,7 @@ async function evaluate(ws: WorkspaceService): Promise<void> {
     let changed = followProjects(store, await store.ws.projectIds({ fresh: true }))
     // Each card read once for all the watches on it (#321).
     const reads: CardReads = new Map()
-    const contextOf = await releaseContexts(store)
+    const contextOf = await releaseContexts(store, store.list.filter((r) => !r.fired))
     for (const rec of [...store.list]) {
       if (rec.fired || rec.agents || rec.lanes) continue
       // One watch that can't be checked doesn't stop the others.

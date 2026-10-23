@@ -1126,6 +1126,69 @@ describe('agent watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it("a lane ended, abandoned or a card merged after the watch fired but before its line is typed is told as that, not as the change; a watch for Done is told the Done, not its lane's end (#1475 round 1 findings)", async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const user = { kind: 'user' } as const
+    const lanes = await import('../src/main/lanes')
+    const card = async (title: string, agent = 'a2') => (await inWorkspace(w, () => tasks.createTask({ title, project: 'alpha', agent, column: 'doing' }, user))).number
+    const over = (one: boolean) => `Your card watch has ended: there is nothing more to wait for on ${one ? 'it' : 'them'}.`
+    for (const how of ['abandoned', 'ended', 'done'] as const) {
+      // a1 reviews a2's lane and awaits its card in Review; it works, so the arrival fires the watch but waits to be typed.
+      st.status = 'watching'
+      const c = await card(`Card ${how}`)
+      const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'a2', reviewer: 'a1', cards: [c], by: 'Reviewer (alpha)' })).lane
+      await watches.registerWatch(w, alpha, 'a1', { cards: [c], changes: ['column'], column: 'review' })
+      st.status = 'working'
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, user))
+      await watches.evaluateWatches(w)
+      if (how !== 'abandoned') await inWorkspace(w, () => tasks.updateTask(c, { column: 'done' }, user))
+      if (how !== 'done') await lanes.endLane(w, lane.id, { abandoned: how === 'abandoned' })
+      st.status = 'watching'
+      const before = st.told.length
+      await watches.tick()
+      await vi.waitFor(() => expect(st.told).toHaveLength(before + 1), { timeout: HUNG_MS })
+      // A card merged is told as Done, whether or not its lane has ended yet.
+      expect(st.told.at(-1)).toBe(`[Hive] #${c}${how === 'abandoned' ? "'s lane was abandoned" : ' is in Done'} (your watch on it ended). ${over(true)} Don't watch it again; end your turn unless you have other work.`)
+      await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).toBeNull(), { timeout: HUNG_MS })
+    }
+    // Two cards in two lanes: the one that fired is in the lane abandoned before the line is typed; nothing is typed, the
+    // other stays watched, and its arrival is told with the release first.
+    st.status = 'watching'
+    const c1 = await card('One')
+    const c2 = await card('Two', 'a3')
+    const l1 = (await lanes.startLane(w, { project: 'alpha', builder: 'a2', reviewer: 'a1', cards: [c1], by: 'Reviewer (alpha)' })).lane
+    await lanes.startLane(w, { project: 'alpha', builder: 'a3', reviewer: 'a1', cards: [c2], by: 'Second (alpha)' })
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c1, c2], changes: ['column'], column: 'review' })
+    st.status = 'working'
+    await inWorkspace(w, () => tasks.updateTask(c1, { column: 'review' }, user))
+    await watches.evaluateWatches(w)
+    await lanes.endLane(w, l1.id, { abandoned: true })
+    st.status = 'watching'
+    const typed = st.typed.length
+    await watches.tick()
+    await watches.settled()
+    expect(st.typed).toHaveLength(typed)
+    expect(watches.watchFor(alpha, 'a1')?.cards).toEqual([c2])
+    await inWorkspace(w, () => tasks.updateTask(c2, { column: 'review' }, { kind: 'agent', name: 'Second (alpha)', self: { project: 'alpha', agentId: 'a3' }, scope: 'alpha' }))
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(4), { timeout: HUNG_MS })
+    expect(st.told.at(-1)).toMatch(new RegExp(`^\\[Hive\\] #${c1}'s lane was abandoned \\(your watch on it ended\\); #${c2} \\(Second's card\\) is in Review`))
+    // A builder waiting for its own card's Done, with a real lane: merged, then the lane ended, it is told the Done.
+    st.status = 'watching'
+    await watches.cancelWatch(w, alpha, 'a1')
+    const mine = await card('Mine', 'a1')
+    const l3 = (await lanes.startLane(w, { project: 'alpha', builder: 'a1', reviewer: 'a2', cards: [mine], by: 'Builder (alpha)' })).lane
+    await watches.registerWatch(w, alpha, 'a1', { cards: [mine], changes: ['column'], column: 'done' })
+    await inWorkspace(w, () => tasks.updateTask(mine, { column: 'done' }, user))
+    await lanes.endLane(w, l3.id, {})
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(5), { timeout: HUNG_MS })
+    expect(st.told.at(-1)).toMatch(new RegExp(`^\\[Hive\\] #${mine} is in Done`))
+    expect(st.told.at(-1)).not.toMatch(/your watch on it ended|lane ended|nothing more to wait for/)
+    await disposeWorkspaceService(w)
+  })
+
   it('a card released after its watch fired but before the line is typed is told as released; released cards are told with the limit too (#420 round 1 findings)', async () => {
     const { w, alpha } = await open()
     const st = fake(alpha)
