@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, loopStepSide, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { agentActor, agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, loopStepSide, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
@@ -123,8 +123,11 @@ export interface WorkflowConfig {
    * instead): a Git card's refusal for what couldn't be read then offers the switch to None as its next step.
    */
   repositoryGone?: () => boolean
-  /** Paths an agent holds or held file locks on since its card started (a shared folder's own changes, G16). */
-  locksOf?: (agent: string) => string[]
+  /**
+   * The lock records still being written for the project (#1481: a lock taken before an intent is recorded before the
+   * intent reads the cards' records); left out, none are.
+   */
+  locksSettled?: () => Promise<void>
   /** Run the actions after each write (false: leave them pending, as a crash right after the commit would). */
   autoRun?: boolean
   effects?: Effects
@@ -163,6 +166,14 @@ export function slugOf(title: string): string {
 }
 
 const ORDER: StageId[] = ['todo', 'active', 'review', 'approved', 'merging', 'done']
+/**
+ * Where file locks were seen (recordLocks, #1481): on that cycle of the agent's current card then, or, when the cards
+ * weren't read then (the runtime not made yet this launch), at that time (ISO).
+ */
+export type LockSeen = { card: number; cycle: number } | { at: string }
+
+/** The stages in which a card's lock record counts (G16, #1481): started and not finished. */
+const LOCK_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'merging']
 
 /** The user's choice at the round limit, as an agent's wake says it (English). */
 const CHOICE_WORDS: Record<RoundChoice, string> = { carryOn: 'carry on', split: 'split it', accept: 'accept it with follow-ups', takeOver: 'the user takes it over' } // i18n-ignore: a wake, agent-facing
@@ -363,6 +374,53 @@ export class Workflow {
   }
 
   ownLine = (s: CardState): boolean => !!s.started && s.started.folder !== 'project'
+
+  // --- File-lock records (G16, #1481).
+
+  /**
+   * Each agent's current card, by agent: the card it started last (the project's starts in the order written), while
+   * that cycle runs and the card isn't finished (Active to Merging). Its lock record (`locked`) is the agent's own changes
+   * in a shared folder; an earlier card's stops counting once the agent starts another, and a card's once it is Done,
+   * back in Todo or on hold.
+   */
+  currentCards(): Map<string, { card: CardRecord; s: CardState }> {
+    const last = new Map<string, Fact>()
+    for (const f of this.store.factsOfKind(['Started', 'Adopted'])) { // i18n-ignore: fact kinds, not text
+      const b = (f.data as FactData['Started']).builder
+      if (b && b !== 'user') last.set(b, f)
+    }
+    const out = new Map<string, { card: CardRecord; s: CardState }>()
+    for (const [b, f] of last) {
+      if (this.store.isArchived(f.card)) continue
+      const card = this.store.card(f.card)
+      if (!LOCK_STAGES.includes(card.stage)) continue
+      const s = this.state(card)
+      if (s.cycle === f.seq && LOCK_STAGES.includes(s.stage)) out.set(b, { card, s })
+    }
+    return out
+  }
+
+  /**
+   * Records paths an agent held file locks on, on its current card when the locks were seen (`seen`). Decided in the
+   * write, against the cards as they are then: the card must still be the agent's current one in that cycle (a lock seen
+   * before the agent started its next card is never put on that one), and only paths not recorded this cycle are.
+   * Returns whether anything was written.
+   */
+  async recordLocks(agent: string, paths: string[], seen: LockSeen): Promise<boolean> {
+    const first = this.currentCards().get(agent)
+    if (!first || ('card' in seen && (first.card.id !== seen.card || first.s.cycle !== seen.cycle))) return false
+    return this.write(first.card, null, agentActor(agent), (w) => {
+      const now = this.currentCards().get(agent)
+      if (!now || now.card.id !== first.card.id || now.s.cycle !== first.s.cycle) return false
+      // Seen when the cards weren't read: only a card started before then.
+      const startedAt = 'at' in seen ? this.store.facts(now.card.id).find((f) => f.seq === now.s.cycle)?.at : null
+      if ('at' in seen && (!startedAt || startedAt >= seen.at)) return false
+      const fresh = [...new Set(paths)].filter((p) => !now.s.locked.includes(p))
+      if (!fresh.length) return false
+      w.fact('FilesLocked', { agent, paths: fresh })
+      return true
+    })
+  }
 
   // --- Writing.
 
@@ -1003,6 +1061,8 @@ export class Workflow {
     let paths: string[] | undefined
     const inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'> = { agent, folder: this.folderOf(s) }
     const warnings: string[] = []
+    // A lock taken before the submission is in the cards' records before it reads them (G16, submit.clean: #1481).
+    await this.cfg.locksSettled?.()
     // The card's declared paths (None) are its data: what the evidence and the revision are read with (args, else the
     // pre-fill), written with the submission.
     const setPaths = args.paths ?? (card.kind === 'code' && o.platform === 'none' && !card.paths ? this.prefill(card) : null)

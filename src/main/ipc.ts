@@ -8,7 +8,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { readFile } from 'original-fs/promises'
 import type { HiveChannel, HiveRequests } from '../shared/api'
 import * as updater from './updater'
-import type { LaneStartRequest, ProviderId, QuitChoice } from '../shared/types'
+import type { LaneStartRequest, MergeResult, ProviderId, QuitChoice } from '../shared/types'
 import { instructionFiles, instructionsShared, shareInstructions, SHARED_INSTRUCTIONS, type InstructionsFile } from '../shared/instructions'
 import { extraArgsProblem, isKnownProvider, projectProviderConfig, providerDescriptor } from '../shared/providers'
 import { isProjectPref, projectPrefValue, withProjectPref } from '../shared/uiPrefs'
@@ -29,7 +29,8 @@ import { addRemote, createBranch, createTag, fetchAll, pull, push, pushToRemote,
 import { checkGit, gitTool } from './gitTool'
 import { refreshPath, refreshPathBeforeStart } from './freshPath'
 import { openExternalTerminal } from './externalTerminal'
-import { mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchStatus, unusedWorktrees } from './unusedWorktrees'
+import { mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchOf, unusedBranchStatus, unusedWorktrees } from './unusedWorktrees'
+import { branchMergeStatus, lineCard, lineConfirmed, mergeBranch, mergeBranches } from './branchMerge'
 import { createLogger, logsDir, userText } from './logger'
 import { diagnostics } from './diagnostics'
 import { resumeAfterClose, startupStep, stopLeftAfterClose } from './lastRun'
@@ -297,6 +298,23 @@ function moveOptions(o: unknown): MoveOptions {
   return { ...(locate ? { locate } : {}), ...(unlink ? { unlink } : {}), ...(recreate ? { recreate } : {}), ...(v.defender === true ? { defender: true } : {}) }
 }
 
+
+/**
+ * Every merge route's authorization, decided now in main (#1357 and #1450, OP-13): a branch whose card Hive's merge
+ * queue merges goes only as Merge anyway for that card (then recorded on it as an override, with the reason); a line
+ * whose card isn't Done otherwise only when the request names that card, after the window's confirmation. So no dialog
+ * whose lookup was pending, failed or out of date, and no older route, merges a card's work plainly.
+ */
+async function authorizedMerge(path: string, branch: string | null | undefined, opts: { card?: number; outsideQueue?: { card: number; reason: string } } | undefined, run: () => Promise<MergeResult>): Promise<MergeResult> {
+  const queued = branch ? await branchQueueCard(workspace, path, branch) : null
+  const out = opts?.outsideQueue
+  if (queued && (!out || out.card !== queued.card)) throw hiveError(M.queueMerges, { card: queued.key }, { kind: 'conflict' })
+  if (!queued) await lineConfirmed(path, branch, opts?.card)
+  const r = await run()
+  // Merged anyway, outside the merge queue: an override on the card, with the user's reason.
+  if (r.ok && queued && out) await mergedOutsideQueue(workspace, path, queued.card, typeof out.reason === 'string' ? out.reason.slice(0, 2000) : '').catch((e) => log.warn('recording a merge outside the queue', e))
+  return r
+}
 export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info']>, quitControl: QuitControl): void {
   // Each time a workspace opens: Hive's bundled skills and modes it hasn't got, or has untouched older copies of.
   WorkspaceService.onOpened = async (fresh) => {
@@ -920,26 +938,29 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'agents:branchStatuses': () => branchWatch.statuses(),
     'agents:merge': async (p, id, opts) => {
-      // A branch whose card Hive merges (#1357, OP-13; HR3's round 1 finding 1): merged only as Merge anyway, for that
-      // card, decided now, so a dialog whose lookup was pending, failed or is out of date never merges it plainly.
       const path = workspace.assertProject(p)
       const branch = agentsOf(await workspace.projectConfig(path)).find((a) => a.id === id)?.worktree?.branch
-      const card = branch ? await branchQueueCard(workspace, path, branch) : null
-      const out = opts?.outsideQueue
-      if (card && (!out || out.card !== card.card)) throw hiveError(M.queueMerges, { card: card.key }, { kind: 'conflict' })
-      const r = await projectAgents.merge(p, id, opts)
-      // Merged anyway, outside the merge queue: an override on the card, with the user's reason.
-      if (r.ok && card && out) await mergedOutsideQueue(workspace, path, card.card, typeof out.reason === 'string' ? out.reason.slice(0, 2000) : '').catch((e) => log.warn('recording a merge outside the queue', e))
-      return r
+      return authorizedMerge(path, branch, opts, () => projectAgents.merge(p, id, opts))
     },
     'worktrees:unused': (p) => unusedWorktrees(p),
     'worktrees:unusedBranchStatus': (p, path) => unusedBranchStatus(p, path),
     'worktrees:mergeUnused': async (p, path, opts) => {
-      const r = await mergeUnused(p, path, opts)
+      const project = workspace.assertProject(p)
+      const r = await authorizedMerge(project, await unusedBranchOf(project, path), opts, () => mergeUnused(p, path, opts))
       if (r.cleanedUp) storage.forgetStorage(p)
       return r
     },
     'worktrees:removalPreview': (p, path) => removalPreview(p, path),
+    'worktrees:mergeBranches': (p) => mergeBranches(p),
+    'worktrees:branchMergeStatus': (p, branch, target) => branchMergeStatus(p, branch, target),
+    'worktrees:branchCards': async (p, branch) => {
+      const path = workspace.assertProject(p)
+      return { queue: await branchQueueCard(workspace, path, branch), line: await lineCard(path, branch) }
+    },
+    'worktrees:mergeBranch': async (p, branch, opts) => {
+      const path = workspace.assertProject(p)
+      return authorizedMerge(path, branch, opts, () => mergeBranch(path, branch, { target: opts.target, squash: opts.squash, message: opts.message }))
+    },
     'worktrees:removeUnused': async (p, path, opts) => {
       const r = await removeUnusedWorktree(p, path, opts ?? {})
       if (r.deleted) {

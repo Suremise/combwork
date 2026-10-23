@@ -1328,6 +1328,7 @@ that can't be written fails the change whole.
 | `Blocked` / `Unblocked` | reason | As today's `blocked`. |
 | `Decision` | decision id, **generation** (1, 2, 3… per card) | A decision is recorded (the decision itself stays on the card). |
 | `DecisionsReceived` | agent, generation | The agent received the card's decisions up to that generation (§16.4.6). |
+| `FilesLocked` | agent, paths (relative to the project folder) | The card's builder took file locks on paths not yet recorded this cycle, while the card was its current one (G16, §16.6.4, #1481). |
 | `CannotWithinRules` | rule, why | The agent's "I couldn't do it within the rules" intent (#686) [#1120 c]. |
 | `ReviewerRequest` | text | The reviewer's request to the builder mid-review (#912) [#1120 c]. |
 | `LoopStep` | step, text, design?, until?, waitMinutes?, of? | A card loop's step that moves nothing (#1382, #1467): the builder's design for its reviewer's check (`design`: its id, `<key>/s<seq>`, and when its check is due, `until`, by `waitMinutes`) or going ahead with it unchecked (`proceed`), the builder's follow-up of reviewed work for the check (`followUp`: its id, no due time), or the reviewer's answer (`ok`, `gaps`); an answer and going ahead name the step they are about (`design`; `of`: its kind). A design or follow-up waits (`CardState.step`) until answered, gone ahead from (a design), replaced by another, or the card moves, is submitted or given a verdict. |
@@ -1753,7 +1754,10 @@ The Version Control tab documents each preset's choices and why (P6, from this t
   `index.lock`, no destructive git (checkout, reset, branch switch, pull) while an agent works in the folder (§8's
   fence, #646), and the merge queue's compare-and-swap on the target (§16.9) [note "What all off means"].
 - **Several agents in one folder.** File locks stop two agents editing one file. The remaining risks and helpers:
-  commits sweeping in another agent's half-done files (G16 warns, from file-lock records); which card a commit
+  commits sweeping in another agent's half-done files (G16 warns, from file-lock records: the paths each agent locks
+  while it works a card are recorded on that card, `FilesLocked`, and count while it is the agent's current card, the
+  one it started last, until it is Done or back in Todo or on hold; with file locks Off nothing is locked, so G16 has
+  nothing to warn of, #1481; `submit.clean` there leaves another agent's recorded files out too); which card a commit
   belongs to (the `Hive-Card:` trailer, §16.3.2); builds and tests seeing others' unfinished changes (inherent: the
   option's description says so and suggests slots); branch switches and pulls (already held, #646).
 
@@ -2813,6 +2817,33 @@ project's builders (`setBuilderCount`; until #1438 its agents), at least one, at
   command runs first and a failure keeps the slot; git removes the worktree, never forced. Settings → Advanced,
   **Remove idle slots after a day** (`hive.slots.removeIdle`, on) removes free slots beyond the pool's size unused for
   a day, and failed ones, every hour.
+
+**Built [#1450], the views that list and merge worktrees** (`unusedWorktrees.ts`, `branchMerge.ts`; they read only #1429's
+`slots` and `slot_leases`, #1435's copies and #1434's folder facts and `legacyWorktree`, never `AgentDef.worktree`):
+- **Unused Worktrees** lists, besides worktrees no agent works in (as before): a slot left `dirty` with no open lease
+  (with Open: the Changes tab shows a detached slot's changes too); free `ready` slots beyond the pool's size, least
+  recently used first; a slot whose newest lease is an ended `carried` one; a retired home once no session record of an
+  agent the project still has is in it. Never a lent slot, one with an open carried lease, one with an operation, an
+  unsettled job or a writer, anything in the project's `copies` folder, or a queue folder with a living lease. A slot
+  row's Remove is `SlotPool.remove` (the archive command first; kept with the guard's reason, worded in the window's
+  language), its verdict shown before as `SlotPool.check` (the same guards without the rename probe); never Remove
+  anyway (its preview is refused) or Give to an agent. "Remove all merged" takes the same rows. Every removal and
+  Remove anyway's preview checks again that the folder is still a listed row (a home a conversation resumes in, a copy
+  or a live queue folder is refused, by HR3's round 1), and refuses when what it decides from can't be read (session
+  records that can't be read keep every retired home, unlisted, HR3's round 2); right
+  before anything is deleted, a session running in the folder keeps it.
+- **The Merge dialog for merges outside cards** (OP-13) picks a branch, a card's line (with its slot), a carried slot's
+  branch or any other local branch, and a target (any local branch, the project folder's by default), and merges it as
+  an agent's merge (`mergeWorktree` with the target, the target's merge slot, #350): committed work only, refused while
+  a session in the branch's folder is mid-task. A line whose card isn't Done (`started.line`, any stage but done) says
+  so with a link, and main merges it only when the request names that card, after the window's confirmation; the merge
+  is then observed as one outside the rules (§16.4.4). A card the queue merges takes Merge anyway (#1357). Every merge
+  route (`agents:merge`, `worktrees:mergeUnused`, `worktrees:mergeBranch`) goes through one check in main
+  (`authorizedMerge`), so the older Merge dialog (an agent's 0.9 worktree, an unused worktree's Open, kept until #1452
+  removes the field) shows the same note and asks the same; a slot row's Open → Merge opens Merge a branch.
+- **Branches & remotes** reads `slots:list`: a slot's row names its lease (card or lane, its agent; carried for whom; not
+  lent), a branch checked out in a slot shows the slot's name, and a folder's agent is its slot lease's, else the agent
+  whose session runs there (#1424's worktree badge becomes the slot's).
 
 #### 16.10.3 Agents unbound from folders, and resuming
 

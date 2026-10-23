@@ -8,6 +8,7 @@ interface HiveMessageValues {
   'git.branches.earlierCards': { n: number }
   'git.branches.heading': undefined
   'git.branches.loadTarget': undefined
+  'git.branches.merge': { branch: string | number }
   'git.branches.merged': { has: string; revision: string | number }
   'git.branches.noCommits': undefined
   'git.branches.reload': undefined
@@ -325,6 +326,7 @@ interface HiveMessageValues {
   'git.vc.workflowTip': undefined
   'git.worktree.agent': { agent: string | number }
   'git.worktree.badge': undefined
+  'git.worktree.slotLease': { kind: string; slot: string | number; agent: string | number; card: string | number; lane: string | number }
   'git.worktree.unused': undefined
   'git.worktrees.changes': undefined
   'git.worktrees.heading': undefined

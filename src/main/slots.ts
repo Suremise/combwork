@@ -1120,13 +1120,27 @@ export class SlotPool {
     })
   }
 
-  /** The guards a removal checks, in order; null when nothing holds the slot. */
-  private async guard(s: Slot): Promise<SlotKept | null> {
+  /**
+   * What would keep a slot if it were removed now (#1450, Unused Worktrees' rows): its lease, an operation, then the
+   * removal's guards, without the rename probe (a listing doesn't touch the folder; the removal probes it). Null: it
+   * would go.
+   */
+  async check(name: string): Promise<SlotKept | null> {
+    const s = this.store.slot(name)
+    if (!s) return null
+    const open = this.store.openLease(name)
+    if (open) return { why: 'leased', agent: open.agent }
+    if (s.op || s.job || s.writer) return { why: 'busy', state: s.state }
+    return this.guard(s, false)
+  }
+
+  /** The guards a removal checks, in order; null when nothing holds the slot. `probe`: also prove no process holds it. */
+  private async guard(s: Slot, probe = true): Promise<SlotKept | null> {
     const session = this.deps.sessionIn?.(s.folder)
     if (session) return { why: 'session', detail: session }
     for (const card of this.store.cardsOf(s.name)) if (await this.deps.inFlight?.(card)) return { why: 'inFlight', card }
     if (!existsSync(s.folder)) return null
-    if (!(await quiet(s.folder))) return { why: 'process' }
+    if (probe && !(await quiet(s.folder))) return { why: 'process' }
     const d = await G.dirty(s.folder)
     if (isUnknown(d)) return { why: 'cantCheck', detail: d.what }
     if (d.length) return { why: 'dirty', files: d.length }

@@ -907,6 +907,14 @@
     "defaultMessage": "Hive closed running out of memory?",
     "description": "A tip's title."
   },
+  "tips.mergeBranch.text": {
+    "defaultMessage": "⑂ beside a branch in Version Control → Branches & remotes merges it into the branch you pick, one merge at a time. A card's branch that isn't Done asks first, and the card is marked merged outside the rules.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: outside the rules."
+  },
+  "tips.mergeBranch.title": {
+    "defaultMessage": "Merge a branch by hand",
+    "description": "A tip's title (#1450): merging any branch outside cards."
+  },
   "tips.mergeQueueFolder.text": {
     "defaultMessage": "When the merge queue merges into a branch checked out in a folder (main in the project folder), it updates the folder too, but pauses rather than touch a file you are changing. Settings → Advanced can have it ask you under For you first.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. For you is the board's list of what waits for the user."

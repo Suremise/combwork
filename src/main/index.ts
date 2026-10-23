@@ -57,6 +57,7 @@ import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost
 import { startSlots, stopSlots } from './slotsApp'
 import { startCopies, stopCopies } from './copiesApp'
 import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
+import { startLockRecords } from './workflow/lockRecord'
 import { setQueueLive, setRunsGoing } from './workflow/service'
 import { isOpenRun } from '../shared/progress'
 import { createLogger, userText, logsDir } from './logger'
@@ -1005,6 +1006,8 @@ app.whenReady().then(async () => {
     return !!now && (now.pending || ['starting', 'working', 'waiting', 'background'].includes(now.status))
   })
   startLineUpdates()
+  // G16 (#1481): each agent's file locks recorded on its current card.
+  startLockRecords()
   // What an agent has going, which its submission waits for with "its own runs stopped" (#1265, G13): its open
   // Progress runs and its CLI's background tasks.
   setRunsGoing((project, agent) => {

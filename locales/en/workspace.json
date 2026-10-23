@@ -1911,6 +1911,22 @@
     "defaultMessage": "(detached)",
     "description": "An unused worktree with no branch (a detached HEAD), in the Changes tab's picker."
   },
+  "workspace.unused.kind.carried": {
+    "defaultMessage": "agent's old worktree, given up",
+    "description": "What an unused worktree is (#1450): an agent's 0.9 worktree Hive carried into the slots (a carried lease), whose lease has ended. Lower case: a badge after its name."
+  },
+  "workspace.unused.kind.dirtySlot": {
+    "defaultMessage": "slot with changes, not lent",
+    "description": "What an unused worktree is (#1450): one of Hive's slots, left with uncommitted or untracked files and lent to no card. Lower case: a badge after its name."
+  },
+  "workspace.unused.kind.home": {
+    "defaultMessage": "retired home, no conversation left",
+    "description": "What an unused worktree is (#1450): an agent's old folder kept so its conversations could resume (a reviewer's old worktree, say), none of which can now. Lower case: a badge after its name."
+  },
+  "workspace.unused.kind.slot": {
+    "defaultMessage": "free slot beyond the pool",
+    "description": "What an unused worktree is (#1450): one of Hive's slots, free and set up, beyond the number the project needs now. Lower case: a badge after its name."
+  },
   "workspace.unused.lostCommits": {
     "defaultMessage": "{count, plural, one {# commit} other {# commits}} on {branch} not on {known, select, yes {{into}} other {any other branch}}",
     "description": "What removing an unused worktree anyway loses: a line of the confirmation's list."

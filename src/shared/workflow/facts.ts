@@ -204,6 +204,11 @@ export interface FactData {
   /** A decision added, its words changed, or removed (`removed`, its last words): each a new generation (#1216). */
   Decision: { decision: string; generation: number; text: string; removed?: boolean }
   DecisionsReceived: { agent: string; generation: number }
+  /**
+   * Paths the card's builder took Hive's file locks on this cycle (#1481, G16: its own changes in a shared folder),
+   * relative to the project folder with `/`: each only once a cycle, and only while the card is its builder's current one.
+   */
+  FilesLocked: { agent: string; paths: string[] }
   CannotWithinRules: { rule: string; why: string; request: string }
   ReviewerRequest: { text: string }
   /**
@@ -306,6 +311,8 @@ export interface CardState {
   /** The last observed HeadMoved's seq this cycle (what the next observation follows), else the cycle's start. */
   lastHeadFact: number
   attributed: string[]
+  /** The paths the builder locked this cycle (`FilesLocked`, #1481), in order, each once. */
+  locked: string[]
   checks: FactData['CheckRan'][]
   marks: { mergedInPart?: FactData['MergedInPart']; leftTarget?: FactData['LeftTarget']; outsideRules?: string[] }
   blocked: string | null
@@ -357,6 +364,7 @@ export const emptyState = (): CardState => ({
   head: null,
   lastHeadFact: 0,
   attributed: [],
+  locked: [],
   checks: [],
   marks: {},
   blocked: null,
@@ -534,6 +542,9 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       }
       case 'Blocked':
         s.blocked = (f.data as FactData['Blocked']).reason
+        break
+      case 'FilesLocked':
+        for (const p of (f.data as FactData['FilesLocked']).paths) s.locked = addOnce(s.locked, p)
         break
       case 'Unblocked':
         s.blocked = null
