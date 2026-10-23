@@ -149,7 +149,7 @@ describe("what a platform couldn't read", () => {
       "No revision recorded: Hive didn't read one when the card went to Review. Its next submission reads it again.",
       'Files not read',
       'Not read when its work started',
-      'Revision not read when it was submitted: the latest commit in D:\\work\\am. Its next submission reads it again.',
+      "Revision not read when it was submitted: Hive couldn't read the latest commit in D:\\work\\am. Its next submission reads it again.",
       'Not read: there was no target branch to start from',
       'Files not read: there was no base or revision to compare'
     ])
