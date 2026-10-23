@@ -310,7 +310,8 @@
   "agents.resume.sub": "A {kind} {cli} ran for another session, not a conversation of its own: it can't be resumed.",
   "agents.session.unnamed": "Session {id}",
   "agents.settings.appliesNext": "Changes apply the next time {agent} starts; the running session keeps its settings until then.",
-  "agents.settings.ownWorktree": "Its own worktree",
+  "agents.settings.note": "Note",
+  "agents.settings.noteNone": "Optional: what it is for, in your words",
   "agents.settings.role": "Role",
   "agents.settings.roleNone": "None (its name: {name})",
   "agents.settings.save": "Save",
@@ -331,5 +332,12 @@
   "agents.tested.older": "Older than tested; consider updating.",
   "agents.tested.summary": "Tested with {tested} · installed {installed}",
   "agents.tested.summaryUnknown": "Tested with {tested} · installed version unknown",
-  "agents.tested.unknown": "Hive couldn't tell which version is installed, so it can't compare it with the tested one."
+  "agents.tested.unknown": "Hive couldn't tell which version is installed, so it can't compare it with the tested one.",
+  "agents.workflowRole.builder": "Builder",
+  "agents.workflowRole.builderText": "Works on cards and sends them to Review.",
+  "agents.workflowRole.either": "Either",
+  "agents.workflowRole.eitherText": "Builds or reviews, but never reviews its own work.",
+  "agents.workflowRole.label": "Role in the workflow",
+  "agents.workflowRole.reviewer": "Reviewer",
+  "agents.workflowRole.reviewerText": "Reviews the builders’ cards and passes or fails them."
 }

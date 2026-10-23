@@ -5,7 +5,8 @@
 //
 // The check is `"<tools>\tool.cmd"`, which runs check.js: it reads control.json (`pass`, `fail`, or `wait` for go.txt
 // and then pass), writes its pid to started.txt, and never writes in the folder it runs in (a check must count). Take
-// tool.cmd away for a check that can't start (transient).
+// tool.cmd away for a check that can't start (transient). A `wait` gives up after two minutes (a bound for a hung run), or
+// the `maxMs` a suite steers it with (p6lane's screenshots while it holds one take minutes on a loaded machine).
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -41,7 +42,7 @@ function prepare(fx) {
       "const c = JSON.parse(fs.readFileSync(control, 'utf8'))",
       'fs.writeFileSync(started, String(process.pid))',
       "if (c.mode === 'fail') { console.error('red: ' + (c.say || 'the check failed')); process.exit(1) }",
-      "if (c.mode === 'wait') { const t = Date.now(); const tick = () => { if (fs.existsSync(go)) process.exit(0); if (Date.now() - t > 120000) process.exit(3); setTimeout(tick, 100) }; tick() }",
+      "if (c.mode === 'wait') { const t = Date.now(); const tick = () => { if (fs.existsSync(go)) process.exit(0); if (Date.now() - t > (c.maxMs || 120000)) process.exit(3); setTimeout(tick, 100) }; tick() }",
       ''
     ].join('\n')
   )
@@ -57,10 +58,10 @@ function prepare(fx) {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 }
 
-/** Sets what the next check does (`pass`, `fail`, `wait`), and clears its last start and go-ahead. */
-function steer(fx, mode, say) {
+/** Sets what the next check does (`pass`, `fail`, `wait`), and clears its last start and go-ahead. `maxMs`: a wait's bound. */
+function steer(fx, mode, say, maxMs) {
   for (const f of [fx.started, fx.go]) fs.rmSync(f, { force: true })
-  fs.writeFileSync(fx.control, JSON.stringify({ mode, ...(say ? { say } : {}) }))
+  fs.writeFileSync(fx.control, JSON.stringify({ mode, ...(say ? { say } : {}), ...(maxMs ? { maxMs } : {}) }))
 }
 
 /** The options "Hive merges" into integration, with the one merge check (G9), set as the project's (no preset: #1355's). */

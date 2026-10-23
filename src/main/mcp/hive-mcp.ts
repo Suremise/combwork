@@ -127,6 +127,7 @@ const settingsArgs = {
   context200k: { type: 'string', enum: ['on', 'off', ''], description: "Use a 200K context window instead of the model's 1M one, for providers with context200k (hive_list_providers). Empty follows the project." },
   mcpServers: { type: 'array', items: { type: 'string' }, description: "Only these of the project's MCP servers (names), [] none, [\"*\"] all (the default). The hive server is always given." }
 }
+const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either'], description: 'Its side in the workflow: builds cards, reviews them, or either (never its own). Default: guessed from its name.' }
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`
 /** Which agent is changing a card, for its history (Hive fills in the name). */
 const columnArg = { type: 'string', enum: [...COLUMN_IDS] }
@@ -417,6 +418,7 @@ const tools: Tool[] = [
       properties: {
         project: projectArg,
         name: { type: 'string', description: 'Default: "Agent n".' },
+        workflowRole: workflowRoleArg,
         ...settingsArgs,
         worktree: { type: 'boolean' },
         branch: { type: 'string', description: 'Worktree branch (default hive/<workspace>/<project>/<name>).' },
@@ -428,7 +430,7 @@ const tools: Tool[] = [
       required: ['project']
     },
     run: async (a) => {
-      const r = (await api('POST', `/v1/projects/${proj(a)}/agents`, { name: a.name, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers, worktree: a.worktree, existingWorktree: a.existingWorktree, branch: a.branch, base: a.base, start: a.start, prompt: a.prompt })) as {
+      const r = (await api('POST', `/v1/projects/${proj(a)}/agents`, { name: a.name, workflowRole: a.workflowRole, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers, worktree: a.worktree, existingWorktree: a.existingWorktree, branch: a.branch, base: a.base, start: a.start, prompt: a.prompt })) as {
         agent: { id: string; name: string; worktree?: { path: string; branch: string } | null }
         project: { name: string; agents: { id: string; provider: string; status: string }[] }
         reuse?: string
@@ -440,9 +442,9 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_update_agent',
-    description: "Change an agent's name, provider, model, effort, permission mode, 200K context or MCP servers. A running agent takes the change when restarted; its provider changes only while it is stopped.",
-    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, name: { type: 'string' }, ...settingsArgs }, required: ['project', 'agent'] },
-    run: (a) => api('PATCH', agentPath(a), { name: a.name, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers })
+    description: "Change an agent's name, role in the workflow, provider, model, effort, permission mode, 200K context or MCP servers. A running agent takes the change when restarted; its provider changes only while it is stopped.",
+    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, name: { type: 'string' }, workflowRole: workflowRoleArg, ...settingsArgs }, required: ['project', 'agent'] },
+    run: (a) => api('PATCH', agentPath(a), { name: a.name, workflowRole: a.workflowRole, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers })
   },
   {
     name: 'hive_start_agent',
@@ -935,7 +937,9 @@ const offered = tools.filter((t) => (t.name !== 'hive_console' || DEV_CONSOLE) &
 
 // The Assistant's journal rule while its journal is on (#1032): the kinds it may store come from Hive.
 const JOURNAL_SCOPE = ASSISTANT && JOURNAL ? (process.env.HIVE_JOURNAL_SCOPE ?? '').split(',').filter(Boolean) : null
-const INSTRUCTIONS = withJournal(hiveInstructions(PROJECT, ASSISTANT ? 'assistant' : 'agent', process.env.HIVE_PROGRESS_COMMANDS !== '0'), JOURNAL_SCOPE)
+// The skills the session isn't given (#1431: switched off in Skills), which its instructions don't name.
+const SKILLS_OFF = new Set((process.env.HIVE_SKILLS_OFF ?? '').split(',').map((n) => n.trim().toLowerCase()).filter(Boolean))
+const INSTRUCTIONS = withJournal(hiveInstructions(PROJECT, ASSISTANT ? 'assistant' : 'agent', process.env.HIVE_PROGRESS_COMMANDS !== '0', SKILLS_OFF), JOURNAL_SCOPE)
 
 /** A project agent given Hive's tools without its guidance (#1285: Settings → Advanced, Hive's guidance for agents). */
 const GUIDED = ASSISTANT || process.env.HIVE_GUIDANCE !== '0'

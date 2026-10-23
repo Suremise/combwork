@@ -437,10 +437,34 @@ async function theForm(page, app, inv) {
     await page.getByText('web', { exact: true }).first().click()
     await reopen()
     const base = (await inv('app:info')).language
+    let messages = null
     const speak = async (code) => {
       const dir = path.join(lib.ROOT, 'locales', code)
-      const messages = code === 'en' ? null : Object.assign({}, ...fs.readdirSync(dir).filter((x) => x.endsWith('.json')).map((x) => JSON.parse(fs.readFileSync(path.join(dir, x), 'utf8'))))
+      messages = code === 'en' ? null : Object.assign({}, ...fs.readdirSync(dir).filter((x) => x.endsWith('.json')).map((x) => JSON.parse(fs.readFileSync(path.join(dir, x), 'utf8'))))
       await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: messages ? { ...base, code, locale: code, messages } : base })
+    }
+    /**
+     * The save's dialog opened in the window's language (#1489): its title, message, what changes (Merge style, its
+     * values) and Save in `code`'s words, read from its catalogue; shot in both themes, then cancelled.
+     */
+    const saveDialogIn = async (code) => {
+      const m = (id) => messages[id]
+      const style = row('style').locator('select')
+      const from = await style.inputValue()
+      const to = from === 'squash' ? 'merge' : 'squash'
+      await style.selectOption(to)
+      await save.click()
+      const d = page.locator('.dialog', { hasText: m('workflow.form.confirmTitle') })
+      const shown = !!(await lib.until(async () => (await d.count()) === 1, HUNG_MS))
+      const line = `${m('workflow.option.style.title')}: ${m(`workflow.value.style.${from}`)} → ${m(`workflow.value.style.${to}`)}`
+      const text = shown ? await d.innerText() : ''
+      const parts = [m('workflow.form.confirmMessage'), m('workflow.form.changesHead'), line]
+      check(`${code}: the save's dialog in its language: title, message, what changes`, shown && parts.every((p) => text.includes(p)), JSON.stringify({ text, missing: parts.filter((p) => !text.includes(p)) }))
+      check(`${code}: …and its Save button`, shown && (await d.getByRole('button', { name: m('workflow.form.save').replace(/…$/, ''), exact: true }).count()) === 1, text)
+      await themes(`save-${code}`)
+      await d.getByRole('button', { name: m('shell.dialog.cancel'), exact: true }).click()
+      await lib.until(async () => (await d.count()) === 0, HUNG_MS)
+      await style.selectOption(from)
     }
     await speak('de')
     check('the section shows in German', !!(await lib.until(async () => (await section.innerText()).includes('Wer mergt'), HUNG_MS)))
@@ -449,9 +473,11 @@ async function theForm(page, app, inv) {
     await themes('presets-de', section.locator('.workflow-group[data-group="presets"]'))
     await preview.getByRole('button').last().click()
     await themes('groups-de', section.locator('.workflow-group[data-group="merging"]'))
+    await saveDialogIn('de')
     await speak('pl')
     check('the section shows in Polish', !!(await lib.until(async () => (await section.innerText()).includes('Kto scala'), HUNG_MS)))
     await themes('groups-pl', section.locator('.workflow-group[data-group="review"]'))
+    await saveDialogIn('pl')
     await speak('en')
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))

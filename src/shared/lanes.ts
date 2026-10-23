@@ -234,6 +234,8 @@ export function laneStatusText(s: LaneStatus): string {
       return `list changes after ${card}`
     case 'hooks':
       return `paused: ${s.agent ?? 'an agent'}'s hooks aren't arriving`
+    case 'checkCopy':
+      return `waiting for a check copy for ${card}`
   }
 }
 

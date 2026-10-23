@@ -10,7 +10,10 @@ import { mustCompile } from '../src/shared/workflow/compile'
 import { preset } from '../src/shared/workflow/options'
 import { refusalLines, type RuleId } from '../src/shared/workflow/refusals'
 import type { LaneCard, LaneState, StoredText, TaskCard, TaskColumn } from '../src/shared/types'
-import { fmt, tr } from '../src/shared/i18n'
+import { fmt, setLanguage, tr } from '../src/shared/i18n'
+import type { Tr } from '../src/shared/tasks'
+import { readdirSync, readFileSync } from 'fs'
+import { join } from 'path'
 
 // The segments' text is the window's (#798): worded with tr(), in English here.
 const cardSegment = (n: number, c: TaskCard | undefined): CardSegment => segmentIn(n, c, tr)
@@ -532,6 +535,26 @@ describe('stages in a lane (#1421): names over the categories, the divider, the 
     expect(groups.find((g) => g.category === 'review')!.stages).toEqual([])
     // No projects known: the categories alone.
     expect(laneLegend([], tr).every((g) => g.stages.length === 0)).toBe(true)
+  })
+
+  it("the legend: a stage named as its category but for its spaces lists none (#1496: pt-BR's no-break space)", () => {
+    const ptBr: Tr = (m, ...v) => (m.id === 'board.column.todo' ? 'A\u00a0fazer' : m.id === 'workflow.stage.todo' ? 'A fazer' : tr(m, ...v))
+    expect(laneLegend([pairStages], ptBr).find((g) => g.category === 'todo')).toMatchObject({ name: 'A\u00a0fazer', stages: [] })
+    // Two projects naming a stage alike but for a space: listed once.
+    const approved = laneLegend([{ ...pairStages, names: { approved: 'Pronto  já' } }, { ...pairStages, names: { approved: 'Pronto já' } }], tr).find((g) => g.category === 'passed')!
+    expect(approved.stages).toEqual(['Pronto  já', 'Merging'])
+    // Every language shipped: no category's row repeats its own name.
+    const LOCALES = join(__dirname, '..', 'locales')
+    try {
+      for (const code of readdirSync(LOCALES, { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== 'en' && !d.name.startsWith('.')).map((d) => d.name)) {
+        const dir = join(LOCALES, code)
+        setLanguage(code, Object.assign({}, ...readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')))))
+        const repeated = laneLegend([pairStages], tr).filter((g) => g.stages.length === 1)
+        expect(repeated, code).toEqual([])
+      }
+    } finally {
+      setLanguage('en', {})
+    }
   })
 
   it("Pulse leaves out a Solo project's ended lanes, never a running one; Pair, Team and none as they are", () => {

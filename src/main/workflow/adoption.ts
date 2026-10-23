@@ -13,7 +13,7 @@
 
 import { basename } from 'path'
 import { compile } from '../../shared/workflow/compile'
-import { isReviewer } from '../../shared/workflow/presetStep'
+import { agentWorkflowRole, reviewsWork } from '../../shared/workflow/roles'
 import type { StageId } from '../../shared/workflow/facts'
 import type { ProjectConfig } from '../../shared/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
@@ -180,7 +180,7 @@ async function projectOptions(ws: WorkspaceService, folder: string, hasLane: boo
     configured = true
     const platform = projectPlatform(folder, c.platform).id
     const agents = c.agents ?? []
-    const options = upgradeOptions(platform, { reviewers: hasLane || agents.some(isReviewer), worktrees: agents.some((a) => !!a.worktree) })
+    const options = upgradeOptions(platform, { reviewers: hasLane || agents.some((a) => reviewsWork(agentWorkflowRole(a))), worktrees: agents.some((a) => !!a.worktree) })
     return { platform: c.platform ?? platform, workflow: { platform, preset: null, options } }
   })
   if (made || !cfg.workflow) return MADE_BY_1_0

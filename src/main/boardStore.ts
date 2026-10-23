@@ -12,7 +12,7 @@ import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, 
 import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
-import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, QUEUE_SEEN_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
+import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
@@ -251,6 +251,33 @@ export const BOARD_MIGRATIONS: Migration[] = [
     group: UPGRADE_GROUP_ID,
     up: (db) => {
       for (const sql of QUEUE_SEEN_STEP.ddl) db.exec(sql)
+    }
+  },
+  {
+    // #1429: a project's slots and their leases (slots.ts), one open lease per slot and per agent kept by SQLite itself.
+    version: 19,
+    name: SLOTS_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      for (const sql of SLOTS_STEP.ddl) db.exec(sql)
+    }
+  },
+  {
+    // #1435: a project's review and check copies and their leases (copies.ts), one lease not freed per copy.
+    version: 20,
+    name: COPIES_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      for (const sql of COPIES_STEP.ddl) db.exec(sql)
+    }
+  },
+  {
+    // #1431: which skill copies Hive made in which folder (skillCopies.ts), so a clean-up removes only its own.
+    version: 21,
+    name: SKILL_COPIES_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      for (const sql of SKILL_COPIES_STEP.ddl) db.exec(sql)
     }
   }
 ]

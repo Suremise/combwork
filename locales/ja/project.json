@@ -295,6 +295,7 @@
   "project.skills.addLocal": "ファイル（.mdまたは.zip）から{provider}のローカルスキルを追加…",
   "project.skills.assistantOnly": "{count, plural, other {#個のHiveスキルはHive Assistant専用のため、一覧に表示されません。このプロジェクトのエージェントには提供されません。}}",
   "project.skills.delete": "スキルを削除",
+  "project.skills.deliveredNote": "各スイッチは、このプロジェクトのエージェントが次のセッションからそのスキルを受け取るかどうか（エージェントに提供）を示します。「スキル」ビューでオフにしたスキルは、すべてのプロジェクトでオフになります。",
   "project.skills.editInWorkspace": "ワークスペースの「スキル」ビューで編集（Hiveスキルはすべてのプロジェクトで共有されます）",
   "project.skills.heading": "エージェントが使えるスキル",
   "project.skills.hive": "Hive",

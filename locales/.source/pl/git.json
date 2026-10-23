@@ -157,6 +157,7 @@
   "git.queue.none": "No merge queue. When the project's workflow has Hive merge its cards (Version Control → Workflow: Who merges), each target branch's queue shows here, with its history.",
   "git.queue.open": "Open {card}",
   "git.queue.outcome": "Outcome",
+  "git.queue.reading": "Reading the merge queues…",
   "git.queue.region": "Merge queues",
   "git.queue.returned": "Returned: {why}",
   "git.queue.revision": "Revision",

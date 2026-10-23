@@ -72,7 +72,7 @@ beforeAll(async () => {
   await w.open(wsPath)
   // A template with an agent for Claude Code, kept in the workspace.
   mkdirSync(join(wsPath, '.hive', 'templates'), { recursive: true })
-  writeFileSync(join(wsPath, '.hive', 'templates', 'pair.json'), JSON.stringify({ version: 1, name: 'Pair', savedAt: '', layout: 'auto', agents: [{ name: 'Builder', provider: 'claude-code', worktree: false }] }))
+  writeFileSync(join(wsPath, '.hive', 'templates', 'pair.json'), JSON.stringify({ version: 2, name: 'Pair', savedAt: '', layout: 'auto', agents: [{ name: 'Builder', role: 'builder', provider: 'claude-code' }] }))
   providerService.info = ((id: string) => ({ provider: id, found: true })) as never
 })
 afterAll(() => disposeWorkspaceService(w))
@@ -201,7 +201,7 @@ describe("a template's load plan is the window's", () => {
     } finally {
       providerService.info = ((id: string) => ({ provider: id, found: true })) as never
     }
-    writeFileSync(join(wsPath, '.hive', 'templates', 'later.json'), JSON.stringify({ version: 1, name: 'Later', savedAt: '', layout: 'auto', agents: [{ name: 'G', provider: 'gemini', worktree: false }] }))
+    writeFileSync(join(wsPath, '.hive', 'templates', 'later.json'), JSON.stringify({ version: 2, name: 'Later', savedAt: '', layout: 'auto', agents: [{ name: 'G', role: 'builder', provider: 'gemini' }] }))
     setLanguage('en', {})
     expect((await run(() => templates.templatePlan(proj, 'workspace', 'later.json'))).missing[0]).toMatchObject({ problem: 'unknown', reason: 'This Hive doesn\'t know the coding agent "gemini" (update Hive)' })
   })
@@ -210,7 +210,7 @@ describe("a template's load plan is the window's", () => {
 describe("a template file's problem: English for the log, the window's text beside it (#870)", () => {
   it("lists a damaged template with its problem in English and as text, and refuses it in English with the window's text", async () => {
     const file = join(wsPath, '.hive', 'templates', 'empty.json')
-    writeFileSync(file, JSON.stringify({ version: 1, name: 'Empty', savedAt: '', layout: 'auto', agents: [] }))
+    writeFileSync(file, JSON.stringify({ version: 2, name: 'Empty', savedAt: '', layout: 'auto', agents: [] }))
     try {
       setLanguage('de', GERMAN)
       const entry = (await run(() => templates.listAllTemplates())).find((t) => t.file === 'empty.json')!
@@ -234,7 +234,7 @@ describe("a template file's problem: English for the log, the window's text besi
 
 describe("lists in the language's way, never joined with English commas", () => {
   it("lists a template's agents in the window's language, in the plan and its refusal, and English in the refusal's message", async () => {
-    writeFileSync(join(wsPath, '.hive', 'templates', 'crew.json'), JSON.stringify({ version: 1, name: 'Crew', savedAt: '', layout: 'auto', agents: ['Builder', 'Reviewer', 'Tester'].map((name) => ({ name, provider: 'claude-code', worktree: false })) }))
+    writeFileSync(join(wsPath, '.hive', 'templates', 'crew.json'), JSON.stringify({ version: 2, name: 'Crew', savedAt: '', layout: 'auto', agents: ['Builder', 'Reviewer', 'Tester'].map((name) => ({ name, role: 'builder', provider: 'claude-code' })) }))
     config.settings.providers['claude-code'].enabled = false
     setLanguage('de', GERMAN)
     expect((await run(() => templates.templatePlan(proj, 'workspace', 'crew.json'))).blocked).toEqual(['Claude Code ist ausgeschaltet (Einstellungen → Anbieter), gebraucht von Builder, Reviewer und Tester.'])

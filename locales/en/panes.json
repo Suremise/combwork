@@ -379,9 +379,29 @@
     "defaultMessage": "Could not cancel the messages",
     "description": "An error's title: cancelling messages left for an agent failed."
   },
+  "panes.messages.deliverFailed": {
+    "defaultMessage": "Could not deliver the messages",
+    "description": "An error's title: typing the line that tells an agent of its waiting messages (Deliver Now) failed."
+  },
+  "panes.messages.deliverNow": {
+    "defaultMessage": "Deliver Now",
+    "description": "Menu item on an agent's unread messages, shown while the setting Wake an idle agent is off: types the line telling the agent of them into its terminal, once."
+  },
   "panes.messages.line": {
     "defaultMessage": "{id} from {from} ({state, select, queued {waiting} offered {typed, not fetched or acked yet} other {its offer not confirmed}}): {text}",
     "description": "A message left for an agent, in the menu of its unread messages: its id, who from ({from}), its state (waiting; typed into the agent but not fetched or acked; or offered but not confirmed), and the start of its text ({text}, the sender's own words)."
+  },
+  "panes.messages.noWakesHint": {
+    "defaultMessage": "Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.",
+    "description": "A hint line under the heading of an agent's unread messages menu, when the setting Wake an idle agent is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them."
+  },
+  "panes.messages.notDelivered": {
+    "defaultMessage": "{agent} wasn't told now",
+    "description": "A notice's title: Deliver Now couldn't type the line into the agent's terminal now. {agent} is its name."
+  },
+  "panes.messages.notDeliveredDetail": {
+    "defaultMessage": "It isn't idle, or you are typing in its terminal. Its messages stay in its inbox: try again once it's idle.",
+    "description": "The detail of the notice that Deliver Now could not type the line into an agent now."
   },
   "panes.messages.overdue": {
     "defaultMessage": "{n, plural, one {# overdue} other {# overdue}}",
@@ -394,6 +414,10 @@
   "panes.messages.tip": {
     "defaultMessage": "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with hive_inbox.",
     "description": "The heading of the menu of an agent's unread messages, above the list of them: how many ({n}) for the agent ({agent}: its name). hive_inbox is a tool's name: keep it."
+  },
+  "panes.messages.tipNoWakes": {
+    "defaultMessage": "{n, plural, one {A message} other {# messages}} for {agent} that it hasn't fetched or acked yet",
+    "description": "The heading of the menu of an agent's unread messages when the setting Wake an idle agent is off (a hint line under it says so): how many ({n}) for the agent ({agent}: its name)."
   },
   "panes.messages.unread": {
     "defaultMessage": "{n, plural, one {# unread} other {# unread}}",
@@ -651,6 +675,14 @@
     "defaultMessage": "in {value}",
     "description": "The agent's project in a line of text (screen readers, a dialog's copy): {value} is its name (\"in hive\"). Lower case."
   },
+  "panes.table.role": {
+    "defaultMessage": "Role",
+    "description": "An agents table's column heading: the agent's role in the workflow (Builder, Reviewer, Either). Glossary: workflow role."
+  },
+  "panes.table.rolePrefix": {
+    "defaultMessage": "role {value}",
+    "description": "The agent's role in the workflow in a line of text (screen readers): {value} is its name (\"Reviewer\"). Lower case."
+  },
   "panes.table.state": {
     "defaultMessage": "State",
     "description": "An agents table's column heading: what the agent is doing."
@@ -684,8 +716,8 @@
     "description": "A template's detail in + Add ▾ → Templates: how many agents it has and its layout ({layout}: \"two columns\")."
   },
   "panes.template.heading": {
-    "defaultMessage": "{template} · {scope, select, workspace {workspace} other {this project}}",
-    "description": "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case)."
+    "defaultMessage": "{template} · {scope, select, hive {Hive} workspace {workspace} other {this project}}",
+    "description": "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Hive: one of Hive's own templates, #1436)."
   },
   "panes.template.layout": {
     "defaultMessage": "{layout, select, auto {automatic layout} single {one at a time} columns2 {two columns} columns3 {three columns} grid {grid of four} grid6 {grid of six} other {{layout}}}",
@@ -703,17 +735,13 @@
     "defaultMessage": "No templates yet: + Add ▾ → Templates → Save Template… first",
     "description": "Add Agent from Template with no template: how to save one first. \"+ Add ▾\" is the session toolbar's button, \"Templates\" its menu item and \"Save Template…\" the item of that menu: use their translations."
   },
-  "panes.template.ownWorktree": {
-    "defaultMessage": "own worktree",
-    "description": "A template agent's detail (Add Agent from Template): it works in its own worktree. Lower case."
-  },
   "panes.template.save": {
     "defaultMessage": "Save Template…",
     "description": "Menu item (+ Add ▾ → Templates): saves this project's agents and layout as a template."
   },
   "panes.template.scopeHeading": {
-    "defaultMessage": "{scope, select, workspace {Workspace templates} other {This project's templates}}",
-    "description": "A heading in + Add ▾ → Templates above the templates kept in the workspace, or in this project."
+    "defaultMessage": "{scope, select, hive {Hive's templates} workspace {Workspace templates} other {This project's templates}}",
+    "description": "A heading in + Add ▾ → Templates above Hive's own templates (#1436), those kept in the workspace, or in this project."
   },
   "panes.terminal.exited": {
     "defaultMessage": "process exited with code {code}",

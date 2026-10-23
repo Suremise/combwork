@@ -10,7 +10,8 @@ import { gitFixText, gitProblemText } from '@shared/gitTool'
 import { UnusedHeading, UnusedWorkNotice, UnusedWorktreesLine, UnusedWorktreesSection, useUnusedWorktrees } from '../components/UnusedWorktrees'
 import { PERIODS, activeIn, costText, dailyTotals, moneyLabel, periodFrom, sumUsage, type DayTotal, type Period, type Totals } from '@shared/usageTotals'
 import { FILE_LOCK_MODES, contextPercent, turnPushedCompaction, effectiveModelLabel, mergeBlocked, modelLabel } from '@shared/defaults'
-import { useAgentLimit } from '../advanced'
+import { useAdvancedValue, useAgentLimit } from '../advanced'
+import { INBOX_PROJECT_KEY, INBOX_SWITCHES, INBOX_SWITCH_ID, type InboxSwitch } from '@shared/inboxSwitches'
 import { PROVIDERS, contextLines, defaultProviderLabel, isProviderEnabled, modeDescription, offeredModes, permissionLabel, projectDefaultProvider, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
 import { instructionsStarter } from '@shared/projectTabs'
 import { EffortPicker, ModelPicker } from '../components/ModelPicker'
@@ -32,7 +33,7 @@ import { DataTable, useDateColumns, type DataColumn } from '../components/DataTa
 import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Switch, Tooltip } from '../components/ui'
 import { languageFor } from '../monacoLang'
 import { useScopedLoad } from '../scopedLoad'
-import { addSkill, deleteSkill, editInWorkspace, otherLocal, SKILL_LEVEL_TIP, SkillDetail, SkillRow } from '../components/Skills'
+import { addSkill, deleteSkill, DeliveredSwitch, editInWorkspace, otherLocal, SKILL_LEVEL_TIP, SkillDetail, SkillRow } from '../components/Skills'
 import { CHANGES_ABOUT, unusedPickerLabel } from '@shared/unusedWorktrees'
 import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, openVersionControl, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
 import { rememberProjectPref } from '../projectPrefs'
@@ -220,6 +221,7 @@ const C = {
   skillsHeading: msg({ id: 'project.skills.heading', defaultMessage: 'Skills available to agents', description: "Heading of the project's Skills tab list." }),
   skillsTarget: msg({ id: 'project.skills.target', defaultMessage: 'the skills', description: 'What could not be read in the Skills tab: shown in "Could not load {what}: {error}" and "Could not refresh {what}; last updated …".' }),
   hiveGroup: msg({ id: 'project.skills.hive', defaultMessage: 'Hive', description: "The group of Hive's own skills (the workspace's). Usually kept as Hive." }),
+  deliveredNote: msg({ id: 'project.skills.deliveredNote', defaultMessage: "Each switch says whether this project's agents get the skill (Delivered to agents), from their next session. A skill switched off in the Skills view is off in every project.", description: "Under the Hive skills in a project's Skills tab: what the switch beside each skill does. Delivered to agents is the switch's name; the Skills view is the workspace's list of skills." }),
   noHiveSkills: msg({ id: 'project.skills.noHive', defaultMessage: 'No Hive skills in this workspace.', description: 'Under the Hive group when it is empty.' }),
   editInWorkspace: msg({ id: 'project.skills.editInWorkspace', defaultMessage: "Edit in the workspace's Skills view (Hive skills are shared by every project)", description: 'Tooltip on the button beside a Hive skill.' }),
   assistantOnly: msg({ id: 'project.skills.assistantOnly', defaultMessage: "{count, plural, one {# Hive skill is for the Hive Assistant only, so it isn't listed: this project's agents don't get it.} other {# Hive skills are for the Hive Assistant only, so they aren't listed: this project's agents don't get them.}}", description: 'Under the Hive skills, when some are for the Hive Assistant alone.' }),
@@ -1356,7 +1358,7 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
     const r = await addSkill(mode, { kind: 'local', projectPath: project.path, provider }, otherLocal(project.path, provider, ids))
     if (r) setSelected(r.path)
   }
-  const row = (sk: SkillInfo, actionsFor?: React.ReactNode) => <SkillRow key={sk.path} skill={sk} selected={selected === sk.path} onSelect={() => setSelected(sk.path)} actionsFor={actionsFor} />
+  const row = (sk: SkillInfo, actionsFor?: React.ReactNode, delivered?: React.ReactNode) => <SkillRow key={sk.path} skill={sk} selected={selected === sk.path} onSelect={() => setSelected(sk.path)} actionsFor={actionsFor} delivered={delivered} />
   const group = (title: string, tip: string, items: SkillInfo[], extra?: React.ReactNode, empty?: string) => (
     <>
       <div className="skill-group">
@@ -1395,9 +1397,11 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
             hive.map((sk) =>
               row(
                 sk,
-                <IconButton icon="go-to-file" title={tr(C.editInWorkspace)} onClick={() => editInWorkspace(sk)} />
+                <IconButton icon="go-to-file" title={tr(C.editInWorkspace)} onClick={() => editInWorkspace(sk)} />,
+                !sk.problem && sk.bundled !== 'missing' ? <DeliveredSwitch skill={sk} projectPath={project.path} /> : undefined
               )
             )}
+          {skills && hiveOpen && hive.length > 0 && <div className="pane-empty skills-delivered-note">{tr(C.deliveredNote)}</div>}
           {skills && hiveOpen && assistantOnly > 0 && (
             <div className="pane-empty assistant-only-note">
               {sentences(tr(C.assistantOnly, { count: assistantOnly }), <a onClick={() => showView('skills')}>{tr(C.seeThem)}</a>)}
@@ -1745,6 +1749,12 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
   const workspaceLoops = loopDefaults({ loops: useStore((s) => s.workspace?.config.loops) })
   // Its key, for Project key's example (#1221).
   const ownKey = useStore((s) => projectKeyOf(s, project.path))
+  // Settings → Advanced's inbox switches, which this project's Inherit follows (#1432).
+  const inboxGlobals: Record<InboxSwitch, boolean> = {
+    checkpoints: useAdvancedValue<boolean>(INBOX_SWITCH_ID.checkpoints),
+    stopContinuation: useAdvancedValue<boolean>(INBOX_SWITCH_ID.stopContinuation),
+    idleWakes: useAdvancedValue<boolean>(INBOX_SWITCH_ID.idleWakes)
+  }
   if (!settings) return null
   const update = async (patch: Partial<ProjectConfig>): Promise<void> => {
     await actions.attempt(tr(S.saveFailed), () => call('project:updateConfig', project.path, patch))
@@ -1918,6 +1928,23 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
         </select>
       )
     },
+    // Carrying on (#1432): this project's own of Settings → Advanced's inbox switches.
+    ...INBOX_SWITCHES.map((which): ProjectSettingDef => {
+      const key = INBOX_PROJECT_KEY[which]
+      return {
+        section: 'sessions',
+        key,
+        ...rowText(`project.${key}`),
+        modified: cfg[key] !== 'inherit',
+        render: () => (
+          <select className="select" data-setting={key} value={cfg[key]} onChange={(e) => void update({ [key]: e.target.value as ProjectConfig[typeof key] })}>
+            <option value="inherit">{inherit(tr(inboxGlobals[which] ? S.onLower : S.offLower))}</option>
+            <option value="on">{tr(S.on)}</option>
+            <option value="off">{tr(S.offChoice)}</option>
+          </select>
+        )
+      }
+    }),
     {
       section: 'loops',
       key: 'loopWakes',
@@ -2030,7 +2057,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
           className="btn subtle"
           onClick={async () => {
             if (await confirm({ title: tr(S.resetTitle), message: tr(S.resetMessage), confirmLabel: tr(S.reset) }))
-              void update({ defaultProvider: 'inherit', providers: {}, chime: 'inherit', compactSuggestTokens: null, transcriptWarnMB: null, fileLocks: 'inherit', worktreeCopy: null, worktreeSetup: '', loopWakes: true, loopRounds: null, loopWaitHours: null, loopStepWaitMinutes: null })
+              void update({ defaultProvider: 'inherit', providers: {}, chime: 'inherit', inboxCheckpoints: 'inherit', inboxStopContinuation: 'inherit', inboxIdleWakes: 'inherit', compactSuggestTokens: null, transcriptWarnMB: null, fileLocks: 'inherit', worktreeCopy: null, worktreeSetup: '', loopWakes: true, loopRounds: null, loopWaitHours: null, loopStepWaitMinutes: null })
           }}
         >
           <Icon name="discard" /> {tr(S.resetButton)}

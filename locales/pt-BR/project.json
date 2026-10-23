@@ -295,6 +295,7 @@
   "project.skills.addLocal": "Adicionar uma skill local para {provider} a partir de um arquivo (.md ou .zip)…",
   "project.skills.assistantOnly": "{count, plural, one {# skill do Hive é só para o Hive Assistant, então não aparece na lista: os agentes deste projeto não a recebem.} other {# skills do Hive são só para o Hive Assistant, então não aparecem na lista: os agentes deste projeto não as recebem.}}",
   "project.skills.delete": "Excluir skill",
+  "project.skills.deliveredNote": "Cada interruptor diz se os agentes deste projeto recebem a skill (Entregue aos agentes), a partir da próxima sessão. Uma skill desativada na visualização Skills fica desativada em todos os projetos.",
   "project.skills.editInWorkspace": "Editar na visualização Skills do espaço de trabalho (as skills do Hive são compartilhadas por todos os projetos)",
   "project.skills.heading": "Skills disponíveis para os agentes",
   "project.skills.hive": "Hive",

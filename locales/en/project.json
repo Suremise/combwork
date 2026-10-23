@@ -1183,6 +1183,10 @@
     "defaultMessage": "Delete skill",
     "description": "Tooltip on the delete button beside a local skill."
   },
+  "project.skills.deliveredNote": {
+    "defaultMessage": "Each switch says whether this project's agents get the skill (Delivered to agents), from their next session. A skill switched off in the Skills view is off in every project.",
+    "description": "Under the Hive skills in a project's Skills tab: what the switch beside each skill does. Delivered to agents is the switch's name; the Skills view is the workspace's list of skills."
+  },
   "project.skills.editInWorkspace": {
     "defaultMessage": "Edit in the workspace's Skills view (Hive skills are shared by every project)",
     "description": "Tooltip on the button beside a Hive skill."

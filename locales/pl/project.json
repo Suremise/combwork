@@ -295,6 +295,7 @@
   "project.skills.addLocal": "Dodaj lokalną umiejętność dla {provider} z pliku (.md lub .zip)…",
   "project.skills.assistantOnly": "{count, plural, one {# umiejętność Hive jest tylko dla Hive Assistant, więc nie ma jej na liście: agenci tego projektu jej nie dostają.} few {# umiejętności Hive są tylko dla Hive Assistant, więc nie ma ich na liście: agenci tego projektu ich nie dostają.} many {# umiejętności Hive jest tylko dla Hive Assistant, więc nie ma ich na liście: agenci tego projektu ich nie dostają.} other {# umiejętności Hive jest tylko dla Hive Assistant, więc nie ma ich na liście: agenci tego projektu ich nie dostają.}}",
   "project.skills.delete": "Usuń umiejętność",
+  "project.skills.deliveredNote": "Każdy przełącznik mówi, czy agenci tego projektu dostają umiejętność (Dostarczana agentom), od następnej sesji. Umiejętność wyłączona w widoku Umiejętności jest wyłączona w każdym projekcie.",
   "project.skills.editInWorkspace": "Edytuj w widoku Umiejętności obszaru roboczego (umiejętności Hive są wspólne dla wszystkich projektów)",
   "project.skills.heading": "Umiejętności dostępne dla agentów",
   "project.skills.hive": "Hive",

@@ -1,4 +1,6 @@
 import { AGENTS_PER_PROJECT, advancedDef, advancedRow, rightClickToCliId } from '@shared/advanced'
+import { INBOX_SWITCH_ID, inboxSwitchOn, type InboxSwitch } from '@shared/inboxSwitches'
+import type { ProjectConfig } from '@shared/types'
 import { call } from './api'
 import { set, useStore } from './store'
 
@@ -32,4 +34,14 @@ export function useAgentLimit(): number {
 /** The same, outside a component. */
 export function agentLimit(): number {
   return advancedRow(advancedDef(AGENTS_PER_PROJECT)!, useStore.getState().advanced).value as number
+}
+
+/** Whether a carrying-on switch is on for a project's agents (#1432): its own over Settings → Advanced's; no project (the Assistant), Settings'. */
+export function useInboxSwitch(which: InboxSwitch, project: Partial<ProjectConfig> | null | undefined): boolean {
+  return inboxSwitchOn(which, project, useAdvancedValue<boolean>(INBOX_SWITCH_ID[which]))
+}
+
+/** The same, outside a component. */
+export function inboxSwitchNow(which: InboxSwitch, project: Partial<ProjectConfig> | null | undefined): boolean {
+  return inboxSwitchOn(which, project, advancedRow(advancedDef(INBOX_SWITCH_ID[which])!, useStore.getState().advanced).value === true)
 }

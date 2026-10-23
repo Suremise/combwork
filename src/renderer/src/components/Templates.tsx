@@ -3,13 +3,15 @@ import { SESSION_LAYOUTS } from '@shared/defaults'
 import { useAgentLimit } from '../advanced'
 import { agentChoosesMcp, agentMcpText } from '@shared/agentMcp'
 import { isKnownProvider, providerDescriptor, providerName } from '@shared/providers'
-import { TEMPLATE_DESCRIPTION_MAX, TEMPLATE_NAME_MAX, shownProblem, uniqueName, unknownProviders, type TemplateAgent, type TemplateDest, type TemplateDeleted, type TemplateEntry, type TemplateRef } from '@shared/templates'
+import { TEMPLATE_DESCRIPTION_MAX, TEMPLATE_NAME_MAX, namesKey, shownProblem, templateAgentNames, uniqueName, unknownProviders, type TemplateAgent, type TemplateDest, type TemplateEntry, type TemplateRef } from '@shared/templates'
+import { templateDescription, templateTitle } from '@shared/templateDefaults'
+import { WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
+import { PRESET_TEXT } from '@shared/workflow/optionTexts'
 import type { PageLayout, ProjectInfo } from '@shared/types'
 import * as actions from '../actions'
 import { call } from '../api'
 import { useScopedLoad } from '../scopedLoad'
-import { choose, confirm, findProject, get, notify, prompt, set, showView, useStore, type TemplateDraft, type TemplateEdit } from '../store'
-import { templateWorktreesHint } from '@shared/unusedWorktrees'
+import { choose, confirm, get, notify, prompt, set, showView, useStore, type TemplateDraft, type TemplateEdit } from '../store'
 import { cx, timeAgo } from '../util'
 import { clearEditorDraft, editorDraft, onEditorDrafts, setEditorDraft } from '../editorDrafts'
 import { PaneResizer, usePaneSize } from './Resizer'
@@ -22,7 +24,7 @@ import { fmt, msg, tr, tRich } from '@shared/i18n'
  * agents in the Agent Settings dialog), and load, rename, duplicate, delete, export and import them.
  */
 
-export const TEMPLATES_TIP = msg({ id: 'assistant.templates.tip', defaultMessage: "A template is a project's agents (settings and roles) and layout, saved under a name: the workspace's are for every project, a project's are its own (kept in its .hive, out of git). Export one to share it as a file.", description: 'Tooltip on Templates (the Templates view and a project\'s Templates tab). Keep .hive as it is.' })
+export const TEMPLATES_TIP = msg({ id: 'assistant.templates.tip', defaultMessage: "A template is a project's agents (their roles in the workflow and settings) and layout, saved under a name. Hive's own are read-only: duplicate one to change it. The workspace's are for every project, a project's are its own (kept in its .hive, out of git). Export one to share it as a file.", description: 'Tooltip on Templates (the Templates view and a project\'s Templates tab). Keep .hive as it is. Glossary: workflow role.' })
 
 const M = {
   newAgentName: msg({ id: 'assistant.templates.newAgentName', defaultMessage: 'Agent', description: 'The name suggested for a new agent of a template (a number follows when it is taken: Agent 2).' }),
@@ -58,10 +60,9 @@ const M = {
   deleteMessage: msg({ id: 'assistant.templates.deleteMessage', defaultMessage: 'The template goes to the Recycle Bin (from {scope, select, workspace {the workspace} other {{project}}}).', description: "Confirmation before a template is deleted ({project}: a project's name)." }),
   delete: msg({ id: 'assistant.templates.delete', defaultMessage: 'Delete', description: 'Confirmation before a template is deleted: its button.' }),
   deleting: msg({ id: 'assistant.templates.deleting', defaultMessage: 'Deleting…', description: "Delete's button while it works." }),
-  review: msg({ id: 'assistant.templates.review', defaultMessage: 'Review', description: "A button on the notice of unused worktrees left by a deleted template's agents: opens the list." }),
   exportFailed: msg({ id: 'assistant.templates.exportFailed', defaultMessage: 'Could not export the template', description: "An error notice: a template couldn't be saved as a file; the reason follows." }),
   exported: msg({ id: 'assistant.templates.exported', defaultMessage: 'Template exported', description: "A notice after a template was saved as a file; the file's path follows." }),
-  exportedDetail: msg({ id: 'assistant.templates.exportedDetail', defaultMessage: "It holds the agents' settings and roles and the layout: no paths, sessions or names. Import it into any Hive.", description: "Under Template exported, after the file's path." }),
+  exportedDetail: msg({ id: 'assistant.templates.exportedDetail', defaultMessage: "It holds the agents' roles, notes and settings and the layout: no paths, sessions or names of people. Import it into any Hive.", description: "Under Template exported, after the file's path." }),
   importFailed: msg({ id: 'assistant.templates.importFailed', defaultMessage: 'Could not import the template', description: "An error notice: a template file couldn't be imported; the reason follows." }),
   importTitle: msg({ id: 'assistant.templates.importTitle', defaultMessage: 'Import "{name}"', description: "Import's dialog title: {name} is the template's." }),
   importMessage: msg({ id: 'assistant.templates.importMessage', defaultMessage: '{count, plural, one {# agent} other {# agents}}.{hasUnknown, select, yes { {unknown}} other {}} Where should it be kept?', description: "Import's dialog: how many agents the template has; {unknown} says when its coding agents aren't known here." }),
@@ -74,6 +75,10 @@ const M = {
   imported: msg({ id: 'assistant.templates.imported', defaultMessage: 'Template imported', description: "A notice after a template file was imported; where it is kept follows." }),
   importedDetail: msg({ id: 'assistant.templates.importedDetail', defaultMessage: '"{name}", in {scope, select, workspace {the workspace} other {{project}}}.{hasUnknown, select, yes { {unknown}} other {}}', description: "Under Template imported: the template and where it is kept; {unknown} says when its coding agents aren't known here." }),
   workspace: msg({ id: 'assistant.templates.workspace', defaultMessage: 'Workspace', description: "A badge, a group and a filter: the workspace's templates (for every project)." }),
+  hive: msg({ id: 'assistant.templates.hive', defaultMessage: 'Hive', description: "A badge, a group and a filter: Hive's own templates (#1436, shipped with Hive, read-only)." }),
+  hiveSummary: msg({ id: 'assistant.templates.hiveSummary', defaultMessage: "{count, plural, one {# agent} other {# agents}}, {layout}. One of Hive's own templates: read-only. <b>Duplicate…</b> copies it into the workspace or a project to change it.", description: 'Over one of Hive\'s own templates\' agents: how many, its layout ("two columns layout"). <b> is bold; Duplicate… is the button.' }),
+  suggests: msg({ id: 'assistant.templates.suggests', defaultMessage: 'Suggests the {preset} preset: loading it offers to switch the project’s workflow options to it.{pool, select, yes { Its reviewers are a pool shared by every builder.} other {}}', description: "Over a template's agents: the workflow preset it suggests ({preset}: Solo, Pair, Team); pool when its reviewers are shared by all builders rather than one per lane. Glossary: preset, workflow, reviewer, builder, lane." }),
+  pairedWith: msg({ id: 'assistant.templates.pairedWith', defaultMessage: 'with {name}', description: "A template's table, under an agent's role: the agent it is paired with ({name}). Lower case." }),
   unsavedTip: msg({ id: 'assistant.templates.unsavedTip', defaultMessage: 'It is open in the editor with changes not saved yet', description: 'Tooltip on Not saved, beside a template.' }),
   notSaved: msg({ id: 'assistant.templates.notSaved', defaultMessage: 'Not saved', description: 'A badge on a template open in its editor with unsaved changes.' }),
   cantBeUsed: msg({ id: 'assistant.templates.cantBeUsed', defaultMessage: "Can't be used", description: "A badge on a template that can't be used (damaged, made by a newer Hive…)." }),
@@ -111,13 +116,10 @@ const M = {
   colModel: msg({ id: 'assistant.templates.colModel', defaultMessage: 'Model', description: "A template's table: the column of each agent's model." }),
   colEffort: msg({ id: 'assistant.templates.colEffort', defaultMessage: 'Effort', description: "A template's table: a column (the model's reasoning effort)." }),
   colMode: msg({ id: 'assistant.templates.colMode', defaultMessage: 'Mode', description: "A template's table: a column (the permission mode)." }),
-  colWorksIn: msg({ id: 'assistant.templates.colWorksIn', defaultMessage: 'Works in', description: "A template's table: where each agent works." }),
   colActions: msg({ id: 'assistant.templates.colActions', defaultMessage: 'Actions', description: "The template editor's table: the accessible name of the column of buttons." }),
   unknownProvider: msg({ id: 'assistant.templates.unknownProvider', defaultMessage: '{provider} (unknown)', description: "A template's table: a coding agent this Hive doesn't know ({provider}: its id)." }),
   context200k: msg({ id: 'assistant.templates.context200k', defaultMessage: '200K context', description: "A template's table, after the model: the agent uses the model's 200K-token context. Keep 200K." }),
-  ownWorktree: msg({ id: 'assistant.templates.ownWorktree', defaultMessage: 'Its own worktree', description: "A template's table, Works in: the agent gets a worktree of its own." }),
-  projectFolder: msg({ id: 'assistant.templates.projectFolder', defaultMessage: 'The project folder', description: "A template's table, Works in: the agent works in the project's folder." }),
-  mcpServers: msg({ id: 'assistant.templates.mcpServers', defaultMessage: 'MCP servers: {servers}', description: "A template's table, under Works in: the MCP servers an agent chose." }),
+  mcpServers: msg({ id: 'assistant.templates.mcpServers', defaultMessage: 'MCP servers: {servers}', description: "A template's table, under an agent's coding agent: the MCP servers it chose." }),
   editAgent: msg({ id: 'assistant.templates.editAgent', defaultMessage: 'Edit {name}…', description: "The template editor: a button on an agent's row." }),
   cantEdit: msg({ id: 'assistant.templates.cantEdit', defaultMessage: "This Hive doesn't know its coding agent: it can be moved or removed, not edited", description: "The template editor: the edit button of an agent whose coding agent isn't known here." }),
   copyAgent: msg({ id: 'assistant.templates.copyAgent', defaultMessage: 'Copy {name}', description: "The template editor: a button on an agent's row." }),
@@ -149,6 +151,7 @@ const M = {
   noWorkspaceTemplates: msg({ id: 'assistant.templates.noWorkspaceTemplates', defaultMessage: 'No workspace templates.', description: "Under Workspace, when the workspace has no templates." }),
   noneOfItsOwn: msg({ id: 'assistant.templates.noneOfItsOwn', defaultMessage: 'No templates of its own.', description: "The Templates view, under a project with no templates." }),
   panelHint: msg({ id: 'assistant.templates.panelHint', defaultMessage: "Save a project's agents as a template from its Session tab (<b>Save Template…</b>). Export one to share it; Import brings one in.", description: "Under the Templates view's list. <b> is bold; Save Template… is the Session tab's button." }),
+  noneHive: msg({ id: 'assistant.templates.noneHive', defaultMessage: "Hive's own templates couldn't be listed.", description: "The Templates view, under Hive, when none of Hive's own templates is listed (shouldn't happen)." }),
   gone: msg({ id: 'assistant.templates.gone', defaultMessage: 'That template is no longer there.', description: 'The Templates view: the selected template was deleted or moved.' }),
   selectOne: msg({ id: 'assistant.templates.selectOne', defaultMessage: 'Select a template to see its agents and layout, load it into a project, or export it to share.', description: "The Templates view's main area with no template selected." }),
   thisProject: msg({ id: 'assistant.templates.thisProject', defaultMessage: 'This project', description: "A project's Templates tab: the group of its own templates." }),
@@ -206,7 +209,8 @@ async function saveEdit(key: string, d: TemplateDraft): Promise<TemplateEntry> {
   bump()
   return saved
 }
-const refOf = (t: TemplateEntry): TemplateRef => (t.scope === 'project' ? { scope: 'project', project: t.project, file: t.file } : { scope: 'workspace', file: t.file })
+/** Where a listed template is, to name it in a call: its scope as listed (Hive's own too, #1436), a project's with its project. */
+const refOf = (t: TemplateEntry): TemplateRef => (t.scope === 'project' ? { scope: 'project', project: t.project, file: t.file } : { scope: t.scope, file: t.file })
 /** A layout's name ("Two columns"), and inside a sentence ("two columns layout"). */
 export const layoutText = (l: PageLayout): string => tr(M.layout, { layout: l })
 const layoutPhrase = (l: PageLayout): string => tr(M.layoutPhrase, { layout: l })
@@ -215,7 +219,7 @@ const projectsNow = (): ProjectInfo[] => get().workspace?.projects ?? []
 const sameProject = (a: string | undefined, b: string | undefined): boolean => !!a && !!b && a.toLowerCase() === b.toLowerCase()
 const projectName = (path: string | undefined): string => projectsNow().find((p) => sameProject(p.path, path))?.name ?? path?.split(/[\\/]/).pop() ?? tr(M.aProject)
 /** Where a template is kept, for a message's select: the workspace, or a project by its name. */
-const placeOf = (d: TemplateDest): { scope: 'workspace' | 'project'; project: string } => ({ scope: d.scope, project: d.scope === 'workspace' ? '' : projectName(d.project) })
+const placeOf = (d: TemplateDest): { scope: 'workspace' | 'project'; project: string } => (d.scope === 'project' ? { scope: 'project', project: projectName(d.project) } : { scope: 'workspace', project: '' })
 const unknownText = (ids: string[]): string => tr(M.unknown, { ids: fmt.list(ids, 'unit') })
 
 /** Asks where to keep a template: the workspace, or a project. `initial`: a project's path, or '' for the workspace. */
@@ -264,21 +268,15 @@ async function duplicateTemplate(t: TemplateEntry, initial: string): Promise<Tem
 }
 
 async function deleteTemplate(t: TemplateEntry): Promise<boolean> {
-  let left: TemplateDeleted | null = null
   const ok = await confirm({
     title: tr(M.deleteTitle, { name: t.name }),
     message: tr(M.deleteMessage, placeOf(t)),
     confirmLabel: tr(M.delete),
     danger: true,
     busyLabel: tr(M.deleting),
-    run: async () => {
-      left = await call('templates:delete', refOf(t))
-    }
+    run: () => call('templates:delete', refOf(t))
   })
   if (ok) bump()
-  // Deleting it touches no worktree; but its worktree agents' worktrees, no agent's now, are worth a look (#353): once.
-  const hint = ok && left ? templateWorktreesHint(left, (p) => findProject(get(), p)?.name ?? p) : null
-  if (hint) notify('info', hint.title, hint.detail, [{ label: tr(M.review), command: 'project.unusedWorktrees', args: [hint.project] }])
   return ok
 }
 
@@ -315,18 +313,50 @@ export async function importTemplate(initial: string): Promise<TemplateEntry | n
 }
 
 function ScopeBadge({ t }: { t: TemplateEntry }) {
+  if (t.scope === 'hive') return <span className="badge accent">{tr(M.hive)}</span>
   return t.scope === 'workspace' ? <span className="badge accent">{tr(M.workspace)}</span> : <span className="badge">{projectName(t.project)}</span>
+}
+
+/** The agent a template's agent is paired with (#1436), by name: a builder's reviewer, or a reviewer's builder. */
+function partnerOf(t: Pick<TemplateEntry, 'pairs'>, name: string): string | undefined {
+  const same = (a: string): boolean => a.toLowerCase() === name.toLowerCase()
+  const p = t.pairs?.find((x) => same(x.builder) || same(x.reviewer))
+  return p ? (same(p.builder) ? p.reviewer : p.builder) : undefined
+}
+
+/**
+ * One of Hive's own as a project would get it (#1123 names): its agents' and pairs' names made with that project's key
+ * (`{key}-B1` as HI-B1), so what is shown is what loading makes; any other template as it is.
+ */
+function asLoaded(t: TemplateEntry, projectPath: string | null | undefined): TemplateEntry {
+  if (t.scope !== 'hive') return t
+  const p = projectsNow().find((x) => sameProject(x.path, projectPath ?? undefined))
+  const key = namesKey(get().projectKeys.find((k) => sameProject(k.projectPath, p?.path))?.key, p?.name ?? '')
+  const names = templateAgentNames(t.agents, key)
+  const of = (n: string): string => names[t.agents.findIndex((a) => a.name === n)] ?? n
+  return { ...t, agents: t.agents.map((a, i) => ({ ...a, name: names[i] })), ...(t.pairs ? { pairs: t.pairs.map((x) => ({ builder: of(x.builder), reviewer: of(x.reviewer) })) } : {}) }
+}
+
+/** A template's agent's role in the workflow (#1436), with its note and the agent it is paired with under it. */
+function RoleCell({ a, partner }: { a: TemplateAgent; partner?: string }) {
+  return (
+    <td data-role={a.role}>
+      {tr(WORKFLOW_ROLE_TEXT[a.role].name)}
+      {partner && <div className="faint">{tr(M.pairedWith, { name: partner })}</div>}
+      {a.note && <div className="faint">{a.note}</div>}
+    </td>
+  )
 }
 
 function TemplateRow({ t, selected, onSelect, showScope }: { t: TemplateEntry; selected: boolean; onSelect: () => void; showScope?: boolean }) {
   const unknown = unknownProviders(t.agents)
   const unsaved = useStore((s) => changed(s.templateEdits[`${(s.workspace?.path ?? '').toLowerCase()}|${templateKey(t)}`]))
   return (
-    <div className={cx(/* i18n-ignore: class names */ 'row tall template-row', selected && 'selected')} role="button" tabIndex={0} aria-label={t.name} onClick={onSelect} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onSelect())}>
+    <div className={cx(/* i18n-ignore: class names */ 'row tall template-row', selected && 'selected')} role="button" tabIndex={0} aria-label={templateTitle(t)} data-scope={t.scope} onClick={onSelect} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onSelect())}>
       <Icon name="library" />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="label">
-          {t.name}
+          {templateTitle(t)}
           {showScope && <ScopeBadge t={t} />}
           {unsaved && (
             <Tooltip content={tr(M.unsavedTip)}>
@@ -518,7 +548,6 @@ function TemplateEditor({ t, project, onDone }: { t: TemplateEntry; project?: Pr
               <th>{tr(M.colModel)}</th>
               <th>{tr(M.colEffort)}</th>
               <th>{tr(M.colMode)}</th>
-              <th>{tr(M.colWorksIn)}</th>
               <th aria-label={tr(M.colActions)} />
             </tr>
           </thead>
@@ -528,18 +557,17 @@ function TemplateEditor({ t, project, onDone }: { t: TemplateEntry; project?: Pr
               return (
                 <tr key={`${i}|${a.name}`} data-agent={a.name}>
                   <td>{a.name}</td>
-                  <td>{a.role ?? <span className="faint">—</span>}</td>
-                  <td>{known ? providerName(a.provider) : <span className="badge warn">{tr(M.unknownProvider, { provider: a.provider })}</span>}</td>
+                  <RoleCell a={a} />
+                  <td>
+                    {known ? providerName(a.provider) : <span className="badge warn">{tr(M.unknownProvider, { provider: a.provider })}</span>}
+                    {agentChoosesMcp(a) && <div className="faint">{tr(M.mcpServers, { servers: agentMcpText(a) })}</div>}
+                  </td>
                   <td>
                     {a.model ?? tr(M.default)}
                     {a.use200kContext && <> · {tr(M.context200k)}</>}
                   </td>
                   <td>{settingText(a, 'effort')}</td>
                   <td>{settingText(a, 'permissionMode')}</td>
-                  <td>
-                    {tr(a.worktree ? M.ownWorktree : M.projectFolder)}
-                    {agentChoosesMcp(a) && <div className="faint">{tr(M.mcpServers, { servers: agentMcpText(a) })}</div>}
-                  </td>
                   <td className="template-agent-actions">
                     <IconButton icon="edit" title={known ? tr(M.editAgent, { name: a.name }) : tr(M.cantEdit)} disabled={!known || busy} onClick={() => void edit(i)} />
                     <IconButton icon="copy" title={tr(M.copyAgent, { name: a.name })} disabled={!known || full || busy} onClick={() => void edit(i, true)} />
@@ -562,20 +590,26 @@ function TemplateEditor({ t, project, onDone }: { t: TemplateEntry; project?: Pr
  * What a template holds and what to do with it: Edit… (#271) opens the editor in its place. `project`: loading goes
  * into this project (a project's Templates tab); without it, Load into Project… asks which.
  */
-export function TemplateDetail({ t, project, onGone, onSelect }: { t: TemplateEntry; project?: ProjectInfo; onGone: () => void; onSelect: (t: TemplateEntry) => void }) {
+export function TemplateDetail({ t: entry, project, onGone, onSelect }: { t: TemplateEntry; project?: ProjectInfo; onGone: () => void; onSelect: (t: TemplateEntry) => void }) {
   // An editor left open with its draft (#510) opens again.
-  const [editing, setEditing] = useState(() => changed(get().templateEdits[editKey(t)]))
+  const [editing, setEditing] = useState(() => changed(get().templateEdits[editKey(entry)]))
   const selectedProject = useStore((s) => s.selectedProject)
+  useStore((s) => s.projectKeys)
+  // Hive's own shown with the names this project (or the one selected) would get.
+  const t = asLoaded(entry, project?.path ?? selectedProject)
   // Duplicate offers the other place first: a project's into the workspace, the workspace's into a project.
   const otherPlace = t.scope === 'project' ? '' : (project?.path ?? selectedProject ?? projectsNow()[0]?.path ?? '')
   const unknown = unknownProviders(t.agents)
-  if (editing && !t.problem) return <TemplateEditor t={t} project={project} onDone={() => setEditing(false)} />
+  // Hive's own (#1436): loaded, duplicated and exported, never changed where they are.
+  const readOnly = t.scope === 'hive'
+  const description = templateDescription(t)
+  if (editing && !t.problem && !readOnly) return <TemplateEditor t={t} project={project} onDone={() => setEditing(false)} />
   return (
-    <div className="template-detail">
+    <div className="template-detail" data-scope={t.scope}>
       <div className="template-detail-head">
         <div className="template-detail-title">
           <Icon name="library" />
-          <h2>{t.name}</h2>
+          <h2>{templateTitle(t)}</h2>
           <ScopeBadge t={t} />
         </div>
         <div className="template-detail-actions">
@@ -586,21 +620,25 @@ export function TemplateDetail({ t, project, onGone, onSelect }: { t: TemplateEn
               </button>
             </Tooltip>
           )}
-          <Tooltip content={tr(M.editTip)}>
-            <button className="btn small subtle" disabled={!!t.problem} onClick={() => setEditing(true)}>
-              <Icon name="settings" /> {tr(M.edit)}
-            </button>
-          </Tooltip>
-          <button className="btn small subtle" disabled={!!t.problem} onClick={() => void renameTemplate(t)}>
-            <Icon name="edit" /> {tr(M.renameButton)}
-          </button>
+          {!readOnly && (
+            <>
+              <Tooltip content={tr(M.editTip)}>
+                <button className="btn small subtle" disabled={!!t.problem} onClick={() => setEditing(true)}>
+                  <Icon name="settings" /> {tr(M.edit)}
+                </button>
+              </Tooltip>
+              <button className="btn small subtle" disabled={!!t.problem} onClick={() => void renameTemplate(t)}>
+                <Icon name="edit" /> {tr(M.renameButton)}
+              </button>
+            </>
+          )}
           <button className="btn small subtle" disabled={!!t.problem} onClick={() => void duplicateTemplate(t, otherPlace).then((r) => r && onSelect(r))}>
             <Icon name="copy" /> {tr(M.duplicateButton)}
           </button>
           <button className="btn small subtle" disabled={!!t.problem} onClick={() => void exportTemplate(t)}>
             <Icon name="export" /> {tr(M.exportButton)}
           </button>
-          <IconButton icon="trash" title={tr(M.deleteTip)} onClick={() => void deleteTemplate(t).then((ok) => ok && onGone())} />
+          {!readOnly && <IconButton icon="trash" title={tr(M.deleteTip)} onClick={() => void deleteTemplate(t).then((ok) => ok && onGone())} />}
         </div>
       </div>
       <div className="template-detail-body">
@@ -610,10 +648,17 @@ export function TemplateDetail({ t, project, onGone, onSelect }: { t: TemplateEn
           </p>
         ) : (
           <>
-            {t.description && <p className="template-description">{t.description}</p>}
+            {description && <p className="template-description">{description}</p>}
             <p className="muted">
-              {Children.toArray(tRich<React.ReactNode>(M.summary, { count: t.agents.length, layout: layoutPhrase(t.layout), hasSaved: t.savedAt ? 'yes' : 'no', when: t.savedAt ? timeAgo(t.savedAt) : '', ...placeOf(t), b: bold }))}
+              {readOnly
+                ? Children.toArray(tRich<React.ReactNode>(M.hiveSummary, { count: t.agents.length, layout: layoutPhrase(t.layout), b: bold }))
+                : Children.toArray(tRich<React.ReactNode>(M.summary, { count: t.agents.length, layout: layoutPhrase(t.layout), hasSaved: t.savedAt ? 'yes' : 'no', when: t.savedAt ? timeAgo(t.savedAt) : '', ...placeOf(t), b: bold }))}
             </p>
+            {t.suggestedPreset && (
+              <p className="muted template-suggests" data-suggests={t.suggestedPreset}>
+                {tr(M.suggests, { preset: tr(PRESET_TEXT[t.suggestedPreset]), pool: t.reviewerMode === 'pool' ? 'yes' : 'no' })}
+              </p>
+            )}
             {unknown.length > 0 && (
               <p className="template-problem">
                 <Icon name="warning" /> {unknownText(unknown)}
@@ -628,25 +673,23 @@ export function TemplateDetail({ t, project, onGone, onSelect }: { t: TemplateEn
                   <th>{tr(M.colModel)}</th>
                   <th>{tr(M.colEffort)}</th>
                   <th>{tr(M.colMode)}</th>
-                  <th>{tr(M.colWorksIn)}</th>
                 </tr>
               </thead>
               <tbody>
                 {t.agents.map((a) => (
-                  <tr key={a.name}>
+                  <tr key={a.name} data-agent={a.name}>
                     <td>{a.name}</td>
-                    <td>{a.role ?? <span className="faint">—</span>}</td>
-                    <td>{isKnownProvider(a.provider) ? providerName(a.provider) : <span className="badge warn">{tr(M.unknownProvider, { provider: a.provider })}</span>}</td>
+                    <RoleCell a={a} partner={partnerOf(t, a.name)} />
+                    <td>
+                      {isKnownProvider(a.provider) ? providerName(a.provider) : <span className="badge warn">{tr(M.unknownProvider, { provider: a.provider })}</span>}
+                      {agentChoosesMcp(a) && <div className="faint">{tr(M.mcpServers, { servers: agentMcpText(a) })}</div>}
+                    </td>
                     <td>
                       {a.model ?? tr(M.default)}
                       {a.use200kContext && <> · {tr(M.context200k)}</>}
                     </td>
                     <td>{settingText(a, 'effort')}</td>
                     <td>{settingText(a, 'permissionMode')}</td>
-                    <td>
-                      {tr(a.worktree ? M.ownWorktree : M.projectFolder)}
-                      {agentChoosesMcp(a) && <div className="faint">{tr(M.mcpServers, { servers: agentMcpText(a) })}</div>}
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -676,6 +719,7 @@ function useAllTemplates() {
 }
 
 const ALL = 'all'
+const HIVE = 'hive'
 const WORKSPACE = 'workspace'
 
 /** The Templates view's sidebar: every template, grouped by where it is kept, with a filter (All, Workspace, a project). */
@@ -684,14 +728,15 @@ export function TemplatesPanel() {
   const selected = useStore((s) => s.selectedTemplate)
   const filter = useStore((s) => s.templateFilter)
   const projects = useStore((s) => s.workspace?.projects) ?? []
-  const shownFilter = filter === ALL || filter === WORKSPACE || projects.some((p) => p.path === filter) ? filter : ALL
+  const shownFilter = filter === ALL || filter === HIVE || filter === WORKSPACE || projects.some((p) => p.path === filter) ? filter : ALL
   const all = data ?? []
   const groups: { key: string; title: string; items: TemplateEntry[] }[] = [
+    { key: HIVE, title: tr(M.hive), items: all.filter((t) => t.scope === 'hive') },
     { key: WORKSPACE, title: tr(M.workspace), items: all.filter((t) => t.scope === 'workspace') },
     ...projects.map((p) => ({ key: p.path, title: p.name, items: all.filter((t) => t.scope === 'project' && sameProject(t.project, p.path)) }))
-  ].filter((g) => (shownFilter === ALL ? g.key === WORKSPACE || g.items.length > 0 : g.key === shownFilter))
+  ].filter((g) => (shownFilter === ALL ? g.key === HIVE || g.key === WORKSPACE || g.items.length > 0 : g.key === shownFilter))
   const doImport = (): void =>
-    void importTemplate(shownFilter !== ALL && shownFilter !== WORKSPACE ? shownFilter : '').then((t) => t && set({ selectedTemplate: templateKey(t), templateFilter: ALL }))
+    void importTemplate(shownFilter !== ALL && shownFilter !== HIVE && shownFilter !== WORKSPACE ? shownFilter : '').then((t) => t && set({ selectedTemplate: templateKey(t), templateFilter: ALL }))
   return (
     <>
       <div className="pane-header">
@@ -705,6 +750,7 @@ export function TemplatesPanel() {
         <div style={{ padding: '0 8px 6px 12px' }}>
           <select className="select" style={{ width: '100%' }} aria-label={tr(M.showOf)} value={shownFilter} onChange={(e) => set({ templateFilter: e.target.value })}>
             <option value={ALL}>{tr(M.allTemplates)}</option>
+            <option value={HIVE}>{tr(M.hive)}</option>
             <option value={WORKSPACE}>{tr(M.workspace)}</option>
             {projects.map((p) => (
               <option key={p.path} value={p.path}>
@@ -725,11 +771,11 @@ export function TemplatesPanel() {
         )}
         {data &&
           groups.map((g) => (
-            <div key={g.key} className="template-group">
+            <div key={g.key} className="template-group" data-group={g.key === HIVE || g.key === WORKSPACE ? g.key : 'project'}>
               <div className="skill-group">
                 {g.title} <span className="count">{g.items.length}</span>
               </div>
-              {g.items.length === 0 && <div className="pane-empty">{tr(g.key === WORKSPACE ? M.noWorkspaceTemplates : M.noneOfItsOwn)}</div>}
+              {g.items.length === 0 && <div className="pane-empty">{tr(g.key === HIVE ? M.noneHive : g.key === WORKSPACE ? M.noWorkspaceTemplates : M.noneOfItsOwn)}</div>}
               {g.items.map((t) => (
                 <TemplateRow key={templateKey(t)} t={t} selected={selected === templateKey(t)} onSelect={() => set({ selectedTemplate: templateKey(t) })} />
               ))}
@@ -780,6 +826,7 @@ export function ProjectTemplatesTab({ project }: { project: ProjectInfo }) {
   const list = loaded.data
   const mine = (list ?? []).filter((t) => t.scope === 'project')
   const shared = (list ?? []).filter((t) => t.scope === 'workspace')
+  const hive = (list ?? []).filter((t) => t.scope === 'hive')
   const current = selected ? list?.find((t) => templateKey(t) === selected) : undefined
   const row = (t: TemplateEntry) => <TemplateRow key={templateKey(t)} t={t} showScope selected={selected === templateKey(t)} onSelect={() => setSelected(templateKey(t))} />
   // The list beside the template, or above it when the tab is narrow (#890; app.css `.templates-split`, as Changes').
@@ -815,6 +862,10 @@ export function ProjectTemplatesTab({ project }: { project: ProjectInfo }) {
               </div>
               {shared.length === 0 && <div className="pane-empty">{tr(M.noWorkspaceTemplates)}</div>}
               {shared.map(row)}
+              <div className="skill-group">
+                {tr(M.hive)} <span className="count">{hive.length}</span>
+              </div>
+              {hive.map(row)}
               <p className="hint" style={{ padding: '4px 14px' }}>
                 {Children.toArray(tRich<React.ReactNode>(M.tabHint, { b: bold, view: templatesViewLink }))}
               </p>
@@ -824,7 +875,7 @@ export function ProjectTemplatesTab({ project }: { project: ProjectInfo }) {
       </div>
       <div className="split-main">
         {current ? (
-          <TemplateDetail key={templateKey(current)} t={current} project={project} onGone={() => setSelected(null)} onSelect={(x) => setSelected(sameProject(x.project, project.path) || x.scope === 'workspace' ? templateKey(x) : null)} />
+          <TemplateDetail key={templateKey(current)} t={current} project={project} onGone={() => setSelected(null)} onSelect={(x) => setSelected(sameProject(x.project, project.path) || x.scope !== 'project' ? templateKey(x) : null)} />
         ) : (
           <div className="empty-state" style={{ paddingTop: '18vh' }}>
             <Icon name="library" />

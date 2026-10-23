@@ -308,9 +308,8 @@
   "agents.resume.sub": "C’était un {kind} {cli} lancé pour une autre session, pas une conversation à part entière : impossible de la reprendre.",
   "agents.session.unnamed": "Session {id}",
   "agents.settings.appliesNext": "Les changements s’appliquent au prochain démarrage de l’agent {agent} ; la session en cours garde ses paramètres d’ici là.",
-  "agents.settings.ownWorktree": "Son propre worktree",
-  "agents.settings.role": "Rôle",
-  "agents.settings.roleNone": "Aucun (son nom : {name})",
+  "agents.settings.note": "Note",
+  "agents.settings.noteNone": "Facultatif : à quoi il sert, avec tes mots",
   "agents.settings.save": "Enregistrer",
   "agents.settings.saving": "Enregistrement…",
   "agents.settings.stopToChange": "– arrête l’agent {agent} pour le changer",
@@ -329,5 +328,12 @@
   "agents.tested.older": "Plus ancienne que la version testée ; pense à la mettre à jour.",
   "agents.tested.summary": "Testé avec {tested} · installé : {installed}",
   "agents.tested.summaryUnknown": "Testé avec {tested} · version installée inconnue",
-  "agents.tested.unknown": "Hive n’a pas pu déterminer la version installée, il ne peut donc pas la comparer à la version testée."
+  "agents.tested.unknown": "Hive n’a pas pu déterminer la version installée, il ne peut donc pas la comparer à la version testée.",
+  "agents.workflowRole.builder": "Auteur",
+  "agents.workflowRole.builderText": "Travaille sur les cartes et les envoie en Relecture.",
+  "agents.workflowRole.either": "Les deux",
+  "agents.workflowRole.eitherText": "Travaille ou relit, mais ne relit jamais son propre travail.",
+  "agents.workflowRole.label": "Rôle dans le flux de travail",
+  "agents.workflowRole.reviewer": "Relecteur",
+  "agents.workflowRole.reviewerText": "Relit les cartes des auteurs et les déclare validées ou refusées."
 }

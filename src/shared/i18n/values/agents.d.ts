@@ -310,9 +310,8 @@ interface HiveMessageValues {
   'agents.resume.sub': { kind: string | number; cli: string | number }
   'agents.session.unnamed': { id: string | number }
   'agents.settings.appliesNext': { agent: string | number }
-  'agents.settings.ownWorktree': undefined
-  'agents.settings.role': undefined
-  'agents.settings.roleNone': { name: string | number }
+  'agents.settings.note': undefined
+  'agents.settings.noteNone': undefined
   'agents.settings.save': undefined
   'agents.settings.saving': undefined
   'agents.settings.stopToChange': { agent: string | number }
@@ -332,4 +331,11 @@ interface HiveMessageValues {
   'agents.tested.summary': { tested: string | number; installed: string | number }
   'agents.tested.summaryUnknown': { tested: string | number }
   'agents.tested.unknown': undefined
+  'agents.workflowRole.builder': undefined
+  'agents.workflowRole.builderText': undefined
+  'agents.workflowRole.either': undefined
+  'agents.workflowRole.eitherText': undefined
+  'agents.workflowRole.label': undefined
+  'agents.workflowRole.reviewer': undefined
+  'agents.workflowRole.reviewerText': undefined
 }

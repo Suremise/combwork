@@ -262,6 +262,10 @@ export interface RunAsk {
   card?: string
   revision?: string
   check?: string
+  /** Run it in a check copy at the card's revision (#1435, `--isolated`): Hive leases one, or says to wait for one. */
+  isolated?: true
+  /** The ticket of the copy being leased for it (the last `wait` gave it): asked again with it. */
+  ticket?: string
 }
 
 /** What Hive resolved a run to be for: the card's reference, the commits, the check and its configured command. */
@@ -273,6 +277,8 @@ export interface RunLink {
   testedCheckout: string | null
   check: { name: string; command: string } | null
   folder: string | null
+  /** An isolated run's check copy (#1435): its lease, which its command's launcher is put in (assignIsolated), and name. */
+  isolated: { lease: string; copy: string } | null
 }
 
 /**
@@ -280,7 +286,7 @@ export interface RunLink {
  * with its reason (a revision that isn't checked out, an unknown card, a check with no command), or `unreachable` (no
  * Hive, an older one without the call, a timeout).
  */
-export async function resolveRun(target: ProgressTarget, ask: RunAsk, opts: { fetch?: Fetch; timeoutMs?: number } = {}): Promise<{ link: RunLink } | { refused: string } | { unreachable: true }> {
+export async function resolveRun(target: ProgressTarget, ask: RunAsk, opts: { fetch?: Fetch; timeoutMs?: number } = {}): Promise<{ link: RunLink } | { refused: string } | { wait: string; ticket?: string } | { unreachable: true }> {
   const fetchImpl = opts.fetch ?? (globalThis.fetch as unknown as Fetch)
   try {
     const res = await fetchImpl(`${target.url}/v1/progress/resolve`, {
@@ -293,6 +299,7 @@ export async function resolveRun(target: ProgressTarget, ask: RunAsk, opts: { fe
     if (res.ok && body && typeof body === 'object') {
       const text = (v: unknown): string | null => (typeof v === 'string' && v ? v : null)
       const check = body.check && typeof body.check === 'object' ? (body.check as Record<string, unknown>) : null
+      const iso = body.isolated && typeof body.isolated === 'object' ? (body.isolated as Record<string, unknown>) : null
       return {
         link: {
           link: text(body.link),
@@ -300,15 +307,40 @@ export async function resolveRun(target: ProgressTarget, ask: RunAsk, opts: { fe
           revision: text(body.revision),
           testedCheckout: text(body.testedCheckout),
           check: check && text(check.name) && text(check.command) ? { name: check.name as string, command: check.command as string } : null,
-          folder: text(body.folder)
+          folder: text(body.folder),
+          isolated: iso && text(iso.lease) && text(iso.copy) ? { lease: iso.lease as string, copy: iso.copy as string } : null
         }
       }
     }
     if (res.status === 400 && body && typeof body.error === 'string') return { refused: body.error }
+    // An isolated run with no check copy free yet (#1435): what it waits for, to ask again.
+    if (res.status === 409 && body && typeof body.wait === 'string') return { wait: body.wait, ...(typeof body.ticket === 'string' && body.ticket ? { ticket: body.ticket } : {}) }
   } catch {
     // no Hive, or it didn't answer in time
   }
   return { unreachable: true }
+}
+
+/**
+ * Has Hive put an isolated run's launcher (its pid, started between the two clock readings) in its check copy's job
+ * (#1435, POST /v1/progress/isolated), before the launcher is told to run the command: true once it is; what went wrong
+ * otherwise (the launcher is then ended having run nothing).
+ */
+export async function assignIsolated(target: ProgressTarget, a: { lease: string; pid: number; after: number; before: number }, opts: { fetch?: Fetch; timeoutMs?: number } = {}): Promise<true | string> {
+  const fetchImpl = opts.fetch ?? (globalThis.fetch as unknown as Fetch)
+  try {
+    const res = await fetchImpl(`${target.url}/v1/progress/isolated`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json', ...(target.workspace ? { 'X-Hive-Workspace': encodeURIComponent(target.workspace) } : {}) },
+      body: JSON.stringify(a),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 15000)
+    })
+    if (res.ok) return true
+    const body = (await res.json().catch(() => null)) as Record<string, unknown> | null
+    return typeof body?.error === 'string' ? body.error : `Hive answered ${res.status}`
+  } catch (e) {
+    return `Hive couldn't be reached (${(e as Error).message})`
+  }
 }
 
 // Timings: how long a run (a command in a folder, a test suite) took the last few times, for its estimate.

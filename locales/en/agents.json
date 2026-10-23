@@ -1235,17 +1235,13 @@
     "defaultMessage": "Changes apply the next time {agent} starts; the running session keeps its settings until then.",
     "description": "Under Agent Settings for a running agent ({agent})."
   },
-  "agents.settings.ownWorktree": {
-    "defaultMessage": "Its own worktree",
-    "description": "A choice of where a template's agent works (Agent Settings): a worktree of its own. Keep it short."
+  "agents.settings.note": {
+    "defaultMessage": "Note",
+    "description": "Label of an agent's note (Agent Settings): what it is for, in the user's own words. Not its role in the workflow, which is a separate choice."
   },
-  "agents.settings.role": {
-    "defaultMessage": "Role",
-    "description": "Label of an agent's role (Agent Settings): what it is for, in the user's words (builder, reviewer…)."
-  },
-  "agents.settings.roleNone": {
-    "defaultMessage": "None (its name: {name})",
-    "description": "Placeholder of an agent's empty role (Agent Settings): no role, so its name ({name}) says what it is."
+  "agents.settings.noteNone": {
+    "defaultMessage": "Optional: what it is for, in your words",
+    "description": "Placeholder of an agent's empty note (Agent Settings)."
   },
   "agents.settings.save": {
     "defaultMessage": "Save",
@@ -1322,5 +1318,33 @@
   "agents.tested.unknown": {
     "defaultMessage": "Hive couldn't tell which version is installed, so it can't compare it with the tested one.",
     "description": "Agent Setup: Hive couldn't read the installed CLI's version."
+  },
+  "agents.workflowRole.builder": {
+    "defaultMessage": "Builder",
+    "description": "A choice of an agent's role in the workflow: it builds cards. Glossary: builder."
+  },
+  "agents.workflowRole.builderText": {
+    "defaultMessage": "Works on cards and sends them to Review.",
+    "description": "Under the Builder choice of an agent's role in the workflow. Review is a board column."
+  },
+  "agents.workflowRole.either": {
+    "defaultMessage": "Either",
+    "description": "A choice of an agent's role in the workflow: it builds or reviews. Glossary: either."
+  },
+  "agents.workflowRole.eitherText": {
+    "defaultMessage": "Builds or reviews, but never reviews its own work.",
+    "description": "Under the Either choice of an agent's role in the workflow."
+  },
+  "agents.workflowRole.label": {
+    "defaultMessage": "Role in the workflow",
+    "description": "A heading in Add Agent and Agent Settings, above the choice of builder, reviewer or either: which side of the workflow the agent takes (#1430). Glossary: workflow role."
+  },
+  "agents.workflowRole.reviewer": {
+    "defaultMessage": "Reviewer",
+    "description": "A choice of an agent's role in the workflow: it reviews cards. Glossary: reviewer."
+  },
+  "agents.workflowRole.reviewerText": {
+    "defaultMessage": "Reviews the builders’ cards and passes or fails them.",
+    "description": "Under the Reviewer choice of an agent's role in the workflow. Glossary: pass / fail (a verdict)."
   }
 }

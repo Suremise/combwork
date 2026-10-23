@@ -308,9 +308,8 @@
   "agents.resume.sub": "{cli}が別のセッションのために実行した{kind}で、独立した会話ではないため、再開できません。",
   "agents.session.unnamed": "セッション{id}",
   "agents.settings.appliesNext": "変更は次に{agent}を起動したときに適用されます。それまで実行中のセッションは今の設定のままです。",
-  "agents.settings.ownWorktree": "専用のワークツリー",
-  "agents.settings.role": "役割",
-  "agents.settings.roleNone": "なし（名前：{name}）",
+  "agents.settings.note": "メモ",
+  "agents.settings.noteNone": "任意：何のためのエージェントか、あなたの言葉で",
   "agents.settings.save": "保存",
   "agents.settings.saving": "保存中…",
   "agents.settings.stopToChange": "— 変更するには{agent}を停止してください",
@@ -329,5 +328,12 @@
   "agents.tested.older": "テスト済みのバージョンより古いため、更新をおすすめします。",
   "agents.tested.summary": "テスト済み：{tested} · インストール済み：{installed}",
   "agents.tested.summaryUnknown": "テスト済み：{tested} · インストール済みのバージョンは不明",
-  "agents.tested.unknown": "インストールされているバージョンがわからないため、テスト済みのバージョンと比較できません。"
+  "agents.tested.unknown": "インストールされているバージョンがわからないため、テスト済みのバージョンと比較できません。",
+  "agents.workflowRole.builder": "ビルダー",
+  "agents.workflowRole.builderText": "カードに取り組み、レビューに送ります。",
+  "agents.workflowRole.either": "どちらも",
+  "agents.workflowRole.eitherText": "作業もレビューもしますが、自分の作業はレビューしません。",
+  "agents.workflowRole.label": "ワークフローでの役割",
+  "agents.workflowRole.reviewer": "レビュアー",
+  "agents.workflowRole.reviewerText": "ビルダーのカードをレビューし、合格か不合格かを判定します。"
 }

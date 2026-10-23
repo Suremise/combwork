@@ -41,6 +41,18 @@ describe('the session contract', () => {
     for (const n of [agent, assistant, controlRules('agents')].flatMap(skillsNamed)) expect(catalog.has(n), n).toBe(true)
   })
 
+  it('names only the skills delivered: one switched off leaves the contract, the rest stay (#1431)', () => {
+    const named = (text: string): string[] => [...catalog.keys()].filter((n) => n.includes('-') && new RegExp(`\\b${n}\\b`).test(text))
+    const all = named(agent)
+    for (const off of all) {
+      const without = hiveInstructions('web', 'agent', true, new Set([off]))
+      expect(named(without), off).toEqual(all.filter((n) => n !== off))
+      // The board rules stay whatever is switched off.
+      expect(without, off).toMatch(/Board rules, whatever a skill says, or if it is missing/)
+    }
+    expect(named(hiveInstructions('web', 'agent', true, new Set(all)))).toEqual([])
+  })
+
   it('keeps the board boundaries a session needs when its skills are missing', () => {
     expect(agent).toMatch(/or if it is missing/)
     expect(agent).toMatch(/Working on a card: move it to doing first \(also when it is back from review\), then to review with a comment saying what you did/)

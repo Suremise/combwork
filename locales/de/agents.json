@@ -308,9 +308,8 @@
   "agents.resume.sub": "Dies war ein Hilfslauf ({kind}) von {cli} für eine andere Sitzung, keine eigene Unterhaltung: Er lässt sich nicht fortsetzen.",
   "agents.session.unnamed": "Sitzung {id}",
   "agents.settings.appliesNext": "Änderungen gelten ab dem nächsten Start von {agent}; die laufende Sitzung behält bis dahin ihre Einstellungen.",
-  "agents.settings.ownWorktree": "Eigener Worktree",
-  "agents.settings.role": "Rolle",
-  "agents.settings.roleNone": "Keine (Name: {name})",
+  "agents.settings.note": "Notiz",
+  "agents.settings.noteNone": "Optional: wofür er da ist, in deinen Worten",
   "agents.settings.save": "Speichern",
   "agents.settings.saving": "Wird gespeichert…",
   "agents.settings.stopToChange": "– zum Ändern {agent} stoppen",
@@ -329,5 +328,12 @@
   "agents.tested.older": "Älter als getestet; ein Update ist ratsam.",
   "agents.tested.summary": "Getestet mit {tested} · installiert {installed}",
   "agents.tested.summaryUnknown": "Getestet mit {tested} · installierte Version unbekannt",
-  "agents.tested.unknown": "Hive konnte nicht feststellen, welche Version installiert ist, und kann sie daher nicht mit der getesteten vergleichen."
+  "agents.tested.unknown": "Hive konnte nicht feststellen, welche Version installiert ist, und kann sie daher nicht mit der getesteten vergleichen.",
+  "agents.workflowRole.builder": "Bearbeiter",
+  "agents.workflowRole.builderText": "Arbeitet an Karten und gibt sie ins Review.",
+  "agents.workflowRole.either": "Beides",
+  "agents.workflowRole.eitherText": "Bearbeitet oder prüft, aber nie die eigene Arbeit.",
+  "agents.workflowRole.label": "Rolle im Workflow",
+  "agents.workflowRole.reviewer": "Reviewer",
+  "agents.workflowRole.reviewerText": "Prüft die Karten der Bearbeiter: bestanden oder nicht bestanden."
 }

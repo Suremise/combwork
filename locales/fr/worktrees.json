@@ -1,5 +1,6 @@
 {
   "worktrees.agent.badPlacement": "Impossible de placer les volets ainsi dans cette disposition.",
+  "worktrees.agent.badWorkflowRole": "Un rôle dans le flux de travail est builder, reviewer ou either.",
   "worktrees.agent.chooseMove": "Choisis où déplacer l’agent.",
   "worktrees.agent.chooseTree": "Choisis un worktree.",
   "worktrees.agent.detached": "Ce worktree n’est sur aucune branche (HEAD détachée).",

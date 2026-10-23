@@ -4,6 +4,7 @@ import type { ProjectInfo, TaskCard } from '@shared/types'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { agentCardText, agentRowsText, laneOrder, type TableLane } from '@shared/agentTable'
 import { watchText } from '@shared/agentWatch'
+import { agentWorkflowRole, WORKFLOW_ROLE_TEXT } from '@shared/workflow/roles'
 import { batchOutcome, removeWorktreeText, type BatchKind, type BatchWorktree } from '@shared/startAll'
 import { statusText } from './ui'
 import { ItemTable, type ItemGroup, type ItemRow } from './ItemTable'
@@ -41,7 +42,7 @@ export function agentsText(p: ProjectInfo, tasks: TaskCard[], lanes: readonly Ta
 export interface AgentColumn {
   /** Its heading: a message (#799), or text a caller hasn't converted yet. */
   label: string | Msg
-  kind?: 'card' | 'short'
+  kind?: 'card' | 'short' | 'role'
   /** Its cell in the plain text, a message with the cell as {value} ("card {value}"); none: the cell as it is. */
   cell?: Msg
 }
@@ -112,7 +113,7 @@ export function AgentRowsTable({ columns, rows, className, bodyClassName }: { co
   return (
     <ItemTable
       first={msg({ id: 'panes.table.agent', defaultMessage: 'Agent', description: "An agents table's first column heading: the agent's name and status dot." })}
-      columns={columns.map((c) => ({ label: c.label, className: cx('agents-table-cut', c.kind === 'card' && 'agents-table-card', c.kind === 'short' && 'agents-table-short') }))}
+      columns={columns.map((c) => ({ label: c.label, className: cx('agents-table-cut', c.kind === 'card' && 'agents-table-card', (c.kind === 'short' || c.kind === 'role') && 'agents-table-short', c.kind === 'role' && 'agents-table-role') }))}
       rows={items}
       className={cx('agents-table', `cols-${columns.length + 1}`, agents > AGENT_LIMIT_DEFAULT && 'many', className)}
       bodyClassName={bodyClassName}
@@ -132,6 +133,12 @@ export const WAITING_COLUMN: AgentColumn = {
   label: msg({ id: 'panes.table.waiting', defaultMessage: 'Waiting for', description: "An agents table's column heading: what a watching agent waits for (cards, agents, lanes)." }),
   cell: msg({ id: 'panes.table.waitingPrefix', defaultMessage: 'waiting for {value}', description: "What a watching agent waits for, in a line of text (screen readers, a dialog's copy): {value} is what (\"#12 → Review\", \"B6 to finish\"). Lower case." })
 }
+/** An agent's role in the workflow (#1430): builder, reviewer or either. */
+export const ROLE_COLUMN: AgentColumn = {
+  label: msg({ id: 'panes.table.role', defaultMessage: 'Role', description: "An agents table's column heading: the agent's role in the workflow (Builder, Reviewer, Either). Glossary: workflow role." }),
+  kind: 'role',
+  cell: msg({ id: 'panes.table.rolePrefix', defaultMessage: 'role {value}', description: "The agent's role in the workflow in a line of text (screen readers): {value} is its name (\"Reviewer\"). Lower case." })
+}
 export const PROJECT_COLUMN: AgentColumn = {
   label: msg({ id: 'panes.table.project', defaultMessage: 'Project', description: "An agents table's column heading: the agent's project." }),
   kind: 'short',
@@ -139,23 +146,24 @@ export const PROJECT_COLUMN: AgentColumn = {
 }
 
 /**
- * A project's agents (#529): Agent · State · Card · Waiting for (only when one waits), in lane order (a builder, then
- * its reviewer). `only`: just these agents (ids), as Stop All lists the running ones (#572).
+ * A project's agents (#529): Agent · Role (`role`: the hover's, #1430) · State · Card · Waiting for (only when one
+ * waits), in lane order (a builder, then its reviewer). `only`: just these agents (ids), as Stop All lists the running ones (#572).
  */
-export function projectAgentsData(p: ProjectInfo, tasks: readonly TaskCard[], lanes: readonly TableLane[], only?: readonly string[]): AgentTableData {
+export function projectAgentsData(p: ProjectInfo, tasks: readonly TaskCard[], lanes: readonly TableLane[], only?: readonly string[], opts: { role?: boolean } = {}): AgentTableData {
   const rows = laneOrder(p.agents, lanes)
     .filter((a) => !only || only.includes(a.id))
     .map((a) => ({ a, ...agentRow(p, a, tasks) }))
   const waits = rows.some((r) => r.waits)
+  const role = !!opts.role
   return {
-    columns: [STATE_COLUMN, CARD_COLUMN, ...(waits ? [WAITING_COLUMN] : [])],
-    rows: rows.map(({ a, state, card, waits: w }) => ({ key: a.id, name: a.name, dot: a.live?.status ?? 'stopped', off: !a.live, cells: [{ text: state }, { text: card }, ...(waits ? [{ text: w }] : [])] }))
+    columns: [...(role ? [ROLE_COLUMN] : []), STATE_COLUMN, CARD_COLUMN, ...(waits ? [WAITING_COLUMN] : [])],
+    rows: rows.map(({ a, state, card, waits: w }) => ({ key: a.id, name: a.name, dot: a.live?.status ?? 'stopped', off: !a.live, cells: [...(role ? [{ text: tr(WORKFLOW_ROLE_TEXT[agentWorkflowRole(a)].name) }] : []), { text: state }, { text: card }, ...(waits ? [{ text: w }] : [])] }))
   }
 }
 
-/** A project's agents as a table (#529), for a tooltip (`projectAgentsData`). */
+/** A project's agents as a table (#529), for a tooltip (`projectAgentsData`), with their roles in the workflow (#1430). */
 export function AgentsTable({ project, tasks, lanes }: { project: ProjectInfo; tasks: readonly TaskCard[]; lanes: readonly TableLane[] }) {
-  return <AgentRowsTable {...projectAgentsData(project, tasks, lanes)} />
+  return <AgentRowsTable {...projectAgentsData(project, tasks, lanes, undefined, { role: true })} />
 }
 
 /**

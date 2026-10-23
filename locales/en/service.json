@@ -643,6 +643,14 @@
     "defaultMessage": "{task} exited with code {code}",
     "description": "A notification: a coding agent CLI's task ({task}: \"Codex install\") ended with the exit code {code}."
   },
+  "service.templates.v09": {
+    "defaultMessage": "1.0 templates don’t pin agents to worktrees, so the Hive templates take their place. A copy of {n, plural, one {the template} other {the # templates}} is kept with the 0.9 board backup.",
+    "description": "A quiet notice once after the upgrade to Hive 1.0: the {n} agent templates saved in 0.9 aren't used; a copy of each was put in the folder of the board's 0.9 backup. \"The Hive templates\" are Hive's own templates (the Templates view's Hive group)."
+  },
+  "service.templates.v09Title": {
+    "defaultMessage": "Your 0.9 agent templates aren’t used in 1.0",
+    "description": "A quiet notice's title, once after the upgrade to Hive 1.0: the agent templates saved in 0.9 aren't listed or loaded any more (a copy is kept)."
+  },
   "service.transcripts.busy": {
     "defaultMessage": "This session is being archived or deleted. Try again in a moment.",
     "description": "An error opening a session's conversation in the Sessions tab while it is being archived or deleted."

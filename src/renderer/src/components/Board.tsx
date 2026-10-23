@@ -904,17 +904,20 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
                 </button>
               </Tooltip>
               <ColumnLabel name={name} description={description} />
-              <span className="count">{list.length}</span>
-              <span className="grow" />
-              {col.id === 'todo' && <IconButton icon="add" title={readOnly ?? tr(NEW_CARD_TIP)} disabled={!!readOnly} onClick={() => set({ taskOpen: { project: project ?? '' } })} />}
-              <IconButton
-                icon="ellipsis"
-                title={tr(msg({ id: 'board.columns.more', defaultMessage: '{column}: more', description: "Tooltip on a board column's ⋯ button: opens its menu. {column} is its name." }), { column: name })}
-                onClick={(e) => {
-                  const b = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                  headerMenu.openAt(b.left, b.bottom, columnMenu(col, list))
-                }}
-              />
+              {/* The count, + and ⋯ wrap together (#1490): beside the name while it fits, else a row of their own under it. */}
+              <span className="board-column-tools">
+                <span className="count">{list.length}</span>
+                <span className="grow" />
+                {col.id === 'todo' && <IconButton icon="add" title={readOnly ?? tr(NEW_CARD_TIP)} disabled={!!readOnly} onClick={() => set({ taskOpen: { project: project ?? '' } })} />}
+                <IconButton
+                  icon="ellipsis"
+                  title={tr(msg({ id: 'board.columns.more', defaultMessage: '{column}: more', description: "Tooltip on a board column's ⋯ button: opens its menu. {column} is its name." }), { column: name })}
+                  onClick={(e) => {
+                    const b = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                    headerMenu.openAt(b.left, b.bottom, columnMenu(col, list))
+                  }}
+                />
+              </span>
             </div>
             <div className="board-column-body">
               {list.map((c) => (
@@ -957,7 +960,7 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
         // A category with several stages (Approved with Merging): one heading over its stages' columns (#1420).
         const open = g.columns.filter((c) => !fold.columns?.includes(c.id)).length
         return (
-          <div key={g.category} className={cx('board-category', !open && 'collapsed')} data-category={g.category} style={{ flexGrow: open, ...(colored ? ({ '--col': columnColor(colors, g.category) } as React.CSSProperties) : {}) }}>
+          <div key={g.category} className={cx('board-category', !open && 'collapsed')} data-category={g.category} style={{ flexGrow: open, ...({ '--stages': g.columns.length, '--folded': g.columns.length - open } as React.CSSProperties), ...(colored ? ({ '--col': columnColor(colors, g.category) } as React.CSSProperties) : {}) }}>
             <div className="board-category-head">{tr(COLUMN_TEXT[g.category].label)}</div>
             <div className="board-category-columns">{g.columns.map(column)}</div>
           </div>

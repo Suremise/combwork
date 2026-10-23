@@ -3,6 +3,9 @@ import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestio
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
   ArchiveBatch,
+  CopyView,
+  SlotTestOp,
+  SlotView,
   BoardState,
   SetAsideCard,
   ArchiveRequest,
@@ -33,7 +36,6 @@ import type {
   AgentBranchStatus,
   AgentDef,
   TemplateLoadPlan,
-  OldWorktreeOutcome,
   AgentPatch,
   CleanupItem,
   CleanupOptions,
@@ -115,7 +117,7 @@ import type { PlatformId } from './platform/descriptors'
 import type { MetricsQuery, MetricsReport } from './metrics'
 import type { Fact } from './workflow/facts'
 import type { Artifact, CompareScope, ImportResult, KeptEntry } from './benchmark'
-import type { AgentTemplate, TemplateDeleted, TemplateDest, TemplateEntry, TemplateRef, TemplateScope } from './templates'
+import type { AgentTemplate, TemplateDest, TemplateEntry, TemplateRef, TemplateScope } from './templates'
 import type { ProjectPref, ProjectPrefValue } from './uiPrefs'
 import type { TipsChange, TipsState } from './tips'
 import type { AdvancedState } from './advanced'
@@ -244,6 +246,8 @@ export interface HiveRequests {
   'watch:cancel': (projectPath: string, agentId: string) => boolean
   /** Cancels the messages waiting to be offered to an agent (#530, #647): how many there were. */
   'session:cancelMessages': (projectPath: string, agentId: string) => number
+  /** Deliver Now (#1432): the line telling an agent of what waits in its inbox, typed once. Whether it was typed. */
+  'session:deliverNow': (projectPath: string, agentId: string) => boolean
   /** Kept comparisons (Performance → Compare), for a scope only: a project's page sees its own project's. */
   'benchmarks:list': (scope: CompareScope) => { entries: KeptEntry[]; base: string | null; run: string | null; notice?: string }
   /** Imports a benchmark or export (an open dialog; or, with `token`, a file an earlier answer asked about). Null if cancelled. */
@@ -320,6 +324,12 @@ export interface HiveRequests {
    * show). Each change comes as a `queue-changed` event.
    */
   'queue:list': (projectPath: string, target?: string) => QueueView[]
+  /** The project's slots (#1429, SPEC §16.10.1), each with its open lease. */
+  'slots:list': (projectPath: string) => SlotView[]
+  /** The project's review and check copies (#1435, SPEC §16.10.5), each with its lease not freed. */
+  'copies:list': (projectPath: string) => CopyView[]
+  /** Test copies only (unpackaged): lend, release, tidy or remove in the project's slot pool, as #1438 and #1447 will. */
+  'slots:test': (projectPath: string, op: SlotTestOp) => unknown
   /** A target's queue history (#1357, the Git tab's Merge queue section): its latest 50 outcomes, newest first. */
   'queue:history': (projectPath: string, target: string) => QueueRecent[]
   /** The card an agent's worktree branch is for, when Hive merges it (#1357, the Merge dialog), and where it stands in the queue. */
@@ -526,17 +536,17 @@ export interface HiveRequests {
   'agents:swap': (projectPath: string, agentId: string, otherId: string) => string[]
   /** Saves where the panes are in one layout (#762): its cells page after page, an agent's id or null; returns them as saved. */
   'agents:place': (projectPath: string, layout: SessionLayout, cells: (string | null)[]) => (string | null)[]
-  /** Agent templates (#126): the workspace's and the project's. */
+  /** Agent templates (#126): Hive's own (#1436), the workspace's and the project's. */
   'templates:list': (projectPath: string) => TemplateEntry[]
   /** Saves the project's agents and layout; a name already there is replaced only with `overwrite` (else `exists`). */
   'templates:save': (projectPath: string, scope: TemplateScope, name: string, overwrite: boolean) => { saved: TemplateEntry } | { exists: string }
   /** What loading a template would do, and what stops it now. `from`: the project a project's template is kept in, if not this one. */
   'templates:plan': (projectPath: string, scope: TemplateScope, file: string, from?: string, names?: string[]) => TemplateLoadPlan
   /** Replaces the project's agents and layout with a template's; `expected` is the agents' ids as the user saw them. */
-  'templates:load': (projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, removeOld?: { paths: string[]; mergedInto: string | null }, names?: string[]) =>{ created: string[]; removed: string[]; oldWorktrees: OldWorktreeOutcome[] }
+  'templates:load': (projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[]) => { created: string[]; removed: string[] }
   /** Adds one agent of a template (the `index`-th), the others left alone. */
-  'templates:addAgent': (projectPath: string, scope: TemplateScope, file: string, index: number, from?: string) => AgentDef & { reused?: true }
-  /** Every template of the workspace (#127, the Templates view): the workspace's, then each project's. */
+  'templates:addAgent': (projectPath: string, scope: TemplateScope, file: string, index: number, from?: string) => AgentDef
+  /** Every template of the workspace (#127, the Templates view): Hive's own (#1436), the workspace's, then each project's. */
   'templates:all': () => TemplateEntry[]
   /** Renames a template where it is kept (another of that name there refuses it). */
   'templates:rename': (ref: TemplateRef, name: string) => TemplateEntry
@@ -544,9 +554,8 @@ export interface HiveRequests {
   'templates:update': (ref: TemplateRef, edited: Pick<AgentTemplate, 'name' | 'description' | 'layout' | 'agents'>, savedAt: string | null) => TemplateEntry
   /** Copies a template into the workspace or a project; a name taken there gets a number ("Pair (2)"). */
   'templates:duplicate': (ref: TemplateRef, to: TemplateDest) => TemplateEntry
-  /** Deletes a template (to the Recycle Bin). */
-  /** Deletes it; says the unused worktrees its worktree agents left, per project (#353). */
-  'templates:delete': (ref: TemplateRef) => TemplateDeleted
+  /** Deletes a template (to the Recycle Bin); Hive's own can't be (#1436). */
+  'templates:delete': (ref: TemplateRef) => void
   /** Exports a template to a file the user chooses (a save dialog); its path, or null if cancelled. */
   'templates:export': (ref: TemplateRef) => string | null
   /** Picks a file to import (an open dialog) and checks it: what it holds, refused saying why; null if cancelled. */
@@ -610,6 +619,8 @@ export interface HiveRequests {
   /** Puts back a bundled skill as this version of Hive ships it. */
   'skills:restoreBundled': (name: string) => SkillInfo
   'skills:copyToWorkspace': (skillPath: string) => SkillInfo
+  /** A Hive skill delivered to agents or not (#1431, Skills → Delivered to agents): in the workspace (no project), or one project's. */
+  'skills:setDelivered': (projectPath: string | null, name: string, on: boolean) => void
   'skills:openFolder': () => void
 
   'mcp:list': () => McpServerInfo[]
@@ -687,6 +698,8 @@ export interface HiveRequests {
   'progress:snapshot': () => ProgressSnapshot
   /** Moves a finished or stale run to Recent. */
   'progress:dismiss': (id: string) => void
+  /** Stop for an isolated check (#1435): its check copy's job ended, so its command and all it started end. Whether it was one. */
+  'progress:stop': (id: string) => boolean
   /** The user looked at the Progress panel: the taskbar stops showing a failure in red. */
   'progress:seen': () => void
   /** Opens the log a run reported (a text log or report, in its default app); an error says why it can't. */

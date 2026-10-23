@@ -308,9 +308,8 @@
   "agents.resume.sub": "这是 {cli} 为另一个会话运行的 {kind}，并非独立的对话：无法恢复。",
   "agents.session.unnamed": "会话 {id}",
   "agents.settings.appliesNext": "更改将在 {agent} 下次启动时生效；在此之前，运行中的会话保持原有设置。",
-  "agents.settings.ownWorktree": "独立的工作树",
-  "agents.settings.role": "角色",
-  "agents.settings.roleNone": "无（名称：{name}）",
+  "agents.settings.note": "备注",
+  "agents.settings.noteNone": "可选：它的用途，用你自己的话说",
   "agents.settings.save": "保存",
   "agents.settings.saving": "正在保存…",
   "agents.settings.stopToChange": "——停止 {agent} 后才能更改",
@@ -329,5 +328,12 @@
   "agents.tested.older": "低于测试所用版本，建议更新。",
   "agents.tested.summary": "测试所用版本 {tested} · 已安装 {installed}",
   "agents.tested.summaryUnknown": "测试所用版本 {tested} · 已安装版本未知",
-  "agents.tested.unknown": "Hive 无法确定已安装的版本，因此无法与测试所用版本比较。"
+  "agents.tested.unknown": "Hive 无法确定已安装的版本，因此无法与测试所用版本比较。",
+  "agents.workflowRole.builder": "构建者",
+  "agents.workflowRole.builderText": "处理卡片并将其送去评审。",
+  "agents.workflowRole.either": "均可",
+  "agents.workflowRole.eitherText": "可构建也可评审，但从不评审自己的工作。",
+  "agents.workflowRole.label": "工作流程中的角色",
+  "agents.workflowRole.reviewer": "评审者",
+  "agents.workflowRole.reviewerText": "评审构建者的卡片，给出通过或未通过。"
 }

@@ -157,6 +157,7 @@
   "git.queue.none": "Keine Merge-Warteschlange. Wenn der Workflow des Projekts Hive seine Karten mergen lässt (Versionsverwaltung → Workflow: Wer mergt), erscheint hier die Warteschlange jedes Ziel-Branches mit ihrem Verlauf.",
   "git.queue.open": "{card} öffnen",
   "git.queue.outcome": "Ergebnis",
+  "git.queue.reading": "Merge-Warteschlangen werden gelesen…",
   "git.queue.region": "Merge-Warteschlangen",
   "git.queue.returned": "Zurückgegeben: {why}",
   "git.queue.revision": "Revision",

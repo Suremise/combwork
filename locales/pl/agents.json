@@ -308,9 +308,8 @@
   "agents.resume.sub": "To był {kind} uruchomiony przez {cli} dla innej sesji, a nie osobna rozmowa: nie da się go wznowić.",
   "agents.session.unnamed": "Sesja {id}",
   "agents.settings.appliesNext": "Zmiany zadziałają przy następnym uruchomieniu agenta {agent}; do tego czasu działająca sesja zachowuje swoje ustawienia.",
-  "agents.settings.ownWorktree": "Własny worktree",
-  "agents.settings.role": "Rola",
-  "agents.settings.roleNone": "Brak (jego nazwa: {name})",
+  "agents.settings.note": "Notatka",
+  "agents.settings.noteNone": "Opcjonalnie: do czego służy, własnymi słowami",
   "agents.settings.save": "Zapisz",
   "agents.settings.saving": "Zapisywanie…",
   "agents.settings.stopToChange": "– zatrzymaj agenta {agent}, aby to zmienić",
@@ -329,5 +328,12 @@
   "agents.tested.older": "Starsza niż testowana; rozważ aktualizację.",
   "agents.tested.summary": "Testowano z {tested} · zainstalowano {installed}",
   "agents.tested.summaryUnknown": "Testowano z {tested} · zainstalowana wersja nieznana",
-  "agents.tested.unknown": "Hive nie może ustalić, która wersja jest zainstalowana, więc nie może jej porównać z testowaną."
+  "agents.tested.unknown": "Hive nie może ustalić, która wersja jest zainstalowana, więc nie może jej porównać z testowaną.",
+  "agents.workflowRole.builder": "Wykonawca",
+  "agents.workflowRole.builderText": "Pracuje nad kartami i wysyła je do Recenzji.",
+  "agents.workflowRole.either": "Dowolna",
+  "agents.workflowRole.eitherText": "Wykonuje lub recenzuje, ale nigdy nie recenzuje własnej pracy.",
+  "agents.workflowRole.label": "Rola w przepływie pracy",
+  "agents.workflowRole.reviewer": "Recenzent",
+  "agents.workflowRole.reviewerText": "Recenzuje karty wykonawców i ocenia je jako zaliczone lub niezaliczone."
 }

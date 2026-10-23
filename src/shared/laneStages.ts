@@ -65,22 +65,26 @@ export function legendSources(lanes: readonly { project: string; stages: readonl
   return out
 }
 
+/** Names compared as read (#1496): a translation's no-break space ("A\u00a0fazer") reads as the same name as "A fazer". */
+const sameName = (a: string, b: string): boolean => a.replace(/\s+/g, ' ').trim() === b.replace(/\s+/g, ' ').trim()
+
 /**
  * The lanes' legend (#1421, the Lanes bar's hover): by category, in the order lanes go, each with its colour and pattern
  * and the stages in it of the lanes shown (`legendSources`), by their names (renames included, each name once). A
- * category whose only stage has its own name lists none; none known: its categories alone.
+ * category whose only stage has its own name lists none; none known: its categories alone. Names that differ only in
+ * their spaces are one name.
  */
 export function laneLegend(projects: readonly Pick<ProjectStages, 'stages' | 'names'>[], tr: Tr): LegendGroup[] {
   const shown = new Map<Category, string[]>()
   const add = (c: Category, name: string): void => {
     const list = shown.get(c) ?? []
-    if (!list.includes(name)) list.push(name)
+    if (!list.some((n) => sameName(n, name))) list.push(name)
     shown.set(c, list)
   }
   for (const p of projects) for (const s of STAGE_ORDER.filter((id) => p.stages.some((x) => x.id === id))) add(STAGE_CATEGORY[s], stageName(s, p.names, tr))
   return LEGEND_ORDER.map((c) => {
     const name = columnName(c, tr)
     const stages = shown.get(c) ?? []
-    return { category: c, state: LEGEND_STATE[c], name, stages: stages.length === 1 && stages[0] === name ? [] : stages }
+    return { category: c, state: LEGEND_STATE[c], name, stages: stages.length === 1 && sameName(stages[0], name) ? [] : stages }
   })
 }

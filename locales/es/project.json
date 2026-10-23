@@ -295,6 +295,7 @@
   "project.skills.addLocal": "Agregar una habilidad local para {provider} desde un archivo (.md o .zip)…",
   "project.skills.assistantOnly": "{count, plural, one {# habilidad de Hive es solo para el Hive Assistant, así que no aparece aquí: los agentes de este proyecto no la reciben.} many {# habilidades de Hive son solo para el Hive Assistant, así que no aparecen aquí: los agentes de este proyecto no las reciben.} other {# habilidades de Hive son solo para el Hive Assistant, así que no aparecen aquí: los agentes de este proyecto no las reciben.}}",
   "project.skills.delete": "Eliminar habilidad",
+  "project.skills.deliveredNote": "Cada interruptor indica si los agentes de este proyecto reciben la habilidad (Entregada a los agentes), desde su próxima sesión. Una habilidad desactivada en la vista Habilidades está desactivada en todos los proyectos.",
   "project.skills.editInWorkspace": "Editar en la vista Habilidades del espacio de trabajo (las habilidades de Hive las comparten todos los proyectos)",
   "project.skills.heading": "Habilidades disponibles para los agentes",
   "project.skills.hive": "Hive",

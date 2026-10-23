@@ -3,6 +3,8 @@ import { initLoopWakes } from './loopWakes'
 import { initLoopCheck } from './loopCheck'
 import { initDeliveries } from './deliveries'
 import { initReviewsOnOpen } from './reviewsOnOpen'
+import { initSkillCopies } from './skillCopies'
+import { offNames } from '../shared/skillDelivery'
 import { initInboxNotices } from './inboxNotices'
 import { initDecisionWakes } from './decisionWakes'
 import { initWorkflowNotices } from './workflowNotices'
@@ -52,6 +54,8 @@ import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { releaseQueueRunners } from './workflow/queueRunner'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
+import { startSlots, stopSlots } from './slotsApp'
+import { startCopies, stopCopies } from './copiesApp'
 import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
 import { setQueueLive, setRunsGoing } from './workflow/service'
 import { isOpenRun } from '../shared/progress'
@@ -904,6 +908,8 @@ app.whenReady().then(async () => {
   initLoopCheck()
   initDeliveries()
   initReviewsOnOpen()
+  // Hive's skill copies in folders no session of Hive's works in (#1431), as each workspace opens.
+  initSkillCopies((folder) => sessions.runningIn(folder))
   initInboxNotices()
   initDecisionWakes()
   initWorkflowNotices()
@@ -922,7 +928,9 @@ app.whenReady().then(async () => {
       if (!advanced.get<boolean>(HIVE_GUIDANCE)) return ''
       const project = basename(projectPath)
       const latest = (await handoversFor(workspace, project))[0]
-      return withLatestHandover(hiveInstructions(project, 'agent', wrapsLongCommands(config.settings.general)), latest?.relPath)
+      // Naming only the skills its agents get (#1431).
+      const off = new Set([...offNames(workspace.config.skillDelivery), ...offNames((await workspace.projectConfig(projectPath)).skillDelivery)])
+      return withLatestHandover(hiveInstructions(project, 'agent', wrapsLongCommands(config.settings.general), off), latest?.relPath)
     })
   // The Assistant's state view at each start and after each compaction, while its journal is on (#1032).
   sessions.startContext = async (state, source) => {
@@ -983,6 +991,10 @@ app.whenReady().then(async () => {
   WorkspaceService.closingTasks.add((path) => releaseQueueRunners((r) => !!r.cfg.workspace && r.cfg.workspace.toLowerCase() === path.toLowerCase()))
   // The merge queue (#1348): a host per project and target, started by enqueue actions and as workspaces open.
   startQueueHosts()
+  // The slot pools (#1429): their idle slots tidied every hour.
+  startSlots()
+  // Review and check copies (#1435): returning ones looked at again every 30 s, idle ones tidied every hour.
+  startCopies()
   // The queue's order as agents read it (#1354): this Hive's entry testing now, at its step.
   setQueueLive(queueLive)
   // An agent's branch brought up to date between a lane's cards after a squash merge (#1271, SPEC §16.19.2), once the
@@ -1114,6 +1126,8 @@ app.on('will-quit', () => {
   stopObserving()
   stopReconciling()
   stopQueueHosts()
+  stopSlots()
+  stopCopies()
   flightRecorder.stop()
   advanced.stop()
   destroyTray()
