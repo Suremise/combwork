@@ -35,6 +35,10 @@
 // - While fake-nohooks-<agent> is in CODEX_HOME it sends no hook at all, as when a Codex update broke them (#1336). A
 //   wake it read is answered with the next line of fake-wakes-<agent>.txt there, when there is one. With
 //   FAKE_CODEX_VERSION 0.162.1 or later, a turn draws Codex's Working line as it begins.
+// - "compacting N" (#1514): a turn that compacts its conversation for N seconds first, as Codex's auto-compaction does
+//   at a turn's start, sending no hook meanwhile (no UserPromptSubmit: Hive sees no prompt, as with RR2 on 23 Oct). With
+//   fake-queue-<agent> in CODEX_HOME, a line typed while a turn runs is queued (as Codex queues input) and taken in the
+//   same turn once it has compacted: recorded as a user message, with no UserPromptSubmit; a doorbell read as above.
 const fs = require('fs')
 const path = require('path')
 const { randomUUID } = require('crypto')
@@ -390,6 +394,34 @@ function nextScripted() {
   return first.trim() || null
 }
 
+/** Whether a line typed while a turn runs is queued and taken in it (fake-queue-<agent> in CODEX_HOME, #1514). */
+function queues() {
+  const home = process.env.CODEX_HOME
+  return !!home && fs.existsSync(path.join(home, `fake-queue-${String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_')}`))
+}
+/** Lines typed while a turn ran, queued for it (#1514). */
+const queued = []
+
+/** A user line as Codex records it: the message and the turn's item (#1371). */
+function userLine(text) {
+  fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } }) + '\n')
+  // Its prompt as a turn's item, with the turn's id, as 0.159 records it (#1371: how Hive tells the person's turns).
+  fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'item_completed', turn_id: turnId, item: { type: 'UserMessage', content: [{ type: 'text', text }] } } }) + '\n')
+}
+
+/** The queued lines, taken in the running turn with no UserPromptSubmit (#1514); a doorbell's inbox read and logged. */
+async function takeQueued() {
+  while (queued.length) {
+    const text = queued.shift()
+    userLine(text)
+    if (!isDoorbell(text)) continue
+    const r = await hiveCall('hive_inbox', {})
+    const rows = r.isError ? [] : inboxRows(r.text)
+    if (rows.length && followsNotices()) await hiveCall('hive_inbox', { ack: rows.flatMap((x) => x.ids) })
+    if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-wakes.jsonl'), JSON.stringify({ agent: String(process.env.HIVE_AGENT || 'agent').replace(/[^\w-]/g, '_'), text: rows.map((x) => x.text).join(' '), at: new Date().toISOString(), queued: true }) + '\n')
+  }
+}
+
 /** A prompt: its steps, separated by " then " ("question then review allow"). */
 async function runPrompt(text) {
   busy = true
@@ -401,10 +433,17 @@ async function runPrompt(text) {
   }
   turnId = randomUUID()
   turnRecord('task_started')
-  fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } }) + '\n')
-  // Its prompt as a turn's item, with the turn's id, as 0.159 records it (#1371: how Hive tells the person's turns).
-  fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'item_completed', turn_id: turnId, item: { type: 'UserMessage', content: [{ type: 'text', text }] } } }) + '\n')
-  await hook('UserPromptSubmit', { prompt: text })
+  // Compacting first (#1514): no hook meanwhile, then what was queued is taken in this turn.
+  const compacting = /^compacting (\d+)\b/.exec(text)
+  if (compacting) {
+    await sleep(Number(compacting[1]) * 1000)
+    fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'compacted', payload: { message: '' } }) + '\n')
+    userLine(text)
+    await takeQueued()
+  } else {
+    userLine(text)
+    await hook('UserPromptSubmit', { prompt: text })
+  }
   // Hive's doorbell (#650): it reads its inbox (hive_inbox), as a model does, and acts on what it read (one that follows
   // notices acks it too); what else it read (a wake, a message) is logged in fake-wakes.jsonl in CODEX_HOME.
   if (isDoorbell(text)) {
@@ -495,8 +534,10 @@ process.stdin.on('data', (data) => {
       const text = line.trim()
       line = ''
       if (text && !busy) void runPrompt(text)
+      // Typed while a turn runs (#1514): queued for it, as Codex queues input.
+      else if (text && queues()) queued.push(text)
     } else if (ch === '\x7f' || ch === '\b') line = line.slice(0, -1)
-    else if (ch >= ' ' && !busy) line += ch
+    else if (ch >= ' ' && (!busy || queues())) line += ch
   }
 })
 

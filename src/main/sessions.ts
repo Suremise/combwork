@@ -423,6 +423,12 @@ interface LiveSession {
    * clears it.
    */
   confirming?: symbol
+  /**
+   * The deliveries the line marked not taken (`state.untakenLine`) rang for (#1514 round 1 finding): only one of them read
+   * shows that line was taken; another's read (an older line's, taken long ago) leaves the mark. Empty: a line that rang
+   * for none Hive knows.
+   */
+  untakenFor?: readonly string[]
 }
 
 export interface EffectiveSettings {
@@ -2565,10 +2571,11 @@ class SessionManager {
    * marked in its pane, and the user told once; nothing more is typed into it until the CLI takes it or the user types
    * there. Only for this launch.
    */
-  lineNotTaken(projectPath: string, agentId: string, runId: string, text: string, retried = true): void {
+  lineNotTaken(projectPath: string, agentId: string, runId: string, text: string, retried = true, rangFor: readonly string[] = []): void {
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l || l.state.runId !== runId || l.state.untakenLine) return
     l.state.untakenLine = { since: new Date().toISOString(), text: text.replace(/\s+/g, ' ').trim().slice(0, 160) }
+    l.untakenFor = [...rangFor]
     this.emitState(l.state)
     const label = this.label(l.state)
     const body = retried
@@ -2596,6 +2603,18 @@ class SessionManager {
     }
   }
 
+  /**
+   * A line Hive typed into an agent, marked not taken, was taken after all (#1514): `delivery`, which that very line rang
+   * for, was read in the same launch (Codex takes a line typed while a turn runs as queued input, with no prompt Hive
+   * sees). The mark goes, so its input isn't held for a line its CLI no longer has. Another line's delivery read leaves it
+   * (round 1 finding: an older line's, read late, says nothing of this one).
+   */
+  lineTaken(projectPath: string, agentId: string, runId: string, delivery: string, why: string): void {
+    const l = this.live.get(liveId(projectPath, agentId))
+    if (!l || l.state.runId !== runId || !l.untakenFor?.includes(delivery)) return
+    this.clearUntaken(l, why)
+  }
+
   /** Whether an agent has a line Hive typed that its CLI hasn't taken (#430): nothing more is typed into it meanwhile. */
   lineUntaken(projectPath: string, agentId: string): boolean {
     return !!this.live.get(liveId(projectPath, agentId))?.state.untakenLine
@@ -2621,6 +2640,7 @@ class SessionManager {
     if (!u) return
     log.info(`${userText(this.label(l.state))}: the line Hive typed is no longer waiting (${why}, ${Math.round((Date.now() - Date.parse(u.since)) / 1000)} s after it was marked)`)
     l.state.untakenLine = undefined
+    l.untakenFor = undefined
     this.emitState(l.state)
   }
 

@@ -483,6 +483,26 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
     expect(developerInstructionsOf(rest, null)).toBeNull()
   })
 
+  it("reads 0.164.0's render: past its tools item with the developer role, across its developer messages (#1514's real tier)", async () => {
+    const { developerTexts, developerInstructionsOf } = await import('../src/main/providers/codex/adapter')
+    // 0.164.0's render (probed 23 Oct): its tools, its base instructions, then the developer_instructions first in the
+    // next developer message, then the multi-agent ones; the user's context.
+    const tools = { type: 'additional_tools', id: 'at_1', role: 'developer', tools: [] }
+    const message = (...texts: string[]) => ({ type: 'message', role: 'developer', content: texts.map((text) => ({ type: 'input_text', text })) })
+    const user = { type: 'message', role: 'user', content: [{ type: 'input_text', text: '<environment_context>' }] }
+    const render = (mine: string[]) => [tools, message('You are Codex, …'), message(...mine, '<skills_instructions>', '<permissions instructions>'), message('<multi_agent_role>'), user]
+    expect(developerTexts(render(['USER-ONLY']))).toEqual(['You are Codex, …', 'USER-ONLY', '<skills_instructions>', '<permissions instructions>', '<multi_agent_role>'])
+    expect(developerInstructionsOf(developerTexts(render(['USER-ONLY'])), developerTexts(render([])))).toBe('USER-ONLY')
+    expect(developerInstructionsOf(developerTexts(render([])), developerTexts(render([])))).toBe('')
+    // 0.163.0's: the one developer message, the value in front, no type needed.
+    expect(developerInstructionsOf(developerTexts([{ role: 'developer', content: [{ text: 'Mine.' }, { text: '<skills>' }] }]), developerTexts([{ role: 'developer', content: [{ text: '<skills>' }] }]))).toBe('Mine.')
+    // One text more but the rest not the same: no answer.
+    expect(developerInstructionsOf(['a', 'MINE', 'b', 'c'], ['a', 'b', 'd'])).toBeNull()
+    // No developer message: no texts; not a list: no answer.
+    expect(developerTexts([tools, user])).toEqual([])
+    expect(developerTexts({})).toBeNull()
+  })
+
   it("Codex: Hive's guidance after the developer_instructions Codex renders for the session's own arguments, never in their place", async () => {
     const fake = join(__dirname, 'e2e', 'fake-codex', 'fake-codex.cmd')
     // A Codex home of this test's own.
