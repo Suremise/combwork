@@ -11571,6 +11571,83 @@ button.progress-run-show:focus-visible {
 .vc-switch .caution {
   color: var(--warning);
 }
+/* "How do you work?" (#1423): the presets as choices, the one shown previewed, then Choose, Customise… and Not Now. */
+.vc-step {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 14px 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-elevated, var(--bg));
+  flex-shrink: 0;
+  min-width: 0;
+  max-height: 45vh;
+  overflow-y: auto;
+}
+.vc-step-head h3 {
+  margin: 0 0 2px;
+  font-size: 14px;
+}
+.vc-step-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+.vc-step-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 10px;
+  text-align: left;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+.vc-step-preset:hover {
+  border-color: var(--border);
+}
+.vc-step-preset.active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.vc-step-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.vc-step-tag {
+  font-size: 11px;
+  font-weight: normal;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
+}
+.vc-step-why {
+  margin: 0;
+}
+.vc-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.vc-step-details {
+  margin-left: auto;
+  font-size: 12px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--info);
+  cursor: pointer;
+}
 .git-head-status {
   font-size: 12px;
   white-space: nowrap;

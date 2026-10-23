@@ -1084,6 +1084,9 @@ export class WorkspaceService {
   async projectInfo(projectPath: string, gen = this.generation, scope?: object): Promise<ProjectInfo> {
     const active = new Set(this.activeNames())
     const ticket = ++this.rootTickets
+    // A folder found since the workspace opened is made a project as opening makes one (#1423): its platform recorded
+    // with its project.json, so it counts as made by 1.0 (it asks "How do you work?"), not as one from before.
+    if (!this.isAssistantHome(projectPath) && !existsSync(join(projectPath, HIVE_DIR, 'project.json'))) await this.ensureProject(projectPath).catch((e) => log.warn(`ensureProject ${userText(projectPath)}`, e))
     const cfg = await this.projectConfig(projectPath)
     this.registerRoots(projectPath, cfg, gen, ticket)
     const { live, restartNeeded, agents } = await WorkspaceService.liveProvider(projectPath, cfg, scope)

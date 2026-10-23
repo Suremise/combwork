@@ -1,0 +1,174 @@
+// "How do you work? Solo / Pair / Team" (#1423, SPEC §16.3.5), the Assistant off, no CLI started:
+// - a Git folder found in the workspace with a builder and a reviewer: the notice names it; Choose… opens its Version
+//   Control tab at the step, Git in the header, Pair suggested; Choose asks once (nothing in flight) and saves Pair, and
+//   the header reads "Workflow: Git · Pair";
+// - the switch sequence: to None, None's step (Git's answer doesn't stop it); Not now; a folder found meanwhile gets the
+//   notice, Not now; Hive restarted: no step for None and no notice; back to Git, Pair restored and no step; to None
+//   again, its Not now respected;
+// - New Project (a folder with no version control): its tab opens at None's step, with no notice; Customise… fills the
+//   Workflow section with the preset, not saved;
+// - an upgraded workspace (cards from before 1.0, options the upgrade wrote): no step and no notice, only the old
+//   presets notice.
+// Screenshots of the step and the notice, light and dark, English and French. Dev build, throwaway profile and workspaces.
+const lib = require('./lib.cjs')
+const fs = require('fs')
+const path = require('path')
+const { DatabaseSync } = require('node:sqlite')
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
+const HUNG_MS = 20000
+
+const userData = path.join(lib.WORK, 'presetstep-profile')
+const ws = path.join(lib.WORK, 'presetstep-ws')
+const alpha = path.join(ws, 'alpha')
+const found = path.join(ws, 'found')
+const upgradedWs = path.join(lib.WORK, 'presetstep-upgraded')
+const old = path.join(upgradedWs, 'old')
+const shots = path.join(lib.WORK, 'presetstep-shots')
+let failed = 0
+const check = (name, ok, extra = '') => {
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
+}
+const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
+
+;(async () => {
+  for (const d of [userData, ws, upgradedWs, shots]) fs.rmSync(d, { recursive: true, force: true })
+  fs.mkdirSync(shots, { recursive: true })
+  // A Git folder put in the workspace with its agents, as one copied in or added by the Assistant: no workflow yet.
+  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'Builder' }, { id: 'r1', name: 'Reviewer' }] }))
+  // An upgraded workspace: its project kept today's way of working (the options the upgrade wrote, no preset).
+  lib.gitProject(old, { 'o.txt': 'o\n', '.gitignore': '.hive/\n' })
+  fs.mkdirSync(path.join(old, '.hive'), { recursive: true })
+  fs.writeFileSync(path.join(old, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [], workflow: { platform: 'git', preset: null, options: { review: 'none', finish: 'notChecked', folder: 'project' } } }))
+
+  let { app, page } = await lib.launch({ userData, viewport: { width: 1400, height: 900 } })
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  try {
+    page.on('pageerror', (e) => check('no page errors', false, e.message))
+    const text = async (loc) => ((await loc.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ').trim()
+    const stepEl = () => page.locator('[data-preset-step]')
+    const notice = () => page.locator('[data-step-notice]')
+    const head = () => page.locator('[data-vc-head]')
+    const dialog = () => page.locator('.dialog')
+    const toTab = async (name) => {
+      if (!(await page.getByText(name, { exact: true }).first().isVisible().catch(() => false))) await page.getByRole('button', { name: 'Projects' }).click()
+      await page.getByText(name, { exact: true }).first().click()
+      await page.locator('.tabs .tab', { hasText: 'Version Control' }).first().click()
+      await lib.until(async () => (await head().count()) === 1, HUNG_MS)
+    }
+    const switchTo = async (to) => {
+      await head().locator(`[data-platform="${to}"]`).click()
+      await dialog().getByRole('button', { name: 'Switch', exact: true }).click()
+      return !!(await lib.until(async () => (await dialog().count()) === 0 && (await head().locator(`[data-platform="${to}"][aria-checked="true"]`).count()) === 1, HUNG_MS))
+    }
+    const shoot = async (loc, name) => {
+      await page.mouse.move(5, 5)
+      for (const theme of ['dark', 'light']) {
+        await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+        await loc.screenshot({ path: path.join(shots, `presetstep-${name}-${theme}.png`) })
+      }
+      await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    }
+    const base = (await inv('app:info')).language
+    const dir = path.join(lib.ROOT, 'locales', 'fr')
+    const french = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+
+    // --- A Git folder found in the workspace: the notice, then the step.
+    await lib.openWorkspace(inv, page, ws)
+    check('the notice names the project found', !!(await lib.until(async () => (await text(notice())).startsWith('alpha was added: how do you work?'), HUNG_MS)), await text(notice()))
+    check('…and no options were applied to it', projectJson(alpha).workflow === undefined)
+    await shoot(notice(), 'notice')
+    await speak({ ...base, code: 'fr', locale: 'fr', messages: french })
+    await lib.until(async () => !(await text(notice())).startsWith('alpha was added'), HUNG_MS)
+    await shoot(notice(), 'notice-fr')
+    await speak(base)
+    await lib.until(async () => (await text(notice())).startsWith('alpha was added'), HUNG_MS)
+    await notice().getByRole('button', { name: 'Choose…' }).click()
+    check('Choose… opens its Version Control tab at the step: Git in the header', !!(await lib.until(async () => (await stepEl().getAttribute('data-preset-step').catch(() => null)) === 'git' && (await head().locator('[data-platform="git"][aria-checked="true"]').count()) === 1, HUNG_MS)))
+    check('…and the notice goes', !!(await lib.until(async () => (await notice().count()) === 0, HUNG_MS)))
+    check('Pair is suggested for a builder and a reviewer, and shown', (await stepEl().locator('[data-preset="pair"] .vc-step-tag').count()) === 1 && (await stepEl().locator('[data-preset="pair"]').getAttribute('aria-checked')) === 'true' && (await text(stepEl().locator('.vc-step-why'))) === 'Suggested for a builder and a reviewer.')
+    check('compact: the presets and the buttons, the preview on request', (await stepEl().locator('.workflow-preview').count()) === 0)
+    await shoot(stepEl(), 'step-git')
+    await stepEl().locator('[data-action="step-details"]').click()
+    check('…and, on request, what it sets and why', !!(await lib.until(async () => (await stepEl().locator('.workflow-preview[data-preview="pair"] li').count()) > 3, HUNG_MS)))
+    check('nothing applied yet', projectJson(alpha).workflow === undefined)
+    await shoot(stepEl(), 'step-git-details')
+    await stepEl().locator('[data-action="step-details"]').click()
+    await lib.until(async () => (await stepEl().locator('.workflow-preview').count()) === 0, HUNG_MS)
+    await speak({ ...base, code: 'fr', locale: 'fr', messages: french })
+    await lib.until(async () => (await text(stepEl().locator('h3'))) !== 'How do you work?', HUNG_MS)
+    await shoot(stepEl(), 'step-git-fr')
+    await speak(base)
+    await lib.until(async () => (await text(stepEl().locator('h3'))) === 'How do you work?', HUNG_MS)
+    await stepEl().locator('[data-action="step-choose"]').click()
+    check('Choose asks once: nothing is in flight', !!(await lib.until(async () => /Nothing is in flight yet/.test(await text(dialog())), HUNG_MS)), await text(dialog()))
+    await dialog().getByRole('button', { name: 'Use Pair' }).click()
+    check('Pair saved, the step gone, and the header reads "Workflow: Git · Pair"', !!(await lib.until(async () => (await stepEl().count()) === 0 && (await text(head().locator('[data-action="vc-workflow"]'))) === 'Workflow: Git · Pair', HUNG_MS)) && projectJson(alpha).workflow?.preset === 'pair' && projectJson(alpha).workflow?.presetAsked === 'chosen', JSON.stringify(projectJson(alpha).workflow))
+
+    // --- The switch sequence.
+    check('switched to None', await switchTo('none'))
+    check("None's step is offered: Git's answer doesn't stop it", !!(await lib.until(async () => (await stepEl().getAttribute('data-preset-step').catch(() => null)) === 'none', HUNG_MS)))
+    check('…with no notice: the step is in front of the user', (await notice().count()) === 0)
+    await shoot(stepEl(), 'step-none')
+    await stepEl().locator('[data-action="step-notnow"]').click()
+    check('Not now: the step goes, no preset chosen', !!(await lib.until(async () => (await stepEl().count()) === 0 && (await text(head().locator('[data-action="vc-workflow"]'))) === 'Workflow: None · no preset chosen', HUNG_MS)) && projectJson(alpha).workflow?.presetAsked === 'notNow' && Object.keys(projectJson(alpha).workflow?.options ?? {}).length === 0)
+    // A folder found while the workspace is open: the notice; Not now.
+    fs.mkdirSync(found, { recursive: true })
+    fs.writeFileSync(path.join(found, 'notes.md'), '# Found\n')
+    await inv('workspace:refresh')
+    check('a folder found on reading the workspace gets the notice', !!(await lib.until(async () => (await text(notice())).startsWith('found was added'), HUNG_MS)), await text(notice()))
+    await notice().getByRole('button', { name: 'Not Now' }).click()
+    check('Not now: the notice goes', !!(await lib.until(async () => (await notice().count()) === 0, HUNG_MS)) && projectJson(found).workflow?.presetAsked === 'notNow')
+
+    // Restarted: no step for None, no notice.
+    await app.close()
+    ;({ app, page } = await lib.launch({ userData, viewport: { width: 1400, height: 900 } }))
+    page.on('pageerror', (e) => check('no page errors (restarted)', false, e.message))
+    await lib.openWorkspace(inv, page, ws)
+    await toTab('alpha')
+    check('after a restart: None, no step, no notice', !!(await lib.until(async () => (await head().locator('[data-platform="none"][aria-checked="true"]').count()) === 1, HUNG_MS)) && (await stepEl().count()) === 0 && (await notice().count()) === 0)
+    check('back to Git', await switchTo('git'))
+    check('Pair restored, and no step', !!(await lib.until(async () => (await text(head().locator('[data-action="vc-workflow"]'))) === 'Workflow: Git · Pair', HUNG_MS)) && (await stepEl().count()) === 0)
+    check('to None again', await switchTo('none'))
+    check("None's Not now is respected: no step", !!(await lib.until(async () => (await text(head().locator('[data-action="vc-workflow"]'))) === 'Workflow: None · no preset chosen', HUNG_MS)) && (await stepEl().count()) === 0)
+
+    // --- New Project: its tab opens at None's step, with no notice.
+    await page.keyboard.press('Control+Alt+N')
+    const box = dialog().locator('input').first()
+    await lib.until(async () => (await box.count()) === 1, HUNG_MS)
+    await box.fill('fresh')
+    await dialog().getByRole('button', { name: 'Create' }).click()
+    check("New Project opens its tab at None's step", !!(await lib.until(async () => (await stepEl().getAttribute('data-preset-step').catch(() => null)) === 'none' && (await page.locator('.project-header', { hasText: 'fresh' }).count()) > 0, HUNG_MS)))
+    check('…and Solo is suggested for no agents', (await stepEl().locator('[data-preset="solo"] .vc-step-tag').count()) === 1)
+    check('…with no notice for it', (await notice().count()) === 0)
+    // Customise…: the Workflow section with the preset filled in, not saved.
+    await stepEl().locator('[data-preset="team"]').click()
+    await stepEl().locator('[data-action="step-customise"]').click()
+    const fresh = path.join(ws, 'fresh')
+    check('Customise… opens Workflow with Team filled in, not saved', !!(await lib.until(async () => (await page.locator('.git-sections [data-section="workflow"]').getAttribute('aria-selected')) === 'true' && /Team/.test(await text(page.locator('.workflow-preset-now'))), HUNG_MS)) && projectJson(fresh).workflow === undefined, await text(page.locator('.workflow-preset-now')))
+
+    // --- An upgraded workspace: no step, no notice, only the old presets notice.
+    await lib.openWorkspace(inv, page, upgradedWs)
+    const db = new DatabaseSync(path.join(upgradedWs, '.hive', 'hive.db'), { timeout: 5000 })
+    try {
+      db.prepare("INSERT INTO board_meta (key, value) VALUES ('adoption_upto', '3') ON CONFLICT (key) DO UPDATE SET value = excluded.value").run()
+    } finally {
+      db.close()
+    }
+    await page.reload()
+    await lib.appReady(page)
+    check('upgraded: the old presets notice', !!(await lib.until(async () => (await page.locator('.presets-notice').count()) === 1, HUNG_MS)))
+    await toTab('old')
+    check('…and no step and no notice for its project', (await stepEl().count()) === 0 && (await notice().count()) === 0)
+  } catch (e) {
+    check('no exception', false, e.stack)
+    await page.screenshot({ path: path.join(shots, 'presetstep-failure.png') }).catch(() => {})
+  } finally {
+    await app.close().catch(() => {})
+  }
+  console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
+  process.exit(failed ? 1 : 0)
+})()

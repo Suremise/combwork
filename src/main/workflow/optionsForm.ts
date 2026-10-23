@@ -20,7 +20,7 @@ import * as G from '../platform/git'
 import { englishText, linesOf, withValues, type Text } from '../../shared/advanced'
 import { msg } from '../../shared/i18n/msg'
 import { allOff, NAME_OPTIONS, PRESETS, preset, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
-import { writeWorkflow } from '../../shared/workflow/projectWorkflow'
+import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import type { ProjectStages, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
@@ -255,7 +255,8 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
     if (c.problems.length) throw new WorkflowRefused(c.problems)
     changed = c.changed
     const options = Object.fromEntries(Object.entries(change.options).filter(([k, v]) => k !== 'platform' && v !== undefined))
-    return { workflow: writeWorkflow(cfg.workflow, { platform: project.platform, preset: change.preset, options }) }
+    // Saved from the Workflow section: the answer to "How do you work?" for this platform is given (#1423).
+    return { workflow: setPresetAsked(writeWorkflow(cfg.workflow, { platform: project.platform, preset: change.preset, options }), project.platform, 'chosen') }
   })
   log.info(`the workflow options of ${userText(project.name)} changed: ${changed.join(', ') || 'none'}`)
   workflowChanged(ws, project.path)

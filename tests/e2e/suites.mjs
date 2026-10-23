@@ -180,6 +180,7 @@ export const SUITES = [
   { name: 'placement' },
   { name: 'plan', needs: ['claude'], claudeHome: 'own' },
   { name: 'planusage' },
+  { name: 'presetstep' },
   { name: 'progress', serial: 'window focus' },
   { name: 'progressgates' },
   { name: 'progresslanes' },

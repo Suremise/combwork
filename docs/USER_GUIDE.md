@@ -1175,6 +1175,16 @@ The status bar shows the selected project's git in one item, such as **main · o
 
 Everything here is yours: agents have no tool for any of it, and only the project folder changes here. Agents' worktrees are shown, read-only: their work comes into the project folder through **Merge**.
 
+### How do you work?
+
+A project added since 1.0 starts with one step, at the top of its Version Control tab: **How do you work?** It offers **Solo**, **Pair** and **Team** (for Git, Pair has Hive merge the work), with the one that fits the project's agents marked **Suggested**: Solo for one agent or none, Pair for a builder and a reviewer (an agent whose name says *review*), Team for more. It follows the agents as you add them. Under the presets, the one you picked shows what it sets and why.
+
+- **Choose** saves it, after one question (in a new project nothing is in flight, so the options apply from its first card).
+- **Customise…** opens the **Workflow** section with that preset filled in, for you to change and save.
+- **Not Now** applies nothing: the project's options stay those of the workspace and of Hive (Settings → Workflow defaults), else every rule off, and the header says **no preset chosen**. You can choose a preset in **Workflow** at any time.
+
+Nothing is applied before you choose. **New Project** opens the new project's tab at this step. A project Hive finds in the workspace folder, or one the Assistant adds, gets a notice instead (*alpha was added: how do you work?*), with **Choose…** and **Not Now**. Each version control asks once: a project you switch to one it never had asks again for that one, and your answer for each comes back when you switch back. Projects from before 1.0 don't ask: they kept how they worked, with the one-time presets notice.
+
 ### Switching version control
 
 Click the version control the project doesn't use, **None** or **Git**, atop the tab to switch it. A dialog says first what changes:

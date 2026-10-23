@@ -1229,6 +1229,31 @@ Everything is visible in the Version Control tab itself, not only through the As
   defaults) pauses its queue (`subfolderTarget`), saying how to go on.
 - `hive_project_status` gives `versionControl`: the platform, what is found, and any offer.
 
+**Built [#1423], "How do you work? Solo / Pair / Team":**
+- **Who asks, per platform** (`asksPreset`, `src/shared/workflow/presetStep.ts`): a project whose platform in force has
+  no preset, no options of its own and no answer (`workflow.presetAsked`). That is a project added since 1.0 (New
+  Project, a folder found when the workspace is read, its project.json made then as opening makes it, one the
+  Assistant or the Agent API adds) and one switched to a
+  platform it never had (#1419: nothing in `kept`), even with its other platform answered. A project from before 1.0
+  (no platform recorded) never asks, also before its upgrade has run: the upgrade writes its options (it gets the
+  one-time presets notice, §16.17).
+- **The answer is the platform's:** `chosen` (any save from the Workflow section, the step's Choose included) or
+  `notNow` (for the platform the step showed: one switched meanwhile isn't answered for it), written with
+  `setPresetAsked` (`projectWorkflow.ts`) under the project's lock; it goes into `kept` with the
+  platform's options when the project switches away and comes back with them, so each platform asks once. The settings
+  tool's saves keep it.
+- **The step**, under the Version Control tab's header (`PresetStep.tsx`): Solo, Pair and Team (for Git, Pair is Hive
+  merging), the one suggested from the project's agents marked (Solo for one or none, Pair for a builder and a reviewer
+  counted as the upgrade counts one, Team for more; worked out again as agents are added) and previewed with what it
+  sets and why (#1418's preview). **Choose** checks it as the Workflow section's save does and asks once ("Nothing is
+  in flight yet…"), then saves; **Customise…** opens the Workflow section with the preset filled in, not saved; **Not
+  now** writes `notNow` and no options, so they stay inherited (the workspace's and Hive's defaults, else all off), and
+  the header says "no preset chosen". Nothing is applied before Choose.
+- **Where:** New Project opens the new project's Version Control tab at the step; a project found when the workspace
+  is read, or added by the Assistant or the Agent API, gets a notice in the presets notice's look ("<project> was
+  added: how do you work?", **Choose…** to the step, **Not Now** answers `notNow`); after a switch to a platform with no
+  answer, the tab shows the step. All of it works with the Assistant off.
+
 ### 16.4 Facts
 
 #### 16.4.1 The log
@@ -3424,6 +3449,9 @@ when a role or name says *review*.
   projects with no preset chosen; **Choose…** opens the first one's Project Settings → Workflow, **Not Now** dismisses
   it. Either answer is recorded in `board_meta` (`workflow.presetsNotice`), so it shows once per workspace, and never on
   a board made by 1.0 (no card from before it: `adoption_upto` 0).
+- **[#1423]** Only projects from before 1.0 get the upgrade's options: those whose project.json records no platform
+  (Hive records it as it makes a project.json, which no Hive before 1.0 did), whatever the board (an upgraded board
+  with no cards included). A project made by 1.0 gets none, and asks "How do you work?" (§16.3.5) instead.
 
 **Agents' old moves, for one transition** [HB3's finding 7]: from P4 until P8 rewrites the skills, an agent's
 `hive_update_task` column move is translated into the matching intent instead of refused: `review` → submit, `passed`

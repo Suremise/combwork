@@ -173,7 +173,7 @@ describe('switching a project (#1419)', () => {
     // Nothing kept for None: no preset, no options, no answer.
     expect(await workflowOf(w, repo)).toEqual({ platform: 'none', preset: null, options: {}, kept: { git: { preset: 'pair', options: pair, presetAsked: 'chosen' } } })
     expect((await form.workflowForm(w, repo)).platform).toBe('none')
-    // None's options saved: Git's kept stays.
+    // None's options saved (its answer too, #1423): Git's kept stays.
     const { platform: _q, ...solo } = preset('none', 'solo')
     await form.setWorkflowOptions(w, repo, { preset: 'solo', options: solo })
     expect(await workflowOf(w, repo)).toMatchObject({ platform: 'none', preset: 'solo', kept: { git: { preset: 'pair', presetAsked: 'chosen' } } })
@@ -181,16 +181,17 @@ describe('switching a project (#1419)', () => {
     await inWorkspace(w, async () => {
       expect(await settingsTools.applySetting(settingEntry('project.workflow.platform')!, 'git', repo)).toEqual({ old: 'none', new: 'git' })
     })
-    expect(await workflowOf(w, repo)).toEqual({ platform: 'git', preset: 'pair', options: pair, presetAsked: 'chosen', kept: { none: { preset: 'solo', options: solo } } })
+    expect(await workflowOf(w, repo)).toEqual({ platform: 'git', preset: 'pair', options: pair, presetAsked: 'chosen', kept: { none: { preset: 'solo', options: solo, presetAsked: 'chosen' } } })
     expect((await w.projectConfig(repo)).platform).toBe('git')
     // A Git option edited and saved, by the form and the tool: None's kept unchanged.
     await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, style: 'squash' } })
     await inWorkspace(w, () => settingsTools.applySetting(settingEntry('project.workflow.sameness')!, 'exact', repo))
-    expect((await workflowOf(w, repo))!.kept).toEqual({ none: { preset: 'solo', options: solo } })
+    expect((await workflowOf(w, repo))!.kept).toEqual({ none: { preset: 'solo', options: solo, presetAsked: 'chosen' } })
     // Back to None: None's restored.
     await sw.setPlatform(w, repo, 'none')
     expect(await workflowOf(w, repo)).toMatchObject({ platform: 'none', preset: 'solo', options: solo, kept: { git: { preset: 'pair', options: { style: 'squash', sameness: 'exact' }, presetAsked: 'chosen' } } })
-    expect(await workflowOf(w, repo)).not.toHaveProperty('presetAsked')
+    // With None's own answer back (#1423: its save recorded it).
+    expect(await workflowOf(w, repo)).toMatchObject({ presetAsked: 'chosen' })
   })
 
   it('the warning lists the running lanes and cards in flight; the tool says them; a card in flight keeps its ruleset', async () => {

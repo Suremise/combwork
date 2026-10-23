@@ -176,6 +176,8 @@
   "tips.hiveSkills.title": "Umiejętności do pracy z Hive",
   "tips.hooksMissing.text": "Jeśli aktualizacja CLI lub zasada sprawi, że hooki agenta nie docierają do Hive, jego panel pokazuje Stan nieznany zamiast stanu, który może być błędny, nic nie jest do niego wpisywane, a jego tor się wstrzymuje. Baner nad jego panelem mówi dlaczego, gdy Hive to wie.",
   "tips.hooksMissing.title": "Gdy hooki agenta przestają docierać",
+  "tips.howDoYouWork.text": "Zakładka Kontrola wersji nowego projektu pyta „Jak pracujesz?”: Solo, Para czy Zespół, i sugeruje to, co pasuje do jego agentów. Wybierz konfiguruje je jednym kliknięciem; Nie teraz zachowuje Twoje ustawienia domyślne.",
+  "tips.howDoYouWork.title": "Zacznij nowy projekt od ustawienia wstępnego",
   "tips.imagesTab.text": "Zakładka Załączniki przechowuje każdy zrzut ekranu i plik wklejony lub upuszczony do sesji projektu, pogrupowane według sesji, z podglądem i filtrem rodzaju, gotowe do ponownego wstawienia.",
   "tips.imagesTab.title": "Wszystko, co załączono, w jednym miejscu",
   "tips.improveTranslation.text": "Widzisz w swoim języku niezgrabne lub błędne słowo? Pomoc → Popraw to tłumaczenie pokazuje, jak je poprawić lub dodać język, przez pull request na GitHubie.",
