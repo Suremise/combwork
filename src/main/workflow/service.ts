@@ -12,6 +12,7 @@
 import { join, resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
+import { WORKFLOW_ENFORCE } from '../../shared/advanced'
 import { boardSavepoint, boardWrite } from '../boardStore'
 import { samePlace } from '../fsutil'
 import { hiveError } from '../hiveError'
@@ -30,7 +31,7 @@ import { Workflow } from './runtime'
 import { NOT_RUN_HERE, type QueueLive } from './queueState'
 
 /** The Advanced switch every gate answers to at once (#1120's table): off, nothing is refused and reconciliation records only. */
-export const ENFORCE = 'hive.workflow.enforce'
+export const ENFORCE = WORKFLOW_ENFORCE
 
 const M = {
   closed: msg({ id: 'service.workflow.closed', defaultMessage: 'The workspace this card belongs to has closed', description: 'An error: a change to a card was asked for in a workspace that has since closed, or whose window opened another workspace.' })

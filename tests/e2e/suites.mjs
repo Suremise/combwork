@@ -221,6 +221,8 @@ export const SUITES = [
   { name: 'resume' },
   { name: 'resumeall' },
   { name: 'review' },
+  { name: 'reviewcopies' },
+  { name: 'reviewcopiesreal', needs: ['claude', 'codex', 'copilot'], claudeHome: 'test' },
   { name: 'safeguards' },
   { name: 'scenarioteardown' },
   { name: 'searchclear' },
