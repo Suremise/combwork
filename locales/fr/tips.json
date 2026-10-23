@@ -310,6 +310,8 @@
   "tips.resumeAll.title": "Reprendre tous les agents d’un coup",
   "tips.reviewCopies.text": "Un relecteur relit dans une copie de relecture : un dossier exactement à la révision soumise, où rien d’autre n’écrit, si bien que le constructeur peut continuer pendant ce temps. Ses vérifications y comptent pour cette soumission. Paramètres → Avancé le désactive.",
   "tips.reviewCopies.title": "Les relecteurs testent exactement ce qui a été soumis",
+  "tips.reviewerPool.text": "Avec l’option de workflow Relecteurs réglée sur Un groupe partagé, Démarrer un couloir propose le groupe de relecteurs : chaque carte soumise va au prochain relecteur libre, la plus ancienne d’abord, jamais à son propre auteur.",
+  "tips.reviewerPool.title": "Partager les relecteurs entre couloirs",
   "tips.safeguardStops.text": "Un bouclier à côté de l’état d’un agent signifie que le classificateur de sécurité de sa CLI a arrêté une réponse : survole-le pour voir quand, le modèle et les derniers appels d’outils de l’agent avant l’arrêt. Orange signifie que son modèle a changé depuis, ou qu’il attend ta réponse.",
   "tips.safeguardStops.title": "Voir quand un classificateur de sécurité arrête un agent",
   "tips.saveTemplate.text": "Configure tes agents une fois et réutilise-les : + Ajouter ▾ → Modèles → Enregistrer le modèle… dans la barre de la session garde leurs paramètres, leurs rôles et leur disposition, et le même menu les charge dans n’importe quel projet.",

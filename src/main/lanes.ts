@@ -562,6 +562,8 @@ export interface StartLane {
   /** The builder's and reviewer's agent ids (reviewer null: none yet; undefined: keep a running lane's). */
   builder: string
   reviewer?: string | null
+  /** Reviewed by the project's reviewer pool (#1443), with `reviewer` null; undefined: a running lane keeps what it has. */
+  pool?: boolean
   cards: number[]
   rounds?: number
   waitMinutes?: number
@@ -582,6 +584,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const reviewer = s.reviewer ? await agentIn(ws, s.project, s.reviewer) : s.reviewer === undefined ? undefined : null
   if (s.reviewer && !reviewer) throw new LaneError(404, 'Unknown agent: the reviewer must be an agent of the project') // i18n-ignore: hive_lane's refusal, which only agents get
   if (reviewer && reviewer.id === builder.id) throw new LaneError(400, "A lane's builder can't be its reviewer") // i18n-ignore: hive_lane's refusal, which only agents get
+  if (reviewer && s.pool) throw new LaneError(400, 'A lane reviewed by the pool has no reviewer of its own') // i18n-ignore: hive_lane's refusal, which only agents get
+  // A named reviewer makes it one reviewer per lane; the pool, none of its own (#1443).
+  const pool = s.pool ? true : reviewer ? false : undefined
   // Rounds and wait the start doesn't give: the project's, else the workspace's (#412).
   const project = ws.path ? await ws.projectConfig(join(ws.path, s.project)).catch(() => null) : null
   const defaults = loopDefaults(ws.config, project)
@@ -620,6 +625,10 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
         ...(s.name !== undefined && s.name !== null ? { name: s.name } : {}),
         updatedAt: t
       })
+      if (pool) {
+        was.pool = true
+        was.reviewer = null
+      } else if (pool === false) delete was.pool
       also.push((db) => noteLaneIn(db, ws.path!, before, was))
       return { rec: was, did: 'updated' as const, replaced: null }
     }
@@ -645,7 +654,8 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       updatedAt: t,
       endedAt: null,
       mergeCommit: null,
-      ...(ruleset ? { ruleset } : {})
+      ...(ruleset ? { ruleset } : {}),
+      ...(pool ? { pool: true as const } : {})
     }
     lanes.push(rec)
     also.push((db) => noteLaneIn(db, ws.path!, null, rec))
@@ -685,6 +695,8 @@ export async function joinLane(ws: WorkspaceService, j: { project: string; build
   const found = await mutate(ws, (lanes, _checks, also) => {
     const l = lanes.find((x) => running(x) && same(x.project, j.project) && x.builder.id === builder.id)
     if (!l || (j.cards?.length && !l.cards.some((n) => j.cards!.includes(n)))) return null
+    // Reviewed by the pool (#1443): nobody joins it; each card's assignment is its reviewer's start.
+    if (l.pool) throw new LaneError(409, `${builder.name}'s lane is reviewed by the reviewer pool: there is nothing to join. Hive gives you its cards when it assigns them to you.`) // i18n-ignore: hive_lane's refusal, which only agents get
     const before = laneValues(l)
     l.reviewer = reviewer
     l.updatedAt = now()

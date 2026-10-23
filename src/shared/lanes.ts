@@ -52,6 +52,11 @@ export interface LaneRecord {
    * note in their brief. Kept with the lane (its row's `extra`), so it waits through a restart; cleared once it starts.
    */
   slotWait?: { since: string; note: string }
+  /**
+   * Reviewed by the project's reviewer pool (#1443, G17): no reviewer of its own (`reviewer` null); each card submitted is
+   * given to the next free pooled reviewer. Kept with the lane (its row's `extra`).
+   */
+  pool?: true
 }
 
 /** At most this many cards in a lane, rounds per card, and minutes of wait (a day, as a card watch's longest). */
@@ -148,6 +153,7 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
     name: rec.name,
     builder: named(rec.builder),
     reviewer: rec.reviewer ? named(rec.reviewer) : null,
+    ...(rec.pool ? { pool: true } : {}),
     cards: list,
     current,
     state,
@@ -319,7 +325,8 @@ export function readLane(v: unknown): LaneRecord | null {
     ...(text(v.ruleset, 128) ? { ruleset: v.ruleset } : {}),
     ...(pending ? { pending } : {}),
     ...(whole(v.inFlight, 1e9) ? { inFlight: v.inFlight as number } : {}),
-    ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000) } } : {})
+    ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000) } } : {}),
+    ...(v.pool === true && !reviewer ? { pool: true as const } : {})
   }
 }
 
@@ -372,7 +379,7 @@ const cardWord = (c: LaneCard): string => `${cardRef(c.number)} ${COLUMN_WORD[c.
  * #412 Todo; rounds 10, wait 6 h. lane-3fa2".
  */
 export function laneLine(l: LaneInfo): string {
-  const pair = `${l.builder.name} / ${l.reviewer?.name ?? 'no reviewer'} (${l.project}${l.slot ? `, in ${l.slot}` : ''})`
+  const pair = `${l.builder.name} / ${l.reviewer?.name ?? (l.pool ? 'the reviewer pool' : 'no reviewer')} (${l.project}${l.slot ? `, in ${l.slot}` : ''})`
   const said = l.status ? `; ${laneStatusText(l.status)}` : ''
   const paused = l.cards.find((c) => c.number === l.pausedOn)
   const why = l.status ? laneStatusText(l.status) : `${l.pausedOn !== null ? cardRef(l.pausedOn) : 'a card'} ${paused?.roundLimit && !paused.blocked ? 'waits for the user at its round limit' : 'is blocked'}`

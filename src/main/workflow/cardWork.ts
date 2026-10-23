@@ -163,9 +163,14 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
         const x = d as FactData['CheckRan']
         return `${x.name} ${x.result} on ${r(x.revision)}, ${x.counted ? 'counted' : `not counted${x.whyNot ? ` (${x.whyNot})` : ''}`}`
       }
-      case 'ReviewStarted': {
+      case 'ReviewStarted':
+      case 'ReviewerAssigned': {
         const x = d as FactData['ReviewStarted']
         return `${x.reviewer} on submission ${x.submission}`
+      }
+      case 'ReviewerReleased': {
+        const x = d as FactData['ReviewerReleased']
+        return `${x.reviewer} on submission ${x.submission} (${x.why})`
       }
       case 'Verdict': {
         const x = d as FactData['Verdict']

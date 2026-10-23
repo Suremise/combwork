@@ -639,6 +639,18 @@ without one keeps `slotWait` on its record, and the pass lends it one and starts
 `startWaitingLane`, by their brief's delivery identity). Test copies can end Hive at the pass's seams
 (`HIVE_TEST_SLOT_CRASH`). The pool's size counts builders and either agents (`setBuilderCount`).
 
+**The reviewer pool, built [#1443].** G17 is `WorkflowOptions.reviewerMode` (`lane`, left out of a compiled ruleset so
+older rulesets keep their ids, or `pool`). A lane started with the pool keeps `pool` on its record (its row's `extra`);
+`FactStore` reads it into a card's `reviewerPool`. The runtime then writes `assignReviewer` for a submission or a verdict
+instead of waking a lane reviewer, and `reviewerPool.ts` (one pass per project, like `settleSlotCards`, also on agents'
+status changes, lanes, board changes, the workspace opening, the rules switched and hourly) gives each waiting card, oldest
+submission first, to a free reviewer (`shared/workflow/reviewerPool.ts`'s `poolAssignments`: role, no dispatch lease,
+idle, reviewing no other card of the project, not its builder). It records `ReviewerAssigned` in a write that checks
+again inside that transaction (`FactStore.dispatchLeased` on `slot_leases`, `cardsAt('review')`'s reviewers), and tells
+the reviewer once (delivery source `pool-review`; typed in, or started with purpose `review`), first releasing one that
+took a lease, left or stopped reviewing (`ReviewerReleased`). `loopReviewer.ts` routes a
+pool card's other handoffs to its current reviewer, and `loopWakes.ts` leaves its arrivals in Review to the pool.
+
 **Storage (P3's one migration, #1025, designed in #1208).** The DDL is `src/main/schema/v1_0.ts`: five steps, registered
 in `BOARD_MIGRATIONS` in this order by their cards, each taking the next version number when it merges, and run by
 #1207's 1.0 group in one transaction after one ask, one backup and one exclusive lock. All tables are STRICT; a card's

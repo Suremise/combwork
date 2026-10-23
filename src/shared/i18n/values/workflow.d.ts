@@ -6,6 +6,7 @@ interface HiveMessageValues {
   'workflow.contradiction.mergeNeedsSlots': undefined
   'workflow.contradiction.noneHasNoSlots': undefined
   'workflow.contradiction.okWithReview': undefined
+  'workflow.contradiction.poolNeedsAgent': undefined
   'workflow.contradiction.quorumNeedsAgent': undefined
   'workflow.contradiction.selfReview': undefined
   'workflow.contradiction.subfolderTarget': undefined
@@ -161,6 +162,8 @@ interface HiveMessageValues {
   'workflow.option.review.none': undefined
   'workflow.option.review.shared': undefined
   'workflow.option.review.title': undefined
+  'workflow.option.reviewerMode.desc': undefined
+  'workflow.option.reviewerMode.title': undefined
   'workflow.option.reviewers.desc': undefined
   'workflow.option.reviewers.title': undefined
   'workflow.option.sameness.desc': undefined
@@ -400,6 +403,8 @@ interface HiveMessageValues {
   'workflow.value.review.none': undefined
   'workflow.value.review.noneNone': undefined
   'workflow.value.review.you': undefined
+  'workflow.value.reviewerMode.lane': undefined
+  'workflow.value.reviewerMode.pool': undefined
   'workflow.value.sameness.change': undefined
   'workflow.value.sameness.exact': undefined
   'workflow.value.style.merge': undefined

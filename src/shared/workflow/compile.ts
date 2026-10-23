@@ -51,10 +51,14 @@ export function canonical(v: unknown): string {
   return JSON.stringify(v)
 }
 
-/** The options a ruleset is made of: all but the names (N5), which apply at once and never make "old rules" (#1417). */
+/**
+ * The options a ruleset is made of: all but the names (N5), which apply at once and never make "old rules" (#1417). G17
+ * as one reviewer per lane is left out too (#1443): it is what a ruleset without it means, so every ruleset compiled
+ * before P7 keeps its id.
+ */
 export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
-  const { stageNames: _names, ...rules } = o
-  return rules
+  const { stageNames: _names, reviewerMode, ...rules } = o
+  return reviewerMode === 'pool' ? { ...rules, reviewerMode } : rules
 }
 
 /** Does any rule need the card's change (so its folder must be clean and its revision ready)? */

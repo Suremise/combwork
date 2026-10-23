@@ -17,6 +17,8 @@ export interface Lane {
   project: string
   builder: { agentId: string; name: string }
   reviewer: { agentId: string; name: string } | null
+  /** Reviewed by the project's reviewer pool (#1443): no reviewer of its own. */
+  pool: boolean
   /** What the lane is about, in a few words, when it has a name. */
   name: string | null
   /** Its cards' numbers, in the order they are worked. The panel reads each card from the board itself, as it is now. */
@@ -92,7 +94,7 @@ export function useLanes(load = true): Lane[] {
     const lanes = raw.flatMap((d): Lane[] => {
       const project = pathOf.get(d.project.toLowerCase())
       const frozen = d.state === 'ended' || d.state === 'abandoned' ? d.cards : null
-      return project ? [{ id: d.id, project, builder: who(d.builder), reviewer: d.reviewer ? who(d.reviewer) : null, name: d.name, cards: d.cards.map((c) => c.number), state: d.state, frozen, startedAt: d.startedAt, endedAt: d.endedAt, mergeCommit: d.mergeCommit, status: d.status ?? null, oldRules: !!d.oldRules, stages: d.stages ?? null }] : []
+      return project ? [{ id: d.id, project, builder: who(d.builder), reviewer: d.reviewer ? who(d.reviewer) : null, pool: !!d.pool, name: d.name, cards: d.cards.map((c) => c.number), state: d.state, frozen, startedAt: d.startedAt, endedAt: d.endedAt, mergeCommit: d.mergeCommit, status: d.status ?? null, oldRules: !!d.oldRules, stages: d.stages ?? null }] : []
     })
     return lanes.length ? panelOrder(lanes, order) : NO_LANES
   }, [raw, projects, order])

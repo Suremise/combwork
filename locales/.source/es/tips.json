@@ -310,6 +310,8 @@
   "tips.resumeAll.title": "Resume all agents at once",
   "tips.reviewCopies.text": "A reviewer reviews in a review copy: a folder at exactly the submitted revision, which nothing else writes, so the builder can carry on meanwhile. Its checks there count for that submission. Settings → Advanced turns it off.",
   "tips.reviewCopies.title": "Reviewers test exactly what was submitted",
+  "tips.reviewerPool.text": "With the workflow option Reviewers set to A shared pool, Start Lane offers the reviewer pool: each card submitted goes to the next free reviewer, oldest first, never to its own builder.",
+  "tips.reviewerPool.title": "Share reviewers between lanes",
   "tips.safeguardStops.text": "A shield beside an agent's status means its CLI's safety classifier stopped a response: hover it for when, the model, and the agent's last tool calls before it. Orange means its model changed since, or it waits on you.",
   "tips.safeguardStops.title": "See when a safety classifier stops an agent",
   "tips.saveTemplate.text": "Set agents up once and reuse them: + Add ▾ → Templates → Save Template… in the session toolbar keeps their settings, roles and layout, and the same menu loads them into any project.",

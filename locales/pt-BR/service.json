@@ -131,6 +131,8 @@
   "service.laneStart.needsReviewer": "As regras de {project} fazem um agente revisor revisar cada cartão: escolha um revisor.",
   "service.laneStart.noCards": "Escolha os cartões da raia.",
   "service.laneStart.notTheProjects": "{card} não é um cartão de {project} ou está arquivado.",
+  "service.laneStart.poolEmpty": "Nenhum agente de {project} além do executor revisa, então o grupo não tem ninguém para revisar os cartões.",
+  "service.laneStart.poolNotOffered": "As regras de {project} têm um revisor por raia: escolha um revisor ou mude Revisores para um grupo compartilhado.",
   "service.laneStart.sameAgent": "O executor não pode ser o próprio revisor.",
   "service.laneStart.starting": "A raia de {agent} já está sendo iniciada.",
   "service.laneStart.unknownAgent": "{agent} não é um agente de {project}.",
