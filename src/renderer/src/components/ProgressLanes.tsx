@@ -4,8 +4,9 @@ import { RUNS_KEEP_PX, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSeg
 import { laneLegend, legendSources, segmentStage, type LegendGroup } from '@shared/laneStages'
 import { revisionShort } from '@shared/platform/descriptors'
 import type { WorkBadge } from '@shared/workflow/workView'
-import type { ProgressRun, ProjectStages } from '@shared/types'
-import { latestRunOf } from '@shared/progressTabs'
+import type { LaneStatus, ProgressRun, ProjectStages } from '@shared/types'
+import { NO_RUNS_FILTER, latestRunOf, slotRunsKey } from '@shared/progressTabs'
+import { formatDateTime } from '@shared/dates'
 import { useWorkBadges } from '../cardWork'
 import { useProjectStages } from '../projectStages'
 import { OVERRIDE_NAMES } from './CardWork'
@@ -54,7 +55,7 @@ const stateWord = (state: Lane['state']): string | null =>
   state === 'active' ? null : tr(msg({ id: 'board.lanes.state', defaultMessage: '{state, select, paused {paused} ended {merged} other {abandoned}}', description: "A lane's state in its header in the Progress panel, lower case (a lane: a builder and its reviewer working through cards in turn): paused, merged (it ended: its cards were merged) or abandoned." }), { state })
 
 /** A lane's builder and reviewer: "B1 / R1", "B1 / pool" (#1443), or the builder alone. */
-const lanePair = (l: Lane): string => (l.reviewer ? `${l.builder.name} / ${l.reviewer.name}` : l.pool ? tr(POOL_PAIR, { builder: l.builder.name }) : l.builder.name)
+export const lanePair = (l: Lane): string => (l.reviewer ? `${l.builder.name} / ${l.reviewer.name}` : l.pool ? tr(POOL_PAIR, { builder: l.builder.name }) : l.builder.name)
 const POOL_PAIR = msg({ id: 'board.lanes.poolPair', defaultMessage: '{builder} / pool', description: "A lane's agents in its header in the Progress panel when its cards are reviewed by the project's reviewer pool (#1443): its builder's name ({builder}), then the pool, short (the header is narrow). Glossary: pool (of reviewers)." })
 
 /** Waits for the user's answer (#1279): counted in the Lanes bar. */
@@ -482,6 +483,49 @@ interface LaneReorder {
   onContextMenu: (e: React.MouseEvent<HTMLDivElement>) => void
 }
 
+const SLOT_LINK = msg({ id: 'board.lanes.slotLink', defaultMessage: 'Show {slot} in Branches & remotes', description: "Tooltip and accessible name of a lane's slot in its header (Progress panel, #1446): opens the project's Version Control tab at Branches & remotes, where its slots are listed. {slot} is the slot's name (slot-b): keep it as it is. Branches & remotes is a section of the tab: use its name as shown there." })
+const WAITS_LINK = msg({ id: 'board.lanes.waitsLink', defaultMessage: '{why}. Click to show it.', description: "Tooltip of why a lane waits, in its header (Progress panel, #1446), when a click shows what it waits for: its slot or the slots in use (Branches & remotes), or the runs it waits on (the Runs tab). {why} is the reason as the header says it (\"waiting for a slot\")." })
+
+/** Whether a lane's wait has something to show (#1446): the slots it waits for, or the runs preparing its slot or a copy. */
+const waitsOn = (s: LaneStatus | null): boolean => !!s && (s.reason === 'slot' || s.reason === 'preparing' || s.reason === 'checkCopy')
+
+/** Shows what a lane waits for (#1446): the project's slots (Branches & remotes), its slot's warming runs, or its own runs. */
+function showWaitedOn(l: Lane, projectPath: string): void {
+  if (l.status?.reason === 'slot') return openVersionControl(projectPath, 'branches')
+  if (l.status?.reason === 'preparing' && l.status.slot) return set({ runsShow: { ...NO_RUNS_FILTER, agent: slotRunsKey(l.status.slot) } })
+  set({ runsShow: { ...NO_RUNS_FILTER, lane: l.id } })
+}
+
+/**
+ * A lane's slot in its hover (#1446): its name, ready or being prepared, since when it was lent (or, a carried slot,
+ * kept by its builder), and the current card's line there.
+ */
+function LaneSlotTip({ lane: l }: { lane: Lane }) {
+  if (!l.slot || l.frozen) return null
+  const s = l.slot
+  return (
+    <div className="lane-slot-tip" data-testid="lane-slot">
+      <div>
+        <strong>{s.name}</strong>{' '}
+        {tr(msg({ id: 'board.lanes.slotTip', defaultMessage: '{state, select, preparing {being prepared} other {ready}} · {carried, select, yes {its builder’s own since {since}} other {lent to the lane since {since}}}', description: "A lane's slot in its hover (Progress panel, #1446), after the slot's name (slot-b): whether it is ready or being prepared (its setup or a dependency install), then since when it was lent to the lane, or, for a builder's own worktree kept from before 1.0 (carried), since when it has had it. {since} is a date and time. Keep the select keys." }), { state: s.state, carried: s.carried ? 'yes' : 'no', since: formatDateTime(s.since) })}
+      </div>
+      {s.line && <div className="faint">{tr(msg({ id: 'board.lanes.slotLine', defaultMessage: 'On {line}', description: "A lane's slot in its hover (Progress panel, #1446): the branch its current card is built on there follows ({line}, such as hive/HI/HI-12-fix-login: keep it as it is)." }), { line: s.line })}</div>}
+    </div>
+  )
+}
+
+/** A pool lane's reviewers in its hover (#1446): who gave its current card's last verdict, and who reviews it now. */
+function LanePoolTip({ lane: l }: { lane: Lane }) {
+  if (!l.pool || l.frozen || !l.poolReview) return null
+  const p = l.poolReview
+  return (
+    <div className="lane-pool-tip" data-testid="lane-pool">
+      <div>{tr(msg({ id: 'board.lanes.poolReviewing', defaultMessage: '{reviewing, select, none {Reviewed by the pool: nobody on the card yet} other {Reviewed by the pool: {name} now}}', description: "A lane's hover in the Progress panel when its cards are reviewed by the project's reviewer pool (#1446): who reviews its current card now ({name}, an agent's name), or nobody yet (it waits for a free reviewer). Keep the select keys." }), { reviewing: p.reviewing ? 'some' : 'none', name: p.reviewing ?? '' })}</div>
+      {p.lastVerdict && <div className="faint">{tr(msg({ id: 'board.lanes.poolLastVerdict', defaultMessage: 'Last verdict: {name}, {pass, select, yes {passed} other {failed}}', description: "A pool lane's hover in the Progress panel (#1446): who gave the current card's last verdict ({name}, an agent's name) and whether it passed or failed. Keep the select keys. Glossary: verdict, pass / fail." }), { name: p.lastVerdict.name, pass: p.lastVerdict.pass ? 'yes' : 'no' })}</div>}
+    </div>
+  )
+}
+
 /**
  * `stages`: its project's stages and names (#1421), so its segments say their cards' stages; `enforced`: whether workflow
  * rules are enforced now, for what its old rules marks say.
@@ -542,9 +586,33 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced }: {
           }
         : {})}
     >
-      <Tooltip block content={<LaneCostTip cost={cost.cost} />}>
+      <Tooltip
+        block
+        content={
+          <>
+            <LaneSlotTip lane={l} />
+            <LanePoolTip lane={l} />
+            <LaneCostTip cost={cost.cost} />
+          </>
+        }
+      >
         <div className="progress-lane-top" onMouseEnter={cost.load}>
           <span className="progress-lane-pair">{pair}</span>
+          {/* Its slot (#1446): "· slot-b", or its builder's carried slot ("· hb2"), linking to the slots in Branches & remotes. */}
+          {l.slot && !l.frozen && project && (
+            <button
+              type="button"
+              className="link progress-lane-slot faint"
+              data-action="lane-slot"
+              aria-label={tr(SLOT_LINK, { slot: l.slot.name })}
+              onClick={(e) => {
+                e.stopPropagation()
+                openVersionControl(project.path, 'branches')
+              }}
+            >
+              · {l.slot.name}
+            </button>
+          )}
           {project && (
             <button
               type="button"
@@ -562,7 +630,21 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced }: {
           )}
           {/* Why it waits (#1279) takes the name's room (every lane keeps one height: the list shows whole lanes),
               cut short with its whole text in its title; a paused lane's in the paused colour, another's faint. */}
-          {why ? (
+          {why && waitsOn(l.status) && project ? (
+            // What it waits for, a click away (#1446): the slots in Branches & remotes, or the runs it waits on.
+            <button
+              type="button"
+              className={cx('link', 'progress-lane-why', l.state === 'paused' && 'paused')}
+              data-action="lane-waits"
+              title={tr(WAITS_LINK, { why })}
+              onClick={(e) => {
+                e.stopPropagation()
+                showWaitedOn(l, project.path)
+              }}
+            >
+              {why}
+            </button>
+          ) : why ? (
             <span className={cx('progress-lane-why', l.state === 'paused' && 'paused')} title={why}>
               {why}
             </span>

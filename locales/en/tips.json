@@ -811,6 +811,14 @@
     "defaultMessage": "Hear how a lane goes, without the Assistant",
     "description": "A tip's title. A lane is Hive's record of a card loop (a builder and a reviewer taking cards in turn)."
   },
+  "tips.laneSlots.text": {
+    "defaultMessage": "In the Progress panel, a lane names its slot after its agents (· slot-b): point at it for the branch being built there and whether the slot is ready, or click it for Branches & remotes.",
+    "description": "A tip. A slot is a working folder Hive lends to a lane (glossary 2.5: slot). Branches & remotes is a section of the Version Control tab: keep its name as Hive shows it."
+  },
+  "tips.laneSlots.title": {
+    "defaultMessage": "See where a lane builds",
+    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
+  },
   "tips.laneStart.text": {
     "defaultMessage": "Right-click the Todo column and choose Start Lane with These Cards…: pick the builder and the reviewer, put the cards in order, and both start with a brief. End or abandon a lane from its row in the Progress panel.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane."
@@ -1370,6 +1378,14 @@
   "tips.slots.title": {
     "defaultMessage": "Each card on a branch of its own",
     "description": "A tip's title. A slot is a working folder (a worktree) Hive lends to a card or a lane."
+  },
+  "tips.slotsAdopted.text": {
+    "defaultMessage": "Since the upgrade, each builder's own worktree is a slot kept for it until its next card or lane takes it over. Release Slot… in the agent's ⋯ menu gives one up; once free, Hive renames its folder to a slot name, taking its conversations with it.",
+    "description": "A tip. A slot is a working folder (a worktree) Hive lends to a card or a lane. Release Slot… is a menu item: keep it as Hive shows it; ⋯ is the agent's menu button."
+  },
+  "tips.slotsAdopted.title": {
+    "defaultMessage": "Your agents' worktrees are slots now",
+    "description": "A tip's title, after upgrading from Hive 0.9. A slot is a working folder (a worktree) Hive lends to a card or a lane."
   },
   "tips.sortTables.text": {
     "defaultMessage": "Click a column's header in Hive's tables (shortcuts, Performance, Storage, the Overviews) to sort by it, again for the other way. Hive remembers each table's sort and rows per page.",

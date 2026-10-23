@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import { fmt, tr } from '../src/shared/i18n'
 import { ESTIMATE_OF, JUST_MERGED_MS, RETURN_SEEN_SHOWN_MS, justMerged, keptLive, nextFold, queueKey, withKept, type KeptReturn, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
-import { HIVE_RUNS, NO_RUNS_FILTER, runAgentKey, runMatches, runThing, tabBadges } from '../src/shared/progressTabs'
+import { copyRunsKey, HIVE_RUNS, NO_RUNS_FILTER, runAgentKey, runMatches, runThing, slotRunsKey, tabBadges } from '../src/shared/progressTabs'
 import type { ProgressRun } from '../src/shared/types'
 import type { QueueRecent, QueueView } from '../src/shared/workflow/queue'
 
@@ -278,6 +278,19 @@ describe("Hive's runs in the Runs tab (#1356 item 5)", () => {
     const words = (x: ProgressRun): string => x.title
     expect(runMatches(r, { ...NO_RUNS_FILTER, agent: HIVE_RUNS }, words)).toBe(true)
     expect(runMatches(run({ source: 'agent', agentId: 'b1' }), { ...NO_RUNS_FILTER, agent: HIVE_RUNS }, words)).toBe(false)
+  })
+
+  it("each slot's and copy's set-up runs are an Agent filter entry of their own (#1446), apart from the merge queue's", () => {
+    const words = (x: ProgressRun): string => x.title
+    const slotB = run({ defaultName: 'slot', slot: 'slot-b', agentName: 'Hive (slot slot-b)' })
+    const copy1 = run({ defaultName: 'copy', copy: 'copy-1', agentName: 'Hive (copy copy-1)' })
+    expect([runAgentKey(slotB), runAgentKey(copy1), runAgentKey(run())]).toEqual([slotRunsKey('slot-b'), copyRunsKey('copy-1'), HIVE_RUNS])
+    expect(new Set([slotRunsKey('slot-b'), slotRunsKey('slot-c'), copyRunsKey('copy-1'), HIVE_RUNS]).size).toBe(4)
+    expect(runMatches(slotB, { ...NO_RUNS_FILTER, agent: slotRunsKey('slot-b') }, words)).toBe(true)
+    expect(runMatches(run(), { ...NO_RUNS_FILTER, agent: slotRunsKey('slot-b') }, words)).toBe(false)
+    expect(runMatches(slotB, { ...NO_RUNS_FILTER, agent: HIVE_RUNS }, words)).toBe(false)
+    // An agent's isolated check in a copy is its agent's, never Hive's.
+    expect(runAgentKey(run({ source: 'agent', agentId: 'r1', copy: 'copy-1' }))).toBe('r1')
   })
 
   it('they fold by card and check: a retry of the same check is the same thing, another check or card is not', () => {

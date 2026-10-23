@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { panelOrder } from '@shared/laneBar'
 import { columnSince, type LaneOrderView } from '@shared/tasks'
-import type { LaneCard, LaneInfo, TaskCard } from '@shared/types'
+import type { LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '@shared/types'
 import { call } from './api'
 import { get, set, useStore } from './store'
 
@@ -19,6 +19,10 @@ export interface Lane {
   reviewer: { agentId: string; name: string } | null
   /** Reviewed by the project's reviewer pool (#1443): no reviewer of its own. */
   pool: boolean
+  /** A pool lane's current card (#1446): who gave its last verdict, and who reviews it now. */
+  poolReview: LaneInfo['poolReview'] | null
+  /** The slot its builder works in (#1446: lent to the lane, or the builder's carried one), as its hover tells it; null: none. */
+  slot: LaneSlotInfo | null
   /** What the lane is about, in a few words, when it has a name. */
   name: string | null
   /** Its cards' numbers, in the order they are worked. The panel reads each card from the board itself, as it is now. */
@@ -94,7 +98,7 @@ export function useLanes(load = true): Lane[] {
     const lanes = raw.flatMap((d): Lane[] => {
       const project = pathOf.get(d.project.toLowerCase())
       const frozen = d.state === 'ended' || d.state === 'abandoned' ? d.cards : null
-      return project ? [{ id: d.id, project, builder: who(d.builder), reviewer: d.reviewer ? who(d.reviewer) : null, pool: !!d.pool, name: d.name, cards: d.cards.map((c) => c.number), state: d.state, frozen, startedAt: d.startedAt, endedAt: d.endedAt, mergeCommit: d.mergeCommit, status: d.status ?? null, oldRules: !!d.oldRules, stages: d.stages ?? null }] : []
+      return project ? [{ id: d.id, project, builder: who(d.builder), reviewer: d.reviewer ? who(d.reviewer) : null, pool: !!d.pool, poolReview: d.poolReview ?? null, slot: d.slotInfo ?? null, name: d.name, cards: d.cards.map((c) => c.number), state: d.state, frozen, startedAt: d.startedAt, endedAt: d.endedAt, mergeCommit: d.mergeCommit, status: d.status ?? null, oldRules: !!d.oldRules, stages: d.stages ?? null }] : []
     })
     return lanes.length ? panelOrder(lanes, order) : NO_LANES
   }, [raw, projects, order])

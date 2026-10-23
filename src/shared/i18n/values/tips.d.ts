@@ -204,6 +204,8 @@ interface HiveMessageValues {
   'tips.laneGates.title': undefined
   'tips.laneNotices.text': undefined
   'tips.laneNotices.title': undefined
+  'tips.laneSlots.text': undefined
+  'tips.laneSlots.title': undefined
   'tips.laneStart.text': undefined
   'tips.laneStart.title': undefined
   'tips.lanesLegend.text': undefined
@@ -344,6 +346,8 @@ interface HiveMessageValues {
   'tips.slotResume.title': undefined
   'tips.slots.text': undefined
   'tips.slots.title': undefined
+  'tips.slotsAdopted.text': undefined
+  'tips.slotsAdopted.title': undefined
   'tips.sortTables.text': undefined
   'tips.sortTables.title': undefined
   'tips.staleMessages.text': undefined

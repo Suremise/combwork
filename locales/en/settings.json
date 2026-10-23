@@ -903,6 +903,14 @@
     "defaultMessage": "Remove idle slots after a day",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. A slot is a worktree Hive lends to a card or a lane and gets back when it ends; free ones are kept ready."
   },
+  "settings.advanced.hive.slots.renameAdopted.desc": {
+    "defaultMessage": "At the upgrade to 1.0 your agents' worktrees became slots, keeping their folders (hb2). Once one is free, with no agent or process in it, Hive renames its folder to a slot's name (slot-c), moving its cards' work and the agents' conversations with it, so a slot named after one agent isn't lent to another. Turned off, they keep their names.",
+    "description": "What the advanced setting \"Rename adopted worktrees to slot names\" does (Settings → Advanced, under Hive). A slot is a worktree Hive lends to a card or a lane. Keep hb2 and slot-c as they are (folder names)."
+  },
+  "settings.advanced.hive.slots.renameAdopted.title": {
+    "defaultMessage": "Rename adopted worktrees to slot names",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. At the upgrade to 1.0, agents' own worktrees became slots (worktrees Hive lends to a card or a lane), keeping their folder names."
+  },
   "settings.advanced.hive.slots.setupMinutes.desc": {
     "defaultMessage": "How long Hive lets a slot's setup command, a dependency install or its archive command run before it ends it. A slot whose setup was ended this way isn't lent until it is set up again; an archive command ended so keeps its slot.",
     "description": "What the advanced setting \"Slots: longest a setup command runs\" does (Settings → Advanced, under Hive). A slot is a worktree Hive lends to a card or a lane."

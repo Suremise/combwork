@@ -409,7 +409,10 @@ export class SlotStore {
         const usable = (s: Slot): boolean => s.state === 'ready' && !s.warmError && !s.op && !s.job && !s.writer && !openLeaseIn(db, this.project, s.name)
         let slot: Slot | undefined
         let fresh = false
+        // Names reserved by renames under way (#1441): never made by a lend, asked for by name or not.
+        const reserved = this.reservedIn(db)
         if (req.slot) {
+          if (reserved.has(req.slot.toLowerCase())) return { ok: false as const, refusal: { why: 'notReady' as const, slot: req.slot, state: 'removing' as const, error: null } }
           slot = all.find((s) => s.name.toLowerCase() === req.slot!.toLowerCase())
           const open = slot ? openLeaseIn(db, this.project, slot.name) : null
           if (open) return { ok: false as const, refusal: { why: 'inUse' as const, slot: open.slot, agent: open.agent, card: open.card, lane: open.lane } }
@@ -424,7 +427,7 @@ export class SlotStore {
         let name: string
         if (!slot) {
           if (all.length >= o.size) return { ok: false as const, refusal: { why: 'noSlot' as const, size: o.size } }
-          name = req.slot ?? nextSlotName(new Set(all.map((s) => s.name.toLowerCase())), o.root)
+          name = req.slot ?? nextSlotName(new Set([...all.map((s) => s.name.toLowerCase()), ...reserved]), o.root)
           db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at, op, op_kind, op_lease, op_pid, op_started) VALUES (?, ?, ?, 'creating', ?, ?, ?, ?, ?, 'warm', ?, ?, ?)").run(this.project, name, join(o.root, name), freePort(all), o.target, at, at, o.token, id, o.holder.pid, o.holder.started)
           fresh = true
         } else {
@@ -483,6 +486,7 @@ export class SlotStore {
   carryIn(db: DatabaseSync, agent: string, slot: { name: string; folder: string; target: string | null }): SlotLease | null {
     const at = this.iso()
     const had = this.slotIn(db, slot.name)
+    if (!had && (this.reservedIn(db).has(slot.name.toLowerCase()) || this.renamesIn(db).some((r) => samePlace(r.intent.to, slot.folder)))) return null
     if (!had) db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at) VALUES (?, ?, ?, 'lent', ?, ?, ?, ?)").run(this.project, slot.name, slot.folder, freePort(this.slotsIn(db)), slot.target, at, at)
     else {
       if (!samePlace(had.folder, slot.folder)) return null
@@ -490,6 +494,119 @@ export class SlotStore {
       if (Number(took.changes) !== 1) return null
     }
     return this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, slot.name, 'carried', { agent }, at)
+  }
+
+  /**
+   * A carried lease handed off to a card or lane of its agent's on the same slot (#1441, SPEC §16.10.8), in one write:
+   * the carried lease ended (`handedOff`), a dispatch lease begun on the slot, the slot's writer (the agent's running
+   * session there) moved to it, and `also` (the caller's rebinding of the carried lease's sessions, #1434's
+   * `rebindSession`) in the same write, so all of it lands or none. Null when it can't be now: the carried lease not open
+   * or another agent's, the slot under an operation or a job, or another agent writing there; an index refusing it (the
+   * agent leased meanwhile) too.
+   */
+  async handOff(carried: string, req: { card?: number; lane?: string; agent: string }, also?: (db: DatabaseSync, lease: SlotLease) => void): Promise<SlotLease | null> {
+    if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane')
+    try {
+      return await this.conn.write((db) => {
+        const r = db.prepare("SELECT * FROM slot_leases WHERE id = ? AND project = ? AND ended_at IS NULL AND kind = 'carried'").get(carried, this.project) as Row | undefined
+        if (!r || r.agent !== req.agent) return null
+        const s = this.slotIn(db, r.slot as string)
+        if (!s || s.op || s.job || s.state === 'removing' || (s.writer && s.writer.agent !== req.agent)) return null
+        const at = this.iso()
+        db.prepare("UPDATE slot_leases SET ended_at = ?, why = 'handedOff' WHERE id = ?").run(at, carried)
+        const lease = this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, s.name, req.card !== undefined ? 'card' : 'lane', req, at)
+        if (s.writer) db.prepare('UPDATE slots SET writer_lease = ? WHERE project = ? AND name = ? AND writer_run = ?').run(lease.id, this.project, s.name, s.writer.run)
+        db.prepare('UPDATE slots SET used_at = ? WHERE project = ? AND name = ?').run(at, this.project, s.name)
+        also?.(db, lease)
+        return lease
+      })
+    } catch (e) {
+      if (constraintOf(e)) return null
+      throw e
+    }
+  }
+
+  /**
+   * A rename begun (#1441): in one write, the slot taken by a `remove`-kind operation (as `startRemoval`, only while it is
+   * free and in state `from`) and its destination reserved: the next generic name no slot of the project has, no other
+   * rename's intent has reserved, and whose folder under `root` is absent, recorded as the operation's intent (board_meta
+   * `slot_rename:<project>:<slot>`). Two renames, of two slots or in two Hives, so never share a destination. Null when
+   * the slot isn't free now.
+   */
+  async startRename(name: string, from: SlotState, token: string, holder: Holder, root: string, tree: string): Promise<RenameIntent | null> {
+    return this.conn.write((db) => {
+      if (Number(db.prepare(`UPDATE slots SET state = 'removing', op = ?, op_kind = 'remove', op_lease = NULL, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND state = ? AND state <> 'removing' AND ${FREE}`).run(token, holder.pid, holder.started, this.project, name, from).changes) !== 1) return null
+      const taken = new Set(this.slotsIn(db).map((x) => x.name.toLowerCase()))
+      for (const r of this.renamesIn(db)) taken.add(r.intent.toName.toLowerCase())
+      let n = 0
+      while (taken.has(slotName(n)) || RESERVED.has(slotName(n)) || existsSync(join(root, slotName(n)))) n++
+      const intent: RenameIntent = { from: this.slotIn(db, name)!.folder, toName: slotName(n), to: join(root, slotName(n)), was: from, tree }
+      db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(renameKey(this.project, name), JSON.stringify(intent))
+      return intent
+    })
+  }
+
+  /** The renames under way in the project (their intents, by slot), as recorded. */
+  renames(): { slot: string; intent: RenameIntent }[] {
+    return this.conn.read((db) => this.renamesIn(db))
+  }
+
+  private renamesIn(db: DatabaseSync): { slot: string; intent: RenameIntent }[] {
+    const prefix = renameKey(this.project, '')
+    const rows = db.prepare('SELECT key, value FROM board_meta WHERE key LIKE ?').all(`${prefix}%`) as { key: string; value: string }[]
+    return rows.flatMap((r) => {
+      const i = intentOf(r.value)
+      return i ? [{ slot: r.key.slice(prefix.length), intent: i }] : []
+    })
+  }
+
+  /** The names reserved by renames under way, lower-cased (#1441): `take` and `carryIn` never make a slot of one. */
+  private reservedIn(db: DatabaseSync): Set<string> {
+    return new Set(this.renamesIn(db).map((r) => r.intent.toName.toLowerCase()))
+  }
+
+  /** A slot's rename intent, if one is recorded. */
+  renameOf(name: string): RenameIntent | null {
+    return this.renames().find((r) => r.slot.toLowerCase() === name.toLowerCase())?.intent ?? null
+  }
+
+  /**
+   * A rename done, by its operation (`token`), in one fenced write: the row and its leases' history renamed to the
+   * reserved name and folder, the operation cleared, the slot as it was, and the intent deleted.
+   */
+  async finishRename(name: string, token: string, intent: RenameIntent): Promise<void> {
+    await this.fenced(name, token, (db) => {
+      // The row and its leases renamed together: the leases' key checked at the write's end, once both are.
+      db.exec('PRAGMA defer_foreign_keys = ON')
+      db.prepare('UPDATE slots SET name = ?, folder = ?, state = ?, op = NULL, op_kind = NULL, op_lease = NULL, op_pid = NULL, op_started = NULL WHERE project = ? AND name = ?').run(intent.toName, intent.to, intent.was, this.project, name)
+      db.prepare('UPDATE slot_leases SET slot = ? WHERE project = ? AND slot = ?').run(intent.toName, this.project, name)
+      db.prepare('DELETE FROM board_meta WHERE key = ?').run(renameKey(this.project, name))
+    })
+  }
+
+  /** A rename given up, by its operation, in one fenced write: the slot as it was, the operation cleared, the intent deleted. */
+  async abandonRename(name: string, token: string, intent: RenameIntent): Promise<void> {
+    await this.fenced(name, token, (db) => {
+      this.setIn(db, name, intent.was, {}, { op: null })
+      db.prepare('DELETE FROM board_meta WHERE key = ?').run(renameKey(this.project, name))
+    })
+  }
+
+  /**
+   * Intents no operation owns (none can be made so: an intent is written and deleted with its operation, in the same
+   * writes), cleared. How many.
+   */
+  async clearOrphanRenames(): Promise<number> {
+    return this.conn.write((db) => {
+      let n = 0
+      for (const r of this.renamesIn(db)) {
+        const s = this.slotIn(db, r.slot)
+        if (s?.op?.kind === 'remove') continue
+        db.prepare('DELETE FROM board_meta WHERE key = ?').run(renameKey(this.project, r.slot))
+        n++
+      }
+      return n
+    })
   }
 
   private slotsIn(db: DatabaseSync): Slot[] {
@@ -730,6 +847,8 @@ export interface PoolDeps {
   writerOver?: (w: SlotWriter) => boolean | Promise<boolean>
   /** Removes Hive's own unchanged skill copies from a folder (skillCopies.ts removeCopiesIn), before a slot goes (#1500). */
   removeSkillCopies?: (folder: string) => Promise<unknown>
+  /** A rename's steps (#1441); none: slots aren't renamed. */
+  renamer?: SlotRenamer
   now?: () => number
 }
 
@@ -741,6 +860,51 @@ export function setBuilderCount(fn: ((projectPath: string) => number | Promise<n
 export const builderCountOf = (projectPath: string, fallback: () => number | Promise<number>): number | Promise<number> => (builderCount ? builderCount(projectPath) : fallback())
 
 const newToken = (): string => `o-${randomBytes(8).toString('hex')}`
+
+/**
+ * A rename's intent (#1441), written with its operation: where the slot's folder was, the name and folder reserved for
+ * it, and the state it goes back to (or keeps) once done or given up.
+ */
+export interface RenameIntent {
+  from: string
+  toName: string
+  to: string
+  was: SlotState
+  /** The worktree's identity (its git administrative folder, `SlotRenamer.identity`): only that worktree is moved. */
+  tree: string
+}
+/** board_meta: a slot's rename intent. */
+export const renameKey = (project: string, slot: string): string => `slot_rename:${project}:${slot}`
+function intentOf(v: string): RenameIntent | null {
+  try {
+    const i = JSON.parse(v) as Partial<RenameIntent>
+    return typeof i.from === 'string' && typeof i.toName === 'string' && typeof i.to === 'string' && typeof i.was === 'string' && typeof i.tree === 'string' ? (i as RenameIntent) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * A rename's steps (#1441: an adopted worktree renamed to a generic name), the app's: Repair's helpers
+ * (workspaceMove.ts' `worktreeRenamer`). `who` is the slot's last agent, for the log and the CLIs' records.
+ */
+export interface SlotRenamer {
+  /** A worktree's identity, stable through git's moves (its administrative folder); null when it isn't one git knows. */
+  identity(folder: string): Promise<string | null>
+  /** Before git's move: each CLI's per-folder data copied for the new path; false when any of it couldn't be. */
+  copy(from: string, to: string, who: string): Promise<boolean>
+  /** Git's move of the worktree `tree`; true only when that worktree is then at exactly `to` (else moved back). */
+  move(from: string, to: string, tree: string): Promise<boolean>
+  /** After it: cards' work and sessions' recorded folder follow, only while `tree` is at `to`. Throws when one can't. */
+  follow(from: string, to: string, tree: string): Promise<void>
+  /**
+   * Puts back what `follow` and `move` did to `tree` (never another worktree's), from wherever git lists it (inside
+   * another worktree, a move cut short): true once it is at `from` again.
+   */
+  back(from: string, to: string, tree: string): Promise<boolean>
+  /** Where the worktree `tree` is now: at `from`, at `to`, somewhere else git lists it, or unknown (git couldn't say, or doesn't list it: null). */
+  where(from: string, to: string, tree: string): Promise<'from' | 'to' | 'elsewhere' | null>
+}
 /**
  * The `hive-*` entries in a folder's `.agents/skills` (where Hive puts its skill copies), by name: folders, and links
  * or anything else with that name too (never followed). None only when the skills folder is proved absent; any other
@@ -890,6 +1054,29 @@ export class SlotPool {
     }
   }
 
+  /** A carried lease handed off to a card or lane of its agent's (#1441), `also` in the same write (SlotStore.handOff). */
+  handOff(carried: string, req: { card?: number; lane?: string; agent: string }, also?: (db: DatabaseSync, lease: SlotLease) => void): Promise<SlotLease | null> {
+    return this.store.handOff(carried, req, also)
+  }
+
+  lastLease(name: string): SlotLease | null {
+    return this.store.lastLease(name)
+  }
+
+  /** The renames under way (#1441), and intents no operation owns cleared (SlotStore's). */
+  renames(): { slot: string; intent: RenameIntent }[] {
+    return this.store.renames()
+  }
+
+  clearOrphanRenames(): Promise<number> {
+    return this.store.clearOrphanRenames()
+  }
+
+  /** Where a slot of a name has its folder. */
+  folderFor(name: string): string {
+    return join(this.deps.root, name)
+  }
+
   /** A carried lease for an agent's adopted worktree (#1441); null when it can't be adopted now (see SlotStore.carry). */
   carry(agent: string, slot: { name: string; folder: string; target?: string | null }): Promise<SlotLease | null> {
     return this.store.carry(agent, { ...slot, target: slot.target ?? null })
@@ -1010,6 +1197,19 @@ export class SlotPool {
             if (was.lease) this.store.endIn(db, was.lease, 'interrupted')
             this.store.setIn(db, s.name, 'creating', { warmError: INTERRUPTED }, { op: null, ...job })
           })
+          return
+        }
+        // A rename's (#1441, its intent recorded with it): finished or given up from where git lists the worktree.
+        const intent = was.kind === 'remove' ? this.store.renameOf(s.name) : null
+        if (intent && this.deps.renamer) {
+          const at = await this.deps.renamer.where(intent.from, intent.to, intent.tree)
+          if (at === null) return void log.warn(`Slot ${userText(s.name)}'s rename, cut short: git can't say where it is; left for the next look`)
+          // Not moved yet: given up (renamed again by a later pass, if still free); moved: finished, or put back; somewhere
+          // else (git moved it inside another worktree, and Hive stopped before putting it back): put back, then given up.
+          if (at === 'from') await this.store.abandonRename(s.name, token, intent)
+          else if (at === 'to') await this.carryOut(s.name, token, intent, 'to', () => true)
+          else if (await this.deps.renamer.back(intent.from, intent.to, intent.tree).catch(() => false)) await this.store.abandonRename(s.name, token, intent)
+          else log.warn(`Slot ${userText(s.name)}'s worktree couldn't be put back from where git moved it: it stays out of the pool until it is`)
           return
         }
         const to = await this.look(s)
@@ -1231,6 +1431,69 @@ export class SlotPool {
       this.store.setIn(db, name, state, {}, { op: null })
     })
     return { why: 'notReady', slot: name, state, error: 'the workspace closed' }
+  }
+
+  /**
+   * A free slot renamed (#1441: an adopted worktree given a generic name once nothing holds it), owned by its operation
+   * from the write that reserves its destination (`startRename`) to the write that finishes or gives it up. Its steps
+   * (`deps.renamer`): the CLIs' data copied first (any of it failing: no rename, nothing moved), git's move (checked
+   * where git lists it), cards and sessions following; a step failing after the move puts back what was done. A rename
+   * cut short is the next holder's (`recover`, once this one is gone). `allowed` is asked again before the copy and the
+   * move (the switch, the rules). The new name, or null.
+   */
+  async rename(name: string, allowed: () => boolean = () => true): Promise<string | null> {
+    const s = this.store.slot(name)
+    if (!this.deps.renamer || !s || s.state === 'removing') return null
+    const token = newToken()
+    return this.op(token, async () => {
+      const tree = await this.deps.renamer!.identity(s.folder).catch(() => null)
+      if (!tree) return log.info(`Slot ${userText(name)} keeps its name: its folder isn't a worktree git knows`), null
+      const intent = await this.store.startRename(name, s.state, token, await this.deps.holder.self(), this.deps.root, tree)
+      if (!intent) return null
+      return this.carryOut(name, token, intent, 'from', allowed)
+    })
+  }
+
+  /** A rename's steps from where it is (`at`: git's worktree still at `from`, or already at `to`), then its end. */
+  private async carryOut(name: string, token: string, intent: RenameIntent, at: 'from' | 'to', allowed: () => boolean): Promise<string | null> {
+    const r = this.deps.renamer!
+    const who = this.store.lastLease(name)?.agent ?? name
+    const ok = async (step: () => Promise<boolean>): Promise<boolean> => step().catch((e) => (log.warn(`Renaming slot ${userText(name)} to ${userText(intent.toName)}`, e), false))
+    const giveUp = async (why: string): Promise<null> => {
+      log.info(`Slot ${userText(name)} keeps its name: ${why}`)
+      await this.store.abandonRename(name, token, intent).catch((e) => {
+        if (!(e instanceof OpLost)) throw e
+      })
+      return null
+    }
+    try {
+      if (at === 'from') {
+        if (!allowed()) return await giveUp('renaming is off')
+        if (!(await ok(() => r.copy(intent.from, intent.to, who)))) return await giveUp("its conversations' data couldn't follow")
+        if (!allowed()) return await giveUp('renaming is off')
+        if (!(await ok(() => r.move(intent.from, intent.to, intent.tree)))) {
+          // Not moved, or not where reserved: put back where git can; else the operation and intent stay for recovery.
+          if ((await r.where(intent.from, intent.to, intent.tree)) === 'from' || (await ok(() => r.back(intent.from, intent.to, intent.tree)))) return await giveUp("git couldn't move it")
+          log.warn(`Slot ${userText(name)}'s rename couldn't be put back: it stays out of the pool until it is`)
+          return null
+        }
+      } else if (!(await ok(() => r.copy(intent.from, intent.to, who)))) {
+        if (await ok(() => r.back(intent.from, intent.to, intent.tree))) return await giveUp("its conversations' data couldn't follow")
+        return null
+      }
+      const followed = await ok(async () => (await r.follow(intent.from, intent.to, intent.tree), true))
+      if (!followed) {
+        if (await ok(() => r.back(intent.from, intent.to, intent.tree))) return await giveUp("its cards or sessions couldn't follow")
+        log.warn(`Slot ${userText(name)}'s rename couldn't be put back: it stays out of the pool until it is`)
+        return null
+      }
+      await this.store.finishRename(name, token, intent)
+      log.info(`Slot ${userText(name)} renamed ${userText(intent.toName)} (${userText(intent.to)})`)
+      return intent.toName
+    } catch (e) {
+      if (e instanceof OpLost) return null
+      throw e
+    }
   }
 
   /**

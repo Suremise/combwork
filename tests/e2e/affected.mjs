@@ -180,6 +180,7 @@ export const AREAS = [
   // Branches next to their cards (#1424).
   { paths: ['src/shared/branchCards.ts', 'tests/e2e/gitbranchcards.cjs'], suites: ['gitbranchcards'] },
   // The Progress panel's stages, legend, Solo's lanes, links and old rules marks (#1421).
+  { paths: ['tests/e2e/lanesslots.cjs', 'src/renderer/src/components/ProgressLanes.tsx', 'src/renderer/src/laneSource.ts', 'src/shared/laneBar.ts', 'src/shared/lanes.ts', 'src/main/lanes.ts', 'src/main/slotCards.ts', 'src/shared/progressTabs.ts', 'src/renderer/src/components/Progress.tsx'], suites: ['lanesslots'] },
   { paths: ['src/shared/laneStages.ts', 'src/renderer/src/projectStages.ts', 'tests/e2e/lanestages.cjs'], suites: ['lanestages', 'progresslanes'] },
   { paths: ['src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'tests/e2e/lanestart.cjs'], suites: ['agentrole', 'lanestart'] },
   // The shared list's other user: the Assistant's "Done by the Assistant" (#312).
@@ -215,6 +216,7 @@ export const AREAS = [
   { paths: ['tests/e2e/slotcards.cjs', 'tests/e2e/slotrecovery.cjs', 'src/main/slotCards.ts', 'src/main/laneStart.ts', 'src/main/platform/gitPlatform.ts', 'src/main/workflow/service.ts'], suites: ['slotcards', 'slotrecovery', 'lanestart'] },
   { paths: ['tests/e2e/slotpool.cjs', 'src/main/slots.ts', 'src/main/slotsApp.ts', 'src/main/slotJobs.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts'], suites: ['slotpool', 'slotsessions'] },
   { paths: ['tests/e2e/startfresh.cjs', 'src/main/freshStarts.ts', 'src/shared/freshStarts.ts', 'src/renderer/src/components/NoticeBanners.tsx'], suites: ['startfresh'] },
+  { paths: ['tests/e2e/slotupgrade.cjs', 'src/main/slotMigration.ts', 'src/main/workspaceMove.ts'], suites: ['slotupgrade', 'wsmove', 'repairbranches'] },
   { paths: ['tests/e2e/slotsessions.cjs', 'src/main/agentFolders.ts', 'src/shared/agentFolders.ts', 'src/shared/sessionResume.ts', 'src/shared/resumeAll.ts', 'src/main/sessions.ts'], suites: ['slotsessions'] },
   { paths: ['tests/e2e/p4lane.cjs','src/main/workflow/lineUpdates.ts', 'src/main/workflow/runtime.ts', 'src/main/cardIntents.ts', 'src/main/laneStart.ts', 'src/main/workflow/optionsForm.ts'], suites: ['p4lane'] },
   // The workspace database's small stores (#1018): lanes, card watches and deliveries.

@@ -103,6 +103,7 @@ import { deleteJournalEntry, deleteWorkspaceJournal, editJournalEntry, forgetJou
 import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
+import { migrateSlots, releaseCarried } from './slotMigration'
 import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
 import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
@@ -339,7 +340,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     // The 1.0 upgrade's adoption (#1218, SPEC §16.17): each project's options and its old cards, until it has run once;
     // then what changed in its projects while it was closed, recorded as observed facts (#1217): the cards adopted too.
     const opening = contextWorkspace()!
-    void adoptWorkspace(opening).finally(() => reconcileWorkspace(opening))
+    // Then its agents' worktrees become slots (#1441), each project once, before what changed is observed.
+    void adoptWorkspace(opening)
+      .then(() => migrateSlots(opening))
+      .finally(() => reconcileWorkspace(opening))
     // 0.9's agent templates copied into the 0.9 backup once after the upgrade (#1436), and a quiet notice saying so.
     void copyV09Templates(opening)
       .then(() => sayV09TemplatesOnce(opening))
@@ -665,8 +669,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'board:upgrade': async () => {
       const ws = currentWorkspace()
       const out = await upgradeBoard(ws)
-      // Then the upgrade's adoption, in the background (#1218), and 0.9's templates copied aside (#1436).
-      void adoptWorkspace(ws)
+      // Then the upgrade's adoption, in the background (#1218), its agents' worktrees adopted as slots after it (#1441),
+      // and 0.9's templates copied aside (#1436).
+      void adoptWorkspace(ws).then(() => migrateSlots(ws))
       void copyV09Templates(ws)
         .then(() => sayV09TemplatesOnce(ws))
         .catch((e) => log.warn("copying 0.9's agent templates (tried again at the next open)", e))
@@ -795,6 +800,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workflow:setLevel': (level, platform, change) => setLevelOptions(workspace, level, platform, change),
     'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined, true),
     'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
+    'slots:releaseCarried': (p, agentId) => releaseCarried(workspace, workspace.assertProject(p), String(agentId)),
     'copies:list': (p) => copyViews(workspace, workspace.assertProject(p)),
     'slots:test': async (p, op) => {
       if (app.isPackaged) throw new Error('slots:test is for test copies') // i18n-ignore: a test channel, never shown
