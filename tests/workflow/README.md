@@ -3,8 +3,9 @@
 The acceptance scenarios of SPEC §16.18 (and §16.19's release candidates), each against the test that covers it. Here
 `tests/workflow` is P2's core suite, run with the app's runtime settings (`reconcileActs` on, `harness.ts`). App-level
 unit tests run Hive's main process on a real board (a temporary `hive.db`), and e2e suites (`tests/e2e/*.cjs`) run the
-built app. Written for #1287, P4's acceptance check, and extended for #1358, P5's. A part that a later phase builds is
-marked with that phase rather than left out.
+built app. Written for #1287, P4's acceptance check, and extended for #1358, P5's, and #1425, P6's (with every option
+against its tests: [Options and their tests](#options-and-their-tests)). A part that a later phase builds is marked
+with that phase rather than left out.
 
 ## P4's scenarios
 
@@ -90,11 +91,73 @@ S4, S13, S14 (Hive merges), S47 and S57(e) were proven at core level by their ca
 S21's queue part (a lane started and answered from the window, the Assistant off, through to its verified end) is
 `p5lane` (both lanes end verified, their merge commits the queue's results).
 
+## P6's scenarios (stages, detection, the Version Control tab)
+
+Written for #1425, P6's acceptance check: S19 and S20, and the scenarios whose way in P6 changed (set up through the
+Version Control tab's step or Workflow section, shown on the board by stage). `p6lane` runs them in one app, the
+Assistant off: a Git project added with a builder and a reviewer, Pair from the step, a lane started from the window
+through the queue to Done (Branches & remotes and the Progress panel's hovers on the way); a Solo project; an all-off
+project with two agents in its folder; then S19 and S20.
+
+| Scenario | What it checks | e2e (the app) | Unit (app level, or the core where the card says so) |
+|---|---|---|---|
+| S11 | All off: agents in the project folder commit with trailers; cards move freely; G16 warns; nothing refused | `p6lane` (all off saved in the tab with G16 on; two agents' trailered commits, each card's own; both Done; the user moves a card freely). G16's warning in the app: #1481 (the runtime isn't given the agents' lock records) | `workflow/sharedFolder.test.ts` "S11: …" |
+| S19 | Options changed mid-lane: the lane keeps its rules ("old rules"), the next lane takes the new | `p6lane` (squash saved in the tab while Two is Active: the save names the lane keeping old rules, the mark in Pulse, Two merged with a merge commit); `lanestages` (marks, Apply to cards in flight, a rename sets nothing); `workflowoptions` (the save's warning) | `laneOwnership.test.ts` "S19: …"; `gates.test.ts` "S19: …"; `workflow/lanes.test.ts` "S19: …" |
+| S20 | `.git` removed: Git's rules hold (unknown), None offered; `git init` offers Git back | `p6lane` (the offer, Switch to None, a new card under None's rules); `vcswitch` (the refusal's next step, the warning, `git init` → Git with its options back) | `workflow/scenarios.none.test.ts` "S20: …" (core); `platformSwitch.test.ts` "S20: the repository gone (#1419)" |
+| S36 | Every combination walked Todo → Done; contradictions refused when saved | `workflowoptions` (each contradiction under its rows as chosen, a pasted one refused) | `workflow/combinations.test.ts` "S36: every combination" |
+| S39 | All off: a blocked card starts with a warning; submit → Done with no guard; the user moves anything with no question | `p6lane` (all off saved in the tab: started with the warning, Done on submit, Done → Todo → Done by the user); `boardgates` (S39: no question, no drop where the rules have no column) | `gates.test.ts` "S39: …"; `workflow/scenarios.git.test.ts` "S39: …" |
+| S44 | Solo, one agent in the project folder, no trailers: start → commit → submit → Done (Committed is done) | `p6lane` (Solo from the step; its lane in Pulse while it runs, left out once ended) | `workflow/scenarios.git.test.ts` "S44: …" |
+
+S21 (the Assistant off, a lane from the window) again for P6's way in: `p6lane`'s first lane, started from the board of
+a project set up through the step, ends verified.
+
+## Options and their tests
+
+Every option the Version Control tab offers (SPEC §16.6.1, §16.6.2), for #1122's done-when: each with its unit test, an
+e2e where the window sets it, an e2e where the rule it switches acts in the app, and the values the presets give it
+(`preset()` in `src/shared/workflow/options.ts`) against §16.6.3. **Window**: set in Version Control → Workflow (a row,
+or a preset's Use, or the step's Choose); **inv**: through `workflow:setOptions` (queueFixture's options), which shows
+the rule acting but not the window setting it. N1–N3 share G1–G3's keys; N5 is `stageNames`, N6 `dependenciesDone`
+(G14). Every row also has `workflowOptionsForm.test.ts` "has a row for every option of §16.6.1 and §16.6.2, …", and
+`workflowoptions` checks each group's rows in the window. The preset values are asserted in `workflowOptionsForm.test.ts`
+("Pair is §16.6.3's …", "Team is Darren's …", "Pair (the agent merges) is §16.19.1's …", "Solo (Git) and None's Solo,
+Pair and Team are §16.6.3's (#1425)").
+
+| Option | Key | Solo / Pair / Team (Git; None where it differs) | §16.6.3 | Unit test | e2e: the window sets it | e2e: the rule acts in the app |
+|---|---|---|---|---|---|---|
+| G1 / N1 review | `review` | none / agent / agent; None: none / agent / agentThenYou | Agrees | `workflow/combinations.test.ts` "S36: every combination"; `workflow/scenarios.none.test.ts` "S18: …" | `presetstep`, `p6lane` (Pair through the step); `p4lane`, `p5lane` (a preset's Use); None's N1: #1483 | `p4lane`, `p5lane`, `p6lane` (a reviewer agent); `foryou` (you, inv); `nocode` (no review, Git and None, inv) |
+| G1b reviewers | `reviewers` | 1 / 1 / 1 | Agrees | `workflow/scenarios.git.test.ts` "S57: …" (a quorum of distinct reviewers); `combinations.test.ts` | `workflowoptions` (2 chosen, for its contradiction); saved alone: #1483 | #1483 |
+| G2 / N2 no self-review | `noSelfReview` | false / true / true | Agrees | `workflow/scenarios.git.test.ts` "S6: …"; `agentMoves.test.ts` "S6: …"; `workflow/scenarios.none.test.ts` "S2, S6 (None)" | `workflowoptions` (held on with a reviewer agent; off pasted, refused) | `intents` (review.notAuthor, inv); None's N2: #1483 |
+| G3 / N3 checks before review | `preChecks` | [] / quick / quick + tests | Agrees | `workflow/scenarios.git.test.ts` "S26: …"; `agentMoves.test.ts` "S26: …"; `workflow/scenarios.none.test.ts` "S61: …" | `workflowoptions` (Add Check with its command, saved); `p5lane`, `p6lane` (from the scripts by Pair); None's N3: #1483 | `p4lane`, `p5lane`, `p6lane` (a counted check before submit); `progressgates` (S26, inv); None's N3: #1483 |
+| G4 carry-over | `sameness` | change / change / change | Agrees | `workflow/scenarios.git.test.ts` "S9: …" | `workflowoptions` (Same change, then Exact revision only, each saved) | `workflowoptions` (CarriedOver after a clean rebase; Stale with Exact revision only) |
+| G5 who merges | `finish` | committed / hiveMerges / hiveMerges; None: accept | Agrees | `combinations.test.ts` "S36: …"; `workflow/scenarios.git.test.ts` "S17: …"; `workflow/transitions.test.ts` | `p4lane` (the agent merges), `p5lane`, `p6lane` (Hive merges), `p6lane` (Committed is done by Solo; not checked by All off) | `p4lane` (S17); `p5lane`, `p6lane`, `mergequeue` (the queue); `p6lane` (Committed is done, S44; not checked, S11) |
+| G6 style | `style` | merge / merge / merge | Agrees (Solo —) | `workflow/queueCommits.test.ts` "squash: …"; `workflow/queueStrict.test.ts`; `lineUpdates.test.ts` "after a squash, …" | `workflowoptions` (squash saved); `workflowdefaults` (the workspace's level); `p6lane` (squash mid-lane) | `p5lane` (lane B squashed, inv); `p6lane` (merge commit under old rules) |
+| G7 target | `target` | '' / default branch / default branch | Solo's row says "the branch the project is on": the same in effect (#1482) | `platformSwitch.test.ts` "Hive merges and the agent merges need the project's own target"; `workflowOptionsForm.test.ts` "Pair is §16.6.3's …" | `workflowoptions` (typed; Pair fills the default branch); `p5lane`, `p6lane` (`main` by Pair) | `p5lane`, `p6lane` (into `main`); `mergequeue` (into `integration`, inv); `vcswitch` (OP-29's refusal) |
+| G8 strict | `strict` | false / false / false | Agrees | `workflow/queueStrict.test.ts` "the target moved after the pass: …" | `mergestrict`, `p5lane` (switched on, saved) | `mergestrict`; `p5lane` (lane A's Two and Three) |
+| G9 merge checks | `mergeChecks` | [] / quick / quick + tests | Agrees (Team's per-card tests: #1367) | `workflow/queueChecks.test.ts`; `workflow/queue.test.ts` "S4: …" | `workflowoptions` (Pair fills them, saved); `p5lane`, `p6lane` | `p5scenarios` (S4); `p5lane`, `p6lane` (the queue runs typecheck on the merged result) |
+| G9's install | `mergeInstall` | onManifestChange / onManifestChange / always | Agrees (Built [#1361]) | `workflow/queueChecks.test.ts` "takes its two values; …", "onManifestChange: …", "always: …" | `workflowoptions` (always chosen, saved) | `p5scenarios` (S13: onManifestChange, inv); always: #1483 |
+| G10 your OK | `okBefore` | never / never / labels ui, release | Agrees | `workflow/forYou.test.ts` "G10 under the agent merges (S14's P4 form)"; `workflow/queue.test.ts` "S14: …" | `workflowoptions` (labels typed, saved) | `foryou` (S14, P4's form); `p5scenarios` (S14, the queue); `boardstages`, `lanestages` (Approved waits for your OK); inv |
+| G11 where | `folder` | project / slots / slots; None: project | Agrees (slots = agent worktrees until P7) | `combinations.test.ts` "S36: …"; `workflow/sharedFolder.test.ts` "S29: …"; `gates.test.ts` | `p6lane` (slots by Pair; the project folder by Solo and All off); `workflowdefaults` (slots refused at a level) | `p5lane`, `p6lane` (the builder's worktree; Solo and All off in the project folder) |
+| G12 identity | `identity` | null / the repository's / the repository's | Agrees (On while it can be read) | `workflow/scenarios.git.test.ts` "S15: …"; `agentMoves.test.ts` "S15: …"; `workflow/queueCommits.test.ts` | `p5lane`, `p6lane` (filled by Pair from the repository); edited alone: #1483 | `p6lane` (S15: a personal email refuses submit with the amend command); `p5scenarios` (S47: none, the queue pauses) |
+| G13 stop own runs | `stopOwnRuns` | false / true / true | Agrees | `gates.test.ts` "G13: …", "G13 off (its option): …" | By a preset's Use only (`p4lane`, `p5lane`, `p6lane`); alone: #1483 | #1483 |
+| G14 / N6 dependencies merged | `dependenciesDone` | true / true / true | Agrees | `workflow/scenarios.git.test.ts` "S12: …"; `workflow/transitions.test.ts`; `gates.test.ts` | `workflowdefaults` (Hive's level); a project's own row and None's N6: #1483 | `p6lane` (S12: blocked by an approved, unmerged card, the start refused; started once merged); `boardgates` (a blocked card asks first); None's N6: #1483 |
+| G15 slots up to date | `slotsUpToDate` | false / false / false | §16.6.3's On for Pair and Team waits for slots (Built [#1355]) | P7 | P7 (not in the form) | P7 |
+| G16 shared-folder warning | `sharedFolderWarning` | true / false / false | Agrees (Pair and Team —) | `workflow/sharedFolder.test.ts` "S11: …" | `p6lane` (switched on with All off, saved) | #1481 (no lock records in the app) |
+| G17 reviewers per lane | — | — | P7 | P7 | P7 | P7 |
+| N4 what the work is | `excluded` | node_modules, .venv (every None preset) | **Disagrees**: §16.6.1, §16.6.3 "the whole folder"; §16.3 pre-filled with found build folders (#1482) | `runChecks.test.ts` "a write to a folder the options leave out of the deliverables still counts …" | #1483 | #1483 |
+| N5 stage names | `stageNames` | default names | Agrees | `workflow/stages.test.ts`; `projectWorkflow.test.ts` "a rename alone applies at once …" | `workflowoptions` (a rename saved, applies now; a duplicate refused) | `boardstages` (renamed columns, Git and None); `stagenames` (the Assistant's tool); `lanestages` (hovers and the legend) |
+| N7 file locks | — (Settings → Agents & Worktrees) | as set | Shown, not set | — | `workflowoptions` (shown in None's Set elsewhere) | — |
+
+`pairAgent` (Pair, the agent merges: §16.19.1's P4 row) has its values in `workflowOptionsForm.test.ts` "Pair (the agent
+merges) is §16.19.1's …" and runs in `p4lane`.
+
+**Gaps** (carded): G16's warning in the app (#1481); the window or acting e2e of G1b, G12 (edited), G13, G14's project
+row, `mergeInstall: always`, None's N1–N4 and N6 (#1483); N4's and G7 Solo's wording in SPEC (#1482).
+
 ## Later phases (named here so nothing is missed)
 
 | Phase | Scenarios | Tests so far |
 |---|---|---|
-| P6 | S20 | `workflow/scenarios.none.test.ts` "S20: …" (core) |
 | P7 (slots) | S35, S51, S56 | none yet (P7's cards) |
 
 ## Core-level carry-over and P3's observations
