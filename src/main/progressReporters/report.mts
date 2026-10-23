@@ -351,7 +351,12 @@ interface TimingsFile {
 }
 
 const KEEP_RUNS = 5
-const KEEP_KEYS = 300
+/**
+ * How many keys a timings file keeps (about 75 KB). With 300, newest kept, a busy machine lost a suite's or a daily
+ * command's estimate within hours (#1549): one-off keys (each probe folder's commands, each unit-test selection) pushed
+ * them out. So the keys run only once go first (`evictionOrder`).
+ */
+export const KEEP_KEYS = 1000
 
 /** How many times a read that failed is tried again at once: another runner replacing the file (its rename) can fail it. */
 const READ_TRIES = 20
@@ -381,6 +386,18 @@ function readTimings(file: string): { t: TimingsFile; missing: boolean } | null 
   }
 }
 
+/**
+ * The keys a full timings file gives up, first to last (#1549): those run only once, then those with a history, each
+ * oldest first; never `kept` (the one just recorded, which would otherwise go at once once the file is full of keys
+ * with a history).
+ */
+export function evictionOrder(runs: TimingsFile['runs'], kept: string): string[] {
+  const history = (k: string): number => ((Array.isArray(runs[k]?.ms) ? runs[k].ms.length : 0) > 1 ? 1 : 0)
+  return Object.keys(runs)
+    .filter((k) => k !== kept)
+    .sort((a, b) => history(a) - history(b) || (runs[a].at ?? 0) - (runs[b].at ?? 0))
+}
+
 /** The usual time for `key`: the median of its last few runs, or undefined before its first. */
 export function estimateFor(file: string, key: string): number | undefined {
   const ms = readTimings(file)?.t.runs[key.slice(0, 300)]?.ms
@@ -405,9 +422,7 @@ export function recordTiming(file: string, key: string, ms: number, now = Date.n
     const before = Array.isArray(t.runs[k]?.ms) ? t.runs[k].ms : []
     t.runs[k] = { ms: [...before, Math.round(ms)].slice(-KEEP_RUNS), at: now }
     const keys = Object.keys(t.runs)
-    if (keys.length > KEEP_KEYS) {
-      for (const old of keys.sort((a, b) => (t.runs[a].at ?? 0) - (t.runs[b].at ?? 0)).slice(0, keys.length - KEEP_KEYS)) delete t.runs[old]
-    }
+    if (keys.length > KEEP_KEYS) for (const old of evictionOrder(t.runs, k).slice(0, keys.length - KEEP_KEYS)) delete t.runs[old]
     mkdirSync(dirname(file), { recursive: true })
     writeFileSync(tmp, JSON.stringify(t))
     // A link fails where a file is (EEXIST): another runner's table stays, this run's time is lost. Where links can't be
