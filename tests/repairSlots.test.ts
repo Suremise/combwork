@@ -458,6 +458,39 @@ describe('Delete on slots (#1447, HR1 round 1 findings 2 and 5)', () => {
     }
   })
 
+  it("a slot another Hive's Repair relinks after Delete's check refuses its hold, outside the worktrees folder or in it; nothing recycled, the row and work kept", async () => {
+    const g = await gamma('gamma7', [561, 562])
+    const id = (await ws.projectConfig(g.p)).id!
+    const checked = await projectFolders(ws, g.p)
+    const conn = fileSlotConn(dbFile())
+    try {
+      const slots = new SlotStore(conn, id)
+      const slot = checked.find((f) => f.of.kind === 'slot' && f.folder.toLowerCase() === g.unmerged.toLowerCase())!
+      // Moved for real and relinked outside the project's worktrees folder, as a Repair in the other Hive does.
+      const outside = join(base, 'outside-gamma7')
+      sh(g.p, 'worktree', 'move', g.unmerged, outside)
+      expect(await slots.relocate(slot.name, outside)).toBe(true)
+      expect(await reserveDelete(ws, id, checked, 'd-test7', otherHive)).toEqual({ busy: [slot.name], deleting: false })
+      expect(reservation(id)).toBeUndefined()
+      expect(opsOf(id).filter((o) => o === 'd-test7')).toEqual([])
+      // Delete itself, its check now seeing the outside folder: refused before anything.
+      const { removeProject } = await removal()
+      await expect(run(() => removeProject(g.p, 'delete'))).rejects.toThrow(/Nothing was deleted/)
+      expect(sh(outside, 'log', '-1', '--format=%s')).toBe('unmerged')
+      expect(slots.slot(slot.name)!.folder.toLowerCase()).toBe(outside.toLowerCase())
+      // Relinked to another folder in the project's worktrees folder: refused too (the plan's folder isn't the row's).
+      const inside = join(`${ws.path!}.worktrees`, 'gamma7', 'moved-in')
+      sh(g.p, 'worktree', 'move', outside, inside)
+      expect(await slots.relocate(slot.name, inside)).toBe(true)
+      expect(await reserveDelete(ws, id, checked, 'd-test7b', otherHive)).toEqual({ busy: [slot.name], deleting: false })
+      for (const f of [g.p, g.dirty, g.home, inside]) expect(existsSync(f)).toBe(true)
+      expect(reservation(id)).toBeUndefined()
+      expect(sh(inside, 'log', '-1', '--format=%s')).toBe('unmerged')
+    } finally {
+      conn.close()
+    }
+  })
+
   it("Delete's hold wins: while it recycles, the other Hive can begin nothing on the project's slots or copies, nor make one", async () => {
     const g = await gamma('gamma5', [541, 542])
     const { id, copy } = await withCopy(g)

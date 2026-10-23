@@ -9,7 +9,7 @@ import { projectAgents } from '../shared/defaults'
 import { msg, tr } from '../shared/i18n'
 import type { ProjectFolderOf } from '../shared/types'
 import { folderWhat } from '../shared/projectFolders'
-import { containsPlace } from './fsutil'
+import { containsPlace, samePlace } from './fsutil'
 import { legacyWorktree } from './agentFolders'
 import { existsSync } from 'original-fs'
 import { boardRead, boardWrite, boardWriteOp, cardKeys } from './boardStore'
@@ -244,22 +244,30 @@ export async function deleteBlocks(ws: WorkspaceService, projectPath: string, fo
 /**
  * Delete's reservation of the project's slots and copies (#1447, HR1's round 2), in one write against the rows as they
  * are then: refused, nothing written, if one is held (an operation, a job, a writer, a copy's lease not freed), if a row
- * is there the plan didn't list (made since), or if another Delete holds them; else `token` (this Hive's, held by
+ * is there the plan didn't list (made since) or at another folder than it checked (relinked since), or if another
+ * Delete holds them; else `token` (this Hive's, held by
  * `holder`) becomes every listed row's operation and the project's reservation is recorded, so nothing begins on them
  * and no slot or copy is made until it ends (`trashFolders`, or `releaseDelete`). Null once held, else the folders
  * that refused it.
  */
 export async function reserveDelete(ws: WorkspaceService, id: string, folders: ProjectFolder[], token: string, holder: Holder): Promise<{ busy: string[]; deleting: boolean } | null> {
-  const slots = new Set(folders.filter((f) => f.of.kind === 'slot').map((f) => f.name.toLowerCase()))
-  const copies = new Set(folders.filter((f) => f.of.kind === 'copy').map((f) => f.name.toLowerCase()))
+  // Each row as the plan checked it, by name and folder: a row relinked since (another Hive's Repair) refuses it too, so
+  // the folders Delete recycles are the ones it checked and holds (HR1's round 3).
+  const checked = (kind: 'slot' | 'copy'): Map<string, string> => new Map(folders.filter((f) => f.of.kind === kind).map((f) => [f.name.toLowerCase(), f.folder]))
+  const slots = checked('slot')
+  const copies = checked('copy')
+  const changed = (plan: Map<string, string>, r: { name: string; folder: string }): boolean => {
+    const was = plan.get(r.name.toLowerCase())
+    return was === undefined || !samePlace(was, r.folder)
+  }
   return boardWrite(ws, async () =>
     boardWriteOp(ws, (db) => {
       if (deletingIn(db, id)) return { busy: [], deleting: true }
       const busy: string[] = []
-      const rows = db.prepare('SELECT name, op, job, writer_run FROM slots WHERE project = ?').all(id) as { name: string; op: string | null; job: string | null; writer_run: string | null }[] // i18n-ignore: SQL
-      for (const r of rows) if (!slots.has(r.name.toLowerCase()) || r.op || r.job || r.writer_run) busy.push(r.name)
-      const cs = db.prepare('SELECT name, op, job, EXISTS (SELECT 1 FROM copy_leases l WHERE l.project = copies.project AND l.copy = copies.name AND l.freed_at IS NULL) AS leased FROM copies WHERE project = ?').all(id) as { name: string; op: string | null; job: string | null; leased: number }[] // i18n-ignore: SQL
-      for (const c of cs) if (!copies.has(c.name.toLowerCase()) || c.op || c.job || c.leased) busy.push(c.name)
+      const rows = db.prepare('SELECT name, folder, op, job, writer_run FROM slots WHERE project = ?').all(id) as { name: string; folder: string; op: string | null; job: string | null; writer_run: string | null }[] // i18n-ignore: SQL
+      for (const r of rows) if (changed(slots, r) || r.op || r.job || r.writer_run) busy.push(r.name)
+      const cs = db.prepare('SELECT name, folder, op, job, EXISTS (SELECT 1 FROM copy_leases l WHERE l.project = copies.project AND l.copy = copies.name AND l.freed_at IS NULL) AS leased FROM copies WHERE project = ?').all(id) as { name: string; folder: string; op: string | null; job: string | null; leased: number }[] // i18n-ignore: SQL
+      for (const c of cs) if (changed(copies, c) || c.op || c.job || c.leased) busy.push(c.name)
       if (busy.length) return { busy, deleting: false }
       const at = new Date().toISOString()
       db.prepare("UPDATE slots SET op = ?, op_kind = 'remove', op_lease = NULL, op_pid = ?, op_started = ? WHERE project = ? AND op IS NULL AND job IS NULL AND writer_run IS NULL").run(token, holder.pid, holder.started, id) // i18n-ignore: SQL
