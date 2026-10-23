@@ -2580,6 +2580,17 @@ class SessionManager {
     }
   }
 
+  /**
+   * A line Hive typed into an agent, marked not taken, was taken after all (#1514): what it rang for was read in the same
+   * launch (Codex takes a line typed while a turn runs as queued input, with no prompt Hive sees). The mark goes, so its
+   * input isn't held for a line its CLI no longer has.
+   */
+  lineTaken(projectPath: string, agentId: string, runId: string, why: string): void {
+    const l = this.live.get(liveId(projectPath, agentId))
+    if (!l || l.state.runId !== runId) return
+    this.clearUntaken(l, why)
+  }
+
   /** Whether an agent has a line Hive typed that its CLI hasn't taken (#430): nothing more is typed into it meanwhile. */
   lineUntaken(projectPath: string, agentId: string): boolean {
     return !!this.live.get(liveId(projectPath, agentId))?.state.untakenLine
