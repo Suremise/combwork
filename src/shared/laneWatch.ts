@@ -3,6 +3,7 @@ import { laneStatusText } from './lanes'
 import { columnLabel } from './tasks'
 import { brief, cardPart, WAKE_MAX_BYTES, WATCH_CHANGES, WATCH_MAX_CARDS, type CardChange, type WatchChange } from './watch'
 import { cardRef } from './projectKeys'
+import { HISTORY } from './taskHistory'
 
 /**
  * Lane watches (#531): a watch on whole lanes (main/lanes.ts), not cards. On 10 Oct the Assistant, with seven lanes and
@@ -16,9 +17,9 @@ import { cardRef } from './projectKeys'
  */
 
 /** What a lane watch counts. The default is all but `passed`, `moved` and `paused`. */
-export const LANE_EVENTS = ['failed', 'blocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting', 'passed', 'moved', 'paused', 'unblocked'] as const
+export const LANE_EVENTS = ['failed', 'blocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting', 'passed', 'moved', 'paused', 'unblocked', 'reblocked'] as const
 export type LaneEvent = (typeof LANE_EVENTS)[number]
-export const LANE_DEFAULT_EVENTS: LaneEvent[] = ['failed', 'blocked', 'unblocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting']
+export const LANE_DEFAULT_EVENTS: LaneEvent[] = ['failed', 'blocked', 'unblocked', 'reblocked', 'stalled', 'merge-due', 'ended', 'abandoned', 'waiting']
 /** What counts on the cards beside a lane watch's lanes by default (#726); a card becoming blocked always does. */
 export const LANE_CARD_CHANGES: WatchChange[] = ['comment', 'column', 'verdict']
 /** At most this many lanes named in one watch ("all" follows every running lane, however many). */
@@ -38,6 +39,11 @@ export interface LaneCardMark {
   /** The latest "Review failed" and "Review passed" in its history (ISO), '' for none. */
   f: string
   p: string
+  /**
+   * While blocked (#1475), the latest news on the block (ISO): its blocked reason last set (a changed reason writes a new
+   * "Blocked:" entry) or its agent's latest comment, whichever is later; '' when not blocked. Absent in marks from before.
+   */
+  r?: string
 }
 
 /** A lane as a lane watch last saw it. */
@@ -83,10 +89,23 @@ export function verdictsOf(card: Pick<TaskCard, 'history'>): { failed: { at: str
 }
 
 /** A lane's card mark from the card (null: gone from the watcher's view) and its stall, if any. */
-export function laneCardMark(card: Pick<TaskCard, 'column' | 'blocked' | 'history' | 'archived'> | null, stalled: string | null): LaneCardMark {
-  if (!card || card.archived) return { c: 'gone', b: false, s: false, f: '', p: '' }
+export function laneCardMark(card: (Pick<TaskCard, 'column' | 'blocked' | 'history' | 'archived'> & Partial<Pick<TaskCard, 'comments' | 'agentName'>>) | null, stalled: string | null): LaneCardMark {
+  if (!card || card.archived) return { c: 'gone', b: false, s: false, f: '', p: '', r: '' }
   const v = verdictsOf(card)
-  return { c: card.column, b: !!card.blocked, s: !!stalled, f: v.failed?.at ?? '', p: v.passed?.at ?? '' }
+  return { c: card.column, b: !!card.blocked, s: !!stalled, f: v.failed?.at ?? '', p: v.passed?.at ?? '', r: blockNewsAt(card) }
+}
+
+/**
+ * When a blocked card last had news on its block (#1475), for `reblocked`: its blocked reason last set, or its agent's
+ * latest comment (a builder re-shooting for the user's or the Assistant's OK and saying so). '' when it isn't blocked.
+ */
+export function blockNewsAt(card: Pick<TaskCard, 'blocked' | 'history'> & Partial<Pick<TaskCard, 'comments' | 'agentName'>>): string {
+  if (!card.blocked) return ''
+  const set = card.history.findLast((h) => h.whatText?.id === HISTORY.blocked.id || h.what.startsWith('Blocked: '))?.at ?? ''
+  const name = card.agentName
+  // A comment's author is its agent's name and project: "HB2 (hive)".
+  const said = name ? (card.comments?.findLast((c) => c.by === name || c.by.startsWith(`${name} (`))?.at ?? '') : ''
+  return said > set ? said : set
 }
 
 /** Whether a lane's merge is due: every card passed or done, at least one passed (not yet merged). */
@@ -150,6 +169,9 @@ export function laneHits(before: LaneMark | null | undefined, now: LaneNow, even
     if (on.has('failed') && is.f > was.f) parts.push({ n: c.number, event: 'failed', text: `${cardRef(c.number)} failed review${c.failedBy ? ` (${c.failedBy})` : ''}` })
     if (on.has('passed') && is.p > was.p) parts.push({ n: c.number, event: 'passed', text: `${cardRef(c.number)} passed review${c.passedBy ? ` (${c.passedBy})` : ''}` })
     if (on.has('blocked') && is.b && !was.b) parts.push({ n: c.number, event: 'blocked', text: `${cardRef(c.number)} is blocked`, ...(c.blocked ? { detail: c.blocked } : {}) })
+    // Still blocked, with news on it (#1475): its reason changed, or its agent commented (re-shot for an OK). A mark from
+    // before has no `r`, and a fresh block is told as blocked.
+    if (on.has('reblocked') && is.b && was.b && was.r !== undefined && is.r !== undefined && is.r > was.r) parts.push({ n: c.number, event: 'reblocked', text: `${cardRef(c.number)} is still blocked, with news`, ...(c.blocked ? { detail: c.blocked } : {}) })
     // Its block lifted (#922, #1272): the agent or the user cleared it, so the lane goes on.
     if (on.has('unblocked') && !is.b && was.b) parts.push({ n: c.number, event: 'unblocked', text: `${cardRef(c.number)} is no longer blocked` })
     if (on.has('stalled') && is.s && !was.s) parts.push({ n: c.number, event: 'stalled', text: `${cardRef(c.number)} is stalled`, ...(c.stalled ? { detail: c.stalled } : {}) })
@@ -295,7 +317,8 @@ export function readSavedLaneMark(v: unknown): LaneMark | null {
   for (const [k, c] of entries) {
     const m = c as Record<string, unknown> | null
     if (!/^\d{1,9}$/.test(k) || !m || !COLS.includes(m.c as string) || typeof m.b !== 'boolean' || typeof m.s !== 'boolean' || !iso(m.f) || !iso(m.p)) return null
-    cards[k] = { c: m.c as LaneCardMark['c'], b: m.b, s: m.s, f: m.f, p: m.p }
+    if (m.r !== undefined && !iso(m.r)) return null
+    cards[k] = { c: m.c as LaneCardMark['c'], b: m.b, s: m.s, f: m.f, p: m.p, ...(typeof m.r === 'string' ? { r: m.r } : {}) }
   }
   return { state: r.state as LaneMark['state'], mergeDue: r.mergeDue, ...(r.ms === true ? { ms: true } : {}), cards }
 }

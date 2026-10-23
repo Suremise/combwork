@@ -132,7 +132,7 @@
   "tasks.history.toWorkspace": "Déplacée vers l’espace de travail",
   "tasks.history.unarchived": "Restaurée depuis l’archive",
   "tasks.history.unblocked": "N’est plus bloquée",
-  "tasks.history.watchEnded": "Fin de la surveillance de l’agent {watcher} : {why, select, blocked {la carte est bloquée} reviewer {l’agent {agent} la relit} reviewTaken {sa relecture lui a été retirée} reassigned {réassignée à l’agent {agent}} unassigned {plus assignée à aucun agent} other {{why}}}",
+  "tasks.history.watchEnded": "Fin de la surveillance de l’agent {watcher} : {why, select, blocked {la carte est bloquée} reviewer {l’agent {agent} la relit} reviewTaken {sa relecture lui a été retirée} reassigned {réassignée à l’agent {agent}} unassigned {plus assignée à aucun agent} done {la carte est dans Terminé} laneEnded {son couloir est terminé} laneAbandoned {son couloir a été abandonné} other {{why}}}",
   "tasks.skipped.movedColumn": "déplacée vers {column, select, hold {Suspendu} todo {À faire} doing {En cours} review {Relecture} passed {Validé} done {Terminé} other {{column}}}",
   "tasks.skipped.movedProject": "déplacée vers un autre projet",
   "tasks.skipped.movedStage": "déplacée vers {stage}",

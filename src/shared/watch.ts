@@ -627,14 +627,20 @@ export function cardWakeLine(changes: CardChange[], replies: ReplyNote[], releas
 /**
  * A card that left a watch because the watcher's part in it ended (#420): reassigned to another agent, or reviewed by
  * another. Its agent's or reviewer's name now. 'blocked' is only in watches saved before #481: a blocked card is paused,
- * and stays in the watch now.
+ * and stays in the watch now. #1475: 'done', the card reached Done (merged) where the watch couldn't count it, and
+ * 'laneEnded', the watcher's lane on it ended or was abandoned: nothing more can come of the watch.
  */
 export interface Released {
   number: number
-  why: 'reassigned' | 'reviewer' | 'blocked'
-  /** The agent it was given to or the reviewer reviewing it (null: nobody), or why it is blocked. */
+  why: 'reassigned' | 'reviewer' | 'blocked' | 'done' | 'laneEnded'
+  /** The agent it was given to or the reviewer reviewing it (null: nobody), or why it is blocked; for laneEnded, 'abandoned' or null (ended). */
   detail: string | null
 }
+
+export const RELEASE_REASONS: readonly Released['why'][] = ['reassigned', 'reviewer', 'blocked', 'done', 'laneEnded']
+
+/** Released for good (#1475): the card's loop is over for the watcher, so there is no next card to carry on with on its account. */
+const over = (r: Released): boolean => r.why === 'done' || r.why === 'laneEnded'
 
 /** What happened to a released card, for a wake line: "#354 was reassigned to B4", "#356 is blocked: "…"". */
 function releasedPart(r: Released, full: boolean): string {
@@ -645,19 +651,29 @@ function releasedPart(r: Released, full: boolean): string {
         ? r.detail
           ? `${cardRef(r.number)} is reviewed by ${shortName(r.detail)}`
           : `${cardRef(r.number)}'s review was taken from you`
-        : `${cardRef(r.number)} was reassigned${r.detail ? ` to ${shortName(r.detail)}` : ' (it has no agent now)'}`
+        : r.why === 'done'
+          ? `${cardRef(r.number)} is in Done`
+          : r.why === 'laneEnded'
+            ? `${cardRef(r.number)}'s lane ${r.detail === 'abandoned' ? 'was abandoned' : 'ended'}`
+            : `${cardRef(r.number)} was reassigned${r.detail ? ` to ${shortName(r.detail)}` : ' (it has no agent now)'}`
   return `${head} (your watch on it ended)`
 }
 
-/** The line for a watch whose every card left it (#420): what happened to each, then to drop them and carry on. */
+/**
+ * The line for a watch whose every card left it (#420): what happened to each, then to drop them and carry on. When each
+ * left for good (#1475: Done, its lane ended), there is nothing more to wait for: the agent ends its turn, idle, unless it
+ * has other work, so the next lane's prompt finds it free.
+ */
 export function releasedLine(released: Released[]): string {
   const one = released.length === 1
-  const tail = `. Your card watch has ended: drop ${one ? 'it' : 'them'} from your list and carry on with your next card.`
+  const tail = released.every(over)
+    ? `. Your card watch has ended: there is nothing more to wait for on ${one ? 'it' : 'them'}. Don't watch ${one ? 'it' : 'them'} again; end your turn unless you have other work.`
+    : `. Your card watch has ended: drop ${one ? 'it' : 'them'} from your list and carry on with your next card.`
   for (const full of [true, false]) {
     const line = `[Hive] ${released.map((r) => releasedPart(r, full)).join('; ')}${tail}`
     if (jsonBytes(line) <= WAKE_MAX_BYTES) return line
   }
-  return `[Hive] ${cards(released.map((r) => r.number))} left your watch (reassigned, or reviewed by another)${tail}`
+  return `[Hive] ${cards(released.map((r) => r.number))} left your watch (${released.every(over) ? 'done, or its lane ended' : 'reassigned, or reviewed by another'})${tail}`
 }
 
 /** The line Hive types when a watch's overall limit passes with no change. */
