@@ -269,6 +269,7 @@
   "main.unused.slot.busy": "Hive właśnie go przygotowuje albo usuwa",
   "main.unused.slot.cantCheck": "Hive nie mógł go sprawdzić ({detail})",
   "main.unused.slot.dirty": "{files, plural, one {# plik w nim nie jest zatwierdzony} few {# pliki w nim nie są zatwierdzone} many {# plików w nim nie jest zatwierdzonych} other {# pliku w nim nie jest zatwierdzone}}",
+  "main.unused.slot.editedSkillCopy": "{copies, plural, one {jego folder umiejętności {names} nie jest niezmienioną kopią Hive} few {jego foldery umiejętności {names} nie są niezmienionymi kopiami Hive} many {jego foldery umiejętności {names} nie są niezmienionymi kopiami Hive} other {jego foldery umiejętności {names} nie są niezmienionymi kopiami Hive}}",
   "main.unused.slot.gitRefused": "git go nie usunął ({detail})",
   "main.unused.slot.inFlight": "karta #{card}, która w nim była, jest wciąż scalana",
   "main.unused.slot.leased": "jest wypożyczony agentowi {agent}",
