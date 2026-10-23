@@ -324,7 +324,6 @@
   "agents.settings.appliesNext": "Changes apply the next time {agent} starts; the running session keeps its settings until then.",
   "agents.settings.note": "Note",
   "agents.settings.noteNone": "Optional: what it is for, in your words",
-  "agents.settings.ownWorktree": "Its own worktree",
   "agents.settings.role": "Role",
   "agents.settings.roleNone": "None (its name: {name})",
   "agents.settings.save": "Save",

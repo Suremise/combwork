@@ -328,6 +328,8 @@ interface HiveMessageValues {
   'tips.signInExpired.title': undefined
   'tips.silentUnknown.text': undefined
   'tips.silentUnknown.title': undefined
+  'tips.skillsDelivered.text': undefined
+  'tips.skillsDelivered.title': undefined
   'tips.slotResume.text': undefined
   'tips.slotResume.title': undefined
   'tips.sortTables.text': undefined
@@ -344,10 +346,10 @@ interface HiveMessageValues {
   'tips.taskbarBadge.title': undefined
   'tips.teamPreset.text': undefined
   'tips.teamPreset.title': undefined
+  'tips.teamTemplates.text': undefined
+  'tips.teamTemplates.title': undefined
   'tips.templateNames.text': undefined
   'tips.templateNames.title': undefined
-  'tips.templateWorktrees.text': undefined
-  'tips.templateWorktrees.title': undefined
   'tips.testedClis.text': undefined
   'tips.testedClis.title': undefined
   'tips.tileStrip.text': undefined
@@ -391,6 +393,8 @@ interface HiveMessageValues {
   'tips.workspaceMoved.title': undefined
   'tips.workspaceMovedDefender.text': undefined
   'tips.workspaceMovedDefender.title': undefined
+  'tips.workspaceNotes.text': undefined
+  'tips.workspaceNotes.title': undefined
   'tips.worktreeReuse.text': undefined
   'tips.worktreeReuse.title': undefined
   'tips.worktrees.text': undefined

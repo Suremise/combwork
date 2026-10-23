@@ -2,7 +2,6 @@
 // shows (main's for lostLines, which main words for the removal's confirmation); reuseNote is also the Agent API's, so
 // it words its text in English unless given the window's tr().
 import type { UnusedWorktree, WorktreeReuse } from './types'
-import type { TemplateDeleted } from './templates'
 import { tr } from './i18n'
 import { msg } from './i18n/msg'
 
@@ -38,8 +37,6 @@ const M = {
   alreadyAt: msg({ id: 'workspace.reuse.alreadyAt', defaultMessage: 'reused {branch}, already at {base}', description: 'After adding an agent: it works in an unused worktree again, already up to {base} (main). Lower case: it follows the agent.' }),
   summary: msg({ id: 'workspace.unused.summary', defaultMessage: '{count, plural, one {# unused worktree} other {# unused worktrees}} ({merged, number} merged)', description: "The Overview's line on a project's unused worktrees." }),
   workNotice: msg({ id: 'workspace.unused.workNotice', defaultMessage: "{count, plural, one {# unused worktree has} other {# unused worktrees have}} work that isn't on {known, select, yes {{into}} other {the main branch}}", description: "The Changes tab's notice on unused worktrees holding work." }),
-  hintTitle: msg({ id: 'workspace.unused.hintTitle', defaultMessage: '{count, plural, one {# unused worktree} other {# unused worktrees}} in {many, select, yes {{projects, plural, one {# project} other {# projects}}} other {{project}}}', description: "A notice after deleting a template whose worktree agents left unused worktrees: how many, and in which project (or how many projects)." }),
-  hintDetail: msg({ id: 'workspace.unused.hintDetail', defaultMessage: "The template's worktree agents worked in them. Deleting the template left them as they are: review them in Changes.", description: 'Under the notice of unused worktrees left by a deleted template. Changes is the Git tab\'s page.' })
 }
 
 /** The user guide's heading on kept worktrees. */
@@ -139,17 +136,3 @@ export function unusedWorkNotice(list: UnusedWorktree[]): string | null {
   return tr(M.workNotice, { count: n, known: into ? 'yes' : 'no', into: into ?? '' })
 }
 
-/**
- * The one notice after deleting a template whose worktree agents left unused worktrees (#353), or null: "3 unused
- * worktrees in hive", with the project to review (the one with most).
- */
-export function templateWorktreesHint(left: TemplateDeleted, nameOf: (path: string) => string): { title: string; detail: string; project: string } | null {
-  const list = [...left.unusedWorktrees].filter((u) => u.count > 0).sort((a, b) => b.count - a.count)
-  if (!list.length) return null
-  const n = list.reduce((sum, u) => sum + u.count, 0)
-  return {
-    title: tr(M.hintTitle, { count: n, many: list.length === 1 ? 'no' : 'yes', projects: list.length, project: list.length === 1 ? nameOf(list[0].project) : '' }),
-    detail: tr(M.hintDetail),
-    project: list[0].project
-  }
-}

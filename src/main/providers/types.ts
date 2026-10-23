@@ -61,6 +61,16 @@ export interface LaunchContext {
   /** More instructions for this launch, over the provider's own (the Hive Assistant's role and mode). */
   instructions?: string
   /**
+   * The Workspace notes note as this launch delivers it (#1433: its part for the project, bounded, under its header), on
+   * every provider after Hive's guidance and the launch's instructions; empty or missing: none (switched off, no note).
+   */
+  notes?: string
+  /**
+   * A resume of a conversation Hive gave instructions of its own at an earlier launch, by any agent (SessionRecord.promptAdded,
+   * #1433): its prompt is rendered fresh, so instructions given then and not now leave it.
+   */
+  promptAddedBefore?: boolean
+  /**
    * The provider's override switches (#1167) as read once for this launch (overridesNow), so prepareLaunch and
    * buildCommand agree when one changes meanwhile; read with launchOverrides. Missing: each read as it is now.
    */
@@ -74,6 +84,34 @@ export interface LaunchContext {
   allowBackgroundSessions: boolean
   /** A 200K context window instead of the model's 1M one (capabilities.contextLimit). */
   use200kContext: boolean
+  /**
+   * Hive's record of the skill copies it made in folders (#1431, skillCopies.ts), for CLIs that read copies in the folder
+   * (syncAgentsSkills). Missing: nothing is recorded, and no copy is removed but by its marker and content (tests).
+   */
+  copies?: SkillCopyBook
+  /**
+   * Whether another session of Hive's (not this launch's) runs or is starting in `cwd` (#1431): it may be reading Hive's
+   * skill copies there, so the copies of skills this launch no longer gets stay while one does.
+   */
+  othersHere?: () => boolean
+}
+
+/** One skill copy Hive recorded making in a folder (#1431): its revision is the copy's contentHash, its marker left out. */
+export interface SkillCopyRecord {
+  skill: string
+  project: string
+  revision: string
+}
+
+/**
+ * Hive's record of its skill copies (#1431, the `skill_copies` table): what it made in a folder, at which revision. A
+ * failure to read or write it never stops a launch: unrecorded copies are only kept, never removed.
+ */
+export interface SkillCopyBook {
+  /** The folder's recorded copies, by skill name in lower case. */
+  of(folder: string): Promise<Map<string, SkillCopyRecord>>
+  record(folder: string, project: string, skill: string, revision: string): Promise<void>
+  forget(folder: string, skill: string): Promise<void>
 }
 
 export interface UpdateRetry {

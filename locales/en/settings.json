@@ -707,6 +707,22 @@
     "defaultMessage": "Merges: wait for another Hive",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. Another Hive: the installed Hive and a dev or test Hive on the same machine."
   },
+  "settings.advanced.hive.notes.deliverWorkspaceNotes.desc": {
+    "defaultMessage": "Each agent and the Hive Assistant get the shared note Workspace notes in their instructions when they start, on every CLI and in whichever folder they work: notes about this machine that no committed file should hold. A project's agents get the parts for everyone and their own project's section. Turned off, or with the note empty, nothing is added, from each agent's next session.",
+    "description": "What the advanced setting \"Deliver workspace notes to agents\" does (Settings → Advanced, under Hive). Workspace notes is the name of a shared note: keep it in English, as the Notes view shows it."
+  },
+  "settings.advanced.hive.notes.deliverWorkspaceNotes.title": {
+    "defaultMessage": "Deliver workspace notes to agents",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: Hive gives every agent the shared note Workspace notes when it starts."
+  },
+  "settings.advanced.hive.notes.workspaceNotesMax.desc": {
+    "defaultMessage": "How much of the shared note Workspace notes an agent's instructions get, at most, in bytes. A longer note is cut, and agents are told to read the note for the rest. Every agent reads it at every start, so a short note costs less.",
+    "description": "What the advanced setting \"Workspace notes: most an agent gets\" does (Settings → Advanced, under Hive). Workspace notes is the name of a shared note: keep it in English, as the Notes view shows it."
+  },
+  "settings.advanced.hive.notes.workspaceNotesMax.title": {
+    "defaultMessage": "Workspace notes: most an agent gets",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in bytes: how much of the shared note Workspace notes an agent's instructions get at most."
+  },
   "settings.advanced.hive.progress.lanesShown.desc": {
     "defaultMessage": "How many card-loop lanes the Progress panel shows before its lanes scroll, until you drag the section's top edge (the drag is kept per workspace). A workspace that runs many lanes at once can set its own.",
     "description": "What the advanced setting \"Progress panel: lanes shown\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -850,6 +866,26 @@
   "settings.advanced.hive.showDeveloperFeatures.title": {
     "defaultMessage": "Show developer features",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.desc": {
+    "defaultMessage": "Codex and Copilot read Hive's skills from copies Hive puts in each agent's folder (.agents/skills/hive-…); Claude Code gets them at each launch and leaves nothing behind. Once the last of Hive's agents in a folder stops, Hive can remove its copies, so a CLI you run there yourself doesn't see them. Slots only removes them from slots and agents' worktrees, never the project folder. Everywhere removes them from the project folder too. Never keeps them. Only copies Hive made, and nobody changed since, are removed: never your own skills.",
+    "description": "What the advanced setting \"Remove Hive's skill copies when no agent works in the folder\" does (Settings → Advanced, under Hive). Codex, Copilot and Claude Code are CLIs' names and .agents/skills/hive-… a folder: keep them. Slots only, Everywhere and Never are the setting's choices: use the words its list shows."
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.everywhere": {
+    "defaultMessage": "Everywhere",
+    "description": "A choice of the advanced setting \"Remove Hive's skill copies when no agent works in the folder\": in the project folder too."
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.never": {
+    "defaultMessage": "Never",
+    "description": "A choice of the advanced setting \"Remove Hive's skill copies when no agent works in the folder\": copies stay, as before."
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.slots": {
+    "defaultMessage": "Slots only",
+    "description": "A choice of the advanced setting \"Remove Hive's skill copies when no agent works in the folder\": in every folder but the project folder."
+  },
+  "settings.advanced.hive.skills.removeIdleCopies.title": {
+    "defaultMessage": "Remove Hive's skill copies when no agent works in the folder",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: the copies of Hive's skills it puts in a folder for Codex and Copilot."
   },
   "settings.advanced.hive.slots.removeIdle.desc": {
     "defaultMessage": "A project keeps as many slots as it has builders. A free slot beyond that, unused for a day, is removed: its archive command runs first, and it is kept if that fails. Hive never removes one with an agent or a process in it, a lease, a merge in flight, or work that isn't committed and merged. Turned off, idle slots stay until you remove them.",
@@ -1042,6 +1078,10 @@
   "settings.advanced.unitLabel.agents": {
     "defaultMessage": "agents",
     "description": "Beside the box of an advanced setting that is a number of agents (Settings → Advanced)."
+  },
+  "settings.advanced.unitLabel.bytes": {
+    "defaultMessage": "bytes",
+    "description": "Beside the box of an advanced setting that is a size in bytes (Settings → Advanced), as in \"4096 bytes\"."
   },
   "settings.advanced.unitLabel.captures": {
     "defaultMessage": "captures",

@@ -101,6 +101,7 @@ import { deleteJournalEntry, deleteWorkspaceJournal, editJournalEntry, forgetJou
 import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
+import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
 import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
 import { presetNotNow } from './workflow/presetStep'
@@ -112,6 +113,7 @@ import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCa
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
+import { withSkillDelivered } from '../shared/skillDelivery'
 
 /**
  * What the window is told when a call is refused (#845): thrown as HiveErrors, so the window reads them in its language
@@ -319,6 +321,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     // then what changed in its projects while it was closed, recorded as observed facts (#1217): the cards adopted too.
     const opening = contextWorkspace()!
     void adoptWorkspace(opening).finally(() => reconcileWorkspace(opening))
+    // 0.9's agent templates copied into the 0.9 backup once after the upgrade (#1436), and a quiet notice saying so.
+    void copyV09Templates(opening)
+      .then(() => sayV09TemplatesOnce(opening))
+      .catch((e) => log.warn("copying 0.9's agent templates (tried again at the next open)", e))
     // What failed or interrupted saves and the project-id migration left in the .hive folders (#1016).
     void sweepWorkspaceLeftovers(ws).catch((e) => log.warn('removing leftover temp and backup files', e))
     // Moved since it was last opened (#146)? In the background: the window opens meanwhile, and a banner follows.
@@ -631,8 +637,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'board:upgrade': async () => {
       const ws = currentWorkspace()
       const out = await upgradeBoard(ws)
-      // Then the upgrade's adoption, in the background (#1218).
+      // Then the upgrade's adoption, in the background (#1218), and 0.9's templates copied aside (#1436).
       void adoptWorkspace(ws)
+      void copyV09Templates(ws)
+        .then(() => sayV09TemplatesOnce(ws))
+        .catch((e) => log.warn("copying 0.9's agent templates (tried again at the next open)", e))
       return out
     },
     'board:restore09': () => {
@@ -879,10 +888,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'agents:swap': (p, id, other) => projectAgents.swapAgents(p, id, other),
     'agents:place': (p, layout, cells) => projectAgents.placePanes(p, layout, cells),
     'templates:list': (p) => templates.listTemplates(p),
-    'templates:save': (p, scope, name, overwrite) => templates.saveTemplate(p, scope, name, overwrite),
+    'templates:save': (p, scope, name, overwrite, usePatterns) => templates.saveTemplate(p, scope, name, overwrite, usePatterns === true),
     'templates:plan': (p, scope, file, from, names) => templates.templatePlan(p, scope, file, from, names),
-    'templates:load': (p, scope, file, expected, from, removeOld, names) => templates.loadTemplate(p, scope, file, expected, from, removeOld, names),
-    'templates:addAgent': (p, scope, file, index, from) => templates.addAgentFromTemplate(p, scope, file, index, from),
+    'templates:load': (p, scope, file, expected, from, names) => templates.loadTemplate(p, scope, file, expected, from, names),
+    'templates:addAgent': (p, scope, file, index, from, name) => templates.addAgentFromTemplate(p, scope, file, index, from, name),
     'templates:all': () => templates.listAllTemplates(),
     'templates:rename': (ref, name) => templates.renameTemplate(ref, name),
     'templates:update': (ref, edited, savedAt) => templates.updateTemplate(ref, edited, savedAt),
@@ -1042,6 +1051,13 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return s
     },
     'skills:openFolder': () => void shell.openPath(workspace.skillsDir),
+    'skills:setDelivered': async (p, name, on) => {
+      if (typeof name !== 'string' || !skills.validSkillName(name)) throw hiveError(msg({ id: 'content.skill.deliveredName', defaultMessage: 'That is not a skill name.', description: 'An error switching a skill on or off for agents (Skills → Delivered to agents): the name given is not a valid skill name.' }))
+      if (p) await workspace.mutateProjectConfig(workspace.assertProject(p), (cfg) => ({ skillDelivery: withSkillDelivered(cfg.skillDelivery, name, on === true) }))
+      else await workspace.saveWorkspaceConfigWith((c) => ({ skillDelivery: withSkillDelivered(c.skillDelivery, name, on === true) }))
+      emit({ type: 'skills-changed' })
+      workspace.scheduleRefresh()
+    },
 
     'mcp:list': () => mcp.listMcp(),
     'mcp:setGlobal': async (name, enabled, expected, projects) => {

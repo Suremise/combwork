@@ -1307,6 +1307,14 @@
     "defaultMessage": "An agent silent with its state unknown",
     "description": "A tip's title."
   },
+  "tips.skillsDelivered.text": {
+    "defaultMessage": "The switch beside each Hive skill, in the Skills view or a project's Skills tab, says whether agents get it (Delivered to agents). Copies Hive puts in a folder for Codex and Copilot are removed once no agent works there, as Settings → Advanced says.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Codex and Copilot are CLIs' names."
+  },
+  "tips.skillsDelivered.title": {
+    "defaultMessage": "Choose which skills agents get",
+    "description": "A tip's title."
+  },
   "tips.slotResume.text": {
     "defaultMessage": "A builder's conversation stays in its card's slot. Once the card ends, Resume All leaves it so the slot stays free for new work; its own Resume takes the slot back while nothing else has used it.",
     "description": "A tip. A slot is a worktree Hive lends to a card. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1371,20 +1379,20 @@
     "defaultMessage": "Several builders? Try the Team preset",
     "description": "A tip's title (glossary 2.1: Team, preset)."
   },
+  "tips.teamTemplates.text": {
+    "defaultMessage": "The Templates view’s Hive group has ready-made teams: Solo, Pair, Pair: one provider, Team 3×3, Team 6×6 and Team 6 + pool, with builders and reviewers paired. Loading one offers to switch the project to the preset it suits.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands, and of Hive's own templates: keep them as Hive shows them. Glossary: builder, reviewer, preset."
+  },
+  "tips.teamTemplates.title": {
+    "defaultMessage": "Start from one of Hive’s templates",
+    "description": "A tip's title. Glossary: template."
+  },
   "tips.templateNames.text": {
     "defaultMessage": "Agent names are unique across the workspace. Loading a template from another project, give its agents new names in the list beside the template's own: Load template waits until none is taken.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.templateNames.title": {
     "defaultMessage": "Name a template's agents as you load it",
-    "description": "A tip's title."
-  },
-  "tips.templateWorktrees.text": {
-    "defaultMessage": "Loading a template puts an agent back in the clean worktree of its name, its branch left as it is, instead of making a new one. Old worktrees that are merged and clean can go too: tick the box in the Load dialog.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
-  },
-  "tips.templateWorktrees.title": {
-    "defaultMessage": "Templates reuse worktrees",
     "description": "A tip's title."
   },
   "tips.testedClis.text": {
@@ -1557,6 +1565,14 @@
   },
   "tips.workspaceMovedDefender.title": {
     "defaultMessage": "Defender exclusions follow a moved workspace",
+    "description": "A tip's title."
+  },
+  "tips.workspaceNotes.text": {
+    "defaultMessage": "Workspace notes, pinned first in Shared Notes, is for what's true of this machine, like a full path. Every agent gets it when it starts, in any folder, so it needn't go in a committed AGENTS.md. A section headed with a project's name is that project's alone.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Workspace notes is a shared note's name and AGENTS.md a file name: keep both in English."
+  },
+  "tips.workspaceNotes.title": {
+    "defaultMessage": "Notes about this machine for every agent",
     "description": "A tip's title."
   },
   "tips.worktreeReuse.text": {

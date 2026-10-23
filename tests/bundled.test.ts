@@ -438,9 +438,10 @@ describe("Codex's copies of a session's skills", () => {
     writeFileSync(join(dir, '.hive-example.hive-old-1-1', 'SKILL.md'), 'v1')
     writeFileSync(join(dir, '.hive-example.hive-old-1-1', '.hive-copy'), JSON.stringify({ hash: 'old' }))
     mkdirSync(join(dir, '.hive-example.hive-new-1-1'), { recursive: true })
-    // And one for a skill the session no longer gets: it comes back as Hive's copy, then goes like any such copy.
+    // And one for a skill the session no longer gets: it comes back as Hive's copy, then goes like any such copy (its
+    // content still its marker's hash: unchanged since Hive made it, #1431).
     mkdirSync(join(dir, '.hive-gone.hive-old-1-2'), { recursive: true })
-    writeFileSync(join(dir, '.hive-gone.hive-old-1-2', '.hive-copy'), JSON.stringify({ hash: 'x' }))
+    writeFileSync(join(dir, '.hive-gone.hive-old-1-2', '.hive-copy'), JSON.stringify({ hash: await contentHash(join(dir, '.hive-gone.hive-old-1-2')) }))
     const out = await sync(cwd, [{ name: 'example', sourcePath: example }])
     expect(readdirSync(dir).sort()).toEqual(['hive-example'])
     expect(readFileSync(join(dir, 'hive-example', 'SKILL.md'), 'utf8')).toBe('v2')

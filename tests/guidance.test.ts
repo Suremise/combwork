@@ -11,6 +11,7 @@ import { taskPrompt } from '../src/shared/tasks'
 import { ASSISTANT_ONLY_TOOLS, assistantTools } from '../src/shared/assistantTools'
 import { parseSkillFrontmatter, skillFor } from '../src/main/skills'
 import type { SkillAudience, TaskCard } from '../src/shared/types'
+import { WORKSPACE_NOTES_PATH } from '../src/shared/workspaceNotes'
 
 const ROOT = join(__dirname, '..')
 const SKILLS = join(ROOT, 'resources', 'skills')
@@ -39,6 +40,18 @@ describe('the session contract', () => {
     for (const n of forAssistant) expect(skillFor(catalog.get(n)!.audience, 'assistant'), n).toBe(true)
     // Unknown names written as "<name> skill" fail too.
     for (const n of [agent, assistant, controlRules('agents')].flatMap(skillsNamed)) expect(catalog.has(n), n).toBe(true)
+  })
+
+  it('names only the skills delivered: one switched off leaves the contract, the rest stay (#1431)', () => {
+    const named = (text: string): string[] => [...catalog.keys()].filter((n) => n.includes('-') && new RegExp(`\\b${n}\\b`).test(text))
+    const all = named(agent)
+    for (const off of all) {
+      const without = hiveInstructions('web', 'agent', true, new Set([off]))
+      expect(named(without), off).toEqual(all.filter((n) => n !== off))
+      // The board rules stay whatever is switched off.
+      expect(without, off).toMatch(/Board rules, whatever a skill says, or if it is missing/)
+    }
+    expect(named(hiveInstructions('web', 'agent', true, new Set(all)))).toEqual([])
   })
 
   it('keeps the board boundaries a session needs when its skills are missing', () => {
@@ -221,6 +234,24 @@ describe('board-hygiene', () => {
     expect(skill.text).toMatch(/On Hold and Done are the user's: change nothing there unless they ask\./)
     expect(catalog.get('coordinate-agents')!.text).toMatch(/the board-hygiene skill\./)
     expect(catalog.get('run-lanes')!.text).toMatch(/an out-of-date blocked reason \(board-hygiene\)/)
+  })
+})
+
+// #1433 (#873): where each kind of note goes is the workspace-note skill's, and the note it names is the one Hive
+// delivers; the session contract carries neither the table nor the note's text (it comes after, at launch).
+describe('workspace-note: where each kind of note goes', () => {
+  it('routes machine notes to Workspace notes, and the rest where they belong; the contract leaves it to the skill', () => {
+    const skill = catalog.get('workspace-note')!
+    expect(skill.audience).toBe('all')
+    expect(skill.text).toContain('## Where each kind of note goes')
+    for (const [kind, where] of [
+      ['Project rules', "the project's `AGENTS.md`"],
+      ['Allow rules', "the project's `.claude/settings.json`"],
+      ['What one lane or card needs', 'its brief'],
+      ['About this machine or person', `the shared note \`${WORKSPACE_NOTES_PATH}\``]
+    ]) expect(skill.text, kind).toMatch(new RegExp(`\\| ${kind}[^\\n]*\\| ${where.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))
+    expect(skill.text).toMatch(/Only the user and the Hive Assistant write it/)
+    for (const text of [hiveInstructions('web'), hiveInstructions('', 'assistant')]) expect(text).not.toMatch(/Workspace notes/)
   })
 })
 

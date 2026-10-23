@@ -24,6 +24,7 @@ import { fmt, language, msg, tr, type Msg } from './i18n'
 import { INBOX_SWITCH_ID } from './inboxSwitches'
 import { SAFEGUARD_DEFAULTS } from './safeguards'
 import type { ProviderId } from './types'
+import { WORKSPACE_NOTES_MAX } from './workspaceNotes'
 
 /**
  * Text as data (#767): a message, or a message with its values (a value can be text of its own, formatted in the same
@@ -220,6 +221,18 @@ export const ASSISTANT_OTHER_MCP = 'hive.assistant.otherMcpServers'
 
 /** Project agents get Hive's guidance with Hive's tools (#1285, #966 row 13): index.ts's hiveGuidance and the hive MCP server. */
 export const HIVE_GUIDANCE = 'hive.guidance'
+
+/** Hive delivers the Workspace notes note at each launch (#1433, #873): main's workspaceNotes.ts. */
+export const DELIVER_WORKSPACE_NOTES = 'hive.notes.deliverWorkspaceNotes'
+
+/** How much of the Workspace notes note a launch delivers at most, in bytes (#1433): main's workspaceNotes.ts and the note's editor. */
+export const WORKSPACE_NOTES_MAX_ID = 'hive.notes.workspaceNotesMax'
+
+/**
+ * Where Hive removes its skill copies (.agents/skills/hive-*) once no agent of Hive's works in the folder (#1431, #966 row
+ * 15): `slots` in every folder but the project folder, `everywhere`, or `never`. Read by main's skillCopies.ts.
+ */
+export const SKILLS_REMOVE_IDLE_COPIES = 'hive.skills.removeIdleCopies'
 
 /**
  * Whether right-click goes to a provider's CLI rather than Hive's copy/paste (#737): `<provider>.mouse.rightClickToCli`,
@@ -800,6 +813,57 @@ const SOURCES: readonly AdvancedSource[] = [
     kind: 'boolean',
     default: true,
     applies: 'sessions'
+  },
+  // Workspace notes (#1433, #873): machine-specific notes reach every agent at launch, in any folder and on every CLI.
+  {
+    id: DELIVER_WORKSPACE_NOTES,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.notes.deliverWorkspaceNotes.title', defaultMessage: 'Deliver workspace notes to agents', description: "An advanced setting's title (Settings → Advanced), listed under Hive: Hive gives every agent the shared note Workspace notes when it starts." }),
+    desc: msg({
+      id: 'settings.advanced.hive.notes.deliverWorkspaceNotes.desc',
+      defaultMessage: "Each agent and the Hive Assistant get the shared note Workspace notes in their instructions when they start, on every CLI and in whichever folder they work: notes about this machine that no committed file should hold. A project's agents get the parts for everyone and their own project's section. Turned off, or with the note empty, nothing is added, from each agent's next session.",
+      description: 'What the advanced setting "Deliver workspace notes to agents" does (Settings → Advanced, under Hive). Workspace notes is the name of a shared note: keep it in English, as the Notes view shows it.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions'
+  },
+  {
+    id: WORKSPACE_NOTES_MAX_ID,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.notes.workspaceNotesMax.title', defaultMessage: 'Workspace notes: most an agent gets', description: "An advanced setting's title (Settings → Advanced), followed by its value in bytes: how much of the shared note Workspace notes an agent's instructions get at most." }),
+    desc: msg({
+      id: 'settings.advanced.hive.notes.workspaceNotesMax.desc',
+      defaultMessage: "How much of the shared note Workspace notes an agent's instructions get, at most, in bytes. A longer note is cut, and agents are told to read the note for the rest. Every agent reads it at every start, so a short note costs less.",
+      description: 'What the advanced setting "Workspace notes: most an agent gets" does (Settings → Advanced, under Hive). Workspace notes is the name of a shared note: keep it in English, as the Notes view shows it.'
+    }),
+    kind: 'number',
+    default: WORKSPACE_NOTES_MAX,
+    min: 512,
+    max: 32768,
+    unit: 'bytes',
+    applies: 'sessions'
+  },
+  // Hive's skill copies for Codex and Copilot outlive their sessions (#1431, #966 row 15): a CLI run on its own in the
+  // folder would still see them. Removed by default where Hive's own folders are (slots), kept in the project folder.
+  {
+    id: SKILLS_REMOVE_IDLE_COPIES,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.title', defaultMessage: "Remove Hive's skill copies when no agent works in the folder", description: "An advanced setting's title (Settings → Advanced), listed under Hive: the copies of Hive's skills it puts in a folder for Codex and Copilot." }),
+    desc: msg({
+      id: 'settings.advanced.hive.skills.removeIdleCopies.desc',
+      defaultMessage:
+        "Codex and Copilot read Hive's skills from copies Hive puts in each agent's folder (.agents/skills/hive-…); Claude Code gets them at each launch and leaves nothing behind. Once the last of Hive's agents in a folder stops, Hive can remove its copies, so a CLI you run there yourself doesn't see them. Slots only removes them from slots and agents' worktrees, never the project folder. Everywhere removes them from the project folder too. Never keeps them. Only copies Hive made, and nobody changed since, are removed: never your own skills.",
+      description: 'What the advanced setting "Remove Hive\'s skill copies when no agent works in the folder" does (Settings → Advanced, under Hive). Codex, Copilot and Claude Code are CLIs\' names and .agents/skills/hive-… a folder: keep them. Slots only, Everywhere and Never are the setting\'s choices: use the words its list shows.'
+    }),
+    kind: 'choice',
+    choices: [
+      { value: 'slots', label: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.slots', defaultMessage: 'Slots only', description: 'A choice of the advanced setting "Remove Hive\'s skill copies when no agent works in the folder": in every folder but the project folder.' }) },
+      { value: 'everywhere', label: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.everywhere', defaultMessage: 'Everywhere', description: 'A choice of the advanced setting "Remove Hive\'s skill copies when no agent works in the folder": in the project folder too.' }) },
+      { value: 'never', label: msg({ id: 'settings.advanced.hive.skills.removeIdleCopies.never', defaultMessage: 'Never', description: 'A choice of the advanced setting "Remove Hive\'s skill copies when no agent works in the folder": copies stay, as before.' }) }
+    ],
+    default: 'slots',
+    applies: 'now'
   },
   // Carrying on (#1432, #966 row 16; shared/inboxSwitches.ts): how Hive gets an agent to read its inbox, one switch each,
   // apart from whether it can read one (its hive tools). None drops an item: off, it stays in the inbox.
@@ -1932,6 +1996,7 @@ const UNIT_LABELS: Record<string, Msg> = {
   lanes: msg({ id: 'settings.advanced.unitLabel.lanes', defaultMessage: 'lanes', description: 'Beside the box of an advanced setting that is a number of card-loop lanes the Progress panel shows (Settings → Advanced).' }),
   agents: msg({ id: 'settings.advanced.unitLabel.agents', defaultMessage: 'agents', description: 'Beside the box of an advanced setting that is a number of agents (Settings → Advanced).' }),
   min: msg({ id: 'settings.advanced.unitLabel.minutes', defaultMessage: 'min', description: 'Beside the box of an advanced setting given in minutes (Settings → Advanced): the unit, short, as in "10 min".' }),
+  bytes: msg({ id: 'settings.advanced.unitLabel.bytes', defaultMessage: 'bytes', description: 'Beside the box of an advanced setting that is a size in bytes (Settings → Advanced), as in "4096 bytes".' }),
   captures: msg({ id: 'settings.advanced.unitLabel.captures', defaultMessage: 'captures', description: "Beside the box of an advanced setting that is a number of the flight recorder's captures (saved recordings of the developer console; Settings → Advanced)." })
 }
 

@@ -30,7 +30,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
 ;(async () => {
   for (const d of [userData, ws, origin, backup, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.writeFileSync(globalConfig, '[user]\n\tname = Test User\n\temail = 1+test@users.noreply.github.com\n[init]\n\tdefaultBranch = main\n[core]\n\tautocrlf = false\n')
-  const gitEnv = { ...lib.baseEnv(), GIT_CONFIG_GLOBAL: globalConfig }
+  const gitEnv = lib.gitEnv({ GIT_CONFIG_GLOBAL: globalConfig })
   const g = (cwd, ...a) => execFileSync('git', a, { cwd, env: gitEnv, encoding: 'utf8' }).trim()
   const commit = (file) => {
     fs.writeFileSync(path.join(alpha, file), `${file}\n`)

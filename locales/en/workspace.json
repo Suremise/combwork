@@ -735,6 +735,30 @@
     "defaultMessage": "Select a note, or create one. Shared notes live in <code>.hive/shared</code> and are available to every project and agent.",
     "description": "The Shared Notes view with no note selected. <code> is a folder: keep .hive/shared as it is."
   },
+  "workspace.notes.workspaceNotes.assistant": {
+    "defaultMessage": "the Assistant",
+    "description": "In the warning that the Workspace notes note is cut for some: the Hive Assistant, which gets the whole note."
+  },
+  "workspace.notes.workspaceNotes.cut": {
+    "defaultMessage": "Over {max, number} bytes for {who}: they get it cut, and are told to read the note for the rest.",
+    "description": "A warning above the Workspace notes note's editor, as you type: what an agent gets of it is longer than the limit (Settings → Advanced). {max} is the limit in bytes, {who} the projects (a list, in the language's way) or the Assistant."
+  },
+  "workspace.notes.workspaceNotes.how": {
+    "defaultMessage": "Every agent and the Assistant get this note in their instructions when they start, on every coding agent and in any folder. A project's agents get the parts for everyone and the section headed with their project's name (<code>## {example}</code>). A change reaches each agent's next launch or new conversation: running agents keep what they started with.",
+    "description": "Above the Workspace notes note's editor: who gets it and when. <code> marks a Markdown heading: keep ## and the project name {example} as they are."
+  },
+  "workspace.notes.workspaceNotes.off": {
+    "defaultMessage": "Delivering it is turned off (Settings → Advanced → Deliver workspace notes to agents): agents don't get it.",
+    "description": "Above the Workspace notes note's editor when its delivery is switched off. Names a setting: use its words as Settings shows them."
+  },
+  "workspace.notes.workspaceNotes.template": {
+    "defaultMessage": "# Workspace notes\n\nNotes about this machine that every agent should know: a full path a command needs, a local tool's version. Rules for anyone who works on a project belong in its AGENTS.md instead.\n",
+    "description": "The text a new Workspace notes note starts with, which the user edits (Markdown: keep the # heading line and the blank lines). Keep Workspace notes in English (the note's name) and AGENTS.md (a file name)."
+  },
+  "workspace.notes.workspaceNotes.title": {
+    "defaultMessage": "Workspace notes",
+    "description": "The title of the shared note Hive gives every agent when it starts (notes about this machine), over its editor. Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told."
+  },
   "workspace.overview.agentLabel": {
     "defaultMessage": "{project} · {agent}",
     "description": "A running agent in the Workspace Overview: its project and name."
@@ -1552,7 +1576,7 @@
     "description": "What could not be refreshed while the skill stays open: shown in \"Could not refresh {what}; last updated …\", with Retry."
   },
   "workspace.skillView.select": {
-    "defaultMessage": "Select a Hive skill to view or edit it. The agents in every project of this workspace get these skills, except those marked for the Hive Assistant.",
+    "defaultMessage": "Select a Hive skill to view or edit it. The agents in every project of this workspace get these skills, except those marked for the Hive Assistant and those switched off beside them (Delivered to agents).",
     "description": "The Skills view with no skill selected."
   },
   "workspace.statusBar.api": {
@@ -1886,14 +1910,6 @@
   "workspace.unused.detached": {
     "defaultMessage": "(detached)",
     "description": "An unused worktree with no branch (a detached HEAD), in the Changes tab's picker."
-  },
-  "workspace.unused.hintDetail": {
-    "defaultMessage": "The template's worktree agents worked in them. Deleting the template left them as they are: review them in Changes.",
-    "description": "Under the notice of unused worktrees left by a deleted template. Changes is the Git tab's page."
-  },
-  "workspace.unused.hintTitle": {
-    "defaultMessage": "{count, plural, one {# unused worktree} other {# unused worktrees}} in {many, select, yes {{projects, plural, one {# project} other {# projects}}} other {{project}}}",
-    "description": "A notice after deleting a template whose worktree agents left unused worktrees: how many, and in which project (or how many projects)."
   },
   "workspace.unused.lostCommits": {
     "defaultMessage": "{count, plural, one {# commit} other {# commits}} on {branch} not on {known, select, yes {{into}} other {any other branch}}",

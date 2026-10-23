@@ -14,7 +14,6 @@ const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
-const { baseEnv } = require('./runContext.cjs')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 15000
@@ -28,7 +27,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const git = (cwd, args) => execFileSync('git', args, { cwd, env: baseEnv(), encoding: 'utf8' }).trim()
+const git = (cwd, args) => execFileSync('git', args, { cwd, env: lib.gitEnv(), encoding: 'utf8' }).trim()
 const branches = (cwd) => git(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads']).split(/\r?\n/)
 const configOf = (project) => JSON.parse(fs.readFileSync(path.join(project, '.hive', 'project.json'), 'utf8'))
 const agentsOf = (project) => configOf(project).agents

@@ -924,6 +924,26 @@ export const COPIES_STEP: SchemaStep = {
 }
 
 /**
+ * Hive's skill copies in folders' .agents/skills (#1431, SPEC §16.15 C row 15; Codex and Copilot): which copy Hive made in
+ * which folder, at which revision (the copy's contentHash, its marker left out). A clean-up removes a copy only when this
+ * record and the copy's marker both say Hive made it and its content is still that revision (skillCopies.ts). `project`
+ * is the project folder the copy's session was in: Slots only compares the folder with it.
+ */
+export const SKILL_COPIES_STEP: SchemaStep = {
+  name: 'skill copies',
+  ddl: [
+    `CREATE TABLE skill_copies (
+      folder   TEXT NOT NULL COLLATE NOCASE,
+      skill    TEXT NOT NULL COLLATE NOCASE,
+      project  TEXT NOT NULL COLLATE NOCASE,
+      revision TEXT NOT NULL,
+      made_at  TEXT NOT NULL,
+      PRIMARY KEY (folder, skill)
+    ) STRICT, WITHOUT ROWID`
+  ]
+}
+
+/**
  * Sessions on leases (#1434, SPEC §16.10.3): `sessions.lease`, the slot lease a session is bound to (set when it starts in
  * a slot; null in the project folder or a home; changed only by `rebindSession`, agentFolders.ts, in the lease change's
  * own write); `slot_leases.end_rev`, the slot's head once its ended lease's writer has drained (a free slot still there
@@ -945,7 +965,7 @@ export const SESSION_LEASES_STEP: SchemaStep = {
 }
 
 /** The 1.0 group's steps (P3's, then P4's, then P5's, then P7's), in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP, SLOTS_STEP, COPIES_STEP, SESSION_LEASES_STEP]
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP, SLOTS_STEP, COPIES_STEP, SKILL_COPIES_STEP, SESSION_LEASES_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {
@@ -1043,6 +1063,9 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'queuePauses.ofProject': { sql: 'SELECT target FROM workflow_queue_pauses WHERE project = ?', args: ['p'], index: 'PRIMARY KEY' },
   // queueControls.ts (#1356): when the user saw a project's returned entries.
   'queueSeen.ofProject': { sql: 'SELECT entry, seen_at FROM workflow_queue_seen WHERE project = ?', args: ['p'], index: 'PRIMARY KEY' },
+  // skillCopies.ts (#1431): a folder's copies, one copy's record.
+  'skillCopies.of': { sql: 'SELECT skill, project, revision, made_at FROM skill_copies WHERE folder = ?', args: ['D:\\ws\\p'], index: 'PRIMARY KEY' },
+  'skillCopies.one': { sql: 'SELECT revision FROM skill_copies WHERE folder = ? AND skill = ?', args: ['D:\\ws\\p', 'handover'], index: 'PRIMARY KEY' },
   // queueRunner.ts (through factStore.ts): a target's lease, a lease by id (holds), its processes, a target's folders.
   'queueRunners.of': { sql: 'SELECT * FROM queue_runners WHERE project = ? AND target = ?', args: ['p', 'main'], index: 'PRIMARY KEY' },
   'queueRunners.holds': { sql: 'SELECT 1 FROM queue_runners WHERE lease = ? AND token = ?', args: ['l1', 't1'], index: 'sqlite_autoindex_queue_runners_1' },

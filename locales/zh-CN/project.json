@@ -293,6 +293,7 @@
   "project.skills.addLocal": "从文件（.md 或 .zip）为 {provider} 添加本地技能…",
   "project.skills.assistantOnly": "{count, plural, =1 {有 # 个 Hive 技能仅供 Hive Assistant 使用，因此未列出：此项目的智能体不会获得它。} other {有 # 个 Hive 技能仅供 Hive Assistant 使用，因此未列出：此项目的智能体不会获得它们。}}",
   "project.skills.delete": "删除技能",
+  "project.skills.deliveredNote": "每个开关表示此项目的智能体是否从下一次会话起获得该技能（向智能体提供）。在“技能”视图中关闭的技能在所有项目中都关闭。",
   "project.skills.editInWorkspace": "在工作区的“技能”视图中编辑（Hive 技能由所有项目共享）",
   "project.skills.heading": "智能体可用的技能",
   "project.skills.hive": "Hive",

@@ -101,7 +101,7 @@ if (require.main === module) {
     for (const d of [dir, alpha]) fs.mkdirSync(d, { recursive: true })
     // A Git project from the start (#1416: Hive records the version control it finds, and shows Git's sections for Git
     // only); the cases add its commits.
-    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: alpha, env: lib.baseEnv(), stdio: 'pipe' })
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: alpha, env: lib.gitEnv(), stdio: 'pipe' })
     const cenv = lib.fakeClaude(userData, claudeHome, [alpha])
     const cfgFile = path.join(userData, 'config.json')
     const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))

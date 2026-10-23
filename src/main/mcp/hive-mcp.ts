@@ -284,7 +284,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_write_shared_note',
-    description: "Create or overwrite a shared note (markdown) in .hive/shared; append=true adds to the end. expectedRevision (from reading it): written only if the note hasn't changed since, else refused with its current revision. Replies with the path, size and new revision.",
+    description: "Create or overwrite a shared note (markdown) in .hive/shared; append=true adds to the end. expectedRevision (from reading it): written only if the note hasn't changed since, else refused with its current revision. \"Workspace notes.md\", which Hive gives every agent at launch, only the user and the Assistant write. Replies with the path, size and new revision.",
     inputSchema: {
       type: 'object',
       properties: { path: { type: 'string' }, content: { type: 'string' }, append: { type: 'boolean' }, expectedRevision: { type: 'string' } },
@@ -928,7 +928,9 @@ const offered = tools.filter((t) => (t.name !== 'hive_console' || DEV_CONSOLE) &
 
 // The Assistant's journal rule while its journal is on (#1032): the kinds it may store come from Hive.
 const JOURNAL_SCOPE = ASSISTANT && JOURNAL ? (process.env.HIVE_JOURNAL_SCOPE ?? '').split(',').filter(Boolean) : null
-const INSTRUCTIONS = withJournal(hiveInstructions(PROJECT, ASSISTANT ? 'assistant' : 'agent', process.env.HIVE_PROGRESS_COMMANDS !== '0'), JOURNAL_SCOPE)
+// The skills the session isn't given (#1431: switched off in Skills), which its instructions don't name.
+const SKILLS_OFF = new Set((process.env.HIVE_SKILLS_OFF ?? '').split(',').map((n) => n.trim().toLowerCase()).filter(Boolean))
+const INSTRUCTIONS = withJournal(hiveInstructions(PROJECT, ASSISTANT ? 'assistant' : 'agent', process.env.HIVE_PROGRESS_COMMANDS !== '0', SKILLS_OFF), JOURNAL_SCOPE)
 
 /** A project agent given Hive's tools without its guidance (#1285: Settings → Advanced, Hive's guidance for agents). */
 const GUIDED = ASSISTANT || process.env.HIVE_GUIDANCE !== '0'

@@ -104,8 +104,8 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const zeroSeen = async () => (await view())?.recent.find((r) => r.card === zero.n && r.outcome === 'returned')?.seen ?? null
     check('…but not seen: its queue card is filtered out', (await card.count()) === 0 && (await zeroSeen()) === null)
     // A dialog over the panel, then all projects: shown, but covered.
-    await page.getByRole('button', { name: 'Task Board' }).click()
-    await page.locator(`.task-card[data-task="${zero.n}"]`).click()
+    await q.showBoard(page)
+    await q.openByTitle(page, zero.n)
     const dialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
     await until(async () => (await dialog.count()) === 1, HUNG_MS)
     await projectFilter.evaluate((el) => {

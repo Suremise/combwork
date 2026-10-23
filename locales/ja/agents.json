@@ -322,7 +322,6 @@
   "agents.settings.appliesNext": "変更は次に{agent}を起動したときに適用されます。それまで実行中のセッションは今の設定のままです。",
   "agents.settings.note": "メモ",
   "agents.settings.noteNone": "任意：何のためのエージェントか、あなたの言葉で",
-  "agents.settings.ownWorktree": "専用のワークツリー",
   "agents.settings.save": "保存",
   "agents.settings.saving": "保存中…",
   "agents.settings.stopToChange": "— 変更するには{agent}を停止してください",

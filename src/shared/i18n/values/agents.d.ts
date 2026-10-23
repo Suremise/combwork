@@ -324,7 +324,6 @@ interface HiveMessageValues {
   'agents.settings.appliesNext': { agent: string | number }
   'agents.settings.note': undefined
   'agents.settings.noteNone': undefined
-  'agents.settings.ownWorktree': undefined
   'agents.settings.save': undefined
   'agents.settings.saving': undefined
   'agents.settings.stopToChange': { agent: string | number }

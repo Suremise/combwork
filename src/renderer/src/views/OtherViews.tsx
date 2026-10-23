@@ -13,6 +13,8 @@ import { call, errorMessage } from '../api'
 import { clearEditorDraft, editorDraft, onEditorDrafts, setEditorDraft } from '../editorDrafts'
 import { runCommand, commandKeybinding } from '../commands'
 import { DocEditor } from '../components/DocEditor'
+import { workspaceNotesNotice, workspaceNotesTemplate, workspaceNotesTitle } from '../components/WorkspaceNotes'
+import { workspaceNotesPath } from '@shared/workspaceNotes'
 import { CodeEditor } from '../components/Editors'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { Icon, IconButton, LoadFailed, Markdown, StaleNote, Switch, useContextMenu } from '../components/ui'
@@ -52,7 +54,7 @@ const M = {
   deleteNote: msg({ id: 'workspace.notes.delete', defaultMessage: 'Delete note', description: "A button over an open shared note." }),
   skillLoadTarget: msg({ id: 'workspace.skillView.loadTarget', defaultMessage: 'the skill', description: 'What could not be loaded: shown in "Could not load {what}: {error}", with Retry.' }),
   skillRefreshTarget: msg({ id: 'workspace.skillView.refreshTarget', defaultMessage: 'the skill', description: 'What could not be refreshed while the skill stays open: shown in "Could not refresh {what}; last updated …", with Retry.' }),
-  selectSkill: msg({ id: 'workspace.skillView.select', defaultMessage: 'Select a Hive skill to view or edit it. The agents in every project of this workspace get these skills, except those marked for the Hive Assistant.', description: 'The Skills view with no skill selected.' }),
+  selectSkill: msg({ id: 'workspace.skillView.select', defaultMessage: 'Select a Hive skill to view or edit it. The agents in every project of this workspace get these skills, except those marked for the Hive Assistant and those switched off beside them (Delivered to agents).', description: 'The Skills view with no skill selected.' }),
   skillGone: msg({ id: 'workspace.skillView.gone', defaultMessage: 'The skill <b>{name}</b> no longer exists in this workspace. It may have been deleted or renamed.', description: 'The Skills view, for a skill deleted or renamed since it was chosen. <b> is bold.' }),
   ok: msg({ id: 'workspace.skillView.ok', defaultMessage: 'OK', description: 'The Skills view, under a skill that no longer exists: closes it.' }),
   mcpFormat: msg({ id: 'workspace.mcpView.format', defaultMessage: "**Format** — one server per file, in Claude Code's .mcp.json format (Hive converts it for other providers) plus an optional `description`:", description: "An MCP server's view, beside its editor (Markdown: keep ** and the backticks). An example follows." }),
@@ -233,6 +235,14 @@ export function NotesView() {
       <div className="empty-state" style={{ paddingTop: '18vh' }}>
         <Icon name="notebook" />
         {rich(M.selectNote)}
+      </div>
+    )
+  }
+  // Workspace notes (#1433): titled, started from a template, and saying as you type who gets it and whether it is cut.
+  if (selected.toLowerCase() === workspaceNotesPath(workspace.path).toLowerCase()) {
+    return (
+      <div className="split">
+        <DocEditor key={selected} path={selected} title={workspaceNotesTitle()} createIfMissing={workspaceNotesTemplate()} notice={workspaceNotesNotice} toolbarExtra={<IconButton icon="trash" title={tr(M.deleteNote)} onClick={() => void actions.deleteNote(selected, basename(selected), false)} />} />
       </div>
     )
   }

@@ -25,7 +25,7 @@ async function excludeRefused(ctx) {
   if (!fs.existsSync(path.join(dir, '.git'))) {
     fs.mkdirSync(dir, { recursive: true })
     fs.writeFileSync(path.join(dir, '.gitignore'), '!.hive/\n')
-    execFileSync('git', ['init', '-q'], { cwd: dir, env: ctx.lib.baseEnv(), stdio: 'pipe' })
+    execFileSync('git', ['init', '-q'], { cwd: dir, env: ctx.lib.gitEnv(), stdio: 'pipe' })
   }
   await inv('workspace:refresh')
   await inv('project:setActive', dir, true)
