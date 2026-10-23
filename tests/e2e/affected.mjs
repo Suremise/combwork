@@ -253,6 +253,8 @@ export const AREAS = [
   { paths: ['src/main/handOverCheck.ts', 'src/shared/handOver.ts', 'src/main/sessions.ts', 'src/main/lanes.ts', 'src/renderer/src/components/AgentPanes.tsx', 'src/renderer/src/components/AgentDialogs.tsx'], suites: ['handovernotice', 'longsession', 'sessionsize'] },
   // Hive's loop wakes (#405).
   { paths: ['src/main/loopWakes.ts', 'src/main/lanes.ts'], suites: ['loopwakes', 'lanenotices'] },
+  // A card's loop reviewer (#1382): who loop wakes go to, and who answers a builder's design.
+  { paths: ['src/main/loopReviewer.ts'], suites: ['loopwakes', 'intents'] },
   // Hive's own notices of the work (#1266): a card's request for the user, a lane's events without the Assistant.
   { paths: ['src/main/workflowNotices.ts', 'tests/e2e/lanenotices.cjs'], suites: ['lanenotices'] },
   { paths: ['src/main/reviewsOnOpen.ts'], suites: ['review', 'stopswitch', 'recent'] },
