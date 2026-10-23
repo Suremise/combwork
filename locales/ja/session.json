@@ -157,6 +157,7 @@
   "session.start.providerOff": "{provider}はオフになっています。{resuming, select, yes {この会話を再開するには、「設定」→「プロバイダー」でオンにしてください。} other {{agent}を実行するには、「設定」→「プロバイダー」でオンにしてください。}}",
   "session.start.removing": "このプロジェクトは削除中です",
   "session.start.repairing": "Hiveが移動したワークスペースを修復しています。「修復」が終わってからエージェントを起動してください。",
+  "session.start.slotBusy": "{slot}ではまだ別のセッションが実行中です。そのセッションが停止すると、{agent}はそこで開始できます。",
   "session.start.slotChanged": "{slot}はもう{agent}のものではありません。カードかレーンが終了したか、別のエージェントの作業が使っています。{agent}をもう一度開始または再開してください。",
   "session.start.subSession": "このセッションは{provider}が別のセッションのために実行した{kind}で、会話ではありません。再開できません。",
   "session.start.turnedOff": "{agent}の起動中に{provider}がオフにされました。",

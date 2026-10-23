@@ -926,12 +926,22 @@ export const COPIES_STEP: SchemaStep = {
 /**
  * Sessions on leases (#1434, SPEC §16.10.3): `sessions.lease`, the slot lease a session is bound to (set when it starts in
  * a slot; null in the project folder or a home; changed only by `rebindSession`, agentFolders.ts, in the lease change's
- * own write), and `slot_leases.end_rev`, the slot's head when the lease ended (a free slot still there is where its
- * conversations may resume by hand). Neither is in the sessions' codec: a record's save leaves `lease` as it is.
+ * own write); `slot_leases.end_rev`, the slot's head once its ended lease's writer has drained (a free slot still there
+ * is where its conversations may resume by hand); and a slot's writer, the session run that writes in it (its lease,
+ * agent and Hive), reserved in the write that lets it start and cleared once it has exited: while it is set the slot
+ * isn't lent, adopted, taken by hand or removed. `lease` isn't in the sessions' codec: a record's save leaves it as it is.
  */
 export const SESSION_LEASES_STEP: SchemaStep = {
   name: 'session leases',
-  ddl: ['ALTER TABLE sessions ADD COLUMN lease TEXT', 'ALTER TABLE slot_leases ADD COLUMN end_rev TEXT']
+  ddl: [
+    'ALTER TABLE sessions ADD COLUMN lease TEXT',
+    'ALTER TABLE slot_leases ADD COLUMN end_rev TEXT',
+    'ALTER TABLE slots ADD COLUMN writer_run TEXT',
+    'ALTER TABLE slots ADD COLUMN writer_lease TEXT',
+    'ALTER TABLE slots ADD COLUMN writer_agent TEXT',
+    'ALTER TABLE slots ADD COLUMN writer_pid INTEGER',
+    'ALTER TABLE slots ADD COLUMN writer_started INTEGER'
+  ]
 }
 
 /** The 1.0 group's steps (P3's, then P4's, then P5's, then P7's), in the order they are registered. */

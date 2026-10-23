@@ -36,8 +36,10 @@ export interface FolderSlot {
   /** Its block of ports (HIVE_SLOT_PORT_BASE). */
   portBase: number
   open: FolderLease | null
-  /** Its newest lease (the open one, else the last that ended), with the slot's head when it ended. */
+  /** Its newest lease (the open one, else the last that ended). */
   last: (FolderLease & { ended: boolean }) | null
+  /** The session run that writes in it now (main's claimPlace reserves it; cleared once that run has exited). */
+  writer: { run: string; agent: string; lease: string } | null
 }
 
 /** What the contract decides from: the project, its slots, its migration and its retired homes. */
@@ -138,9 +140,9 @@ export function resumeHold(facts: FolderFacts, agent: FolderAgent, s: FolderSess
   // Its carried slot while it builds a card elsewhere: the card's lease wins, this waits for it to end.
   if (dispatch && (!open || open.kind === 'carried') && dispatch.slot.toLowerCase() !== slot.name.toLowerCase()) return { is: 'after', slot: dispatch.slot, card: dispatch.card, lane: dispatch.lane }
   if (open) return s.lease === open.id ? null : { is: 'byHand', slot: slot.name, how: 'rebind', lease: open.id }
-  // Free: lent to other work since this conversation's lease, or not as it was left.
+  // Free: lent to other work since this conversation's lease (or another agent's session still draining there), or not as it was left.
   const last = slot.last
-  if (last && last.id !== s.lease) return { is: 'reused', slot: slot.name, card: last.card, lane: last.lane }
+  if (last && (last.id !== s.lease || (slot.writer && slot.writer.agent !== agent.id))) return { is: 'reused', slot: slot.name, card: last.card, lane: last.lane }
   if (slot.state !== 'ready') return { is: 'changed', slot: slot.name }
   if (carried) return { is: 'holds', slot: carried.slot }
   return { is: 'byHand', slot: slot.name, how: 'take', lease: last?.id ?? '' }

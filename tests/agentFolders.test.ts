@@ -11,7 +11,7 @@ import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { fileSlotConn, SlotStore } from '../src/main/slots'
-import { legacyWorktree, rebindSession, RebindRefused, takeByHand } from '../src/main/agentFolders'
+import { claimIn, ClaimRefused, legacyWorktree, rebindSession, RebindRefused, slotsIn } from '../src/main/agentFolders'
 import { readSessionRecords, writeSessionRecords } from '../src/main/schema/sessionDeliveryTables'
 import { canResumeByUser, canResumeNow, currentFolder, defaultPurpose, launchFolder, resumeFolder, resumeHold, type FolderAgent, type FolderFacts, type FolderLease, type FolderSlot, type ResumeHold } from '../src/shared/agentFolders'
 import { agentsToResume, resumeAll, type ResumeAllAgent } from '../src/shared/resumeAll'
@@ -23,13 +23,14 @@ const W = 'C:\\ws.worktrees\\project'
 const slotFolder = (name: string): string => `${W}\\${name}`
 
 const lease = (id: string, slot: string, agent: string, kind: FolderLease['kind'] = 'card', card: number | null = kind === 'card' ? 12 : null): FolderLease => ({ id, kind, slot, card, lane: kind === 'lane' ? 'lane-1' : null, agent })
-const slot = (name: string, o: { open?: FolderLease | null; last?: FolderLease | null; state?: string } = {}): FolderSlot => ({
+const slot = (name: string, o: { open?: FolderLease | null; last?: FolderLease | null; state?: string; writer?: FolderSlot['writer'] } = {}): FolderSlot => ({
   name,
   folder: slotFolder(name),
   state: o.state ?? (o.open ? 'lent' : 'ready'),
   portBase: 41000,
   open: o.open ?? null,
-  last: o.open ? { ...o.open, ended: false } : o.last ? { ...o.last, ended: true } : null
+  last: o.open ? { ...o.open, ended: false } : o.last ? { ...o.last, ended: true } : null,
+  writer: o.writer ?? null
 })
 const facts = (slots: FolderSlot[], o: Partial<FolderFacts> = {}): FolderFacts => ({ projectPath: P, migrated: true, homes: [], slots, ...o })
 const builder: FolderAgent = { id: 'b1', role: 'builder', legacy: null }
@@ -161,14 +162,20 @@ describe('Resume All and the Sessions tab with holds', () => {
   })
 })
 
-describe('sessions bound to leases in hive.db', () => {
+
+describe("a slot's writer: claimed in one write with the resume authority, held until its run has exited (hive.db)", () => {
   const opened: (() => void)[] = []
   afterEach(() => {
     for (const close of opened.splice(0)) close()
   })
+  const at = '2026-10-23T08:00:00.000Z'
+  const ME = { pid: process.pid, started: 1 }
 
-  /** A workspace's hive.db with a project's slot-b lent to b1 for #12 (lease l1) and b1's session s1 in it, bound to l1. */
-  function board(): { ws: string; file: string; store: SlotStore; db: DatabaseSync; other: () => SlotStore } {
+  /**
+   * A workspace's hive.db with a project's slot-b lent to b1 for #12 (lease l1), slot-c free and ready, and b1's
+   * session s1 in slot-b, bound to l1. `other()` is another Hive's connection to the same file.
+   */
+  function board(): { store: SlotStore; db: DatabaseSync; other: () => SlotStore } {
     const ws = join(tempDir('agentfolders-'), 'ws')
     const dismiss = admitted(ws)
     workspaceDb(ws)
@@ -181,8 +188,8 @@ describe('sessions bound to leases in hive.db', () => {
     }
     const store = make()
     const db = new DatabaseSync(file)
-    const at = '2026-10-23T08:00:00.000Z'
     db.prepare("INSERT INTO slots (project, name, folder, state, port_base, created_at, used_at) VALUES ('p1', 'slot-b', ?, 'lent', 41000, ?, ?)").run(slotFolder('slot-b'), at, at)
+    db.prepare("INSERT INTO slots (project, name, folder, state, port_base, created_at, used_at) VALUES ('p1', 'slot-c', ?, 'ready', 41010, ?, ?)").run(slotFolder('slot-c'), at, at)
     db.prepare("INSERT INTO slot_leases (id, project, slot, kind, card, agent, from_at) VALUES ('l1', 'p1', 'slot-b', 'card', 12, 'b1', ?)").run(at)
     db.prepare("INSERT INTO sessions (host, id, ord, provider, name, agent_id, cwd, created_at, last_active_at, lease) VALUES ('p1', 's1', 0, 'claude-code', 'one', 'b1', ?, ?, ?, 'l1')").run(slotFolder('slot-b'), at, at)
     opened.push(() => {
@@ -191,40 +198,121 @@ describe('sessions bound to leases in hive.db', () => {
       closeBoard(ws)
       dismiss()
     })
-    return { ws, file, store, db, other: make }
+    return { store, db, other: make }
   }
   const leaseOf = (db: DatabaseSync, id = 's1'): string | null => (db.prepare("SELECT lease FROM sessions WHERE host = 'p1' AND id = ?").get(id) as { lease: string | null }).lease
+  const writerOf = (store: SlotStore, name = 'slot-b') => store.slot(name)?.writer ?? null
+  /** A claim as claimPlace makes it, its facts read before the write (as `before` has them). */
+  const claim = (store: SlotStore, o: { run: string; existing?: { id: string; cwd: string; lease?: string } | null; auto?: boolean; head?: string | null; stale?: string | null; folder?: string; agent?: FolderAgent }) =>
+    store.conn.write((db) => claimIn(db, store, { facts: facts([]), folder: o.folder ?? slotFolder('slot-b'), agent: o.agent ?? builder, existing: o.existing === undefined ? null : o.existing, purpose: 'build', auto: o.auto ?? false, run: o.run, sessionsHost: 'p1', me: ME, head: o.head ?? null, stale: o.stale ?? null }))
+  const refusal = (p: Promise<unknown>) =>
+    p.then(
+      () => null,
+      (e) => (e instanceof ClaimRefused ? e.why : String(e))
+    )
+  const s1 = { id: 's1', cwd: slotFolder('slot-b'), lease: 'l1' }
 
-  it("rebinds in the lease change's own write: only the lease changes, never the folder or the conversation's id", async () => {
+  it("a new conversation claims its lease's slot for its run; nothing else may start, lend, adopt or remove it meanwhile", async () => {
     const b = board()
-    await b.store.end('l1', 'done', 'abc123')
-    expect(b.store.lease('l1')).toMatchObject({ to: expect.any(String), endRev: 'abc123' })
-    const taken = await b.store.carry('b1', { name: 'slot-b', folder: slotFolder('slot-b'), target: null }, (db, l) => {
-      rebindSession(db, 'p1', 'p1', 's1', l.id)
-      return true
-    })
-    expect(taken).not.toBeNull()
-    const row = b.db.prepare("SELECT id, provider, cwd, lease FROM sessions WHERE host = 'p1' AND id = 's1'").get() as Record<string, string>
-    expect(row).toEqual({ id: 's1', provider: 'claude-code', cwd: slotFolder('slot-b'), lease: taken!.id })
+    expect(await claim(b.store, { run: 'run-1' })).toMatchObject({ lease: 'l1', slot: { name: 'slot-b', writer: { run: 'run-1', agent: 'b1', lease: 'l1' } } })
+    expect(writerOf(b.store)).toMatchObject({ run: 'run-1', lease: 'l1', agent: 'b1', pid: process.pid })
+    // Another run (another Hive's, say) for the same lease: refused, the slot is written.
+    expect(await refusal(claim(b.other(), { run: 'run-2' }))).toEqual({ is: 'busy', slot: 'slot-b', agent: 'b1' })
+    // The lease ends while the run drains: the slot still isn't lent, adopted or removed.
+    await b.store.end('l1', 'done')
+    expect(await b.store.carry('b2', { name: 'slot-b', folder: slotFolder('slot-b'), target: null })).toBeNull()
+    expect(await b.store.startRemoval('slot-b', 'lent', 'o-x', { pid: 1, started: 1 })).toBe(false)
+    const taken = await b.store.take({ agent: 'b2', card: 14, slot: 'slot-b' }, { size: 4, root: W, target: null, token: 'o-y', holder: { pid: 1, started: 1 } })
+    expect(taken.ok).toBe(false)
+    // Its last revision isn't recorded while it drains; once its run has released it, it is.
+    expect(await b.store.finalizeEndRev('l1', 'head-1')).toBe(false)
+    expect(await b.store.clearWriter('slot-b', 'run-2')).toBe(false)
+    expect(await b.store.clearWriter('slot-b', 'run-1')).toBe(true)
+    expect(await b.store.finalizeEndRev('l1', 'head-2')).toBe(true)
+    expect(b.store.lease('l1')?.endRev).toBe('head-2')
+    expect(await b.store.finalizeEndRev('l1', 'head-3')).toBe(false)
   })
 
-  it('refuses another folder, another agent, or an ended lease', async () => {
+  it('a lease that changed before the write: the claim decides from hive.db as it is then (two Hives at once: one writer)', async () => {
+    const b = board()
+    // The lease ended between the facts read and the write: a new conversation has no slot of its own any more.
+    await b.store.end('l1', 'done')
+    expect(await refusal(claim(b.store, { run: 'run-1' }))).toEqual({ is: 'changed', slot: 'slot-b' })
+    expect(writerOf(b.store)).toBeNull()
+    // Lent again to b1 (#13): two starts of it at once (two Hives), one writer.
+    b.db.prepare("INSERT INTO slot_leases (id, project, slot, kind, card, agent, from_at) VALUES ('l2', 'p1', 'slot-b', 'card', 13, 'b1', '2026-10-23T09:00:00.000Z')").run()
+    const two = await Promise.all([refusal(claim(b.store, { run: 'run-a' })), refusal(claim(b.other(), { run: 'run-b' }))])
+    expect(two.filter((r) => r === null)).toHaveLength(1)
+    expect(two.find((r) => r !== null)).toMatchObject({ is: 'busy', slot: 'slot-b' })
+    expect(['run-a', 'run-b']).toContain(writerOf(b.store)?.run)
+  })
+
+  it("the user's Resume taking a free slot re-decides in its write: refused once the agent has a card elsewhere (stale hold), nothing written", async () => {
     const b = board()
     await b.store.end('l1', 'done')
-    const at = '2026-10-23T09:00:00.000Z'
-    b.db.prepare("INSERT INTO slots (project, name, folder, state, port_base, created_at, used_at) VALUES ('p1', 'slot-c', ?, 'lent', 41010, ?, ?)").run(slotFolder('slot-c'), at, at)
+    await b.store.finalizeEndRev('l1', 'abc123')
+    b.db.prepare("UPDATE slots SET state = 'ready' WHERE project = 'p1' AND name = 'slot-b'").run()
+    // Computed byHand before; then #15's dispatch lease opens for b1 in slot-c before the write.
+    expect(resumeHold(facts([slot('slot-b', { last: lease('l1', 'slot-b', 'b1') })]), builder, s1)?.is).toBe('byHand')
+    b.db.prepare("INSERT INTO slot_leases (id, project, slot, kind, card, agent, from_at) VALUES ('l15', 'p1', 'slot-c', 'card', 15, 'b1', '2026-10-23T09:00:00.000Z')").run()
+    expect(await refusal(claim(b.store, { run: 'run-1', existing: s1, head: 'abc123' }))).toEqual({ is: 'hold', hold: { is: 'after', slot: 'slot-c', card: 15, lane: null } })
+    expect(b.store.openLease('slot-b')).toBeNull()
+    expect(leaseOf(b.db)).toBe('l1')
+    expect(writerOf(b.store)).toBeNull()
+  })
+
+  it("…takes it at the head its lease ended at, under a new carried lease, rebinding and claiming it together; Resume All's (auto) never does", async () => {
+    const b = board()
+    await b.store.end('l1', 'done')
+    await b.store.finalizeEndRev('l1', 'abc123')
+    b.db.prepare("UPDATE slots SET state = 'ready' WHERE project = 'p1' AND name = 'slot-b'").run()
+    expect(await refusal(claim(b.store, { run: 'run-1', existing: s1, head: 'abc123', auto: true }))).toMatchObject({ is: 'hold', hold: { is: 'byHand', how: 'take' } })
+    expect(await refusal(claim(b.store, { run: 'run-1', existing: s1, head: 'other' }))).toEqual({ is: 'changed', slot: 'slot-b' })
+    expect(await refusal(claim(b.store, { run: 'run-1', existing: s1, head: null }))).toEqual({ is: 'changed', slot: 'slot-b' })
+    expect(b.store.openLease('slot-b')).toBeNull()
+    const got = await claim(b.store, { run: 'run-1', existing: s1, head: 'abc123' })
+    expect(b.store.openLease('slot-b')).toMatchObject({ id: got.lease, agent: 'b1', kind: 'carried' })
+    expect(leaseOf(b.db)).toBe(got.lease)
+    expect(writerOf(b.store)).toMatchObject({ run: 'run-1', lease: got.lease })
+    // Its row: only the lease changed, never its folder or its conversation's id.
+    expect(b.db.prepare("SELECT id, provider, cwd FROM sessions WHERE host = 'p1' AND id = 's1'").get()).toEqual({ id: 's1', provider: 'claude-code', cwd: slotFolder('slot-b') })
+  })
+
+  it("…its own slot under a later lease: rebound only while that is still so in the write (the card ending meanwhile refuses it)", async () => {
+    const b = board()
+    await b.store.end('l1', 'done')
+    b.db.prepare("INSERT INTO slot_leases (id, project, slot, kind, card, agent, from_at) VALUES ('l2', 'p1', 'slot-b', 'card', 13, 'b1', '2026-10-23T09:00:00.000Z')").run()
+    expect(resumeHold(facts([slot('slot-b', { open: lease('l2', 'slot-b', 'b1') })]), builder, s1)).toMatchObject({ is: 'byHand', how: 'rebind', lease: 'l2' })
+    await b.store.end('l2', 'put back')
+    expect(await refusal(claim(b.store, { run: 'run-1', existing: s1 }))).toMatchObject({ is: 'hold', hold: { is: 'reused' } })
+    expect(leaseOf(b.db)).toBe('l1')
+    b.db.prepare("INSERT INTO slot_leases (id, project, slot, kind, card, agent, from_at) VALUES ('l3', 'p1', 'slot-b', 'card', 16, 'b1', '2026-10-23T10:00:00.000Z')").run()
+    expect(await claim(b.store, { run: 'run-1', existing: s1 })).toMatchObject({ lease: 'l3' })
+    expect(leaseOf(b.db)).toBe('l3')
+  })
+
+  it("another agent's run still draining in a free slot: the slot holds its work, and a writer whose run is over is taken over", async () => {
+    const b = board()
+    await claim(b.store, { run: 'run-1' })
+    await b.store.end('l1', 'done')
+    const s2 = { id: 's2', cwd: slotFolder('slot-b'), lease: 'l0' }
+    const b2: FolderAgent = { id: 'b2', role: 'builder', legacy: null }
+    expect(resumeHold({ ...facts([]), slots: b.store.conn.read((db) => slotsIn(db, 'p1')) }, b2, s2)).toMatchObject({ is: 'reused', card: 12 })
+    // b1 lent slot-b again (#13) while run-1 is gone without releasing it (its Hive crashed): taken over only as stale.
+    b.db.prepare("INSERT INTO slot_leases (id, project, slot, kind, card, agent, from_at) VALUES ('l2', 'p1', 'slot-b', 'card', 13, 'b1', '2026-10-23T09:00:00.000Z')").run()
+    expect(await refusal(claim(b.store, { run: 'run-2' }))).toMatchObject({ is: 'busy' })
+    expect(await claim(b.store, { run: 'run-2', stale: 'run-1' })).toMatchObject({ lease: 'l2', slot: { writer: { run: 'run-2' } } })
+  })
+
+  it('binds and rebinds only within the rules, and a failure inside the write changes neither', async () => {
+    const b = board()
+    await b.store.end('l1', 'done')
     b.db.prepare("INSERT INTO slot_leases (id, project, slot, kind, card, agent, from_at) VALUES ('l2', 'p1', 'slot-c', 'card', 13, 'b1', ?)").run(at)
     b.db.prepare("INSERT INTO sessions (host, id, ord, provider, name, agent_id, cwd, created_at, last_active_at) VALUES ('p1', 's2', 1, 'claude-code', 'two', 'b2', ?, ?, ?)").run(slotFolder('slot-b'), at, at)
     const tryRebind = (session: string, to: string): Promise<unknown> => b.store.conn.write((db) => rebindSession(db, 'p1', 'p1', session, to))
     await expect(tryRebind('s1', 'l2')).rejects.toThrow(/another folder/)
     await expect(tryRebind('s2', 'l2')).rejects.toThrow(/another agent's/)
     await expect(tryRebind('s1', 'l1')).rejects.toBeInstanceOf(RebindRefused)
-    expect(leaseOf(b.db)).toBe('l1')
-  })
-
-  it('a failure inside the write changes neither: no new lease, the session still bound to its old one', async () => {
-    const b = board()
-    await b.store.end('l1', 'done', 'abc123')
     await expect(
       b.store.conn.write((db) => {
         db.prepare("INSERT INTO slot_leases (id, project, slot, kind, agent, from_at) VALUES ('l9', 'p1', 'slot-b', 'carried', 'b1', 't')").run()
@@ -234,36 +322,18 @@ describe('sessions bound to leases in hive.db', () => {
     ).rejects.toThrow('injected')
     expect(b.store.lease('l9')).toBeNull()
     expect(leaseOf(b.db)).toBe('l1')
-    // carry's own check refusing: nothing written either.
-    expect(await b.store.carry('b1', { name: 'slot-b', folder: slotFolder('slot-b'), target: null }, () => false)).toBeNull()
-    expect(b.store.openLease('slot-b')).toBeNull()
-    expect(leaseOf(b.db)).toBe('l1')
-  })
-
-  it("the user's Resume taking a free slot: only at the head its lease ended at, and two Hives at once: one wins, the other reads it", async () => {
-    const b = board()
-    await b.store.end('l1', 'done', 'abc123')
-    b.db.prepare("UPDATE slots SET state = 'ready' WHERE project = 'p1' AND name = 'slot-b'").run()
-    const hold = { is: 'byHand' as const, slot: 'slot-b', how: 'take' as const, lease: 'l1' }
-    expect(await takeByHand(b.store, 'p1', 'b1', 's1', slotFolder('slot-b'), hold, 'other')).toBeNull()
-    expect(b.store.openLease('slot-b')).toBeNull()
-    const [x, y] = await Promise.all([takeByHand(b.store, 'p1', 'b1', 's1', slotFolder('slot-b'), hold, 'abc123'), takeByHand(b.other(), 'p1', 'b1', 's1', slotFolder('slot-b'), hold, 'abc123')])
-    const won = [x, y].filter(Boolean)
-    expect(won).toHaveLength(1)
-    expect(b.store.openLease('slot-b')).toMatchObject({ id: won[0], agent: 'b1', kind: 'carried' })
-    expect(leaseOf(b.db)).toBe(won[0])
   })
 
   it("a record's save leaves its lease as it is, and older rows (no lease) read as before", async () => {
     const b = board()
-    const w = workspaceDb(b.ws).writer
-    const recs = readSessionRecords(w, 'p1')
+    const w = b.store.conn
+    const recs = w.read((db) => readSessionRecords(db, 'p1'))
     expect(recs[0]).toMatchObject({ id: 's1', cwd: slotFolder('slot-b'), lease: 'l1' })
-    writeSessionRecords(w, 'p1', { sessions: [{ ...recs[0], name: 'renamed', lease: 'ignored' }] })
+    await w.write((db) => writeSessionRecords(db, 'p1', { sessions: [{ ...recs[0], name: 'renamed', lease: 'ignored' }] }))
     expect(leaseOf(b.db)).toBe('l1')
-    expect(readSessionRecords(w, 'p1')[0]).toMatchObject({ name: 'renamed', lease: 'l1' })
+    expect(w.read((db) => readSessionRecords(db, 'p1'))[0]).toMatchObject({ name: 'renamed', lease: 'l1' })
     b.db.prepare("INSERT INTO sessions (host, id, ord, provider, name, created_at, last_active_at) VALUES ('p1', 'old', 1, 'claude-code', 'old', 't', 't')").run()
-    const old = readSessionRecords(w, 'p1').find((r) => r.id === 'old')!
+    const old = w.read((db) => readSessionRecords(db, 'p1')).find((r) => r.id === 'old')!
     expect(old).not.toHaveProperty('lease')
     expect(old).not.toHaveProperty('cwd')
     expect(resumeFolder(P, old as { cwd?: string })).toBe(P)

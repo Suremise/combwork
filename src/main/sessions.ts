@@ -18,9 +18,9 @@ import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { assistantTools } from '../shared/assistantTools'
 import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
-import { defaultPurpose, launchPlace, resumeFolder, resumeHold, slotAt, type FolderFacts, type FolderPurpose, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
+import { defaultPurpose, resumeHold, slotAt, type FolderPurpose, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
-import { bindSession, claimByHand, folderAgent, folderFacts, writerHolds } from './agentFolders'
+import { bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, releaseWriter } from './agentFolders'
 import { slotEnv } from './slots'
 import { agentLaunchSettings, canSwitchModeLive, defaultProviderPending, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
@@ -437,6 +437,8 @@ interface PendingStart {
   resumeId?: string
   /** Set by a stop, workspace close or quit: the start gives up at its next check. */
   cancelled: boolean
+  /** Its launch's run id, from the start (#1434: the slot's writer is reserved for it before its process exists). */
+  runId: string
   /** Settles when the start has finished or given up. */
   done: Promise<unknown>
 }
@@ -1058,6 +1060,8 @@ class SessionManager {
    * agent, closing its workspace or quitting can cancel a start that hasn't spawned its process yet.
    */
   private starting = new Map<string, PendingStart>()
+  /** Each run's slot whose writer it holds (#1434), from its claim until it is released. */
+  private writers = new Map<string, { projectPath: string; slot: string }>()
   /** Hive is quitting: no new agent starts. */
   private shuttingDown = false
   /** The window showing a project (several windows each show one workspace). */
@@ -1289,7 +1293,7 @@ class SessionManager {
     // Two terminals on one conversation would both append to its transcript.
     if (opts.resumeId && [...this.starting.values()].some((p) => p.resumeId === opts.resumeId)) throw hiveError(msg({ id: 'session.start.beingOpened', defaultMessage: 'This conversation is already being opened in another agent.', description: 'Resuming a conversation is refused: another agent is starting on it now.' }), undefined, { kind: 'conflict' })
     if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw hiveError(msg({ id: 'session.start.cleaning', defaultMessage: "Hive is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Hive is moving or removing its files." }))
-    const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve() }
+    const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve(), runId: randomBytes(12).toString('hex') }
     this.starting.set(id, pending)
     // A start that takes over a second says where the time went (#1177: a resume waited ~45 s after an upgrade).
     const times = new StepTimes()
@@ -1297,6 +1301,10 @@ class SessionManager {
     pending.done = run.catch(() => undefined)
     try {
       return await run
+    } catch (e) {
+      // Given up before its process ran, or that process has already exited: its slot's writer released (#1434).
+      this.releaseWriterOf(pending.runId)
+      throw e
     } finally {
       this.starting.delete(id)
       const slow = times.slowLine()
@@ -1358,28 +1366,41 @@ class SessionManager {
    * and startup's (`auto`) never do. Outside the slots, the project folder and a retired home are any agent's, and a 0.9
    * worktree only its agent's (`foreign` otherwise).
    */
-  private async placeFor(projectPath: string, agent: AgentDef, existing: SessionRecord | undefined, opts: StartOptions): Promise<Place> {
-    const facts: FolderFacts = await folderFacts(projectPath)
+  private async placeFor(projectPath: string, agent: AgentDef, existing: SessionRecord | undefined, opts: StartOptions, run: string): Promise<Place> {
     const fa = folderAgent(agent)
-    if (!existing) {
-      const p = launchPlace(facts, fa, fa.role === 'reviewer' ? 'review' : (opts.purpose ?? defaultPurpose(fa.role)))
-      return { cwd: p.folder, lease: p.lease?.id ?? null, slot: p.lease ? slotAt(facts, p.folder) : null, foreign: false }
+    try {
+      const c = await claimPlace(projectPath, fa, existing ?? null, { purpose: fa.role === 'reviewer' ? 'review' : (opts.purpose ?? defaultPurpose(fa.role)), auto: !!opts.auto, run })
+      // Its slot's writer is this run's from now: released once it has exited, or its start is given up.
+      if (c.lease && c.slot) this.writers.set(run, { projectPath, slot: c.slot.name })
+      return c
+    } catch (e) {
+      if (!(e instanceof ClaimRefused)) throw e
+      const w = e.why
+      if (w.is === 'hold') throw new HiveError(holdText(w.hold, agent.name), { kind: 'conflict' })
+      if (w.is === 'busy') throw hiveError(msg({ id: 'session.start.slotBusy', defaultMessage: '{slot} still has another session running in it. {agent} can start there once that session has stopped.', description: "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): another session (of a card that has ended, or of another Hive) still runs in it. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
+      throw hiveError(msg({ id: 'session.start.slotChanged', defaultMessage: "{slot} isn't {agent}'s any more: its card or lane ended, or another agent's work has it. Start or resume {agent} again.", description: "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): the slot's lease ended or changed hands while the start was getting ready. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
     }
-    const folder = resumeFolder(projectPath, existing)
-    const slot = slotAt(facts, folder)
-    if (!slot) {
-      const own = samePlace(folder, projectPath) || facts.homes.some((h) => samePlace(h, folder)) || (!!fa.legacy && samePlace(fa.legacy.path, folder))
-      return { cwd: folder, lease: null, slot: null, foreign: !own }
-    }
-    // A slot's conversation resumes only with its own agent (one writer per slot, its lease that agent's).
-    if (existing.agentId && existing.agentId !== agent.id) return { cwd: folder, lease: null, slot: null, foreign: true }
-    const hold = resumeHold(facts, fa, existing)
-    if (!hold) return { cwd: folder, lease: slot.open?.id ?? null, slot, foreign: false }
-    if (hold.is !== 'byHand' || opts.auto) throw new HiveError(holdText(hold, agent.name), { kind: 'conflict' })
-    const lease = await claimByHand(projectPath, agent.id, existing.id, folder, hold)
-    // The slot changed meanwhile (lent, or its files): nothing was taken.
-    if (!lease) throw new HiveError(holdText({ is: 'changed', slot: slot.name }, agent.name), { kind: 'conflict' })
-    return { cwd: folder, lease, slot, foreign: false }
+  }
+
+  /** A run's slot writer released (#1434), once: when its start was given up, or once its process has exited. */
+  private releaseWriterOf(run: string): void {
+    const w = this.writers.get(run)
+    if (!w || this.runs.has(run)) return
+    this.writers.delete(run)
+    void releaseWriter(w.projectPath, w.slot, run)
+  }
+
+  /** Whether a run of this Hive still holds its slot (#1434: a writer of a run that doesn't is cleared by the pool). */
+  runLive(run: string): boolean {
+    return this.writers.has(run)
+  }
+
+  /** The agent's run now (#1434): its live session's, else its start's while being prepared. */
+  runNow(projectPath: string, agentId: string): { run: string; starting: boolean } | null {
+    const l = this.live.get(liveId(projectPath, agentId))
+    if (l) return { run: l.state.runId, starting: false }
+    const p = this.starting.get(liveId(projectPath, agentId))
+    return p ? { run: p.runId, starting: true } : null
   }
 
   /**
@@ -1440,11 +1461,9 @@ class SessionManager {
     times.mark('ensureProject')
     // Where it runs (#1434, agentFolders.ts): the Assistant in the workspace folder, where it can read every project; a
     // conversation where it was made; a new one where its purpose has the agent work, under that slot's lease.
-    const place: Place = assistant ? { cwd: workspaceOf(projectPath).path!, lease: null, slot: null, foreign: false } : await this.placeFor(projectPath, agent, existing, opts)
+    const run = this.starting.get(id)!.runId
+    const place: Place = assistant ? { cwd: workspaceOf(projectPath).path!, lease: null, slot: null, foreign: false } : await this.placeFor(projectPath, agent, existing, opts, run)
     times.mark('folder')
-    this.assertStarting(id)
-    // One writer per slot, checked last under the board's lock: its lease ended or changed hands meanwhile, it doesn't start.
-    if (place.lease && place.slot && !(await writerHolds(projectPath, place.slot.name, agent.id, place.lease))) throw hiveError(msg({ id: 'session.start.slotChanged', defaultMessage: "{slot} isn't {agent}'s any more: its card or lane ended, or another agent's work has it. Start or resume {agent} again.", description: "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): the slot's lease ended or changed hands while the start was getting ready. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: place.slot.name, agent: agent.name }, { kind: 'conflict' })
     this.assertStarting(id)
     const cwd = place.cwd
     if (!existsSync(cwd)) throw hiveError(msg({ id: 'session.start.worktreeMissing', defaultMessage: "{agent}'s worktree folder is missing: {folder}. Start {agent} from its pane to recreate the worktree on its branch (Repair… if the workspace moved), or remove the agent.", description: "Starting an agent is refused: its git worktree's folder is gone. {agent} is the agent's name, {folder} the folder's path. Repair… is a command." }), { agent: agent.name, folder: cwd })
@@ -1479,7 +1498,7 @@ class SessionManager {
     }
     const sessionName = adopted || opts.name?.trim() || existing?.name || (assistant ? `${ASSISTANT_NAME}${mode ? ` · ${mode}` : ''} · ${formatDateTime(new Date())}` : autoName(projectPath, agent, count))
     const key = this.key(projectPath, agentId)
-    const runId = randomBytes(12).toString('hex')
+    const runId = run
     const state: LiveSessionState = {
       provider: providerId,
       runId,
@@ -3022,6 +3041,8 @@ class SessionManager {
       if (l.state.hooksMissing) noteHooksMissing(projectPath, agentId, false)
     }
     this.runs.delete(runId)
+    // Its slot's writer released: the slot may be lent or taken again, and its ended lease's revision recorded (#1434).
+    this.releaseWriterOf(runId)
     // Its hook token ends with it: hooks of an ended launch were ignored anyway (findLaunch).
     endHookToken(runId)
     this.releaseLocks(id)

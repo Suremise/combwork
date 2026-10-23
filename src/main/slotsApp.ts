@@ -28,7 +28,8 @@ import { builderCountOf, SlotPool, slotOptionsOf, SlotStore, type OpHolder, type
 import { onHiveEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
-import { openWorkspaces, WorkspaceService } from './workspace'
+import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
+import { setWriterDrained, setWriterHost } from './agentFolders'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
 import { endLeaseJob, journalPath, LeaseJob, startLauncher } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
@@ -210,7 +211,8 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
         }
       },
       removeIdle: () => advanced.get(SLOTS_REMOVE_IDLE) !== false,
-      ended: (lease, slot) => stopLeaseSession(projectPath, lease, slot)
+      ended: (lease, slot) => stopLeaseSession(projectPath, lease, slot),
+      runLive: (run) => sessions.runLive(run)
     })
   })()
   pools.set(key, { life: ws.lifetime, pool })
@@ -219,32 +221,36 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
 }
 
 /**
- * A lease ended (#1434, SPEC §16.10.2): its builder's session in the slot is stopped once its turn has finished (not in
- * a turn, no prompt waiting, no run or background task going), also one starting there as it ended. Its conversation
- * stays resumable by hand while the slot isn't lent again, and the pool doesn't lend the slot while a session runs in
- * it. Looked at again at each change of its status or of the Progress panel's runs, until it is stopped or ends.
+ * A lease ended (#1434, SPEC §16.10.2): the session run writing in its slot under it (the slot's writer, as the lease's
+ * end found it) is stopped once its turn has finished (not in a turn, no prompt waiting, no run or background task
+ * going); a start of it still being prepared gives up. Only that run: the agent's next run, in this slot under a new
+ * lease or anywhere else, isn't this lease's to stop. Looked at again at each change of the agent's status or of the
+ * Progress panel's runs, until that run is stopped or over. Its conversation stays resumable by hand while the slot
+ * isn't lent again, and the slot isn't lent, taken or removed until the run has exited and released it.
  */
 export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Slot): void {
-  const inSlot = (): boolean => {
-    const st = sessions.liveFor(projectPath, lease.agent)
-    return !!st && containsPlace(slot.folder, st.cwd)
+  const w = slot.writer
+  if (!w || w.lease !== lease.id) return
+  // This Hive's run of it, still (another Hive's run, or one already over, isn't this Hive's to stop).
+  const mine = (): { run: string; starting: boolean } | null => {
+    const r = sessions.runNow(projectPath, w.agent)
+    return r && r.run === w.run ? r : null
   }
-  const starting = (): boolean => sessions.startingFor(projectPath, lease.agent)
-  if (!inSlot() && !starting()) return
   let off: (() => void) | null = null
-  const look = (): void => {
-    if (!inSlot()) {
-      if (!starting()) off?.()
-      return
-    }
-    if (agentBusy(projectPath, lease.agent) || agentRunsGoing(projectPath, lease.agent).length) return
+  const done = (): void => {
     off?.()
     off = null
-    log.info(`Stopping ${userText(lease.agent)}'s session in ${userText(slot.name)}: its lease ${lease.id} ended (${lease.why ?? 'released'})`)
-    sessions.stop(projectPath, lease.agent)
+  }
+  const look = (): void => {
+    const r = mine()
+    if (!r) return done()
+    if (!r.starting && (agentBusy(projectPath, w.agent) || agentRunsGoing(projectPath, w.agent).length)) return
+    done()
+    log.info(`Stopping ${userText(w.agent)}'s ${r.starting ? 'start' : 'session'} in ${userText(slot.name)}: its lease ${lease.id} ended (${lease.why ?? 'released'})`)
+    sessions.stop(projectPath, w.agent)
   }
   off = onHiveEvent((e) => {
-    if ((e.type === 'session-status' && e.state.agentId === lease.agent && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
+    if ((e.type === 'session-status' && e.state.agentId === w.agent && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
   })
   look()
 }
@@ -279,6 +285,12 @@ export function startSlots(): void {
   timer = setInterval(() => void tidyOpenPools(), TIDY_MS)
   timer.unref()
   WorkspaceService.closingTasks.add(forgetPools)
+  // Slots' writers (#1434, agentFolders.ts): this Hive as theirs, and a writer released handed to its pool.
+  setWriterHost({ self: holder.self, alive: holder.alive, runLive: (run) => sessions.runLive(run) })
+  setWriterDrained(async (projectPath, slot) => {
+    const ws = workspaceFor(projectPath)
+    if (ws) await poolFor(ws, projectPath).then((p) => p.drained(slot))
+  })
 }
 
 /** A workspace closing: its pools' running commands ended and their operations awaited, then the pools forgotten. */
@@ -289,6 +301,8 @@ function forgetPools(path: string): Promise<void> {
 }
 
 export function stopSlots(): void {
+  setWriterHost(null)
+  setWriterDrained(null)
   if (timer) clearInterval(timer)
   timer = null
   WorkspaceService.closingTasks.delete(forgetPools)
@@ -298,7 +312,7 @@ export function stopSlots(): void {
 export function slotViews(pool: SlotPool): SlotView[] {
   return pool.slots().map((s) => {
     const l = pool.openLease(s.name)
-    return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null }
+    return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: s.writer ? { agent: s.writer.agent, lease: s.writer.lease } : null }
   })
 }
 
@@ -306,7 +320,7 @@ export function slotViews(pool: SlotPool): SlotView[] {
 export async function slotTest(pool: SlotPool, op: SlotTestOp): Promise<unknown> {
   switch (op?.op) {
     case 'lend':
-      return pool.lend({ agent: op.agent, ...(op.card !== undefined ? { card: op.card } : { lane: op.lane }) })
+      return pool.lend({ agent: op.agent, ...(op.card !== undefined ? { card: op.card } : { lane: op.lane }), ...(op.slot ? { slot: op.slot } : {}) })
     case 'release':
       return pool.release(op.lease, op.why ?? 'released')
     case 'tidy':

@@ -1,21 +1,22 @@
-// A lease's end (#1434, SPEC §16.10.2; slotsApp.ts's stopLeaseSession): its builder's session in the slot is stopped
-// once its turn has finished (not in a turn, no run going), also one still starting there as the lease ended; a session
-// elsewhere, or none, is left alone.
+// A lease's end (#1434, SPEC §16.10.2; slotsApp.ts's stopLeaseSession): the run writing in its slot under it (the
+// slot's writer) is stopped once its turn has finished (not in a turn, no run going); a start of it still being prepared
+// gives up. Only that run: one that replaced it (the agent started again, in this slot under a new lease or elsewhere)
+// is never stopped for the old lease, nor a run of another lease, nor anything once that run is over.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { LiveSessionState } from '../src/shared/types'
 
-const live = new Map<string, Partial<LiveSessionState> & { cwd: string }>()
-const starting = new Set<string>()
+/** The agent's run now, as sessions.runNow gives it. */
+const runs = new Map<string, { run: string; starting: boolean }>()
 const stopped: string[] = []
 
 vi.mock('../src/main/sessions', () => ({
   sessions: {
-    liveFor: (_p: string, agent: string) => live.get(agent) ?? null,
-    startingFor: (_p: string, agent: string) => starting.has(agent),
+    runNow: (_p: string, agent: string) => runs.get(agent) ?? null,
     stop: (_p: string, agent: string) => {
-      stopped.push(agent)
-      live.delete(agent)
+      stopped.push(`${agent}:${runs.get(agent)?.run ?? '-'}`)
+      runs.delete(agent)
     },
+    runLive: () => true,
     liveStates: () => []
   }
 }))
@@ -26,60 +27,71 @@ const { setRunsGoing } = await import('../src/main/workflow/service')
 const { stopLeaseSession } = await import('../src/main/slotsApp')
 
 const P = 'C:\\ws\\project'
-const SLOT = { name: 'slot-b', folder: 'C:\\ws.worktrees\\project\\slot-b' } as Parameters<typeof stopLeaseSession>[2]
+type SlotArg = Parameters<typeof stopLeaseSession>[2]
+const slotWith = (writer: { run: string; lease: string } | null): SlotArg => ({ name: 'slot-b', folder: 'C:\\ws.worktrees\\project\\slot-b', writer: writer && { ...writer, agent: 'b1', pid: 1, started: 1 } }) as SlotArg
 const LEASE = { id: 'l1', agent: 'b1', why: 'done' } as Parameters<typeof stopLeaseSession>[1]
 const status = (): void => tellListeners({ type: 'session-status', state: { agentId: 'b1', projectPath: P } as LiveSessionState })
 
 afterEach(() => {
-  live.clear()
-  starting.clear()
+  runs.clear()
   stopped.length = 0
   setAgentBusy(null)
   setRunsGoing(null)
 })
 
-describe("a lease's end stops its builder's session in the slot", () => {
-  it('at once when the builder is idle there', () => {
-    live.set('b1', { cwd: SLOT.folder })
-    stopLeaseSession(P, LEASE, SLOT)
-    expect(stopped).toEqual(['b1'])
+describe("a lease's end stops the run writing in its slot under it", () => {
+  it('at once when that run is idle', () => {
+    runs.set('b1', { run: 'run-1', starting: false })
+    stopLeaseSession(P, LEASE, slotWith({ run: 'run-1', lease: 'l1' }))
+    expect(stopped).toEqual(['b1:run-1'])
   })
 
-  it('only once its turn and its runs have finished', () => {
-    live.set('b1', { cwd: SLOT.folder })
+  it('only once its turn and its runs have finished, and only once', () => {
+    runs.set('b1', { run: 'run-1', starting: false })
     let busy = true
-    let runs = ['npm test']
+    let going = ['npm test']
     setAgentBusy(() => busy)
-    setRunsGoing(() => runs)
-    stopLeaseSession(P, LEASE, SLOT)
+    setRunsGoing(() => going)
+    stopLeaseSession(P, LEASE, slotWith({ run: 'run-1', lease: 'l1' }))
     status()
     expect(stopped).toEqual([])
     busy = false
     status()
     expect(stopped).toEqual([])
-    runs = []
+    going = []
     tellListeners({ type: 'progress-changed', workspacePath: 'C:\\ws', runs: [] })
-    expect(stopped).toEqual(['b1'])
-    // Stopped once: later changes don't stop it again.
-    live.set('b1', { cwd: SLOT.folder })
+    expect(stopped).toEqual(['b1:run-1'])
+    // Started again since: its next run isn't the ended lease's to stop.
+    runs.set('b1', { run: 'run-2', starting: false })
     status()
-    expect(stopped).toEqual(['b1'])
+    expect(stopped).toEqual(['b1:run-1'])
   })
 
-  it('also a session still starting there as the lease ended, once it runs and is idle', () => {
-    starting.add('b1')
-    stopLeaseSession(P, LEASE, SLOT)
+  it('never a run that replaced it while it was busy (the old one exited, the agent started again in the folder)', () => {
+    runs.set('b1', { run: 'run-1', starting: false })
+    let busy = true
+    setAgentBusy(() => busy)
+    stopLeaseSession(P, LEASE, slotWith({ run: 'run-1', lease: 'l1' }))
+    // run-1 exits during its turn's end; run-2 (a new lease of the same slot, say) starts before its last status event.
+    runs.set('b1', { run: 'run-2', starting: false })
+    busy = false
+    status()
+    status()
     expect(stopped).toEqual([])
-    starting.delete('b1')
-    live.set('b1', { cwd: SLOT.folder })
-    status()
-    expect(stopped).toEqual(['b1'])
   })
 
-  it('never a session elsewhere (the project folder, another slot), nor when none runs', () => {
-    live.set('b1', { cwd: P })
-    stopLeaseSession(P, LEASE, SLOT)
-    stopLeaseSession(P, { ...LEASE, agent: 'b2' }, SLOT)
+  it('a start of it still being prepared gives up', () => {
+    runs.set('b1', { run: 'run-1', starting: true })
+    setAgentBusy(() => true)
+    stopLeaseSession(P, LEASE, slotWith({ run: 'run-1', lease: 'l1' }))
+    expect(stopped).toEqual(['b1:run-1'])
+  })
+
+  it("nothing when the slot has no writer, or a writer of another lease, or the run is over", () => {
+    runs.set('b1', { run: 'run-1', starting: false })
+    stopLeaseSession(P, LEASE, slotWith(null))
+    stopLeaseSession(P, LEASE, slotWith({ run: 'run-1', lease: 'l0' }))
+    stopLeaseSession(P, LEASE, slotWith({ run: 'run-9', lease: 'l1' }))
     status()
     expect(stopped).toEqual([])
   })

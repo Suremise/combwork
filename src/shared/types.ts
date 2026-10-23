@@ -1217,6 +1217,8 @@ export interface SlotView {
   warmError: string | null
   warmLog: string | null
   lease: { id: string; kind: 'card' | 'lane' | 'carried'; agent: string; card: number | null; lane: string | null } | null
+  /** The session run writing in it now (#1434): its agent and the lease it started under, until it has exited. */
+  writer: { agent: string; lease: string } | null
 }
 
 /** One of a project's review and check copies as the window reads it (#1435, copies.ts): its state and its lease not freed. */
@@ -1230,7 +1232,7 @@ export interface CopyView {
 }
 
 /** What a test copy asks of a project's slot pool (`slots:test`, unpackaged builds only: #1429's e2e). */
-export type SlotTestOp = { op: 'lend'; agent: string; card?: number; lane?: string } | { op: 'release'; lease: string; why?: string } | { op: 'tidy'; at?: number } | { op: 'remove'; slot: string } | { op: 'carry'; agent: string; slot: string; folder: string }
+export type SlotTestOp = { op: 'lend'; agent: string; card?: number; lane?: string; slot?: string } | { op: 'release'; lease: string; why?: string } | { op: 'tidy'; at?: number } | { op: 'remove'; slot: string } | { op: 'carry'; agent: string; slot: string; folder: string }
 
 /** A project's slot options as project.json keeps them (ProjectConfig.slots): each left out falls back (slots.ts). */
 export interface SlotOptions {

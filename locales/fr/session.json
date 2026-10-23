@@ -157,6 +157,7 @@
   "session.start.providerOff": "Le fournisseur {provider} est désactivé. {resuming, select, yes {Active-le dans Paramètres → Fournisseurs pour reprendre cette conversation.} other {Active-le dans Paramètres → Fournisseurs pour exécuter l’agent {agent}.}}",
   "session.start.removing": "Ce projet est en cours de retrait",
   "session.start.repairing": "Hive répare cet espace de travail déplacé : démarre l’agent une fois la réparation terminée.",
+  "session.start.slotBusy": "Une autre session tourne encore dans {slot}. {agent} pourra y démarrer une fois cette session arrêtée.",
   "session.start.slotChanged": "{slot} n’est plus à {agent} : sa carte ou son couloir est terminé, ou le travail d’un autre agent l’occupe. Démarre ou reprends {agent} à nouveau.",
   "session.start.subSession": "Cette session est une exécution « {kind} » que {provider} a lancée pour une autre session, pas une conversation : elle ne peut pas être reprise.",
   "session.start.turnedOff": "Le fournisseur {provider} a été désactivé pendant le démarrage de l’agent {agent}.",

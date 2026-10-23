@@ -183,6 +183,50 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     expect(w.set.ended).toHaveLength(1)
   })
 
+  it("a lease's end waits for its writer to drain: the final commit of its last turn is its revision, the slot kept till then (#1434)", async () => {
+    const w = world()
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    const db = new DatabaseSync(boardFile(w.ws))
+    try {
+      db.prepare("UPDATE slots SET writer_run = 'run-1', writer_lease = ?, writer_agent = 'a1', writer_pid = 1, writer_started = 1 WHERE project = 'p-test' AND name = 'slot-a'").run(r.lease.id)
+    } finally {
+      db.close()
+    }
+    expect(await w.pool.release(r.lease.id, 'done')).toBe(true)
+    // Still written: no revision yet, not looked at, not lent.
+    expect(w.store.lease(r.lease.id)?.endRev).toBeNull()
+    expect((await w.pool.lend({ agent: 'a2', card: 2 })).ok).toBe(true)
+    expect(w.store.openLease('slot-a')).toBeNull()
+    // The draining turn's commit, then its run exits and releases the slot.
+    commit(r.slot.folder, { 'finished.txt': 'done\n' }, 'the last turn')
+    const head = sh(r.slot.folder, 'rev-parse', 'HEAD')
+    expect(await w.store.clearWriter('slot-a', 'run-1')).toBe(true)
+    await w.pool.drained('slot-a')
+    expect(w.store.lease(r.lease.id)?.endRev).toBe(head)
+    expect(w.store.slot('slot-a')?.state).toBe('ready')
+  })
+
+  it('a writer left by a run that has ended (its Hive gone) is cleared by a refresh, and the slot drained then (#1434)', async () => {
+    const w = world()
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    const db = new DatabaseSync(boardFile(w.ws))
+    try {
+      db.prepare("UPDATE slots SET writer_run = 'run-1', writer_lease = ?, writer_agent = 'a1', writer_pid = 77, writer_started = 77 WHERE project = 'p-test' AND name = 'slot-a'").run(r.lease.id)
+    } finally {
+      db.close()
+    }
+    await w.pool.release(r.lease.id, 'done')
+    writeFileSync(join(r.slot.folder, 'left.txt'), 'untracked\n')
+    await w.pool.refresh()
+    expect(w.store.slot('slot-a')?.writer).not.toBeNull()
+    w.dead.add(77)
+    await w.pool.refresh()
+    expect(w.store.slot('slot-a')?.writer).toBeNull()
+    expect(w.store.lease(r.lease.id)?.endRev).toBe(sh(r.slot.folder, 'rev-parse', 'HEAD'))
+    // Left dirty by it: kept, not lent until clean.
+    expect(w.store.slot('slot-a')?.state).toBe('dirty')
+  })
+
   it('lends a new slot (a detached worktree at the target, its files copied, set up as a run) and gets it back', async () => {
     const w = world({ setup: WRITE_ENV })
     const r = await lent(w, { agent: 'a1', card: 12 })

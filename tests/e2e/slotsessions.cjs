@@ -1,7 +1,9 @@
 // Sessions on leases (#1434, S35; SPEC §16.10.2–16.10.3): a Git project's slots lent through the test copies'
 // `slots:test` channel (as #1438's card start will), on the fake Claude Code:
 // 1. B1's card #12 gets slot-a: B1's new conversation starts there, with HIVE_SLOT and HIVE_SLOT_PORT_BASE, bound to
-//    the lease. The lease ends while B1 is in a turn: its session is stopped once the turn is over.
+//    the lease. The lease ends while B1 is in a turn: its session is stopped once the turn is over. #13's lease ends
+//    while B1's next run there is still starting (its CLI asking to trust the folder): slot-a isn't lent meanwhile, and
+//    is free once that run is idle and stopped.
 // 2. slot-a free at that revision: Resume All resumes R1 (the project folder) and leaves B1, listing it "resume by hand".
 // 3. A new card (#14, B2) gets slot-a meanwhile: B1's Resume is refused with why ("now holds #14's work"), offering Read
 //    Transcript and Start Fresh with a Handover; two launches for slot-a at once: B2's runs, B1's is refused.
@@ -108,6 +110,22 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     fs.writeFileSync(path.join(home, 'lease-go'), '')
     check('…and is stopped once the turn is over', !!(await until(() => stopped(b1.id), HUNG_MS)))
     check('slot-a is free and ready again', !!(await until(async () => (await slotList()).find((s) => s.name === 'slot-a' && s.state === 'ready' && !s.lease), HUNG_MS)))
+
+    // --- 1b. #13's lease ends while B1's run there hasn't started its work yet (its CLI asking to trust the folder):
+    // the slot stays that run's (not lent again) until it is idle and stopped, then is free.
+    const l13 = await op({ op: 'lend', agent: b1.id, card: 13 })
+    check('#13 is lent slot-a for B1 again', l13.ok && l13.slot.name === 'slot-a', JSON.stringify(l13))
+    const trustFile = path.join(home, 'fake-trusted.json')
+    fs.writeFileSync(trustFile, JSON.stringify(JSON.parse(fs.readFileSync(trustFile, 'utf8')).filter((f) => !same(f, folderA))))
+    await inv('session:start', alpha, { agentId: b1.id })
+    const asking = async () => /trust this folder/i.test(await inv('pty:buffer', lib.ptyKey(alpha, b1.id)).catch(() => ''))
+    check('B1 is starting in slot-a, its CLI asking first', !!(await until(async () => (await asking()) && (await live(b1.id))?.slot === 'slot-a', HUNG_MS)))
+    check('…slot-a is written by it', (await slotList()).find((s) => s.name === 'slot-a')?.writer?.agent === b1.id)
+    await op({ op: 'release', lease: l13.lease.id, why: 'put back' })
+    const lendNow = await op({ op: 'lend', agent: b2.id, card: 99, slot: 'slot-a' })
+    check("#13 put back before B1's run is idle: slot-a isn't lent to anyone meanwhile", !lendNow.ok && !!(await live(b1.id)) && !!(await slotList()).find((s) => s.name === 'slot-a')?.writer, JSON.stringify(lendNow))
+    await lib.acceptClaudeTrust(inv, alpha, b1.id, HUNG_MS)
+    check('…once it is idle, it is stopped, and the slot is free and ready', !!(await until(async () => (await stopped(b1.id)) && !!(await slotList()).find((s) => s.name === 'slot-a' && !s.writer && !s.lease && s.state === 'ready'), HUNG_MS)))
 
     // --- 2. Resume All: R1 resumes, B1 is left and listed (its slot is free: only its own Resume takes it).
     const held1 = await until(async () => (await agentInfo(b1.id))?.resume?.hold, HUNG_MS)

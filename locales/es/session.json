@@ -157,6 +157,7 @@
   "session.start.providerOff": "{provider} está desactivado. {resuming, select, yes {Actívalo en Configuración → Proveedores para reanudar esta conversación.} other {Actívalo en Configuración → Proveedores para ejecutar el agente {agent}.}}",
   "session.start.removing": "Este proyecto se está quitando",
   "session.start.repairing": "Hive está reparando este espacio de trabajo movido: inicia el agente cuando termine Reparar.",
+  "session.start.slotBusy": "En {slot} todavía se ejecuta otra sesión. {agent} podrá iniciarse allí cuando esa sesión se haya detenido.",
   "session.start.slotChanged": "{slot} ya no es de {agent}: su tarjeta o carril terminó, o lo tiene el trabajo de otro agente. Vuelve a iniciar o reanudar {agent}.",
   "session.start.subSession": "Esa sesión es de tipo {kind}: {provider} la ejecutó para otra sesión y no es una conversación, así que no se puede reanudar.",
   "session.start.turnedOff": "Se desactivó {provider} mientras se iniciaba el agente {agent}.",
