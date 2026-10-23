@@ -11,7 +11,8 @@ export interface LaneBriefInput {
   project: string
   /** The cards in the order they are worked: each by its key (AL-12) and title. */
   cards: { key: string; title: string }[]
-  builder: { name: string; folder: string | null; branch: string | null }
+  /** Where the builder works: its slot (#1438: a new branch per card), else its folder and branch. */
+  builder: { name: string; folder: string | null; branch: string | null; slot?: string | null }
   reviewer: { name: string } | null
   /** The options in force, or null while workflow rules are off. */
   options: Pick<WorkflowOptions, 'review' | 'preChecks' | 'finish' | 'okBefore' | 'target'> | null
@@ -47,7 +48,11 @@ export function laneRules(o: LaneBriefInput['options']): string[] {
 /** The brief for a lane's builder or reviewer, as the prompt of its fresh conversation. */
 export function laneBrief(i: LaneBriefInput, role: LaneRole): string {
   const cards = i.cards.map((c, n) => `${n + 1}. ${c.key} ${c.title}`)
-  const where = i.builder.folder ? `${i.builder.name} works in ${i.builder.folder}${i.builder.branch ? ` (branch ${i.builder.branch})` : ''}` : `${i.builder.name} works in the project folder`
+  const where = i.builder.slot
+    ? `${i.builder.name} works in ${i.builder.slot}, a new branch per card (Hive makes each card's branch there from the target and gives the card to ${i.builder.name} there)`
+    : i.builder.folder
+      ? `${i.builder.name} works in ${i.builder.folder}${i.builder.branch ? ` (branch ${i.builder.branch})` : ''}`
+      : `${i.builder.name} works in the project folder`
   const target = i.options?.target ? `; work goes to ${i.options.target}` : ''
   const lines: string[] = []
   if (role === 'builder') {

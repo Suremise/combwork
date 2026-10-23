@@ -2943,6 +2943,8 @@ export interface LaneInfo {
    * too; null for an ended lane, or one with none recorded (its project's options now stand in).
    */
   stages: StageId[] | null
+  /** The slot a running lane's builder works in (#1438: its lease's), or null (none yet, or slots don't apply). */
+  slot: string | null
 }
 
 /**
@@ -2950,9 +2952,10 @@ export interface LaneInfo {
  * passed but not merged yet (merging: in the merge queue), its pass gone stale (submit again), no reviewer on a card in
  * Review, or a list change queued after the card in flight. The first four and the merge pause the lane, as does `hooks`
  * (#1336): its builder's or reviewer's hooks aren't arriving, so Hive can't tell what it does and types nothing into it.
- * `checkCopy` (#1435): its card's review or isolated check waits for a review or check copy to be free.
+ * `checkCopy` (#1435): its card's review or isolated check waits for a review or check copy to be free. `slot` (#1438):
+ * the lane has no slot yet (every one is lent), so its builder can't start; it pauses the lane until one is free.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot'
 
 /** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */
 export interface LaneStartRequest {
@@ -2967,6 +2970,9 @@ export interface LaneStartRequest {
 export interface LaneStartResult {
   lane: LaneInfo
   started: { agentId: string; name: string; role: 'builder' | 'reviewer'; how: 'started' | 'fresh' | 'failed'; why?: string }[]
+  /** Its slot (#1438), or, with none free, why it waits: its agents start once one is. */
+  slot?: string
+  waitingForSlot?: string
 }
 
 export interface LaneStatus {

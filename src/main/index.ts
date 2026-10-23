@@ -56,6 +56,7 @@ import { releaseQueueRunners } from './workflow/queueRunner'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { poolFor, startSlots, stopSlots } from './slotsApp'
 import { setSlotPools } from './unusedWorktrees'
+import { startSlotCards, stopSlotCards } from './slotCards'
 import { startFreshNudges } from './freshStarts'
 import { startCopies, stopCopies } from './copiesApp'
 import { startReviewCopies, stopReviewCopies } from './reviewCopies'
@@ -999,6 +1000,8 @@ app.whenReady().then(async () => {
   startSlots()
   // Unused Worktrees reads the slots through those pools (#1450, #1519).
   setSlotPools(poolFor)
+  // Cards on slots (#1438): a start lends its builder a slot and makes its line there, Done or put back gives it back.
+  startSlotCards()
   // The nudge to start fresh when a project's work has finished (#1437).
   startFreshNudges()
   // Review and check copies (#1435): returning ones looked at again every 30 s, idle ones tidied every hour.
@@ -1137,6 +1140,7 @@ app.on('will-quit', () => {
   stopObserving()
   stopReconciling()
   stopQueueHosts()
+  stopSlotCards()
   stopSlots()
   stopCopies()
   stopReviewCopies()

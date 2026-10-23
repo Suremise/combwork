@@ -91,6 +91,9 @@ export interface Effects {
   notify?: (card: CardRecord, text: string, shown?: StoredText) => void
 }
 
+/** What `slotFor` gives a start (#1438): the slot and lease, or why it waits for one; null, no slot. */
+export type SlotForStart = { slot: string; folder: string; lease: string; fresh: boolean } | { wait: string } | null
+
 export interface WorkflowConfig {
   store: FactStore
   /** The project folder. */
@@ -99,8 +102,16 @@ export interface WorkflowConfig {
   projectKey: string
   /** The project's resolved options (§16.6.6); a card in flight keeps its own ruleset. */
   options: () => WorkflowOptions
-  /** Where cards' own folders go (the spike's stand-in for slots). */
-  slots: string
+  /** Where cards' own folders go (the P2 spike's stand-in for slots, its unit tests only: the app lends slots, `slotFor`). */
+  slots?: string
+  /**
+   * Slots (#1438, SPEC §16.10): the slot a card under G11 = slots starts in, for its builder (`leaseForStart`, the app's):
+   * its lease (a lane's, kept for the lane; else the card's own, `fresh` when lent now), or why none can be now (`wait`,
+   * English). `dry`: only whether one could be, nothing lent. Null: no slot here (the rules off, the builder a reviewer).
+   */
+  slotFor?: (card: CardRecord, builder: string, o: { dry: boolean; target: string | null }) => Promise<SlotForStart>
+  /** A lease lent for a start that wasn't written (refused, or undone): given back. */
+  slotUnused?: (lease: string) => Promise<void>
   /** Runs an agent started that are still going (G13). */
   runsOf?: (agent: string) => string[]
   /**
@@ -158,11 +169,20 @@ export interface WorkflowConfig {
 /** A branch name's slug from a card title (§16.10.1): lower case ASCII letters, digits and hyphens, at most 40. */
 export function slugOf(title: string): string {
   return title
+    // Accents folded (é → e): decomposed, the marks dropped.
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 40)
     .replace(/-+$/, '')
+}
+
+/** A card's line (§16.10.1): `hive/<KEY>/<card key>-<slug>` (`hive/AM/AM-12-fix-the-login`); no slug, the key alone. */
+export function lineName(projectKey: string, card: Pick<CardRecord, 'key' | 'title'>): string {
+  const slug = slugOf(card.title)
+  return `hive/${projectKey}/${card.key}${slug ? `-${slug}` : ''}`
 }
 
 const ORDER: StageId[] = ['todo', 'active', 'review', 'approved', 'merging', 'done']
@@ -236,6 +256,8 @@ interface StartGathered {
   ins: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>
   before: Evidence
   warnings: string[]
+  /** A slot's lease lent for this start (#1438): given back if the start isn't written. */
+  lent: string | null
 }
 
 /** A submission gathered outside the lock: the revision with its endpoints, keys and files, and its guards' inputs. */
@@ -588,49 +610,54 @@ export class Workflow {
     if (inMove) return this.refuse(card, actor, 'start', inMove)
     const g = await this.gatherStart(card, from, actor, opts.builder)
     if (!('data' in g)) return this.refuse(card, actor, 'start', g)
-    // Its ruleset is stored by the write that names it (write()), under the store's lock.
-    await this.cfg.hooks?.beforeWrite?.('start')
-    if (await this.revalidate(card, from, g.o, g.before)) return this.regather(card, () => this.start(ref, actor, opts))
-    let laneMoved = false
-    const out = await this.writeWhole(card, g.r, actor, (w) => {
-      const moved = this.stillAt(w, s, 'start')
-      if (moved) return moved
-      // Back to Todo first: its evidence was gathered on that state.
-      if (reopening) w.move('todo', 'intent')
-      // Refused once it has moved it back to Todo: undone whole (writeWhole), nothing of the reopening kept (a lane's
-      // boundary applied in it too: the next write applies it again).
-      const undone = (g2: GuardRefusal): GuardRefusal => (reopening ? undo(g2) : g2)
-      const changed = this.evidenceChanged(w, g.o, g.before)
-      if (changed) return undone(changed)
-      // Decided where the start is written, from the lane as it is there (HR6's #1270 round 1, the Assistant's round 4
-      // design): a queued list whose boundary has passed applies first (committed with its wake even if this start is
-      // then refused: the boundary passed either way), then the start is checked against it.
-      if (this.enforced() && !opts.drag) {
-        this.applyLaneBoundary(w, this.store.card(card.id))
-        // The lane and ruleset the gather used must still be the card's (HR6's round 4: a queued list that took the card
-        // out, or a lane changed meanwhile): else it is gathered again from the top, once, as what it is now.
-        const now = this.store.card(card.id)
-        const r = this.rulesetOf(now, w.state())
-        if ((now.lane ?? null) !== (card.lane ?? null) || r.id !== g.r.id || r.version !== g.r.version) {
-          laneMoved = true
-          return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
+    try {
+      // Its ruleset is stored by the write that names it (write()), under the store's lock.
+      await this.cfg.hooks?.beforeWrite?.('start')
+      if (await this.revalidate(card, from, g.o, g.before)) return this.regather(card, () => this.start(ref, actor, opts))
+      let laneMoved = false
+      const out = await this.writeWhole(card, g.r, actor, (w) => {
+        const moved = this.stillAt(w, s, 'start')
+        if (moved) return moved
+        // Back to Todo first: its evidence was gathered on that state.
+        if (reopening) w.move('todo', 'intent')
+        // Refused once it has moved it back to Todo: undone whole (writeWhole), nothing of the reopening kept (a lane's
+        // boundary applied in it too: the next write applies it again).
+        const undone = (g2: GuardRefusal): GuardRefusal => (reopening ? undo(g2) : g2)
+        const changed = this.evidenceChanged(w, g.o, g.before)
+        if (changed) return undone(changed)
+        // Decided where the start is written, from the lane as it is there (HR6's #1270 round 1, the Assistant's round 4
+        // design): a queued list whose boundary has passed applies first (committed with its wake even if this start is
+        // then refused: the boundary passed either way), then the start is checked against it.
+        if (this.enforced() && !opts.drag) {
+          this.applyLaneBoundary(w, this.store.card(card.id))
+          // The lane and ruleset the gather used must still be the card's (HR6's round 4: a queued list that took the card
+          // out, or a lane changed meanwhile): else it is gathered again from the top, once, as what it is now.
+          const now = this.store.card(card.id)
+          const r = this.rulesetOf(now, w.state())
+          if ((now.lane ?? null) !== (card.lane ?? null) || r.id !== g.r.id || r.version !== g.r.version) {
+            laneMoved = true
+            return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
+          }
         }
-      }
-      const waits = (this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null) ?? moving()
-      if (waits) return undone(waits)
-      // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
-      const bad = opts.drag ? this.across(w, 'start', 'active', g.ins, opts.drag) : this.check(w, 'start', g.ins)
-      if (bad) return undone(bad)
-      this.applyStart(w, g, w.written.some((f) => f.kind === 'Override') ? 'override' : actor === 'user' ? 'user' : 'intent')
-      return null
-    })
-    if (out && laneMoved && !this.regathering.has(card.id)) return this.regather(card, () => this.start(ref, actor, opts))
-    if (out) return this.refuse(card, actor, 'start', out)
-    return this.ok(card, s.stage, 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
+        const waits = (this.enforced() && !opts.drag ? this.laneRefusal(this.store.card(card.id)) : null) ?? moving()
+        if (waits) return undone(waits)
+        // The user's Start across a rule: the rules skipped are recorded, and the start's own facts still are.
+        const bad = opts.drag ? this.across(w, 'start', 'active', g.ins, opts.drag) : this.check(w, 'start', g.ins)
+        if (bad) return undone(bad)
+        this.applyStart(w, g, w.written.some((f) => f.kind === 'Override') ? 'override' : actor === 'user' ? 'user' : 'intent')
+        return null
+      })
+      if (out && laneMoved && !this.regathering.has(card.id)) return this.regather(card, () => this.start(ref, actor, opts))
+      if (out) return this.refuse(card, actor, 'start', out)
+      return this.ok(card, s.stage, 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
+    } finally {
+      // A slot lent for it and not started with (refused, undone): given back (#1438).
+      if (g.lent) await this.slotUnused(card, g.lent)
+    }
   }
 
   /** A start's slow part, outside the lock: its folder, line, base and target, the cards it waits for, its evidence. */
-  private async gatherStart(card: CardRecord, s: CardState, actor: Actor, builderOpt?: string): Promise<StartGathered | GuardRefusal> {
+  private async gatherStart(card: CardRecord, s: CardState, actor: Actor, builderOpt?: string, dry = false): Promise<StartGathered | GuardRefusal> {
     const r = this.rulesetOf(card, s)
     const o = r.options
     // The agent it is started for: one named (the user's drag, an agent's old move giving it to another, #1268), else the starter.
@@ -639,23 +666,42 @@ export class Workflow {
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(`${card.key} is blocked: ${s.blocked}`) // i18n-ignore: agent-facing warning in the spike's reply
     // Its target's ref included, resolved as the plan resolves it (#1401: the default branch, when G7 is empty).
     const before = await this.evidenceOf(card, s, o, builder)
-    const plan = await this.platform(o).start(card, o, builder)
+    const plan = await this.platform(o).start(card, o, builder, dry)
     if (isUnknown(plan)) return { rule: 'platform.unknown', values: { card: card.key, what: plan.whatText ?? plan.what, rule: 'start' } }
+    const { existing, slotWait, fresh, ...planned } = plan
+    // A slot lent for this start (#1438) is given back if the start isn't written (refused, gathered again, undone).
+    const lent = fresh && plan.lease ? plan.lease : null
     // Its target resolved again as it was planned (the builder worktree's base moved meanwhile): not what the evidence
     // covers, so a change to it before the write would go unseen (#1401 round 2).
-    if (!this.platform(o).planCovered(before.primed, plan)) return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
-    const { existing, ...planned } = plan
+    if (!this.platform(o).planCovered(before.primed, plan)) {
+      if (lent) await this.slotUnused(card, lent)
+      return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
+    }
     const data: FactData['Started'] = { ...planned, builder, cardKind: card.kind }
+    if (dry) delete data.lease
+    if (slotWait) warnings.push(`${card.key} waits for a slot: ${slotWait}`) // i18n-ignore: agent-facing warning, beside the refusal
+    // Where it is built (#1438): its builder is given it there once its line is made, so a builder starting it ends its turn.
+    if (data.lease && data.slot) warnings.push(`You'll continue in ${data.slot}, on ${data.line}: Hive makes the line there from ${data.target}, then gives you ${card.key} there (a new conversation unless you already work there; your old one is kept). End your turn now.`) // i18n-ignore: agent-facing, the start's reply
     // Dependencies Done by facts, in this card's target (§16.7.4).
     const waitingFor = r.guards.start.includes('start.dependenciesIntegrated') ? await this.waitingFor(card, data.target, o) : []
-    return { r, o, data, existing: !!existing, ins: { agent: agentOf(actor), waitingFor, slotFree: true }, before, warnings }
+    return { r, o, data, existing: !!existing, ins: { agent: agentOf(actor), waitingFor, slotFree: !slotWait }, before, warnings, lent }
+  }
+
+  /**
+   * A slot's lease lent for a start of the card that wasn't written (#1438): given back, unless the card started with it
+   * after all (a start gathered again reuses its card's lease, and its write is the one that counts).
+   */
+  private async slotUnused(card: CardRecord, lease: string): Promise<void> {
+    if (this.state(card).started?.lease === lease) return
+    await this.cfg.slotUnused?.(lease).catch(() => undefined)
   }
 
   /** A start's facts and actions, in its write: `Started`, the move into Active, its folder prepared (a slot of its own). */
   private applyStart(w: Write, g: StartGathered, cause: FactData['Moved']['cause']): void {
     w.fact('Started', g.data) // i18n-ignore: a fact's kind and codes, not text
     w.move('active', cause)
-    if (g.data.folder !== 'project' && !g.existing) w.action('prepareSlot', { folder: g.data.folder, line: g.data.line, base: g.data.base })
+    // A slot's (#1438): its lease's, and whether it is brought up to date (G15).
+    if (g.data.folder !== 'project' && !g.existing) w.action('prepareSlot', { folder: g.data.folder, line: g.data.line, base: g.data.base, ...(g.data.lease ? { slot: g.data.slot, lease: g.data.lease, upToDate: g.o.slotsUpToDate, builder: g.data.builder } : {}) })
   }
 
   /** The card's state as it would be once a gathered start is written (a drag gathers its submission on it). */
@@ -903,6 +949,7 @@ export class Workflow {
       w.fact('Accepted', { submission: s.latest!.id }) // i18n-ignore: a fact's kind and codes, not text
       w.move('done', 'derived')
       w.action('endLaneIfDone', {})
+      w.action('releaseSlot', {})
       return
     }
     if (o.finish === 'accept') {
@@ -912,6 +959,7 @@ export class Workflow {
         w.fact('Accepted', { revision: approved! }) // i18n-ignore: a fact's kind and codes, not text
         w.move('done', 'derived')
         w.action('endLaneIfDone', {})
+        w.action('releaseSlot', {})
       } else {
         w.fact('Stale', { approved, current: isUnknown(fin.currentRevision) ? null : (fin.currentRevision ?? null), why: 'change' }) // i18n-ignore: a fact's kind and codes, not text
         w.move(hasStage(r, 'review') ? 'review' : 'active', 'derived')
@@ -940,6 +988,7 @@ export class Workflow {
           w.fact('Integrated', { revision: s.approved!.revision!, target: s.started!.target ?? '', result: s.approved!.revision!, method: 'committed', by: 'hive' }) // i18n-ignore: a fact's kind and codes, not text
           w.move('done', 'derived')
           w.action('endLaneIfDone', {})
+          w.action('releaseSlot', {})
         }
         return
       case 'notChecked':
@@ -947,6 +996,7 @@ export class Workflow {
         else {
           w.move('done', 'derived')
           w.action('endLaneIfDone', {})
+          w.action('releaseSlot', {})
         }
         return
       default:
@@ -1640,81 +1690,86 @@ export class Workflow {
     const s: CardState = fromHold ? { ...s0, stage: fromHold } : s0
     // The rules of where the drag counts from (a reopened card's: its next cycle's).
     const r = this.rulesetOf(card, s)
-    const gs = s.stage === 'todo' ? await this.gatherStart(card, s, by, opts.builder) : null
+    const gs = s.stage === 'todo' ? await this.gatherStart(card, s, by, opts.builder, !!opts.dry) : null
     if (gs && !('data' in gs)) return this.refuse(card, by, 'start', gs)
-    const s1 = gs ? this.predicted(card, s, gs) : s
-    const gsub = ORDER.indexOf(to) > ORDER.indexOf('active') && s1.stage === 'active' ? await this.gatherSubmit(card, s1, by, {}, gs ? gs.r : r, !!gs) : null
-    if (gsub && !('inputs' in gsub)) {
-      // A submission refused for what no override makes true stops the drag there (§16.8.4), after its start. Its folder
-      // may only exist once started (a slot of its own): the start alone, then the submission gathered again on it.
-      if (!gs) return this.refuse(card, by, 'submit', gsub)
-      if (opts.dry) return this.dragForward(card, from, 'active', by, opts, fromHold)
-      const started = await this.dragForward(card, from, 'active', by, opts, fromHold)
-      return isRefusal(started) || 'ask' in started ? started : this.dragForward(card, from, to, by, opts)
-    }
-    // Where the card is once submitted (null: Finish decides, with no review), and what is left to the stage dragged to.
-    const after: StageId | null = gsub ? (r.options.review === 'none' ? null : 'review') : s1.stage
-    const approved = !gsub && !!s1.latest && !s1.stale && !notApproved(s1, r, card.labels)
-    const queueOnly = approved && to === 'merging' && r.options.finish === 'hiveMerges' && ORDER.indexOf(s1.stage) < ORDER.indexOf('merging')
-    const pastReview = !approved && after !== null && ORDER.indexOf(after) < ORDER.indexOf(to)
-    if (!gs && !gsub && !pastReview && !queueOnly && !fromHold) return this.ok(card, from, s0.stage)
-    const rules = new Set<string>()
-    if (gs) for (const x of this.failingOf(card, s, gs.r, 'start', gs.ins)) rules.add(x)
-    if (gsub) for (const x of this.failingOf(gsub.card, gsub.s, gsub.r, 'submit', gsub.inputs, gsub.only)) rules.add(x)
-    // Past Review (or the user's OK): the review and approvals are skipped, and the change counts as approved.
-    if (pastReview && this.enforced()) rules.add('integrate.approved')
-    const skipped = [...rules]
-    const needs = (list: string[]): Ask | Refusal => (by === 'user' ? { ask: true, card: card.key, rules: list } : refusal('move.needsOverride', { card: card.key, stage: to, rules: list.join(', ') }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
-    if (opts.dry && !skipped.length) return this.ok(card, from, s0.stage)
-    if (skipped.length && asking) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
-    await this.cfg.hooks?.beforeWrite?.('move')
-    if (gs && (await this.revalidate(card, s, gs.o, gs.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
-    if (!gs && gsub && (await this.revalidate(gsub.card, gsub.s, gsub.o, gsub.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
-    const cause: FactData['Moved']['cause'] = skipped.length ? 'override' : 'user'
-    // The rules as they are in the write: one not decided on undoes the write (it throws), to ask again.
-    const decided = (now: string[]): void => {
-      const more = now.filter((x) => !rules.has(x))
-      if (more.length) throw new DragUndone({ rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: [...skipped, ...more].join(', ') } })
-    }
-    let out: GuardRefusal | null
     try {
-      out = await this.write(card, r, by, (w) => {
-        const moved = this.stillAt(w, s0, 'move')
-        if (moved) return moved
-        // One Override naming every rule skipped: after the submission when it approves it (past Review: it counts as
-        // approved for the latest submission), else first.
-        const override = (): void => void (skipped.length && w.fact('Override', { rules: skipped, move: `${s.stage}→${to}`, by, reason: opts.reason ?? '' })) // i18n-ignore: a fact's kind and codes, not text
-        const approves = pastReview && !!gsub
-        if (!approves) override()
-        if (fromHold) w.move(fromHold, 'user')
-        // The evidence on the state it was gathered on (back where it was, from On Hold): moved since, the write is undone.
-        const changed = gs ? this.evidenceChanged(w, gs.o, gs.before) : gsub ? this.evidenceChanged(w, gsub.o, gsub.before, gsub.card) : null
-        if (changed) throw new DragUndone(changed)
-        if (gs) {
-          decided(this.failingIn(w, 'start', gs.ins))
-          this.applyStart(w, gs, cause)
-        }
-        if (gsub) {
-          // After the start, the submission's evidence as it was gathered on the state the start leaves.
-          const shifted = gs ? this.evidenceChanged(w, gsub.o, gsub.before, gsub.card) : null
-          if (shifted) throw new DragUndone(shifted)
-          decided(this.failingIn(w, 'submit', this.submitInputs(gsub), gsub.only))
-          this.applySubmit(w, gsub, { summary: '' }, cause)
-          if (approves) override()
-        }
-        if (queueOnly) this.enqueue(w)
-        else if (pastReview && ORDER.indexOf(w.current) < ORDER.indexOf(to)) {
-          if (to === 'merging' && r.options.finish === 'hiveMerges') this.enqueue(w)
-          else w.move(hasStage(r, 'approved') ? 'approved' : to, cause)
-        }
-        return null
-      })
-    } catch (e) {
-      if (!(e instanceof DragUndone)) throw e
-      if (e.refused.rule === 'move.needsOverride' && by === 'user') return needs(String(e.refused.values.rules).split(', '))
-      return this.refuse(card, by, 'move', e.refused, e.refused.rule === 'move.needsOverride' ? 'the user or the Assistant' : 'the user') // i18n-ignore: who can override, agent-facing (§16.8.3)
+      const s1 = gs ? this.predicted(card, s, gs) : s
+      const gsub = ORDER.indexOf(to) > ORDER.indexOf('active') && s1.stage === 'active' ? await this.gatherSubmit(card, s1, by, {}, gs ? gs.r : r, !!gs) : null
+      if (gsub && !('inputs' in gsub)) {
+        // A submission refused for what no override makes true stops the drag there (§16.8.4), after its start. Its folder
+        // may only exist once started (a slot of its own): the start alone, then the submission gathered again on it.
+        if (!gs) return this.refuse(card, by, 'submit', gsub)
+        if (opts.dry) return this.dragForward(card, from, 'active', by, opts, fromHold)
+        const started = await this.dragForward(card, from, 'active', by, opts, fromHold)
+        return isRefusal(started) || 'ask' in started ? started : this.dragForward(card, from, to, by, opts)
+      }
+      // Where the card is once submitted (null: Finish decides, with no review), and what is left to the stage dragged to.
+      const after: StageId | null = gsub ? (r.options.review === 'none' ? null : 'review') : s1.stage
+      const approved = !gsub && !!s1.latest && !s1.stale && !notApproved(s1, r, card.labels)
+      const queueOnly = approved && to === 'merging' && r.options.finish === 'hiveMerges' && ORDER.indexOf(s1.stage) < ORDER.indexOf('merging')
+      const pastReview = !approved && after !== null && ORDER.indexOf(after) < ORDER.indexOf(to)
+      if (!gs && !gsub && !pastReview && !queueOnly && !fromHold) return this.ok(card, from, s0.stage)
+      const rules = new Set<string>()
+      if (gs) for (const x of this.failingOf(card, s, gs.r, 'start', gs.ins)) rules.add(x)
+      if (gsub) for (const x of this.failingOf(gsub.card, gsub.s, gsub.r, 'submit', gsub.inputs, gsub.only)) rules.add(x)
+      // Past Review (or the user's OK): the review and approvals are skipped, and the change counts as approved.
+      if (pastReview && this.enforced()) rules.add('integrate.approved')
+      const skipped = [...rules]
+      const needs = (list: string[]): Ask | Refusal => (by === 'user' ? { ask: true, card: card.key, rules: list } : refusal('move.needsOverride', { card: card.key, stage: to, rules: list.join(', ') }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
+      if (opts.dry && !skipped.length) return this.ok(card, from, s0.stage)
+      if (skipped.length && asking) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
+      await this.cfg.hooks?.beforeWrite?.('move')
+      if (gs && (await this.revalidate(card, s, gs.o, gs.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
+      if (!gs && gsub && (await this.revalidate(gsub.card, gsub.s, gsub.o, gsub.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
+      const cause: FactData['Moved']['cause'] = skipped.length ? 'override' : 'user'
+      // The rules as they are in the write: one not decided on undoes the write (it throws), to ask again.
+      const decided = (now: string[]): void => {
+        const more = now.filter((x) => !rules.has(x))
+        if (more.length) throw new DragUndone({ rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: [...skipped, ...more].join(', ') } })
+      }
+      let out: GuardRefusal | null
+      try {
+        out = await this.write(card, r, by, (w) => {
+          const moved = this.stillAt(w, s0, 'move')
+          if (moved) return moved
+          // One Override naming every rule skipped: after the submission when it approves it (past Review: it counts as
+          // approved for the latest submission), else first.
+          const override = (): void => void (skipped.length && w.fact('Override', { rules: skipped, move: `${s.stage}→${to}`, by, reason: opts.reason ?? '' })) // i18n-ignore: a fact's kind and codes, not text
+          const approves = pastReview && !!gsub
+          if (!approves) override()
+          if (fromHold) w.move(fromHold, 'user')
+          // The evidence on the state it was gathered on (back where it was, from On Hold): moved since, the write is undone.
+          const changed = gs ? this.evidenceChanged(w, gs.o, gs.before) : gsub ? this.evidenceChanged(w, gsub.o, gsub.before, gsub.card) : null
+          if (changed) throw new DragUndone(changed)
+          if (gs) {
+            decided(this.failingIn(w, 'start', gs.ins))
+            this.applyStart(w, gs, cause)
+          }
+          if (gsub) {
+            // After the start, the submission's evidence as it was gathered on the state the start leaves.
+            const shifted = gs ? this.evidenceChanged(w, gsub.o, gsub.before, gsub.card) : null
+            if (shifted) throw new DragUndone(shifted)
+            decided(this.failingIn(w, 'submit', this.submitInputs(gsub), gsub.only))
+            this.applySubmit(w, gsub, { summary: '' }, cause)
+            if (approves) override()
+          }
+          if (queueOnly) this.enqueue(w)
+          else if (pastReview && ORDER.indexOf(w.current) < ORDER.indexOf(to)) {
+            if (to === 'merging' && r.options.finish === 'hiveMerges') this.enqueue(w)
+            else w.move(hasStage(r, 'approved') ? 'approved' : to, cause)
+          }
+          return null
+        })
+      } catch (e) {
+        if (!(e instanceof DragUndone)) throw e
+        if (e.refused.rule === 'move.needsOverride' && by === 'user') return needs(String(e.refused.values.rules).split(', '))
+        return this.refuse(card, by, 'move', e.refused, e.refused.rule === 'move.needsOverride' ? 'the user or the Assistant' : 'the user') // i18n-ignore: who can override, agent-facing (§16.8.3)
+      }
+      return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, this.state(card).stage)
+    } finally {
+      // A slot lent for its start and not started with (asked, refused, undone): given back (#1438).
+      if (gs && 'data' in gs && gs.lent) await this.slotUnused(card, gs.lent)
     }
-    return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, this.state(card).stage)
   }
 
   /**

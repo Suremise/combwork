@@ -20,6 +20,14 @@ const input = (over: Partial<LaneBriefInput> = {}): LaneBriefInput => ({
   ...over
 })
 
+describe("a lane's brief on slots (#1438)", () => {
+  it('names the slot the builder works in, a new branch per card', () => {
+    const b = laneBrief(input({ builder: { name: 'B1', folder: null, branch: null, slot: 'slot-b' } }), 'builder')
+    expect(b).toContain("B1 works in slot-b, a new branch per card (Hive makes each card's branch there from the target and gives the card to B1 there); work goes to main.")
+    expect(laneBrief(input({ builder: { name: 'B1', folder: null, branch: null, slot: 'slot-b' } }), 'reviewer')).toContain('B1 works in slot-b, a new branch per card')
+  })
+})
+
 describe("a lane's brief (#1280)", () => {
   it("the builder's: card-loop as the builder with its reviewer, the cards in order, where it works, the rules, the intents, the note", () => {
     const b = laneBrief(input(), 'builder')

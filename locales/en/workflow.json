@@ -1553,7 +1553,7 @@
   },
   "workflow.value.folder.slots": {
     "defaultMessage": "Each card in its own folder",
-    "description": "A value of the workflow option “Where cards are built” (glossary 2.6, G11). In this version the folder is the builder’s worktree."
+    "description": "A value of the workflow option “Where cards are built” (glossary 2.6, G11). The folder is a slot, a worktree Hive lends to the card or its lane (glossary 2.5: slot)."
   },
   "workflow.value.mergeInstall.always": {
     "defaultMessage": "Before every merge",
