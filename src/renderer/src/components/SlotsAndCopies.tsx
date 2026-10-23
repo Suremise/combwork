@@ -32,6 +32,7 @@ const T = {
   fromCopy: msg({ id: 'workflow.slots.fromCopy', defaultMessage: 'From Agents & Worktrees’ files to copy', description: 'Where the setting “Files copied into new slots” comes from while it isn’t set: Agents & Worktrees’ list of files to copy into new worktrees (its name as translated there).' }),
   none: msg({ id: 'workflow.slots.none', defaultMessage: 'None', description: 'A slot script that isn’t set: nothing runs.' }),
   setNone: msg({ id: 'workflow.slots.setNone', defaultMessage: 'Set for this project: none', description: 'Where a slot setting’s value comes from: this project sets it to nothing (no script runs, no files are copied), over Agents & Worktrees’ value.' }),
+  toNone: msg({ id: 'workflow.slots.useNone', defaultMessage: 'Set to none', description: 'A button beside a slot setting this project inherits from Agents & Worktrees: set it to nothing for this project (no script runs, no files are copied).' }),
   inherit: msg({ id: 'workflow.slots.inherit', defaultMessage: 'Inherit', description: 'A button beside a slot setting set for this project: stop setting it here, and use Agents & Worktrees’ value again.' }),
   setHere: msg({ id: 'workflow.slots.setHere', defaultMessage: 'Set for this project', description: 'Where a slot setting’s value comes from: set in this project.' }),
   inUse: msg({ id: 'workflow.slots.inUse', defaultMessage: 'Slots in use and ready', description: 'A read-only list under “Slots and copies”: the project’s slots, what each is lent to, and those ready (glossary 2.5: slot).' }),
@@ -95,7 +96,8 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
   }
   /**
    * A field's text as the project's own value. The setup script and copied files: emptied, it is "none" (nothing runs, no
-   * file is copied, over Agents & Worktrees' value); Inherit is its own button. The archive script has nothing to inherit.
+   * file is copied, over Agents & Worktrees' value). An inherited one has Set to none (HR5's round 2: an empty field over an inherited value
+   * isn't a change), and one set here Inherit. The archive script has nothing to inherit.
    */
   const setSlot = (key: 'setup' | 'archive' | 'copy', v: string): Promise<void> => save(key, key === 'archive' && !v.trim() ? null : v)
   const copySize = cfg.copies?.size ?? null
@@ -121,9 +123,13 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
               <div className="s-desc">{tr(T.setupDesc)}</div>
               <div className="s-desc workflow-origin" data-origin={setupOwn === undefined ? 'worktreeSetup' : setupOwn.trim() ? 'project' : 'none'}>
                 {setupOwn === undefined ? `${tr(T.fromSetup)}: ${cfg.worktreeSetup.trim() || tr(T.none)}` : tr(setupOwn.trim() ? T.setHere : T.setNone)}
-                {setupOwn !== undefined && (
+                {setupOwn !== undefined ? (
                   <button className="btn subtle small workflow-inherit" data-action="inherit-setup" onClick={() => void save('setup', null)}>
                     {tr(T.inherit)}
+                  </button>
+                ) : (
+                  <button className="btn subtle small workflow-inherit" data-action="none-setup" onClick={() => void save('setup', '')}>
+                    {tr(T.toNone)}
                   </button>
                 )}
               </div>
@@ -153,9 +159,13 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
               <div className="s-desc">{tr(T.copyDesc)}</div>
               <div className="s-desc workflow-origin" data-origin={copyOwn === undefined ? 'worktreeCopy' : copyOwn.trim() ? 'project' : 'none'}>
                 {copyOwn === undefined ? `${tr(T.fromCopy)}: ${copyInherited.trim() || tr(T.none)}` : tr(copyOwn.trim() ? T.setHere : T.setNone)}
-                {copyOwn !== undefined && (
+                {copyOwn !== undefined ? (
                   <button className="btn subtle small workflow-inherit" data-action="inherit-copy" onClick={() => void save('copy', null)}>
                     {tr(T.inherit)}
+                  </button>
+                ) : (
+                  <button className="btn subtle small workflow-inherit" data-action="none-copy" onClick={() => void save('copy', '')}>
+                    {tr(T.toNone)}
                   </button>
                 )}
               </div>

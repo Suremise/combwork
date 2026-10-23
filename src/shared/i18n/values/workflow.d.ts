@@ -374,6 +374,7 @@ interface HiveMessageValues {
   'workflow.slots.state.lent': undefined
   'workflow.slots.state.ready': undefined
   'workflow.slots.state.removing': undefined
+  'workflow.slots.useNone': undefined
   'workflow.stage.active': undefined
   'workflow.stage.approved': undefined
   'workflow.stage.done': undefined

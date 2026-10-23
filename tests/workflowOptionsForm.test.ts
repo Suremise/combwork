@@ -768,6 +768,34 @@ describe("G15 saved before P7: the one-time step (#1445)", () => {
     expect((await w.projectConfig(repo)).workflow!.options.slotsUpToDate).toBe(false)
   })
 
+  it("the project's record is in the same write as its change (HR5's round 2): a run held or stopped just after it never lets another rewrite the user's choice", async () => {
+    for (const how of ['held', 'stopped'] as const) {
+      const { w, repo } = await workspace({})
+      const { platform: _p, ...pairOptions } = (await form.workflowForm(w, repo)).presets.find((x) => x.id === 'pair')!.options
+      await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow, platform: 'git', preset: 'pair', options: { ...pairOptions, slotsUpToDate: false } } }))
+      let release!: () => void
+      let reached!: () => void
+      const written = new Promise<void>((r) => (reached = r))
+      const gate = new Promise<void>((r) => (release = r))
+      // A has written the project and goes no further: held there, or failing (a crash before anything else is recorded).
+      const a = settleSlotsUpToDate(w, { afterProject: async () => { reached(); if (how === 'stopped') throw new Error('stopped'); await gate } })
+      await written
+      // The file holds the change and its record together, as one write did.
+      const onDisk = JSON.parse(readFileSync(join(repo, '.hive', 'project.json'), 'utf8'))
+      expect([onDisk.workflow.options.slotsUpToDate, onDisk.stepsDone], how).toEqual([true, [SLOTS_UP_TO_DATE_STEP]])
+      expect(boardValue(w, SLOTS_UP_TO_DATE_STEP), how).toBeNull()
+      // The user saves G15 Off, and another run (a second Hive, or the next open) goes over the workspace.
+      await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, slotsUpToDate: false } } }))
+      expect(await settleSlotsUpToDate(w), how).toBe(0)
+      release()
+      await a
+      expect((await w.projectConfig(repo)).workflow!.options.slotsUpToDate, how).toBe(false)
+      expect((await w.projectConfig(repo)).stepsDone, how).toEqual([SLOTS_UP_TO_DATE_STEP])
+      // Once a run has gone over every project, the step's mark: a project made later is never looked at.
+      expect(boardValue(w, SLOTS_UP_TO_DATE_STEP), how).not.toBeNull()
+    }
+  })
+
   it('a run that failed part way leaves the projects it settled alone when it runs again', async () => {
     const { w, repo, ws } = await workspace({})
     const second = join(ws, 'q')

@@ -372,6 +372,7 @@
   "workflow.slots.state.lent": "使用中",
   "workflow.slots.state.ready": "就绪",
   "workflow.slots.state.removing": "正在移除",
+  "workflow.slots.useNone": "设为无",
   "workflow.stage.active": "进行中",
   "workflow.stage.approved": "已批准",
   "workflow.stage.done": "已完成",

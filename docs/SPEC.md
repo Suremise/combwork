@@ -1874,10 +1874,10 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
     have G15's and G17's lines (`OPTION_WHY`); G11's is as before. The settings tool has `project.workflow.slotsUpToDate`.
   - **Saved options from before P7** (`src/main/workflow/slotsUpToDateStep.ts`): a pre-P7 build stored G15 only as its
     forced Off. A one-time step after the upgrade's adoption (a `board_meta` mark,
-    `workflow.slotsUpToDateFromBeforeP7`, set once every project is done, and a mark per project,
-    `workflow.slotsUpToDateFromBeforeP7:<project id>`, set once it is settled; both checked under the project's lock
-    before its write through `writeWorkflow`, so a second Hive running the step meanwhile, or a run again after one that
-    failed part way, never touches a project already settled nor a choice made since) settles each project's stored
+    `workflow.slotsUpToDateFromBeforeP7`, set once every project is done, and the project's own record, the step's
+    name in project.json's `stepsDone`, written in the same locked write as its change through `writeWorkflow`; both
+    checked under the project's lock first, so a second Hive running the step meanwhile, or a run again after one that
+    failed or stopped anywhere, never touches a project already settled nor a choice made since) settles each project's stored
     value, and its kept options' (#1419): a project whose options started from a preset takes that preset's value (On
     for Pair and Team), one with none drops it and inherits. **Never a change that adds a problem:** each is checked
     against the options' problems at the workspace's levels first (`checkOptions`); one that adds any (a Pair customised
@@ -1894,8 +1894,9 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
     (#1429's `slots.setup` / `slots.archive`; unset, the setup shows the old `worktreeSetup` as its origin), **Files
     copied into new slots** (`slots.copy`, unset showing `worktreeCopy` or Hive's). Emptied, the setup script and the
     copied files are the project's own *none* (`''`: nothing runs, nothing is copied, over the old value), shown as
-    *Set for this project: none*; **Inherit** beside a value set here removes it, so the old value applies again (the
-    archive script has nothing to inherit: emptied, it is removed). **Slots in use
+    *Set for this project: none*; beside an inherited value, **Set to none** stores it at once (an empty field over an
+    inherited value isn't a change), and beside a value set here, **Inherit** removes it, so the old value applies again
+    (the archive script has nothing to inherit: emptied, it is removed). **Slots in use
     and ready**, read-only (`slots:list`: name, state, lent to whom for which card or lane, or a carried worktree),
     linking to Branches & remotes. With any G11: **Review and check copies** (`copies.size`; empty keeps OP-32's default,
     shown) with how many there are and are leased (`copies:list`), and **Reviewers review in review copies**

@@ -1201,6 +1201,11 @@ export interface ProjectConfig {
    * read-only in P3 (P4's Version Control tab edits them).
    */
   workflow?: ProjectWorkflow
+  /**
+   * The one-time upgrade steps settled in this project (#1445's `workflow.slotsUpToDateFromBeforeP7`), each recorded in
+   * the same write as its change, so a later run can tell it from a choice the user made since, after a failure too.
+   */
+  stepsDone?: string[]
   fileLocks: Inherit<FileLockMode>
   /** Overrides settings.agents.worktreeCopy; null inherits. */
   worktreeCopy: string | null

@@ -166,6 +166,21 @@ function board(sql, ...args) {
     await slotsGroup.locator('[data-action="inherit-setup"]').click()
     check('Inherit uses Agents & Worktrees’ setup again', !!(await until(async () => projectJson().slots && !('setup' in projectJson().slots) && (await setupOrigin.getAttribute('data-origin')) === 'worktreeSetup' && (await setupOrigin.innerText()).includes('npm ci --old'), HUNG_MS)), JSON.stringify(projectJson().slots))
     check('…with no Inherit button left', (await slotsGroup.locator('[data-action="inherit-setup"]').count()) === 0)
+    // From an inherited value straight to none, with no value of the project's first (HR5's round 2), then back.
+    await slotsGroup.locator('[data-action="none-setup"]').click()
+    check('an inherited setup is set to none with Set to none', !!(await until(async () => projectJson().slots?.setup === '' && (await setupOrigin.getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(projectJson().slots))
+    await slotsGroup.locator('[data-action="inherit-setup"]').click()
+    check('…and inherits again', !!(await until(async () => !('setup' in (projectJson().slots ?? {})) && (await setupOrigin.getAttribute('data-origin')) === 'worktreeSetup', HUNG_MS)), JSON.stringify(projectJson().slots))
+    // The copied files: the project's own back to inherited, where nothing but Hive's own default (Agents & Worktrees) is set.
+    const hiveCopy = (await inv('settings:get')).agents.worktreeCopy
+    const copyOrigin = slotsGroup.locator('[data-slot-option="copy"] .workflow-origin')
+    await slotsGroup.locator('[data-action="inherit-copy"]').click()
+    check('the copied files inherit Hive’s default', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'worktreeCopy' && (await copyOrigin.innerText()).includes(hiveCopy.trim().split('\n')[0]), HUNG_MS)), `${JSON.stringify(projectJson().slots)} ${JSON.stringify(hiveCopy)}`)
+    await slotsGroup.locator('[data-action="none-copy"]').click()
+    check('…are set to none from there with Set to none', !!(await until(async () => projectJson().slots?.copy === '' && (await copyOrigin.getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(projectJson().slots))
+    await shot('copy-none', slotsGroup)
+    await slotsGroup.locator('[data-action="inherit-copy"]').click()
+    check('…and inherit it again', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'worktreeCopy', HUNG_MS)), JSON.stringify(projectJson().slots))
     check('Reviewers review in review copies shows Advanced’s switch', (await slotsGroup.locator('[data-slot-option="reviewCopies"] [data-value]').getAttribute('data-value')) === 'on')
     await shot('slots-group', slotsGroup)
 
@@ -191,11 +206,11 @@ function board(sql, ...args) {
     // --- A project a P6 build saved with Pair: G15 stored Off, and the one-time step not yet run.
     const pairOptions = (await inv('workflow:form', beta)).presets.find((p) => p.id === 'pair').options
     const { platform: _p, ...stored } = pairOptions
-    const cfg = projectJson(beta)
+    // As before P7: no step recorded in the project (the first start settled beta, with nothing to change), nor its mark.
+    const { stepsDone: _done, ...cfg } = projectJson(beta)
     fs.writeFileSync(path.join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: 'pair', options: { ...stored, slotsUpToDate: false } } }))
     await h.app.close()
-    // As before P7: neither the step's mark nor the projects' own (the first start settled beta, with nothing to change).
-    board("DELETE FROM board_meta WHERE key = 'workflow.slotsUpToDateFromBeforeP7' OR key LIKE 'workflow.slotsUpToDateFromBeforeP7:%'")
+    board("DELETE FROM board_meta WHERE key = 'workflow.slotsUpToDateFromBeforeP7'")
     h = await q.startHive(fx, { port: PORT, keepOptions: true })
     ;({ page, inv, app } = h)
     page.on('pageerror', (e) => check('no page errors', false, e.message))

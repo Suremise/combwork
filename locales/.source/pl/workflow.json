@@ -380,6 +380,7 @@
   "workflow.slots.state.lent": "In use",
   "workflow.slots.state.ready": "Ready",
   "workflow.slots.state.removing": "Being removed",
+  "workflow.slots.useNone": "Set to none",
   "workflow.stage": "{stage, select, hold {On Hold} todo {Todo} active {Active} review {Review} approved {Approved} merging {Merging} done {Done} other {{stage}}}",
   "workflow.stage.active": "Active",
   "workflow.stage.approved": "Approved",

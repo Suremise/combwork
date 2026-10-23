@@ -372,6 +372,7 @@
   "workflow.slots.state.lent": "Utilisé",
   "workflow.slots.state.ready": "Prêt",
   "workflow.slots.state.removing": "En cours de retrait",
+  "workflow.slots.useNone": "Définir sur aucun",
   "workflow.stage.active": "En cours",
   "workflow.stage.approved": "Validé",
   "workflow.stage.done": "Terminé",

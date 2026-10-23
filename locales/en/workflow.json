@@ -1491,6 +1491,10 @@
     "defaultMessage": "Being removed",
     "description": "A slot’s state in the list under “Slots and copies”."
   },
+  "workflow.slots.useNone": {
+    "defaultMessage": "Set to none",
+    "description": "A button beside a slot setting this project inherits from Agents & Worktrees: set it to nothing for this project (no script runs, no files are copied)."
+  },
   "workflow.stage.active": {
     "defaultMessage": "Active",
     "description": "A stage of the board (glossary 2.2: Active, was Doing): cards being worked on."

@@ -11,11 +11,11 @@
 //   project is left as it is.
 // It writes through `writeWorkflow` (#1417), keeping every other field. G1b's `reviewers` is never touched.
 //
-// Once, durably, whatever runs it (HR5's round 1): each project is settled at most once, its own `board_meta` mark
-// (`<STEP>:<project id>`) checked under the project's lock before the write and set after it, and the step's mark
-// (`STEP`, once every project is done) checked there too. So a second Hive running it meanwhile, or a run retried after a
-// failure part way, never touches a project already settled, nor a choice the user made since. Only dev and test
-// workspaces have such values: no release has P5 or P6.
+// Once, durably, whatever runs it (HR5's rounds 1 and 2): each project is settled at most once, recorded in project.json's
+// `stepsDone` in the same write as its change (one locked, atomic write: never a change published without its record),
+// and checked under that lock with the step's `board_meta` mark (set once every project is done). So a second Hive
+// running it meanwhile, or a run again after one that failed or stopped anywhere, never touches a project already
+// settled, nor a choice the user made since. Only dev and test workspaces have such values: no release has P5 or P6.
 
 import { basename } from 'path'
 import type { ProjectWorkflow } from '../../shared/types'
@@ -32,8 +32,6 @@ const log = createLogger('workflow')
 
 /** The `board_meta` mark the step leaves once it has run over every project. */
 export const SLOTS_UP_TO_DATE_STEP = 'workflow.slotsUpToDateFromBeforeP7'
-/** A project's own mark: settled (or left as it was), never looked at again. */
-export const stepMarkOf = (projectId: string): string => `${SLOTS_UP_TO_DATE_STEP}:${projectId.toLowerCase()}`
 
 /** The problems a platform's options would have (contradictions, a value it can't read), as ids, for the step's check. */
 export type ProblemsOf = (platform: PlatformId, options: Partial<WorkflowOptions>) => string[]
@@ -82,14 +80,15 @@ const problemsIn =
   (platform, options) =>
     checkOptions(platform, { global: config.settings.workflow, workspace: ws.config.workflow, project: options, folder }).problems.map((p) => (p.kind === 'contradiction' ? p.id : p.kind))
 
-/** For tests: awaited before each project is looked at (a second Hive, or a failure, part way through). */
+/** For tests: awaited before each project is looked at and after its write (a second Hive, or a failure, part way through). */
 export interface StepHooks {
   beforeProject?: (folder: string) => Promise<void> | void
+  afterProject?: (folder: string) => Promise<void> | void
 }
 
 /**
- * The step over a workspace's projects (hidden ones too), once: each project settled under its lock (its own mark and
- * the step's checked there first), then its own mark, then once every project is done the step's. Not before the 1.0
+ * The step over a workspace's projects (hidden ones too), once: each project settled under its lock (its `stepsDone` and
+ * the step's mark checked there first) with its record in the same write, then once every project is done the step's. Not before the 1.0
  * upgrade (its board isn't 1.0's yet), nor after the step's mark, nor once the workspace has closed. How many it changed;
  * a failure leaves the rest for the next open.
  */
@@ -104,19 +103,15 @@ export async function settleSlotsUpToDate(ws: WorkspaceService, hooks: StepHooks
     for (const folder of folders) {
       await hooks.beforeProject?.(folder)
       if (!alive()) return changed
-      const id = (await ws.projectConfig(folder)).id ?? basename(folder)
       let did = false
-      let settled = false
       await ws.mutateProjectConfig(folder, (c) => {
         // Under the project's lock, from the file as it is now: settled by any run of the step already, it is left alone.
-        if (boardValue(ws, SLOTS_UP_TO_DATE_STEP) !== null || boardValue(ws, stepMarkOf(c.id ?? id)) !== null) return {}
-        settled = true
+        if (boardValue(ws, SLOTS_UP_TO_DATE_STEP) !== null || c.stepsDone?.includes(SLOTS_UP_TO_DATE_STEP)) return {}
         const next = settledSlotsUpToDate(c.workflow, problemsIn(ws, folder))
-        if (!next) return {}
-        did = true
-        return { workflow: next }
+        did = !!next
+        return { ...(next ? { workflow: next } : {}), stepsDone: [...(c.stepsDone ?? []), SLOTS_UP_TO_DATE_STEP] }
       })
-      if (settled) await boardWrite(ws, async () => setBoardValue(ws, stepMarkOf(id), new Date().toISOString()), { alive })
+      await hooks.afterProject?.(folder)
       if (did) {
         changed++
         log.info(`G15 from before P7 settled in ${userText(basename(folder))}`)

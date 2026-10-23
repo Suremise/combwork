@@ -372,6 +372,7 @@
   "workflow.slots.state.lent": "使用中",
   "workflow.slots.state.ready": "準備済み",
   "workflow.slots.state.removing": "削除中",
+  "workflow.slots.useNone": "なしに設定",
   "workflow.stage.active": "進行中",
   "workflow.stage.approved": "承認済み",
   "workflow.stage.done": "完了",
