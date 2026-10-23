@@ -2863,10 +2863,13 @@ repeating them (#533) [note §8].
   - One note per workspace, `Workspace notes.md` in `.hive/shared` (git-excluded), pinned first in Shared Notes. The user
     edits it in the window and the Assistant with the notes tools; a project agent's write is refused (403), its read
     isn't. A `## <project name>` section (any case, a project of the workspace, hidden ones included) is that project's
-    alone; the rest, other headings included, is everyone's, and the Assistant gets the whole note (`notesFor`).
+    alone; the rest, other headings included, is everyone's, and the Assistant gets the whole note (`notesFor`). A
+    heading inside a code block is text (Markdown's fences: the same character, at least as many, close one), and only
+    `#`/`##` headings up to three spaces in start a section.
   - Delivered inline at each launch, as the note is then, after Hive's guidance and the launch's own instructions, to
     every agent and the Assistant in any folder, whatever its tools: Claude Code `--append-system-prompt-file` (with
-    `--system-prompt-snapshot off` on resume, as for the Assistant's mode), Codex `developer_instructions` after the
+    `--system-prompt-snapshot off` on resume, as for the Assistant's mode, and on every resume of a conversation Hive
+    appended to before, so notes switched off or emptied since leave it: the launch folder's `prompted.json`), Codex `developer_instructions` after the
     user's own (when Codex can't say what those are, an agent's are left alone, without the notes), Copilot its
     instruction file. Under "Workspace notes (this machine), from the shared note "Workspace notes":"; reviewers get it
     through their own session.

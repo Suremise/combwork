@@ -17,7 +17,7 @@ import { placeMatcher } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { hiveError } from '../../hiveError'
 import { findSecretWarnings } from '../../mcpSecrets'
-import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, installText, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
+import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import { storePwshFirst, storePwshIssue } from './storePwsh'
 import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, KeySteps, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
 import { codexBackgroundMemo, codexBackgroundTasks, type CodexBackgroundMemo } from './background'
@@ -237,13 +237,6 @@ export function developerInstructionsOf(as: readonly string[] | null, cleared: r
   const same = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((t, i) => t === b[i])
   if (same(as, cleared)) return ''
   return as.length === cleared.length + 1 && same(as.slice(1), cleared) ? as[0].trim() : null
-}
-
-/** Remembers `value` for a launch (`key`), keeping only the latest 16: a launch stopped part-way never takes its own. */
-function keepBounded<V>(map: Map<string, V>, key: string, value: V): void {
-  map.delete(key)
-  map.set(key, value)
-  while (map.size > 16) map.delete(map.keys().next().value!)
 }
 
 /** The texts of the developer message in Codex's rendering of a session's prompt (`codex <args> debug prompt-input`), or null. */

@@ -24,7 +24,7 @@ const HEADER = `Workspace notes (this machine), from the shared note "${NOTE_NAM
 const CUT = `(cut: read the shared note ${NOTE_NAME} for the rest)` // i18n-ignore: agent-facing, the launch's instructions
 
 /** A heading that starts a section (`#` or `##`, outside a code block), and its text. */
-const heading = (line: string): string | null => /^#{1,2}\s+(.+?)\s*#*\s*$/.exec(line)?.[1] ?? null
+const heading = (line: string): string | null => /^ {0,3}#{1,2}[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$/.exec(line)?.[1] ?? null
 
 /**
  * The part of the note one project's agents get: everything outside the projects' sections, and its own section
@@ -38,10 +38,16 @@ export function notesFor(text: string, project: string | null, projects: readonl
   const mine = project.toLowerCase()
   const out: string[] = []
   let owner: string | null = null
-  let fence = false
+  // The code block a line is in (Markdown's fences: three or more backticks or tildes, up to three spaces in; closed
+  // only by the same character, at least as many, with nothing after), so a heading inside one is its text.
+  let fence: { char: string; length: number } | null = null
   for (const line of lines) {
-    if (/^\s*(```|~~~)/.test(line)) fence = !fence
-    const h = fence ? null : heading(line)
+    const f = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line)
+    let h: string | null = null
+    if (fence) {
+      if (f && f[1][0] === fence.char && f[1].length >= fence.length && !f[2].trim()) fence = null
+    } else if (f && !(f[1][0] === '`' && f[2].includes('`'))) fence = { char: f[1][0], length: f[1].length }
+    else h = heading(line)
     if (h !== null) owner = names.has(h.toLowerCase()) ? h.toLowerCase() : null
     if (owner === null || owner === mine) out.push(line)
   }

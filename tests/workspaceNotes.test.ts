@@ -17,7 +17,8 @@ const { advanced } = await import('../src/main/advanced')
 const { appendedInstructions, claudeCode } = await import('../src/main/providers/claude/adapter')
 const { codex } = await import('../src/main/providers/codex/adapter')
 const { copilot } = await import('../src/main/providers/copilot/adapter')
-const { DELIVER_WORKSPACE_NOTES, WORKSPACE_NOTES_MAX_ID, advancedDef } = await import('../src/shared/advanced')
+const { DELIVER_WORKSPACE_NOTES, WORKSPACE_NOTES_MAX_ID, advancedDef, overrideId } = await import('../src/shared/advanced')
+const { overridesNow } = await import('../src/main/advancedValues')
 const { deliveredNotes, notesFor, WORKSPACE_NOTES_MAX, WORKSPACE_NOTES_PATH, workspaceNotesPath } = await import('../src/shared/workspaceNotes')
 const { utf8Bytes } = await import('../src/shared/metrics')
 
@@ -65,6 +66,29 @@ describe('the note and its sections', () => {
     expect(notesFor(NOTE, null, PROJECTS)).toBe(NOTE)
     // CRLF reads as LF.
     expect(notesFor(NOTE.replace(/\n/g, '\r\n'), 'alpha', PROJECTS)).toBe(alpha)
+  })
+
+  it("follows Markdown's code fences: a heading inside one, of any fence, is text, never a section (HR5's round 1)", () => {
+    const fenced = (open: string, inner: string, close: string): string => ['## beta', open, inner, '## alpha', 'BETA-PRIVATE', close, '## alpha', 'ALPHA-OWN'].join('\n')
+    for (const [open, inner, close] of [
+      ['````', '```', '````'], // a shorter run of the same character doesn't close it
+      ['```', '~~~', '```'], // nor does the other character
+      ['~~~~', '```', '~~~~~'], // closed by a longer run
+      ['```js', '``` not a close', '```'], // an info string opens; a run with text after doesn't close
+      ['   ```', '', '  ```'] // up to three spaces in
+    ]) {
+      const alpha = notesFor(fenced(open, inner, close), 'alpha', PROJECTS)
+      expect(alpha, `${open} … ${close}`).toContain('ALPHA-OWN')
+      expect(alpha, `${open} … ${close}`).not.toContain('BETA-PRIVATE')
+      expect(notesFor(fenced(open, inner, close), 'beta', PROJECTS), `${open} … ${close}`).toContain('BETA-PRIVATE')
+    }
+    // A fence never closed runs to the end: what follows is still the section's.
+    expect(notesFor(['## beta', '```', '## alpha', 'BETA-PRIVATE'].join('\n'), 'alpha', PROJECTS)).toBe('')
+    // A backtick run with a backtick after it isn't a fence (inline code), so the heading after it counts.
+    expect(notesFor(['## beta', '``` inline ` code', '## alpha', 'ALPHA-OWN'].join('\n'), 'alpha', PROJECTS)).toBe('## alpha\nALPHA-OWN')
+    // Four spaces in is indented code, not a heading; a heading may close with #s and be indented up to three.
+    expect(notesFor(['## beta', '    ## alpha', 'BETA-PRIVATE'].join('\n'), 'alpha', PROJECTS)).toBe('')
+    expect(notesFor(['## beta', 'BETA-PRIVATE', '   ## alpha ##', 'ALPHA-OWN'].join('\n'), 'alpha', PROJECTS)).toBe('## alpha ##\nALPHA-OWN')
   })
 
   it('is delivered under its header; empty, nothing', () => {
@@ -126,6 +150,35 @@ describe('delivered at launch, on every CLI, after Hive\'s guidance', () => {
     expect(args(context())).not.toContain('--append-system-prompt-file')
     // A resumed conversation gets the notes as they are now, not as it started with them.
     expect(args(context({ notes: NOTES, resume: true, cliVersion: '2.1.305' })).join(' ')).toContain('--system-prompt-snapshot off')
+  })
+
+  it("Claude Code: a conversation Hive appended notes to loses them on resume once they're off or emptied (HR5's round 1)", async () => {
+    const projectPath = join(base, 'claude-proj')
+    mkdirSync(projectPath, { recursive: true })
+    const sessionId = '6a0c1d2e-0000-4000-8000-000000000001'
+    const other = '6a0c1d2e-0000-4000-8000-000000000002'
+    /** A launch as Hive makes it: prepared, then its command; whether it renders the prompt fresh, and what it appends. */
+    const launch = async (over: Partial<LaunchContext>) => {
+      const ctx = context({ projectPath, cwd: projectPath, agentId: 'a-claude', sessionId, cliVersion: '2.1.305', mcpServers: {}, guidance: '', ...over })
+      await claudeCode.prepareLaunch(ctx)
+      const args = claudeCode.buildCommand('C:\\bin\\claude.exe', ctx).args
+      return { fresh: args.join(' ').includes('--system-prompt-snapshot off'), appends: args.includes('--append-system-prompt-file') }
+    }
+    // Started with notes.
+    expect(await launch({ notes: NOTES })).toEqual({ fresh: false, appends: true })
+    // Resumed with notes switched off (no notes): nothing appended, and the prompt rendered fresh, without the old note.
+    expect(await launch({ resume: true, notes: '' })).toEqual({ fresh: true, appends: false })
+    // …and on every resume after (Claude Code would go back to its saved prompt with the note).
+    expect(await launch({ resume: true, notes: '' })).toEqual({ fresh: true, appends: false })
+    // Emptied rather than switched off: the same (Hive passes no notes either way).
+    expect(await launch({ resume: true })).toEqual({ fresh: true, appends: false })
+    // Another conversation of the agent never given any: left as it is.
+    expect(await launch({ sessionId: other })).toEqual({ fresh: false, appends: false })
+    expect(await launch({ sessionId: other, resume: true })).toEqual({ fresh: false, appends: false })
+    // The user's own --system-prompt-snapshot, and the switch off (#1167), still decide.
+    expect((await launch({ resume: true, extraArgs: ['--system-prompt-snapshot', 'on'] })).fresh).toBe(false)
+    await advanced.set(overrideId('claude-code', 'promptSnapshotOff'), false)
+    expect((await launch({ resume: true, overrides: overridesNow('claude-code') })).fresh).toBe(false)
   })
 
   it('Copilot: in its instruction file, after the guidance and the role', async () => {
