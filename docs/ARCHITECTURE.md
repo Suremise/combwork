@@ -613,6 +613,21 @@ holds the slot, and lets git remove the worktree, never forced. `tidy` (hourly, 
 the pool's size. Where an agent works because of a lease is #1434's `agentFolders.ts`; lending for a card's start is
 #1438's.
 
+**Cards on slots, built [#1438].** `slotCards.ts` is the app's side of G11 = slots. The runtime's start asks
+`WorkflowConfig.slotFor` (set by `service.ts` from `setSlotStarts`; none in the spike's unit tests, which keep their
+`.hive/slots` stand-in) from `GitPlatform.start`, after an agent's 0.9 worktree (`agentFolder`, `legacyWorktree` until
+#1441 migrates the project): `leaseForStart` gives the lane's lease (lent once, kept for the lane) or the card's own,
+or why none is free (the plan's `slotWait`: `start.slotAvailable` refuses). A card lease lent for a start that isn't
+written is given back (`slotUnused`, checked against the card's `Started`). The start writes `prepareSlot` with the
+lease, the line and G15; its handler runs `SlotPool.prepare` (a warming operation on the lent slot: the line checked
+out, an install on a changed lock), then places the builder there once its turn is over (`launchWith` a new
+conversation, or the card typed in where it already runs; a window Start hands its prompt over: `expectStartPrompt`).
+`releaseSlot` (written with every move to Done and put back) ends a card's own lease and deletes the merged line
+(`deleteMergedLine`: containment, nothing checked out, `update-ref -d` at the head checked, `LineDeleted`); a lane's
+lease ends with its lane (`releaseEndedLanes`, on `onLanesWritten`). Start Lane lends the lane's slot first
+(`lendLane`); a lane without one waits in memory and is lent one when a lease ends or a slot's writer drains
+(`setSlotFreed`), its agents then started. The pool's size counts builders and either agents (`setBuilderCount`).
+
 **Storage (P3's one migration, #1025, designed in #1208).** The DDL is `src/main/schema/v1_0.ts`: five steps, registered
 in `BOARD_MIGRATIONS` in this order by their cards, each taking the next version number when it merges, and run by
 #1207's 1.0 group in one transaction after one ask, one backup and one exclusive lock. All tables are STRICT; a card's

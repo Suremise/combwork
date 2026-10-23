@@ -332,6 +332,8 @@ interface HiveMessageValues {
   'tips.skillsDelivered.title': undefined
   'tips.slotResume.text': undefined
   'tips.slotResume.title': undefined
+  'tips.slots.text': undefined
+  'tips.slots.title': undefined
   'tips.sortTables.text': undefined
   'tips.sortTables.title': undefined
   'tips.staleMessages.text': undefined

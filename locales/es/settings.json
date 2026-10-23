@@ -221,6 +221,8 @@
   "settings.advanced.hive.skills.removeIdleCopies.never": "Nunca",
   "settings.advanced.hive.skills.removeIdleCopies.slots": "Solo slots",
   "settings.advanced.hive.skills.removeIdleCopies.title": "Quitar las copias de habilidades de Hive cuando ningún agente trabaja en la carpeta",
+  "settings.advanced.hive.slots.deleteMergedLines.desc": "Cada tarjeta que se trabaja en un slot tiene su propia rama, como hive/AM/AM-12-fix-the-login. Cuando la tarjeta está terminada y su rama de destino contiene el trabajo de esa rama (también tras una fusión squash), Hive borra la rama y lo anota en la tarjeta. Una rama con trabajo sin fusionar, o activa en algún sitio, nunca se borra. Desactivado, las ramas se quedan.",
+  "settings.advanced.hive.slots.deleteMergedLines.title": "Borrar la rama de una tarjeta una vez fusionada",
   "settings.advanced.hive.slots.removeIdle.desc": "Un proyecto conserva tantos slots como autores tiene. Un slot libre de más, sin usar durante un día, se quita: primero se ejecuta su comando de archivado y, si falla, el slot se conserva. Hive nunca quita uno con un agente o un proceso dentro, un préstamo, una fusión en curso o trabajo sin confirmar y fusionar. Desactivado, los slots sin usar se quedan hasta que los quites.",
   "settings.advanced.hive.slots.removeIdle.title": "Quitar los slots sin usar tras un día",
   "settings.advanced.hive.slots.setupMinutes.desc": "Cuánto tiempo deja Hive que se ejecute el comando de preparación de un slot, una instalación de dependencias o su comando de archivado antes de terminarlo. Un slot cuya preparación se terminó así no se presta hasta que se prepara de nuevo; un comando de archivado terminado así conserva su slot.",

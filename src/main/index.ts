@@ -55,6 +55,7 @@ import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { releaseQueueRunners } from './workflow/queueRunner'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { startSlots, stopSlots } from './slotsApp'
+import { startSlotCards, stopSlotCards } from './slotCards'
 import { startCopies, stopCopies } from './copiesApp'
 import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
 import { setQueueLive, setRunsGoing } from './workflow/service'
@@ -993,6 +994,8 @@ app.whenReady().then(async () => {
   startQueueHosts()
   // The slot pools (#1429): their idle slots tidied every hour.
   startSlots()
+  // Cards on slots (#1438): a start lends its builder a slot and makes its line there, Done or put back gives it back.
+  startSlotCards()
   // Review and check copies (#1435): returning ones looked at again every 30 s, idle ones tidied every hour.
   startCopies()
   // The queue's order as agents read it (#1354): this Hive's entry testing now, at its step.
@@ -1126,6 +1129,7 @@ app.on('will-quit', () => {
   stopObserving()
   stopReconciling()
   stopQueueHosts()
+  stopSlotCards()
   stopSlots()
   stopCopies()
   flightRecorder.stop()

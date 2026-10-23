@@ -14,7 +14,7 @@ import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { CardRecord } from '../workflow/factStore'
 import { reconcileGit, type ReconcileHooks } from '../workflow/reconcile'
 import { snapshot } from '../workflow/checks'
-import { slugOf, type Workflow } from '../workflow/runtime'
+import { lineName, type Workflow } from '../workflow/runtime'
 import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
 import * as G from './git'
 import { observer, type Disposable, type ObserveEvent } from './observe'
@@ -55,7 +55,7 @@ export class GitPlatform implements PlatformAdapter {
     return this.wf.cfg.project
   }
 
-  async start(card: CardRecord, o: WorkflowOptions, builder?: string): Promise<Maybe<StartPlan>> {
+  async start(card: CardRecord, o: WorkflowOptions, builder?: string, dry = false): Promise<Maybe<StartPlan>> {
     // Before P7 (SPEC §16.19.1): the builder's own worktree stands in for a slot, and is where its work is whatever the
     // folder option says (as P3 recorded it). Its line is the worktree's branch, and the card's base the merge base of its
     // head with the target's (sound: a lane's next card starts once the last is Done).
@@ -75,9 +75,28 @@ export class GitPlatform implements PlatformAdapter {
       if (!base) return unknown(UNREADABLE.branchedOff, { a: line ?? own.path, b: target })
       return { folder: own.path, line, base, target, existing: true }
     }
-    if (o.folder === 'slots' && this.wf.cfg.agentFolder) {
-      // In the app, no slots yet (P7): a card started with no agent's worktree works in the project folder, as all-off does.
-      return this.start(card, { ...o, folder: 'project' })
+    if (o.folder === 'slots' && this.wf.cfg.slotFor) {
+      // Slots (#1438, SPEC §16.10): the card's own line from the target's head, in the slot its builder is lent (its
+      // lane's, kept for the lane, else the card's own). None free: it waits for one (refused `start.slotAvailable`;
+      // the user's start across it works where the agent is). No slot here (the rules off): where the agent is, as P3.
+      const target = card.target || o.target || (await G.defaultBranch(this.project))
+      if (isUnknown(target)) return target
+      const got = builder ? await this.wf.cfg.slotFor(card, builder, { dry, target }) : null
+      if (!got || 'wait' in got) {
+        const here = await this.start(card, { ...o, folder: 'project' })
+        return got && !isUnknown(here) ? { ...here, slotWait: got.wait } : here
+      }
+      const th = await G.lineHead(this.project, target)
+      if (isUnknown(th)) return th
+      if (!th) return unknown(UNREADABLE.head, { where: target })
+      const line = lineName(this.wf.cfg.projectKey, card)
+      // A line of its from an earlier start (put back, then started again) carries on: its base is where it left the target.
+      const had = await G.lineHead(this.project, line)
+      if (isUnknown(had)) return had
+      const base = had && had !== th ? await G.mergeBase(this.project, had, th) : th
+      if (isUnknown(base)) return base
+      if (!base) return unknown(UNREADABLE.branchedOff, { a: line, b: target })
+      return { folder: got.folder, line, base, target, slot: got.slot, lease: got.lease, fresh: got.fresh }
     }
     if (o.folder === 'slots') {
       const target = card.target || o.target || (await G.defaultBranch(this.project))
@@ -85,9 +104,7 @@ export class GitPlatform implements PlatformAdapter {
       const base = await G.lineHead(this.project, target)
       if (isUnknown(base)) return base
       if (!base) return unknown(UNREADABLE.head, { where: target })
-      const slug = slugOf(card.title)
-      const line = `hive/${this.wf.cfg.projectKey}/${card.key}${slug ? `-${slug}` : ''}`
-      return { folder: join(this.wf.cfg.slots, card.key), line, base, target }
+      return { folder: join(this.wf.cfg.slots ?? join(this.project, '.hive', 'slots'), card.key), line: lineName(this.wf.cfg.projectKey, card), base, target }
     }
     const line = await G.branch(this.project)
     const base = await G.head(this.project)
@@ -106,9 +123,14 @@ export class GitPlatform implements PlatformAdapter {
   private async startTarget(card: CardRecord, o: WorkflowOptions, builder?: string): Promise<Maybe<string | null>> {
     const own = builder && this.wf.cfg.agentFolder ? await this.wf.cfg.agentFolder(builder) : null
     if (own) return card.target || o.target || own.base || G.defaultBranch(this.project)
-    if (o.folder === 'slots' && !this.wf.cfg.agentFolder) return card.target || o.target || G.defaultBranch(this.project)
+    if (o.folder === 'slots' && (this.slotsHere() || !this.wf.cfg.agentFolder)) return card.target || o.target || G.defaultBranch(this.project)
     if (o.finish !== 'committed' && (card.target || o.target)) return card.target || o.target
     return G.branch(this.project)
+  }
+
+  /** Whether a start here asks for a slot (#1438): the app's lending, while the rules are enforced. */
+  private slotsHere(): boolean {
+    return !!this.wf.cfg.slotFor && (this.wf.cfg.enforced?.() ?? true)
   }
 
   /** The plan's target is the one prime resolved and the evidence covers (a Todo card's; otherwise nothing was resolved). */

@@ -46,6 +46,9 @@ export interface StartedData {
   target: string | null
   builder: string
   cardKind: CardKind
+  /** Slots (#1438): the slot the card is built in, and the lease it holds it by (a lane's, or the card's own). */
+  slot?: string
+  lease?: string
   /** None: the card's paths and their hashes at the start. */
   manifest?: Manifest
   /** None: every deliverable's hash at the start, which unclaimed changes are found against (§16.4.2). */
@@ -161,6 +164,8 @@ export interface FactData {
   LineMoved: { line: string; from: string; to: string; why: 'squashContinuation' }
   /** The card's line renamed (#1305: Repair renaming an agent's branch named after an old place): its work follows it. */
   LineRenamed: { from: string; to: string; why: 'repair' }
+  /** A Done card's line deleted (#1438): its target contained it at `revision`, and nothing had it checked out. */
+  LineDeleted: { line: string; revision: string; why: 'merged' }
   /** The card's folder moved (#1343: Repair relinking or recreating the agent's worktree at a new place): its work follows it. */
   FolderMoved: { from: string; to: string; why: 'repair' }
   /**

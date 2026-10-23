@@ -405,8 +405,8 @@ let stopHosts: (() => void) | null = null
 
 /**
  * Starts the app's merge queue (index.ts, once): `enqueue` runs a target's host; `pin` pins a submission's revision
- * (the runtime wrote it, nothing in the app ran it before the queue); `releaseSlot` is marked done (P7's
- * slots; agents' worktrees carry on meanwhile); a workspace opening starts its hosts with open entries; the rules
+ * (the runtime wrote it, nothing in the app ran it before the queue); `releaseSlot` is slotCards.ts's (#1438); a
+ * workspace opening starts its hosts with open entries; the rules
  * coming back on lift `rulesOff` pauses; a workspace closing waits for its hosts' runs to end.
  */
 export function startQueueHosts(): void {
@@ -423,7 +423,6 @@ export function startQueueHosts(): void {
     }
     void kickQueue(ws, project, target)
   })
-  onAction('releaseSlot', () => undefined)
   // A submission's pin (§16.9.3): what was reviewed is kept until its card is archived (prunePins).
   onAction('pin', async (a, ws) => {
     const project = projectOfCard(ws, a.card)

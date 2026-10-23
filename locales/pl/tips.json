@@ -330,6 +330,8 @@
   "tips.skillsDelivered.title": "Wybierz, jakie umiejętności dostają agenci",
   "tips.slotResume.text": "Rozmowa wykonawcy zostaje w slocie jego karty. Gdy karta się zakończy, „Wznów wszystkich” ją pomija, żeby slot został wolny dla nowej pracy; jej własne Wznów zabiera slot z powrotem, dopóki nic innego go nie użyło.",
   "tips.slotResume.title": "Rozmowa wznawia się tam, gdzie powstała",
+  "tips.slots.text": "Gdy Gdzie powstają karty ma wartość Każda karta we własnym folderze, rozpoczęcie karty wypożycza wykonawcy slot, gotowy worktree, i tworzy tam gałąź karty. Tor zachowuje slot od karty do karty; gdy wszystkie są zajęte, czeka na wolny.",
+  "tips.slots.title": "Każda karta na własnej gałęzi",
   "tips.sortTables.text": "Kliknij nagłówek kolumny w tabelach Hive (skróty, Wydajność, Miejsce na dysku, przeglądy), żeby posortować według niej, a ponownie – w drugą stronę. Hive pamięta sortowanie i liczbę wierszy na stronę każdej tabeli.",
   "tips.sortTables.title": "Sortuj dowolną tabelę",
   "tips.staleMessages.text": "Gdy Asystent przekazuje coś o bieżącej rundzie karty, wiąże wiadomość z tą kartą: jeśli karta zostanie zatwierdzona lub zacznie kolejną rundę, zanim agent ją przeczyta, Hive odrzuca ją jako nieaktualną, więc żaden agent nie otworzy ponownie zatwierdzonej karty z powodu starego ustalenia.",

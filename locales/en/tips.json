@@ -1323,6 +1323,14 @@
     "defaultMessage": "A conversation resumes where it was made",
     "description": "A tip's title (#1434)."
   },
+  "tips.slots.text": {
+    "defaultMessage": "With Where cards are built set to Each card in its own folder, starting a card lends its builder a slot, a ready worktree, and makes the card's branch there. A lane keeps its slot from card to card; with every slot in use, it waits for one.",
+    "description": "A tip. A slot is a working folder (a worktree) Hive lends to a card or a lane. Names of Hive's menus, views, settings and commands (Where cards are built is a workflow option, Each card in its own folder its value; glossary 2.6, G11): keep them as Hive shows them."
+  },
+  "tips.slots.title": {
+    "defaultMessage": "Each card on a branch of its own",
+    "description": "A tip's title. A slot is a working folder (a worktree) Hive lends to a card or a lane."
+  },
   "tips.sortTables.text": {
     "defaultMessage": "Click a column's header in Hive's tables (shortcuts, Performance, Storage, the Overviews) to sort by it, again for the other way. Hive remembers each table's sort and rows per page.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

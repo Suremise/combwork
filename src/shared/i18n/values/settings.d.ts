@@ -223,6 +223,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.skills.removeIdleCopies.never': undefined
   'settings.advanced.hive.skills.removeIdleCopies.slots': undefined
   'settings.advanced.hive.skills.removeIdleCopies.title': undefined
+  'settings.advanced.hive.slots.deleteMergedLines.desc': undefined
+  'settings.advanced.hive.slots.deleteMergedLines.title': undefined
   'settings.advanced.hive.slots.removeIdle.desc': undefined
   'settings.advanced.hive.slots.removeIdle.title': undefined
   'settings.advanced.hive.slots.setupMinutes.desc': undefined

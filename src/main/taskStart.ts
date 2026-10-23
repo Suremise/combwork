@@ -16,6 +16,7 @@ import { columnError, getTask, setContextProblems, UNKNOWN_AGENT, updateTask, ty
 import { createLogger, userText } from './logger'
 import { workspace, workspaceOf } from './workspace'
 import { checkDocRef, type DocRefCheck } from './docSections'
+import { expectStartPrompt, startedSlot } from './slotCards'
 import type { ContextLine } from '../shared/tasks'
 
 const log = createLogger('tasks')
@@ -153,6 +154,9 @@ async function giveCard(
     if (added) await removeAgent(p, agentId, { deleteWorktree: true }).catch((e) => log.warn(`Could not remove ${userText(agentName)} after #${n} didn't start`, e))
   }
 
+  // A start in a slot (#1438) gives the card to the agent there once its line is made: this Start's prompt goes to that.
+  const toSlot = expectStartPrompt(p, n)
+  let slotted = false
   // Taken first, on the card as it is now: it must still be startable, and in the project, column and with the agent
   // this Start read. Anything else is a newer decision (moved, reassigned, put in Done) and stays.
   let card: TaskCard
@@ -172,6 +176,7 @@ async function giveCard(
       }
     })
   } catch (e) {
+    toSlot(null)
     await undoAgent()
     throw e
   }
@@ -203,6 +208,14 @@ async function giveCard(
       if (!current) throw hiveError(msg({ id: 'tasks.start.changed', defaultMessage: '#{n} changed while it was being started (archived, moved, given to another agent, or its Read first edited): start it again if it should still go.', description: "An error: the card #{n} (a number) was changed while Hive was starting it (archived, moved to another column or project, given to another agent, deleted, or its Read first doc sections edited), so it wasn't given to the agent. Read first is the card's field: keep its name as the card dialog shows it." }), { n }, { kind: 'conflict' })
     }
     const prompt = advanced.get<boolean>(RAW_CARD_START) ? rawTaskPrompt(card, note) : taskPrompt(card, !!sessions.hiveMcp(p), { from: before.column, note, context })
+    // Started in a slot (#1438): Hive gives it to the agent there once the slot is ready (a new conversation where the
+    // agent isn't running there), so nothing is typed where it is now.
+    if (before.column !== 'doing' && (await startedSlot(workspaceOf(p), p, n))) {
+      slotted = true
+      toSlot(prompt)
+      if (added && actor.kind !== 'user') emit({ type: 'agent-added', projectPath: p, agentId })
+      return { card, agentId, agentName, added, typed: false }
+    }
     // Again now: the agent may have started work, or the user typed in it, while the card was taken.
     live = availability(p, agentId, agentName, actor).live
     // A task delivery (#649), given now or not at all: typed into a running agent (and while it is typed, an agent that
@@ -221,12 +234,14 @@ async function giveCard(
       })
     else run = (await launchWith(p, nd, (line) => sessions.start(p, { agentId, prompt: line }))).launched?.runId
   } catch (e) {
+    if (!slotted) toSlot(null)
     await back(before.agent)
       .catch(() => back(null))
       .catch(() => undefined)
     await undoAgent()
     throw e
   }
+  toSlot(null)
   // The view stays where the user has it; the new agent is marked for them.
   if (added && actor.kind !== 'user') emit({ type: 'agent-added', projectPath: p, agentId })
   return { card, agentId, agentName, added, typed: live, ...(run ? { run } : {}) }

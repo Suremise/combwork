@@ -409,7 +409,13 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   const current = recorded.length ? await rulesetsNow(ws) : new Map<string, string>()
   // And their own stages, which a lane under old rules keeps (HR4's #1421 round 1).
   const stagesOf = ws.path ? rulesetStages(ws, recorded) : new Map<string, null>()
-  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null))
+  return lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) && slotOf ? slotOf(ws, l.id) : null))
+}
+
+/** A lane's slot and whether it waits for one (#1438: slotCards.ts gives it; none, no slots). */
+let slotOf: ((ws: WorkspaceService, lane: string) => { slot: string | null; waiting: boolean }) | null = null
+export function setLaneSlots(fn: typeof slotOf): void {
+  slotOf = fn
 }
 
 /** A decision about a lane made on a read its cards have since moved on from (#1270): not saved; the lanes are read again. */
