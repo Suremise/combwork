@@ -361,8 +361,10 @@ export function pendingStep(card: Pick<TaskCard, 'history'>): { entry: TaskCard[
   const i = card.history.findLastIndex((h) => isLoopStepEntry(h.what))
   const posted = i < 0 ? null : /^Posted a (design|follow-up)\b/.exec(card.history[i].what)
   if (!posted) return null
-  // The column it was posted in, as its lines last said.
-  let column = card.history.slice(0, i).map(columnOfLine).findLast((c) => c !== null) ?? null
+  // The column it was posted in: as its line kept it (#1495: the lines before may have been trimmed, MAX_HISTORY), else
+  // as the lines before it last said (a line from before).
+  const kept = card.history[i].whatText?.values?.column
+  let column = typeof kept === 'string' ? kept : (card.history.slice(0, i).map(columnOfLine).findLast((c) => c !== null) ?? null)
   for (const h of card.history.slice(i + 1)) {
     if (/^(Returned for review|Review (passed|failed))\b/.test(h.what)) return null
     const now = columnOfLine(h)
