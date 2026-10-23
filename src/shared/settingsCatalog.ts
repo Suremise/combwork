@@ -767,6 +767,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('stopOwnRuns', 'boolean'),
     option('dependenciesDone', 'boolean'),
     option('sharedFolderWarning', 'boolean'),
+    option('reviewerMode', 'select', [['lane', V.reviewerMode.lane], ['pool', V.reviewerMode.pool]]),
     option('excluded', 'custom'),
     option('stageNames', 'custom')
   ]

@@ -158,6 +158,11 @@ export interface FactData {
   Submitted: SubmittedData
   CheckRan: CheckRanData
   ReviewStarted: { reviewer: string; submission: number; revision: string | null; reviewCopy?: string }
+  /**
+   * The reviewer pool (#1443, G17) gave the card's submission to a free pooled reviewer: it reviews that submission. With
+   * G1b = 2, a second one after the first passes.
+   */
+  ReviewerAssigned: { reviewer: string; submission: number }
   Verdict: { reviewer: string; submission: number; revision: string | null; pass: boolean; failKind?: 'content' | 'explanation'; round: number; generation: number; comment: string }
   CarriedOver: { from: string; to: string; toBase: string | null; how: 'replay' | 'sameRevision' }
   Updated: { entry: string; from: string; to: string; how: 'mergedTarget' | 'rebased'; carried: boolean }

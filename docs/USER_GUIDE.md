@@ -710,6 +710,16 @@ When agents work in pairs, a builder and a reviewer taking cards in turn (the **
 
 With no lanes and no merge going on, the panel is just the runs, as before.
 
+#### A reviewer pool
+
+Lanes can share their reviewers instead of each having its own. A project whose workflow option **Reviewers** is **A shared pool** (the **Team 6 + pool** template suggests it; until the Version Control tab has its row, ask the Hive Assistant to set it, `project.workflow.reviewerMode`) offers **The reviewer pool (HI-R1 and HI-R2)** in **Start Lane**'s reviewer list. Its agents are the project's reviewers and either-role agents. A lane started with it has no reviewer of its own, so only its builder starts, and its brief says the pool reviews its cards.
+
+- **Each card submitted** in a pool lane goes to the next free reviewer, oldest submission first, across all the pool's lanes. Free means: its role reviews, it isn't in a turn, waiting for you, watching cards or running something, it isn't reviewing another card, and it isn't building in a slot (an either-role agent mid-card is left alone until its card is Done). A reviewer never gets a card it built.
+- **Hive tells it**: *#12 (HI-B1's card) is in Review: you review it from the pool*, typed into its conversation, or it is started for the review in the project folder (it reviews in a review copy).
+- **Nobody free:** the card waits, and its lane says *waiting for a reviewer*. A verdict frees the reviewer for the next card.
+- **Two reviewers per card** (**Reviewers per card: 2**): a second reviewer, another agent, gets the card once the first has passed it.
+- With **Workflow rules are enforced** off (Settings → Advanced), nothing is given out: name a reviewer for each lane yourself.
+
 #### The merge queue in the Progress panel
 
 When Hive merges a project's cards itself (**Who merges: Hive merges**, the merge queue), the **Merges** tab has a card for each target the queue merges into (*Merge queue · main*), beside any merge slot an agent holds, by project and then target. It says, each with its own icon and words:

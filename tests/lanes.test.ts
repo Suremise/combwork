@@ -310,6 +310,25 @@ describe('the lanes service', () => {
     await expect(lanes.joinLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', by: 'R1 (alpha)' })).rejects.toThrow(/no lane running yet/)
   })
 
+  it('a lane reviewed by the pool (#1443): kept with its row, nobody joins it, its builder keeps it; a reviewer named makes it one per lane', async () => {
+    const [c1, c2] = [await make('Q1'), await make('Q2')]
+    const started = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: null, pool: true, cards: [c1.number, c2.number], by: 'the user' })
+    expect([started.lane.pool, started.lane.reviewer]).toEqual([true, null])
+    expect(laneLine(started.lane)).toContain('B2 / the reviewer pool (alpha)')
+    expect((await lanes.rawLanes(w)).find((l) => l.id === started.lane.id)?.pool).toBe(true)
+    await expect(lanes.joinLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', by: 'R1 (alpha)' })).rejects.toThrow(/reviewed by the reviewer pool/)
+    // The builder's own start (card-loop) names no reviewer: the pool stays.
+    const mine = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number, c2.number], rounds: 3, by: 'B2 (alpha)' })
+    expect([mine.did, mine.lane.id, mine.lane.pool, mine.lane.rounds]).toEqual(['updated', started.lane.id, true, 3])
+    await expect(lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', pool: true, cards: [c1.number], by: 'B2 (alpha)' })).rejects.toThrow(/no reviewer of its own/)
+    const named = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number, c2.number], by: 'B2 (alpha)' })
+    expect([named.lane.id, named.lane.pool, named.lane.reviewer?.id]).toEqual([started.lane.id, undefined, 'r1'])
+    expect(readLane({ ...rec(), reviewer: null, pool: true })?.pool).toBe(true)
+    // A pool beside a reviewer of its own doesn't read back as one.
+    expect(readLane({ ...rec(), pool: true })?.pool).toBeUndefined()
+    await lanes.endLane(w, named.lane.id, { abandoned: true })
+  })
+
   it("a builder's next loop, its last lane's cards passed but not merged: that lane ends (not abandoned), whoever registers first", async () => {
     // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
     await rulesOff()

@@ -2909,6 +2909,8 @@ export interface LaneInfo {
   name: string | null
   builder: { id: string; name: string }
   reviewer: { id: string; name: string } | null
+  /** Reviewed by the project's reviewer pool (#1443, G17): `reviewer` is null, and each card goes to a free pooled reviewer. */
+  pool?: boolean
   /** In the lane's order. */
   cards: LaneCard[]
   /** The first card not in Passed or Done (null: none left). */
@@ -2961,9 +2963,19 @@ export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMer
 export interface LaneStartRequest {
   builder: string
   reviewer: string | null
+  /** Reviewed by the project's reviewer pool (#1443: G17 a shared pool), with `reviewer` null. */
+  pool?: boolean
   cards: number[]
   note?: string
   name?: string | null
+}
+
+/**
+ * What Start Lane… offers for a project (#1443): with workflow rules on and G17 a shared pool, Pool in its reviewer list
+ * (`pool`: the agents whose role reviews, by id and name); null: one reviewer per lane.
+ */
+export interface LaneStartInfo {
+  pool: { id: string; name: string }[] | null
 }
 
 /** What Start lane… did: the lane recorded, and how each agent started (failed: the lane stays, why said). */

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { AgentInfo, ProjectInfo } from '@shared/types'
+import type { AgentInfo, LaneStartInfo, ProjectInfo } from '@shared/types'
 import { fmt, msg, tr } from '@shared/i18n'
 import { cardLabel } from '@shared/projectKeys'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '@shared/workflow/roles'
@@ -26,10 +26,21 @@ const busy = (a: AgentInfo | undefined): boolean => !!a?.live && BUSY.has(a.live
 /** Who may build and who may review, by their role in the workflow (#1430): either-role agents are in both lists. */
 const builders = (p: ProjectInfo | null): AgentInfo[] => p?.agents.filter((a) => buildsWork(agentWorkflowRole(a))) ?? []
 const reviewers = (p: ProjectInfo | null, builder: string): AgentInfo[] => p?.agents.filter((a) => a.id !== builder && reviewsWork(agentWorkflowRole(a))) ?? []
-/** The first builder, and the first reviewer besides it. */
-const firstPair = (p: ProjectInfo | null): { builder: string; reviewer: string } => {
+/** The reviewer list's Pool choice (#1443): never an agent's id, which Hive makes. */
+const POOL = '*pool'
+/**
+ * A builder's reviewer to start with: the one it is paired with (#1436's `pairedWith`, by name), else the pool where the
+ * rules have one, else the first reviewer besides it.
+ */
+const reviewerFor = (p: ProjectInfo | null, builder: string, pool: boolean): string => {
+  const paired = p?.agents.find((a) => a.id === builder)?.pairedWith?.toLowerCase()
+  const list = reviewers(p, builder)
+  return list.find((a) => !!paired && a.name.toLowerCase() === paired)?.id ?? (pool ? POOL : (list[0]?.id ?? ''))
+}
+/** The first builder, and its reviewer. */
+const firstPair = (p: ProjectInfo | null, pool: boolean): { builder: string; reviewer: string } => {
   const builder = builders(p)[0]?.id ?? ''
-  return { builder, reviewer: reviewers(p, builder)[0]?.id ?? '' }
+  return { builder, reviewer: reviewerFor(p, builder, pool) }
 }
 
 const M = {
@@ -38,6 +49,8 @@ const M = {
   project: msg({ id: 'board.laneStart.project', defaultMessage: 'Project', description: "A field label in the Start Lane dialog: the project whose cards the lane works through." }),
   builder: msg({ id: 'board.laneStart.builder', defaultMessage: 'Builder', description: 'A field label in the Start Lane dialog: the agent that builds the cards. Glossary: builder.' }),
   reviewer: msg({ id: 'board.laneStart.reviewer', defaultMessage: 'Reviewer', description: 'A field label in the Start Lane dialog: the agent that reviews each card. Glossary: reviewer.' }),
+  pool: msg({ id: 'board.laneStart.pool', defaultMessage: 'The reviewer pool ({agents})', description: 'A choice of the Start Lane dialog’s reviewer (#1443): the lane is reviewed by the project’s pool of reviewer agents ({agents}: their names, joined), each card going to the next free one. Glossary: reviewer pool.' }),
+  poolNobody: msg({ id: 'board.laneStart.poolNobody', defaultMessage: 'nobody yet', description: 'In the Start Lane dialog’s reviewer choice “The reviewer pool (…)”, in place of the names: no agent of the project reviews yet.' }),
   noReviewer: msg({ id: 'board.laneStart.noReviewer', defaultMessage: 'No reviewer', description: 'A choice of the Start Lane dialog’s reviewer: the lane has none (the project’s rules may need one).' }),
   noAgents: msg({ id: 'board.laneStart.noAgents', defaultMessage: 'The project has no agents. Add one first.', description: 'In the Start Lane dialog: the chosen project has no agents to build the cards.' }),
   noBuilders: msg({ id: 'board.laneStart.noBuilders', defaultMessage: 'None of the project’s agents builds. Set Role in the workflow to Builder or Either in an agent’s settings.', description: 'In the Start Lane dialog: every agent of the project is a reviewer, so none can build the cards. Role in the workflow, Builder and Either are the Agent Settings field and its choices: use their translated names. Glossary: builder, either.' }),
@@ -76,8 +89,11 @@ export function LaneStartDialog() {
   const [name, setName] = useState('')
   const [note, setNote] = useState('')
   const [waiting, setWaiting] = useState(false)
+  // What the project's rules offer (#1443): the reviewer pool, read for the project chosen.
+  const [info, setInfo] = useState<{ path: string; info: LaneStartInfo } | null>(null)
   const action = useBusy()
   const project: ProjectInfo | null = projects.find((p) => p.path === projectPath) ?? null
+  const pool = info && info.path === projectPath ? info.info.pool : null
 
   // Opened: its project and cards, its first builder and first reviewer (#1430).
   useEffect(() => {
@@ -86,7 +102,7 @@ export function LaneStartDialog() {
     const named = req.project?.toLowerCase()
     const p = projects.find((x) => x.path.toLowerCase() === named || x.name.toLowerCase() === named) ?? projects.find((x) => x.agents.length > 0) ?? projects[0] ?? null
     setProjectPath(p?.path ?? null)
-    const pair = firstPair(p)
+    const pair = firstPair(p, false)
     setBuilder(pair.builder)
     setReviewer(pair.reviewer)
     setCards(req.cards.filter((n) => tasks.some((c) => c.number === n && c.project.toLowerCase() === p?.name.toLowerCase())))
@@ -97,18 +113,37 @@ export function LaneStartDialog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [req])
 
+  // The pool the project's rules offer, read as its project is chosen; with one, a builder that isn't paired starts with it.
+  useEffect(() => {
+    if (!req || !projectPath) return
+    let gone = false
+    void call('lanes:startInfo', projectPath)
+      .then((got) => {
+        if (gone) return
+        setInfo({ path: projectPath, info: got })
+        // The reviewer the builder starts with, now that the pool is known (opened, another project or builder chosen).
+        setReviewer(reviewerFor(project, builder, !!got.pool))
+      })
+      .catch(() => !gone && setInfo({ path: projectPath, info: { pool: null } }))
+    return () => {
+      gone = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [req, projectPath, builder])
+
   const agentOf = (id: string): AgentInfo | undefined => project?.agents.find((a) => a.id === id)
-  const chosen = [agentOf(builder), reviewer ? agentOf(reviewer) : undefined].filter((a): a is AgentInfo => !!a)
+  const pooled = reviewer === POOL && !!pool
+  const chosen = [agentOf(builder), reviewer && !pooled ? agentOf(reviewer) : undefined].filter((a): a is AgentInfo => !!a)
   const busyNow = chosen.filter(busy)
-  const ready = !!project && !!agentOf(builder) && builder !== reviewer && cards.length > 0
+  const ready = !!project && !!agentOf(builder) && builder !== reviewer && (reviewer !== POOL || pooled) && cards.length > 0
 
   const go = async (): Promise<void> => {
     // Only for the request still open: a dialog closed or opened again since starts nothing.
     if (!project || !ready || !req || get().laneStartFor !== req) return
-    const out = await action.run('start', () => call('lanes:start', project.path, { builder, reviewer: reviewer || null, cards, note, name }))
+    const out = await action.run('start', () => call('lanes:start', project.path, { builder, reviewer: pooled || !reviewer ? null : reviewer, ...(pooled ? { pool: true } : {}), cards, note, name }))
     if (!out) return setWaiting(false)
     const r = out.value
-    const pair = r.lane.reviewer ? `${r.lane.builder.name} / ${r.lane.reviewer.name}` : r.lane.builder.name
+    const pair = r.lane.reviewer ? `${r.lane.builder.name} / ${r.lane.reviewer.name}` : r.lane.pool && pool ? `${r.lane.builder.name} / ${tr(M.pool, { agents: poolNames(builder) })}` : r.lane.builder.name
     notify('success', tr(M.started, { pair }), tr(M.startedText, { n: cards.length }), [{ label: tr(M.show), command: 'agent.show', args: [project.path, builder] }])
     for (const s of r.started.filter((x) => x.how === 'failed')) notify('error', tr(M.notStarted, { agent: s.name }), tr(M.notStartedText, { why: s.why ?? '', agent: s.name }))
     set({ laneStartFor: null })
@@ -138,6 +173,10 @@ export function LaneStartDialog() {
     </option>
   )
   const names = fmt.list(busyNow.map((a) => a.name))
+  function poolNames(b: string): string {
+    const in_ = (pool ?? []).filter((a) => a.id !== b).map((a) => a.name)
+    return in_.length ? fmt.list(in_) : tr(M.poolNobody)
+  }
   return (
     <Modal
       title={tr(M.title)}
@@ -170,7 +209,7 @@ export function LaneStartDialog() {
                 onChange={(e) => {
                   const p = projects.find((x) => x.path === e.target.value) ?? null
                   setProjectPath(p?.path ?? null)
-                  const pair = firstPair(p)
+                  const pair = firstPair(p, false)
                   setBuilder(pair.builder)
                   setReviewer(pair.reviewer)
                   setCards([])
@@ -196,8 +235,8 @@ export function LaneStartDialog() {
                 disabled={waiting}
                 onChange={(e) => {
                   setBuilder(e.target.value)
-                  // An either-role reviewer chosen as the builder: the next reviewer instead.
-                  if (reviewer === e.target.value) setReviewer(reviewers(project, e.target.value)[0]?.id ?? '')
+                  // Its own reviewer (#1436's pairing), else the pool or the first reviewer: never itself.
+                  setReviewer(reviewerFor(project, e.target.value, !!pool))
                 }}
               >
                 {builders(project).map(agentChoice)}
@@ -206,6 +245,7 @@ export function LaneStartDialog() {
               <label htmlFor="lane-start-reviewer">{tr(M.reviewer)}</label>
               <select id="lane-start-reviewer" className="select" value={reviewer} disabled={waiting} onChange={(e) => setReviewer(e.target.value)}>
                 <option value="">{tr(M.noReviewer)}</option>
+                {pool && <option value={POOL}>{tr(M.pool, { agents: poolNames(builder) })}</option>}
                 {reviewers(project, builder).map(agentChoice)}
               </select>
             </>

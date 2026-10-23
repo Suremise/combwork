@@ -88,6 +88,10 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
     title: msg({ id: 'workflow.option.sharedFolderWarning.title', defaultMessage: 'Warn when a commit includes another agent’s files', description: 'A workflow option (glossary 2.6, G16).' }),
     desc: msg({ id: 'workflow.option.sharedFolderWarning.desc', defaultMessage: 'A submit warns, never refuses, when its commit takes in files another agent is editing in the project folder.', description: 'What the workflow option “Warn when a commit includes another agent’s files” does.' })
   },
+  reviewerMode: {
+    title: msg({ id: 'workflow.option.reviewerMode.title', defaultMessage: 'Reviewers', description: 'A workflow option (glossary 2.6, G17): whether each lane has its own reviewer agent or the lanes share a pool of reviewers.' }),
+    desc: msg({ id: 'workflow.option.reviewerMode.desc', defaultMessage: 'One reviewer per lane, or a shared pool: Hive gives each card submitted in a pool lane, oldest first, to the next free reviewer that didn’t build it.', description: 'What the workflow option “Reviewers” does (glossary 2.6, G17; glossary: lane, pool).' })
+  },
   commands: {
     title: msg({ id: 'workflow.option.commands.title', defaultMessage: 'Check commands', description: 'A workflow setting: the command each named check runs (the checks of “Checks pass before review”).' }),
     desc: msg({ id: 'workflow.option.commands.desc', defaultMessage: 'The command each named check runs. A run counts as the check only when it runs that command.', description: 'What the workflow setting “Check commands” does.' })
@@ -137,6 +141,10 @@ export const VALUE_TEXT = {
   folder: {
     slots: msg({ id: 'workflow.value.folder.slots', defaultMessage: 'Each card in its own folder', description: 'A value of the workflow option “Where cards are built” (glossary 2.6, G11). The folder is a slot, a worktree Hive lends to the card or its lane (glossary 2.5: slot).' }),
     project: msg({ id: 'workflow.value.folder.project', defaultMessage: 'Everyone in the project folder', description: 'A value of the workflow option “Where cards are built” (glossary 2.6, G11).' })
+  },
+  reviewerMode: {
+    lane: msg({ id: 'workflow.value.reviewerMode.lane', defaultMessage: 'One per lane', description: 'A value of the workflow option “Reviewers” (glossary 2.6, G17): each lane has its own reviewer agent.' }),
+    pool: msg({ id: 'workflow.value.reviewerMode.pool', defaultMessage: 'A shared pool', description: 'A value of the workflow option “Reviewers” (glossary 2.6, G17): lanes share a pool of reviewer agents, each card going to the next free one.' })
   }
 } satisfies Record<string, Record<string, Msg>>
 

@@ -44,6 +44,8 @@ export interface CardRecord {
   lane?: string
   /** The reviewer agent to wake: its lane's, else the pool. */
   reviewer?: string
+  /** Its lane is reviewed by the project's reviewer pool (#1443, G17): each submission is given to a free pooled reviewer. */
+  reviewerPool?: true
   /** Its lane's round limit (§16.11.4: the Card loops rounds the lane started with); none outside a running lane. */
   rounds?: number
   /** A card from before 1.0 (§16.4.1). */
@@ -340,10 +342,11 @@ export class FactStore {
       const blockedBy = lists<number>(`SELECT card, target AS v FROM card_links WHERE ${of} AND kind = 'blockedBy' ORDER BY card, ord`)
       const paths = lists<string>(`SELECT card, path AS v FROM card_paths WHERE ${of} AND kind = 'declared' ORDER BY card, ord`)
       // Its lane (#1291): the newest running lane of this project with it in its list or its queued one.
-      const lanes = new Map<number, { lane: string; reviewer: string | null; rounds: number }>()
-      const inLanes = `SELECT x.card, l.id AS lane, l.reviewer_id AS reviewer, l.rounds FROM (SELECT lane, card FROM lane_cards UNION ALL SELECT lane, card FROM lane_pending) x
+      const lanes = new Map<number, { lane: string; reviewer: string | null; rounds: number; pool: number | null }>()
+      // A lane reviewed by the pool says so in its `extra` (#1443); one kept whole there (an array) has no pool.
+      const inLanes = `SELECT x.card, l.id AS lane, l.reviewer_id AS reviewer, l.rounds, CASE WHEN json_type(l.extra) = 'object' THEN json_extract(l.extra, '$.pool') END AS pool FROM (SELECT lane, card FROM lane_cards UNION ALL SELECT lane, card FROM lane_pending) x
         JOIN lanes l ON l.id = x.lane WHERE x.${of} AND l.state = 'active' AND l.project = ? COLLATE NOCASE ORDER BY l.started_at, l.id`
-      for (const r of db.prepare(inLanes).all(...args, this.scope.project) as { card: number; lane: string; reviewer: string | null; rounds: number }[]) lanes.set(r.card, { lane: r.lane, reviewer: r.reviewer, rounds: r.rounds })
+      for (const r of db.prepare(inLanes).all(...args, this.scope.project) as { card: number; lane: string; reviewer: string | null; rounds: number; pool: number | null }[]) lanes.set(r.card, { lane: r.lane, reviewer: r.reviewer, rounds: r.rounds, pool: r.pool })
       // Its key (#1294): its project's key now and its number there (#1219), else the scope's name and its number.
       const keys = cardKeys(db, rows.map((r) => r.number))
       return rows.map((r) => ({
@@ -358,6 +361,7 @@ export class FactStore {
         ...(lanes.has(r.number) ? { lane: lanes.get(r.number)!.lane } : {}),
         ...(lanes.get(r.number)?.reviewer ? { reviewer: lanes.get(r.number)!.reviewer! } : {}),
         ...(lanes.has(r.number) ? { rounds: lanes.get(r.number)!.rounds } : {}),
+        ...(lanes.get(r.number)?.pool === 1 && !lanes.get(r.number)!.reviewer ? { reviewerPool: true as const } : {}),
         ...(r.pre_workflow ? { preWorkflow: true } : {}),
         stage: r.stage ?? CATEGORY_STAGE[r.col] ?? 'todo',
         category: r.col
@@ -404,7 +408,7 @@ export class FactStore {
   }
 
   /** A new card of this project on the board (the runtime's own; the board's are made by tasks.ts), in Todo unless `stage` says. */
-  createCard(c: Omit<CardRecord, 'id' | 'key' | 'stage' | 'category' | 'lane' | 'reviewer' | 'rounds'> & { stage?: StageId }): CardRecord {
+  createCard(c: Omit<CardRecord, 'id' | 'key' | 'stage' | 'category' | 'lane' | 'reviewer' | 'reviewerPool' | 'rounds'> & { stage?: StageId }): CardRecord {
     const stage = c.stage ?? 'todo'
     return this.conn.write((db) => {
       const n = takeNumberIn(db)
@@ -418,7 +422,7 @@ export class FactStore {
   }
 
   /** Changes what the runtime keeps of a card: its kind, target and declared paths (its lane is its lanes', #1291). */
-  updateCard(id: number, patch: Partial<Omit<CardRecord, 'id' | 'key' | 'stage' | 'category' | 'lane' | 'reviewer' | 'rounds'>>): CardRecord {
+  updateCard(id: number, patch: Partial<Omit<CardRecord, 'id' | 'key' | 'stage' | 'category' | 'lane' | 'reviewer' | 'reviewerPool' | 'rounds'>>): CardRecord {
     const other = Object.keys(patch).filter((k) => !['kind', 'target', 'paths', 'title', 'labels', 'blockedBy', 'preWorkflow'].includes(k))
     if (other.length) throw new Error(`a card's ${other.join(', ')} isn't the runtime's to change`) // i18n-ignore: a programming error, never shown
     return this.conn.write((db) => {
@@ -759,7 +763,7 @@ export class FactStore {
         facts: (card) => this.facts(card),
         card: (id) => this.card(id),
         putCard: (c) => {
-          const { id, key: _k, stage: _s, category: _c, lane: _l, reviewer: _r, rounds: _n, ...patch } = c
+          const { id, key: _k, stage: _s, category: _c, lane: _l, reviewer: _r, reviewerPool: _p, rounds: _n, ...patch } = c
           this.updateCard(id, patch)
         },
         meta: (k) => this.meta(k),

@@ -131,6 +131,8 @@
   "service.laneStart.needsReviewer": "{project} のルールではレビュアーエージェントが各カードをレビューします。レビュアーを選んでください。",
   "service.laneStart.noCards": "レーンのカードを選んでください。",
   "service.laneStart.notTheProjects": "{card} は {project} のカードではないか、アーカイブされています。",
+  "service.laneStart.poolEmpty": "{project} にはビルダー以外にレビューするエージェントがいないため、プールにはカードをレビューする人がいません。",
+  "service.laneStart.poolNotOffered": "{project} のルールではレーンごとにレビュアーが 1 人です。レビュアーを選ぶか、「レビュアー」を共有プールにしてください。",
   "service.laneStart.sameAgent": "ビルダーは自分のレビュアーにはなれません。",
   "service.laneStart.starting": "{agent} のレーンはすでに開始中です。",
   "service.laneStart.unknownAgent": "{agent} は {project} のエージェントではありません。",

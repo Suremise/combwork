@@ -1,6 +1,7 @@
 import { join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import type { TaskCard } from '../shared/types'
+import type { Fact } from '../shared/workflow/facts'
 import { FactStore } from './workflow/factStore'
 import type { WorkspaceService } from './workspace'
 
@@ -12,7 +13,9 @@ const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCas
  * paused: stored as active) lane with the card; else the agent of its latest review started or verdict (its facts, by the agent's id, so a
  * rename doesn't lose it); else, for a card with no such fact (from before 1.0), the agent whose board name last started
  * reviewing it. Only while it is one of the project's agents now: a removed one can't be woken. Null: the card has none
- * (a lane whose reviewer was removed has none, never an earlier reviewer instead).
+ * (a lane whose reviewer was removed has none, never an earlier reviewer instead). A lane reviewed by the pool (#1443):
+ * whoever reviews its latest submission, assigned by the pool (`ReviewerAssigned`, the newest) or started on it; none
+ * before the pool gives it to one (an earlier round's reviewer isn't this round's).
  */
 export async function loopReviewerOf(ws: WorkspaceService, card: TaskCard): Promise<{ id: string; name: string } | null> {
   if (!ws.path || !card.project) return null
@@ -23,16 +26,38 @@ export async function loopReviewerOf(ws: WorkspaceService, card: TaskCard): Prom
   }
   // From the board's own tables, which a board change reads as it writes them (never the lanes' views: they read more).
   const store = FactStore.forBoard(ws, { project: card.project, key: '' })
-  const laneReviewer = (() => {
+  const rec = (() => {
     try {
-      return store.card(card.number).reviewer ?? null
+      return store.card(card.number)
     } catch {
       return null
     }
   })()
-  if (laneReviewer) return named(laneReviewer)
+  if (rec?.reviewer) return named(rec.reviewer)
+  if (rec?.reviewerPool) return named(poolReviewerOf(store.facts(card.number)))
   const last = store.facts(card.number).findLast((f) => f.kind === 'ReviewStarted' || f.kind === 'Verdict')
   if (last) return named((last.data as { reviewer?: string }).reviewer)
   const started = card.history.findLast((h) => h.what === 'Started reviewing')
   return started ? named(agents.find((a) => same(`${a.name} (${card.project})`, started.by))?.id) : null
+}
+
+/**
+ * Who reviews a pool lane's card now (#1443): of its latest submission, the newest reviewer assigned to it or started on
+ * it; null before the pool gives it to one.
+ */
+export function poolReviewerOf(facts: readonly Fact[]): string | null {
+  const latest = facts.findLast((f) => f.kind === 'Submitted')
+  if (!latest) return null
+  const on = facts.filter((f) => (f.kind === 'ReviewerAssigned' || f.kind === 'ReviewStarted') && (f.data as { submission?: number }).submission === latest.seq)
+  return (on.at(-1)?.data as { reviewer?: string } | undefined)?.reviewer ?? null
+}
+
+/** Whether a card's lane is reviewed by the pool (#1443): its arrivals in Review are the pool's to give, not a loop wake's. */
+export function poolCard(ws: WorkspaceService, card: TaskCard): boolean {
+  if (!ws.path || !card.project) return false
+  try {
+    return !!FactStore.forBoard(ws, { project: card.project, key: '' }).card(card.number).reviewerPool
+  } catch {
+    return false
+  }
 }

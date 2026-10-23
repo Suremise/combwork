@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 type Live = { status: string; sessionId: string }
-const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void) }))
+const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[] }))
 
 vi.mock('../src/main/sessions', () => ({
   sessions: {
@@ -26,10 +26,14 @@ vi.mock('../src/main/sessions', () => ({
 }))
 vi.mock('../src/main/deliveries', () => ({
   deliveriesOf: async () => [],
-  launchWith: async (_p: string, nd: { body: string }, start: (line: string) => Promise<unknown>) => ({ record: null, launched: await start(nd.body) })
+  launchWith: async (_p: string, nd: { body: string }, start: (line: string) => Promise<unknown>) => {
+    state.briefs.push(nd.body)
+    return { record: null, launched: await start(nd.body) }
+  }
 }))
 vi.mock('../src/main/lanes', () => ({
-  startLane: async () => {
+  startLane: async (_ws: unknown, s: unknown) => {
+    state.recorded.push(s)
     state.calls.push('record')
     state.afterRecord?.()
     return { lane: { id: 'lane-1', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' } }, did: 'started', replaced: null }
@@ -38,21 +42,62 @@ vi.mock('../src/main/lanes', () => ({
 vi.mock('../src/main/tasks', () => ({
   getTask: async (n: number) => ({ number: n, key: `AL-${n}`, title: `Card ${n}`, project: 'alpha', column: 'todo', archived: false })
 }))
-vi.mock('../src/main/workflow/service', () => ({ workflowEnforced: () => false }))
-vi.mock('../src/main/workflow/rulesets', () => ({ resolvedOf: () => ({ options: null }) }))
+vi.mock('../src/main/workflow/service', () => ({ workflowEnforced: () => state.enforced }))
+vi.mock('../src/main/workflow/rulesets', () => ({ resolvedOf: () => ({ options: state.options }) }))
 
-const { startLaneFromWindow } = await import('../src/main/laneStart')
+const { laneStartInfo, startLaneFromWindow } = await import('../src/main/laneStart')
+const { allOff } = await import('../src/shared/workflow/options')
 
 const ws = {
   config: {},
   info: () => ({ projects: [{ path: 'D:\\ws\\alpha', name: 'alpha', platform: { id: 'git' } }] }),
-  projectConfig: async () => ({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] })
+  projectConfig: async () => ({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'r2', name: 'R2', workflowRole: 'reviewer' }, { id: 'b2', name: 'B2', workflowRole: 'builder' }] })
 } as never
 
 beforeEach(() => {
   state.live.clear()
   state.calls.length = 0
   state.afterRecord = null
+  state.enforced = false
+  state.options = null
+  state.recorded.length = 0
+  state.briefs.length = 0
+})
+
+describe('Start Lane… with the reviewer pool (#1443)', () => {
+  const pool = (): void => {
+    state.enforced = true
+    state.options = { ...allOff('git'), review: 'agent', noSelfReview: true, reviewerMode: 'pool' }
+  }
+
+  it("offers the pool only where the project's rules have one, with the agents whose role reviews", async () => {
+    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: null })
+    state.enforced = true
+    state.options = { ...allOff('git'), review: 'agent', noSelfReview: true }
+    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: null })
+    pool()
+    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: [{ id: 'r1', name: 'R1' }, { id: 'r2', name: 'R2' }] })
+  })
+
+  it("records the lane with the pool and starts only its builder, whose brief names the pool's reviewers", async () => {
+    pool()
+    const r = await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b1', reviewer: null, pool: true, cards: [1] })
+    expect(state.recorded).toEqual([expect.objectContaining({ builder: 'b1', reviewer: null, pool: true })])
+    expect(state.calls).toEqual(['record', 'start b1'])
+    expect(r.started.map((s) => s.role)).toEqual(['builder'])
+    expect(state.briefs[0]).toContain('reviewed by the pool (R1 and R2)')
+  })
+
+  it("is refused while the rules have one reviewer per lane or are off, and with nobody in the pool but the builder", async () => {
+    await expect(startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b1', reviewer: null, pool: true, cards: [1] })).rejects.toThrow(/one reviewer per lane/)
+    state.enforced = true
+    state.options = { ...allOff('git'), review: 'agent', noSelfReview: true }
+    await expect(startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b1', reviewer: null, pool: true, cards: [1] })).rejects.toThrow(/one reviewer per lane/)
+    pool()
+    const lonely = { ...(ws as object), projectConfig: async () => ({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'e1', name: 'E1', workflowRole: 'either' }] }) } as never
+    await expect(startLaneFromWindow(lonely, 'D:\\ws\\alpha', { builder: 'e1', reviewer: null, pool: true, cards: [1] })).rejects.toThrow(/pool has nobody/)
+    expect(state.recorded).toEqual([])
+  })
 })
 
 describe('Start lane… in main (#1280)', () => {

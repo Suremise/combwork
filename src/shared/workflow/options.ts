@@ -8,6 +8,7 @@
 import { msg, type Msg } from '../i18n/msg'
 import type { PlatformId } from '../platform/descriptors'
 import type { StageId } from './facts'
+import type { ReviewerMode } from './roles'
 
 /** G1 / N1: who checks the work before it's done. */
 export type ReviewBy = 'none' | 'agent' | 'agentThenYou' | 'you'
@@ -70,6 +71,12 @@ export interface WorkflowOptions {
   slotsUpToDate: boolean
   /** G16. */
   sharedFolderWarning: boolean
+  /**
+   * G17 (#1443): one reviewer per lane, or a shared pool that takes the next submitted card, oldest first. Git only (None
+   * has no G17); unset reads as `lane` (`reviewerModeOf`), and `lane` is left out of a ruleset (`ruleOptions`), so every
+   * ruleset from before P7 keeps its id.
+   */
+  reviewerMode?: ReviewerMode
   /** N4: folders and files left out of None's deliverables (`.hive` always is). */
   excluded: string[]
   /** The command of each named check (G3, G9, N3): a run counts as a check only as that command (§16.13). */
@@ -135,17 +142,25 @@ const BASE: Omit<WorkflowOptions, 'platform'> = {
   dependenciesDone: false,
   slotsUpToDate: false,
   sharedFolderWarning: false,
+  reviewerMode: 'lane',
   excluded: ['node_modules', '.venv'],
   commands: {}
 }
 
 /**
  * Every check and balance off (§16.6.4): cards move freely, facts are still recorded. Also a new project's options
- * before a preset is chosen (§16.7.4).
+ * before a preset is chosen (§16.7.4). None has no G17, so no level sets it there.
  */
 export function allOff(platform: PlatformId): WorkflowOptions {
-  return { ...BASE, platform, finish: platform === 'none' ? 'accept' : 'notChecked' }
+  if (platform === 'none') {
+    const { reviewerMode: _g17, ...none } = BASE
+    return { ...none, platform, finish: 'accept' }
+  }
+  return { ...BASE, platform, finish: 'notChecked' }
 }
+
+/** G17 as a ruleset or options have it: unset (a ruleset from before P7, None) is one reviewer per lane. */
+export const reviewerModeOf = (o: Pick<WorkflowOptions, 'reviewerMode'>): ReviewerMode => o.reviewerMode ?? 'lane'
 
 /**
  * The presets (§16.6.3, OP-3). `quick` and `tests` are the project's suggested check names (OP-24: suggested from its
@@ -200,7 +215,8 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
   if (id === 'pair') return pair
   // Team (#1361, Darren's point 1 on #1121): as Pair, with the unit tests too before review and on the merged result
   // (each card's own focused tests come later: #1367), installed from scratch before every merge, and your OK for cards
-  // labelled ui or release. G15 and G17 wait for slots (P7).
+  // labelled ui or release. G15 waits for slots (P7); G17 is one reviewer per lane, as in every preset (a pool is the
+  // Team 6 + pool template's choice, §16.6.3).
   return { ...pair, preChecks: quickAndTests, mergeChecks: quickAndTests, mergeInstall: 'always', okBefore: { mode: 'labels', labels: ['ui', 'release'] }, commands: commandsOf(quickAndTests) }
 }
 
@@ -212,6 +228,7 @@ export const CONTRADICTIONS = {
   okWithReview: msg({ id: 'workflow.contradiction.okWithReview', defaultMessage: 'Your OK before merging is already part of review by you.', description: "Why workflow options cannot be saved: the user's OK before merging was set while the user already reviews." }),
   hiveMergesNeedsGit: msg({ id: 'workflow.contradiction.hiveMergesNeedsGit', defaultMessage: 'Merging needs Git: without version control, work is accepted where it is.', description: 'Why workflow options cannot be saved: a merge option was set for a project with no version control.' }),
   quorumNeedsAgent: msg({ id: 'workflow.contradiction.quorumNeedsAgent', defaultMessage: 'Two reviewers per card need review by reviewer agents.', description: 'Why workflow options cannot be saved: two reviewers per card were set without reviewer agents.' }),
+  poolNeedsAgent: msg({ id: 'workflow.contradiction.poolNeedsAgent', defaultMessage: 'A shared pool of reviewers needs review by reviewer agents.', description: 'Why workflow options cannot be saved: “Reviewers” was set to a shared pool (reviewer agents lanes share) without review by reviewer agents.' }),
   subfolderTarget: msg({ id: 'workflow.contradiction.subfolderTarget', defaultMessage: 'This project is inside a larger repository: name the branch its work merges into.', description: 'Why workflow options cannot be saved (OP-29): Hive or the agent merges, but the project is a subfolder of a bigger Git repository and its own options name no target branch (merges would affect the whole repository).' }),
   noneHasNoSlots: msg({ id: 'workflow.contradiction.noneHasNoSlots', defaultMessage: 'Without version control, everyone works in the project folder.', description: 'Why workflow options cannot be saved: separate folders per card were set for a project with no version control.' })
 } satisfies Record<string, Msg>
@@ -247,6 +264,7 @@ export const CONTRADICTION_ROWS: Record<Contradiction, OptionKey[]> = {
   okWithReview: ['okBefore', 'review'],
   hiveMergesNeedsGit: ['finish'],
   quorumNeedsAgent: ['reviewers', 'review'],
+  poolNeedsAgent: ['reviewerMode', 'review'],
   noneHasNoSlots: ['folder'],
   subfolderTarget: ['target', 'finish']
 }
@@ -272,6 +290,7 @@ export function contradictions(o: WorkflowOptions, where: ContradictionPlace = {
   const out: Contradiction[] = []
   if (reviewerAgent(o.review) && !o.noSelfReview) out.push('selfReview')
   if (o.reviewers === 2 && !reviewerAgent(o.review)) out.push('quorumNeedsAgent')
+  if (reviewerModeOf(o) === 'pool' && !reviewerAgent(o.review)) out.push('poolNeedsAgent')
   if (o.platform === 'none') {
     if (o.finish !== 'accept') out.push('hiveMergesNeedsGit')
     if (o.folder !== 'project') out.push('noneHasNoSlots')
@@ -319,6 +338,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   dependenciesDone: bool,
   slotsUpToDate: bool,
   sharedFolderWarning: bool,
+  reviewerMode: oneOf<ReviewerMode>(['lane', 'pool']),
   excluded: strings,
   commands: (v) => isRecord(v) && Object.values(v).every((x) => typeof x === 'string'),
   stageNames: (v) => isRecord(v) && Object.entries(v).every(([k, x]) => (STAGE_IDS as readonly string[]).includes(k) && typeof x === 'string')
@@ -335,7 +355,8 @@ export type FormGroupId = 'review' | 'checks' | 'merging' | 'where' | 'work' | '
 
 /**
  * The Workflow section's groups for a platform, in order, and their options (SPEC §16.6.1, §16.6.2; #1418). It offers
- * what this version ships (§16.19.1): G15 and G17 wait for slots (P7). The check commands (`commands`) are edited with
+ * what this version ships (§16.19.1): G15 waits for slots (P7), and G17's row is #1445's (until then a project sets it
+ * through the Assistant's settings tool, and the form keeps what it inherits). The check commands (`commands`) are edited with
  * the checks that name them. "Shown here, set elsewhere" holds rows whose owner is another setting (N7, Card loops).
  * Some rows show only where they apply (`formShows`).
  */

@@ -3106,6 +3106,43 @@ for a day go hourly (Remove idle slots after a day).
 Submitted card (oldest first). Run records attached to the revision let a reviewer trust the builder's runs instead of
 repeating them (#533) [note §8].
 
+**G17 Built [#1443]** (`shared/workflow/reviewerPool.ts`, `main/reviewerPool.ts`):
+- **The option** is `reviewerMode: 'lane' | 'pool'` (#1430's `ReviewerMode`), never G1b's `reviewers` (its key, values
+  and saved data unchanged). Git only: None has no G17 (no level can set it there). Default `lane` in every preset. In
+  the ruleset (it decides who reviews), so a lane keeps its value; `lane` is left out of the compiled options, so a
+  ruleset stored before P7 (none) reads as `lane` and keeps its id. A pool without a reviewer agent (G1) is a
+  contradiction (`poolNeedsAgent`). It doesn't depend on G11: with everyone in the project folder the pool works the same.
+  The Assistant sets it (`project.workflow.reviewerMode`); `hive_project_status` shows it. The Version Control tab's row
+  is #1445's: until then the form keeps what the project inherits or set.
+- **One per lane**, as before: Start Lane's reviewer list, pre-filled from the builder's `pairedWith` (#1436).
+- **A shared pool**: with the rules on and G17 a pool, Start Lane's reviewer list offers *The reviewer pool (HI-R1 and
+  HI-R2)* (`lanes:startInfo`: the agents whose role reviews), pre-chosen for a builder that isn't paired; refused where
+  the rules don't have one or nobody but the builder reviews. The lane records `pool` with no reviewer (its row's
+  `extra`), only its builder starts, and its brief says *reviewed by the pool (…)*, with no reviewer for `hive_lane`.
+  Nobody joins it (`hive_lane join` is refused); a builder's own `hive_lane start` naming no reviewer keeps the pool, one
+  naming a reviewer makes it one per lane.
+- **Assignment**: a pool lane's submission writes `assignReviewer` (`card_actions`) instead of waking a reviewer, and so
+  does every verdict on its cards. One pass per project (`settleReviewerPool`) decides from durable state, also as an
+  agent's turn ends, as lanes or the board change, as a workspace opens, as the rules are switched, and hourly. Each pool
+  card in Review whose latest submission nobody reviews, with fewer passes than G1b asks, oldest submission first, goes
+  to the first free agent: its role reviews (#1430's `reviewsWork`), no open dispatch lease (#1434: an either agent
+  building in a slot is never taken, and is once its lease ends), idle (not in a turn, waiting, watching, with
+  background tasks or runs), not reviewing another card (given or started a submission with no verdict, in any running
+  lane), not the card's builder (`review.notAuthor`'s builders), and with G1b = 2 not one who has seen this submission:
+  the second is given it once the first has passed. Recorded as `ReviewerAssigned { reviewer, submission }` in a write
+  that finds the submission still waiting.
+- **Telling it**: once (its delivery's identity is the card, the submission and the agent): typed into its conversation
+  when it runs, else it is launched with it for review (#1434's purpose: the project folder, with #1439's grant to the
+  review copies): *#12 (HI-B1's card) is in Review: you review it from the pool…*. Not given: told at a later pass.
+  Hive's loop wakes leave a pool card's arrival in Review to the pool, and route its other handoffs (requests, steps,
+  verdicts) by its current reviewer: the newest given or started on its latest submission (`loopReviewerOf`).
+- **None free**: the card waits, *waiting for a reviewer on HI-12* (the existing reason). A verdict frees its reviewer;
+  a pooled reviewer serves every pool lane of its project.
+- **Card loops**: the builder's watch and wakes are unchanged; the reviewer joins nothing, the assignment is its start.
+  The card-loop skill's line for pools is #1444's.
+- **Off switch**: the option itself (`lane`). With workflow rules off nothing is given out or told, Start Lane offers no
+  pool, and the lane's reviewer is whoever the user names.
+
 #### 16.10.6 Agent templates and roles
 
 [#1123 tpl, names] Template format v2 (`TEMPLATE_VERSION` 2, `src/shared/templates.ts:13`):
