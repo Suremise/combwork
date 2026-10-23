@@ -132,7 +132,7 @@
   "tasks.history.toWorkspace": "In den Arbeitsbereich verschoben",
   "tasks.history.unarchived": "Aus dem Archiv zurückgeholt",
   "tasks.history.unblocked": "Nicht mehr blockiert",
-  "tasks.history.watchEnded": "Beobachtung durch Agent {watcher} beendet: {why, select, blocked {die Karte ist blockiert} reviewer {Agent {agent} prüft sie} reviewTaken {das Review wurde dem Agenten entzogen} reassigned {Agent {agent} zugewiesen} unassigned {keinem Agenten zugewiesen} other {{why}}}",
+  "tasks.history.watchEnded": "Beobachtung durch Agent {watcher} beendet: {why, select, blocked {die Karte ist blockiert} reviewer {Agent {agent} prüft sie} reviewTaken {das Review wurde dem Agenten entzogen} reassigned {Agent {agent} zugewiesen} unassigned {keinem Agenten zugewiesen} done {die Karte ist in Erledigt} laneEnded {ihre Lane wurde beendet} laneAbandoned {ihre Lane wurde abgebrochen} other {{why}}}",
   "tasks.skipped.movedColumn": "nach {column, select, hold {Geparkt} todo {Offen} doing {In Arbeit} review {Review} passed {Genehmigt} done {Erledigt} other {{column}}} verschoben",
   "tasks.skipped.movedProject": "in ein anderes Projekt verschoben",
   "tasks.skipped.movedStage": "nach {stage} verschoben",

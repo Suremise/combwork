@@ -1732,7 +1732,9 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
       said.push(card.links.length ? storedText(HISTORY.linked, { cards: card.links.map((x) => `#${x}`).join(', ') }) : storedText(HISTORY.linksRemoved))
     }
     // History lines of the caller's own (#1272: a reviewer's request, which watches count).
-    if (opts.note) said.push(...opts.note)
+    // A loop step's line keeps the column it was written in (#1495), a value its words don't show: what pendingStep reads
+    // when the history that said so has been trimmed.
+    if (opts.note) said.push(...opts.note.map((s) => (s.id === HISTORY.loopStep.id ? { ...s, values: { ...s.values, column: card.column } } : s)))
     else if (comment && (await laneReviewerAsks(ws, card, patch, actor, said))) said.push(requestNote(comment))
     // What changed, in the history's words (English), for a caller that confirms it (the hive tools' short replies).
     opts.said?.push(...said.map(englishSaid))

@@ -132,7 +132,7 @@
   "tasks.history.toWorkspace": "Przeniesiono do obszaru roboczego",
   "tasks.history.unarchived": "Przywrócono z archiwum",
   "tasks.history.unblocked": "Odblokowano",
-  "tasks.history.watchEnded": "Zakończono obserwowanie karty przez agenta {watcher}: {why, select, blocked {karta jest zablokowana} reviewer {recenzuje ją agent {agent}} reviewTaken {odebrano mu recenzję} reassigned {przekazano ją agentowi {agent}} unassigned {nie ma już agenta} other {{why}}}",
+  "tasks.history.watchEnded": "Zakończono obserwowanie karty przez agenta {watcher}: {why, select, blocked {karta jest zablokowana} reviewer {recenzuje ją agent {agent}} reviewTaken {odebrano mu recenzję} reassigned {przekazano ją agentowi {agent}} unassigned {nie ma już agenta} done {karta jest w kolumnie Gotowe} laneEnded {jej tor się zakończył} laneAbandoned {jej tor porzucono} other {{why}}}",
   "tasks.skipped.movedColumn": "przeniesiona do kolumny {column, select, hold {Wstrzymane} todo {Do zrobienia} doing {Aktywne} review {Recenzja} passed {Zatwierdzone} done {Gotowe} other {{column}}}",
   "tasks.skipped.movedProject": "przeniesiona do innego projektu",
   "tasks.skipped.movedStage": "przeniesiona do etapu {stage}",

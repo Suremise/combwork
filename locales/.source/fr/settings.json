@@ -717,7 +717,7 @@
   "settings.project.loopWaitHours.tip": "Saying \"wait: 2h\" when you start a loop still wins. Up to a day.",
   "settings.project.loopWaitHours.title": "Wait (hours)",
   "settings.project.loopWakes.desc": "When a card with a reviewer arrives in Review, Hive wakes the reviewer; when the review gives its verdict, Hive wakes the card's builder. Off: only the agents' own card watches wake them.",
-  "settings.project.loopWakes.tip": "A card's reviewer is the reviewer of a lane with the card, else the agent that last reviewed it: cards nobody reviews never wake anyone. An agent is only woken while it is idle, never by its own change, and not when its own card watch already tells it. These are idle wakes: with Sessions → Wake an idle agent off, none is typed, and the wake waits in the agent's inbox.",
+  "settings.project.loopWakes.tip": "A card's reviewer is the reviewer of a lane with the card, else the agent that last reviewed it: cards nobody reviews never wake anyone. An agent is only woken while it is idle, never by its own change, and not when its own card watch already tells it. These are idle wakes: with Sessions → Wake an idle agent off, none is typed, and the wake waits in the agent's inbox. It also ends an agent's card watch that can no longer fire: on a card merged (Done) since, or whose lane ended or was abandoned.",
   "settings.project.loopWakes.title": "Wake reviewers and builders",
   "settings.project.metadata.desc": "Stored in the project's .hive/project.json (excluded from git). Changes apply to new sessions; restart a running session to apply them.",
   "settings.project.metadata.title": "Settings file",

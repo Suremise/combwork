@@ -2872,7 +2872,7 @@
     "description": "What the setting \"Wake reviewers and builders\" does, under its title (Project Settings → Card loops)."
   },
   "settings.project.loopWakes.tip": {
-    "defaultMessage": "A card's reviewer is the reviewer of a lane with the card, else the agent that last reviewed it: cards nobody reviews never wake anyone. An agent is only woken while it is idle, never by its own change, and not when its own card watch already tells it. These are idle wakes: with Sessions → Wake an idle agent off, none is typed, and the wake waits in the agent's inbox.",
+    "defaultMessage": "A card's reviewer is the reviewer of a lane with the card, else the agent that last reviewed it: cards nobody reviews never wake anyone. An agent is only woken while it is idle, never by its own change, and not when its own card watch already tells it. These are idle wakes: with Sessions → Wake an idle agent off, none is typed, and the wake waits in the agent's inbox. It also ends an agent's card watch that can no longer fire: on a card merged (Done) since, or whose lane ended or was abandoned.",
     "description": "The info tip of the setting \"Wake reviewers and builders\" (Project Settings → Card loops): more on what it does and when it applies."
   },
   "settings.project.loopWakes.title": {

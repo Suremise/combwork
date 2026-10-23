@@ -132,7 +132,7 @@
   "tasks.history.toWorkspace": "ワークスペースに移動",
   "tasks.history.unarchived": "アーカイブから復帰",
   "tasks.history.unblocked": "ブロックを解除",
-  "tasks.history.watchEnded": "{watcher}の監視を終了：{why, select, blocked {カードがブロックされたため} reviewer {{agent}がレビューするため} reviewTaken {待っていたレビューが他に移ったため} reassigned {{agent}に割り当て直されたため} unassigned {担当エージェントが外されたため} other {{why}}}",
+  "tasks.history.watchEnded": "{watcher}の監視を終了：{why, select, blocked {カードがブロックされたため} reviewer {{agent}がレビューするため} reviewTaken {待っていたレビューが他に移ったため} reassigned {{agent}に割り当て直されたため} unassigned {担当エージェントが外されたため} done {カードが完了になったため} laneEnded {レーンが終了したため} laneAbandoned {レーンが中止されたため} other {{why}}}",
   "tasks.skipped.movedColumn": "「{column, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{column}}}」に移動済み",
   "tasks.skipped.movedProject": "別のプロジェクトに移動済み",
   "tasks.skipped.movedStage": "「{stage}」に移動しました",
