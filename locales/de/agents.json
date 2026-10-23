@@ -301,6 +301,7 @@
   "agents.resume.hold.after": "{agent} arbeitet in {slot} an {kind, select, card {{work}} other {seiner Lane}}: Setze diese Unterhaltung fort, wenn {kind, select, card {{work}} other {die Lane}} beendet ist.",
   "agents.resume.hold.byHand": "Ihr Slot ({slot}) ist frei: „Fortsetzen“ übernimmt ihn wieder für {agent}. „Alle fortsetzen“ und der Start von Hive lassen ihn aus, damit freie Slots für neue Arbeit bleiben.",
   "agents.resume.hold.changed": "Der Slot dieser Unterhaltung ({slot}) hat sich seit ihrem Lauf geändert, darum kann sie dort nicht fortgesetzt werden. Lies das Transkript oder beginne mit einer Übergabe neu.",
+  "agents.resume.hold.draining": "Der Slot dieser Unterhaltung ({slot}) wird noch von ihrer letzten Sitzung zurückgegeben. Versuche es gleich noch einmal.",
   "agents.resume.hold.gone": "Der Slot dieser Unterhaltung ({slot}) ist nicht mehr auf dem Datenträger. Lies das Transkript oder beginne mit einer Übergabe neu.",
   "agents.resume.hold.holds": "{agent} behält bereits {slot}. Gib diesen Slot frei, um diese Unterhaltung in ihrem eigenen fortzusetzen.",
   "agents.resume.hold.reused": "Im Slot dieser Unterhaltung ({slot}) liegt jetzt {kind, select, card {die Arbeit von {work}} other {die Arbeit einer Lane}}. Lies das Transkript oder beginne mit einer Übergabe neu.",

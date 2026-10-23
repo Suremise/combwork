@@ -301,6 +301,7 @@
   "agents.resume.hold.after": "{agent} está em {kind, select, card {{work}} other {sua raia}} no {slot}: retome esta conversa depois de {kind, select, card {{work}} other {sua raia}}.",
   "agents.resume.hold.byHand": "O slot dela ({slot}) está livre: Retomar o pega de novo para {agent}. Retomar todos e a inicialização do Hive o deixam, para que os slots livres fiquem para trabalho novo.",
   "agents.resume.hold.changed": "O slot desta conversa ({slot}) mudou desde que ela rodou, então ela não pode ser retomada lá. Leia a transcrição ou comece de novo com uma passagem de trabalho.",
+  "agents.resume.hold.draining": "O slot desta conversa ({slot}) ainda está sendo devolvido pela última sessão dela. Tente de novo em instantes.",
   "agents.resume.hold.gone": "O slot desta conversa ({slot}) não existe mais no disco. Leia a transcrição ou comece de novo com uma passagem de trabalho.",
   "agents.resume.hold.holds": "{agent} já mantém {slot}. Libere esse slot para retomar esta conversa no slot dela.",
   "agents.resume.hold.reused": "O slot desta conversa ({slot}) agora tem {kind, select, card {o trabalho de {work}} other {o trabalho de uma raia}}. Leia a transcrição ou comece de novo com uma passagem de trabalho.",

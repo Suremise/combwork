@@ -1207,6 +1207,10 @@
     "defaultMessage": "This conversation's slot ({slot}) has changed since it ran, so it can't resume there. Read its transcript, or start fresh with a handover.",
     "description": "Why a conversation can't resume (#1434): the slot it ran in ({slot}: \"slot-b\") is free, but its files or its revision changed since (or it isn't set up)."
   },
+  "agents.resume.hold.draining": {
+    "defaultMessage": "This conversation's slot ({slot}) is still being handed back from its last session. Try again in a moment.",
+    "description": "Why a conversation can't resume just now (#1434): the slot it ran in ({slot}: \"slot-b\") is free, but its last session there is still exiting and Hive hasn't finished taking the slot back. It can be resumed in a moment."
+  },
   "agents.resume.hold.gone": {
     "defaultMessage": "This conversation's slot ({slot}) is gone from disk. Read its transcript, or start fresh with a handover.",
     "description": "Why a conversation can't resume (#1434): the slot folder it ran in ({slot}: \"slot-b\") no longer exists."

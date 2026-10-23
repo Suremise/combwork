@@ -128,7 +128,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     check('…once it is idle, it is stopped, and the slot is free and ready', !!(await until(async () => (await stopped(b1.id)) && !!(await slotList()).find((s) => s.name === 'slot-a' && !s.writer && !s.lease && s.state === 'ready'), HUNG_MS)))
 
     // --- 2. Resume All: R1 resumes, B1 is left and listed (its slot is free: only its own Resume takes it).
-    const held1 = await until(async () => (await agentInfo(b1.id))?.resume?.hold, HUNG_MS)
+    const held1 = await until(async () => ((await agentInfo(b1.id))?.resume?.hold?.is === 'byHand' ? (await agentInfo(b1.id)).resume.hold : null), HUNG_MS)
     check("B1's conversation may resume only by hand", held1?.is === 'byHand' && held1.slot === 'slot-a', JSON.stringify(held1))
     const resumeAll = h.page.locator('button.act-resume.quiet')
     await until(async () => (await resumeAll.count()) === 1, HUNG_MS)
@@ -182,7 +182,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     // --- 5. #14 ends, slot-a stays free: Resume All leaves B2; B2's own Resume takes slot-a under a new lease.
     await op({ op: 'release', lease: l14.lease.id, why: 'done' })
     check("#14's end stops B2's idle session", !!(await until(() => stopped(b2.id), HUNG_MS)))
-    check("B2's conversation may resume only by hand", (await until(async () => (await agentInfo(b2.id))?.resume?.hold?.is, HUNG_MS)) === 'byHand')
+    check("B2's conversation may resume only by hand (once its run has handed the slot back)", !!(await until(async () => (await agentInfo(b2.id))?.resume?.hold?.is === 'byHand', HUNG_MS)))
     await inv('session:start', alpha, { agentId: b2.id, resumeId: conv2, auto: true }).catch(() => undefined)
     check('…an automatic resume (Resume All, startup) leaves it', (await stopped(b2.id)) && !(await slotList()).find((s) => s.name === 'slot-a')?.lease)
     await inv('session:start', alpha, { agentId: b2.id, resumeId: conv2 })

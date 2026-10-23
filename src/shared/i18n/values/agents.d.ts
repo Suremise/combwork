@@ -303,6 +303,7 @@ interface HiveMessageValues {
   'agents.resume.hold.after': { agent: string | number; kind: string; work: string | number; slot: string | number }
   'agents.resume.hold.byHand': { slot: string | number; agent: string | number }
   'agents.resume.hold.changed': { slot: string | number }
+  'agents.resume.hold.draining': { slot: string | number }
   'agents.resume.hold.gone': { slot: string | number }
   'agents.resume.hold.holds': { agent: string | number; slot: string | number }
   'agents.resume.hold.reused': { slot: string | number; kind: string; work: string | number }

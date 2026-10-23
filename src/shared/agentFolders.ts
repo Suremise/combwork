@@ -36,8 +36,8 @@ export interface FolderSlot {
   /** Its block of ports (HIVE_SLOT_PORT_BASE). */
   portBase: number
   open: FolderLease | null
-  /** Its newest lease (the open one, else the last that ended). */
-  last: (FolderLease & { ended: boolean }) | null
+  /** Its newest lease (the open one, else the last that ended), and its last revision (null: not recorded yet, its session draining). */
+  last: (FolderLease & { ended: boolean; endRev?: string | null }) | null
   /** The session run that writes in it now (main's claimPlace reserves it; cleared once that run has exited). */
   writer: { run: string; agent: string; lease: string } | null
 }
@@ -71,6 +71,8 @@ export interface FolderSession {
  *   carried slot: it resumes once that card ends;
  * - `reused`: its slot holds other work now (open, or lent since) — a card's or a lane's;
  * - `holds`: its agent already keeps another slot (a carried lease), so it can't take this one;
+ * - `draining`: its slot is free, but its last session there is still being handed back (its run exiting, the slot not
+ *   looked at yet): it may resume by hand in a moment;
  * - `changed`: its slot is free but not as the conversation left it (files changed, or not set up);
  * - `gone`: its slot's folder is gone;
  * - `reviewer`: its agent reviews now, and reviewers never run in a slot;
@@ -81,6 +83,7 @@ export type ResumeHold =
   | { is: 'after'; slot: string; card: number | null; lane: string | null }
   | { is: 'reused'; slot: string; card: number | null; lane: string | null }
   | { is: 'holds'; slot: string }
+  | { is: 'draining'; slot: string }
   | { is: 'changed'; slot: string }
   | { is: 'gone'; slot: string }
   | { is: 'reviewer'; slot: string }
@@ -143,6 +146,7 @@ export function resumeHold(facts: FolderFacts, agent: FolderAgent, s: FolderSess
   // Free: lent to other work since this conversation's lease (or another agent's session still draining there), or not as it was left.
   const last = slot.last
   if (last && (last.id !== s.lease || (slot.writer && slot.writer.agent !== agent.id))) return { is: 'reused', slot: slot.name, card: last.card, lane: last.lane }
+  if (slot.writer || slot.state === 'lent' || (last && last.ended && last.endRev === null)) return { is: 'draining', slot: slot.name }
   if (slot.state !== 'ready') return { is: 'changed', slot: slot.name }
   if (carried) return { is: 'holds', slot: carried.slot }
   return { is: 'byHand', slot: slot.name, how: 'take', lease: last?.id ?? '' }
