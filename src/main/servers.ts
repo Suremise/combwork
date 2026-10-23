@@ -22,7 +22,7 @@ import { ProgressError, admitReport, type ProgressCaller } from './progress'
 import { progress, progressGate } from './progressService'
 import { cardOfRef, isCardRef, withCardNames } from './projectKeys'
 import { admitLinked, commitIn, folderHead, IssuedLinks, linkOwner, publicLink, resolveRunLink, type RunLink, type RunLinkDeps } from './workflow/runLink'
-import { assignIsolated, copiesFor, copyAt, isolatedLease, isolatedLinked, isolatedRunEnded, takeStopped } from './copiesApp'
+import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, isolatedRunEnded, takeStopped } from './copiesApp'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
 import { newestComments, progressLabel, taskRow, withoutHistory, type IntentDone, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
@@ -3094,10 +3094,12 @@ const runLinkDeps: RunLinkDeps = {
   commitOf: commitIn,
   projectName: (projectPath) => basename(projectPath),
   keyCard: (key, scope) => cardOfRef(requireWorkspace(), key, scope),
-  // A folder in a review or check copy (#1435): its lease's card and revision, whatever the agent's card is.
-  copyAt: async (folder) => {
+  // A folder in a review or check copy (#1435): its lease's card and revision, whatever the agent's card is. A project
+  // agent's own project's copies only.
+  copyAt: async (folder, scope) => {
     const ws = requireWorkspace()
-    for (const p of await ws.listProjectPaths()) {
+    const projects = scope !== null ? [join(ws.path!, scope)] : await ws.listProjectPaths()
+    for (const p of projects) {
       const got = await copyAt(ws, p, folder).catch(() => null)
       if (got) return got.lease && !got.lease.returned ? { copy: got.copy, card: got.lease.card, revision: got.lease.revision } : { copy: got.copy, card: null, revision: null }
     }
@@ -3134,7 +3136,7 @@ route('POST', '/v1/progress/resolve', async ({ body }) => {
   const caller = resolved.caller
   let link: RunLink = resolved.link
   // An isolated check (#1435, `--isolated`): leased a check copy at the card's revision, the run's folder that copy.
-  const iso = b.isolated === true ? await isolatedFor(ws, caller, link) : null
+  const iso = b.isolated === true ? await isolatedFor(ws, caller, link, typeof b.ticket === 'string' ? b.ticket : undefined) : null
   if (iso) link = { ...link, folder: iso.folder, testedCheckout: link.revision, copy: iso.copy, isolated: true }
   const id = issuedLinks.issue(linkOwner(caller), link)
   if (iso) await isolatedLinked(ws, iso.project, iso.lease, id)
@@ -3149,15 +3151,16 @@ route('POST', '/v1/progress/resolve', async ({ body }) => {
  * An isolated check's copy (#1435): an agent's check for a card of its own project on Git, leased at the card's revision.
  * Refused (400) for anything else, with what to do; 409 with `wait` while no copy is free (hive-progress asks again).
  */
-async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: RunLink): Promise<{ project: string; lease: string; folder: string; copy: string }> {
+async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: RunLink, ticket?: string): Promise<{ project: string; lease: string; folder: string; copy: string }> {
   if (caller.source !== 'agent') throw new HttpError(400, "--isolated runs an agent's check in a copy of its own: run it in an agent's session")
   if (!link.check) throw new HttpError(400, '--isolated runs a check in a copy of its own: use it with --check <name>')
   if (link.card === null || !link.revision) throw new HttpError(400, "--isolated runs a check at its card's revision: name the card (--card), or work on one in Doing")
   const cfg = await ws.projectConfig(caller.projectPath).catch(() => null)
   // None has no check copies (OP-16): its remedy is running again once the deliverables are quiet.
   if (projectPlatform(caller.projectPath, cfg?.platform).id !== 'git') throw new HttpError(400, "This project has no version control, so there are no check copies: run the check again without --isolated once nobody is changing the card's files")
-  const got = await isolatedLease(ws, caller.projectPath, { card: link.card, revision: link.revision, agent: caller.agentId })
-  if ('wait' in got) throw new HttpError(409, `waiting for ${got.wait}`, { wait: got.wait })
+  // Leased and set up apart from this request (a first setup takes minutes): `wait` with a ticket to ask again with.
+  const got = await isolatedRequest(ws, caller.projectPath, linkOwner(caller), { card: link.card, revision: link.revision, agent: caller.agentId }, ticket)
+  if ('wait' in got) throw new HttpError(409, `waiting for ${got.wait}`, { wait: got.wait, ...(got.ticket ? { ticket: got.ticket } : {}) })
   if ('refused' in got) throw new HttpError(400, got.refused)
   return { project: caller.projectPath, lease: got.lease.id, folder: got.folder, copy: got.copy }
 }

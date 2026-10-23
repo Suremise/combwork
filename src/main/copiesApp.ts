@@ -13,7 +13,7 @@
 import { app } from 'electron'
 import { basename, join } from 'path'
 import { advanced } from './advanced'
-import { processSupervisor } from './agentProcesses'
+import { inAgentLaunch, processSupervisor } from './agentProcesses'
 import { boardRead } from './boardStore'
 import { config } from './config'
 import { containsPlace } from './fsutil'
@@ -23,7 +23,7 @@ import { sessions } from './sessions'
 import { appRunner, appSettle, boardConn, holder, journalsOf } from './slotsApp'
 import { slotOptionsOf } from './slots'
 import { openWorkspaces, WorkspaceService } from './workspace'
-import { CopyPool, CopyStore, copyPoolSize, COPIES_DIR, type CopyLease } from './copies'
+import { CopyPool, CopyStore, copyPoolSize, COPIES_DIR, IsolatedRequests, type CopyLease } from './copies'
 import { journalPath, LeaseJob } from './workflow/queueJobs'
 import { LINK_TTL_MS } from './workflow/runLink'
 import { projectAgents } from '../shared/defaults'
@@ -68,6 +68,7 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
           for (const [id, j] of jobs) {
             if (j.lease !== job) continue
             jobs.delete(id)
+            assigned.delete(id)
             void j.close().catch(() => undefined)
           }
         return ok
@@ -113,6 +114,7 @@ export async function isolatedLease(ws: WorkspaceService, projectPath: string, r
   if (!r.ok) {
     if (r.refusal.why === 'noCopy') return { wait: 'a check copy' } // i18n-ignore: hive-progress's words, agent-facing
     if (r.refusal.why === 'stillInUse') return { wait: `a check copy (${r.refusal.copy} is still in use by ${r.refusal.by})` } // i18n-ignore: hive-progress's words, agent-facing
+    if (r.refusal.why === 'returned') return { wait: 'a check copy' } // i18n-ignore: hive-progress's words, agent-facing
     return { refused: r.refusal.why === 'setupFailed' ? `${r.refusal.copy}'s setup failed (${r.refusal.error}), so nothing was run` : 'no check copy could be leased' } // i18n-ignore: hive-progress's words, agent-facing
   }
   // The job its run's processes go in: recorded on the lease before it exists, then made (kill on close, journaled).
@@ -128,22 +130,43 @@ export async function isolatedLease(ws: WorkspaceService, projectPath: string, r
   return { lease: r.lease, folder: r.copy.folder, copy: r.copy.name }
 }
 
+/** Isolated runs' copies being leased apart from the Agent API's requests (copies.ts' IsolatedRequests). */
+const requests = new IsolatedRequests<{ lease: CopyLease; folder: string; copy: string }>((project, lease) => {
+  void Promise.all(openWorkspaces().map((ws) => copiesFor(ws, project).then((p) => p.returnCopy(lease.id, 'abandoned')).catch(() => false))).catch(() => undefined)
+})
+
+/**
+ * An isolated run's copy, asked for and set up without holding the Agent API's request (HR1's #1435 round 1: a first
+ * setup outlasts any request's time limit): `wait` with a ticket to ask again with, until the copy is ready.
+ */
+export function isolatedRequest(ws: WorkspaceService, projectPath: string, owner: string, req: { card: number; revision: string; agent: string | null }, ticket?: string): Promise<{ lease: CopyLease; folder: string; copy: string } | { wait: string; ticket: string } | { refused: string }> {
+  return requests.ask(owner, projectPath, `${req.card}|${req.revision}`, () => isolatedLease(ws, projectPath, req), ticket)
+}
+
 /** The link resolve gave out is the lease's run until its run starts. */
 export async function isolatedLinked(ws: WorkspaceService, projectPath: string, lease: string, ref: string): Promise<void> {
   await (await copiesFor(ws, projectPath)).setRef(lease, ref)
 }
 
+/** The leases whose launcher has been put in their job: one each. */
+const assigned = new Set<string>()
+
 /**
  * Puts an isolated run's launcher (its pid, started between the readings) in its lease's job: only the lease's own
- * agent's, while the lease is out. Why not, or null once it is.
+ * agent's, once per lease, while the lease is out, and only a process of that agent's own (in its launch's job, started
+ * in that window: never another's, HR1's #1435 round 1). A lease returned meanwhile gets nothing new in its job; one
+ * returned after it is in has the job ended by the barrier. Why not, or null once it is.
  */
 export async function assignIsolated(ws: WorkspaceService, projectPath: string, agent: string, a: { lease: string; pid: number; after: number; before: number }): Promise<string | null> {
   const pool = await copiesFor(ws, projectPath)
   const l = pool.lease(a.lease)
   if (!l || l.agent !== agent) return 'no such check copy lease' // i18n-ignore: hive-progress's words, agent-facing
-  if (l.returned) return 'its check copy was returned' // i18n-ignore: hive-progress's words, agent-facing
+  if (!(await inAgentLaunch(projectPath, agent, a.pid, a.after, a.before))) return "that process isn't one of this agent's own" // i18n-ignore: hive-progress's words, agent-facing
   const job = jobs.get(a.lease)
-  if (!job) return "its check copy's job is gone" // i18n-ignore: hive-progress's words, agent-facing
+  if (!job || assigned.has(a.lease)) return "its check copy's job takes no launcher now" // i18n-ignore: hive-progress's words, agent-facing
+  // Taken before the await that assigns: a second call for the lease is refused, never two launchers in it.
+  assigned.add(a.lease)
+  if (pool.lease(a.lease)?.returned) return 'its check copy was returned' // i18n-ignore: hive-progress's words, agent-facing
   return (await job.assign(a.pid, a.after, a.before)) ? null : "the check's launcher couldn't be put in its check copy's job" // i18n-ignore: hive-progress's words, agent-facing
 }
 
@@ -201,6 +224,7 @@ export async function copyViews(ws: WorkspaceService, projectPath: string): Prom
 
 /** Looks again at every open workspace's pools that have copies returning, or that `all` (the hourly tidy) asks for. */
 export async function lookAtCopies(tidy = false): Promise<void> {
+  requests.abandon()
   for (const ws of openWorkspaces()) {
     if (!ws.path) continue
     let ids: string[]

@@ -86,6 +86,7 @@ export interface CopyLease {
 
 export type CopyRefusal =
   | { why: 'noCopy'; size: number }
+  | { why: 'returned'; copy: string }
   | { why: 'stillInUse'; copy: string; by: string }
   | { why: 'off' }
   | { why: 'setupFailed'; copy: string; error: string; log: string | null }
@@ -100,6 +101,8 @@ export function copyRefusalText(r: CopyRefusal): string {
   switch (r.why) {
     case 'noCopy':
       return `no check copy free: the pool's ${r.size} ${r.size === 1 ? 'copy is' : 'copies are'} in use`
+    case 'returned':
+      return `its lease of ${r.copy} was returned while the copy was being set up`
     case 'stillInUse':
       return `${r.copy} is still in use by ${r.by}`
     case 'off':
@@ -287,9 +290,12 @@ export class CopyStore {
     return this.conn.write((db) => Number(db.prepare(`UPDATE copies SET op = ?, op_kind = ?, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND state = ? AND ${FREE}`).run(token, kind, holder.pid, holder.started, this.project, name, from).changes) === 1)
   }
 
-  /** Takes over an operation whose holder is gone: only while `was` still holds it. */
+  /**
+   * Takes over an operation whose holder is gone: only while `was` still holds it. Its kind stays (a lease's reset, a
+   * removal), so a taker that is itself interrupted leaves the same recovery for the next one (HR1's #1435 round 1).
+   */
   async takeOver(name: string, was: string, token: string, holder: Holder): Promise<boolean> {
-    return this.conn.write((db) => Number(db.prepare('UPDATE copies SET op = ?, op_kind = ?, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND op = ?').run(token, 'recover', holder.pid, holder.started, this.project, name, was).changes) === 1)
+    return this.conn.write((db) => Number(db.prepare('UPDATE copies SET op = ?, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND op = ?').run(token, holder.pid, holder.started, this.project, name, was).changes) === 1)
   }
 
   /** Returns a lease (its review or run is over): the copy `returning`. The lease as returned, or null when it was already. */
@@ -445,6 +451,11 @@ export class CopyPool {
         if (!taken.ok) return { ok: false, refusal: this.heldTooLong() ?? { why: 'noCopy', size: taken.size } }
         const done = await this.reset(taken.copy, taken.lease, token, taken.fresh)
         if (done === 'ready') return { ok: true, lease: this.store.lease(taken.lease.id)!, copy: this.store.copy(taken.copy.name)! }
+        // Returned while it was being set up (cancelled, expired): returning, freed only through the barrier.
+        if (done === 'returned') {
+          await this.tryFree(taken.copy.name)
+          return { ok: false, refusal: { why: 'returned', copy: taken.copy.name } }
+        }
         if (done === 'skip') {
           skip.add(taken.copy.name)
           return 'skip'
@@ -474,7 +485,7 @@ export class CopyPool {
    * lock files changed; then `leased`. A failure leaves it not ready with why (its lease dropped); a free copy whose
    * folder git doesn't list is passed over (marked gone); an operation taken over meanwhile stops.
    */
-  private async reset(copy: Copy, lease: CopyLease, token: string, fresh: boolean): Promise<'ready' | 'skip' | CopyRefusal> {
+  private async reset(copy: Copy, lease: CopyLease, token: string, fresh: boolean): Promise<'ready' | 'skip' | 'returned' | CopyRefusal> {
     const name = copy.name
     const fail = async (error: string, logPath: string | null = null): Promise<CopyRefusal> => {
       log.warn(`Copy ${userText(name)} of ${userText(this.deps.project)} isn't ready: ${userText(error)}`)
@@ -499,6 +510,15 @@ export class CopyPool {
         await this.store.fenced(name, token, (db) => {
           this.store.dropIn(db, lease.id, 'gone')
           this.store.setIn(db, name, 'creating', { warmError: 'its folder is there but git does not list it as a worktree' }, { op: null })
+        })
+        return 'skip'
+      }
+      // Free since it was freed, not since now: a run or a process may have come into it since. Passed over (it stays as it
+      // was, its lease dropped) while anything is in it; never reset under it.
+      if (!made && (this.deps.runIn(copy.folder) || !(await quiet(copy.folder)))) {
+        await this.store.fenced(name, token, (db) => {
+          this.store.dropIn(db, lease.id, 'busy')
+          this.store.setIn(db, name, copy.state, {}, { op: null })
         })
         return 'skip'
       }
@@ -529,8 +549,12 @@ export class CopyPool {
         }
         fields = { ...fields, installHash: hash }
       }
-      await this.store.fenced(name, token, (db) => this.store.setIn(db, name, 'leased', fields, { op: null }))
-      return 'ready'
+      // The lease as it is now, in the write that ends the operation: returned meanwhile, the copy is returning, not lent.
+      return await this.store.fenced(name, token, (db) => {
+        const open = !!db.prepare('SELECT 1 FROM copy_leases WHERE id = ? AND returned_at IS NULL AND freed_at IS NULL').get(lease.id)
+        this.store.setIn(db, name, open ? 'leased' : 'returning', fields, { op: null })
+        return open ? ('ready' as const) : ('returned' as const)
+      })
     } catch (e) {
       if (e instanceof OpLost) return { why: 'noCopy', size: 0 }
       return fail(e instanceof Error ? e.message : String(e)).catch(() => ({ why: 'noCopy' as const, size: 0 }))
@@ -703,5 +727,84 @@ export class CopyPool {
       }
     }
     return removed
+  }
+}
+
+// --- Isolated runs' copies, asked for apart from the request that asks.
+
+/** A request's answer: the leased copy, `wait` (none free yet: asked again later), or why not. */
+export type RequestAnswer<T> = T | { wait: string } | { refused: string }
+
+/** A copy being leased for an isolated run (#1435): whose, for what, its answer once there, and when it was last asked about. */
+interface Pending<T> {
+  owner: string
+  project: string
+  asks: string
+  result: RequestAnswer<T> | null
+  polled: number
+}
+
+/** Requests at most at once (the oldest go, a copy of theirs given back). */
+const MAX_REQUESTS = 100
+/** A copy leased for a request nobody asked about for this long is given back (hive-progress gone, or given up). */
+export const ABANDON_MS = 60_000
+/** How long the first ask waits for its answer before saying to wait (the rest comes by asking again). */
+export const FIRST_WAIT_MS = 2000
+
+/**
+ * Isolated runs' copies leased and set up apart from the Agent API's request that asks for them (HR1's #1435 round 1: a
+ * first setup takes minutes, longer than any request may): the first ask starts the lease and answers within
+ * FIRST_WAIT_MS, with the copy or `wait` and a ticket; asked again with the ticket (hive-progress asks every 2 s), the
+ * copy once ready. A ticket is its asker's alone and for what it asked (another's, or for something else, starts anew).
+ * A copy nobody collects within ABANDON_MS of the last ask is given back (`abandon`, on each look).
+ */
+export class IsolatedRequests<T extends { lease: CopyLease }> {
+  private readonly pending = new Map<string, Pending<T>>()
+
+  constructor(
+    private readonly giveBack: (project: string, lease: CopyLease) => void,
+    private readonly now: () => number = Date.now,
+    private readonly firstWaitMs = FIRST_WAIT_MS
+  ) {}
+
+  get size(): number {
+    return this.pending.size
+  }
+
+  async ask(owner: string, project: string, asks: string, lease: () => Promise<RequestAnswer<T>>, ticket?: string): Promise<T | { wait: string; ticket: string } | { refused: string }> {
+    const known = ticket ? this.pending.get(ticket) : undefined
+    let t = known && known.owner === owner && known.asks === asks ? ticket! : null
+    if (!t) {
+      while (this.pending.size >= MAX_REQUESTS) this.drop(this.pending.keys().next().value!)
+      t = `t-${randomBytes(8).toString('hex')}`
+      const p: Pending<T> = { owner, project, asks, result: null, polled: this.now() }
+      this.pending.set(t, p)
+      const leasing = lease().then(
+        (got) => void (p.result = got),
+        (e: Error) => void (p.result = { refused: `no check copy could be leased: ${e.message}` })
+      )
+      let timer: NodeJS.Timeout | undefined
+      await Promise.race([leasing, new Promise<void>((res) => (timer = setTimeout(res, this.firstWaitMs)))])
+      clearTimeout(timer)
+    }
+    const p = this.pending.get(t)
+    if (!p) return { wait: 'a check copy', ticket: '' }
+    p.polled = this.now()
+    if (!p.result) return { wait: 'a check copy to be set up', ticket: t }
+    this.pending.delete(t)
+    // None free yet: the next ask starts anew (no ticket).
+    if ('wait' in p.result) return { wait: p.result.wait, ticket: '' }
+    return p.result
+  }
+
+  /** Gives back the copies nobody asked about for ABANDON_MS (a set-up still under way is left to finish first). */
+  abandon(): void {
+    for (const [t, p] of [...this.pending]) if (p.result && this.now() - p.polled > ABANDON_MS) this.drop(t)
+  }
+
+  private drop(ticket: string): void {
+    const p = this.pending.get(ticket)
+    this.pending.delete(ticket)
+    if (p?.result && 'lease' in p.result) this.giveBack(p.project, (p.result as T).lease)
   }
 }

@@ -2817,7 +2817,10 @@ is settled (#1429's `slotJobs.ts`: ended, journal sealed and read, seen gone), i
 running background tasks, and a rename of its folder aside and back succeeds; otherwise it stays returning, looked at
 again every 30 s and on each lease. Past Settings → Advanced, **Copies: wait for one to be free**
 (`hive.copies.quietWaitMinutes`, 10), a lease that finds none free says which copy is still in use and by what. At a
-restart a lease whose Hive is gone, or (this Hive's) whose run is over, is returned and goes through the barrier.
+restart a lease whose Hive is gone, or (this Hive's) whose run is over, is returned and goes through the barrier. A free
+copy is looked at again under its next reservation (a run or a process in it since: passed over, never reset under
+it), and a lease returned while its copy is being reset is never handed over: the copy is returning when the reset
+ends. An operation taken over keeps its kind, so a taker that is itself interrupted leaves the same recovery.
 Leasing and removal are operations owning the copy as slots' are. **Reviewers review in review copies**
 (`hive.copies.review`, on) is the switch #1439 reads: off, a review lease is refused `off`. Copies beyond the size unused
 for a day go hourly (Remove idle slots after a day).
@@ -3080,14 +3083,18 @@ copies (§16.10.5), leased to that run and written by nothing else, so it counts
 refusal's next step names it ("another agent changed files during your run: run it isolated"). A reviewer's runs in a
 review copy count for the revision it holds (§16.10.5). None has no check copies (no isolation, OP-16): its remedy is
 running again when the deliverables are quiet, which the refusal says.
-**Built [#1435]:** `--isolated` (with `--check` only, by an agent, on Git) asks resolve for a check copy: it is leased at
-the card's revision (409 `wait` while none is free: hive-progress says *waiting for a check copy* once and asks again
-every 2 s) and the lease's job is opened on the process supervisor (`copy-<lease>`, recorded on the lease first).
-hive-progress then starts the command's launcher (#1360's, `workflow/launcher.ts`) in the copy and has Hive put it in
-that job (`POST /v1/progress/isolated`, only the lease's agent) before it runs anything. The run's start takes the lease,
+**Built [#1435]:** `--isolated` (with `--check` only, by an agent, on Git) asks resolve for a check copy. It is leased at
+the card's revision apart from the request (`IsolatedRequests`: a first setup takes longer than any request may): resolve
+answers within 2 s, with the copy or 409 `wait` and a ticket, and hive-progress asks again with the ticket every 2 s,
+saying what it waits for once (*waiting for a check copy*, *… to be set up*); a copy leased for a ticket nobody asks
+about for a minute is given back (`abandoned`). The lease's job is opened on the process supervisor (`copy-<lease>`,
+recorded on the lease first). hive-progress then starts the command's launcher (#1360's, `workflow/launcher.ts`) in the
+copy and has Hive put it in that job (`POST /v1/progress/isolated`) before it runs anything: only by the lease's agent,
+once per lease, and only a process of that agent's own (in its launch's job, started in the window it names). The run's start takes the lease,
 its finish returns it after its `CheckRan` (`isolated: true`), and **Stop** on its row in the Progress panel
-(`progress:stop`) ends the job, so the whole tree ends, and the run is recorded as stopped. Any run whose folder is in a leased copy is linked to the
-lease's card and revision (runLink's `copyAt`), never the agent's card in Doing; naming another card there is refused.
+(`progress:stop`) ends the job, so the whole tree ends, and the run is recorded as stopped. Any run whose folder is in a leased copy of the caller's own
+project is linked to the lease's card and revision (runLink's `copyAt`), never the agent's card in Doing; naming another
+card there is refused. Another project's copy is no copy to an agent: nothing of its lease is read or shown.
 The run's details name the copy (`ProgressRun.copy`). A lane waiting for a copy has the status `checkCopy` (*waiting
 for a check copy for HI-12*). Hive running pre-review checks itself is OP-27.
 

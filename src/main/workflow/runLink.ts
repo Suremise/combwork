@@ -58,9 +58,10 @@ export interface RunLinkDeps {
   checkCommand: (project: string, name: string) => Promise<string | null>
   /**
    * The review or check copy a folder is in (#1435), with its lease's card and revision while it is out (null when it
-   * has none); null when the folder is no copy.
+   * has none); null when the folder is no copy. `scope`: a project agent's own project (its folder name): another
+   * project's copies are no copies to it.
    */
-  copyAt?: (folder: string) => Promise<{ copy: string; card: number | null; revision: string | null } | null>
+  copyAt?: (folder: string, scope: string | null) => Promise<{ copy: string; card: number | null; revision: string | null } | null>
 }
 
 const MAX_FOLDER = 1000
@@ -99,8 +100,14 @@ export async function resolveRunLink(caller: ProgressCaller, asked: RunLinkAsked
     folder = asked.folder
   }
   const own = caller.source === 'agent' ? deps.projectName(caller.projectPath).toLowerCase() : null
-  // A run in a review or check copy (#1435) is a check of the copy's lease: its card and revision, never another's.
-  const inCopy = folder && deps.copyAt ? await deps.copyAt(folder) : null
+  // A run in a review or check copy (#1435) is a check of the copy's lease: its card and revision, never another's. Only
+  // the caller's own project's copies (an agent's): another project's folder is just a folder, revealing nothing of it.
+  let inCopy = folder && deps.copyAt ? await deps.copyAt(folder, caller.source === 'agent' ? deps.projectName(caller.projectPath) : null) : null
+  // Its lease's card, checked as a card named would be (HR1's #1435 round 1): one the caller can't see makes it no copy.
+  if (inCopy?.card != null && own !== null) {
+    const c = await deps.card(inCopy.card)
+    if (!c || c.project.toLowerCase() !== own) inCopy = null
+  }
 
   let card: number | null = null
   let cardProject: string | null = null

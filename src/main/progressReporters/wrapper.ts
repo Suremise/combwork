@@ -490,7 +490,8 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
     while ('wait' in r) {
       if (r.wait !== said) io.stderr.write(`hive-progress: waiting for ${(said = r.wait)}\n`)
       await new Promise((res) => setTimeout(res, io.isolatedPollMs ?? ISOLATED_POLL_MS))
-      r = await resolveRun(target, ask, { fetch: io.fetch, timeoutMs: io.resolveTimeoutMs })
+      // Asked again with its ticket: the copy Hive is setting up for this run (none: a new ask).
+      r = await resolveRun(target, { ...ask, ...(r.ticket ? { ticket: r.ticket } : {}) }, { fetch: io.fetch, timeoutMs: io.resolveTimeoutMs })
     }
     if ('refused' in r) {
       io.stderr.write(`hive-progress: ${r.refused}\n`)

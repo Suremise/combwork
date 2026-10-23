@@ -7,8 +7,10 @@
 //   runs in copy-1 once B1's has ended and the copy is quiet;
 // - an isolated check that started a detached process of its own is stopped from the Progress panel: its whole tree ends
 //   (the check and what it left), and the copy is used by the next run.
-// Screenshots of the panel with the isolated run and its details. Dev build, throwaway profile, workspace and
-// CLAUDE_CONFIG_DIR.
+// And HR1's round 1: the first copy's setup held past hive-progress's 5 s request limit (it waits, then runs); the
+// launcher route takes only the lease's own agent's own process, once; another project's copy folder gives an agent
+// nothing of its lease. Screenshots of the panel with the isolated run and its details, light and dark. Dev build,
+// throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { execFileSync } = require('child_process')
@@ -28,6 +30,8 @@ const alpha = path.join(ws, 'alpha')
 const control = path.join(tools, 'control.json')
 const started = path.join(tools, 'started.jsonl')
 const go = path.join(tools, 'go.txt')
+const setupGo = path.join(tools, 'setup-go.txt')
+const beta = path.join(ws, 'beta')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -55,6 +59,11 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
   for (const d of [claudeHome, tools, shots]) fs.mkdirSync(d, { recursive: true })
   lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', '.gitignore': '.hive/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
+  lib.gitProject(beta, { 'b.ts': 'export const b = 1\n', '.gitignore': '.hive/\n' })
+  lib.git(beta, ['branch', '-M', 'main'])
+  // A copy's setup the test holds (the first copy's): until setup-go.txt exists, bounded against a hang.
+  const setupScript = path.join(tools, 'setup.js')
+  fs.writeFileSync(setupScript, `const fs = require('fs'); const t = Date.now(); const tick = () => { if (fs.existsSync(${JSON.stringify(setupGo)})) process.exit(0); if (Date.now() - t > 120000) process.exit(3); setTimeout(tick, 100) }; tick()\n`)
   const script = path.join(tools, 'check.js')
   fs.writeFileSync(
     script,
@@ -72,7 +81,7 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
     ].join('\n')
   )
   steer('pass')
-  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase()]))
+  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase(), beta.toLowerCase()]))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -95,22 +104,26 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, folder: 'project', preChecks: ['quick'], commands: { quick: `node "${script}"` } } })
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1' })
     const b2 = await lib.addAgent(inv, alpha, { name: 'B2' })
-    const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
+    // Beta: another project, with an agent and a check of its own.
+    await inv('workflow:setOptions', beta, { preset: null, options: { review: 'agent', noSelfReview: true, folder: 'project', preChecks: ['quick'], commands: { quick: `node "${script}"` } } })
+    const c1 = await lib.addAgent(inv, beta, { name: 'C1' })
+    const live = async (id, project = alpha) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === id)
     for (const a of [b1, b2]) await inv('session:start', alpha, { agentId: a.id })
-    check('the agents start', !!(await until(async () => (await live(b1.id))?.status === 'ready' && (await live(b2.id))?.status === 'ready', HUNG_MS)))
+    await inv('session:start', beta, { agentId: c1.id })
+    check('the agents start', !!(await until(async () => (await live(b1.id))?.status === 'ready' && (await live(b2.id))?.status === 'ready' && (await live(c1.id, beta))?.status === 'ready', HUNG_MS)))
     const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
     const launches = () => {
       const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''
       return text.slice(0, text.lastIndexOf('\n') + 1).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l))
     }
-    const tokenOf = async (id) => {
-      const sessionId = (await live(id))?.sessionId
+    const tokenOf = async (id, project = alpha) => {
+      const sessionId = (await live(id, project))?.sessionId
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
       const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
       return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
     }
-    const call = async (token, p) => {
-      const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: '{}' })
+    const call = async (token, p, body = {}) => {
+      const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       return { status: res.status, body: await res.json().catch(() => null) }
     }
     const shells = () => {
@@ -118,13 +131,13 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
     }
     /** Types a shell command into an agent's fake session; resolves with its record once it has ended. */
-    const shell = async (id, cmd) => {
+    const shell = async (id, cmd, project = alpha) => {
       const before = shells().length
-      await until(async () => (await live(id))?.status !== 'working', HUNG_MS)
-      await inv('pty:write', lib.ptyKey(alpha, id), `shell: ${cmd}`)
+      await until(async () => (await live(id, project))?.status !== 'working', HUNG_MS)
+      await inv('pty:write', lib.ptyKey(project, id), `shell: ${cmd}`)
       // Typed, then entered (the fake reads a line), as progressreport does.
       await lib.sleep(300)
-      await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+      await inv('pty:write', lib.ptyKey(project, id), '\r')
       // Its own record: the first of its command after those there before it was typed (another agent's may come first).
       const index = await until(() => {
         const i = shells().findIndex((x, n) => n >= before && x.cmd === cmd && !taken.has(n))
@@ -162,13 +175,20 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
     const sharedCheck = await until(() => quick(a, sharedId), HUNG_MS)
     check("…but doesn't count: files changed in the folder while it ran", sharedCheck?.counted === false && sharedCheck.whyNot === 'changed', JSON.stringify(sharedCheck))
 
-    // --- The same check, isolated: in copies/copy-1 at the card's revision; the same edit doesn't touch it.
-    await inv('project:updateConfig', alpha, { copies: { size: 1 } })
+    // --- The same check, isolated: in copies/copy-1 at the card's revision; the same edit doesn't touch it. The first copy's
+    // setup is held past hive-progress's 5 s request limit (HR1's round 1): it waits, then runs.
+    await inv('project:updateConfig', alpha, { copies: { size: 1 }, slots: { setup: `node "${setupScript}"` } })
     steer('wait')
     const iso = shell(b1.id, `hive-progress --check quick --isolated --card "${keyA}"`)
+    const copies = () => inv('copies:list', alpha)
+    check("copy-1 is being set up", !!(await until(async () => (await copies()).some((c) => c.name === 'copy-1' && c.state === 'creating'), HUNG_MS)), JSON.stringify(await copies()))
+    // Held for longer than one request may take (5 s): the point is the time, so this waits for it (bounded).
+    const heldFrom = Date.now()
+    await until(() => Date.now() - heldFrom > 7000, HUNG_MS)
+    check('…past the request limit, nothing has run and hive-progress still waits', starts().length === 1 && !shells().some((x) => x.cmd.includes('--isolated')))
+    fs.writeFileSync(setupGo, 'go')
     check('the isolated check starts in copies\\copy-1', !!(await until(() => starts().length === 2, HUNG_MS)) && /[\\/]copies[\\/]copy-1$/i.test(starts()[1].cwd), JSON.stringify(starts()[1]))
     check('…at the card\'s revision', gitIn(starts()[1].cwd, 'rev-parse', 'HEAD') === revision)
-    const copies = () => inv('copies:list', alpha)
     check('…its copy leased to B1 for the card', !!(await until(async () => (await copies()).some((c) => c.name === 'copy-1' && c.state === 'leased' && c.lease?.card === a && c.lease.agent === b1.id && c.lease.kind === 'check'), HUNG_MS)), JSON.stringify(await copies()))
     const isoRunId = await until(async () => (await runs()).find((r) => r.check === 'quick' && r.copy === 'copy-1' && r.state === 'running')?.id, HUNG_MS)
     // The panel: the run, its Stop, and its details naming the copy.
@@ -180,7 +200,29 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
     await isoRow.locator('.progress-details-toggle').click()
     check("…its details name the copy", !!(await until(async () => /Copy\s*copy-1/.test((await isoRow.innerText().catch(() => '')) ?? ''), HUNG_MS)), await isoRow.innerText().catch(() => ''))
     await page.mouse.move(5, 5)
-    await panel.screenshot({ path: path.join(shots, 'isolatedcheck-1-running.png') })
+    for (const theme of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme } })
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+      await panel.screenshot({ path: path.join(shots, `isolatedcheck-1-running-${theme}.png`) })
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+
+    // The launcher route (HR1's round 1): only the lease's own agent, once, and only a process of that agent's own.
+    const leaseId = (await copies()).find((c) => c.name === 'copy-1')?.lease?.id
+    const after = Date.now()
+    const foreign = require('child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true, env: lib.baseEnv() })
+    const before = Date.now()
+    try {
+      const asOther = await call(t2, '/v1/progress/isolated', { lease: leaseId, pid: foreign.pid, after, before })
+      check("another agent can't put a process in B1's copy's job", asOther.status === 409 && /no such check copy lease/.test(asOther.body?.error ?? ''), JSON.stringify(asOther))
+      const notOwn = await call(t1, '/v1/progress/isolated', { lease: leaseId, pid: foreign.pid, after, before })
+      check("…nor B1 a process that isn't its own", notOwn.status === 409 && /isn't one of this agent's own/.test(notOwn.body?.error ?? ''), JSON.stringify(notOwn))
+      // Its own check's process (in its launch, any time up to now): its lease has its launcher already.
+      const second = await call(t1, '/v1/progress/isolated', { lease: leaseId, pid: starts()[1].pid, after: 0, before: Date.now() })
+      check('…nor a second launcher in the same lease', second.status === 409 && /takes no launcher now/.test(second.body?.error ?? ''), JSON.stringify(second))
+    } finally {
+      foreign.kill()
+    }
     otherEdit()
     fs.writeFileSync(go, 'go')
     const isoRun = await iso
@@ -190,16 +232,34 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
     check('…and counts, isolated, for the card\'s revision', isoCheck?.counted === true && isoCheck.isolated === true && isoCheck.revision === revision, JSON.stringify(isoCheck))
     check('…its copy returned and freed', !!(await until(async () => (await copies()).every((c) => c.state === 'free' && !c.lease), HUNG_MS)), JSON.stringify(await copies()))
 
+    // --- Another project's copy (HR1's round 1): its folder gives B1 nothing of its lease.
+    const cardC = (await inv('tasks:create', { title: 'Beta C', project: 'beta' })).number
+    const keyC = (await card(cardC)).key
+    const t3 = await tokenOf(c1.id, beta)
+    const sc = await call(t3, `/v1/tasks/${encodeURIComponent(keyC)}/start`)
+    check('C1 starts its card in beta', sc.status === 200, JSON.stringify(sc.body))
+    await inv('project:updateConfig', beta, { copies: { size: 1 } })
+    steer('wait')
+    const betaRun = shell(c1.id, `hive-progress --check quick --isolated --card "${keyC}"`, beta)
+    const betaCopy = await until(() => starts().find((x) => /beta[\\/]copies[\\/]copy-1$/i.test(x.cwd))?.cwd, HUNG_MS)
+    check("C1's check holds beta's copy-1", !!betaCopy, JSON.stringify(starts()))
+    const peek = await call(t1, '/v1/progress/resolve', { folder: betaCopy })
+    check("B1 resolving in beta's copy gets its own card, nothing of beta's lease", peek.status === 200 && peek.body?.card === `#${a}` && !JSON.stringify(peek.body).includes(`#${cardC}`) && !JSON.stringify(peek.body).includes(keyC) && !('copy' in (peek.body ?? {})), JSON.stringify(peek))
+    const peekNamed = await call(t1, '/v1/progress/resolve', { folder: betaCopy, card: keyA })
+    check('…naming its own card there either', peekNamed.status === 200 && peekNamed.body?.card === `#${a}` && !JSON.stringify(peekNamed.body).includes(`#${cardC}`), JSON.stringify(peekNamed))
+    fs.writeFileSync(go, 'go')
+    check("C1's check passes", (await betaRun)?.code === 0)
+
     // --- The one copy leased: B2's isolated check waits for it, then runs there.
     steer('wait')
     const holding = shell(b1.id, `hive-progress --check quick --isolated --card "${keyA}"`)
-    check('B1 holds copy-1', !!(await until(() => starts().length === 3, HUNG_MS)))
+    check('B1 holds copy-1', !!(await until(() => starts().length === 4, HUNG_MS)))
     const waiting = shell(b2.id, `hive-progress --check quick --isolated --card "${keyB}"`)
-    check('…B2\'s check waits: nothing of it runs while copy-1 is out', !!(await until(async () => (await live(b2.id))?.status === 'working', HUNG_MS)) && starts().length === 3)
+    check('…B2\'s check waits: nothing of it runs while copy-1 is out', !!(await until(async () => (await live(b2.id))?.status === 'working', HUNG_MS)) && starts().length === 4)
     fs.writeFileSync(go, 'go')
     const held = await holding
     const waited = await waiting
-    check("B1's check ends, then B2's runs in copy-1 and passes", held?.code === 0 && waited?.code === 0 && starts().length === 4 && /copies[\\/]copy-1$/i.test(starts()[3].cwd), JSON.stringify({ held: held?.code, waited, s: starts()[3] }))
+    check("B1's check ends, then B2's runs in copy-1 and passes", held?.code === 0 && waited?.code === 0 && starts().length === 5 && /copies[\\/]copy-1$/i.test(starts()[4].cwd), JSON.stringify({ held: held?.code, waited, s: starts()[4] }))
     check('…having said it waited for a check copy', /waiting for a check copy/.test(waited?.stderr ?? ''), waited?.stderr)
     const bCheck = await until(async () => (await inv('tasks:work', b))?.checks.find((c) => c.name === 'quick' && c.isolated), HUNG_MS)
     check("…counted for B's card", bCheck?.counted === true, JSON.stringify(bCheck))
@@ -207,7 +267,7 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
     // --- Stopped from the panel: the check and the process it started end, and the copy is used again.
     steer('spawn')
     const stopped = shell(b1.id, `hive-progress --check quick --isolated --card "${keyA}"`)
-    const s5 = await until(() => starts()[4], HUNG_MS)
+    const s5 = await until(() => starts()[5], HUNG_MS)
     check('a check that starts a detached process of its own runs in copy-1', !!s5 && !!s5.kid && /copy-1$/i.test(s5.cwd) && alive(s5.pid) && alive(s5.kid), JSON.stringify(s5))
     const stopId = await until(async () => (await runs()).find((r) => r.copy === 'copy-1' && r.state === 'running' && r.card === a)?.id, HUNG_MS)
     const stopRow = panel.locator(`[data-run="${stopId}"]`).first()
@@ -219,7 +279,7 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
     check('…and copy-1 is free again', !!(await until(async () => (await copies()).every((c) => c.state === 'free'), HUNG_MS)), JSON.stringify(await copies()))
     steer('pass')
     const next = await shell(b2.id, `hive-progress --check quick --isolated --card "${keyB}"`)
-    check('the next isolated check runs in copy-1', next?.code === 0 && /copy-1$/i.test(starts()[5]?.cwd ?? ''), JSON.stringify({ next, s: starts()[5] }))
+    check('the next isolated check runs in copy-1', next?.code === 0 && /copy-1$/i.test(starts()[6]?.cwd ?? ''), JSON.stringify({ next, s: starts()[6] }))
     await panel.screenshot({ path: path.join(shots, 'isolatedcheck-2-stopped.png') })
   } catch (e) {
     check('no exception', false, e.stack)

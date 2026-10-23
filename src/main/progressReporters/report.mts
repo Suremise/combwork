@@ -264,6 +264,8 @@ export interface RunAsk {
   check?: string
   /** Run it in a check copy at the card's revision (#1435, `--isolated`): Hive leases one, or says to wait for one. */
   isolated?: true
+  /** The ticket of the copy being leased for it (the last `wait` gave it): asked again with it. */
+  ticket?: string
 }
 
 /** What Hive resolved a run to be for: the card's reference, the commits, the check and its configured command. */
@@ -284,7 +286,7 @@ export interface RunLink {
  * with its reason (a revision that isn't checked out, an unknown card, a check with no command), or `unreachable` (no
  * Hive, an older one without the call, a timeout).
  */
-export async function resolveRun(target: ProgressTarget, ask: RunAsk, opts: { fetch?: Fetch; timeoutMs?: number } = {}): Promise<{ link: RunLink } | { refused: string } | { wait: string } | { unreachable: true }> {
+export async function resolveRun(target: ProgressTarget, ask: RunAsk, opts: { fetch?: Fetch; timeoutMs?: number } = {}): Promise<{ link: RunLink } | { refused: string } | { wait: string; ticket?: string } | { unreachable: true }> {
   const fetchImpl = opts.fetch ?? (globalThis.fetch as unknown as Fetch)
   try {
     const res = await fetchImpl(`${target.url}/v1/progress/resolve`, {
@@ -312,7 +314,7 @@ export async function resolveRun(target: ProgressTarget, ask: RunAsk, opts: { fe
     }
     if (res.status === 400 && body && typeof body.error === 'string') return { refused: body.error }
     // An isolated run with no check copy free yet (#1435): what it waits for, to ask again.
-    if (res.status === 409 && body && typeof body.wait === 'string') return { wait: body.wait }
+    if (res.status === 409 && body && typeof body.wait === 'string') return { wait: body.wait, ...(typeof body.ticket === 'string' && body.ticket ? { ticket: body.ticket } : {}) }
   } catch {
     // no Hive, or it didn't answer in time
   }

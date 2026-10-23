@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
-import { COPIES_DIR, CopyPool, copyPoolSize, CopyStore, type CopyLease } from '../src/main/copies'
+import { ABANDON_MS, COPIES_DIR, CopyPool, copyPoolSize, CopyStore, IsolatedRequests, type CopyLease } from '../src/main/copies'
 import { fileSlotConn, quiet, type OpHolder, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
 import { resolveRunLink, type RunLinkDeps } from '../src/main/workflow/runLink'
@@ -34,6 +34,8 @@ interface World {
   set: { size: number; runIn: Map<string, string>; busy: Map<string, string>; jobs: Map<string, boolean>; over: Set<string>; review: boolean; quietMs: number }
   dead: Set<number>
   another: (pid: number) => { pool: CopyPool; store: CopyStore }
+  /** Holds the next `what` run of a copy at a gate: resolves once it has started; `open()` lets it go. */
+  hold: (copy: string, what: SlotRun['what']) => { started: Promise<void>; open: () => void }
   close: () => void
 }
 
@@ -61,6 +63,7 @@ function world(o: { setup?: string; size?: number } = {}): World {
   const set: World['set'] = { size: o.size ?? 2, runIn: new Map(), busy: new Map(), jobs: new Map(), over: new Set(), review: true, quietMs: 10 * 60_000 }
   const dead = new Set<number>()
   const dir = join(`${ws}.worktrees`, 'project', COPIES_DIR)
+  const gates = new Map<string, { entered: () => void; go: Promise<void> }>()
   const stores: CopyStore[] = []
   const make = (pid: number): { pool: CopyPool; store: CopyStore } => {
     const store = new CopyStore(fileSlotConn(boardFile(ws)), 'p-test')
@@ -73,6 +76,12 @@ function world(o: { setup?: string; size?: number } = {}): World {
       options: async () => ({ ...opts }),
       size: () => set.size,
       runner: async (r) => {
+        const gate = gates.get(`${r.slot}:${r.what}`)
+        if (gate) {
+          gates.delete(`${r.slot}:${r.what}`)
+          gate.entered()
+          await gate.go
+        }
         const logPath = join(logs, `${runs.length}.log`)
         const out = new BoundedLog(logPath, FILE_IO)
         const e = await execCommand({ spawn: nodeSpawn, platform: process.platform, timeoutMs: 60_000, env: () => ({ ...baseEnv(), ...r.env }) }, r.command, r.folder, out)
@@ -104,6 +113,13 @@ function world(o: { setup?: string; size?: number } = {}): World {
     set,
     dead,
     another: make,
+    hold: (copy, what) => {
+      let entered!: () => void
+      let open!: () => void
+      const started = new Promise<void>((r) => (entered = r))
+      gates.set(`${copy}:${what}`, { entered, go: new Promise<void>((r) => (open = r)) })
+      return { started, open: () => open() }
+    },
     close: () => {
       for (const s of stores) s.conn.close()
       closeBoard(ws)
@@ -367,3 +383,180 @@ describe('copies: operations and clean-up (#1435)', { timeout: 60_000 }, () => {
     expect(w.pool.copies().map((c) => c.name)).toEqual(['copy-2'])
   })
 })
+
+describe("copies: HR1's round 1", { timeout: 90_000 }, () => {
+  it('a free copy with a process that came into it after it was freed is never reset under it: passed over', async () => {
+    const w = world({ size: 2 })
+    const first = await leased(w)
+    await w.pool.returnCopy(first.lease.id, 'runEnded')
+    expect(w.store.copy('copy-1')?.state).toBe('free')
+    const before = head(first.folder)
+    writeFileSync(join(first.folder, 'mine.txt'), 'mine\n')
+    // A process starts in copy-1 now that it is free.
+    const child = spawn(process.execPath, ['-e', 'console.log("up"); setInterval(() => {}, 1000)'], { cwd: first.folder, env: baseEnv(), stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true })
+    procs.push(child)
+    await new Promise<void>((r) => child.stdout!.once('data', () => r()))
+    commit(w.project, { 'b.txt': 'b\n' }, 'later')
+    const next = await leased(w, { card: 2 })
+    expect(next.name).toBe('copy-2')
+    expect(head(first.folder)).toBe(before)
+    expect(readFileSync(join(first.folder, 'mine.txt'), 'utf8')).toBe('mine\n')
+    expect(w.store.copy('copy-1')).toMatchObject({ state: 'free', op: null })
+    // A run there (as the Progress panel has it) holds it back the same way.
+    child.kill()
+    await new Promise<void>((r) => child.once('exit', () => r()))
+    await w.pool.returnCopy(next.lease.id, 'runEnded')
+    w.set.size = 1
+    w.set.runIn.set(first.folder.toLowerCase(), 'B1: unit')
+    w.set.runIn.set(next.folder.toLowerCase(), 'B2: unit')
+    expect(await w.pool.leaseCopy({ kind: 'check', card: 3, revision: head(w.project) })).toEqual({ ok: false, refusal: { why: 'noCopy', size: 1 } })
+    expect(head(first.folder)).toBe(before)
+  })
+
+  it('returned while its first setup runs: never handed over, returning, then freed through the barrier', async () => {
+    const w = world({ size: 1, setup: 'node -e ""' })
+    const gate = w.hold('copy-1', 'setup')
+    const leasing = w.pool.leaseCopy({ kind: 'check', card: 1, revision: head(w.project), agent: 'a1' })
+    await gate.started
+    const lease = w.store.unfreed()[0]
+    expect(await w.pool.returnCopy(lease.id, 'cancelled')).toBe(true)
+    gate.open()
+    expect(await leasing).toEqual({ ok: false, refusal: { why: 'returned', copy: 'copy-1' } })
+    expect(w.store.lease(lease.id)).toMatchObject({ why: 'cancelled', freed: expect.any(String) })
+    expect(w.store.copy('copy-1')).toMatchObject({ state: 'free', op: null })
+    expect((await leased(w, { card: 2 })).name).toBe('copy-1')
+  })
+
+  it('returned while it reinstalls (its lock changed), and a lease expired while it resets: the same', async () => {
+    const w = world({ size: 1, setup: 'node -e ""' })
+    commit(w.project, { 'package-lock.json': '{"v":1}\n' }, 'lock')
+    const a = await leased(w, { agent: 'a1' })
+    await w.pool.returnCopy(a.lease.id, 'runEnded')
+    commit(w.project, { 'package-lock.json': '{"v":2}\n' }, 'lock 2')
+    w.set.busy.set('a1', 'a1 (working)')
+    const gate = w.hold('copy-1', 'install')
+    const leasing = w.pool.leaseCopy({ kind: 'check', card: 2, revision: head(w.project), agent: 'a1', ref: 'run-2' })
+    await gate.started
+    // Its run over (as a look finds an expired link): returned by the look while the reset still runs.
+    w.set.over.add('run-2')
+    await w.pool.refresh()
+    gate.open()
+    expect(await leasing).toEqual({ ok: false, refusal: { why: 'returned', copy: 'copy-1' } })
+    // Its holder still busy: returning, held back; then freed.
+    expect(w.store.copy('copy-1')?.state).toBe('returning')
+    w.set.busy.clear()
+    expect(await w.pool.tryFree('copy-1')).toBeNull()
+    expect(w.store.copy('copy-1')?.state).toBe('free')
+  })
+
+  it('a reset taken over twice (the taker dies at its takeover, then at its last write) still ends as a reset recovered', async () => {
+    const w = world({ size: 1 })
+    const l = await leased(w)
+    await w.pool.returnCopy(l.lease.id, 'runEnded')
+    await w.store.conn.write((db) => {
+      db.prepare("UPDATE copies SET op = 'o-dead', op_kind = 'lease', op_pid = 9, op_started = 1009 WHERE name = 'copy-1'").run()
+      db.prepare("INSERT INTO copy_leases (id, project, copy, kind, card, revision, profile, pid, started, from_at) VALUES ('c-x', 'p-test', 'copy-1', 'check', 5, ?, 'hive-9', 9, 1009, 't')").run(l.lease.revision)
+    })
+    w.dead.add(9)
+    // Hive 2 takes it over, and dies right after its takeover commits.
+    const b = w.another(2)
+    const takeOver = b.store.takeOver.bind(b.store)
+    b.store.takeOver = async (...a) => {
+      await takeOver(...a)
+      w.dead.add(2)
+      throw new Error('Hive 2 ended')
+    }
+    await expect(b.pool.refresh()).rejects.toThrow('Hive 2 ended')
+    expect(w.store.copy('copy-1')).toMatchObject({ op: { kind: 'lease', pid: 2 } })
+    // Hive 3 takes it over too, and dies at its last write.
+    const c = w.another(3)
+    const fenced = c.store.fenced.bind(c.store)
+    c.store.fenced = async () => {
+      w.dead.add(3)
+      throw new Error('Hive 3 ended')
+    }
+    await expect(c.pool.refresh()).rejects.toThrow('Hive 3 ended')
+    c.store.fenced = fenced
+    expect(w.store.copy('copy-1')).toMatchObject({ op: { kind: 'lease', pid: 3 } })
+    // Hive 4 finishes the same recovery: the reset's lease dropped, the copy not ready.
+    await w.another(4).pool.refresh()
+    expect(w.store.copy('copy-1')).toMatchObject({ state: 'creating', warmError: 'its reset was interrupted', op: null })
+    expect(w.store.lease('c-x')).toMatchObject({ why: 'interrupted', freed: expect.any(String) })
+  })
+
+  it("an agent can't read another project's copy: its folder is no copy to it, and nothing of its lease shows", async () => {
+    const w = world()
+    const l = await leased(w, { kind: 'review', card: 55 })
+    const calls: number[] = []
+    const deps: RunLinkDeps = {
+      card: async (n) => (calls.push(n), n === 55 ? { project: 'beta', column: 'review', agent: 'x' } : { project: 'project', column: 'doing', agent: 'a2' }),
+      doing: async () => [77],
+      cardRun: async (n) => (calls.push(-n), null),
+      head: async (f) => head(f),
+      commitOf: async () => null,
+      projectName: () => 'project',
+      keyCard: () => null,
+      checkCommand: async () => null,
+      // A copy of beta's, as a lookup that ignored the caller's project would find it.
+      copyAt: async (f) => (w.pool.at(f) ? { copy: 'copy-1', card: 55, revision: l.lease.revision } : null)
+    }
+    const caller = { source: 'agent' as const, workspacePath: w.ws, projectPath: w.project, agentId: 'a2', agentName: 'B2', provider: null }
+    const link = await resolveRunLink(caller, { folder: l.folder }, deps)
+    expect(link.card).toBe(77)
+    expect(link).not.toHaveProperty('copy')
+    expect(calls).not.toContain(-55)
+    // Naming a card of its own there: no refusal naming beta's card.
+    const named = await resolveRunLink(caller, { folder: l.folder, card: '#78' }, deps)
+    expect(named.card).toBe(78)
+  })
+})
+
+describe('copies: isolated requests apart from the request (HR1 round 1)', () => {
+  const lease = (id: string): CopyLease => ({ id, project: 'p', copy: 'copy-1', kind: 'check', card: 1, revision: 'r', ref: null, agent: 'a', profile: 'h', pid: 1, started: 1, job: null, from: 't', returned: null, why: null, freed: null })
+
+  it('a setup longer than the first wait answers wait with a ticket; asked again with it, the copy', async () => {
+    const back: string[] = []
+    const reqs = new IsolatedRequests<{ lease: CopyLease; folder: string }>((_, l) => back.push(l.id), Date.now, 20)
+    let done!: (v: { lease: CopyLease; folder: string }) => void
+    const slow = (): Promise<{ lease: CopyLease; folder: string }> => new Promise((r) => (done = r))
+    const first = await reqs.ask('agent|a', 'p', '1|r', slow)
+    expect(first).toEqual({ wait: 'a check copy to be set up', ticket: expect.stringMatching(/^t-/) })
+    const ticket = (first as { ticket: string }).ticket
+    expect(await reqs.ask('agent|a', 'p', '1|r', slow, ticket)).toEqual({ wait: 'a check copy to be set up', ticket })
+    done({ lease: lease('c-1'), folder: 'F' })
+    await vi.waitFor(async () => expect(await reqs.ask('agent|a', 'p', '1|r', slow, ticket)).toEqual({ lease: lease('c-1'), folder: 'F' }), { timeout: 10_000, interval: 10 })
+    expect(reqs.size).toBe(0)
+    expect(back).toEqual([])
+  })
+
+  it("another asker's ticket, or one for another card, starts a request of its own", async () => {
+    const reqs = new IsolatedRequests<{ lease: CopyLease }>(() => undefined, Date.now, 10)
+    const never = (): Promise<{ lease: CopyLease }> => new Promise(() => undefined)
+    const a = (await reqs.ask('agent|a', 'p', '1|r', never)) as { ticket: string }
+    const b = (await reqs.ask('agent|b', 'p', '1|r', never, a.ticket)) as { ticket: string }
+    const c = (await reqs.ask('agent|a', 'p', '2|r', never, a.ticket)) as { ticket: string }
+    expect(new Set([a.ticket, b.ticket, c.ticket]).size).toBe(3)
+  })
+
+  it('a copy nobody collects (hive-progress gone) is given back after ABANDON_MS; one still being set up is left', async () => {
+    let now = 1000
+    const back: string[] = []
+    const reqs = new IsolatedRequests<{ lease: CopyLease }>((_, l) => back.push(l.id), () => now, 10)
+    let done!: (v: { lease: CopyLease }) => void
+    const first = (await reqs.ask('agent|a', 'p', '1|r', () => new Promise((r) => (done = r)))) as { ticket: string }
+    now += ABANDON_MS + 1
+    reqs.abandon()
+    expect(back).toEqual([])
+    done({ lease: lease('c-9') })
+    await vi.waitFor(
+      () => {
+        reqs.abandon()
+        expect(back).toEqual(['c-9'])
+      },
+      { timeout: 10_000, interval: 10 }
+    )
+    expect(reqs.size).toBe(0)
+    expect(first.ticket).toMatch(/^t-/)
+  })
+})
+
