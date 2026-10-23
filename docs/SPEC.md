@@ -2866,15 +2866,16 @@ card" means after its Done fact; its merge-slot case goes away with P5). They ar
   and with the Assistant on or off: when a project's last running lane ends (`lane-ended`, its verified end), or, with no
   lane running, a card of it reaches Done, and its work has finished (no agent starting, working, waiting, watching, with
   background tasks or a prompt not taken; no card in Review or Passed). Once per quiet spell: the board keeps the
-  spell's mark per project (`fresh_nudge:<project id>` in board_meta), claimed in one write that checks the work again
-  as it is then, so two triggers at once, a refresh, another window, another Hive or a restart tell it once. One of the
-  project's agents getting busy ends the spell: noted at the event, and the mark goes in the first board write after it
-  (the next claim's, or the reset's), so the order is the events' own, never compared by time; a reset coming late
-  finds the busy moment taken and leaves the next spell's mark. A completion is kept, one per project, from before it
-  is checked: one seen while the work is still finishing (the usual order: the agent marks its last card Done in its
-  turn) is considered again as the project's agents go quiet (never while they are busy), until it is told, a lane of
-  the project runs again or the switch is off. The banner's button runs in the window that has the project, with the project shown, whatever was
-  shown. Off switch: Settings → Notifications, **Suggest a fresh start when work finishes** (on), and the project's own
+  spell's mark per project (`fresh_nudge:<project name>` in board_meta, each mark unique), claimed in one write that
+  checks the work again as it is then, so two triggers at once, a refresh, another window, another Hive or a restart
+  tell it once. One of the project's agents getting busy ends the spell whose mark is on the board at that moment, read
+  then with no wait: that exact mark (compared by its value) is removed by the next write that gets to it, the reset's
+  or the next claim's, and a mark made later, here or by another Hive, is never removed for it. The duty is kept until
+  such a write commits (a failed one leaves it for the next), and retiring it never removes a newer one. No time is
+  compared. A completion is kept, one per project, from before it is checked: one seen while the work is still
+  finishing (the usual order: the agent marks its last card Done in its turn) is considered again as the project's
+  agents go quiet (never while they are busy), until it is told, a lane of the project runs again or the switch is off.
+  The banner's button runs in the window that has the project, with the project shown, whatever was shown. Off switch: Settings → Notifications, **Suggest a fresh start when work finishes** (on), and the project's own
   (Project Settings → Sessions).
 - **Stay On Hold** (Darren's answer): #1087 (a fresh conversation after an idle gap: lanes already start fresh, and the
   rest needs a cache-lifetime threshold per provider), #1089 (the Assistant's save and start fresh: about the Assistant,

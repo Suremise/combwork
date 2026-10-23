@@ -196,7 +196,7 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
     fresh.resetFreshNudgesForTests()
     fresh.startFreshNudges()
     const { w, alpha, told } = await open()
-    const project = (await w.projectConfig(alpha)).id ?? 'alpha'
+    const project = 'alpha'
     // Busy here with no mark: nothing to remove.
     status(alpha, 'a1', 'working')
     await resetRun(alpha)
@@ -217,7 +217,7 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-23T12:00:00.000Z'))
     const { w, alpha, states, told } = await open()
     try {
-      const project = (await w.projectConfig(alpha)).id ?? 'alpha'
+      const project = 'alpha'
       expect(await fresh.considerNudge(w, alpha, 'card:50')).toBe(true)
       // Busy (the same millisecond): the mark goes; the next completion is told.
       status(alpha, 'a1', 'working')
@@ -248,39 +248,145 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
     }
   })
 
-  it('race 6 (the clock frozen): a reset held from an earlier busy moment, finishing after the next spell is told, leaves that mark', async () => {
+  /** Holds each spell reset (once it has its duty) until released: what a reset late for its busy moment does. */
+  const holdResets = (svc: typeof fresh) => {
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    let reached = false
+    svc.gateSpellResetsForTests(async () => {
+      reached = true
+      await held
+    })
+    return {
+      reached: () => reached,
+      release: () => {
+        svc.gateSpellResetsForTests(null)
+        release()
+      }
+    }
+  }
+  /** An SQLite trigger refusing changes to the spell marks (`op`: DELETE or INSERT), as a failed write; returns its removal. */
+  const refuse = async (w: Awaited<ReturnType<typeof open>>['w'], op: 'DELETE' | 'INSERT') => {
+    await boardWrite(w, async () => boardWriteOp(w, (db) => void db.exec(`CREATE TRIGGER refuse_${op} BEFORE ${op} ON board_meta WHEN ${op === 'DELETE' ? 'old' : 'new'}.key LIKE 'fresh_nudge:%' BEGIN SELECT RAISE(ABORT, 'refused'); END`)))
+    return () => boardWrite(w, async () => boardWriteOp(w, (db) => void db.exec(`DROP TRIGGER refuse_${op}`)))
+  }
+  /** A second, independent copy of the service (its own pending completions and duties), on the same board and sessions: another Hive. */
+  // @ts-expect-error: the same module, loaded again as another instance
+  const other: typeof fresh = await import('../src/main/freshStarts?watcher=b')
+
+  it('race 6: another Hive (its own state) replaces the mark while this one is late to end it: its mark stays, told once each', async () => {
+    fresh.resetFreshNudgesForTests()
+    other.resetFreshNudgesForTests()
+    fresh.startFreshNudges()
+    const { w, alpha, told } = await open()
+    try {
+      // No mark at this Hive's busy moment: no duty; the other Hive's mark, made after, stays.
+      status(alpha, 'a1', 'working')
+      await resetRun(alpha)
+      expect(await other.considerNudge(w, alpha, 'card:b1')).toBe(true)
+      const y1 = markOf(w, 'alpha')!.value
+      expect(await fresh.considerNudge(w, alpha, 'card:a1')).toBe(false)
+      expect(markOf(w, 'alpha')!.value).toBe(y1)
+      expect(told).toHaveLength(1)
+      // Mark X here; a busy moment here, its reset held. The other Hive's own busy moment, then its claim: X replaced by Y.
+      other.agentBusy(alpha)
+      await vi.waitFor(() => expect(markOf(w, 'alpha')).toBeUndefined(), { timeout: HUNG_MS })
+      expect(await fresh.considerNudge(w, alpha, 'card:a2')).toBe(true)
+      const x = markOf(w, 'alpha')!.value
+      const held = holdResets(fresh)
+      status(alpha, 'a1', 'working')
+      expect(held.reached()).toBe(true)
+      // (its duty is X; its claim removes X and makes Y. Its own reset would too, but in this test the two copies share
+      // one coalescing key, so it waits behind this Hive's held one.)
+      other.agentBusy(alpha)
+      expect(await other.considerNudge(w, alpha, 'card:b2')).toBe(true)
+      const y = markOf(w, 'alpha')!.value
+      expect(y).not.toBe(x)
+      expect(told).toHaveLength(3)
+      // This Hive's late reset: X is gone, Y stays; this Hive's next completion is in Y's spell.
+      held.release()
+      await resetRun(alpha)
+      expect(markOf(w, 'alpha')!.value).toBe(y)
+      expect(await fresh.considerNudge(w, alpha, 'card:a3')).toBe(false)
+      expect(told).toHaveLength(3)
+    } finally {
+      fresh.gateSpellResetsForTests(null)
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  it('race 7: a reset whose write fails keeps its duty: the next completion ends that spell and is told', async () => {
+    fresh.resetFreshNudgesForTests()
+    fresh.startFreshNudges()
+    const { w, alpha, told } = await open()
+    try {
+      expect(await fresh.considerNudge(w, alpha, 'card:70')).toBe(true)
+      const x = markOf(w, 'alpha')!.value
+      const allow = await refuse(w, 'DELETE')
+      status(alpha, 'a1', 'working')
+      await resetRun(alpha)
+      // Rolled back: X is still there.
+      expect(markOf(w, 'alpha')!.value).toBe(x)
+      await allow()
+      // The duty was kept: the next completion removes X and is told.
+      expect(await fresh.considerNudge(w, alpha, 'card:71')).toBe(true)
+      expect(markOf(w, 'alpha')!.value).not.toBe(x)
+      expect(told).toHaveLength(2)
+    } finally {
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  it("race 8: a claim that fails while it ends a spell keeps the duty: nothing told, X stays; then the reset ends it and the next is told once", async () => {
+    fresh.resetFreshNudgesForTests()
+    fresh.startFreshNudges()
+    const { w, alpha, told } = await open()
+    try {
+      expect(await fresh.considerNudge(w, alpha, 'card:80')).toBe(true)
+      const x = markOf(w, 'alpha')!.value
+      const held = holdResets(fresh)
+      status(alpha, 'a1', 'working')
+      expect(held.reached()).toBe(true)
+      const allow = await refuse(w, 'INSERT')
+      expect(await fresh.considerNudge(w, alpha, 'card:81')).toBe(false)
+      expect(markOf(w, 'alpha')!.value).toBe(x)
+      expect(told).toHaveLength(1)
+      await allow()
+      held.release()
+      await vi.waitFor(() => expect(markOf(w, 'alpha')).toBeUndefined(), { timeout: HUNG_MS })
+      expect(await fresh.considerNudge(w, alpha, 'card:82')).toBe(true)
+      expect(await fresh.considerNudge(w, alpha, 'card:83')).toBe(false)
+      expect(told).toHaveLength(2)
+    } finally {
+      fresh.gateSpellResetsForTests(null)
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  it('race 9 (the clock frozen): overlapping busy moments: a late reset for X leaves Y, and the newer duty for Y still ends its spell', async () => {
     fresh.resetFreshNudgesForTests()
     fresh.startFreshNudges()
     const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-23T12:00:00.000Z'))
     const { w, alpha, told } = await open()
-    const real = w.projectConfig.bind(w)
     try {
-      const project = (await w.projectConfig(alpha)).id ?? 'alpha'
-      expect(await fresh.considerNudge(w, alpha, 'card:70')).toBe(true)
-      // The reset for the busy moment is held at its first read.
-      let release!: () => void
-      const held = new Promise<void>((r) => (release = r))
-      let hold = true
-      w.projectConfig = (async (...a: Parameters<typeof real>) => {
-        if (hold) {
-          hold = false
-          await held
-        }
-        return real(...a)
-      }) as typeof w.projectConfig
+      expect(await fresh.considerNudge(w, alpha, 'card:90')).toBe(true)
+      const held = holdResets(fresh)
       status(alpha, 'a1', 'working')
-      expect(hold).toBe(false)
-      // Quiet again, a new completion: the busy moment ended the old spell, so it is told (the old mark replaced).
-      expect(await fresh.considerNudge(w, alpha, 'card:71')).toBe(true)
-      expect(JSON.parse(markOf(w, project)!.value)).toEqual({ trigger: 'card:71' })
-      // The held reset finishes: the new spell's mark stays, and the next trigger isn't told.
-      release()
-      await resetRun(alpha)
-      expect(JSON.parse(markOf(w, project)!.value)).toEqual({ trigger: 'card:71' })
-      expect(await fresh.considerNudge(w, alpha, 'card:72')).toBe(false)
-      expect(told).toHaveLength(2)
+      expect(held.reached()).toBe(true)
+      // The claim ends X's spell itself and tells Y.
+      expect(await fresh.considerNudge(w, alpha, 'card:91')).toBe(true)
+      const y = markOf(w, 'alpha')!.value
+      // Busy again (duty Y); the held reset for X goes on: Y isn't removed for X …
+      status(alpha, 'a2', 'working')
+      held.release()
+      // … but for its own busy moment it is, by the run after it.
+      await vi.waitFor(() => expect(markOf(w, 'alpha')).toBeUndefined(), { timeout: HUNG_MS })
+      expect(y).toBeTruthy()
+      expect(await fresh.considerNudge(w, alpha, 'card:92')).toBe(true)
+      expect(await fresh.considerNudge(w, alpha, 'card:93')).toBe(false)
+      expect(told).toHaveLength(3)
     } finally {
-      w.projectConfig = real
+      fresh.gateSpellResetsForTests(null)
       clock.mockRestore()
       await disposeWorkspaceService(w)
     }
