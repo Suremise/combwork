@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { OwnWorkflowProblem, ProjectInfo, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
 import type { PlatformId } from '@shared/platform/descriptors'
-import { allOff, CONTRADICTIONS, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, isAllOff, liveContradictions, NOT_OFFERED, reviewerAgent, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
+import { allOff, CONTRADICTIONS, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, isAllOff, liveContradictions, NOT_OFFERED, reviewerAgent, setOption, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { GROUP_TEXT, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NEEDS_TEXT, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import { LOOP_ROUNDS, loopDefaults } from '@shared/lanes'
 import { compile, mustCompile } from '@shared/workflow/compile'
@@ -314,7 +314,7 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
   const live = liveContradictions(effective)
   const stageProblems = stageNameProblems(effective.stageNames, tr)
   const blocked = contradictions(effective).length > 0 || stageProblems.length > 0
-  const set = <K extends OptionKey>(key: K, value: WorkflowOptions[K]): void => setDraft({ ...draft, options: { ...draft.options, [key]: value } })
+  const set = <K extends OptionKey>(key: K, value: WorkflowOptions[K]): void => setDraft({ ...draft, options: setOption(draft.options, effective, key, value) })
   const inheritKey = (key: OptionKey): void => {
     const { [key]: _gone, ...rest } = draft.options
     setDraft({ ...draft, options: rest })

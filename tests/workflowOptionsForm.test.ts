@@ -23,7 +23,7 @@ const form = await import('../src/main/workflow/optionsForm')
 const levels = await import('../src/main/workflow/levels')
 const { workflowFor } = await import('../src/main/workflow/service')
 const { checkOptions } = await import('../src/main/workflow/rulesets')
-const { allOff, CONTRADICTION_ROWS, CONTRADICTIONS, FORM_GROUPS, FORM_OPTIONS, formShows, liveContradictions, notOffered, preset, PRESETS } = await import('../src/shared/workflow/options')
+const { allOff, contradictions, CONTRADICTION_ROWS, CONTRADICTIONS, FORM_GROUPS, FORM_OPTIONS, formShows, liveContradictions, notOffered, preset, PRESETS, setOption } = await import('../src/shared/workflow/options')
 const { OPTION_TEXT, OPTION_WHY, optionTitle, PRESET_SUMMARY } = await import('../src/shared/workflow/optionTexts')
 const { englishText } = await import('../src/shared/advanced')
 const { cardLabel } = await import('../src/shared/projectKeys')
@@ -332,6 +332,23 @@ describe("the Version Control tab's Workflow section (#1418)", () => {
       for (const key of CONTRADICTION_ROWS[c]) expect(live[key], `${c} under ${key}`).toContain(c)
     }
     expect(liveContradictions(preset('git', 'pair'))).toEqual({})
+  })
+
+  it('choosing a reviewer agent from All off turns "Nobody reviews their own work" on in the draft, so it saves (#1508)', async () => {
+    const { platform: _p, ...off } = allOff('git')
+    for (const review of ['agent', 'agentThenYou'] as const) {
+      const own = setOption(off, allOff('git'), 'review', review)
+      expect(own).toMatchObject({ review, noSelfReview: true })
+      expect(contradictions({ ...allOff('git'), ...own })).toEqual([])
+    }
+    // Held on where it already was (inherited), the draft's own options gain nothing; other choices leave it as it is.
+    expect(setOption({}, { ...allOff('git'), noSelfReview: true }, 'review', 'agent')).toEqual({ review: 'agent' })
+    expect(setOption(off, allOff('git'), 'review', 'you')).toMatchObject({ review: 'you', noSelfReview: false })
+    // Saved from the form's draft: the project's options take it.
+    const { w, repo } = await workspace()
+    await form.setWorkflowOptions(w, repo, { preset: null, options: off })
+    await form.setWorkflowOptions(w, repo, { preset: null, options: setOption(off, allOff('git'), 'review', 'agent'), base: { preset: null, options: off } })
+    expect((await w.projectConfig(repo)).workflow?.options).toMatchObject({ review: 'agent', noSelfReview: true })
   })
 
   it("refuses a save read before another change (the Assistant's tool, another window), never writing over it", async () => {
