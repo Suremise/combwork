@@ -227,6 +227,10 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
         const x = d as FactData['DecisionsReceived']
         return `${x.agent}, generation ${x.generation}`
       }
+      case 'FilesLocked': {
+        const x = d as FactData['FilesLocked']
+        return `${x.agent}: ${x.paths.join(', ')}`
+      }
       case 'HeadMoved': {
         const x = d as FactData['HeadMoved']
         return `${r(x.from)} to ${r(x.to)}`

@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { cardsInPlay, unwatched } from '../src/main/loopCheck'
 import { providerDescriptor } from '../src/shared/providers'
-import { laneOrderWait, laneOrderWaitReason, notWatchingAgent, notWatchingReason, REVIEW_WAIT_STALL_MS, reviewVerdictWaitReason, reviewWaitReason } from '../src/shared/tasks'
+import { laneOrderWait, laneOrderWaitReason, LOOP_STEP_STALL_GRACE_MS, loopStepWait, loopStepWaitReason, notWatchingAgent, pendingDesign, pendingStep, notWatchingReason, REVIEW_WAIT_STALL_MS, reviewVerdictWaitReason, reviewWaitReason } from '../src/shared/tasks'
 import type { TaskCard } from '../src/shared/types'
 
 const card = (number: number, over: Partial<TaskCard> = {}): TaskCard => ({ number, title: `Card ${number}`, project: 'alpha', column: 'todo', agent: null, archived: false, labels: [], blockedBy: [], links: [], comments: [], history: [], ...over }) as unknown as TaskCard
@@ -203,5 +203,108 @@ describe("a lane's deadlock: its reviewer waits for an earlier card while its bu
     expect(laneOrderWaitReason(sent({ blocked: 'Asked the user' }), lane, [hr2, hb2], late)).toBeNull()
     expect(laneOrderWaitReason(sent({ archived: true }), lane, [hr2, hb2], late)).toBeNull()
     expect(laneOrderWaitReason(sent({ column: 'doing' }), lane, [hr2, hb2], late)).toBeNull()
+  })
+})
+
+describe('a design its builder posted in Doing that nobody checks (#1382)', () => {
+  // 21 Oct: HB5 posted #1305's design at 15:19 with the card in Doing; HR5 watched for Review only; the card sat 6 hours.
+  const t0 = Date.parse('2026-10-21T15:19:00.000Z')
+  const at = (min: number) => new Date(t0 + min * 60_000).toISOString()
+  const posted = { at: at(0), by: 'HB5 (alpha)', what: 'Posted a design for the reviewer to check: "Design: …"' }
+  const doing = (history = [posted], over: Partial<TaskCard> = {}) => card(1305, { column: 'doing', agent: 'b5', history: [{ at: at(-90), by: 'HB5 (alpha)', what: 'Moved to Doing' }, ...history], ...over })
+  const hb5 = { name: 'HB5', project: 'alpha', agentId: 'b5', cards: [1305], status: 'watching', watchSince: at(0) }
+  const bound = 30 * 60_000
+  it('stalled once the builder has only watched past its wait and a grace, naming it; not before', () => {
+    expect(pendingDesign(doing())).toEqual(posted)
+    expect(loopStepWaitReason(doing(), [hb5], bound, t0 + bound + LOOP_STEP_STALL_GRACE_MS - 1000)).toBeNull()
+    expect(loopStepWaitReason(doing(), [hb5], bound, t0 + bound + LOOP_STEP_STALL_GRACE_MS)).toBe("HB5 posted a design on #1305 for its reviewer to check and has waited 35 min: nobody has answered it, and it hasn't gone ahead as posted (hive_loop_step proceed).")
+    expect(loopStepWaitReason(doing(), [hb5], bound, t0 + 6 * 3600_000)).toMatch(/has waited 6 h:/)
+    // Its own bound: a project that waits two hours flags it later.
+    expect(loopStepWaitReason(doing(), [hb5], 120 * 60_000, t0 + 60 * 60_000)).toBeNull()
+    // Counted from the design, never its builder's watch: watching again (a turn taken, a restart) doesn't restart it.
+    expect(loopStepWaitReason(doing(), [{ ...hb5, watchSince: at(20) }], bound, t0 + bound + LOOP_STEP_STALL_GRACE_MS)).toMatch(/has waited 35 min:/)
+  })
+  it('due when its line says, as kept when it was posted, whatever the setting is now (HR4 round 1, finding 1)', () => {
+    const kept = { ...posted, whatText: { id: 'tasks.history.loopStep', values: { step: 'design', text: 'Design: …', until: at(45) } } }
+    expect(loopStepWaitReason(doing([kept]), [hb5], bound, t0 + 45 * 60_000 + LOOP_STEP_STALL_GRACE_MS - 1000)).toBeNull()
+    expect(loopStepWaitReason(doing([kept]), [hb5], bound, t0 + 45 * 60_000 + LOOP_STEP_STALL_GRACE_MS)).toMatch(/has waited 50 min:/)
+    // Posted again: the newer design's own deadline.
+    const again = { ...kept, at: at(40), whatText: { ...kept.whatText, values: { ...kept.whatText.values, until: at(70) } } }
+    expect(loopStepWaitReason(doing([kept, again]), [hb5], bound, t0 + 60 * 60_000)).toBeNull()
+  })
+  it('not stalled once answered, gone ahead, moved, blocked, or with its builder at work or not watching it', () => {
+    const late = t0 + 6 * 3600_000
+    for (const what of ['Checked the design: OK: "Fine"', 'Checked the design: gaps: "Bounds?"', 'Went ahead with the design unchecked: "No answer"', 'Moved to Review']) {
+      expect(pendingDesign(doing([posted, { at: at(5), by: 'X', what }]))).toBeNull()
+      expect(loopStepWaitReason(doing([posted, { at: at(5), by: 'X', what }]), [hb5], bound, late)).toBeNull()
+    }
+    // Posted again after its gaps: waiting again.
+    expect(pendingDesign(doing([posted, { at: at(5), by: 'HR5 (alpha)', what: 'Checked the design: gaps: "Bounds?"' }, { ...posted, at: at(9) }]))?.at).toBe(at(9))
+    expect(loopStepWaitReason(doing([], {}), [hb5], bound, late)).toBeNull()
+    expect(loopStepWaitReason(doing([posted], { blocked: 'Build as posted, or wait?' }), [hb5], bound, late)).toBeNull()
+    expect(loopStepWaitReason(doing([posted], { column: 'review' }), [hb5], bound, late)).toBeNull()
+    expect(loopStepWaitReason(doing(), [{ ...hb5, status: 'working' }], bound, late)).toBeNull()
+    expect(loopStepWaitReason(doing(), [{ ...hb5, cards: [1306] }], bound, late)).toBeNull()
+    // A builder watching with no start known is still only watching: flagged (the design's time decides).
+    expect(loopStepWaitReason(doing(), [{ ...hb5, watchSince: undefined }], bound, late)).toMatch(/has waited 6 h:/)
+  })
+})
+
+describe('a follow-up its builder posted in Review or Passed that nobody checks (#1467)', () => {
+  // 22 Oct: HB3 posted #1419's screenshot fixes on the card in Passed; HR3 watched for its move into Review, which never came.
+  const t0 = Date.parse('2026-10-22T16:00:00.000Z')
+  const at = (min: number) => new Date(t0 + min * 60_000).toISOString()
+  const posted = { at: at(0), by: 'HB3 (alpha)', what: 'Posted a follow-up for the reviewer to check: "Fixes: …"' }
+  const passed = (history = [posted], over: Partial<TaskCard> = {}) => card(1419, { column: 'passed', agent: 'b3', history: [{ at: at(-90), by: 'HR3 (alpha)', what: 'Moved to Passed' }, ...history], ...over })
+  const hb3 = { name: 'HB3', project: 'alpha', agentId: 'b3', cards: [1419], status: 'watching', watchSince: at(0) }
+  // A design's bound (Card loops → Design check wait) doesn't apply: a follow-up has no going ahead, only the stall's.
+  const bound = 120 * 60_000
+  it('stalled once its builder has only watched it REVIEW_WAIT_STALL_MS since the follow-up, in Passed or Review; not before', () => {
+    expect(pendingStep(passed())).toEqual({ entry: posted, step: 'followUp' })
+    expect(pendingDesign(passed())).toBeNull()
+    expect(loopStepWaitReason(passed(), [hb3], bound, t0 + REVIEW_WAIT_STALL_MS - 1000)).toBeNull()
+    expect(loopStepWaitReason(passed(), [hb3], bound, t0 + REVIEW_WAIT_STALL_MS)).toBe('HB3 posted a follow-up on #1419 for its reviewer to check and has waited 15 min: nobody has answered it (hive_loop_step ok or gaps).')
+    expect(loopStepWait(passed(), [hb3], bound, t0 + REVIEW_WAIT_STALL_MS)?.step).toBe('followUp')
+    expect(loopStepWaitReason(passed([posted], { column: 'review' }), [hb3], bound, t0 + 5 * 3600_000)).toMatch(/has waited 5 h:/)
+    // Counted from the follow-up, never its builder's watch.
+    expect(loopStepWaitReason(passed(), [{ ...hb3, watchSince: at(14) }], bound, t0 + REVIEW_WAIT_STALL_MS)).toMatch(/has waited 15 min:/)
+  })
+  it('not stalled once answered (gaps included), moved, blocked, elsewhere, or with its builder at work or not watching it', () => {
+    const late = t0 + 6 * 3600_000
+    for (const what of ['Checked the follow-up: OK: "Fine"', 'Checked the follow-up: gaps: "The dark theme"', 'Moved to Done', 'Returned for review']) {
+      expect(pendingStep(passed([posted, { at: at(5), by: 'X', what }]))).toBeNull()
+      expect(loopStepWaitReason(passed([posted, { at: at(5), by: 'X', what }]), [hb3], bound, late)).toBeNull()
+    }
+    // Posted again after its gaps: waiting again, from the new one.
+    const again = passed([posted, { at: at(5), by: 'HR3 (alpha)', what: 'Checked the follow-up: gaps: "The dark theme"' }, { ...posted, at: at(30) }])
+    expect(loopStepWaitReason(again, [hb3], bound, t0 + 40 * 60_000)).toBeNull()
+    expect(loopStepWaitReason(again, [hb3], bound, t0 + 45 * 60_000)).toMatch(/has waited 15 min:/)
+    expect(loopStepWaitReason(passed([posted], { blocked: 'Which theme?' }), [hb3], bound, late)).toBeNull()
+    expect(loopStepWaitReason(passed([posted], { column: 'doing' }), [hb3], bound, late)).toBeNull()
+    expect(loopStepWaitReason(passed(), [{ ...hb3, status: 'working' }], bound, late)).toBeNull()
+    expect(loopStepWaitReason(passed(), [{ ...hb3, cards: [1420] }], bound, late)).toBeNull()
+  })
+  it("a change of place in its column isn't a move: the step still waits, its stall aged from its post (HR4's round 1 finding)", () => {
+    // Lines as Hive writes them: the words, and the message with its column.
+    const line = (min: number, id: string, what: string, column: string, more: Record<string, string | number> = {}) => ({ at: at(min), by: 'HB3 (alpha)', what, whatText: { id: `tasks.history.${id}`, values: { column, ...more } } })
+    const into = line(-90, 'moved', 'Moved to Approved', 'passed')
+    const typed = (column: TaskCard['column'], ...after: ReturnType<typeof line>[]) => card(1419, { column, agent: 'b3', history: [line(-90, 'moved', `Moved to ${column}`, column), posted, ...after] })
+    // Within Passed and within Review: top, bottom, before another card, a place by number.
+    for (const [column, name] of [['passed', 'Approved'], ['review', 'Review']] as const) {
+      for (const moved of [line(5, 'movedBottom', `Moved to the bottom of ${name}`, column), line(5, 'movedTop', `Moved to the top of ${name}`, column), line(5, 'movedBeforeIn', `Moved before #1400 in ${name}`, column, { before: 1400 }), line(5, 'placed', `Placed 2nd in ${name}`, column, { place: 2 })]) {
+        expect(pendingStep(typed(column, moved))?.entry).toEqual(posted)
+        expect(loopStepWaitReason(typed(column, moved), [hb3], bound, t0 + 16 * 60_000)).toMatch(/has waited 16 min:/)
+      }
+    }
+    // Into another column, at its top or bottom too: the step ends.
+    expect(pendingStep(card(1419, { column: 'review', agent: 'b3', history: [into, posted, line(5, 'movedTop', 'Moved to the top of Review', 'review')] }))).toBeNull()
+    expect(pendingStep(typed('passed', line(5, 'moved', 'Moved to Done', 'done')))).toBeNull()
+    expect(pendingStep(typed('passed', line(5, 'movedBefore', 'Moved to Review, before #1400', 'review', { before: 1400 })))).toBeNull()
+    // A design in Doing the same way (#1382): reordered in Doing it still waits; moved on, it doesn't.
+    const design = { ...posted, what: 'Posted a design for the reviewer to check: "Design: …"' }
+    const doing = (...after: ReturnType<typeof line>[]) => ({ history: [line(-90, 'moved', 'Moved to Active', 'doing'), design, ...after] })
+    expect(pendingStep(doing(line(5, 'movedTop', 'Moved to the top of Active', 'doing')))?.step).toBe('design')
+    expect(pendingDesign(doing(line(5, 'movedBottom', 'Moved to the bottom of Active', 'doing')))).toEqual(design)
+    expect(pendingStep(doing(line(5, 'movedBottom', 'Moved to the bottom of Todo', 'todo')))).toBeNull()
   })
 })

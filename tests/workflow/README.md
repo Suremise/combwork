@@ -101,7 +101,7 @@ project with two agents in its folder; then S19 and S20.
 
 | Scenario | What it checks | e2e (the app) | Unit (app level, or the core where the card says so) |
 |---|---|---|---|
-| S11 | All off: agents in the project folder commit with trailers; cards move freely; G16 warns; nothing refused | `p6lane` (all off saved in the tab with G16 on; two agents' trailered commits, each card's own; both Done; the user moves a card freely). G16's warning in the app: #1481 (the runtime isn't given the agents' lock records) | `workflow/sharedFolder.test.ts` "S11: …" |
+| S11 | All off: agents in the project folder commit with trailers; cards move freely; G16 warns; nothing refused | `p6lane` (all off saved in the tab with G16 on; two agents' trailered commits, each card's own; both Done; the user moves a card freely; G16: G1's edit hook locks a file, recorded on its card, and G2's submit including it warns, naming that card) | `workflow/sharedFolder.test.ts` "S11: …" |
 | S19 | Options changed mid-lane: the lane keeps its rules ("old rules"), the next lane takes the new | `p6lane` (squash saved in the tab while Two is Active: the save names the lane keeping old rules, the mark in Pulse, Two merged with a merge commit); `lanestages` (marks, Apply to cards in flight, a rename sets nothing); `workflowoptions` (the save's warning) | `laneOwnership.test.ts` "S19: …"; `gates.test.ts` "S19: …"; `workflow/lanes.test.ts` "S19: …" |
 | S20 | `.git` removed: Git's rules hold (unknown), None offered; `git init` offers Git back | `p6lane` (the offer, Switch to None, a new card under None's rules); `vcswitch` (the refusal's next step, the warning, `git init` → Git with its options back) | `workflow/scenarios.none.test.ts` "S20: …" (core); `platformSwitch.test.ts` "S20: the repository gone (#1419)" |
 | S36 | Every combination walked Todo → Done; contradictions refused when saved | `workflowoptions` (each contradiction under its rows as chosen, a pasted one refused) | `workflow/combinations.test.ts` "S36: every combination" |
@@ -142,7 +142,7 @@ Pair and Team are §16.6.3's (#1425)").
 | G13 stop own runs | `stopOwnRuns` | false / true / true | Agrees | `gates.test.ts` "G13: …", "G13 off (its option): …" | `p4lane`, `p5lane`, `p6lane` (a preset's Use); `workflowoptions` (switched alone, saved) | #1507 |
 | G14 / N6 dependencies merged | `dependenciesDone` | true / true / true | Agrees | `workflow/scenarios.git.test.ts` "S12: …"; `workflow/transitions.test.ts`; `gates.test.ts` | `workflowdefaults` (Hive's level); `workflowoptions` (a project's own row, and None's N6, each switched alone, saved) | `p6lane` (S12: blocked by an approved, unmerged card, the start refused; started once merged); `boardgates` (a blocked card asks first); None's N6: #1507 |
 | G15 slots up to date | `slotsUpToDate` | false / false / false | §16.6.3's On for Pair and Team waits for slots (Built [#1355]) | P7 | P7 (not in the form) | P7 |
-| G16 shared-folder warning | `sharedFolderWarning` | true / false / false | Agrees (Pair and Team —) | `workflow/sharedFolder.test.ts` "S11: …" | `p6lane` (switched on with All off, saved) | #1481 (no lock records in the app) |
+| G16 shared-folder warning | `sharedFolderWarning` | true / false / false | Agrees (Pair and Team —) | `workflow/sharedFolder.test.ts` "S11: …", "G16's lock records …"; `lockRecord.test.ts` (the app's records: after release and restart, the next card, ordering) | `p6lane` (switched on with All off, saved; warns on G2's submit) | — (needs file locks on: Off records nothing, #1481) |
 | G17 reviewers per lane | — | — | P7 | P7 | P7 | P7 |
 | N4 what the work is | `excluded` | node_modules, .venv (every None preset) | Agrees: §16.3, §16.6.1 and §16.6.3 say the whole folder except `.hive`, `node_modules` and `.venv`, no build folders found (#1482) | `runChecks.test.ts` "a write to a folder the options leave out of the deliverables still counts …" | `workflowoptions` (a folder added on None's form, saved) | #1507 |
 | N5 stage names | `stageNames` | default names | Agrees | `workflow/stages.test.ts`; `projectWorkflow.test.ts` "a rename alone applies at once …" | `workflowoptions` (a rename saved, applies now; a duplicate refused) | `boardstages` (renamed columns, Git and None); `stagenames` (the Assistant's tool); `lanestages` (hovers and the legend) |
@@ -151,7 +151,7 @@ Pair and Team are §16.6.3's (#1425)").
 `pairAgent` (Pair, the agent merges: §16.19.1's P4 row) has its values in `workflowOptionsForm.test.ts` "Pair (the agent
 merges) is §16.19.1's …" and runs in `p4lane`.
 
-**Gaps** (carded): G16's warning in the app (#1481); the acting e2e of G1b's quorum, G13, `mergeInstall: always`, None's N2,
+**Gaps** (carded): the acting e2e of G1b's quorum, G13, `mergeInstall: always`, None's N2,
 N3, N4 and N6 (#1507).
 
 ## Later phases (named here so nothing is missed)

@@ -18,7 +18,7 @@ import { EffortPicker, ModelPicker } from '../components/ModelPicker'
 import { effortText, runsAsName } from '@shared/models'
 import { PROJECT_KEY_DESC, PROJECT_SETTINGS_SECTIONS, settingEntry, shownSetting, type SettingsSectionInfo } from '@shared/settingsCatalog'
 import { shownText } from '@shared/advanced'
-import { LANE_MAX_ROUNDS, LOOP_WAIT_MAX_HOURS, loopDefaults } from '@shared/lanes'
+import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_STEP_WAIT_MINUTES, LOOP_WAIT_MAX_HOURS, loopDefaults } from '@shared/lanes'
 import { NumberField } from '../components/NumberField'
 import { StorageView } from '../components/Storage'
 import { TaskStrip } from '../components/Board'
@@ -297,6 +297,8 @@ const S = {
   openVersionControl: msg({ id: 'project.settings.openVersionControl', defaultMessage: 'Open Version Control', description: 'A button in Project Settings → Workflow: shows the project’s Version Control tab at its Workflow section, where the workflow options are (glossary 2.1: Version Control).' }),
   rounds: msg({ id: 'project.settings.rounds', defaultMessage: 'Rounds', description: 'Accessible name of the card-loop rounds box.' }),
   waitHours: msg({ id: 'project.settings.waitHours', defaultMessage: 'Wait (hours)', description: "Accessible name of the card-loop wait box." }),
+  stepWait: msg({ id: 'project.settings.stepWait', defaultMessage: 'Design check wait (minutes)', description: "Accessible name of the card-loop design check wait box (#1382): how long a builder waits for its reviewer to check a design." }),
+  stepWaitDefault: msg({ id: 'project.settings.stepWaitDefault', defaultMessage: 'Default ({count, number} min)', description: 'Placeholder of the empty design check wait box: empty uses the default, {count} minutes.' }),
   hours: msg({ id: 'project.settings.hours', defaultMessage: '{count} h', description: 'Hours, short, as in "Inherit (6 h)".' }),
   openHive: msg({ id: 'project.settings.openHive', defaultMessage: 'Open .hive folder', description: "Button: opens the project's .hive folder. Keep .hive." }),
   resetTitle: msg({ id: 'project.settings.resetTitle', defaultMessage: 'Reset project settings?', description: 'Title of the confirmation before resetting the project settings.' }),
@@ -1965,6 +1967,13 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       render: () => <NumberField value={cfg.loopWaitHours} min={1} max={LOOP_WAIT_MAX_HOURS} step={1} label={tr(S.waitHours)} inherit={inherit(tr(S.hours, { count: workspaceLoops.waitHours }))} onCommit={(v) => update({ loopWaitHours: v })} />
     },
     {
+      section: 'loops',
+      key: 'loopStepWaitMinutes',
+      ...rowText('project.loopStepWaitMinutes'),
+      modified: cfg.loopStepWaitMinutes !== null,
+      render: () => <NumberField value={cfg.loopStepWaitMinutes} min={1} max={LOOP_STEP_WAIT_MAX_MINUTES} step={5} label={tr(S.stepWait)} inherit={tr(S.stepWaitDefault, { count: LOOP_STEP_WAIT_MINUTES })} onCommit={(v) => update({ loopStepWaitMinutes: v })} />
+    },
+    {
       section: 'workflow',
       key: 'workflow',
       ...rowText('project.workflow'),
@@ -2048,7 +2057,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
           className="btn subtle"
           onClick={async () => {
             if (await confirm({ title: tr(S.resetTitle), message: tr(S.resetMessage), confirmLabel: tr(S.reset) }))
-              void update({ defaultProvider: 'inherit', providers: {}, chime: 'inherit', inboxCheckpoints: 'inherit', inboxStopContinuation: 'inherit', inboxIdleWakes: 'inherit', compactSuggestTokens: null, transcriptWarnMB: null, fileLocks: 'inherit', worktreeCopy: null, worktreeSetup: '', loopWakes: true, loopRounds: null, loopWaitHours: null })
+              void update({ defaultProvider: 'inherit', providers: {}, chime: 'inherit', inboxCheckpoints: 'inherit', inboxStopContinuation: 'inherit', inboxIdleWakes: 'inherit', compactSuggestTokens: null, transcriptWarnMB: null, fileLocks: 'inherit', worktreeCopy: null, worktreeSetup: '', loopWakes: true, loopRounds: null, loopWaitHours: null, loopStepWaitMinutes: null })
           }}
         >
           <Icon name="discard" /> {tr(S.resetButton)}
