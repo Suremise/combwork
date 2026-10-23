@@ -2,7 +2,9 @@
 // passes, shows its Work section in the card dialog (its branch, base and folder; the revision submitted, round 1, by the
 // builder, its file, which opens in Files; the reviewer's pass) and its badges on the board card (the revision, the
 // verdict); a card of a project with no version control shows its work with no branch; a card from before 1.0 says it has
-// no work record. Screenshots of the section (Git and None, both themes, narrow) and the badges. Dev build, throwaway
+// no work record. What couldn't be read, and a card sent to Review with no agent (nothing read before the change), in the
+// window's own words, in English and German (#1477). Screenshots of the section (Git and None, both themes, narrow; the
+// unread ones in English and German) and the badges. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -159,7 +161,51 @@ const commit = (dir, file, text, message) => {
   const uSection = (await openCard(u)).locator('.card-work[data-work="recorded"]')
   const uText = async () => (await uSection.innerText().catch(() => '')).replace(/\s+/g, ' ')
   check('the Work section says the revision and its files weren’t read, with why, not that none changed', !!(await lib.until(async () => { const t = await uText(); return t.includes('Revision not read when it was submitted: ') && t.includes('Its next submission reads it again.') && t.includes('Files not read: ') && !t.includes('No files changed') }, HUNG_MS)), await uText())
-  await uSection.screenshot({ path: path.join(lib.WORK, 'cardwork-unread-dark.png') })
+  // Why, as the window words it (#1477): what couldn't be read, from the reason kept as data, said once.
+  check('…the revision line names what couldn’t be read once', !!(await lib.until(async () => /Revision not read when it was submitted: the latest commit in [^ ]+\. Its next submission reads it again\./.test(await uText()), HUNG_MS)), await uText())
+  await uSection.scrollIntoViewIfNeeded()
+  const shots = async (loc, name) => {
+    await page.mouse.move(5, 5)
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await loc.screenshot({ path: path.join(lib.WORK, `cardwork-${name}-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+  }
+  await shots(uSection, 'unread')
+
+  // --- A card that went into Review with no agent (#1477): nothing was read before the change, which the window says
+  // in a sentence of its own, never with the English note agents read ("not read before the change").
+  const nobody = (await inv('tasks:create', { title: 'Nobody built it', project: 'alpha', column: 'review' })).number
+  const nWork = await lib.until(async () => { const v = await inv('tasks:work', nobody); return v?.revisions.length === 1 && v }, HUNG_MS)
+  check('its work records the revision as not read before the change, in English for agents', nWork?.revisions[0]?.unknown?.revision === 'not read before the change', JSON.stringify(nWork?.revisions[0]))
+  const nSection = (await openCard(nobody)).locator('.card-work[data-work="recorded"]')
+  const nText = async () => (await nSection.innerText().catch(() => '')).replace(/\s+/g, ' ')
+  check('the Work section says no revision was recorded, and why, once', !!(await lib.until(async () => { const t = await nText(); return t.includes("No revision recorded: Hive didn't read one when the card went to Review. Its next submission reads it again.") && t.includes('Files not read') && !t.includes('not read before the change') }, HUNG_MS)), await nText())
+  await nSection.scrollIntoViewIfNeeded()
+  await shots(nSection, 'notread')
+
+  // --- The same in German: no English inside its sentences.
+  const base0 = (await inv('app:info')).language
+  const deDir = path.join(lib.ROOT, 'locales', 'de')
+  const deMessages = Object.assign({}, ...fs.readdirSync(deDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(deDir, f), 'utf8'))))
+  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+  await speak({ ...base0, code: 'de', locale: 'de', messages: deMessages })
+  const english = /not read|latest commit|no base|no target|Its next submission/
+  check('German: nothing read before the change, said in German', !!(await lib.until(async () => { const t = await nText(); return t.includes('Keine Revision aufgezeichnet: Hive hat keine gelesen, als die Karte nach Review kam.') && t.includes('Dateien nicht gelesen') && !english.test(t) }, HUNG_MS)), await nText())
+  await shots(nSection, 'notread-de')
+  // The board's button has its English name again before the next card opens; then German with its dialog open.
+  await speak(base0)
+  await lib.until(async () => (await page.getByRole('button', { name: 'Task Board' }).count()) > 0, HUNG_MS)
+  const uDe = (await openCard(u)).locator('.card-work[data-work="recorded"]')
+  await speak({ ...base0, code: 'de', locale: 'de', messages: deMessages })
+  const uDeText = async () => (await uDe.innerText().catch(() => '')).replace(/\s+/g, ' ')
+  check('German: what couldn’t be read, in German too', !!(await lib.until(async () => { const t = await uDeText(); return t.includes('Revision beim Einreichen nicht gelesen: ') && !english.test(t) }, HUNG_MS)), await uDeText())
+  await uDe.scrollIntoViewIfNeeded()
+  await shots(uDe, 'unread-de')
+  await speak(base0)
+  await lib.until(async () => (await page.getByRole('button', { name: 'Task Board' }).count()) > 0, HUNG_MS)
+  await closeDialogs()
 
   // --- A builder in its own worktree: its files open there (#1224 round 1, finding 1); once no agent has that folder,
   // its files are shown as text with why, never opened in another tree.
