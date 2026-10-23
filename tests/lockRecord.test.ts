@@ -98,8 +98,8 @@ function locks(repo: string, agentId: string, lockedFiles: string[]): void {
 const submit = (w: WS, card: number, by: typeof A | typeof B) => act(w, card, by, { kind: 'submit', summary: 'done' })
 
 describe("G16's lock records in the app (#1481)", () => {
-  it("warns of another agent's recorded file, naming its card, after the lock is released and after a restart; nothing refused", async () => {
-    const { w, ws, repo } = await workspace()
+  it("warns of another agent's recorded file, naming its card, after the lock is released; nothing refused", async () => {
+    const { w, repo } = await workspace()
     const x = await started(w, 'X', A)
     locks(repo, 'a1', ['one.txt'])
     await vi.waitFor(() => expect(locked(w, x.n)).toEqual(['one.txt']), { timeout: HUNG_MS })
@@ -107,20 +107,43 @@ describe("G16's lock records in the app (#1481)", () => {
     locks(repo, 'a1', [])
     const z = await started(w, 'Z', B)
     commit(repo, { 'one.txt': 'one, by B\n', 'two.txt': 'two\n' }, z.key)
-    const r = await submit(w, z.n, B)
-    expect(r.done).toMatchObject({ ok: true, warnings: [`one.txt is a1's (${x.key})`] })
-    // After a restart: the record is the card's facts.
+    expect((await submit(w, z.n, B)).done).toMatchObject({ ok: true, warnings: [`one.txt is a1's (${x.key})`] })
+  })
+
+  it('after a restart the record is still the card’s, until the card is Done', async () => {
+    const { w, ws, repo } = await workspace()
+    const x = await started(w, 'X', A)
+    locks(repo, 'a1', ['one.txt'])
+    await vi.waitFor(() => expect(locked(w, x.n)).toEqual(['one.txt']), { timeout: HUNG_MS })
     await disposeWorkspaceService(w)
     const w2 = await open(ws)
-    const z2 = await started(w2, 'Z2', B)
-    commit(repo, { 'one.txt': 'one, by B again\n' }, z2.key)
-    expect((await submit(w2, z2.n, B)).done.warnings).toEqual([`one.txt is a1's (${x.key})`])
+    const z = await started(w2, 'Z', B)
+    commit(repo, { 'one.txt': 'one, by B\n' }, z.key)
+    expect((await submit(w2, z.n, B)).done.warnings).toEqual([`one.txt is a1's (${x.key})`])
     // Once X is Done, its files aren't anyone's.
     commit(repo, { 'x.txt': 'x\n' }, x.key)
     expect((await act(w2, x.n, A, { kind: 'submit', summary: 'X' })).done.to).toBe('done')
-    const z3 = await started(w2, 'Z3', B)
-    commit(repo, { 'one.txt': 'one, by B a third time\n' }, z3.key)
-    expect((await submit(w2, z3.n, B)).done.warnings).toBeUndefined()
+    const z2 = await started(w2, 'Z2', B)
+    commit(repo, { 'one.txt': 'one, by B again\n' }, z2.key)
+    expect((await submit(w2, z2.n, B)).done.warnings).toBeUndefined()
+  })
+
+  it("a file both agents locked in turn is still the submitter's own: its uncommitted edit refuses submit.clean, and G16 still warns of the other card (HR6's round 2)", async () => {
+    const { w, repo } = await workspace()
+    const x = await started(w, 'X', A)
+    const z = await started(w, 'Z', B)
+    locks(repo, 'a1', ['one.txt'])
+    locks(repo, 'a1', [])
+    locks(repo, 'a2', ['one.txt'])
+    await vi.waitFor(() => expect([locked(w, x.n), locked(w, z.n)]).toEqual([['one.txt'], ['one.txt']]), { timeout: HUNG_MS })
+    commit(repo, { 'two.txt': 'two\n' }, z.key)
+    // B's own edit to one.txt, not committed.
+    writeFileSync(join(repo, 'one.txt'), 'one, B at work\n')
+    await expect(submit(w, z.n, B)).rejects.toMatchObject({ refusal: { rule: 'submit.clean' } })
+    // Committed with the change: submitted, warning of A's card too.
+    git(repo, 'add', 'one.txt')
+    git(repo, 'commit', '-qm', 'one', '--trailer', `Hive-Card: ${z.key}`)
+    expect((await submit(w, z.n, B)).done).toMatchObject({ ok: true, warnings: [`one.txt is a1's (${x.key})`] })
   })
 
   it('a submit right after the lock event sees it: the recording is queued before the submit reads the records', async () => {

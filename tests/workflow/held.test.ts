@@ -144,6 +144,22 @@ describe('an index refreshed or a file touched meanwhile is no change', () => {
     refusedBy(await e.wf.submit(other.key, B1, { summary: 'y' }), 'evidence.changed')
   })
 
+  it("in a shared folder, a file both agents locked in turn is still the builder's own: edited during the submit → refused (HR6's #1481 round 2)", async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: [], mergeChecks: [], target: '' }))
+    const card = e.wf.createCard({ title: 'Mine' })
+    const theirs = e.wf.createCard({ title: 'Theirs' })
+    moved(await e.wf.start(card.key, B1))
+    moved(await e.wf.start(theirs.key, B2))
+    commit(e.project, { 'both.txt': 'both\n' }, 'both', { trailer: theirs.key })
+    expect([await locked(e.wf, B2, ['both.txt']), await locked(e.wf, B1, ['both.txt'])]).toEqual([true, true])
+    commit(e.project, { 'mine.txt': 'mine\n' }, 'mine', { trailer: card.key })
+    during(e, 'submit', () => {
+      writeFileSync(join(e.project, 'both.txt'), 'both, edited\n')
+      sh(e.project, 'add', 'both.txt')
+    })
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'evidence.changed')
+  })
+
   // Git, not Hive, says what content is the same: each path's own attributes and filters (HR5, round 1).
   it('core.autocrlf on, a path marked -text: rewritten with CRLF during the submit → refused (a real edit to git)', async () => {
     const e = (env = setup(pairOpts))

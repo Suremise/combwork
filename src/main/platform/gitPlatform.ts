@@ -161,9 +161,9 @@ export class GitPlatform implements PlatformAdapter {
     // answer where it covers the whole folder.
     const ls = await git(folder, ['ls-files', '--stage', '-z'])
     if (!ls.ok) return null
-    // In a shared folder other agents' locked paths don't count (their edits are "not yours", §16.3.2's dirty, #1481):
-    // ls-files gives paths relative to the folder, as the records are.
-    const locked = this.wf.ownLine(s) ? [] : this.othersLocked(card, s).map((x) => x.path)
+    // In a shared folder other agents' locked paths don't count (their edits are "not yours", §16.3.2's dirty, #1481),
+    // unless this card recorded them too: ls-files gives paths relative to the folder, as the records are.
+    const locked = this.wf.ownLine(s) ? [] : this.notMine(card, s).map((x) => x.path)
     const others = locked.length ? locked : null
     const all = [...new Set(ls.out.split('\0').filter(Boolean).map((rec) => rec.slice(rec.indexOf('\t') + 1)))]
     const files = others ? all.filter((f) => !others.some((p) => under(f, p))) : all
@@ -312,11 +312,13 @@ export class GitPlatform implements PlatformAdapter {
     // The guards' platform inputs, gathered only for the guards the ruleset holds.
     const inputs: Partial<GuardInputs> = {}
     const shared = !this.wf.ownLine(s)
-    // In a shared folder, other agents' locked changes aren't this card's (#1481); git's paths are the repository's.
-    const others = shared ? await this.othersInRepo(card, s) : []
+    // In a shared folder, other agents' locked changes aren't this card's, unless it recorded them too (#1481); git's
+    // paths are the repository's. G16 warns of every other agent's recorded file the change includes.
+    const others = shared ? await this.inRepo(this.othersLocked(card, s)) : []
+    const notMine = shared ? await this.inRepo(this.notMine(card, s)) : []
     if (args.guards.includes('submit.clean')) {
       const all = dirty ?? (await G.dirty(folder))
-      inputs.dirty = isUnknown(all) || !others.length ? all : all.filter((f) => f.startsWith('(') || !others.some((x) => under(f, x.path)))
+      inputs.dirty = isUnknown(all) || !notMine.length ? all : all.filter((f) => f.startsWith('(') || !notMine.some((x) => under(f, x.path)))
     }
     if (args.guards.includes('submit.ready')) inputs.conflicts = [] // a Git commit can't store unresolved conflicts
     if (args.guards.includes('submit.trailer')) inputs.untrailered = this.untrailered(card, s)
@@ -363,9 +365,17 @@ export class GitPlatform implements PlatformAdapter {
     return out
   }
 
-  /** othersLocked's paths as git's status and diffs give them: relative to the repository's root. */
-  private async othersInRepo(card: CardRecord, s: CardState): Promise<Locked[]> {
-    const locked = this.othersLocked(card, s)
+  /**
+   * What a shared folder leaves out of this card's own (its dirty files, its evidence): other agents' recorded paths,
+   * except those this card recorded too (HR6's #1481 round 2: both agents locked one file in turn, and the submitter's
+   * own uncommitted edit to it still counts).
+   */
+  private notMine(card: CardRecord, s: CardState): Locked[] {
+    return this.othersLocked(card, s).filter((x) => !s.locked.some((p) => under(x.path, p) || under(p, x.path)))
+  }
+
+  /** Locked paths as git's status and diffs give them: relative to the repository's root. */
+  private async inRepo(locked: Locked[]): Promise<Locked[]> {
     if (!locked.length) return locked
     const prefix = await this.repoPrefix()
     return locked.map((x) => ({ ...x, path: prefix + x.path }))
