@@ -415,9 +415,9 @@ export function worktreeRenamer(ws: WorkspaceService, projectPath: string, hooks
     for (const w of listed ?? []) if ((await worktreeIdentity(w.path)) === tree) return w.path
     return null
   }
-  const where = async (from: string, to: string, tree: string): Promise<'from' | 'to' | null> => {
+  const where = async (from: string, to: string, tree: string): Promise<'from' | 'to' | 'elsewhere' | null> => {
     const at = await locate(tree)
-    return at && samePlace(at, to) ? 'to' : at && samePlace(at, from) ? 'from' : null
+    return !at ? null : samePlace(at, to) ? 'to' : samePlace(at, from) ? 'from' : 'elsewhere'
   }
   /** Sessions and cards put back from `to` to `from`, only while no other worktree is at `to` (theirs are its). */
   const unfollow = async (from: string, to: string, tree: string): Promise<void> => {
@@ -470,6 +470,13 @@ export function worktreeRenamer(ws: WorkspaceService, projectPath: string, hooks
         const back = await git(projectPath, ['worktree', 'move', to, from])
         if (!back.ok) log.warn(`${userText(to)} couldn't be moved back to ${userText(from)}: ${userText(back.err)}`)
       } else if (at === 'from') await unfollow(from, to, tree)
+      else if (at === 'elsewhere' && !existsSync(from)) {
+        // Inside another worktree that came to `to` (a move cut short before its own check): this one moved back from
+        // there; the other, and its records, left as they are (follow never ran for this one).
+        const there = (await locate(tree))!
+        const back = await git(projectPath, ['worktree', 'move', there, from])
+        if (!back.ok) log.warn(`${userText(there)} couldn't be moved back to ${userText(from)}: ${userText(back.err)}`)
+      }
       return (await where(from, to, tree)) === 'from'
     }
   }

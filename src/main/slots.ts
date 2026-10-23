@@ -897,10 +897,13 @@ export interface SlotRenamer {
   move(from: string, to: string, tree: string): Promise<boolean>
   /** After it: cards' work and sessions' recorded folder follow, only while `tree` is at `to`. Throws when one can't. */
   follow(from: string, to: string, tree: string): Promise<void>
-  /** Puts back what `follow` and `move` did to `tree` (never another worktree's); true once it is at `from` again. */
+  /**
+   * Puts back what `follow` and `move` did to `tree` (never another worktree's), from wherever git lists it (inside
+   * another worktree, a move cut short): true once it is at `from` again.
+   */
   back(from: string, to: string, tree: string): Promise<boolean>
-  /** Where the worktree `tree` is now: at `from`, at `to`, or neither (or git couldn't say: null). */
-  where(from: string, to: string, tree: string): Promise<'from' | 'to' | null>
+  /** Where the worktree `tree` is now: at `from`, at `to`, somewhere else git lists it, or unknown (git couldn't say, or doesn't list it: null). */
+  where(from: string, to: string, tree: string): Promise<'from' | 'to' | 'elsewhere' | null>
 }
 /**
  * The `hive-*` entries in a folder's `.agents/skills` (where Hive puts its skill copies), by name: folders, and links
@@ -1201,9 +1204,12 @@ export class SlotPool {
         if (intent && this.deps.renamer) {
           const at = await this.deps.renamer.where(intent.from, intent.to, intent.tree)
           if (at === null) return void log.warn(`Slot ${userText(s.name)}'s rename, cut short: git can't say where it is; left for the next look`)
-          // Not moved yet: given up (renamed again by a later pass, if still free); moved: finished, or put back.
+          // Not moved yet: given up (renamed again by a later pass, if still free); moved: finished, or put back; somewhere
+          // else (git moved it inside another worktree, and Hive stopped before putting it back): put back, then given up.
           if (at === 'from') await this.store.abandonRename(s.name, token, intent)
-          else await this.carryOut(s.name, token, intent, 'to', () => true)
+          else if (at === 'to') await this.carryOut(s.name, token, intent, 'to', () => true)
+          else if (await this.deps.renamer.back(intent.from, intent.to, intent.tree).catch(() => false)) await this.store.abandonRename(s.name, token, intent)
+          else log.warn(`Slot ${userText(s.name)}'s worktree couldn't be put back from where git moved it: it stays out of the pool until it is`)
           return
         }
         const to = await this.look(s)

@@ -3278,7 +3278,8 @@ decided again in it):
   its cards' `FolderMoved` and its sessions' recorded folder. A step failing after the move puts back what was done; if
   even that fails, the operation and intent stay, the slot out of the pool, until a later look puts it back. A rename cut
   short by a crash is the next holder's (the pool's recovery, once its Hive is gone): given up if git hasn't moved it,
-  finished (or put back) if it has; a live one is never touched by another Hive. Only with the rules on and Settings →
+  finished (or put back) if it has, put back from inside another worktree if git moved it there; a live one is never
+  touched by another Hive. Only with the rules on and Settings →
   Advanced, **Rename adopted worktrees to slot names** (`hive.slots.renameAdopted`, on).
 - **A reviewer's own worktree** gets no slot and no rename: it becomes a retired home (its conversations resume there,
   its new ones start in the project folder).

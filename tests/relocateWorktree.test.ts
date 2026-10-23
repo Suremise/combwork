@@ -87,7 +87,7 @@ let projectId = 'p1'
 let store: InstanceType<typeof SlotStore>
 const owner = { kind: 'worktree' as const, agent: 'X1' }
 /** Each test's own agent (its worktree `h<id>`); x1's worktree, outside the pool, is the steps' own tests'. */
-const AGENTS = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'c1', 'c2']
+const AGENTS = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'c1', 'c2', 'c3']
 const treeOf = (a: string): string => (a === 'x1' ? wt('x1') : wt(`h${a}`))
 
 function writeProject(): void {
@@ -388,6 +388,35 @@ describe('renames at once, and cut short (#1441, HR1 round 1 findings 1 and 2)',
     expect(store.slot(name)?.folder.toLowerCase()).toBe(wt('hb8').toLowerCase())
     expect(await listed()).toContain(wt('hb8').toLowerCase())
     expect(intentOf(name)).toBeNull()
+  })
+
+  it('its Hive gone right after git moved it inside another worktree that came to the destination: put back from there, given up', async () => {
+    const name = await free('c3')
+    const r = realRenamer()
+    const crashed = gate()
+    // Hive A: another worktree arrives at the destination, git moves this one inside it, and A stops before its check.
+    void hivePool(96001, {
+      ...r,
+      move: async (from, to) => {
+        mkdirSync(join(to, '..'), { recursive: true })
+        sh(project, 'worktree', 'add', '-q', '-b', 'hive/intruder-c3', to)
+        sh(project, 'worktree', 'move', from, to)
+        await crashed.wait()
+        return never()
+      }
+    }).rename(name)
+    await crashed.reached
+    const intent = intentOf(name)!
+    expect(await r.where(intent.from, intent.to, intent.tree)).toBe('elsewhere')
+    dead.add(96001)
+    await settleRenames(hivePool(96002, realRenamer()))
+    // This worktree back where it was, its slot free again; the other at the destination, untouched.
+    expect(await r.where(intent.from, intent.to, intent.tree)).toBe('from')
+    expect(store.slot(name)).toMatchObject({ state: 'ready', op: null })
+    expect(intentOf(name)).toBeNull()
+    expect(await cwdOf('s-c3')).toBe(wt('hc3').toLowerCase())
+    expect(sh(intent.to, 'branch', '--show-current')).toBe('hive/intruder-c3')
+    expect((await listed()).some((p) => p.startsWith(`${intent.to.toLowerCase()}\\`))).toBe(false)
   })
 
   it('a rename whose putting back fails stays out of the pool, its intent kept, until a later look puts it back', async () => {
