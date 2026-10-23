@@ -1,5 +1,6 @@
 import { Children, useCallback, useEffect, useState } from 'react'
 import type { HiddenProject, ProjectInfo, ProjectRemoval, ProjectRemovalInfo } from '@shared/types'
+import { folderWhat } from '@shared/projectFolders'
 import { call, errorMessage } from '../api'
 import { clearEditorDraftsUnder, hasEditorDraftsUnder } from '../editorDrafts'
 import { useScopedLoad } from '../scopedLoad'
@@ -53,6 +54,11 @@ const M = {
   handoversHow: msg({ id: 'workspace.removal.handoversHow', defaultMessage: '{how, select, hide {left in the shared notes} remove {packed into the folder, then moved to the Recycle Bin} other {to the Recycle Bin}}', description: "Remove Project, What it touches, What happens to the project's handovers, for the choice made." }),
   cards: msg({ id: 'workspace.removal.cardsThing', defaultMessage: '{count, plural, =0 {No cards} one {# card} other {# cards}}{archived, plural, =0 {} other { (and # archived)}}', description: "Remove Project, What it touches, the What column: the project's cards on the board, and its archived ones." }),
   cardsHow: msg({ id: 'workspace.removal.cardsHow', defaultMessage: '{how, select, delete {deleted} remove {archived, and a copy packed into the folder} other {archived until you restore it}}', description: "Remove Project, What it touches, What happens to the project's cards, for the choice made." }),
+  folders: msg({ id: 'workspace.removal.foldersThing', defaultMessage: '{count, plural, one {# slot, copy or old folder} other {# slots, copies and old folders}}', description: "Remove Project, What it touches, the What column (#1447): the project's slots (working folders Hive lends to cards), review copies and old reviewer folders, each on a row under it." }),
+  foldersHow: msg({ id: 'workspace.removal.foldersHow', defaultMessage: '{how, select, hide {left as they are} other {removed when clean and merged; the rest stay, listed}}', description: "Remove Project, What it touches, what happens to the project's slots, copies and old folders for the choice made (#1447): Hive removes those with nothing to lose, and keeps the others." }),
+  folderRemoved: msg({ id: 'workspace.removal.folderRemoved', defaultMessage: 'removed', description: "Remove Project, What it touches (#1447): a slot or copy that goes, nothing in it being lost." }),
+  folderKept: msg({ id: 'workspace.removal.folderKept', defaultMessage: 'kept: {why}', description: "Remove Project, What it touches (#1447): a slot, copy or old folder that stays, and why ({why}: a clause, such as \"2 files in it aren't committed\")." }),
+  folderLeft: msg({ id: 'workspace.removal.folderLeft', defaultMessage: 'left as it is', description: "Remove Project, What it touches, with Hide chosen (#1447): a slot, copy or old folder isn't touched." }),
   worktrees: msg({ id: 'workspace.removal.worktreesThing', defaultMessage: '{count, plural, one {# worktree} other {# worktrees}}', description: "Remove Project, What it touches, the What column: the agents' worktrees (each on a row under it)." }),
   worktreesHow: msg({ id: 'workspace.removal.worktreesHow', defaultMessage: '{how, select, hide {left as they are} remove {removed with their branches, once nothing in them is unmerged} other {to the Recycle Bin}}', description: "Remove Project, What it touches, What happens to the agents' worktrees, for the choice made." }),
   worktree: msg({ id: 'workspace.removal.worktreeThing', defaultMessage: '{agent} ({branch})', description: "Remove Project, What it touches: an agent's worktree, by the agent ({agent}) and its branch ({branch}), under the worktrees' row." }),
@@ -121,6 +127,17 @@ function touchRows(info: ProjectRemovalInfo, how: ProjectRemoval): ItemRow[] {
       const name = tr(M.worktree, { agent: w.agent, branch: w.branch })
       const work = tr(M.worktreeWork, { hasError: w.error ? 'yes' : 'no', error: w.error ?? '', ahead: w.ahead ?? 0, dirty: w.dirty ?? 0 })
       rows.push(row(`worktree#${w.path}`, <span title={w.path}>{name}</span>, name, work, cx('removal-sub', !!(w.ahead || w.dirty || w.error) && how !== 'hide' && 'warn-text')))
+    }
+  }
+  // Its slots, copies and old reviewer folders (#1447): what the guarded clean-up would do to each, kept ones first.
+  const folders = [...(info.folders ?? [])].sort((a, b) => Number(!a.kept) - Number(!b.kept))
+  if (folders.length) {
+    const things = tr(M.folders, { count: folders.length })
+    rows.push(row('folders', things, things, tr(M.foldersHow, { how })))
+    for (const f of folders) {
+      const name = folderWhat(f.of)
+      const happens = how === 'hide' ? tr(M.folderLeft) : f.kept ? tr(M.folderKept, { why: f.kept }) : tr(M.folderRemoved)
+      rows.push(row(`folder#${f.path}`, <span title={f.path}>{name}</span>, name, happens, cx('removal-sub', !!f.kept && how !== 'hide' && 'warn-text')))
     }
   }
   const transcripts = tr(M.transcripts)

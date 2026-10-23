@@ -258,6 +258,28 @@ export async function releaseCarried(ws: WorkspaceService, projectPath: string, 
   return ended
 }
 
+/** A project's retired homes (#1441), as recorded. */
+export async function retiredHomes(ws: WorkspaceService, projectPath: string): Promise<string[]> {
+  try {
+    return json<Record<string, string[]>>(boardValue(ws, HOMES), {})[await projectId(ws, projectPath)] ?? []
+  } catch {
+    return []
+  }
+}
+
+/** A retired home moved by Repair (#1447) to `to`, or forgotten (null), in one board write. */
+export async function replaceHome(ws: WorkspaceService, projectPath: string, from: string, to: string | null): Promise<void> {
+  const id = await projectId(ws, projectPath)
+  await boardWrite(ws, async () =>
+    boardWriteOp(ws, (db) => {
+      const all = json<Record<string, string[]>>((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(HOMES) as { value: string } | undefined)?.value ?? null, {}) // i18n-ignore: SQL
+      const mine = (all[id] ?? []).flatMap((h) => (samePlace(h, from) ? (to ? [to] : []) : [h]))
+      all[id] = [...new Set(mine)]
+      db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(HOMES, JSON.stringify(all)) // i18n-ignore: SQL
+    })
+  )
+}
+
 /** #1434's seams, from what the migration recorded: whether a project is migrated, and its retired homes. */
 export function startSlotMigration(): void {
   const wsOf = (projectPath: string): WorkspaceService | null => workspaceFor(projectPath)
@@ -267,12 +289,7 @@ export function startSlotMigration(): void {
   })
   setRetiredHomes(async (projectPath) => {
     const ws = wsOf(projectPath)
-    if (!ws) return []
-    try {
-      return json<Record<string, string[]>>(boardValue(ws, HOMES), {})[await projectId(ws, projectPath)] ?? []
-    } catch {
-      return []
-    }
+    return ws ? retiredHomes(ws, projectPath) : []
   })
 }
 

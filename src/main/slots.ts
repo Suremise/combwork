@@ -41,8 +41,8 @@
 import { createHash, randomBytes } from 'crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { existsSync } from 'original-fs'
-import { readdir, readFile, rename } from 'original-fs/promises'
-import { join } from 'path'
+import { mkdir, readdir, readFile, rename } from 'original-fs/promises'
+import { dirname, join } from 'path'
 import { BOARD_MIGRATIONS } from './boardStore'
 import { openDb } from './db'
 import { samePlace } from './fsutil'
@@ -731,6 +731,24 @@ export class SlotStore {
   /** Sets a free slot's state from what it was (no operation, lease or writer meanwhile): whether it changed. */
   async look(name: string, from: SlotState, to: SlotState): Promise<boolean> {
     return this.conn.write((db) => Number(db.prepare(`UPDATE slots SET state = ? WHERE project = ? AND name = ? AND state = ? AND op IS NULL AND writer_run IS NULL AND NOT EXISTS (SELECT 1 FROM slot_leases l WHERE l.project = slots.project AND l.slot = slots.name AND l.ended_at IS NULL)`).run(to, this.project, name, from).changes) === 1)
+  }
+
+  /**
+   * A slot's folder moved by Repair (#1447): its row follows it (`folder`), only while no operation or job holds it. With
+   * `gone` (a free slot whose folder wasn't found): marked gone at its place in the moved pool, so its next lease makes
+   * it again there, only while it is free. Whether it was.
+   */
+  async relocate(name: string, folder: string, o: { gone?: boolean } = {}): Promise<boolean> {
+    return this.conn.write((db) =>
+      o.gone
+        ? Number(db.prepare(`UPDATE slots SET folder = ?, state = 'gone' WHERE project = ? AND name = ? AND state <> 'removing' AND ${FREE}`).run(folder, this.project, name).changes) === 1
+        : Number(db.prepare('UPDATE slots SET folder = ? WHERE project = ? AND name = ? AND op IS NULL AND job IS NULL').run(folder, this.project, name).changes) === 1
+    )
+  }
+
+  /** A warming operation taken on a leased slot (#1447: Repair recreating it), only while none holds it. Whether it was. */
+  async startWarm(name: string, lease: string, token: string, holder: Holder): Promise<boolean> {
+    return this.conn.write((db) => Number(db.prepare("UPDATE slots SET op = ?, op_kind = 'warm', op_lease = ?, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND op IS NULL AND job IS NULL").run(token, lease, holder.pid, holder.started, this.project, name).changes) === 1)
   }
 
   /** A leased slot's folder is gone: marked so (its holder's sessions are refused, #1434). */
@@ -1434,6 +1452,47 @@ export class SlotPool {
   }
 
   /**
+   * A leased slot whose folder is gone, made again on its line (#1447, Repair's Recreate): its lease kept, under a warming
+   * operation. Git's stale registration of it is pruned only when the prune would drop nothing else (`prunable`: the
+   * folders git would forget), then `git worktree add <folder> <line>` (the line must be a branch), and the row's folder
+   * and state (`lent`) set in the fenced write that ends the operation. Null once made, else why not (English, logged).
+   */
+  async recreateGone(name: string, folder: string, line: string, prunable: () => Promise<string[]>): Promise<string | null> {
+    const s = this.store.slot(name)
+    const open = this.store.openLease(name)
+    if (!s || !open) return 'it is not lent' // i18n-ignore: the log's reason
+    if (existsSync(folder)) return `${folder} is already there` // i18n-ignore: the log's reason
+    const token = newToken()
+    return this.op(token, async () => {
+      if (!(await this.store.startWarm(name, open.id, token, await this.deps.holder.self()))) return 'Hive is setting it up or removing it now' // i18n-ignore: the log's reason
+      const end = async (fields: { folder?: string; state?: SlotState }): Promise<void> => {
+        await this.store
+          .fenced(name, token, (db) => {
+            if (fields.folder) db.prepare('UPDATE slots SET folder = ? WHERE project = ? AND name = ?').run(fields.folder, this.store.project, name)
+            this.store.setIn(db, name, fields.state ?? s.state, {}, { op: null })
+          })
+          .catch((e) => {
+            if (!(e instanceof OpLost)) throw e
+          })
+      }
+      try {
+        const others = (await prunable()).filter((p) => !samePlace(p, s.folder))
+        if (others.length) return await end({}).then(() => `git's prune would also forget ${others.join(', ')}`) // i18n-ignore: the log's reason
+        await git(this.deps.project, ['worktree', 'prune'])
+        await mkdir(dirname(folder), { recursive: true })
+        const r = await git(this.deps.project, ['worktree', 'add', folder, line])
+        if (!r.ok) return await end({}).then(() => r.err.trim() || 'git worktree add failed') // i18n-ignore: the log's reason
+        await end({ folder, state: 'lent' })
+        log.info(`Slot ${userText(name)} made again at ${userText(folder)} on ${userText(line)}`)
+        return null
+      } catch (e) {
+        await end({})
+        return e instanceof Error ? e.message : String(e)
+      }
+    })
+  }
+
+  /**
    * A free slot renamed (#1441: an adopted worktree given a generic name once nothing holds it), owned by its operation
    * from the write that reserves its destination (`startRename`) to the write that finishes or gives it up. Its steps
    * (`deps.renamer`): the CLIs' data copied first (any of it failing: no rename, nothing moved), git's move (checked
@@ -1574,6 +1633,17 @@ export class SlotPool {
     if (open) return { why: 'leased', agent: open.agent }
     if (s.op || s.job || s.writer) return { why: 'busy', state: s.state }
     return this.guard(s, false)
+  }
+
+  /**
+   * What would keep a slot from its project's removal (#1447): an operation, a job or a writer, then the removal's guards;
+   * its lease aside (the removal ends a lease only when nothing would be kept). `probe`: also prove no process holds it.
+   */
+  async keepsFromRemoval(name: string, probe = false): Promise<SlotKept | null> {
+    const s = this.store.slot(name)
+    if (!s) return null
+    if (s.op || s.job || s.writer) return { why: 'busy', state: s.state }
+    return this.guard(s, probe)
   }
 
   /** The guards a removal checks, in order; null when nothing holds the slot. `probe`: also prove no process holds it. */

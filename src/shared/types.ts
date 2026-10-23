@@ -980,6 +980,11 @@ export interface ProjectRemovalInfo {
   /** Worktree agents: their folder, and work not merged into the project folder (commits ahead, uncommitted files). */
   /** `error`: git couldn't check it, which counts as holding work. */
   worktrees: { agent: string; path: string; branch: string; ahead: number; dirty: number; error?: string }[]
+  /**
+   * Its slots, copies and retired homes (#1447), with what removing the project would do to each: `kept`, why it would
+   * stay (the guarded clean-up's reason, or a home's, or a folder Hive didn't make), or null: removed.
+   */
+  folders?: { of: ProjectFolderOf; path: string; kept: string | null }[]
 }
 
 /** A project folder holding what Remove from Hive packed into its .hive/removed. */
@@ -1992,12 +1997,28 @@ export interface MoveBranch {
  * branch is gone (`to`: where, if that place can be used); unlink: the agent's worktree link is to be removed;
  * original: the project is still at its old folder too (a copy), which keeps the worktree.
  */
+/**
+ * A folder Hive keeps for a project besides an agent's 0.9 worktree (#1447), as Repair and project removal name it: a
+ * slot (its lease's agent and the cards it held, by key; `carried`: an agent's adopted worktree), a review or check copy,
+ * or a reviewer's retired home (its agent).
+ */
+export type ProjectFolderOf =
+  | { kind: 'slot'; name: string; agent: string | null; cards: string[]; carried: boolean }
+  | { kind: 'copy'; name: string }
+  | { kind: 'home'; agent: string | null }
+
+/**
+ * A worktree Repair looks at: an agent's 0.9 worktree, or (`of`, #1447) one of the project's slots, copies or retired
+ * homes, keyed then as `slot:<name>`, `copy:<name>` or `home:<n>` in `agentId` (`agentName`: its name for the log).
+ * `later`: a free slot or copy not found, made again where it belongs at its next lease.
+ */
 export interface MoveWorktree {
   agentId: string
   agentName: string
   from: string
   to: string | null
-  how: 'moved' | 'stayed' | 'located' | 'missing' | 'recreate' | 'unlink' | 'original'
+  how: 'moved' | 'stayed' | 'located' | 'missing' | 'recreate' | 'unlink' | 'original' | 'later'
+  of?: ProjectFolderOf
   /** missing and recreate: its branch, and whether the branch survives (Recreate) or not (Create a new worktree). */
   branch?: string
   branchExists?: boolean
@@ -2010,6 +2031,8 @@ export interface WorktreeGone {
   branch: string
   base: string
   branchExists: boolean
+  /** A gone slot the agent holds (#1447): its name; Recreate makes it again on its line (`branch`), Release frees it. */
+  slot?: string
 }
 
 /** A CLI's per-path folder copied for a moved folder: files to copy, and files already there with other content (kept). */
@@ -2048,6 +2071,7 @@ export interface MoveOptions {
 /** What a row of Repair's report is about (#1313): the dialog words it as the plan's What column does. */
 export type MoveReportWhat =
   | { kind: 'worktree' | 'branch'; agent: string }
+  | { kind: 'folder'; of: ProjectFolderOf }
   | { kind: 'sessions' }
   | { kind: 'copy'; provider: ProviderId }
   | { kind: 'board'; from: string }

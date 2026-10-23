@@ -104,6 +104,18 @@ interface HiveMessageValues {
   'main.move.copyFailed': { n: number; owner: string; host: string | number; provider: string | number; folder: string | number; files: string | number; agent: string | number; of: string | number }
   'main.move.copyKept': { n: number; owner: string; host: string | number; provider: string | number; folder: string | number; files: string | number; agent: string | number; of: string | number }
   'main.move.defenderFailed': { why: string | number }
+  'main.move.folder.busy': undefined
+  'main.move.folder.failed': { host: string | number; what: string | number; path: string | number; why: string | number }
+  'main.move.folder.forgotten': { host: string | number; what: string | number; path: string | number }
+  'main.move.folder.homeMissing': { host: string | number; what: string | number; path: string | number }
+  'main.move.folder.later': { host: string | number; what: string | number; path: string | number }
+  'main.move.folder.movedTo': { host: string | number; what: string | number; path: string | number }
+  'main.move.folder.original': { host: string | number; what: string | number; path: string | number; project: string | number }
+  'main.move.folder.recreateFailed': { host: string | number; what: string | number; why: string | number }
+  'main.move.folder.recreated': { host: string | number; what: string | number; branch: string | number; path: string | number }
+  'main.move.folder.released': { host: string | number; what: string | number }
+  'main.move.folder.relinked': { host: string | number; what: string | number; path: string | number }
+  'main.move.folder.slotMissing': { hasBranch: string; host: string | number; what: string | number; path: string | number; branch: string | number }
   'main.move.gitFailed': { command: string | number }
   'main.move.lanes': { n: number }
   'main.move.madeNew': { host: string | number; agent: string | number; branch: string | number; path: string | number }
@@ -126,8 +138,11 @@ interface HiveMessageValues {
   'main.move.result.copyFailed': { n: number }
   'main.move.result.copyKept': { n: number }
   'main.move.result.failed': { why: string | number }
+  'main.move.result.folderMissing': { kind: string; gone: string }
+  'main.move.result.forgotten': undefined
   'main.move.result.given': { to: string | number; what: string | number }
   'main.move.result.gone': undefined
+  'main.move.result.later': undefined
   'main.move.result.linked': undefined
   'main.move.result.missing': { gone: string }
   'main.move.result.notGiven': { to: string | number; why: string | number }
@@ -137,6 +152,7 @@ interface HiveMessageValues {
   'main.move.result.recent': undefined
   'main.move.result.recreateFailed': { made: string; why: string | number }
   'main.move.result.recreated': { made: string }
+  'main.move.result.released': undefined
   'main.move.result.renameFailed': { why: string | number }
   'main.move.result.renamed': { remote: string }
   'main.move.result.sessions': { n: number }
@@ -164,7 +180,13 @@ interface HiveMessageValues {
   'main.removal.already': { project: string | number }
   'main.removal.cardsKept': { why: string | number }
   'main.removal.dirty': { n: number }
+  'main.removal.folder.copyBusy': undefined
+  'main.removal.folder.copyHeld': { by: string | number }
+  'main.removal.folder.copyLeased': undefined
+  'main.removal.folder.home': undefined
+  'main.removal.folder.notHives': undefined
   'main.removal.folderGone': { folder: string | number }
+  'main.removal.folderKept': { what: string | number; path: string | number; why: string | number }
   'main.removal.handoverKept': { note: string | number; why: string | number }
   'main.removal.heldTree': { agent: string | number; work: string | number }
   'main.removal.leftAlone': { worktree: string | number }

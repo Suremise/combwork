@@ -2,6 +2,7 @@ import { Children, useCallback, useEffect, useState } from 'react'
 import type { MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MovePlan, MoveReport, MoveReportRow, MoveReportWhat, WorkspaceMoved } from '@shared/types'
 import { providerName } from '@shared/providers'
 import { moveHasWork } from '@shared/movePaths'
+import { folderWhat } from '@shared/projectFolders'
 import { shortPath } from '@shared/shortPath'
 import { call } from '../api'
 import { cardLabelOf, get, set, useStore } from '../store'
@@ -134,6 +135,16 @@ const T = {
   hideFolders: msg({ id: 'workspace.repair.hideFolders', defaultMessage: 'Hide the folders', description: "Repair's plan: the button that folds a coding agent's folders back into one row." }),
   recreateShort: msg({ id: 'workspace.repair.recreateShort', defaultMessage: 'Recreate', description: "Repair's plan, a missing worktree's compact button (its tooltip says it in full: workspace.move.recreateButton)." }),
   createShort: msg({ id: 'workspace.repair.createShort', defaultMessage: 'Create', description: "Repair's plan, a missing worktree's compact button when its branch is gone too (its tooltip: workspace.move.createButton)." }),
+  chooseFolder: msg({ id: 'workspace.repair.chooseFolder', defaultMessage: '{kind, select, home {locate or forget it} other {{gone, select, yes {its branch is gone too: locate or release it} other {recreate, locate or release it}}}}', description: "Repair's plan, the Will do column, in the warning colour (#1447): a lent slot or an old reviewer folder ({kind}: slot or home) wasn't found and waits for a choice (the row's buttons)." }),
+  recreateSlot: msg({ id: 'workspace.repair.recreateSlot', defaultMessage: 'Recreate the slot on its branch', description: "Repair's plan, a missing lent slot's button, in full (its tooltip; #1447): make the slot's folder again on its branch, the agent keeping it." }),
+  recreateOn: msg({ id: 'workspace.repair.recreateOn', defaultMessage: 'make again on {branch}', description: "Repair's plan, the Will do column: a lent slot's folder made again on its branch ({branch}; #1447)." }),
+  releaseShort: msg({ id: 'workspace.repair.releaseShort', defaultMessage: 'Release', description: "Repair's plan, a missing lent slot's compact button (#1447; its tooltip: workspace.repair.releaseSlot)." }),
+  releaseSlot: msg({ id: 'workspace.repair.releaseSlot', defaultMessage: 'Release the slot: it is made again when next lent', description: "Repair's plan, a missing lent slot's button, in full (its tooltip; #1447): its agent gives it up, and Hive makes it again the next time it lends it." }),
+  release: msg({ id: 'workspace.repair.release', defaultMessage: 'release it', description: "Repair's plan, the Will do column: a missing lent slot is released (#1447)." }),
+  forgetShort: msg({ id: 'workspace.repair.forgetShort', defaultMessage: 'Forget', description: "Repair's plan, a missing old reviewer folder's compact button (#1447; its tooltip: workspace.repair.forgetHome)." }),
+  forgetHome: msg({ id: 'workspace.repair.forgetHome', defaultMessage: "Forget it: its conversations can be read, but not resumed there", description: "Repair's plan, a missing old reviewer folder's button, in full (its tooltip; #1447)." }),
+  forget: msg({ id: 'workspace.repair.forget', defaultMessage: 'forget it', description: "Repair's plan, the Will do column: a missing old reviewer folder is forgotten (#1447)." }),
+  later: msg({ id: 'workspace.repair.later', defaultMessage: 'made again here when next used', description: "Repair's plan, the Will do column: a free slot or review copy wasn't found; Hive makes it again at its new place the next time it's used (#1447)." }),
   unlinkShort: msg({ id: 'workspace.repair.unlinkShort', defaultMessage: 'Remove link', description: "Repair's plan, a missing worktree's compact button (its tooltip says it in full: workspace.move.unlinkButton)." }),
   sessions: msg({ id: 'workspace.repair.sessions', defaultMessage: 'Sessions', description: "Repair's plan, the What column: the project's session records (each remembers the folder it ran in)." }),
   recent: msg({ id: 'workspace.repair.recent', defaultMessage: 'Open Recent', description: "Repair's plan, the What column: File → Open Recent's entry for the workspace. Use the menu's name as shown." }),
@@ -274,9 +285,32 @@ function hostRows(h: MoveHostPlan, open: ReadonlySet<string>, toggle: (k: string
   const undo = (k: string) => <ChoiceButton icon="discard" label={tr(M.undo)} full={tr(M.undo)} onClick={() => onChoose(k, null)} />
   for (const w of h.worktrees) {
     const k = key(h.path, w.agentId)
-    const what = tr(T.worktree, { agent: w.agentName })
+    const what = w.of ? folderWhat(w.of) : tr(T.worktree, { agent: w.agentName })
     const was = { path: w.from, other: w.to ?? undefined }
-    if (w.how === 'missing') {
+    if (w.of && w.how === 'missing') {
+      // A lent slot (#1447): Recreate on its line, Locate…, Release; an old reviewer folder: Locate…, Forget.
+      const slot = w.of.kind === 'slot'
+      rows.push(
+        planRow(k, {
+          what,
+          was: { path: w.from },
+          now: { text: tr(T.notFound), warn: true },
+          does: tr(T.chooseShort),
+          said: tr(T.chooseFolder, { kind: w.of.kind, gone: w.branchExists ? 'no' : 'yes' }),
+          warn: true,
+          actions: (
+            <>
+              {slot && w.branchExists && <ChoiceButton icon="refresh" label={tr(T.recreateShort)} full={tr(T.recreateSlot)} onClick={() => onChoose(k, 'recreate')} />}
+              <ChoiceButton icon="folder-opened" label={tr(M.locate)} full={tr(M.locate)} onClick={() => onLocate(k, w.agentId)} />
+              <ChoiceButton icon="close" label={tr(slot ? T.releaseShort : T.forgetShort)} full={tr(slot ? T.releaseSlot : T.forgetHome)} onClick={() => onChoose(k, 'unlink')} />
+            </>
+          )
+        }, 'repair-missing')
+      )
+    } else if (w.how === 'later') rows.push(planRow(k, { what, was: { path: w.from }, now: w.to ? { path: w.to, other: w.from } : undefined, does: tr(T.later) }, 'faint'))
+    else if (w.of && w.how === 'recreate') rows.push(planRow(k, { what, was: { path: w.from }, now: w.to ? { path: w.to, other: w.from } : undefined, does: tr(T.recreateOn, { branch: w.branch ?? '' }), actions: undo(k) }))
+    else if (w.of && w.how === 'unlink') rows.push(planRow(k, { what, was: { path: w.from }, does: tr(w.of.kind === 'slot' ? T.release : T.forget), actions: undo(k) }))
+    else if (w.how === 'missing') {
       rows.push(
         planRow(k, {
           what,
@@ -385,6 +419,8 @@ function reportWhat(w: MoveReportWhat): string {
   switch (w.kind) {
     case 'worktree':
       return tr(T.worktree, { agent: w.agent })
+    case 'folder':
+      return folderWhat(w.of)
     case 'branch':
       return tr(T.branch, { agent: w.agent })
     case 'sessions':

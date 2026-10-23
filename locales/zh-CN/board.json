@@ -735,7 +735,7 @@
   "board.toolbar.search": "搜索卡片（AM-12、文字、标签）",
   "board.toolbar.startLane": "启动通道…",
   "board.upgrade.askDetail": "请先关闭所有打开了此工作区的其他 Hive。升级之前，它的看板在这里是只读的，它的智能体也无法启动。",
-  "board.upgrade.askMessage": "Hive 1.0 需要升级此工作区的数据。之后 Hive 0.9 将无法再打开它；备份会被保留，“帮助”→“恢复 0.9 看板备份…”可将其放回。请先备份：一旦你的代理的工作树变成槽位，就无法回到 0.9.3。",
+  "board.upgrade.askMessage": "Hive 1.0 需要升级此工作区的数据。之后 Hive 0.9 将无法再打开它；备份会被保留，“帮助”→“恢复 0.9 看板备份…”可将其放回。请先备份：一旦你的智能体的工作树变成槽位，就无法回到 0.9.3。",
   "board.upgrade.askTitle": "将此工作区的看板升级到 1.0？",
   "board.upgrade.banner": "此工作区来自 Hive 0.9：在升级到 1.0 之前，它的看板在这里是只读的，它的智能体也无法启动。",
   "board.upgrade.bannerButton": "升级…",

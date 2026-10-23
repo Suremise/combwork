@@ -44,6 +44,7 @@
   "worktrees.missing.noAgent": "Ten agent już nie istnieje.",
   "worktrees.missing.noBranch": "Gałąź {branch} agenta {agent} nie istnieje, a folder projektu nie jest na żadnej gałęzi, od której można by zacząć nową.",
   "worktrees.missing.noTree": "Agent {agent} nie pracuje w worktree.",
+  "worktrees.missing.slotFailed": "Nie udało się odtworzyć slotu {slot} agenta {agent}: {why}",
   "worktrees.missing.stillListed": "git nadal uznaje {folder} za worktree (może być zablokowane): odblokuj je albo uruchom git worktree prune, a potem spróbuj ponownie.",
   "worktrees.missing.stopFirst": "Najpierw zatrzymaj agenta {agent}.",
   "worktrees.missing.thereRecreate": "Folder worktree agenta {agent} istnieje ({folder}): nie ma czego odtwarzać.",

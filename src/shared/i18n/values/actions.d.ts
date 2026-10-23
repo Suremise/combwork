@@ -185,6 +185,14 @@ interface HiveMessageValues {
   'actions.session.resumeFailed': undefined
   'actions.session.startFailed': undefined
   'actions.sessionView.failed': undefined
+  'actions.slot.goneDetail': undefined
+  'actions.slot.goneMessage': { agent: string | number; slot: string | number; path: string | number; branch: string | number }
+  'actions.slot.goneNoBranch': { agent: string | number; slot: string | number; path: string | number }
+  'actions.slot.goneTitle': undefined
+  'actions.slot.recreate': undefined
+  'actions.slot.recreateFailed': undefined
+  'actions.slot.release': undefined
+  'actions.slot.releaseFailed': undefined
   'actions.startAll.archiveMessage': { n: number; agent: string | number; project: string | number }
   'actions.startAll.failed': { all: string; tried: number; failed: string | number }
   'actions.startAll.noAgents': undefined

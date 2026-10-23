@@ -400,12 +400,24 @@ export function settleSlotCards(ws: WorkspaceService, projectPath: string): Prom
   return pass.done
 }
 
+/** Projects whose pass waits for Repair (their folders moved): said once in the log. */
+const waitingForRepair = new Set<string>()
+
 async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<void> {
   if (!ws.path || ws.lifetime.aborted) return
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return
   const pool = await poolFor(ws, projectPath)
   if (pool.closed) return
+  // The workspace or project moved and Repair hasn't run yet (#1447): its slots' recorded folders are the old ones, so
+  // nothing is prepared, placed, deleted, renamed or released until Repair has relinked them (its FolderMoved facts and
+  // the board's change ask for the next pass).
+  if (await wf.cfg.movePending?.()) {
+    if (!waitingForRepair.has(projectPath.toLowerCase())) log.info(`${userText(basename(projectPath))}'s slots wait for Repair a Moved Workspace`)
+    waitingForRepair.add(projectPath.toLowerCase())
+    return
+  }
+  waitingForRepair.delete(projectPath.toLowerCase())
   // 0. Deletions begun and cut short (a crash between the ref's removal and its settling): settled first, as data safety,
   //    whatever the switches say and wherever the card is now: one may have left a checkout without its branch.
   for (const { card: n, d } of unsettledDeletions(wf.store.factsOfKind([...DELETION_KINDS]))) {

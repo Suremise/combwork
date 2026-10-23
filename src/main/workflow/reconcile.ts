@@ -155,7 +155,9 @@ async function followFolder(wf: Workflow, card: CardRecord, s: CardState): Promi
     }
     return renamed ? 'pending' : 'gone'
   }
-  return now && (await wf.cfg.movePending?.()) ? 'pending' : 'gone'
+  // The workspace or project moved and Repair hasn't run yet: undecided, for an agent's worktree and a slot alike (#1447:
+  // Repair relinks the slot and writes the card's FolderMoved).
+  return (await wf.cfg.movePending?.()) ? 'pending' : 'gone'
 }
 
 /**

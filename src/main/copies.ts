@@ -346,6 +346,14 @@ export class CopyStore {
   }
 
   /** A free copy whose folder is gone: marked so (it is made again at its next lease). */
+  /**
+   * A copy's folder moved by Repair (#1447): its row follows it, only while no operation or job holds it; with `gone` (not
+   * found), marked gone at its place in the moved pool, so its next lease makes it again there. Whether it was.
+   */
+  async relocate(name: string, folder: string, o: { gone?: boolean } = {}): Promise<boolean> {
+    return this.conn.write((db) => Number(db.prepare(`UPDATE copies SET folder = ?${o.gone ? ", state = 'gone'" : ''} WHERE project = ? AND name = ? AND op IS NULL AND job IS NULL`).run(folder, this.project, name).changes) === 1)
+  }
+
   async markGone(name: string): Promise<void> {
     await this.conn.write((db) => db.prepare(`UPDATE copies SET state = 'gone' WHERE project = ? AND name = ? AND state = 'free' AND ${FREE}`).run(this.project, name))
   }

@@ -44,6 +44,7 @@
   "worktrees.missing.noAgent": "该智能体已不存在。",
   "worktrees.missing.noBranch": "{agent} 的分支 {branch} 已不存在，且项目文件夹不在任何分支上，无法从中新建分支。",
   "worktrees.missing.noTree": "{agent} 不在工作树中工作。",
+  "worktrees.missing.slotFailed": "无法重建 {agent} 的槽位 {slot}：{why}",
   "worktrees.missing.stillListed": "git 仍将 {folder} 列为工作树（它可能已被锁定）：请解锁，或运行 git worktree prune，然后重试。",
   "worktrees.missing.stopFirst": "请先停止 {agent}。",
   "worktrees.missing.thereRecreate": "{agent} 的工作树文件夹仍在（{folder}）：无需重新创建。",
