@@ -93,7 +93,7 @@ const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@exam
       await page.screenshot({ path: path.join(shots, `removeprojectslots-dialog-${theme}.png`) })
     }
     // Delete: every one to the Recycle Bin with the project (the repository goes too), none kept behind.
-    await rd.locator('label.choice', { hasText: 'Delete' }).click()
+    await rd.locator('label.choice').nth(2).click() // Hide, Remove from Hive, Delete
     check('…with Delete, every one goes to the Recycle Bin with the project', !!(await until(async () => /4 slots, copies and old folders[^]*to the Recycle Bin, with what is in them/.test(await text()) && (await text()).split('to the Recycle Bin').length >= 5 && !/kept:/.test(await text()), HUNG_MS)), await text())
     for (const theme of ['light', 'dark']) {
       await inv('settings:update', { appearance: { theme } })
