@@ -424,6 +424,10 @@ export function recordTiming(file: string, key: string, ms: number, now = Date.n
   } catch {
     // estimates are a nicety
   } finally {
-    rmSync(tmp, { force: true })
+    try {
+      rmSync(tmp, { force: true })
+    } catch {
+      // held by another process (a scanner): a leftover copy, never a failure (HR6's #1518 round 2)
+    }
   }
 }
