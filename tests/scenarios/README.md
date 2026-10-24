@@ -77,6 +77,13 @@ The checks are positive and negative:
   A reviewer woken by Hive's own loop wake, with no watch of its own, reviews the card and waits for the next (#405).
   A builder told no rounds or wait gets the workspace's Card loop settings for its lane and its wait; one told its own keeps them (#412).
   The Assistant at Look and advise lists the running lanes when asked, and changes none (#500).
+- **The intents and their gates** (1.0): an agent starts, puts back, submits, reviews and gives verdicts with the intent
+  tools (`hive_start_card`, `hive_submit`, `hive_start_review`, `hive_verdict`…), where a check of a move or a review
+  accepts the intent as well as the old move. Most scenarios' projects have every rule off (a new project's options
+  before a preset), so their old moves still work, and the `old-move-*` scenarios test Hive translating them.
+- **Under the presets** (#1536), saved as the Workflow section saves them: a solo user's card goes from start to Done
+  under Solo (started, committed, submitted: committed is done, with no review), and a pair's builder registers its
+  lane and starts its card in the slot Hive lends it under Pair, submitting from there.
 - **With `work-on-card` deleted**, the board rules still hold, and **an edited skill** is the one followed.
 - **The Assistant**:
   - at Look and advise, changes nothing;
@@ -92,7 +99,9 @@ The checks are positive and negative:
   - in Coordinator mode, the defaults Hive's setup decides (#1346 items 2–4, #1527), asking the user none of them: a
     builder and reviewer pair's one card runs as a lane; a card reaching Review outside a lane gets its idle reviewer
     started; a running lane is watched with `lanes` and none of its cards; a second failed review in a ten-round lane is
-    left to the loop; and a no-code card that passed (its lane ended) is neither moved nor its lane ended again;
+    left to the loop; a lane whose cards have all passed, its builder merging them, is left to merge (it never asks
+    whether to merge, and merges, moves or ends nothing itself); and a no-code card that passed (its lane ended) is
+    neither moved nor its lane ended again;
   - in Coordinator mode, looking before asking (#1346 items 1 and 5, #1528): a card whose deploy details are in a doc
     it names is looked up and started without asking the user; asked whether a card should wait for another lane, it
     reads the board and the lanes first and changes nothing;
@@ -123,6 +132,11 @@ starts the same) and started after the scenario did (`tests/e2e/folderProcesses.
 many). A folder it still can't remove is kept and named in the result (`kept`) rather than ending the run. Setup helpers
 that start an agent for the fixture (a builder working, an agent idle) fail the scenario (`setup: …`, with the
 environment problem when the screen shows one) when it doesn't get there, rather than run on a fixture it didn't get.
+So does a setup's move of a card as the user moves it (`userMove`): its reply is checked, and the card must be seen in
+the column (in Review, with a new submission) before the scenario goes on (#1583). Setups change the project's workflow
+options through Hive (`workflow:setOptions`, under the project's lock), never by writing `project.json` beside it (a
+write that lost the agents just added, #1588), and make an agent's watch with its own token (`POST /v1/tasks/wait`), as
+its hive tool does, so a model trial gets the same fixture as a fake (#1545).
 
 - **The fakes** (`fake`, the default, `fake-codex` and `fake-copilot`) act each scenario out with their scripted commands (`skill NAME`, `boardmove`,
   `boardreview`, `boardcomment`). It checks the harness itself and the board rules Hive enforces, at no cost. Checks
