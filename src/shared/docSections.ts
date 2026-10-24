@@ -23,6 +23,8 @@ export interface DocHeading {
   slug: string
   /** Its slug is an explicit id (`<a id="…"></a>`), kept when its text changes. */
   fixed?: true
+  /** The explicit id it carries that another heading carries too: no reference names it for sure. */
+  sharedId?: string
   /** Its line, from 1. */
   line: number
   /** Its section's size in characters (the heading line and everything to the next heading of its level or higher). */
@@ -99,15 +101,22 @@ export function docOutline(md: string): DocHeading[] {
   // Each line's length with its ending (one character: sizes count the text, not CRLF twice).
   const lineSize = lines.map((l, k) => l.length + (k < lines.length - 1 ? 1 : 0))
   const found = headingLines(lines)
-  // Explicit ids are taken first: a heading without one never gets another's id as its slug.
-  const used = new Map<string, number>(found.flatMap((h) => (headingId(h.raw) ? [[headingId(h.raw)!, 0] as const] : [])))
+  // Explicit ids are taken first: a heading without one never gets another's id as its slug. An id two headings carry
+  // fixes neither: the first keeps it as its slug, the others are numbered from it, and each is marked `sharedId`.
+  const ids = found.map((h) => headingId(h.raw))
+  const count = new Map<string, number>()
+  for (const id of ids) if (id) count.set(id, (count.get(id) ?? 0) + 1)
+  const used = new Map<string, number>([...count.keys()].map((id) => [id, 0]))
+  const firstTaken = new Set<string>()
   return found.map((h, k) => {
     const text = headingText(h.raw)
-    const id = headingId(h.raw)
+    const id = ids[k]
+    const shared = id && count.get(id)! > 1 ? id : null
     // As github-slugger numbers them: a slug used before gets the next number of its own, skipping any taken.
-    const base = slugOf(h.raw)
+    const base = shared ?? slugOf(h.raw)
     let slug = base
-    if (id) slug = id
+    if (id && !shared) slug = id
+    else if (shared && !firstTaken.has(shared)) firstTaken.add(shared)
     else {
       while (used.has(slug)) {
         const n = (used.get(base) ?? 0) + 1
@@ -120,7 +129,7 @@ export function docOutline(md: string): DocHeading[] {
     const end = next ? next.at : lines.length
     let size = 0
     for (let l = h.at; l < end; l++) size += lineSize[l]
-    return { level: h.level, text, slug, ...(id ? { fixed: true as const } : {}), line: h.at + 1, size }
+    return { level: h.level, text, slug, ...(id && !shared ? { fixed: true as const } : {}), ...(shared ? { sharedId: shared } : {}), line: h.at + 1, size }
   })
 }
 
@@ -128,7 +137,8 @@ export function docOutline(md: string): DocHeading[] {
 export function sectionText(md: string, heading: DocHeading): string {
   const lines = linesOf(md)
   const outline = docOutline(md)
-  const k = outline.findIndex((h) => h.slug === heading.slug)
+  // By its line: the heading itself, whatever slugs the others have.
+  const k = outline.findIndex((h) => h.line === heading.line)
   const next = outline.slice(k + 1).find((x) => x.level <= heading.level)
   return lines.slice(heading.line - 1, next ? next.line - 1 : lines.length).join('\n').replace(/\n+$/, '')
 }
@@ -153,7 +163,8 @@ function distance(a: string, b: string): number {
 /**
  * The heading `asked` names, in this order:
  * - `#<slug>` (no space after `#`): exactly the section with that slug, also the first of several with the same text
- *   (`#setup`; `#setup-1` is the second), as a reference to a section (`file#slug`) names it;
+ *   (`#setup`; `#setup-1` is the second), as a reference to a section (`file#slug`) names it; an explicit id several
+ *   headings carry is ambiguous, listing them;
  * - a heading's text (any case, with or without its `#` marks and a space): that heading; several with that text are
  *   ambiguous, listed each with its own slug;
  * - a slug (`core-contracts`, `setup-1`): that heading.
@@ -162,6 +173,9 @@ function distance(a: string, b: string): number {
 export function findHeading(outline: DocHeading[], asked: string): SectionMatch {
   const q = asked.trim()
   if (/^#[^#\s]/.test(q)) {
+    // An explicit id several headings carry names none of them for sure (#1535).
+    const sharing = outline.filter((h) => h.sharedId === q.slice(1) || h.sharedId === q.slice(1).toLowerCase())
+    if (sharing.length) return { ambiguous: sharing }
     const exact = outline.find((h) => h.slug === q.slice(1) || h.slug === q.slice(1).toLowerCase())
     return exact ? { heading: exact } : { closest: closest(outline, q.slice(1)) }
   }

@@ -34,6 +34,8 @@ describe("the user guide's heading ids", () => {
   it('every heading has an explicit id, unique, in slug form', () => {
     const outline = docOutline(guide)
     expect(outline.length).toBeGreaterThan(50)
+    const shared = outline.filter((h) => h.sharedId).map((h) => `line ${h.line}: ${h.text} (${h.sharedId})`)
+    expect(shared, 'an id two headings carry (a copied heading): give the new one its own').toEqual([])
     const without = outline.filter((h) => !h.fixed).map((h) => `line ${h.line}: ${h.text}`)
     expect(without, 'a heading without an id: end it with <a id="its-slug"></a> (its slug as hive_doc_outline lists it, then never change the id)').toEqual([])
     expect(new Set(outline.map((h) => h.slug)).size).toBe(outline.length)

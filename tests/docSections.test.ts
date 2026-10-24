@@ -121,6 +121,19 @@ describe('findHeading and sectionText', () => {
     expect(headingId('Setup <a id="setup"></a>')).toBe('setup')
     expect(headingId('Setup')).toBeNull()
   })
+  it('an explicit id two headings carry (a section copied with its anchor) fixes neither: #id is ambiguous, each section its own', () => {
+    const md = '# Doc\n\n## First <a id="setup"></a>\n\nOne.\n\n## Second <a id="setup"></a>\n\nTwo.\n\n## Setup\n\nThree.\n'
+    const o = docOutline(md)
+    expect(o.map((h) => [h.text, h.slug, !!h.fixed, h.sharedId])).toEqual([['Doc', 'doc', false, undefined], ['First', 'setup', false, 'setup'], ['Second', 'setup-1', false, 'setup'], ['Setup', 'setup-2', false, undefined]])
+    const m = findHeading(o, '#setup')
+    expect('ambiguous' in m && m.ambiguous.map((h) => h.text)).toEqual(['First', 'Second'])
+    expect(findHeading(o, '#SETUP')).toEqual(m)
+    // Each section is its own, found by its line, never the first with a slug.
+    expect(sectionText(md, o[1])).toBe('## First <a id="setup"></a>\n\nOne.')
+    expect(sectionText(md, o[2])).toBe('## Second <a id="setup"></a>\n\nTwo.')
+    const second = findHeading(o, '#setup-1')
+    expect('heading' in second && second.heading.text).toBe('Second')
+  })
   it('an unknown heading gives the closest ones, never an empty section', () => {
     const m = findHeading(outline, 'core contract')
     expect('closest' in m && m.closest[0].slug).toBe('core-contracts')
