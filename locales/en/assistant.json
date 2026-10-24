@@ -1684,7 +1684,7 @@
     "description": "What a skill that ships with Hive (review-agent-work) is for: under its name in the Skills view and a project's Skills tab. Review is a column of the task board: use its name as the board shows it."
   },
   "assistant.skills.shipped.runLanes": {
-    "defaultMessage": "Run a team as the Hive Assistant: builder and reviewer lanes on card loops, planned by files, briefed and watched to their end. Use when there are three or more agents, builder and reviewer pairs or worktree agents, when asked for lanes, or woken about one.",
+    "defaultMessage": "Run a team as the Hive Assistant: builder and reviewer lanes on card loops, planned by files, briefed and watched to their end. Use when there are three or more agents or several builder and reviewer pairs, when asked for lanes, or woken about one.",
     "description": "What a skill that ships with Hive (run-lanes) is for: under its name in the Skills view and a project's Skills tab. A lane is a builder and a reviewer taking cards in turn (a card loop): use the words Hive uses for them."
   },
   "assistant.skills.shipped.splitWork": {
