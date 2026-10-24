@@ -109,7 +109,7 @@
   "workspace.changes.aboutProject": "A pasta do projeto: o que ainda não tem commit, seu ou dos agentes que trabalham na própria pasta (os que não têm worktree).",
   "workspace.changes.aboutUnusedOne": "Um worktree não usado: tudo no branch {branch} que {into} não tem. Faça o merge, ou volte para Worktrees não usados para removê-lo.",
   "workspace.changes.aboutUnusedShort": "Worktrees em que nenhum agente do projeto {project} trabalha: abra um para ver as alterações e fazer merge delas, ou remova-o.",
-  "workspace.changes.aboutUnusedTip": "Mantidos quando o agente foi removido, criados fora do Hive (por exemplo, por um git worktree add do próprio agente) ou vindos de outro modelo (carregar esse modelo os devolve aos agentes dele).{known, select, yes { Os já mesclados em {into} e limpos podem ser removidos junto com os branches; os outros guardam trabalho que não existe em nenhum outro lugar.} other {}}",
+  "workspace.changes.aboutUnusedTip": "Mantidos quando o agente foi removido (à mão ou ao ser substituído pelos agentes de um modelo) ou criados fora do Hive (por exemplo, por um git worktree add do próprio agente). Carregar um modelo não entrega nenhum deles aos agentes dele.{known, select, yes { Os já mesclados em {into} e limpos podem ser removidos junto com os branches; os outros guardam trabalho que não existe em nenhum outro lugar.} other {}}",
   "workspace.docs.about": "Sobre o {app}",
   "workspace.docs.api": "Agent API",
   "workspace.docs.changelog": "Notas da versão",

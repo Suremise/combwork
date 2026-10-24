@@ -109,7 +109,7 @@
   "workspace.changes.aboutProject": "プロジェクトフォルダー：まだコミットされていない変更です（自分の変更と、フォルダーで直接作業しているワークツリーなしのエージェントの変更）。",
   "workspace.changes.aboutUnusedOne": "未使用のワークツリー：{into}にない{branch}のすべての変更です。マージするか、「未使用のワークツリー」に戻って削除してください。",
   "workspace.changes.aboutUnusedShort": "{project}のどのエージェントも作業していないワークツリーです。開くと変更を確認してマージでき、不要なら削除できます。",
-  "workspace.changes.aboutUnusedTip": "エージェントを削除したときに残されたもの、Hiveの外で作られたもの（エージェント自身のgit worktree addなど）、別のテンプレートのもの（そのテンプレートを読み込むと、そのエージェントに戻ります）です。{known, select, yes {{into}にマージ済みで未変更のものはブランチごと削除できます。それ以外には、ほかのどこにもない作業が残っています。} other {}}",
+  "workspace.changes.aboutUnusedTip": "エージェントを削除したとき（手動で、またはテンプレートのエージェントに置き換えたとき）に残されたもの、またはHiveの外で作られたもの（エージェント自身のgit worktree addなど）です。テンプレートを読み込んでも、そのエージェントには渡されません。{known, select, yes {{into}にマージ済みで未変更のものはブランチごと削除できます。それ以外には、ほかのどこにもない作業が残っています。} other {}}",
   "workspace.docs.about": "{app}について",
   "workspace.docs.api": "Agent API",
   "workspace.docs.changelog": "リリースノート",

@@ -109,7 +109,7 @@
   "workspace.changes.aboutProject": "Folder projektu: to, co nie ma jeszcze commita – Twoje zmiany lub agentów pracujących w samym folderze (tych bez worktree).",
   "workspace.changes.aboutUnusedOne": "Nieużywane worktree: wszystko na gałęzi {branch}, czego nie ma w {into}. Scal je albo wróć do „Nieużywane worktree”, aby je usunąć.",
   "workspace.changes.aboutUnusedShort": "Worktree, w których nie pracuje żaden agent projektu {project}: otwórz jedno, aby zobaczyć i scalić jego zmiany, albo je usuń.",
-  "workspace.changes.aboutUnusedTip": "Zachowane po usunięciu ich agenta, utworzone poza Hive (np. przez własne git worktree add agenta) albo z innego szablonu (wczytanie tego szablonu oddaje je jego agentom).{known, select, yes { Te scalone z {into} i czyste mogą zniknąć razem ze swoimi gałęziami; pozostałe zawierają pracę, której nie ma nigdzie indziej.} other {}}",
+  "workspace.changes.aboutUnusedTip": "Zachowane po usunięciu ich agenta (ręcznie albo gdy zastąpili go agenci szablonu) lub utworzone poza Hive (np. przez własne git worktree add agenta). Wczytanie szablonu nie oddaje żadnego z nich jego agentom.{known, select, yes { Te scalone z {into} i czyste mogą zniknąć razem ze swoimi gałęziami; pozostałe zawierają pracę, której nie ma nigdzie indziej.} other {}}",
   "workspace.docs.about": "{app} – informacje",
   "workspace.docs.api": "Agent API",
   "workspace.docs.changelog": "Informacje o wersjach",
