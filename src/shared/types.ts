@@ -1388,6 +1388,8 @@ export interface ResumeTarget {
   titleAtRename?: string | null
   /** Why it can't resume now in the slot it ran in (#1434): Resume All and startup leave an agent with one. */
   hold?: ResumeHold
+  /** The retired home it resumes in (#1441), by its folder's name, while a new conversation starts elsewhere (#1552). */
+  home?: string
 }
 
 export interface AddAgentOptions {

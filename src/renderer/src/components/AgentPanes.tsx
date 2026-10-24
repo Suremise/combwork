@@ -1715,6 +1715,23 @@ const notRunningText = (agent: string): ReactNode[] => tRich<ReactNode>(msg({ id
 /** "Works in its own worktree on <code>hive/b1</code>." */
 const ownWorktreeText = (branch: string): ReactNode[] => tRich<ReactNode>(msg({ id: 'panes.body.worktree', defaultMessage: 'Works in its own worktree on <code>{branch}</code>.', description: "A stopped worktree agent's pane: its branch ({branch}, shown as code; keep the <code> tags around it)." }), { branch, code: (chunks) => <code key="code">{chunks}</code> })
 
+const code = (chunks: ReactNode[]): ReactNode => <code key="code">{chunks}</code>
+
+/**
+ * Where a stopped agent works (#1552, after #1441's migration): its 0.9 worktree while not migrated, its slot or the slot
+ * kept for it; in the project folder, that its last conversation resumes in its retired home when it does. Null: nothing
+ * to say (the project folder).
+ */
+function placeLine(a: AgentInfo): ReactNode[] | null {
+  const own = legacyOf(a)
+  if (own) return ownWorktreeText(own.branch)
+  const p = a.place
+  if (p.is === 'slot' && p.name) return tRich<ReactNode>(msg({ id: 'panes.body.inSlot', defaultMessage: 'Works in <code>{name}</code>.', description: "A stopped agent's pane: the slot it works in ({name}: its name, such as slot-b, shown as code; keep the <code> tags around it). Glossary: slot." }), { name: p.name, code })
+  if (p.is === 'carried' && p.name) return tRich<ReactNode>(msg({ id: 'panes.body.inCarried', defaultMessage: 'Works in <code>{name}</code>, the slot kept for it.', description: "A stopped agent's pane: its carried slot ({name}: its name, such as hb2, shown as code; keep the <code> tags around it), its own worktree from before 1.0, kept for it as a slot. Glossary: slot." }), { name: p.name, code })
+  if (a.resume?.home) return tRich<ReactNode>(msg({ id: 'panes.body.resumesInHome', defaultMessage: 'A new conversation starts in the project folder; Resume opens its last one in its old folder, <code>{name}</code>.', description: "A stopped agent's pane, for a reviewer whose own worktree from before 1.0 was kept as its retired home: new conversations start in the project folder, and Resume reopens its last conversation in that old folder ({name}: the folder's name, shown as code; keep the <code> tags around it)." }), { name: a.resume.home, code })
+  return null
+}
+
 /**
  * An empty cell of the panes (#762): a quiet placeholder to drop an agent on, Move Agent Here ▾ to bring one from another
  * page (moving one on this page leaves its own cell empty, so only other pages' are offered), and Add Agent.
@@ -1809,10 +1826,11 @@ function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectI
     )
   }
   if (single) return null
+  const where = placeLine(a)
   return (
     <div className="pane-placeholder">
       <p>{notRunningText(a.name)}</p>
-      {own && <p className="faint">{ownWorktreeText(own.branch)}</p>}
+      {where && <p className="faint">{where}</p>}
       {setupPending && <p className="faint">{tr(msg({ id: 'panes.body.setupFirst', defaultMessage: 'Its setup command runs first.', description: "A stopped worktree agent's pane: its worktree setup command runs before its next session." }))}</p>}
       <div className="btns">
         <Tooltip content={startBlocked}>

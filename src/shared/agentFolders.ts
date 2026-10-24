@@ -183,6 +183,12 @@ export const launchFolder = (facts: FolderFacts, agent: FolderAgent, purpose: Fo
 /** Where a conversation resumes: always the folder it recorded (none recorded: the project folder). */
 export const resumeFolder = (projectPath: string, s: FolderSession): string => s.cwd || projectPath
 
+/** The retired home a conversation resumes in, by its folder's name (#1552: its pane says so); null elsewhere. */
+export function resumeHome(facts: FolderFacts, s: FolderSession): string | null {
+  const folder = resumeFolder(facts.projectPath, s)
+  return facts.homes.some((h) => samePath(h, folder)) ? (folder.split(/[\\/]/).filter(Boolean).pop() ?? folder) : null
+}
+
 /** Where the agent works now: its running session's folder (a retired home included), else where it would start. */
 export const currentFolder = (facts: FolderFacts, agent: FolderAgent, running: { cwd: string } | null): string => running?.cwd ?? launchFolder(facts, agent, defaultPurpose(agent.role))
 

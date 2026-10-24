@@ -7,7 +7,9 @@
 // 4. R1, a reviewer running in its retired home (#1441's homes, `slots:test` `homes`): "home: hr1".
 // 5. The Sessions tab names B1's session's folder: "Slot · slot-a".
 // 6. #12's lease ends: B1's pane no longer says "in slot-a" (the window reads the project again at a lease's end).
-// Screenshots of the pane, the hover, the agents table and Add Agent, light and dark. Dev build, throwaway profile,
+// 7. Stopped panes say where each works now, never a 0.9 worktree (#1552): B2 in hb2, the slot kept for it; R1 starts
+//    new conversations in the project folder and resumes its last one in its old folder hr1.
+// Screenshots of the pane, the hover, the agents table, Add Agent and the stopped panes, light and dark. Dev build, throwaway profile,
 // workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -141,6 +143,31 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     // The pane first: the test asks for no refresh before it reads it.
     check('…its pane no longer says "in slot-a"', !!(await until(async () => (await lib.paneHeader(page, 'B1').count()) === 1 && (await placeMark('B1').count()) === 0, HUNG_MS)))
     check('…B1 is stopped, and works in the project folder now', !!(await until(async () => !(await live(b1.id)) && (await agentInfo(b1.id))?.place?.is === 'project', HUNG_MS)), JSON.stringify((await agentInfo(b1.id))?.place))
+
+    // --- 7. Stopped panes say where each works now (#1552), never their 0.9 worktree: B2 in the slot kept for it; R1,
+    // stopped, starts new conversations in the project folder and resumes its last one in its retired home.
+    const placeholder = (name) => page.locator('.agent-pane', { has: lib.paneHeader(page, name) }).first().locator('.pane-placeholder')
+    const b2Says = await until(async () => ((await placeholder('B2').innerText().catch(() => '')).includes('Works in hb2, the slot kept for it.') ? placeholder('B2').innerText() : null), HUNG_MS)
+    check("B2's stopped pane: works in hb2, the slot kept for it", !!b2Says && !/own worktree/.test(b2Says), (await placeholder('B2').innerText().catch(() => '')) || JSON.stringify((await agentInfo(b2.id))?.place))
+    await inv('session:stop', alpha, r1.id)
+    check('R1 stops', !!(await until(async () => !(await live(r1.id)), HUNG_MS)))
+    // A pane whose session ended here keeps its terminal (the ended bar); after an upgrade Hive opens with none: open
+    // it again, as then, and read R1's pane.
+    await h.app.close()
+    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) }, viewport: { width: 1500, height: 900 } })
+    h.page.on('pageerror', (e) => check('no page errors', false, e.message))
+    const again = { inv: h.inv, page: h.page }
+    await lib.openWorkspace(again.inv, again.page, ws)
+    await lib.fitWindow(h.app, again.page, { width: 1500, height: 900 })
+    const placeholder2 = (name) => again.page.locator('.agent-pane', { has: lib.paneHeader(again.page, name) }).first().locator('.pane-placeholder')
+    const r1Says = 'A new conversation starts in the project folder; Resume opens its last one in its old folder, hr1.'
+    check("R1, stopped, Hive opened again: its pane says a new conversation starts in the project folder, Resume in its old folder hr1", !!(await until(async () => (await placeholder2('R1').innerText().catch(() => '')).includes(r1Says), HUNG_MS)), await placeholder2('R1').innerText().catch(() => ''))
+    check("…and not its 0.9 worktree", !/own worktree/.test(await placeholder2('R1').innerText().catch(() => '')))
+    for (const theme of ['light', 'dark']) {
+      await again.inv('settings:update', { appearance: { theme } })
+      await until(async () => (await again.page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+      await again.page.screenshot({ path: path.join(shots, `agentslots-stopped-panes-${theme}.png`) })
+    }
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

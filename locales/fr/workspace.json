@@ -109,7 +109,7 @@
   "workspace.changes.aboutProject": "Le dossier du projet : ce qui n’est pas encore commité, de toi ou des agents qui travaillent dans le dossier lui-même (ceux sans worktree).",
   "workspace.changes.aboutUnusedOne": "Un worktree inutilisé : tout ce qui est sur {branch} et pas sur {into}. Fusionne-le, ou retourne à Worktrees inutilisés pour le retirer.",
   "workspace.changes.aboutUnusedShort": "Les worktrees où aucun agent du projet {project} ne travaille : ouvres-en un pour voir ses modifications et les fusionner, ou retire-le.",
-  "workspace.changes.aboutUnusedTip": "Conservés quand leur agent a été retiré, créés hors de Hive (par un git worktree add d’un agent, par exemple) ou venus d’un autre modèle (charger ce modèle les rend à ses agents).{known, select, yes { Ceux qui sont fusionnés dans {into} et propres peuvent partir avec leurs branches ; les autres contiennent du travail qui n’existe nulle part ailleurs.} other {}}",
+  "workspace.changes.aboutUnusedTip": "Conservés quand leur agent a été retiré (à la main, ou remplacé par les agents d’un modèle) ou créés hors de Hive (par un git worktree add d’un agent, par exemple). Charger un modèle n’en donne aucun à ses agents.{known, select, yes { Ceux qui sont fusionnés dans {into} et propres peuvent partir avec leurs branches ; les autres contiennent du travail qui n’existe nulle part ailleurs.} other {}}",
   "workspace.docs.about": "À propos de {app}",
   "workspace.docs.api": "Agent API",
   "workspace.docs.changelog": "Notes de version",
