@@ -240,10 +240,14 @@ const check = (name, ok, extra = '') => {
   // A revision that isn't what's checked out is refused before the command runs; a check runs the project's command.
   const refused = await shell(builder.id, `hive-progress --card "#${card.number}" --revision HEAD~1 -- node -e "require('fs').writeFileSync('refused-ran.txt', 'x')"`)
   check("a --revision that isn't checked out is refused, and the command never runs", refused?.code === 2 && /isn't what's checked out here/.test(refused?.stderr ?? '') && !fs.existsSync(path.join(alpha, 'refused-ran.txt')), JSON.stringify(refused))
-  const projectFile = path.join(alpha, '.hive', 'project.json')
-  const pj = JSON.parse(fs.readFileSync(projectFile, 'utf8'))
-  pj.workflow = { options: { commands: { quick: `node -e "require('fs').writeFileSync('check-ran.txt', 'yes')"` } } }
-  fs.writeFileSync(projectFile, JSON.stringify(pj, null, 2))
+  // The check commands are set through the app's own save (#1594): a direct write of project.json, made in place, could
+  // be read half written by Hive meanwhile, taken as damaged and replaced by its .bak, losing the commands.
+  const commands = { quick: `node -e "require('fs').writeFileSync('check-ran.txt', 'yes')"` }
+  const setCommands = async () => {
+    const form = await inv('workflow:setOptions', alpha, { preset: null, options: { commands } })
+    check('the check commands are saved', JSON.stringify(form?.own?.commands) === JSON.stringify(commands), JSON.stringify(form?.own))
+  }
+  await setCommands()
   known = (await runs()).map((r) => r.id)
   const checked = await shell(builder.id, 'hive-progress --check quick')
   const quick = (await runs()).find((r) => !known.includes(r.id) && r.check === 'quick')
@@ -258,8 +262,8 @@ const check = (name, ok, extra = '') => {
   await quickRow.locator('.progress-title').click()
   const quickDetails = async () => (await quickRow.locator('.progress-details').textContent().catch(() => '')) ?? ''
   check('…and its details say it counts as the check', !!(await until(async () => (await quickDetails()).includes('CheckCounts as check: quick'), 10000)), await quickDetails())
-  pj.workflow.options.commands.edit = `node -e "const fs = require('fs'); const t = fs.readFileSync('b.ts'); fs.writeFileSync('b.ts', 'edited'); fs.writeFileSync('b.ts', t)"`
-  fs.writeFileSync(projectFile, JSON.stringify(pj, null, 2))
+  commands.edit = `node -e "const fs = require('fs'); const t = fs.readFileSync('b.ts'); fs.writeFileSync('b.ts', 'edited'); fs.writeFileSync('b.ts', t)"`
+  await setCommands()
   known = (await runs()).map((r) => r.id)
   const edited = await shell(builder.id, 'hive-progress --check edit')
   const editRun = (await runs()).find((r) => !known.includes(r.id) && r.check === 'edit')
