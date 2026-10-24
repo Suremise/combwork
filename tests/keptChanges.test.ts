@@ -2,7 +2,7 @@
 // record of project names, the record of handovers' owners) never writes back the .bak's value read from a file still
 // being saved; it reads again a few times, then refuses, the file left as the other program saves it.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
@@ -129,9 +129,24 @@ describe('read-modify-write callers refuse rather than write over a save in prog
     await inWorkspace(w, () => notes.createHandover('alpha', 'First', 'x'))
     const bak = readFileSync(`${file}.bak`, 'utf8')
     saving(file)
-    await expect(inWorkspace(w, () => notes.createHandover('alpha', 'Second', 'y'))).rejects.toBeInstanceOf(KeptFileBusy)
+    // Refused before the handover is written (review round 1): never there for someone to edit, so nothing is taken back.
+    const second = (): string[] => readdirSync(join(ws, '.hive', 'shared', 'handovers')).filter((f) => f.includes('second'))
+    const run = { settled: false }
+    const made = inWorkspace(w, () => notes.createHandover('alpha', 'Second', 'y')).finally(() => (run.settled = true))
+    const seen: string[] = []
+    while (!run.settled) {
+      seen.push(...second())
+      await new Promise((r) => setTimeout(r, 5))
+    }
+    await expect(made).rejects.toBeInstanceOf(KeptFileBusy)
+    expect(seen).toEqual([])
+    expect(second()).toEqual([])
     untouched(file, bak)
-    expect(readdirSync(join(ws, '.hive', 'shared', 'handovers')).filter((f) => f.includes('second'))).toEqual([])
+    // Saved: the handover is written and owned.
+    writeFileSync(file, bak)
+    const third = await inWorkspace(w, () => notes.createHandover('alpha', 'Third', 'z'))
+    expect(existsSync(third)).toBe(true)
+    expect(Object.keys(JSON.parse(readFileSync(file, 'utf8')).owners)).toContain(basename(third))
     await disposeWorkspaceService(w)
   })
 })

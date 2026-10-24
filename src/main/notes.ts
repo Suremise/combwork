@@ -1,5 +1,5 @@
 import { join, relative, resolve, sep, dirname, basename } from 'path'
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'original-fs/promises'
+import { mkdir, readdir, readFile, rename, stat, writeFile } from 'original-fs/promises'
 import { existsSync } from 'original-fs'
 import { handoverHeader, handoverProject, handoverSession, type HandoverAuthor } from '../shared/hiveGuidance'
 import { HIVE_DIR } from '../shared/defaults'
@@ -170,12 +170,17 @@ async function readOwners(file: string): Promise<Record<string, string>> {
   return out
 }
 
-/** Records that a handover is a project's (by its id): Hive wrote it for it. */
-async function ownHandover(at: WorkspaceAt, file: string, id: string): Promise<void> {
+/**
+ * Records that a handover is a project's (by its id) as Hive writes it: `write` creates the file, in the record's lock
+ * once the record has been read (#1600), so a record still being saved by something else refuses the handover before
+ * there is any file to take back.
+ */
+async function ownHandover(at: WorkspaceAt, file: string, id: string, write: () => Promise<void>): Promise<void> {
   await retryWhileSaving(() => withFileLock(at.owners, async () => {
     stillOpen(at)
     const owners = await readOwners(at.owners)
     stillOpen(at)
+    await write()
     owners[file] = id
     await writeKeptJson(at.owners, { version: 1, owners })
   }))
@@ -323,14 +328,9 @@ export async function createHandover(project: string, title: string, content: st
   // Created, never overwritten: two handovers with the same title at once get -2, -3…
   for (let n = 2; ; n++) {
     try {
-      await writeFile(file, header + content.trim() + '\n', { flag: 'wx' })
-      // Its owner not recorded (the record still being saved by something else, #1600): no handover either, so one
-      // written again isn't a second copy.
-      if (owner)
-        await ownHandover(at, basename(file), owner).catch(async (e) => {
-          await rm(file, { force: true }).catch(() => undefined)
-          throw e
-        })
+      const write = (): Promise<void> => writeFile(file, header + content.trim() + '\n', { flag: 'wx' })
+      if (owner) await ownHandover(at, basename(file), owner, write)
+      else await write()
       return file
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'EEXIST' || n > 1000) throw e
