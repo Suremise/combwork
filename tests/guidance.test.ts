@@ -212,8 +212,9 @@ describe('the bundled skills', () => {
   it('the builder commits each round and the reviewer asks for a commit rather than failing on that alone', () => {
     const text = catalog.get('card-loop')!.text
     const line = (starts: string): string => text.split(/\r?\n/).find((l) => l.startsWith(starts)) ?? ''
-    expect(line('1. Do its work')).toMatch(/Commit each round's work and name the commit in its summary: the reviewer reviews the revision you submit/)
-    expect(line('2. Review it')).toMatch(/`hive_start_review` names the revision to review\. Work it doesn't hold \(uncommitted, or no commit named\) isn't a failed round on that alone/)
+    // In Git only (HR1's #1524 round 1 finding 1): a no-code card submits a summary, a project without version control its files' state.
+    expect(line('1. Do its work')).toMatch(/in Git, commit each round's work and name the commit in its summary/)
+    expect(line('2. Review it')).toMatch(/`hive_start_review` names what to review \(a revision, or a no-code card's summary\)\. In Git, work that revision doesn't hold \(uncommitted, or no commit named\) isn't a failed round on that alone/)
     expect(line('- builder: the card')).toMatch(/changes: \["verdict", "column", "comment"\]/)
     expect(line('- reviewer, after asking the builder for something')).toMatch(/changes: \["comment"\]/)
     // run-lanes' sample brief agrees, leaving the procedure to card-loop (a brief saying "commit once it passes" undid it).
@@ -253,7 +254,8 @@ describe('the skills follow the gates (#1524)', () => {
     const loop = ['hive_start_review', 'hive_verdict', 'hive_request_builder', 'hive_loop_step', 'hive_lane']
     const named = (name: string): string[] => toolsNamed(catalog.get(name)!.text)
     expect(named('work-on-card')).toEqual(expect.arrayContaining(intents))
-    expect(named('card-loop')).toEqual(expect.arrayContaining([...loop, 'hive_start_card', 'hive_submit', 'hive_report_merge', 'hive_ask_user', 'hive_cannot_within_rules']))
+    // Finishing (report merge among its ways) is work-on-card's, which card-loop points to.
+    expect(named('card-loop')).toEqual(expect.arrayContaining([...loop, 'hive_start_card', 'hive_submit', 'hive_ask_user', 'hive_cannot_within_rules']))
     for (const t of [...intents, ...loop]) {
       expect(TOOLS, t).toContain(t)
       expect(ASSISTANT_ONLY_TOOLS, t).not.toContain(t)
@@ -271,12 +273,27 @@ describe('the skills follow the gates (#1524)', () => {
     expect(limit).toMatch(/the lane's rounds/)
     expect(limit).toMatch(/Where the project's rules are enforced, Hive counts/)
     expect(limit).toMatch(/With the rules off nothing counts them/)
-    // A no-code card: no revision to submit, nothing to merge.
-    expect(woc).toMatch(/a no-code card[^.]*submits its summary alone/)
-    expect(woc).toMatch(/for a no-code card, the card finishes on its own/)
-    // Who finishes is the project's: no one way stated as the rule.
-    expect(woc).toMatch(/Done means merged, and how it gets there is the project's/)
-    expect(loop).toMatch(/its finish is the project's/)
+    // What a submission is depends on the platform and the card's kind (HR1's round 1 findings 1 and 3): a revision in
+    // Git (the card's own, which in a shared folder isn't the folder's head), the files' state without version control,
+    // the summary for a no-code card.
+    expect(woc).toMatch(/in Git, a revision, by default the card's own \(its line's head, or its newest commit in a folder shared with other agents; the reply names it\)/)
+    expect(woc).toMatch(/without version control, the state of the card's files \(`paths`\)/)
+    expect(woc).toMatch(/for a no-code card, such as a decision or a write-up, its summary alone/)
+    expect(woc).not.toMatch(/by default your folder's head/)
+    // Every line telling an agent to commit, or about a commit to name or ask for, says it is Git's.
+    for (const name of GATED) {
+      for (const l of catalog.get(name)!.text.split(/\r?\n/)) {
+        if (/\bcommit (each|it|what)\b|\(committed\b|\bnaming the commit\b|\bno commit named\b/i.test(l)) expect(l, name).toMatch(/\bin Git\b/i)
+      }
+    }
+    // Who finishes is the project's: every supported way, none stated as the rule (finding 2: Not checked).
+    expect(woc).toMatch(/how it finishes is the project's: the reply, then `hive_read_task`, says what's next/)
+    expect(woc).toMatch(/Where Hive merges, the card's `merge` follows it through the queue/)
+    expect(woc).toMatch(/Where you merge, use merge-ready, then `hive_report_merge` with the merge commit/)
+    expect(woc).toMatch(/Where merges aren't checked, `hive_report_merge` says it's finished, with no merge to prove/)
+    expect(woc).toMatch(/Where the user's OK comes first, it waits for them/)
+    expect(woc).toMatch(/Where the work is done once committed, accepted \(no version control\) or reviewed, and for a no-code card, it finishes on its own/)
+    expect(loop).toMatch(/its finish is the project's, and the card says what's next \(work-on-card, Finish\)/)
     // A lane one card at a time is the project's rule, said so.
     expect(loop).toMatch(/where the project's rules hold a lane to one card at a time/)
     for (const name of GATED) {
