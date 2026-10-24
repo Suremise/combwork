@@ -64,7 +64,8 @@ async function endFromOutside(app) {
     await lib.openWorkspace(h.inv, h.page, ws)
   }
   const inv = (...a) => h.inv(...a)
-  const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 250)
+  // Each wait passes its bound (HUNG_MS), as test:waits checks (#1576): a default here would hide it.
+  const until = (fn, ms) => lib.until(fn, ms, 250)
   const live = async (id) => (await inv('session:live')).find((s) => same(s.projectPath, alpha) && s.agentId === id) ?? null
   const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
   const slotA = async () => (await inv('slots:list', alpha)).find((s) => s.name === 'slot-a')
@@ -88,7 +89,7 @@ async function endFromOutside(app) {
     const lent = await inv('slots:test', alpha, { op: 'lend', agent: b1.id, card: 12 })
     check('#12 is lent slot-a for B1', lent?.ok && lent.slot.name === 'slot-a', JSON.stringify(lent))
     await inv('session:start', alpha, { agentId: b1.id })
-    const s1 = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null))
+    const s1 = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null), HUNG_MS)
     check('B1 runs in slot-a', s1?.slot === 'slot-a', JSON.stringify(s1))
     const w1 = await inv('slots:heldWriter', alpha, 'slot-a')
     check('…its run is slot-a\'s writer, live in this Hive', w1?.agent === b1.id && w1.live === true && w1.hive.self === true, JSON.stringify(w1))
@@ -103,19 +104,19 @@ async function endFromOutside(app) {
     const lingerFile = path.join(home, 'fake-linger.jsonl')
     const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l).pid) : [])
     await lib.sendPrompt(inv, key, 'linger 1', { submitted: async () => (await live(b1.id))?.status === 'working' || lingering().length > 0 })
-    check('B1 leaves a process running', !!(await until(async () => lingering().length === 1 && (await idle(b1.id)))))
+    check('B1 leaves a process running', !!(await until(async () => lingering().length === 1 && (await idle(b1.id)), HUNG_MS)))
     kept.push(...lib.identify(lingering()))
     await inv('session:stop', alpha, b1.id)
-    check('…stopped, its leftover listed', !!(await until(async () => !(await live(b1.id)) && (await inv('session:leftovers')).some((l) => l.agentId === b1.id))))
+    check('…stopped, its leftover listed', !!(await until(async () => !(await live(b1.id)) && (await inv('session:leftovers')).some((l) => l.agentId === b1.id), HUNG_MS)))
     const followed = await releaseNow(w1.run)
     check('Release is refused while Hive still follows what it left running', /still running in this Hive/.test(followed), followed)
     await inv('session:settleLeftovers', alpha, b1.id, 'keep')
     const wSelf = await until(async () => {
       const w = await inv('slots:heldWriter', alpha, 'slot-a')
       return w && !w.live ? w : null
-    })
+    }, HUNG_MS)
     check('kept running: slot-a held by this Hive, nothing listed of its processes', wSelf?.run === w1.run && wSelf.hive.self && wSelf.processes === null, JSON.stringify(wSelf))
-    check("…B1's ⋯ offers Release Slot…", !!(await until(async () => (await agentInfo(b1.id))?.heldSlot === 'slot-a')) && (await lib.agentMenu(h.page, 'B1')).some((t) => t.startsWith('Release Slot…')))
+    check("…B1's ⋯ offers Release Slot…", !!(await until(async () => (await agentInfo(b1.id))?.heldSlot === 'slot-a', HUNG_MS)) && (await lib.agentMenu(h.page, 'B1')).some((t) => t.startsWith('Release Slot…')))
     await lib.menuEntry(h.page, 'Release Slot…').click()
     await dialog().waitFor({ timeout: HUNG_MS })
     const saidSelf = await dialog().innerText()
@@ -123,12 +124,12 @@ async function endFromOutside(app) {
     await themed('self', dialog())
     await dialog().getByRole('button', { name: 'Release', exact: true }).click()
     await dialog().waitFor({ state: 'detached', timeout: HUNG_MS })
-    check('Release frees it', !!(await until(async () => !(await slotA())?.writer)), JSON.stringify(await slotA()))
+    check('Release frees it', !!(await until(async () => !(await slotA())?.writer, HUNG_MS)), JSON.stringify(await slotA()))
     lib.endExactly(kept.splice(0))
 
     // --- 2. B1 again, and that Hive ends as a crash would: the next one lists slot-a's writer as held.
     await inv('session:start', alpha, { agentId: b1.id })
-    const s2 = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null))
+    const s2 = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null), HUNG_MS)
     const w1b = await inv('slots:heldWriter', alpha, 'slot-a')
     check('B1 runs in slot-a again, its new run the writer', s2?.slot === 'slot-a' && w1b?.run === s2.runId && w1b.run !== w1.run, JSON.stringify({ s2, w1b }))
     w1.run = w1b.run
@@ -137,10 +138,10 @@ async function endFromOutside(app) {
     const w2 = await until(async () => {
       const w = await inv('slots:heldWriter', alpha, 'slot-a')
       return w && w.hive.alive === false ? w : null
-    })
+    }, HUNG_MS)
     check("the next Hive sees slot-a's writer held by a Hive that has gone", w2?.run === w1.run && !w2.hive.self && w2.hive.pid === w1.hive.pid && !w2.live, JSON.stringify(w2))
-    check('…listed as held', !!(await until(async () => (await slotA())?.writer?.held === true)))
-    check("…and B1's ⋯ offers Release Slot…", !!(await until(async () => (await agentInfo(b1.id))?.heldSlot === 'slot-a')) && (await lib.agentMenu(h.page, 'B1')).some((t) => t.startsWith('Release Slot…')))
+    check('…listed as held', !!(await until(async () => (await slotA())?.writer?.held === true, HUNG_MS)))
+    check("…and B1's ⋯ offers Release Slot…", !!(await until(async () => (await agentInfo(b1.id))?.heldSlot === 'slot-a', HUNG_MS)) && (await lib.agentMenu(h.page, 'B1')).some((t) => t.startsWith('Release Slot…')))
     await h.page.keyboard.press('Escape')
     const startRefused = await inv('session:start', alpha, { agentId: b1.id }).then(() => 'started', (e) => String(e?.message ?? e))
     check('B1 can\'t start in slot-a meanwhile', /still has another session in it/.test(startRefused), startRefused)
@@ -153,7 +154,7 @@ async function endFromOutside(app) {
     await section.waitFor({ timeout: HUNG_MS })
     await section.locator('.workflow-option[data-option="folder"] select').selectOption('slots')
     const row = section.locator('.workflow-slots-table tr[data-slot="slot-a"]')
-    check('the slot list shows slot-a held by B1\'s ended session', !!(await until(async () => (await row.locator(`[data-held="${b1.id}"]`).count()) === 1)) && /Held by B1/.test(await row.innerText()), await row.innerText().catch(() => ''))
+    check('the slot list shows slot-a held by B1\'s ended session', !!(await until(async () => (await row.locator(`[data-held="${b1.id}"]`).count()) === 1, HUNG_MS)) && /Held by B1/.test(await row.innerText()), await row.innerText().catch(() => ''))
     await row.locator('[data-action="release-held"]').click()
     await dialog().waitFor({ timeout: HUNG_MS })
     const said = await dialog().innerText()
@@ -164,10 +165,10 @@ async function endFromOutside(app) {
     check('Release frees slot-a: no writer, still lent to #12', !!(await until(async () => {
       const s = await slotA()
       return s && !s.writer && s.lease?.card === 12
-    })), JSON.stringify(await slotA()))
-    check("…the list and B1's ⋯ no longer offer it", !!(await until(async () => (await row.locator('[data-action="release-held"]').count()) === 0 && !(await agentInfo(b1.id))?.heldSlot)))
+    }, HUNG_MS)), JSON.stringify(await slotA()))
+    check("…the list and B1's ⋯ no longer offer it", !!(await until(async () => (await row.locator('[data-action="release-held"]').count()) === 0 && !(await agentInfo(b1.id))?.heldSlot, HUNG_MS)))
     await inv('session:start', alpha, { agentId: b1.id })
-    const s3 = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null))
+    const s3 = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null), HUNG_MS)
     check('B1 starts in slot-a again', s3?.slot === 'slot-a' && (await inv('slots:heldWriter', alpha, 'slot-a'))?.run === s3.runId, JSON.stringify(s3))
   } finally {
     await h?.app.close().catch(() => undefined)

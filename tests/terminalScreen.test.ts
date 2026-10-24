@@ -6,6 +6,9 @@ const { warnings } = vi.hoisted(() => ({ warnings: [] as string[] }))
 vi.mock('../src/main/logger', () => ({ createLogger: () => ({ info: () => undefined, warn: (m: string) => void warnings.push(m), debug: () => undefined }), userText: (s: string) => s }))
 const { TerminalScreen } = await import('../src/main/terminalScreen')
 
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
+const HUNG_MS = 10000
+
 type Screen = InstanceType<typeof TerminalScreen>
 const screens: Screen[] = []
 const screen = (cols: number, rows: number): Screen => {
@@ -49,7 +52,7 @@ describe("a session's headless screen (#1572)", () => {
     s.write('more', () => (pendingParsed = true))
     s.resize(26, 38)
     expect(warnings).toEqual([expect.stringContaining('26×38')])
-    await vi.waitFor(() => expect(pendingParsed).toBe(true))
+    await vi.waitFor(() => expect(pendingParsed).toBe(true), { timeout: HUNG_MS })
     // It keeps what Hive reads besides the cells (bracketed paste), and takes what was going to throw.
     expect(s.bracketedPaste()).toBe(true)
     await parsed(s, '\x1b[K\x1b[41;1H')
