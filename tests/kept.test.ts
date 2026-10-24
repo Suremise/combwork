@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { Worker } from 'worker_threads'
 import { describe, expect, it } from 'vitest'
-import { onCorruptFile, readKeptJson, readKeptJsonSync, writeKeptJson } from '../src/main/fsutil'
+import { keptSettleSteps, onCorruptFile, readKeptJson, readKeptJsonSync, writeKeptJson, type KeptSample, type KeptSettled } from '../src/main/fsutil'
 import { tempDir } from './tempDir'
 
 describe('kept files', () => {
@@ -50,6 +50,51 @@ describe('kept files', () => {
     expect(await readKeptJson(f, null)).toEqual({ n: 4 })
     expect(readdirSync(dir).some((n) => n.startsWith('d.json.corrupt-'))).toBe(true)
   })
+
+  // The rule both readers follow, given reads made up (#1598): what each pause's read sees decides the outcome.
+  const run = (reads: KeptSample[]): { pauses: number; outcome: KeptSettled } => {
+    const steps = keptSettleSteps(reads[0])
+    let pauses = 0
+    for (let step = steps.next(); ; ) {
+      if (step.done) return { pauses, outcome: step.value }
+      pauses++
+      step = steps.next(reads[Math.min(pauses, reads.length - 1)])
+    }
+  }
+  const read = (text: string, mtimeMs: number): KeptSample => ({ text, size: text.length, mtimeMs })
+
+  it('keeps reading a file that keeps changing, and leaves it unsettled when the pauses run out', () => {
+    const changing = Array.from({ length: 20 }, (_, i) => read(`{"a":${'1'.repeat(i + 1)}`, 1000 + i))
+    expect(run(changing)).toEqual({ pauses: 6, outcome: 'unsettled' })
+  })
+
+  it('counts a file emptied a moment ago as still saving to the end, and one emptied long ago as damaged', () => {
+    expect(run([read('', Date.now())])).toEqual({ pauses: 6, outcome: 'unsettled' })
+    expect(run([read('', Date.now() - 60_000)])).toEqual({ pauses: 1, outcome: 'damaged' })
+  })
+
+  it('calls a file damaged once two reads in a row see it unchanged, and takes it once it parses', () => {
+    expect(run([read('{"a":', 1000), read('{"a":1', 2000), read('{"a":1', 2000)])).toEqual({ pauses: 2, outcome: 'damaged' })
+    expect(run([read('', Date.now()), read('{"a":', 3000), read('{"a":2}', 4000)])).toEqual({ pauses: 2, outcome: { value: { a: 2 } } })
+    // Gone and still gone (a save that deletes, then renames, may yet bring it back): missing once the pauses run out.
+    expect(run([null, null])).toEqual({ pauses: 6, outcome: 'missing' })
+  })
+
+  for (const sync of [false, true]) {
+    it(`leaves a file still changing after the pauses as it is, using its last good copy${sync ? ' (sync)' : ''}`, async () => {
+      const f = join(dir, `busy-${sync ? 'sync' : 'async'}.json`)
+      await writeKeptJson(f, { n: 5 })
+      writeFileSync(f, '')
+      // Emptied "a moment ago" for the whole budget: a save still in progress when the pauses run out.
+      const soon = new Date(Date.now() + 60_000)
+      utimesSync(f, soon, soon)
+      const before = reports.length
+      expect(sync ? readKeptJsonSync(f, null) : await readKeptJson(f, null)).toEqual({ n: 5 })
+      expect(readFileSync(f, 'utf8')).toBe('')
+      expect(readdirSync(dir).filter((n) => n.startsWith(`busy-${sync ? 'sync' : 'async'}.json.corrupt-`))).toEqual([])
+      expect(reports.length).toBe(before)
+    })
+  }
 
   // #1598: something outside Hive saving in place (truncate, then write) while Hive reads must never look like damage.
   for (const sync of [false, true]) {
