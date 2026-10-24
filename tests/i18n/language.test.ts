@@ -81,7 +81,7 @@ describe('Settings → General → Language in the catalogue', () => {
     expect(e.title).toBe('Language')
     expect(e.text?.title).toBe(LANGUAGE_TEXT.title)
     expect(e.text?.englishTitle).toBe(true)
-    expect(e.docs).toBe('Language')
+    expect(e.docs).toBe('language')
     expect(DEFAULT_SETTINGS.general.language).toBe('auto')
   })
 
