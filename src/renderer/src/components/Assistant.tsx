@@ -1,6 +1,7 @@
 import { Children, useEffect, useRef, useState } from 'react'
 import { ASSISTANT_AGENT_ID, DEFAULT_MODE, NEW_MODE_DESCRIPTION, assistantModeId } from '@shared/assistant'
 import { assistantStatusLine } from '@shared/assistantStatus'
+import { SHIPPED_MODE_DESCRIPTIONS, SHIPPED_MODE_NAMES } from '@shared/modeDescriptions'
 import { AGENT_STATE_LABEL, agentState, boardExtras, type AgentState } from '@shared/agentState'
 import { compactThreshold, isCompacting } from '@shared/defaults'
 import { formatTime } from '@shared/dates'
@@ -29,7 +30,7 @@ import { PaneResizer, usePaneSize } from './Resizer'
 import { StateMark } from './StateMark'
 import { TerminalView } from './TerminalView'
 import { Icon, IconButton, Modal, ReviewMark, statusText, Tooltip, useContextMenu, type MenuEntry } from './ui'
-import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
+import { fmt, msg, tr, tRich } from '@shared/i18n'
 
 /**
  * The Hive Assistant's side panel: the workspace's overseer. Its header (mode, controls) and status line, what is
@@ -162,36 +163,17 @@ const settingsLink = (c: React.ReactNode[]): React.ReactNode => (
 )
 
 /**
- * The names of the modes Hive ships (resources/modes), as the window shows them (#806). Display only: the files keep
- * their names, and what the Assistant reads is the file.
- */
-const SHIPPED_NAMES: Record<string, Msg> = {
-  coordinator: msg({ id: 'assistant.modes.shipped.coordinator', defaultMessage: 'Coordinator', description: "The name of a mode of the Hive Assistant that ships with Hive: it runs the work across the agents. Shown in its menus and the Assistant view; keep it short." }),
-  planner: msg({ id: 'assistant.modes.shipped.planner', defaultMessage: 'Planner', description: "The name of a mode of the Hive Assistant that ships with Hive: it shapes work before anyone starts it. Shown in its menus and the Assistant view; keep it short." }),
-  'qa-triager': msg({ id: 'assistant.modes.shipped.qaTriager', defaultMessage: 'QA triager', description: "The name of a mode of the Hive Assistant that ships with Hive: it turns a bug report into a card with evidence. Shown in its menus and the Assistant view; keep it short." }),
-  'release-manager': msg({ id: 'assistant.modes.shipped.releaseManager', defaultMessage: 'Release manager', description: "The name of a mode of the Hive Assistant that ships with Hive: it takes a release through its checklist. Shown in its menus and the Assistant view; keep it short." })
-}
-
-/**
- * A mode's name in the window: one Hive ships, in the window's language while its file still has Hive's name for it;
- * any other (the user's own, or one they renamed) as its file has it.
+ * A mode's name in the window: one Hive ships (SHIPPED_MODE_NAMES, #806), in the window's language while its file still
+ * has Hive's name for it; any other (the user's own, or one they renamed) as its file has it.
  */
 export function modeName(p: Pick<ModeInfo, 'id' | 'name' | 'bundled'>): string {
-  const shipped = p.bundled ? SHIPPED_NAMES[p.id] : undefined
+  const shipped = p.bundled ? SHIPPED_MODE_NAMES[p.id] : undefined
   return shipped && p.name === shipped.defaultMessage ? tr(shipped) : p.name
-}
-
-/** What the modes Hive ships are for (their files' description), as the window shows them (#885). Display only, as their names. */
-const SHIPPED_DESCRIPTIONS: Record<string, Msg> = {
-  coordinator: msg({ id: 'assistant.modes.shippedDescription.coordinator', defaultMessage: 'Runs the work across the agents: state first, facts looked up before asked, short status tables, lane prompts from settled cards, decisions only when they are real.', description: "What a mode of the Hive Assistant that ships with Hive (Coordinator) is for, in a line: under its name in the mode menu and the Assistant view." }),
-  planner: msg({ id: 'assistant.modes.shippedDescription.planner', defaultMessage: 'Shapes work before anyone starts it: the open questions with a recommendation each, options, lanes split by files, complete cards.', description: "What a mode of the Hive Assistant that ships with Hive (Planner) is for, in a line: under its name in the mode menu and the Assistant view." }),
-  'qa-triager': msg({ id: 'assistant.modes.shippedDescription.qaTriager', defaultMessage: 'Turns a bug report into a card with evidence: reproduce or read the code to find the likely cause, propose a fix, place it in the right lane.', description: "What a mode of the Hive Assistant that ships with Hive (QA triager) is for, in a line: under its name in the mode menu and the Assistant view." }),
-  'release-manager': msg({ id: 'assistant.modes.shippedDescription.releaseManager', defaultMessage: "Takes a release through the project's release path, stage by stage: notes, licences, packaged checks; each build, version, merge, tag and publish only when asked.", description: "What a mode of the Hive Assistant that ships with Hive (Release manager) is for, in a line: under its name in the mode menu and the Assistant view." })
 }
 
 /** What a mode is for, in the window: as modeName, one Hive ships in the window's language while its file still has Hive's words. */
 export function modeDescription(p: Pick<ModeInfo, 'id' | 'description' | 'bundled'>): string {
-  const shipped = p.bundled ? SHIPPED_DESCRIPTIONS[p.id] : undefined
+  const shipped = p.bundled ? SHIPPED_MODE_DESCRIPTIONS[p.id] : undefined
   if (shipped && p.description === shipped.defaultMessage) return tr(shipped)
   // A new mode's description until the user writes one (#889).
   if (p.description === NEW_MODE_DESCRIPTION) return tr(msg({ id: 'assistant.modes.newDescription', defaultMessage: 'What this mode is for, in one line.', description: "A new mode of the Hive Assistant's description, until the user writes one in its file: under its name in the mode menu and the Assistant view." }))
