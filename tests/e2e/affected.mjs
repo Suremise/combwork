@@ -326,7 +326,7 @@ export const AREAS = [
   // Start and Resume busy while a session starts (#1177).
   { paths: ['src/renderer/src/actions.ts', 'src/renderer/src/components/AgentPanes.tsx', 'src/renderer/src/components/Assistant.tsx', 'src/renderer/src/views/SessionsTab.tsx', 'src/renderer/src/views/ProjectView.tsx', 'src/renderer/src/components/Sidebar.tsx', 'src/main/stepTimes.ts'], suites: ['startbusy'] },
   // The Tiles view and focus view (#976).
-  { paths: ['src/renderer/src/components/AgentTiles.tsx', 'src/shared/tiles.ts', 'src/renderer/src/views/ProjectView.tsx', 'src/renderer/src/commands.ts'], suites: ['tilesview'] },
+  { paths: ['src/renderer/src/components/AgentTiles.tsx', 'src/shared/tiles.ts', 'src/renderer/src/views/ProjectView.tsx', 'src/renderer/src/commands.ts'], suites: ['tilestrip', 'tilesview'] },
   // The agent-state marks (#973).
   { paths: ['src/renderer/src/components/StateMark.tsx', 'src/shared/agentState.ts'], suites: ['statemarks', 'contrast'] },
   { paths: ['src/renderer/src/components/AgentsTable.tsx', 'src/shared/agentTable.ts'], suites: ['agentrole', 'agentstable', 'cardchip'] },
