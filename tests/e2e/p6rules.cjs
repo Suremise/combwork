@@ -55,13 +55,14 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 200)
     const setOptions = (over) => inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, over) })
     const r1 = await q.agent(fx, h, 'R1')
     const r2 = await q.agent(fx, h, 'R2')
-    const b1 = await q.agent(fx, h, 'B1', { worktree: true })
+    const b1 = await q.agent(fx, h, 'B1')
     check('the agents have their tokens', !!(r1.token && r2.token && b1.token))
-    /** A card of B1's: started, `files` committed in its worktree. */
+    /** A card of B1's: started on the slot its start lends (#1578), `files` committed there. */
     const started = async (title, files) => {
       const n = (await inv('tasks:create', { title, project: 'alpha' })).number
-      const s = await q.intent(h, b1, n, 'start')
-      commitIn(b1.folder, files, title)
+      const s = await q.startCard(fx, h, b1, n)
+      // Refused, B1's folder is still its last card's slot: nothing is committed there.
+      if (s.status === 200) commitIn(b1.folder, files, title)
       return { n, start: s }
     }
 
@@ -91,24 +92,27 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 200)
     await api(b1, 'POST', `/v1/progress/${run.body.id}/finish`, { ok: true })
     const after = await q.intent(h, b1, g13.n, 'submit', { summary: 'own runs: ready' })
     check('…the run ended: submitted', after.status === 200 && (await column(g13.n)) === 'review', JSON.stringify(after.body))
+    // Each card reviewed and merged before B1's next starts (its slot is the card's until then, #1578), so G9's part has
+    // the queue to itself.
+    const merged = async (n) => {
+      await q.intent(h, r1, n, 'start-review')
+      await q.intent(h, r1, n, 'verdict', { pass: true, comment: 'passed' })
+      return done(n)
+    }
+    check('…reviewed and merged', await merged(g13.n), JSON.stringify(await h.kinds(g13.n)))
     await setOptions({ stopOwnRuns: false })
     const off = await started('Runs allowed', { 'allowed.txt': 'runs allowed\n' })
     const run2 = await api(b1, 'POST', '/v1/progress', { title: 'lint (B1)', card: `#${off.n}` })
     const offSub = await q.intent(h, b1, off.n, 'submit', { summary: 'allowed: ready' })
-    check('G13 off: an open run of B1’s refuses nothing', run2.status === 200 && offSub.status === 200 && (await column(off.n)) === 'review', JSON.stringify(offSub.body))
+    check('G13 off: an open run of B1’s refuses nothing', off.start.status === 200 && run2.status === 200 && offSub.status === 200 && (await column(off.n)) === 'review', JSON.stringify({ start: off.start.body, sub: offSub.body }))
     await api(b1, 'POST', `/v1/progress/${run2.body.id}/finish`, { ok: true })
-    // Both cards reviewed and merged, so G9's part has the queue to itself.
-    for (const n of [g13.n, off.n]) {
-      await q.intent(h, r1, n, 'start-review')
-      await q.intent(h, r1, n, 'verdict', { pass: true, comment: 'passed' })
-    }
-    check('…both reviewed and merged', (await done(g13.n)) && (await done(off.n)), JSON.stringify({ g13: await h.kinds(g13.n), off: await h.kinds(off.n) }))
+    check('…reviewed and merged too', await merged(off.n), JSON.stringify(await h.kinds(off.n)))
 
     // ===== G9 mergeInstall: always: an install before every entry's checks, in the warm worktree too.
     const order = path.join(fx.tools, 'order.log')
     fs.writeFileSync(order, '')
     const install = path.join(fx.tools, 'install.js')
-    // Each install says where it ran: agents' new worktrees run the setup too, and only the queue's count here.
+    // Each install says where it ran: slots run the setup too, and only the queue's count here.
     fs.writeFileSync(install, `require('fs').appendFileSync(${JSON.stringify(order)}, 'install ' + process.cwd() + '\\n')\n`)
     await inv('project:updateConfig', fx.alpha, { worktreeSetup: `node "${install}"` })
     q.checkWith(fx, 'ordered', `require('fs').appendFileSync(${JSON.stringify(order)}, 'check\\n')`)
@@ -122,8 +126,8 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 200)
         .map((l) => l.split(' ')[0])
     // The second card under way as the first merges (as in a lane): the queue keeps its worktree, warm, for it.
     const second9 = (await inv('tasks:create', { title: 'Install again', project: 'alpha' })).number
-    const b9 = await q.agent(fx, h, `B${second9}`, { worktree: true })
-    const s9 = await q.intent(h, b9, second9, 'start')
+    const b9 = await q.agent(fx, h, `B${second9}`)
+    const s9 = await q.startCard(fx, h, b9, second9)
     const first9 = await q.approve(fx, h, r1, 'Install first', { 'first.txt': 'first\n' })
     check('G9: the first card approved and merged', s9.status === 200 && Object.values(first9.steps).every((x) => x.status === 200) && (await done(first9.n)), JSON.stringify(first9.steps))
     check('…an install before its check', JSON.stringify(lines()) === JSON.stringify(['install', 'check']), JSON.stringify(lines()))

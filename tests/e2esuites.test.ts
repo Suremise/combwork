@@ -65,6 +65,29 @@ describe('the e2e suite list', () => {
     for (const s of suites) if ('serial' in s) expect(typeof s.serial === 'string' && s.serial.length > 3, s.name).toBe(true)
   })
 
+  it("the queue suites run on a packaged build, or say in their header why they can't (#1578)", () => {
+    // A packaged Hive (HIVE_EXE) refuses the test copies' channels (0.9 worktree agents through agents:testLegacy,
+    // slots:test) and ignores the HIVE_TEST_ seams, and a suite starting Electron itself never starts it: a suite that
+    // needs one is a dev-build test on purpose and says so, or skips that part there (queueFixture's devSeam) and says so.
+    // (`{ worktree: true })`: an agent asked for in a worktree (q.agent), not a 0.9 template's data, as templatesv2 imports.)
+    const devOnly = /agents:testLegacy|slots:test|\{ worktree: true \}\)|['"]new-worktree['"]|HIVE_TEST_(SLOW_IPC|FAIL_IPC|QUEUE_[A-Z_]+)|_electron\.launch/
+    // The queue suites, and those #1578 named beside them (the rest are #1580's).
+    const named = ['agentapislots', 'gitbranchcards', 'mergedialogslots', 'slotreleaseapi', 'templatesv2']
+    const unsaid: string[] = []
+    for (const n of names) {
+      const lines = readFileSync(join(dir, `${n}.cjs`), 'utf8').split(/\r?\n/)
+      if (!named.includes(n) && !lines.some((l) => /require\('\.\/queueFixture\.cjs'\)/.test(l))) continue
+      const header = lines
+        .slice(0, lines.findIndex((l) => !l.startsWith('//')))
+        .map((l) => l.replace(/^\/\/\s*/, ''))
+        .join(' ')
+      const needs = lines.filter((l) => !l.trimStart().startsWith('//')).find((l) => devOnly.test(l))
+      const skips = /NOT RUN on a packaged build/.test(header) && lines.some((l) => /q\.devSeam\(|process\.env\.HIVE_EXE/.test(l))
+      if (needs && !/Dev build only/.test(header) && !skips) unsaid.push(`${n}.cjs: ${devOnly.exec(needs)?.[0]}`)
+    }
+    expect(unsaid).toEqual([])
+  })
+
   it('no fixed wait of 1 s or more without a reason: wait for the condition (lib.until) instead', () => {
     // A long sleep is slower and flakier than waiting for what the next check needs. The ones left say why: they check
     // that something does NOT happen, are a loop's poll interval, or are a race's timeout.

@@ -8,6 +8,7 @@
 // - an archive script that fails (exit 3) keeps the slot, saying so; once it passes, it runs before the slot is removed
 //   (it saw the folder), and the slot goes.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR (no agent is started).
+// Dev build only (#1578): its slots are lent and released through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')

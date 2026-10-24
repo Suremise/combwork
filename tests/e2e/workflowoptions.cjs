@@ -11,6 +11,8 @@
 // window (#1483): a reviewer agent chosen from All off (#1508), G1b two reviewers, G12, G13, G14 on the project's own row; None's N1, N3, N4, N6. G4 set from the tab decides a clean
 // rebase: Same change carries the pass over, Exact revision only makes it stale (S9). Screenshots in both themes, in
 // German and in Polish. Dev build, throwaway profiles and workspaces; the fake Claude Code for G4's agents.
+// Dev build only (#1578): it starts this checkout's Electron itself, writes the board's tables, and holds a read with a
+// test seam (HIVE_TEST_SLOW_IPC); its queue's builders are on slots, as 1.0 has them.
 const lib = require('./lib.cjs')
 const q = require('./queueFixture.cjs')
 const { _electron } = require('playwright-core')

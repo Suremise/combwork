@@ -831,6 +831,14 @@
     "defaultMessage": "{pages, plural, one {The project's agents} other {The project's agents, page {page, number} of {pages, number}}}",
     "description": "Accessible name of the Tiles view's grid of tiles: the page shown ({page}) of how many ({pages})."
   },
+  "panes.tiles.moveDown": {
+    "defaultMessage": "Move Down",
+    "description": "Menu item (an agent's row in the focus view's strip, the Tiles view): moves the agent one place down the list, the project's order."
+  },
+  "panes.tiles.moveUp": {
+    "defaultMessage": "Move Up",
+    "description": "Menu item (an agent's row in the focus view's strip, the Tiles view): moves the agent one place up the list, the project's order."
+  },
   "panes.tiles.notRunning": {
     "defaultMessage": "Not running",
     "description": "An agent's status on its tile (the Tiles view) and in the focus view's strip: its session isn't running."
@@ -846,6 +854,14 @@
   "panes.tiles.reviewing": {
     "defaultMessage": "Reviewing {card}",
     "description": "On an agent's tile: the card it reviews ({card}: \"#12 Its title\")."
+  },
+  "panes.tiles.rowEdge": {
+    "defaultMessage": "{where, select, first {{agent} is already first} other {{agent} is already last}}",
+    "description": "Said to screen readers when an agent is moved in the focus view's strip with Alt+Up or Alt+Down but is already first or last in the project's order."
+  },
+  "panes.tiles.rowMoved": {
+    "defaultMessage": "{agent}: {place, number} of {count, number}",
+    "description": "Said to screen readers when an agent is moved in the focus view's strip from the keyboard (Alt+Up, Alt+Down or its menu): its place in the project's order now ({place}) of how many agents ({count})."
   },
   "panes.tiles.stripLabel": {
     "defaultMessage": "The project's agents",

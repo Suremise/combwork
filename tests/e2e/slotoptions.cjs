@@ -11,6 +11,8 @@
 //   after the next start, with G15 On.
 // Screenshots of the Slots and copies group and the G11/G15/G17 rows, light and dark, in English and German.
 // Dev build, throwaway profile and workspace.
+// Dev build only (#1578): B1's slot is lent through slots:test, and a write is held with a test seam
+// (HIVE_TEST_SLOW_IPC).
 const lib = require('./lib.cjs')
 const q = require('./queueFixture.cjs')
 const fs = require('fs')

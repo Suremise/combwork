@@ -422,6 +422,14 @@ minutes, the network off and Hive's fake CLIs only: no real CLI, sign-in or cred
   `lib.launch` starts that packaged Hive.exe instead of the dev build, saying so in the suite's log; `boardupgrade`'s
   step 8 needs an unpackaged build's upgrade hold, so it says NOT RUN there. The Sandbox maps Node, Git and the checkout
   read-only as tool folders; #1227's card has the script.
+- **The queue suites on a packaged build** (#1578; S54 and S55 among them, for #1449 and #1539): `queueFixture.cjs`
+  starts Hive through `lib.launch`, so `HIVE_EXE` runs them on the build named. A packaged build refuses the test
+  copies' channels (`agents:testLegacy`, which makes 0.9 worktree agents, and `slots:test`) and ignores the
+  `HIVE_TEST_…` seams, so builders are added in the project folder and work on the slot each card's start lends
+  (`q.approve`, `q.approveBy`, `q.startCard`). A part that needs a seam runs only when `q.devSeam(what)` says so, and
+  prints NOT RUN on a packaged build. A suite that tests 0.9 worktrees on purpose (a lane carried over the upgrade, the
+  Merge dialog on an agent's branch) or that needs the test channels says "Dev build only" and why in its header.
+  `tests/e2esuites.test.ts` fails on a queue suite that needs one of these without saying so.
 
 ## What they need
 

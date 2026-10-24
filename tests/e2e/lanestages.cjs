@@ -64,23 +64,23 @@ const beta = path.join(fx.ws, 'beta')
     const m = await q.approve(fx, h, r1, 'Merging card', { 'm.txt': 'm\n' })
     check('Merging: the queue tests its merge (its check held)', !!(await waitHung(() => fs.existsSync(fx.started))) && m.steps.verdict.status === 200, JSON.stringify(m.steps))
     check('…its stage is Merging', !!(await waitHung(async () => (await badge(m.n))?.stage === 'merging')), JSON.stringify(await badge(m.n)))
-    const ba = await q.agent(fx, h, 'BA', { worktree: true })
+    const ba = await q.agent(fx, h, 'BA')
     const a = (await inv('tasks:create', { title: 'Approved card', project: 'alpha', labels: ['ui'] })).number
-    await q.intent(h, ba, a, 'start')
+    await q.startCard(fx, h, ba, a)
     commitIn(ba.folder, 'a.txt', 'Approved card')
     await q.intent(h, ba, a, 'submit', { summary: 'ready' })
     await q.intent(h, r1, a, 'start-review')
     const av = await q.intent(h, r1, a, 'verdict', { pass: true, comment: 'passed' })
     check('Approved: passed, waiting for your OK (labelled ui)', av.status === 200 && !!(await waitHung(async () => (await badge(a))?.stage === 'approved')), JSON.stringify(av.body))
-    const br = await q.agent(fx, h, 'BR', { worktree: true })
+    const br = await q.agent(fx, h, 'BR')
     const r = (await inv('tasks:create', { title: 'Review card', project: 'alpha' })).number
-    await q.intent(h, br, r, 'start')
+    await q.startCard(fx, h, br, r)
     commitIn(br.folder, 'r.txt', 'Review card')
     const rs = await q.intent(h, br, r, 'submit', { summary: 'ready' })
     check('Review: submitted', rs.status === 200 && !!(await waitHung(async () => (await badge(r))?.stage === 'review')), JSON.stringify(rs.body))
     const l1 = await startLane('alpha', `B${m.n}`, 'R1', 'stages', [m.n, a, r])
     // A second lane, its card still to do: started before the options change, it keeps the ruleset of then.
-    const bx = await q.agent(fx, h, 'BX', { worktree: true })
+    const bx = await q.agent(fx, h, 'BX')
     const nx = (await inv('tasks:create', { title: 'Next card', project: 'alpha' })).number
     const l2 = await startLane('alpha', 'BX', 'R1', 'next', [nx])
     check('the lanes are recorded with their rulesets, no old rules yet', !!l1 && !!l2 && (await laneNow(l1))?.oldRules === false && (await laneNow(l2))?.oldRules === false, JSON.stringify(await inv('lanes:list')))
@@ -157,8 +157,8 @@ const beta = path.join(fx.ws, 'beta')
 
     // The lane's next card, started after the change, keeps the lane's ruleset (§16.5.4): the one in force before it, as
     // the cards started then have.
+    const sx = await q.startCard(fx, h, bx, nx)
     commitIn(bx.folder, 'nx.txt', 'Next card')
-    const sx = await q.intent(h, bx, nx, 'start')
     const started = (await h.facts(nx)).find((x) => x.kind === 'Started')
     check("the lane's next card, started after the change, keeps the lane's ruleset: old rules", sx.status === 200 && !!started?.ruleset && started.ruleset === (await h.facts(m.n)).find((x) => x.kind === 'Started')?.ruleset && !!(await waitHung(async () => (await badge(nx))?.oldRules === true)), JSON.stringify({ sx: sx.body, started }))
 

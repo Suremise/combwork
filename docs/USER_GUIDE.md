@@ -1,8 +1,8 @@
-# Hive Desktop User Guide
+# Hive Desktop User Guide <a id="hive-desktop-user-guide"></a>
 
 Hive Desktop (Hive for short) is a desktop workspace for coding with AI agents. It runs coding agents (**Claude Code** and **Codex**) for each project you're working on, side by side, and keeps track of what each one is doing, how many tokens it uses, and the skills and MCP servers it has.
 
-## Getting started
+## Getting started <a id="getting-started"></a>
 
 1. **Install Hive Desktop.** Download `Hive-Setup-<version>.exe` from the [latest release](https://github.com/Suremise/hive-desktop/releases/latest) and run it: it adds **Hive Desktop** to the Start menu and the desktop. The installer isn't code-signed yet, so Windows SmartScreen may warn you; choose **More info → Run anyway**. From then on Hive keeps itself up to date (see [Updating Hive](#updating-hive)).
 2. **Choose your coding agents.** Hive runs the standalone command-line tools of **Claude Code** (Anthropic), **Codex** (OpenAI) and **GitHub Copilot** (GitHub); they aren't included with Hive. A new install starts with all of them turned off: turn on the ones you use in **Settings → Providers** (the banner at the top links there). **Help → Agent Setup…** finds each CLI and offers a one-click install with the official installer if it's missing, and walks you through signing in (and, for Codex, its one-time Windows sandbox setup). The copies inside VS Code (or Cursor) extensions are not used. See [Coding agents](#coding-agents-claude-code-codex-and-github-copilot).
@@ -12,21 +12,21 @@ Hive Desktop (Hive for short) is a desktop workspace for coding with AI agents. 
 
 **Start small, finish a block, start fresh.** Hive runs well on a small plan, such as Claude Pro. Start with one agent; a builder and a reviewer (see [Card loops](#card-loops)) is optional. A lighter model suits routine work for a project's agents (**Agent Settings**), but keep the Assistant on your agents' model and effort (see [Assistant settings](#assistant-settings)). What uses a plan most is long conversations, since every turn sends the whole conversation again. So work in blocks of a few hours, let the lanes finish, then start every session fresh, the Assistant's too (**New Conversation** in its **⋯** menu): it picks up from its journal and the board. To keep an agent's thread, hand it over to itself in a new conversation (see [Long conversations](#long-conversations)).
 
-### Tips
+### Tips <a id="tips"></a>
 
 Hive shows a **tip** about something it can do when it starts, at most one a day, in a small card in the bottom-right corner: **Try it** does it, **Learn more** opens the part of this guide about it, and **Next tip** shows another. A few tips come at the moment they help, once each: the first time a transcript turns amber, the context passes your Compact threshold, you add a second agent, or you paste a screenshot. Tips about things you already do are skipped. The card never blocks anything: it steps aside while you type in a terminal under it, sits left of the Assistant's panel while that is open, and moves up above a bar with buttons (such as **Resume** and **New** when a conversation has ended). **Don't show tips** turns them off (**Settings → General → Show a tip when Hive starts** turns them back on); **Help → Tips…** lists them all, searchable, either way.
 
 With several Hive windows open, they share what the tips remember: a tip seen, the day's tip shown, a moment's tip used or a command you've run in one window counts in all of them, and stays that way after a restart. Another window doesn't show you the same tip again.
 
-### Moving dialogs
+### Moving dialogs <a id="moving-dialogs"></a>
 
 Any dialog (Add Agent, Agent Settings, a card, a question…) can be moved out of the way: drag it by its header. It stays inside the window, and **Escape** while dragging puts it back. A dialog opens in the middle again next time. A question over a dialog moves on its own, and Escape closes just the question. The image viewers stay where they are. When a dialog closes, the keyboard goes back to what had it before, such as the button that opened it. Pressing **Enter** to confirm a name (New Mode…, a rename) never presses that button again, so the dialog doesn't reopen.
 
-### Search and filter boxes
+### Search and filter boxes <a id="search-and-filter-boxes"></a>
 
 Every search and filter box (the board's search, Settings, the Files and Sessions tabs, the sidebar's filters, tables' filters, Tips, Keyboard Shortcuts and the command palette) shows an **×** at its right while it has text: click it, or press **Escape**, to clear it and see everything again; the cursor stays in the box. In a dialog or the command palette, the first Escape clears the box and the next one closes it.
 
-## Coding agents: Claude Code, Codex and GitHub Copilot
+## Coding agents: Claude Code, Codex and GitHub Copilot <a id="coding-agents-claude-code-codex-and-github-copilot"></a>
 
 Hive calls the coding agents it can run **providers**. Each agent in a project chooses its own, so a project can have a Claude Code agent and a Codex agent working side by side. Hive shows each CLI's own terminal, exactly as it looks when you run it yourself.
 
@@ -37,7 +37,7 @@ Hive calls the coding agents it can run **providers**. Each agent in a project c
 - **Conversations stay with their provider.** A Claude Code session can only be resumed by a Claude Code agent, and a Codex session by a Codex agent. To move work to another provider, use **Hand Over to…** (see [Sessions](#sessions)).
 - **What both share.** The workspace's Hive skills (those for project agents), its MCP servers and Hive's own `hive` tools reach every agent, whichever provider it uses. Neither CLI loads MCP servers from your user settings in Hive sessions. Hive never changes either CLI's own configuration files.
 
-### GitHub Copilot
+### GitHub Copilot <a id="github-copilot"></a>
 
 Hive runs the **GitHub Copilot CLI** (the `copilot` command), not Copilot in VS Code. Any Copilot plan includes it, Copilot Free too. Turn it on in **Settings → Providers**, then choose **GitHub Copilot** when you add an agent. Its agents get what the others get: statuses, file locks, the `hive` tools, the workspace's skills, sessions you can resume, usage and cost.
 
@@ -56,13 +56,13 @@ Hive runs the **GitHub Copilot CLI** (the `copilot` command), not Copilot in VS 
 - **Cost.** Copilot counts usage in **AI credits** (one credit is $0.01), not tokens. It writes a session's token totals only as it exits, so **Stop** ends a Copilot agent as you would, with Ctrl+C (it takes a second or two), and the Sessions tab keeps its tokens. If Copilot doesn't exit, Hive ends it after 10 seconds (**Settings → Advanced → Stop: exit grace**, under GitHub Copilot). Your plan's monthly allowance is in Copilot's `/usage`.
 - **"Third-party agents" on Copilot Pro.** Pro's Claude Code and Codex agents are GitHub's cloud agents, which work on issues and pull requests on github.com. They aren't the local CLIs: a Copilot plan doesn't sign in Hive's Claude Code or Codex agents. With Copilot, Hive's Claude and GPT models come through Copilot agents (on a paid plan).
 
-### Git
+### Git <a id="git"></a>
 
 Worktree agents, merging, the **Git** tab, what's left to merge on **Merge…**, agent templates with worktrees and **Remove All**'s clean-up all use **git**. Install **Git for Windows**, version **2.38 or later** (git-scm.com). **Help → Agent Setup…** shows a **Git** row under every tab: the version Hive found and where, or **Git not found** with how to fix it and a **Git for Windows** button. With an older git, the row says what doesn't work (for example, squash-merged branches still count as unmerged, so their worktrees are kept).
 
 Hive uses the git on its own PATH, together with the PATH Windows gives new programs. If you install git while Hive is open, or add its folder to your PATH, click **Check again**: no need to restart Hive. While git is missing, the status bar shows **Git** in red, and the screens that need it say *"Git isn't installed (or isn't on Hive's PATH)"* rather than that the project isn't a git repository. Hive never deletes a worktree or branch it can't check with git: they're kept, and it says why. Claude Code also uses Git for Windows' Bash for its commands when it's installed (else PowerShell).
 
-### Tested CLI versions
+### Tested CLI versions <a id="tested-cli-versions"></a>
 
 Claude Code, Codex and Copilot update on their own schedule, and a new version can change what Hive relies on. Each Hive release says which version of each it was tested with: **Help → Agent Setup…** shows it under the CLI it found, as **Tested with 2.1.287 · installed 2.1.290**.
 
@@ -73,7 +73,7 @@ Claude Code, Codex and Copilot update on their own schedule, and a new version c
 
 **Help → Copy Diagnostics** lists the tested and installed versions for each CLI, so a bug report says how they compare, and the Hive Assistant can see them too when you ask it about a CLI behaving oddly.
 
-### Models, effort levels and prices
+### Models, effort levels and prices <a id="models-effort-levels-and-prices"></a>
 
 Hive asks each CLI which models it has and what each can do, so a new model, or one your plan now includes, shows up without waiting for a Hive update. Claude Code and Codex answer for your installed version and your account (asking uses no tokens, and never starts a session). **Settings → <provider> → Models (fallback)** says where the models come from now, for example *From Claude Code 2.1.289*.
 
@@ -84,7 +84,7 @@ Hive asks each CLI which models it has and what each can do, so a new model, or 
 - **API prices** are Hive's starting prices, labelled with the date they were checked: edit any that are out of date, add a model, remove one, or **Reset to defaults**. Hive never fetches prices. Each table also lists the models the CLI has, so a model a CLI update adds appears on its own, marked **No price: enter one** until you do (its sessions' cost shows as unknown meanwhile, never $0). A model Hive has a price for that the CLI no longer lists stays, greyed and marked *not in <provider>'s list*, for older sessions. Codex doesn't report costs, so its table is the only source of its estimates, and the page links to OpenAI's pricing to check them against.
 - **Session costs** (Claude Code and GitHub Copilot, which report each session's cost themselves): **<provider>'s reported cost** (the default) uses the CLI's own figure. It follows the CLI's own price table and updates with the CLI; Hive never recomputes it, even when that table lags a price change. **My prices (the table below)** uses Hive's estimate from the table instead, for your own rates (a discount, another tier). Either way the table is used for sessions with no reported cost. Haiku 5.5's starting price covers prompts up to 100,000 tokens and five-minute cache writes. Longer prompts cost five times as much, and one-hour cache writes ($0.20 per million) are not modelled, so Hive's estimate for such sessions is low. Where Claude Code reports a cost, that figure is the one to trust.
 
-## Workspaces and projects
+## Workspaces and projects <a id="workspaces-and-projects"></a>
 
 A **workspace** is a folder of projects. When you open one, Hive creates a `.hive` folder in it:
 
@@ -104,7 +104,7 @@ The workspace `.hive` folder is meant to be **committed** so a team can share sk
 
 Each **project** (every subfolder except dot-folders) gets its own `.hive` folder for Hive's metadata: project settings, the session list and transcript backups. Hive adds it to the project's `.git/info/exclude`, so it's never committed and your `.gitignore` is left alone.
 
-### What Hive keeps in a project
+### What Hive keeps in a project <a id="what-hive-keeps-in-a-project"></a>
 
 A project's `.hive` folder is this computer's, not the project's: its settings, the session list, transcript backups and archive, attachments (files pasted or dropped into sessions), and each agent's launch folder (the skills, MCP servers and hooks it started with). None of it belongs in commits or shared copies. What could hold a secret isn't kept there at all: the key the hooks use to report an agent's status, and each session's settings and MCP server configuration (which may carry your servers' keys or a `--settings` file's `env`), go in Hive's own data folder instead, for as long as that session runs.
 
@@ -118,7 +118,7 @@ Where Hive can't do that, the project's **Overview** and **Project Settings** sa
 
 The Overview's notice has ✕ to stop showing it for that project; it comes back if the situation changes, and Project Settings always shows it.
 
-### Recent workspaces
+### Recent workspaces <a id="recent-workspaces"></a>
 
 **File → Open Recent** and the welcome page list the 12 workspaces you opened last, the most recent first.
 
@@ -129,7 +129,7 @@ The Overview's notice has ✕ to stop showing it for that project; it comes back
 
 Every window's list follows a change made in another.
 
-### Moving a workspace
+### Moving a workspace <a id="moving-a-workspace"></a>
 
 Move the workspace folder (in Explorer, to another drive…) while Hive doesn't have it open, then open it from its new place. A few things are kept by full path and still point to the old folder: agents' worktrees (and git's links to them), the folders sessions ran in, and Claude Code's conversations and memory, which it files under each folder's path in `~/.claude/projects`. Hive notices and says so in a banner, **This workspace was moved from …** (the same folder opened by another name, through a junction or a short name, hasn't moved, and brings no banner). **Repair…** shows what it will do as a table, a group of rows a project: **What** (an agent's worktree or branch, the sessions, Claude Code's conversations and memory), **Was** and **Now** (the part of each path that differs, the full path when you point at it, and copied whole when you copy it), and **Will do**, with a missing worktree's choices at the row's right edge. Claude Code's folders are one row; its arrow lists them one by one. It does it all when you choose **Repair**:
 
@@ -151,7 +151,7 @@ The banner's **✕** hides it for now; **Repair Moved Workspace…** in the comm
 
 **A worktree folder that's gone.** If an agent's worktree folder was deleted (after its work was merged, say) or never came along (a workspace copied to another computer), starting the agent offers to **Recreate** the worktree on its branch, with its commits, at the same place; the project's worktree setup command runs first, as for a new worktree. When the branch is gone too, it offers a new worktree on it from the branch it started from, or to remove the agent's worktree link. If the old place can't be used (a drive that isn't connected), the worktree goes where Hive makes new ones, and the agent's sessions follow it.
 
-### Several windows
+### Several windows <a id="several-windows"></a>
 
 Like VS Code, Hive can show several workspaces at once, each in its own window: **File → New Window** (Ctrl+K Ctrl+N) opens one on the welcome page, where you open or create a workspace. Each window is a full Hive with its own projects, agents, shared notes, skills and MCP servers; settings, the tray and updates are shared.
 
@@ -162,7 +162,7 @@ Like VS Code, Hive can show several workspaces at once, each in its own window: 
 - Notifications and the tray menu take you to the window showing the project.
 - The title bar names the window's project and workspace, centred. When the window is too narrow for it beside the menus (in a language with long menu names, say), it moves aside and is shortened with "…", or hides, so the menus always stay clear.
 
-### Always on Top
+### Always on Top <a id="always-on-top"></a>
 
 Keep a Hive window above your other apps, so a test run, an emulator or a browser can work underneath without covering it: click the **pin** in the title bar, just left of the window buttons, or use **View → Always on Top** (Ctrl+Alt+O), or the command palette. The pin is lit, and the menu item checked, while the window stays on top; click it again to turn it off.
 
@@ -171,7 +171,7 @@ Keep a Hive window above your other apps, so a test run, an emulator or a browse
 - It's your desk's preference, kept by Hive on this computer, not in the workspace's `.hive` folder: someone else opening the same workspace isn't affected.
 - On top means above other apps' windows. Windows' own system screens (sign-in prompts, the Start menu) still come in front.
 
-### Working on a project
+### Working on a project <a id="working-on-a-project"></a>
 
 The switch next to a project marks it as one you're **working on**. Only active projects run sessions, show live status and send notifications, so a workspace with dozens of projects stays quiet. Turning a project on never starts a session by itself.
 
@@ -195,7 +195,7 @@ The sidebar and the lists in the Sessions, Files, Version Control (Changes) and 
 
 A project's tabs (Session, Overview, Performance, Tasks and the rest) shrink to **icons** when their names don't fit, as in a narrow window or with the sidebar and panels open; the tab you're on keeps its name. Hover a tab for its name and shortcut. They get their names back once there's room. In a very narrow window the tabs scroll sideways, keeping the one you're on in view.
 
-### Removing a project
+### Removing a project <a id="removing-a-project"></a>
 
 **Project → Remove Project…** (also in a project's right-click menu and the **⋯** at the top of a project) offers three ways. The dialog lists what each one touches as a table, **What** and **What happens** for the way you pick: running agents (stopped first; their conversations are kept), the folder (by its name; point at it for the full path), the project's handovers, its cards on the task board and its worktrees, each with any work not merged.
 
@@ -208,7 +208,7 @@ The coding agents' own transcripts (in `~/.claude` and `~/.codex`) are never tou
 
 **Compact project list.** To give the terminals more room while keeping an eye on every project, collapse the Projects sidebar to a narrow rail of status dots: click the **‹** chevron at the top of the list, press **Ctrl+Alt+B**, or drag the sidebar's edge almost all the way left. Each project shows as a tile with its initials and status dot; hover it for the name, status and a table of its agents (each one's state, its card and what it waits for, a builder beside its reviewer), click to open it, right-click for the usual menu. Click **›** at the top of the rail (or press Ctrl+Alt+B again, or drag the edge out) to get the full list back. Shared Notes, Skills and MCP Servers always open at full width.
 
-## Sessions
+## Sessions <a id="sessions"></a>
 
 Each agent of a project runs one session at a time (most projects have just one agent; see [Several agents in one project](#several-agents-in-one-project)). A project without agents shows **No agents yet**: New Session and Resume add one for you.
 
@@ -238,7 +238,7 @@ An agent's header, its **⋯** and the **Session** menu let you:
 - **Hand Over to…** (agent menu) — hand this agent's work to another agent of the project, which may use another provider, or to the agent itself **in a new conversation** (see [Long conversations](#long-conversations)). Hive asks this agent to write a handover (if it's running and idle; untick to use the latest handover instead), then starts the other agent, or messages it if it's already running, and tells it to read that handover and carry on. Hive waits for a handover from that agent's own conversation, so one another agent writes meanwhile isn't picked up. Every handover an agent writes starts with a header Hive fills in: the project, the **author** (the agent and its CLI, e.g. *Claude (Claude Code)*), the **session** it was written in (to resume it with questions) and the date, in your time with UTC in brackets. The new session shows a **handed over** badge in the Sessions tab that links back. It needs **Settings → Agent API → Provide Hive tools to sessions**. If the other agent's CLI asks something first (for example whether to trust the folder), answer it in its terminal.
 - **Archive and Start New…** (in the agent's **⋯** menu, or **Archive Session and Start New…** in the command palette) — archive the current conversation and start a clean one. This is the cheapest way to continue after a long session: the new session starts with an empty context instead of re-caching the old one. Write a handover first (see below) so the new session knows where to pick up.
 
-### Cards in slots
+### Cards in slots <a id="cards-in-slots"></a>
 
 When a project's **Where cards are built** is **Each card in its own folder** (Version Control → Workflow), each card is built on a branch of its own, in a slot:
 
@@ -251,7 +251,7 @@ When a project's **Where cards are built** is **Each card in its own folder** (V
 - An agent with its own worktree from before slots keeps building cards there until its project is moved to slots.
 - With **Settings → Advanced → Workflow rules are enforced** off, no slot is lent: a card starts where its agent is.
 
-### Resuming in slots
+### Resuming in slots <a id="resuming-in-slots"></a>
 
 A project's **slots** are worktrees Hive lends to a card or a lane, one builder at a time. A builder's new conversation starts in its card's slot (a reviewer's in the project folder, never a slot), with `HIVE_SLOT` and `HIVE_SLOT_PORT_BASE` (the slot's name and its block of ports) in its environment. A conversation always resumes in the folder it was made in, because the CLIs keep conversations by folder:
 
@@ -261,13 +261,13 @@ A project's **slots** are worktrees Hive lends to a card or a lane, one builder 
 - **Once the slot holds other work** (*This conversation's slot (slot-a) now holds AM-14's work*), or it changed since, the conversation can't resume there. Hive says why and offers **Read Transcript** (the Sessions tab, on that conversation) and **Start Fresh with a Handover** (Hand Over to… for its agent). Resume All lists it as *slot reused*.
 - **An agent that kept its own worktree** (from before slots) and is given a card in another slot builds the card there; its older conversation waits until that card ends (*B1 is on AM-15 in slot-b: resume this after AM-15*).
 
-### Starting fresh
+### Starting fresh <a id="starting-fresh"></a>
 
 A long conversation gets slower and costs more with every message, so a finished piece of work is a good moment for a fresh one. **Start Fresh (Idle Agents)…**, in the project header's **Agents ▾** menu, gives each idle running agent a new conversation in one step. Its old conversation stays in the Sessions tab. First it lists every agent and what happens to it: an idle one starts fresh. One that is working, waiting for you, watching cards, has background tasks running, or still has a card or lane in flight is left as it is, and a stopped one stays stopped. Each is checked again as it starts, so one that started work meanwhile is left alone.
 
 Hive also suggests it by itself: when a project's last lane ends, or (with no lane running) one of its cards is done, and none of its agents is busy and no card waits in Review or Passed, a notice says **A good moment to start fresh**, with **Start Fresh (Idle Agents)**. It comes once each time the work finishes, with or without the Assistant; when an agent marks its last card done while still finishing its turn, it comes as that turn ends. Its button opens the question for that project, whichever project you are looking at. Turn it off in **Settings → Notifications → Suggest a fresh start**, or for one project in Project Settings → Sessions.
 
-### Agent states
+### Agent states <a id="agent-states"></a>
 
 Hive sums up what each agent is doing in one of four states, each drawn with its own shape as well as its own colour, so they read apart without colour too:
 
@@ -278,7 +278,7 @@ Hive sums up what each agent is doing in one of four states, each drawn with its
 
 The project header's state line uses them (*1 waiting · 2 working*), with the mark of the most urgent.
 
-### The session toolbar
+### The session toolbar <a id="the-session-toolbar"></a>
 
 Above the panes, the Session tab's toolbar holds what is about all of the project's agents; each agent's own controls are on its pane's header and footer.
 
@@ -289,7 +289,7 @@ Above the panes, the Session tab's toolbar holds what is about all of the projec
 
 To rename an agent, change its settings, move it or remove it, use its pane's **⋯** (or right-click its header); drag a pane by its header to rearrange the agents.
 
-### The Tiles view
+### The Tiles view <a id="the-tiles-view"></a>
 
 **Tiles** (the session toolbar's **Panes | Tiles**) shows each agent as a small tile, so a whole team fits on one screen and you can see at a glance who is doing what and who needs you. A tile shows:
 
@@ -311,11 +311,11 @@ A tile waiting for you has a red border and a diamond; a stalled one has a squar
 
 **Rearrange the tiles** (Same as panes): drag a tile onto another tile to **swap** them, or onto a page button to move it to that page's last place (hold it over another page's button for a moment and that page shows, to drop it on a tile there). From the keyboard, press **Ctrl+Alt+Shift+Left / Right** on a tile, or open its menu (right-click, or the menu key) for **Move Left** / **Move Right**. The order is the panes' order, so the panes change too, and it is saved with the project. By urgency, Hive sets the order, so tiles don't move.
 
-**Open an agent**: click its tile, or press Enter on it. Its **focus view** shows the agent's own pane, large and fully working (type into it, scroll, select), with the other agents in a strip on the left; choose one there to switch. Each agent's card shows as a small chip at the right of its name, tinted with the colour of the board column the card is in (what it works on, else what it reviews, else a card of its waiting in Review or Approved): hover it for the agent's cards, click it to open the card. Drag the strip's right edge to make it wider or narrower (double-click the edge to reset it); Hive remembers the width. On a narrow window the strip gives way so the agent's terminal keeps room: it takes at most two fifths of the width, narrower than you made it down to its least before the terminal narrows, then is hidden altogether (Esc and **Tiles** still go back), and as wide as you made it again once there is room. To go back to the tiles, press **Esc** (outside the terminal: in it, Esc goes to the agent, as always), **Ctrl+Alt+Esc** (from anywhere, the terminal too: **Back to Tiles**), click **← Tiles** at the top of the strip, or click **Tiles** in the toolbar again. Choosing an agent anywhere else (the summary chip's list, a notification, the board, Ctrl+1…9) opens its focus view too while the project shows Tiles.
+**Open an agent**: click its tile, or press Enter on it. Its **focus view** shows the agent's own pane, large and fully working (type into it, scroll, select), with the other agents in a strip on the left; choose one there to switch. Each agent's card shows as a small chip at the right of its name, tinted with the colour of the board column the card is in (what it works on, else what it reviews, else a card of its waiting in Review or Approved): hover it for the agent's cards, click it to open the card. Drag the strip's right edge to make it wider or narrower (double-click the edge to reset it); Hive remembers the width. **Reorder the agents** there as on the tiles (with Tile order *Same as panes*): drag one up or down the strip, a line showing where it will go, or press **Alt+Up** or **Alt+Down** on it (its right-click menu has Move Up and Move Down too). The tiles and the panes follow the same order, and the agent you're looking at stays shown. On a narrow window the strip gives way so the agent's terminal keeps room: it takes at most two fifths of the width, narrower than you made it down to its least before the terminal narrows, then is hidden altogether (Esc and **Tiles** still go back), and as wide as you made it again once there is room. To go back to the tiles, press **Esc** (outside the terminal: in it, Esc goes to the agent, as always), **Ctrl+Alt+Esc** (from anywhere, the terminal too: **Back to Tiles**), click **← Tiles** at the top of the strip, or click **Tiles** in the toolbar again. Choosing an agent anywhere else (the summary chip's list, a notification, the board, Ctrl+1…9) opens its focus view too while the project shows Tiles.
 
 From the keyboard: Tab to the tiles, move between them with the arrow keys (Home and End for the first and last), and press Enter to open one.
 
-### Processes agents leave running
+### Processes agents leave running <a id="processes-agents-leave-running"></a>
 
 An agent can start programs that keep running in the background: a preview server (`npm run serve`), a `tail -f` on a log, a shell. Stopping the agent ends its terminal, but not always what it started, and those can go on holding the project's folder (Windows then won't rename or delete it: "in use") or a port long after the agent has stopped.
 
@@ -330,7 +330,7 @@ Agents are also told to stop what they start: to watch a test run with something
 
 Hive only ever ends processes the agent's session started: never one you started yourself in the same folder. If Windows doesn't let Hive end them, they stay listed in the agent's **⋯**, so you can try again or keep them. On a PC where Hive can't keep track of agents' processes (PowerShell blocked by a company policy, for example), agents start as usual, Hive tells you once, and Help → Copy Diagnostics says why; what they leave running then isn't listed. Processes the agent's CLI already ends with its terminal (those attached to it) are never listed. One gap remains with PowerShell 7 installed from the Microsoft Store (Codex runs its commands in PowerShell 7 when you have it): a program it starts and leaves running as it exits within about a second, before Hive has seen it (`Start-Process` returning at once), isn't tracked. Commands Codex leaves running in the background keep their PowerShell open, so they are.
 
-### Reading past sessions
+### Reading past sessions <a id="reading-past-sessions"></a>
 
 The **Sessions** tab shows every session of the project on the left as a tree, like the Files tab: by **provider** (Claude Code, Codex), then by **agent**, then the sessions themselves, newest first, with when each was last used, its context size and the size of its transcript file (amber past **Settings → Sessions → Warn when a transcript is over**, with a tip to hand it over to a new conversation; **—** when the CLI no longer has the file). Sessions started outside Hive (in VS Code or a terminal) and adopted ones go under **Not from an agent**; started outside Hive, they show as *external*: **Adopt** them to manage them in Hive. A session keeps its own agent: if you remove an agent and add another with the same name, the old sessions stay under **Coder (removed)** (or **Removed agent**, for sessions from before Hive kept agents' names). Each session says where it ran, such as **Project folder** or **Worktree · hive/reviewer** (hover for the full folder), and the **Ran in** line over its transcript names the agent too. **Resume in …** says which agent would resume it now, and its ▾ menu shows where each agent works. Tick **Archived** to include archived sessions.
 
@@ -363,11 +363,11 @@ From the toolbar you can **Copy** a message or reply (hover it), **Export as Mar
 
 **Deleting a session** removes it from Hive: Hive's copies of its transcript go to the Recycle Bin and it no longer shows in the tree. What it used (tokens, cost, prompts) stays in the Overview's totals. A running session has to be stopped first, and one whose files are in use waits until they're free. Claude Code and Codex keep their own copy, so their own resume lists still have it.
 
-### Dates and times
+### Dates and times <a id="dates-and-times"></a>
 
 Hive shows dates as **2026-10-04** and times as **14:05** by default: sessions named by when they started, the session lists and their tooltips, transcripts, exports and the rest. **Settings → General → Date format** chooses *yyyy-mm-dd*, *dd/mm/yyyy*, *mm/dd/yyyy* or *System* (as your Windows regional format shows them), and **Time format** *24-hour* or *12-hour* (2:05 PM). Names you give sessions stay as you typed them; only the automatic ones follow the format. How long ago a session was last active (*2 hours ago*) stays as it is: hover it for the date and time.
 
-### Language
+### Language <a id="language"></a>
 
 Hive's window, menus and messages come in eight languages: English, Deutsch (German), Español (Spanish), Français (French), Polski (Polish), Português (Brasil) (Brazilian Portuguese), 日本語 (Japanese) and 简体中文 (Simplified Chinese). All but English were translated by AI.
 
@@ -383,7 +383,7 @@ What stays in English: this user guide and the other documents in the Docs view,
 
 **Starting Hive in a language:** `--lang=<code>` (for example `Hive.exe --lang=pl`) starts Hive in that language for one run, whatever the setting says, which is how translators check their work. While Hive runs that way, the setting says it applies from the next start.
 
-### Several agents in one project
+### Several agents in one project <a id="several-agents-in-one-project"></a>
 
 A project can have up to twelve agents working at once (more, up to 24, with **Agents per project** in Settings → Advanced: see **More than twelve agents** below), for example one building a feature while another reviews or writes tests. All agents are equal, and any can be removed once stopped. No agent has a worktree of its own: a builder works in one of the project's [slots](#cards-in-slots) while it builds a card, and in the project folder otherwise (see **Where each agent works** below). **+ Add ▾** in the session toolbar has **Configure Agent and Add…**, which opens **Add Agent…**, and **Add Agent from Template** (see [Agent templates](#agent-templates)). Its **Add Agent** adds one straight away, with your default provider (**Settings → Providers → Default provider**, or the project's in Project Settings) and its default settings, working in the project folder; so does **Ctrl+Alt+Shift+N** (**Add Agent** in the command palette, or right-click the project). In **Add Agent…** you choose:
 
@@ -437,7 +437,7 @@ If git can't read the changes, the **Git** tab's **Changes** says why, with **Re
 
 **Remove every agent at once.** **Remove All (4)…** in the project header's **Agents ▾** (also **Session → Remove All Agents (4)…** and the command palette) removes all of the project's agents after one question. It lists them in a table, says which are working (running agents are stopped first) and, for each worktree agent, whether its worktree is *merged and clean* or *always kept* (with the reason, such as "2 commits not merged into main"). Worktrees and branches are kept unless you tick **Also delete the worktrees and branches fully merged into main with no uncommitted changes**: then only those are deleted; anything not merged or not committed is always kept. If the agents have open cards, you're asked once what to do with them. Their sessions stay in the Sessions tab. If an agent can't be removed, one notice says which and why, and the others still go. In a narrow window it moves into the header's **⋯** with the rest of Agents ▾. Two dev servers from different agents can clash on the same port; give them different ports.
 
-### Role in the workflow
+### Role in the workflow <a id="role-in-the-workflow"></a>
 
 Each agent takes a side in the workflow, chosen in **Add Agent…** and **Agent Settings…** under **Role in the workflow**:
 
@@ -449,7 +449,7 @@ Each agent takes a side in the workflow, chosen in **Add Agent…** and **Agent 
 
 **Agents from before 1.0** have no role saved. Hive reads one from the agent's note or name: a note or name that says *review*, or a name like **HR1** or **HI-R2**, makes it a reviewer; anything else makes it a builder. A project with HB1–HB6 and HR1–HR6 therefore reads as six builders and six reviewers, and a single agent reads as a builder. Nothing is written at the upgrade: the role is saved the first time you save the agent's settings. The Assistant can change an agent's role (within **Settings → Assistant → Control**), but project agents can't change their own or anyone else's.
 
-### Unused worktrees
+### Unused worktrees <a id="unused-worktrees"></a>
 
 A worktree you keep when you remove its agent (**Keep worktree and branch**, or **Remove All** without its tick box) stays on disk with its branch: Hive says so in a notice with **Review unused worktrees**. They live in the **Git** tab's **Changes**, with every other worktree. Its picker starts with **Unused worktrees (n)**, for worktrees no agent of the project uses right now (for example ones whose agents a template's agents replaced, or ones an agent made itself with `git worktree add`; loading a template gives none of them to its agents), then lists the worktrees agents work in, then the project folder. **Unused worktrees** lists them as a table, a line each: its branch, whether it is **merged into main and clean** or what it holds that is nowhere else ("3 commits not on main · 2 changed files") and who made it (**was B4**, the Hive agent that last worked there; **made by Hive**; or **not made by Hive**), its folder (its name; the full path when you point at it, copied whole), its last commit and its size, with its buttons at the right. In a narrower pane each takes two lines, or stacks; the ⓘ beside the heading says where unused worktrees come from:
 
@@ -467,7 +467,7 @@ A slot lent to a card or a lane, an old worktree still carried for its agent, a 
 
 The project's **Overview** shows one line, such as "7 unused worktrees (7 merged) — Review in Changes". **Changes**' project folder says when an unused worktree has work that isn't on main, with **Review**. **Project Settings → Storage** has a line for unused worktrees with their total size, linking to Changes. Deleting a template never touches worktrees, but if its worktree agents left worktrees that no agent uses now, Hive says how many, once. The Hive Assistant can see how many unused worktrees a project has and mention them; only you can remove them. Without git (see [Git](#git)), nothing is listed or removed.
 
-### Agent templates
+### Agent templates <a id="agent-templates"></a>
 
 Set a project's agents up once, see them work, and reuse the setup anywhere: a **template** saves each agent's name, **role in the workflow** (builder, reviewer or either), note, provider, model, effort, permission mode and context setting, the project's layout, and the preset the project's workflow options started from. Builders paired with reviewers stay paired. Conversations, folders and branches aren't saved: they belong to the project. Where an agent works is its card's or lane's, never the template's, so a template's agents all start in the project folder. Hive also comes with templates of its own (below).
 
@@ -487,7 +487,7 @@ Set a project's agents up once, see them work, and reuse the setup anywhere: a *
 
 **Templates from Hive 0.9** held whether each agent had a worktree of its own, which 1.0 doesn't do, so 1.0 doesn't use them: they aren't listed or loaded, and importing one is refused, saying so. Your saved 0.9 templates (the workspace's and each project's) stay where they were, untouched, and at the upgrade to 1.0 Hive also keeps a copy of each in `.hive/backups/templates-0.9`, beside the 0.9 board backup, and says so once. Hive's own templates take their place; make your own again with **Save Template…**.
 
-### Hive's own templates
+### Hive's own templates <a id="hives-own-templates"></a>
 
 The **Hive** group of the Templates view, and of + Add ▾ → **Templates**, holds ready-made teams. Each suggests a preset, and its builders are paired with their reviewers:
 
@@ -502,7 +502,7 @@ The **Hive** group of the Templates view, and of + Add ▾ → **Templates**, ho
 
 Their models are each coding agent's default, and their layout fits their count (one pane, two columns, or a grid of six). If a coding agent one of them needs isn't installed or is turned off, its agents run on one you have instead (Claude Code first), and the load dialog says so on their rows: Pair then loads as Pair: one provider. They're read-only: **Duplicate…** copies one into the workspace or a project, where you can change it.
 
-### Managing and sharing templates
+### Managing and sharing templates <a id="managing-and-sharing-templates"></a>
 
 The **Templates** view (its icon is next to Skills on the activity bar) lists Hive's templates, the workspace's and each project's, grouped by where they're kept; the drop-down at the top shows all of them, Hive's, the workspace's, or one project's. A project's **Templates** tab lists its own templates, the workspace's and Hive's, each marked with where it's kept.
 
@@ -517,7 +517,7 @@ Select a template to see what it holds: each agent's name, role in the workflow 
 
 **Import…** (the download icon at the top of the list) opens a template file and asks where to keep it: the workspace, or a project. Hive checks the file first and refuses one it can't use, saying why: not a template, made by Hive 0.9 or a newer Hive, or more than 24 agents. A template with more agents than a project can have (Agents per project) can't be loaded there: its Load dialog says so. Nothing is half imported. If a template of that name is already there, choose **Replace** or **Keep Both** (the imported one gets a number). A template whose coding agent this Hive doesn't know, from a newer Hive say, is imported and marked: Hive won't load it until it knows that agent.
 
-### Archiving and backups
+### Archiving and backups <a id="archiving-and-backups"></a>
 
 Claude Code and Codex delete old transcripts after a while. Hive keeps a copy of every session transcript in the project's `.hive/sessions` folder, and archived sessions in `.hive/archive`. Once a session ends or is archived, Hive compresses its copy (`<id>.jsonl.gz`, usually under a third of the size); you can still open, search, export and resume it as before. Files you paste or drop into a session are kept in `.hive/attachments`. Hive only deletes them when you ask (deleting a session sends its transcript copies to the Recycle Bin; its attachments stay), or as **Keep transcript backups** says (below). If the CLI has removed a transcript, Hive restores it from the backup when you resume.
 
@@ -542,7 +542,7 @@ The dialog lists every file that will go, with its size and the total, before an
 - Purge removes exactly what the dialog listed: anything that changes while it is open (a session resumed, a file added or written to, a coding agent's transcript gone or back) is left alone and listed in the result. A dialog left open for over an hour removes nothing: Hive says its list is out of date, and you open Purge again to see what goes now.
 - If Hive ever stopped while deleting or moving a session's files, the files it left may be that session's only copy: Purge keeps them, and the dialog says how many.
 
-### Antivirus scanning
+### Antivirus scanning <a id="antivirus-scanning"></a>
 
 On Windows, Microsoft Defender's real-time protection scans every file as it is created or opened, and Hive's work creates and opens a great many: installs, builds, tests, git, worktrees, transcripts. With several agents at once that adds up. **Settings → Workspace → Antivirus scanning** (or **Antivirus Scanning of the Workspace** in the command palette) shows how Defender treats the workspace:
 
@@ -558,7 +558,7 @@ On the machine Hive is developed on, with several agents at work, Hive's full te
 
 When Defender scans the workspace and it matters (two or more agents running at once, or a command in the Progress panel that took two minutes or more), Hive suggests this, with **Review…** and **Don't Ask Again** (for this workspace). If you close it, or review without adding exclusions, Hive reminds you later: at most once a day, and only when scanning matters again. It stops when you pick **Don't Ask Again**, or once the folders are excluded or on a trusted Dev Drive, or Defender isn't the active antivirus. A folder added since, such as the worktrees folder, is suggested straight away. The Performance view says so too.
 
-### Token use, cache and compaction
+### Token use, cache and compaction <a id="token-use-cache-and-compaction"></a>
 
 The **Overview** tab updates as sessions change (at most every 15 seconds; **Settings → Sessions → Overview updates** can make it every minute or only when you click **Refresh**). It starts with the project's **cards at a glance**, as on the Workspace Overview but for this project only: how many are On Hold, in Todo, Active, Waiting for review, Approved and Done, and how many are stalled or blocked. They update as cards change, and clicking a number opens the project's **Tasks** tab. A project without cards says so, with **Open Tasks**. Then a **project summary** for the period you choose (All time at first, or Today, 7 days, 30 days), across every provider: tokens, API-equivalent cost, sessions and prompts. Periods are calendar days (Today is since midnight; 7 days is today and the six days before), and they count only what happened in them: a session that has been running since Monday adds only today's work to Today. For 7 and 30 days a small chart shows the tokens of each day; hover a day for its cost and prompts. Below it are the agents **running now** (with how full each one's context is), a section per provider with its totals and plan limits, a table **by agent**, and one agent's session: its running session, else its most recent one. It follows the focused agent; with several agents, a picker next to the heading shows another's.
 
@@ -570,7 +570,7 @@ The **Overview** tab updates as sessions change (at most every 15 seconds; **Set
 **Tables.** Hive's longer tables work the same way: the compactions, archived cards, keyboard shortcuts, Performance's and Compare's tables, Storage and the Overviews' tables by project and by agent. Click a column's header to sort by it (again for the other way, a third time for the table's own order); Hive remembers each table's sort and rows per page. A table with many rows has filters under its headers and pages under it.
 - **API-equivalent cost** — what the session would have cost at API prices. On a subscription you are not charged this; it is a measure of how heavy the session is. Claude Code calculates it itself; for Codex, Hive **estimates** it from a price table (shown with **≈**). Hive ships the published prices as starting values, and you can change, add and remove them in each provider's settings page (**API prices**) if they change or you have different rates. For a model Hive has no price for, the cost shows as unknown (**$?** in the agent's footer, **Unknown** on the Overview; a total that includes such sessions shows what is known with **+ ?**); hover it to see which model, and add its price under **API prices** to see the estimate.
 
-### Long conversations
+### Long conversations <a id="long-conversations"></a>
 
 A conversation's transcript keeps everything that happened in it, and compacting doesn't make it smaller: it only shortens what the agent has in its context. A very long one (100 MB and more) slows down the CLI and Hive, and can make typing in the terminals stutter. The size shows on the right of each agent's footer (and when you hover its context), and beside each session in the Sessions tab (the Assistant's conversations too); past **Settings → Sessions → Warn when a transcript is over** (20 MB; projects can set their own) it turns amber, with a ⚠. Hive also tells you once when a conversation passes it.
 
@@ -580,7 +580,7 @@ So that a hand-over never cuts into an agent's work, the notice offers **Hand Ov
 
 **Usage history.** Hive records what each session used as it goes, in the workspace's `.hive/usage.db`, so the Overviews open at once without reading any transcript, and a session's usage stays in the totals after you delete it or its transcripts are gone. A running session is recorded at the end of each turn, about every minute, and when it ends, so the Overviews can be a turn behind. The first time a workspace opens in this version, Hive imports what its existing sessions used, in the background; the Workspace Overview says how far it is, and its figures are partial until it's done. Sessions started outside Hive aren't counted. A running agent's footer and context gauge still follow each turn; they're read in the background, so a long session doesn't hold Hive up, and a session you resume after restarting Hive picks up from what its history already has instead of reading its whole transcript again. **Settings → Sessions → Usage cache size** only sets how many transcripts Hive keeps in memory while it runs (5,000), and **Clear the usage cache** forgets those; the usage history stays.
 
-### Workspace Overview
+### Workspace Overview <a id="workspace-overview"></a>
 
 The **Workspace Overview** (in the activity bar, or **Ctrl+Shift+O**) adds up the whole workspace: every project and the Hive Assistant. It opens on the last **7 days** (or Today, 30 days, All time) and shows:
 
@@ -593,19 +593,19 @@ The **Workspace Overview** (in the activity bar, or **Ctrl+Shift+O**) adds up th
 
 Hidden and removed projects aren't counted. It updates like the project Overview, and reads no transcript: its figures come from the usage history (see **Usage history** above).
 
-### Plan usage
+### Plan usage <a id="plan-usage"></a>
 
 If you use a subscription (a Claude plan for Claude Code, a ChatGPT plan for Codex), the status bar shows how much of each plan's limits is used, one item per provider, for example **5h 34% · Week 12%**: the rolling 5-hour allowance and the weekly one. Hover it to see when each resets; the **Overview** tab shows them with meters in each provider's section. The numbers are for your whole account (every session, not just Hive's) and come from the CLI while a session is running, so after a quiet spell they show when they were last updated, and which agent reported each. Each session passes on the figures from its own latest request, so one that last asked a while ago can report a little less than another: within a reset period Hive keeps the highest it has been told, and once a limit resets it shows the new figure (or nothing, until a session reports again). The status bar darkens at 80% and turns red at 95%, and Hive notifies you once when you pass 80% and 95% of each limit in each reset period.
 
 Each agent's footer shows its model and **effort**, e.g. *Opus 5.5 (default) · High*: the model that actually runs, as the running session reports it, otherwise the model new sessions will use. An alias such as **Opus** shows as the model it stands for (*Opus 5.5*), with *chosen as Opus* in the tooltip; the model pickers list it as *Opus (Opus 5.5)*. *(default)* means the model is inherited, not chosen for this agent or project. With no effort chosen, the effort is the model's own default once the CLI has said it (*Medium (default)*).
 
-### Performance metrics
+### Performance metrics <a id="performance-metrics"></a>
 
 Hive counts what its own parts cost, for each workspace: its Agent API's requests (how many, how long, how big), its tools' replies as the agents got them, what each session was given at launch (Hive's guidance, the Assistant's mode, the skills), and its skill service's work, alongside the providers' own reported token usage. Only totals are kept, never prompts, replies, tokens or paths, for 30 days, in the workspace's database, `.hive/hive.db` (kept out of git; before 0.9, `.hive/metrics/metrics.json`, which moves in the first time 0.9 opens the workspace, with the same numbers). Hive doesn't guess token counts: what it measures is exact bytes and characters, and token usage is what the providers report.
 
 It's on by default: **Settings → Sessions → Record performance metrics** turns it off (what was recorded stays), and **Reset performance metrics** clears the workspace's. Scripts can read them with the Agent API (`GET /v1/metrics`).
 
-### Performance view
+### Performance view <a id="performance-view"></a>
 
 **Performance** in the activity bar shows these metrics for the whole workspace; each project's **Performance** tab (next to Overview) shows only that project's. Pick the last **24 hours**, **7 days** or **30 days**; in the activity bar view, the sidebar (or **Scope**) picks the whole workspace, its own work (the Assistant, scripts) or one project. Each filter sits with what it changes: **Who** (project agents, the Assistant, scripts) heads a box holding the cards, the chart and the tables, and **Provider**, inside it, heads the two parts recorded per provider, the guidance given at launch and the providers' usage (Hive doesn't record API requests or tool calls per provider). Provider always lists every provider with data in the range, so you can switch from one to another directly. **Export** (and Compare's **Keep current view**) saves the page's scope, range and **Who**, with every provider's rows, each naming its provider, so its totals match the cards whatever provider is picked. You see:
 
@@ -617,7 +617,7 @@ It's on by default: **Settings → Sessions → Record performance metrics** tur
 
 It refreshes every minute while you look at it (and **Refresh** at once); reading it doesn't add to the numbers. A note says when measurements were dropped because a limit was full, and **What isn't measured** lists what it can't see. **Export** saves what the page shows (its scope, range and filters) as a JSON file with its units, coverage and Hive's version; **Shift+click** Export to replace project names with project-1, project-2… and leave out the workspace's path, before sharing it.
 
-### Cost per card
+### Cost per card <a id="cost-per-card"></a>
 
 Hive works out what each card cost from who held it when and what their sessions used then:
 
@@ -628,7 +628,7 @@ Hive works out what each card cost from who held it when and what their sessions
 
 Time an agent spends between cards, such as reading a card it was just woken for before taking it, is overhead, not the card's. While an agent holds several cards at once, what it uses then is shared between them equally. A reported charge is split only between the requests it covered, so a card's cost never changes because of work done later; where a card took only some of a charge's requests, its share is marked ≈. Copilot reports its tokens only when a session ends: until then a Copilot card's tokens show as unknown, and then Hive spreads them over that session's requests, marked ≈ (its cost comes from Copilot's own charges). Cards worked on before Hive kept this have it worked out from their history, by the agents' names.
 
-### Comparing before and after
+### Comparing before and after <a id="comparing-before-and-after"></a>
 
 **Compare** (at the top of the Performance page) puts a baseline next to a run, to see whether a change made Hive's
 traffic and guidance smaller while the work still got done:
@@ -658,7 +658,7 @@ traffic and guidance smaller while the work still got done:
   folder's `quarantine` subfolder instead of being deleted. A removal that can't finish (a file in use) is retried
   later, and the comparison doesn't come back to the list.
 
-### Progress panel
+### Progress panel <a id="progress-panel"></a>
 
 Long runs, such as test suites and builds, can report their progress to Hive, and the **Progress panel** shows them: which agent is running what, how far along it is and about how long is left. It sits on the right, beside the Hive Assistant's panel. Show or fold it with **Ctrl+Alt+P** (Toggle Progress Panel); each workspace remembers whether it's open, and dragging its left edge makes it wider.
 
@@ -679,7 +679,7 @@ Long runs, such as test suites and builds, can report their progress to Hive, an
 
 Runs come from what agents run: a tool or script reports through the Agent API (`/v1/progress`, see the Agent API reference), as the agent that started it. **Settings → General → Progress panel** turns it all off; agents can still report, and Hive ignores it.
 
-#### Merges and lanes
+#### Merges and lanes <a id="merges-and-lanes"></a>
 
 When agents work in pairs, a builder and a reviewer taking cards in turn (the **card-loop** skill), the Progress panel shows how they are getting on, around the runs:
 
@@ -710,7 +710,7 @@ When agents work in pairs, a builder and a reviewer taking cards in turn (the **
 
 With no lanes and no merge going on, the panel is just the runs, as before.
 
-#### Slots, pools and copies in the Progress panel
+#### Slots, pools and copies in the Progress panel <a id="slots-pools-and-copies-in-the-progress-panel"></a>
 
 - **A lane's slot:** its row names the slot its builder works in, *HI-B1 / HI-R1 · slot-b* (or the builder's own worktree from before 1.0, *· hb2*). Click it for Version Control → **Branches & remotes**, where the project's slots are listed. Point at the row: its hover says whether the slot is ready or being prepared, since when the lane has had it, and the branch of the card being built there.
 - **A pool lane:** *HI-B1 / pool*. Its hover says who reviews the current card now and who gave its last verdict.
@@ -719,7 +719,7 @@ With no lanes and no merge going on, the panel is just the runs, as before.
 - **Waiting:** *waiting for a slot* and *waiting for a check copy* pause a lane; *waiting: preparing slot-b* doesn't. Click the reason to see what it waits for: the slots, or the runs.
 - A run's folder is where it ran, kept as it was, even after its agent moves to another slot.
 
-#### A reviewer pool
+#### A reviewer pool <a id="a-reviewer-pool"></a>
 
 Lanes can share their reviewers instead of each having its own. A project whose workflow option **Reviewers** is **A shared pool** (set it in **Version Control → Workflow → Review**; the **Team 6 + pool** template suggests it, and the Hive Assistant sets it as `project.workflow.reviewerMode`) offers **The reviewer pool (HI-R1 and HI-R2)** in **Start Lane**'s reviewer list. Its agents are the project's reviewers and either-role agents. A lane started with it has no reviewer of its own, so only its builder starts, and its brief says the pool reviews its cards.
 
@@ -729,7 +729,7 @@ Lanes can share their reviewers instead of each having its own. A project whose 
 - **Two reviewers per card** (**Reviewers per card: 2**): a second reviewer, another agent, gets the card once the first has passed it.
 - With **Workflow rules are enforced** off (Settings → Advanced), nothing is given out: name a reviewer for each lane yourself.
 
-#### The merge queue in the Progress panel
+#### The merge queue in the Progress panel <a id="the-merge-queue-in-the-progress-panel"></a>
 
 When Hive merges a project's cards itself (**Who merges: Hive merges**, the merge queue), the **Merges** tab has a card for each target the queue merges into (*Merge queue · main*), beside any merge slot an agent holds, by project and then target. It says, each with its own icon and words:
 
@@ -743,7 +743,7 @@ When Hive merges a project's cards itself (**Who merges: Hive merges**, the merg
 
 The queue's card shows while the queue has something: a card testing, waiting or paused, a return you haven't seen, a merge of the last few seconds, a Hive running it, or a card still in flight under rules that have Hive merge into that target. With nothing going on, it shows, *Nothing queued.*, while the project's options have Hive merge. So when you switch the next cards to **The agent merges** (or a project to no version control), the cards already going through the queue keep going, and its card stays, with Pause, Resume and Remove, until they are merged or out of the queue and you've seen how they ended. Pulse has a line for a queue testing or paused, *main: testing AL-61 · 2 queued*, which opens **Merges**. Each change is said to a screen reader once, politely: *AL-61 merged*, *AL-108 returned: conflict in tasks.ts*, the queue paused or resumed. The project filter applies to the queues too, and **Runs**' agent filter has **Hive (merge queue)** for the queue's checks.
 
-#### Show progress for any command
+#### Show progress for any command <a id="show-progress-for-any-command"></a>
 
 Any command can show in the panel by running it with **`hive-progress`** in front, for example `hive-progress -- npm test`. Agents do this by themselves for tests, builds and other commands they expect to take more than about 30 seconds, in the background too, so you see them without asking. To have them do it only when you ask, turn off **Settings → General → Agents show long commands in the Progress panel** (agents started or restarted afterwards follow it; with the Progress panel off, they don't use it either). The panel shows the command under the agent's name with the time it has taken and, from the second time, about how long is left (from how long the same command took before in that folder; Hive remembers up to 1,000 commands, forgetting those run only once first). The command's output and result are unchanged, and outside Hive it simply runs the command.
 
@@ -753,13 +753,13 @@ Stopping a `hive-progress` command (Ctrl+C where it gets one) gives it 5 seconds
 
 **A check in a copy of its own.** In a folder several agents share, another agent's edit while a check runs makes it not count (its details say files changed while it ran). Run it isolated instead: `hive-progress --check typecheck --isolated` runs the project's command for that check in a **check copy**, a folder Hive keeps at exactly the card's revision (`<workspace>.worktrees/<project>/copies/copy-1`), which nothing else writes, so it counts whatever happens in the shared folder. Its run's details name the copy. When every copy is in use, it says *waiting for a check copy* and runs once one is free; a copy is used again only once nothing is left running in it. **Stop** (the square on its row in the Progress panel) ends the check and everything it started, also processes it left running in the background, and the run shows as stopped. A project keeps the larger of two copies and its reviewers plus one; **Settings → Advanced → Copies: wait for one to be free** (10 minutes) is how long a check waits before it says which copy is still in use, and by what. Copies set themselves up with your setup command, shown as **Hive (copy copy-1)** runs. A project with no version control has no check copies: run the check again once nobody is changing the card's files.
 
-#### Review copies
+#### Review copies <a id="review-copies"></a>
 
 A reviewer reviews a card's work in a **review copy**: a folder from the same pool as check copies (`<workspace>.worktrees/<project>/copies/copy-2`), at exactly the revision the builder submitted, which nothing else writes. When it starts its review, Hive leases it a copy and its reply says where: *Review in …\copies\copy-2 at a3f2c1d: read and run commands there, with it as their working directory; your session stays where it is.* So the builder can carry on in its own folder while the review reads and tests what was submitted, and a check the reviewer runs there (`hive-progress --check typecheck`) counts for that submission. Its verdict returns the copy, and so does its review ending otherwise (the card moving on, or the reviewer's session ending); a copy is used again only once nothing is left running in it. When every copy is in use, the card's history says *R1 is waiting for a review copy*, and Hive tells the reviewer once one is free.
 
 The reviewer's session stays in the project folder, so its conversation always resumes there. Its launch is given the project's copies folder, one fixed path, as each coding agent allows on its command line, never in its own settings: **Claude Code** and **GitHub Copilot** `--add-dir` (Copilot's Accept edits approves its edits there as in its own folder), **Codex** `--add-dir`, which adds the folder to the writable roots of your own Codex settings rather than replacing them. Reviewers and agents that do either get it whenever they start in the project folder; builders, and an agent that does either while it builds in its slot, don't. Builds and tests in the copy run within the agent's own permission mode. **Settings → Advanced → Reviewers review in review copies** turns this off: reviewers then review the builder's folder, as before, and sessions started afterwards aren't given the folder. With **Workflow rules are enforced** off, no review copy is leased either; a copy a reviewer already has is handed back as usual when its review ends.
 
-## Task board
+## Task board <a id="task-board"></a>
 
 The **Task Board** (in the activity bar, or **Ctrl+Shift+J**) is the workspace's list of work, as cards in six columns: **On Hold**, **Todo**, **Active**, **Review**, **Approved** and **Done**. (Before 1.0, Active and Approved were called Doing and Passed; agents and the Agent API still name them by their ids, `doing` and `passed`, and read a card's history in those words: "Moved to Doing" where the card dialog says "Moved to Active".) You, the Hive Assistant and the agents all use it, so it's where you can see at a glance what is planned, what is being worked on and what is waiting for you.
 
@@ -782,7 +782,7 @@ The **Task Board** (in the activity bar, or **Ctrl+Shift+J**) is the workspace's
 - **One project.** The sidebar filters the board by project and lists the cards waiting for review; the badge on the activity bar counts them. Each project also has a **Tasks** tab with its own cards.
 - **With the Assistant.** Ask it to plan work as cards, start them on agents and follow them: *"split the login rework into cards for web and start the first two"*. Agents can add cards for follow-up work they find instead of doing it unasked.
 
-### The card's work
+### The card's work <a id="the-cards-work"></a>
 
 From Hive 1.0, a card records its **work** as it goes: what its builder submitted for review, the verdicts and checks on it, and how it was merged. Open a card to see it in its **Work** section, below the decisions:
 
@@ -795,7 +795,7 @@ From Hive 1.0, a card records its **work** as it goes: what its builder submitte
 
 On the board, a card shows its work in one quiet line: the revision under review, the last verdict (an icon, dimmed when it no longer counts) and how many of its checks passed and failed, with a mark when its pass is stale or it was merged outside the rules. Hover any of them for what it says.
 
-### Project keys
+### Project keys <a id="project-keys"></a>
 
 Each project has a **key** of 2 to 4 letters (HI, AM, WEB), and its cards are named by it: **HI-12** is the hive project's twelfth card. The board, the card dialog, agents' card chips, the Progress panel, Performance and notifications all name a card this way; a card about the whole workspace, with no project, keeps its number (#12).
 
@@ -807,7 +807,7 @@ Each project has a **key** of 2 to 4 letters (HI, AM, WEB), and its cards are na
 - **Moving a card** to another project gives it that project's next number; its old name keeps finding it, in the search, the palette, Depends on, Related and links.
 - **Agents** take a card's name wherever they take a card, and Hive names cards to them as **HI-12 (#40)**: the key, and the number their tools took before 1.0.
 
-### Moves and your project's rules
+### Moves and your project's rules <a id="moves-and-your-projects-rules"></a>
 
 From 1.0 a project has workflow rules (its version control's options): for example, that work is reviewed before it reaches Done. When you move a card to a column its rules have, Hive does what the move stands for: into **Active** it starts the card's work (in its agent's worktree, if it has one), into **Review** it submits what the card's folder has now. A move that skips one of the rules, such as a card dragged to **Done** that was never reviewed or merged, asks first: *Move HI-12 to Done anyway?*, with the rules it skips by name and a **Reason (optional)**. **Move Anyway** makes the move and records it on the card as an exception (an override), naming the rules it skipped, with your reason; **Cancel** leaves the card where it was. A card moved past its rules shows an open lock on its tile, and in its lane's segment in the Progress panel: hover it to see who moved it, past which rules and why. Some steps no exception can make true, such as a card dragged to **Review** with nothing to submit: the move stops there (the card's work started, say) and a message says why and what to do. While you drag a card, a column its project's rules don't have (Review in a project with no review) isn't highlighted and doesn't take it. The same goes for the card's right-click **Move to**, the **Move to Active** dialog and the card dialog's **Column**.
 
@@ -821,17 +821,17 @@ Moving a **Done** card back to Active (or further) reopens it: its work starts a
 
 Turn every rule off at once with **Settings → Advanced → Workflow rules are enforced** (see [Advanced settings](#advanced-settings)): moves are then as before 1.0.
 
-### No-code cards
+### No-code cards <a id="no-code-cards"></a>
 
 Some cards have no code to write: a decision, a write-up, a trial. Make one with **No code (a decision, a write-up, a trial…)** in the New Card dialog: its tile and its dialog say **No code**, and when its work is done it is submitted with a summary instead of commits, reviewed if your project reviews work, and goes to Done with nothing to merge. An agent that adds a card can only propose it as no code: the card shows **No code?** and its dialog asks you to **Confirm No Code** or **Keep as Code**. To change a card's kind after it was made, use **Make It Code…** or **Make It No Code…** beside its **Kind** in the dialog: as it is an exception to its rules, Hive asks first and records it on the card with your reason. The Hive Assistant changes a kind only with your reason; agents never change it.
 
-### For you
+### For you <a id="for-you"></a>
 
 Some cards wait for you: a review or an OK that is yours to give, a question an agent asked (*"OK to push the release tag?"*), a rule an agent couldn't keep, or a card loop that reached its round limit. Each such card shows a **For you** chip with what it asks (Approve, Decide, Test, Sign in or Other; hover it to read the request), the **Task Board** icon on the activity bar counts them, and the **For you** box in the board's toolbar shows only those cards (with the search box, both apply).
 
 Open the card to answer in its **For you** section: **Approve** or **Decline…** for an approval (declining asks why, and the agent reads your reason; declining your own review sends the card back to its builder as a round), or for a question, type your answer and **Send Reply**, or **Record as Decision** to keep it as one of the card's decisions. At a card loop's round limit you choose how it goes on: carry on with more rounds, split it, accept it with follow-ups, or take it over. A Test request lists what to try. Answering clears the chip at once and wakes the agent waiting on it. Only you answer: agents and the Assistant can ask, never answer for you. If the request was answered or retired meanwhile (a new submission, the card moved on), your answer isn't taken and Hive says why.
 
-### Exporting the board
+### Exporting the board <a id="exporting-the-board"></a>
 
 The board is kept in the workspace's database, `.hive/hive.db`, and so are the card loops' lanes, agents' card watches and every project's inbox (what Hive has for its agents to read): their `lanes.json`, `watches.json` and `deliveries.json` files are moved in the first time Hive 0.9 opens the workspace, and kept beside it as `….imported-<time>`. Every change to the board is saved whole or not at all, also when many cards change at once (Archive All, a batch move), and a board of a thousand cards stays quick. The database is this computer's: a workspace you commit to git leaves it out.
 
@@ -840,7 +840,7 @@ The board is kept in the workspace's database, `.hive/hive.db`, and so are the c
 - **Going back to an older version.** An older Hive doesn't know the database, so it shows an empty board: nothing is lost. Cards you add there aren't added to the board when 0.9 opens the workspace again: they are kept, unchanged, in `.hive/tasks.set-aside`, and a notice asks you to review them. To use the whole board in an older version, export it and copy the files into `.hive/tasks` with Hive closed.
 - **Reviewing cards made by an older Hive.** **Review…** on that notice (later, **Set-Aside Cards…** in the board's **⋯** menu while any are left, or **Review Cards Made by an Older Hive…** in the command palette) lists each card with the number the older Hive gave it, who made it and when, its project, column and comments, and the start of its description. **Add to Board** adds it with everything it had, last in its column: under its old number when no card here has it, else under the next free number; its history says *Added from an older Hive, where it was made as #n*, by Repair. **Discard…** asks first, then moves its file to the Recycle Bin. This is the only way such cards reach the board, and nothing else is rewritten: links to an old number stay as they are, also when the card gets a new one.
 
-### Upgrading to 1.0
+### Upgrading to 1.0 <a id="upgrading-to-10"></a>
 
 Hive 1.0 keeps the board in a new format. The first time it opens a workspace whose board Hive 0.9 saved, it asks: **Upgrade this workspace's board to 1.0?** A new workspace has nothing to upgrade, so it isn't asked.
 
@@ -855,7 +855,7 @@ Hive 1.0 keeps the board in a new format. The first time it opens a workspace wh
 - **A slot held after Hive closed.** Nothing else uses a slot while an agent's session runs there, nor afterwards while Hive doesn't know that everything the session started has ended: when Hive closed unexpectedly with the session running, when you chose **Keep Running** for what it left running, or when Hive couldn't follow its processes. Hive never guesses, so such a slot stays held until you release it. **Release Slot…** in the agent's **⋯** menu, or **Release…** beside the slot in the **Version Control** tab's list of slots (*Held by B1's ended session*), says which Hive held it and what Hive lists of the processes left running, offers to end those first, and frees the slot once you confirm. It refuses while the session still runs in this Hive, or while the other Hive holding it is still running. The Hive Assistant can do the same when you ask (with **Control agents**): it tells you which slot, session and processes first, and releases the slot only once you agree. A slot kept for an agent can be released this way too. Neither can be undone.
 - **Choosing a preset afterwards.** Once the upgrade is done, a banner names the projects that kept working as before and offers the presets: **Choose…** opens the first one's **Version Control** tab at **Workflow**, **Not Now** dismisses it. Either way it isn't shown again in that workspace. A workspace made with 1.0 never shows it.
 
-### Workflow options
+### Workflow options <a id="workflow-options"></a>
 
 A project's workflow is how its cards move from Todo to Done: who reviews the work, which checks pass first, who merges it and where cards are built. Set it in the project's **Version Control** tab, in its first section, **Workflow** (until 1.0 it was in Project Settings, which now has an **Open Version Control** button there). Agents and the Hive Assistant still read and change each option as a setting (`project.workflow.<option>`).
 
@@ -907,7 +907,7 @@ A project's workflow is how its cards move from Todo to Done: who reviews the wo
 
 Without version control, **Solo** has no review (a card is done when its builder submits it), **Pair** has a reviewer agent check each card after the quick checks pass, and **Team** has a reviewer agent and then you check each card, after the quick checks and the tests; all three leave `node_modules` and `.venv` out of what the work is, and have cards wait for the cards they depend on. A card's paths (the files its work covers) can only narrow that: Hive refuses a path inside `node_modules`, `.venv`, `.git`, `.hive` or another folder the project leaves out, and a folder's files inside them never count.
 
-### Workflow defaults
+### Workflow defaults <a id="workflow-defaults"></a>
 
 Each project's workflow options start from defaults, which you can set at two levels:
 
@@ -922,7 +922,7 @@ The editor is the Workflow section's: the same groups, presets (with what each s
 
 The Hive Assistant can set one at a time with its settings tool, within Settings → Assistant → Control: `workflow.<git|none>.<option>` for Hive's and `workspace.workflow.<git|none>.<option>` for the workspace's, with the same checks.
 
-### The merge queue
+### The merge queue <a id="the-merge-queue"></a>
 
 When a project's workflow says Hive merges, each approved card goes into its target branch's **merge queue**, and Hive merges the cards one at a time: a test merge in its own worktree, the merge checks on exactly that result, and the target moved only when they pass. A card that conflicts or fails a check goes back to its builder.
 
@@ -937,7 +937,7 @@ You stay in charge of each queue:
 
 The Hive Assistant can do these for you within **Settings → Assistant → Control** (it gives your reason when it takes a card out or retries one), and lists them among its actions. Agents can see a queue but never change it. You see each queue in the Progress panel's **Merges** tab, in the project's Version Control tab (**Merge queue**, with its history), and on each card in its **Work** section.
 
-### When the merge queue pauses
+### When the merge queue pauses <a id="when-the-merge-queue-pauses"></a>
 
 When Hive merges cards itself, it commits each merge with your repository's own setup. Its commits run the repository's hooks and are signed as the repository says; Hive never skips or overrides either.
 
@@ -950,7 +950,7 @@ Anything else that stops a merge is something to fix on this computer, not in th
 - **Signing failed**: the signer refused, with its message (no secret key, a key that can't be loaded). Fix the signing setup (`user.signingkey`, `gpg.program`, `gpg.format`), or turn signing off for the repository.
 - **Needs you**: git couldn't merge for another reason, with git's message: another git command holding the repository's index (`index.lock`), a damaged repository, a folder it couldn't check out. Let the other command finish, or fix what git says.
 
-### Merging into a branch checked out in a folder
+### Merging into a branch checked out in a folder <a id="merging-into-a-branch-checked-out-in-a-folder"></a>
 
 The branch a card merges into is often checked out somewhere, usually `main` in the project folder. Merging then changes that folder's files as well as the branch, so Hive takes more care:
 
@@ -960,13 +960,13 @@ The branch a card merges into is often checked out somewhere, usually `main` in 
 - **If something interrupts it.** Hive keeps a record of each step of the update, so if Hive or the computer stops halfway, the next start finishes the update or undoes it, and never merges a card twice. If it finds the folder in a state it can't be sure about (a file in the merge edited since, or the folder switched to another branch), it stops, changes nothing more, and pauses the queue with **Needs you**. The card asks you under **For you** to settle it, and says what to run in PowerShell: a `git update-ref` that finishes the merge, a `git read-tree` that undoes it, or, when the files are neither as they were nor as merged, to put them right by hand. Answer it once that's done, and Hive looks again. Until you do, Hive leaves that branch alone, even when another card is queued for it or Hive restarts; **Resume** looks again too.
 - **One rare case.** If another program switches the folder's branch in the very instant Hive updates it, the merged files can end up as uncommitted changes in that other branch. Hive notices at once, records the card as merged (it is, into its branch), pauses the queue and lists the files, with the `git read-tree` command that puts them back.
 
-### Merging outside cards
+### Merging outside cards <a id="merging-outside-cards"></a>
 
 **Merge a branch** merges any branch by hand: **Merge…** (⑂) beside a branch in Version Control → **Branches & remotes** opens it on that branch. Pick the **Branch** (cards' branches first, each with the slot it's checked out in; then agents' old worktrees' branches; then the rest) and the branch to merge it **Into** (the project folder's, unless you choose another). It merges as an agent's merge does: committed work only (uncommitted files where the branch is checked out stay there, and the dialog says how many), one merge at a time into each branch (it waits while the merge slot is held), as a **Merge** or a **Squash** with your commit message. A merge that would conflict changes nothing and lists the files.
 
 A branch whose card isn't Done is that card's work: the dialog says so, with a link to the card, and merges it only after you confirm. The Merge dialog of an agent's own worktree, and of an unused worktree's **Open**, asks the same; a slot's **Open** → **Merge** opens **Merge a branch**. Hive then sees the merge and marks the card **merged outside the rules**, as for any merge done by hand. A card Hive's merge queue merges offers **Merge anyway…** instead, recorded on the card as an override, as for an agent's merge.
 
-### Card loops
+### Card loops <a id="card-loops"></a>
 
 Two agents can take a list of cards in turn, one building and one reviewing, without you passing each card between them. Tell one agent *"work through #111 to #117 as the builder"* and another *"review #111 to #117 as they come in"*. Both use Hive's **card-loop** skill. The builder does a card and moves it to Review. The reviewer reviews it and passes it, or sends it back with findings; the builder fixes them and moves it to Review again. When a card passes, the builder starts the next one. The builder says which checks it ran, on exactly which code; the reviewer checks that record rather than running everything again, and runs the tests the change affects and its own probes.
 
@@ -1001,7 +1001,7 @@ A card sent back with findings stays in Review. The builder moves it to Active w
 - **The Assistant watches whole lanes.** Running several lanes, the Assistant waits on all of them in one go and is woken only when something needs it: a review fails, a card is blocked (a question for you), unblocked again (you OK'd what it waited for), still blocked but with news (its builder commented, say with new screenshots for your OK, or changed why it's blocked) or stalled, a lane's cards have all passed so its merge is due (and again if that merge then stalls: its builder idle for 10 minutes without taking its turn to merge), or a lane ends (with its merge commit, *"ended: merged at dd4ed990c0ff"*). What you type to a lane's agent in its pane reaches the Assistant too, with its first line, while it keeps watching (**When you answer an agent yourself**, below). A card simply moving on, or passing, doesn't wake it, and a lane started later, or a card added to one, is followed too. Its status says **Waiting on all running lanes**. The same watch follows cards in no lane that it keeps an eye on, such as a release card (**Waiting on all running lanes and #720**): a comment, a move, a verdict or a block on one wakes it too. And when any agent starts waiting for you (a permission prompt or a question in its pane), the Assistant is woken once, told which agent, its card and what it asks, so it can tell you; it never answers for you.
 - **Each lane in a new conversation.** When the Assistant starts an agent on its next set of cards (a new *lane*), it gives the agent a new conversation in the same step: the old one ends and stays in the **Sessions** tab, and the new one starts on the task, with no handover. Within a lane, the agent keeps its conversation. Every request re-reads the whole conversation, so short ones cost much less. The Assistant doesn't do it while the agent is busy, waiting for you or watching a card, or just after you typed in it.
 
-#### Messages and the inbox
+#### Messages and the inbox <a id="messages-and-the-inbox"></a>
 
 Hive gets an agent to read its inbox in three ways, each with its own switch in **Settings → Advanced** (under Hive), on by default. A project can set its own of each in **Project Settings → Sessions** (Inherit follows Settings'); the Hive Assistant follows Settings'.
 
@@ -1011,7 +1011,7 @@ Hive gets an agent to read its inbox in three ways, each with its own switch in 
 
 None of them drops anything: with any of them off, an item stays in the inbox, unread, and counts as overdue after 30 minutes as before. With the first two off, an idle wake still tells the agent once its turn ends; with all three off, it reads its inbox when it next calls `hive_inbox`, or when you press **Deliver Now**. Whether agents can read an inbox at all is **Settings → Agent API → Provide Hive tools to sessions**: the Advanced list links to it beside these switches.
 
-## Hive Assistant
+## Hive Assistant <a id="hive-assistant"></a>
 
 Each workspace has a **Hive Assistant**, its overseer, in a panel on the right. Show or hide it with **Ctrl+Alt+I**; hidden, it folds into a narrow **Hive Assistant** strip down the right edge, and clicking the strip opens it. Each workspace remembers whether it's open, and dragging its left edge makes it wider (double-click the edge for the default width). Hiding the panel doesn't stop the Assistant.
 
@@ -1027,7 +1027,7 @@ Ask it anything about the workspace: what the agents are doing, what a project i
 
 It doesn't use one of a project's agent slots, and it runs in the workspace folder. Closing the workspace or the window, or quitting, stops it like any agent (the dialogs call it "Assistant"), and its conversations can be resumed.
 
-### What the Assistant may do
+### What the Assistant may do <a id="what-the-assistant-may-do"></a>
 
 **Settings → Assistant → Control** decides, for every workspace:
 
@@ -1043,7 +1043,7 @@ It never removes agents, discards worktrees, archives or deletes cards (but one 
 
 When an agent's CLI asks whether to trust a new folder before it starts, the agent shows as **waiting** for you: answer in its terminal.
 
-### The Assistant's journal
+### The Assistant's journal <a id="the-assistants-journal"></a>
 
 The Assistant keeps a **journal** in each workspace: its memory across sessions. Instead of reading a long handover after a restart or a compaction, it recalls a few lines at a time: what was decided and why, plans, what happened, incidents, what it learned. Each entry is a one-line summary with optional detail, a project, an importance, and links to cards, commits, notes and other entries; newer entries can supersede older ones. Hive adds its own facts as they happen: a lane started and ended (with its merge), a card moved to Done, Hive closing unexpectedly.
 
@@ -1059,7 +1059,7 @@ It is in **Settings → Assistant → Journal**, for the workspace you have open
 
 The journal is a file in the workspace, `.hive/assistant/journal.db`, kept on this computer only and never sent anywhere (it stays out of git with the Assistant's other files). Long entries are kept compressed, and a search finds words in summaries, details and reasons.
 
-### Reading and correcting the journal
+### Reading and correcting the journal <a id="reading-and-correcting-the-journal"></a>
 
 The **Journal** section of the Assistant view (or **Show Assistant Journal** in the command palette) shows the journal itself. **Timeline** lists every entry newest first, a line each under its day: the time, a mark for its kind, the summary, its project, a star for an important one, who wrote it (the Assistant's mark, or Hive's for its own facts) and the cards it links to as the board's chips, which open the card. A superseded entry is struck through. **Weekly Digests** lists only the Assistant's weekly summaries.
 
@@ -1070,13 +1070,13 @@ The **Journal** section of the Assistant view (or **Show Assistant Journal** in 
 
 The footer shows the journal's size, how many entries it has, how long everyday entries are kept and its size cap, with **Journal Settings** to change them. While the journal is off, the browser says so with **Turn On**; its entries can still be read, corrected and deleted. The browser follows changes as they happen: an entry the Assistant or Hive writes shows at once.
 
-### The Assistant and Hive's settings
+### The Assistant and Hive's settings <a id="the-assistant-and-hives-settings"></a>
 
 Hive has a lot of settings. Ask the Assistant what one does (*"what does Warn when a transcript is over do?"*) or how to make Hive behave differently (*"the chime is driving me mad"*), and it finds the setting, explains it and says where it is. It reads the same descriptions Settings shows. When it notices something a setting would help with, such as a transcript growing very large or several agents editing the same files, it suggests that setting in a line, and changes nothing unless you agree.
 
 To let it make the change for you, turn on **Settings → Assistant → Control → Change settings** (off by default; a running Assistant takes it after a restart). With it on, the Assistant changes a setting when you ask it to or agree to its suggestion, in Settings or in a project's Project Settings. Each change shows under **Done by the Assistant** with the old and new value and an **Undo** button that puts the old value back. Some settings stay yours whatever you allow: its own Control and the other Settings → Assistant permissions, permission modes, the Agent API, and what Hive runs (CLI paths, extra arguments, a project's setup command). For those it tells you where to change them. An agent's own model, effort or mode is part of running agents (Control agents), not of this switch.
 
-### The Assistant view
+### The Assistant view <a id="the-assistant-view"></a>
 
 The **Hive Assistant** button in the activity bar (the crown on a hive cell) opens everything else about it. At the top, **Used so far**: its conversations, prompts, tokens and API-equivalent cost, for Today, 7 days, 30 days or All time. These aren't counted in any project's Overview. Below that:
 
@@ -1086,7 +1086,7 @@ The **Hive Assistant** button in the activity bar (the crown on a hive cell) ope
 
 The panel's **⋯** menu opens the same view with **All Conversations…** or **Manage Modes…**; the command palette has **Show Assistant Conversations**, **Show Assistant Modes** and **Show Assistant Attachments**.
 
-### Modes
+### Modes <a id="modes"></a>
 
 A **mode** is how the Assistant works: what it puts first, its habits, and the shape of what it hands back. It is written as instructions in a Markdown file in the workspace's `.hive/modes` folder (`.hive/personas` before Hive 0.9.3: Hive moves it, with your edits, when the workspace opens). Hive comes with four:
 
@@ -1103,7 +1103,7 @@ The **Modes** section of the Assistant view lists them. Click one to read or edi
 
 **From personas to modes.** Up to 0.3, Hive shipped character personas (Overseer, Planner, Reviewer, Orchestrator). The modes replace them: a workspace's unedited copies go, and an Assistant that used one moves to the closest mode (Overseer and Orchestrator → Coordinator, Reviewer → QA triager), which Hive says once. Personas you wrote or edited stay as they are.
 
-### Assistant settings
+### Assistant settings <a id="assistant-settings"></a>
 
 **Settings → Assistant** sets the defaults for every workspace:
 
@@ -1115,7 +1115,7 @@ The **Modes** section of the Assistant view lists them. Click one to read or edi
 
 It uses the same model and effort as your agents (each provider's defaults in Settings), since a lighter model or low effort makes it careless: it may say it will check on an agent later and never do. Its mode, like your agents', approves safe actions itself and only asks about risky ones: **Auto** for Claude Code and **Approve for me** for Codex. Claude Code says which models it runs in Auto, for your version and account (currently not **Haiku**), and the settings warn you when you pick a model without it in Auto, for the Assistant or an agent: the session then runs in Manual instead (asking before edits and commands), and Hive shows that mode. **Assistant Settings** in the panel changes any of them for one workspace. Changing its provider restarts it, after asking; a new mode is told to it at once. Its provider is for new conversations: an earlier conversation always resumes in the provider it ran in, so you can go back to a Claude Code conversation after switching the Assistant to Codex, and the other way round.
 
-## Skills
+## Skills <a id="skills"></a>
 
 Skills are instructions an agent loads when they're relevant. Every skill an agent can see is available to it; Hive's own skills can also be switched off for agents (below, **Choosing the skills agents get**). Hive shows where each one comes from:
 
@@ -1151,13 +1151,13 @@ metadata:
 
 When a session starts, Hive copies the Hive skills into the agent's own launch folder in the project's `.hive` and points Claude Code at it (Claude Code shows them as `hive:<name>`), so a running Claude Code agent keeps the version it started with. Codex only reads skills from the folder it works in (`.agents/skills`), so for Codex agents Hive copies them there as `hive-<name>` folders (and keeps them out of git); those copies aren't listed as local skills. Codex agents sharing a folder share those copies, so after one starts with a changed skill, the others use the new version too. Either way, a restarted session has the current skills.
 
-### Choosing the skills agents get
+### Choosing the skills agents get <a id="choosing-the-skills-agents-get"></a>
 
 Every Hive skill for agents is delivered to them, unless you switch it off. **Delivered to agents** is the switch beside each Hive skill: in the **Skills** view it is the workspace's (off there, no project's agents get the skill), and in a project's **Skills** tab the project's own (off there, that project's agents don't; a skill the workspace has off shows off and can't be turned on there). A change reaches each agent's next session: Claude Code's launch folder and the Codex and Copilot copies both follow it, Hive removes its copy of a skill switched off at the agent's next launch (while another of Hive's agents works in the same folder, the copy stays until it stops: it may be reading it), and Hive's guidance stops naming it. The Hive Assistant's own skills aren't chosen here.
 
 **Where Codex and Copilot copies go, and when they're removed.** Codex and Copilot read Hive's skills from copies in the folder an agent works in (its worktree, a slot, or the project folder), and those copies stay after the session, so a CLI you start there yourself would still see them. Hive records each copy it makes, and once the last of Hive's agents in a folder stops, it removes its copies there as **Settings → Advanced → Remove Hive's skill copies when no agent works in the folder** says: **Slots only** (the default) removes them in every folder but the project folder, **Everywhere** in the project folder too, **Never** nowhere (as before). Hive also tidies them as a workspace opens, for folders whose agents have gone. It only removes a copy its record and the copy's own marker both say it made, and that nobody has changed since: never a skill of yours, and never a copy you've edited. Reviewers' sessions run in the project folder, so the review copies they read get none. Claude Code's launch folder leaves nothing in your folders.
 
-## MCP servers
+## MCP servers <a id="mcp-servers"></a>
 
 MCP servers give agents extra tools. Each server is a JSON file in `Workspace/.hive/mcp`:
 
@@ -1178,7 +1178,7 @@ A server you add or change is used by sessions started afterwards; restart a run
 
 Hive approves only its own `hive` tools in advance, for every CLI (for the Assistant, only those its Control setting allows; [Hive's changes to the CLIs](#hives-changes-to-the-clis) can turn it off). A server you add is treated like the agent's other tools: whether the agent asks before using one depends on its CLI and its [permission mode](#permission-modes). Codex follows its own approval rules for them. In **Read only** and **Ask for approval** it asks before calling such a tool, except where the server marks the tool as read-only, or you chose **Allow for this session** or **Always allow** when it asked before. In **Approve for me**, its automatic reviewer decides, and asks you only about a call it thinks is risky. In **Full access**, it calls them without asking.
 
-### Turning servers on where they're needed
+### Turning servers on where they're needed <a id="turning-servers-on-where-theyre-needed"></a>
 
 A server in the workspace is **available** to every project, and runs in a project only when it is **on in the workspace and on in that project**, so a big server you need in one project doesn't fill every other project's agents' context with its tools. A server you add starts off everywhere.
 
@@ -1191,7 +1191,7 @@ Upgrading from 0.9.0 or earlier changes nothing that runs: a server that was on 
 
 If a project has its own `.mcp.json` (or, for Codex, `.codex/config.toml` servers), Hive tells you which of its servers aren't in the workspace and offers to copy them there; until then they stay disabled. **Copy to workspace** shows what each runs, then copies it and turns it on in the workspace and in that project straight away (other projects can turn it on in their **MCP** tab).
 
-### Giving a server to some agents only
+### Giving a server to some agents only <a id="giving-a-server-to-some-agents-only"></a>
 
 By default every agent in a project gets all the servers on in its project. To keep a server's tools away from agents that don't need it (each server's tools take up room in an agent's context), open the agent's settings (its pane's **⋯** → **Agent Settings…**) and under **MCP servers** choose **Only these**, then untick the servers it shouldn't have. For example, a release-testing agent can have a sandbox server that the builders don't. Choosing **Only these** starts with every server ticked, so nothing changes until you untick one; **All of the project's** puts it back.
 
@@ -1201,7 +1201,7 @@ By default every agent in a project gets all the servers on in its project. To k
 - Templates keep the choice, so an agent loaded from a template gets the same servers, where they're on.
 - The agent's tooltip shows its choice, and once any agent has one, the project's **MCP** tab says under each server which agents get it.
 
-### Adding a server from a file
+### Adding a server from a file <a id="adding-a-server-from-a-file"></a>
 
 **Add MCP Server from File** (the file icon in the MCP view's header) adds a server someone gave you, as **Add Skill from File** does for skills:
 
@@ -1212,11 +1212,11 @@ Before adding it, Hive shows the name it will have (the file's or the folder's, 
 
 Nothing in the file runs while it's added. Hive refuses a zip with files that would land outside the server's folder (`..`, a drive or a leading `/`), names Windows can't hold, links, more than 5,000 files or more than 200 MB unpacked, and a definition without a `command` or `url`.
 
-### The built-in `hive` server
+### The built-in `hive` server <a id="the-built-in-hive-server"></a>
 
 Every session also gets Hive's own MCP server, which lets agents list projects, read and write shared notes, write handovers, read and update the task board, and notify you. Try: *"Write a handover for the next session using the hive tools."* A new session is told about these tools and about the project's latest handover, so *"read the handover"* is enough to pick up where the last session stopped. See the [Agent API reference](AGENT_API.md).
 
-## Shared notes and handovers
+## Shared notes and handovers <a id="shared-notes-and-handovers"></a>
 
 The **Shared Notes** view edits the markdown files in `.hive/shared`. Use it for team conventions, instructions every agent should follow, and **handovers** — notes a session writes before it ends so the next session (or another project) can continue. Handovers go in `shared/handovers`, named by date and project (`2026-09-29-api-auth-refactor.md`), with the project on a `**Project:**` line at the top. When project names overlap, such as `hive` and `hive-website`, that line decides whose handover it is.
 
@@ -1224,7 +1224,7 @@ Several agents can update the same note without losing each other's changes. An 
 
 **Long documents by section.** An agent that needs one part of a long plan, design note or spec doesn't have to read all of it: its **hive_doc_outline** tool lists a Markdown file's headings with each section's size, and **hive_read_section** reads just one section (with its subsections), by the heading's text or its slug, the heading in lower case with hyphens (`#core-contracts`; two headings called Setup are `#setup` and `#setup-1`). They work on the project's files (in the agent's worktree when it has one) and on shared notes (`shared:plans/design.md`), for Claude Code, Codex and Copilot agents and the Hive Assistant alike. A heading that isn't there gets the closest ones in reply, never an empty section. An agent reads its own project's documents only.
 
-### Workspace notes
+### Workspace notes <a id="workspace-notes"></a>
 
 **Workspace notes**, pinned first in Shared Notes, is for what is true of this machine: a full path a command needs, the version of a tool you have installed, a folder that lives somewhere unusual. Such notes don't belong in a committed `AGENTS.md`, and `CLAUDE.local.md` doesn't reach every agent: worktrees don't have it, and Codex and Copilot never read it.
 
@@ -1232,7 +1232,7 @@ Hive adds the note to every agent's instructions when it starts, on every coding
 
 Agents get at most 4 KB of it (Settings → Advanced → **Workspace notes: most an agent gets**). The editor warns as you type when the note is longer for any project, and a longer note is cut, with a line telling agents to read the note for the rest. You and the Hive Assistant edit the note; project agents can read it but not change it. To stop delivering it, empty the note or turn off Settings → Advanced → **Deliver workspace notes to agents**.
 
-## Memory
+## Memory <a id="memory"></a>
 
 A project's **Memory** tab shows what each provider its agents use reads about it, grouped by provider:
 
@@ -1243,7 +1243,7 @@ All of them can be edited here.
 
 **One set of instructions for both.** When a project has Claude Code and Codex agents, each reads its own file. **Share one AGENTS.md…** at the top of the list makes `AGENTS.md` the shared file: `CLAUDE.md` gets an `@AGENTS.md` line, which makes Claude Code read it too. Anything else in `CLAUDE.md` stays and applies to Claude Code only. If there's no `AGENTS.md` yet, what's in `CLAUDE.md` moves into it, so nothing is lost.
 
-## Files
+## Files <a id="files"></a>
 
 The **Files** tab is a file browser for the project folder.
 
@@ -1257,7 +1257,7 @@ The **Files** tab is a file browser for the project folder.
 
 Names are coloured by git status like in VS Code (modified, new), folders containing changes get a dot, and git-ignored files and the `.hive` folder are dimmed. `.git` is hidden. The tree updates by itself when files change on disk.
 
-### Viewing and editing files
+### Viewing and editing files <a id="viewing-and-editing-files"></a>
 
 Select a file and it opens on the right, ready to edit, with syntax highlighting for code, SQL, XML, JSON, YAML and many more. **Ctrl+S** (or **Save**) saves it. Some file types also get a nicer view, and the buttons above the file switch between them:
 
@@ -1273,7 +1273,7 @@ When the file's pane is narrow (or the labels are long in your language), these 
 
 Files with unsaved changes get a ● in the tree. The edits are kept while you look at other files or tabs, and follow a file you rename or move in the Files tab. Deleting a file with unsaved changes warns you first. When you quit, Hive lists the files with unsaved changes and saves them or discards them, as you choose; reloading the window or switching workspace offers to save them first. Unsaved changes are not kept if Hive crashes, so save often. If a file changes on disk while you have unsaved edits, for example because the agent edited it, Hive tells you and lets you **Reload** it or **Overwrite with mine**. A file without edits simply updates. Binary files and files over 5 MB aren't opened; use **Open in Default App** for those.
 
-## Attachments
+## Attachments <a id="attachments"></a>
 
 You can attach any file to an agent's or the Assistant's prompt: paste a screenshot with **Ctrl+V**, or drag files from Explorer (or from the Files or Attachments tab) onto its terminal. Each file reaches the agent as its path in the prompt:
 
@@ -1294,7 +1294,7 @@ The **Attachments** tab shows everything pasted or dropped into the project's se
 
 This tab was called **Images**, and the folder `.hive/images`, before attachments could be any file. Hive moves the old folder's files into `.hive/attachments` the first time it needs them, and links to the old paths (in a transcript, or printed in a terminal) still open the moved files in Hive. An agent given an old path in an earlier conversation won't find it there any more: give it the file again.
 
-## Version Control tab
+## Version Control tab <a id="version-control-tab"></a>
 
 A project's **Version Control** tab (**Alt+8**; before 1.0 it was the **Git** tab) starts with the project's version control, **None** or **Git**, as Hive found it when it first saw the project. Hive never switches it by itself: you switch it by clicking the other one, and Hive offers a switch when it finds another version control in the folder (see [Switching version control](#switching-version-control)). Beside it, a line says what Hive finds in the folder now: *This folder is a Git repository at …*; a folder inside a larger repository, whose branch and merge actions affect that whole repository; a folder with no version control; one kept in Mercurial or Jujutsu, not supported yet, so the project uses None; or a Git repository that is gone. **Workflow: Git · Team** names the project's preset (**Custom (from Team)** once an option differs from it, **no preset chosen** when there is none): click it to see the options.
 
@@ -1304,7 +1304,7 @@ The status bar shows the selected project's git in one item, such as **main · o
 
 Everything here is yours: agents have no tool for any of it, and only the project folder changes here. Agents' worktrees are shown, read-only: their work comes into the project folder through **Merge**.
 
-### How do you work?
+### How do you work? <a id="how-do-you-work"></a>
 
 A project added since 1.0 starts with one step, at the top of its Version Control tab: **How do you work?** It offers **Solo**, **Pair** and **Team** (for Git, Pair has Hive merge the work), with the one that fits the project's agents marked **Suggested**: Solo for one agent or none, Pair for a builder and a reviewer (an agent whose name says *review*), Team for more. It follows the agents as you add them. Under the presets, the one you picked shows what it sets and why.
 
@@ -1314,7 +1314,7 @@ A project added since 1.0 starts with one step, at the top of its Version Contro
 
 Nothing is applied before you choose. **New Project** opens the new project's tab at this step. A project Hive finds in the workspace folder, or one the Assistant adds, gets a notice instead (*alpha was added: how do you work?*), with **Choose…** and **Not Now**. Each version control asks once: a project you switch to one it never had asks again for that one, and your answer for each comes back when you switch back. Projects from before 1.0 don't ask: they kept how they worked, with the one-time presets notice.
 
-### Switching version control
+### Switching version control <a id="switching-version-control"></a>
 
 Click the version control the project doesn't use, **None** or **Git**, atop the tab to switch it. A dialog says first what changes:
 
@@ -1334,7 +1334,7 @@ While an offer shows, it says what Hive found; **Not Now** hides it until Hive s
 
 **A project inside a larger repository** (its folder is a subfolder of a Git repository) is Git, and the tab says that branch and merge actions affect that whole repository. So when Hive or the agent merges, the project must name the branch its work merges into itself (**Target branch** in Workflow): options that would merge into the whole repository's default branch are refused when you save them, saying so. If a card's options name none anyway (from before), the merge queue pauses at it, saying how to go on.
 
-### Changes
+### Changes <a id="changes"></a>
 
 **Changes** lists files changed in the project's git working tree and shows each one as a side-by-side diff against the last commit — a quick way to review what the agent did.
 
@@ -1342,11 +1342,11 @@ Its picker chooses whose changes you see, in this order: **Unused worktrees** (w
 
 Hive checks your projects' git status in the background (this tab, branch status, the Files tab's dimmed entries) without writing to the repository's index, so your own `git add` or `git commit`, or an agent's, never fails with *"index.lock: File exists"* because of it. Hive's own git actions, such as **Merge**, still update it as git does. If git is busy when the Files tab lists a folder, ignored entries keep their dimming and the folder is listed again a moment later.
 
-### History
+### History <a id="history"></a>
 
 **History** lists the project folder's last 20 commits, newest first, with their branches and tags, and the repository's tags below them. **Create tag…** tags the commit the folder has checked out: give it a name, and a message for an annotated tag, and choose a remote to push it to if you like.
 
-### Branches & remotes
+### Branches & remotes <a id="branches--remotes"></a>
 
 - **Branch**: the branch the project folder is on (or its detached HEAD, and a merge or rebase git has in progress, which you finish in a terminal), the branch it tracks, and ↑ / ↓. These counts are as of the last fetch, whose time is shown: **Hive never fetches by itself**. **Fetch** fetches every remote. **Pull** fetches the branch it tracks and brings yours up to it when that needs no merge; when both have new commits, it says so and changes nothing (merge or rebase in a terminal, or ask an agent). **Push** pushes to the branch it tracks, or, for a branch that tracks none, to the remote you choose, which it then tracks. A push is never forced: when the remote has commits yours hasn't, it says to pull first. **Push to…** pushes to any remote, a backup on your NAS say, without changing what your branch tracks (**Push** still goes where it went): **This branch**, or **All branches and tags**. Push to… pushes the branch it names, even if you switch branch in a terminal before you click. With all of them, it lists each branch by what happened to it (pushed, already up to date, refused) and the tags it pushed; a branch the remote has newer commits on is refused, and the rest still go. **New branch…** makes a branch at the folder's commit and switches to it.
 - **Branches**: each local branch, with what it tracks and ↑ / ↓, its last commit, and **Switch**. **Track…** (🔗) chooses the remote branch it tracks, which **Pull** and **Push** then use: a remote, and the branch's name there (its own name by default). If that remote has no such branch yet (as of the last fetch), the form says so, and **Track** pushes yours there first, never forced. **Stop tracking** (beside it) leaves the branch tracking nothing; nothing changes on the remote. Uncommitted changes come along when they don't clash with the other branch; when they do, git refuses and nothing changes. A branch checked out in an agent's worktree can't be switched to (a branch is in one folder at a time). A branch checked out in a slot shows the slot's name; point at it for whose it is (*slot-a: HB1 on AL-12*). **Merge…** (⑂) opens [Merging outside cards](#merging-outside-cards) on the branch. **A branch next to its card:** a branch a card works on shows that card's key (click it to open the card) and its stage, in its category's colour and by your name for it if you renamed it. In Review it adds *under review: a3f2c1d*, the revision the review is on (the button beside it copies it); once Done, *merged* and the commit that merged it. An agent's branch carries one card after another: it shows the card being worked, else the latest, and how many earlier cards worked on it (hover for which). A no-code card has no branch, and a branch no card works on shows as before. **Remote branches** lists those you have no local branch for: **Switch** makes one that tracks it.
@@ -1355,7 +1355,7 @@ Hive checks your projects' git status in the background (this tab, branch status
 - **Worktrees**: the repository's other worktrees, whose agent works in each, the card that agent is on (shown as on a branch, whatever the worktree has checked out), and **Changes** to review it. A slot is named with its lease: *slot-a: HB1 on AL-12*, *slot-b: HB2, lane P7 C*, *slot-c: carried for HB3* (an agent's old worktree) or *slot-d: not lent*. Read-only.
 - **Commit identity**: the name and email commits are made with, agents' too: this repository's own setting, your global one, and the one git uses. It warns when commits would fail (no name or email), and when a repository with a GitHub remote commits with a personal address, which anyone can read on GitHub; GitHub's no-reply address (*…@users.noreply.github.com*, in GitHub's email settings) keeps it private. **Set for this repository…** sets this repository's own (`git config --local`); leave both empty to use your global one.
 
-### Merge queue
+### Merge queue <a id="merge-queue"></a>
 
 **Merge queue** shows each of the project's merge queues, a part per target branch: the queue now, as its card in the Progress panel shows it (what it tests, what waits, a card it returned, a pause, with **Pause queue** and **Resume queue**), and its **history**, the latest 50 outcomes: each card, its revision, merged (with the target's new commit) or returned (with why) or taken out, and when. A queue shows here while it has anything going on, including after you switch the project to **The agent merges** while cards still go through it, and once it has a history. The Progress panel's **Queue in Version Control** opens this section.
 
@@ -1363,13 +1363,13 @@ A project inside another repository (say, a workspace you keep in git) shows tha
 
 Fetch, pull, push and Push to… use your git's own sign-in (Git Credential Manager may open its window); they never wait on a prompt in a terminal you can't see, and give up after five minutes.
 
-### Without git
+### Without git <a id="without-git"></a>
 
 A project that isn't a git repository keeps working in its project folder, without worktrees or merging: its **Version Control** tab says so, with **Initialise repository…** to make it one. Without git itself, the tab says so, with the fix (see [Git](#git)).
 
 Git isn't required: each project has a **version control**, found when Hive first sees it. A Git repository (the project's own, or one in a folder above) is **Git**; any other folder, or one kept in Mercurial or Jujutsu (not supported yet), works **without version control**. Hive never switches it by itself: when a project's folder changes (you run `git init` in it, or its repository goes), a notice says so, the project keeps the version control it had, and its Version Control tab offers the switch (see [Switching version control](#switching-version-control)).
 
-### Initialise repository
+### Initialise repository <a id="initialise-repository"></a>
 
 **Initialise repository…** in the Version Control tab of a project without git makes it a repository in one click, ready for agents' worktrees. Its dialog:
 
@@ -1382,7 +1382,7 @@ Git isn't required: each project has a **version control**, found when Hive firs
 - A repository with **no commits yet** (one that stopped short, or one made with `git init` by hand) says so on **Branches & remotes**, with **Make first commit…**: the same dialog, which keeps .hive out of git and makes the first commit on the branch it has.
 - A folder another version control system keeps (Mercurial, Subversion, Jujutsu, Bazaar, Fossil), in it or in a folder above, isn't initialised, even a Jujutsu repository that has git beside it: the dialog says which.
 
-## Project settings
+## Project settings <a id="project-settings"></a>
 
 Each project can override the global defaults in its **Settings** tab, which has the same categories and search as Settings. In a narrow window (or with the side panels open), Settings and Project Settings make room: a setting's control moves under its description, the list of categories narrows, and when even that doesn't fit, the categories become a row across the top that scrolls sideways.
 
@@ -1409,7 +1409,7 @@ Each project can override the global defaults in its **Settings** tab, which has
 
 Changes apply to new sessions. If you change something while a session is running, Hive shows **Restart session**, which restarts it with the new settings and continues the same conversation. The permission mode is the exception: it can be switched in a running session (below).
 
-### Permission modes
+### Permission modes <a id="permission-modes"></a>
 
 | Mode | Behaviour |
 |---|---|
@@ -1437,7 +1437,7 @@ In **Approve for me**, Codex's reviewer decides on risky actions itself: while i
 
 **The CLI's own setting.** Every CLI's modes end with **The CLI's own setting**, for an agent, a project or a CLI's default like any mode: Hive then passes no permission mode at all, and the CLI starts in the one its own config sets (Claude Code's `defaultMode`, Codex's `sandbox_mode` and `approval_policy`, Copilot's own settings), or its default. Hive doesn't know which mode that is, so the agent's badge says **CLI's own** (the CLI's own screen shows the mode), and Hive switches no mode in such a session while it runs: choosing a mode from its menu restarts the session in that mode, the conversation continuing. A mode your CLI config sets is yours to choose, so Hive doesn't ask first for one without guardrails, as it does for **Bypass permissions** or **Full access**. The Hive Assistant isn't offered it: what it may do (**Control**) relies on knowing the mode it runs in.
 
-### Codex's Windows sandbox
+### Codex's Windows sandbox <a id="codexs-windows-sandbox"></a>
 
 On Windows, Codex runs commands in a sandbox, which it sets up once. **Help → Agent Setup… → Codex → Set up** opens Codex and, once it has finished loading and is idle (on a busy computer this can take a little while), brings up its setup, which offers two choices. With either, Codex agents in **Ask for approval** or **Approve for me** edit files in their own folder (the project, or the agent's worktree) and run commands there without asking, and ask before going online or writing anywhere else. Hive's own features (status, file locks, handovers, shared notes) work the same with both.
 
@@ -1468,11 +1468,11 @@ GitHub Copilot's modes:
 
 **Switching mode while an agent runs.** The mode badge in each agent's footer shows the mode its session is really in. Click it, or press **Ctrl+Alt+M**, and choose another: Hive switches it straight away, without a restart, the same way pressing **Shift+Tab** in the terminal does (which Hive also notices). Don't ask and Bypass permissions can't be reached that way, so choosing them restarts the session in that mode and carries on the same conversation; the menu says *Restarts the session* under the modes that will. For Codex, Hive picks the preset from Codex's `/permissions` menu, Full access included: after Hive's confirmation, Codex shows its own warning in the terminal (*Enable full access?*); answer it there, and the session switches without a restart (choose Cancel and it stays as it was). The switch applies to that session only; the settings decide what new sessions start in. When you change the setting while agents are running, Hive offers to **Switch Now**: the agents switch side by side, so the others don't wait while one waits for your answer to Codex's warning, and Hive lists which switched once they all have. This works with `NO_COLOR` set too (Claude Code then shows its footer without colours): Hive reads the mode as it appears on the terminal's screen and leaves your `NO_COLOR` preference as it is.
 
-## Agent API
+## Agent API <a id="agent-api"></a>
 
 Hive has a local API that agents, scripts and other apps use to talk to it: it listens on your computer only (`127.0.0.1`), and every call needs a token. **Settings → Agent API** turns it on or off, sets its port and shows its access token, which can do anything you can. Agents get tokens of their own automatically. See the [Agent API reference](AGENT_API.md).
 
-### Viewer tokens
+### Viewer tokens <a id="viewer-tokens"></a>
 
 An app that only shows what Hive is doing, such as **Apiary** (the office view), should get a **viewer token** rather than the access token: it can read everything in your workspaces (projects, agents, the board, lanes, merge slots, the Progress panel) and follow what happens as it happens, but it can't change anything. Every attempt to change something is refused.
 
@@ -1480,7 +1480,7 @@ To make one, open **Settings → Agent API → Viewer tokens**, type a name for 
 
 The app finds a running Hive by itself: while the Agent API is on, Hive keeps its address (never a token) in `%APPDATA%\Hive\agent-api-discovery.json`, and removes it when the API is turned off or Hive quits.
 
-### The developer console
+### The developer console <a id="the-developer-console"></a>
 
 The developer console shows what each coding agent's CLI sends Hive (its hooks, status line, transcript records, the terminal signs Hive reacts to, its launch and exit) next to what Hive made of each: the status it set, the details it read. It also shows Hive's own work in the workspace: Agent API calls, the merge slot, watches waking agents and Progress runs. It's for power users and for developing Hive, so it is hidden until you turn on **Settings → Advanced → Show developer features**. Then open it from **Help → Developer Console** or with **Ctrl+Alt+J**.
 
@@ -1493,7 +1493,7 @@ The developer console shows what each coding agent's CLI sends Hive (its hooks, 
 - **Record** (the red dot) writes the source's events from then on to a file, until you click **Stop recording**, pick another source or close the console. Recordings are redacted like the console; tick **Include prompt and reply text in this recording** to keep the text in that one recording (tokens and sign-ins are still masked; the box starts unticked each time, or ticked while the console shows text). Each file starts with the versions of Hive and of your coding agents' CLIs (and the versions this Hive was tested with). The bar at the bottom names the file; **Show in folder** opens Hive's `console-recordings` folder. If the file can't be written (a full disk, say), the bar says **Recording failed** and why, and keeps what was written.
 - **Help → Copy Diagnostics…** offers to attach the newest recording to a bug report: tick it to add its newest events, with folders and names taken out as from the log. A recording that includes text is never attached.
 
-#### The flight recorder
+#### The flight recorder <a id="the-flight-recorder"></a>
 
 Some things happen too rarely to catch with the console open: a model's safeguards stopping a response, a CLI update sending something new. The **flight recorder** saves them for you. Turn on any of its triggers in **Settings → Advanced** (they are off by default):
 
@@ -1505,7 +1505,7 @@ Some things happen too rarely to catch with the console open: a model's safeguar
 
 While any trigger is on, Hive keeps each agent's newest developer console events in memory (redacted, at most 200 or 256 KB an agent), whether the console is open or not. When a trigger fires, Hive waits 10 seconds for what follows (**Flight recorder: wait after a trigger**), then saves that agent's events, from before it to just after, as a **capture**: a recording like those you make, redacted, in the same `console-recordings` folder. A notice says what was captured and on which agent, with **Show in Folder**. The console's **Captures** button (the clock) lists them, newest first, and **Help → Copy Diagnostics…** offers the newest one like a recording. Each trigger captures an agent at most once every 10 minutes (**Flight recorder: one capture per trigger and agent every**), and Hive keeps the newest 20 captures (**Flight recorder: captures kept**), removing older ones; recordings you made yourself are never removed. Captures stay on your computer: nothing is sent anywhere.
 
-### Agents reading the developer console
+### Agents reading the developer console <a id="agents-reading-the-developer-console"></a>
 
 Hive's developer console shows what each coding agent's CLI sends Hive (its hooks, status line, transcript records, the terminal signs Hive reacts to) next to what Hive made of each: the status it set, the details it read. **Settings → Agent API → Let agents read the developer console** gives agents and the Hive Assistant a read-only tool for it (`hive_console`), so they can see what their CLI does while they build and debug. It is off unless you turn it on, and running sessions get the tool when they next start.
 
@@ -1513,7 +1513,7 @@ Hive's developer console shows what each coding agent's CLI sends Hive (its hook
 - Hive captures only while you have the developer console open on an agent: an agent reading starts nothing, and is told when nothing is captured. Hive keeps the newest 500 events of each, in memory only, and nothing once the console stops watching it.
 - What it captures is **redacted**: no prompt or reply text, commands, tokens or sign-in details. Names of tools and files, session ids and the numbers (usage, plan limits, costs) stay. That holds while your console shows text too: **Developer console: show prompt, reply and command text** changes only what you see.
 
-### Advanced settings
+### Advanced settings <a id="advanced-settings"></a>
 
 **Settings → Advanced** lists details Hive relies on that a coding agent's CLI update can break, and timeouts and limits for power users: the question each CLI asks before trusting a folder, the text that means it's ready, the messages that mean its sign-in was refused, the fields it sends plan limits in, what its screen shows while it works or once a turn is done, how its footer shows each permission mode (Claude Code's and Copilot's), the labels of Codex's `/permissions` menu, how Hive tells a safety classifier stopped an agent's response (Claude Code's note and question), the timeouts Hive gives its hooks and the `hive` tools, how long a stopped Copilot gets to exit by itself, whether right-click in Copilot panes goes to Copilot (see [Keyboard shortcuts](#keyboard-shortcuts)), the longest an agent's wait lasts, how many lanes the Progress panel shows, and whether the developer console shows prompt, reply and command text (see [The developer console](#the-developer-console)). Hive's defaults work with the CLI versions it was tested with; change one only when something stops working after a CLI update, or Hive's notes say to.
 
@@ -1529,7 +1529,7 @@ Hive's developer console shows what each coding agent's CLI sends Hive (its hook
 - **Help → Copy Diagnostics** lists which values you changed (their names, not what you changed them to).
 - The Hive Assistant can explain them and, if you let it change settings, change them when you ask.
 
-#### Hive's changes to the CLIs
+#### Hive's changes to the CLIs <a id="hives-changes-to-the-clis"></a>
 
 Hive changes some of what each CLI does in the sessions it starts, never by editing the CLI's own config files. Each such change can be turned off in **Settings → Advanced**, under its CLI. All are on by default, as Hive has always done; turning one off applies to sessions started afterwards, and its description says what Hive can no longer do without it.
 
@@ -1561,7 +1561,7 @@ Under **Hive**, seven more switches cover what Hive does with a pane's keys and 
 - **A card's start in its own words** (`hive.prompt.rawCardStart`, off): a card started on an agent reaches it wrapped in Hive's words (which card it is, what it depends on, the docs to read first, the skill to follow). On, the agent gets only the card's title, your note and its description. Hive's wakes and messages stay as they are: they are how Hive and its agents talk.
 - **Clear the CLI's draft before Hive types** (`hive.prompt.clearDraft`, on): before Hive types a prompt or **Compact**, it presses Ctrl+U, which clears what you left in the CLI's input, and again to take back a prompt it stopped part-way. Off, Hive never presses it: your draft stays in front of what Hive types and is sent with it, and **Compact** can fail behind one. Changing a Codex agent's mode still clears its input first, as its menu needs.
 
-## Updating Hive
+## Updating Hive <a id="updating-hive"></a>
 
 Hive keeps itself up to date from its GitHub releases. By default it checks shortly after starting and every six hours, downloads a new version in the background, and installs it the next time you quit Hive — it never restarts on its own, so your agents are never interrupted.
 
@@ -1574,13 +1574,13 @@ Hive keeps itself up to date from its GitHub releases. By default it checks shor
 
 Updates are checked against their published checksum before they install.
 
-## Notifications
+## Notifications <a id="notifications"></a>
 
 When an agent finishes (for one waiting on background tasks, once they have ended) or needs input, Hive plays a chime and tells you: with a **banner in Hive** while you're using it, and with a **Windows notification** when Hive is in the background. Click either to jump to the project. Configure them in **Settings → Notifications**; each project can override the chime.
 
 Agents that finish together don't flood you: they chime once, and get one notice (**3 agents finished in hive**: *Claude, Codex, Agent 3*, or across projects *hive (2), web (1)*), shown a few seconds after the last of them. If you turn notifications off meanwhile, it isn't shown. An agent asking for your input is always told at once, on its own.
 
-### Banners in Hive
+### Banners in Hive <a id="banners-in-hive"></a>
 
 Windows notifications always appear at the bottom right of the screen, over the Assistant's panel where you type, so while any Hive window is focused Hive shows its own **banner** in that window instead:
 
@@ -1594,7 +1594,7 @@ With no Hive window focused, you get Windows notifications as always. Plan usage
 
 Hive's own messages (warnings, what an action did) are kept in the **Notifications** panel: the bell at the bottom of the activity bar, or **Ctrl+Alt+U**. While some are unread the bell shows a dot and turns orange; opening the panel marks them read.
 
-### When a sign-in expires
+### When a sign-in expires <a id="when-a-sign-in-expires"></a>
 
 All of Claude Code's agents share one sign-in, and so do all of Codex's. When it expires (or Codex's API key is refused), the CLI stops each agent's next turn. Hive then shows those agents as **Needs sign-in**, with a violet dot, in the agent row, the pane header, the Overview and the Assistant's lists. Hover one to see what the CLI said and how to sign in. You're told once for that CLI, however many of its agents stopped ("3 agents need you to sign in to Claude Code"), and **Help → Agent Setup** shows it signed out.
 
@@ -1605,7 +1605,7 @@ To sign in again:
 
 Hive notices the sign-in when an agent of that CLI works again, when Agent Setup's **Sign in** finishes, or at its next check (every minute while agents wait). The agents that are still stopped then read **Stopped while signed out**, and **Resume (n)** in the project header counts them: it types a short "carry on" into each, so a card loop picks up where it stopped. Agents that already carried on aren't prompted again. A Codex agent you prompt again right after signing in shows **working**: Hive reads Codex's refusal from its session after the fact, and that late read can't turn it back to **Needs sign-in**.
 
-### When a safety classifier stops an agent
+### When a safety classifier stops an agent <a id="when-a-safety-classifier-stops-an-agent"></a>
 
 A CLI's safety classifier can stop an agent's response part way (Claude Code's model safeguards, Codex's cyber checks), carry on with another model, or ask you what to do. Hive spots it in the agent's session and tells you, so a false positive doesn't go unnoticed and an agent doesn't carry on with a weaker model without your knowing:
 
@@ -1616,7 +1616,7 @@ A CLI's safety classifier can stop an agent's response part way (Claude Code's m
 
 Hive reads this from Claude Code's and Codex's session records. GitHub Copilot's sessions don't record it, so for Copilot agents it isn't detected.
 
-### Agents that need you
+### Agents that need you <a id="agents-that-need-you"></a>
 
 With agents working in several projects, the status bar tells you who is waiting on you: **2 need you**. Click it for the list, oldest first, with how long each has been waiting:
 
@@ -1632,13 +1632,13 @@ With Hive behind other windows, its **taskbar button** shows the count too: a re
 
 Below them, **To review** lists worktree agents that have stopped or finished with work not merged yet, with a summary such as *3 files, +120 −40 · 2 commits*, and buttons for **Changes** and **Merge…**. They don't add to the count; one leaves the list once its work is merged or it starts working again. When nothing needs you but there is work to review, the status bar says **1 to review**.
 
-### Sleep and shutdown
+### Sleep and shutdown <a id="sleep-and-shutdown"></a>
 
 Agents work while you're away from the keyboard, so Hive keeps Windows from **sleeping** while any agent is working or waiting on background tasks, and lets it sleep again as soon as none is. The screen can still turn off and lock. The status bar says **Keeping the PC awake: 2 agents working** while it does. **Settings → General → Keep the PC awake while agents work** chooses *When plugged in* (the default: on a laptop's battery, it may sleep), *Always, on battery too* or *Never*.
 
 When Windows shuts down, restarts or signs you out, Hive backs up the agents' transcripts first, in the moment Windows gives it, without holding up the shutdown. After the PC wakes from sleep, Hive reads each agent's state and plan usage again.
 
-### When Hive closed unexpectedly
+### When Hive closed unexpectedly <a id="when-hive-closed-unexpectedly"></a>
 
 If Hive ended without quitting (it crashed, something ended its process, or the PC lost power), the next start says so with a notice, **Hive closed unexpectedly**: **Hive was last seen on 17 Oct at 04:03. 6 agents were running in hive and amberlight. Nothing was resumed.** The time is when Hive last showed it was running (it notes that every minute), and the agents are those running then. The notice also says when Hive kept a crash dump of that run, and names any merge an agent was in the middle of, with the folder to check. **Resume All** resumes those agents, each in the conversation it was in; **Show Overview** shows every project's agents first. Nothing resumes on its own: to have Hive resume them by itself, turn on **Settings → Sessions → Resume agents after an unexpected close** (off by default), and the notice then says which were resumed. If the Hive Assistant is set up in the workspace, Hive also leaves it a line in its inbox, so it can tell you which card loops stalled; it doesn't restart anything itself.
 
@@ -1646,11 +1646,11 @@ What the agents had started can outlive Hive: a test run, a dev server, a copy o
 
 Quitting Hive, restarting it, installing an update or Windows shutting down or signing out never shows the notice. Help → Copy Diagnostics says whether the last run ended without quitting, and the log (**Help → Open Logs**) has the details.
 
-## The system tray
+## The system tray <a id="the-system-tray"></a>
 
 Closing the (last) window keeps Hive running in the tray so sessions continue. The tray icon shows a red dot when an agent needs you. Its menu lists the agents that need you and those with work to review, from every window (click one to go to it), then your active projects, grouped by workspace when several windows are open. Quit from the tray menu or **File → Exit**.
 
-### Quitting
+### Quitting <a id="quitting"></a>
 
 Quitting stops every running session, in every window. Nothing is lost: each conversation is kept and you can resume it next time. So Hive only asks first when an agent is **in the middle of something** (working, waiting for your answer, or waiting on background tasks it started). Otherwise it just closes and a notification tells you which sessions to resume.
 
@@ -1664,7 +1664,7 @@ If files have unsaved changes (in the Files tab, or a shared note, skill, instru
 
 Tick **Don't ask again** to stop the question about sessions, or change it any time in **Settings → General → Confirm before quitting** (*When an agent is working*, *Whenever sessions are running*, or *Never*).
 
-## Keyboard shortcuts
+## Keyboard shortcuts <a id="keyboard-shortcuts"></a>
 
 | Action | Shortcut |
 |---|---|
@@ -1706,7 +1706,7 @@ In the terminal, Ctrl+C copies when text is selected (otherwise it interrupts th
 
 **Screenshots and files.** With a screenshot on the clipboard (for example from Win+Shift+S), press **Ctrl+V** in a session: Hive saves the image in the session's `.hive/attachments` folder and pastes its path, and Claude Code attaches it as `[Image #1]`. You can also **drag files** from Explorer onto the terminal: any kind of file, its path pasted, copied into `.hive/attachments` first when it comes from outside the agent's folder or is an image. They're kept per session, so you can always see what was sent (see [Attachments](#attachments)).
 
-## Troubleshooting
+## Troubleshooting <a id="troubleshooting"></a>
 
 - **"… was damaged and has been restored"** — one of Hive's settings or record files couldn't be read (for example after a hand edit). Hive went back to its last good copy (`.bak`) and kept the damaged file next to it as `.corrupt-<date>`.
 - **"Claude Code is required" / "Codex is required"** — install the CLI from **Help → Agent Setup…**, or set its path in the provider's settings page. Having the VS Code extension isn't enough; Hive needs the standalone CLI.
@@ -1728,6 +1728,6 @@ In the terminal, Ctrl+C copies when text is selected (otherwise it interrupts th
 - **Where is my data?** — app settings in `%APPDATA%\Hive` (the folder kept the name Hive when the app became Hive Desktop), workspace data in `Workspace/.hive`, project data in `Project/.hive`.
 - **How many sessions can run?** — as many as your machine can handle, across any number of projects. Each is a CLI process; Hive only draws the terminals you can see with the graphics card, so dozens of background sessions don't slow the window down.
 
-## Licence
+## Licence <a id="licence"></a>
 
 Hive is open source under the [MIT License](../LICENSE). It includes open-source libraries (xterm.js, Monaco, React and others) under their own permissive licences, listed with their full texts in [Third-Party Notices](../THIRD_PARTY_NOTICES.md); both are in the Docs view and linked from **Help → About Hive Desktop**. Electron's and Chromium's licences are in the folder Hive is installed in (`LICENSES.chromium.html`). Hive Desktop is independently developed and isn't affiliated with, endorsed or sponsored by Anthropic, OpenAI or GitHub. Claude and Claude Code are products of Anthropic; Codex and ChatGPT of OpenAI; GitHub Copilot and the Copilot CLI of GitHub. Each CLI is installed separately under its maker's terms. The provider badges beside their names are Hive's own, not the providers' logos.
