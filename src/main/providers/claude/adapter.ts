@@ -12,6 +12,7 @@ import { samePath } from '../../../shared/movePaths'
 import { config } from '../../config'
 import { claudeFileAllowed, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
+import { plainHttpsJson } from '../../plainHttpsJson'
 import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
 import type { Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
@@ -241,12 +242,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
 
   async latestVersion(): Promise<string | null> {
     try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 6000)
-      const res = await fetch('https://registry.npmjs.org/@anthropic-ai/claude-code/latest', { signal: ctrl.signal })
-      clearTimeout(t)
-      if (!res.ok) return null
-      return ((await res.json()) as { version?: string }).version ?? null
+      return ((await plainHttpsJson('https://registry.npmjs.org/@anthropic-ai/claude-code/latest', { timeoutMs: 6000 })) as { version?: string }).version ?? null
     } catch {
       return null
     }
