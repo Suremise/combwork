@@ -7,6 +7,8 @@
 // switched, #1419), and an agent added in a new
 // worktree gets its folder and branch. Git's global config is the suite's own, with no identity (GIT_CONFIG_GLOBAL), and
 // no system config (GIT_CONFIG_NOSYSTEM). Dev build, throwaway profile and workspace.
+// Dev build only (#1580): 0.9 worktrees on purpose: Tree, Blank Tree and Late Tree are 0.9 worktree agents
+// (agents:testLegacy, refused by a packaged build), checking a worktree from a repository Hive initialised.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
 const fs = require('fs')

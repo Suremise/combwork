@@ -211,16 +211,18 @@ function WorkflowRoleChoice({ value, onChange }: { value: WorkflowRole; onChange
       <h3 className="agent-dialog-h" id="agent-workflow-role">
         {tr(ROLE_IN_WORKFLOW)}
       </h3>
-      <div className="workflow-role-choice" role="radiogroup" aria-labelledby="agent-workflow-role">
-        {WORKFLOW_ROLES.map((r) => (
-          <label key={r} className={cx('choice', value === r && 'selected')} data-workflow-role={r}>
-            <input type="radio" checked={value === r} onChange={() => onChange(r)} />
-            <div>
-              <strong>{tr(WORKFLOW_ROLE_TEXT[r].name)}</strong>
-              <div className="faint">{tr(WORKFLOW_ROLE_TEXT[r].text)}</div>
-            </div>
-          </label>
-        ))}
+      <div className="workflow-role">
+        <div className="workflow-role-choice" role="radiogroup" aria-labelledby="agent-workflow-role">
+          {WORKFLOW_ROLES.map((r) => (
+            <label key={r} className={cx('choice', value === r && 'selected')} data-workflow-role={r}>
+              <input type="radio" checked={value === r} onChange={() => onChange(r)} />
+              <div>
+                <strong>{tr(WORKFLOW_ROLE_TEXT[r].name)}</strong>
+                <div className="faint">{tr(WORKFLOW_ROLE_TEXT[r].text)}</div>
+              </div>
+            </label>
+          ))}
+        </div>
       </div>
     </>
   )

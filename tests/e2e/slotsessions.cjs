@@ -14,6 +14,7 @@
 //    slot-b, and its hb1 conversation is refused ("on #15 in slot-b: resume this after #15") until #15 ends, then resumes.
 // Screenshots of the refusals and Resume All's list, light and dark. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): its slots are lent through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')

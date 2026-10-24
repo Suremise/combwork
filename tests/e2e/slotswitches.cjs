@@ -7,6 +7,7 @@
 // - Rename adopted worktrees to slot names off: an adopted worktree (hb2), free all along, keeps its name;
 // - both turned on, the next pass deletes card 1's line (LineDeleted) and renames hb2 to a slot name.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): hb2 is carried and released through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')

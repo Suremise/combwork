@@ -5,6 +5,8 @@
 // tab (also for a session no agent can run, while one is added for it), Start Without Setup and the Hive Assistant's
 // panel, in both themes (screenshots in the run's folder). The agents run the fake Claude Code (fake-claude/). Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): session:start is slowed through HIVE_TEST_SLOW_IPC (a seam a packaged build ignores), and
+// Tree is a 0.9 worktree agent (agents:testLegacy, refused by a packaged build) whose setup fails.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
