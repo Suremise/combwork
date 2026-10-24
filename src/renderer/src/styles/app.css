@@ -10996,6 +10996,8 @@ button.progress-run-show:focus-visible {
 }
 .progress-queue-card > .progress-merge-top > .progress-merge-who {
   flex: 1 1 9em;
+  /* Its project, name and target wrap rather than lose the queue's name ("Kolejka scalania · integration") to "…". */
+  white-space: normal;
 }
 .progress-queue-card > .progress-merge-top > :is(.btn, .tip-wrap) {
   margin-inline-start: auto;
