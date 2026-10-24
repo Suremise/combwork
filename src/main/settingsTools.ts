@@ -13,6 +13,8 @@ import { workflowWrite } from './workflow/writes'
 import { problemEnglish, WorkflowRefused } from './workflow/optionsForm'
 import type { SettingDetail, SettingRow } from '../shared/toolReplies'
 import { language } from '../shared/i18n'
+import { docOutline } from '../shared/docSections'
+import userGuideDoc from '../../docs/USER_GUIDE.md?raw'
 import { SOURCE_LANGUAGE } from '../shared/i18n/languages'
 import * as assistant from './assistantControl'
 import { config } from './config'
@@ -154,6 +156,10 @@ function shownAs(e: SettingEntry): string | undefined {
   return shown === settingPath(e) ? undefined : shown
 }
 
+let guideHeadings: Map<string, string> | null = null
+/** A user guide heading's text as it is now, by its id (#1535: settings name headings by id). */
+const guideHeading = (id: string): string => (guideHeadings ??= new Map(docOutline(userGuideDoc).map((h) => [h.slug, h.text]))).get(id) ?? id
+
 /** One setting in full, with its value (a project's for a project setting; a table as it is). */
 export function settingDetail(e: SettingEntry, project: { name: string; config: ProjectConfig } | null): SettingDetail {
   if (e.scope === 'project' && !project) throw new SettingRefused(400, `${e.id} is a project's setting: say which project.`)
@@ -173,7 +179,7 @@ export function settingDetail(e: SettingEntry, project: { name: string; config: 
     ...(e.helps ? { helps: e.helps } : {}),
     ...(e.restart ? { restart: RESTART_TEXT[e.restart] } : {}),
     ...(e.readOnly ? { readOnly: e.readOnly } : {}),
-    docs: e.docs
+    docs: guideHeading(e.docs)
   }
 }
 

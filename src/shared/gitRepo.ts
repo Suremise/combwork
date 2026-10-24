@@ -461,6 +461,6 @@ export function identityProblemData(name: string, email: string): Text | null {
 /** identityProblemData in the language shown (a dialog's check). */
 export const identityProblem = (name: string, email: string): string | null => inLanguage(identityProblemData(name, email))
 
-/** The user guide's heading for this view. */
-// i18n-ignore: a user guide heading, found by its English text
-export const GIT_VIEW_GUIDE = 'Version Control tab'
+/** The id of the user guide's heading for this view. */
+// i18n-ignore: a user guide heading's id (#1535)
+export const GIT_VIEW_GUIDE = 'version-control-tab'

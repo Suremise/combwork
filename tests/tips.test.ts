@@ -4,6 +4,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { tr } from '../src/shared/i18n'
+import { docOutline } from '../src/shared/docSections'
 import { EMPTY_TIPS_STATE, TIP_ENTRIES, TIP_GROUPS, TIP_MOMENTS, TIPS, applyTipsChange, localDay, nextTip, sawTip, tipForMoment, tipForToday, tipsChange, tipsState, usedCommand, type Tip, type TipsChange, type TipsState } from '../src/shared/tips'
 
 const t = (id: string, command?: string, knownBy?: string[]): Tip => ({ id, group: 'Sessions', order: 0, title: id, text: id, command, knownBy })
@@ -54,9 +55,10 @@ describe('choosing a tip', () => {
 
 describe('the tips', () => {
   const guide = readFileSync(join(__dirname, '..', 'docs', 'USER_GUIDE.md'), 'utf8')
-  const headings = new Set([...guide.matchAll(/^#{1,4} (.+)$/gm)].map((m) => m[1].trim()))
+  // Learn more goes by a heading's explicit id (#1535), never its text.
+  const headings = new Set(docOutline(guide).filter((h) => h.fixed).map((h) => h.slug))
 
-  it('have unique ids, known groups, short texts and a heading of the user guide behind Learn more', () => {
+  it('have unique ids, known groups, short texts and the id of a user guide heading behind Learn more', () => {
     expect(TIPS.length).toBeGreaterThanOrEqual(25)
     expect(new Set(TIPS.map((x) => x.id)).size).toBe(TIPS.length)
     for (const tip of TIPS) {
