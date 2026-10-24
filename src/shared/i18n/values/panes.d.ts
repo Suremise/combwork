@@ -209,10 +209,14 @@ interface HiveMessageValues {
   'panes.tiles.context': { tokens: string | number }
   'panes.tiles.empty': undefined
   'panes.tiles.label': { pages: number; page: number }
+  'panes.tiles.moveDown': undefined
+  'panes.tiles.moveUp': undefined
   'panes.tiles.notRunning': undefined
   'panes.tiles.pageButton': { page: number; urgent: number }
   'panes.tiles.pageTip': { page: number; urgent: number; key: string }
   'panes.tiles.reviewing': { card: string | number }
+  'panes.tiles.rowEdge': { where: string; agent: string | number }
+  'panes.tiles.rowMoved': { agent: string | number; place: number; count: number }
   'panes.tiles.stripLabel': undefined
   'panes.tiles.transcript': { size: string | number }
   'panes.tiles.waitingCard': undefined

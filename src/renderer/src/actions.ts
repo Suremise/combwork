@@ -1131,16 +1131,17 @@ const moveFailed = (): string => tr(msg({ id: 'actions.agent.moveFailed', defaul
 
 /**
  * Moves an agent to `index` in the project's order (its position afterwards): the strip, its pages and the panes
- * follow. Shown at once, then saved; the agent keeps focus, so the view goes to its page.
+ * follow. Shown at once, then saved; the agent keeps focus, so the view goes to its page (`focus` false: the focus stays
+ * where it is, as in the Tiles view's focus view, whose pane shows another agent, #1053).
  */
-export async function moveAgent(path: string, agentId: string, index: number): Promise<void> {
+export async function moveAgent(path: string, agentId: string, index: number, focus = true): Promise<void> {
   const p = project(path)
   if (!p || isAssistantPath(path) || !agentOf(p, agentId)) return
   const agents = moveAgentTo(p.agents, agentId, index)
   if (agents.every((a, i) => a.id === p.agents[i].id)) return
   // The panes follow the order (#134): what's on screen changes with it.
   set((s) => ({ workspace: s.workspace && { ...s.workspace, projects: s.workspace.projects.map((x) => (x.path === path ? { ...x, agents } : x)) } }))
-  focusAgent(path, agentId)
+  if (focus) focusAgent(path, agentId)
   // Kept as shown until saved (#1229): a refresh that read the order before the save doesn't put it back meanwhile.
   const end = movesShown.begin(path, { order: agents.map((a) => a.id) })
   const saved = await attempt(moveFailed(), () => call('agents:move', path, agentId, index))

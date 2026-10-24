@@ -276,6 +276,7 @@ export const SUITES = [
   { name: 'terminalinput' },
   { name: 'termsize' },
   { name: 'testedclis' },
+  { name: 'tilestrip' },
   { name: 'tilesview' },
   { name: 'tipcorner' },
   { name: 'tips' },

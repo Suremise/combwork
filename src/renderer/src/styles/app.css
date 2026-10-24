@@ -5859,6 +5859,35 @@ body.pane-resizing .monaco-editor {
   position: relative;
   flex: none;
 }
+/* A row moves (#1053): dragged by its button; where it would go shows as a line in the gap between rows, the accent's,
+   as the lanes' and tabs' drops are. */
+.tile-strip-row.movable > .tile-strip-item {
+  cursor: grab;
+}
+.tile-strip-row.movable > .tile-strip-item:active {
+  cursor: grabbing;
+}
+.tile-strip-row.dragging {
+  opacity: 0.45;
+}
+.tile-strip-row.drop-before::before,
+.tile-strip-row.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 1;
+}
+.tile-strip-row.drop-before::before {
+  top: -2.5px;
+}
+.tile-strip-row.drop-after::after {
+  bottom: -2.5px;
+}
 .tile-strip-back,
 .tile-strip-item {
   display: grid;
