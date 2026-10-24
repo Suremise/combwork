@@ -126,6 +126,22 @@ describe('references that no longer resolve (#819)', () => {
     expect(renamed).toMatchObject([{ ref: 'docs/PLAN.md#setup', problem: 'noHeading' }])
     expect(renamed[0].closest?.[0]).toBe('set-up')
   })
+  it('a renamed heading with an explicit id (#1535) still resolves by it, and a heading another shares the text of is no longer ambiguous', async () => {
+    writeFileSync(join(alpha, 'docs', 'PLAN.md'), PLAN.replace('## Setup', '## Set up <a id="setup"></a>'))
+    expect(await check(['docs/PLAN.md#setup'])).toEqual([])
+    const section = await resolveDocRef(alpha, w.sharedDir, 'docs/PLAN.md#setup')
+    expect('content' in section && section.content).toMatch(/^## Set up <a id="setup"><\/a>/)
+    writeFileSync(join(alpha, 'docs', 'PLAN.md'), PLAN.replace('## Setup', '## Setup <a id="setup"></a>').replace('## Release', '## Setup\n\nAnother.\n\n## Release'))
+    expect(await check(['docs/PLAN.md#setup', 'docs/PLAN.md#setup-1'])).toEqual([{ ref: 'docs/PLAN.md#setup-1', problem: 'ambiguous', closest: ['setup', 'setup-1'] }])
+  })
+  it('an explicit id two headings carry (a section copied with its anchor): a reference to it, or to the copy, is ambiguous, never the first picked', async () => {
+    writeFileSync(join(alpha, 'docs', 'PLAN.md'), PLAN.replace('## Setup', '## Setup <a id="setup"></a>').replace('## Release', '## Setup again <a id="setup"></a>\n\nAnother.\n\n## Release'))
+    expect(await check(['docs/PLAN.md#setup', 'docs/PLAN.md#SETUP', 'docs/PLAN.md#setup-1'])).toEqual([
+      { ref: 'docs/PLAN.md#setup', problem: 'ambiguous', closest: ['setup', 'setup-1'] },
+      { ref: 'docs/PLAN.md#SETUP', problem: 'ambiguous', closest: ['setup', 'setup-1'] },
+      { ref: 'docs/PLAN.md#setup-1', problem: 'ambiguous', closest: ['setup', 'setup-1'] }
+    ])
+  })
   it('a deleted file', async () => {
     expect(await check(['docs/GONE.md#setup', 'docs/GONE.md'])).toEqual([
       { ref: 'docs/GONE.md#setup', problem: 'notFound' },

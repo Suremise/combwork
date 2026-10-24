@@ -609,7 +609,7 @@ describe("the Assistant's settings catalog", () => {
       const e = settingEntry(`advanced.${d.id}`)
       expect(e, d.id).toBeTruthy()
       expect(e!.hidden).toBe(true)
-      expect(e!.docs).toBe('Advanced settings')
+      expect(e!.docs).toBe('advanced-settings')
       expect(!!settingEntry(`workspace.advanced.${d.id}`), d.id).toBe(!!d.workspace)
       expect(e!.restart === 'sessions', d.id).toBe(d.applies === 'sessions')
     }
