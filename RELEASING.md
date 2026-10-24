@@ -39,21 +39,22 @@ An agent takes the OK in its own pane: the release-hive skill says how.
 
    Failures are carded at once and bisected over the merges since the last full run.
 2. **The baseline install** (#1288): a 1.0 build the user installs and uses day to day, before anything is uploaded. Features from On Hold are then built on top of it for a while.
-   - The checks on the integration branch's head: the last checks card's results stand if the branch hasn't moved since; otherwise run them again.
+   - It waits for the last phase's checks card (#1539), the translation review (#1126) and #1582 (Hive's version checks off `fetch()`). Electron's CVE fix (#1503) comes before the RC (#1541), not the baseline (the user, 24 Oct).
+   - **Its checks are lighter than a release's** (the user, 24 Oct): the checks on the integration branch's head, where the last checks card's results stand if the branch hasn't moved since (otherwise run them again), with the model trials as a **smoke run**: Claude Code and Codex each run the key scenarios once, with no repeats, no Haiku and no Copilot. The full trials, the full e2e set and the real tier come before a proper release (What a release checks).
    - The release notes (below).
    - The version is `1.0.0-rc.<n>` (asked), set before the build: no current-version candidate comes first (that's Step 1, for an uploaded release). A pre-release version means the updater never offers a 0.9.x release over it, and a later RC or 1.0.0 updates it.
-   - `npm run dist` (asked), built from the integration branch's head. From a worktree, it copies the installer into the main checkout's `dist` (Notes).
+   - `npm run dist -- --kind baseline` (asked), built from the integration branch's head. From a worktree, it copies the installer into the main checkout's `dist` (Notes).
    - `npm run e2e -- packaged-mcp packaged-progress` against `dist/win-unpacked`, and the Sandbox checks (the release-hive skill), including the one-way upgrade from 0.9.3.
    - An install note for the user: back up first, close every 0.9.3 Hive on the workspace, and what to expect. **The user installs.** Nothing is pushed, tagged or uploaded.
 3. **The RC, then the release** (#1541), once the user is happy with what the baseline has become:
    - **An RC** is a draft GitHub pre-release at `1.0.0-rc.<n>`. It follows the Steps below, built from the integration branch, with **Set as a pre-release** ticked. Only installs with **Include pre-releases** on see it.
    - **The release**: the integration branch is merged into `main` (asked, `--no-ff`), and the Steps run on `main` at `1.0.0`. After that, 1.0.x fixes go to `main`.
 
-Each build `npm run dist` makes is recorded in `dist/build-info.json`, beside its installer: the code, commit and branch it was built from (Notes).
+Each build `npm run dist` makes is recorded in `dist/build-info.json`, beside its installer: the code, commit and branch it was built from (Notes). Each successful build, by `npm run dist` or `npm run release`, also goes into the Hive Assistant's journal as Hive's entry: its kind (`--kind beta|baseline|rc|release`, else from the version: a `-beta.n` is a beta, an `-rc.n` an RC, and a release version is `npm run release`'s release or `npm run dist`'s candidate for it), version, commit and installer. It's sent to Hive while it's running; otherwise it's recorded when the workspace next opens. **Settings → Advanced → Record builds in the journal** turns it off.
 
 ## What a release checks
 
-Before any release that is uploaded, an RC or the release itself, everything runs on its commit:
+Before any release that is uploaded, an RC or the release itself, everything runs on its commit, unlike the baseline's lighter checks (The 1.0 path):
 
 - the full fake set, and the real tier for every CLI (Steps 4 and 5);
 - the i18n checks, with all text translated in the 7 locales and checked in context (#1126);

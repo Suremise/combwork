@@ -49,8 +49,8 @@ export const ALLOW_DIR = 'i18n/allow'
 export const EXCLUDED = [
   [/^src\/main\/mcp\//, 'agent-facing: the hive MCP server'],
   [/^src\/main\/progressReporters\//, 'agent-facing: hive-progress output'],
-  [/^src\/main\/(agentMessages|agentTokens|apiDiscovery|cardBusy|decisionNotices|decisionWakes|deliveries|guidance|hookTokens|inboxNotices|journal|journalService|loopWakes|mergeSlots|servers|settingsTools|slotRelease|startView|taskBatch|viewerTokens|watches)\.ts$/, 'agent-facing: tool replies, guidance, wakes, inbox and the Agent API'],
-  [/^src\/shared\/(agentMcp|assistant|assistantActivity|assistantTools|deliveries|doorbell|hiveGuidance|instructions|journal|laneBrief|lanes|laneWatch|mergeSlot|startView|toolReplies|watch)\.ts$/, 'agent-facing: tool replies, guidance, wakes, inbox and the Agent API'],
+  [/^src\/main\/(agentMessages|agentTokens|apiDiscovery|buildFacts|cardBusy|decisionNotices|decisionWakes|deliveries|guidance|hookTokens|inboxNotices|journal|journalService|loopWakes|mergeSlots|servers|settingsTools|slotRelease|startView|taskBatch|viewerTokens|watches)\.ts$/, 'agent-facing: tool replies, guidance, wakes, inbox and the Agent API'],
+  [/^src\/shared\/(agentMcp|assistant|assistantActivity|assistantTools|buildFacts|deliveries|doorbell|hiveGuidance|instructions|journal|laneBrief|lanes|laneWatch|mergeSlot|startView|toolReplies|watch)\.ts$/, 'agent-facing: tool replies, guidance, wakes, inbox and the Agent API'],
   [/^src\/main\/(launchGate|screenRecognition|terminalScreen)\.ts$/, "CLI-facing: a CLI's screen and text (#367)"],
   // The 1.0 workflow core's files with no text the window shows (#1264): the rest of src/main/workflow and platform is
   // checked, its window text messages in src/shared/workflow (refusals.ts, texts.ts) kept as data beside the English.
