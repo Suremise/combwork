@@ -1,7 +1,8 @@
 // The Assistant's journal in Settings (#1031): Settings → Assistant → Journal shows it on, work only by default, with no
 // journal yet; Hive's facts fill it (a card into Done) and its size shows; a kind ticked, the journal turned off (the
 // entries kept) and on again are saved in the workspace's workspace.json; Delete Journal… asks, then the file goes to the
-// trash. Both themes. No agents (its tools are measured in replysize). Dev build, throwaway profile and workspace.
+// trash, and the copy starts with tips off. Both themes. No agents (its tools are measured in replysize). Dev build, or
+// a packaged one with HIVE_EXE (#1599: its deletion goes to the suite's trash folder too). Throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -31,6 +32,8 @@ const saved = () => {
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
+    // A test copy starts with tips off (HIVE_TEST_TIPS=off), packaged with HIVE_EXE too (#1599).
+    check('tips are off in a test copy, and no tip card shows', (await inv('settings:get')).general.showTips === false && (await page.locator('.tip-card').count()) === 0)
     const openSection = async () => {
       await page.keyboard.press('Control+,')
       await page.locator('.settings-nav .row', { hasText: 'General' }).click()

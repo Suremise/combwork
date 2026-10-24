@@ -26,7 +26,7 @@ export const isRealCli = (s) => (s.needs ?? []).some((n) => n === 'claude' || n 
 /**
  * The HIVE_TEST_ seams a packaged Hive ignores (src/main reads them in unpackaged builds only, #1591): a suite needing
  * one tests the dev build's behaviour. tests/e2esuites.test.ts checks every HIVE_TEST_ name src reads is here, in
- * PACKAGED_SEAMS or in EVERY_COPY_SEAMS.
+ * or in PACKAGED_SEAMS.
  */
 export const DEV_SEAMS = [
   'HIVE_TEST_ANTIVIRUS', 'HIVE_TEST_ANTIVIRUS_LOG', 'HIVE_TEST_BLOCK_IPC', 'HIVE_TEST_BOARD_UPGRADE', 'HIVE_TEST_CLI_LOG', 'HIVE_TEST_DECISION_SETTLE_MS',
@@ -38,10 +38,11 @@ export const DEV_SEAMS = [
   'HIVE_TEST_START_VIEW_LOG', 'HIVE_TEST_TASKBAR_LOG', 'HIVE_TEST_TESTED_CLIS', 'HIVE_TEST_TRACKER_HEARD', 'HIVE_TEST_TRACKER_WAIT_MS',
   'HIVE_TEST_UPGRADE_HOLD', 'HIVE_TEST_WAKE_TAKE_MS'
 ]
-/** The seams a packaged Hive honours too, when quiet (#1253: lib.hiveEnv starts every test copy quiet). */
-export const PACKAGED_SEAMS = ['HIVE_TEST_ASK_LEFTOVERS', 'HIVE_TEST_DIALOG_SNAPSHOT', 'HIVE_TEST_NOTIFY_LOG', 'HIVE_TEST_QUIET']
-/** Seams every test copy is given (runContext.hiveEnv), dev-only but no one suite's need: a suite naming one isn't marked. */
-export const EVERY_COPY_SEAMS = ['HIVE_TEST_TIPS', 'HIVE_TEST_TRASH_DIR']
+/**
+ * The seams a packaged Hive honours too, when quiet (#1253: lib.hiveEnv starts every test copy quiet), among them the two
+ * every test copy is given, HIVE_TEST_TIPS and HIVE_TEST_TRASH_DIR (#1599: takesTestSeams in src/main/testQuiet.ts).
+ */
+export const PACKAGED_SEAMS = ['HIVE_TEST_ASK_LEFTOVERS', 'HIVE_TEST_DIALOG_SNAPSHOT', 'HIVE_TEST_NOTIFY_LOG', 'HIVE_TEST_QUIET', 'HIVE_TEST_TIPS', 'HIVE_TEST_TRASH_DIR']
 /**
  * The test copies' channels a packaged Hive refuses: 0.9 worktree agents (agents:testLegacy; `{ worktree: true })`, an
  * agent asked for in a worktree, as q.agent does; a 0.9 template's worktree modes) and slots:test. A worktree agent asked

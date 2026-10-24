@@ -21,4 +21,6 @@ export const nativeImage = {}
 export const dialog = {}
 export const crashReporter = {}
 export const powerMonitor = {}
-export default { app, BrowserWindow, Notification, clipboard, shell, nativeImage, dialog, crashReporter, powerMonitor }
+// No screens: main code that places windows (testQuiet.ts) is bundled in by trash.ts and config.ts.
+export const screen = { getAllDisplays: (): unknown[] => [] }
+export default { app, BrowserWindow, Notification, clipboard, shell, nativeImage, dialog, crashReporter, powerMonitor, screen }
