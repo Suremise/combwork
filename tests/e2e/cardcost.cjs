@@ -4,6 +4,8 @@
 // the card passed, holding none); Performance's Cards table lists the card, sortable, a row opening it. A card held by
 // an agent with no session is Unknown, never $0. The Agent API's card leaves the holds out. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): it starts this checkout's Electron itself, and B1 is a 0.9 worktree agent (agents:testLegacy,
+// refused by a packaged build).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

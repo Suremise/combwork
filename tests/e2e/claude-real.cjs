@@ -10,6 +10,8 @@
 // Each wait on the CLI is a lib.cliStep: a usage limit, sign-in or network failure there makes the suite a SKIP.
 // Dev build, throwaway profile and workspace; the real Claude Code in a home of the suite's own with a made-up API key
 // (lib.ownClaudeHome, #368: never the user's ~/.claude). No prompt is sent, so it needs no sign-in.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Reviewer is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build), for a real session in a worktree.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

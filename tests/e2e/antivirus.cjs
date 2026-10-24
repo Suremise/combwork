@@ -9,6 +9,8 @@
 // when several agents run, again when a worktree agent adds its folder, a reminder after its spacing (a fixture's),
 // never after "Don't ask again"; and a test copy
 // without a fixture refusing to touch Defender. Screenshots in both themes.
+// Dev build only (#1580): HIVE_TEST_ANTIVIRUS (a seam a packaged build ignores) stands in for every scan, and Tree is a
+// 0.9 worktree agent (agents:testLegacy, refused by a packaged build), making the worktrees folder.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')

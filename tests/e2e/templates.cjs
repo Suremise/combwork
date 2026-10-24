@@ -9,6 +9,9 @@
 // template's load shows each name in the template beside a box for the agent's new name: a name another project's
 // agent has (or one used twice) is marked and Load template greyed out until it is changed; nothing is filled in. Agents run the fake Claude Code (fake-claude/). Dev build, throwaway profile,
 // workspace and CLAUDE_CONFIG_DIR; a quiet test copy.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Tree is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build) (in beta, with uncommitted work, and in alpha as a template's
+// source).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

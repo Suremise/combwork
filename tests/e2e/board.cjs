@@ -3,6 +3,8 @@
 // a project's Tasks tab, archiving; and Project → Remove Project… (Hide, restored from Settings → Workspace, and
 // Delete). Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR. Delete sends a small test folder to the
 // Recycle Bin.
+// Dev build only (#1580): it starts this checkout's Electron itself, and delta's long-named agent is a 0.9 worktree
+// agent (agents:testLegacy, refused by a packaged build), for Remove Project's table of names and branches (#1316).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

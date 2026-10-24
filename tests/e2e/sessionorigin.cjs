@@ -4,6 +4,8 @@
 // and never take the name of an agent added later with the same name or worktree. Resume still names the agent that
 // resumes it now, and its menu gives every agent's location. New sessions record their agent's name.
 // The agents run the fake Claude Code (fake-claude/). Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Reviewer is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build), for a session that ran outside the project folder.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

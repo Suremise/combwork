@@ -5,6 +5,8 @@
 // (#819) are flagged on the card's tile and in its dialog with the closest headings, whether saved so or broken by a
 // change before the start, and named in the prompt. The agent is the fake Claude Code. Pictured in both themes. Dev
 // build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Tree is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build), whose copy of a file differs from the project's.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

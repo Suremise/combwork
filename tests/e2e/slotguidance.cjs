@@ -12,6 +12,7 @@
 //    and the system prompt it sends have them too.
 // No text delivered to any of them tells an agent to use a worktree of its own. Dev build, throwaway profile, workspace,
 // CLAUDE_CONFIG_DIR, CODEX_HOME and COPILOT_HOME.
+// Dev build only (#1580): its slots are lent through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -41,7 +42,7 @@ const readOr = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
 // The lines P7 changed (#1444), as agents are given them.
 const SLOT_LINE = /that folder is the slot: work and run checks there, never in another one/
 const ISOLATED = /with `--isolated` it runs in a check copy of its own/
-const COPY_LINE = /the review copy to read and run checks in when the project has them: review there, never in the builder's slot or folder/
+const COPY_LINE = /the review copy holding that revision when the project has them\. Review there, never in the builder's slot or folder/
 const CONTRACT = /Hive sets your folder \(the project's, a card's or lane's slot, or the review copy a review names\)/
 // What nothing delivered may say any more: a worktree of an agent's own (tests/guidance.test.ts has the same).
 const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown (?:git )?worktree\b|\bagents? with (?:its|their) own\b/i
