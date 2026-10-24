@@ -68,6 +68,7 @@
   "project.card.writtenToCache": "写入缓存的 Token",
   "project.changes.agentSetup": "配置智能体",
   "project.changes.agentWorktree": "{agent} 的工作树 · {branch}",
+  "project.changes.agentSlot": "{agent} · {place}{known, select, yes { · {branch}} other {}}",
   "project.changes.binary": "二进制文件，没有文本差异。",
   "project.changes.cantShow": "{problem}，因此 Hive 无法显示 {project} 的更改。",
   "project.changes.checkingAgain": "正在重新检查…",

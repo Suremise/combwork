@@ -69,6 +69,7 @@ interface HiveMessageValues {
   'project.card.writtenNext': undefined
   'project.card.writtenToCache': undefined
   'project.changes.agentSetup': undefined
+  'project.changes.agentSlot': { agent: string | number; place: string | number; known: string; branch: string | number }
   'project.changes.agentWorktree': { agent: string | number; branch: string | number }
   'project.changes.binary': undefined
   'project.changes.cantShow': { problem: string | number; project: string | number }

@@ -67,6 +67,7 @@
   "project.card.writtenNext": "tokens written to cache on the next message",
   "project.card.writtenToCache": "tokens written to cache",
   "project.changes.agentSetup": "Agent Setup",
+  "project.changes.agentSlot": "{agent} · {place}{known, select, yes { · {branch}} other {}}",
   "project.changes.agentWorktree": "{agent}'s worktree · {branch}",
   "project.changes.binary": "Binary file — no text diff.",
   "project.changes.cantShow": "{problem}, so Hive can't show {project}'s changes.",

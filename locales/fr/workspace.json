@@ -106,6 +106,7 @@
   "workspace.banners.showProject": "Afficher le projet",
   "workspace.banners.showProjectLabel": "Afficher le projet : {title}",
   "workspace.changes.aboutAgent": "Worktree de l’agent {agent} : tout ce qui est sur {branch} depuis son départ de {base}. Fusionner… l’intègre dans {base}.",
+  "workspace.changes.aboutSlot": "{is, select, carried {{agent} travaille dans {name}, l’emplacement repris pour lui} other {{agent} construit dans {name}}} : {known, select, yes {tout ce qui est sur sa branche depuis son départ de {base}.} other {ce qui n’y est pas encore commité.}}",
   "workspace.changes.aboutProject": "Le dossier du projet : ce qui n’est pas encore commité, de toi ou des agents qui travaillent dans le dossier lui-même (ceux sans worktree).",
   "workspace.changes.aboutUnusedOne": "Un worktree inutilisé : tout ce qui est sur {branch} et pas sur {into}. Fusionne-le, ou retourne à Worktrees inutilisés pour le retirer.",
   "workspace.changes.aboutUnusedShort": "Les worktrees où aucun agent du projet {project} ne travaille : ouvres-en un pour voir ses modifications et les fusionner, ou retire-le.",

@@ -96,6 +96,7 @@ export function slotsIn(db: DatabaseSync, project: string): FolderSlot[] {
       folder: s.folder as string,
       state: s.state as string,
       portBase: s.port_base as number,
+      target: (s.target as string | null) ?? null,
       open: o ? leaseOfRow(o) : null,
       last: n ? { ...leaseOfRow(n), ended: n.ended_at !== null, endRev: (n.end_rev as string | null) ?? null } : null,
       writer: s.writer_run ? { run: s.writer_run as string, agent: s.writer_agent as string, lease: s.writer_lease as string } : null
