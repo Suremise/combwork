@@ -11,6 +11,7 @@
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
+const { createIntl } = require('@formatjs/intl')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 60000
 
@@ -203,19 +204,25 @@ const lines = (file) => {
       await ja.page.reload()
       await lib.appReady(ja.page)
       const until = (fn, ms) => lib.until(fn, ms, 250)
+      // The Japanese texts from the catalogue, not literals (#1597: a translation fix broke "copy-1 内"): `jaPieces` gives a
+      // message formatted with `values`, split around those passed as null (a name or date the hover fills in).
+      const jaDir = path.join(lib.ROOT, 'locales', 'ja')
+      const jaIntl = createIntl({ locale: 'ja', messages: Object.assign({}, ...fs.readdirSync(jaDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(jaDir, f), 'utf8')))) })
+      const jaPieces = (id, values) => jaIntl.formatMessage({ id }, Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v ?? '\u0000']))).split('\u0000').filter(Boolean)
       await ja.page.locator('.progress-rail').click().catch(() => undefined)
       const panel = ja.page.locator('.progress-panel')
       await until(async () => (await panel.count()) === 1, HUNG_MS)
       await panel.locator('.progress-tab[data-tab="lanes"]').click()
       const top = panel.locator(`.progress-lane[data-lane="${laneId}"] .progress-lane-top`)
       // Its slot ready and the pool's last verdict, in Japanese.
-      const want = (t) => t.includes('準備完了') && t.includes('最後の判定')
+      const wantPieces = [...jaPieces('board.lanes.slotTip', { state: 'ready', carried: 'no', since: null }), ...jaPieces('board.lanes.poolLastVerdict', { name: 'R1', pass: 'no' })]
+      const want = (t) => wantPieces.every((p) => t.includes(p))
       const hover = async () => want(await lib.hoverTip(ja.page, top, want, HUNG_MS))
-      check('ja: the lane’s hover shows its slot and the pool’s last verdict', await hover())
+      check('ja: the lane’s hover shows its slot and the pool’s last verdict', await hover(), JSON.stringify(wantPieces))
       await shots2(ja.page, ja.inv, 'ja', 'lane-hover', null, hover)
       await panel.locator('.progress-tab[data-tab="runs"]').click()
       // Its copy's check, kept from the first start.
-      const row = panel.locator('.progress-recent-item', { hasText: 'copy-1 内' })
+      const row = panel.locator('.progress-recent-item', { hasText: jaPieces('board.progress.inCopy', { copy: 'copy-1' }).join('') })
       check('ja: the copy’s run is listed, "in copy-1" in Japanese', !!(await until(async () => (await row.count()) === 1, HUNG_MS)), JSON.stringify({ shown: await panel.locator('.progress-runs-body').innerText().catch(() => ''), kept: (await ja.inv('progress:snapshot')).runs.map((r) => [r.title, r.copy, r.state]) }))
       await row.locator('.progress-recent').click()
       await shots2(ja.page, ja.inv, 'ja', 'runs', panel)
