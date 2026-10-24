@@ -69,6 +69,8 @@ describe('a kept file read for a change (#1600)', () => {
     const f = join(dir, 'damaged.json')
     await writeKeptJson(f, { n: 1 })
     writeFileSync(f, '{"n": ')
+    const old = new Date(Date.now() - 60_000) // damaged a while ago, not a save stalled a moment ago (#1601)
+    utimesSync(f, old, old)
     await expect(readKeptJson(f, null, { unsettled: 'throw' })).resolves.toEqual({ n: 1 })
   })
 

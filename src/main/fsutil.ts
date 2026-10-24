@@ -57,16 +57,21 @@ function recoverText(path: string, bak: string | null): { value: unknown; restor
 
 // A file that doesn't parse may be mid-save by something outside Hive: an editor or `fs.writeFileSync` saving in
 // place truncates it, then writes (#1598). Before calling it damaged, it is read again after short pauses (about
-// 1 s in all, only when it doesn't parse) until it parses, or two reads in a row see the same text, size and mtime.
-// An empty file changed within that time is still counted as a save in progress. A file still changing when the
-// pauses run out is left as it is: that read gets the .bak's value (or the fallback), and the next read looks again.
+// 1 s in all, only when it doesn't parse) until it parses, or two reads in a row see the same text, size and mtime
+// and that mtime is at least DAMAGED_AGE_MS old. A writer stalled mid-save on a busy machine leaves a half-written
+// file unchanged for longer than a pause, so a file changed more recently is still counted as a save in progress
+// (#1601). A file still changing, or changed too recently, when the pauses run out is left as it is (unsettled):
+// that read gets the .bak's value (or the fallback), and the next read looks again. The pauses add up to under half
+// DAMAGED_AGE_MS, so a file changed just before it is read always ends unsettled, never damaged.
 const SETTLE_PAUSES = [25, 50, 100, 150, 250, 400]
 const SETTLE_MS = SETTLE_PAUSES.reduce((a, b) => a + b, 0)
+/** How long a kept file that doesn't parse must have been unchanged before it can count as damaged. */
+export const DAMAGED_AGE_MS = 2000
 
 /** One read of a kept file: its text and what its stat said (null: missing or locked). */
 export type KeptSample = { text: string; size: number; mtimeMs: number } | null
 
-/** What reading a kept file that didn't parse came to: its value once it did, damaged, still changing, or missing. */
+/** What reading a kept file that didn't parse came to: its value once it did, damaged, still changing (or changed too recently), or missing. */
 export type KeptSettled = { value: unknown } | 'damaged' | 'unsettled' | 'missing'
 
 const parses = (text: string): { value: unknown } | null => {
@@ -80,7 +85,7 @@ const parses = (text: string): { value: unknown } | null => {
 /** Whether a read that didn't parse is still worth reading again, given the read before it. */
 function stillSaving(prev: KeptSample, cur: KeptSample): boolean {
   if (!cur || !prev) return true
-  if (cur.size === 0 && Date.now() - cur.mtimeMs < SETTLE_MS) return true
+  if (Date.now() - cur.mtimeMs < DAMAGED_AGE_MS) return true
   return prev.size !== cur.size || prev.mtimeMs !== cur.mtimeMs || prev.text !== cur.text
 }
 
@@ -138,9 +143,9 @@ function settleSync(path: string): KeptSettled {
   }
 }
 
-/** A file still changing after the pauses: its .bak's value for this read, the file left as it is. */
+/** A file still changing after the pauses, or changed too recently to call damaged: its .bak's value for this read, the file left as it is. */
 function unsettled<T>(path: string, bak: string | null, fallback: T): T {
-  log.warn(`${userText(path)} was still changing after ${SETTLE_MS} ms and doesn't parse: its last good copy is used for now, the file left as it is`)
+  log.warn(`${userText(path)} doesn't parse and had changed within ${DAMAGED_AGE_MS} ms (or was still changing after ${SETTLE_MS} ms): its last good copy is used for now, the file left as it is`)
   const ok = bak === null ? null : parses(bak)
   return ok ? (ok.value as T) : fallback
 }
@@ -196,7 +201,7 @@ export async function readKeptJson<T>(path: string, fallback: T, opts: KeptReadO
     if (settled === 'missing') return fallback
     if (typeof settled === 'object') return settled.value as T
     if (settled === 'unsettled' && opts.unsettled === 'throw') {
-      log.warn(`${userText(path)} was still changing after ${SETTLE_MS} ms and doesn't parse: a change to it waits for it`)
+      log.warn(`${userText(path)} doesn't parse and had changed within ${DAMAGED_AGE_MS} ms (or was still changing after ${SETTLE_MS} ms): a change to it waits for it`)
       throw new KeptFileBusy(path)
     }
     const bak = await readFile(`${path}.bak`, 'utf8').catch(() => null)

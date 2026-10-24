@@ -2,13 +2,18 @@ import { readdirSync, readFileSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { Worker } from 'worker_threads'
 import { describe, expect, it } from 'vitest'
-import { keptSettleSteps, onCorruptFile, readKeptJson, readKeptJsonSync, writeKeptJson, type KeptSample, type KeptSettled } from '../src/main/fsutil'
+import { DAMAGED_AGE_MS, KeptFileBusy, keptSettleSteps, onCorruptFile, readKeptJson, readKeptJsonSync, writeKeptJson, type KeptSample, type KeptSettled } from '../src/main/fsutil'
 import { tempDir } from './tempDir'
 
 describe('kept files', () => {
   const dir = tempDir('hive-kept-')
   const reports: [string, boolean][] = []
   onCorruptFile((file, _aside, restored) => reports.push([file, restored]))
+  // Damaged on disk: unchanged for a minute, well past DAMAGED_AGE_MS (#1601).
+  const age = (f: string): void => {
+    const old = new Date(Date.now() - 60_000)
+    utimesSync(f, old, old)
+  }
 
   it('saves a .bak copy with every write', async () => {
     const f = join(dir, 'a.json')
@@ -21,6 +26,7 @@ describe('kept files', () => {
     const f = join(dir, 'b.json')
     await writeKeptJson(f, { sessions: ['s1'] })
     writeFileSync(f, '{ "sessions": [')
+    age(f)
     expect(await readKeptJson(f, { sessions: [] })).toEqual({ sessions: ['s1'] })
     expect(JSON.parse(readFileSync(f, 'utf8'))).toEqual({ sessions: ['s1'] })
     expect(readdirSync(dir).some((n) => n.startsWith('b.json.corrupt-'))).toBe(true)
@@ -30,6 +36,7 @@ describe('kept files', () => {
   it('falls back to the default when there is no good copy, keeping the damaged file', () => {
     const f = join(dir, 'c.json')
     writeFileSync(f, 'not json')
+    age(f)
     expect(readKeptJsonSync(f, { fresh: true })).toEqual({ fresh: true })
     expect(readdirSync(dir).some((n) => n.startsWith('c.json.corrupt-'))).toBe(true)
     expect(reports.at(-1)).toEqual([f, false])
@@ -45,8 +52,7 @@ describe('kept files', () => {
     const f = join(dir, 'd.json')
     await writeKeptJson(f, { n: 4 })
     writeFileSync(f, '')
-    const old = new Date(Date.now() - 60_000)
-    utimesSync(f, old, old)
+    age(f)
     expect(await readKeptJson(f, null)).toEqual({ n: 4 })
     expect(readdirSync(dir).some((n) => n.startsWith('d.json.corrupt-'))).toBe(true)
   })
@@ -68,9 +74,12 @@ describe('kept files', () => {
     expect(run(changing)).toEqual({ pauses: 6, outcome: 'unsettled' })
   })
 
-  it('counts a file emptied a moment ago as still saving to the end, and one emptied long ago as damaged', () => {
-    expect(run([read('', Date.now())])).toEqual({ pauses: 6, outcome: 'unsettled' })
-    expect(run([read('', Date.now() - 60_000)])).toEqual({ pauses: 1, outcome: 'damaged' })
+  it('counts a file changed a moment ago as still saving to the end, and one changed long ago as damaged', () => {
+    for (const text of ['', '{"a":']) {
+      expect(run([read(text, Date.now())])).toEqual({ pauses: 6, outcome: 'unsettled' })
+      expect(run([read(text, Date.now() - DAMAGED_AGE_MS + 500)])).toEqual({ pauses: 6, outcome: 'unsettled' })
+      expect(run([read(text, Date.now() - 60_000)])).toEqual({ pauses: 1, outcome: 'damaged' })
+    }
   })
 
   it('calls a file damaged once two reads in a row see it unchanged, and takes it once it parses', () => {
@@ -93,6 +102,34 @@ describe('kept files', () => {
       expect(readFileSync(f, 'utf8')).toBe('')
       expect(readdirSync(dir).filter((n) => n.startsWith(`busy-${sync ? 'sync' : 'async'}.json.corrupt-`))).toEqual([])
       expect(reports.length).toBe(before)
+    })
+  }
+
+  // #1601: a half-written file a stalled writer left unchanged for a while is only damaged once it is DAMAGED_AGE_MS
+  // old; before that it is unsettled (the read keeps its last good copy) and a read for a change refuses.
+  for (const sync of [false, true]) {
+    it(`leaves a stable file that doesn't parse unsettled while it is recent, and recovers it once it is old${sync ? ' (sync)' : ''}`, async () => {
+      const name = `stalled-${sync ? 'sync' : 'async'}.json`
+      const f = join(dir, name)
+      const readIt = async (): Promise<unknown> => (sync ? readKeptJsonSync(f, null) : await readKeptJson(f, null))
+      const setAside = (): string[] => readdirSync(dir).filter((n) => n.startsWith(`${name}.corrupt-`))
+      await writeKeptJson(f, { n: 6 })
+      const half = JSON.stringify({ n: 7, items: ['a', 'b'] }).slice(0, 12)
+      writeFileSync(f, half) // changed just now: the read's pauses (about 1 s) end well inside DAMAGED_AGE_MS
+      const before = reports.length
+      expect(await readIt()).toEqual({ n: 6 })
+      expect(readFileSync(f, 'utf8')).toBe(half)
+      expect(setAside()).toEqual([])
+      expect(reports.length).toBe(before)
+      writeFileSync(f, half)
+      await expect(readKeptJson(f, null, { unsettled: 'throw' })).rejects.toBeInstanceOf(KeptFileBusy)
+      expect(readFileSync(f, 'utf8')).toBe(half)
+
+      age(f)
+      expect(await readIt()).toEqual({ n: 6 })
+      expect(JSON.parse(readFileSync(f, 'utf8'))).toEqual({ n: 6 })
+      expect(setAside()).toHaveLength(1)
+      expect(reports.slice(before)).toEqual([[f, true]])
     })
   }
 
