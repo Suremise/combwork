@@ -242,11 +242,21 @@ describe('agent watches (main/watches.ts)', async () => {
     expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [second(alpha)], ignoreBackground: false })).toMatchObject({ dropped: ['Reviewer (alpha)'] })
     // The same agents again, or more: nothing dropped.
     expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [second(alpha), reviewer(alpha)], ignoreBackground: false })).not.toHaveProperty('dropped')
-    // An answer at once (the agent asked about is idle) ends the earlier watch too: said (HR2's #1530 round 1).
+    // An answer at once (an agent asked about is idle) makes no watch and ends the earlier one whole: every agent it
+    // followed is said, those asked about again included (HR2's #1530 rounds 1 and 2).
     move(st, alpha, 'a3', nowOf({ status: 'finished', reply: 'Done.' }))
     const r = await watches.registerAgentWatch(w, alpha, 'a1', { agents: [second(alpha)], ignoreBackground: false })
-    expect(r).toMatchObject({ already: [expect.stringMatching(/^Second \(alpha\)/)], dropped: ['Reviewer (alpha)'] })
+    expect(r).toMatchObject({ already: [expect.stringMatching(/^Second \(alpha\)/)], dropped: ['Second (alpha)', 'Reviewer (alpha)'] })
     expect(savedOf(w.path!)).toEqual([])
+    // Mixed: a watch on the busy Reviewer, then one asked for on Reviewer and the idle Second.
+    expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [reviewer(alpha)], ignoreBackground: false })).toHaveProperty('watching')
+    expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [reviewer(alpha), second(alpha)], ignoreBackground: false })).toMatchObject({ already: [expect.stringMatching(/^Second \(alpha\)/)], dropped: ['Reviewer (alpha)'] })
+    expect(savedOf(w.path!)).toEqual([])
+    // The same list again once one of them has finished.
+    move(st, alpha, 'a3', nowOf())
+    expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [reviewer(alpha), second(alpha)], ignoreBackground: false })).toHaveProperty('watching')
+    move(st, alpha, 'a3', nowOf({ status: 'finished', reply: 'Done again.', prompts: 2 }))
+    expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [reviewer(alpha), second(alpha)], ignoreBackground: false })).toMatchObject({ already: [expect.stringMatching(/^Second \(alpha\)/)], dropped: ['Reviewer (alpha)', 'Second (alpha)'] })
     await disposeWorkspaceService(w)
   })
 

@@ -1216,9 +1216,10 @@ export async function registerAgentWatch(ws: WorkspaceService, projectPath: stri
     }
     stopDelivery(store, old)
     // A card watch it had ends: said, so it isn't thought to be still running. So do the agents an agent watch it had
-    // followed and this call doesn't (#1346 item 6: a second watch dropped the first's agents unsaid), with a new watch
-    // or with an answer at once (HR2's #1530 round 1: that ends the earlier watch too).
-    const dropped = old?.agents ? old.agents.agents.filter((o) => !cond.agents.some((a) => same(a.projectPath, o.projectPath) && a.agentId === o.agentId)).map((o) => `${o.name} (${o.project})`) : []
+    // followed and this call doesn't follow now (#1346 item 6: a second watch dropped the first's agents unsaid): those
+    // the new watch leaves out, or, answered at once with no watch made, every one (HR2's #1530 rounds 1 and 2).
+    const followedNow = rec ? cond.agents : []
+    const dropped = old?.agents ? old.agents.agents.filter((o) => !followedNow.some((a) => same(a.projectPath, o.projectPath) && a.agentId === o.agentId)).map((o) => `${o.name} (${o.project})`) : []
     const ended = { ...(old && !old.agents ? { replaced: infoOf(old).label } : {}), ...(dropped.length ? { dropped } : {}) }
     if (!rec) {
       noteToldAgents(store, watcher, toldNow)
