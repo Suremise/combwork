@@ -72,8 +72,8 @@ export async function turnOffTips(): Promise<void> {
   }
 }
 
-/** Opens the user guide at a heading. */
-export function openGuideAt(heading: string): void {
-  set({ docsPage: 'guide', docsAnchor: heading })
+/** Opens the user guide at a heading, by its id (#1535: `<a id="…"></a>` on the heading, kept when it's renamed). */
+export function openGuideAt(id: string): void {
+  set({ docsPage: 'guide', docsAnchor: id })
   if (get().activity !== 'docs') setActivity('docs')
 }

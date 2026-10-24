@@ -1,13 +1,11 @@
 import { useEffect } from 'react'
 import { fmt, msg, tr } from '@shared/i18n'
 import type { BoardState } from '@shared/types'
+import { BOARD_UPGRADE_GUIDE } from '@shared/userGuide'
 import { call, errorMessage } from '../api'
 import { confirm, get, loadTasks, notify, useStore } from '../store'
 import { openGuideAt } from '../tips'
 import { Icon } from './ui'
-
-/** The user guide's section about the upgrade (Learn more). */
-const GUIDE = 'Upgrading to 1.0' // i18n-ignore: a user guide heading, the link's target
 
 const M = {
   askTitle: msg({ id: 'board.upgrade.askTitle', defaultMessage: "Upgrade this workspace's board to 1.0?", description: "Title of the dialog Hive shows on opening a workspace whose task board was saved by Hive 0.9: Hive 1.0 keeps the board in a new format, and asks before converting it." }),
@@ -115,7 +113,7 @@ export function BoardUpgradeBanner() {
       <button className="btn small primary" onClick={() => void askBoardUpgrade().catch((e) => notify('error', errorMessage(e)))}>
         {tr(M.bannerButton)}
       </button>
-      <button className="btn small subtle" onClick={() => openGuideAt(GUIDE)}>
+      <button className="btn small subtle" onClick={() => openGuideAt(BOARD_UPGRADE_GUIDE)}>
         {tr(M.learnMore)}
       </button>
     </div>

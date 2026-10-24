@@ -9,6 +9,8 @@
 // question reaches the builder; S14's P4 form (with no review and the OK before merging on `ui` cards, a `ui` card
 // approved waits for your OK, then its builder is told to merge). Screenshots in both themes and in Polish. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
+// Dev build only (#1578): it starts this checkout's Electron itself, and Maker is a 0.9 worktree agent
+// (agents:testLegacy).
 const lib = require('./lib.cjs')
 const { showBoard, openByTitle } = require('./queueFixture.cjs')
 const { _electron } = require('playwright-core')

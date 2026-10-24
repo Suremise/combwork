@@ -5,6 +5,8 @@
 // and merged with Integrated's revision; a no-code card's builder's branch has no card; a branch no card works on is as
 // before; a worktree names its agent's card even with another branch checked out; the card's key opens the card. Screenshots in both themes. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
+// Dev build only, 0.9 worktrees on purpose (#1578): B1 and B2 are 0.9 worktree agents (agents:testLegacy, refused by a
+// packaged build), as a lane carried over the upgrade has; cards on slots beside their branches are p6lane's.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')

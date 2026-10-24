@@ -25,9 +25,9 @@ export const GIT_REQUIRED = '2.17'
 
 export const GIT_DOWNLOAD = 'https://git-scm.com/download/win'
 
-/** The user guide's heading on git. */
-// i18n-ignore: a user guide heading, found by its English text
-export const GIT_GUIDE = 'Git'
+/** The id of the user guide's heading on git. */
+// i18n-ignore: a user guide heading's id (#1535)
+export const GIT_GUIDE = 'git'
 
 const M = {
   missing: msg({ id: 'git.tool.missing', defaultMessage: "Git isn't installed (or isn't on Hive's PATH)", description: 'Said wherever git is needed when Hive cannot run git. No full stop: some places add more after it.' }),

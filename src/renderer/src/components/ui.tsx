@@ -15,6 +15,7 @@ import { safeguardText } from '@shared/safeguards'
 import { placeTip, type Box } from '@shared/tipPlacement'
 import { placeMenu } from '@shared/menuPlacement'
 import { msg, tr, tRich, type Msg } from '@shared/i18n'
+import { headingId, slugOf } from '@shared/docSections'
 
 export function Icon({ name, className, title, spin }: { name: string; className?: string; title?: string; spin?: boolean }) {
   return <i className={cx('codicon', `codicon-${name}`, spin && 'spin', className)} title={title} aria-hidden={!title} />
@@ -919,12 +920,14 @@ export function Modal({
 }
 
 marked.setOptions({ gfm: true, breaks: false })
-// GitHub-style heading ids, so the docs' #links work in Hive as they do on GitHub.
+// GitHub-style heading ids, so the docs' #links work in Hive as they do on GitHub; a heading's explicit id
+// (`<a id="git"></a>`, #1535) is its id instead, and its empty anchor is dropped.
 marked.use({
   renderer: {
     heading({ tokens, depth, text }) {
-      const id = text.toLowerCase().replace(/<[^>]*>/g, '').replace(/[^\p{L}\p{N}\s-]/gu, '').trim().replace(/\s/g, '-')
-      return `<h${depth} id="${id}">${this.parser.parseInline(tokens)}</h${depth}>\n` // i18n-ignore: HTML, not text
+      const id = headingId(text) ?? slugOf(text)
+      const inner = this.parser.parseInline(tokens).replace(/\s*<a\s+id="[^"]*"\s*>\s*<\/a>/gi, '')
+      return `<h${depth} id="${id}">${inner}</h${depth}>\n` // i18n-ignore: HTML, not text
     }
   }
 })

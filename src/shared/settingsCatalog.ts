@@ -185,7 +185,7 @@ export interface SettingEntry extends Omit<Row, 'title' | 'desc' | 'tip' | 'opti
   sensitive?: boolean
   /** Who takes a change only when restarted: running agents' sessions, the Assistant, or Hive itself (#676). */
   restart?: 'sessions' | 'assistant' | 'hive'
-  /** The user guide's heading about it (Help → User Guide). */
+  /** The id of the user guide's heading about it (Help → User Guide; #1535). */
   docs: string
   /** A project setting that can inherit Hive's (null, or the 'inherit' option). */
   inherits?: boolean
@@ -1004,52 +1004,52 @@ const HELPS: Record<string, string> = {
   ...Object.fromEntries(PROVIDERS.filter((p) => p.capabilities.contextLimit).map((p) => [`${p.id}.use200kContext`, `${p.name} conversations get slow and costly as they grow: a 200K window makes ${p.name} compact sooner.`])) // i18n-ignore: the Assistant's tools (English)
 }
 
-/** The user guide's heading for each section (Help → User Guide). */
+/** The id of the user guide's heading for each section (Help → User Guide). */
 const DOCS: Record<string, string> = {
-  general: 'Getting started', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  updates: 'Updating Hive', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  appearance: 'Getting started', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  providers: 'Coding agents: Claude Code, Codex and GitHub Copilot', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  notifications: 'Notifications', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  sessions: 'Sessions', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  assistant: 'Assistant settings', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  workspace: 'Workspaces and projects', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  board: 'Task board', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  agents: 'Several agents in one project', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  keybindings: 'Keyboard shortcuts', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  agentApi: 'The built-in `hive` server', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  advanced: 'Troubleshooting' // i18n-ignore: a heading of the user guide, which stays English (D2)
+  general: 'getting-started', // i18n-ignore: a user guide heading's id (#1535)
+  updates: 'updating-hive', // i18n-ignore: a user guide heading's id (#1535)
+  appearance: 'getting-started', // i18n-ignore: a user guide heading's id (#1535)
+  providers: 'coding-agents-claude-code-codex-and-github-copilot', // i18n-ignore: a user guide heading's id (#1535)
+  notifications: 'notifications', // i18n-ignore: a user guide heading's id (#1535)
+  sessions: 'sessions', // i18n-ignore: a user guide heading's id (#1535)
+  assistant: 'assistant-settings', // i18n-ignore: a user guide heading's id (#1535)
+  workspace: 'workspaces-and-projects', // i18n-ignore: a user guide heading's id (#1535)
+  board: 'task-board', // i18n-ignore: a user guide heading's id (#1535)
+  agents: 'several-agents-in-one-project', // i18n-ignore: a user guide heading's id (#1535)
+  keybindings: 'keyboard-shortcuts', // i18n-ignore: a user guide heading's id (#1535)
+  agentApi: 'the-built-in-hive-server', // i18n-ignore: a user guide heading's id (#1535)
+  advanced: 'troubleshooting' // i18n-ignore: a user guide heading's id (#1535)
 }
 const DOCS_BY_ID: Record<string, string> = {
-  'project.key': 'Project keys', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'project.workflow': 'Workflow options', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'workflow.defaults': 'Workflow defaults', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'workspace.workflowDefaults': 'Workflow defaults', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'project.inboxCheckpoints': 'Messages and the inbox', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'project.inboxStopContinuation': 'Messages and the inbox', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'project.inboxIdleWakes': 'Messages and the inbox', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'notifications.suggestFreshStart': 'Starting fresh', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'project.suggestFreshStart': 'Starting fresh', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'project.loopWakes': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'project.loopRounds': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'project.loopWaitHours': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'project.loopStepWaitMinutes': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'workspace.loopRounds': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'workspace.loopWaitHours': 'Card loops', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'general.progressPanel': 'Progress panel', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'general.progressCommands': 'Progress panel', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'general.keepAwake': 'Sleep and shutdown', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'general.dateFormat': 'Dates and times', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'general.language': 'Language', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'general.timeFormat': 'Dates and times', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'general.showTips': 'Tips', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'sessions.transcriptWarnMB': 'Long conversations', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'sessions.backupTranscripts': 'Archiving and backups', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'sessions.backupRetention': 'Archiving and backups', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'sessions.recordPerformance': 'Performance metrics', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'sessions.resumeAfterUnexpectedClose': 'When Hive closed unexpectedly', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'agents.backgroundTaskMinutes': 'Sessions', // i18n-ignore: a heading of the user guide, which stays English (D2)
-  'agents.leftoverProcesses': 'Processes agents leave running' // i18n-ignore: a heading of the user guide, which stays English (D2)
+  'project.key': 'project-keys', // i18n-ignore: a user guide heading's id (#1535)
+  'project.workflow': 'workflow-options', // i18n-ignore: a user guide heading's id (#1535)
+  'workflow.defaults': 'workflow-defaults', // i18n-ignore: a user guide heading's id (#1535)
+  'workspace.workflowDefaults': 'workflow-defaults', // i18n-ignore: a user guide heading's id (#1535)
+  'project.inboxCheckpoints': 'messages-and-the-inbox', // i18n-ignore: a user guide heading's id (#1535)
+  'project.inboxStopContinuation': 'messages-and-the-inbox', // i18n-ignore: a user guide heading's id (#1535)
+  'project.inboxIdleWakes': 'messages-and-the-inbox', // i18n-ignore: a user guide heading's id (#1535)
+  'notifications.suggestFreshStart': 'starting-fresh', // i18n-ignore: a user guide heading's id (#1535)
+  'project.suggestFreshStart': 'starting-fresh', // i18n-ignore: a user guide heading's id (#1535)
+  'project.loopWakes': 'card-loops', // i18n-ignore: a user guide heading's id (#1535)
+  'project.loopRounds': 'card-loops', // i18n-ignore: a user guide heading's id (#1535)
+  'project.loopWaitHours': 'card-loops', // i18n-ignore: a user guide heading's id (#1535)
+  'project.loopStepWaitMinutes': 'card-loops', // i18n-ignore: a user guide heading's id (#1535)
+  'workspace.loopRounds': 'card-loops', // i18n-ignore: a user guide heading's id (#1535)
+  'workspace.loopWaitHours': 'card-loops', // i18n-ignore: a user guide heading's id (#1535)
+  'general.progressPanel': 'progress-panel', // i18n-ignore: a user guide heading's id (#1535)
+  'general.progressCommands': 'progress-panel', // i18n-ignore: a user guide heading's id (#1535)
+  'general.keepAwake': 'sleep-and-shutdown', // i18n-ignore: a user guide heading's id (#1535)
+  'general.dateFormat': 'dates-and-times', // i18n-ignore: a user guide heading's id (#1535)
+  'general.language': 'language', // i18n-ignore: a user guide heading's id (#1535)
+  'general.timeFormat': 'dates-and-times', // i18n-ignore: a user guide heading's id (#1535)
+  'general.showTips': 'tips', // i18n-ignore: a user guide heading's id (#1535)
+  'sessions.transcriptWarnMB': 'long-conversations', // i18n-ignore: a user guide heading's id (#1535)
+  'sessions.backupTranscripts': 'archiving-and-backups', // i18n-ignore: a user guide heading's id (#1535)
+  'sessions.backupRetention': 'archiving-and-backups', // i18n-ignore: a user guide heading's id (#1535)
+  'sessions.recordPerformance': 'performance-metrics', // i18n-ignore: a user guide heading's id (#1535)
+  'sessions.resumeAfterUnexpectedClose': 'when-hive-closed-unexpectedly', // i18n-ignore: a user guide heading's id (#1535)
+  'agents.backgroundTaskMinutes': 'sessions', // i18n-ignore: a user guide heading's id (#1535)
+  'agents.leftoverProcesses': 'processes-agents-leave-running' // i18n-ignore: a user guide heading's id (#1535)
 }
 
 /** Where a setting is, in English (the tools name it so) or as the user sees it: "Settings → Sessions → Suggest compacting above". */
@@ -1094,7 +1094,7 @@ function entry(row: Row, id: string, scope: SettingScope, docs: string): Setting
     ...(off ? { off: englishText(off) } : {}),
     ...(confirmOn ? { confirmOn: { title: englishText(confirmOn.title), message: englishText(confirmOn.message), ...(confirmOn.detail ? { detail: englishText(confirmOn.detail) } : {}) } } : {}),
     text,
-    docs: row.advanced || id === 'advanced.values' ? 'Advanced settings' : row.workflowLevel ? 'Workflow defaults' : row.workflow ? 'Workflow options' : (DOCS_BY_ID[id] ?? docs), // i18n-ignore: a heading of the user guide, which stays English (D2)
+    docs: row.advanced || id === 'advanced.values' ? 'advanced-settings' : row.workflowLevel ? 'workflow-defaults' : row.workflow ? 'workflow-options' : (DOCS_BY_ID[id] ?? docs), // i18n-ignore: a user guide heading's id (#1535)
     ...(HELPS[id] ? { helps: HELPS[id] } : {}),
     ...(action ? { action: true } : {}),
     ...(value ? { value } : {}),
@@ -1112,11 +1112,11 @@ export const shownSettingPath = (e: SettingEntry): string => settingPathOf(e, e.
 
 /** Settings' entries (Hive's and the providers' pages), in their order. */
 export const APP_SETTINGS_CATALOG: readonly SettingEntry[] = [...APP_ROWS, ...levelRows()].map((r) =>
-  r.provider ? entry(r, `${r.provider}.${r.key}`, 'provider', 'Coding agents: Claude Code, Codex and GitHub Copilot') : entry(r, `${r.section}.${r.key}`, r.section === 'workspace' ? 'workspace' : 'app', DOCS[r.section] ?? 'Getting started') // i18n-ignore: a heading of the user guide, which stays English (D2)
+  r.provider ? entry(r, `${r.provider}.${r.key}`, 'provider', 'coding-agents-claude-code-codex-and-github-copilot') : entry(r, `${r.section}.${r.key}`, r.section === 'workspace' ? 'workspace' : 'app', DOCS[r.section] ?? 'getting-started') // i18n-ignore: a user guide heading's id (#1535)
 )
 
 /** Project Settings' entries, in their order. */
-export const PROJECT_SETTINGS_CATALOG: readonly SettingEntry[] = PROJECT_ROWS.map((r) => entry(r, r.provider ? `project.${r.provider}.${r.key}` : `project.${r.key}`, 'project', 'Project settings')) // i18n-ignore: a heading of the user guide, which stays English (D2)
+export const PROJECT_SETTINGS_CATALOG: readonly SettingEntry[] = PROJECT_ROWS.map((r) => entry(r, r.provider ? `project.${r.provider}.${r.key}` : `project.${r.key}`, 'project', 'project-settings')) // i18n-ignore: a user guide heading's id (#1535)
 
 /** Every setting, Settings' then Project Settings'. */
 export const SETTINGS_CATALOG: readonly SettingEntry[] = [...APP_SETTINGS_CATALOG, ...PROJECT_SETTINGS_CATALOG]
