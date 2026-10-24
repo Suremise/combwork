@@ -1,3 +1,4 @@
+import { advanced } from '../../advanced'
 import type { BackgroundTaskEvent } from '../types'
 
 /**
@@ -22,9 +23,6 @@ const MAX_KEPT = 50
 export function codexBackgroundMemo(): CodexBackgroundMemo {
   return { open: new Map(), known: new Set(), unnamed: new Map(), subagentsEnded: new Set() }
 }
-
-/** A subagent's activity that doesn't end it (any other but `started` does: one missed rather than one counted that ended). */
-const SUBAGENT_RUNNING = new Set(['running', 'pending_init'])
 
 /** Drops the oldest entry past MAX_KEPT (a call whose output, or a command whose end, never came). */
 function bound(kept: Map<string, unknown> | Set<string>): void {
@@ -81,7 +79,8 @@ function sessionId(text: string): string | undefined {
  *
  * Subagents (#1584, Codex 0.164's spawn_agent): one runs on after the turn that spawned it ends. The parent's rollout
  * records a SubAgentActivity item `started` and, when it ends, `completed` (Codex writes it under the spawning turn's
- * id and starts no turn for it), by its thread id; its task name (agent_path) describes it.
+ * id and starts no turn for it), by its thread id; its task name (agent_path) describes it. Any other kind ends it too
+ * (one missed rather than one counted that has ended). The item, its kind and fields are advanced settings (codex.subagent.*).
  */
 export function codexBackgroundTasks(appended: string, memo: CodexBackgroundMemo = codexBackgroundMemo()): BackgroundTaskEvent[] {
   const out: BackgroundTaskEvent[] = []
@@ -90,8 +89,12 @@ export function codexBackgroundTasks(appended: string, memo: CodexBackgroundMemo
     bound(memo.known)
     out.push({ kind: 'start', id, at })
   }
+  const activity = advanced.get<string>('codex.subagent.item')
+  const startedKind = advanced.get<string>('codex.subagent.started')
+  const threadField = advanced.get<string>('codex.subagent.threadField')
+  const taskField = advanced.get<string>('codex.subagent.taskField')
   for (const line of appended.split('\n')) {
-    if (!/session_id|session ID|process_id|custom_tool_call|SubAgentActivity/.test(line)) continue
+    if (!/session_id|session ID|process_id|custom_tool_call/.test(line) && !line.includes(activity)) continue
     let o: Record<string, any>
     try {
       o = JSON.parse(line)
@@ -102,12 +105,12 @@ export function codexBackgroundTasks(appended: string, memo: CodexBackgroundMemo
     const p = o.payload
     if (!p || typeof p !== 'object') continue
     const sub = p.item
-    if (o.type === 'event_msg' && p.type === 'item_completed' && sub?.type === 'SubAgentActivity' && typeof sub.agent_thread_id === 'string' && sub.agent_thread_id) {
-      const id: string = sub.agent_thread_id
-      if (sub.kind === 'started') {
+    if (o.type === 'event_msg' && p.type === 'item_completed' && sub?.type === activity && typeof sub[threadField] === 'string' && sub[threadField]) {
+      const id: string = sub[threadField]
+      if (sub.kind === startedKind) {
         const again = memo.subagentsEnded.delete(id)
-        out.push({ kind: 'start', id, at, type: 'subagent', ...(typeof sub.agent_path === 'string' ? { description: sub.agent_path } : {}), ...(again ? { resumed: true as const } : {}) })
-      } else if (!SUBAGENT_RUNNING.has(sub.kind)) {
+        out.push({ kind: 'start', id, at, type: 'subagent', ...(typeof sub[taskField] === 'string' ? { description: sub[taskField] } : {}), ...(again ? { resumed: true as const } : {}) })
+      } else {
         memo.subagentsEnded.add(id)
         bound(memo.subagentsEnded)
         out.push({ kind: 'end', id, at })

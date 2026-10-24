@@ -1,3 +1,4 @@
+import { advanced } from '../../advanced'
 import type { BackgroundTaskEvent } from '../types'
 
 /** Notification statuses that report on a task still running (a Monitor's events); any other status ends it. */
@@ -12,13 +13,18 @@ const MAX_KEPT = 50
  * subagent the Agent tool runs in the background (#1584) is `async_launched` with its agentId, a background workflow
  * the same with a taskId; a message to a finished subagent resumes it (resumedAgentId), and it notifies again. A
  * message queued to one still running changes nothing. A task's end arrives as a <task-notification> naming it (which
- * starts a new turn), or a TaskStop result. `memo` keeps the subagents' descriptions for their resumes.
+ * starts a new turn), or a TaskStop result. `memo` keeps the subagents' descriptions for their resumes. The subagents'
+ * status and fields are advanced settings (claude-code.subagent.*).
  */
 export function claudeBackgroundTasks(appended: string, memo: Record<string, unknown> = {}): BackgroundTaskEvent[] {
   const out: BackgroundTaskEvent[] = []
   const described = ((memo.described as Map<string, string> | undefined) ??= new Map())
+  const launched = advanced.get<string>('claude-code.subagent.launched')
+  const idField = advanced.get<string>('claude-code.subagent.idField')
+  const descriptionField = advanced.get<string>('claude-code.subagent.descriptionField')
+  const resumedField = advanced.get<string>('claude-code.subagent.resumedField')
   for (const line of appended.split('\n')) {
-    if (!/backgroundTaskId|"taskId"|async_launched|resumedAgentId|task-notification|stopped task/.test(line)) continue
+    if (!/backgroundTaskId|"taskId"|task-notification|stopped task/.test(line) && !line.includes(launched) && !line.includes(resumedField)) continue
     let o: Record<string, any>
     try {
       o = JSON.parse(line)
@@ -29,19 +35,19 @@ export function claudeBackgroundTasks(appended: string, memo: Record<string, unk
     const r = o.toolUseResult
     if (r && typeof r === 'object') {
       if (typeof r.backgroundTaskId === 'string' && r.backgroundTaskId) out.push({ kind: 'start', id: r.backgroundTaskId, at, type: 'command' })
-      else if (r.status === 'async_launched' && typeof (r.agentId ?? r.taskId) === 'string' && (r.agentId ?? r.taskId)) {
-        const subagent = typeof r.agentId === 'string'
-        const description = typeof r.description === 'string' ? r.description : typeof r.summary === 'string' ? r.summary : undefined
-        const id: string = subagent ? r.agentId : r.taskId
+      else if (r.status === launched && typeof (r[idField] ?? r.taskId) === 'string' && (r[idField] ?? r.taskId)) {
+        const subagent = typeof r[idField] === 'string'
+        const description = typeof r[descriptionField] === 'string' ? r[descriptionField] : undefined
+        const id: string = subagent ? r[idField] : r.taskId
         if (subagent && description) {
           described.delete(id)
           described.set(id, description)
           if (described.size > MAX_KEPT) described.delete(described.keys().next().value!)
         }
         out.push({ kind: 'start', id, at, type: subagent ? 'subagent' : 'workflow', ...(description ? { description } : {}) })
-      } else if (typeof r.resumedAgentId === 'string' && r.resumedAgentId) {
-        const description = described.get(r.resumedAgentId)
-        out.push({ kind: 'start', id: r.resumedAgentId, at, type: 'subagent', resumed: true, ...(description ? { description } : {}) })
+      } else if (typeof r[resumedField] === 'string' && r[resumedField]) {
+        const description = described.get(r[resumedField])
+        out.push({ kind: 'start', id: r[resumedField], at, type: 'subagent', resumed: true, ...(description ? { description } : {}) })
       } else if (typeof r.taskId === 'string' && r.taskId && typeof r.timeoutMs === 'number') {
         out.push({ kind: 'start', id: r.taskId, at, type: 'monitor', ...(r.persistent ? {} : { expiresAt: at + r.timeoutMs }) })
       } else if (typeof r.message === 'string') {

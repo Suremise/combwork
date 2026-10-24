@@ -122,7 +122,7 @@ describe('Claude Code background subagents (#1584)', () => {
     ])
   })
 
-  it('starts a background workflow (taskId, its summary) and ends it on its notification', () => {
+  it('starts a background workflow (its taskId) and ends it on its notification', () => {
     const out = claudeBackgroundTasks(
       lines(
         { type: 'user', timestamp: t1, toolUseResult: { status: 'async_launched', taskId: 'w1dy13uyy', taskType: 'local_workflow', workflowName: 'translate', runId: 'wf_1', summary: 'Translate the workflow messages', transcriptDir: 'C:\\t', scriptPath: 'C:\\t\\s.js' } },
@@ -130,7 +130,7 @@ describe('Claude Code background subagents (#1584)', () => {
       )
     )
     expect(out).toEqual([
-      { kind: 'start', id: 'w1dy13uyy', at: at(t1), type: 'workflow', description: 'Translate the workflow messages' },
+      { kind: 'start', id: 'w1dy13uyy', at: at(t1), type: 'workflow' },
       { kind: 'end', id: 'w1dy13uyy', at: at(t2) }
     ])
   })
