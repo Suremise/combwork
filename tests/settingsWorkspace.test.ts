@@ -42,7 +42,8 @@ describe('Settings → Workspace → Card loops (#412)', async () => {
       const changed = await applySetting(entryOf('workspace.loopRounds'), 7, null)
       expect([changed.old, changed.new]).toEqual([10, 7])
       await applySetting(entryOf('workspace.loopWaitHours'), '3', null)
-      expect(settingDetail(entryOf('workspace.loopWaitHours'), null)).toMatchObject({ value: '3', default: '6' })
+      // Its user guide heading by its id (#1535), given as the heading's text.
+      expect(settingDetail(entryOf('workspace.loopWaitHours'), null)).toMatchObject({ value: '3', default: '6', docs: 'Card loops' })
       expect(settingRows({ query: 'card loop' }).find((r) => r.id === 'workspace.loopRounds')).toMatchObject({ value: '7', default: '10' })
       await expect(applySetting(entryOf('workspace.loopRounds'), 99, null)).rejects.toThrow(/1 to 50/)
     })

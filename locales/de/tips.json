@@ -376,6 +376,8 @@
   "tips.testedClis.title": "Sehen, mit welchen CLI-Versionen Hive getestet wurde",
   "tips.tileStrip.text": "In der Fokusansicht eines Agenten (Kacheln) zeigt die Leiste links die Karte jedes Agenten als kleinen Chip, eingefärbt in der Farbe der Board-Spalte, in der sie liegt; ein Klick öffnet die Karte. Zieh den Rand der Leiste, um sie zu verbreitern, und doppelklicke auf den Rand, um sie zurückzusetzen.",
   "tips.tileStrip.title": "Die Karte jedes Agenten neben seinem Namen",
+  "tips.tileStripOrder.text": "Zieh in der Fokusansicht eines Agenten (Kacheln) einen Agenten in der Leiste links nach oben oder unten, oder drück darauf Alt+Pfeil nach oben oder Alt+Pfeil nach unten. Die Kacheln und die Bereiche folgen derselben Reihenfolge.",
+  "tips.tileStripOrder.title": "Agenten in der Fokusansicht neu anordnen",
   "tips.tilesView.text": "Kacheln zeigt jeden Agenten als kleine Kachel: Zustand, Status, Karte, Fortschritt und letzte Antwort, zwölf pro Seite. Klicke auf eine, um ihren Bereich groß neben den anderen zu öffnen; Esc führt zurück. Einstellungen → Sitzungen → Reihenfolge der Kacheln kann die Agenten, die auf dich warten, nach vorne stellen.",
   "tips.tilesView.title": "Ein ganzes Team auf einen Blick als Kacheln",
   "tips.triageReport.text": "Sag dem Assistenten im Modus QA-Triage, was du getan und gesehen hast, oder füge einen Screenshot ein. Er findet die Ursache im Code, prüft, ob schon eine Karte sie abdeckt (auch eine noch nicht gemergte), und legt dann eine Karte mit den Belegen an.",

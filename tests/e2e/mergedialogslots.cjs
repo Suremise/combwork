@@ -7,6 +7,8 @@
 //   dialog says it is that card's work, with a link to the card, and Merge asks first; once confirmed the merge is
 //   observed outside the rules (Integrated, by outside, with the rules it skipped) and the card is Done.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1578): slot-a is lent through slots:test, and B2 is a 0.9 worktree agent on purpose (the Merge
+// dialog on an agent's branch); a packaged build refuses both test channels.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')

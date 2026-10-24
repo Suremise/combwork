@@ -11,7 +11,7 @@ Hive works with providers through two pieces and never names one outside them. [
 
 - **Descriptor** (`src/shared/providers.ts`): static data both processes use. Names, icon, permission modes, effort levels, models and `capabilities`.
 - **Adapter** (`src/main/providers/<id>/`, the `ProviderAdapter` interface in `types.ts`): everything that runs. Locating the CLI and its readiness, setup tasks, `prepareLaunch` and `buildCommand`, hook normalisation, live details, transcripts and usage, skill folders, and the project's own MCP servers.
-- Shared code and the UI never test a provider id. A difference goes into the descriptor (a capability) or the adapter. Hive never edits a CLI's own config files; settings go on the command line (Codex: `-c` overrides).
+- The rules every provider change keeps (no provider id in shared code or the UI, never a CLI's own config files, a CLI's text and timeouts as advanced settings) are AGENTS.md's (Gotchas: Providers and the advanced settings).
 
 ## Checklist
 

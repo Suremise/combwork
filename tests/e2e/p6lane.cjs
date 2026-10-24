@@ -2,7 +2,7 @@
 // Version Control tab, the Assistant off, on fake Claude Code agents acting by their own tokens.
 // - alpha (Git), added with a builder and a reviewer: the notice, the step suggests Pair, Choose; the header reads
 //   "Workflow: Git · Pair"; the board shows Todo, Active, Review, Approved | Merging and Done. A lane started from the
-//   window runs One: a counted check, submit (Branches & remotes shows the card beside its branch with the revision under
+//   window is lent a slot, B1 (added in the project folder: no worktree agents, #1578) started again there, and runs One: a counted check, submit (Branches & remotes shows the card beside its branch with the revision under
 //   review; the Progress panel's hover says Review), review and pass, the queue's merge (Merging, the hover's Approved |
 //   Merging), Done (the branch's card merged).
 // - S19: Two starts, the options are changed in the tab (squash): the save names the lane keeping old rules, the lane
@@ -18,6 +18,8 @@
 // Screenshots in both themes, in English and German: the step, the board, Branches & remotes, the Pulse hovers, the
 // legend, the old rules mark, the save's warning, the offer, and each Version Control section of a Git and a None
 // project. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// The Merge queue section read slowly (HIVE_TEST_SLOW_IPC) is NOT RUN on a packaged build (HIVE_EXE), where the rest
+// runs (#1578).
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -236,15 +238,16 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     }
 
     // ===== alpha: added with a builder and a reviewer; Pair from the step.
-    const b1 = await q.agent(fx, h, 'B1', { worktree: true })
+    // B1 in the project folder (#1578: 1.0 adds no worktree agents): the lane started below is lent a slot, its folder `wt`.
+    const b1 = await q.agent(fx, h, 'B1')
     const r1 = await q.agent(fx, h, 'Reviewer')
-    const wt = b1.folder
+    let wt = null
     check('alpha: its notice opens the step at Git', await fromNotice('alpha'))
     check('…Pair suggested for a builder and a reviewer, and shown', !!(await waitHung(async () => (await stepEl.locator('[data-preset="pair"] .vc-step-tag').count()) === 1)) && (await stepEl.locator('[data-preset="pair"]').getAttribute('aria-checked')) === 'true' && (await text(stepEl.locator('.vc-step-why'))) === 'Suggested for a builder and a reviewer.', await text(stepEl))
     await shoot('1-step-pair', { loc: page.locator('.vc-view') })
     check('Choose → Use Pair: the header reads "Workflow: Git · Pair"', await choose('Pair'), await workflowLine())
     const options = projectJson(alpha).workflow?.options ?? {}
-    check("…saved: Hive merges into main, the agents' worktrees, typecheck before review and on the merged result, the repository's identity", projectJson(alpha).workflow?.preset === 'pair' && projectJson(alpha).workflow?.presetAsked === 'chosen' && options.finish === 'hiveMerges' && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email, JSON.stringify(projectJson(alpha).workflow))
+    check("…saved: Hive merges into main, cards on slots, typecheck before review and on the merged result, the repository's identity", projectJson(alpha).workflow?.preset === 'pair' && projectJson(alpha).workflow?.presetAsked === 'chosen' && options.finish === 'hiveMerges' && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email, JSON.stringify(projectJson(alpha).workflow))
     const identity = options.identity ?? fx.identity
     const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, '-c', `user.email=${identity.email}`, ...args]).trim()
 
@@ -350,12 +353,19 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     }
     const a = await startLane(laneA)
     check('a lane is started from the window: B1 / Reviewer, One and Two', !!a, JSON.stringify(await inv('lanes:list')))
+    const lentSlot = await waitHung(async () => (await inv('lanes:list')).find((l) => l.id === a?.id)?.slot)
+    wt = lentSlot ? path.join(`${fx.ws}.worktrees`, 'alpha', lentSlot) : null
+    check('…lent a slot', !!wt, JSON.stringify(await inv('lanes:list')))
+    // B1 is started again in the lane's slot (a new conversation, a launch with its own token, read by retoken).
+    check("…B1 runs in the lane's slot", !!(await waitHung(async () => (await idle(b1.id)) && (await live(b1.id))?.cwd?.toLowerCase() === wt?.toLowerCase())), JSON.stringify(await live(b1.id)))
     await retoken()
+    /** Hive has made the card's line in the lane's slot (the start names the folder and the line). */
+    const onLine = (s) => waitHung(() => s.body?.data?.folder?.toLowerCase() === wt?.toLowerCase() && git(wt, 'branch', '--show-current') === s.body?.data?.line)
 
     // --- One: start, a counted check, submit.
     const s1 = await intent('b1', c1, 'start')
     const line = s1.body?.data?.line
-    check("One starts in B1's worktree, on its line", s1.status === 200 && s1.body?.data?.folder?.toLowerCase() === wt.toLowerCase() && !!line, JSON.stringify(s1.body))
+    check("One starts in the lane's slot, on its line", s1.status === 200 && !!line && !!(await onLine(s1)), JSON.stringify(s1.body))
     const rev1 = commit('one.txt')
     check("One's quick check through hive-progress --check is counted", await quickCheck(c1))
     const sub1 = await intent('b1', c1, 'submit', { summary: 'one ready' })
@@ -375,7 +385,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     check("Pulse: One's segment says Review, in its accessible name and hover", !!(await waitHung(async () => /· Review/.test((await seg(c1).getAttribute('aria-label').catch(() => '')) ?? ''))) && !!(await hover(seg(c1), (t) => t.includes('Review') && t.includes('One'))), await tipText())
 
     // G14's card and its builder, ready before the merge is held.
-    const b2 = await q.agent(fx, h, 'B2', { worktree: true })
+    const b2 = await q.agent(fx, h, 'B2')
     const dep = (await inv('tasks:create', { title: 'Needs One', project: 'alpha' })).number
     await inv('tasks:update', dep, { blockedBy: [c1] })
 
@@ -414,7 +424,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
 
     // ===== S19: the options changed mid-lane, in the tab.
     const s2 = await intent('b1', c2, 'start')
-    check('Two starts once One is Done', s2.status === 200, JSON.stringify(s2.body))
+    check("Two starts once One is Done, on its own line in the lane's slot", s2.status === 200 && s2.body?.data?.line !== line && !!(await onLine(s2)), JSON.stringify(s2.body))
     await section('workflow')
     const form = page.locator('.workflow-form')
     const row = (option) => form.locator(`.workflow-option[data-option="${option}"]`)
@@ -615,14 +625,16 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     const queueTab = page.locator('.git-sections [data-section="queue"]')
     check('None, a Git card still in flight: the Merge queue section stays', (await queueTab.count()) === 1, JSON.stringify(await page.locator('.git-sections [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section')))))
     if ((await queueTab.count()) === 1) {
-      // Read slowly (as under load): the section says it's reading, never nothing.
-      await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'queue:list=3000' })
-      await section('workflow')
-      await section('queue')
-      const reading = page.locator('.git-body [data-queue-reading]')
-      check('the Merge queue section, while its queues are read, says so', !!(await waitHung(async () => (await reading.count()) === 1 && (await text(reading)) === 'Reading the merge queues…')), (await page.locator('.git-body').innerHTML().catch(() => '')).slice(0, 600))
-      await page.locator('.vc-view').screenshot({ path: path.join(fx.shots, 'p6lane-vc-none-queue-reading-en-dark.png') })
-      await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
+      if (q.devSeam('the Merge queue section read slowly (HIVE_TEST_SLOW_IPC)')) {
+        // Read slowly (as under load): the section says it's reading, never nothing.
+        await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'queue:list=3000' })
+        await section('workflow')
+        await section('queue')
+        const reading = page.locator('.git-body [data-queue-reading]')
+        check('the Merge queue section, while its queues are read, says so', !!(await waitHung(async () => (await reading.count()) === 1 && (await text(reading)) === 'Reading the merge queues…')), (await page.locator('.git-body').innerHTML().catch(() => '')).slice(0, 600))
+        await page.locator('.vc-view').screenshot({ path: path.join(fx.shots, 'p6lane-vc-none-queue-reading-en-dark.png') })
+        await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
+      }
       // Then the old queue as the board has it, with its history: the repository gone takes none of it away.
       const body = page.locator('.git-body')
       check('None, the repository gone: the Merge queue section shows the queue and its history', !!(await waitHung(async () => (await body.locator('.git-queue-target[data-target="main"]').count()) === 1 && (await body.locator('.git-queue-table tr[data-outcome="merged"]').count()) >= 2)), JSON.stringify({ html: (await body.innerHTML().catch(() => '')).slice(0, 600) }))

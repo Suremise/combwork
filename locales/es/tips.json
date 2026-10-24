@@ -376,6 +376,8 @@
   "tips.testedClis.title": "Mira con qué versiones de las CLI se probó Hive",
   "tips.tileStrip.text": "En la vista enfocada de un agente (Mosaicos), la franja de la izquierda muestra la tarjeta de cada agente como un pequeño chip, teñido con el color de la columna del tablero en la que está; haz clic en uno para abrir la tarjeta. Arrastra el borde de la franja para ensancharla, y haz doble clic en el borde para restablecerla.",
   "tips.tileStrip.title": "La tarjeta de cada agente, junto a su nombre",
+  "tips.tileStripOrder.text": "En la vista enfocada de un agente (Mosaicos), arrastra un agente hacia arriba o hacia abajo en la franja de la izquierda, o pulsa Alt+Arriba o Alt+Abajo sobre él. Los mosaicos y los paneles siguen el mismo orden.",
+  "tips.tileStripOrder.title": "Reordena los agentes desde la vista enfocada",
   "tips.tilesView.text": "Mosaicos muestra cada agente como un pequeño mosaico: su estado, estado actual, tarjeta, progreso y última respuesta, doce por página. Haz clic en uno para abrir su panel en grande junto a los demás; Esc vuelve. Configuración → Sesiones → Orden de los mosaicos puede poner primero a los agentes que esperan tu respuesta.",
   "tips.tilesView.title": "Ve a todo un equipo de un vistazo en mosaicos",
   "tips.triageReport.text": "Cuéntale al Asistente en modo Clasificador de QA qué hiciste y qué viste, o pega una captura de pantalla. Encuentra la causa en el código, comprueba si ya hay una tarjeta que lo cubra (incluso una aún sin fusionar) y luego crea una tarjeta con las pruebas.",

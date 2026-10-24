@@ -369,6 +369,94 @@ describe('coordinator guidance', () => {
   })
 })
 
+// #1532 (P8): what Hive enforces for every project is its gates' (SPEC §16.11) and the bundled skills'. AGENTS.md keeps
+// only this repository's own conventions, and points to Hive's development skills rather than repeating them.
+describe("the repository's AGENTS.md", () => {
+  const text = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')
+  it('states no rule a gate owns (the design note §10, "Becomes a gate")', () => {
+    for (const gate of [
+      /\bcommit (?:each round |the card's work )?before (?:moving it to )?Review\b/i,
+      /\breview the exact commit\b/i,
+      /\bPassed (?:is not|isn't|≠) merged\b/i,
+      /\bDone (?:means|=) merged\b/i,
+      /\bdependencies (?:merged|done) before\b/i,
+      /\bmerge slot\b|\bhive_merge_slot\b/i,
+      /\bthe builder merges\b/i,
+      /\bcards? (?:in)?to a running lane\b|\brestart (?:its|the) lane\b/i,
+      /\ba decision wakes\b/i
+    ])
+      expect(text).not.toMatch(gate)
+  })
+  it("keeps this repository's own conventions", () => {
+    for (const own of [
+      /Design is settled before code/,
+      /Outside a card loop, \*\*commit only when the user asks\*\*/,
+      /\*\*Never run `prettier --write`\*\*/,
+      /\*\*Line endings\*\*/,
+      /\*\*Translations\*\*/,
+      /`TIP_ENTRIES`/,
+      /\*\*Merge checks\*\*, this repository's \(#1010\): a merge into main or an integration branch .* runs typecheck, lint, the unit tests and the cards' own focused e2e suites/,
+      /never open the main checkout .* with one until the 1\.0 baseline is installed \(#1288\)/,
+      /\*\*Test isolation\*\*/,
+      /\*\*The machine is shared\*\*/,
+      /\*\*Providers\*\*/
+    ])
+      expect(text).toMatch(own)
+  })
+  it("points to Hive's development skills for what they own", () => {
+    expect(text).toMatch(/is the `verify-hive-ui` skill/)
+    expect(text).toMatch(/use the `investigate-flake` skill/)
+    // Moved there (#1532): AGENTS.md no longer carries them.
+    for (const moved of [/EventID=5007/, /HIVE_TEST_SLOW_IPC/, /HIVE_UPDATE_FEED/, /make it cheaper unasked/]) expect(text).not.toMatch(moved)
+    const skill = (name: string): string => readFileSync(join(ROOT, '.claude/skills', name, 'SKILL.md'), 'utf8')
+    expect(skill('investigate-flake')).toMatch(/EventID=5007/)
+    expect(skill('investigate-flake')).toMatch(/make it cheaper unasked/)
+    expect(skill('verify-hive-ui')).toMatch(/HIVE_TEST_SLOW_IPC/)
+    expect(skill('verify-hive-ui')).toMatch(/HIVE_UPDATE_FEED/)
+  })
+})
+
+// #1533 (P8): RELEASING.md owns the release path and the list of the user's OKs; release-hive and AGENTS.md point to it.
+describe('RELEASING.md on the 1.0 path', () => {
+  const releasing = readFileSync(join(ROOT, 'RELEASING.md'), 'utf8')
+  const section = (heading: string): string => releasing.split(/^## /m).find((s) => s.startsWith(heading)) ?? ''
+  it('goes from phases on the integration branch to a baseline install, then an RC and the release', () => {
+    const path = section('The 1.0 path')
+    expect(path).toMatch(/\*\*integration branch\*\* \(`1\.0\.0`\)/)
+    expect(path).toMatch(/1\. \*\*Phases\.\*\*[\s\S]*\*\*checks card\*\*, #1449/)
+    expect(path).toMatch(/2\. \*\*The baseline install\*\* \(#1288\)[\s\S]*\*\*The user installs\.\*\* Nothing is pushed, tagged or uploaded\./)
+    expect(path).toMatch(/3\. \*\*The RC, then the release\*\* \(#1541\)[\s\S]*the integration branch is merged into `main` \(asked/)
+    expect(path).toMatch(/`dist\/build-info\.json`/)
+    expect(section('Release notes')).toMatch(/\*\*back up first, there's no going back\*\*/)
+  })
+  // The user, 24 Oct (m3757, on #1288, #1537, #1539, #1541): the baseline's checks are lighter, and it doesn't wait for Electron.
+  it("gives the baseline its own prerequisites and lighter checks, the full ones before a proper release", () => {
+    const path = section('The 1.0 path')
+    expect(path).toMatch(/It waits for the last phase's checks card \(#1539\), the translation review \(#1126\) and #1582[^\n]*Electron's CVE fix \(#1503\) comes before the RC \(#1541\), not the baseline/)
+    expect(path).toMatch(/\*\*Its checks are lighter than a release's\*\*[^\n]*a \*\*smoke run\*\*: Claude Code and Codex each run the key scenarios once, with no repeats, no Haiku and no Copilot\. The full trials, the full e2e set and the real tier come before a proper release/)
+    expect(path).toMatch(/`npm run dist -- --kind baseline` \(asked\)/)
+    // #1534: where each build is recorded.
+    expect(path).toMatch(/also goes into the Hive Assistant's journal as Hive's entry[^\n]*\*\*Settings → Advanced → Record builds in the journal\*\* turns it off/)
+    expect(section('What a release checks')).toMatch(/unlike the baseline's lighter checks/)
+    for (const copy of ['.claude', '.agents']) expect(readFileSync(join(ROOT, copy, 'skills', 'release-hive', 'SKILL.md'), 'utf8')).toMatch(/Its checks are lighter than an uploaded release's \(the model trials a smoke run: RELEASING says which\)/)
+  })
+  it("lists every publishing step as the user's OK, which release-hive and AGENTS.md point to without repeating", () => {
+    const ok = section("The user's OK")
+    for (const step of [/`npm run dist`/, /changing the version/, /pushing/, /merging an integration branch into `main`/, /`npm run release`/, /publishing the draft, and creating tags/, /GitHub issue/]) expect(ok).toMatch(step)
+    for (const copy of ['.claude', '.agents']) {
+      const skill = readFileSync(join(ROOT, copy, 'skills', 'release-hive', 'SKILL.md'), 'utf8')
+      expect(skill).toMatch(/RELEASING\.md's \*\*The user's OK\*\* lists the decisions that are the user's/)
+      expect(skill).not.toMatch(/^- creating tags;/m)
+      // HR5's #1533 round 1 finding: the current-version candidate is the uploaded release's; a baseline sets its version first.
+      expect(skill).toMatch(/\*\*A baseline install\*\* .* goes version first: its `1\.0\.0-rc\.<n>` is set \(asked\) before its one `npm run dist`, with no current-version candidate before it/)
+      expect(skill).toMatch(/^- \*\*For an uploaded release\*\* \(an RC or the release, RELEASING's Steps\), the release candidate comes first/m)
+    }
+    expect(section('The 1.0 path')).toMatch(/`1\.0\.0-rc\.<n>` \(asked\), set before the build: no current-version candidate comes first \(that's Step 1, for an uploaded release\)/)
+    expect(section('Steps')).toMatch(/^These are the steps for an uploaded release/m)
+    expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/RELEASING\.md's \*\*The user's OK\*\* lists each step that needs it/)
+  })
+})
+
 describe("Hive's development skills", () => {
   const claude = '.claude/skills'
   const agents = '.agents/skills'

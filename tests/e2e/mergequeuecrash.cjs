@@ -10,6 +10,8 @@
 //   the state (branch, ref, the file's side, no command), changes nothing more, and asks in For you (screenshots of the
 //   card dialog's request, both themes); put back and answered, the queue looks again and recovery finishes the swap.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1578): every part ends Hive at a crash seam (HIVE_TEST_QUEUE_CRASH, _QUEUE_RACE), which a packaged
+// build ignores.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')

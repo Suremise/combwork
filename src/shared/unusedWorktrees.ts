@@ -44,8 +44,8 @@ const M = {
   workNotice: msg({ id: 'workspace.unused.workNotice', defaultMessage: "{count, plural, one {# unused worktree has} other {# unused worktrees have}} work that isn't on {known, select, yes {{into}} other {the main branch}}", description: "The Changes tab's notice on unused worktrees holding work." }),
 }
 
-/** The user guide's heading on kept worktrees. */
-export const UNUSED_WORKTREES_GUIDE = 'Unused worktrees' // i18n-ignore: a heading of the user guide (English until the guide is translated, D2)
+/** The id of the user guide's heading on kept worktrees. */
+export const UNUSED_WORKTREES_GUIDE = 'unused-worktrees' // i18n-ignore: a user guide heading's id (#1535)
 
 /** Whether it holds work that is nowhere else: commits not on the main branch, or uncommitted files. */
 export const holdsWork = (w: UnusedWorktree): boolean => !w.check.removable && ((w.check.ahead ?? 0) > 0 || (w.check.dirty ?? 0) > 0)
