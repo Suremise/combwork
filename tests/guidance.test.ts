@@ -304,13 +304,44 @@ describe('coordinator guidance', () => {
     const line = (skill: string, starts: string): string => catalog.get(skill)!.text.split(/\r?\n/).find((l) => l.includes(starts)) ?? ''
     it('run even one card of a builder and reviewer pair as a lane, and start a reviewer on a card in Review without asking, where an agent reviews', () => {
       const review = line('coordinate-agents', '**Its review**')
-      // Conditional on review (#1524's cases), the pair's lane too (HR3's round 1 finding 3): with no review, or only the
-      // user's, no reviewer is started, and a no-code card finishes on submit.
-      expect(review).toMatch(/depends on the project's Review option\. Where an agent reviews .* and the project has a builder and a reviewer, run even one card as a lane/)
-      expect(review).toMatch(/Where only the user reviews, the card waits for them under For you; with no review, it finishes as it is submitted: start no reviewer for either\./)
       expect(review).toMatch(/in a project whose work is reviewed by an agent: start an idle reviewer on it .* without asking the user/)
-      expect(line('coordinate-agents', '**A builder and a reviewer**')).toMatch(/in a project whose work an agent reviews: .*With no review, or only yours, the builder alone takes the cards\./)
-      expect(line('coordinate-agents', 'Create cards (`hive_create_task`)')).toMatch(/`kind: "no-code"`: it finishes with no merge, through its review where the project has one, else as it is submitted/)
+    })
+    // Every sentence on how a card starts, moves or finishes holds across the options it depends on (HR3's rounds 1 and 2,
+    // the Assistant's grid): kind × review × finish × enforcement. Each cell names the sentence that covers it.
+    const GRID: [cell: string, skill: string, starts: string, says: RegExp][] = [
+      ['review agent: a pair runs one card as a lane', 'coordinate-agents', '**Its review**', /Where an agent reviews \(an agent, or an agent then you\) and the project has a builder and a reviewer, run even one card as a lane/],
+      ['review agent: the pair line holds only there', 'coordinate-agents', '**A builder and a reviewer**', /in a project whose work an agent reviews: .*With no review, or only yours, the builder alone takes the cards\./],
+      ['review user: it waits for them, no reviewer', 'coordinate-agents', '**Its review**', /Where only the user reviews, the card waits for them under For you/],
+      ['review off: the stage is skipped, on to the finish, no reviewer', 'coordinate-agents', '**Its review**', /with no review, the review stage is skipped and the card goes straight on to its finish \(How a card finishes\): start no reviewer for either\./],
+      ['review off or user: a lane is its builder alone', 'run-lanes', '**One per lane**', /Where the project's work isn't reviewed by an agent \(no review, or only the user's\), a lane is its builder alone\./],
+      ['no-code, review on: through its review and approval', 'coordinate-agents', '**How a card finishes**', /A no-code card has nothing to merge: it finishes through its review \(and the user's approval, where the options ask for it\)/],
+      ['no-code, review off: as it is submitted', 'coordinate-agents', '**How a card finishes**', /or as it is submitted where the project has no review\./],
+      ['no-code: made so, no merge', 'coordinate-agents', 'Create cards (`hive_create_task`)', /`kind: "no-code"`: it finishes with no merge, through its review where the project has one, else as it is submitted/],
+      ['code, Hive merges: the queue', 'coordinate-agents', '**How a card finishes**', /A code card, after its review if any, goes on as Who merges says: Hive's merge queue merges it/],
+      ['code, the agent merges: its builder merges and reports', 'coordinate-agents', '**How a card finishes**', /its builder merges it and reports the merge/],
+      ['code, committed is done', 'coordinate-agents', '**How a card finishes**', /it is done once committed in the project folder/],
+      ['code, Not checked: its builder reports it', 'coordinate-agents', '**How a card finishes**', /\(Not checked\) its builder reports it done/],
+      ['code: the OK before merging comes first where asked', 'coordinate-agents', '**How a card finishes**', /where the options ask for the user's OK before merging, Hive asks them first/],
+      ['a merge due: code only, as Who merges says, the OK first', 'run-lanes', '**A merge due**', /\(a code card passed; a no-code card has none\): it goes on as Who merges says .*committed in the project folder, it is already done\. Where the options ask for the user's OK before merging, Hive asks them first/],
+      ['Done: merged, accepted (no-code) or reported (Not checked)', 'coordinate-agents', 'Done means merged', /Done means merged \(for a no-code card, accepted; under Not checked, reported done by its builder\)/],
+      ['verify: a Done code card in the target, none for Not checked or no-code', 'run-lanes', 'Check what agents report', /a Done code card's work really is in the target \(Not checked records no merge, and a no-code card has none\)/],
+      ['enforcement on: one card at a time, queued lists, the limit asks', 'run-lanes', 'Hive owns the lane:', /While workflow rules are enforced .* it also takes one card at a time .*, queues list changes between cards and asks the user at the round limit; with them off, none of those three happens\./],
+      ['enforcement off: list changes apply at once', 'run-lanes', "A lane's list is Hive's", /While workflow rules are enforced, a change made while one of its cards is in flight is queued until that card is Done, and Hive tells the builder when it applies; between cards, or with the rules off, it applies at once/],
+      ['enforcement off: no limit, and no asking in its place', 'run-lanes', '**The round limit**', /With workflow rules off there is no limit: nothing asks and no lane pauses for it, so don't ask in its place/],
+      ['enforcement off: the pool gives nothing out', 'run-lanes', '**A shared pool**', /The pool works only while workflow rules are enforced: with them off, nothing is given out/],
+      ['enforcement off: nothing refuses, card-loop carries the steps', 'run-lanes', 'The rules themselves', /With workflow rules off nothing refuses, and the agents' own skills \(card-loop\) carry the steps\./],
+      ['enforcement off: cards move as put', 'coordinate-agents', '**With workflow rules off**', /Hive enforces none of the project's rules: cards move as they are put/]
+    ]
+    it.each(GRID)('cover the grid: %s', (_cell, skill, starts, says) => {
+      const l = line(skill, starts)
+      expect(l, `${skill}: ${starts}`).not.toBe('')
+      expect(l).toMatch(says)
+    })
+    it('finish a card on submit only where it is no-code, and never say Done on submit (HR3\'s round 2 finding)', () => {
+      for (const [name, body] of both()) {
+        for (const s of body.split(/(?<=\.)\s+/)) if (/as it is submitted|on submit/i.test(s)) expect(s, name).toMatch(/no-code/)
+        expect(body, name).not.toMatch(/Done (?:on|as it is) submit/i)
+      }
     })
     it('watch a lane with lanes only: its cards added wake on every move', () => {
       expect(line('run-lanes', '**One lane watch covers the whole team.**')).toMatch(/and no `cards` of the lanes.*A lane's cards added as `cards` would wake you on every move of them/)
@@ -328,9 +359,6 @@ describe('coordinator guidance', () => {
       expect(limit).toMatch(/With workflow rules off there is no limit: nothing asks and no lane pauses for it, so don't ask in its place/)
       for (const [name, body] of both()) expect(body, name).not.toMatch(/ask the user yourself when a card has failed|failed that many reviews/i)
       expect(line('run-lanes', '**A failed review is the loop\'s**')).toMatch(/at any round below the lane's limit \(at any round with workflow rules off\)/)
-      // A card finishes by its kind and the project's options.
-      const finish = line('coordinate-agents', '**How a card finishes**')
-      expect(finish).toMatch(/its kind and the project's workflow options: a no-code card finishes through its review .*or as it is submitted where the project has no review; a code card, after its review if any, as Who merges says/)
     })
     it("leave Hive's steps to Hive: merges, a lane's end, a decision's wakes; and say what the switches turn off", () => {
       expect(line('run-lanes', '**A merge due**')).toMatch(/Never ask whether to merge/)
@@ -343,10 +371,6 @@ describe('coordinator guidance', () => {
     it('describe the pool and Hive-owned lane lists, with no worktree, merge-point or junction leftovers', () => {
       const lanes = catalog.get('run-lanes')!.text
       expect(lanes).toMatch(/\*\*A shared pool\*\*: a lane has no reviewer of its own\. Hive gives each submitted card to the next free reviewer/)
-      // Queued only while the rules are enforced (HR3's round 1 finding 2): with them off a change applies at once, and one
-      // card at a time and the limit's question are off too.
-      expect(line('run-lanes', "A lane's list is Hive's")).toMatch(/While workflow rules are enforced, a change made while one of its cards is in flight is queued until that card is Done, and Hive tells the builder when it applies; between cards, or with the rules off, it applies at once/)
-      expect(line('run-lanes', 'Hive owns the lane:')).toMatch(/While workflow rules are enforced .* it also takes one card at a time .*, queues list changes between cards and asks the user at the round limit; with them off, none of those three happens\./)
       for (const [name, body] of both()) expect(body, name).not.toMatch(/merge point|junction|worktree agents|agents in worktrees|only if the user (?:asked for it|agrees)/i)
     })
     it("say a message reaches the agent's inbox and leave how it is told to the tool's reply (#1544)", () => {

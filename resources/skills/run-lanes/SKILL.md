@@ -22,12 +22,12 @@ Hive owns the lane: its card list, the wakes between builder and reviewer, mergi
 ## Reviewers: one per lane, or the pool
 
 The project's Reviewers option decides:
-- **One per lane**: each lane has a builder and its reviewer, both briefed.
-- **A shared pool**: a lane has no reviewer of its own. Hive gives each submitted card to the next free reviewer of the pool, oldest submission first, and tells it; a card nobody is free for waits ("waiting for a reviewer"). Brief only the builder, and leave the pool's agents to Hive: no reviewer briefs or starts per card. A pool lane is started with **Start Lane** in the window (its reviewer list offers the pool), which `hive_lane` can't record: ask the user to start it there, with your plan of cards.
+- **One per lane**: each lane has a builder and its reviewer, both briefed. Where the project's work isn't reviewed by an agent (no review, or only the user's), a lane is its builder alone.
+- **A shared pool**: a lane has no reviewer of its own. Hive gives each submitted card to the next free reviewer of the pool, oldest submission first, and tells it; a card nobody is free for waits ("waiting for a reviewer"). Brief only the builder, and leave the pool's agents to Hive: no reviewer briefs or starts per card. A pool lane is started with **Start Lane** in the window (its reviewer list offers the pool), which `hive_lane` can't record: ask the user to start it there, with your plan of cards. The pool works only while workflow rules are enforced: with them off, nothing is given out, so each lane needs a reviewer of its own.
 
 ## Brief completely
 
-Each agent reads only what you send it, and each lane starts in a new conversation (coordinate-agents, A new lane). The rules themselves (where to work, what a submission needs, who merges, when a card is Done) are Hive's: each card's start and each refusal say them, so a brief doesn't repeat them. A builder's brief, to adapt:
+Each agent reads only what you send it, and each lane starts in a new conversation (coordinate-agents, A new lane). The rules themselves (where to work, what a submission needs, who merges, when a card is Done) are Hive's: each card's start, each reply and each refusal say them, so a brief doesn't repeat them. With workflow rules off nothing refuses, and the agents' own skills (card-loop) carry the steps. A builder's brief, to adapt:
 
 ```
 Use card-loop as the builder. Lane "<name>": cards, in order, #12, #15. Your reviewer is R1.
@@ -53,7 +53,7 @@ Nothing wakes you but the user and a watch you started, so never leave lanes on 
 
 - **A failed review is the loop's**, at any round below the lane's limit (at any round with workflow rules off): the builder fixes it and submits again. Don't ask the user whether to go on, however many rounds it has taken.
 - **The round limit** is the lane's rounds (the project's Card loops settings, or what the user gave). At it, Hive asks the user itself, under For you (carry on, split the card, accept it with follow-ups, or take it over), and the lane waits on that card: pass the question on and record the answer as a decision. With workflow rules off there is no limit: nothing asks and no lane pauses for it, so don't ask in its place; the loop runs on, and a finding that keeps coming back is still your judgement (below).
-- **A merge due**: under Hive merges, Hive's merge queue merges the card (`hive_queue` shows why one waits or was returned); under the agent merges, the card's builder merges it as it passes. Step in only when the merge stalls (the queue paused or failing, a builder idle on a passed card): read why, and prompt the builder or tell the user. Never ask whether to merge.
+- **A merge due** (a code card passed; a no-code card has none): it goes on as Who merges says (coordinate-agents, How a card finishes). Under Hive merges, Hive's merge queue merges it (`hive_queue` shows why one waits or was returned); under the agent merges, its builder merges it as it passes; committed in the project folder, it is already done. Where the options ask for the user's OK before merging, Hive asks them first: pass it on. The lane's status says which step it waits on. Step in only when the merge stalls (the queue paused or failing, a builder idle on a passed card): read why, and prompt the builder or tell the user. Never ask whether to merge.
 - **A lane's end**: it ends by itself once every card is Done. Don't end a finished lane or ask to.
 - **A finding that keeps coming back**: when the reviewer marks a finding recurring, or the rounds keep turning up new edge cases of one mechanism, the loop isn't converging: that is your judgement, not a count of failures. Bring the user a simpler option with your recommendation (the simple version now, the rest on a new card), record their choice as a decision on the card (which wakes the builder and reviewer), and where the new shape needs agreeing first, ask the builder to post it as a design step (`hive_loop_step`) for its reviewer to check before building. The builder and reviewer carry on meanwhile (card-loop); stepping in is yours.
 
@@ -65,5 +65,5 @@ Nothing wakes you but the user and a watch you started, so never leave lanes on 
 
 ## Verify, don't trust
 
-- Check what agents report against git and the board: the merge commit is in the target branch (`git log`), merged isn't pushed, a Done card's work really is merged. Correct the record on the card when it's wrong.
+- Check what agents report against git and the board: the merge commit is in the target branch (`git log`), merged isn't pushed, a Done code card's work really is in the target (Not checked records no merge, and a no-code card has none). Correct the record on the card when it's wrong.
 - When an agent finds a real problem late, lay out the options with your recommendation rather than letting "nearly done" ship a known break.
