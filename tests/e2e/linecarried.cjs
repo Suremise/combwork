@@ -263,7 +263,8 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     const main3 = squash(line, 'card 3 (squash)')
     const done3 = await reportMerge(c3)
     check('card 3 squash-merged and reported: Done', done3.ok, JSON.stringify(done3.r.body))
-    check('…with an untracked file in its worktree, the branch waits (the lane says why)', !!(await until(async () => (await laneNow())?.status?.reason === 'lineUpdate', HUNG_MS)) && !(await kinds(c3)).includes('LineMoved'), JSON.stringify((await laneNow())?.status))
+    // The lane's lineUpdate for card 4 is published by a pass that found the worktree dirty and moved nothing (#1579).
+    check('…with an untracked file in its worktree, the branch waits (the lane says why)', !!(await until(async () => (await laneNow())?.status?.reason === 'lineUpdate' && (await laneNow())?.status?.card === c4, HUNG_MS)) && !(await kinds(c3)).includes('LineMoved'), JSON.stringify((await laneNow())?.status))
     // The builder cleans up in its own turn: once it is idle again, Hive looks and moves the branch.
     fs.rmSync(path.join(wt, 'scratch.txt'))
     await typeTo(b1.id, 'work 1')
