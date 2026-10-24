@@ -522,6 +522,41 @@ describe('the adapters and the hive MCP server use them', () => {
     expect(parseClaudePlanUsage(renamed, now)).toEqual(before)
   })
 
+  it("counts Claude Code's recorded background subagents, and under a renamed status and fields once the overrides name them (#1584)", async () => {
+    const dir = tempDir('hive-advanced-subagents-')
+    advanced.load(dir)
+    const { claudeBackgroundTasks } = await import('../src/main/providers/claude/background')
+    const recorded = fixtureText('tests/fixtures/advanced/subagent-launch-claude-2.1.310.jsonl') + fixtureText('tests/fixtures/advanced/subagent-resume-claude-2.1.309.jsonl')
+    const summary = (text: string): string[] => claudeBackgroundTasks(text).map((e) => `${e.kind} ${e.id}${e.kind === 'start' ? ` ${e.description ?? ''}${e.resumed ? ' resumed' : ''}` : ''}`)
+    const before = summary(recorded)
+    expect(before).toEqual(['start ab1827f13c285365d Review pl translations part A', 'end ab1827f13c285365d', 'start a152e8fb710ad64b4  resumed'])
+    // As if Claude Code renamed them: the status, the id, the description and the resume's field.
+    const renamed = recorded.replace(/"async_launched"/g, '"background_started"').replace(/"agentId"/g, '"subagentId"').replace(/"description"/g, '"task"').replace(/"resumedAgentId"/g, '"resumedSubagentId"')
+    expect(summary(renamed)).toEqual(['end ab1827f13c285365d'])
+    await advanced.set('claude-code.subagent.launched', 'background_started')
+    await advanced.set('claude-code.subagent.idField', 'subagentId')
+    await advanced.set('claude-code.subagent.descriptionField', 'task')
+    await advanced.set('claude-code.subagent.resumedField', 'resumedSubagentId')
+    expect(summary(renamed)).toEqual(before)
+  })
+
+  it("counts Codex's recorded subagent, and under a renamed item, kind and fields once the overrides name them (#1584)", async () => {
+    const dir = tempDir('hive-advanced-codex-subagents-')
+    advanced.load(dir)
+    const { codexBackgroundTasks } = await import('../src/main/providers/codex/background')
+    const recorded = fixtureText('tests/fixtures/advanced/subagent-codex-0.164.0.jsonl')
+    const summary = (text: string): string[] => codexBackgroundTasks(text).map((e) => `${e.kind} ${e.id}${e.kind === 'start' ? ` ${e.description}` : ''}`)
+    const before = summary(recorded)
+    expect(before).toEqual(['start 01a16de6-2c40-7ef2-b882-f6423230efbe /root/sleep_task', 'end 01a16de6-2c40-7ef2-b882-f6423230efbe'])
+    const renamed = recorded.replace(/"SubAgentActivity"/g, '"SubagentEvent"').replace(/"kind": "started"/g, '"kind": "spawned"').replace(/"agent_thread_id"/g, '"thread"').replace(/"agent_path"/g, '"task_path"')
+    expect(summary(renamed)).toEqual([])
+    await advanced.set('codex.subagent.item', 'SubagentEvent')
+    await advanced.set('codex.subagent.started', 'spawned')
+    await advanced.set('codex.subagent.threadField', 'thread')
+    await advanced.set('codex.subagent.taskField', 'task_path')
+    expect(summary(renamed)).toEqual(before)
+  })
+
   it('takes an override at once (patterns, the placeholder, a sign-in error) and at the next launch (hooks, title, tool timeout)', async () => {
     const dir = tempDir('hive-advanced-adapters-')
     advanced.load(dir)

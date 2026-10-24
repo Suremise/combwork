@@ -15,7 +15,8 @@
 //   (1 s, or N seconds for "work N"), and ends with a reply and Stop. "newfield": its UserPromptSubmit carries a
 //   top-level field Claude Code doesn't send (hive_test_new_field: true), as a CLI update adding one would (#698). "edit <file>" first sends PreToolUse for
 //   an Edit of that file and records the tool call. "background N" starts a background command that ends after
-//   N seconds; its task notification then starts a turn by itself, as in Claude Code. "pad N" adds N KB to the
+//   N seconds; its task notification then starts a turn by itself, as in Claude Code. "subagent N" (once or more)
+//   launches a subagent in the background that finishes after N seconds, told the same way (#1584). "pad N" adds N KB to the
 //   transcript. "context N": the reply's request reports N input tokens, so the session's context is about N. "ask" first asks for permission (a permission_prompt Notification), then carries on by itself.
 //   It connects the launch's hive MCP server as it starts (#865: the real server, which tells Hive it has connected);
 //   with fake-mcp-hold-<agent> in its home, only once the test makes fake-mcp-go-<agent>.
@@ -566,6 +567,7 @@ async function runPrompt(text, enter = null) {
   }
   const background = /\bbackground\s+(\d+)/i.exec(text)
   if (background) await startBackgroundTask(Number(background[1]))
+  for (const [k, m] of [...text.matchAll(/\bsubagent\s+(\d+)/gi)].entries()) await startSubagent(Number(m[1]), k + 1)
   const linger = /(?<!-)\blinger\s+(\d+)/i.exec(text)
   if (linger) leaveRunning(Number(linger[1]))
   if (/\bprogress-linger\b/i.test(text)) await leaveProgressRunning(!/\bnowait\b/i.test(text))
@@ -824,6 +826,34 @@ async function startBackgroundTask(secs) {
     await hook('UserPromptSubmit', { prompt: note })
     await sleep(1500)
     await endTurn(`The background task ${task} has finished.`)
+  }, secs * 1000)
+}
+
+/**
+ * A subagent the Agent tool runs in the background for `secs` seconds (#1584), recorded as Claude Code 2.1 records one
+ * (an `async_launched` result with its agentId). Its end is told as a background command's is: a notification that
+ * starts a turn by itself.
+ */
+async function startSubagent(secs, k) {
+  const id = `toolu_${randomUUID().slice(0, 8)}`
+  const agentId = `a${randomUUID().replace(/-/g, '').slice(0, 16)}`
+  const description = `Review part ${k}`
+  const input = { description, prompt: 'Review the change.', subagent_type: 'general-purpose', run_in_background: true }
+  await hook('PreToolUse', { tool_name: 'Agent', tool_input: input, tool_use_id: id })
+  write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: 'Agent', input }], usage: { input_tokens: 10, output_tokens: 5 } } })
+  write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text: `Async agent launched successfully.\nagentId: ${agentId}` }] }] }, toolUseResult: { isAsync: true, status: 'async_launched', agentId, description, resolvedModel: model, prompt: input.prompt, canContinueAgent: true } })
+  await hook('PostToolUse', { tool_name: 'Agent', tool_input: input, tool_use_id: id })
+  setTimeout(async () => {
+    for (let i = 0; i < 600 && isBusy(); i++) await sleep(200)
+    busy = true
+    promptId = randomUUID()
+    turnStarted = Date.now()
+    const note = `<task-notification>\n<task-id>${agentId}</task-id>\n<tool-use-id>${id}</tool-use-id>\n<status>completed</status>\n<summary>Agent "${description}" finished</summary>\n</task-notification>`
+    write({ type: 'queue-operation', operation: 'enqueue', content: note })
+    write({ type: 'user', origin: { kind: 'task-notification' }, promptSource: 'system', message: { role: 'user', content: note } })
+    await hook('UserPromptSubmit', { prompt: note })
+    await sleep(1500)
+    await endTurn(`The subagent ${description} has finished.`)
   }, secs * 1000)
 }
 

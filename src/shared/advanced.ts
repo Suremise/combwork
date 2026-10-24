@@ -1020,6 +1020,46 @@ const SOURCES: readonly AdvancedSource[] = [
     samples: [{ from: `${FIX}/advanced/statusline-claude-2.1.296.json`, version: '2.1.296', fields: ['used_percentage', 'resets_at'] }]
   },
   {
+    id: 'claude-code.subagent.launched',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.subagent.launched.title', defaultMessage: 'Transcript: background subagent launched', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.subagent.launched.desc', defaultMessage: "The status of the Agent tool's result when it runs a subagent (or a workflow) in the background (#1584). Wrong, Hive doesn't count those subagents, and shows the agent finished while they work.", description: 'What the advanced setting "Transcript: background subagent launched" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'async_launched',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/subagent-launch-claude-2.1.310.jsonl`, version: '2.1.310', text: 'async_launched' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'claude-code.subagent.idField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.subagent.idField.title', defaultMessage: "Transcript: background subagent's id field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.subagent.idField.desc', defaultMessage: "The field of that result with the subagent's id, which its notification names when it ends. Wrong, Hive doesn't count background subagents.", description: 'What the advanced setting "Transcript: background subagent\'s id field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'agentId',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/subagent-launch-claude-2.1.310.jsonl`, version: '2.1.310', fields: ['isAsync', 'status', 'agentId', 'description', 'resolvedModel', 'prompt', 'outputFile', 'canReadOutputFile', 'canContinueAgent'] }]
+  },
+  {
+    id: 'claude-code.subagent.descriptionField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.subagent.descriptionField.title', defaultMessage: "Transcript: background subagent's description field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.subagent.descriptionField.desc', defaultMessage: 'The field of that result with what the subagent was asked to do, in a few words. Wrong, Hive still counts it but has no description of it.', description: 'What the advanced setting "Transcript: background subagent\'s description field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'description',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/subagent-launch-claude-2.1.310.jsonl`, version: '2.1.310', fields: ['isAsync', 'status', 'agentId', 'description', 'resolvedModel', 'prompt', 'outputFile', 'canReadOutputFile', 'canContinueAgent'] }]
+  },
+  {
+    id: 'claude-code.subagent.resumedField',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.subagent.resumedField.title', defaultMessage: 'Transcript: resumed subagent field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.subagent.resumedField.desc', defaultMessage: "The field of a message's result with the id of a finished subagent the message started again. Wrong, Hive doesn't count a resumed subagent while it works.", description: 'What the advanced setting "Transcript: resumed subagent field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'resumedAgentId',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/subagent-resume-claude-2.1.309.jsonl`, version: '2.1.309', fields: ['success', 'message', 'resumedAgentId', 'revivedAgentId', 'pin'] }]
+  },
+  {
     id: 'claude-code.hooks.timeoutSeconds',
     group: 'claude-code',
     title: msg({ id: 'settings.advanced.claude-code.hooks.timeoutSeconds.title', defaultMessage: 'Hooks: timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
@@ -1169,6 +1209,46 @@ const SOURCES: readonly AdvancedSource[] = [
     flags: 'i',
     applies: 'now',
     samples: [{ from: `${FIX}/signin-codex-0.160.0.jsonl`, version: '0.160.0', text: 'unexpected status 401 Unauthorized: Incorrect API key provided' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.subagent.item',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.subagent.item.title', defaultMessage: "Session file: subagent's activity", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.subagent.item.desc', defaultMessage: "The kind of item Codex records when a subagent it spawned starts or ends (#1584). Wrong, Hive doesn't count Codex's subagents among an agent's background tasks.", description: 'What the advanced setting "Session file: subagent\'s activity" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'SubAgentActivity',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/subagent-codex-0.164.0.jsonl`, version: '0.164.0', text: 'SubAgentActivity' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.subagent.started',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.subagent.started.title', defaultMessage: 'Session file: subagent started', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.subagent.started.desc', defaultMessage: "The kind of that activity when the subagent starts; any other kind ends it. Wrong, Hive doesn't count Codex's subagents.", description: 'What the advanced setting "Session file: subagent started" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'started',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/subagent-codex-0.164.0.jsonl`, version: '0.164.0', text: 'started' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.subagent.threadField',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.subagent.threadField.title', defaultMessage: "Session file: subagent's thread field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.subagent.threadField.desc', defaultMessage: "The field of that activity with the subagent's thread, which tells its start and its end apart from another's. Wrong, Hive doesn't count Codex's subagents.", description: 'What the advanced setting "Session file: subagent\'s thread field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'agent_thread_id',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/subagent-codex-0.164.0.jsonl`, version: '0.164.0', fields: ['type', 'model', 'reasoning_effort', 'id', 'kind', 'agent_thread_id', 'agent_path'] }]
+  },
+  {
+    id: 'codex.subagent.taskField',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.subagent.taskField.title', defaultMessage: "Session file: subagent's task field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.subagent.taskField.desc', defaultMessage: "The field of that activity with the subagent's task name. Wrong, Hive still counts it but has no description of it.", description: 'What the advanced setting "Session file: subagent\'s task field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'agent_path',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/subagent-codex-0.164.0.jsonl`, version: '0.164.0', fields: ['type', 'model', 'reasoning_effort', 'id', 'kind', 'agent_thread_id', 'agent_path'] }]
   },
   {
     id: 'codex.rateLimits.field',

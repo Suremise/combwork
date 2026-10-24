@@ -275,12 +275,17 @@ export interface LiveDetails {
   stopsAnswered?: string[]
 }
 
+/** What a background task is (#1584): a command left running, a Monitor, a subagent run in the background, a workflow. */
+export type BackgroundTaskType = 'command' | 'monitor' | 'subagent' | 'workflow'
+
 /**
- * A background task an agent started (a command left running, a Monitor) or that ended, from its transcript.
- * `at` is when the line was written (ms); a task with `expiresAt` ends then if nothing says so sooner.
+ * A background task an agent started (a command left running, a Monitor, a subagent) or that ended, from its transcript.
+ * `at` is when the line was written (ms); a task with `expiresAt` ends then if nothing says so sooner. A start may say
+ * what it is (`type`; left out, a command) and its CLI's description of it (a subagent's: user text). `resumed`: a
+ * task that ended starts again under its id (a subagent given a message after it finished).
  */
 /** `stopped`: an end the agent made itself (Claude Code's TaskStop, #640): its CLI isn't told, so no turn follows. */
-export type BackgroundTaskEvent = { kind: 'start'; id: string; at: number; expiresAt?: number } | { kind: 'end'; id: string; at: number; stopped?: true }
+export type BackgroundTaskEvent = { kind: 'start'; id: string; at: number; expiresAt?: number; type?: BackgroundTaskType; description?: string; resumed?: true } | { kind: 'end'; id: string; at: number; stopped?: true }
 
 /** A turn as the transcript identifies it (#1371): its id, when its prompt was written (Unix ms), whether the model took it up. */
 export interface TranscriptTurn {

@@ -61,7 +61,7 @@ import { recacheEstimate } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage } from '../shared/usageDays'
-import type { Ask, HookEvent, LaunchContext, LaunchSkill, ProviderAdapter, SkillDelivery } from './providers/types'
+import type { Ask, BackgroundTaskType, HookEvent, LaunchContext, LaunchSkill, ProviderAdapter, SkillDelivery } from './providers/types'
 import { providerService } from './providerService'
 import { config } from './config'
 import { emit, emitTo, tellListeners, toast } from './events'
@@ -352,8 +352,11 @@ interface LiveSession {
   /** Asks its hooks reported that are still open, and the one it waits on (HookStatusInput). */
   open?: Ask[]
   waitingOn?: Ask | null
-  /** Background tasks started in this launch that haven't ended: id → when it started, and when it expires. */
-  tasks?: Map<string, { at: number; expiresAt?: number }>
+  /**
+   * Background tasks started in this launch that haven't ended: id → when it started, when it expires, what it is and
+   * its CLI's description (a subagent's, #1584: user text).
+   */
+  tasks?: Map<string, { at: number; expiresAt?: number; type?: BackgroundTaskType; description?: string }>
   /** Tasks seen to end, so a start read late doesn't count one again. */
   tasksEnded?: Set<string>
   /** Bytes of the transcript already read for background tasks. */
@@ -3551,7 +3554,9 @@ class SessionManager {
     for (const ev of l.adapter.backgroundTasks(text.slice(0, end + 1), (l.tasksMemo ??= {}))) {
       if (ev.at < since) continue
       if (ev.kind === 'start') {
-        if (!ended.has(ev.id)) tasks.set(ev.id, { at: ev.at, expiresAt: ev.expiresAt })
+        // A start read after its end counts nothing, unless the task starts again (a subagent resumed, #1584).
+        if (ev.resumed) ended.delete(ev.id)
+        if (!ended.has(ev.id)) tasks.set(ev.id, { at: ev.at, expiresAt: ev.expiresAt, type: ev.type, description: ev.description })
         continue
       }
       // A task the agent stopped itself wakes nothing (#640: read after its Stop, it showed HB3 working with no turn).
@@ -3797,6 +3802,10 @@ class SessionManager {
         st.status = 'background'
         st.unseen = false
         changed = true
+      } else if (woke && st.status === 'background') {
+        // One of several ended (subagents a turn started together, #1584): its CLI begins a turn for it while the others
+        // run on, so that wake may open a turn too (turnLedger rule 1).
+        l.woke = true
       }
     }
     if (changed) this.emitState(st)

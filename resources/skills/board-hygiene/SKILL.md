@@ -9,7 +9,7 @@ metadata:
 
 A board drifts: the same problem gets filed twice, the user's answers sit in comments, and a card stays blocked on something that has since shipped. Tidy those three things, and only those: Hive keeps the columns and the lanes' lists itself.
 
-Keep it light with one or two agents. When asked to tidy the board, sweep it all; on a wake, look only at the cards the wake and your sweep turned up.
+Keep it light for a solo user or a pair. When asked to tidy the board, sweep it all; on a wake, look only at the cards the wake and your sweep turned up.
 
 ## Duplicates
 
@@ -32,7 +32,8 @@ Keep it light with one or two agents. When asked to tidy the board, sweep it all
 
 ## Leave alone
 
-- On Hold and Done are the user's: change nothing there unless they ask.
+- On Hold is the user's, and Done follows a card's merge (or its acceptance, for a no-code card): change nothing there unless the user asks.
+- A card waiting for the user under For you (an approval, a decision, the round limit's question) is theirs to answer: tell them, don't settle it.
 - Columns, stalled cards and the lanes' card lists are Hive's to keep: report what looks wrong (coordinate-agents, run-lanes), don't move cards for it.
 
 ## After the sweep
