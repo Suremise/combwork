@@ -4,6 +4,6 @@
   "slots.release.notEnded": "Einige der aufgeführten Prozesse laufen noch: Windows hat Hive sie nicht beenden lassen, daher wurde {slot} nicht freigegeben. Versuche es erneut oder gib ihn frei, ohne sie zu beenden.",
   "slots.release.otherHive": "{slot} wird von einem anderen Hive gehalten, das noch läuft (Prozess {pid}): Gib ihn dort frei oder beende zuerst dieses Hive.",
   "slots.setting.bad": "Diese Slot-Einstellung gibt es in Hive nicht.",
-  "slots.setting.badSize": "Die Zahl der Review- und Prüfkopien ist eine ganze Zahl von 1 bis 32.",
+  "slots.setting.badSize": "Die Zahl der Review- und Check-Kopien ist eine ganze Zahl von 1 bis 32.",
   "slots.setting.badText": "Ein Slot-Skript oder eine Dateiliste ist Text mit höchstens 4.000 Zeichen."
 }

@@ -5,6 +5,8 @@
 // them, then each file is deleted from outside Hive.
 // The workspace watcher still notices projects coming and going and .hive changes. Dev build, throwaway profile and
 // workspace.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Tree is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build), whose worktree holds a build.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

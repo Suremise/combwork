@@ -78,8 +78,8 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
 
   it('Copilot with bracketed paste on gets the line as one paste too (#600)', async () => {
     await running(copilot, '\x1b[?2004h')
-    await sessions.sendPrompt(p, id, '[Hive] New in your inbox: 1 message (m4). Call hive_inbox to read it.')
-    expect(writes).toEqual(['\x15', '\x1b[200~[Hive] New in your inbox: 1 message (m4). Call hive_inbox to read it.\x1b[201~', '\r'])
+    await sessions.sendPrompt(p, id, '[Hive] New in your inbox: 1 message (m4). Call hive_inbox to read it, act on it, then ack it.')
+    expect(writes).toEqual(['\x15', '\x1b[200~[Hive] New in your inbox: 1 message (m4). Call hive_inbox to read it, act on it, then ack it.\x1b[201~', '\r'])
   })
 
   describe("Settings → Advanced's switches for what Hive types (#1286)", () => {
@@ -174,7 +174,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
   })
 
   describe("Codex: Enter once the line is drawn (#600: a busy Codex drops an Enter it reads with the line)", () => {
-    const line = '[Hive] New in your inbox: 1 message (m4). Call hive_inbox to read it.'
+    const line = '[Hive] New in your inbox: 1 message (m4). Call hive_inbox to read it, act on it, then ack it.'
 
     it('no Enter while the line isn’t drawn; Enter once it is', async () => {
       const screen = await running(codex, '\x1b[?2004h› ')
@@ -192,7 +192,7 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
     })
 
     it("an earlier doorbell with the same end on screen doesn't count as drawn", async () => {
-      const screen = await running(codex, '› [Hive] New in your inbox: 1 message (m3). Call hive_inbox to read it.\r\n› ')
+      const screen = await running(codex, '› [Hive] New in your inbox: 1 message (m3). Call hive_inbox to read it, act on it, then ack it.\r\n› ')
       vi.useFakeTimers()
       const sent = sessions.sendPrompt(p, id, line)
       await vi.advanceTimersByTimeAsync(2000)

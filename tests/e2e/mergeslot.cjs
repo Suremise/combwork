@@ -4,6 +4,8 @@
 // slot; a hold that runs out passes on and is reported; the user releases a holder from the Overview; the Merge dialog
 // waits while the slot is taken; another project's agent can't reach the slot. Dev build, throwaway profile, workspace
 // and CLAUDE_CONFIG_DIR; holds last 20 s here (HIVE_TEST_MERGE_HOLD_MS).
+// Dev build only (#1580): it starts this checkout's Electron itself, and Wes is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build), with a branch for the Merge dialog.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

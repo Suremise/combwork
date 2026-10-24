@@ -104,7 +104,7 @@
   "session.newConversation.pending": "CLIがまだ受け取っていないプロンプトを渡したばかりです。",
   "session.notice.finished": "{agent}：完了",
   "session.notice.finishedBody": "エージェントが作業を終えました。",
-  "session.notice.hooksMissingTitle": "Hive に {agent} のフックが届いていません",
+  "session.notice.hooksMissingTitle": "Hiveに{agent}のフックが届いていません",
   "session.notice.longConversation": "{agent}：会話が長くなっています",
   "session.notice.needsInput": "{agent}が入力を待っています",
   "session.notice.notWatching": "{agent}が{cards}を監視していません",

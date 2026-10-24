@@ -11,6 +11,8 @@
 //    new conversations in the project folder and resumes its last one in its old folder hr1.
 // Screenshots of the pane, the hover, the agents table, Add Agent and the stopped panes, light and dark. Dev build, throwaway profile,
 // workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): its slots are lent through slots:test (and R1's retired home made there), which a packaged
+// build refuses.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')

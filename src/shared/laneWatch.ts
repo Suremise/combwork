@@ -260,6 +260,8 @@ export interface LaneWatchCards {
   kept?: true
   replaced?: number[]
   dropped?: number[]
+  /** Of `now`, the watched lanes' own cards (#1531): kept as asked, but each wakes it on every move. */
+  inLanes?: number[]
 }
 
 /**

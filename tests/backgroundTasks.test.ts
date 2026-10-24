@@ -22,10 +22,10 @@ describe('Claude Code background tasks', () => {
       )
     )
     expect(out).toEqual([
-      { kind: 'start', id: 'bkqkq2vgh', at: at(t) },
-      { kind: 'start', id: 'bum6823gu', at: at(t) },
-      { kind: 'start', id: 'bi9giyn5m', at: at(t), expiresAt: at(t) + 1800000 },
-      { kind: 'start', id: 'bpersist1', at: at(t) }
+      { kind: 'start', id: 'bkqkq2vgh', at: at(t), type: 'command' },
+      { kind: 'start', id: 'bum6823gu', at: at(t), type: 'command' },
+      { kind: 'start', id: 'bi9giyn5m', at: at(t), type: 'monitor', expiresAt: at(t) + 1800000 },
+      { kind: 'start', id: 'bpersist1', at: at(t), type: 'monitor' }
     ])
   })
 
@@ -54,6 +54,89 @@ describe('Claude Code background tasks', () => {
 
   it('ignores ordinary lines', () => {
     expect(claudeBackgroundTasks(lines({ type: 'assistant', message: { content: [{ type: 'text', text: 'The tests pass.' }] } }, { type: 'user', toolUseResult: { stdout: 'ok' } }) + 'not json\n')).toEqual([])
+  })
+})
+
+// Background subagents (#1584), as Claude Code 2.1 wrote them in a real session (24 Oct 2026: two of nine reviews run
+// at once, a message queued to one, a resume), prompts and paths left out.
+const launched = (ts: string, agentId: string, description: string): unknown => ({
+  type: 'user',
+  timestamp: ts,
+  message: { role: 'user', content: [{ tool_use_id: 'toolu_012C', type: 'tool_result', content: [{ type: 'text', text: `Async agent launched successfully.\nagentId: ${agentId}` }] }] },
+  toolUseResult: { isAsync: true, status: 'async_launched', agentId, description, resolvedModel: 'claude-opus-5-5', prompt: '…', outputFile: `C:\\tasks\\${agentId}.output`, canReadOutputFile: true, canContinueAgent: true }
+})
+const agentDone = (id: string, description: string): string =>
+  `<task-notification>\n<task-id>${id}</task-id>\n<tool-use-id>toolu_018m</tool-use-id>\n<output-file>C:\\tasks\\${id}.output</output-file>\n<status>completed</status>\n<summary>Agent "${description}" finished</summary>\n<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>\n<usage><subagent_tokens>250660</subagent_tokens><tool_uses>84</tool_uses><duration_ms>288438</duration_ms></usage>\n</task-notification>`
+const sent = (ts: string, message: string, extra: Record<string, unknown> = {}): unknown => ({ type: 'user', timestamp: ts, toolUseResult: { success: true, message, ...extra } })
+
+describe('Claude Code background subagents (#1584)', () => {
+  const t1 = '2026-10-24T12:13:19.419Z'
+  const t2 = '2026-10-24T12:18:21.027Z'
+  const t3 = '2026-10-24T12:19:41.772Z'
+
+  it('starts a task for each subagent launched in the background, with its description; two at once', () => {
+    const out = claudeBackgroundTasks(lines(launched(t1, 'ab1827f13c285365d', 'Review pl translations part A'), launched(t1, 'ac82ead91b961b4f2', 'Review pl translations part B')))
+    expect(out).toEqual([
+      { kind: 'start', id: 'ab1827f13c285365d', at: at(t1), type: 'subagent', description: 'Review pl translations part A' },
+      { kind: 'start', id: 'ac82ead91b961b4f2', at: at(t1), type: 'subagent', description: 'Review pl translations part B' }
+    ])
+  })
+
+  it('ends one on its notification, each copy of it (queued, delivered), leaving the other running', () => {
+    const note = agentDone('ab1827f13c285365d', 'Review pl translations part A')
+    const out = claudeBackgroundTasks(
+      lines(
+        { type: 'queue-operation', operation: 'enqueue', timestamp: t3, sessionId: 's', content: note },
+        { type: 'queue-operation', operation: 'remove', timestamp: t3, sessionId: 's', content: note },
+        { type: 'user', timestamp: t3, message: { role: 'user', content: note } }
+      )
+    )
+    expect(out).toEqual([
+      { kind: 'end', id: 'ab1827f13c285365d', at: at(t3) },
+      { kind: 'end', id: 'ab1827f13c285365d', at: at(t3) },
+      { kind: 'end', id: 'ab1827f13c285365d', at: at(t3) }
+    ])
+  })
+
+  it("a message queued to a running subagent neither ends nor restarts it", () => {
+    expect(claudeBackgroundTasks(lines(sent(t2, 'Message queued for delivery to ac82ead91b961b4f2 at its next tool round. If it finishes first, it is resumed with the message and notifies again, so wait for that notification before resending.')))).toEqual([])
+  })
+
+  it('a finished subagent resumed by a message starts again under its id, named as it was launched', () => {
+    const memo = {}
+    claudeBackgroundTasks(lines(launched(t1, 'a152e8fb710ad64b4', "Translate #1432's new messages")), memo)
+    const out = claudeBackgroundTasks(lines(sent(t3, 'Resuming agent a152e8f', { resumedAgentId: 'a152e8fb710ad64b4', revivedAgentId: 'a152e8fb710ad64b4' })), memo)
+    expect(out).toEqual([{ kind: 'start', id: 'a152e8fb710ad64b4', at: at(t3), type: 'subagent', resumed: true, description: "Translate #1432's new messages" }])
+  })
+
+  it('a subagent stopped with TaskStop ends without a wake, as a command does (#640); one the user stops ends', () => {
+    const out = claudeBackgroundTasks(
+      lines(
+        { type: 'user', timestamp: t2, toolUseResult: { message: 'Successfully stopped task: ab1827f13c285365d (Review pl translations part A)' } },
+        { type: 'user', timestamp: t2, message: { role: 'user', content: agentDone('ac82ead91b961b4f2', 'Review pl translations part B').replace('completed', 'killed') } }
+      )
+    )
+    expect(out).toEqual([
+      { kind: 'end', id: 'ab1827f13c285365d', at: at(t2), stopped: true },
+      { kind: 'end', id: 'ac82ead91b961b4f2', at: at(t2) }
+    ])
+  })
+
+  it('starts a background workflow (its taskId) and ends it on its notification', () => {
+    const out = claudeBackgroundTasks(
+      lines(
+        { type: 'user', timestamp: t1, toolUseResult: { status: 'async_launched', taskId: 'w1dy13uyy', taskType: 'local_workflow', workflowName: 'translate', runId: 'wf_1', summary: 'Translate the workflow messages', transcriptDir: 'C:\\t', scriptPath: 'C:\\t\\s.js' } },
+        { type: 'queue-operation', operation: 'enqueue', timestamp: t2, content: '<task-notification>\n<task-id>w1dy13uyy</task-id>\n<status>completed</status>\n<summary>Dynamic workflow "Translate the workflow messages" completed</summary>\n</task-notification>' }
+      )
+    )
+    expect(out).toEqual([
+      { kind: 'start', id: 'w1dy13uyy', at: at(t1), type: 'workflow' },
+      { kind: 'end', id: 'w1dy13uyy', at: at(t2) }
+    ])
+  })
+
+  it('a foreground subagent (its result when it has finished) starts nothing', () => {
+    expect(claudeBackgroundTasks(lines({ type: 'user', timestamp: t1, toolUseResult: { status: 'completed', agentId: 'a0123456789abcdef', prompt: '…', content: [{ type: 'text', text: 'Done.' }], totalDurationMs: 1000 } }))).toEqual([])
   })
 })
 
@@ -229,5 +312,37 @@ describe('Codex background terminals in code mode', () => {
     const out = codexBackgroundTasks(lines(script(t2, 'b', execOf('npm test', '')), commandEnded(t2, '77', 'built elsewhere'), scriptOutput(t3, 'b', 'Script completed')), memo)
     expect(out).toEqual([{ kind: 'end', id: '77', at: at(t2) }])
     expect([...memo.unnamed.keys()]).toEqual(['a#0'])
+  })
+})
+
+// Subagents (#1584) as Codex 0.164 writes them in the parent's rollout (a real run in the test home, 24 Oct 2026: the
+// parent's turn ended at 12:32:45, its subagent at 12:34:04, and Codex started no turn for that).
+const activity = (ts: string, kind: string, thread: string, extra: Record<string, unknown> = {}): unknown => ({
+  timestamp: ts,
+  type: 'event_msg',
+  payload: { type: 'item_completed', thread_id: '01a16de6-192e', turn_id: '01a16de6-1a94', item: { type: 'SubAgentActivity', model: null, reasoning_effort: null, id: `subagent-${kind}-1`, kind, agent_thread_id: thread, agent_path: '/root/sleep_task', ...extra } }
+})
+
+describe('Codex subagents (#1584)', () => {
+  const t1 = '2026-10-24T12:32:43.619Z'
+  const t2 = '2026-10-24T12:34:04.055Z'
+  const child = '01a16de6-2c40-7ef2-b882-f6423230efbe'
+
+  it('starts one on its started activity, named by its task, and ends it on completed', () => {
+    const memo = codexBackgroundMemo()
+    expect(codexBackgroundTasks(lines(activity(t1, 'started', child, { model: 'gpt-6.1-sol', reasoning_effort: 'low', id: 'call_ae9d' })), memo)).toEqual([{ kind: 'start', id: child, at: at(t1), type: 'subagent', description: '/root/sleep_task' }])
+    expect(codexBackgroundTasks(lines(activity(t2, 'completed', child)), memo)).toEqual([{ kind: 'end', id: child, at: at(t2) }])
+  })
+
+  it('two at once end one by one; one that fails or is closed ends too', () => {
+    const other = '01a16de7-0000-7000-8000-000000000000'
+    const out = codexBackgroundTasks(lines(activity(t1, 'started', child), activity(t1, 'started', other), activity(t2, 'errored', other), activity(t2, 'shutdown', child)))
+    expect(out.map((e) => `${e.kind} ${e.id}`)).toEqual([`start ${child}`, `start ${other}`, `end ${other}`, `end ${child}`])
+  })
+
+  it('one started again after it ended (resume_agent) counts again', () => {
+    const memo = codexBackgroundMemo()
+    codexBackgroundTasks(lines(activity(t1, 'started', child), activity(t2, 'completed', child)), memo)
+    expect(codexBackgroundTasks(lines(activity(t2, 'started', child)), memo)).toEqual([{ kind: 'start', id: child, at: at(t2), type: 'subagent', description: '/root/sleep_task', resumed: true }])
   })
 })

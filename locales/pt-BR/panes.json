@@ -48,7 +48,7 @@
   "panes.footer.costEstimated": "Custo a preços de API desta sessão, estimado pelo Hive a partir dos tokens",
   "panes.footer.costReported": "Custo a preços de API desta sessão, conforme informado pelo provedor",
   "panes.footer.ctxValue": "ctx {value}",
-  "panes.footer.handOverWhen": "{when, select, now {Passe para uma nova conversa: clique para Passar para… e escolha o próprio agente.} other {Ele pode passar para uma nova conversa quando terminar: não enquanto trabalha, faz merge ou está num cartão de um loop de cartões.}}",
+  "panes.footer.handOverWhen": "{when, select, now {Passe para uma nova conversa: clique para Passar para… e escolha o próprio agente.} other {Ele pode passar para uma nova conversa quando terminar: não enquanto trabalha, faz merge ou está num cartão de um ciclo de cartões.}}",
   "panes.footer.modelTip": "{chosenAs, select, none {} other {{model} · escolhido como {chosenAs}. }}{provider}: {effort, select, yes {modelo e esforço} other {modelo}} {live, select, yes {desta sessão} other {para novas sessões}}{reported, select, yes { (esforço conforme a sessão informa)} other {}}. Altere em {where}.",
   "panes.footer.reading": "Lendo o uso desta conversa…",
   "panes.footer.settingsName": "Configurações do agente ou Configurações do projeto",

@@ -12,6 +12,7 @@ import { cardName, cardRef, namedBy, namesFrom, namesOf } from './projectKeys'
 import { shortDuration } from './progress'
 import { LANE_DEFAULT_EVENTS, type LaneEvent, type LaneWatchCards } from './laneWatch'
 import type { StageId } from './workflow/facts'
+import type { NextStep } from './workflow/nextStep'
 import type { QueuePublic } from './workflow/queue'
 import { INBOX_SWITCHES, type InboxSwitch } from './inboxSwitches'
 
@@ -133,12 +134,35 @@ export interface IntentDone {
   to: string
   data?: Record<string, unknown>
   warnings?: string[]
+  /** What comes next on the card under its rules (#1530, shared/workflow/nextStep.ts). */
+  next?: NextStep
 }
+
+/** What a reply says comes next (#1530): an agent follows it rather than infer the step from a column. */
+function nextText(n: NextStep): string {
+  switch (n.step) {
+    case 'intents':
+      return `Next on it: ${n.intents.map((i) => INTENT_TOOL[i] ?? i).join(' or ')}.`
+    case 'review':
+      return "Next: a reviewer's verdict."
+    case 'user':
+      return "Next: the user's OK, asked under For you: wait for it."
+    case 'merge':
+      return 'Next: its builder merges it, then reports the merge (hive_report_merge).'
+    case 'queue':
+      return "Next: Hive's merge queue merges it."
+    case 'done':
+      return 'Done: nothing more on it.'
+  }
+}
+
+/** The hive tool of each intent: an old move's reply says to call it next time (#1268), an intent's names what's next (#1530). */
+export const INTENT_TOOL: Record<string, string> = { start: 'hive_start_card', submit: 'hive_submit', verdict: 'hive_verdict', 'report merge': 'hive_report_merge', 'put back': 'hive_put_back', 'start review': 'hive_start_review' }
 
 /** At most this many of a list in an intent's reply (start review's files): the rest counted. */
 const INTENT_LIST_MAX = 20
 
-/** "HI-12: active → review. revision: 3f2a…; base: 9c1d…" and a line per warning. */
+/** "HI-12: active → review. revision: 3f2a…; base: 9c1d… Next on it: hive_start_review or hive_verdict." and a line per warning. */
 export function intentText(d: IntentDone): string {
   const where = d.from && d.to ? (d.from === d.to ? `still ${d.to}` : `${d.from} → ${d.to}`) : 'done'
   // A list's item: a changed file as git's letter and its path ("M greet.js", #1444: start review's files read
@@ -149,7 +173,7 @@ export function intentText(d: IntentDone): string {
   const facts = Object.entries(d.data ?? {})
     .filter(([, v]) => v !== undefined && v !== null && v !== '')
     .map(([k, v]) => `${k}: ${value(v)}`)
-  return [`${d.card}: ${where}.${facts.length ? ` ${facts.join('; ')}` : ''}`, ...(d.warnings ?? []).map((w) => `Warning: ${w}`)].join('\n')
+  return [`${d.card}: ${where}.${facts.length ? ` ${facts.join('; ')}` : ''}${d.next ? ` ${nextText(d.next)}` : ''}`, ...(d.warnings ?? []).map((w) => `Warning: ${w}`)].join('\n')
 }
 
 /** One of the Assistant's changes as GET /v1/assistant/changes lists it (#1282). */
@@ -464,7 +488,7 @@ function waitText(r: WaitReply): string {
     // The cards beside its lanes (#726): kept from the last lane watch, replacing its cards, or left (done or gone).
     const c = r.cards
     const list = (ns: number[]): string => ns.map((n) => `${cardRef(n)}`).join(', ')
-    const cards = c ? `${c.kept && c.now.length ? ` It kept ${list(c.now)} from your last lane watch (cards: [] for none).` : ''}${c.replaced?.length ? (c.now.length ? ` Its cards replace ${list(c.replaced)}.` : ` It no longer watches ${list(c.replaced)}.`) : ''}${c.dropped?.length ? ` ${list(c.dropped)} left it (done or gone).` : ''}` : ''
+    const cards = c ? `${c.kept && c.now.length ? ` It kept ${list(c.now)} from your last lane watch (cards: [] for none).` : ''}${c.replaced?.length ? (c.now.length ? ` Its cards replace ${list(c.replaced)}.` : ` It no longer watches ${list(c.replaced)}.`) : ''}${c.dropped?.length ? ` ${list(c.dropped)} left it (done or gone).` : ''}${c.inLanes?.length ? ` Warning: ${list(c.inLanes)} ${c.inLanes.length === 1 ? 'is a card' : 'are cards'} of the lanes you watch: listed too, ${c.inLanes.length === 1 ? 'it wakes' : 'they wake'} you on every move. For a lane, pass lanes only.` : ''}` : ''
     return `${r.watching}${own ? ` (${r.events.join(', ')})` : ''}. End your turn now: Hive types a line into this session on a lane event${c?.now.length ? ` or a change to ${list(c.now)}` : ''}, or at ${r.limitAt ?? 'the limit'} if none comes.${r.replaced ? ` It replaces your watch (${r.replaced.replace(/^Waiting/, 'waiting')}).` : ''}${cards}`
   }
   const line = (c: WaitChange): string =>
@@ -480,11 +504,13 @@ function waitText(r: WaitReply): string {
  * hive_wait_for_agents with wake or cancel (#416), as the model gets it: an agent watch begun (end the turn, and the card
  * watch it replaced), agents not working already (each and its state), or the cancel. The bounded wait replies as JSON.
  */
-export function agentWatchText(r: { done?: string; watching?: string; limitAt?: string; replaced?: string; already?: string[] }): string {
+export function agentWatchText(r: { done?: string; watching?: string; limitAt?: string; replaced?: string; dropped?: string[]; already?: string[] }): string {
   if (r.done) return r.done
-  if (r.already) return `Already: ${r.already.join('; ')}.`
   const replaced = r.replaced ? ` It replaces your card watch (${r.replaced.replace(/^Waiting/, 'waiting')}).` : ''
-  return `${r.watching}. End your turn now: Hive types a line into this session when one finishes, waits for the user or stops, or at ${r.limitAt ?? 'the limit'} if none does. Nothing runs meanwhile.${replaced}`
+  // #1346 item 6: the agents your earlier agent watch followed and this call doesn't; an answer at once ends it too.
+  const dropped = r.dropped?.length ? ` It replaces your watch on ${r.dropped.join(', ')}: pass every agent you're following.` : ''
+  if (r.already) return `Already: ${r.already.join('; ')}.${r.replaced ? ` Your card watch (${r.replaced.replace(/^Waiting/, 'waiting')}) has ended.` : ''}${r.dropped?.length ? ` Your watch on ${r.dropped.join(', ')} has ended: watch again, passing every agent you're following.` : ''}`
+  return `${r.watching}. End your turn now: Hive types a line into this session when one finishes, waits for the user or stops, or at ${r.limitAt ?? 'the limit'} if none does. Nothing runs meanwhile.${replaced}${dropped}`
 }
 
 /** A setting in a listing (GET /v1/settings): where it is, its value (and default when it differs), what it does. */

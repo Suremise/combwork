@@ -11,6 +11,8 @@
 // listed, never overwritten. Then the common case: a workspace moved without its worktrees
 // folder, whose worktree stays put and is linked to the moved project. Dev build, throwaway profile, folders and fake
 // Claude home; quiet.
+// Dev build only (#1580): it starts this checkout's Electron itself, and its agents are 0.9 worktree agents
+// (agents:testLegacy, refused by a packaged build): moving their worktrees with the workspace is what it tests.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { execFileSync } = require('child_process')

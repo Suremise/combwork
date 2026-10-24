@@ -6,7 +6,7 @@ import { advanced } from '../src/main/advanced'
 import { overridesNow } from '../src/main/advancedValues'
 import { claudeCode } from '../src/main/providers/claude/adapter'
 import { codex, outrankNativeHive } from '../src/main/providers/codex/adapter'
-import { copilot } from '../src/main/providers/copilot/adapter'
+import { copilot, HIVE_TOOL_NAMES } from '../src/main/providers/copilot/adapter'
 import { copilotEnv } from '../src/main/providers/copilot/home'
 import { copilotCheckEnv, copilotSignIn, ignoredTokens } from '../src/main/providers/copilot/install'
 import { catalogArgs } from '../src/main/providers/copilot/models'
@@ -108,22 +108,23 @@ describe("Copilot: every MCP server's instructions (row 21)", () => {
     await copilot.prepareLaunch(agent)
     const on = copilot.buildCommand('C:\\bin\\copilot.exe', agent)
     expect(on.args).toContain('--allow-all-mcp-server-instructions')
-    expect(on.env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBeUndefined()
-    expect(existsSync(join(agent.privateDir, 'instructions'))).toBe(false)
+    // Only the line on the hive tools' names (#1530) is custom then.
+    expect(on.env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(join(agent.privateDir, 'instructions'))
+    expect(instructions(agent)).toBe(`---\napplyTo: '**'\n---\n${HIVE_TOOL_NAMES}\n`)
 
     await advanced.set(overrideId('copilot', 'allMcpInstructions'), false)
     const off = context({ privateDir: join(base, 'private-off'), env: { PATH: 'C:\\Windows', COPILOT_CUSTOM_INSTRUCTIONS_DIRS: 'D:\\mine' } })
     await copilot.prepareLaunch(off)
     const cmd = copilot.buildCommand('C:\\bin\\copilot.exe', off)
     expect(cmd.args).not.toContain('--allow-all-mcp-server-instructions')
-    expect(instructions(off)).toBe("---\napplyTo: '**'\n---\nHive guidance\n")
+    expect(instructions(off)).toBe(`---\napplyTo: '**'\n---\nHive guidance\n\n${HIVE_TOOL_NAMES}\n`)
     // The user's own folders stay, Hive's after them.
     expect(cmd.env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(`D:\\mine,${join(off.privateDir, 'instructions')}`)
 
     // The Assistant gets its role after the guidance; a launch without Hive's tools gets no guidance.
     const assistant = context({ privateDir: join(base, 'private-assistant'), instructions: 'You are in Planner mode.' })
     await copilot.prepareLaunch(assistant)
-    expect(instructions(assistant)).toBe("---\napplyTo: '**'\n---\nHive guidance\n\nYou are in Planner mode.\n")
+    expect(instructions(assistant)).toBe(`---\napplyTo: '**'\n---\nHive guidance\n\n${HIVE_TOOL_NAMES}\n\nYou are in Planner mode.\n`)
     const bare = context({ privateDir: join(base, 'private-bare'), mcpServers: {} })
     await copilot.prepareLaunch(bare)
     expect(copilot.buildCommand('C:\\bin\\copilot.exe', bare).env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBeUndefined()
@@ -138,9 +139,9 @@ describe('a launch reads its switches once (overridesNow), so its stages agree w
     await copilot.prepareLaunch(ctx)
     await advanced.set(id, false)
     const cmd = copilot.buildCommand('C:\\bin\\copilot.exe', ctx)
-    // Still the launch it was prepared as: the flag, and no instructions folder that was never written.
+    // Still the launch it was prepared as: the flag, and the instructions folder holding only the tool names' line.
     expect(cmd.args).toContain('--allow-all-mcp-server-instructions')
-    expect(cmd.env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBeUndefined()
+    expect(readFileSync(join(cmd.env!.COPILOT_CUSTOM_INSTRUCTIONS_DIRS!, '.github', 'instructions', 'hive.instructions.md'), 'utf8')).not.toContain('Hive guidance')
   })
 
   it('Copilot: prepared with it off, then turned on before the command is built', async () => {

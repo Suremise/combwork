@@ -453,8 +453,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return deciding && obj(deciding.json)!.disableAllHooks === true ? deciding.label : null
   }
 
-  backgroundTasks(appended: string): BackgroundTaskEvent[] {
-    return claudeBackgroundTasks(appended)
+  backgroundTasks(appended: string, memo: Record<string, unknown>): BackgroundTaskEvent[] {
+    return claudeBackgroundTasks(appended, memo)
   }
 
   safeguards(appended: string, memo: Record<string, unknown>): SafeguardEvent[] {

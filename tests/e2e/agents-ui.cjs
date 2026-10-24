@@ -1,4 +1,6 @@
 // Screenshots of the agent dialogs and settings. Throwaway profile and git project; no sessions.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Tester is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build), for the Merge dialog, Files' folder picker and Remove.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs'), path = require('path')

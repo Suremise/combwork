@@ -33,6 +33,12 @@ const log = createLogger('copilot')
  */
 const HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Notification', 'Stop', 'ErrorOccurred', 'PreCompact', 'SessionEnd'] as const // i18n-ignore: Copilot's hook event names
 
+/**
+ * The line Copilot's sessions get about the hive tools' names (#1346 item 7): Copilot names an MCP server's tools
+ * "<server>-<tool>", so a model told hive_inbox searched for it 18 times. Only Copilot's custom instructions carry it.
+ */
+export const HIVE_TOOL_NAMES = 'This CLI names the hive tools "hive-<tool>": where Hive says hive_inbox, call hive-hive_inbox.' // i18n-ignore: agent-facing guidance
+
 /** Copilot's file tools, as its hooks name them (Edit: path, old_str, new_str; Write: path, file_text; 1.0.93). */
 const EDIT_TOOL = /^(edit|write|create|str_replace\w*|multi_?edit)$/i
 
@@ -212,7 +218,8 @@ export class CopilotAdapter implements ProviderAdapter {
    * out, whatever the server is called), then the Workspace notes note (#1433).
    */
   private customInstructions(ctx: LaunchContext): string {
-    return [launchOverrides(ctx.overrides, COPILOT, 'allMcpInstructions') ? '' : ctx.mcpServers.hive ? ctx.guidance : '', ctx.instructions ?? '', ctx.notes ?? ''].map((t) => t.trim()).filter(Boolean).join('\n\n')
+    const names = ctx.mcpServers.hive ? HIVE_TOOL_NAMES : ''
+    return [launchOverrides(ctx.overrides, COPILOT, 'allMcpInstructions') ? '' : ctx.mcpServers.hive ? ctx.guidance : '', names, ctx.instructions ?? '', ctx.notes ?? ''].map((t) => t.trim()).filter(Boolean).join('\n\n')
   }
 
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {

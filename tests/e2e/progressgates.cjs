@@ -5,6 +5,8 @@
 // clears it; a card passed but not merged pauses the lane, its header saying why; a new revision after the pass marks
 // the segment stale with both revisions; the user's move past the rules shows its mark with who, which rule and why. Its
 // screenshots in both themes and in German. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): it starts this checkout's Electron itself, and B1 is a 0.9 worktree agent (agents:testLegacy,
+// refused by a packaged build), its card's folder.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { execFileSync } = require('child_process')

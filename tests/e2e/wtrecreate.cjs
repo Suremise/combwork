@@ -5,6 +5,8 @@
 // two worktrees missing, recreating one is refused rather than pruning the other's link. A recorded place that can't be
 // used (a drive that isn't there): made at the agent's default place, its session following it. Dev build, throwaway profile
 // and workspace, the fake Claude Code; quiet.
+// Dev build only (#1580): it starts this checkout's Electron itself, and its agents are 0.9 worktree agents
+// (agents:testLegacy, refused by a packaged build): recreating a 0.9 worktree is what it tests.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { execFileSync } = require('child_process')

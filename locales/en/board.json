@@ -2264,8 +2264,8 @@
     "description": "Why a merge queue is paused, on its card in the Progress panel: a git hook kept running past the time limit."
   },
   "board.queue.pause.identity": {
-    "defaultMessage": "The repository has no commit identity, so Hive can't make its merge commit. Set one in Git → Branches & remotes, then resume.",
-    "description": "Why a merge queue is paused, on its card in the Progress panel: git has no user name and email for the repository. Git → Branches & remotes is a place in Hive."
+    "defaultMessage": "The repository has no commit identity, so Hive can't make its merge commit. Set one in Version Control → Branches & remotes, then resume.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel: git has no user name and email for the repository. Version Control → Branches & remotes is a place in Hive."
   },
   "board.queue.pause.needsYou": {
     "defaultMessage": "Needs you: Hive stopped part way and changes nothing more on its own. Open the card for its state and the commands that finish or undo it.",

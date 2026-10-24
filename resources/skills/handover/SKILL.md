@@ -11,7 +11,7 @@ A handover is read cold by someone with none of this conversation. Write it so t
 
 ## Check the state
 
-- **Code**: the branch and folder (worktree or project folder), `git status`, and `git log --oneline -10`. Note what is committed and what isn't.
+- **Code**: the branch and folder (slot or project folder), `git status`, and `git log --oneline -10`. Note what is committed and what isn't.
 - **Checks**: give the results you already have, and say when they were run and against what. If the code changed since a check, say so, or run it again if it's quick. Don't re-run unchanged checks just to write the note: results the user has just given you count too.
 - **Running work**: anything still going or half-done (a background job, a migration, a file mid-edit).
 

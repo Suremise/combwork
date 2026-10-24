@@ -3,6 +3,8 @@
 // (one running), and a worktree. Storage shows their sizes, Settings → Workspace links to it, the preview lists exactly
 // what goes, Clean Up moves exactly that to the Recycle Bin, and the Overview's totals don't change (also after the
 // CLI's copy goes). Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR (the fake Claude Code's transcripts).
+// Dev build only (#1580): it starts this checkout's Electron itself, and Tree is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build), whose folder Storage counts.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

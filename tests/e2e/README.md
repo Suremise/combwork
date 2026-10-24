@@ -429,7 +429,9 @@ minutes, the network off and Hive's fake CLIs only: no real CLI, sign-in or cred
   (`q.approve`, `q.approveBy`, `q.startCard`). A part that needs a seam runs only when `q.devSeam(what)` says so, and
   prints NOT RUN on a packaged build. A suite that tests 0.9 worktrees on purpose (a lane carried over the upgrade, the
   Merge dialog on an agent's branch) or that needs the test channels says "Dev build only" and why in its header.
-  `tests/e2esuites.test.ts` fails on a queue suite that needs one of these without saying so.
+  `tests/e2esuites.test.ts` fails on a queue suite that needs one of these without saying so, and on any suite that
+  uses the test channels without saying so (#1580: the suites making 0.9 worktree agents or lending slots through
+  `slots:test` are all dev-build tests, each header saying why).
 
 ## What they need
 

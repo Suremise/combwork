@@ -35,6 +35,14 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.statusLine.usedPercent.title': undefined
   'settings.advanced.claude-code.statusLine.weekly.desc': undefined
   'settings.advanced.claude-code.statusLine.weekly.title': undefined
+  'settings.advanced.claude-code.subagent.descriptionField.desc': undefined
+  'settings.advanced.claude-code.subagent.descriptionField.title': undefined
+  'settings.advanced.claude-code.subagent.idField.desc': undefined
+  'settings.advanced.claude-code.subagent.idField.title': undefined
+  'settings.advanced.claude-code.subagent.launched.desc': undefined
+  'settings.advanced.claude-code.subagent.launched.title': undefined
+  'settings.advanced.claude-code.subagent.resumedField.desc': undefined
+  'settings.advanced.claude-code.subagent.resumedField.title': undefined
   'settings.advanced.claude-code.trust.prompt.desc': undefined
   'settings.advanced.claude-code.trust.prompt.title': undefined
   'settings.advanced.claude-code.turnScreen.done.desc': undefined
@@ -83,6 +91,14 @@ interface HiveMessageValues {
   'settings.advanced.codex.ready.placeholder.title': undefined
   'settings.advanced.codex.signIn.expired.desc': undefined
   'settings.advanced.codex.signIn.expired.title': undefined
+  'settings.advanced.codex.subagent.item.desc': undefined
+  'settings.advanced.codex.subagent.item.title': undefined
+  'settings.advanced.codex.subagent.started.desc': undefined
+  'settings.advanced.codex.subagent.started.title': undefined
+  'settings.advanced.codex.subagent.taskField.desc': undefined
+  'settings.advanced.codex.subagent.taskField.title': undefined
+  'settings.advanced.codex.subagent.threadField.desc': undefined
+  'settings.advanced.codex.subagent.threadField.title': undefined
   'settings.advanced.codex.title.items.desc': undefined
   'settings.advanced.codex.title.items.title': undefined
   'settings.advanced.codex.trust.prompt.desc': undefined

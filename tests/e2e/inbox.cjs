@@ -3,6 +3,8 @@
 // until its pane is shown; a waiting agent stays until answered; an idle worktree agent with unmerged work is listed
 // to review, not counted. The agents run the fake Claude Code (fake-claude/). Dev build, throwaway profile, workspace
 // and CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Two is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
