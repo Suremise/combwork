@@ -50,7 +50,7 @@ Process model: the **main process** owns the filesystem, ptys, hook server, Agen
 
 Robustness and safety rules:
 
-- **Hive's JSON files** (`project.json`, `config.json`…) are written to a temporary file and renamed into place, each write with its own temporary file, so a crash or two writes at once never leave a partial file. The files Hive keeps (`config.json`, `workspace.json`, `project.json`) also get a `.bak` copy of the last good version with every save; a file that can't be read is set aside as `<file>.corrupt-<time>`, the `.bak` restored and the user told (or, with no good copy, defaults used and the user told), so a damaged file never silently turns into lost settings or session records. Read-modify-write changes to one project's `project.json` or its session records are serialised, so changes made at the same moment (two agents finishing together) are all kept.
+- **Hive's JSON files** (`project.json`, `config.json`…) are written to a temporary file and renamed into place, each write with its own temporary file, so a crash or two writes at once never leave a partial file. The files Hive keeps (`config.json`, `workspace.json`, `project.json`) also get a `.bak` copy of the last good version with every save; a file that can't be read is read again for up to about a second while it is still changing (something outside Hive saving it in place, which empties it and then writes it, #1598). One still changing (or still empty from a moment ago) after that second is left as it is, nothing reported: that read uses the `.bak`'s settings (or defaults), the next read looks again, and a warning naming it goes to the log. Only a file that stops changing and still can't be read is set aside as `<file>.corrupt-<time>`, the `.bak` restored and the user told (or, with no good copy, defaults used and the user told), so a damaged file never silently turns into lost settings or session records. Read-modify-write changes to one project's `project.json` or its session records are serialised, so changes made at the same moment (two agents finishing together) are all kept.
 - **Session IDs** from the renderer, the Agent API or the file system are checked (letters, digits, `-`, `_`) before they are used in a file name.
 - **Starting an agent** is reserved before anything else happens, so two starts at once (a double click, or the UI and the Agent API) start it only once; the other is refused.
 - **The window** only uses the clipboard; every other permission a page can ask for is refused, and a build's CSP allows no network connections. IPC calls are accepted only from Hive's own top-level page (not an embedded preview). Paths from the window are checked against the workspace by their real location too (following links and junctions), for `file:read`/`file:write`, `hive-img:` and shared notes.
@@ -1546,7 +1546,7 @@ keep the category's colour and pattern; hovers and accessible names use the stag
 (`stagesOf`, `stageName`, `stageOf`, `stagesShown`; IPC `workflow:stages`, with a `workflow-changed` event whenever a
 project's workflow is written). The stages are the ruleset's, compiled as the table says (decided on #1417): Review
 with any review; Approved when a review or your OK before merging (G10) approves the work and something follows it: in
-Git a merge (Hive merges, the agent merges, or Not checked), in None your OK after the reviewer agent (N1's "a reviewer
+Git a merge (Hive merges, the agent merges, or Not checked: G10 asks under each, decided on #1592), in None your OK after the reviewer agent (N1's "a reviewer
 agent, then you"); Merging when Hive merges. Committed is done has nothing after its review, and with neither a review
 nor G10 there is no Approved (the agent merging comes from Active). Before #1417 the engine gave None no Approved and gave "the agent merges"
 Approved without a review; 1.0 wasn't released, so no stored ruleset keeps that. A card keeps the stages of its own
@@ -1711,7 +1711,7 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G7 | **Work merges into** (target) | A branch, default the repository's default branch (`main`) | Per-card target allowed (OP-12). |
 | G8 | **Work is up to date with <target> before it merges** (strict) | On / Off | `integrate.upToDate` |
 | G9 | **Checks pass on the merged result** | Named commands | `integrate.checksPassed` (Hive merges only) |
-| G10 | **Your OK before merging** | Never · Cards with these labels (e.g. `ui`, `release`) · Every card | `approval.given` on integrate; Darren's UI-screenshot gate is "cards labelled ui" [note §6; OP-23] |
+| G10 | **Your OK before merging** | Never · Cards with these labels (e.g. `ui`, `release`) · Every card | `approval.given` on integrate, and on report merge where the agent merges or merges aren't checked (#1592: G10 applies under Not checked too); Darren's UI-screenshot gate is "cards labelled ui" [note §6; OP-23] |
 | G11 | **Where cards are built** | Each card in its own folder (slots) · Everyone in the project folder | Slots (§16.10) |
 | G12 | **Commits use the project's identity** | Off · On (the identity shown, from `git config --local`, else global) | `submit.identity` (#809) |
 | G13 | **Agents stop what they started before review** | On / Off | `submit.ownRunsStopped` |
@@ -2022,7 +2022,7 @@ folder (the folder's line is the target); G10 is hidden when R includes you; Q =
 | Review | **user approves** (R = you, or agent then you after the quorum) | `approval.given` | **Finish** |
 | Review | **user declines** | — | Active · wake the builder; a round |
 | Approved | **user approves** (G10's request) | `approval.given` | **Finish (merge step)** |
-| Approved | **report merge** (builder; M = the agent merges, or not checked) | `done.contained` (not with not checked) | Done · `recordIntegrated (by agent)`; with not checked, Done with no `Integrated` (nothing was checked, and §16.8.4 never fakes one; a later observed integration adds it) [P2] |
+| Approved | **report merge** (builder; M = the agent merges, or not checked) | `done.contained` (not with not checked); `approval.given` when G10 applies, and with not checked a stale pass refuses it too (`integrate.approved`, cause stale: nothing checks what was merged, so the OK must be for the work there) (#1592) | Done · `recordIntegrated (by agent)`; with not checked, Done with no `Integrated` (nothing was checked, and §16.8.4 never fakes one; a later observed integration adds it) [P2] |
 | Approved | **submit** after a stale pass | as Active's submit | Review |
 | Merging | queue: merged | `integrate.*`, `done.contained` | Done · `recordIntegrated`, `releaseSlot`, `endLaneIfDone` |
 | Merging | queue: returned | — | Active · `returnToBuilder` (§16.9) |
@@ -2036,7 +2036,7 @@ folder (the folder's line is the target); G10 is hidden when R includes you; Q =
 | code, Hive merges | G10 applies: Approved · `askUser(approve)`, then the merge step. Else **Merging** · `enqueue`. |
 | code, the agent merges | Approved; the builder merges and reports (above). G10 asks first, as above. |
 | code, committed is done | `done.contained` on the folder's line (its revision is on the target by construction) → Done · `recordIntegrated (method: committed)`. A Pair project in its folder thus reviews before Done; the work is on the target meanwhile, which the option's description says. |
-| code, not checked | R ≠ none: Approved, then report merge (unchecked) or the user's move. R = none: Done. |
+| code, not checked | R ≠ none, or G10 applies: Approved, then report merge (unchecked) or the user's move; G10 asks first, as above, and report merge waits for its OK (#1592). Else Done. |
 | None, code | `accept`: `Accepted` of the submitted revision if the card's paths still hash to it, else Stale → Review (§16.3.3) → Done. |
 | None, no-code | `Accepted` of the submission → Done. |
 | no-code (Git) | `Accepted` of the submission → Done; no `Integrated` fact. |
