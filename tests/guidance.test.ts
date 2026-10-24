@@ -304,9 +304,13 @@ describe('coordinator guidance', () => {
     const line = (skill: string, starts: string): string => catalog.get(skill)!.text.split(/\r?\n/).find((l) => l.includes(starts)) ?? ''
     it('run even one card of a builder and reviewer pair as a lane, and start a reviewer on a card in Review without asking, where an agent reviews', () => {
       const review = line('coordinate-agents', '**Its review**')
-      expect(review).toMatch(/with a builder and a reviewer in the project, run even one card as a lane/)
-      // Conditional on review (#1524's cases): with no review, nothing is to start.
+      // Conditional on review (#1524's cases), the pair's lane too (HR3's round 1 finding 3): with no review, or only the
+      // user's, no reviewer is started, and a no-code card finishes on submit.
+      expect(review).toMatch(/depends on the project's Review option\. Where an agent reviews .* and the project has a builder and a reviewer, run even one card as a lane/)
+      expect(review).toMatch(/Where only the user reviews, the card waits for them under For you; with no review, it finishes as it is submitted: start no reviewer for either\./)
       expect(review).toMatch(/in a project whose work is reviewed by an agent: start an idle reviewer on it .* without asking the user/)
+      expect(line('coordinate-agents', '**A builder and a reviewer**')).toMatch(/in a project whose work an agent reviews: .*With no review, or only yours, the builder alone takes the cards\./)
+      expect(line('coordinate-agents', 'Create cards (`hive_create_task`)')).toMatch(/`kind: "no-code"`: it finishes with no merge, through its review where the project has one, else as it is submitted/)
     })
     it('watch a lane with lanes only: its cards added wake on every move', () => {
       expect(line('run-lanes', '**One lane watch covers the whole team.**')).toMatch(/and no `cards` of the lanes.*A lane's cards added as `cards` would wake you on every move of them/)
@@ -317,14 +321,16 @@ describe('coordinator guidance', () => {
         expect(body, name).not.toMatch(/\b(?:second|third|twice|two|three|four|five|ten) (?:times?|rounds?|failed reviews?)\b|\b\d+ (?:rounds|failed reviews)\b/i)
         expect(body, name).not.toMatch(/(?:goes|moves?|go) to Done when (?:it|they) pass/i)
       }
-      // The limit is the lane's configured rounds, where Hive asks; none with the rules off, and then the Assistant asks.
+      // The limit is the lane's configured rounds, where Hive asks; none with the rules off, and the Assistant doesn't ask in
+      // its place (HR3's round 1 finding 1: that recreated the switched-off gate in text).
       const limit = line('run-lanes', '**The round limit**')
       expect(limit).toMatch(/the lane's rounds .*Hive asks the user itself, under For you/)
-      expect(limit).toMatch(/With workflow rules off .* Hive asks nothing at the limit/)
-      expect(line('run-lanes', '**A failed review is the loop\'s**')).toMatch(/at any round below the lane's limit/)
+      expect(limit).toMatch(/With workflow rules off there is no limit: nothing asks and no lane pauses for it, so don't ask in its place/)
+      for (const [name, body] of both()) expect(body, name).not.toMatch(/ask the user yourself when a card has failed|failed that many reviews/i)
+      expect(line('run-lanes', '**A failed review is the loop\'s**')).toMatch(/at any round below the lane's limit \(at any round with workflow rules off\)/)
       // A card finishes by its kind and the project's options.
       const finish = line('coordinate-agents', '**How a card finishes**')
-      expect(finish).toMatch(/its kind and the project's workflow options: a no-code card finishes through its review .* a code card as Who merges says/)
+      expect(finish).toMatch(/its kind and the project's workflow options: a no-code card finishes through its review .*or as it is submitted where the project has no review; a code card, after its review if any, as Who merges says/)
     })
     it("leave Hive's steps to Hive: merges, a lane's end, a decision's wakes; and say what the switches turn off", () => {
       expect(line('run-lanes', '**A merge due**')).toMatch(/Never ask whether to merge/)
@@ -337,7 +343,10 @@ describe('coordinator guidance', () => {
     it('describe the pool and Hive-owned lane lists, with no worktree, merge-point or junction leftovers', () => {
       const lanes = catalog.get('run-lanes')!.text
       expect(lanes).toMatch(/\*\*A shared pool\*\*: a lane has no reviewer of its own\. Hive gives each submitted card to the next free reviewer/)
-      expect(line('run-lanes', "A lane's list is Hive's")).toMatch(/queued until that card is Done, and Hive tells the builder when it applies/)
+      // Queued only while the rules are enforced (HR3's round 1 finding 2): with them off a change applies at once, and one
+      // card at a time and the limit's question are off too.
+      expect(line('run-lanes', "A lane's list is Hive's")).toMatch(/While workflow rules are enforced, a change made while one of its cards is in flight is queued until that card is Done, and Hive tells the builder when it applies; between cards, or with the rules off, it applies at once/)
+      expect(line('run-lanes', 'Hive owns the lane:')).toMatch(/While workflow rules are enforced .* it also takes one card at a time .*, queues list changes between cards and asks the user at the round limit; with them off, none of those three happens\./)
       for (const [name, body] of both()) expect(body, name).not.toMatch(/merge point|junction|worktree agents|agents in worktrees|only if the user (?:asked for it|agrees)/i)
     })
     it("say a message reaches the agent's inbox and leave how it is told to the tool's reply (#1544)", () => {
