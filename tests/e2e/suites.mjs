@@ -178,6 +178,7 @@ export const SUITES = [
   { name: 'p5scenarios' },
   { name: 'p6lane' },
   { name: 'p6rules' },
+  { name: 'p7lane' },
   { name: 'packaged', needs: ['packaged'] },
   { name: 'packaged-mcp', needs: ['packaged'] },
   { name: 'packaged-progress', needs: ['packaged'] },

@@ -111,6 +111,37 @@ project with two agents in its folder; then S19 and S20.
 S21 (the Assistant off, a lane from the window) again for P6's way in: `p6lane`'s first lane, started from the board of
 a project set up through the step, ends verified.
 
+## P7's scenarios (slots, review copies, the reviewer pool)
+
+Written for #1448, P7's acceptance check (#1123's done-when: a 6×6 setup runs a full lane on slots, Resume All and resume
+after restart work): S35's window side, S42, S43, S51 and S56 on slots. `p7lane` runs them in one app, the Assistant off,
+fake Claude Code builders and fake Codex reviewers acting by their own tokens:
+- alpha: Hive's Team 6×6 loaded from the Templates view (its twelve agents named from the project's key), Team chosen in
+  the Version Control tab (G15 On, G17 One per lane), Hive merging into main checked out in the project folder. Two lanes
+  started from the window at once are lent slot-a and slot-b, their builders started there; each card gets its own line
+  from main's head; counted checks in the slot; the reviewer, in the project folder, is leased a review copy at the
+  revision and runs a check of it there; the queue merges; Done; the line deleted as the slot moves on; the Progress
+  panel's rows ("AL-B1 / AL-R1 · slot-a", the copy's run "AL-1 · <revision> · in copy-1", the slots' and the copy's runs as
+  Hive's). A third lane is lent slot-a again; Hive quits and opens again; the other lane carries on to Done.
+- beta: Team 6 + pool trimmed to two builders and its two pooled reviewers, an either agent E1, G1b = 2: lanes on the pool
+  ("BE-B1 / pool · slot-…"), a card reviewed by both pooled reviewers in review copies, E1 given no review while it builds
+  in a slot, and reviewing from the pool in the project folder (its launch granted the copies folder) once its card is Done.
+- gamma: everyone in the project folder with the pool (HR2's round 1 finding 2 on #1428), Committed is done: two builders'
+  cards each reviewed from the pool in a review copy at its revision, Done, no slot lent.
+- The gallery for #1123, light and dark, English and German: the Slots and copies group, lane rows with their slots and
+  a pool, an agent pane "in slot-a", a refused resume, Resume All's list with a slot reused, a template load's names.
+
+| Scenario | What it checks | e2e (the app) | Unit (app level, or the core where the card says so) |
+|---|---|---|---|
+| S35 | Slot reuse: a session whose slot was lent again is refused with why and left by Resume All, listed; two launches for a slot at once, one refused; a restart resumes the open lease's session | `p7lane` (the window side, after a restart: Resume All resumes AL-B2 in slot-b and AL-B3 in slot-a on their lanes' leases and lists AL-B1, whose slot holds a lane's work; the pane's refusal with Read Transcript and Start Fresh with a Handover); `slotsessions` (#1434's rest: by hand only, two launches at once, a carried slot's conversation after its card) | `agentFolders.test.ts` "Resume All resumes only conversations that may resume now, …", "the words: each refusal, …", "a lease that changed before the write: … (two Hives at once: one writer)" |
+| S42 | Team, the target checked out in the project folder: a reviewer idle there doesn't hold the queue; an uncommitted edit in a file the merge changes pauses it, the file named; a commit during the merge checks isn't held up | `p7lane` (on slots, Team from the tab: the reviewer's session in the project folder while it reviews in a copy; the user's commit and the Git view's branch and switch during the checks, merged after it; an edit to a.txt pauses the queue naming it, put back and resumed, merged); `mergequeuefolder` (P5's, on worktrees) | `workflow/queueFolder.test.ts` "S42: the checks run without the lock" |
+| S43 | A lane's next card waits while the one before it merges ("waiting: AL-11 merging") and starts once it is Done, in the same slot, from a target that has it | `p7lane` (the next card's start refused `lane.oneAtATime` while the first merges, the lane's "waiting: AL-1 merging" in Pulse, then started in slot-a from main with the first in it, the first's line deleted); `p5lane` (P5's, in a worktree) | `laneOwnership.test.ts` "S43 (P4): one card at a time: …" |
+| S51 | A Claude Code, a Codex and a Copilot reviewer each build and run tests in a review copy within their permission mode | `reviewcopiesreal` (the real tier: run again for #1448, its record on the card); `p7lane` (fake Codex reviewers' checks in their copies, counted for the revision) | `reviewCopies.test.ts` "goes to a reviewer and to an either agent in the project folder; …", "Claude Code: --add-dir, …", "Codex: --add-dir after resume <id>, …", "Copilot: --add-dir, …" |
+| S56 | P7's RC: a lane running on an agent's worktree at the upgrade finishes there; the next lane gets a slot and per-card lines | `slotupgrade` (a 6×6-shaped 0.9.3 workspace, #1448: B1's lane finishes on hb1, carried; hb2–hb6 carried by their builders, R2's worktree a retired home; hb1, freed, renamed slot-a with its conversation; the next lane takes it with a per-card line; a solo agent's worktree keeps its work and conversation) | `slotMigration.test.ts` "builders' worktrees carried under their folders' names, kept for their lane or card", "… its reviewer's worktree is a retired home", "what a carried lease is kept for is going while its lane runs, or its card is in flight" |
+
+S21 (the Assistant off, a lane from the window) again for P7's way in: `p7lane`'s lanes, started from the board of a
+project set up from a template and the Version Control tab, run on slots to Done.
+
 ## Options and their tests
 
 Every option the Version Control tab offers (SPEC §16.6.1, §16.6.2), for #1122's done-when: each with its unit test, an
@@ -137,13 +168,13 @@ Pair and Team are §16.6.3's (#1425)").
 | G9 merge checks | `mergeChecks` | [] / quick / quick + tests | Agrees (Team's per-card tests: #1367) | `workflow/queueChecks.test.ts`; `workflow/queue.test.ts` "S4: …" | `workflowoptions` (Pair fills them, saved); `p5lane`, `p6lane` | `p5scenarios` (S4); `p5lane`, `p6lane` (the queue runs typecheck on the merged result) |
 | G9's install | `mergeInstall` | onManifestChange / onManifestChange / always | Agrees (Built [#1361]) | `workflow/queueChecks.test.ts` "takes its two values; …", "onManifestChange: …", "always: …" | `workflowoptions` (always chosen, saved) | `p5scenarios` (S13: onManifestChange, inv); always: `p6rules` (an install before every entry's check, the warm worktree's too, no manifest changed) |
 | G10 your OK | `okBefore` | never / never / labels ui, release | Agrees | `workflow/forYou.test.ts` "G10 under the agent merges (S14's P4 form)"; `workflow/queue.test.ts` "S14: …" | `workflowoptions` (labels typed, saved) | `foryou` (S14, P4's form); `p5scenarios` (S14, the queue); `boardstages`, `lanestages` (Approved waits for your OK); inv |
-| G11 where | `folder` | project / slots / slots; None: project | Agrees (slots = agent worktrees until P7) | `combinations.test.ts` "S36: …"; `workflow/sharedFolder.test.ts` "S29: …"; `gates.test.ts` | `p6lane` (slots by Pair; the project folder by Solo and All off); `workflowdefaults` (slots refused at a level) | `p5lane`, `p6lane` (the builder's worktree; Solo and All off in the project folder) |
+| G11 where | `folder` | project / slots / slots; None: project | Agrees (slots are #1438's: a card's own line in a slot lent to it or its lane) | `combinations.test.ts` "S36: …"; `workflow/sharedFolder.test.ts` "S29: …"; `gates.test.ts`; `workflow/slotStarts.test.ts` "starts in the builder's slot: the card's own line …"; `slots.test.ts` "preparing a lent slot for its card (#1438)" | `p7lane` (Team from the tab); `slotoptions` (slots again after the project folder); `p6lane` (the project folder by Solo and All off); `workflowdefaults` (slots refused at a level) | `p7lane` (two lanes in slot-a and slot-b, each card its own line; gamma in the project folder, no slot lent); `slotcards`, `lanesslots` (inv); `p6lane` (Solo and All off in the project folder) |
 | G12 identity | `identity` | null / the repository's / the repository's | Agrees (On while it can be read) | `workflow/scenarios.git.test.ts` "S15: …"; `agentMoves.test.ts` "S15: …"; `workflow/queueCommits.test.ts` | `p5lane`, `p6lane` (filled by Pair from the repository); `workflowoptions` (switched alone, saved) | `p6lane` (S15: a personal email refuses submit with the amend command); `p5scenarios` (S47: none, the queue pauses) |
 | G13 stop own runs | `stopOwnRuns` | false / true / true | Agrees | `gates.test.ts` "G13: …", "G13 off (its option): …" | `p4lane`, `p5lane`, `p6lane` (a preset's Use); `workflowoptions` (switched alone, saved) | `p6rules` (the builder's own open Progress run refuses its submit, naming it; ended, submitted; off, nothing refused) |
 | G14 / N6 dependencies merged | `dependenciesDone` | true / true / true | Agrees | `workflow/scenarios.git.test.ts` "S12: …"; `workflow/transitions.test.ts`; `gates.test.ts` | `workflowdefaults` (Hive's level); `workflowoptions` (a project's own row, and None's N6, each switched alone, saved) | `p6lane` (S12: blocked by an approved, unmerged card, the start refused; started once merged); `boardgates` (a blocked card asks first); None's N6: `p6rules` (blocked by a card not yet accepted, the start refused; started once accepted) |
-| G15 slots up to date | `slotsUpToDate` | false / false / false | §16.6.3's On for Pair and Team waits for slots (Built [#1355]) | P7 | P7 (not in the form) | P7 |
+| G15 slots up to date | `slotsUpToDate` | false / true / true | Agrees (#1445: On for Pair and Team now slots are built) | `slots.test.ts` "a lane's next card in the same slot: G15 on installs again when the lock files changed; off, nothing is installed"; `workflow/slotStarts.test.ts` "G15 on: the preparation asks for the install"; `workflowOptionsForm.test.ts` "shows G15 only with slots …", "Pair is §16.6.3's at its full values (P7, #1445) …" | `slotoptions` (Pair's and Team's previews and saves; the project folder hides it); `p7lane` (Team saved with it On) | `slotcards` (installed again before card 2, from the new lock file; inv); off: unit only |
 | G16 shared-folder warning | `sharedFolderWarning` | true / false / false | Agrees (Pair and Team —) | `workflow/sharedFolder.test.ts` "S11: …", "G16's lock records …"; `lockRecord.test.ts` (the app's records: after release and restart, the next card, ordering) | `p6lane` (switched on with All off, saved; warns on G2's submit) | — (needs file locks on: Off records nothing, #1481) |
-| G17 reviewers per lane | — | — | P7 | P7 | P7 | P7 |
+| G17 reviewers | `reviewerMode` | lane / lane / lane (Hive's Team 6 + pool template suggests pool) | Agrees (#1443, #1445) | `reviewerPool.test.ts` "the option G17 (#1443)", "the pool's choice", "the pool's pass", "G1b %i × G17 × G11: every cell valid, …"; `laneStart.test.ts` "Start Lane… with the reviewer pool"; `workflowOptionsForm.test.ts` "sets G1b and G17 independently, and saves both" | `slotoptions` (One per lane through Pair and Team; A shared pool saved with the project folder; with G1b = 2); `p7lane` (One per lane through Team) | One per lane: `p7lane` (AL-B1 / AL-R1); the pool: `p7lane` beta (G1b = 2 × pool × slots: both pooled reviewers, an either agent) and gamma (pool × the project folder), `reviewerpool`, `lanesslots` (inv) |
 | N4 what the work is | `excluded` | node_modules, .venv (every None preset) | Agrees: §16.3, §16.6.1 and §16.6.3 say the whole folder except `.hive`, `node_modules` and `.venv`, no build folders found (#1482) | `runChecks.test.ts` "a write to a folder the options leave out of the deliverables still counts …" | `workflowoptions` (a folder added on None's form, saved) | `p6rules` (a change under node_modules is never unclaimed, and a check writing there as it runs still counts) |
 | N5 stage names | `stageNames` | default names | Agrees | `workflow/stages.test.ts`; `projectWorkflow.test.ts` "a rename alone applies at once …" | `workflowoptions` (a rename saved, applies now; a duplicate refused) | `boardstages` (renamed columns, Git and None); `stagenames` (the Assistant's tool); `lanestages` (hovers and the legend) |
 | N7 file locks | — (Settings → Agents & Worktrees) | as set | Shown, not set | — | `workflowoptions` (shown in None's Set elsewhere) | — |
@@ -153,11 +184,38 @@ merges) is §16.19.1's …" and runs in `p4lane`.
 
 **Gaps** (carded): none.
 
+## P7's slot and copy options and switches
+
+The Version Control tab's Slots and copies group (#1445) and Settings → Advanced's P7 switches, each with its unit test,
+an e2e where the window sets it and one where it acts. **inv** as above (`project:updateConfig`, `advanced:set`).
+
+| Option or switch | Key | Default | Unit test | e2e: the window sets it | e2e: it acts in the app |
+|---|---|---|---|---|---|
+| Setup script | `slots.setup` (falls back to `worktreeSetup`) | Agents & Worktrees' setup | `slots.test.ts` "reads the setup and copy patterns from the worktree settings while the slot options are unset", "a failed setup leaves the slot not ready …"; `workflowOptionsForm.test.ts` "an empty value is the project's own none …" | `slotoptions` (typed, emptied to none, Inherit) | `slotoptions` (the next warming runs it); `p7lane`, `slotcards`, `lanesslots` (each slot's warming as Hive's run; inv) |
+| Archive script | `slots.archive` | none | `slots.test.ts` "runs the archive command first, as a run, and keeps the slot when it fails", "an archive command whose processes could not be ended keeps the slot" | `slotoptions` (saved beside another field) | none: carded (#1563) |
+| Files copied into new slots | `slots.copy` (falls back to `worktreeCopy`) | `.env*` | `slots.test.ts` "lends a new slot (a detached worktree …, its files copied …)" | `slotoptions` (Set to none, Inherit) | none: carded (#1563) |
+| Slots per project | the builders, at most `hive.agents.perProject` | the builders, 1 to 12 | `slots.test.ts` "is as large as the project's builders, at least one, at most the cap"; `agentLimit.test.ts` "is 12 by default, 1 to 24 …" | `advanced` (Settings → Advanced's row) | `slotcards`, `lanesslots`, `slotrecovery` ("waiting for a slot" with one; inv); `p7lane` (two lanes, two slots, a third lane lent slot-a again) |
+| Review and check copies | `copies.size` | the larger of 2 and the reviewers plus one | `copies.test.ts` "the pool's size: the larger of 2 and the reviewers plus one, or the project's own" | `slotoptions` (saved) | `isolatedcheck` (one: a check waits for a copy), `reviewcopies` (two at once; inv); `p7lane` (default) |
+| Idle slots removed | `hive.slots.removeIdle` | on | `slots.test.ts` "removes ready slots beyond its size once unused for a day, oldest first, and only with the switch on" | none: carded (#1563) | `slotpool` (on); off: unit only |
+| Merged lines deleted | `hive.slots.deleteMergedLines` | on | `slotCards.test.ts` "a begun deletion settled …, whatever the switches" (off), "is kept while its slot has it checked out, deleted once nothing does" (on) | none: carded (#1563) | `p7lane`, `slotcards` (on: LineDeleted as the slot moves on); off: unit only |
+| Adopted worktrees renamed | `hive.slots.renameAdopted` | on | `relocateWorktree.test.ts` "free, but with the switch off, the rules off or a session running in it: kept as it is", "free and nothing in it: renamed …" | none: carded (#1563) | `slotupgrade` (on: hb1 renamed slot-a once free); off: unit only |
+| Reviewers review in review copies | `hive.copies.review` | on | `copies.test.ts` "refuses when none is free (noCopy), and a review while review copies are off"; `reviewCopies.test.ts` "goes to a reviewer and to an either agent …" | shown in `slotoptions` (Open Advanced) | `reviewcopies` (on, then off: no --add-dir, no lease; inv); `p7lane` (on) |
+| Wait for a copy to go quiet | `hive.copies.quietWaitMinutes` | 10 | `copies.test.ts` "a copy held back past the bound says what still uses it" | none: carded (#1563) | none: carded (#1563) |
+| Idle skill copies removed | `hive.skills.removeIdleCopies` | Slots only | `skillCopies.test.ts` "in a workspace: the record is hive.db's, and each value removes the copies where it says, …" | none: carded (#1563) | `skilldelivery` (Slots only, Everywhere; inv); never: unit only |
+| Inbox: checkpoints | `hive.inbox.checkpoints` (the project's `inboxCheckpoints`) | on | `carryingOn.test.ts` "the table: each switch decides only its own way, and nothing is dropped", "a project's own value wins over Settings' …"; `inboxNotices.test.ts` "with their switches off (#1432), …" | `carryingon` (the project's own, Project Settings → Sessions) | `carryingon` (on, then off; inv) |
+| Inbox: carrying on at Stop | `hive.inbox.stopContinuation` (`inboxStopContinuation`) | on | the same `carryingOn.test.ts` table; `toolReplies.test.ts` "names only the ways the carrying-on switches on for the agent tell it …" | `carryingon` (the project's own) | `carryingon` (on, then off; inv) |
+| Inbox: idle wakes | `hive.inbox.idleWakes` (`inboxIdleWakes`) | on | `carryingOn.test.ts` "idle wakes off: no kind of item is typed, a card event (a loop wake) included …" | `carryingon` (the project's own) | `carryingon` (off: nothing typed, a loop's wake included) |
+| Wake reviewers and builders | `loopWakes` (Project Settings → Card loops) | on | `loopWakes.test.ts` "wakes a lane's reviewer …", "is off for a project that turned it off (Project Settings → Card loops)" | none: carded (#1563) | `loopwakes` (on, then off; inv) |
+
+The P7 switches' "the window sets it" for Settings → Advanced is one row type the `advanced` suite checks with
+`hive.agents.perProject`; the switches it doesn't set there, the archive and copy scripts acting, the quiet wait, and
+the switches' off states in the app are #1563's.
+
 ## Later phases (named here so nothing is missed)
 
 | Phase | Scenarios | Tests so far |
 |---|---|---|
-| P7 (slots) | S35, S51, S56 | none yet (P7's cards) |
+| P7 (slots) | S35, S42, S43, S51, S56 | P7's scenarios above (#1448) |
 
 ## Core-level carry-over and P3's observations
 
