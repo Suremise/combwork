@@ -3,6 +3,7 @@ import { DEV_DRIVE_URL, KIND_LABEL, type AntivirusStatus, type AvAction, type Av
 import { formatDateTime } from '@shared/dates'
 import { call, errorMessage } from '../api'
 import { confirm, get, pushToast, set, setActivity, useStore } from '../store'
+import { awayFromProject } from '../agentPlace'
 import { cx, timeAgo } from '../util'
 import { Icon, LoadFailed } from './ui'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
@@ -316,8 +317,9 @@ const RECHECK_MS = 60 * 60_000
 export function useAntivirusOffer(): void {
   const workspace = useStore((s) => s.workspace?.path ?? null)
   const agents = useStore((s) => hostsOf(s).reduce((n, p) => n + p.agents.filter((a) => a.live && !a.live.settingUp).length, 0))
-  // The workspace's worktree agents, as a count: a new one may have made the worktrees folder.
-  const worktrees = useStore((s) => hostsOf(s).reduce((n, p) => n + p.agents.filter((a) => a.worktree).length, 0))
+  // The workspace's agents working outside their project folders (slots, worktrees: #1442), as a count: a new one may
+  // have made the worktrees folder.
+  const worktrees = useStore((s) => hostsOf(s).reduce((n, p) => n + p.agents.filter((a) => awayFromProject(a)).length, 0))
   // When the latest long command finished (0: none): each new one is a reason to ask.
   const slowRun = useStore((s) => s.progressRuns.reduce((t, r) => (r.finishedAt !== null && r.finishedAt - r.startedAt >= SLOW_RUN_MS ? Math.max(t, r.finishedAt) : t), 0))
   const reason = agents >= 2 ? 'agents' : slowRun ? 'slow' : null

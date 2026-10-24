@@ -11,6 +11,7 @@ import type { AgentInfo, AgentPatch, EffortLevel, PermissionMode, ModeInfo, Prog
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
+import { legacyOf, placeText, placeTip } from '../agentPlace'
 import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
 import { cardLabel } from '@shared/projectKeys'
 import { loadAssistantChanges } from '../assistantUndo'
@@ -122,7 +123,7 @@ const M = {
   workingOn: msg({ id: 'assistant.panel.workingOn', defaultMessage: 'Working on {number} {title}', description: "An agent's tooltip in the Assistant's overview: a card it works on ({number}: its name, its key, such as AM-12, or #12 for a card with none; {title}: its title)." }),
   reviewing: msg({ id: 'assistant.panel.reviewing', defaultMessage: 'Reviewing {number} {title}', description: "An agent's tooltip in the Assistant's overview: a card it reviews ({number}: its name, its key, such as AM-12, or #12 for a card with none; {title}: its title)." }),
   progress: msg({ id: 'assistant.panel.progress', defaultMessage: '{hasStep, select, yes {Progress: {run} ({step})} other {Progress: {run}}}', description: "An agent's tooltip in the Assistant's overview: its test run ({run}: \"e2e: 12 suites 4/12\"; {step}: what it is on)." }),
-  worktree: msg({ id: 'assistant.panel.worktree', defaultMessage: 'Worktree on {branch}', description: "An agent's tooltip in the Assistant's overview: its worktree's branch." }),
+  ownWorktree: msg({ id: 'assistant.panel.worktree', defaultMessage: 'Worktree on {branch}', description: "An agent's tooltip in the Assistant's overview: its worktree's branch." }),
   noAgents: msg({ id: 'assistant.panel.noAgents', defaultMessage: 'no agents', description: "The Assistant's overview: a project with no agents. Lower case." }),
   running: msg({ id: 'assistant.panel.running', defaultMessage: '{count} running', description: "The Assistant's overview: how many of a folded project's agents run. Lower case." }),
   workspace: msg({ id: 'assistant.panel.workspace', defaultMessage: 'Workspace', description: "The heading of the Assistant's overview of the workspace." }),
@@ -764,7 +765,8 @@ function OverviewAgent({ project: p, a, state, names, onGo }: { project: Project
     ...doing.map((c) => tr(M.workingOn, { number: cardLabel(c), title: c.title })),
     ...reviewing.map((c) => tr(M.reviewing, { number: cardLabel(c), title: c.title })),
     ...(run ? [tr(M.progress, { run: runWords(run), hasStep: run.stepName ? 'yes' : 'no', step: run.stepName ?? '' })] : []),
-    ...(a.worktree ? [tr(M.worktree, { branch: a.worktree.branch })] : [])
+    // Where it works (#1442): its 0.9 worktree's branch, else its slot, carried slot or home.
+    ...(legacyOf(a) ? [tr(M.ownWorktree, { branch: legacyOf(a)!.branch })] : placeText(a.place) ? [placeTip(a.place)] : [])
   ]
   // The whole of it on keyboard focus too, and for screen readers: the name and state as its label, the rest as its description.
   return (

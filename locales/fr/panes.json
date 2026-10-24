@@ -172,6 +172,8 @@
   "panes.table.projectPrefix": "dans le projet {value}",
   "panes.table.role": "Rôle",
   "panes.table.rolePrefix": "rôle {value}",
+  "panes.table.slot": "Emplacement",
+  "panes.table.slotPrefix": "travaille {value}",
   "panes.table.state": "État",
   "panes.table.waiting": "En attente de",
   "panes.table.waitingFor": "En attente de {what}",

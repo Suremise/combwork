@@ -106,6 +106,7 @@ interface HiveMessageValues {
   'files.refresh': undefined
   'files.reveal': undefined
   'files.revealInExplorer': undefined
+  'files.root.place': { agent: string | number; place: string | number }
   'files.root.projectFolder': undefined
   'files.root.tip': undefined
   'files.root.worktree': { agent: string | number; branch: string | number }

@@ -20,7 +20,7 @@ const M = {
   archive: msg({ id: 'workspace.storage.archive', defaultMessage: 'Archive', description: "Storage: Hive's archive folder (.hive/archive)." }),
   beforeCompression: msg({ id: 'workspace.storage.beforeCompression', defaultMessage: '{size} before compression', description: "Storage, beside the size of Hive's transcript backups or archive: what they hold uncompressed ({size}: like 1.2 GB). Ended sessions' backups are compressed." }),
   attachments: msg({ id: 'workspace.storage.attachments', defaultMessage: 'Attachments', description: 'Storage: files pasted or dropped into sessions (.hive/attachments).' }),
-  worktree: msg({ id: 'workspace.storage.worktree', defaultMessage: "{agent}'s worktree", description: "Storage: an agent's worktree." }),
+  agentWorktree: msg({ id: 'workspace.storage.worktree', defaultMessage: "{agent}'s worktree", description: "Storage: an agent's worktree." }),
   slot: msg({ id: 'workspace.storage.slot', defaultMessage: '{slot}, lent to {agent}', description: "Storage (#1451): one of the project's slots (a working folder Hive lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), lent now to the agent {agent}. Glossary: slot." }),
   freeSlot: msg({ id: 'workspace.storage.freeSlot', defaultMessage: '{slot}, not lent', description: "Storage (#1451): one of the project's slots (a working folder Hive lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), kept on disk but lent to no one now. Glossary: slot." }),
   copies: msg({ id: 'workspace.storage.copies', defaultMessage: 'Review and check copies', description: "Storage (#1451): the folder of the project's review and check copies (folders Hive keeps at one revision for a reviewer, or an isolated check). Glossary: review copy." }),
@@ -170,7 +170,7 @@ export function StorageView({ path }: { path: string }) {
         { label: tr(M.backups), where: '.hive/sessions', bytes: data.sessions, raw: data.sessionsRaw },
         { label: tr(M.archive), where: '.hive/archive', bytes: data.archive, raw: data.archiveRaw },
         { label: tr(M.attachments), where: '.hive/attachments', bytes: data.attachments },
-        ...data.worktrees.map((w) => ({ label: w.slot ? (w.agent ? tr(M.slot, { slot: w.slot, agent: w.agent }) : tr(M.freeSlot, { slot: w.slot })) : tr(M.worktree, { agent: w.agent ?? '' }), where: w.path, bytes: w.bytes })),
+        ...data.worktrees.map((w) => ({ label: w.slot ? (w.agent ? tr(M.slot, { slot: w.slot, agent: w.agent }) : tr(M.freeSlot, { slot: w.slot })) : tr(M.agentWorktree, { agent: w.agent ?? '' }), where: w.path, bytes: w.bytes })),
         ...(data.copies ? [{ label: tr(M.copies), where: data.copies.path, bytes: data.copies.bytes }] : []),
         // The worktrees no agent works in (#353), on one line: the Overview lists and tidies them.
         ...(data.unusedWorktrees?.length

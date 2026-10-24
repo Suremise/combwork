@@ -95,25 +95,21 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
     await lib.until(async () => (await page.locator(sel).count() > 0) === panelsBefore[i], HUNG_MS)
   }
 
-  // Add Agent dialog (+ Add ▾, #975), new worktree option
-  await lib.addMenuRun(page, 'Configure Agent and Add…'); await sleep(800)
-  check('dialog open', await page.locator('.dialog', { hasText: 'Add an agent' }).count() === 1)
-  await page.locator('.choice', { hasText: 'New worktree' }).click(); await sleep(400)
+  // Add Agent dialog (+ Add ▾, #975): no worktree to choose (#1442): agents start in the project folder, a builder in a
+  // slot per card.
+  await lib.addMenuRun(page, 'Configure Agent and Add…')
+  check('dialog open', !!(await lib.until(async () => (await addDialog.count()) === 1, HUNG_MS)))
+  check('#1442: no worktree choice (no New worktree, no Existing worktree, no branch)', (await addDialog.locator('.choice', { hasText: /New worktree|Existing worktree|Project folder/ }).count()) === 0 && (await addDialog.locator('.agent-form.nested').count()) === 0, await addDialog.innerText())
+  check('#1442: …it says where the agent works instead', /project folder[\s\S]*slots/i.test(await addDialog.locator('[data-where-note]').innerText().catch(() => '')), await addDialog.locator('[data-where-note]').innerText().catch(() => ''))
   await page.screenshot({ path: path.join(scratch, 'ui-1-add.png') })
-  await page.locator('.dialog input.input').first().fill('Tester')
-  check('branch follows name, in the place git can make it (hive/ws is a branch)', !!(await lib.until(async () => (await page.locator('.agent-form.nested input').inputValue()) === 'hive/ws-2/demo/tester', HUNG_MS)), await page.locator('.agent-form.nested input').inputValue())
-  // 1.0 adds no agent in a worktree (#1451: main refuses it; #1442 takes the choice out of the dialog): the agent the
-  // dialog would have made is made as a 0.9 one, on the branch the dialog shows, for the Merge dialog's check below.
-  const testerBranch = await page.locator('.agent-form.nested input').inputValue()
   await page.keyboard.press('Escape')
-  await lib.until(async () => (await page.locator('.dialog', { hasText: 'Add an agent' }).count()) === 0, HUNG_MS)
-  await lib.addAgent(inv, proj, { location: 'new-worktree', name: 'Tester', branch: testerBranch })
+  await lib.until(async () => (await addDialog.count()) === 0, HUNG_MS)
+  // A 0.9 agent in its own worktree (#1451: 1.0 makes none; made as an upgraded project has one), for the Merge dialog,
+  // Files' folder picker and Remove below.
+  await lib.addAgent(inv, proj, { location: 'new-worktree', name: 'Tester', branch: 'hive/ws-2/demo/tester' })
   await lib.until(async () => (await inv('workspace:refresh')).projects[0].agents.some((a) => a.name === 'Tester'), 15000)
   let p = (await inv('workspace:refresh')).projects[0]
-  check('the agent on the branch the dialog showed', p.agents.some((a) => a.name === 'Tester' && a.worktree?.branch === 'hive/ws-2/demo/tester') && g('branch --list hive/ws').includes('hive/ws'))
-  // The dialog sends the branch it shows: its generated default still records the part as the project's (#703 round 4).
-  const projectJson = () => JSON.parse(fs.readFileSync(path.join(proj, '.hive', 'project.json'), 'utf8'))
-  check("…its workspace part recorded as the project's", JSON.stringify(projectJson().branchSpaces) === '["ws-2"]', JSON.stringify(projectJson().branchSpaces))
+  check('the 0.9 agent on its branch, shown as its 0.9 worktree (#1442)', p.agents.some((a) => a.name === 'Tester' && a.worktree?.branch === 'hive/ws-2/demo/tester' && a.place?.is === 'legacy' && a.place.branch === 'hive/ws-2/demo/tester'), JSON.stringify(p.agents.map((a) => a.place)))
   check('two agents: two columns, automatically', (p.config.layout ?? 'auto') === 'auto' && (await page.locator('.agent-pane').count()) === 2, JSON.stringify(p.config.layout))
   await sleep(500)
   await page.screenshot({ path: path.join(scratch, 'ui-2-strip.png') })
@@ -150,9 +146,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await page.screenshot({ path: path.join(scratch, 'ui-6-global.png') })
   check('global agents settings', await page.locator('.setting', { hasText: 'Default merge style' }).count() === 1)
 
-  // #703 round 4: an agent added with the dialog's default branch in the part the project moved to, removed keeping its
-  // worktree; then the branch in the way (hive/ws) goes. The dialog still offers that part and says it reuses the kept
-  // worktree; adding works in it again: same folder, same branch, no new one.
+  // Adding with the dialog (#1442): the agent works in the project folder, with nothing sent for a worktree.
   // (Back from Settings to the project's Session tab, where Add Agent is.)
   await page.locator('.activitybar [aria-label="Projects"]').click()
   await page.getByText('demo', { exact: true }).first().click()
@@ -160,38 +154,14 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await lib.until(async () => (await sessionTab.count()) === 1, HUNG_MS)
   await sessionTab.click()
   await lib.until(async () => (await page.locator('.session-toolbar .add-menu').count()) === 1, HUNG_MS)
-  const addWith = async (name) => {
-    await lib.addMenuRun(page, 'Configure Agent and Add…')
-    const d = page.locator('.dialog', { hasText: 'Add an agent' })
-    await lib.until(async () => (await d.count()) === 1, HUNG_MS)
-    await d.locator('input.input').first().fill(name)
-    await d.locator('.choice', { hasText: 'New worktree' }).click()
-    await d.locator('label', { hasText: 'Start a session now' }).locator('input').uncheck()
-    return d
-  }
-  const branchShown = (d) => d.locator('.agent-form.nested input').first().inputValue()
-  let keeperDialog = await addWith('Keeper')
-  check('Keeper: the default branch in the part the project moved to', !!(await lib.until(async () => (await branchShown(keeperDialog)) === 'hive/ws-2/demo/keeper', HUNG_MS)), await branchShown(keeperDialog))
-  // Made as a 0.9 agent on the branch shown (#1451, as above).
-  const keeperBranch = await branchShown(keeperDialog)
-  await page.keyboard.press('Escape')
-  await lib.until(async () => (await keeperDialog.count()) === 0, HUNG_MS)
-  await lib.addAgent(inv, proj, { location: 'new-worktree', name: 'Keeper', branch: keeperBranch })
-  await lib.until(async () => (await inv('workspace:refresh')).projects[0].agents.some((a) => a.name === 'Keeper'), 15000)
-  const keeper = (await inv('workspace:refresh')).projects[0].agents.find((a) => a.name === 'Keeper')
-  await inv('agents:remove', proj, keeper.id, { deleteWorktree: false })
-  g('branch -D hive/ws')
-  check('Keeper removed, its worktree kept; the branch in the way gone', fs.existsSync(keeper.worktree.path) && !g('branch --list hive/ws').split('\n').some((l) => l.trim() === 'hive/ws'))
-  keeperDialog = await addWith('Keeper')
-  check('…the dialog still offers the part it moved to', !!(await lib.until(async () => (await branchShown(keeperDialog)) === 'hive/ws-2/demo/keeper', HUNG_MS)), await branchShown(keeperDialog))
-  const reuseNote = keeperDialog.locator('[data-worktree-match="reuse"]')
-  check('…and says it reuses the kept worktree', !!(await lib.until(async () => (await reuseNote.innerText().catch(() => '')).toLowerCase().includes(keeper.worktree.path.toLowerCase()), HUNG_MS)), await reuseNote.innerText().catch(() => ''))
-  await page.screenshot({ path: path.join(scratch, 'ui-7-reuse-moved-part.png') })
-  // Adding there is refused in 1.0 (#1451): nothing is pinned to the kept worktree.
-  await keeperDialog.locator('.btn.primary', { hasText: 'Add Agent' }).click()
-  check('…and adding in it is refused, saying why (1.0 pins no agent to a worktree)', !!(await lib.until(async () => /Could not add agent[\s\S]*pinned to worktrees/.test((await page.locator('.toast').allInnerTexts()).join(' | ')), HUNG_MS)) && !(await inv('workspace:refresh')).projects[0].agents.some((a) => a.name === 'Keeper'), (await page.locator('.toast').allInnerTexts()).join(' | '))
-  await page.keyboard.press('Escape')
-  await lib.until(async () => (await keeperDialog.count()) === 0, HUNG_MS)
+  await lib.addMenuRun(page, 'Configure Agent and Add…')
+  await lib.until(async () => (await addDialog.count()) === 1, HUNG_MS)
+  await addDialog.locator('input.input').first().fill('Plain')
+  await addDialog.locator('label', { hasText: 'Start a session now' }).locator('input').uncheck()
+  await addDialog.locator('.btn.primary', { hasText: 'Add Agent' }).click()
+  const plain = await lib.until(async () => (await inv('workspace:refresh')).projects[0].agents.find((a) => a.name === 'Plain'), HUNG_MS)
+  check('#1442: an agent added with the dialog works in the project folder, with no worktree', !!plain && !plain.worktree && plain.place?.is === 'project' && plain.place.folder === proj && !fs.existsSync(path.join(`${ws}.worktrees`, 'demo', 'plain')), JSON.stringify(plain))
+  await inv('agents:remove', proj, plain.id, { deleteWorktree: false })
 
   // Discard the worktree agent through the API and check cleanup
   await inv('agents:remove', proj, t.id, { deleteWorktree: true })

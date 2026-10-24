@@ -11,6 +11,7 @@ import { overrideNote, type OverrideNames } from '@shared/laneBar'
 import { useCardWork } from '../cardWork'
 import { openFileLink } from '../fileLinks'
 import { notify, useStore } from '../store'
+import { agentFolder, awayFromProject } from '../agentPlace'
 import { cx, timeAgo } from '../util'
 import { CardQueue, SHOW_QUEUE_WORK } from './CardQueue'
 import { Icon, Tooltip } from './ui'
@@ -225,9 +226,10 @@ function workMarks(v: WorkView, short: (id: string) => string): string[] {
 
 function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agentName }: { r: WorkRevision; noCode: boolean; verdicts: WorkVerdict[]; checks: WorkCheck[]; project: ProjectInfo | null; folder: string | null; short: (id: string) => string; agentName: (id: string | null) => string }) {
   const [files, setFiles] = useState(false)
-  // Its files open in the folder it was made in (#1224 round 1, finding 1): the project folder, or the worktree at the
-  // recorded path, whichever agent has it now; never another tree. A folder no agent has now: its files show as text.
-  const agentAt = folder && folder !== 'project' ? (project?.agents.find((a) => a.worktree && samePath(a.worktree.path, folder))?.id ?? null) : null
+  // Its files open in the folder it was made in (#1224 round 1, finding 1): the project folder, or the slot or worktree
+  // at the recorded path, whichever agent works there now (#1442); never another tree. A folder no agent has now: its
+  // files show as text.
+  const agentAt = folder && folder !== 'project' ? (project?.agents.find((a) => awayFromProject(a) && samePath(agentFolder(a), folder))?.id ?? null) : null
   const openable = !!project && (folder === 'project' || folder === null || agentAt !== null)
   const open = (path: string): void => {
     if (!project || !openable) return

@@ -1072,6 +1072,16 @@ kbd {
 .agents-table.cols-5 .agents-table-card > span {
   max-width: min(260px, calc(var(--agents-room) * 0.28));
 }
+/* Six (#1442: the hover's Slot beside Role and Waiting for). */
+.agents-table.cols-6 .agents-table-cut > span {
+  max-width: min(170px, calc(var(--agents-room) * 0.15));
+}
+.agents-table.cols-6 .agents-table-name > span {
+  max-width: min(130px, calc(var(--agents-room) * 0.12));
+}
+.agents-table.cols-6 .agents-table-card > span {
+  max-width: min(230px, calc(var(--agents-room) * 0.24));
+}
 /* An agent's role in the workflow (#1430): a word ("Reviewer"), so a small share. */
 .agents-table-role > span {
   max-width: min(110px, calc(var(--agents-room) * 0.12));
@@ -6242,6 +6252,23 @@ body.pane-resizing .monaco-editor {
 }
 .pane-header-bar > .tip-wrap:has(> .agent-name) {
   min-width: 24px;
+}
+/* Where it works (#1442): "in slot-b" (a link to Branches & remotes), "carried: hb2", "home: hr4". */
+.agent-place {
+  white-space: nowrap;
+  font-size: 12px;
+}
+button.agent-place {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--info);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+button.agent-place:hover {
+  text-decoration: underline;
 }
 /* The status gives way entirely before the name does (its shrink far outweighs the name's), and the review and
    safeguard shields with it. */

@@ -3,6 +3,8 @@
   "tips.advancedSettings.title": "Sam napraw zmianę w CLI",
   "tips.agentConsole.text": "Ustawienia → Agent API → Pozwól agentom czytać konsolę deweloperską daje agentom narzędzie tylko do odczytu: pokazuje hooki i linię statusu ich CLI obok tego, co Hive z nich odczytał (z ukrytymi danymi), żeby mogli sprawdzić, co widzi Hive.",
   "tips.agentConsole.title": "Pokaż agentom, co wysyła ich CLI",
+  "tips.agentInSlot.text": "Obok nazwy agenta w jego panelu: w slot-b, gdy realizuje kartę w slocie (kliknij, aby przejść do Gałęzie i zdalne repozytoria), przejęty: hb2 w slocie przejętym dla niego, dom: hr4 w dawnym domu recenzenta. Podpowiedź projektu wymienia je w kolumnie Slot.",
+  "tips.agentInSlot.title": "Zobacz, gdzie pracuje każdy agent",
   "tips.agentLayouts.text": "Każdy agent ma własny panel: wybierz układ po prawej stronie paska sesji i przeciągnij panel za jego nagłówek, żeby je przestawić. Blokady plików nie pozwalają dwóm agentom edytować tego samego pliku.",
   "tips.agentLayouts.title": "Kilku agentów obok siebie",
   "tips.agentMenu.text": "Nagłówek panelu agenta pokazuje tylko jego stan, kartę i Zatrzymaj. Kompaktowanie, przekazanie pracy, Scal…, jego ustawienia i wszystko, co wymaga uwagi (pokazuje to kropka na ⋯), są w jego menu ⋯; możesz też kliknąć nagłówek prawym przyciskiem. {key}",
@@ -414,9 +416,5 @@
   "tips.workspaceMovedDefender.text": "Jeśli Hive kazał Defenderowi pomijać foldery obszaru roboczego, Napraw… po przeniesieniu proponuje przenieść te wykluczenia do nowych folderów, z jednym pytaniem o uprawnienia administratora, żeby żadne nie zostało na folderze, którego już nie ma. Twoje własne wykluczenia zostają bez zmian.",
   "tips.workspaceMovedDefender.title": "Wykluczenia Defendera idą za przeniesionym obszarem roboczym",
   "tips.workspaceNotes.text": "Workspace notes, przypięta na górze Notatek wspólnych, jest na to, co dotyczy tego komputera, np. pełną ścieżkę. Każdy agent dostaje ją przy starcie, w każdym folderze, więc nie trzeba tego wpisywać do commitowanego AGENTS.md. Sekcja z nazwą projektu w nagłówku należy tylko do tego projektu.",
-  "tips.workspaceNotes.title": "Notatki o tym komputerze dla każdego agenta",
-  "tips.worktreeReuse.text": "Dodajesz agenta z nowym worktree o nazwie takiej jak zachowany (B4, a worktree B4 jest nieużywany)? Jeśli jest scalony i czysty, Hive daje agentowi ten folder, zaktualizowany do main: jego node_modules już tam są.",
-  "tips.worktreeReuse.title": "Zachowany worktree wraca do użytku",
-  "tips.worktrees.text": "W oknie Dodaj agenta… wybierz Nowy worktree: agent pracuje na własnej gałęzi, a Scal… przenosi jego pracę z powrotem, gdy praca Ci odpowiada.",
-  "tips.worktrees.title": "Daj agentowi własny worktree"
+  "tips.workspaceNotes.title": "Notatki o tym komputerze dla każdego agenta"
 }

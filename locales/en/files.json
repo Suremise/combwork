@@ -419,13 +419,17 @@
     "defaultMessage": "Reveal in File Explorer",
     "description": "Button or menu item: shows the file or folder in Windows File Explorer."
   },
+  "files.root.place": {
+    "defaultMessage": "{agent} · {place}",
+    "description": "The Files tab's folder picker: the folder an agent works in. {agent} is the agent's name, {place} where (agents.place.short: \"in slot-b\", \"carried: hb2\", \"home: hr4\")."
+  },
   "files.root.projectFolder": {
     "defaultMessage": "Project folder",
     "description": "The Files tab's folder picker: the project's own folder."
   },
   "files.root.tip": {
-    "defaultMessage": "Show the project folder, or the worktree a worktree agent works in",
-    "description": "Tooltip on the Files tab's folder picker, shown when agents work in worktrees."
+    "defaultMessage": "Show the project folder, or the folder an agent works in: its slot or worktree",
+    "description": "Tooltip on the Files tab's folder picker, shown when agents work outside the project folder (in slots, Hive's worktrees lent to cards, or their own worktrees from before 1.0)."
   },
   "files.root.worktree": {
     "defaultMessage": "{agent}'s worktree · {branch}",

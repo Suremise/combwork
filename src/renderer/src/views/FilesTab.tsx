@@ -13,6 +13,7 @@ import { pasteIntoTerminal } from '../components/TerminalView'
 import { Icon, IconButton, InfoTip, LoadFailed, Modal, SearchInput, StaleNote, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
 import { confirm, filesListeners, focusedAgentId, get, notify, openInSessionsTab, projectKey, set, setProjectTab, showAgent, useDateStyle, useStore } from '../store'
 import { useScopedLoad } from '../scopedLoad'
+import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
 import { cx, formatBytes, formatKeybinding, HIVE_FILES_MIME, IMAGE_EXT, imageUrl, quotePath, timeAgo } from '../util'
 
 const parentOf = (rel: string): string => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '')
@@ -25,8 +26,9 @@ const faint = (chunks: React.ReactNode[]): React.ReactNode => <span className="f
 const rich = (m: Msg, values: Parameters<typeof tRich<React.ReactNode>>[1]): React.ReactNode[] => Children.toArray(tRich<React.ReactNode>(m, values))
 
 const M = {
-  rootTip: msg({ id: 'files.root.tip', defaultMessage: 'Show the project folder, or the worktree a worktree agent works in', description: "Tooltip on the Files tab's folder picker, shown when agents work in worktrees." }),
+  rootTip: msg({ id: 'files.root.tip', defaultMessage: 'Show the project folder, or the folder an agent works in: its slot or worktree', description: "Tooltip on the Files tab's folder picker, shown when agents work outside the project folder (in slots, Hive's worktrees lent to cards, or their own worktrees from before 1.0)." }),
   projectFolder: msg({ id: 'files.root.projectFolder', defaultMessage: 'Project folder', description: "The Files tab's folder picker: the project's own folder." }),
+  agentPlace: msg({ id: 'files.root.place', defaultMessage: '{agent} · {place}', description: "The Files tab's folder picker: the folder an agent works in. {agent} is the agent's name, {place} where (agents.place.short: \"in slot-b\", \"carried: hb2\", \"home: hr4\")." }),
   agentWorktree: msg({ id: 'files.root.worktree', defaultMessage: "{agent}'s worktree · {branch}", description: "The Files tab's folder picker: a worktree agent's folder. {agent} is the agent's name, {branch} its git branch." }),
   gitStatus: msg({ id: 'files.git.status', defaultMessage: '{status, select, M {Modified} A {Added} D {Deleted} R {Renamed} U {Untracked} C {Copied} other {{status}}}', description: "A file's git status in the Files tab's details, after its letter. Translate the words, not the letters that pick them." }),
   gitInFolder: msg({ id: 'files.git.inFolder', defaultMessage: '{status} (contains changes)', description: "A folder's git status in the Files tab's details: {status} is the first change inside it, such as Modified." }),
@@ -163,8 +165,8 @@ async function insertIntoSession(project: ProjectInfo, paths: string[]): Promise
 }
 
 /**
- * A project as a tab sees it: the folder shown (the project folder, or a worktree agent's worktree)
- * and, as `live`, the session that Insert into Session pastes into — the worktree's agent, else the
+ * A project as a tab sees it: the folder shown (the project folder, or the folder an agent works in: its slot, home or
+ * 0.9 worktree, #1442) and, as `live`, the session that Insert into Session pastes into — that folder's agent, else the
  * focused agent if it works in the project folder, else the first agent (none in a project without agents).
  */
 type ViewProject = ProjectInfo & { target?: { path: string; agentId: string | null } }
@@ -174,16 +176,16 @@ function sessionTarget(p: ViewProject): { path: string; agentId: string | null }
 }
 
 export function projectView(project: ProjectInfo, rootAgent?: string): ViewProject {
-  const wt = project.agents.find((a) => a.id === rootAgent && a.worktree)
-  if (wt) return { ...project, path: wt.worktree!.path, branch: wt.worktree!.branch, live: wt.live, target: { path: project.path, agentId: wt.id } }
+  const away = project.agents.find((a) => a.id === rootAgent && awayFromProject(a))
+  if (away) return { ...project, path: agentFolder(away), branch: away.place.branch ?? project.branch, live: away.live, target: { path: project.path, agentId: away.id } }
   const focused = project.agents.find((a) => a.id === focusedAgentId(project))
-  const agent = focused && !focused.worktree ? focused : project.agents[0]
+  const agent = focused && !awayFromProject(focused) ? focused : project.agents[0]
   return { ...project, live: agent?.live ?? null, target: { path: project.path, agentId: agent?.id ?? null } }
 }
 
-/** Picks whose folder the Files tab shows when agents work in worktrees. Renders nothing otherwise. */
+/** Picks whose folder the Files tab shows when agents work outside the project folder (#1442). Renders nothing otherwise. */
 export function RootSelector({ project, value, onChange }: { project: ProjectInfo; value: string | undefined; onChange: (agentId: string) => void }) {
-  const worktrees = project.agents.filter((a) => a.worktree)
+  const worktrees = project.agents.filter((a) => awayFromProject(a))
   if (!worktrees.length) return null
   const known = worktrees.some((a) => a.id === value)
   return (
@@ -193,7 +195,7 @@ export function RootSelector({ project, value, onChange }: { project: ProjectInf
           <option value="">{tr(M.projectFolder)}</option>
           {worktrees.map((a) => (
             <option key={a.id} value={a.id}>
-              {tr(M.agentWorktree, { agent: a.name, branch: a.worktree!.branch })}
+              {legacyOf(a) ? tr(M.agentWorktree, { agent: a.name, branch: legacyOf(a)!.branch }) : tr(M.agentPlace, { agent: a.name, place: placeText(a.place) ?? '' })}
             </option>
           ))}
         </select>

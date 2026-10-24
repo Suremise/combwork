@@ -3,6 +3,8 @@
   "tips.advancedSettings.title": "Eine CLI-Änderung selbst beheben",
   "tips.agentConsole.text": "Einstellungen → Agent API → „Agenten die Entwicklerkonsole lesen lassen“ gibt Agenten ein Werkzeug mit Lesezugriff: Es zeigt die Hooks und die Statuszeile ihrer CLI neben dem, was Hive daraus gemacht hat, geschwärzt. So können sie untersuchen, was Hive sieht.",
   "tips.agentConsole.title": "Agenten sehen lassen, was ihre CLI sendet",
+  "tips.agentInSlot.text": "Neben dem Namen eines Agenten in seinem Bereich: in slot-b, während er eine Karte in einem Slot bearbeitet (klicke darauf für Branches & Remotes), übernommen: hb2 im für ihn übernommenen Slot, Zuhause: hr4 für das ehemalige Zuhause eines Reviewers. Der Hover des Projekts listet sie in einer Spalte Slot auf.",
+  "tips.agentInSlot.title": "Sehen, wo jeder Agent arbeitet",
   "tips.agentLayouts.text": "Jeder Agent hat einen eigenen Bereich: Wähle rechts in der Sitzungsleiste ein Layout und ziehe einen Bereich an seiner Kopfzeile, um sie neu anzuordnen. Dateisperren verhindern, dass zwei Agenten dieselbe Datei bearbeiten.",
   "tips.agentLayouts.title": "Mehrere Agenten nebeneinander",
   "tips.agentMenu.text": "Die Kopfzeile eines Agentenbereichs zeigt nur seinen Zustand, seine Karte und „Stoppen“. Komprimieren, Übergeben, Mergen…, seine Einstellungen und alles, was einen Blick braucht (ein Punkt auf ⋯ zeigt es an), stehen in seinem ⋯-Menü, oder klicke mit der rechten Maustaste auf die Kopfzeile. {key}",
@@ -414,9 +416,5 @@
   "tips.workspaceMovedDefender.text": "Hat Hive Defender die Ordner des Arbeitsbereichs überspringen lassen, bietet „Reparieren…“ nach einer Verschiebung an, diese Ausschlüsse mit einer Administratorabfrage in die neuen Ordner zu verschieben, damit keiner auf einem Ordner bleibt, den es nicht mehr gibt. Ausschlüsse, die du selbst angelegt hast, bleiben, wie sie sind.",
   "tips.workspaceMovedDefender.title": "Defender-Ausschlüsse folgen einem verschobenen Arbeitsbereich",
   "tips.workspaceNotes.text": "Workspace notes, oben in den gemeinsamen Notizen angeheftet, ist für das, was für diesen Rechner gilt, etwa einen vollständigen Pfad. Jeder Agent bekommt sie beim Start, in jedem Ordner, also muss das nicht in eine committete AGENTS.md. Ein Abschnitt mit dem Namen eines Projekts gehört nur diesem Projekt.",
-  "tips.workspaceNotes.title": "Notizen über diesen Rechner für jeden Agenten",
-  "tips.worktreeReuse.text": "Du fügst einen Agenten mit einem neuen Worktree hinzu, der wie ein behaltener heißt (B4, und der Worktree von B4 ist unbenutzt)? Ist er gemergt und sauber, gibt Hive dem Agenten diesen Ordner, auf den Stand von main gebracht: Seine node_modules sind schon da.",
-  "tips.worktreeReuse.title": "Ein behaltener Worktree wird wiederverwendet",
-  "tips.worktrees.text": "Wähle in „Agent hinzufügen…“ „Neuer Worktree“: Der Agent arbeitet auf seinem eigenen Branch, und „Mergen…“ holt seine Arbeit zurück, wenn du zufrieden bist.",
-  "tips.worktrees.title": "Einem Agenten einen eigenen Worktree geben"
+  "tips.workspaceNotes.title": "Notizen über diesen Rechner für jeden Agenten"
 }
