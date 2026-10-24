@@ -3,49 +3,9 @@
     "defaultMessage": "Add Agent",
     "description": "The Add Agent dialog's button: adds the agent."
   },
-  "agents.add.basedOn": {
-    "defaultMessage": "Based on",
-    "description": "Label of the branch a new worktree's branch starts from (Add Agent dialog)."
-  },
-  "agents.add.branch": {
-    "defaultMessage": "Branch",
-    "description": "Label of the new worktree's branch name in the Add Agent dialog."
-  },
-  "agents.add.branchHint": {
-    "defaultMessage": "<code>hive/</code> marks branches Hive made, so it can reuse and tidy them up.",
-    "description": "Under the branch name in the Add Agent dialog. Keep <code>hive/</code> as it is: it is the start of the branch name."
-  },
   "agents.add.checking": {
     "defaultMessage": "Checking which coding agents are installed, for the default provider (Automatic)…",
     "description": "The Add Agent dialog while Hive looks for the installed CLIs, to pick the default provider. Automatic is that setting's name."
-  },
-  "agents.add.createdIn": {
-    "defaultMessage": "Created in <code>{folder}</code>{copied, select, none {} other {, with <code>{copied}</code> copied from the project folder}}.",
-    "description": "Under the branch name in the Add Agent dialog: where the new worktree goes ({folder}, a path), and the files copied into it from the project folder ({copied}, a list; none: leave that branch empty). Keep the <code> tags."
-  },
-  "agents.add.currentBranch": {
-    "defaultMessage": "{branch} (current)",
-    "description": "A branch in the Based on list: the one checked out in the project folder now."
-  },
-  "agents.add.detached": {
-    "defaultMessage": "(detached)",
-    "description": "An existing worktree in the Add Agent dialog's list whose checkout is on no branch (git's detached HEAD)."
-  },
-  "agents.add.existingMerged": {
-    "defaultMessage": "One merged into {branch} and clean is brought up to it first; any other keeps its work as it is.",
-    "description": "Under the Existing worktree list: what happens to the chosen worktree ({branch}: the branch checked out in the project folder)."
-  },
-  "agents.add.existingMergedCurrent": {
-    "defaultMessage": "One merged into the current branch and clean is brought up to it first; any other keeps its work as it is.",
-    "description": "Under the Existing worktree list: what happens to the chosen worktree, when the project folder's branch isn't known."
-  },
-  "agents.add.existingNote": {
-    "defaultMessage": "A worktree of this project that no agent uses, e.g. one kept when an agent was removed.",
-    "description": "Under the Existing worktree choice in the Add Agent dialog."
-  },
-  "agents.add.existingWorktree": {
-    "defaultMessage": "Existing worktree",
-    "description": "A choice in the Add Agent dialog: the agent works in one of the project's worktrees that no agent uses."
   },
   "agents.add.failed": {
     "defaultMessage": "Could not add agent",
@@ -55,18 +15,6 @@
     "defaultMessage": "{limit} Remove one first.",
     "description": "The Add Agent dialog when the project has as many agents as it may: why ({limit}, a sentence), then what to do."
   },
-  "agents.add.gitError": {
-    "defaultMessage": "Could not read the git repository: {error}",
-    "description": "Under the New worktree choice: Hive couldn't read the project's git repository; {error} is why."
-  },
-  "agents.add.gitProblem": {
-    "defaultMessage": "{problem}. Agent Setup says how to fix it.",
-    "description": "Under the New worktree choice: git can't be used ({problem}, a sentence without its full stop). Agent Setup is a Help window: use its translated name."
-  },
-  "agents.add.heldWorktree": {
-    "defaultMessage": "<code>{branch}</code> already has an unused worktree with work in it ({why}). Hive makes a new one, or <reuse>reuse it (it keeps its work)</reuse>.",
-    "description": "Under the branch name in the Add Agent dialog: an unused worktree on that branch ({branch}) has work in it ({why}). <reuse> is a link that chooses that worktree instead. Keep the tags."
-  },
   "agents.add.nameTaken": {
     "defaultMessage": "{project} already has an agent called {agent}: agent names are unique across the workspace.",
     "description": "Under the name in the Add Agent dialog: an agent of another project ({project}) has that name ({agent})."
@@ -75,49 +23,9 @@
     "defaultMessage": "{project} already has an agent called {agent}.",
     "description": "Under the name in the Add Agent dialog: an agent of this project ({project}) has that name ({agent})."
   },
-  "agents.add.needsRepo": {
-    "defaultMessage": "Needs a git repository.",
-    "description": "Under the New worktree choice: the project isn't a git repository."
-  },
-  "agents.add.newWorktree": {
-    "defaultMessage": "New worktree",
-    "description": "A choice in the Add Agent dialog: the agent works in a new git worktree (its own checkout on its own branch)."
-  },
-  "agents.add.newWorktreeNote": {
-    "defaultMessage": "Its own checkout on its own branch. Review and merge its work when it is done.",
-    "description": "Under the New worktree choice in the Add Agent dialog."
-  },
-  "agents.add.noUnused": {
-    "defaultMessage": "This project has no unused worktrees.",
-    "description": "Under the Existing worktree choice in the Add Agent dialog, when there is none to choose."
-  },
-  "agents.add.projectFolder": {
-    "defaultMessage": "Project folder",
-    "description": "A choice in the Add Agent dialog: the agent works in the project's own folder."
-  },
-  "agents.add.projectFolderNote": {
-    "defaultMessage": "Shares the folder with the project's other agents. File locks stop two agents editing the same file at once.",
-    "description": "Under the Project folder choice in the Add Agent dialog."
-  },
   "agents.add.providerOff": {
     "defaultMessage": "{cli} is turned off{whose, select, project {, and it is this project's default provider} yours {, and it is your default provider} other {}}. Turn it on in Settings → Providers, or choose another provider.",
     "description": "The Add Agent dialog when the chosen provider ({cli}) is turned off; if it is the default provider, whose default it is: this project's (project) or the user's (yours); other: say nothing. Settings → Providers: use its translated names."
-  },
-  "agents.add.reuses": {
-    "defaultMessage": "Reuses <code>{path}</code>, the unused worktree already on <code>{branch}</code>: it is merged into {base} and clean, so Hive brings it up to {base}.",
-    "description": "Under the branch name in the Add Agent dialog: the new agent reuses an unused worktree ({path}, on {branch}) that is merged into {base}. Keep the <code> tags."
-  },
-  "agents.add.setupAgain": {
-    "defaultMessage": "<code>{setup}</code> runs again only if a lockfile changed.",
-    "description": "Under a reused worktree in the Add Agent dialog: the project's setup command ({setup}) runs again only when a lockfile changed. Keep the <code> tags."
-  },
-  "agents.add.setupNone": {
-    "defaultMessage": "Set a setup command (e.g. npm install) in Project Settings → Agents.",
-    "description": "Under the branch name in the Add Agent dialog when the project has no setup command: where to set one. npm install is a command: keep it. Project Settings → Agents: use their translated names."
-  },
-  "agents.add.setupRuns": {
-    "defaultMessage": "<code>{setup}</code> runs in the agent's pane before {cli} starts.",
-    "description": "Under the branch name in the Add Agent dialog: the project's setup command ({setup}) runs in the new agent's pane before its CLI ({cli}) starts. Keep the <code> tags."
   },
   "agents.add.startNow": {
     "defaultMessage": "Start a session now",
@@ -133,11 +41,11 @@
   },
   "agents.add.where": {
     "defaultMessage": "Where it works",
-    "description": "A heading in the Add Agent dialog, above the choice of folder: the project folder, a new worktree or an existing one."
+    "description": "A heading in the Add Agent dialog, above where the new agent works."
   },
-  "agents.add.worktreeNotice": {
-    "defaultMessage": "{agent}: {reused, select, yes {worktree reused} other {new worktree}}",
-    "description": "A notification's title after adding a worktree agent ({agent}): whether it reused an unused worktree or made a new one. Its message says how."
+  "agents.add.whereNote": {
+    "defaultMessage": "In the project folder. A builder takes one of the project's slots for each card it builds and works there until the card is done; Version Control → Branches & remotes lists them.",
+    "description": "The Add Agent dialog, under Where it works: agents have no worktree of their own (1.0); a builder works in a slot (a working folder Hive lends to a card) while it builds a card. Version Control → Branches & remotes: use their translated names. Glossary: slot."
   },
   "agents.batch.busy": {
     "defaultMessage": "{status, select, working {will be interrupted} background {background tasks will stop} waiting {waiting for you} other {its card loop pauses until it is resumed}}",
@@ -577,11 +485,7 @@
   },
   "agents.dialog.worksIn": {
     "defaultMessage": "Works in",
-    "description": "Label of where an agent works (Agent Settings): its worktree or the project folder."
-  },
-  "agents.dialog.worktree": {
-    "defaultMessage": "Worktree",
-    "description": "Label of an agent's git worktree (a checkout of its own)."
+    "description": "Label of where an agent works (Agent Settings): its slot, its worktree from before 1.0, or the project folder."
   },
   "agents.effort.inherited": {
     "defaultMessage": "{effort} (default)",
@@ -1278,6 +1182,14 @@
   "agents.picker.showOlder": {
     "defaultMessage": "Show older versions",
     "description": "Link under the model picker: shows the older models in it."
+  },
+  "agents.place.short": {
+    "defaultMessage": "{is, select, slot {in {name}} carried {carried: {name}} home {home: {name}} other {0.9 worktree: {name}}}",
+    "description": "Where an agent works, shown on its pane's header, in its hover and in the Agents table: in a slot it builds in ({name}: the slot's name, such as slot-b), its carried slot (its own worktree from before 1.0, kept for it), a reviewer's retired home, or its worktree from before 1.0 (Hive 0.9) not moved to a slot yet. Lower case."
+  },
+  "agents.place.tip": {
+    "defaultMessage": "{is, select, slot {Works in {name}: {path}} carried {Works in {name}, the slot kept for it: {path}} home {Works in its retired home {name}: {path}} other {Works in its 0.9 worktree {name}: {path}}}",
+    "description": "A line of an agent's hover: where it works and that folder's path ({path}): a slot it builds in ({name}: the slot's name, such as slot-b), its carried slot (its own worktree from before 1.0, kept for it as a slot), a reviewer's retired home, or its worktree from before 1.0 (Hive 0.9) not moved to a slot yet. Glossary: slot."
   },
   "agents.provider.automatic": {
     "defaultMessage": "{state, select, checking {Automatic (checking…)} picked {Automatic ({provider})} other {Automatic}}",

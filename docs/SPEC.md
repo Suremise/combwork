@@ -1129,7 +1129,15 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
 [P1, answering HB3's round 1 finding 6 and round 2 finding C, HR2's round 2 finding 6]
 - **Deliverables** (N4, §16.6.1): where a None project's work may be. By default the project folder except `.hive`
   and folders the option excludes (`node_modules` and `.venv` by default; no build output folders are found, #1482); a
-  card can narrow it to paths (OP-17).
+  card can narrow it to paths (OP-17), never widen it (#1511, decided: refuse): **declare paths** and `submit`'s
+  `paths` refuse a path any part of which is `.hive`, `.git` or an excluded folder (`paths.excluded`, naming the path
+  and the folder); a declared folder leaves such descendants out, as before; paths stored before #1511 under one are
+  left out of the revision (`NoneAdapter.leftOut`), and submit's reply says what it left out; a starting manifest
+  recorded before is compared without them too (`covering`: the submission's change, unclaimed changes), so no such
+  path shows as changed or deleted. So a write there is never a card's work, as N4's watcher and checks already held
+  (`isDeliverable`, the same rule). Names match as the file system resolves them: on Windows whatever their case
+  (`NODE_MODULES`, `.HIVE`), in a declaration, a folder's walk, a stored path and N4 alike; a refusal names the path
+  as given.
 - **A card's paths** are **declared, not guessed**: the card's list of files and folders its work covers, kept on the
   card from its start, which the builder sets at any time (the **declare paths** intent, §16.8.1, or `submit`'s
   `paths`) and the user can edit on the card. Hive **pre-fills** it from what
@@ -3111,6 +3119,28 @@ Whether a conversation may resume there is its **hold** (none: it may):
 - **Tests:** suites that need a 0.9 agent with its worktree make it as an upgraded project has one (test copies'
   `agents:testLegacy`, through `lib.addAgent`); `wtreuse` (reusing an unused worktree for a new agent) is retired with
   the feature.
+
+**Built [#1442], the window** (`AgentInfo.place` from `shownPlace` in `shared/agentFolders.ts`, made in `sessions.liveInfo`
+over #1451's `agentPlace`; the window's helpers in `renderer/src/agentPlace.ts`):
+- **Where an agent is, as the window shows it:** each agent's `place` comes with its live state: its current folder, the
+  kind of place (`slot`: a slot under a card's or lane's lease; `carried`: its own carried slot, #1441; `home`: a retired
+  home; `legacy`: its 0.9 worktree, until #1441 migrates it; `project`), the place's short name and its line. A project
+  also sends its slots and homes by name (`ProjectInfo.folders`). Facts that can't be read count as no slots or homes.
+  The window reads `AgentDef.worktree` nowhere: what acted on an agent's worktree acts on its 0.9 worktree only
+  (`legacyOf`: Review Changes, Merge, Discard Worktree and Branch, Remove's keep-or-delete, Remove All's tick box,
+  Recreate before a start, its branch's unmerged work in the inbox and hover). Everything that means "the folder it
+  works in" uses its place (`agentFolder`): the Files tab's folder picker and root, file links, a card's Work files,
+  Antivirus's count, and which agents count as working in the project folder (switching its branch, Resume in).
+- **Shown:** "in slot-b" beside the agent's name on its pane's header (a link to Version Control → Branches & remotes),
+  "carried: hb2", "home: hr4" or "0.9 worktree: hb1" as text, nothing in the project folder; the same in a Slot column
+  of the project hover's agents table (when an agent works outside the project folder), Project Settings' agent list,
+  Agent Settings' Works in, the Assistant's overview, and the agent's hover with the folder's path. The Sessions tab
+  names a session's folder by its slot ("Slot · slot-b") or home ("Home · hr4"), else as before.
+- **Add Agent** has no worktree choice: an agent is added in the project folder with its workflow role, and nothing is
+  sent for a worktree (`AddAgentOptions.location` may be left out). A note says a builder takes a slot for each card.
+  Quick add sends no location either.
+- **Off switches:** none needed: it only shows where agents are; G11 another value has no slots, so every agent reads
+  as the project folder (or its 0.9 worktree).
 
 #### 16.10.4 Fresh conversations and hand-overs
 

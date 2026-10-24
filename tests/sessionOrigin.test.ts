@@ -37,6 +37,16 @@ describe('sessionOrigin', () => {
     expect(sessionOrigin(P, [], { source: 'hive', cwd: WT })?.location).toBe('Worktree · coder')
   })
 
+  it("a slot's or a retired home's session is named by it (#1442); a folder the project doesn't name, as a worktree", () => {
+    const slots = 'C:\\ws.worktrees\\alpha'
+    const folders = [{ path: `${slots}\\slot-b`, name: 'slot-b', is: 'slot' as const }, { path: `${slots}\\hr4`, name: 'hr4', is: 'home' as const }]
+    const agents = [{ id: 'a-1', name: 'HB1' }]
+    expect(sessionOrigin(P, agents, { source: 'hive', agentId: 'a-1', cwd: `${slots}\\SLOT-B` }, folders)?.label).toBe('HB1 · Slot · slot-b')
+    expect(sessionOrigin(P, agents, { source: 'hive', agentId: 'a-1', cwd: `${slots}\\hr4` }, folders)?.location).toBe('Home · hr4')
+    expect(sessionOrigin(P, agents, { source: 'hive', agentId: 'a-1', cwd: WT, branch: 'hive/coder' }, folders)?.location).toBe('Worktree · hive/coder')
+    expect(sessionOrigin(P, agents, { source: 'hive', agentId: 'a-1', cwd: P }, folders)?.location).toBe('Project folder')
+  })
+
   it('a session started outside Hive claims no agent', () => {
     expect(sessionOrigin(P, [{ id: 'a-1', name: 'Coder' }], { source: 'external', agentId: 'a-1' })).toBeNull()
   })

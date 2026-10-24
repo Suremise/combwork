@@ -6,7 +6,7 @@ const live = (status: SessionStatus, statusSince: string, unseen = false, extra:
   ({ provider: 'claude-code', runId: 'r', projectPath: '', agentId: '', cwd: '', sessionId: '', status, statusSince, unseen, startedAt: '', launchSignature: '', ...extra }) as LiveSessionState
 
 const agent = (id: string, l: LiveSessionState | null, worktree = false): AgentInfo =>
-  ({ id, name: id, live: l, restartNeeded: false, resume: null, ...(worktree ? { worktree: { path: `C:/wt/${id}`, branch: `hive/${id}`, base: 'main' } } : {}) }) as AgentInfo
+  ({ id, name: id, live: l, restartNeeded: false, resume: null, place: worktree ? { folder: `C:/wt/${id}`, is: 'legacy', name: id, branch: `hive/${id}`, base: 'main' } : { folder: 'C:/ws', is: 'project', name: null, branch: null } }) as AgentInfo
 
 const project = (name: string, agents: AgentInfo[]): ProjectInfo => ({ name, path: `C:/ws/${name}`, agents }) as ProjectInfo
 

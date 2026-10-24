@@ -352,11 +352,6 @@ interface State {
   compactFor: AgentRef | null
   /** Project whose Add Agent dialog is open. */
   addAgentFor: string | null
-  /**
-   * Add Agent opened on an existing worktree, chosen (#353's Give to an agent…). Nothing sets it since #1555 (no agent
-   * is given a worktree in 1.0); it goes with Add Agent's worktree choice (#1442).
-   */
-  addAgentPreset: { project: string; worktreePath: string } | null
   /** Agent whose settings dialog (name, model, effort, permission mode) is open. */
   agentSettingsFor: AgentRef | null
   /** The Agent Settings dialog for a template's agent (#271): open while set; it answers the template editor. */
@@ -565,7 +560,6 @@ export const useStore = create<State>(() => ({
   keepAwake: 0,
   compactFor: null,
   addAgentFor: null,
-  addAgentPreset: null,
   agentSettingsFor: null,
   templateAgentFor: null,
   templateEdits: {},
@@ -1075,7 +1069,7 @@ export function applyLiveState(state: LiveSessionState): void {
       const agents = known
         ? p.agents.map((a) => (a.id === agentId ? { ...a, live, restartNeeded: live ? a.restartNeeded : false } : a))
         : live
-          ? [...p.agents, { id: agentId, name: state.agentName ?? 'Agent', live, restartNeeded: false, resume: null }] // i18n-ignore: a stand-in agent name until the project's own list arrives
+          ? [...p.agents, { id: agentId, name: state.agentName ?? 'Agent', live, restartNeeded: false, resume: null, place: { folder: state.cwd, is: 'project' as const, name: null, branch: null } }] // i18n-ignore: a stand-in agent name until the project's own list arrives
           : p.agents
       const primary = agents.find((a) => a.live)
       return { ...p, agents, live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, active: live ? true : p.active }

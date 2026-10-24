@@ -9,6 +9,8 @@ import { agentsToResume, resumeAll, stalledOnSignIn, type ResumeAllResult } from
 import { holdShort, holdText } from '@shared/sessionResume'
 import type { FreshRow } from '@shared/freshStarts'
 import type { ResumeHold } from '@shared/agentFolders'
+import { samePath } from '@shared/movePaths'
+import { legacyOf, namedFolder } from './agentPlace'
 import { eachAgent, sessionsToArchive, type BatchResult } from '@shared/startAll'
 import { serverOnIn } from '@shared/agentMcp'
 import { shownText } from '@shared/advanced'
@@ -361,7 +363,9 @@ async function goneSlot(path: string, agentId: string, gone: { agentName: string
 
 /**
  * A worktree agent whose folder is gone (#146): its branch lives in the repository, so the worktree can be made again
- * on it before the agent starts (or, with the branch gone too, made new from its base, or the link removed).
+ * on it before the agent starts (or, with the branch gone too, made new from its base, or the link removed). An agent
+ * whose 0.9 worktree was missing at the 1.0 upgrade isn't migrated (#1441), so this is still its way back; a slot it
+ * holds is #1447's (`goneSlot`).
  */
 async function ensureWorktree(path: string, agentId: string): Promise<boolean> {
   // Its 0.9 worktree, or a slot it holds (#1447): asked of main for every agent, since a slot isn't on the agent.
@@ -419,7 +423,7 @@ export async function quickAddAgent(path: string | null = get().selectedProject,
     set({ addAgentFor: path })
     return null
   }
-  const def = await attempt(tr(msg({ id: 'actions.agent.addFailed', defaultMessage: 'Could not add an agent', description: "An error's title: adding an agent failed." })), () => call('agents:add', path, { location: 'project', provider }))
+  const def = await attempt(tr(msg({ id: 'actions.agent.addFailed', defaultMessage: 'Could not add an agent', description: "An error's title: adding an agent failed." })), () => call('agents:add', path, { provider }))
   if (!def) return null
   await refreshWorkspace()
   noteManyAgents(path)
@@ -515,17 +519,20 @@ export function resumeTarget(p: ProjectInfo | undefined, item: Pick<SessionListI
   if (isAssistantPath(p.path)) return p.agents[0]?.id ?? null
   // One in a slot resumes with its own agent (#1434: one writer per slot), if it is still there.
   if (item.slot) return p.agents.find((a) => a.id === item.agentId)?.id ?? null
-  if (item.cwd && item.cwd.toLowerCase() !== p.path.toLowerCase()) return p.agents.find((x) => x.worktree?.path.toLowerCase() === item.cwd!.toLowerCase())?.id ?? null
-  const inFolder = (id: string | undefined): boolean => !!id && p.agents.some((a) => a.id === id && !a.worktree)
+  // One in a 0.9 worktree resumes with the agent still working there; one in a retired home with its own agent (#1442).
+  const cwd = item.cwd
+  if (cwd && !samePath(cwd, p.path)) return p.agents.find((x) => { const l = legacyOf(x); return !!l && samePath(l.path, cwd) })?.id ?? (namedFolder(p, cwd)?.is === 'home' ? (p.agents.find((a) => a.id === item.agentId)?.id ?? null) : null)
+  // An agent on its 0.9 worktree works only there; any other can resume a conversation of the project folder there.
+  const inFolder = (id: string | undefined): boolean => !!id && p.agents.some((a) => a.id === id && !legacyOf(a))
   const free = (id: string | undefined): boolean => inFolder(id) && !agentOf(p, id!)?.live
   if (inFolder(preferred)) return preferred!
   const recorded = item.agentId
   const focused = focusedAgentId(p) ?? undefined
   if (free(recorded)) return recorded!
   if (free(focused)) return focused!
-  const idle = p.agents.filter((a) => !a.worktree && !a.live)
+  const idle = p.agents.filter((a) => !legacyOf(a) && !a.live)
   const other = (idle.find((a) => item.provider && agentProviderOf(p, a) === item.provider) ?? idle[0])?.id
-  return other ?? (inFolder(recorded) ? recorded! : (p.agents.find((a) => !a.worktree)?.id ?? null))
+  return other ?? (inFolder(recorded) ? recorded! : (p.agents.find((a) => !legacyOf(a))?.id ?? null))
 }
 
 /**
@@ -637,7 +644,7 @@ async function resumeLatest(path: string, id: string): Promise<void> {
   const a = agentOf(p, id)
   // Hive works out the session in the main process (AgentInfo.resume), skipping any open in another agent.
   const list = a?.resume ? await attempt(listFailed(), () => call('session:list', path)) : []
-  const last = a?.resume ? (list ?? []).find((s) => s.id === a.resume!.id) ?? { id: a.resume.id, name: a.resume.name, title: null, recache: null, agentId: id, cwd: a.worktree?.path, provider: agentProviderOf(p, a) } : null
+  const last = a?.resume ? (list ?? []).find((s) => s.id === a.resume!.id) ?? { id: a.resume.id, name: a.resume.name, title: null, recache: null, agentId: id, cwd: legacyOf(a)?.path, provider: agentProviderOf(p, a) } : null
   if (!last) {
     notify(
       'info',
@@ -1396,11 +1403,13 @@ export async function removeAgent(path: string, agentId: string): Promise<void> 
   if (a.live && !(await stopIfRunning(path, agentId, { what: 'remove', agent: a.name }, 'remove'))) return
   let deleteWorktree = false
   const removeTitle = (): string => tr(msg({ id: 'actions.remove.title', defaultMessage: 'Remove {agent}?', description: 'Title of the question before removing an agent ({agent}).' }), { agent: a.name })
-  if (a.worktree) {
+  // Its 0.9 worktree (#1442: slots are the pool's, never the agent's): kept or deleted with it.
+  const own = legacyOf(a)
+  if (own) {
     const keep = await confirm({
       title: removeTitle(),
-      message: tr(msg({ id: 'actions.remove.worktreeMessage', defaultMessage: '{agent} works in its own worktree on branch {branch}.', description: 'The question before removing a worktree agent ({agent}): its git branch ({branch}).' }), { agent: a.name, branch: a.worktree.branch }),
-      detail: tr(msg({ id: 'actions.remove.worktreeDetail', defaultMessage: 'Keep the worktree and branch to merge or reuse them later (Add Agent → Existing worktree), or delete both. Its sessions stay in the Sessions tab either way.', description: 'Under the question before removing a worktree agent. Add Agent → Existing worktree is where: use the translated names.' })),
+      message: tr(msg({ id: 'actions.remove.worktreeMessage', defaultMessage: '{agent} works in its own worktree on branch {branch}.', description: 'The question before removing a worktree agent ({agent}): its git branch ({branch}).' }), { agent: a.name, branch: own.branch }),
+      detail: tr(msg({ id: 'actions.remove.worktreeDetail', defaultMessage: 'Keep the worktree and branch to merge them later, or delete both. Its sessions stay in the Sessions tab either way.', description: 'Under the question before removing an agent that works in its own worktree from before 1.0.' })),
       confirmLabel: tr(msg({ id: 'actions.remove.keepWorktree', defaultMessage: 'Keep worktree and branch', description: "Button: removes the agent and keeps its worktree and branch." })),
       cancelLabel: tr(msg({ id: 'actions.remove.deleteThem', defaultMessage: 'Delete them…', description: "Button: goes on to delete the agent's worktree and branch (asks again)." })),
       action: 'remove'
@@ -1408,8 +1417,8 @@ export async function removeAgent(path: string, agentId: string): Promise<void> 
     if (!keep) {
       const del = await confirm({
         title: tr(msg({ id: 'actions.remove.deleteTitle', defaultMessage: 'Delete the worktree and branch?', description: "Title of the question before deleting a removed agent's worktree and branch." })),
-        message: tr(msg({ id: 'actions.remove.deleteMessage', defaultMessage: 'Delete {path} and branch {branch}?', description: "The question before deleting a removed agent's worktree folder ({path}) and git branch ({branch})." }), { path: a.worktree.path, branch: a.worktree.branch }),
-        detail: tr(msg({ id: 'actions.remove.deleteDetail', defaultMessage: "Anything on {branch} that hasn't been merged is lost. Cancel keeps the agent.", description: "Under the question before deleting a worktree and branch ({branch}). Cancel is the dialog's other button." }), { branch: a.worktree.branch }),
+        message: tr(msg({ id: 'actions.remove.deleteMessage', defaultMessage: 'Delete {path} and branch {branch}?', description: "The question before deleting a removed agent's worktree folder ({path}) and git branch ({branch})." }), { path: own.path, branch: own.branch }),
+        detail: tr(msg({ id: 'actions.remove.deleteDetail', defaultMessage: "Anything on {branch} that hasn't been merged is lost. Cancel keeps the agent.", description: "Under the question before deleting a worktree and branch ({branch}). Cancel is the dialog's other button." }), { branch: own.branch }),
         confirmLabel: tr(msg({ id: 'actions.remove.deleteConfirm', defaultMessage: 'Delete worktree and branch', description: "Button: deletes the agent's worktree and branch and removes it." })),
         danger: true
       })
@@ -1425,7 +1434,7 @@ export async function removeAgent(path: string, agentId: string): Promise<void> 
   focusAfterRemoving(p, agentId)
   await refreshWorkspace()
   // Kept, it is an unused worktree now (#353): said once, with where to tidy it.
-  if (a.worktree && !deleteWorktree) notify('info', tr(msg({ id: 'actions.remove.keptTitle', defaultMessage: "{agent}'s worktree is kept", description: "A notification's title: a removed agent's ({agent}) worktree was kept." }), { agent: a.name }), tr(msg({ id: 'actions.remove.keptMessage', defaultMessage: "{branch} in {path}. Git → Changes lists the project's unused worktrees, merged or not.", description: "Under the notification that a removed agent's worktree was kept: its branch ({branch}) and folder ({path}). Git → Changes is a project tab: use its translated names." }), { branch: a.worktree.branch, path: a.worktree.path }), [reviewUnused(path)])
+  if (own && !deleteWorktree) notify('info', tr(msg({ id: 'actions.remove.keptTitle', defaultMessage: "{agent}'s worktree is kept", description: "A notification's title: a removed agent's ({agent}) worktree was kept." }), { agent: a.name }), tr(msg({ id: 'actions.remove.keptMessage', defaultMessage: "{branch} in {path}. Git → Changes lists the project's unused worktrees, merged or not.", description: "Under the notification that a removed agent's worktree was kept: its branch ({branch}) and folder ({path}). Git → Changes is a project tab: use its translated names." }), { branch: own.branch, path: own.path }), [reviewUnused(path)])
 }
 
 /** A notification's button to the project's unused worktrees (#353). */
@@ -1446,11 +1455,11 @@ export function removeAllAgents(path: string): Promise<void> {
 async function removeAllAgents_(path: string): Promise<void> {
   const p = project(path)
   if (!p || isAssistantPath(path) || !p.agents.length) return
-  const checks = p.agents.some((a) => a.worktree) ? await attempt(tr(msg({ id: 'actions.removeAll.checkFailed', defaultMessage: 'Could not check the worktrees', description: "An error's title: checking whether the agents' worktrees are merged failed (Remove All)." })), () => call('agents:worktreeChecks', path)) : []
+  const checks = p.agents.some((a) => legacyOf(a)) ? await attempt(tr(msg({ id: 'actions.removeAll.checkFailed', defaultMessage: 'Could not check the worktrees', description: "An error's title: checking whether the agents' worktrees are merged failed (Remove All)." })), () => call('agents:worktreeChecks', path)) : []
   if (!checks) return
   const checkOf = (id: string) => checks.find((c) => c.agentId === id)
   const agents = p.agents
-  const trees = agents.filter((a) => a.worktree)
+  const trees = agents.filter((a) => legacyOf(a))
   const removable = trees.filter((a) => checkOf(a.id)?.removable)
   const into = checks.find((c) => c.into)?.into
   let deleteMerged = false
@@ -1472,7 +1481,7 @@ async function removeAllAgents_(path: string): Promise<void> {
     content: createElement(AgentsDetail, { data, note }),
     wide: true,
     check: removable.length
-      ? { label: tr(msg({ id: 'actions.removeAll.deleteMerged', defaultMessage: 'Also delete the worktrees and branches fully merged into {into} with no uncommitted changes: {branches}', description: "Remove All's tick box: also delete the agents' worktrees and branches merged into a branch ({into}) with no changes. {branches} lists them." }), { into: into ?? '', branches: removable.map((a) => a.worktree!.branch).join(', ') }), initial: false, set: (v) => (deleteMerged = v) }
+      ? { label: tr(msg({ id: 'actions.removeAll.deleteMerged', defaultMessage: 'Also delete the worktrees and branches fully merged into {into} with no uncommitted changes: {branches}', description: "Remove All's tick box: also delete the agents' worktrees and branches merged into a branch ({into}) with no changes. {branches} lists them." }), { into: into ?? '', branches: removable.map((a) => legacyOf(a)?.branch ?? '').join(', ') }), initial: false, set: (v) => (deleteMerged = v) }
       : undefined,
     confirmLabel: tr(msg({ id: 'actions.removeAll.confirm', defaultMessage: '{n, plural, one {Remove} other {Remove # agents}}', description: "Remove All's button ({n} agents)." }), { n: agents.length }),
     danger: true,
@@ -1578,10 +1587,11 @@ export async function releaseHeldSlot(path: string, slot: string): Promise<void>
 export async function discardAgent(path: string, agentId: string): Promise<void> {
   const p = project(path)
   const a = agentOf(p, agentId)
-  if (!p || !a?.worktree) return
+  const own = a ? legacyOf(a) : null
+  if (!p || !a || !own) return
   const ok = await confirm({
     title: tr(msg({ id: 'actions.discard.title', defaultMessage: "Discard {agent}'s work?", description: "Title of the question before deleting a worktree agent's ({agent}) worktree and branch and removing it." }), { agent: a.name }),
-    message: tr(msg({ id: 'actions.discard.message', defaultMessage: 'Delete the worktree {path} and branch {branch}, and remove {agent}?', description: "The question before discarding a worktree agent's ({agent}) work: its worktree folder ({path}) and git branch ({branch})." }), { agent: a.name, path: a.worktree.path, branch: a.worktree.branch }),
+    message: tr(msg({ id: 'actions.discard.message', defaultMessage: 'Delete the worktree {path} and branch {branch}, and remove {agent}?', description: "The question before discarding a worktree agent's ({agent}) work: its worktree folder ({path}) and git branch ({branch})." }), { agent: a.name, path: own.path, branch: own.branch }),
     detail: tr(msg({ id: 'actions.discard.detail', defaultMessage: "Everything on the branch that hasn't been merged is lost. Its sessions stay in the Sessions tab.", description: "Under the question before discarding a worktree agent's work." })),
     confirmLabel: tr(msg({ id: 'actions.discard.confirm', defaultMessage: 'Discard', description: "Button: deletes the agent's worktree and branch and removes it." })),
     danger: true

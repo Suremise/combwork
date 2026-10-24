@@ -255,6 +255,8 @@
   "workflow.refused.move.notFromHere.nextNone": "Não há nada esperando para ser feito aí agora.",
   "workflow.refused.move.useIntent.message": "Agentes não movem cartões entre colunas.",
   "workflow.refused.move.useIntent.next": "Use a intenção {intent} em vez disso.",
+  "workflow.refused.paths.excluded.message": "{card}: {path} está em {folder}, que um projeto sem controle de versão deixa fora do seu trabalho.",
+  "workflow.refused.paths.excluded.next": "Declare só os arquivos do trabalho, fora de {folder}: os caminhos de um cartão restringem o trabalho do projeto, nunca o ampliam.",
   "workflow.refused.platform.unknown.message": "{card}: o Hive não conseguiu ler {what}, então a regra {rule} não pode ser verificada.",
   "workflow.refused.platform.unknown.next": "Verifique a Configuração de agentes ou a pasta e tente de novo.",
   "workflow.refused.platform.unknown.nextGone": "O repositório Git do projeto sumiu: peça ao usuário para restaurá-lo ou para mudar o projeto para Nenhum na aba Controle de versão dele (a partir do próximo cartão).",

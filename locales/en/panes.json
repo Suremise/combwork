@@ -691,6 +691,14 @@
     "defaultMessage": "role {value}",
     "description": "The agent's role in the workflow in a line of text (screen readers): {value} is its name (\"Reviewer\"). Lower case."
   },
+  "panes.table.slot": {
+    "defaultMessage": "Slot",
+    "description": "An agents table's column heading: where the agent works (\"in slot-b\", \"carried: hb2\", \"home: hr4\"; empty in the project folder). Glossary: slot."
+  },
+  "panes.table.slotPrefix": {
+    "defaultMessage": "works {value}",
+    "description": "Where the agent works in a line of text (screen readers): {value} is agents.place.short (\"in slot-b\", \"carried: hb2\"). Lower case."
+  },
   "panes.table.state": {
     "defaultMessage": "State",
     "description": "An agents table's column heading: what the agent is doing."

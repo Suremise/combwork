@@ -8,6 +8,7 @@ import { call, errorMessage } from '../api'
 import { gitReader, type GitReadState } from '../gitReads'
 import { attempt } from '../actions'
 import { bumpGit, notify, set, showVersionControl, showView, useStore } from '../store'
+import { awayFromProject } from '../agentPlace'
 import { openGuideAt } from '../tips'
 import { useNow } from '../usage'
 import { cx, timeAgo } from '../util'
@@ -90,7 +91,7 @@ export function useGitRead<C extends 'git:summary' | 'git:info' | 'git:history'>
 /** Why an action that moves the project folder is refused now (an agent works there, or its merge slot is held), or null. */
 export function useFolderBusy(project: ProjectInfo): (action: GitFolderAction) => string | null {
   const slots = projectSlots(useMergeSlots(), project.path)
-  const agents = project.agents.filter((a) => !a.worktree).map((a) => ({ name: a.name, status: a.live?.status ?? null }))
+  const agents = project.agents.filter((a) => !awayFromProject(a)).map((a) => ({ name: a.name, status: a.live?.status ?? null }))
   const folder = slots.map((s) => ({ branch: s.branch, holder: s.holder && s.holder.kind !== 'user' ? s.holder.name : null, ...(s.holder?.kind === 'user' ? { byUser: true } : {}), waiting: s.waiting.map((w) => w.name) }))
   return (action) => folderBusy(agents, folder, action)
 }

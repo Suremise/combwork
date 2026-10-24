@@ -255,6 +255,8 @@
   "workflow.refused.move.notFromHere.nextNone": "今そこで行うことはありません。",
   "workflow.refused.move.useIntent.message": "エージェントはカードを列の間で移動しません。",
   "workflow.refused.move.useIntent.next": "代わりに{intent}を使ってください。",
+  "workflow.refused.paths.excluded.message": "{card}: {path} は {folder} の中にあります。バージョン管理のないプロジェクトでは、ここは作業に含まれません。",
+  "workflow.refused.paths.excluded.next": "{folder} の外にある作業ファイルだけを宣言してください。カードのパスはプロジェクトの作業を絞り込むもので、広げることはありません。",
   "workflow.refused.platform.unknown.message": "{card}：Hiveは{what}を読み取れなかったため、ルール「{rule}」を確認できません。",
   "workflow.refused.platform.unknown.next": "「エージェントのセットアップ」またはフォルダーを確認してから、もう一度試してください。",
   "workflow.refused.platform.unknown.nextGone": "プロジェクトの Git リポジトリが見つかりません。ユーザーに復元を依頼するか、「バージョン管理」タブでプロジェクトを「なし」に切り替えるよう依頼してください（次のカードから適用）。",
