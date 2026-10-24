@@ -213,8 +213,8 @@ describe('the bundled skills', () => {
     const text = catalog.get('card-loop')!.text
     const line = (starts: string): string => text.split(/\r?\n/).find((l) => l.startsWith(starts)) ?? ''
     // In Git only (HR1's #1524 round 1 finding 1): a no-code card submits a summary, a project without version control its files' state.
-    expect(line('1. Do its work')).toMatch(/in Git, commit each round's work and name the commit in its summary/)
-    expect(line('2. Review it')).toMatch(/`hive_start_review` names what to review \(a revision, or a no-code card's summary\)\. In Git, work that revision doesn't hold \(uncommitted, or no commit named\) isn't a failed round on that alone/)
+    expect(line('1. Do its work')).toMatch(/for a code card in Git, commit each round's work and name the commit in its summary; a no-code card has nothing to commit/)
+    expect(line('2. Review it')).toMatch(/`hive_start_review` names what to review \(a revision, or a no-code card's summary\)\. For a code card in Git, work that revision doesn't hold \(uncommitted, or no commit named\) isn't a failed round on that alone/)
     expect(line('- builder: the card')).toMatch(/changes: \["verdict", "column", "comment"\]/)
     expect(line('- reviewer, after asking the builder for something')).toMatch(/changes: \["comment"\]/)
     // run-lanes' sample brief agrees, leaving the procedure to card-loop (a brief saying "commit once it passes" undid it).
@@ -273,19 +273,49 @@ describe('the skills follow the gates (#1524)', () => {
     expect(limit).toMatch(/the lane's rounds/)
     expect(limit).toMatch(/Where the project's rules are enforced, Hive counts/)
     expect(limit).toMatch(/With the rules off nothing counts them/)
-    // What a submission is depends on the platform and the card's kind (HR1's round 1 findings 1 and 3): a revision in
-    // Git (the card's own, which in a shared folder isn't the folder's head), the files' state without version control,
-    // the summary for a no-code card.
-    expect(woc).toMatch(/in Git, a revision, by default the card's own \(its line's head, or its newest commit in a folder shared with other agents; the reply names it\)/)
-    expect(woc).toMatch(/without version control, the state of the card's files \(`paths`\)/)
-    expect(woc).toMatch(/for a no-code card, such as a decision or a write-up, its summary alone/)
+    // What a submission is depends on two separate dimensions, the platform and the card's kind (HR1's #1524 findings:
+    // round 1's 1 and 3, round 2's 1): only a code card in Git has a commit, its default the card's own revision (in a
+    // shared folder not the folder's head); a no-code card submits its summary on either platform.
+    const SUBMITS: [platform: 'Git' | 'None', kind: 'code' | 'no-code', says: RegExp][] = [
+      ['Git', 'code', /for a code card in Git, a revision, by default the card's own \(its line's head, or its newest commit in a folder shared with other agents; the reply names it\), so commit what it should hold first/],
+      ['Git', 'no-code', /for a no-code card, such as a decision or a write-up, its summary alone/],
+      ['None', 'code', /without version control, the state of the card's files \(`paths`\)/],
+      ['None', 'no-code', /for a no-code card, such as a decision or a write-up, its summary alone/]
+    ]
+    for (const [platform, kind, says] of SUBMITS) expect(woc, `${platform} × ${kind}`).toMatch(says)
     expect(woc).not.toMatch(/by default your folder's head/)
-    // Every line telling an agent to commit, or about a commit to name or ask for, says it is Git's.
-    for (const name of GATED) {
-      for (const l of catalog.get(name)!.text.split(/\r?\n/)) {
-        if (/\bcommit (each|it|what)\b|\(committed\b|\bnaming the commit\b|\bno commit named\b/i.test(l)) expect(l, name).toMatch(/\bin Git\b/i)
+    expect(loop).toMatch(/a no-code card has nothing to commit/)
+    // Review decides where a submission goes, and only a reviewer agent asks for a missing commit (in Git, code only).
+    const REVIEW: [review: 'agent' | 'user' | 'off', skill: string, says: RegExp][] = [
+      ['agent', 'card-loop', /`hive_start_review` names what to review \(a revision, or a no-code card's summary\)/],
+      ['user', 'work-on-card', /The reply says where the card went: Review/],
+      ['off', 'work-on-card', /or on past it where the project has no review/]
+    ]
+    for (const [review, skill, says] of REVIEW) expect(catalog.get(skill)!.text, `review ${review}`).toMatch(says)
+    // Every clause telling an agent to commit, or about a commit to name or ask for, is scoped to a code card in Git,
+    // never to Git alone. Clauses split at sentence, semicolon and colon breaks outside parentheses.
+    const clauses = (text: string): string[] => {
+      const out: string[] = []
+      let depth = 0
+      let cur = ''
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i]
+        if (ch === '(') depth++
+        if (ch === ')') depth = Math.max(0, depth - 1)
+        if (ch === '\n' || (depth === 0 && /[.;:]/.test(ch) && /\s/.test(text[i + 1] ?? ''))) {
+          out.push(cur)
+          cur = ''
+        } else cur += ch
       }
+      return [...out, cur]
     }
+    for (const name of GATED) {
+      const commits = clauses(catalog.get(name)!.text).filter((c) => /\bcommit (each|it|what)\b|\(committed\b|\bnaming the commit\b|\bno commit named\b/i.test(c))
+      expect(commits.length, name).toBeGreaterThan(0)
+      for (const c of commits) expect(c, name).toMatch(/\bfor a code card in Git\b/i)
+    }
+    // The check catches what round 2 left: "in Git" alone.
+    expect(clauses('Fix the findings (committed, in Git), then submit.').every((c) => !/\(committed\b/.test(c) || /for a code card in Git/.test(c))).toBe(false)
     // Who finishes is the project's: every supported way, none stated as the rule (finding 2: Not checked).
     expect(woc).toMatch(/how it finishes is the project's: the reply, then `hive_read_task`, says what's next/)
     expect(woc).toMatch(/Where Hive merges, the card's `merge` follows it through the queue/)
