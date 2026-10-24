@@ -162,5 +162,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   const m = reply as Moved
   // A start: how long a design waits for its check here (Card loops → Design check wait), for a watch set before posting one.
   if (intent.kind === 'start') m.data = { ...m.data, designWaitMinutes: stepWait }
-  return { done: { ok: true, card: card.key ?? `#${ref.n}`, from: m.from, to: m.to, ...(m.data ? { data: m.data } : {}), ...(m.warnings?.length ? { warnings: m.warnings } : {}) }, card }
+  // What can come next on it (#1530), as its rules have it: the verdict after a review starts, else only after a move.
+  const next = intent.kind === 'startReview' ? ['verdict'] : m.from !== m.to ? wf.nextFor(ref.n) : [] // i18n-ignore: an intent's name, agent-facing
+  return { done: { ok: true, card: card.key ?? `#${ref.n}`, from: m.from, to: m.to, ...(m.data ? { data: m.data } : {}), ...(m.warnings?.length ? { warnings: m.warnings } : {}), ...(next.length ? { next } : {}) }, card }
 }

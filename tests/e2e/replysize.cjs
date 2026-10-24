@@ -585,11 +585,14 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   const designLane = tool('hive_lane', { action: 'start', cards: [todo[40]], reviewer: 'Tester', name: 'design step' }).text.match(/lane-[0-9a-f]+$/)?.[0]
   const startedOwn = measure('hive_start_card', intent('hive_start_card', { card: `#${todo[40]}` }), 400)
   check('an intent says where the card went', new RegExp(`^[A-Z]+-\\d+: todo → active\\. folder: `).test(startedOwn), startedOwn)
+  // …and what can come next on it, as its rules have it (#1530).
+  check('…and what comes next on it', startedOwn.split('\n')[0].endsWith(' Next on it: hive_submit or hive_put_back.'), startedOwn)
   // A card loop's design step (#1382): nothing moves, and the reply says how long to wait for the check.
   const designed = measure('hive_loop_step', intent('hive_loop_step', { card: `#${todo[40]}`, step: 'design', text: 'Design: one line.' }), 160)
   check('a design step says the card stays, names the design and when its check is due', /^[A-Z]+-\d+: still active\. design: [A-Z]+-\d+\/s\d+; until: \S+; waitMinutes: 30$/.test(designed), designed)
   check('…and its lane ends', !!designLane && tool('hive_lane', { action: 'end', lane: designLane, abandoned: true }).text.startsWith('Lane abandoned: '), designLane)
-  measure('hive_put_back', intent('hive_put_back', { card: `#${todo[40]}`, why: 'Not yet.' }), 200)
+  const putBack = measure('hive_put_back', intent('hive_put_back', { card: `#${todo[40]}`, why: 'Not yet.' }), 200)
+  check('put back names the start as next', putBack.endsWith(' Next on it: hive_start_card.'), putBack)
   const plainRefused = intent('hive_put_back', { card: String(todo[40]), why: 'Not yet.' })
   check("an intent refuses the coder's plain number, naming the card's forms", plainRefused.isError && plainRefused.text.includes(`#${todo[40]}`) && plainRefused.text.length <= 600, plainRefused.text)
   check('metrics: a project agent has no role or mode', g?.roleBytes === 0 && g?.modeBytes === 0, JSON.stringify(g))

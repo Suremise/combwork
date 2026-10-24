@@ -142,6 +142,7 @@ describe('what an agent watch counts', () => {
       'Waiting for B6 to finish. End your turn now: Hive types a line into this session when one finishes, waits for the user or stops, or at 2026-10-08T14:00:00.000Z if none does. Nothing runs meanwhile.'
     )
     expect(agentWatchText({ watching: 'Waiting for B6 to finish', limitAt: 'x', replaced: 'Waiting for #12 → Review' })).toMatch(/It replaces your card watch \(waiting for #12 → Review\)\.$/)
+    expect(agentWatchText({ watching: 'Waiting for B6 to finish', limitAt: 'x', dropped: ['R6 (hive)', 'B5 (hive)'] })).toMatch(/It replaces your watch on R6 \(hive\), B5 \(hive\): pass every agent you're following\.$/)
     expect(agentWatchText({ already: ['B6 (hive) is idle: "Done."'] })).toBe('Already: B6 (hive) is idle: "Done.".')
     expect(agentWatchText({ done: 'Cancelled your agent watch.' })).toBe('Cancelled your agent watch.')
   })
@@ -226,6 +227,19 @@ describe('agent watches (main/watches.ts)', async () => {
     await watches.tick()
     await watches.settled()
     expect(st.told).toEqual(['[Hive] Reviewer (alpha) finished: "First done." (working again now); Second (alpha) finished: "Second done.". Your agent watch has ended: carry on (hive_agent_activity for more).'])
+    await disposeWorkspaceService(w)
+  })
+
+  // #1346 item 6 (#1530): a second agent watch replaced the first silently, and its agents went unwatched.
+  it('a new agent watch says which agents of the one it replaces it no longer follows', async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    move(st, alpha, 'a2', nowOf())
+    move(st, alpha, 'a3', nowOf())
+    expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [reviewer(alpha), second(alpha)], ignoreBackground: false })).not.toHaveProperty('dropped')
+    expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [second(alpha)], ignoreBackground: false })).toMatchObject({ dropped: ['Reviewer (alpha)'] })
+    // The same agents again, or more: nothing dropped.
+    expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [second(alpha), reviewer(alpha)], ignoreBackground: false })).not.toHaveProperty('dropped')
     await disposeWorkspaceService(w)
   })
 

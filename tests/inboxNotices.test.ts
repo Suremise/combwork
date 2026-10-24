@@ -30,7 +30,7 @@ describe("Hive's notice wording (#650)", () => {
     expect(noticeCounts([{ id: 'm3', kind: 'card-event', card: 14 }, { id: 'm1', kind: 'rebrief' }, { id: 'm2', kind: 'card-event', card: 12 }, { id: 'm4', kind: 'control' }])).toBe('1 message, 2 card events (#12, #14) and 1 notice')
     const items = [{ id: 'm4', kind: 'rebrief' as const }, { id: 'm7', kind: 'card-event' as const, card: 607 }]
     expect(inboxNotice('checkpoint', items)).toBe('[Hive] New in your inbox: 1 message and 1 card event (#607) (m4, m7). Call hive_inbox now to read them, then carry on.')
-    expect(inboxNotice('drain', items.slice(0, 1))).toBe("[Hive] Before you finish: your inbox has 1 message (m4) you haven't read. Call hive_inbox and act on it before you end your turn.")
+    expect(inboxNotice('drain', items.slice(0, 1))).toBe("[Hive] Before you finish: your inbox has 1 message (m4) you haven't read. Call hive_inbox, act on it and ack before you end your turn.")
     expect(inboxNotice('doorbell', items.slice(1))).toBe('[Hive] New in your inbox: 1 card event (#607) (m7). Call hive_inbox to read it.')
     expect(inboxNotice('doorbell', [])).toBe('')
   })
@@ -138,7 +138,7 @@ describe('notices in the hook replies (#650)', () => {
     await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
     const m = await leave(st)
     const drain = await hook(st, { hook_event_name: 'Stop', prompt_id: 'p1', stop_hook_active: false, last_assistant_message: 'Done' })
-    expect(context(drain)).toBe(`[Hive] Before you finish: your inbox has 1 message (${m.id}) you haven't read. Call hive_inbox and act on it before you end your turn.`)
+    expect(context(drain)).toBe(`[Hive] Before you finish: your inbox has 1 message (${m.id}) you haven't read. Call hive_inbox, act on it and ack before you end your turn.`)
     expect(st.status).toBe('working')
     // It didn't read it; the Stop after the continuation isn't drained again (stop_hook_active), and ends the turn.
     expect(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p1', stop_hook_active: true, last_assistant_message: 'Done' })).toBeNull()

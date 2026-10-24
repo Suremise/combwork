@@ -1546,7 +1546,7 @@ route('POST', '/v1/agents/wait', async ({ body }) => {
     for (const t of unique) agents.push({ projectPath: t.p, agentId: t.id, name: (await agentDefOf(t.p, t.id)).name, project: basename(t.p) })
     const r = await registerAgentWatch(requireWorkspace(), who.projectPath, who.agentId, { agents, ignoreBackground: !throughBackground }, limit)
     if ('already' in r) return { already: r.already }
-    return { watching: r.watching.label, limitAt: r.watching.limitAt, ...(r.replaced ? { replaced: r.replaced } : {}) }
+    return { watching: r.watching.label, limitAt: r.watching.limitAt, ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.dropped ? { dropped: r.dropped } : {}) }
   }
   const limit = Math.min(waitMaxSeconds('agents'), Math.max(5, Number(body?.timeoutSeconds) || 300)) * 1000
   const t0 = Date.now()

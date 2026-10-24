@@ -504,6 +504,13 @@ export class Workflow {
     return this.refuse(card, actor, move, { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move, moves: this.movesFrom(s.stage, this.rulesetOf(card, s), s).join(', ') } })
   }
 
+  /** The intents card `n` can take from where it is now, under its rules (#1530: an intent's reply names them). */
+  nextFor(n: number): string[] {
+    const card = this.store.card(n)
+    const s = this.state(card)
+    return this.movesFrom(s.stage, this.rulesetOf(card, s), s)
+  }
+
   /** The intents an agent can use from a stage under a ruleset (§16.7.2's table): what a refusal offers as the next step. */
   movesFrom(stage: StageId, r?: Ruleset, s?: CardState): string[] {
     const o = r?.options

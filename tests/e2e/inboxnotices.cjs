@@ -110,7 +110,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check('the builder works again', !!(await until(async () => (await status(builder.id)) === 'working', HUNG_MS)))
     const m2 = leave('Builder', 'Then take #2.')
     go('notices-go3')
-    check('before its turn ends it is told once', !!(await until(() => notices('Builder').some((n) => n.at === 'drain'), HUNG_MS)) && notices('Builder').filter((n) => n.at === 'drain').map((n) => n.text).join('|') === `[Hive] Before you finish: your inbox has 1 message (${m2}) you haven't read. Call hive_inbox and act on it before you end your turn.`, JSON.stringify(notices('Builder')))
+    check('before its turn ends it is told once', !!(await until(() => notices('Builder').some((n) => n.at === 'drain'), HUNG_MS)) && notices('Builder').filter((n) => n.at === 'drain').map((n) => n.text).join('|') === `[Hive] Before you finish: your inbox has 1 message (${m2}) you haven't read. Call hive_inbox, act on it and ack before you end your turn.`, JSON.stringify(notices('Builder')))
     check('…reads and acks it before it stops', !!(await until(() => delivery('Builder', m2)?.state === 'acked', HUNG_MS)), JSON.stringify(delivery('Builder', m2)))
     check('…and then its turn ends (finished, not left working)', !!(await until(() => idle(builder.id), HUNG_MS)), await status(builder.id))
     check('…nothing typed into it', wakes('Builder').length === 0, JSON.stringify(wakes('Builder')))

@@ -1,7 +1,7 @@
 // Workspace notes (#1433, #873, SPEC §16.10.7): one shared note per workspace, delivered inline at each launch after
 // Hive's guidance, on every CLI and in any folder; a project's own section reaches only its agents; bounded at 4 KB
 // (Settings → Advanced), cut with a pointer; off with the note empty or the switch.
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { parse as parseToml } from 'smol-toml'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
@@ -16,7 +16,7 @@ const homes = { CODEX_HOME: process.env.CODEX_HOME, COPILOT_HOME: process.env.CO
 const { advanced } = await import('../src/main/advanced')
 const { appendedInstructions, claudeCode } = await import('../src/main/providers/claude/adapter')
 const { codex } = await import('../src/main/providers/codex/adapter')
-const { copilot } = await import('../src/main/providers/copilot/adapter')
+const { copilot, HIVE_TOOL_NAMES } = await import('../src/main/providers/copilot/adapter')
 const { DELIVER_WORKSPACE_NOTES, WORKSPACE_NOTES_MAX_ID, advancedDef, overrideId } = await import('../src/shared/advanced')
 const { overridesNow } = await import('../src/main/advancedValues')
 const { deliveredNotes, notesFor, WORKSPACE_NOTES_MAX, WORKSPACE_NOTES_PATH, workspaceNotesPath } = await import('../src/shared/workspaceNotes')
@@ -182,15 +182,15 @@ describe('delivered at launch, on every CLI, after Hive\'s guidance', () => {
     const file = (ctx: LaunchContext): string => readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'hive.instructions.md'), 'utf8')
     const agent = context({ notes: NOTES })
     await copilot.prepareLaunch(agent)
-    // The guidance comes as the hive server's instructions (the switch on): the file has the notes alone.
-    expect(file(agent)).toBe(`---\napplyTo: '**'\n---\n${NOTES}\n`)
+    // The guidance comes as the hive server's instructions (the switch on): the file has the tools' names and the notes.
+    expect(file(agent)).toBe(`---\napplyTo: '**'\n---\n${HIVE_TOOL_NAMES}\n\n${NOTES}\n`)
     expect(copilot.buildCommand('C:\\bin\\copilot.exe', agent).env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(join(agent.privateDir, 'instructions'))
     const assistant = context({ notes: NOTES, instructions: 'You are in Planner mode.' })
     await copilot.prepareLaunch(assistant)
-    expect(file(assistant)).toBe(`---\napplyTo: '**'\n---\nYou are in Planner mode.\n\n${NOTES}\n`)
+    expect(file(assistant)).toBe(`---\napplyTo: '**'\n---\n${HIVE_TOOL_NAMES}\n\nYou are in Planner mode.\n\n${NOTES}\n`)
     const none = context()
     await copilot.prepareLaunch(none)
-    expect(existsSync(join(none.privateDir, 'instructions'))).toBe(false)
+    expect(file(none)).toBe(`---\napplyTo: '**'\n---\n${HIVE_TOOL_NAMES}\n`)
   })
 
   it("Codex: in developer_instructions after the user's own and Hive's guidance; Codex unable to say, an agent's are left alone", async () => {

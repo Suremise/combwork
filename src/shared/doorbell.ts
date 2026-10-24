@@ -61,6 +61,6 @@ export function inboxNotice(at: NoticeAt, items: readonly NoticeItem[]): string 
   if (!items.length) return ''
   const what = `${noticeCounts(items)} (${idList(items)})`
   if (at === 'checkpoint') return `${NOTICE_PREFIX}New in your inbox: ${what}. Call hive_inbox now to read ${items.length === 1 ? 'it' : 'them'}, then carry on.`
-  if (at === 'drain') return `${NOTICE_PREFIX}Before you finish: your inbox has ${what} you haven't read. Call hive_inbox and act on ${items.length === 1 ? 'it' : 'them'} before you end your turn.`
+  if (at === 'drain') return `${NOTICE_PREFIX}Before you finish: your inbox has ${what} you haven't read. Call hive_inbox, act on ${items.length === 1 ? 'it' : 'them'} and ack before you end your turn.`
   return `${NOTICE_PREFIX}New in your inbox: ${what}. Call hive_inbox to read ${items.length === 1 ? 'it' : 'them'}.`
 }

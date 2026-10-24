@@ -135,11 +135,9 @@ describe('one owner per rule', () => {
   // Places stating one besides its owner today, until lanes A and B (#1524–#1528) and #1530 rewrite them. The list only
   // shrinks: one no longer stating it fails until it's taken off.
   const NOT_YET: Record<string, string[]> = {
-    'agent: Done means merged': ['card-loop', 'merge-ready', 'review-agent-work', 'tool descriptions'],
-    "agent: Passed isn't merged": ['review-agent-work', 'tool descriptions'],
-    'agent: wait with a watch': ['merge-ready'],
-    'assistant: Done means merged': ['tool descriptions'],
-    "assistant: Passed isn't merged": ['tool descriptions']
+    'agent: Done means merged': ['card-loop', 'merge-ready', 'review-agent-work'],
+    "agent: Passed isn't merged": ['review-agent-work'],
+    'agent: wait with a watch': ['merge-ready']
   }
   const tools = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
   const descriptions = [...tools.matchAll(/description:\s*(?:ASSISTANT\s*\?\s*)?(["'`])((?:\\.|(?!\1).)*)\1(?:\s*:\s*(["'`])((?:\\.|(?!\3).)*)\3)?/g)].map((m) => `${m[2]}\n${m[4] ?? ''}`).join('\n')
@@ -162,6 +160,23 @@ describe('one owner per rule', () => {
   }
   it('keeps each rule somewhere an agent reads it', () => {
     for (const [rule, re] of RULES) expect(places('agent').some(([, text]) => (text.match(re) ?? []).length > 0), rule).toBe(true)
+  })
+})
+
+// #1530 (P8): the tools' texts say arguments, side effects and refusals as Hive enforces them, and stay true for every
+// project's options (no version control, review off, merges not checked, a shared folder); #1346's text fixes.
+describe("the tools' descriptions", () => {
+  const tools = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+  it('describe moves as the intents, with no workflow stated as the rule', () => {
+    // The old moves are one sentence of hive_update_task's: translated where the rules apply, as asked elsewhere.
+    expect(tools).toMatch(/Moves are the intent tools' \(hive_start_card, hive_submit, hive_start_review, hive_verdict, hive_report_merge, hive_put_back\): where the project's workflow rules apply, column and review here are translated into those intents/)
+    // A revision isn't always a commit, nor the folder's head (a shared folder, no version control, a no-code card).
+    expect(tools).not.toMatch(/the head of the card's folder|The revision it is about \(a commit\)/)
+    expect(tools).toMatch(/Report a card's work merged, where its agent merges it or merges aren't checked/)
+  })
+  it("carry #1346's text fixes: a lane watch takes lanes only; a decision nudges the Assistant's journal", () => {
+    expect(tools).toMatch(/For a lane, pass lanes only: adding its cards wakes you on every move\./)
+    expect(tools).toMatch(/ASSISTANT && JOURNAL && typeof a\.decision === 'string'[^\n]*Note it in your journal \(hive_journal_write\)\./)
   })
 })
 

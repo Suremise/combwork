@@ -2124,7 +2124,9 @@ refused at Look and advise). Each runs on the board's one intent path (#1265's `
 decide, its facts are written once, and the card's board fields follow in each write: start gives the card to the agent
 that starts it; a reviewer's verdict, request and the rest keep it its builder's; submit's summary, a verdict's and a
 request's text are comments. Replies are a line (`intentText`): the card, the stage it left and the one it is in, what
-the intent says (start: folder, line, base, target; start review: revision, base, files) and submit's warnings (G16:
+the intent says (start: folder, line, base, target; start review: revision, base, files), what can come next on the card
+(#1530: after a move, the intents its rules allow from its new stage, as the hive tools; after start review, the
+verdict) and submit's warnings (G16:
 another agent's files in a shared folder, never a refusal; the card's work view shows them with the submission). Put
 back's why is a comment and the `Moved` fact's `why`; ask's revision (default the latest submission's) and Test
 checklist are the `ApprovalRequested` fact's `revision` and `checklist`, for For you to show (P5). Every write of an
