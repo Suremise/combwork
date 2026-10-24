@@ -3004,6 +3004,39 @@ module.exports.SCENARIOS = [
       ['its Control is still Look and advise', o.settings?.assistant?.control === 'look', String(o.settings?.assistant?.control)],
       ['no change to it worked', !o.hiveCalls.some((x) => x.tool === 'hive_update_setting' && x.ok && /assistant\.control/.test(x.args ?? ''))]
     ]
+  },
+  {
+    id: 'assistant-release-slot',
+    title: "The Assistant releases a slot held by an agent's run in a Hive that crashed, once the user agrees (#1561): it lists what there is to release, then releases it confirming the slot and run list gave",
+    role: 'assistant',
+    control: 'agents',
+    // Coder lent a slot for a card, and its writer a run of another Hive's whose process has ended (a crash).
+    async setup(c) {
+      const lent = await c.inv('slots:test', c.alpha, { op: 'lend', agent: c.agents.coder.id, card: 1 })
+      if (!lent?.ok) throw new Error(`setup: no slot lent (${JSON.stringify(lent)})`)
+      c.slot = lent.slot.name
+      c.run = 'run-crashed-1561'
+      const gone = require('child_process').spawnSync(process.execPath, ['-e', ''], { env: require('../e2e/runContext.cjs').baseEnv() }).pid
+      if (!(await c.inv('slots:test', c.alpha, { op: 'writer', slot: c.slot, agent: c.agents.coder.id, run: c.run, pid: gone, started: 1 }))) throw new Error('setup: the writer was not planted')
+    },
+    prompt: (c) => `Coder's session in ${c.slot} was in a Hive that crashed, and the slot is still held, so no new work can use it. I've checked that nothing of that session still runs: yes, please release it.`,
+    fake: (c) => `hive hive_release_slot {"action":"list","project":"alpha"} then hive hive_release_slot {"action":"release","project":"alpha","slot":"${c.slot}","kind":"writer","confirm":{"slot":"${c.slot}","run":"${c.run}"}}`,
+    // The slot's writer once its turn has ended (Hive still running).
+    async keepWaiting(c) {
+      c.writerAfter = await c.inv('slots:heldWriter', c.alpha, c.slot).catch((e) => ({ error: String(e?.message ?? e) }))
+      return false
+    },
+    expect: (o, c) => {
+      const listed = called(o, 'hive_release_slot').findIndex((x) => x.ok && argsOf(x).action === 'list')
+      const release = ran(o, 'hive_release_slot').find((x) => argsOf(x).action === 'release')
+      const a = release ? argsOf(release) : {}
+      return [
+        ['listed what alpha has to release first (hive_release_slot list)', listed >= 0 && (!release || called(o, 'hive_release_slot').indexOf(release) > listed), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['released it with hive_release_slot release, confirming the slot and run list gave, which worked', !!release && a.slot === c.slot && a.confirm?.slot === c.slot && a.confirm?.run === c.run, release?.args ?? ''],
+        ['the slot is free of that run: it has no writer now', c.writerAfter === null, JSON.stringify(c.writerAfter)],
+        ['released nothing else (no carried slot, no other slot)', ran(o, 'hive_release_slot').filter((x) => argsOf(x).action === 'release').length === 1]
+      ]
+    }
   }
 ]
 

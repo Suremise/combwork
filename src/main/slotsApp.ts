@@ -385,6 +385,9 @@ export async function slotTest(pool: SlotPool, op: SlotTestOp): Promise<unknown>
       if (!testHomes.size) setRetiredHomes((p) => testHomes.get(p.toLowerCase()) ?? [])
       testHomes.set(pool.deps.project.toLowerCase(), op.folders)
       return true
+    case 'writer':
+      // A run of another Hive's writing in a lent slot (#1561's scenario): its Hive gone when that process has ended.
+      return pool.deps.store.conn.write((db) => Number(db.prepare("UPDATE slots SET writer_run = ?, writer_lease = (SELECT l.id FROM slot_leases l WHERE l.project = slots.project AND l.slot = slots.name AND l.ended_at IS NULL), writer_agent = ?, writer_pid = ?, writer_started = ? WHERE project = ? AND name = ? AND writer_run IS NULL").run(op.run, op.agent, op.pid, op.started, pool.deps.store.project, op.slot).changes) === 1) // i18n-ignore: SQL
     default:
       throw new Error('unknown slot test op') // i18n-ignore: a test channel, never shown
   }

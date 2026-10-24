@@ -55,6 +55,13 @@ export const ASSISTANT_LANE_TOOLS = ['hive_lane']
 export const ASSISTANT_QUEUE_TOOLS = ['hive_queue']
 
 /**
+ * Release Slot (#1561): every Assistant lists what a project has to release (a read); releasing a carried slot or a held
+ * writer needs Control agents, which the Agent API checks (assistantChange). Project agents don't get it: releasing is
+ * the user's, and the Assistant's once the user agrees.
+ */
+export const ASSISTANT_SLOT_TOOLS = ['hive_release_slot']
+
+/**
  * Undoing its own changes (#1282, SPEC §16.14): the Assistant at the control level that runs agents (the Agent API checks
  * it, and that a change is its own: only its own are kept).
  */
@@ -73,7 +80,7 @@ export const JOURNAL_TOOLS = ['hive_journal_write', 'hive_journal_recall', 'hive
 export const AGENT_ONLY_TOOLS = ['hive_merge_slot', 'hive_start_card']
 
 /** Tools only the Assistant has (project agents don't get them). hive_wait_for_agents isn't one: an agent waits on its project's agents too (#416). */
-export const ASSISTANT_ONLY_TOOLS = ['hive_agent_activity', 'hive_list_providers', 'hive_list_settings', 'hive_read_setting', ...ASSISTANT_AGENT_TOOLS, ...ASSISTANT_UNDO_TOOLS, ...ASSISTANT_PROJECT_TOOLS, ...ASSISTANT_SETTINGS_TOOLS, ...JOURNAL_TOOLS]
+export const ASSISTANT_ONLY_TOOLS = ['hive_agent_activity', 'hive_list_providers', 'hive_list_settings', 'hive_read_setting', ...ASSISTANT_AGENT_TOOLS, ...ASSISTANT_SLOT_TOOLS, ...ASSISTANT_UNDO_TOOLS, ...ASSISTANT_PROJECT_TOOLS, ...ASSISTANT_SETTINGS_TOOLS, ...JOURNAL_TOOLS]
 
 const RANK: Record<AssistantControlLevel, number> = { look: 0, agents: 1, projects: 2 }
 
@@ -84,7 +91,7 @@ export function controlAllows(level: AssistantControlLevel | string | undefined,
 
 /** The tools an Assistant with this control level (and Change settings, its journal, on or off) may use without asking. */
 export function assistantTools(level: AssistantControlLevel | string | undefined, changeSettings = false, journal = false): string[] {
-  return [...(journal ? JOURNAL_TOOLS : []), ...ASSISTANT_READ_TOOLS, ...ASSISTANT_LANE_TOOLS, ...ASSISTANT_QUEUE_TOOLS, ...(controlAllows(level, 'agents') ? [...ASSISTANT_AGENT_TOOLS, ...TASK_TOOLS, ...INTENT_TOOLS, ...ASSISTANT_UNDO_TOOLS] : []), ...(controlAllows(level, 'projects') ? ASSISTANT_PROJECT_TOOLS : []), ...(changeSettings ? ASSISTANT_SETTINGS_TOOLS : [])]
+  return [...(journal ? JOURNAL_TOOLS : []), ...ASSISTANT_READ_TOOLS, ...ASSISTANT_LANE_TOOLS, ...ASSISTANT_QUEUE_TOOLS, ...ASSISTANT_SLOT_TOOLS, ...(controlAllows(level, 'agents') ? [...ASSISTANT_AGENT_TOOLS, ...TASK_TOOLS, ...INTENT_TOOLS, ...ASSISTANT_UNDO_TOOLS] : []), ...(controlAllows(level, 'projects') ? ASSISTANT_PROJECT_TOOLS : []), ...(changeSettings ? ASSISTANT_SETTINGS_TOOLS : [])]
 }
 
 /** Every tool the hive MCP server has (a test checks it against hive-mcp.ts): the only tool names metrics record. */
@@ -93,7 +100,7 @@ export const HIVE_TOOLS: readonly string[] = [
   'hive_read_latest_handover', 'hive_create_handover', 'hive_notify', 'hive_list_providers', 'hive_agent_activity', 'hive_wait_for_agents',
   'hive_create_project', 'hive_activate_project', 'hive_add_agent', 'hive_update_agent', 'hive_start_agent', 'hive_stop_agent', 'hive_prompt_agent',
   'hive_message_agent', 'hive_hand_over', 'hive_list_tasks', 'hive_read_task', 'hive_create_task', 'hive_update_task', 'hive_update_tasks', 'hive_reorder_tasks', 'hive_start_task', 'hive_list_skills', 'hive_wait_for_tasks',
-  'hive_list_settings', 'hive_read_setting', 'hive_update_setting', 'hive_merge_slot', 'hive_lane', 'hive_queue', 'hive_inbox', 'hive_console',
+  'hive_list_settings', 'hive_read_setting', 'hive_update_setting', 'hive_merge_slot', 'hive_lane', 'hive_queue', 'hive_release_slot', 'hive_inbox', 'hive_console',
   'hive_journal_write', 'hive_journal_recall', 'hive_journal_entry', 'hive_journal_update',
   'hive_start_card', ...INTENT_TOOLS, 'hive_undo'
 ]

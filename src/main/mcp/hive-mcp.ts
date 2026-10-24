@@ -18,7 +18,7 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, agentWatchText, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, agentWatchText, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import type { QueuePublic } from '../../shared/workflow/queue'
 import { LOOP_STEPS } from '../../shared/workflow/facts'
@@ -626,6 +626,30 @@ const tools: Tool[] = [
       if (a.action === 'resume') return queueResumedText((await api('POST', '/v1/queue/resume', where)) as { resumed: boolean; queue: QueuePublic })
       if (a.action !== 'remove' && a.action !== 'retry') throw new Error('action must be list, pause, resume, remove or retry')
       return intentText((await api('POST', `/v1/queue/${a.action}`, { card: a.card, reason: a.reason })) as IntentDone)
+    }
+  },
+  {
+    name: 'hive_release_slot',
+    description: `Release Slot, as an agent's ⋯ in Hive offers it: slots (folders cards are built in) still kept for an agent or held by an agent's ended run, which nothing else can use until released. list: project: each carried slot (kept for an agent: its 0.9 worktree) and each held writer (an ended run whose processes Hive doesn't know have ended: its run, whether its Hive is this one or gone, and the processes Hive lists). release: project, slot, kind (carried or writer; left out when the slot has only one). A carried slot stops being kept for its agent (its folder and branch stay). A held writer needs the user's agreement first: show them the slot, run and processes, and once they agree pass confirm {slot, run} as list gave them; end: true ends the listed processes first (left running, they may still write in the slot). Refused while that run is still live in this Hive, while another Hive holding it still runs, or when the slot changed since list (look again). Not undoable. Replies in a line per slot (release: what was released).${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only list works: release needs Control agents.'}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list', 'release'] },
+        project: projectArg,
+        slot: { type: 'string', description: 'release: the slot, by name (slot-b, hb2).' },
+        kind: { type: 'string', enum: ['carried', 'writer'], description: 'release: what to release, when the slot is both kept for an agent and held by a run.' },
+        confirm: { type: 'object', properties: { slot: { type: 'string' }, run: { type: 'string' } }, description: "release of a held writer: the slot and run the user agreed to release, as list gave them." },
+        end: { type: 'boolean', description: 'release of a held writer: end the processes list named first.' }
+      },
+      required: ['action', 'project']
+    },
+    run: async (a) => {
+      if (typeof a.project !== 'string' || !a.project) throw new Error('project is required')
+      const base = `/v1/projects/${enc(a.project)}/slots`
+      if (a.action === 'list') return releasableText((await api('GET', `${base}/releasable`)) as ReleasablePublic)
+      if (a.action !== 'release') throw new Error('action must be list or release')
+      if (typeof a.slot !== 'string' || !a.slot) throw new Error('slot is required: the name list gives')
+      return slotReleasedText((await api('POST', `${base}/${enc(a.slot)}/release`, Object.fromEntries(['kind', 'confirm', 'end'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]])))) as Parameters<typeof slotReleasedText>[0])
     }
   },
   {
