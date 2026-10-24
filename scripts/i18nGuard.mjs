@@ -65,6 +65,7 @@ export const EXCLUDED = [
   [/^src\/shared\/appName\.ts$/, 'brand names'],
   [/^src\/shared\/redact\.ts$/, 'log markers'],
   [/^src\/main\/freshPath\.ts$/, 'a registry key, not text'],
+  [/^src\/main\/plainHttpsJson\.ts$/, "the version checks' GET: its errors are only ever their \"couldn't check\" (null), never shown (#1582)"],
   [/^src\/main\/exitLog\.ts$/, "log lines and Copy Diagnostics' report, in English (#985)"],
   [/^src\/main\/mainStalls\.ts$/, 'log lines of hive.log, in English (#1109)'],
   [/^src\/main\/db\.ts$/, 'SQL statements and settings, no text (#1017)'],
