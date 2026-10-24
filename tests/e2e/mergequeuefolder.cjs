@@ -13,6 +13,8 @@
 // - S34a: main moved by another client just before the swap (HIVE_TEST_QUEUE_RACE): rolled back, tested again, merged once.
 // Crashes at each point of the journal and the terminal state are mergequeuecrash's (S34d), in a suite of their own.
 // Dev build, throwaway profiles, workspace and CLAUDE_CONFIG_DIR.
+// S34a's race is a test seam (HIVE_TEST_QUEUE_RACE): NOT RUN on a packaged build (HIVE_EXE), where the rest runs
+// (#1578).
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')

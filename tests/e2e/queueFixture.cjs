@@ -1,7 +1,8 @@
 // The merge queue's e2e fixture (#1348; later P5 suites add helpers here only): a git project set to "Hive merges" into
 // `integration` (a branch checked out in no folder, as #1348's advance needs; the project folder stays on main), with one
 // merge check whose behaviour a test steers from outside the repository, fake Claude Code agents acting by their own
-// tokens (a builder per card, each in its own worktree; one reviewer), and the steps that take a card to approved.
+// tokens (a builder per card, or one for many, each card on the slot its start lends: no 0.9 worktree agents, #1578; one
+// reviewer), and the steps that take a card to approved.
 //
 // The check is `"<tools>\tool.cmd"`, which runs check.js: it reads control.json (`pass`, `fail`, or `wait` for go.txt
 // and then pass), writes its pid to started.txt, and never writes in the folder it runs in (a check must count). Take
@@ -182,10 +183,20 @@ async function startCard(fx, h, builder, n) {
 }
 
 /** approve() with a builder of the caller's (one agent for many cards, each on the slot its start lends): { n, revision, steps }. */
-async function approveBy(fx, h, builder, reviewer, title, files) {
+async function approveBy(fx, h, builder, reviewer, title, files, opts = {}) {
   const n = (await h.inv('tasks:create', { title, project: 'alpha' })).number
+  return { n, ...(await approveCard(fx, h, builder, reviewer, n, title, files, opts)) }
+}
+
+/**
+ * Card `n` started by `builder` (startCard), `files` committed in its slot, submitted and passed: { revision, steps }.
+ * `afterStart`: run once its line is made (from the target's head at its start, #1578), before the commit: a change to the
+ * target that the card's must conflict with goes there, as one made before the start is in the card's line already.
+ */
+async function approveCard(fx, h, builder, reviewer, n, title, files, { afterStart } = {}) {
   const steps = {}
   steps.start = await startCard(fx, h, builder, n)
+  if (afterStart) await afterStart(builder)
   for (const [f, text] of Object.entries(files)) fs.writeFileSync(path.join(builder.folder, f), text)
   lib.git(builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
   lib.git(builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', title])
@@ -193,7 +204,7 @@ async function approveBy(fx, h, builder, reviewer, title, files) {
   steps.submit = await intent(h, builder, n, 'submit', { summary: `${title}: ready` })
   steps.review = await intent(h, reviewer, n, 'start-review')
   steps.verdict = await intent(h, reviewer, n, 'verdict', { pass: true, comment: `${title}: passed` })
-  return { n, revision, steps }
+  return { revision, steps }
 }
 
 /** An agent's intent on a card (`#n`): its status and reply. */
@@ -203,22 +214,15 @@ async function intent(h, who, n, name, body = {}) {
 }
 
 /**
- * A card taken to approved, so Hive queues it: a new builder (its own worktree) starts it, commits `files` there,
- * submits; the reviewer starts its review and passes it. Returns { n, builder, revision, steps } (each step's status).
+ * A card taken to approved, so Hive queues it: a new builder in the project folder (#1578: 1.0 adds no worktree agents)
+ * starts it on the slot its start lends (startCard), commits `files` there, submits; the reviewer starts its review and
+ * passes it. Each card's builder has a slot of its own, as each had a worktree in 0.9. `opts.afterStart`: approveCard's.
+ * Returns { n, builder, revision, steps } (each step's status; `builder.folder` its slot).
  */
-async function approve(fx, h, reviewer, title, files) {
+async function approve(fx, h, reviewer, title, files, opts = {}) {
   const n = (await h.inv('tasks:create', { title, project: 'alpha' })).number
-  const builder = await agent(fx, h, `B${n}`, { worktree: true })
-  const steps = {}
-  steps.start = await intent(h, builder, n, 'start')
-  for (const [f, text] of Object.entries(files)) fs.writeFileSync(path.join(builder.folder, f), text)
-  lib.git(builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
-  lib.git(builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', title])
-  const revision = lib.git(builder.folder, ['rev-parse', 'HEAD']).trim()
-  steps.submit = await intent(h, builder, n, 'submit', { summary: `${title}: ready` })
-  steps.review = await intent(h, reviewer, n, 'start-review')
-  steps.verdict = await intent(h, reviewer, n, 'verdict', { pass: true, comment: `${title}: passed` })
-  return { n, builder, revision, steps }
+  const builder = await agent(fx, h, `B${n}`)
+  return { n, builder, ...(await approveCard(fx, h, builder, reviewer, n, title, files, opts)) }
 }
 
 /** A commit on a branch checked out nowhere (as another person's push would land), through a worktree of its own. */
@@ -241,6 +245,16 @@ function mergeOn(fx, branch, revision, message) {
   lib.git(dir, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'merge', '--no-ff', '-qm', message, revision])
   lib.git(fx.alpha, ['worktree', 'remove', '--force', dir])
   return lib.git(fx.alpha, ['rev-parse', branch]).trim()
+}
+
+/**
+ * Whether a part needing one of the dev build's test seams runs (#1578): a packaged Hive (HIVE_EXE, the Sandbox checks)
+ * ignores HIVE_TEST_… and refuses the test channels, so there the part says NOT RUN and the suite's other checks stand.
+ */
+function devSeam(what) {
+  if (!process.env.HIVE_EXE) return true
+  console.log(`NOT RUN ${what}: it needs a test seam of the dev build, and HIVE_EXE is a packaged one`)
+  return false
 }
 
 const head = (fx, ref = 'integration') => lib.git(fx.alpha, ['rev-parse', ref]).trim()
@@ -340,4 +354,4 @@ function otherProfile(fx, suffix) {
   return { ...fx, userData }
 }
 
-module.exports = { HUNG_MS, queueProject, prepare, steer, queueOptions, startHive, agent, rejoin, intent, startCard, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }
+module.exports = { HUNG_MS, devSeam, queueProject, prepare, steer, queueOptions, startHive, agent, rejoin, intent, startCard, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }

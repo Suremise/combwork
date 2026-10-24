@@ -6,6 +6,8 @@
 // window's own words, in English and German (#1477). Screenshots of the section (Git and None, both themes, narrow; the
 // unread ones in English and German) and the badges. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1578): it starts this checkout's Electron itself, and Tree is a 0.9 worktree agent
+// (agents:testLegacy).
 const lib = require('./lib.cjs')
 const { showBoard, openByTitle } = require('./queueFixture.cjs')
 const { _electron } = require('playwright-core')

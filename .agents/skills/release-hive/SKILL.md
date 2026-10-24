@@ -9,21 +9,14 @@ description: Prepare a release of Hive itself - version, release notes, checks a
 
 ## Authorisation
 
-Each of these is a separate decision of the user's. Do one only when asked:
+RELEASING.md's **The user's OK** lists the decisions that are the user's. Do each only when asked. Ask for each in your own pane, and take the user's answer there: an OK relayed by the Assistant or another agent isn't one, and Claude Code's permission check refuses a push or `npm run release` on it (#1073).
 
-- changing the version;
-- pushing (CI runs on what is pushed, and the release candidate is pushed by the user);
-- `npm run release` (uploads a draft to GitHub);
-- publishing the draft;
-- creating tags.
-
-Ask for each in your own pane, and take the user's answer there: an OK relayed by the Assistant or another agent isn't one, and Claude Code's permission check refuses a push or `npm run release` on it (#1073).
-
-`npm run dist` builds an installer locally and publishes nothing. Installers end up in the **main checkout's** `dist` (the project folder): built in an agent's worktree, `npm run dist` copies the installer, blockmap, `latest.yml` and `build-info.json` there and prints where, unless an installer of the same name there was built from other code (then it says so and copies nothing; `--replace` overrides), the code changed while it built (it labels and copies nothing: build again), or `--here` keeps it in the worktree. Before building a release, have the main checkout at the commit being released and build it there (`npm run release` uploads what it builds, wherever it runs). Leave running the installer to the user.
+`npm run dist` builds an installer locally and publishes nothing. RELEASING's Notes say where the installer ends up (the main checkout's `dist`) and when a copy is refused. Leave running the installer to the user.
 
 ## Before the version changes
 
-- The release candidate comes first (RELEASING step 1): an installer at the current version, built from main, that the user has installed and tested. Until they have, don't change `version`; ask.
+- **A baseline install** (RELEASING, The 1.0 path, stage 2) uploads nothing and goes version first: its `1.0.0-rc.<n>` is set (asked) before its one `npm run dist`, with no current-version candidate before it. Its other steps are there; its Sandbox checks are the ones below, with the upgrade check starting from the 0.9.3 installer (`--previous`).
+- **For an uploaded release** (an RC or the release, RELEASING's Steps), the release candidate comes first (step 1): an installer at the current version, built from the commit to release (`main`, or the integration branch for an RC), that the user has installed and tested. Until they have, don't change `version`; ask.
 - **The full set on the RC's commit** before it is built (RELEASING step 1): `npm run e2e -- --all --build --record`. Merges run only focused checks (#1010), so the RC is where every suite runs on the release's code (besides the quiet-time runs on the integration branch); a failure is a release finding.
 - **The Sandbox checks on the RC**, once it is built and before the user installs it: `node "<mcp repo>\servers\windows-sandbox\scenarios\hive-checks.js" --installer "<the RC's Hive-Setup-<version>.exe>" --hive "<Hive repo: the main checkout>" --report "$env:LOCALAPPDATA\hive-test\sandbox-reports\<version>-rc<n>"` (about 3 minutes; network off, fake CLIs only; the upgrade check starts from the newest other installer in the main checkout's `dist`, or `--previous`).
   - Comment the verdict and any failed checks on the release card, with the report folder.

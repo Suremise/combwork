@@ -12,6 +12,8 @@
 // - once nothing keeps it (its outcomes seen, no card in flight under the old rules), the queue's card goes.
 // Screenshots of the Merges tab (wide and narrow) and Pulse, both themes. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
+// Builders on slots (#1578). Many returns makes the list of returns small with a test seam (HIVE_TEST_QUEUE_RETURNS):
+// NOT RUN on a packaged build (HIVE_EXE), where the rest runs.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -234,61 +236,63 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     for (const c of [zero, two, three]) await inv('tasks:archive', c.n, true)
     check('once none is, and its outcomes are seen, the queue\'s card goes', !!(await until(async () => (await card.count()) === 0, HUNG_MS)), await panel.locator('.progress-tab-merges').innerText().catch(() => ''))
 
-    // --- Many returns (#1356's returns policy, HR3's rounds 1 to 4): the window's list of returns made small (the seam: a
-    // bound of 2), so four cards pass it. A card queued again takes no place; the rest are counted; a row shown and seen
-    // stays usable for its 10 s, and only then does the next come, with nothing else happening (the queue paused).
-    await h.app.evaluate(() => {
-      process.env.HIVE_TEST_QUEUE_RETURNS = '2'
-    })
-    await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
-    // Not seen meanwhile: the window counts as not focused.
-    await h.app.evaluate(({ BrowserWindow }) => {
-      const w = BrowserWindow.getAllWindows()[0]
-      w.isFocused = () => false
-      w.emit('blur')
-    })
-    q.steer(fx, 'fail', 'many')
-    const reds = []
-    for (const title of ['P1', 'P2', 'P3', 'P4']) {
-      const c = await q.approve(fx, h, reviewer, title, { [`${title.toLowerCase()}.txt`]: `${title}\n` })
-      reds.push({ ...c, key: await keyOf(c.n) })
-      check(`${title} is returned`, !!(await until(async () => (await column(c.n)) === 'doing', HUNG_MS)), JSON.stringify(await h.kinds(c.n)))
+    if (q.devSeam('many returns (the list of returns made small, HIVE_TEST_QUEUE_RETURNS)')) {
+      // --- Many returns (#1356's returns policy, HR3's rounds 1 to 4): the window's list of returns made small (the seam: a
+      // bound of 2), so four cards pass it. A card queued again takes no place; the rest are counted; a row shown and seen
+      // stays usable for its 10 s, and only then does the next come, with nothing else happening (the queue paused).
+      await h.app.evaluate(() => {
+        process.env.HIVE_TEST_QUEUE_RETURNS = '2'
+      })
+      await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
+      // Not seen meanwhile: the window counts as not focused.
+      await h.app.evaluate(({ BrowserWindow }) => {
+        const w = BrowserWindow.getAllWindows()[0]
+        w.isFocused = () => false
+        w.emit('blur')
+      })
+      q.steer(fx, 'fail', 'many')
+      const reds = []
+      for (const title of ['P1', 'P2', 'P3', 'P4']) {
+        const c = await q.approve(fx, h, reviewer, title, { [`${title.toLowerCase()}.txt`]: `${title}\n` })
+        reds.push({ ...c, key: await keyOf(c.n) })
+        check(`${title} is returned`, !!(await until(async () => (await column(c.n)) === 'doing', HUNG_MS)), JSON.stringify(await h.kinds(c.n)))
+      }
+      const [p1, p2, p3, p4] = reds
+      await inv('queue:pause', fx.alpha, TARGET)
+      await inv('queue:retry', p2.n, 'again')
+      const listed = await until(async () => {
+        const v = await view()
+        return v && v.queued.some((e) => e.card === p2.n) && v.returns.length === 2 ? v : null
+      }, HUNG_MS)
+      check('the model: P4 and P3 listed, one more (P1); P2, queued again, takes no place', listed?.returns.map((r) => r.card).join() === `${p4.n},${p3.n}` && listed.returnsMore === 1, JSON.stringify({ returns: listed?.returns.map((r) => r.key), more: listed?.returnsMore }))
+      await showTab('merges')
+      const more = card.locator('[data-more-returns]')
+      check('the card shows P4 and P3, and says one more is waiting', !!(await until(async () => (await more.count()) === 1 && /1 more returned card/.test(await more.innerText()) && (await cardText()).includes(`${p4.key} returned`) && (await cardText()).includes(`${p3.key} returned`), HUNG_MS)), await cardText())
+      check("…not P2's return (it is queued again)", !(await cardText()).includes(`${p2.key} returned`) && (await cardText()).includes(`${p2.key} waiting`), await cardText())
+      await shoot('merges-more')
+      // Focused again: P4 and P3 are seen, and stay shown and usable; P1 comes only once they fold.
+      await h.app.evaluate(({ BrowserWindow }) => {
+        const w = BrowserWindow.getAllWindows()[0]
+        w.isFocused = () => true
+        w.emit('focus')
+      })
+      const kept = await until(async () => {
+        const v = await view()
+        return v && v.returns.length === 2 && v.returns.every((r) => !!r.seen) ? v : null
+      }, HUNG_MS)
+      check('seen: P4 and P3 kept in the list, P1 still counted, not listed', !!kept && kept.returnsMore === 1 && !kept.returns.some((r) => r.card === p1.n), JSON.stringify({ returns: kept?.returns.map((r) => [r.key, r.seen]), more: kept?.returnsMore }))
+      const seenAt = kept ? Math.min(...kept.returns.map((r) => Date.parse(r.seen))) : 0
+      check('…and straight after, still shown with Open card and Show log (round 4)', (await cardText()).includes(`${p4.key} returned`) && (await cardText()).includes(`${p3.key} returned`) && (await card.locator(`.progress-queue-returned[data-entry^="${p3.key}/"] [data-action="show-log"]`).count()) === 1 && Date.now() - seenAt < 10_000, await cardText())
+      const p1Row = card.locator(`.progress-queue-returned[data-entry^="${p1.key}/"]`)
+      check('after their 10 s the window reads again by itself: P1, with Open card and Show log; no more waiting', !!(await until(async () => (await p1Row.count()) === 1 && (await more.count()) === 0, HUNG_MS)) && (await p1Row.locator('[data-action="show-log"]').count()) === 1 && Date.now() - seenAt >= 10_000, await cardText())
+      const p1Seen = await until(async () => (await view())?.returns.find((r) => r.card === p1.n)?.seen ?? null, HUNG_MS)
+      check('…P1 seen, still shown straight after', !!p1Seen && (await p1Row.count()) === 1, await cardText())
+      const last = await view()
+      check('…still paused, P2 still queued, never shown as returned', last?.paused?.reason === 'user' && last.queued.some((e) => e.card === p2.n) && !(await cardText()).includes(`${p2.key} returned`), JSON.stringify({ paused: last?.paused, queued: last?.queued.map((e) => e.key) }))
+      await h.app.evaluate(() => {
+        delete process.env.HIVE_TEST_QUEUE_RETURNS
+      })
     }
-    const [p1, p2, p3, p4] = reds
-    await inv('queue:pause', fx.alpha, TARGET)
-    await inv('queue:retry', p2.n, 'again')
-    const listed = await until(async () => {
-      const v = await view()
-      return v && v.queued.some((e) => e.card === p2.n) && v.returns.length === 2 ? v : null
-    }, HUNG_MS)
-    check('the model: P4 and P3 listed, one more (P1); P2, queued again, takes no place', listed?.returns.map((r) => r.card).join() === `${p4.n},${p3.n}` && listed.returnsMore === 1, JSON.stringify({ returns: listed?.returns.map((r) => r.key), more: listed?.returnsMore }))
-    await showTab('merges')
-    const more = card.locator('[data-more-returns]')
-    check('the card shows P4 and P3, and says one more is waiting', !!(await until(async () => (await more.count()) === 1 && /1 more returned card/.test(await more.innerText()) && (await cardText()).includes(`${p4.key} returned`) && (await cardText()).includes(`${p3.key} returned`), HUNG_MS)), await cardText())
-    check("…not P2's return (it is queued again)", !(await cardText()).includes(`${p2.key} returned`) && (await cardText()).includes(`${p2.key} waiting`), await cardText())
-    await shoot('merges-more')
-    // Focused again: P4 and P3 are seen, and stay shown and usable; P1 comes only once they fold.
-    await h.app.evaluate(({ BrowserWindow }) => {
-      const w = BrowserWindow.getAllWindows()[0]
-      w.isFocused = () => true
-      w.emit('focus')
-    })
-    const kept = await until(async () => {
-      const v = await view()
-      return v && v.returns.length === 2 && v.returns.every((r) => !!r.seen) ? v : null
-    }, HUNG_MS)
-    check('seen: P4 and P3 kept in the list, P1 still counted, not listed', !!kept && kept.returnsMore === 1 && !kept.returns.some((r) => r.card === p1.n), JSON.stringify({ returns: kept?.returns.map((r) => [r.key, r.seen]), more: kept?.returnsMore }))
-    const seenAt = kept ? Math.min(...kept.returns.map((r) => Date.parse(r.seen))) : 0
-    check('…and straight after, still shown with Open card and Show log (round 4)', (await cardText()).includes(`${p4.key} returned`) && (await cardText()).includes(`${p3.key} returned`) && (await card.locator(`.progress-queue-returned[data-entry^="${p3.key}/"] [data-action="show-log"]`).count()) === 1 && Date.now() - seenAt < 10_000, await cardText())
-    const p1Row = card.locator(`.progress-queue-returned[data-entry^="${p1.key}/"]`)
-    check('after their 10 s the window reads again by itself: P1, with Open card and Show log; no more waiting', !!(await until(async () => (await p1Row.count()) === 1 && (await more.count()) === 0, HUNG_MS)) && (await p1Row.locator('[data-action="show-log"]').count()) === 1 && Date.now() - seenAt >= 10_000, await cardText())
-    const p1Seen = await until(async () => (await view())?.returns.find((r) => r.card === p1.n)?.seen ?? null, HUNG_MS)
-    check('…P1 seen, still shown straight after', !!p1Seen && (await p1Row.count()) === 1, await cardText())
-    const last = await view()
-    check('…still paused, P2 still queued, never shown as returned', last?.paused?.reason === 'user' && last.queued.some((e) => e.card === p2.n) && !(await cardText()).includes(`${p2.key} returned`), JSON.stringify({ paused: last?.paused, queued: last?.queued.map((e) => e.key) }))
-    await h.app.evaluate(() => {
-      delete process.env.HIVE_TEST_QUEUE_RETURNS
-    })
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {
