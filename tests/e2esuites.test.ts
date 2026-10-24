@@ -14,7 +14,7 @@ import { AREAS, DOCS_ONLY, EVERYTHING, REAL_TIER, UNIT_ONLY, affectedSuites, und
 // @ts-expect-error: plain .mjs modules without types
 import { fingerprint } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { DEV_SEAMS, EVERY_COPY_SEAMS, PACKAGED_SEAMS, TEST_CHANNELS, devBuildOnly, isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, resultLines, selectSuites, suiteOutcome, suiteSource } from './e2e/runner.mjs'
+import { DEV_SEAMS, EVERY_COPY_SEAMS, PACKAGED_SEAMS, TEST_CHANNELS, devBuildOnly, isRealCli, keepLimits, needsDevBuild, packagedPlan, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, resultLines, selectSuites, suiteDevOnly, suiteFiles as filesOfSuite, suiteOutcome, suiteSource } from './e2e/runner.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { recordJson, recordMarkdown, selectionLine, selectionOf } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -76,7 +76,7 @@ describe('the e2e suite list', () => {
     for (const n of names) {
       const src = readFileSync(join(dir, `${n}.cjs`), 'utf8')
       const { header, code } = suiteSource(src)
-      const why = devBuildOnly(src)
+      const why = suiteDevOnly(n, dir)
       const queue = named.includes(n) || code.some((l: string) => /require\('\.\/queueFixture\.cjs'\)/.test(l))
       const handles = code.some((l: string) => /q\.devSeam\(|process\.env\.HIVE_EXE/.test(l))
       const channel = handles ? null : code.filter((l: string) => !/inv\('agents:add'/.test(l)).find((l: string) => TEST_CHANNELS.test(l))
@@ -113,6 +113,37 @@ describe('the e2e suite list', () => {
     // A suite handling HIVE_EXE itself runs: its dev-only parts say NOT RUN. Starting Electron itself it can't handle.
     expect(devBuildOnly(`${hdr}if (q.devSeam('S7')) env.HIVE_TEST_QUEUE_CRASH = 'afterFiles'\n`)).toBe(null)
     expect(devBuildOnly(`${hdr}if (process.env.HIVE_EXE) return\n_electron.launch({ executablePath: lib.ELECTRON })\n`)).toMatch(/Electron itself/)
+  })
+
+  it('judges a suite with the helpers it uses: its own folder and what it requires, not lib.cjs (suiteDevOnly, #1591)', () => {
+    // wakepaste-codex is a few lines handing over to wakepaste-cli/run.cjs, which starts Electron itself.
+    expect(filesOfSuite('wakepaste-codex', dir)).toContain('wakepaste-cli/run.cjs')
+    expect(suiteDevOnly('wakepaste-codex', dir)).toMatch(/^wakepaste-cli\/run\.cjs: it starts this checkout's Electron itself/)
+    // A suite's own folder (i18nshots/) counts; the shared launch helpers don't (lib.cjs honours HIVE_EXE).
+    expect(filesOfSuite('i18nshots', dir)).toEqual(expect.arrayContaining(['i18nshots/main.cjs', 'layoutReport.cjs']))
+    expect(filesOfSuite('p4lane', dir)).not.toContain('lib.cjs')
+    expect(filesOfSuite('wakepaste-codex', dir)).not.toContain('lib.cjs')
+    // A queue suite: queueFixture handles HIVE_EXE (devSeam), so it runs; #1539's packaged suites all do.
+    expect(filesOfSuite('p5lane', dir)).toContain('queueFixture.cjs')
+    for (const n of ['p4lane', 'p5lane', 'reviewcopies', 'mergequeuefolder']) expect(suiteDevOnly(n, dir), n).toBe(null)
+  })
+
+  it('a packaged run of suites none of which can run tested nothing: its record says so and it fails (#1591)', () => {
+    const pick = (...n: string[]) => suites.filter((s) => n.includes(s.name))
+    const exe = 'C:\\sb\\Hive.exe'
+    const none = packagedPlan(pick('cardloop', 'wakepaste-codex'), dir, exe)
+    expect([...none.devOnly.keys()]).toEqual(['cardloop', 'wakepaste-codex'])
+    expect(none.nothingRan).toMatch(/nothing was tested/)
+    const some = packagedPlan(pick('cardloop', 'p4lane'), dir, exe)
+    expect([...some.devOnly.keys()]).toEqual(['cardloop'])
+    expect(some.nothingRan).toBe(null)
+    // Without HIVE_EXE nothing changes.
+    expect(packagedPlan(pick('cardloop'), dir, null)).toEqual({ devOnly: new Map(), nothingRan: null })
+    // run.mjs doesn't stop before its record: the record is not valid for it, and the run fails.
+    const runner = readFileSync(join(dir, 'run.mjs'), 'utf8')
+    expect(runner).toContain('const problems = [...(nothingRan ? [nothingRan] : []),')
+    expect(runner).toContain('process.exit(!lastRun.ok || recordInvalid || nothingRan ? 1 : 0)')
+    expect(runner).not.toMatch(/nothingRan[^\n]*\n[^\n]*process\.exit\(1\)/)
   })
 
   it('no fixed wait of 1 s or more without a reason: wait for the condition (lib.until) instead', () => {

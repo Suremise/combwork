@@ -45,7 +45,7 @@ import { e2eProgress, slotWaitProgress } from '../progressReport.mts'
 import { SUITES } from './suites.mjs'
 import { affectedSuites, changedFiles, mergeBase } from './affected.mjs'
 import { CLI_LOG, fingerprint, readCliLog, realCliHomes, realCliVersions, recordJson, recordMarkdown, selectionOf } from './record.mjs'
-import { LANG_SUITE, devBuildOnly, isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, repeatStatus, resultLines, selectSuites, suiteOutcome } from './runner.mjs'
+import { LANG_SUITE, isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, repeatStatus, packagedPlan, resultLines, selectSuites, suiteOutcome } from './runner.mjs'
 import { devBuild, ensureBuild } from './build.mjs'
 import { FAILED_KEEP_MS, finishRunDirs, keepSuiteFiles, logsRootFor, markRunFailed, newRunDir, omittedLine, pruneRunDirsReleasing } from './logs.mjs'
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from './lanes.mjs'
@@ -119,16 +119,12 @@ if (!chosen.length) {
   process.exit(0)
 }
 // A packaged build (HIVE_EXE, the Sandbox checks): a suite that can't run on one would test the dev build and pass for
-// it, so it is NOT RUN, with why, in the output and the record (#1591, runner.mjs devBuildOnly). The parts of a suite
-// that runs which need the dev build say NOT RUN themselves (queueFixture devSeam).
+// it, so it is NOT RUN, with why, in the output and the record (#1591, runner.mjs suiteDevOnly: the suite and the
+// helpers it uses). The parts of a suite that runs which need the dev build say NOT RUN themselves (queueFixture
+// devSeam). A run where none can run tested nothing: it fails, with its record saying so.
 const packagedExe = process.env.HIVE_EXE || null
-const devOnly = new Map(packagedExe ? chosen.map((s) => [s.name, devBuildOnly(readFileSync(join(here, `${s.name}.cjs`), 'utf8'))]).filter(([, why]) => why) : [])
+const { devOnly, nothingRan } = packagedPlan(chosen, here, packagedExe)
 if (packagedExe) console.log(`Packaged build: ${packagedExe} (HIVE_EXE)${devOnly.size ? `. NOT RUN, as they would test the dev build: ${devOnly.size} of ${chosen.length} suites (each said with why)` : ''}.\n`)
-if (devOnly.size === chosen.length) {
-  for (const [name, why] of devOnly) for (const line of resultLines(name, { notRun: why })) console.log(line)
-  console.log('\nNo suite chosen can run on a packaged build: nothing was tested.')
-  process.exit(1)
-}
 
 // --- A heavy run (more than a few suites, or a repeat) waits for a test slot: at most a few go at once on this machine,
 // across every worktree (slots.mjs), so runs don't slow each other until tests time out. A runner started inside a
@@ -520,7 +516,7 @@ if (opts.record) {
   const status = repeatStatus({ repeat, runs, before: codeBefore, after: fingerprint(root), buildStale: stale, packagedStale: packagedStale ?? packagedCheck() })
   // Each real suite's CLI home (#368): named in the record; one in the user's own home makes it not valid.
   const { homes, own } = realCliHomes(lastRun.results, SUITES)
-  const problems = [...status.problems, ...(own.length ? [`ran a real CLI in the user's own home (never, #368): ${own.join(', ')}`] : [])]
+  const problems = [...(nothingRan ? [nothingRan] : []), ...status.problems, ...(own.length ? [`ran a real CLI in the user's own home (never, #368): ${own.join(', ')}`] : [])]
   recordInvalid = problems.length > 0
   // A record that isn't valid: its run is kept as a failed one's (#223).
   if (recordInvalid) markRunFailed(lastRun.logDir, `record not valid: ${problems.join('; ')}`)
@@ -555,5 +551,7 @@ if (lane) {
   lane.release()
   await autoClean({ root, ev: evidence })
 }
-await progress.finish(lastRun.ok && runs.length === repeat && !recordInvalid, summary, opts.record ? join(lastRun.logDir, 'run-record.md') : lastRun.logDir)
-process.exit(!lastRun.ok || recordInvalid ? 1 : 0)
+if (nothingRan) console.log(`
+It failed: ${nothingRan}.`)
+await progress.finish(lastRun.ok && runs.length === repeat && !recordInvalid && !nothingRan, summary, opts.record ? join(lastRun.logDir, 'run-record.md') : lastRun.logDir)
+process.exit(!lastRun.ok || recordInvalid || nothingRan ? 1 : 0)

@@ -1,7 +1,9 @@
 // The e2e runner's decisions, kept pure so tests/e2esuites.test.ts can check them without running suites: what the
 // command line asks for (parseArgs), which suites that is (selectSuites), and whether a run record can be trusted
 // (recordStatus). run.mjs does the running.
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { createRequire } from 'module'
+import { join, posix } from 'path'
 
 const { exitText } = createRequire(import.meta.url)('./windowsExits.cjs')
 
@@ -71,6 +73,44 @@ export function devBuildOnly(source) {
   if (seam) return `it needs ${seam}, a test seam a packaged build ignores`
   const channel = code.filter((l) => !/inv\('agents:add'/.test(l)).map((l) => TEST_CHANNELS.exec(l)?.[0]).find(Boolean)
   if (channel) return `it uses a test channel a packaged build refuses (${channel})`
+  return null
+}
+
+/** The launch helpers every suite shares: lib.launch honours HIVE_EXE, and the seams they give are every copy's. */
+const SHARED_HELPERS = new Set(['lib.cjs', 'runContext.cjs'])
+
+/**
+ * A suite's files, relative to the suites' folder: its own, those in a folder of its name (i18nshots/), and the helpers
+ * they require by relative path, in turn (wakepaste-cli/run.cjs), apart from SHARED_HELPERS.
+ */
+export function suiteFiles(name, dir) {
+  const files = [`${name}.cjs`]
+  const own = join(dir, name)
+  if (existsSync(own) && statSync(own).isDirectory()) files.push(...readdirSync(own).filter((f) => f.endsWith('.cjs')).sort().map((f) => `${name}/${f}`))
+  for (let i = 0; i < files.length; i++) {
+    for (const m of readFileSync(join(dir, files[i]), 'utf8').matchAll(/require\('(\.\.?\/[^']+\.cjs)'\)/g)) {
+      const f = posix.normalize(posix.join(posix.dirname(files[i]), m[1]))
+      if (!SHARED_HELPERS.has(f) && !files.includes(f) && existsSync(join(dir, f))) files.push(f)
+    }
+  }
+  return files
+}
+
+/**
+ * A run's suites on a packaged build (exe: HIVE_EXE, or none): { devOnly (a Map of each suite NOT RUN to why), nothingRan
+ * (why the run tested nothing, when none of them can run: the run still writes its record, not valid, and fails) }.
+ */
+export function packagedPlan(chosen, dir, exe) {
+  const devOnly = new Map(exe ? chosen.map((s) => [s.name, suiteDevOnly(s.name, dir)]).filter(([, why]) => why) : [])
+  return { devOnly, nothingRan: chosen.length && devOnly.size === chosen.length ? 'no suite chosen can run on a packaged build: nothing was tested' : null }
+}
+
+/** devBuildOnly for a suite and every file it uses (suiteFiles), each judged on its own: the first reason, or null. */
+export function suiteDevOnly(name, dir) {
+  for (const f of suiteFiles(name, dir)) {
+    const why = devBuildOnly(readFileSync(join(dir, f), 'utf8'))
+    if (why) return f === `${name}.cjs` ? why : `${f}: ${why}`
+  }
   return null
 }
 
