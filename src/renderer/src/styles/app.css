@@ -6986,12 +6986,13 @@ button.agent-place:hover {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 6px;
-  margin-top: 8px;
 }
 /* The role cards side by side where each has room for its sentence (Add Agent); in a narrower dialog (Agent Settings)
-   they stack, a card a row, rather than squeeze the sentence to a word or two a line (#1587: Polish, German). */
+   they stack, a card a row, rather than squeeze the sentence to a word or two a line (#1587: Polish, German). The
+   margin is the container's: one inside it wouldn't collapse with the heading's. */
 .workflow-role {
   container: workflow-role / inline-size;
+  margin-block-start: 8px;
 }
 @container workflow-role (max-width: 519px) {
   .workflow-role-choice {
