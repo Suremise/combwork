@@ -206,21 +206,99 @@ describe('the bundled skills', () => {
   })
 
   // #1074: reviewers split over uncommitted work (some failed the round, some reviewed it by fingerprint). The builder
-  // commits before Review and names the commit; a reviewer handed uncommitted work asks for the commit, and the
-  // builder's watch counts comments so the request wakes it.
-  it('the builder commits before Review and the reviewer asks for a commit rather than failing on that alone', () => {
+  // commits each round and names the commit; a reviewer handed uncommitted work asks for the commit, and the
+  // builder's watch counts comments so the request wakes it. Since #1524 (P8): a submission is a revision, and the rule
+  // that it is committed is the project's gate, so the skill says what to do, not the rule.
+  it('the builder commits each round and the reviewer asks for a commit rather than failing on that alone', () => {
     const text = catalog.get('card-loop')!.text
     const line = (starts: string): string => text.split(/\r?\n/).find((l) => l.startsWith(starts)) ?? ''
-    expect(line('1. Do its work')).toMatch(/\*\*Commit the card's work before submitting it\*\*, every round, and name the commit/)
-    expect(line('2. Review it')).toMatch(/\*\*Review the commit the builder names\.\*\* Work sent uncommitted .* isn't a failed round on that alone/)
+    expect(line('1. Do its work')).toMatch(/Commit each round's work and name the commit in its summary: the reviewer reviews the revision you submit/)
+    expect(line('2. Review it')).toMatch(/`hive_start_review` names the revision to review\. Work it doesn't hold \(uncommitted, or no commit named\) isn't a failed round on that alone/)
     expect(line('- builder: the card')).toMatch(/changes: \["verdict", "column", "comment"\]/)
-    expect(line('- reviewer, after asking for a commit')).toMatch(/changes: \["comment"\]/)
+    expect(line('- reviewer, after asking the builder for something')).toMatch(/changes: \["comment"\]/)
     // run-lanes' sample brief agrees, leaving the procedure to card-loop (a brief saying "commit once it passes" undid it).
     const brief = catalog.get('run-lanes')!.text
     expect(brief).toMatch(/Commit each round on the card's branch before sending the card to Review \(card-loop\)\./)
     expect(brief).not.toMatch(/After each card passes: commit/)
     // A reviewer that reads only review-agent-work is pointed there (haiku passed uncommitted work so).
     expect(catalog.get('review-agent-work')!.text).toMatch(/In a card loop, review the commit its builder names: work sent uncommitted gets a request for a commit \(`hive_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
+  })
+})
+
+// #1524 (P8, SPEC §16.17): work-on-card and card-loop describe the intents and the gates; what a gate owns isn't stated
+// again as a rule (the design note's §10, "Becomes a gate"), and where the outcome depends on the project's options, the
+// card's kind or the rules' switch, they say it depends rather than state one case as the rule.
+describe('the skills follow the gates (#1524)', () => {
+  const GATED = ['work-on-card', 'card-loop']
+  // Rules a gate now owns, as the skills used to state them: each phrase was in a bundled skill before P8.
+  const GATE_RULES: [string, RegExp][] = [
+    ['commit before Review', /\bcommit (the card's work )?before (Review|submitting|moving it)\b/i],
+    ['review the exact commit', /\breview the commit the builder names\b/i],
+    ['dependencies done before start', /\bcards it depends on \(`blockedBy`\) that aren't done block it\b/i],
+    ['no cards into a running lane', /\b(a running loop never sees a card added|no cards? (in)?to a running lane)\b/i],
+    ['Passed is not merged', /\bPassed means it passed review, not that it's merged\b/i],
+    ['Done = merged, moved by the agent', /\bmove (your|the|a) card (there|to `?done`?) once its work is merged\b/i],
+    ['a decision wakes the lane', /\brecorded decision wakes (nobody|no one)\b/i],
+    ['a late message reopens nothing', /\blate message\b/i],
+    ['old column moves as the way to work', /\bmove (it|the card|a card) to `?(doing|review|passed|done)`?(?! with `hive_update_task`)/i],
+    ['the old review parameter', /\breview: "(start|passed|failed)"/],
+    ['ending the lane with a merge commit', /\bmergeCommit\b|\babandoned: true\b/]
+  ]
+  it("state no rule a gate owns", () => {
+    for (const name of GATED) for (const [rule, re] of GATE_RULES) expect(catalog.get(name)!.text, `${name}: ${rule}`).not.toMatch(re)
+  })
+
+  it('name the intent tools, each one an agent has', () => {
+    const intents = ['hive_start_card', 'hive_submit', 'hive_put_back', 'hive_report_merge', 'hive_ask_user', 'hive_cannot_within_rules']
+    const loop = ['hive_start_review', 'hive_verdict', 'hive_request_builder', 'hive_loop_step', 'hive_lane']
+    const named = (name: string): string[] => toolsNamed(catalog.get(name)!.text)
+    expect(named('work-on-card')).toEqual(expect.arrayContaining(intents))
+    expect(named('card-loop')).toEqual(expect.arrayContaining([...loop, 'hive_start_card', 'hive_submit', 'hive_report_merge', 'hive_ask_user', 'hive_cannot_within_rules']))
+    for (const t of [...intents, ...loop]) {
+      expect(TOOLS, t).toContain(t)
+      expect(ASSISTANT_ONLY_TOOLS, t).not.toContain(t)
+    }
+  })
+
+  it('stay conditional where the gates are: review off, the rules off, a no-code card, the lane\'s rounds', () => {
+    const woc = catalog.get('work-on-card')!.text
+    const loop = catalog.get('card-loop')!.text
+    // Review off: submitting moves the card on past Review.
+    expect(woc).toMatch(/or on past it where the project has no review/)
+    // The rules off: nothing is refused, and nothing counts rounds.
+    expect(woc).toMatch(/With the rules switched off nothing is refused/)
+    const limit = loop.split(/\r?\n/).find((l) => l.includes('**The round limit**')) ?? ''
+    expect(limit).toMatch(/the lane's rounds/)
+    expect(limit).toMatch(/Where the project's rules are enforced, Hive counts/)
+    expect(limit).toMatch(/With the rules off nothing counts them/)
+    // A no-code card: no revision to submit, nothing to merge.
+    expect(woc).toMatch(/a no-code card[^.]*submits its summary alone/)
+    expect(woc).toMatch(/for a no-code card, the card finishes on its own/)
+    // Who finishes is the project's: no one way stated as the rule.
+    expect(woc).toMatch(/Done means merged, and how it gets there is the project's/)
+    expect(loop).toMatch(/its finish is the project's/)
+    // A lane one card at a time is the project's rule, said so.
+    expect(loop).toMatch(/where the project's rules hold a lane to one card at a time/)
+    for (const name of GATED) {
+      const text = catalog.get(name)!.text
+      // No round count or wait written in: they are the lane's (the project's Card loops settings).
+      expect(text, name).not.toMatch(/\b\d+ rounds?\b|\brounds: \d+|\b\d+ hours\b/)
+      // Never "Done when it passes" (or the like) without the card's kind and the project's finish.
+      expect(text, name).not.toMatch(/\b(done|finished) (when|once) it passes\b/i)
+      expect(text, name).not.toMatch(/\bmoves? (it|the card) to Passed\b/)
+    }
+  })
+
+  it('read, act, then ack the inbox, for every CLI, and say why', () => {
+    const woc = catalog.get('work-on-card')!.text
+    expect(woc).toMatch(/1\. \*\*Read it then\*\*[\s\S]*2\. \*\*Act on each\*\*[\s\S]*3\. \*\*Then ack it\*\*/)
+    expect(woc).toMatch(/Reading isn't acking, whatever CLI you run in: one not acked within 30 minutes shows as overdue/)
+    expect(catalog.get('card-loop')!.text).toMatch(/`hive_inbox` first[^.]*act, then ack/)
+  })
+
+  it('stay smaller than before P8 (work-on-card 8,991 and card-loop 15,776 characters)', () => {
+    expect(catalog.get('work-on-card')!.text.length).toBeLessThan(8991)
+    expect(catalog.get('card-loop')!.text.length).toBeLessThan(11000)
   })
 })
 
