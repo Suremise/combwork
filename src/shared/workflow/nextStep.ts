@@ -18,7 +18,7 @@ export type NextStep = { step: 'intents'; intents: string[] } | { step: 'review'
 /**
  * The step a card has next, from its state and the ruleset it works under. The user is next only while Hive has asked
  * them (a review by you, your OK after a reviewer agent or before merging, open under For you): what the options would
- * want but Hive didn't ask (#1530: the OK before merging with merges not checked) isn't waited for.
+ * want but Hive didn't ask (the rules not enforced) isn't waited for.
  */
 export function nextStep(s: CardState, r: Ruleset): NextStep | null {
   const asked = s.requests.some((q) => q.gate === 'review' || q.gate === 'okBefore')
