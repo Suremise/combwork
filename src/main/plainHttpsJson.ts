@@ -42,50 +42,63 @@ export function plainHttpsJson(url: string, opts: PlainJsonOptions = {}): Promis
     function get(target: URL, redirects: number): void {
       if (target.protocol !== 'https:' && target.protocol !== 'http:') return fail(new Error(`Not an http(s) URL: ${target.protocol}`))
       const send = target.protocol === 'https:' ? httpsRequest : httpRequest
-      req = send(target, { method: 'GET', headers }, (res) => {
-        if (done) return void res.destroy()
-        const status = res.statusCode ?? 0
-        const location = res.headers.location
-        if (status >= 300 && status < 400 && location) {
-          res.resume()
-          if (redirects >= MAX_REDIRECTS) return fail(new Error('Too many redirects'))
-          const next = new URL(location, target)
-          // Never from https down to http.
-          if (target.protocol === 'https:' && next.protocol !== 'https:') return fail(new Error('Redirected off https'))
-          return get(next, redirects + 1)
-        }
-        if (status < 200 || status >= 300) {
-          res.resume()
-          return fail(new Error(`HTTP ${status}`))
-        }
-        const encoding = encodingOf(res)
-        if (encoding) {
+      const current = send(target, { method: 'GET', headers }, (res) => {
+        // A throw here (a Location that isn't a URL) would be uncaught, outside the promise: it fails the call instead.
+        try {
+          reply(current, res, target, redirects)
+        } catch (e) {
           res.destroy()
-          return fail(new Error(`Refused an encoded reply (${encoding})`))
+          fail(e as Error)
         }
-        const chunks: Buffer[] = []
-        let size = 0
-        res.on('data', (c: Buffer) => {
-          size += c.length
-          if (size > maxBytes) return fail(new Error(`Reply over ${maxBytes} bytes`))
-          chunks.push(c)
-        })
-        res.on('end', () => {
-          if (done) return
-          try {
-            const value: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
-            done = true
-            clearTimeout(deadline)
-            resolve(value)
-          } catch (e) {
-            fail(e as Error)
-          }
-        })
-        res.on('error', fail)
-        res.on('aborted', () => fail(new Error('Reply cut short')))
       })
-      req.on('error', fail)
-      req.end()
+      req = current
+      // Only the request still in play: one left behind by a redirect, destroyed, is no failure.
+      current.on('error', (e) => current === req && fail(e))
+      current.end()
+    }
+    function reply(current: ReturnType<typeof httpsRequest>, res: IncomingMessage, target: URL, redirects: number): void {
+      if (done) return void res.destroy()
+      const status = res.statusCode ?? 0
+      const location = res.headers.location
+      if (status >= 300 && status < 400 && location) {
+        // Its body isn't read: closed now, so it can't outlive the call or escape maxBytes and the deadline.
+        res.destroy()
+        current.destroy()
+        if (redirects >= MAX_REDIRECTS) return fail(new Error('Too many redirects'))
+        const next = new URL(location, target)
+        // Never from https down to http.
+        if (target.protocol === 'https:' && next.protocol !== 'https:') return fail(new Error('Redirected off https'))
+        return get(next, redirects + 1)
+      }
+      if (status < 200 || status >= 300) {
+        res.destroy()
+        return fail(new Error(`HTTP ${status}`))
+      }
+      const encoding = encodingOf(res)
+      if (encoding) {
+        res.destroy()
+        return fail(new Error(`Refused an encoded reply (${encoding})`))
+      }
+      const chunks: Buffer[] = []
+      let size = 0
+      res.on('data', (c: Buffer) => {
+        size += c.length
+        if (size > maxBytes) return fail(new Error(`Reply over ${maxBytes} bytes`))
+        chunks.push(c)
+      })
+      res.on('end', () => {
+        if (done) return
+        try {
+          const value: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+          done = true
+          clearTimeout(deadline)
+          resolve(value)
+        } catch (e) {
+          fail(e as Error)
+        }
+      })
+      res.on('error', fail)
+      res.on('aborted', () => fail(new Error('Reply cut short')))
     }
     try {
       get(new URL(url), 0)

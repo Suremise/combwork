@@ -5,7 +5,10 @@ import type { AddressInfo } from 'net'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { plainHttpsJson } from '../src/main/plainHttpsJson'
 
-type Handler = (req: IncomingMessage, res: ServerResponse) => void
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
+const HUNG_MS = 10000
+
+type Handler =(req: IncomingMessage, res: ServerResponse) => void
 const routes = new Map<string, Handler>()
 const seen: IncomingMessage[] = []
 let server: Server
@@ -83,6 +86,25 @@ describe('plainHttpsJson', () => {
     expect(await plainHttpsJson(`${base}/moved`)).toEqual({ version: '1.2.3' })
     await expect(plainHttpsJson(`${base}/moved-br`)).rejects.toThrow(/encoded reply/)
     await expect(plainHttpsJson(`${base}/loop`)).rejects.toThrow(/Too many redirects/)
+  })
+
+  it('fails the call, never throws, on a Location that isn’t a URL', async () => {
+    // A throw in the reply's callback would be an uncaught exception (vitest fails the run on one), not a rejection.
+    routes.set('/bad-location', (_req, res) => res.writeHead(302, { Location: 'http://[invalid' }).end())
+    await expect(plainHttpsJson(`${base}/bad-location`)).rejects.toThrow(/Invalid URL/)
+  })
+
+  it('closes a redirect’s body rather than leaving it read in the background', async () => {
+    // A 302 whose body never ends, then the reply it points to: the 302's connection is closed, not left draining
+    // past the call (beyond maxBytes and the deadline).
+    let closed = false
+    routes.set('/endless-redirect', (req, res) => {
+      req.socket.once('close', () => (closed = true))
+      res.writeHead(302, { Location: '/plain' })
+      res.write('x'.repeat(4096))
+    })
+    expect(await plainHttpsJson(`${base}/endless-redirect`, { maxBytes: 1024 })).toEqual({ version: '1.2.3' })
+    await vi.waitFor(() => expect(closed).toBe(true), { timeout: HUNG_MS })
   })
 
   it('refuses a URL that isn’t http(s)', async () => {
