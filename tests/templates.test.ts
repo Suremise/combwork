@@ -9,7 +9,7 @@
 // preset, a reviewer mode and pairs; no worktrees), 0.9's refused, Hive's own templates (valid, read-only, copied,
 // loaded with names from the project's key, pairs kept as the agents' pairing, a provider that can't run swapped).
 import { execFileSync } from 'child_process'
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, utimesSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -346,6 +346,8 @@ describe('saving and loading templates', () => {
   it('a damaged template is recovered from its copy; one past saving is listed with why it cannot be used', async () => {
     const dir = join(wsPath, '.hive', 'templates')
     writeFileSync(join(dir, 'pair.json'), '{ damaged')
+    const old = new Date(Date.now() - 60_000) // damaged a while ago, not a save stalled a moment ago (#1601)
+    utimesSync(join(dir, 'pair.json'), old, old)
     const listed = await run(() => templates.listTemplates(alpha))
     const recovered = listed.find((t) => t.scope === 'workspace' && t.file === 'pair.json')
     expect([recovered?.name, recovered?.problem]).toEqual(['PAIR', undefined])

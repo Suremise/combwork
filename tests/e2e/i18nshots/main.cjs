@@ -64,6 +64,8 @@ async function corruptFile(ctx) {
   const dir = path.join(ctx.workspace, 'mainbeta', '.hive')
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, 'project.json'), '{ not json')
+  const old = new Date(Date.now() - 60_000) // damaged a while ago: one changed within 2 s is a save in progress (#1601)
+  fs.utimesSync(path.join(dir, 'project.json'), old, old)
   await inv('workspace:refresh')
   return shown(ctx, page.locator('.toasts .toast'), 'the damaged-file notice')
 }
