@@ -3,7 +3,7 @@
 // being saved; it reads again a few times, then refuses, the file left as the other program saves it.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, onTestFinished, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { closeAllBoards } from '../src/main/boardStore'
@@ -30,6 +30,8 @@ async function open(): Promise<{ w: ReturnType<typeof createWorkspaceService>; w
   mkdirSync(join(alpha, '.hive'), { recursive: true })
   writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   const w = createWorkspaceService()
+  // Closed when the test ends, passed or failed.
+  onTestFinished(() => disposeWorkspaceService(w))
   await w.open(ws)
   return { w, ws, alpha }
 }
@@ -104,7 +106,6 @@ describe('read-modify-write callers refuse rather than write over a save in prog
     writeFileSync(file, JSON.stringify({ version: 2, agents: [], chime: 'off', hand: 'edited' }))
     await w.updateProjectConfig(alpha, { suggestFreshStart: 'on' })
     expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({ chime: 'off', suggestFreshStart: 'on', hand: 'edited' })
-    await disposeWorkspaceService(w)
   })
 
   it('noteNames and noteFormerName: project-names.json', async () => {
@@ -120,7 +121,6 @@ describe('read-modify-write callers refuse rather than write over a save in prog
     // A project not in the record yet (a new id): its record isn't written either.
     await expect(names.noteNames(w, [{ path: join(ws, 'beta'), id: 'p-00000000bbbb', copy: false }])).rejects.toBeInstanceOf(KeptFileBusy)
     untouched(file, bak)
-    await disposeWorkspaceService(w)
   })
 
   it('ownHandover (a handover written): handover-owners.json, and no handover left without its owner', async () => {
@@ -132,13 +132,18 @@ describe('read-modify-write callers refuse rather than write over a save in prog
     // Refused before the handover is written (review round 1): never there for someone to edit, so nothing is taken back.
     const second = (): string[] => readdirSync(join(ws, '.hive', 'shared', 'handovers')).filter((f) => f.includes('second'))
     const run = { settled: false }
-    const made = inWorkspace(w, () => notes.createHandover('alpha', 'Second', 'y')).finally(() => (run.settled = true))
+    // Its outcome as a value at once (no rejection left unhandled while the folder is watched).
+    const made = inWorkspace(w, () => notes.createHandover('alpha', 'Second', 'y')).then(
+      () => null,
+      (e: unknown) => e
+    )
+    void made.finally(() => (run.settled = true))
     const seen: string[] = []
     while (!run.settled) {
       seen.push(...second())
       await new Promise((r) => setTimeout(r, 5))
     }
-    await expect(made).rejects.toBeInstanceOf(KeptFileBusy)
+    expect(await made).toBeInstanceOf(KeptFileBusy)
     expect(seen).toEqual([])
     expect(second()).toEqual([])
     untouched(file, bak)
@@ -147,6 +152,5 @@ describe('read-modify-write callers refuse rather than write over a save in prog
     const third = await inWorkspace(w, () => notes.createHandover('alpha', 'Third', 'z'))
     expect(existsSync(third)).toBe(true)
     expect(Object.keys(JSON.parse(readFileSync(file, 'utf8')).owners)).toContain(basename(third))
-    await disposeWorkspaceService(w)
   })
 })
