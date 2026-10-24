@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 75
+const FIXTURES_VERSION = 78
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -130,6 +130,31 @@ function handMerged(c, n) {
   c.git('merge', '-q', '--no-ff', '-m', `Merge branch '${branch}'`, branch)
   return { branch, base }
 }
+/**
+ * A card of Implementer's in Review (#1444): its work committed in alpha's own folder and submitted, as the user moves it,
+ * with Coder a reviewer, so a review of it gets a review copy (#1439: the reviewer in the project folder). `pool`: the
+ * project's reviewers are its pool (G17, #1443).
+ */
+async function inReview(c, pool = false) {
+  await pairInProject(c)
+  if (pool) {
+    const file = require('path').join(c.ws, 'alpha', '.hive', 'project.json')
+    const cfg = JSON.parse(require('fs').readFileSync(file, 'utf8'))
+    cfg.workflow.options.reviewerMode = 'pool'
+    require('fs').writeFileSync(file, JSON.stringify(cfg, null, 2))
+  }
+  await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'reviewer' })
+  await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'builder' })
+  const n = await c.card('r', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>", trimmed.', agent: 'implementer' })
+  await c.inv('tasks:move', n, 'doing')
+  c.write('greet.js', "module.exports = (name) => 'Hello, ' + name.trim()\n")
+  c.git('add', '-A')
+  c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet trims the name')
+  await c.inv('tasks:move', n, 'review')
+  return n
+}
+/** The worktrees alpha has (git's own list), as lower-case paths. */
+const worktreesOf = (c) => c.git('worktree', 'list', '--porcelain').split(/\r?\n/).filter((l) => l.startsWith('worktree ')).map((l) => require('path').resolve(l.slice(9)).toLowerCase())
 /**
  * Whether a call's card reference is card `n`: its number (12, "12", "#12") or its key ("AL-12"), as the tools take it
  * (#1219).
@@ -2332,6 +2357,142 @@ module.exports.SCENARIOS = [
     }
   },
   {
+    id: 'slot-start',
+    title: "A builder starts a card where cards are built in slots (#1444): Hive lends the card a slot, and the builder makes no worktree of its own and changes nothing in the project folder",
+    files: { 'greet.js': "module.exports = (name) => 'Hello ' + name\n" },
+    async setup(c) {
+      await pairRules(c)
+      await c.card('s', { title: 'Greeting punctuation', description: 'greet.js returns "Hello, <name>" with a comma.', agent: 'coder' })
+      c.head = c.git('rev-parse', 'HEAD').trim()
+      c.trees = worktreesOf(c)
+    },
+    // Hive gives Coder the card in its slot in a new conversation, which asks first to trust the slot's folder.
+    async during(c, status) {
+      if (status !== 'waiting' || c.trustedSlot) return
+      const lib = require('../e2e/lib.cjs')
+      const key = lib.ptyKey(c.alpha, c.agents.coder.id)
+      const screen = String((await c.inv('pty:buffer', key).catch(() => '')) ?? '').slice(-2000)
+      if (/Do you trust the files in this folder/i.test(screen)) await c.inv('pty:write', key, '\r')
+      else if (/trust this folder/i.test(screen) && !(await lib.acceptClaudeTrust(c.inv, c.alpha, c.agents.coder.id, 3000))) await c.inv('pty:write', key, '\r')
+      else return
+      c.trustedSlot = true
+    },
+    prompt: (c) => `Work on card #${c.cards.s}.`,
+    fake: (c) => `skill work-on-card then hive hive_start_card {"card":"#${c.cards.s}"}`,
+    expect: (o, c) => {
+      const started = factsOf(o, 's', 'Started')[0]
+      const slot = started?.data?.slot
+      const trees = worktreesOf(c)
+      const made = trees.filter((t) => !c.trees.includes(t))
+      // Its first conversation (where it read work-on-card and started the card) is replaced by the slot's: the checks
+      // read the hive calls, the repository and the card, which span both.
+      return [
+        ['started it with hive_start_card', ran(o, 'hive_start_card').length > 0, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['Hive lent the card a slot (its Started fact)', !!slot, JSON.stringify(started?.data)],
+        ['made no worktree of its own: the only new one is the slot', made.length <= 1 && made.every((t) => !!slot && t.endsWith(slot.toLowerCase())), made.join(', ')],
+        ['ran no git worktree command', runs(o, 'git worktree add').length === 0],
+        ["changed nothing in the project folder: no commit there, no change", c.git('rev-parse', 'HEAD').trim() === c.head && o.gitStatus.trim() === '', o.gitStatus]
+      ]
+    }
+  },
+  {
+    id: 'review-in-copy',
+    title: "A reviewer reviews in the review copy its start names (#1444, #1439): it reads and runs the checks there, not in the builder's folder, and gives its verdict",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n", 'test.js': "const greet = require('./greet'); if (greet(' Ada ') !== 'Hello, Ada') { console.error('greet does not trim'); process.exit(1) }\nrequire('fs').writeFileSync(require('path').join(__dirname, 'ran.txt'), 'ran')\nconsole.log('ok')\n" },
+    async setup(c) {
+      await inReview(c)
+      c.copyLeases = new Set()
+    },
+    // The review copies Hive lends Coder while it works (a CLI may show a tool's reply only in part: Codex calls the hive
+    // tools from its own code tool, whose output it shortens).
+    async during(c) {
+      for (const v of (await c.inv('copies:list', c.alpha).catch(() => [])) ?? []) if (v.lease?.kind === 'review' && v.lease.agent === c.agents.coder.id) c.copyLeases.add(v.folder)
+    },
+    prompt: (c) => `Review card #${c.cards.r}: its check is node test.js. Give your verdict.`,
+    fake: (c) => `skill review-agent-work then hive hive_start_review {"card":"#${c.cards.r}"} then hive hive_verdict {"card":"#${c.cards.r}","pass":true,"comment":"Round 1: PASSED. greet trims the name; node test.js passes."}`,
+    expect: (o, c) => {
+      // The copy's folder: as the reply the agent saw names it (in any tool's result), else the copy Hive lent it.
+      const copyReply = o.tools.map((t) => t.result).find((r) => /Review in .+? at [0-9a-f]{7,}/.test(r)) ?? ''
+      const copy = (copyReply.match(/Review in (.+?) at [0-9a-f]{7,}/) ?? [])[1] ?? [...c.copyLeases][0] ?? ''
+      // A path as a tool's input may give it: either slash, escaped or not, any case.
+      const norm = (x) => String(x).toLowerCase().replace(/\\+/g, '/')
+      const inCopy = copy ? o.tools.filter((t) => !/^(Write|Edit|MultiEdit)$/i.test(t.name) && norm(t.input).includes(norm(copy))) : []
+      return [
+        ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
+        ['started the review with hive_start_review', ran(o, 'hive_start_review').length > 0, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['Hive lent it a review copy at its start', c.copyLeases.size > 0 || !!copyReply, [...c.copyLeases].join(', ')],
+        ['the reply it saw named the copy, with its folder', !!copyReply, hiveReplies(o, 'hive_start_review').map((t) => t.result.slice(0, 300)).join(' | ')],
+        ['read or ran its checks in the review copy', inCopy.length > 0, `${copy} | ${o.tools.map((t) => t.input.slice(0, 80)).join(' | ')}`],
+        // test.js leaves ran.txt beside itself: one in the project folder is a check run there, not in the copy (#1559).
+        ['ran no command in the project folder (no ran.txt there)', !require('fs').existsSync(require('path').join(c.ws, 'alpha', 'ran.txt'))],
+        ['gave a verdict (a Verdict fact)', factsOf(o, 'r', 'Verdict').length > 0],
+        ["changed nothing of the builder's (a review only reads)", o.gitStatus.trim() === '', o.gitStatus]
+      ]
+    },
+    fakeSkips: ['read or ran its checks in the review copy']
+  },
+  {
+    id: 'pool-reviewer-wake',
+    title: "A reviewer from the project's reviewer pool is given a card (#1444, #1443): it reviews that card, with no lane to join, and gives its verdict",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    async setup(c) {
+      await inReview(c, true)
+    },
+    // The line Hive's pool gives its reviewer (reviewerPool.ts), the card named.
+    prompt: (c) => `[Hive] #${c.cards.r} (Implementer's card) is in Review: you review it from the pool. Review its latest submission (hive_read_task, then hive_start_review and hive_verdict); your verdict frees you for the next card.`,
+    fake: (c) => `skill review-agent-work then hive hive_read_task {"number":${c.cards.r}} then hive hive_start_review {"card":"#${c.cards.r}"} then hive hive_verdict {"card":"#${c.cards.r}","pass":true,"comment":"Round 1: PASSED. greet trims the name."}`,
+    expect: (o) => {
+      const joins = called(o, 'hive_lane').filter((x) => argsOf(x).action === 'join')
+      return [
+        ['started the review of that card (a ReviewStarted fact)', factsOf(o, 'r', 'ReviewStarted').length > 0, (o.facts?.r ?? []).map((f) => f.kind).join(',')],
+        ['gave its verdict on it (a Verdict fact)', factsOf(o, 'r', 'Verdict').length > 0],
+        ['joined no lane (a pool reviewer has none)', !joins.some((x) => x.ok), joins.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ['started no lane of its own', !ran(o, 'hive_lane').some((x) => argsOf(x).action === 'start')]
+      ]
+    }
+  },
+  {
+    id: 'isolated-check',
+    title: "A builder runs its card's check while other agents edit the shared folder (#1444, #1435): it runs it isolated, in a check copy at the card's revision",
+    files: { 'greet.js': "module.exports = (name) => 'Hello ' + name\n" },
+    async setup(c) {
+      const path = require('path')
+      // The project folder shared (no slots), with the workflow's check "quick": node check.js, which records where and
+      // at which revision it ran, in the workspace (outside the project and its copies).
+      const file = path.join(c.ws, 'alpha', '.hive', 'project.json')
+      const cfg = JSON.parse(require('fs').readFileSync(file, 'utf8'))
+      require('fs').writeFileSync(file, JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project', preChecks: ['quick'], commands: { quick: 'node check.js' } } } }, null, 2))
+      c.checkLog = path.join(c.ws, 'quick-runs.jsonl')
+      // check.js is the project's own check, run by Hive's check runner with its environment, not a child of the harness.
+      c.write('check.js', `const cp = require('child_process')\nrequire('fs').appendFileSync(${JSON.stringify(c.checkLog)}, JSON.stringify({ cwd: process.cwd(), head: cp.execSync('git rev-parse HEAD').toString().trim() }) + '\\n')\nconsole.log('quick: ok')\n`)
+      const n = await c.card('q', { title: 'Greeting comma', description: 'greet.js returns "Hello, <name>" with a comma. Its check is the workflow check quick.', agent: 'coder' })
+      await c.inv('tasks:move', n, 'doing')
+      // Coder's work on the card, committed in the shared folder.
+      c.write('greet.js', "module.exports = (name) => 'Hello, ' + name\n")
+      c.git('add', '-A')
+      c.git('-c', 'user.name=Coder', '-c', 'user.email=c@example.com', 'commit', '-qm', 'Greeting comma')
+      c.revision = c.git('rev-parse', 'HEAD').trim()
+      c.key = (await c.api('GET', `/v1/tasks/${n}`)).body?.key
+    },
+    prompt: (c) => `Card #${c.cards.q} is yours, in Doing, and its work is committed. Run its check quick now and tell me the result. Other agents are editing files in this folder at the moment, so their edits mustn't affect the check.`,
+    fake: (c) => `skill work-on-card then shell: hive-progress --check quick --isolated --card "${c.key}"`,
+    expect: (o, c) => {
+      const fs = require('fs')
+      const ranAt = fs.existsSync(c.checkLog) ? fs.readFileSync(c.checkLog, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)) : []
+      const isolated = runs(o, '--isolated').filter((t) => /hive-progress[^\n]*--check\s+quick/.test(t.input))
+      const inCopy = ranAt.filter((r) => /[\\/]copies[\\/]/i.test(r.cwd))
+      // What it does is the check, not which skill it read: Claude Code found --isolated without reading work-on-card (#1444).
+      return [
+        ['ran the check isolated (hive-progress --check quick --isolated)', isolated.length > 0, o.tools.map((t) => t.input.slice(0, 100)).join(' | ')],
+        ['the check ran in a check copy, not the shared folder', inCopy.length > 0 && ranAt.every((r) => /[\\/]copies[\\/]/i.test(r.cwd)), JSON.stringify(ranAt)],
+        ["…at the card's revision", inCopy.length > 0 && inCopy.every((r) => r.head === c.revision), `${c.revision} | ${JSON.stringify(ranAt)}`],
+        ['changed nothing in the shared folder', o.gitStatus.trim() === '', o.gitStatus]
+      ]
+    },
+    // The fakes' shell steps aren't tool calls in their transcripts: where the check ran shows it.
+    fakeSkips: ['ran the check isolated (hive-progress --check quick --isolated)']
+  },
+  {
     id: 'card-loop-design-first',
     title: "A card loop builder asked for a design first (#1382): it arms its watch, posts the design for its reviewer's check with hive_loop_step, and builds nothing yet",
     files: { 'cache.js': 'module.exports = new Map()\n' },
@@ -2844,6 +3005,39 @@ module.exports.SCENARIOS = [
       ['its Control is still Look and advise', o.settings?.assistant?.control === 'look', String(o.settings?.assistant?.control)],
       ['no change to it worked', !o.hiveCalls.some((x) => x.tool === 'hive_update_setting' && x.ok && /assistant\.control/.test(x.args ?? ''))]
     ]
+  },
+  {
+    id: 'assistant-release-slot',
+    title: "The Assistant releases a slot held by an agent's run in a Hive that crashed, once the user agrees (#1561): it lists what there is to release, then releases it confirming the slot and run list gave",
+    role: 'assistant',
+    control: 'agents',
+    // Coder lent a slot for a card, and its writer a run of another Hive's whose process has ended (a crash).
+    async setup(c) {
+      const lent = await c.inv('slots:test', c.alpha, { op: 'lend', agent: c.agents.coder.id, card: 1 })
+      if (!lent?.ok) throw new Error(`setup: no slot lent (${JSON.stringify(lent)})`)
+      c.slot = lent.slot.name
+      c.run = 'run-crashed-1561'
+      const gone = require('child_process').spawnSync(process.execPath, ['-e', ''], { env: require('../e2e/runContext.cjs').baseEnv() }).pid
+      if (!(await c.inv('slots:test', c.alpha, { op: 'writer', slot: c.slot, agent: c.agents.coder.id, run: c.run, pid: gone, started: 1 }))) throw new Error('setup: the writer was not planted')
+    },
+    prompt: (c) => `Coder's session in ${c.slot} was in a Hive that crashed, and the slot is still held, so no new work can use it. I've checked that nothing of that session still runs: yes, please release it.`,
+    fake: (c) => `hive hive_release_slot {"action":"list","project":"alpha"} then hive hive_release_slot {"action":"release","project":"alpha","slot":"${c.slot}","kind":"writer","confirm":{"slot":"${c.slot}","run":"${c.run}"}}`,
+    // The slot's writer once its turn has ended (Hive still running).
+    async keepWaiting(c) {
+      c.writerAfter = await c.inv('slots:heldWriter', c.alpha, c.slot).catch((e) => ({ error: String(e?.message ?? e) }))
+      return false
+    },
+    expect: (o, c) => {
+      const listed = called(o, 'hive_release_slot').findIndex((x) => x.ok && argsOf(x).action === 'list')
+      const release = ran(o, 'hive_release_slot').find((x) => argsOf(x).action === 'release')
+      const a = release ? argsOf(release) : {}
+      return [
+        ['listed what alpha has to release first (hive_release_slot list)', listed >= 0 && (!release || called(o, 'hive_release_slot').indexOf(release) > listed), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['released it with hive_release_slot release, confirming the slot and run list gave, which worked', !!release && a.slot === c.slot && a.confirm?.slot === c.slot && a.confirm?.run === c.run, release?.args ?? ''],
+        ['the slot is free of that run: it has no writer now', c.writerAfter === null, JSON.stringify(c.writerAfter)],
+        ['released nothing else (no carried slot, no other slot)', ran(o, 'hive_release_slot').filter((x) => argsOf(x).action === 'release').length === 1]
+      ]
+    }
   }
 ]
 

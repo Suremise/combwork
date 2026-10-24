@@ -24,7 +24,7 @@ import { OPTION_TEXT, optionTitle, VALUE_TEXT } from './workflow/optionTexts'
 import { writeWorkflow } from './workflow/projectWorkflow'
 import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
-import { AUTO_PROVIDER, PROVIDERS, dangerModes, defaultProviderSettings, modeOption, permissionLabel, projectProviderConfig, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
+import { AUTO_PROVIDER, DEFAULT_PROJECT_PROVIDER, PROVIDERS, dangerModes, defaultProviderSettings, modeOption, permissionLabel, projectProviderConfig, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
 
 /** Where a setting lives: Hive's own (Settings), a provider's page in Settings, the open workspace, or one project (Project Settings). */
 export type SettingScope = 'app' | 'provider' | 'workspace' | 'project'
@@ -907,6 +907,7 @@ const ACTIONS = new Set([
   'project.agents',
   'project.metadata',
   'project.reset',
+  'project.slotOptions',
   ...PROVIDERS.map((p) => `${p.id}.status`),
   // The Assistant's "With <provider>" rows: their fields are entries of their own (assistant.<provider>.<key>).
   ...PROVIDERS.map((p) => `assistant.provider:${p.id}`)
@@ -1164,7 +1165,8 @@ export function settingDefault(e: SettingEntry): unknown {
   if (e.advanced) return e.advanced.scope === 'workspace' ? null : advancedDef(e.advanced.id)?.default
   if (e.workflowLevel) return 'inherit'
   if (e.scope === 'workspace') return e.key === 'loopRounds' ? LOOP_ROUNDS : LOOP_WAIT_HOURS
-  if (e.scope === 'project') return e.provider || e.workflow ? 'inherit' : (DEFAULT_PROJECT_CONFIG as unknown as Record<string, unknown>)[e.key]
+  // A project's provider settings inherit, but its Extra arguments are added to Hive's: empty (DEFAULT_PROJECT_PROVIDER).
+  if (e.scope === 'project') return e.provider ? (DEFAULT_PROJECT_PROVIDER as unknown as Record<string, unknown>)[e.key] : e.workflow ? 'inherit' : (DEFAULT_PROJECT_CONFIG as unknown as Record<string, unknown>)[e.key]
   if (e.assistantProvider) return ''
   if (e.id === 'providers.defaultProvider') return DEFAULT_SETTINGS.defaultProvider
   if (e.provider) {

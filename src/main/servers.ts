@@ -60,6 +60,7 @@ import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, ty
 import { writePty } from './ptyHost'
 import { sessions } from './sessions'
 import { agentPlace, folderFacts } from './agentFolders'
+import { releasableSlots, releaseSlot, SlotReleaseRefused, type HeldRow } from './slotRelease'
 import { slotAt } from '../shared/agentFolders'
 import { cardStall, laneOrderView, stepWaitOf } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
@@ -596,7 +597,8 @@ const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
   'cancel-messages': UNDO_FINAL.withdrawn,
   'lane-end': UNDO_FINAL.laneEnded,
   'queue-pause': UNDO_FINAL.queuePaused,
-  'queue-resume': UNDO_FINAL.queueResumed
+  'queue-resume': UNDO_FINAL.queueResumed,
+  'release-slot': UNDO_FINAL.slotReleased
 }
 
 /**
@@ -1869,6 +1871,38 @@ route('POST', '/v1/queue/resume', async ({ body }) => {
   })
 })
 
+/** A held writer as the Agent API lists it (#1561): who holds it, its run and Hive, and the processes Hive lists of it. */
+const publicHeld = (w: HeldRow) => ({ slot: w.slot, agent: w.agentName, run: w.run, hive: w.hive.self ? 'this Hive' : `gone (process ${w.hive.pid})`, processes: w.processes ? { list: w.processes.list.map((p) => ({ pid: p.pid, label: p.label })), more: w.processes.more } : null })
+
+/** Release Slot's refusals (#1561) as the Agent API answers them. */
+const slotRefusal = (e: unknown): unknown => (e instanceof SlotReleaseRefused ? new HttpError(e.status, e.message) : e)
+
+// What a project has to release (#1561): carried slots (#1441) and held writers (#1506), as the agents' ⋯ offer them.
+route('GET', '/v1/projects/:name/slots/releasable', async ({ params }) => {
+  const p = projectByName(params[0])
+  ownProjectOnly(p, "Reading a project's slots to release")
+  const r = await releasableSlots(p)
+  return { project: basename(p), carried: r.carried.map((c) => ({ slot: c.slot, agent: c.agent.name })), held: r.held.map(publicHeld) }
+})
+
+// Release Slot (#1561): a carried slot, or a held writer once confirmed (its slot and run), as the window's ⋯ does.
+route('POST', '/v1/projects/:name/slots/:slot/release', async ({ params, body }) => {
+  if (agentCaller()) throw new HttpError(403, "Project agents can't release a slot: that is the user's, and the Hive Assistant's within Settings → Assistant → Control once the user agrees. Tell the user if a slot is stuck.")
+  const p = projectByName(params[0])
+  const slot = decodeURIComponent(params[1])
+  const kind = body?.kind === undefined ? undefined : body.kind === 'carried' || body.kind === 'writer' ? body.kind : null
+  if (kind === null) throw new HttpError(400, 'kind is carried or writer')
+  const confirm = body?.confirm && typeof body.confirm === 'object' ? (body.confirm as { slot?: unknown; run?: unknown }) : null
+  return assistantChange('agents', `release slot ${slot} in ${basename(p)}`, { kind: 'release-slot', project: basename(p) }, async (guard) => {
+    const r = await releaseSlot(requireWorkspace(), p, slot, { ...(kind ? { kind } : {}), confirm, end: body?.end === true, guard }).catch((e) => {
+      throw slotRefusal(e)
+    })
+    await workspaceOf(p).refresh()
+    const what = r.kind === 'carried' ? `${r.slot} in ${basename(p)}: no longer kept for ${r.agent.name}` : `${r.slot} in ${basename(p)} from ${r.agent.name}'s ended run${r.ended ? ', its listed processes ended first' : ''}`
+    return { done: `Released ${what}`, act: { agent: { id: r.agent.id, name: r.agent.name } }, result: { project: basename(p), ...r, agent: r.agent.name } }
+  })
+})
+
 /** Remove from queue or Retry merge, the Assistant's: its reason required, run as the card's intent (#1353). */
 async function queueCard(body: any, kind: 'removeFromQueue' | 'retryMerge'): Promise<IntentDone> {
   notAgents(kind === 'removeFromQueue' ? 'take a card out of the merge queue' : "retry a card's merge")
@@ -2727,7 +2761,8 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
   if (actor.kind !== 'assistant') {
     const { done, card } = await runCardIntent(ref, actor, intent)
     const copy = await reviewCopyAfter(actor, card, { start: intent.kind === 'startReview', verdict: intent.kind === 'verdict' })
-    return copy ? { ...done, data: { ...done.data, reviewCopy: copy } } : done
+    // The copy first (#1444): a CLI that shortens a long reply (Codex's code tool) still shows where to review.
+    return copy ? { ...done, data: { reviewCopy: copy, ...done.data } } : done
   }
   const was = await tasks.getTask(ref.n).catch(() => null)
   const what = INTENT_WORDS[intent.kind]

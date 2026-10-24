@@ -184,8 +184,8 @@ const f = q.folderHelpers(fx)
     const override = await until(async () => (await h.facts(d)).find((x) => x.kind === 'Override' && x.data.move === 'merge outside the queue') ?? null, HUNG_MS)
     check('…merged, and recorded on the card as an override, the user\'s', !!override && override.data.by === 'user' && lib.git(fx.alpha, ['log', '--format=%s', 'main']).includes('BD: work from'), JSON.stringify(override))
 
-    // A crew for the crash part: a builder in its worktree, rejoined in each run after.
-    crew = { builder: await q.agent(fx, h, 'CB', { worktree: true }), reviewer }
+    // A crew for the crash part: a builder building its card on the slot its start lends, rejoined in each run after.
+    crew = { builder: await q.agent(fx, h, 'CB'), reviewer }
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {
@@ -203,8 +203,8 @@ const f = q.folderHelpers(fx)
       let ended = false
       h.app.process().once('exit', () => (ended = true))
       q.steer(fx, 'pass')
-      await q.approveBy(fx, h, crew.builder, crew.reviewer, 'Card stuck', { 'stuck.txt': 'stuck\n' }).catch(() => null)
-      check('needs you: Hive ended at the seam', !!(await until(() => ended, HUNG_MS)))
+      const steps = await q.approveBy(fx, h, crew.builder, crew.reviewer, 'Card stuck', { 'stuck.txt': 'stuck\n' }).then((r) => r.steps, (e) => String(e?.message ?? e))
+      check('needs you: Hive ended at the seam', !!(await until(() => ended, HUNG_MS)), JSON.stringify(steps))
       await h.app.close().catch(() => {})
       fs.writeFileSync(path.join(fx.alpha, 'stuck.txt'), 'edited after the crash\n')
       h = await q.startHive(fx, { port: PORT, keepOptions: true })
@@ -258,8 +258,8 @@ const f = q.folderHelpers(fx)
       crew = { builder: await q.rejoin(fx, h, crew.builder), reviewer: await q.rejoin(fx, h, crew.reviewer) }
       let ended2 = false
       h.app.process().once('exit', () => (ended2 = true))
-      await q.approveBy(fx, h, crew.builder, crew.reviewer, 'Card cmd', { 'cmd.txt': 'cmd\n' }).catch(() => null)
-      check('commands: Hive ended once the advance began, before the files', !!(await until(() => ended2, HUNG_MS)))
+      const steps2 = await q.approveBy(fx, h, crew.builder, crew.reviewer, 'Card cmd', { 'cmd.txt': 'cmd\n' }).then((r) => r.steps, (e) => String(e?.message ?? e))
+      check('commands: Hive ended once the advance began, before the files', !!(await until(() => ended2, HUNG_MS)), JSON.stringify(steps2))
       await h.app.close().catch(() => {})
       const expected = q.head(fx, 'main')
       const result = lib.git(fx.alpha, ['for-each-ref', '--format=%(objectname)', 'refs/hive/queue/']).trim().split(String.fromCharCode(10))[0].trim()

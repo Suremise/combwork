@@ -7,12 +7,12 @@ metadata:
 
 # Merge ready
 
-In Hive an agent often works in its own git worktree on its own branch. The user reviews the branch and merges it from Hive. Make that review quick and the merge safe.
+In Hive a card's work is often on its own branch, in the slot (a working folder) Hive lends the card or its lane. The user reviews the branch and merges it from Hive. Make that review quick and the merge safe.
 
 ## Steps
 
 1. **Where you are.** `git branch --show-current` and `git worktree list`. This prepares a separate branch. On the project's main branch there is nothing to merge: say so, and do what the user asked (commit there only if they asked you to).
-2. **Finish loose work.** `git status`. Commit the work that belongs to this task, with clear messages, and only that. Leave out build output, logs, local config and secrets. List anything you left uncommitted, and why. End what you started that still runs (log watchers, servers, app copies): left running, they hold the worktree's files and ports.
+2. **Finish loose work.** `git status`. Commit the work that belongs to this task, with clear messages, and only that. Leave out build output, logs, local config and secrets. List anything you left uncommitted, and why. End what you started that still runs (log watchers, servers, app copies): left running, they hold the folder's files and ports.
 3. **Run the checks.** Use the project's own commands (package scripts, a Makefile, the README, CI config): tests, typecheck, lint, and whatever else the change needs. Fix failures this branch caused. Report failures that were there before, without fixing unrelated code.
 4. **Compare with the base** (usually `main` or `master`):
    - `git log --oneline <base>..HEAD` and `git diff --stat <base>...HEAD`. Look for files changed by accident, debug code, commented-out code and leftover TODOs.
@@ -33,7 +33,7 @@ Give the user the summary and say plainly whether the branch is ready, and if no
 
 Other agents merge into the same base. What you merge must be what you checked, so merges into a base take turns through Hive's **merge slot**:
 1. **Claim the slot** for the base with `hive_merge_slot` (`claim`, with the cards you are merging). If it replies that you are still in line, claim again: you keep your place. Without Hive's tools, go on without it; step 4 still protects the merge.
-2. **Merge the base into your branch, note its commit** (`git rev-parse <base>`) **and run the checks** the combined change needs. While you hold the slot nobody merges into the base through Hive, so one run is enough. The hold lasts 60 minutes: claim again to extend it, or run long checks through `hive-progress`. Waiting while you hold it (for the user, a push, a card), wait with a watch, not a timer (work-on-card), its `limitMinutes` under the hold (such as 40), and claim again when it wakes you.
+2. **Merge the base into the branch, note its commit** (`git rev-parse <base>`) **and run the checks** the combined change needs. While you hold the slot nobody merges into the base through Hive, so one run is enough. The hold lasts 60 minutes: claim again to extend it, or run long checks through `hive-progress`. Waiting while you hold it (for the user, a push, a card), wait with a watch, not a timer (work-on-card), its `limitMinutes` under the hold (such as 40), and claim again when it wakes you.
 3. **If something fails**, release the slot (`release`) before fixing it, and claim it again when you are ready.
 4. **Just before merging, compare** the base's commit with the one you noted. If it moved anyway (a merge from outside Hive), merge the base in again, rerun the checks (all of them when the new commits touch shared code or test tooling) and compare again.
 5. **Merge** in the checkout where the base is (`git -C <that checkout> merge --no-ff <branch>`). If git says `index.lock` exists, another merge is under way there: wait and try again; never delete the lock.

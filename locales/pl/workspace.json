@@ -106,6 +106,7 @@
   "workspace.banners.showProject": "Pokaż projekt",
   "workspace.banners.showProjectLabel": "Pokaż projekt: {title}",
   "workspace.changes.aboutAgent": "Worktree agenta {agent}: wszystko na gałęzi {branch} od odejścia od {base}. „Scal…” przenosi to do {base}.",
+  "workspace.changes.aboutSlot": "{is, select, carried {{agent} pracuje w {name}, slocie przejętym dla niego} other {{agent} buduje w {name}}}: {known, select, yes {wszystko na jego gałęzi od odejścia od {base}.} other {to, czego jeszcze tam nie zatwierdzono.}}",
   "workspace.changes.aboutProject": "Folder projektu: to, co nie ma jeszcze commita – Twoje zmiany lub agentów pracujących w samym folderze (tych bez worktree).",
   "workspace.changes.aboutUnusedOne": "Nieużywane worktree: wszystko na gałęzi {branch}, czego nie ma w {into}. Scal je albo wróć do „Nieużywane worktree”, aby je usunąć.",
   "workspace.changes.aboutUnusedShort": "Worktree, w których nie pracuje żaden agent projektu {project}: otwórz jedno, aby zobaczyć i scalić jego zmiany, albo je usuń.",

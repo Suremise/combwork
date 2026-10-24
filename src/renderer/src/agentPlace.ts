@@ -15,6 +15,16 @@ export function legacyOf(a: Pick<AgentInfo, 'place'>): { path: string; branch: s
   return p.is === 'legacy' ? { path: p.folder, branch: p.branch ?? '', base: p.base ?? '' } : null
 }
 
+/**
+ * The folder its work is in, away from the project folder (#1569): the slot it builds in, the slot kept for it or its
+ * 0.9 worktree, with its branch and the branch that work is compared with (`base`), when known; null in the project
+ * folder or a retired home. What the Changes tab lists as in use.
+ */
+export function workFolderOf(a: Pick<AgentInfo, 'place'>): { path: string; branch: string | null; base: string | null } | null {
+  const p = a.place
+  return p.is === 'slot' || p.is === 'carried' || p.is === 'legacy' ? { path: p.folder, branch: p.branch || null, base: p.base || null } : null
+}
+
 /** Whether it works outside the project folder (a slot, a carried slot, a home or a 0.9 worktree). */
 export const awayFromProject = (a: Pick<AgentInfo, 'place'>): boolean => a.place.is !== 'project'
 

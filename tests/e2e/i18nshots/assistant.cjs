@@ -181,7 +181,8 @@ async function notes(ctx) {
   await ctx.inv('notes:create', 'plans', true)
   await ctx.inv('notes:create', 'plans/next.md', false)
   await ctx.command('view.notes')
-  const row = ctx.page.locator('.sidebar .pane-body .row').first()
+  // The plans folder's row, by its path: Workspace notes is pinned first (#1433) and has no menu.
+  const row = ctx.page.locator('.sidebar .pane-body .row[data-note="plans"]')
   await (await shown(ctx, row, 'the notes')).click({ button: 'right' })
   await menuShown(ctx)
   return windowShot()

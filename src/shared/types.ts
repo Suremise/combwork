@@ -1279,7 +1279,7 @@ export interface CopyView {
 }
 
 /** What a test copy asks of a project's slot pool (`slots:test`, unpackaged builds only: #1429's e2e). */
-export type SlotTestOp = { op: 'lend'; agent: string; card?: number; lane?: string; slot?: string } | { op: 'release'; lease: string; why?: string } | { op: 'tidy'; at?: number } | { op: 'remove'; slot: string } | { op: 'carry'; agent: string; slot: string; folder: string } | { op: 'homes'; folders: string[] }
+export type SlotTestOp = { op: 'lend'; agent: string; card?: number; lane?: string; slot?: string } | { op: 'release'; lease: string; why?: string } | { op: 'tidy'; at?: number } | { op: 'remove'; slot: string } | { op: 'carry'; agent: string; slot: string; folder: string } | { op: 'homes'; folders: string[] } | { op: 'writer'; slot: string; agent: string; run: string; pid: number; started: number }
 
 /** A project's slot options as project.json keeps them (ProjectConfig.slots): each left out falls back (slots.ts). */
 export interface SlotOptions {

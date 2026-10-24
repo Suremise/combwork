@@ -106,6 +106,7 @@
   "workspace.banners.showProject": "Projekt anzeigen",
   "workspace.banners.showProjectLabel": "Projekt anzeigen: {title}",
   "workspace.changes.aboutAgent": "Worktree von {agent}: alles auf {branch}, seit der Branch von {base} abgezweigt wurde. „Mergen…“ bringt es nach {base}.",
+  "workspace.changes.aboutSlot": "{is, select, carried {{agent} arbeitet in {name}, dem für ihn übernommenen Slot} other {{agent} baut in {name}}}: {known, select, yes {alles auf seinem Branch, seit er von {base} abgezweigt wurde.} other {was dort noch nicht committet ist.}}",
   "workspace.changes.aboutProject": "Der Projektordner: was noch nicht committet ist, von dir oder den Agenten, die direkt im Ordner arbeiten (denen ohne Worktree).",
   "workspace.changes.aboutUnusedOne": "Ein ungenutzter Worktree: alles auf {branch}, was nicht auf {into} ist. Merge ihn, oder geh zurück zu „Ungenutzte Worktrees“, um ihn zu entfernen.",
   "workspace.changes.aboutUnusedShort": "Worktrees, in denen kein Agent von {project} arbeitet: Öffne einen, um seine Änderungen zu sehen und sie zu mergen, oder entferne ihn.",

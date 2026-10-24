@@ -25,7 +25,7 @@ Ask if the role or the cards aren't clear.
 
 Hive keeps a record of the loop, its **lane**, and shows it to the user. Register it as you start, with `hive_lane`:
 - builder: `action: "start"`, the cards in order, `reviewer` (its name), and `rounds` and `waitMinutes` only if the request gave them;
-- reviewer: `action: "join"`, `builder` (its name) and the cards.
+- reviewer: `action: "join"`, `builder` (its name) and the cards. A reviewer from the project's reviewer pool joins no lane: Hive tells it of each card it is given to review, in its inbox.
 
 Its reply gives the lane's rounds and wait: use them where your request gave none. Without a lane, 10 rounds and 6 hours.
 

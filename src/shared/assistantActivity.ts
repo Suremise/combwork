@@ -28,6 +28,7 @@ export const ACTIVITY_KINDS = [
   'lane-end',
   'queue-pause',
   'queue-resume',
+  'release-slot',
   'create-project',
   'activate-project',
   'deactivate-project',
@@ -137,7 +138,8 @@ export const UNDO_FINAL = {
   removedFromQueue: "Taking it out of the merge queue stays in the card's work: it is queued again only by Retry merge or a new approval.",
   retriedMerge: "Its Retry merge stays in the card's work.",
   queuePaused: "A merge queue it paused stays paused: resume it if it should run.",
-  queueResumed: "A merge queue it resumed isn't paused again: pause it if it shouldn't run."
+  queueResumed: "A merge queue it resumed isn't paused again: pause it if it shouldn't run.",
+  slotReleased: "A slot it released isn't kept or held again: the next work that needs a slot may take it."
 } as const
 
 /** A reason a change of the Assistant's, or part of it, can't be undone (UNDO_FINAL's codes). */

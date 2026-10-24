@@ -1,6 +1,7 @@
 // Crash injection into the merge queue's update of a target checked out in a folder (#1351, SPEC §16.9.2's recovery
 // table; S34d): `main` checked out in the project folder, Merge into a checked-out branch set to Automatically, fake
-// Claude Code agents (one builder in its worktree and one reviewer, rejoined in each run of Hive), the Assistant off.
+// Claude Code agents (one builder, building each card on the slot its start lends, and one reviewer, rejoined in each
+// run of Hive), the Assistant off.
 // - Hive ended (HIVE_TEST_QUEUE_CRASH) after IntegrationStarted, before and after read-tree, before and after update-ref,
 //   and in and after a rollback (the target moved by another client just before the swap: HIVE_TEST_QUEUE_RACE): each
 //   next start recovers per the table, the card merged exactly once, the folder clean on main, the queue not paused.
@@ -36,7 +37,7 @@ const main = () => q.head(fx, 'main')
     if (!crew) {
       await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: f.options() })
       await h.inv('advanced:set', 'hive.queue.checkedOutTarget', 'auto')
-      crew = { builder: await q.agent(fx, h, 'CB', { worktree: true }), reviewer: await q.agent(fx, h, 'CR') }
+      crew = { builder: await q.agent(fx, h, 'CB'), reviewer: await q.agent(fx, h, 'CR') }
     } else crew = { builder: await q.rejoin(fx, h, crew.builder), reviewer: await q.rejoin(fx, h, crew.reviewer) }
     return h
   }
@@ -45,8 +46,8 @@ const main = () => q.head(fx, 'main')
     let ended = false
     h.app.process().once('exit', () => (ended = true))
     q.steer(fx, 'pass')
-    await q.approveBy(fx, h, crew.builder, crew.reviewer, `Card ${label}`, { [`${label}.txt`]: `${label}\n` }).catch(() => null)
-    check(`${label}: Hive ended at the seam`, !!(await waitHung(() => ended)))
+    const steps = await q.approveBy(fx, h, crew.builder, crew.reviewer, `Card ${label}`, { [`${label}.txt`]: `${label}\n` }).then((r) => r.steps, (e) => String(e?.message ?? e))
+    check(`${label}: Hive ended at the seam`, !!(await waitHung(() => ended)), JSON.stringify(steps))
     await h.app.close().catch(() => {})
   }
   /** After a restart: Done, Integrated once (its result in main), one merge commit, its file there, the folder clean. */

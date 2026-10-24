@@ -2691,6 +2691,10 @@
     "defaultMessage": "Its Retry merge stays in the card's work.",
     "description": "What of the Assistant's Retry merge on a card (a command that queues a returned card again) stays when it is undone."
   },
+  "assistant.undo.why.slotReleased": {
+    "defaultMessage": "A slot it released isn't kept or held again: the next work that needs a slot may take it.",
+    "description": "Why a change of the Assistant's can't be undone: it released a slot (a folder cards are built in) that was kept for an agent or held by an agent's ended session."
+  },
   "assistant.undo.why.start": {
     "defaultMessage": "Its start stays in the card's work: undo moves the card back, it doesn't unstart it.",
     "description": "What of a card's start by the Assistant stays when it is undone."

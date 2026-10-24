@@ -82,7 +82,7 @@ const key = (card: number, agent: string): string => `${card}|${agent}`
 
 /** The line an agent's start review reply, or its later message, gives for a copy. */
 export function reviewCopyText(a: ReviewCopyAnswer, card?: number): string {
-  if (a.is === 'ready') return `${card !== undefined ? `#${card}'s review copy is ready. ` : ''}Review in ${a.folder} at ${a.revision.slice(0, 12)}: read and run commands there; your session stays where it is.` // i18n-ignore: agent-facing
+  if (a.is === 'ready') return `${card !== undefined ? `#${card}'s review copy is ready. ` : ''}Review in ${a.folder} at ${a.revision.slice(0, 12)}: read and run commands there, with it as their working directory; your session stays where it is.` // i18n-ignore: agent-facing
   if (a.is === 'waiting') return `Waiting for a review copy (${a.why}): Hive tells you when one is ready, with its folder. Meanwhile git can show the submission from where you are.` // i18n-ignore: agent-facing
   return `No review copy (${a.why}): review the builder's work read-only from where you are.` // i18n-ignore: agent-facing
 }

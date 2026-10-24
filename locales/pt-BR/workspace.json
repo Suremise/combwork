@@ -106,6 +106,7 @@
   "workspace.banners.showProject": "Mostrar o projeto",
   "workspace.banners.showProjectLabel": "Mostrar o projeto: {title}",
   "workspace.changes.aboutAgent": "Worktree de {agent}: tudo no branch {branch} desde que saiu de {base}. Fazer merge… leva isso para {base}.",
+  "workspace.changes.aboutSlot": "{is, select, carried {{agent} trabalha em {name}, o slot adotado para ele} other {{agent} constrói em {name}}}: {known, select, yes {tudo no seu branch desde que saiu de {base}.} other {o que ainda não foi commitado lá.}}",
   "workspace.changes.aboutProject": "A pasta do projeto: o que ainda não tem commit, seu ou dos agentes que trabalham na própria pasta (os que não têm worktree).",
   "workspace.changes.aboutUnusedOne": "Um worktree não usado: tudo no branch {branch} que {into} não tem. Faça o merge, ou volte para Worktrees não usados para removê-lo.",
   "workspace.changes.aboutUnusedShort": "Worktrees em que nenhum agente do projeto {project} trabalha: abra um para ver as alterações e fazer merge delas, ou remova-o.",

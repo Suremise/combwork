@@ -271,6 +271,10 @@
     "defaultMessage": "Agent Setup",
     "description": "Button: opens Agent Setup, which checks git and says how to fix it."
   },
+  "project.changes.agentSlot": {
+    "defaultMessage": "{agent} · {place}{known, select, yes { · {branch}} other {}}",
+    "description": "An agent's slot in the picker (#1569): the agent, where it works ({place}: \"in slot-b\", or \"carried: hb2\" for the slot kept for it) and its git branch ({branch}), when known. Glossary: slot."
+  },
   "project.changes.agentWorktree": {
     "defaultMessage": "{agent}'s worktree · {branch}",
     "description": "An agent's worktree in the picker. {branch} is its git branch."

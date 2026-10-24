@@ -96,6 +96,7 @@ export function slotsIn(db: DatabaseSync, project: string): FolderSlot[] {
       folder: s.folder as string,
       state: s.state as string,
       portBase: s.port_base as number,
+      target: (s.target as string | null) ?? null,
       open: o ? leaseOfRow(o) : null,
       last: n ? { ...leaseOfRow(n), ended: n.ended_at !== null, endRev: (n.end_rev as string | null) ?? null } : null,
       writer: s.writer_run ? { run: s.writer_run as string, agent: s.writer_agent as string, lease: s.writer_lease as string } : null
@@ -473,20 +474,22 @@ async function restartList(projectPath: string, w: { run: string; agent: string 
  * The user's recovery of a held writer (#1506, Release Slot…): with `end`, what Hive lists of its run's processes is
  * ended first; then the writer is cleared in a write fenced by its run, and drained (the ended lease's last revision,
  * the slot looked at). Refused while its Hive still runs (another one, or one that can't be told) or its run is live
- * here, and when the slot's writer is no longer that run (a claim or a release meanwhile: one outcome).
+ * here, and when the slot's writer is no longer that run (a claim or a release meanwhile: one outcome). `guard` (#1561:
+ * the Assistant's Control and session) runs just before the processes are ended and in the write that clears it.
  */
-export async function releaseHeldWriter(projectPath: string, slot: string, run: string, o: { end: boolean }): Promise<void> {
+export async function releaseHeldWriter(projectPath: string, slot: string, run: string, o: { end: boolean; guard?: () => void }): Promise<void> {
   const changed = (): Error => hiveError(msg({ id: 'slots.release.changed', defaultMessage: '{slot} changed meanwhile: its writer is no longer the one shown. Look again.', description: 'Release Slot… refused: the slot ({slot}, such as slot-b) was released or taken by another run while the question was open.' }), { slot }, { kind: 'conflict' })
   const w = await heldWriter(projectPath, slot)
   if (!w || w.run !== run) throw changed()
   if (w.live) throw hiveError(msg({ id: 'slots.release.live', defaultMessage: "{slot}'s writer is still running in this Hive: stop the agent, or end or keep what it left running, first.", description: "Release Slot… refused: the session writing in the slot ({slot}) still runs in this Hive, or Hive still follows the processes it left running (End or Keep Running in the agent's ⋯ menu settles them)." }), { slot }, { kind: 'conflict' })
   if (!w.hive.self && w.hive.alive !== false) throw hiveError(msg({ id: 'slots.release.otherHive', defaultMessage: '{slot} is held by another Hive that is still running (process {pid}): release it there, or quit that Hive first.', description: 'Release Slot… refused: another running copy of Hive (its process id {pid}) holds the slot ({slot}).' }), { slot, pid: w.hive.pid }, { kind: 'conflict' })
+  if (o.end && w.processes) o.guard?.()
   if (o.end && w.processes?.from === 'leftovers') await settleLeftovers(projectPath, w.agent, 'end', run)
   if (o.end && w.processes?.from === 'restart' && !(await endProcessesExactly(w.processes.list))) {
     throw hiveError(msg({ id: 'slots.release.notEnded', defaultMessage: "Some of the processes listed still run: Windows didn't let Hive end them, so {slot} wasn't released. Try again, or release it without ending them.", description: 'Release Slot… with "End these processes first": ending the listed processes failed (Windows refused), so the slot ({slot}) was left as it was.' }), { slot }, { kind: 'conflict' })
   }
   const { ws, project } = await hostOf(projectPath)
-  if (!(await new SlotStore(boardConn(ws), project).clearWriter(slot, run))) throw changed()
+  if (!(await new SlotStore(boardConn(ws), project).clearWriter(slot, run, o.guard))) throw changed()
   released.delete(run)
   log.info(`The slot writer ${run} on ${userText(slot)} released by the user (its Hive ${w.hive.self ? 'this one' : `process ${w.hive.pid}, gone`}${o.end && w.processes ? ', its listed processes ended first' : ''})`)
   await writerHost.drained(projectPath, slot)

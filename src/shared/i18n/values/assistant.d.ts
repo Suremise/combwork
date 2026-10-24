@@ -674,6 +674,7 @@ interface HiveMessageValues {
   'assistant.undo.why.reportMerge': undefined
   'assistant.undo.why.request': undefined
   'assistant.undo.why.retriedMerge': undefined
+  'assistant.undo.why.slotReleased': undefined
   'assistant.undo.why.start': undefined
   'assistant.undo.why.startReview': undefined
   'assistant.undo.why.submit': undefined
