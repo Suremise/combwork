@@ -10,7 +10,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'merge.hiveMerges' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'merge.hiveMerges' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -159,6 +159,10 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'card.plainNumber': r(
     msg({ id: 'workflow.refused.card.plainNumber.message', defaultMessage: 'A plain number is not a card reference.', description: 'A refused intent: the card was named by a bare number.' }),
     msg({ id: 'workflow.refused.card.plainNumber.next', defaultMessage: 'Name the card as {key} or {alias}.', description: 'The forms a card reference takes: {key} like AM-12, {alias} like #1061.' })
+  ),
+  'paths.excluded': r(
+    msg({ id: 'workflow.refused.paths.excluded.message', defaultMessage: "{card}: {path} is in {folder}, which a project without version control leaves out of its work.", description: "A refused declaration of a card's paths (#1511): in a project without version control (None), a card's paths are the files of its work; {path} is under {folder} (node_modules, .venv, .git, .hive or a folder the project excludes), which never counts as work. {card} is a card key like AM-12." }),
+    msg({ id: 'workflow.refused.paths.excluded.next', defaultMessage: "Declare only the files of the work, outside {folder}: a card's paths narrow the project's work, never widen it.", description: "The next step after a refused declaration of a card's paths: name files outside the excluded folder {folder} (#1511)." })
   ),
   'platform.unknown': r(
     msg({ id: 'workflow.refused.platform.unknown.message', defaultMessage: "{card}: Hive couldn't read {what}, so the rule {rule} can't be checked.", description: 'A refused move: a fact a rule needs could not be read (git missing, folder gone). {what} says what, {rule} the rule id.' }),

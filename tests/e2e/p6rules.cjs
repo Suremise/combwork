@@ -8,7 +8,7 @@
 //   with no manifest changed (`onManifestChange` is p5scenarios' S13);
 // - None (a project folder with no version control, `nada`): N3 a check before review refuses submit until it is counted
 //   (run through Progress for the card, as hive-progress --check does); N4 a change under node_modules isn't part of the
-//   work (not unclaimed, and written while the check runs, the check still counts); N2 the builder can't review its own card; N6 a card blocked by one not yet accepted can't start, and
+//   work (not unclaimed, and written while the check runs, the check still counts), nor can a card declare it (#1511); N2 the builder can't review its own card; N6 a card blocked by one not yet accepted can't start, and
 //   starts once it is.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -158,6 +158,11 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 200)
     check('None: NB declares the path its card changes', decl.status === 200, JSON.stringify(decl.body))
     const unclaimed = decl.body?.data?.unclaimed ?? []
     check("N4: what no card claims is extra.txt; node_modules' change isn't part of the work", unclaimed.includes('extra.txt') && !unclaimed.some((x) => x.startsWith('node_modules')), JSON.stringify(decl.body?.data))
+    // #1511: nor can a card declare it its work: a path under node_modules is refused, the card's paths kept.
+    const widen = await q.intent(h, nb, nc, 'declare-paths', { paths: ['notes.txt', 'node_modules/pad/index.js'] })
+    check('N4: declaring a path under node_modules is refused, saying why', widen.status === 409 && widen.body?.rule === 'paths.excluded' && /node_modules\/pad\/index\.js is in node_modules/.test(JSON.stringify(widen.body)), JSON.stringify(widen.body))
+    const kept = await q.intent(h, nb, nc, 'declare-paths', { paths: ['notes.txt'] })
+    check("…the card's paths as declared before", kept.status === 200 && kept.body?.data?.revision === decl.body?.data?.revision, JSON.stringify(kept.body))
     const early = await q.intent(h, nb, nc, 'submit', { summary: 'notes: ready' })
     check('N3: submit refused until the check before review is counted', early.status === 409 && early.body?.rule === 'submit.checksPassed' && JSON.stringify(early.body).includes('quick'), JSON.stringify(early.body))
     // The check through Progress for the card, as hive-progress --check reports it: resolved (the folder as it starts),

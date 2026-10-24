@@ -178,6 +178,37 @@ describe('workflow scenarios, None', () => {
     expect(during).toMatchObject({ counted: false, whyNot: 'changed' })
   })
 
+  // #1511 (decided: refuse): a card's paths narrow the deliverables, never widen them.
+  it('#1511: a path under node_modules, .venv, .git or .hive is refused by declare paths and submit; a declared folder leaves its excluded descendants out; paths stored from before are left out of the revision, and said so', async () => {
+    const e = (env = setup({ ...preset('none', 'team'), preChecks: [] }, { files: { 'src/a.md': 'a\n', 'src/node_modules/y.js': 'y\n', 'node_modules/pad/index.js': 'pad\n', '.venv/lib/x.py': 'x\n' } }))
+    const card = e.wf.createCard({ title: 'Src', paths: ['src/a.md'] })
+    moved(await e.wf.start(card.key, B1))
+    for (const [path, folder] of [['node_modules/pad/index.js', 'node_modules'], ['node_modules', 'node_modules'], ['src/node_modules/y.js', 'node_modules'], ['.venv/lib/x.py', '.venv'], ['.git/config', '.git'], ['.hive/project.json', '.hive']]) {
+      const r = await e.wf.declarePaths(card.key, B1, ['src/a.md', path])
+      expect(isRefusal(r) && r.rule === 'paths.excluded' && r.values).toMatchObject({ path, folder })
+      expect(e.wf.store.card(card.id).paths).toEqual(['src/a.md'])
+    }
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'x', paths: ['src/a.md', 'node_modules/pad/index.js'] }), 'paths.excluded')
+    // A declared folder: its excluded descendants are left out, as before (an edit there is no new revision).
+    const folder = async () => {
+      const r = await e.wf.declarePaths(card.key, B1, ['src'])
+      if (isRefusal(r)) throw new Error(r.message)
+      return r.revision
+    }
+    const r1 = await folder()
+    put(e.project, 'src/node_modules/y.js', 'y, a cache write\n')
+    expect(await folder()).toBe(r1)
+    put(e.project, 'src/a.md', 'a, written\n')
+    const r2 = await folder()
+    expect(r2).not.toBe(r1)
+    // Paths stored before #1511 under an excluded folder: the revision is the rest's, and the submit says what it left out.
+    e.wf.store.updateCard(card.id, { paths: ['src', 'node_modules/pad/index.js'] })
+    const m = await e.wf.submit(card.key, B1, { summary: 'src' })
+    moved(m)
+    expect(e.wf.state(card).latest?.revision).toBe(r2)
+    expect((m as { warnings?: string[] }).warnings?.join(' ')).toMatch(/left out of .*'s revision: node_modules\/pad\/index\.js/)
+  })
+
   it('S20: .git removed → Git\'s rules hold (unknown) and None is offered; a None project gets git init → Git offered', async () => {
     const g = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }))
     const card = g.wf.createCard({ title: 'Lost repo' })

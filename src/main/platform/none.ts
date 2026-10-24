@@ -106,14 +106,42 @@ export class NoneAdapter {
     return !!posix && !isAbsolute(p) && !posix.split('/').some((part) => part === '..' || part === '.hive')
   }
 
-  /** The manifest of some paths: each file under them with its content hash; a declared path that's gone is "deleted". */
+  /**
+   * The part of a project-relative path that keeps it out of the deliverables (`.hive`, `.git` or an excluded folder), or
+   * null (#1511). A card's paths narrow the deliverables, never widen them: declaring such a path is refused, and one
+   * stored from before is left out of the card's revision (`leftOut`).
+   */
+  excludedPart(rel: string): string | null {
+    return (
+      toPosix(rel)
+        .split('/')
+        .filter(Boolean)
+        .find((part) => this.skip(part)) ?? null
+    )
+  }
+
+  /** The declared paths a revision leaves out (#1511): those under `.hive`, `.git` or an excluded folder. */
+  leftOut(paths: string[]): string[] {
+    return [...new Set(paths.map(toPosix))].filter((p) => this.excludedPart(p) !== null).sort()
+  }
+
+  /** The declared paths a revision covers: the rest. */
+  private covered(paths: string[]): string[] {
+    return [...new Set(paths.map(toPosix))].filter((p) => this.excludedPart(p) === null).sort()
+  }
+
+  /**
+   * The manifest of some paths: each file under them with its content hash; a declared path that's gone is "deleted".
+   * Declared paths under an excluded folder are left out (#1511), as a folder's excluded descendants are.
+   */
   manifest(paths: string[]): Maybe<Manifest> {
     const out: Manifest = {}
     const limit = { n: 0 }
     let bytes = 0
-    const outside = paths.find((p) => !NoneAdapter.inside(p))
+    const kept = this.covered(paths)
+    const outside = kept.find((p) => !NoneAdapter.inside(p))
     if (outside !== undefined) return unknown(UNREADABLE.pathOutside, { path: outside })
-    for (const p of [...new Set(paths.map(toPosix))].sort()) {
+    for (const p of kept) {
       const found: string[] = []
       this.files(p, found, limit)
       if (limit.n > NONE_MAX_FILES) return unknown(UNREADABLE.cardPathsFiles, { n: NONE_MAX_FILES })
@@ -133,12 +161,13 @@ export class NoneAdapter {
 
   /**
    * The revision of a card's paths (§16.3.3): SHA-256 over the sorted (path, hash or "deleted") list together with the
-   * path list itself, so changing the list is a new revision too. Computable at any time.
+   * path list itself, so changing the list is a new revision too. Computable at any time. The paths it covers: those
+   * left out (#1511) are in neither.
    */
   revision(paths: string[]): Maybe<NoneRevision> {
     const m = this.manifest(paths)
     if (isUnknown(m)) return m
-    const list = [...new Set(paths.map(toPosix))].sort()
+    const list = this.covered(paths)
     const body = JSON.stringify({ paths: list, files: Object.keys(m).sort().map((k) => [k, m[k]]) })
     return { revision: createHash('sha256').update(body).digest('hex'), manifest: m }
   }
@@ -157,8 +186,7 @@ export class NoneAdapter {
 
   /** Whether a project-relative path is in the deliverables (no part of it is `.hive`, `.git` or an excluded folder). */
   isDeliverable(rel: string): boolean {
-    const parts = toPosix(rel).split('/').filter(Boolean)
-    return parts.length > 0 && !parts.some((part) => this.skip(part))
+    return toPosix(rel).split('/').filter(Boolean).length > 0 && this.excludedPart(rel) === null
   }
 
   /** A path relative to the project, with `/`. */

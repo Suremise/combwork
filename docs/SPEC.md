@@ -1129,7 +1129,11 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
 [P1, answering HB3's round 1 finding 6 and round 2 finding C, HR2's round 2 finding 6]
 - **Deliverables** (N4, §16.6.1): where a None project's work may be. By default the project folder except `.hive`
   and folders the option excludes (`node_modules` and `.venv` by default; no build output folders are found, #1482); a
-  card can narrow it to paths (OP-17).
+  card can narrow it to paths (OP-17), never widen it (#1511, decided: refuse): **declare paths** and `submit`'s
+  `paths` refuse a path any part of which is `.hive`, `.git` or an excluded folder (`paths.excluded`, naming the path
+  and the folder); a declared folder leaves such descendants out, as before; paths stored before #1511 under one are
+  left out of the revision (`NoneAdapter.leftOut`), and submit's reply says what it left out. So a write there is never
+  a card's work, as N4's watcher and checks already held (`isDeliverable`, the same rule).
 - **A card's paths** are **declared, not guessed**: the card's list of files and folders its work covers, kept on the
   card from its start, which the builder sets at any time (the **declare paths** intent, §16.8.1, or `submit`'s
   `paths`) and the user can edit on the card. Hive **pre-fills** it from what
