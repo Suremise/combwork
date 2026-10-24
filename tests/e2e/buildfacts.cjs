@@ -99,7 +99,7 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'hive' })).
     check('in German, Journal → Timeline shows both builds in German', !!(await lib.until(async () => (await german.count()) === 2, HUNG_MS)), await page.locator('.journal').innerText().catch(() => ''))
     await german.first().locator('.journal-row-main').click()
     const detail = page.locator('.journal-entry .journal-detail')
-    check("…and the entry's detail too", !!(await lib.until(async () => /^Installer: .*Hive-Setup-9\.9\.9-rc\.1\.exe\nGebaut: /.test(await detail.innerText().catch(() => '')), HUNG_MS)), await detail.innerText().catch(() => ''))
+    check("…and the entry's detail too", !!(await lib.until(async () => /^Installer: .*Hive-Setup-9\.9\.9-rc\.1\.exe\s+Gebaut: /.test(await detail.innerText().catch(() => '')), HUNG_MS)), await detail.innerText().catch(() => ''))
     await page.screenshot({ path: path.join(lib.WORK, 'buildfacts-journal-de.png') })
   } catch (e) {
     check('no unexpected error', false, e.stack)
