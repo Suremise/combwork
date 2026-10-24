@@ -1,7 +1,7 @@
 // Markdown documents by section (#817): headings outside code fences and front matter, GitHub-style unique slugs, each
 // section's size with its subsections, CRLF documents, and finding a heading by slug or text (ambiguous or unknown).
 import { describe, expect, it } from 'vitest'
-import { docOutline, findHeading, sectionText, slugOf } from '../src/shared/docSections'
+import { docOutline, findHeading, headingId, sectionText, slugOf } from '../src/shared/docSections'
 import { MAX_ROWS, docOutlineText, docSectionText } from '../src/shared/toolReplies'
 
 const doc = [
@@ -109,6 +109,17 @@ describe('findHeading and sectionText', () => {
       return 'heading' in m ? m.heading.text : JSON.stringify(m)
     }
     expect([pick('C++'), pick('C'), pick('#c'), pick('#c-1'), pick('c-1')]).toEqual(['C++', 'C', 'C++', 'C', 'C'])
+  })
+  it("a heading's explicit id (#1535) is its slug whatever its text, kept through a rename, and never another's", () => {
+    const md = '# Plan\n\n## Version Control <a id="git"></a>\n\nText.\n\n## Git\n\nOther.\n\n## Setup <a id="setup"></a>\n'
+    const o = docOutline(md)
+    expect(o.map((h) => [h.text, h.slug, !!h.fixed])).toEqual([['Plan', 'plan', false], ['Version Control', 'git', true], ['Git', 'git-1', false], ['Setup', 'setup', true]])
+    const renamed = docOutline(md.replace('## Version Control', '## Source control'))
+    const m = findHeading(renamed, '#git')
+    expect('heading' in m && m.heading.text).toBe('Source control')
+    expect('heading' in m && sectionText(md.replace('## Version Control', '## Source control'), m.heading)).toBe('## Source control <a id="git"></a>\n\nText.')
+    expect(headingId('Setup <a id="setup"></a>')).toBe('setup')
+    expect(headingId('Setup')).toBeNull()
   })
   it('an unknown heading gives the closest ones, never an empty section', () => {
     const m = findHeading(outline, 'core contract')

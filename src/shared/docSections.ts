@@ -8,6 +8,10 @@
 // Slugs follow GitHub's rule, one rule for the outline and for references to sections (#818): the heading's text as
 // shown (links as their words, code and emphasis marks dropped), lower case, every character that isn't a letter, a
 // digit, a space, a hyphen or an underscore removed, each space a hyphen. A slug used before gets -1, -2… in order.
+//
+// A heading can carry an explicit id (#1535), an empty anchor anywhere on its line: `## Version Control <a id="git"></a>`.
+// Its slug is then that id, whatever its text, so links to it survive a rename. An HTML anchor rather than `{#git}`:
+// GitHub hides it and still scrolls to `#git`, where `{#git}` would show as text in the guide on GitHub.
 
 /** One heading of a document. */
 export interface DocHeading {
@@ -15,8 +19,10 @@ export interface DocHeading {
   level: number
   /** Its text as shown. */
   text: string
-  /** Its slug, unique in the document. */
+  /** Its slug, unique in the document: its explicit id when it has one. */
   slug: string
+  /** Its slug is an explicit id (`<a id="…"></a>`), kept when its text changes. */
+  fixed?: true
   /** Its line, from 1. */
   line: number
   /** Its section's size in characters (the heading line and everything to the next heading of its level or higher). */
@@ -42,6 +48,13 @@ export function slugOf(text: string): string {
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\p{M} _-]/gu, '')
     .replace(/ /g, '-')
+}
+
+const EXPLICIT_ID = /<a\s+id="([^"\s<>]+)"\s*>\s*<\/a>/i
+
+/** A heading's explicit id (`<a id="git"></a>` on its line), or null. */
+export function headingId(raw: string): string | null {
+  return EXPLICIT_ID.exec(raw)?.[1] ?? null
 }
 
 const ATX = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/
@@ -86,23 +99,28 @@ export function docOutline(md: string): DocHeading[] {
   // Each line's length with its ending (one character: sizes count the text, not CRLF twice).
   const lineSize = lines.map((l, k) => l.length + (k < lines.length - 1 ? 1 : 0))
   const found = headingLines(lines)
-  const used = new Map<string, number>()
+  // Explicit ids are taken first: a heading without one never gets another's id as its slug.
+  const used = new Map<string, number>(found.flatMap((h) => (headingId(h.raw) ? [[headingId(h.raw)!, 0] as const] : [])))
   return found.map((h, k) => {
     const text = headingText(h.raw)
+    const id = headingId(h.raw)
     // As github-slugger numbers them: a slug used before gets the next number of its own, skipping any taken.
     const base = slugOf(h.raw)
     let slug = base
-    while (used.has(slug)) {
-      const n = used.get(base)! + 1
-      used.set(base, n)
-      slug = `${base}-${n}`
+    if (id) slug = id
+    else {
+      while (used.has(slug)) {
+        const n = (used.get(base) ?? 0) + 1
+        used.set(base, n)
+        slug = `${base}-${n}`
+      }
+      used.set(slug, 0)
     }
-    used.set(slug, 0)
     const next = found.slice(k + 1).find((x) => x.level <= h.level)
     const end = next ? next.at : lines.length
     let size = 0
     for (let l = h.at; l < end; l++) size += lineSize[l]
-    return { level: h.level, text, slug, line: h.at + 1, size }
+    return { level: h.level, text, slug, ...(id ? { fixed: true as const } : {}), line: h.at + 1, size }
   })
 }
 

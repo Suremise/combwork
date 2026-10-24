@@ -550,13 +550,13 @@ export function DocsView() {
   const doc = DOCS.find((d) => d.id === page) ?? DOCS[0]
   const api = useStore((s) => s.api)
   const source = api?.url ? doc.source().replace(/http:\/\/127\.0\.0\.1:47821/g, api.url) : doc.source()
-  // Opened at a heading (a tip's Learn more): scroll to it once the page has rendered, and mark it briefly.
+  // Opened at a heading by its id (a tip's Learn more, #1535): scroll to it once the page has rendered, and mark it briefly.
   const anchor = useStore((s) => s.docsAnchor)
   const pageRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!anchor) return
     const t = setTimeout(() => {
-      const h = [...(pageRef.current?.querySelectorAll('h1, h2, h3, h4') ?? [])].find((x) => x.textContent?.trim() === anchor)
+      const h = [...(pageRef.current?.querySelectorAll('h1, h2, h3, h4, h5, h6') ?? [])].find((x) => x.id === anchor)
       if (h) {
         h.scrollIntoView({ block: 'start' })
         h.classList.add('docs-target')
