@@ -1,5 +1,6 @@
 // S56, agents' worktrees become slots at the upgrade (#1441, SPEC §16.10.8), on fake Claude Code agents, the Assistant
-// off. The workspace is made as 0.9 left it: each builder's own worktree in project.json, the slots' migration held off
+// off; alpha is a 6×6 team (#1448: B1–B6 each in a worktree of its own, R2 too, the other reviewers in the folder).
+// The workspace is made as 0.9 left it: each builder's own worktree in project.json, the slots' migration held off
 // for the first start (HIVE_TEST_SLOT_MIGRATION=off, unpackaged only), so the dev build runs it as 0.9 did:
 // 1. "0.9 day": alpha (Pair with Hive merges into integration, cards in slots) runs a lane of two cards on B1, whose
 //    worktree hb1 is where it works and where card 1 starts; the solo project's agent Me works in its worktree, no cards.
@@ -28,6 +29,10 @@ const hb1 = path.join(root, 'hb1')
 const slotA = path.join(root, 'slot-a')
 const slotB = path.join(root, 'slot-b')
 const meTree = path.join(`${ws}.worktrees`, 'solo', 'me')
+// The rest of a 6×6 team as 0.9 left it (#1448): B2–B6 each in a worktree of its own, R2 too (a reviewer's own, which
+// becomes a retired home), R3–R6 in the project folder.
+const others = [2, 3, 4, 5, 6].map((n) => ({ n, tree: path.join(root, `hb${n}`) }))
+const hr2 = path.join(root, 'hr2')
 const PORT = Number(lib.port(47937))
 const identity = { name: 'Hive Slot Test', email: 'slots@example.com' }
 let failed = 0
@@ -59,13 +64,18 @@ const isIn = (dir, rev, ref) => {
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.git(alpha, ['branch', 'integration'])
   lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb1', hb1, 'integration'])
+  for (const o of others) lib.git(alpha, ['worktree', 'add', '-q', '-b', `hive/hb${o.n}`, o.tree, 'integration'])
+  lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hr2', hr2, 'integration'])
   lib.gitProject(solo, { 's.txt': 's\n', '.gitignore': '.hive/\n' })
   lib.git(solo, ['branch', '-M', 'main'])
   lib.git(solo, ['worktree', 'add', '-q', '-b', 'hive/me', meTree, 'main'])
   const agents = {
     [alpha]: [
       { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: hb1, branch: 'hive/hb1', base: 'integration' } },
-      { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer' }
+      { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer' },
+      ...others.map((o) => ({ id: `b${o.n}`, name: `B${o.n}`, provider: 'claude-code', workflowRole: 'builder', worktree: { path: o.tree, branch: `hive/hb${o.n}`, base: 'integration' } })),
+      { id: 'r2', name: 'R2', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: hr2, branch: 'hive/hr2', base: 'integration' } },
+      ...[3, 4, 5, 6].map((n) => ({ id: `r${n}`, name: `R${n}`, provider: 'claude-code', workflowRole: 'reviewer' }))
     ],
     [solo]: [{ id: 'me', name: 'Me', provider: 'claude-code', worktree: { path: meTree, branch: 'hive/me', base: 'main' } }]
   }
@@ -73,7 +83,7 @@ const isIn = (dir, rev, ref) => {
     fs.mkdirSync(path.join(p, '.hive'), { recursive: true })
     fs.writeFileSync(path.join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: list }, null, 2))
   }
-  const env = lib.fakeClaude(userData, home, [alpha, solo, ws, hb1, slotA, slotB, meTree])
+  const env = lib.fakeClaude(userData, home, [alpha, solo, ws, hb1, slotA, slotB, meTree, hr2, ...others.map((o) => o.tree)])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
@@ -160,6 +170,9 @@ const isIn = (dir, rev, ref) => {
     }, HUNG_MS)
     check('hb1 is a slot, carried by B1', adopted?.lease?.kind === 'carried' && adopted.lease.agent === 'b1' && same(adopted.folder, hb1), JSON.stringify(adopted))
     const mine = (await slots(solo)).find((s) => s.name === 'me')
+    const team = await slots(alpha)
+    check("the 6×6 team's other builders' worktrees are slots, each carried by its builder", others.every((o) => team.some((s) => same(s.folder, o.tree) && s.lease?.kind === 'carried' && s.lease.agent === `b${o.n}`)), JSON.stringify(team.map((s) => [s.name, s.lease?.agent])))
+    check("…R2's own worktree is kept, a retired home, not a slot", fs.existsSync(hr2) && !team.some((s) => same(s.folder, hr2)), JSON.stringify(team.map((s) => s.folder)))
     check("Me's worktree is a slot carried by Me", mine?.lease?.kind === 'carried' && mine.lease.agent === 'me', JSON.stringify(await slots(solo)))
     const b1Rec = await sessionOf(alpha, b1Old.sessionId)
     check("B1's 0.9 conversation is bound to its carried lease", !!adopted?.lease?.id && b1Rec?.lease === adopted.lease.id, JSON.stringify(b1Rec))

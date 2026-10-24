@@ -115,7 +115,7 @@ describe('the suites a change needs (affected.mjs)', () => {
   it('maps runtime resources and every user of a shared test helper (review round 1)', () => {
     expect(affectedSuites(['resources/skills/card-loop/SKILL.md'], names).suites).toEqual(expect.arrayContaining(['skills', 'skillaudience', 'skilldelivery', 'cardloop']))
     expect(affectedSuites(['resources/modes/planner.md'], names).suites).toEqual(expect.arrayContaining(['assistant', 'assistant-control']))
-    expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(['attention', 'carryingon', 'codexfolder', 'codexqueued', 'defaultprovider', 'flightrecorder', 'footerfit', 'freshpath', 'hookshealth', 'hookstranscript', 'models', 'providerdetect', 'reviewcopies', 'sessiontree', 'skilldelivery', 'termsize', 'turnledger', 'workspacenotes'])
+    expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(['attention', 'carryingon', 'codexfolder', 'codexqueued', 'defaultprovider', 'flightrecorder', 'footerfit', 'freshpath', 'hookshealth', 'hookstranscript', 'models', 'p7lane', 'providerdetect', 'reviewcopies', 'sessiontree', 'skilldelivery', 'termsize', 'turnledger', 'workspacenotes'])
     expect(affectedSuites(['tests/e2e/fake-bridge.cjs'], names).all).toBe(true)
     expect(affectedSuites(['resources/tray.png'], names).all).toBe(true)
     expect(affectedSuites(['scripts/build-icons.mjs'], names).all).toBe(true)
