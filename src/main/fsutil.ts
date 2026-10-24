@@ -61,8 +61,9 @@ function recoverText(path: string, bak: string | null): { value: unknown; restor
 // and that mtime is at least DAMAGED_AGE_MS old. A writer stalled mid-save on a busy machine leaves a half-written
 // file unchanged for longer than a pause, so a file changed more recently is still counted as a save in progress
 // (#1601). A file still changing, or changed too recently, when the pauses run out is left as it is (unsettled):
-// that read gets the .bak's value (or the fallback), and the next read looks again. The pauses add up to under half
-// DAMAGED_AGE_MS, so a file changed just before it is read always ends unsettled, never damaged.
+// that read gets the .bak's value (or the fallback), and the next read looks again. The pauses nominally add up to
+// under half DAMAGED_AGE_MS, so a file changed just before it is read ends unsettled, unless the read itself is held
+// up for over a second (timers and disk reads have no upper bound on a loaded machine): then it is judged by its age.
 const SETTLE_PAUSES = [25, 50, 100, 150, 250, 400]
 const SETTLE_MS = SETTLE_PAUSES.reduce((a, b) => a + b, 0)
 /** How long a kept file that doesn't parse must have been unchanged before it can count as damaged. */

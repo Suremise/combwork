@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { Worker } from 'worker_threads'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { DAMAGED_AGE_MS, KeptFileBusy, keptSettleSteps, onCorruptFile, readKeptJson, readKeptJsonSync, writeKeptJson, type KeptSample, type KeptSettled } from '../src/main/fsutil'
 import { tempDir } from './tempDir'
 
@@ -68,25 +68,40 @@ describe('kept files', () => {
     }
   }
   const read = (text: string, mtimeMs: number): KeptSample => ({ text, size: text.length, mtimeMs })
+  // The clock the age rule reads, held at `now` for the whole of `fn` (timers stay real, #1601): what a test asserts
+  // about a file's age can't depend on how long the run took on a loaded machine.
+  const frozen = async <T>(now: number, fn: () => T | Promise<T>): Promise<T> => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(now)
+    try {
+      return await fn()
+    } finally {
+      vi.useRealTimers()
+    }
+  }
+  // A whole-second time a while ago: a file's mtime set to it reads back exactly.
+  const T = Math.floor(Date.now() / 1000) * 1000 - 600_000
 
   it('keeps reading a file that keeps changing, and leaves it unsettled when the pauses run out', () => {
     const changing = Array.from({ length: 20 }, (_, i) => read(`{"a":${'1'.repeat(i + 1)}`, 1000 + i))
     expect(run(changing)).toEqual({ pauses: 6, outcome: 'unsettled' })
   })
 
-  it('counts a file changed a moment ago as still saving to the end, and one changed long ago as damaged', () => {
+  it('counts a file changed under DAMAGED_AGE_MS ago as still saving to the end, and one changed that long ago as damaged', async () => {
     for (const text of ['', '{"a":']) {
-      expect(run([read(text, Date.now())])).toEqual({ pauses: 6, outcome: 'unsettled' })
-      expect(run([read(text, Date.now() - DAMAGED_AGE_MS + 500)])).toEqual({ pauses: 6, outcome: 'unsettled' })
-      expect(run([read(text, Date.now() - 60_000)])).toEqual({ pauses: 1, outcome: 'damaged' })
+      expect(await frozen(T, () => run([read(text, T)]))).toEqual({ pauses: 6, outcome: 'unsettled' })
+      expect(await frozen(T + DAMAGED_AGE_MS - 1, () => run([read(text, T)]))).toEqual({ pauses: 6, outcome: 'unsettled' })
+      expect(await frozen(T + DAMAGED_AGE_MS, () => run([read(text, T)]))).toEqual({ pauses: 1, outcome: 'damaged' })
     }
   })
 
-  it('calls a file damaged once two reads in a row see it unchanged, and takes it once it parses', () => {
-    expect(run([read('{"a":', 1000), read('{"a":1', 2000), read('{"a":1', 2000)])).toEqual({ pauses: 2, outcome: 'damaged' })
-    expect(run([read('', Date.now()), read('{"a":', 3000), read('{"a":2}', 4000)])).toEqual({ pauses: 2, outcome: { value: { a: 2 } } })
-    // Gone and still gone (a save that deletes, then renames, may yet bring it back): missing once the pauses run out.
-    expect(run([null, null])).toEqual({ pauses: 6, outcome: 'missing' })
+  it('calls a file damaged once two reads in a row see it unchanged, and takes it once it parses', async () => {
+    await frozen(T, () => {
+      expect(run([read('{"a":', 1000), read('{"a":1', 2000), read('{"a":1', 2000)])).toEqual({ pauses: 2, outcome: 'damaged' })
+      expect(run([read('', T), read('{"a":', 3000), read('{"a":2}', 4000)])).toEqual({ pauses: 2, outcome: { value: { a: 2 } } })
+      // Gone and still gone (a save that deletes, then renames, may yet bring it back): missing once the pauses run out.
+      expect(run([null, null])).toEqual({ pauses: 6, outcome: 'missing' })
+    })
   })
 
   for (const sync of [false, true]) {
@@ -115,21 +130,25 @@ describe('kept files', () => {
       const setAside = (): string[] => readdirSync(dir).filter((n) => n.startsWith(`${name}.corrupt-`))
       await writeKeptJson(f, { n: 6 })
       const half = JSON.stringify({ n: 7, items: ['a', 'b'] }).slice(0, 12)
-      writeFileSync(f, half) // changed just now: the read's pauses (about 1 s) end well inside DAMAGED_AGE_MS
-      const before = reports.length
-      expect(await readIt()).toEqual({ n: 6 })
-      expect(readFileSync(f, 'utf8')).toBe(half)
-      expect(setAside()).toEqual([])
-      expect(reports.length).toBe(before)
       writeFileSync(f, half)
-      await expect(readKeptJson(f, null, { unsettled: 'throw' })).rejects.toBeInstanceOf(KeptFileBusy)
-      expect(readFileSync(f, 'utf8')).toBe(half)
-
-      age(f)
-      expect(await readIt()).toEqual({ n: 6 })
-      expect(JSON.parse(readFileSync(f, 'utf8'))).toEqual({ n: 6 })
-      expect(setAside()).toHaveLength(1)
-      expect(reports.slice(before)).toEqual([[f, true]])
+      utimesSync(f, new Date(T), new Date(T))
+      const before = reports.length
+      // 1 ms short of DAMAGED_AGE_MS old for the whole read, however long it takes: unsettled.
+      await frozen(T + DAMAGED_AGE_MS - 1, async () => {
+        expect(await readIt()).toEqual({ n: 6 })
+        expect(readFileSync(f, 'utf8')).toBe(half)
+        expect(setAside()).toEqual([])
+        expect(reports.length).toBe(before)
+        await expect(readKeptJson(f, null, { unsettled: 'throw' })).rejects.toBeInstanceOf(KeptFileBusy)
+        expect(readFileSync(f, 'utf8')).toBe(half)
+      })
+      // DAMAGED_AGE_MS old: damaged, set aside and its last good copy restored.
+      await frozen(T + DAMAGED_AGE_MS, async () => {
+        expect(await readIt()).toEqual({ n: 6 })
+        expect(JSON.parse(readFileSync(f, 'utf8'))).toEqual({ n: 6 })
+        expect(setAside()).toHaveLength(1)
+        expect(reports.slice(before)).toEqual([[f, true]])
+      })
     })
   }
 
