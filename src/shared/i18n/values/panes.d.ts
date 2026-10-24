@@ -18,7 +18,10 @@ interface HiveMessageValues {
   'panes.body.empty': undefined
   'panes.body.ended': undefined
   'panes.body.endedLong': undefined
+  'panes.body.inCarried': { name: string | number }
+  'panes.body.inSlot': { name: string | number }
   'panes.body.notRunning': { agent: string | number }
+  'panes.body.resumesInHome': { name: string | number }
   'panes.body.retrySetup': undefined
   'panes.body.setupFailed': undefined
   'panes.body.setupFirst': undefined
@@ -92,6 +95,7 @@ interface HiveMessageValues {
   'panes.menu.moveLeft': undefined
   'panes.menu.moveRight': undefined
   'panes.menu.moveUp': undefined
+  'panes.menu.releaseHeld': undefined
   'panes.menu.releaseSlot': undefined
   'panes.menu.remove': undefined
   'panes.menu.reviewChanges': undefined
@@ -173,6 +177,8 @@ interface HiveMessageValues {
   'panes.table.projectPrefix': { value: string | number }
   'panes.table.role': undefined
   'panes.table.rolePrefix': { value: string | number }
+  'panes.table.slot': undefined
+  'panes.table.slotPrefix': { value: string | number }
   'panes.table.state': undefined
   'panes.table.waiting': undefined
   'panes.table.waitingFor': { what: string | number }

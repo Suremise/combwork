@@ -13,7 +13,7 @@ import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { fileSlotConn, SlotStore } from '../src/main/slots'
 import { claimIn, ClaimRefused, leasedLine, legacyWorktree, rebindSession, RebindRefused, slotsIn } from '../src/main/agentFolders'
 import { readSessionRecords, writeSessionRecords } from '../src/main/schema/sessionDeliveryTables'
-import { agentPlaces, canResumeByUser, canResumeNow, currentFolder, defaultPurpose, launchFolder, resumeFolder, resumeHold, type FolderAgent, type FolderFacts, type FolderLease, type FolderSlot, type ResumeHold } from '../src/shared/agentFolders'
+import { agentPlaces, canResumeByUser, canResumeNow, currentFolder, defaultPurpose, launchFolder, namedFolders, resumeFolder, resumeHold, resumeHome, shownPlace, type FolderAgent, type FolderFacts, type FolderLease, type FolderSlot, type ResumeHold } from '../src/shared/agentFolders'
 import { agentsToResume, resumeAll, type ResumeAllAgent } from '../src/shared/resumeAll'
 import { holdShort, holdText, resumeBlock, type ResumeContext } from '../src/shared/sessionResume'
 import { shownText } from '../src/shared/advanced'
@@ -84,6 +84,17 @@ describe('where a new conversation starts, and where an agent works now', () => 
     expect(resumeFolder(P, { cwd: slotFolder('slot-b') })).toBe(slotFolder('slot-b'))
     expect(resumeFolder(P, {})).toBe(P)
   })
+
+  it('names the retired home a conversation resumes in (#1552), by its folder whatever its case; none elsewhere', () => {
+    const home = 'C:\\ws.worktrees\\project\\hr1'
+    const f = facts([slot('slot-b')], { homes: [home] })
+    expect(resumeHome(f, { cwd: home })).toBe('hr1')
+    expect(resumeHome(f, { cwd: home.toUpperCase() })).toBe('HR1')
+    expect(resumeHome(f, { cwd: slotFolder('slot-b') })).toBeNull()
+    expect(resumeHome(f, { cwd: P })).toBeNull()
+    expect(resumeHome(f, {})).toBeNull()
+    expect(resumeHome(facts([]), { cwd: home })).toBeNull()
+  })
 })
 
 describe('where an agent is, as the Agent API names it (#1451)', () => {
@@ -109,6 +120,39 @@ describe('where an agent is, as the Agent API names it (#1451)', () => {
     ])
     // An either agent mid-build reviews in the project folder only when it starts afresh for that: its next conversation (a build) is its slot.
     expect(agentPlaces(facts([slot('slot-c', { open: lease('l3', 'slot-c', 'e1') })]), either, null).launch.at).toBe('slot-c')
+  })
+})
+
+describe('where an agent is, as the window shows it (#1442)', () => {
+  const shown = (f: FolderFacts, a: FolderAgent, running: { cwd: string } | null = null, branch: string | null = null) => shownPlace(f, a, agentPlaces(f, a, running).now, branch)
+
+  it('a builder in a card\'s slot: "slot", by the slot\'s name, with its line; in its carried slot: "carried"', () => {
+    const f = facts([slot('slot-b', { open: lease('l1', 'slot-b', 'b1') })])
+    expect(shown(f, builder, null, 'hive/card-12')).toEqual({ folder: slotFolder('slot-b'), is: 'slot', name: 'slot-b', branch: 'hive/card-12' })
+    expect(shown(facts([slot('hb2', { open: lease('l2', 'hb2', 'b1', 'carried') })]), builder)).toEqual({ folder: slotFolder('hb2'), is: 'carried', name: 'hb2', branch: null })
+    // Running in a slot under another agent's carried lease (draining): a slot, not its carried one.
+    expect(shown(facts([slot('hb3', { open: lease('l3', 'hb3', 'b9', 'carried') })]), builder, { cwd: slotFolder('hb3') }).is).toBe('slot')
+  })
+
+  it('a reviewer resumed in its retired home: "home", by the folder\'s name; in the project folder: nothing to name', () => {
+    const home = slotFolder('hr4')
+    const f = facts([], { homes: [home] })
+    expect(shown(f, reviewer, { cwd: home })).toEqual({ folder: home, is: 'home', name: 'hr4', branch: null })
+    expect(shown(f, reviewer)).toEqual({ folder: P, is: 'project', name: null, branch: null })
+  })
+
+  it('an agent on its 0.9 worktree, not migrated yet: "legacy", with its branch; once migrated, where the contract puts it', () => {
+    const old: FolderAgent = { ...builder, legacy: { path: slotFolder('hb1'), branch: 'hive/hb1' } }
+    expect(shown(facts([], { migrated: false }), old)).toEqual({ folder: slotFolder('hb1'), is: 'legacy', name: 'hb1', branch: 'hive/hb1' })
+    expect(shown(facts([], { migratedAgents: ['b1'] }), old).is).toBe('project')
+  })
+
+  it("the project's slots and homes, named: what a session's folder is called", () => {
+    expect(namedFolders(facts([slot('slot-a'), slot('hb2')], { homes: [slotFolder('hr4')] }))).toEqual([
+      { path: slotFolder('slot-a'), name: 'slot-a', is: 'slot' },
+      { path: slotFolder('hb2'), name: 'hb2', is: 'slot' },
+      { path: slotFolder('hr4'), name: 'hr4', is: 'home' }
+    ])
   })
 })
 

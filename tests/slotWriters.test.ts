@@ -25,12 +25,40 @@ vi.mock('../src/main/ptyHost', async (orig) => ({
   }
 }))
 
+/**
+ * What the process tracker lists of a run's leftovers (#1506's Release Slot…), and the ends asked of it: the real
+ * tracker's End needs its job host, which unit tests don't have.
+ */
+type Proc = { pid: number; name: string; label: string; created?: string }
+const tracker = vi.hoisted(() => ({
+  listed: new Map<string, { processes: Proc[]; more: number; restored: boolean }>(),
+  ended: [] as { run?: string; at: string | null }[],
+  writerAt: () => null as string | null,
+  /** The last run's marker's launches (the notice that Hive closed unexpectedly), and whether ending them works. */
+  restart: [] as { projectPath: string; agentId: string; agentName: string; runId?: string; processes: Proc[] }[],
+  endedExactly: [] as { list: Proc[]; at: string | null }[],
+  endWorks: true
+}))
+vi.mock('../src/main/agentProcesses', async (orig) => ({
+  ...((await orig()) as object),
+  leftoversOfRun: (run: string) => tracker.listed.get(run) ?? null,
+  settleLeftovers: async (_p: string, _agent: string, how: string, run?: string) => {
+    if (how === 'end') tracker.ended.push({ run, at: tracker.writerAt() })
+    if (run) tracker.listed.delete(run)
+    return 1
+  },
+  // Every one kept still runs (the job host would check each by id and start time).
+  stillRunningOf: async (list: Proc[]) => list,
+  endProcessesExactly: async (list: Proc[]) => (tracker.endedExactly.push({ list, at: tracker.writerAt() }), tracker.endWorks)
+}))
+vi.mock('../src/main/lastRun', async (orig) => ({ ...((await orig()) as object), lastUnexpectedClose: () => (tracker.restart.length ? { processes: tracker.restart } : null) }))
+
 const base = tempDir('slotwriters-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { boardFile, onBoardCommitted } = await import('../src/main/boardStore')
 const { SlotPool, SlotStore, fileSlotConn } = await import('../src/main/slots')
-const { setWriterHost, writerOver } = await import('../src/main/agentFolders')
+const { heldSlots, heldWriter, releaseHeldWriter, setWriterHost, writerOver } = await import('../src/main/agentFolders')
 const { settleRunForTests } = await import('../src/main/agentProcesses')
 const { sessions } = await import('../src/main/sessions')
 const { config } = await import('../src/main/config')
@@ -107,10 +135,13 @@ afterAll(async () => {
   await disposeWorkspaceService(ws)
 })
 
-/** A pool on the project (this Hive's holder and live tokens), and the app's writer host on it. */
-function hostOn(): void {
-  pool = new SlotPool({ store, project, root: base, options: async () => ({ setup: '', archive: '', copy: '' }), builders: () => 2, cap: () => 2, runner: async () => ({ ok: true, exitCode: 0, settled: true, logPath: null }), settle: async () => true, holder: { self: async () => me, alive: async () => true, live }, writerOver: (w) => writerOver(w) })
-  setWriterHost({ self: async () => me, live, track: async () => pool.trackWriter(), drained: async (_p, slot) => pool.drained(slot) })
+/**
+ * A pool on the project (this Hive's holder and live tokens), and the app's writer host on it. `others`: whether
+ * another Hive (a writer's holder) still runs, as the probe says it (null: can't be told).
+ */
+function hostOn(others: boolean | null = true): void {
+  pool = new SlotPool({ store, project, root: base, options: async () => ({ setup: '', archive: '', copy: '' }), builders: () => 2, cap: () => 2, runner: async () => ({ ok: true, exitCode: 0, settled: true, logPath: null }), settle: async () => true, holder: { self: async () => me, alive: async () => others, live }, writerOver: (w) => writerOver(w) })
+  setWriterHost({ self: async () => me, alive: async (pid) => (pid === me.pid ? true : others), live, track: async () => pool.trackWriter(), drained: async (_p, slot) => pool.drained(slot) })
 }
 const start = () => inWorkspace(ws, () => sessions.start(project, { agentId: 'b1' }))
 
@@ -253,5 +284,142 @@ describe("a slot's writer through sessions.start (#1434 round 3)", () => {
     expect(spawned).toHaveLength(0)
     expect(launched).toBe(1)
     expect(writer()?.run).toBe(state.runId)
+  })
+})
+
+describe('Release Slot… on a held writer (#1506)', () => {
+  afterEach(() => {
+    tracker.listed.clear()
+    tracker.ended.length = 0
+    tracker.writerAt = () => null
+    tracker.restart = []
+    tracker.endedExactly.length = 0
+    tracker.endWorks = true
+  })
+  /** A run of b1's in slot-a, over, its processes kept running: its writer held by this Hive. */
+  const heldRun = async (): Promise<string> => {
+    const run = (await start()).runId
+    ;(manager.settleWriterOf as (run: string) => void).call(manager, run)
+    settleRunForTests(run, 'kept')
+    await vi.waitFor(() => expect(live.has(run)).toBe(false), { timeout: 15000 })
+    manager.live.clear()
+    manager.runs.clear()
+    return run
+  }
+  /** slot-a's writer as another Hive (process pid) left it: its run, under b1's carried lease. */
+  const plant = (run: string, pid = me.pid + 1) => {
+    const lease = store.openLease('slot-a')!.id
+    return store.conn.write((db) => db.prepare('UPDATE slots SET writer_run = ?, writer_lease = ?, writer_agent = ?, writer_pid = ?, writer_started = ? WHERE project = ? AND name = ?').run(run, lease, 'b1', pid, 5, projectId, 'slot-a'))
+  }
+
+  it("is refused while its run is live in this Hive; once held, it is released after the user's confirmation and the slot can be taken again", async () => {
+    hostOn()
+    const run = (await start()).runId
+    expect(await heldWriter(project, 'slot-a')).toMatchObject({ run, agent: 'b1', live: true, hive: { self: true } })
+    expect((await heldSlots(project)).size).toBe(0)
+    await expect(releaseHeldWriter(project, 'slot-a', run, { end: false })).rejects.toThrow(/still running in this Hive/)
+    expect(writer()?.run).toBe(run)
+    manager.live.clear()
+    manager.runs.clear()
+    manager.writers.clear()
+    live.delete(run)
+    await store.clearWriterRun(run)
+    // Its run over and its processes kept running: held, offered in b1's ⋯ (heldSlots), nothing listed of them.
+    const held = await heldRun()
+    expect([...(await heldSlots(project))]).toEqual([['b1', 'slot-a']])
+    expect(await heldWriter(project, 'slot-a')).toMatchObject({ run: held, live: false, hive: { self: true, alive: true }, processes: null })
+    await releaseHeldWriter(project, 'slot-a', held, { end: false })
+    expect(writer()).toBeNull()
+    expect((await heldSlots(project)).size).toBe(0)
+    const again = await start()
+    expect(writer()?.run).toBe(again.runId)
+  })
+
+  it("another Hive's writer: refused while that Hive runs or can't be told; released once it has gone", async () => {
+    for (const others of [true, null, false]) {
+      hostOn(others)
+      await plant(`other-${others}`)
+      expect(await heldWriter(project, 'slot-a')).toMatchObject({ hive: { self: false, alive: others }, live: false })
+      expect((await heldSlots(project)).has('b1')).toBe(others === false)
+      const release = releaseHeldWriter(project, 'slot-a', `other-${others}`, { end: false })
+      if (others === false) {
+        await release
+        expect(writer()).toBeNull()
+      } else {
+        await expect(release).rejects.toThrow(/another Hive that is still running/)
+        expect(writer()?.run).toBe(`other-${others}`)
+        await store.clearWriterRun(`other-${others}`)
+      }
+    }
+  })
+
+  it('ends the processes listed for its run first when asked (while the writer is still there), never when not', async () => {
+    hostOn(false)
+    tracker.writerAt = () => writer()?.run ?? null
+    const listed = { processes: [{ pid: 4242, name: 'node.exe', label: 'node serve.js' }], more: 0, restored: true }
+    await plant('r-listed')
+    tracker.listed.set('r-listed', listed)
+    expect((await heldWriter(project, 'slot-a'))?.processes).toEqual({ list: listed.processes, more: 0, from: 'leftovers' })
+    await releaseHeldWriter(project, 'slot-a', 'r-listed', { end: true })
+    expect(tracker.ended).toEqual([{ run: 'r-listed', at: 'r-listed' }])
+    expect(writer()).toBeNull()
+    await plant('r-kept')
+    tracker.listed.set('r-kept', listed)
+    await releaseHeldWriter(project, 'slot-a', 'r-kept', { end: false })
+    expect(tracker.ended).toHaveLength(1)
+    expect(writer()).toBeNull()
+  })
+
+  it("its Hive gone with nothing listed for its run: the notice's list of that run's own processes that still run, ended exactly first when asked; a failed end releases nothing", async () => {
+    hostOn(false)
+    tracker.writerAt = () => writer()?.run ?? null
+    const node = { pid: 5150, name: 'node.exe', label: 'node serve.js', created: '133900000000000000' }
+    // The last run's marker: this run's launch, b1's newer launch elsewhere, a launch from before runs were named, b2's.
+    tracker.restart = [
+      { projectPath: project, agentId: 'b1', agentName: 'B1', runId: 'r-newer', processes: [{ ...node, pid: 7170 }] },
+      { projectPath: project, agentId: 'b1', agentName: 'B1', runId: 'r-crash', processes: [node] },
+      { projectPath: project, agentId: 'b1', agentName: 'B1', processes: [{ ...node, pid: 8180 }] },
+      { projectPath: project, agentId: 'b2', agentName: 'B2', runId: 'r-crash', processes: [{ ...node, pid: 6160 }] }
+    ]
+    // HR4's round 1: an older held writer of b1's never takes its newer launch's processes, nor an unnamed one's.
+    await plant('r-older')
+    expect((await heldWriter(project, 'slot-a'))?.processes).toBeNull()
+    await releaseHeldWriter(project, 'slot-a', 'r-older', { end: true })
+    expect(tracker.endedExactly).toEqual([])
+    await plant('r-crash')
+    expect((await heldWriter(project, 'slot-a'))?.processes).toEqual({ list: [node], more: 0, from: 'restart' })
+    tracker.endWorks = false
+    await expect(releaseHeldWriter(project, 'slot-a', 'r-crash', { end: true })).rejects.toThrow(/didn't let Hive end them, so slot-a wasn't released/)
+    expect(writer()?.run).toBe('r-crash')
+    tracker.endWorks = true
+    await releaseHeldWriter(project, 'slot-a', 'r-crash', { end: true })
+    expect(tracker.endedExactly.map((e) => ({ pids: e.list.map((p) => p.pid), at: e.at }))).toEqual([{ pids: [5150], at: 'r-crash' }, { pids: [5150], at: 'r-crash' }])
+    expect(writer()).toBeNull()
+    // This Hive's own writer never takes the last run's list (its run's leftovers are what it knows).
+    hostOn()
+    await plant('r-mine', me.pid)
+    await store.conn.write((db) => db.prepare('UPDATE slots SET writer_started = ? WHERE project = ? AND name = ?').run(me.started, projectId, 'slot-a'))
+    expect((await heldWriter(project, 'slot-a'))?.processes).toBeNull()
+  })
+
+  it('a writer that is no longer the one shown, or two releases at once: one outcome, the other told it changed', async () => {
+    hostOn(false)
+    await plant('r-a')
+    await expect(releaseHeldWriter(project, 'slot-a', 'r-wrong', { end: false })).rejects.toThrow(/changed meanwhile/)
+    expect(writer()?.run).toBe('r-a')
+    const both = await Promise.allSettled([releaseHeldWriter(project, 'slot-a', 'r-a', { end: false }), releaseHeldWriter(project, 'slot-a', 'r-a', { end: false })])
+    expect(both.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+    expect(String((both.find((r) => r.status === 'rejected') as PromiseRejectedResult).reason)).toMatch(/changed meanwhile/)
+    expect(writer()).toBeNull()
+    await expect(releaseHeldWriter(project, 'slot-a', 'r-a', { end: false })).rejects.toThrow(/changed meanwhile/)
+  })
+
+  it('a release racing a start in the slot: one outcome, never the old writer kept or two writers', async () => {
+    hostOn()
+    const held = await heldRun()
+    const [released, started] = await Promise.allSettled([releaseHeldWriter(project, 'slot-a', held, { end: false }), start()])
+    expect(released.status).toBe('fulfilled')
+    if (started.status === 'fulfilled') expect(writer()?.run).toBe(started.value.runId)
+    else expect(writer()).toBeNull()
   })
 })

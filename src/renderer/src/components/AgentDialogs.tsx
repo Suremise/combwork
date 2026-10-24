@@ -1,23 +1,21 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { DEFAULT_PROJECT_CONFIG, ROLE_MAX, agentLimitText, effectiveModelLabel, mergeBlocked, projectAgents, slugify, transcriptWarnLimit } from '@shared/defaults'
+import { DEFAULT_PROJECT_CONFIG, ROLE_MAX, agentLimitText, effectiveModelLabel, mergeBlocked, projectAgents, transcriptWarnLimit } from '@shared/defaults'
 import { handOverNow, onRunningLane } from '@shared/handOver'
 import { useAgentLimit } from '../advanced'
-import { shownText as inLanguage } from '@shared/advanced'
 import { PROVIDERS, agentProvider, chosenDefaultProvider, defaultProviderPending, isProviderEnabled, modeCaveat, modeOption, offeredModes, projectDefaultProvider, projectProviderConfig, projectUse200k, providerDescriptor, providerName, providerSettings, shownText } from '@shared/providers'
 import type { BranchQueueCard } from '@shared/workflow/queue'
 import type { MergeBranch } from '@shared/types'
-import type { AddAgentOptions, AgentBranchStatus, EffortLevel, MergeResult, PermissionMode, ProjectConfig, ProjectGitInfo, ProjectInfo, ProviderId, WorktreeMatch } from '@shared/types'
+import type { AgentBranchStatus, EffortLevel, MergeResult, PermissionMode, ProjectConfig, ProjectInfo, ProviderId } from '@shared/types'
 import { serverOnIn } from '@shared/agentMcp'
-import { reuseNote } from '@shared/unusedWorktrees'
-import { hiveBranch, reusableBranches } from '@shared/hiveBranches'
 import { agentNameProblem, nameTaken, nameTakenMessage, sameAgentName, suggestAgentName, workspaceAgentList } from '@shared/agentNames'
 import type { TemplateAgent } from '@shared/templates'
 import { agentWorkflowRole, ROLE_IN_WORKFLOW, WORKFLOW_ROLE_TEXT, WORKFLOW_ROLES, type WorkflowRole } from '@shared/workflow/roles'
 import { gitFixText, gitProblemText } from '@shared/gitTool'
 import * as actions from '../actions'
+import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
 import { call, errorMessage } from '../api'
 import { agentProviderOf, bumpUnused, confirm, focusAfterRemoving, notify, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
-import { fmt, msg, tr, tRich } from '@shared/i18n'
+import { msg, tr, tRich } from '@shared/i18n'
 import { confirmDangerousMode } from './PermissionMode'
 import { ProviderIcon } from './ProviderIcon'
 import { cx } from '../util'
@@ -27,29 +25,20 @@ import { confirmLineMerge, LineCardNote, QUEUE_MERGES, QueueCardNote } from './B
 import { EffortPicker, ModelPicker } from './ModelPicker'
 import { cliDefaultEffort, effortName, effortText, effortUnknown, modelCaps } from '@shared/models'
 import { pasteIntoTerminal } from './TerminalView'
-import { BusyButton, Icon, Modal, sentences, Tooltip, useBusy } from './ui'
+import { BusyButton, Icon, Modal, Tooltip, useBusy } from './ui'
 
 /** Markup in messages (tRich): <code> and <b>, keyed by their text. */
 const CODE = (chunks: ReactNode[]): ReactNode => <code key={String(chunks)}>{chunks}</code>
 const BOLD = (chunks: ReactNode[]): ReactNode => <strong key={String(chunks)}>{chunks}</strong>
-/** A link in a message (tRich), doing `onClick`. */
-const LINK =
-  (onClick: (e: React.MouseEvent) => void) =>
-  (chunks: ReactNode[]): ReactNode => (
-    <a key="link" onClick={onClick}>
-      {chunks}
-    </a>
-  )
 
 // Words several dialogs here use (#800): messages as data, shown with tr().
 const CANCEL = msg({ id: 'agents.dialog.cancel', defaultMessage: 'Cancel', description: "Button: closes an agent dialog without changing anything." })
 const NAME = msg({ id: 'agents.dialog.name', defaultMessage: 'Name', description: "Label of an agent's name (Add Agent, Agent Settings)." })
 const CODING_AGENT = msg({ id: 'agents.dialog.codingAgent', defaultMessage: 'Coding agent', description: 'A heading in Add Agent and Agent Settings, above the choice of provider (Claude Code, Codex, GitHub Copilot).' })
-const WORKTREE = msg({ id: 'agents.dialog.worktree', defaultMessage: 'Worktree', description: "Label of an agent's git worktree (a checkout of its own)." })
 const SETTINGS = msg({ id: 'agents.dialog.settings', defaultMessage: 'Settings', description: "A heading in Add Agent and Agent Settings, above the agent's model, effort, mode and context." })
 const PROJECTS = msg({ id: 'agents.overrides.projects', defaultMessage: "Project's", description: "An agent's model, effort, mode or context choice that follows the project's: the first choice of each, before the project's value in brackets (\"Project's (Opus 5.5)\"). Keep it short." })
 const MCP_SERVERS = msg({ id: 'agents.dialog.mcpServers', defaultMessage: 'MCP servers', description: "A heading in Agent Settings, above the agent's MCP servers." })
-const WORKS_IN = msg({ id: 'agents.dialog.worksIn', defaultMessage: 'Works in', description: 'Label of where an agent works (Agent Settings): its worktree or the project folder.' })
+const WORKS_IN = msg({ id: 'agents.dialog.worksIn', defaultMessage: 'Works in', description: 'Label of where an agent works (Agent Settings): its slot, its worktree from before 1.0, or the project folder.' })
 const PROJECT_FOLDER = msg({ id: 'agents.dialog.projectFolder', defaultMessage: 'The project folder', description: "Where an agent works: the project's own folder (not a worktree)." })
 const MERGE = msg({ id: 'agents.dialog.merge', defaultMessage: 'Merge', description: "The Merge dialog's button, and its choice of a git merge (not a squash). Keep it short." })
 const BUSY_AGENT = msg({ id: 'agents.dialog.busy', defaultMessage: 'Busy. Choose it once it has finished.', description: 'Under an agent in the Continue with… dialog: it is working, so it can\'t be chosen now.' })
@@ -247,17 +236,7 @@ export function AddAgentDialog() {
   const project = useStore((s) => s.workspace?.projects.find((p) => p.path === s.addAgentFor) ?? null)
   const settings = useStore((s) => s.settings)
   const workspaceProjects = useStore((s) => s.workspace?.projects)
-  const workspaceName = useStore((s) => s.workspace?.name ?? '')
-  // `error`: git couldn't be read, which isn't the same as "not a repository".
-  const [git, setGit] = useState<(ProjectGitInfo & { error?: string }) | null>(null)
   const [name, setName] = useState('')
-  const [location, setLocation] = useState<AddAgentOptions['location']>('project')
-  const [branch, setBranch] = useState('')
-  const [branchEdited, setBranchEdited] = useState(false)
-  const [base, setBase] = useState('')
-  const [existing, setExisting] = useState('')
-  // The unused worktree a new one on that branch would reuse (#456), as last checked; null: none.
-  const [match, setMatch] = useState<WorktreeMatch | null>(null)
   const [model, setModel] = useState('')
   const [effort, setEffort] = useState('')
   const [permission, setPermission] = useState('')
@@ -281,9 +260,6 @@ export function AddAgentDialog() {
     const named = (k: number): string => `Agent ${k}` // i18n-ignore: an agent's default name (stored, read by agents)
     while (everyone.some((a) => sameAgentName(a.name, named(n)))) n++
     setName(named(n))
-    // hive/<workspace>/<project>/<agent> (#703).
-    setBranch(hiveBranch({ workspace: useStore.getState().workspace?.name ?? '', project: project.name }, named(n)))
-    setBranchEdited(false)
     setModel('')
     setEffort('')
     setPermission('')
@@ -296,55 +272,9 @@ export function AddAgentDialog() {
     setStartNow(true)
     setBusy(false)
     setRoleChosen(null)
-    setGit(null)
-    setExisting('')
-    // Opened to give an unused worktree to an agent (#353): Existing worktree, that one chosen once git lists it free.
-    const preset = useStore.getState().addAgentPreset
-    const wanted = preset?.project === path ? preset.worktreePath.toLowerCase() : null
-    if (preset) set({ addAgentPreset: null })
-    setLocation(wanted ? 'existing-worktree' : 'project')
-    void call('agents:gitInfo', path)
-      .then((g) => {
-        setGit(g)
-        setBase(g.current ?? g.branches[0] ?? '')
-        const free = g.worktrees.filter((w) => !w.used)
-        setExisting((wanted && free.find((w) => w.path.toLowerCase() === wanted)?.path) || (free[0]?.path ?? ''))
-      })
-      .catch((e) => setGit({ isRepo: false, current: null, branches: [], worktrees: [], worktreesRoot: '', error: errorMessage(e) }))
     // Only when the dialog opens for a project.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path])
-
-  // Where its branch is (#703): hive/<workspace>/<project>/<agent>, the workspace part as git info gives it for this
-  // repository (clear of branches from before, `branchSpace`) once it is known.
-  const home = { workspace: workspaceName, project: path?.split(/[\\/]/).pop() ?? '', spaces: git?.branchSpaces ?? [], ...(git?.branchSpace ? { space: git.branchSpace } : {}) }
-  // Git info read: the default branch in the repository's own space, unless the user typed one.
-  useEffect(() => {
-    if (git?.branchSpace && !branchEdited) setBranch(hiveBranch({ ...home, space: git.branchSpace }, name))
-    // Only when git info arrives.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [git])
-
-  // New worktree: whether an unused worktree is already on that branch (#456), looked at once the typing pauses: for its
-  // default branch, also one on the branch Hive made for that name before (#703).
-  useEffect(() => {
-    setMatch(null)
-    const b = branch.trim()
-    const agent = name.trim()
-    if (!path || location !== 'new-worktree' || !b || !base || !git?.worktrees.some((w) => !w.used && !!w.branch && reusableBranches(b, home, agent).includes(w.branch))) return
-    let live = true
-    const t = setTimeout(() => {
-      void call('agents:worktreeMatch', path, b, base, agent)
-        .then((m) => live && setMatch(m))
-        .catch(() => undefined)
-    }, 300)
-    return () => {
-      live = false
-      clearTimeout(t)
-    }
-    // (home follows path, git and the workspace's name.)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, location, branch, base, git, workspaceName, name])
 
   // Opened while Hive was still looking for the CLIs: Automatic's pick, once it is known (#506).
   useEffect(() => {
@@ -357,15 +287,12 @@ export function AddAgentDialog() {
   const close = (): void => set({ addAgentFor: null })
   const workflowRole = roleChosen ?? agentWorkflowRole({ name: name.trim() })
   const full = project.agents.length >= limit
-  const free = git?.worktrees.filter((w) => !w.used) ?? []
-  const copy = project.config.worktreeCopy ?? settings.agents.worktreeCopy
-  const setup = project.config.worktreeSetup.trim()
   const checking = followDefault && defaultPending
   // A name another agent of the workspace has (#702): refused, with a free one to use.
   const everyone = workspaceAgentList(workspaceProjects)
   const owner = name.trim() ? nameTaken(name, everyone) : null
   const suggestion = owner ? suggestAgentName(name.trim(), project.name, everyone.map((a) => a.name)) : ''
-  const valid = !!name.trim() && !owner && !full && !checking && isProviderEnabled(settings, provider) && (location !== 'new-worktree' || (!!branch.trim() && !!base)) && (location !== 'existing-worktree' || !!existing)
+  const valid = !!name.trim() && !owner && !full && !checking && isProviderEnabled(settings, provider)
   const chooseProvider = (v: ProviderId): void => {
     // Model, effort, mode and context are the provider's own: another provider starts from the project's.
     if (v === provider) return
@@ -377,11 +304,6 @@ export function AddAgentDialog() {
     setContext('')
   }
 
-  const rename = (v: string): void => {
-    setName(v)
-    if (!branchEdited) setBranch(hiveBranch(home, v))
-  }
-
   const add = async (): Promise<void> => {
     if (permission && !(await confirmDangerousMode(provider, permission, name.trim()))) return
     setBusy(true)
@@ -390,11 +312,6 @@ export function AddAgentDialog() {
         name: name.trim(),
         provider,
         workflowRole,
-        location,
-        branch: location === 'new-worktree' ? branch.trim() : undefined,
-        base: location === 'new-worktree' ? base : undefined,
-        worktreePath: location === 'existing-worktree' ? existing : undefined,
-        reuseWorktree: true,
         model: model || undefined,
         effort: (effort || undefined) as EffortLevel | undefined,
         permissionMode: (permission || undefined) as PermissionMode | undefined,
@@ -402,13 +319,6 @@ export function AddAgentDialog() {
       })
       await actions.refreshWorkspace()
       close()
-      // What happened to an unused worktree it could reuse (#456): "Reused hive/b4, brought up to main at 66ce11b".
-      if (def.reuse) {
-        // Why an unused worktree wasn't reused, in the window's language (#848): the English is the Agent API's.
-        const reuse = def.reuse.notReusedText ? { ...def.reuse, notReused: inLanguage(def.reuse.notReusedText) } : def.reuse
-        const note = reuseNote(reuse, tr)
-        notify('info', tr(msg({ id: 'agents.add.worktreeNotice', defaultMessage: '{agent}: {reused, select, yes {worktree reused} other {new worktree}}', description: "A notification's title after adding a worktree agent ({agent}): whether it reused an unused worktree or made a new one. Its message says how." }), { agent: def.name, reused: def.reuse.reused ? 'yes' : 'no' }), note.charAt(0).toUpperCase() + note.slice(1))
-      }
       actions.noteManyAgents(project.path)
       const p = useStore.getState().workspace?.projects.find((x) => x.path === project.path)
       // Show the new agent in a pane: a single-pane layout switches to it (in the Tiles view, its tile: #976).
@@ -447,14 +357,14 @@ export function AddAgentDialog() {
           className="input"
           value={name}
           autoFocus
-          onChange={(e) => rename(e.target.value)}
+          onChange={(e) => setName(e.target.value)}
         />
         {owner && (
           <div className="field-error span2" data-name-taken>
             {owner.project === project.name
               ? tr(msg({ id: 'agents.add.nameTakenHere', defaultMessage: '{project} already has an agent called {agent}.', description: 'Under the name in the Add Agent dialog: an agent of this project ({project}) has that name ({agent}).' }), { project: project.name, agent: owner.name })
               : tr(msg({ id: 'agents.add.nameTaken', defaultMessage: '{project} already has an agent called {agent}: agent names are unique across the workspace.', description: 'Under the name in the Add Agent dialog: an agent of another project ({project}) has that name ({agent}).' }), { project: owner.project, agent: owner.name })}{' '}
-            <a onClick={() => rename(suggestion)}>{tr(msg({ id: 'agents.add.useSuggestion', defaultMessage: 'Use {name}', description: 'Link after a taken name in the Add Agent dialog: uses a free name ({name}) instead.' }), { name: suggestion })}</a>
+            <a onClick={() => setName(suggestion)}>{tr(msg({ id: 'agents.add.useSuggestion', defaultMessage: 'Use {name}', description: 'Link after a taken name in the Add Agent dialog: uses a free name ({name}) instead.' }), { name: suggestion })}</a>
           </div>
         )}
       </div>
@@ -475,118 +385,9 @@ export function AddAgentDialog() {
           </span>
         </div>
       )}
-      <h3 className="agent-dialog-h">{tr(msg({ id: 'agents.add.where', defaultMessage: 'Where it works', description: 'A heading in the Add Agent dialog, above the choice of folder: the project folder, a new worktree or an existing one.' }))}</h3>
-      <div className="choice-list">
-        <label className={cx('choice', location === 'project' && 'selected')}>
-          <input type="radio" checked={location === 'project'} onChange={() => setLocation('project')} />
-          <div>
-            <strong>{tr(msg({ id: 'agents.add.projectFolder', defaultMessage: 'Project folder', description: "A choice in the Add Agent dialog: the agent works in the project's own folder." }))}</strong>
-            <div className="faint">{tr(msg({ id: 'agents.add.projectFolderNote', defaultMessage: "Shares the folder with the project's other agents. File locks stop two agents editing the same file at once.", description: 'Under the Project folder choice in the Add Agent dialog.' }))}</div>
-          </div>
-        </label>
-        <label className={cx('choice', location === 'new-worktree' && 'selected', !git?.isRepo && 'disabled')}>
-          <input type="radio" disabled={!git?.isRepo} checked={location === 'new-worktree'} onChange={() => setLocation('new-worktree')} />
-          <div>
-            <strong>{tr(msg({ id: 'agents.add.newWorktree', defaultMessage: 'New worktree', description: 'A choice in the Add Agent dialog: the agent works in a new git worktree (its own checkout on its own branch).' }))}</strong>
-            <div className="faint">
-              {git?.error
-                ? tr(msg({ id: 'agents.add.gitError', defaultMessage: 'Could not read the git repository: {error}', description: "Under the New worktree choice: Hive couldn't read the project's git repository; {error} is why." }), { error: git.error })
-                : git?.gitProblem
-                  ? tr(msg({ id: 'agents.add.gitProblem', defaultMessage: '{problem}. Agent Setup says how to fix it.', description: "Under the New worktree choice: git can't be used ({problem}, a sentence without its full stop). Agent Setup is a Help window: use its translated name." }), { problem: git.gitProblem })
-                  : git?.isRepo === false
-                    ? tr(msg({ id: 'agents.add.needsRepo', defaultMessage: 'Needs a git repository.', description: "Under the New worktree choice: the project isn't a git repository." }))
-                    : tr(msg({ id: 'agents.add.newWorktreeNote', defaultMessage: 'Its own checkout on its own branch. Review and merge its work when it is done.', description: 'Under the New worktree choice in the Add Agent dialog.' }))}
-            </div>
-            {location === 'new-worktree' && (
-              <div className="agent-form nested">
-                <label>{tr(msg({ id: 'agents.add.branch', defaultMessage: 'Branch', description: "Label of the new worktree's branch name in the Add Agent dialog." }))}</label>
-                <input
-                  className="input mono"
-                  value={branch}
-                  onChange={(e) => {
-                    setBranch(e.target.value)
-                    setBranchEdited(true)
-                  }}
-                />
-                <div className="faint span2" data-branch-hint>
-                  {tRich<ReactNode>(msg({ id: 'agents.add.branchHint', defaultMessage: '<code>hive/</code> marks branches Hive made, so it can reuse and tidy them up.', description: 'Under the branch name in the Add Agent dialog. Keep <code>hive/</code> as it is: it is the start of the branch name.' }), { code: CODE })}
-                </div>
-                <label>{tr(msg({ id: 'agents.add.basedOn', defaultMessage: 'Based on', description: "Label of the branch a new worktree's branch starts from (Add Agent dialog)." }))}</label>
-                <select className="select" value={base} onChange={(e) => setBase(e.target.value)}>
-                  {git?.branches.map((b) => (
-                    <option key={b} value={b}>
-                      {b === git.current ? tr(msg({ id: 'agents.add.currentBranch', defaultMessage: '{branch} (current)', description: 'A branch in the Based on list: the one checked out in the project folder now.' }), { branch: b }) : b}
-                    </option>
-                  ))}
-                </select>
-                {match && !match.reusable && (
-                  <div className="banner info span2" data-worktree-match="held">
-                    <Icon name="info" />
-                    <span>
-                      {tRich<ReactNode>(msg({ id: 'agents.add.heldWorktree', defaultMessage: '<code>{branch}</code> already has an unused worktree with work in it ({why}). Hive makes a new one, or <reuse>reuse it (it keeps its work)</reuse>.', description: 'Under the branch name in the Add Agent dialog: an unused worktree on that branch ({branch}) has work in it ({why}). <reuse> is a link that chooses that worktree instead. Keep the tags.' }), {
-                        branch: match.branch,
-                        why: match.why,
-                        code: CODE,
-                        reuse: LINK((e) => {
-                          // Inside the New worktree choice's label: its click would choose New worktree again.
-                          e.preventDefault()
-                          setExisting(match.path)
-                          setLocation('existing-worktree')
-                        })
-                      })}
-                    </span>
-                  </div>
-                )}
-                {match?.reusable ? (
-                  <div className="faint span2" data-worktree-match="reuse">
-                    {/* Sentences joined as the language does (#893: no space after 。). */}
-                    {(() => {
-                      const reuses = tRich<ReactNode>(msg({ id: 'agents.add.reuses', defaultMessage: 'Reuses <code>{path}</code>, the unused worktree already on <code>{branch}</code>: it is merged into {base} and clean, so Hive brings it up to {base}.', description: 'Under the branch name in the Add Agent dialog: the new agent reuses an unused worktree ({path}, on {branch}) that is merged into {base}. Keep the <code> tags.' }), { path: match.path, branch: match.branch, base: match.base, code: CODE })
-                      return setup ? sentences(reuses, tRich<ReactNode>(msg({ id: 'agents.add.setupAgain', defaultMessage: '<code>{setup}</code> runs again only if a lockfile changed.', description: "Under a reused worktree in the Add Agent dialog: the project's setup command ({setup}) runs again only when a lockfile changed. Keep the <code> tags." }), { setup, code: CODE })) : reuses
-                    })()}
-                  </div>
-                ) : (
-                <div className="faint span2">
-                  {sentences(
-                    tRich<ReactNode>(msg({ id: 'agents.add.createdIn', defaultMessage: 'Created in <code>{folder}</code>{copied, select, none {} other {, with <code>{copied}</code> copied from the project folder}}.', description: "Under the branch name in the Add Agent dialog: where the new worktree goes ({folder}, a path), and the files copied into it from the project folder ({copied}, a list; none: leave that branch empty). Keep the <code> tags." }), { folder: `${git?.worktreesRoot ?? ''}\\${slugify(name)}`, copied: fmt.list(copy.split(/[\n,]/).map((s) => s.trim()).filter(Boolean), 'unit') || 'none', code: CODE }),
-                    setup
-                      ? tRich<ReactNode>(msg({ id: 'agents.add.setupRuns', defaultMessage: "<code>{setup}</code> runs in the agent's pane before {cli} starts.", description: "Under the branch name in the Add Agent dialog: the project's setup command ({setup}) runs in the new agent's pane before its CLI ({cli}) starts. Keep the <code> tags." }), { setup, cli: providerDescriptor(provider).name, code: CODE })
-                      : tr(msg({ id: 'agents.add.setupNone', defaultMessage: 'Set a setup command (e.g. npm install) in Project Settings → Agents.', description: 'Under the branch name in the Add Agent dialog when the project has no setup command: where to set one. npm install is a command: keep it. Project Settings → Agents: use their translated names.' }))
-                  )}
-                </div>
-                )}
-              </div>
-            )}
-          </div>
-        </label>
-        <label className={cx('choice', location === 'existing-worktree' && 'selected', !free.length && 'disabled')}>
-          <input type="radio" disabled={!free.length} checked={location === 'existing-worktree'} onChange={() => setLocation('existing-worktree')} />
-          <div>
-            <strong>{tr(msg({ id: 'agents.add.existingWorktree', defaultMessage: 'Existing worktree', description: "A choice in the Add Agent dialog: the agent works in one of the project's worktrees that no agent uses." }))}</strong>
-            <div className="faint">
-              {free.length
-                ? tr(msg({ id: 'agents.add.existingNote', defaultMessage: 'A worktree of this project that no agent uses, e.g. one kept when an agent was removed.', description: 'Under the Existing worktree choice in the Add Agent dialog.' }))
-                : tr(msg({ id: 'agents.add.noUnused', defaultMessage: 'This project has no unused worktrees.', description: 'Under the Existing worktree choice in the Add Agent dialog, when there is none to choose.' }))}
-            </div>
-            {location === 'existing-worktree' && (
-              <div className="agent-form nested">
-                <label>{tr(WORKTREE)}</label>
-                <select className="select" value={existing} onChange={(e) => setExisting(e.target.value)}>
-                  {free.map((w) => (
-                    <option key={w.path} value={w.path}>
-                      {w.branch ?? tr(msg({ id: 'agents.add.detached', defaultMessage: '(detached)', description: "An existing worktree in the Add Agent dialog's list whose checkout is on no branch (git's detached HEAD)." }))} — {w.path}
-                    </option>
-                  ))}
-                </select>
-                <div className="faint span2">
-                  {git?.current
-                    ? tr(msg({ id: 'agents.add.existingMerged', defaultMessage: 'One merged into {branch} and clean is brought up to it first; any other keeps its work as it is.', description: 'Under the Existing worktree list: what happens to the chosen worktree ({branch}: the branch checked out in the project folder).' }), { branch: git.current })
-                    : tr(msg({ id: 'agents.add.existingMergedCurrent', defaultMessage: 'One merged into the current branch and clean is brought up to it first; any other keeps its work as it is.', description: "Under the Existing worktree list: what happens to the chosen worktree, when the project folder's branch isn't known." }))}
-                </div>
-              </div>
-            )}
-          </div>
-        </label>
+      <h3 className="agent-dialog-h">{tr(msg({ id: 'agents.add.where', defaultMessage: 'Where it works', description: 'A heading in the Add Agent dialog, above where the new agent works.' }))}</h3>
+      <div className="faint agent-dialog-note" data-where-note>
+        {tr(msg({ id: 'agents.add.whereNote', defaultMessage: "In the project folder. A builder takes one of the project's slots for each card it builds and works there until the card is done; Version Control → Branches & remotes lists them.", description: "The Add Agent dialog, under Where it works: agents have no worktree of their own (1.0); a builder works in a slot (a working folder Hive lends to a card) while it builds a card. Version Control → Branches & remotes: use their translated names. Glossary: slot." }))}
       </div>
       <h3 className="agent-dialog-h">{tr(SETTINGS)}</h3>
       <Overrides project={project} provider={provider} model={model} effort={effort} permission={permission} context={context} onModel={setModel} onEffort={setEffort} onPermission={setPermission} onContext={setContext} />
@@ -818,6 +619,7 @@ export function AgentSettingsDialog() {
   }
   const current = agent.live?.provider ?? agentProvider(agent, project.config, settings)
   const close = (): void => set({ agentSettingsFor: null })
+  const own = legacyOf(agent)
   // Its role as it reads now (the guess, for an agent from before 1.0), stored once the user saves (#1430).
   const initial: AgentFields = { name: agent.name, role: agent.role ?? '', workflowRole: agentWorkflowRole(agent), provider: current, model: agent.model ?? '', effort: agent.effort ?? '', permission: agent.permissionMode ?? '', context: contextChoice(agent.use200kContext), mcp: agent.mcpServers ? [...agent.mcpServers] : null }
   return (
@@ -830,10 +632,16 @@ export function AgentSettingsDialog() {
       mcpProject={project.config.mcp}
       mcpWhere="project"
       works={
-        agent.worktree ? (
+        // Where it works now (#1442): its 0.9 worktree, a slot, carried slot or home, or the project folder.
+        own ? (
           <>
-            {tRich<ReactNode>(msg({ id: 'agents.settings.worktreeOn', defaultMessage: 'Worktree on <code>{branch}</code> (from {base})', description: "Where an agent works (Agent Settings): its worktree's branch ({branch}) and the branch it started from ({base}). Keep the <code> tags." }), { branch: agent.worktree.branch, base: agent.worktree.base, code: CODE })}
-            <div className="faint">{agent.worktree.path}</div>
+            {tRich<ReactNode>(msg({ id: 'agents.settings.worktreeOn', defaultMessage: 'Worktree on <code>{branch}</code> (from {base})', description: "Where an agent works (Agent Settings): its worktree's branch ({branch}) and the branch it started from ({base}). Keep the <code> tags." }), { branch: own.branch, base: own.base, code: CODE })}
+            <div className="faint">{own.path}</div>
+          </>
+        ) : placeText(agent.place) ? (
+          <>
+            {placeText(agent.place)}
+            <div className="faint">{agentFolder(agent)}</div>
           </>
         ) : (
           tr(PROJECT_FOLDER)
@@ -1097,18 +905,20 @@ export function MergeDialog() {
   const [lookup, setLookup] = useState<{ state: 'pending' | 'done' | 'failed'; error?: string }>({ state: 'pending' })
   const [lookups, setLookups] = useState(0)
   const slots = useMergeSlots()
-  // What is merged: an agent's worktree, or an unused worktree (#400), named by its branch, nobody working in it.
+  // What is merged: an agent's 0.9 worktree (#1442: while it still works there), or an unused worktree (#400), named
+  // by its branch, nobody working in it.
   const unused = target?.worktree ?? null
-  const agent = found?.worktree ? found : unused ? { id: '', name: unused.branch, live: null, worktree: { path: unused.path, branch: unused.branch, base: status?.into ?? '' } } : null
+  const own = found ? legacyOf(found) : null
+  const agent = found && own ? { id: found.id, name: found.name, live: found.live, tree: own } : unused ? { id: '', name: unused.branch, live: null, tree: { path: unused.path, branch: unused.branch, base: status?.into ?? '' } } : null
 
   useEffect(() => {
     setStatus(null)
     setReadError(null)
     setResult(null)
     setBusy(false)
-    if (!target || !agent?.worktree) return
+    if (!target || !agent?.tree) return
     setSquash((settings?.agents.mergeStyle ?? 'merge') === 'squash')
-    setMessage(unused ? `Work from ${unused.branch}` : `${agent.name}: work from ${agent.worktree.branch}`) // i18n-ignore: a commit message, kept in git's history (English, as agents read it)
+    setMessage(unused ? `Work from ${unused.branch}` : `${agent.name}: work from ${agent.tree.branch}`) // i18n-ignore: a commit message, kept in git's history (English, as agents read it)
     setCleanup(false)
     setMoveBranch(true)
     void (unused ? call('worktrees:unusedBranchStatus', target.project, unused.path) : call('agents:branchStatus', target.project, target.agentId))
@@ -1122,7 +932,7 @@ export function MergeDialog() {
   useEffect(() => {
     setQueueCard(null)
     setLineCard(null)
-    const branch = unused?.branch ?? found?.worktree?.branch
+    const branch = unused?.branch ?? own?.branch
     if (!target || !branch) return void setLookup({ state: 'done' })
     setLookup({ state: 'pending' })
     let live = true
@@ -1143,13 +953,13 @@ export function MergeDialog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target?.project, target?.agentId, target?.worktree?.path, lookups])
 
-  if (!target || !project || !agent?.worktree) return null
+  if (!target || !project || !agent?.tree) return null
   const close = (): void => set({ mergeFor: null })
   const running = !!agent.live
   // The agent started a task while the dialog was open.
   const blocked = mergeBlocked(agent.name, agent.live?.status, tr)
   const nothing = status && status.ahead === 0 && status.dirty === 0
-  const folderAgent = project.agents.find((a) => !a.worktree && a.live && (a.live.status === 'ready' || a.live.status === 'finished'))
+  const folderAgent = project.agents.find((a) => !awayFromProject(a) && a.live && (a.live.status === 'ready' || a.live.status === 'finished'))
   // The branch it merges into is being merged into by an agent, or agents wait for it (#350): Merge waits until it is free.
   const slot = status?.into ? (projectSlots(slots, project.path).find((s) => s.branch === status.into) ?? null) : null
   const slotTaken = !!slot && (!!slot.holder || slot.waiting.length > 0)
@@ -1163,7 +973,7 @@ export function MergeDialog() {
         danger: true
       })
       if (!ok) return
-    } else if (lineCard && !(await confirmLineMerge(lineCard, agent.worktree!.branch, status?.into ?? ''))) return
+    } else if (lineCard && !(await confirmLineMerge(lineCard, agent.tree!.branch, status?.into ?? ''))) return
     setBusy(true)
     try {
       const removing = cleanup && !running
@@ -1174,7 +984,7 @@ export function MergeDialog() {
       setResult(r)
       if (r.ok) {
         // Where it went: the branch the project folder is on, or the folder itself when git didn't say.
-        const where = { branch: agent.worktree!.branch, into: status?.into ?? '', folder: status?.into ? 'no' : 'yes', agent: agent.name }
+        const where = { branch: agent.tree!.branch, into: status?.into ?? '', folder: status?.into ? 'no' : 'yes', agent: agent.name }
         notify(
           'success',
           tr(msg({ id: 'agents.merged.title', defaultMessage: 'Merged {branch} into {folder, select, yes {the project folder} other {{into}}}', description: "A notification's title after a merge: a worktree's branch ({branch}) merged into the project folder's branch ({into}; or the project folder, when its branch isn't known)." }), where),
@@ -1204,7 +1014,7 @@ export function MergeDialog() {
 
   // Sent to an agent (or copied for one): agent-facing, English.
   const instructions = result?.conflicts
-    ? `Merge branch ${agent.worktree.branch} into ${status?.into ?? 'the current branch'} and resolve the conflicts in: ${result.conflicts.join(', ')}. Keep the intent of both sides; ask me if it isn't clear which to keep. Commit the merge when done.` // i18n-ignore: agent-facing: instructions sent to an agent
+    ? `Merge branch ${agent.tree.branch} into ${status?.into ?? 'the current branch'} and resolve the conflicts in: ${result.conflicts.join(', ')}. Keep the intent of both sides; ask me if it isn't clear which to keep. Commit the merge when done.` // i18n-ignore: agent-facing: instructions sent to an agent
     : ''
 
   return (
@@ -1255,14 +1065,14 @@ export function MergeDialog() {
         </div>
       ) : !status ? (
         <p className="muted">
-          <Icon name="loading" spin /> {tr(msg({ id: 'agents.mergeDialog.reading', defaultMessage: 'Reading {branch}…', description: "The Merge dialog while it reads the worktree's branch ({branch})." }), { branch: agent.worktree.branch })}
+          <Icon name="loading" spin /> {tr(msg({ id: 'agents.mergeDialog.reading', defaultMessage: 'Reading {branch}…', description: "The Merge dialog while it reads the worktree's branch ({branch})." }), { branch: agent.tree.branch })}
         </p>
       ) : result?.conflicts ? (
         <>
           <div className="banner warn">
             <Icon name="warning" /> {tr(msg({ id: 'agents.mergeDialog.conflict', defaultMessage: 'Merging would conflict. Nothing was changed.', description: "The Merge dialog after a merge that would conflict: Hive tried it and changed nothing." }))}
           </div>
-          <p>{tr(msg({ id: 'agents.mergeDialog.conflictFiles', defaultMessage: 'These files were changed on both {branch} and {into}:', description: 'Above the files that would conflict: both branches ({branch}, the worktree\'s; {into}, the project folder\'s) changed them.' }), { branch: agent.worktree.branch, into: status.into ?? '' })}</p>
+          <p>{tr(msg({ id: 'agents.mergeDialog.conflictFiles', defaultMessage: 'These files were changed on both {branch} and {into}:', description: 'Above the files that would conflict: both branches ({branch}, the worktree\'s; {into}, the project folder\'s) changed them.' }), { branch: agent.tree.branch, into: status.into ?? '' })}</p>
           <ul className="conflict-list">
             {result.conflicts.map((f) => (
               <li key={f}>
@@ -1297,16 +1107,16 @@ export function MergeDialog() {
         <>
           <p style={{ marginTop: 0 }}>
             {nothing
-              ? tr(msg({ id: 'agents.mergeDialog.nothing', defaultMessage: "There is nothing to merge: {branch} has no changes that aren't in {into}.", description: "The Merge dialog when the worktree's branch ({branch}) has nothing new for the project folder's branch ({into})." }), { branch: agent.worktree.branch, into: status.into ?? '' })
+              ? tr(msg({ id: 'agents.mergeDialog.nothing', defaultMessage: "There is nothing to merge: {branch} has no changes that aren't in {into}.", description: "The Merge dialog when the worktree's branch ({branch}) has nothing new for the project folder's branch ({into})." }), { branch: agent.tree.branch, into: status.into ?? '' })
               : status.ahead > 0
                 ? tRich<ReactNode>(msg({ id: 'agents.mergeDialog.mergesCommits', defaultMessage: 'Merges <b>{commits, plural, one {# commit} other {# commits}}</b> from <code>{branch}</code> into <code>{into}</code>, the branch checked out in the project folder.', description: "At the top of the Merge dialog: how many commits ({commits}) it merges from the worktree's branch ({branch}) into the project folder's ({into}). Keep the tags." }), {
                     commits: status.ahead,
-                    branch: agent.worktree.branch,
+                    branch: agent.tree.branch,
                     into: status.into ?? tr(msg({ id: 'agents.mergeDialog.noBranch', defaultMessage: '(no branch)', description: "In the Merge dialog, where the project folder's branch goes, when it isn't on one." })),
                     b: BOLD,
                     code: CODE
                   })
-                : tRich<ReactNode>(msg({ id: 'agents.mergeDialog.onlyUncommitted', defaultMessage: '<code>{branch}</code> has no commits to merge yet, only uncommitted changes.', description: "At the top of the Merge dialog when the worktree's branch ({branch}) has nothing committed to merge, only uncommitted files. Keep the tags." }), { branch: agent.worktree.branch, code: CODE })}
+                : tRich<ReactNode>(msg({ id: 'agents.mergeDialog.onlyUncommitted', defaultMessage: '<code>{branch}</code> has no commits to merge yet, only uncommitted changes.', description: "At the top of the Merge dialog when the worktree's branch ({branch}) has nothing committed to merge, only uncommitted files. Keep the tags." }), { branch: agent.tree.branch, code: CODE })}
           </p>
           {blocked && (
             <div className="banner warn">
@@ -1315,9 +1125,9 @@ export function MergeDialog() {
           )}
           {!status.into && <div className="banner warn">{tr(msg({ id: 'agents.mergeDialog.noInto', defaultMessage: 'The project folder is not on a branch. Check one out first.', description: "The Merge dialog when the project folder isn't on a git branch (detached HEAD)." }))}</div>}
           <MergeSlotNote slot={slot} />
-          {status.into && !unused && status.into !== agent.worktree.base && (
+          {status.into && !unused && status.into !== agent.tree.base && (
             <div className="banner warn">
-              <Icon name="info" /> {tr(msg({ id: 'agents.mergeDialog.otherBase', defaultMessage: "{agent}'s branch started from {base}, but the project folder is on {into}.", description: "The Merge dialog when the agent's ({agent}) branch started from another branch ({base}) than the one the project folder is on now ({into})." }), { agent: agent.name, base: agent.worktree.base, into: status.into })}
+              <Icon name="info" /> {tr(msg({ id: 'agents.mergeDialog.otherBase', defaultMessage: "{agent}'s branch started from {base}, but the project folder is on {into}.", description: "The Merge dialog when the agent's ({agent}) branch started from another branch ({base}) than the one the project folder is on now ({into})." }), { agent: agent.name, base: agent.tree.base, into: status.into })}
             </div>
           )}
           {status.dirty > 0 && (
@@ -1355,7 +1165,7 @@ export function MergeDialog() {
             <>
               <label className="flex muted" style={{ marginTop: 6 }}>
                 <input type="checkbox" className="checkbox" checked={moveBranch} onChange={(e) => setMoveBranch(e.target.checked)} />{' '}
-                {tr(msg({ id: 'agents.mergeDialog.move', defaultMessage: 'Move {branch} to {known, select, yes {{into}} other {the merged branch}} afterwards', description: "Checkbox in the Merge dialog (Squash): points the agent's branch ({branch}) at the merged branch ({into}; when it isn't known, the merged branch) once merged." }), { branch: agent.worktree.branch, into: status.into ?? '', known: status.into ? 'yes' : 'no' })}
+                {tr(msg({ id: 'agents.mergeDialog.move', defaultMessage: 'Move {branch} to {known, select, yes {{into}} other {the merged branch}} afterwards', description: "Checkbox in the Merge dialog (Squash): points the agent's branch ({branch}) at the merged branch ({into}; when it isn't known, the merged branch) once merged." }), { branch: agent.tree.branch, into: status.into ?? '', known: status.into ? 'yes' : 'no' })}
               </label>
               <div className="detail">
                 {moveBranch

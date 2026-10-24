@@ -50,8 +50,9 @@ export function MergeCards({ slots, projectName, showProject, stepOf, now }: { s
 export function MergeCard({ slot: s, project, showProject, step, now, folded, onFold }: { slot: MergeSlotInfo; project: string; showProject: boolean; step: string | null; now: number; folded: boolean; onFold: () => void }) {
   // Only taken slots get a card (Progress.tsx).
   const h = s.holder!
-  // The holder's branch, when it is an agent working in its own worktree: "hive/b1 → main".
-  const from = useStore((st) => (h.agentId ? (findProject(st, s.project)?.agents.find((a) => a.id === h.agentId)?.worktree?.branch ?? null) : null))
+  // The holder's branch, when it is an agent working outside the project folder (its slot's card line, or its own
+  // worktree's branch, #1442): "hive/b1 → main".
+  const from = useStore((st) => (h.agentId ? (findProject(st, s.project)?.agents.find((a) => a.id === h.agentId)?.place.branch ?? null) : null))
   const late = h.until < now
   const left = h.until - now
   const sofar = minutesText(now - h.since)

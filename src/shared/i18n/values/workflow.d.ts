@@ -257,6 +257,8 @@ interface HiveMessageValues {
   'workflow.refused.move.notFromHere.nextNone': undefined
   'workflow.refused.move.useIntent.message': undefined
   'workflow.refused.move.useIntent.next': { intent: string | number }
+  'workflow.refused.paths.excluded.message': { card: string | number; path: string | number; folder: string | number }
+  'workflow.refused.paths.excluded.next': { folder: string | number }
   'workflow.refused.platform.unknown.message': { card: string | number; what: string | number; rule: string | number }
   'workflow.refused.platform.unknown.next': undefined
   'workflow.refused.platform.unknown.nextGone': undefined
@@ -352,6 +354,7 @@ interface HiveMessageValues {
   'workflow.slots.fromCopy': undefined
   'workflow.slots.fromSetup': undefined
   'workflow.slots.heading': undefined
+  'workflow.slots.held': { agent: string | number }
   'workflow.slots.inUse': undefined
   'workflow.slots.inherit': undefined
   'workflow.slots.lentCard': { agent: string | number; card: string | number }
@@ -361,6 +364,7 @@ interface HiveMessageValues {
   'workflow.slots.off': undefined
   'workflow.slots.on': undefined
   'workflow.slots.openAdvanced': undefined
+  'workflow.slots.release': undefined
   'workflow.slots.reviewCopies': undefined
   'workflow.slots.reviewCopiesDesc': undefined
   'workflow.slots.saveFailed': undefined

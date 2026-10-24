@@ -7,7 +7,7 @@ import { forgetPtys } from './ptyHost'
 import { agentProvider, defaultProviderPending, isKnownProvider } from '../shared/providers'
 import { cleanMcpServers } from '../shared/agentMcp'
 import { isWorkflowRole, type WorkflowRole } from '../shared/workflow/roles'
-import type { AddAgentOptions, AddedAgent, AgentBranchStatus, AgentDef, AgentPatch, AgentWorktree, MergeResult, ProjectConfig, ProjectGitInfo, RemovedAgent, SessionLayout, WorktreeCheck, WorktreeMatch } from '../shared/types'
+import type { AddAgentOptions, AddedAgent, AgentBranchStatus, AgentDef, AgentPatch, MergeResult, ProjectConfig, ProjectGitInfo, RemovedAgent, SessionLayout, WorktreeCheck, WorktreeMatch } from '../shared/types'
 import { config } from './config'
 import { toast } from './events'
 import { placeKey, samePlace } from './fsutil'
@@ -31,6 +31,7 @@ import { chooseSpace, hiveBranch, reusableBranches, type BranchHome } from '../s
 import { AGENTS_PER_PROJECT } from '../shared/advanced'
 import { advanced } from './advanced'
 import { legacyWorktree } from './agentFolders'
+import { legacySetupPending } from '../shared/agentFolders'
 
 const log = createLogger('agents')
 
@@ -272,7 +273,7 @@ export async function newWorktreePlace(projectPath: string, name: string, branch
 export async function addLegacyAgent(projectPath: string, opts: AddAgentOptions): Promise<AgentDef> {
   projectPath = workspace.assertProject(projectPath)
   const cfg = await workspace.projectConfig(projectPath)
-  let tree: AgentWorktree
+  let tree: wt.WorktreeRef
   if (opts.location === 'existing-worktree') {
     const found = (await wt.listWorktrees(projectPath)).find((w) => !!opts.worktreePath && placeKey(w.path) === placeKey(opts.worktreePath))
     if (!found?.branch) throw new Error(`not a worktree of this project on a branch: ${opts.worktreePath}`) // i18n-ignore: a test channel, never shown
@@ -287,7 +288,7 @@ export async function addLegacyAgent(projectPath: string, opts: AddAgentOptions)
     tree = { path: dest, branch, base }
   }
   const def = await addAgent(projectPath, { ...opts, location: 'project', branch: undefined, base: undefined, worktreePath: undefined, reuseWorktree: undefined })
-  const now = await workspace.updateAgent(projectPath, def.id, { worktree: tree, ...(cfg.worktreeSetup.trim() ? { needsSetup: true } : {}) })
+  const now = await workspace.updateLegacyAgent(projectPath, def.id, { worktree: tree, ...(cfg.worktreeSetup.trim() ? { needsSetup: true } : {}) })
   await workspaceOf(projectPath).refresh()
   return now
 }
@@ -422,7 +423,7 @@ export async function removeAgent(projectPath: string, agentId: string, opts: { 
     const was = now.agents.find((a) => a.id === agentId)
     const left = now.agents.filter((a) => a.id !== agentId)
     const keptTree = result.worktree && !result.worktree.deleted ? legacyWorktree(was) : null
-    const pending = keptTree && was?.needsSetup && now.worktreeSetup.trim() && !left.some((a) => legacyWorktree(a) && samePlace(legacyWorktree(a)!.path, keptTree.path)) ? [keptTree.path] : []
+    const pending = keptTree && legacySetupPending(was) && now.worktreeSetup.trim() && !left.some((a) => legacyWorktree(a) && samePlace(legacyWorktree(a)!.path, keptTree.path)) ? [keptTree.path] : []
     const gone = result.worktree?.deleted ? [result.worktree.path] : []
     return { agents: left, ...pendingSetupPatch(now, { add: pending, drop: gone }) }
   })
@@ -532,7 +533,7 @@ export function setUserMergeSlot(fn: typeof userMergeSlot): void {
  * branch it merges into (#350), so an agent's merge doesn't land in the middle. An agent's merge and an unused
  * worktree's (#400) both go through it.
  */
-export async function mergeInProject(projectPath: string, worktree: AgentWorktree, opts: { squash: boolean; message: string; moveBranch?: boolean; target?: string }): Promise<MergeResult> {
+export async function mergeInProject(projectPath: string, worktree: wt.WorktreeRef, opts: { squash: boolean; message: string; moveBranch?: boolean; target?: string }): Promise<MergeResult> {
   // The merge slot of the branch merged into: the target named (#1450's branch merges), else the project folder's.
   const into = opts.target ?? (await workspace.branch(projectPath))
   const run = (): Promise<MergeResult> => withRepoLock(projectPath, () => wt.mergeWorktree(projectPath, worktree, opts), { project: projectPath })

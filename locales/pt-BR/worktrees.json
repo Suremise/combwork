@@ -38,6 +38,7 @@
   "worktrees.missing.noAgent": "Esse agente não existe mais.",
   "worktrees.missing.noBranch": "O branch {branch} do agente {agent} não existe mais, e a pasta do projeto não está em um branch a partir do qual criar outro.",
   "worktrees.missing.noTree": "O agente {agent} não trabalha em um worktree.",
+  "worktrees.missing.slotFailed": "Não foi possível recriar o slot {slot} de {agent}: {why}",
   "worktrees.missing.stillListed": "O git ainda lista {folder} como worktree (ele pode estar bloqueado): desbloqueie-o ou execute git worktree prune e tente de novo.",
   "worktrees.missing.stopFirst": "Pare o agente {agent} primeiro.",
   "worktrees.missing.thereRecreate": "A pasta do worktree do agente {agent} existe ({folder}): não há nada para recriar.",

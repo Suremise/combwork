@@ -14,6 +14,7 @@
 import { basename } from 'path'
 import { compile } from '../../shared/workflow/compile'
 import { agentWorkflowRole, reviewsWork } from '../../shared/workflow/roles'
+import { legacyWorktree } from '../../shared/agentFolders'
 import type { StageId } from '../../shared/workflow/facts'
 import type { ProjectConfig } from '../../shared/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
@@ -180,7 +181,7 @@ async function projectOptions(ws: WorkspaceService, folder: string, hasLane: boo
     configured = true
     const platform = projectPlatform(folder, c.platform).id
     const agents = c.agents ?? []
-    const options = upgradeOptions(platform, { reviewers: hasLane || agents.some((a) => reviewsWork(agentWorkflowRole(a))), worktrees: agents.some((a) => !!a.worktree) })
+    const options = upgradeOptions(platform, { reviewers: hasLane || agents.some((a) => reviewsWork(agentWorkflowRole(a))), worktrees: agents.some((a) => !!legacyWorktree(a)) })
     return { platform: c.platform ?? platform, workflow: { platform, preset: null, options } }
   })
   if (made || !cfg.workflow) return MADE_BY_1_0
@@ -199,14 +200,15 @@ const madeBy1_0 = (c: Pick<ProjectConfig, 'platform'>): boolean => c.platform !=
 
 /** The folder an agent works in, as its project's config says (its worktree and the branch it merges into, or none). */
 function placeOf(cfg: ProjectConfig, agent: string | null): string {
-  const wt = agent ? (cfg.agents ?? []).find((a) => a.id === agent)?.worktree : undefined
+  const wt = agent ? legacyWorktree((cfg.agents ?? []).find((a) => a.id === agent)) : null
   return wt ? JSON.stringify([wt.path, wt.base]) : ''
 }
 
 /** Where a card in flight works: its agent's worktree (merging into the branch it came from), else the project folder's line. */
 async function whereItWorks(folder: string, cfg: ProjectConfig, c: AdoptionCard, platform: PlatformId): Promise<AdoptionAt> {
   const agent = c.agent ? (cfg.agents ?? []).find((a) => a.id === c.agent) : undefined
-  if (agent?.worktree) return { agent: agent.id, worktree: agent.worktree.path, target: agent.worktree.base }
+  const tree = legacyWorktree(agent)
+  if (agent && tree) return { agent: agent.id, worktree: tree.path, target: tree.base }
   const line = platform === 'git' ? await G.branch(folder) : null
   return { agent: c.agent ?? 'user', target: line && !isUnknown(line) ? line : null }
 }

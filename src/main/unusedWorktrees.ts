@@ -4,7 +4,7 @@ import { createReadStream, existsSync } from 'original-fs'
 import { lstat, readdir, readlink } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
-import type { AgentBranchStatus, AgentWorktree, MergeResult, SessionRecord, UnusedWorktree, UnusedWorktreeKind, UnusedWorktreeOrigin, UnusedWorktreePreview, UnusedWorktreeRemoval, UnusedWorktrees } from '../shared/types'
+import type { AgentBranchStatus, MergeResult, SessionRecord, UnusedWorktree, UnusedWorktreeKind, UnusedWorktreeOrigin, UnusedWorktreePreview, UnusedWorktreeRemoval, UnusedWorktrees } from '../shared/types'
 import { homeListed, lostLines, slotsListed } from '../shared/unusedWorktrees'
 import { folderFacts, legacyWorktree } from './agentFolders'
 import { COPIES_DIR } from './copies'
@@ -211,7 +211,7 @@ const CANT_CHECK = msg({ id: 'main.unused.slot.cantCheck', defaultMessage: "Hive
 const SLOT_GUARDED = msg({ id: 'main.unused.why.slotGuarded', defaultMessage: 'it is a slot, which Hive removes only when it is clean and its work is merged', description: "Why Hive won't remove a slot anyway from Unused worktrees (#1450): slots go only through the guarded clean-up. A clause." })
 
 /** Why the pool keeps a slot (#1450), in the window's language: a row's reason, and Remove's refusal. */
-async function keptText(projectPath: string, k: SlotKept): Promise<string> {
+export async function keptText(projectPath: string, k: SlotKept): Promise<string> {
   switch (k.why) {
     case 'leased': {
       const agent = projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === k.agent)?.name ?? k.agent
@@ -328,7 +328,7 @@ export async function unusedWorktrees(projectPath: string): Promise<UnusedWorktr
  * lists as the project's that no agent uses and Hive may touch, on a branch (a detached one has nothing to merge), with
  * the branch it would merge into as its base. Throws otherwise.
  */
-async function unusedWorktree(projectPath: string, path: string): Promise<AgentWorktree> {
+async function unusedWorktree(projectPath: string, path: string): Promise<wt.WorktreeRef> {
   const { listed, problem } = await candidates(projectPath)
   const w = listed.find((x) => key(x.path) === key(path))
   if (!w) throw new Error(problem ?? tr(msg({ id: 'main.unused.gone', defaultMessage: "It isn't one of the project's unused worktrees any more.", description: "An error merging one of the Overview's unused worktrees (Remove, Remove anyway, Merge): it changed meanwhile." })))
@@ -354,7 +354,7 @@ export async function unusedBranchStatus(projectPath: string, path: string): Pro
  */
 export async function mergeUnused(projectPath: string, path: string, opts: { squash: boolean; message: string; cleanup: boolean }): Promise<MergeResult> {
   projectPath = workspace.assertProject(projectPath)
-  let worktree: AgentWorktree
+  let worktree: wt.WorktreeRef
   let result: MergeResult
   const release = reserveForRemoval(path)
   try {
@@ -624,7 +624,7 @@ export async function removeUnusedWorktree(projectPath: string, path: string, op
       log.info(`Removed unused worktree ${userText(listed.path)} anyway (${snap.ahead} commits only it held, ${snap.dirty} uncommitted files)`)
     } else {
       if (!listed.branch) return { deleted: false, reason: tr(msg({ id: 'main.unused.why.detached', defaultMessage: 'it is not on a branch (detached HEAD)', description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause. detached HEAD is git's term." })) }
-      const tree: AgentWorktree = { path: listed.path, branch: listed.branch, base: '' }
+      const tree: wt.WorktreeRef = { path: listed.path, branch: listed.branch, base: '' }
       const check = await wt.worktreeCheck(projectPath, tree)
       done = await wt.removeCheckedWorktree(projectPath, tree, check, opts.expectInto).catch((e: Error) => ({ deleted: false, reason: e.message.split('\n')[0] }))
     }

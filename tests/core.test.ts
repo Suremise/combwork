@@ -9,6 +9,7 @@ import { splitArgs } from '../src/shared/providers'
 import { readFile, readdir } from 'fs/promises'
 import { assertSessionId, isSessionId, compactThreshold, DEFAULT_APP_CONFIG, DEFAULT_SETTINGS, effectiveModelLabel, mergeDefaults, migrateConfig, modelLabel } from '../src/shared/defaults'
 import { tempDir, tempRoot } from './tempDir'
+import type { StoredAgent } from '../src/shared/agentFolders'
 
 const line = (o: unknown): string => JSON.stringify(o)
 
@@ -647,9 +648,9 @@ describe('agents', () => {
   it('lists only the agents added, all equal, in the order added', async () => {
     const { projectAgents } = await import('../src/shared/defaults')
     expect(projectAgents({ agents: [] })).toEqual([])
-    const list = projectAgents({ agents: [{ id: 'a-2', name: 'Reviewer' }, { id: 'a-1', name: 'Lead', worktree: { path: 'x', branch: 'b', base: 'main' } }, null as never] })
+    const list = projectAgents({ agents: [{ id: 'a-2', name: 'Reviewer' }, { id: 'a-1', name: 'Lead', worktree: { path: 'x', branch: 'b', base: 'main' } } as StoredAgent, null as never] })
     expect(list.map((a) => a.name)).toEqual(['Reviewer', 'Lead'])
-    expect(list[1].worktree).toBeDefined()
+    expect((list[1] as StoredAgent).worktree).toBeDefined()
   })
 
   it('gives every agent its own terminal key, and a layout that shows them all', async () => {
@@ -723,7 +724,7 @@ describe('resumeRecord', () => {
     const { resumeRecord } = await import('../src/shared/defaults')
     expect(resumeRecord(P, { id: 'a4', lastSessionId: 'm2' }, records, new Set(['m2']), agents)?.id).toBe('m1')
     expect(resumeRecord(P, { id: 'a4', lastSessionId: 'w1' }, records, new Set(['m1', 'm2']), agents)).toBeNull()
-    expect(resumeRecord(P, { id: 'a2', worktree: { path: WT, branch: 'hive/agent-2', base: 'main' } }, records, new Set(), agents)?.id).toBe('w1')
+    expect(resumeRecord(P, { id: 'a2', worktree: { path: WT, branch: 'hive/agent-2', base: 'main' } } as StoredAgent, records, new Set(), agents)?.id).toBe('w1')
     expect(resumeRecord(P, { id: 'a4', lastSessionId: 'old' }, records, new Set(), agents)?.id).toBe('m2')
   })
 })

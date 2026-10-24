@@ -30,6 +30,7 @@ import { cx } from '../util'
 import { BusyButton, Icon, IconButton, Tooltip, useBusy } from '../components/ui'
 import { INIT_TEXT, InitRepoButton } from '../components/InitRepo'
 import { at, GIT_TEXT, GitForm, gitAction, Loading, rich, useFolderBusy, useGitRead, type FormSpec, type OpenForm } from './GitTab'
+import { awayFromProject } from '../agentPlace'
 
 /**
  * Version Control → Branches & remotes (#607, #1385; its own file since #1416): the project folder's branch or detached
@@ -197,7 +198,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
 
   /** A branch, after a confirm that names the agents whose session runs in the folder (idle now: they find it on their next turn). */
   const switchTo = async (target: string, current: string | null): Promise<void> => {
-    const idle = project.agents.filter((a) => !a.worktree && a.live).map((a) => a.name)
+    const idle = project.agents.filter((a) => !awayFromProject(a) && a.live).map((a) => a.name)
     const ok = await confirm({
       title: tr(M.switchTitle, { project: project.name, branch: target }),
       message: tr(M.switchMessage, { current: current ?? tr(M.detachedHead), branch: target }),

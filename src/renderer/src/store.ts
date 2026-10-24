@@ -352,8 +352,6 @@ interface State {
   compactFor: AgentRef | null
   /** Project whose Add Agent dialog is open. */
   addAgentFor: string | null
-  /** Add Agent opened on an existing worktree, chosen (#353's Give to an agent…). */
-  addAgentPreset: { project: string; worktreePath: string } | null
   /** Agent whose settings dialog (name, model, effort, permission mode) is open. */
   agentSettingsFor: AgentRef | null
   /** The Agent Settings dialog for a template's agent (#271): open while set; it answers the template editor. */
@@ -562,7 +560,6 @@ export const useStore = create<State>(() => ({
   keepAwake: 0,
   compactFor: null,
   addAgentFor: null,
-  addAgentPreset: null,
   agentSettingsFor: null,
   templateAgentFor: null,
   templateEdits: {},
@@ -1056,11 +1053,6 @@ export function bumpUnused(path: string): void {
   set((s) => ({ unusedVersion: { ...s.unusedVersion, [path]: (s.unusedVersion[path] ?? 0) + 1 } }))
 }
 
-/** Opens Add Agent on one of the project's worktrees (#353). */
-export function giveWorktreeToAgent(path: string, worktreePath: string): void {
-  set({ addAgentPreset: { project: path, worktreePath }, addAgentFor: path })
-}
-
 /** Opens a project's Overview at one agent's session (picked there, and scrolled to). */
 export function showInOverview(path: string, agentId: string, target: 'history' | 'session' = 'history'): void {
   set((s) => ({ projectTabs: { ...s.projectTabs, [path]: 'overview' }, overviewJump: { project: path, agentId, at: Date.now(), target } }))
@@ -1077,7 +1069,7 @@ export function applyLiveState(state: LiveSessionState): void {
       const agents = known
         ? p.agents.map((a) => (a.id === agentId ? { ...a, live, restartNeeded: live ? a.restartNeeded : false } : a))
         : live
-          ? [...p.agents, { id: agentId, name: state.agentName ?? 'Agent', live, restartNeeded: false, resume: null }] // i18n-ignore: a stand-in agent name until the project's own list arrives
+          ? [...p.agents, { id: agentId, name: state.agentName ?? 'Agent', live, restartNeeded: false, resume: null, place: { folder: state.cwd, is: 'project' as const, name: null, branch: null } }] // i18n-ignore: a stand-in agent name until the project's own list arrives
           : p.agents
       const primary = agents.find((a) => a.live)
       return { ...p, agents, live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, active: live ? true : p.active }

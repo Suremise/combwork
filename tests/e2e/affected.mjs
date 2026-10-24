@@ -216,8 +216,11 @@ export const AREAS = [
   { paths: ['tests/e2e/slotcards.cjs', 'tests/e2e/slotrecovery.cjs', 'src/main/slotCards.ts', 'src/main/laneStart.ts', 'src/main/platform/gitPlatform.ts', 'src/main/workflow/service.ts'], suites: ['slotcards', 'slotrecovery', 'lanestart'] },
   { paths: ['tests/e2e/slotpool.cjs', 'src/main/slots.ts', 'src/main/slotsApp.ts', 'src/main/slotJobs.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts'], suites: ['slotpool', 'slotsessions'] },
   { paths: ['tests/e2e/startfresh.cjs', 'src/main/freshStarts.ts', 'src/shared/freshStarts.ts', 'src/renderer/src/components/NoticeBanners.tsx'], suites: ['startfresh'] },
+  { paths: ['tests/e2e/repairslots.cjs', 'tests/e2e/removeprojectslots.cjs', 'src/main/projectFolders.ts', 'src/shared/projectFolders.ts', 'src/main/projectRemoval.ts', 'src/renderer/src/components/MoveRepair.tsx', 'src/renderer/src/components/ProjectRemoval.tsx', 'src/main/agentWorktree.ts'], suites: ['repairslots', 'removeprojectslots', 'wsmove', 'wtrecreate', 'repairbranches'] },
   { paths: ['tests/e2e/slotupgrade.cjs', 'src/main/slotMigration.ts', 'src/main/workspaceMove.ts'], suites: ['slotupgrade', 'wsmove', 'repairbranches'] },
-  { paths: ['tests/e2e/slotsessions.cjs', 'src/main/agentFolders.ts', 'src/shared/agentFolders.ts', 'src/shared/sessionResume.ts', 'src/shared/resumeAll.ts', 'src/main/sessions.ts'], suites: ['slotsessions'] },
+  { paths: ['tests/e2e/slotsessions.cjs', 'src/main/agentFolders.ts', 'src/shared/agentFolders.ts', 'src/shared/sessionResume.ts', 'src/shared/resumeAll.ts', 'src/main/sessions.ts'], suites: ['slotsessions', 'legacyworktree'] },
+  { paths: ['tests/e2e/legacyworktree.cjs', 'src/main/agentWorktree.ts'], suites: ['legacyworktree', 'slotupgrade'] },
+  { paths: ['tests/e2e/slotrelease.cjs', 'src/main/agentFolders.ts', 'src/renderer/src/components/SlotsAndCopies.tsx'], suites: ['slotrelease'] },
   // The Agent API's agents on slots (#1451): where each is, and adding none in a worktree.
   { paths: ['tests/e2e/agentapislots.cjs', 'src/main/agentFolders.ts', 'src/shared/agentFolders.ts', 'src/main/projectAgents.ts', 'src/main/mcp/hive-mcp.ts'], suites: ['agentapislots', 'replysize'] },
   { paths: ['tests/e2e/p4lane.cjs','src/main/workflow/lineUpdates.ts', 'src/main/workflow/runtime.ts', 'src/main/cardIntents.ts', 'src/main/laneStart.ts', 'src/main/workflow/optionsForm.ts'], suites: ['p4lane'] },
@@ -319,6 +322,7 @@ export const AREAS = [
   // The agent-state marks (#973).
   { paths: ['src/renderer/src/components/StateMark.tsx', 'src/shared/agentState.ts'], suites: ['statemarks', 'contrast'] },
   { paths: ['src/renderer/src/components/AgentsTable.tsx', 'src/shared/agentTable.ts'], suites: ['agentrole', 'agentstable', 'cardchip'] },
+  { paths: ['src/renderer/src/agentPlace.ts', 'tests/e2e/agentslots.cjs'], suites: ['agentslots', 'agents-ui', 'files', 'sessionorigin'] },
   { paths: ['src/renderer/src/components/Tips.tsx', 'src/renderer/src/tips.ts', 'src/shared/tips.ts', 'src/shared/corner.ts', 'docs/USER_GUIDE.md'], suites: ['tips', 'tipcorner'] },
   { paths: ['src/renderer/src/tips.ts', 'src/shared/tips.ts'], suites: ['tipwindows'] },
   { paths: ['src/renderer/src/startupReplay.ts'], suites: ['tips', 'tipwindows', 'skillprefs', 'sessiontree'] },
@@ -329,7 +333,7 @@ export const AREAS = [
   // The usage history (#1106): what every usage view reads, the worker that records it, the parsers it runs, Delete and Clean Up recording first.
   { paths: ['src/main/usageHistory.ts', 'src/main/usageWorker.ts', 'src/main/usageDb.ts', 'src/main/usageParsers.ts', 'src/main/advancedValues.ts', 'src/shared/usageLedger.ts'], suites: ['overview', 'wsoverview', 'cardcost', 'unpricedcost', 'perftable', 'performance', 'storage', 'transcript', 'sessioncleanup', 'assistantoverview', 'loadfail', 'safeguards', 'advanced'] },
   { paths: ['src/renderer/src/views/OtherViews.tsx'], suites: ['about', 'skills', 'drafts', 'windows', 'recent', 'welcomefit'] },
-  { paths: ['tests/e2e/slotoptions.cjs', 'src/renderer/src/components/SlotsAndCopies.tsx', 'src/main/workflow/slotsUpToDateStep.ts', 'src/main/workflow/optionsForm.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'src/shared/workflow/options.ts', 'src/shared/workflow/optionTexts.ts'], suites: ['slotoptions'] },
+  { paths: ['tests/e2e/slotoptions.cjs', 'src/renderer/src/components/SlotsAndCopies.tsx', 'src/main/slotSettings.ts','src/main/workflow/slotsUpToDateStep.ts', 'src/main/workflow/optionsForm.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'src/shared/workflow/options.ts', 'src/shared/workflow/optionTexts.ts'], suites: ['slotoptions'] },
   { paths: ['src/main/workflow/optionsForm.ts', 'src/main/workflow/rulesets.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'src/shared/workflow/options.ts', 'src/shared/workflow/optionTexts.ts', 'tests/e2e/workflowoptions.cjs'], suites: ['workflowoptions', 'assistantsettings', 'workflowdefaults'] },
   { paths: ['src/main/workflow/levels.ts', 'src/renderer/src/views/SettingsView.tsx'], suites: ['workflowdefaults', 'workflowoptions', 'assistantsettings'] },
   { paths: ['src/renderer/src/boardStages.ts', 'src/renderer/src/components/BoardWorkflow.tsx', 'src/renderer/src/components/Board.tsx', 'src/shared/workflow/stages.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/boardstages.cjs'], suites: ['boardstages'] },

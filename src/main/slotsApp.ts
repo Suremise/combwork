@@ -30,7 +30,7 @@ import { onHiveEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
-import { setRetiredHomes, setWriterHost, writerOver } from './agentFolders'
+import { setRetiredHomes, setWriterHost, writerHeld, writerOver } from './agentFolders'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
 import { endLeaseJob, journalPath, LeaseJob, startLauncher } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
@@ -228,7 +228,11 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
         }
       },
       removeIdle: () => advanced.get(SLOTS_REMOVE_IDLE) !== false,
-      ended: (lease, slot) => stopLeaseSession(projectPath, lease, slot),
+      ended: (lease, slot) => {
+        stopLeaseSession(projectPath, lease, slot)
+        // Where its agent works changes (#1442: an idle builder's "in slot-b" goes): the window reads it again.
+        if (!ws.lifetime.aborted) ws.scheduleRefresh()
+      },
       writerOver: (w) => writerOver(w),
       removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }), // i18n-ignore: the log's reason (English)
       renamer: renamerFor(ws, projectPath)
@@ -314,6 +318,7 @@ export function startSlots(): void {
   // tracked as its project's pool's work (close awaits it), and a writer released handed to its pool.
   setWriterHost({
     self: holder.self,
+    alive: holder.alive,
     live: holder.live,
     track: async (projectPath) => {
       const ws = workspaceFor(projectPath)
@@ -343,12 +348,19 @@ export function stopSlots(): void {
   WorkspaceService.closingTasks.delete(forgetPools)
 }
 
-/** A pool's slots as the window reads them (`slots:list`). */
-export function slotViews(pool: SlotPool): SlotView[] {
-  return pool.slots().map((s) => {
-    const l = pool.openLease(s.name)
-    return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: s.writer ? { agent: s.writer.agent, lease: s.writer.lease } : null }
-  })
+/**
+ * A pool's slots as the window reads them (`slots:list`). A writer is held (#1506) when its run isn't live here and its
+ * Hive is this one or one known to have gone: Release Slot… is offered for it.
+ */
+export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
+  return Promise.all(
+    pool.slots().map(async (s) => {
+      const l = pool.openLease(s.name)
+      const w = s.writer
+      const held = !!w && (await writerHeld(w))
+      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null }
+    })
+  )
 }
 
 /** A test copy's retired homes by project folder (`slots:test` `homes`, #1450's suite), until #1441 records real ones. */

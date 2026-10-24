@@ -299,11 +299,8 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'templates-11-name-taken.png') })
   await taken.locator('a').click()
   check('…and its suggestion fills the name in', (await nameField.inputValue()) === 'alpha builder (beta)' && (await taken.count()) === 0 && (await addDialog.getByRole('button', { name: 'Add Agent' }).isEnabled()), await nameField.inputValue())
-  // New worktree: what hive/ in its branch means.
-  await addDialog.locator('label.choice', { hasText: 'New worktree' }).locator('input[type="radio"]').check()
-  const hint = addDialog.locator('[data-branch-hint]')
-  check('Add Agent says what hive/ in a branch means', !!(await lib.until(async () => (await hint.innerText().catch(() => '')) === 'hive/ marks branches Hive made, so it can reuse and tidy them up.', HUNG_MS)), await hint.innerText().catch(() => ''))
-  await page.screenshot({ path: path.join(lib.WORK, 'templates-12-branch-hint.png') })
+  // No worktree to choose (#1442): it says where the agent works instead.
+  check('Add Agent offers no worktree, saying where an agent works', (await addDialog.locator('.choice', { hasText: /New worktree|Existing worktree/ }).count()) === 0 && (await addDialog.locator('[data-where-note]').count()) === 1)
   await page.keyboard.press('Escape')
   await lib.until(async () => (await addDialog.count()) === 0, HUNG_MS)
 

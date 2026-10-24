@@ -12,6 +12,10 @@ import { notify, useLanguage } from '../store'
  * copying it (a selection, Ctrl+C) copies the full path. Monospace only where the path is what the row is about (`mono`).
  */
 export function ShortPath({ path, other, mono, className }: { path: string; other?: string; mono?: boolean; className?: string }) {
+  // Cut in the middle when it doesn't fit (#1447): its last name kept whole, the rest shortened with an ellipsis, so a
+  // slot's or worktree's own folder, often the part that differs, stays in sight.
+  const shown = shortPath(path, other)
+  const cut = Math.max(shown.lastIndexOf('\\'), shown.lastIndexOf('/'))
   return (
     <Tooltip content={path} className="short-path-tip">
       <span
@@ -22,8 +26,15 @@ export function ShortPath({ path, other, mono, className }: { path: string; othe
           e.preventDefault()
         }}
       >
-        <span className="short-path-text" aria-hidden="true">
-          {shortPath(path, other)}
+        <span className={cx('short-path-text', cut > 0 && 'short-path-split')} aria-hidden="true">
+          {cut > 0 ? (
+            <>
+              <span className="short-path-head">{shown.slice(0, cut)}</span>
+              <span className="short-path-tail">{shown.slice(cut)}</span>
+            </>
+          ) : (
+            shown
+          )}
         </span>
         <span className="visually-hidden">{path}</span>
       </span>

@@ -41,8 +41,8 @@
 import { createHash, randomBytes } from 'crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import { existsSync } from 'original-fs'
-import { readdir, readFile, rename } from 'original-fs/promises'
-import { join } from 'path'
+import { mkdir, readdir, readFile, rename } from 'original-fs/promises'
+import { dirname, join } from 'path'
 import { BOARD_MIGRATIONS } from './boardStore'
 import { openDb } from './db'
 import { samePlace } from './fsutil'
@@ -66,6 +66,8 @@ const LOCK_FILES = ['package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml'
 const RESERVED = new Set(['copies'])
 /** What a warming taken over from a holder that is gone leaves as its error (never ready). */
 export const INTERRUPTED = 'its setup was interrupted' // i18n-ignore: agent-facing and the log
+/** Why nothing is lent or made while the project's Delete holds its slots (#1447). */
+export const DELETING = 'the project is being deleted' // i18n-ignore: agent-facing and the log, as INTERRUPTED
 
 export type SlotState = 'creating' | 'ready' | 'lent' | 'dirty' | 'gone' | 'removing'
 export type LeaseKind = 'card' | 'lane' | 'carried'
@@ -398,6 +400,8 @@ export class SlotStore {
     try {
       return await this.conn.write((db) => {
         const at = this.iso()
+        // The project being deleted (#1447): nothing lent or made until its reservation ends.
+        if (deletingIn(db, this.project)) return { ok: false as const, refusal: { why: 'notReady' as const, slot: req.slot ?? 'a slot', state: 'removing' as const, error: DELETING } }
         const mine = this.dispatchOf(db, req.agent)
         if (mine) {
           if ((req.card !== undefined && mine.card === req.card) || (req.lane !== undefined && mine.lane === req.lane)) return { ok: true as const, lease: mine, slot: this.slotIn(db, mine.slot)!, fresh: false, again: true }
@@ -486,6 +490,7 @@ export class SlotStore {
   carryIn(db: DatabaseSync, agent: string, slot: { name: string; folder: string; target: string | null }): SlotLease | null {
     const at = this.iso()
     const had = this.slotIn(db, slot.name)
+    if (deletingIn(db, this.project)) return null
     if (!had && (this.reservedIn(db).has(slot.name.toLowerCase()) || this.renamesIn(db).some((r) => samePlace(r.intent.to, slot.folder)))) return null
     if (!had) db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at) VALUES (?, ?, ?, 'lent', ?, ?, ?, ?)").run(this.project, slot.name, slot.folder, freePort(this.slotsIn(db)), slot.target, at, at)
     else {
@@ -733,6 +738,65 @@ export class SlotStore {
     return this.conn.write((db) => Number(db.prepare(`UPDATE slots SET state = ? WHERE project = ? AND name = ? AND state = ? AND op IS NULL AND writer_run IS NULL AND NOT EXISTS (SELECT 1 FROM slot_leases l WHERE l.project = slots.project AND l.slot = slots.name AND l.ended_at IS NULL)`).run(to, this.project, name, from).changes) === 1)
   }
 
+  /**
+   * A slot's folder moved by Repair (#1447): its row follows it (`folder`), only while no operation or job holds it. With
+   * `gone` (a free slot whose folder wasn't found): marked gone at its place in the moved pool, so its next lease makes
+   * it again there, only while it is free. Whether it was.
+   */
+  async relocate(name: string, folder: string, o: { gone?: boolean } = {}): Promise<boolean> {
+    return this.conn.write((db) =>
+      o.gone
+        ? Number(db.prepare(`UPDATE slots SET folder = ?, state = 'gone' WHERE project = ? AND name = ? AND state <> 'removing' AND ${FREE}`).run(folder, this.project, name).changes) === 1
+        : Number(db.prepare('UPDATE slots SET folder = ? WHERE project = ? AND name = ? AND op IS NULL AND job IS NULL').run(folder, this.project, name).changes) === 1
+    )
+  }
+
+  /** A warming operation taken on a leased slot, only while none holds it (tests). Whether it was. */
+  async startWarm(name: string, lease: string, token: string, holder: Holder): Promise<boolean> {
+    return this.conn.write((db) => Number(db.prepare("UPDATE slots SET op = ?, op_kind = 'warm', op_lease = ?, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND op IS NULL AND job IS NULL").run(token, lease, holder.pid, holder.started, this.project, name).changes) === 1)
+  }
+
+  /**
+   * A gone leased slot's recreation begun (#1447, Repair's Recreate; HR1's round 1): in one write, a warm-kind operation
+   * taken only while the row is as the plan saw it (that open lease, that folder, no operation, job or writer) and `to`
+   * is no other slot's folder nor reserved by a rename, and its intent recorded (board_meta `slot_recreate:`), so a
+   * recovery finishes or puts back the recreation, never ending the lease as a lend's interrupted warming would. Null: the
+   * slot changed since (another Hive relinked or reassigned it, a resume claimed it).
+   */
+  async startRecreate(name: string, expect: { lease: string; folder: string }, token: string, holder: Holder, to: string, line: string): Promise<RecreateIntent | null> {
+    return this.conn.write((db) => {
+      const s = this.slotIn(db, name)
+      if (!s || s.op || s.job || s.writer || !samePlace(s.folder, expect.folder)) return null
+      if (openLeaseIn(db, this.project, name)?.id !== expect.lease) return null
+      if (this.slotsIn(db).some((x) => x.name.toLowerCase() !== name.toLowerCase() && samePlace(x.folder, to))) return null
+      if (this.renamesIn(db).some((r) => samePlace(r.intent.to, to))) return null
+      if (Number(db.prepare("UPDATE slots SET op = ?, op_kind = 'warm', op_lease = ?, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND op IS NULL").run(token, expect.lease, holder.pid, holder.started, this.project, name).changes) !== 1) return null
+      const intent: RecreateIntent = { lease: expect.lease, from: s.folder, to, line, was: s.state }
+      db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(recreateKey(this.project, name), JSON.stringify(intent))
+      return intent
+    })
+  }
+
+  /** A slot's recreate intent, if one is recorded. */
+  recreateOf(name: string): RecreateIntent | null {
+    return this.conn.read((db) => {
+      const v = (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(recreateKey(this.project, name)) as { value: string } | undefined)?.value
+      return v ? recreateIntentOf(v) : null
+    })
+  }
+
+  /**
+   * A recreation ended by its operation, in one fenced write: made (the row at `to`, lent) or not (the row as it was),
+   * the operation and the intent cleared; its lease kept either way.
+   */
+  async endRecreate(name: string, token: string, intent: RecreateIntent, made: boolean): Promise<void> {
+    await this.fenced(name, token, (db) => {
+      if (made) db.prepare('UPDATE slots SET folder = ? WHERE project = ? AND name = ?').run(intent.to, this.project, name)
+      this.setIn(db, name, made ? 'lent' : intent.was, {}, { op: null })
+      db.prepare('DELETE FROM board_meta WHERE key = ?').run(recreateKey(this.project, name))
+    })
+  }
+
   /** A leased slot's folder is gone: marked so (its holder's sessions are refused, #1434). */
   async markGone(name: string): Promise<void> {
     await this.conn.write((db) => db.prepare("UPDATE slots SET state = 'gone' WHERE project = ? AND name = ? AND state = 'lent' AND op IS NULL").run(this.project, name))
@@ -873,6 +937,60 @@ export interface RenameIntent {
   /** The worktree's identity (its git administrative folder, `SlotRenamer.identity`): only that worktree is moved. */
   tree: string
 }
+/** A gone leased slot's recreation (#1447): its lease, where its folder was and is made, its line, and its state before. */
+export interface RecreateIntent {
+  lease: string
+  from: string
+  to: string
+  line: string
+  was: SlotState
+}
+/** board_meta: a slot's recreate intent. */
+export const recreateKey = (project: string, slot: string): string => `slot_recreate:${project}:${slot}`
+function recreateIntentOf(v: string): RecreateIntent | null {
+  try {
+    const i = JSON.parse(v) as Partial<RecreateIntent>
+    return typeof i.lease === 'string' && typeof i.from === 'string' && typeof i.to === 'string' && typeof i.line === 'string' && typeof i.was === 'string' ? (i as RecreateIntent) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Delete's reservation of a project's slots and copies (#1447, HR1's round 2), written in one write with its token as
+ * the operation of every row it names (their states unchanged): no claim begins on them, and no slot or copy of the
+ * project is made, until it ends, finished (the rows deleted), released (their operations cleared), or released by a
+ * refresh once its holder is gone.
+ */
+export interface DeleteReservation {
+  token: string
+  pid: number
+  started: number
+  at: string
+  slots: string[]
+  copies: string[]
+}
+/** board_meta: a project's Delete reservation. */
+export const deleteKey = (project: string): string => `project_delete:${project}`
+/** The project's Delete reservation, if one is recorded (a damaged one still counts, with no holder: released at the next refresh). */
+export function deletingIn(db: DatabaseSync, project: string): DeleteReservation | null {
+  const r = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(deleteKey(project)) as { value: string } | undefined
+  if (!r) return null
+  try {
+    const d = JSON.parse(r.value) as Partial<DeleteReservation>
+    if (typeof d.token === 'string' && typeof d.pid === 'number' && typeof d.started === 'number' && Array.isArray(d.slots) && Array.isArray(d.copies)) return d as DeleteReservation
+  } catch {
+    // Damaged: below.
+  }
+  return { token: '', pid: 0, started: 0, at: '', slots: [], copies: [] }
+}
+/** Ends a Delete's reservation (its token), inside a write: the operations it set cleared, its key deleted, nothing else changed. */
+export function releaseDeleteIn(db: DatabaseSync, project: string, token: string): void {
+  db.prepare('UPDATE slots SET op = NULL, op_kind = NULL, op_lease = NULL, op_pid = NULL, op_started = NULL WHERE project = ? AND op = ?').run(project, token)
+  db.prepare('UPDATE copies SET op = NULL, op_kind = NULL, op_pid = NULL, op_started = NULL WHERE project = ? AND op = ?').run(project, token)
+  if (deletingIn(db, project)?.token === token) db.prepare('DELETE FROM board_meta WHERE key = ?').run(deleteKey(project))
+}
+
 /** board_meta: a slot's rename intent. */
 export const renameKey = (project: string, slot: string): string => `slot_rename:${project}:${slot}`
 function intentOf(v: string): RenameIntent | null {
@@ -1141,11 +1259,26 @@ export class SlotPool {
   }
 
   /**
+   * A Delete's reservation of the project's slots and copies whose holder is gone (#1447: its Hive ended mid-Delete):
+   * released whole in one write, the rows as they were (a folder already in the Recycle Bin is then seen gone).
+   */
+  private async releaseStaleDelete(): Promise<void> {
+    const project = this.store.project
+    const d = this.store.conn.read((db) => deletingIn(db, project))
+    if (!d || (d.token && !(await this.holderGone({ token: d.token, kind: 'remove', lease: null, pid: d.pid, started: d.started })))) return
+    await this.store.conn.write((db) => {
+      if (deletingIn(db, project)?.token === d.token) releaseDeleteIn(db, project, d.token)
+    })
+    log.warn(`Released a Delete's hold on the project's slots and copies: process ${d.pid}, which held it, is gone`)
+  }
+
+  /**
    * Brings the rows in step with what runs and what is on disk: an operation whose holder is gone is taken over and
    * recovered, a job left unsettled is settled again, an unleased slot left `lent` or `dirty` is looked at, a leased one
    * whose folder is gone is marked `gone`.
    */
   async refresh(): Promise<void> {
+    await this.releaseStaleDelete()
     for (const s of this.store.slots()) {
       if (this.closed) return
       // A writer whose run is over, its processes known to have ended, but not cleared (its release couldn't be written).
@@ -1175,6 +1308,8 @@ export class SlotPool {
    */
   private async recover(s: Slot): Promise<void> {
     const was = s.op!
+    // A Delete's (#1447): never taken over row by row, only released whole (`releaseStaleDelete`).
+    if (this.store.conn.read((db) => deletingIn(db, this.store.project))?.token === was.token) return
     const token = newToken()
     await this.op(token, async () => {
       // Eligible still, as the row is now (the holder looked at again), right before the write that takes it over.
@@ -1187,6 +1322,16 @@ export class SlotPool {
         const settled = !s.job || (await this.deps.settle(s.job))
         if (!settled) log.warn(`Slot ${userText(s.name)}'s job ${s.job} couldn't be emptied: it stays out of the pool`)
         const job = settled ? { job: null } : {}
+        // A gone slot's recreation (#1447, its intent recorded with it): finished if git lists it on its line, else put
+        // back as it was; its lease kept either way (never ended as an interrupted warming).
+        const recreating = was.kind === 'warm' ? this.store.recreateOf(s.name) : null
+        if (recreating) {
+          const made = await this.madeOn(recreating)
+          // Git can't say: left as it is (its operation now this Hive's, looked at again at the next refresh).
+          if (made === null) return void log.warn(`Slot ${userText(s.name)}'s recreation, cut short: git can't say whether it was made; left for the next look`)
+          await this.store.endRecreate(s.name, token, recreating, made)
+          return
+        }
         // A card's preparation (#1438: a warming of a slot already lent): its lease stays, the slot as it is.
         if (was.kind === 'warm' && s.state === 'lent') {
           await this.store.fenced(s.name, token, (db) => this.store.setIn(db, s.name, 'lent', {}, { op: null, ...job }))
@@ -1434,6 +1579,55 @@ export class SlotPool {
   }
 
   /**
+   * A leased slot whose folder is gone, made again on its line (#1447, Repair's Recreate), its lease kept: its operation
+   * and intent taken only while the row is as the plan saw it (`expect`: the lease and the folder; no other holder or
+   * writer), then, inside the operation, `from` must still be absent and `to` too; git's stale registration pruned only
+   * when the prune would drop nothing else (`prunable`), `git worktree add <to> <line>`, and the result checked (git lists
+   * a worktree at `to` on `line`) before the fenced write that ends it. Null once made, else why not (English, logged).
+   */
+  async recreateGone(name: string, expect: { lease: string; folder: string }, to: string, line: string, prunable: () => Promise<string[]>): Promise<string | null> {
+    const token = newToken()
+    return this.op(token, async () => {
+      const intent = await this.store.startRecreate(name, expect, token, await this.deps.holder.self(), to, line)
+      if (!intent) return 'it changed since Repair looked (relinked, lent or resumed meanwhile)' // i18n-ignore: the log's reason
+      let added = false
+      try {
+        const giveUp = async (why: string): Promise<string> => (await this.store.endRecreate(name, token, intent, false), why)
+        if (existsSync(intent.from) && !samePlace(intent.from, intent.to)) return await giveUp('its folder is there again') // i18n-ignore: the log's reason
+        if (existsSync(intent.to)) return await giveUp(`${intent.to} is already there`) // i18n-ignore: the log's reason
+        const others = (await prunable()).filter((p) => !samePlace(p, intent.from))
+        if (others.length) return await giveUp(`git's prune would also forget ${others.join(', ')}`) // i18n-ignore: the log's reason
+        await git(this.deps.project, ['worktree', 'prune'])
+        await mkdir(dirname(intent.to), { recursive: true })
+        const r = await git(this.deps.project, ['worktree', 'add', intent.to, intent.line])
+        if (!r.ok) return await giveUp(r.err.trim() || 'git worktree add failed') // i18n-ignore: the log's reason
+        // From here git may have made it (HR1's round 2): its operation and intent stay unless this records the result,
+        // so a recovery (this Hive's next look, its token no longer running) finishes it from what git says.
+        added = true
+        const made = await this.madeOn(intent)
+        if (made !== true) return `git ${made === null ? "couldn't say whether" : "doesn't list"} ${intent.to} on ${intent.line}: Hive looks again` // i18n-ignore: the log's reason
+        await this.store.endRecreate(name, token, intent, true)
+        log.info(`Slot ${userText(name)} made again at ${userText(intent.to)} on ${userText(intent.line)}`)
+        return null
+      } catch (e) {
+        if (e instanceof OpLost) return 'its operation was taken over' // i18n-ignore: the log's reason
+        if (!added) await this.store.endRecreate(name, token, intent, false).catch(() => undefined)
+        return e instanceof Error ? e.message : String(e)
+      }
+    })
+  }
+
+  /** Whether git lists a worktree at a recreation's `to`, on its line; null when git can't say (never taken for no). */
+  private async madeOn(intent: RecreateIntent): Promise<boolean | null> {
+    const listed = await listWorktrees(this.deps.project).catch(() => null)
+    if (!listed) return null
+    if (!listed.some((w) => samePlace(w.path, intent.to))) return false
+    const on = await git(intent.to, ['branch', '--show-current'])
+    if (!on.ok) return null
+    return on.out.trim().toLowerCase() === intent.line.toLowerCase()
+  }
+
+  /**
    * A free slot renamed (#1441: an adopted worktree given a generic name once nothing holds it), owned by its operation
    * from the write that reserves its destination (`startRename`) to the write that finishes or gives it up. Its steps
    * (`deps.renamer`): the CLIs' data copied first (any of it failing: no rename, nothing moved), git's move (checked
@@ -1574,6 +1768,17 @@ export class SlotPool {
     if (open) return { why: 'leased', agent: open.agent }
     if (s.op || s.job || s.writer) return { why: 'busy', state: s.state }
     return this.guard(s, false)
+  }
+
+  /**
+   * What would keep a slot from its project's removal (#1447): an operation, a job or a writer, then the removal's guards;
+   * its lease aside (the removal ends a lease only when nothing would be kept). `probe`: also prove no process holds it.
+   */
+  async keepsFromRemoval(name: string, probe = false): Promise<SlotKept | null> {
+    const s = this.store.slot(name)
+    if (!s) return null
+    if (s.op || s.job || s.writer) return { why: 'busy', state: s.state }
+    return this.guard(s, probe)
   }
 
   /** The guards a removal checks, in order; null when nothing holds the slot. `probe`: also prove no process holds it. */

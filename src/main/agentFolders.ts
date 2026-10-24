@@ -14,12 +14,14 @@ import { samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
-import { onRunOutcome, runOutcome, type RunOutcome } from './agentProcesses'
+import { endProcessesExactly, leftoversOfRun, onRunOutcome, runOutcome, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
+import { hiveError } from './hiveError'
+import { msg } from '../shared/i18n'
 import { SlotStore, type SlotConn } from './slots'
 import { workspace, workspaceOf, type WorkspaceService } from './workspace'
 import { agentPlaces, launchPlace, legacyWorktree, resumeFolder, resumeHold, slotAt, type AgentPlace, type FolderAgent, type FolderFacts, type FolderLease, type FolderPurpose, type FolderSession, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { agentWorkflowRole } from '../shared/workflow/roles'
-import type { AgentDef } from '../shared/types'
+import type { AgentDef, HeldWriter } from '../shared/types'
 
 const log = createLogger('sessions')
 
@@ -49,11 +51,13 @@ export function setRetiredHomes(fn: ((projectPath: string) => readonly string[] 
  */
 export interface WriterHost {
   self(): Promise<{ pid: number; started: number }>
+  /** Whether another Hive (a writer's holder) still runs; null when it can't be told (#1506: then it is taken to). */
+  alive(pid: number, started: number): Promise<boolean | null>
   live: Set<string>
   track(projectPath: string): Promise<{ done: () => void } | null>
   drained(projectPath: string, slot: string): Promise<void>
 }
-const standIn = (): WriterHost => ({ self: async () => ({ pid: process.pid, started: 0 }), live: new Set(), track: async () => ({ done: () => undefined }), drained: async () => undefined })
+const standIn = (): WriterHost => ({ self: async () => ({ pid: process.pid, started: 0 }), alive: async (pid) => pid === process.pid, live: new Set(), track: async () => ({ done: () => undefined }), drained: async () => undefined })
 let writerHost: WriterHost = standIn()
 export function setWriterHost(h: WriterHost | null): void {
   writerHost = h ?? standIn()
@@ -63,7 +67,7 @@ export function setWriterHost(h: WriterHost | null): void {
 export { legacyWorktree }
 
 /** An agent as the contract reads it. */
-export const folderAgent = (a: Pick<AgentDef, 'id' | 'name' | 'role' | 'workflowRole' | 'worktree'>): FolderAgent => {
+export const folderAgent = (a: Pick<AgentDef, 'id' | 'name' | 'role' | 'workflowRole'>): FolderAgent => {
   const w = legacyWorktree(a)
   return { id: a.id, role: agentWorkflowRole(a), legacy: w ? { path: w.path, branch: w.branch } : null }
 }
@@ -130,7 +134,7 @@ export async function folderFacts(projectPath: string): Promise<FolderFacts> {
  * (`agentPlaces`), and `branch`, the line of the slot it is in now: the card last started under that slot's open lease,
  * else a carried slot's or 0.9 worktree's own branch. `facts`: read once for several agents.
  */
-export async function agentPlace(projectPath: string, agent: Pick<AgentDef, 'id' | 'name' | 'role' | 'workflowRole' | 'worktree'>, running: { cwd: string } | null, facts?: FolderFacts): Promise<{ now: AgentPlace; launch: AgentPlace; branch: string | null }> {
+export async function agentPlace(projectPath: string, agent: Pick<AgentDef, 'id' | 'name' | 'role' | 'workflowRole'>, running: { cwd: string } | null, facts?: FolderFacts): Promise<{ now: AgentPlace; launch: AgentPlace; branch: string | null }> {
   const f = facts ?? (await folderFacts(projectPath))
   const places = agentPlaces(f, folderAgent(agent), running)
   const slot = places.now.slot ? (f.slots.find((s) => s.name === places.now.slot) ?? null) : null
@@ -408,4 +412,82 @@ export async function settleWriter(projectPath: string, run: string): Promise<vo
 export async function writerOver(w: { run: string; pid: number; started: number }): Promise<boolean> {
   const me = await writerHost.self()
   return w.pid === me.pid && w.started === me.started && !writerHost.live.has(w.run) && released.has(w.run) && runOutcome(w.run) !== 'kept'
+}
+
+/**
+ * Whether a writer is held (#1506): its run isn't live here and its Hive is this one or one known to have gone, so only
+ * the user's Release Slot… frees it. Another Hive still running (or one that can't be told) holds its own writer.
+ */
+export async function writerHeld(w: { run: string; pid: number; started: number }): Promise<boolean> {
+  const me = await writerHost.self()
+  if (w.pid === me.pid && w.started === me.started) return !writerHost.live.has(w.run)
+  return (await writerHost.alive(w.pid, w.started)) === false
+}
+
+/** A project's held writers by agent (#1506): the agent's ⋯ offers Release Slot… for its slot. */
+export async function heldSlots(projectPath: string): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  if (workspace.isAssistantHome(projectPath)) return out
+  const { ws, project } = await hostOf(projectPath)
+  for (const s of new SlotStore(boardConn(ws), project).slots()) if (s.writer && !out.has(s.writer.agent) && (await writerHeld(s.writer))) out.set(s.writer.agent, s.name)
+  return out
+}
+
+/**
+ * A slot's writer as Release Slot… shows it (#1506): who holds it (its Hive, this one or another, and whether that one
+ * still runs), whether its run is still live (this Hive's, its token not ended: a session, or leftovers being followed),
+ * and what Hive lists of its processes (null: nothing listed, so not known). Null when the slot has no writer.
+ */
+export async function heldWriter(projectPath: string, slot: string): Promise<HeldWriter | null> {
+  const { ws, project } = await hostOf(projectPath)
+  const w = new SlotStore(boardConn(ws), project).slot(slot)?.writer
+  if (!w) return null
+  const me = await writerHost.self()
+  const self = w.pid === me.pid && w.started === me.started
+  const alive = self ? true : await writerHost.alive(w.pid, w.started)
+  const left = leftoversOfRun(w.run)
+  return {
+    slot,
+    agent: w.agent,
+    run: w.run,
+    hive: { pid: w.pid, self, alive },
+    live: self && writerHost.live.has(w.run),
+    processes: left ? { list: left.processes, more: left.more, from: 'leftovers' } : !self && alive === false ? await restartList(projectPath, w) : null
+  }
+}
+
+/**
+ * What the notice that Hive closed unexpectedly lists of a held writer's own run (#1506: its Hive gone, the run's own
+ * leftovers not listed): that launch's processes in the last run's marker (by its run, and its agent and project), those
+ * that still run now, each by id and start time. Another launch of the same agent's, a marker of another Hive's, or one
+ * from before launches named their run, is never this run's: null then, as when none still runs or it can't be told.
+ */
+async function restartList(projectPath: string, w: { run: string; agent: string }): Promise<HeldWriter['processes']> {
+  const { lastUnexpectedClose } = await import('./lastRun')
+  const kept = (lastUnexpectedClose()?.processes ?? []).filter((l) => l.runId === w.run && l.agentId === w.agent && samePlace(l.projectPath, projectPath)).flatMap((l) => l.processes)
+  const running = kept.length ? await stillRunningOf(kept) : null
+  return running?.length ? { list: running, more: 0, from: 'restart' } : null
+}
+
+/**
+ * The user's recovery of a held writer (#1506, Release Slot…): with `end`, what Hive lists of its run's processes is
+ * ended first; then the writer is cleared in a write fenced by its run, and drained (the ended lease's last revision,
+ * the slot looked at). Refused while its Hive still runs (another one, or one that can't be told) or its run is live
+ * here, and when the slot's writer is no longer that run (a claim or a release meanwhile: one outcome).
+ */
+export async function releaseHeldWriter(projectPath: string, slot: string, run: string, o: { end: boolean }): Promise<void> {
+  const changed = (): Error => hiveError(msg({ id: 'slots.release.changed', defaultMessage: '{slot} changed meanwhile: its writer is no longer the one shown. Look again.', description: 'Release Slot… refused: the slot ({slot}, such as slot-b) was released or taken by another run while the question was open.' }), { slot }, { kind: 'conflict' })
+  const w = await heldWriter(projectPath, slot)
+  if (!w || w.run !== run) throw changed()
+  if (w.live) throw hiveError(msg({ id: 'slots.release.live', defaultMessage: "{slot}'s writer is still running in this Hive: stop the agent, or end or keep what it left running, first.", description: "Release Slot… refused: the session writing in the slot ({slot}) still runs in this Hive, or Hive still follows the processes it left running (End or Keep Running in the agent's ⋯ menu settles them)." }), { slot }, { kind: 'conflict' })
+  if (!w.hive.self && w.hive.alive !== false) throw hiveError(msg({ id: 'slots.release.otherHive', defaultMessage: '{slot} is held by another Hive that is still running (process {pid}): release it there, or quit that Hive first.', description: 'Release Slot… refused: another running copy of Hive (its process id {pid}) holds the slot ({slot}).' }), { slot, pid: w.hive.pid }, { kind: 'conflict' })
+  if (o.end && w.processes?.from === 'leftovers') await settleLeftovers(projectPath, w.agent, 'end', run)
+  if (o.end && w.processes?.from === 'restart' && !(await endProcessesExactly(w.processes.list))) {
+    throw hiveError(msg({ id: 'slots.release.notEnded', defaultMessage: "Some of the processes listed still run: Windows didn't let Hive end them, so {slot} wasn't released. Try again, or release it without ending them.", description: 'Release Slot… with "End these processes first": ending the listed processes failed (Windows refused), so the slot ({slot}) was left as it was.' }), { slot }, { kind: 'conflict' })
+  }
+  const { ws, project } = await hostOf(projectPath)
+  if (!(await new SlotStore(boardConn(ws), project).clearWriter(slot, run))) throw changed()
+  released.delete(run)
+  log.info(`The slot writer ${run} on ${userText(slot)} released by the user (its Hive ${w.hive.self ? 'this one' : `process ${w.hive.pid}, gone`}${o.end && w.processes ? ', its listed processes ended first' : ''})`)
+  await writerHost.drained(projectPath, slot)
 }

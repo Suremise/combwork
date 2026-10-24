@@ -9,6 +9,8 @@ import { agentsToResume, resumeAll, stalledOnSignIn, type ResumeAllResult } from
 import { holdShort, holdText } from '@shared/sessionResume'
 import type { FreshRow } from '@shared/freshStarts'
 import type { ResumeHold } from '@shared/agentFolders'
+import { samePath } from '@shared/movePaths'
+import { legacyOf, namedFolder } from './agentPlace'
 import { eachAgent, sessionsToArchive, type BatchResult } from '@shared/startAll'
 import { serverOnIn } from '@shared/agentMcp'
 import { shownText } from '@shared/advanced'
@@ -338,13 +340,39 @@ async function detectedProvider(resolve: () => ProviderId, auto: () => boolean):
 }
 
 /**
+ * A slot the agent holds whose folder is gone (#1447): made again on its line, with its commits, and the agent started,
+ * its lease kept; or released (the slot is made again at its next lease) when its line is gone or the user prefers.
+ */
+async function goneSlot(path: string, agentId: string, gone: { agentName: string; path: string; branch: string; branchExists: boolean; slot?: string }): Promise<boolean> {
+  const release = { label: tr(msg({ id: 'actions.slot.release', defaultMessage: 'Release the Slot', description: "Button: the agent gives up the slot whose folder is gone; Hive makes the slot again the next time it lends it." })), value: 'release' }
+  const choice = await choose({
+    title: tr(msg({ id: 'actions.slot.goneTitle', defaultMessage: 'The slot is gone', description: "Title of the question when the folder of a slot an agent holds (a working folder Hive lends it for a card or lane) is missing." })),
+    message: gone.branchExists
+      ? tr(msg({ id: 'actions.slot.goneMessage', defaultMessage: "{agent}'s slot {slot} is missing its folder ({path}). Its branch {branch} is still in the repository: make the slot again on it, with its commits, and start?", description: "The question when a slot's ({slot}) folder ({path}) is missing; the agent ({agent}) holds it, and its branch ({branch}) is still there." }), { agent: gone.agentName, slot: gone.slot ?? '', path: gone.path, branch: gone.branch })
+      : tr(msg({ id: 'actions.slot.goneNoBranch', defaultMessage: "{agent}'s slot {slot} is missing its folder ({path}), and its branch is gone too. Release the slot? Hive makes it again the next time it lends it.", description: "The question when a slot's ({slot}) folder ({path}) and its branch are missing; the agent ({agent}) holds it." }), { agent: gone.agentName, slot: gone.slot ?? '', path: gone.path }),
+    detail: tr(msg({ id: 'actions.slot.goneDetail', defaultMessage: 'If the workspace moved, Repair… in its banner can also locate the folder.', description: "Under the question when a slot's folder is missing: Repair… is a button in the workspace's banner." })),
+    choices: gone.branchExists ? [release, { label: tr(msg({ id: 'actions.slot.recreate', defaultMessage: 'Recreate and Start', description: 'Button: makes the slot again on its branch and starts the agent.' })), value: 'recreate' }] : [release]
+  })
+  if (choice === 'release') {
+    await attempt(tr(msg({ id: 'actions.slot.releaseFailed', defaultMessage: 'Could not release the slot', description: "An error's title: releasing a slot whose folder is gone failed." })), () => call('agents:unlinkWorktree', path, agentId))
+    return false
+  }
+  if (choice !== 'recreate') return false
+  return !!(await attempt(tr(msg({ id: 'actions.slot.recreateFailed', defaultMessage: 'Could not make the slot again', description: "An error's title: making a slot whose folder was gone again failed." })), () => call('agents:recreateWorktree', path, agentId)))
+}
+
+/**
  * A worktree agent whose folder is gone (#146): its branch lives in the repository, so the worktree can be made again
- * on it before the agent starts (or, with the branch gone too, made new from its base, or the link removed).
+ * on it before the agent starts (or, with the branch gone too, made new from its base, or the link removed). An agent
+ * whose 0.9 worktree was missing at the 1.0 upgrade isn't migrated (#1441), so this is still its way back; a slot it
+ * holds is #1447's (`goneSlot`).
  */
 async function ensureWorktree(path: string, agentId: string): Promise<boolean> {
-  if (!agentOf(project(path), agentId)?.worktree) return true
+  // Its 0.9 worktree, or a slot it holds (#1447): asked of main for every agent, since a slot isn't on the agent.
+  if (!agentOf(project(path), agentId)) return true
   const gone = await call('agents:missingWorktree', path, agentId).catch(() => null)
   if (!gone) return true
+  if (gone.slot) return goneSlot(path, agentId, gone)
   const setup = tr(msg({ id: 'actions.worktree.setup', defaultMessage: "Hive copies in the files it copies into new worktrees, and the project's worktree setup command, if it has one, runs before the agent starts. Nothing is deleted.", description: "Under the question before recreating an agent's missing worktree: what making it again involves." }))
   if (gone.branchExists) {
     return confirm({
@@ -395,7 +423,7 @@ export async function quickAddAgent(path: string | null = get().selectedProject,
     set({ addAgentFor: path })
     return null
   }
-  const def = await attempt(tr(msg({ id: 'actions.agent.addFailed', defaultMessage: 'Could not add an agent', description: "An error's title: adding an agent failed." })), () => call('agents:add', path, { location: 'project', provider }))
+  const def = await attempt(tr(msg({ id: 'actions.agent.addFailed', defaultMessage: 'Could not add an agent', description: "An error's title: adding an agent failed." })), () => call('agents:add', path, { provider }))
   if (!def) return null
   await refreshWorkspace()
   noteManyAgents(path)
@@ -491,17 +519,20 @@ export function resumeTarget(p: ProjectInfo | undefined, item: Pick<SessionListI
   if (isAssistantPath(p.path)) return p.agents[0]?.id ?? null
   // One in a slot resumes with its own agent (#1434: one writer per slot), if it is still there.
   if (item.slot) return p.agents.find((a) => a.id === item.agentId)?.id ?? null
-  if (item.cwd && item.cwd.toLowerCase() !== p.path.toLowerCase()) return p.agents.find((x) => x.worktree?.path.toLowerCase() === item.cwd!.toLowerCase())?.id ?? null
-  const inFolder = (id: string | undefined): boolean => !!id && p.agents.some((a) => a.id === id && !a.worktree)
+  // One in a 0.9 worktree resumes with the agent still working there; one in a retired home with its own agent (#1442).
+  const cwd = item.cwd
+  if (cwd && !samePath(cwd, p.path)) return p.agents.find((x) => { const l = legacyOf(x); return !!l && samePath(l.path, cwd) })?.id ?? (namedFolder(p, cwd)?.is === 'home' ? (p.agents.find((a) => a.id === item.agentId)?.id ?? null) : null)
+  // An agent on its 0.9 worktree works only there; any other can resume a conversation of the project folder there.
+  const inFolder = (id: string | undefined): boolean => !!id && p.agents.some((a) => a.id === id && !legacyOf(a))
   const free = (id: string | undefined): boolean => inFolder(id) && !agentOf(p, id!)?.live
   if (inFolder(preferred)) return preferred!
   const recorded = item.agentId
   const focused = focusedAgentId(p) ?? undefined
   if (free(recorded)) return recorded!
   if (free(focused)) return focused!
-  const idle = p.agents.filter((a) => !a.worktree && !a.live)
+  const idle = p.agents.filter((a) => !legacyOf(a) && !a.live)
   const other = (idle.find((a) => item.provider && agentProviderOf(p, a) === item.provider) ?? idle[0])?.id
-  return other ?? (inFolder(recorded) ? recorded! : (p.agents.find((a) => !a.worktree)?.id ?? null))
+  return other ?? (inFolder(recorded) ? recorded! : (p.agents.find((a) => !legacyOf(a))?.id ?? null))
 }
 
 /**
@@ -613,7 +644,7 @@ async function resumeLatest(path: string, id: string): Promise<void> {
   const a = agentOf(p, id)
   // Hive works out the session in the main process (AgentInfo.resume), skipping any open in another agent.
   const list = a?.resume ? await attempt(listFailed(), () => call('session:list', path)) : []
-  const last = a?.resume ? (list ?? []).find((s) => s.id === a.resume!.id) ?? { id: a.resume.id, name: a.resume.name, title: null, recache: null, agentId: id, cwd: a.worktree?.path, provider: agentProviderOf(p, a) } : null
+  const last = a?.resume ? (list ?? []).find((s) => s.id === a.resume!.id) ?? { id: a.resume.id, name: a.resume.name, title: null, recache: null, agentId: id, cwd: legacyOf(a)?.path, provider: agentProviderOf(p, a) } : null
   if (!last) {
     notify(
       'info',
@@ -1372,11 +1403,13 @@ export async function removeAgent(path: string, agentId: string): Promise<void> 
   if (a.live && !(await stopIfRunning(path, agentId, { what: 'remove', agent: a.name }, 'remove'))) return
   let deleteWorktree = false
   const removeTitle = (): string => tr(msg({ id: 'actions.remove.title', defaultMessage: 'Remove {agent}?', description: 'Title of the question before removing an agent ({agent}).' }), { agent: a.name })
-  if (a.worktree) {
+  // Its 0.9 worktree (#1442: slots are the pool's, never the agent's): kept or deleted with it.
+  const own = legacyOf(a)
+  if (own) {
     const keep = await confirm({
       title: removeTitle(),
-      message: tr(msg({ id: 'actions.remove.worktreeMessage', defaultMessage: '{agent} works in its own worktree on branch {branch}.', description: 'The question before removing a worktree agent ({agent}): its git branch ({branch}).' }), { agent: a.name, branch: a.worktree.branch }),
-      detail: tr(msg({ id: 'actions.remove.worktreeDetail', defaultMessage: 'Keep the worktree and branch to merge or reuse them later (Add Agent → Existing worktree), or delete both. Its sessions stay in the Sessions tab either way.', description: 'Under the question before removing a worktree agent. Add Agent → Existing worktree is where: use the translated names.' })),
+      message: tr(msg({ id: 'actions.remove.worktreeMessage', defaultMessage: '{agent} works in its own worktree on branch {branch}.', description: 'The question before removing a worktree agent ({agent}): its git branch ({branch}).' }), { agent: a.name, branch: own.branch }),
+      detail: tr(msg({ id: 'actions.remove.worktreeDetail', defaultMessage: 'Keep the worktree and branch to merge them later, or delete both. Its sessions stay in the Sessions tab either way.', description: 'Under the question before removing an agent that works in its own worktree from before 1.0.' })),
       confirmLabel: tr(msg({ id: 'actions.remove.keepWorktree', defaultMessage: 'Keep worktree and branch', description: "Button: removes the agent and keeps its worktree and branch." })),
       cancelLabel: tr(msg({ id: 'actions.remove.deleteThem', defaultMessage: 'Delete them…', description: "Button: goes on to delete the agent's worktree and branch (asks again)." })),
       action: 'remove'
@@ -1384,8 +1417,8 @@ export async function removeAgent(path: string, agentId: string): Promise<void> 
     if (!keep) {
       const del = await confirm({
         title: tr(msg({ id: 'actions.remove.deleteTitle', defaultMessage: 'Delete the worktree and branch?', description: "Title of the question before deleting a removed agent's worktree and branch." })),
-        message: tr(msg({ id: 'actions.remove.deleteMessage', defaultMessage: 'Delete {path} and branch {branch}?', description: "The question before deleting a removed agent's worktree folder ({path}) and git branch ({branch})." }), { path: a.worktree.path, branch: a.worktree.branch }),
-        detail: tr(msg({ id: 'actions.remove.deleteDetail', defaultMessage: "Anything on {branch} that hasn't been merged is lost. Cancel keeps the agent.", description: "Under the question before deleting a worktree and branch ({branch}). Cancel is the dialog's other button." }), { branch: a.worktree.branch }),
+        message: tr(msg({ id: 'actions.remove.deleteMessage', defaultMessage: 'Delete {path} and branch {branch}?', description: "The question before deleting a removed agent's worktree folder ({path}) and git branch ({branch})." }), { path: own.path, branch: own.branch }),
+        detail: tr(msg({ id: 'actions.remove.deleteDetail', defaultMessage: "Anything on {branch} that hasn't been merged is lost. Cancel keeps the agent.", description: "Under the question before deleting a worktree and branch ({branch}). Cancel is the dialog's other button." }), { branch: own.branch }),
         confirmLabel: tr(msg({ id: 'actions.remove.deleteConfirm', defaultMessage: 'Delete worktree and branch', description: "Button: deletes the agent's worktree and branch and removes it." })),
         danger: true
       })
@@ -1401,7 +1434,7 @@ export async function removeAgent(path: string, agentId: string): Promise<void> 
   focusAfterRemoving(p, agentId)
   await refreshWorkspace()
   // Kept, it is an unused worktree now (#353): said once, with where to tidy it.
-  if (a.worktree && !deleteWorktree) notify('info', tr(msg({ id: 'actions.remove.keptTitle', defaultMessage: "{agent}'s worktree is kept", description: "A notification's title: a removed agent's ({agent}) worktree was kept." }), { agent: a.name }), tr(msg({ id: 'actions.remove.keptMessage', defaultMessage: "{branch} in {path}. Git → Changes lists the project's unused worktrees, merged or not.", description: "Under the notification that a removed agent's worktree was kept: its branch ({branch}) and folder ({path}). Git → Changes is a project tab: use its translated names." }), { branch: a.worktree.branch, path: a.worktree.path }), [reviewUnused(path)])
+  if (own && !deleteWorktree) notify('info', tr(msg({ id: 'actions.remove.keptTitle', defaultMessage: "{agent}'s worktree is kept", description: "A notification's title: a removed agent's ({agent}) worktree was kept." }), { agent: a.name }), tr(msg({ id: 'actions.remove.keptMessage', defaultMessage: "{branch} in {path}. Git → Changes lists the project's unused worktrees, merged or not.", description: "Under the notification that a removed agent's worktree was kept: its branch ({branch}) and folder ({path}). Git → Changes is a project tab: use its translated names." }), { branch: own.branch, path: own.path }), [reviewUnused(path)])
 }
 
 /** A notification's button to the project's unused worktrees (#353). */
@@ -1422,11 +1455,11 @@ export function removeAllAgents(path: string): Promise<void> {
 async function removeAllAgents_(path: string): Promise<void> {
   const p = project(path)
   if (!p || isAssistantPath(path) || !p.agents.length) return
-  const checks = p.agents.some((a) => a.worktree) ? await attempt(tr(msg({ id: 'actions.removeAll.checkFailed', defaultMessage: 'Could not check the worktrees', description: "An error's title: checking whether the agents' worktrees are merged failed (Remove All)." })), () => call('agents:worktreeChecks', path)) : []
+  const checks = p.agents.some((a) => legacyOf(a)) ? await attempt(tr(msg({ id: 'actions.removeAll.checkFailed', defaultMessage: 'Could not check the worktrees', description: "An error's title: checking whether the agents' worktrees are merged failed (Remove All)." })), () => call('agents:worktreeChecks', path)) : []
   if (!checks) return
   const checkOf = (id: string) => checks.find((c) => c.agentId === id)
   const agents = p.agents
-  const trees = agents.filter((a) => a.worktree)
+  const trees = agents.filter((a) => legacyOf(a))
   const removable = trees.filter((a) => checkOf(a.id)?.removable)
   const into = checks.find((c) => c.into)?.into
   let deleteMerged = false
@@ -1448,7 +1481,7 @@ async function removeAllAgents_(path: string): Promise<void> {
     content: createElement(AgentsDetail, { data, note }),
     wide: true,
     check: removable.length
-      ? { label: tr(msg({ id: 'actions.removeAll.deleteMerged', defaultMessage: 'Also delete the worktrees and branches fully merged into {into} with no uncommitted changes: {branches}', description: "Remove All's tick box: also delete the agents' worktrees and branches merged into a branch ({into}) with no changes. {branches} lists them." }), { into: into ?? '', branches: removable.map((a) => a.worktree!.branch).join(', ') }), initial: false, set: (v) => (deleteMerged = v) }
+      ? { label: tr(msg({ id: 'actions.removeAll.deleteMerged', defaultMessage: 'Also delete the worktrees and branches fully merged into {into} with no uncommitted changes: {branches}', description: "Remove All's tick box: also delete the agents' worktrees and branches merged into a branch ({into}) with no changes. {branches} lists them." }), { into: into ?? '', branches: removable.map((a) => legacyOf(a)?.branch ?? '').join(', ') }), initial: false, set: (v) => (deleteMerged = v) }
       : undefined,
     confirmLabel: tr(msg({ id: 'actions.removeAll.confirm', defaultMessage: '{n, plural, one {Remove} other {Remove # agents}}', description: "Remove All's button ({n} agents)." }), { n: agents.length }),
     danger: true,
@@ -1523,13 +1556,42 @@ export async function releaseCarriedSlot(path: string, agentId: string): Promise
   await refreshWorkspace()
 }
 
+/**
+ * Release Slot… on a held writer (#1506): a slot an agent's run that is over still holds, its processes not known to have
+ * ended (Hive quit or closed with it running, its processes kept running, or not tracked). Shows who held it and what
+ * Hive lists of its processes, offers to end those first, and releases it once the user confirms; main refuses while
+ * its Hive or run still lives, or when the slot changed meanwhile (the refusal stays in the dialog).
+ */
+export async function releaseHeldSlot(path: string, slot: string): Promise<void> {
+  const w = await attempt(tr(msg({ id: 'actions.releaseHeld.readFailed', defaultMessage: "Could not read the slot's writer", description: "An error's title: Hive couldn't read who holds a slot, before Release Slot…'s question." })), () => call('slots:heldWriter', path, slot))
+  if (!w) return
+  const agent = agentOf(project(path), w.agent)?.name ?? w.agent
+  let end = !!w.processes?.list.length
+  const ok = await confirm({
+    title: tr(msg({ id: 'actions.releaseHeld.title', defaultMessage: "Release {agent}'s slot {slot}?", description: "Title of the question before releasing a slot ({slot}, such as slot-b) that an agent's ({agent}) last session there still holds: it has ended, but Hive doesn't know that everything it started has." }), { agent, slot }),
+    message: w.hive.self
+      ? tr(msg({ id: 'actions.releaseHeld.messageSelf', defaultMessage: "{agent}'s last session in {slot} (run {run}) has ended in this Hive (process {pid}, running), but Hive doesn't know that everything it started there has: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Hive; its processes were kept running or Hive could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Hive's process id: they tell one launch from another." }), { agent, slot, run: w.run, pid: w.hive.pid })
+      : tr(msg({ id: 'actions.releaseHeld.messageGone', defaultMessage: "{slot} is held by {agent}'s session (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another." }), { agent, slot, run: w.run, pid: w.hive.pid }),
+    ...(w.processes?.list.length ? { list: w.processes.list.map((p) => tr(msg({ id: 'actions.releaseHeld.process', defaultMessage: '{label} (process {pid})', description: "Release Slot…: one process the agent's session left running, as listed: what it runs ({label}, such as node serve.js) and its process id ({pid})." }), { label: p.label, pid: p.pid })), listOnly: true } : {}),
+    detail: w.processes?.list.length
+      ? tr(msg({ id: 'actions.releaseHeld.detailListed', defaultMessage: '{n, plural, one {Hive lists # process its session left running.} other {Hive lists # processes its session left running.}} Released while they run, they may still write in the slot as other work uses it.', description: "Release Slot…: under the list of processes the agent's session left running ({n}: how many)." }), { n: w.processes.list.length + w.processes.more })
+      : tr(msg({ id: 'actions.releaseHeld.detailUnknown', defaultMessage: "Hive doesn't know which of the processes its session started still run. Release it once you know nothing of it still writes in the slot.", description: "Release Slot…: Hive lists no processes the agent's session left running, so it can't say whether any still run." })),
+    ...(w.processes?.list.length ? { check: { label: tr(msg({ id: 'actions.releaseHeld.endFirst', defaultMessage: 'End these processes first', description: "Release Slot…: a tick box, on by default: Hive ends the listed processes before releasing the slot." })), initial: true, set: (v: boolean) => (end = v) } } : {}),
+    confirmLabel: tr(msg({ id: 'actions.releaseHeld.confirm', defaultMessage: 'Release', description: 'Button: releases the slot.' })),
+    danger: true,
+    run: () => call('slots:releaseWriter', path, slot, w.run, end)
+  })
+  if (ok) await refreshWorkspace()
+}
+
 export async function discardAgent(path: string, agentId: string): Promise<void> {
   const p = project(path)
   const a = agentOf(p, agentId)
-  if (!p || !a?.worktree) return
+  const own = a ? legacyOf(a) : null
+  if (!p || !a || !own) return
   const ok = await confirm({
     title: tr(msg({ id: 'actions.discard.title', defaultMessage: "Discard {agent}'s work?", description: "Title of the question before deleting a worktree agent's ({agent}) worktree and branch and removing it." }), { agent: a.name }),
-    message: tr(msg({ id: 'actions.discard.message', defaultMessage: 'Delete the worktree {path} and branch {branch}, and remove {agent}?', description: "The question before discarding a worktree agent's ({agent}) work: its worktree folder ({path}) and git branch ({branch})." }), { agent: a.name, path: a.worktree.path, branch: a.worktree.branch }),
+    message: tr(msg({ id: 'actions.discard.message', defaultMessage: 'Delete the worktree {path} and branch {branch}, and remove {agent}?', description: "The question before discarding a worktree agent's ({agent}) work: its worktree folder ({path}) and git branch ({branch})." }), { agent: a.name, path: own.path, branch: own.branch }),
     detail: tr(msg({ id: 'actions.discard.detail', defaultMessage: "Everything on the branch that hasn't been merged is lost. Its sessions stay in the Sessions tab.", description: "Under the question before discarding a worktree agent's work." })),
     confirmLabel: tr(msg({ id: 'actions.discard.confirm', defaultMessage: 'Discard', description: "Button: deletes the agent's worktree and branch and removes it." })),
     danger: true

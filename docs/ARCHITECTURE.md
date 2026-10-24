@@ -10,6 +10,7 @@ This document explains how Hive is put together, for anyone changing the code. P
 | `src/main/sessions.ts` | Launch/stop/resume per agent (any provider), normalised hooks → status, file locks (PreToolUse), transcript backups, usage and cost, Continue with… |
 | `src/shared/assistant.ts`, `assistantTools.ts`, `src/main/modes.ts`, `assistantControl.ts`, `assistantChanges.ts`, `assistantUndo.ts` (#1282: its changes kept and undone), `src/renderer/src/components/Assistant.tsx`, `AssistantView.tsx`, `Modes.tsx` | The Hive Assistant (one per workspace, a session host at `.hive/assistant` whose settings are overlaid from Settings → Assistant) and its modes (Coordinator, Planner, QA triager; files in `.hive/modes`, shipped in `resources/modes`; called personas until 0.9.3, #1084) |
 | `src/main/projectAgents.ts`, `src/main/worktrees.ts` | A project's agents (`agentLimit()`: 12 by default, 24 at most, #562; a page holds as many as the layout has panes): add/update/remove/merge; git worktree operations |
+| `src/shared/agentFolders.ts`, `src/main/agentFolders.ts` | Where an agent works (#1434's folder contract): `launchFolder`, `currentFolder`, `resumeHold`, `agentPlaces` / `agentPlace` (#1451), the window's `shownPlace` (#1442), read from the project's slots, leases and retired homes. 0.9.3's agent fields (`worktree`, `needsSetup`) are `LegacyAgentFields` here, not `AgentDef`'s: read through `legacyWorktree` / `legacySetupPending` only, carried through every save (`carryLegacyAgentFields`, #1452; `tests/legacyWorktreeGate.test.ts`) |
 | `src/main/repoLock.ts`, `repoLockCore.ts` | The repository lock (#1347, SPEC §16.9.3): one row in `hive-merge.lock` (SQLite) in the repository's common git dir, across Hives; a dead holder (pid gone or reused) taken over by compare and swap, a live one never; taken by merges, the Git view's folder actions and the line updater's move. The core has no Electron imports, so tests run it in plain Node children |
 | `src/shared/providers.ts`, `claude.ts`, `codex.ts`, `copilot.ts` | Provider descriptors (names, modes, models, capabilities) and settings resolution helpers |
 | `src/shared/models.ts`, `src/main/providers/*/models.ts` | Models and capabilities from the CLIs (Claude Code's initialize, codex debug models, Copilot's ACP session), with the editable fallbacks: what the pickers, the footer and the Agent API offer |
@@ -40,6 +41,7 @@ This document explains how Hive is put together, for anyone changing the code. P
 | `src/renderer/src/components/FileView.tsx` | Files tab editor + previewer registry (markdown, CSV, HTML, SVG, images, PDF) |
 | `tests/`, `tests/e2e/` | Unit tests (Vitest, fixtures in `tests/fixtures`); end-to-end suites (`lib.cjs`, `run.mjs`, and a fake Claude Code in `fake-claude/` for suites that run agents without signing in) |
 | `src/renderer/src/components/AgentPanes.tsx`, `AgentDialogs.tsx` | Session tab agent strip, layouts and panes; Add Agent, Agent Settings, Continue with… and Merge dialogs |
+| `src/renderer/src/agentPlace.ts` | Where an agent works, as the window shows it (#1442): `AgentInfo.place` (main's `shownPlace` over the folder contract) read as the agent's folder, its 0.9 worktree (`legacyOf`), "in slot-b" / "carried: hb2" / "home: hr4" (`placeText`), and the project's slots and homes by name (`ProjectInfo.folders`) |
 
 ## Processes
 
@@ -361,7 +363,7 @@ runner's worktree while an entry, an unfinished advance or an in-flight card's r
 | Options and rulesets | `src/shared/workflow/options.ts` (option defs, presets, contradictions), `pieces.ts` (guard and action ids, params, required capabilities), `compile.ts` (options → ruleset, hashed) | `src/main/workflow/rulesets.ts` (stored rulesets, resolution global → workspace → project) |
 | Runtime | `src/shared/workflow/refusals.ts` (refusal messages: `msg()` ids shared by the Agent API's English and the window) | `src/main/workflow/service.ts` (one runtime per project of an open workspace, #1263), `runtime.ts` (evaluate a move: load facts and ruleset, run guards, then actions, in one `boardWrite`), `reconcile.ts`, `intents.ts` (the Agent API routes' handlers) |
 | Merge queue | — | `src/main/workflow/mergeQueue.ts` (per target; replaces `mergeSlots.ts`' role for cards), `queueRunner.ts` (the target's runner, below), `queueJobs.ts` (its job object and launcher), `queueProcs.ts` (process identity by pid and start time), `repoLock.ts` (cross-process lock in the common git dir, shared with `gitRepo.ts`) |
-| Slots | `src/shared/slots.ts` | `src/main/slots.ts` (the pool: `slots` and `slot_leases` rows, lending, warming, guarded clean-up; #1429), `slotMigration.ts` (agents' worktrees adopted as carried slots at the upgrade; #1441), `slotsApp.ts` (a pool per open project on the board, warming runs on the process supervisor, the hourly tidy), `slotJobs.ts` (settling a slot command's job: #1360's sealed-journal protocol), `copies.ts` and `copiesApp.ts` (review
+| Slots | `src/shared/slots.ts` | `src/main/slots.ts` (the pool: `slots` and `slot_leases` rows, lending, warming, guarded clean-up; #1429), `slotMigration.ts` (agents' worktrees adopted as carried slots at the upgrade; #1441), `projectFolders.ts` (a project's slots, copies and retired homes for Repair and project removal; #1447), `slotsApp.ts` (a pool per open project on the board, warming runs on the process supervisor, the hourly tidy), `slotJobs.ts` (settling a slot command's job: #1360's sealed-journal protocol), `copies.ts` and `copiesApp.ts` (review
 and check copies: leases at a revision, the quiescence barrier, isolated checks' jobs; #1435), `reviewCopies.ts`, `slotSettings.ts` (the Version Control tab's Slots and copies settings, one key at a time under the project's lock; #1445) |
 | Undo | `src/shared/assistantUndo.ts` (grouping) | `src/main/assistantUndo.ts` (replays the Assistant's facts backwards, skips "changed since") |
 
@@ -657,6 +659,23 @@ its git administrative folder) in one write (`take` and `carryIn` skip reserved 
 the pass's `settleRenames` asks for one when an intent is there): given up when git still lists the worktree at its
 old folder, finished or put back when at its new one. `relocateWorktree` composes the same steps outside an operation.
 Release Slot… is `slots:releaseCarried`.
+
+**Repair and project removal on slots, built [#1447].** `projectFolders.ts` lists a project's slots (with their open
+lease, its cards' keys and the line a gone one is made again on), copies and retired homes, and changes each through its
+owner: `relocateFolder` (a slot's or copy's row, `SlotStore.relocate`/`CopyStore.relocate`, only while no operation
+holds it; a home's path, `slotMigration.replaceHome`), `recreateSlot` (`SlotPool.recreateGone`: `SlotStore.startRecreate` takes a warming
+operation with its intent, board_meta `slot_recreate:`, only while the row is as the plan saw it; `recover` finishes or
+puts back one cut short, never ending its lease) and `releaseSlotLease`. `workspaceMove.ts`' plan adds them
+to each project's `MoveWorktree`s (`of`, keys `slot:`/`copy:`/`home:`), skipping agents the migration took over; its
+steps relink, recreate, release, forget or mark them `later` (gone at their place in the moved pool). `agentWorktree.ts`'
+missing-worktree functions answer for an agent's gone slot. `removeFolders` (preview and apply; Remove from Hive)
+removes slots and copies through their pools' guarded removal (`SlotPool.keepsFromRemoval` first, the lease ended only
+when nothing would be kept) and keeps homes and folders outside the project's worktrees folder; Delete checks
+`deleteBlocks` before anything, then holds every slot and copy row with `reserveDelete` (one write: its token as each
+row's operation and `project_delete:<id>` in board_meta, which `SlotStore.take`, `carryIn` and `CopyStore.take` refuse to
+make rows under; a reservation whose holder is gone is released whole by either pool's `refresh`, never recovered row by
+row), and `trashFolders` once the project folder is in the Recycle Bin deletes only the rows it holds. The slots' pass (`settleSlotCards`) and
+reconciliation's `followFolder` wait while the workflow's `movePending` says a move waits for Repair.
 
 **The reviewer pool, built [#1443].** G17 is `WorkflowOptions.reviewerMode` (`lane`, left out of a compiled ruleset so
 older rulesets keep their ids, or `pool`). A lane started with the pool keeps `pool` on its record (its row's `extra`);

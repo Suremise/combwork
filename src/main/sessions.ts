@@ -18,9 +18,9 @@ import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { assistantTools } from '../shared/assistantTools'
 import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
-import { defaultPurpose, resumeHold, slotAt, type FolderPurpose, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
+import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
-import { bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, releaseWriter, settleWriter } from './agentFolders'
+import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter } from './agentFolders'
 import { slotEnv } from './slots'
 import { copiesDirOf, grantsCopies } from './copies'
 import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
@@ -578,9 +578,44 @@ async function typeInto(key: string, text: string, still: () => boolean = () => 
  * break would send the prompt early and a tab complete a word); its other control characters are left out either way.
  */
 export function promptInput(line: string, paste: boolean, asTyped: boolean): string {
+  line = withoutInvisible(line)
   if (!asTyped) return paste ? line.replace(/[\x00-\x1f\x7f-\x9f]/g, '') : line
   const kept = paste ? line.replace(/\r\n?|\n/g, '\r') : line.replace(/\r\n?|[\n\t]/g, ' ')
   return kept.replace(paste ? /[\x00-\x08\x0a-\x0c\x0e-\x1f\x7f-\x9f]/g : /[\x00-\x1f\x7f-\x9f]/g, '')
+}
+
+const INVISIBLE = /[\p{Cf}\u{fe00}-\u{fe0f}\u{e0100}-\u{e01ef}]/u
+const PICTOGRAPH = /\p{Extended_Pictographic}/u
+const MODIFIER = /\p{Emoji_Modifier}/u
+const SELECTOR = /[\u{fe0e}\u{fe0f}]/u
+const TAG = /[\u{e0020}-\u{e007f}]/u
+
+/**
+ * A line without its invisible characters (#1547): Unicode's format characters (zero-width spaces and joiners, soft
+ * hyphens, direction marks, a byte order mark) and variation selectors, but for those an emoji is made of (a joiner
+ * between two pictographs, a selector after one or in a keycap, a flag's tags). Claude Code 2.1.309 takes such a
+ * character out of a prompt and leaves the prompt unsent ("Removed 1 invisible character · review and press Enter to
+ * send"), the same characters inside an emoji sent as they are (tried with each: #1547's comment).
+ */
+export function withoutInvisible(line: string): string {
+  if (!INVISIBLE.test(line)) return line
+  const cs = [...line]
+  let out = ''
+  // The last character kept: what an emoji's joiner, selector or tag follows.
+  let prev = ''
+  for (let i = 0; i < cs.length; i++) {
+    const c = cs[i]
+    const next = cs[i + 1] ?? ''
+    const keep =
+      !INVISIBLE.test(c) ||
+      (c === '‍' && (PICTOGRAPH.test(prev) || MODIFIER.test(prev) || SELECTOR.test(prev)) && PICTOGRAPH.test(next)) ||
+      (SELECTOR.test(c) && (PICTOGRAPH.test(prev) || (/^[0-9#*]$/.test(prev) && next === '⃣'))) ||
+      (TAG.test(c) && (prev === '\u{1f3f4}' || TAG.test(prev)))
+    if (!keep) continue
+    out += c
+    prev = c
+  }
+  return out
 }
 
 /**
@@ -1221,7 +1256,7 @@ class SessionManager {
    * Every agent of a project with its running session, for ProjectInfo. `scope`: the refresh it is for (#1002), whose
    * projects' running agents share one read of the workspace's skills and servers; without, this call's agents do.
    */
-  async liveInfo(projectPath: string, cfg: ProjectConfig, scope?: object): Promise<{ live: LiveSessionState | null; restartNeeded: boolean; agents: AgentInfo[] }> {
+  async liveInfo(projectPath: string, cfg: ProjectConfig, scope?: object): Promise<{ live: LiveSessionState | null; restartNeeded: boolean; agents: AgentInfo[]; folders: NamedFolder[] }> {
     const reads = scope ? launchReadsOf(scope) : new LaunchReads()
     const agents: AgentInfo[] = []
     const records = (await workspace.sessionsFile(projectPath)).sessions
@@ -1231,6 +1266,10 @@ class SessionManager {
     // The project's slots and leases (#1434): an agent's conversations in its slots, and whether each may resume now.
     const facts = await folderFacts(projectPath).catch(() => null)
     const slotFolders = facts?.slots.map((s) => s.folder) ?? []
+    // Unreadable: no slots or homes, a 0.9 worktree still its agent's (as the contract reads a project not migrated).
+    const shownFacts: FolderFacts = facts ?? { projectPath, migrated: false, migratedAgents: [], homes: [], slots: [] }
+    // Slots held by an agent's run that is over, its processes not known ended (#1506): its ⋯ offers Release Slot….
+    const held = facts?.slots.some((s) => s.writer) ? await heldSlots(projectPath).catch(() => new Map<string, string>()) : new Map<string, string>()
     for (const a of projectAgents(cfg)) {
       const l = this.live.get(liveId(projectPath, a.id))
       let restartNeeded = false
@@ -1248,12 +1287,19 @@ class SessionManager {
       const folder = workspace.isAssistantHome(projectPath) ? (workspaceOf(projectPath).path ?? projectPath) : projectPath
       const r = l ? null : resumeRecord(folder, a, records.filter((x) => recordProvider(x) === provider), openIds, ids, slotFolders)
       const hold = r && facts ? resumeHold(facts, folderAgent(a), r) : null
+      // Its last conversation resumes in a retired home (#1441), though a new one starts elsewhere: its pane says so (#1552).
+      const home = r && facts ? resumeHome(facts, r) : null
       // Its adopted worktree's slot (#1441), while it holds it carried.
       const carried = facts?.slots.find((s) => s.open?.kind === 'carried' && s.open.agent === a.id)?.name
-      agents.push({ ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}) }, ...(carried ? { carriedSlot: carried } : {}) })
+      // Where it works now, as the window shows it (#1442).
+      const at = await agentPlace(projectPath, a, l ? { cwd: l.state.cwd } : null, shownFacts).catch(() => null)
+      const legacy = legacyWorktree(a)
+      const shown = at ? shownPlace(shownFacts, folderAgent(a), at.now, at.branch) : { folder: projectPath, is: 'project' as const, name: null, branch: null }
+      const place = shown.is === 'legacy' && legacy?.base ? { ...shown, base: legacy.base } : shown
+      agents.push({ ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}), ...(home ? { home } : {}) },...(carried ? { carriedSlot: carried } : {}), ...(held.has(a.id) ? { heldSlot: held.get(a.id) } : {}), place })
     }
     const primary = agents.find((a) => a.live)
-    return { live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, agents }
+    return { live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, agents, folders: namedFolders(shownFacts) }
   }
 
   private backupPath(projectPath: string, sessionId: string, archived = false): string {
@@ -1576,7 +1622,8 @@ class SessionManager {
 
     const setup = cfg.worktreeSetup.trim()
     // The agent's own worktree's first setup (also adopted as its carried slot, #1441), never a slot the pool set up.
-    if (agent.worktree && agent.needsSetup && setup && !opts.skipSetup && (!place.slot || samePlace(place.slot.folder, agent.worktree.path))) {
+    const ownTree = legacyWorktree(agent)
+    if (ownTree && legacySetupPending(agent) && setup && !opts.skipSetup && (!place.slot || samePlace(place.slot.folder, ownTree.path))) {
       // The worktree's setup command runs in the agent's terminal first, then the agent starts there.
       state.settingUp = true
       setStatus(state, withValues(msg({ id: 'session.status.settingUp', defaultMessage: 'Setting up the worktree: {command}', description: "An agent's status while the project's worktree setup command runs in its terminal. {command} is that command, as written." }), { command: setup }))
@@ -1661,11 +1708,11 @@ class SessionManager {
       workspaceOf(projectPath).scheduleRefresh()
       return
     }
-    await workspace.updateAgent(projectPath, agentId, { needsSetup: false }).catch(() => undefined)
+    await workspace.updateLegacyAgent(projectPath, agentId, { needsSetup: false }).catch(() => undefined)
     l.state.settingUp = false
     setStatus(l.state, null)
     try {
-      await this.launch(projectPath, { ...agent, needsSetup: false }, launch)
+      await this.launch(projectPath, ({ ...agent, needsSetup: false } as StoredAgent), launch)
     } catch (e) {
       void this.afterLaunch(l.state.runId, this.label(l.state))
       this.forget(id)
@@ -1942,7 +1989,7 @@ class SessionManager {
    * whatever happens to the launch; the agent's session to resume and its cards only while it is still the agent's
    * launch.
    */
-  private async recordSession(projectPath: string, agent: Pick<AgentDef, 'id' | 'name' | 'worktree'>, l: LiveSession): Promise<void> {
+  private async recordSession(projectPath: string, agent: Pick<AgentDef, 'id' | 'name'>, l: LiveSession): Promise<void> {
     const { state } = l
     const sessionId = state.sessionId
     // A new conversation began with this launch, or (one the CLI switched to) now: its record says so, and the footer
@@ -1968,7 +2015,7 @@ class SessionManager {
       ...(l.transcriptPath && !l.adapter.descriptor.capabilities.fixedSessionId ? { transcriptPath: l.transcriptPath } : {}),
       // Where it ran (#1434: always, the project folder too): a conversation resumes only there.
       cwd: state.cwd,
-      ...(agent.worktree ? { branch: agent.worktree.branch } : {}),
+      ...(legacyWorktree(agent) ? { branch: legacyWorktree(agent)!.branch } : {}),
       ...(l.handedOverFrom ? { handedOverFrom: l.handedOverFrom } : {})
     }, { createdAt: state.sessionCreatedAt })
     // The conversation it was meant for has it: one the CLI moves to later (/clear, /new) wasn't handed over.
@@ -2117,7 +2164,7 @@ class SessionManager {
         writePty(key, '\x15')
         await pause(150)
       }
-      const text = l.adapter.descriptor.capabilities.compactFocus ? (focus ?? '').replace(/\s+/g, ' ').trim() : ''
+      const text = l.adapter.descriptor.capabilities.compactFocus ? withoutInvisible(focus ?? '').replace(/\s+/g, ' ').trim() : ''
       // Written in one go, a long line counts as a paste, and pasted input is sent as a message even when
       // it starts with "/compact". So type the command on its own, then the focus in small pieces.
       writePty(key, '/compact')
@@ -5344,7 +5391,7 @@ class SessionManager {
       if (f && !out.has(resolve(f).toLowerCase())) out.set(resolve(f).toLowerCase(), f)
     }
     if (workspace.isAssistantHome(projectPath)) add(workspaceOf(projectPath).path)
-    for (const a of projectAgents(cfg)) add(a.worktree?.path)
+    for (const a of projectAgents(cfg)) add(legacyWorktree(a)?.path)
     for (const r of records) add(r.cwd)
     return [...out.values()]
   }

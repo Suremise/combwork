@@ -11,16 +11,64 @@
 //   or a refusal saying why.
 
 import { samePath } from './movePaths'
-import type { AgentWorktree } from './types'
+import type { AgentDef } from './types'
 import type { WorkflowRole } from './workflow/roles'
+
+/** An agent's 0.9 worktree: its own checkout of the project on its own branch, made from `base` (0.9.3's `worktree`). */
+export interface LegacyWorktree {
+  path: string
+  branch: string
+  /** Branch it was created from, and merges back into. */
+  base: string
+}
+
+/**
+ * What 0.9.3 stored on an agent in project.json that 1.0's `AgentDef` doesn't type (#1452): its worktree and whether that
+ * worktree's setup command has still to run. 1.0 reads them only here, carries them through every save unchanged
+ * (`carryLegacyAgentFields`), so 0.9.3 finds them after a return, and makes no new worktree.
+ */
+export interface LegacyAgentFields {
+  worktree?: LegacyWorktree
+  needsSetup?: boolean
+}
+
+/** An agent as project.json may store it: 1.0's definition with 0.9.3's fields. For the readers and writers of those only. */
+export type StoredAgent = AgentDef & LegacyAgentFields
+
+/** The agent as stored, for the readers and writers of 0.9.3's fields (migration, Repair, the 0.9 worktree's actions). */
+export const storedAgent = <A extends AgentDef>(a: A): A & LegacyAgentFields => a as A & LegacyAgentFields
 
 /**
  * An agent's 0.9 worktree, as project.json stores it (`worktree`). Only the migration (#1441), Repair (#1447), the folder
  * contract and what still knows a project not migrated yet read it (#1451): everything else asks where an agent works.
  */
-export function legacyWorktree(raw: { worktree?: AgentWorktree | null } | null | undefined): AgentWorktree | null {
-  const w = raw?.worktree
-  return w && typeof w.path === 'string' && w.path ? w : null
+export function legacyWorktree(raw: object | null | undefined): LegacyWorktree | null {
+  const w = (raw as LegacyAgentFields | null | undefined)?.worktree
+  return w && typeof w === 'object' && typeof w.path === 'string' && w.path ? w : null
+}
+
+/** Whether an agent's 0.9 worktree still has its setup command to run before its next session (0.9.3's `needsSetup`). */
+export const legacySetupPending = (raw: object | null | undefined): boolean => !!legacyWorktree(raw) && (raw as LegacyAgentFields).needsSetup === true
+
+/**
+ * 0.9.3's fields carried through a save of the agents (#1452, the keep-what-you-don't-own rule P6's `writeWorkflow` has):
+ * an agent of `before` written again without a `worktree` or `needsSetup` key keeps the stored one, so a return to 0.9.3
+ * finds it. A writer that means to drop one (Repair's unlink) writes the key, `undefined`.
+ */
+export function carryLegacyAgentFields<A extends object>(before: readonly object[], after: readonly A[]): A[] {
+  const old = new Map<string, LegacyAgentFields>()
+  for (const a of before) {
+    const id = (a as { id?: unknown }).id
+    if (typeof id === 'string') old.set(id, a as LegacyAgentFields)
+  }
+  return after.map((a) => {
+    const was = old.get((a as { id?: unknown }).id as string)
+    if (!was) return a
+    const keep: LegacyAgentFields = {}
+    if (!('worktree' in a) && was.worktree !== undefined) keep.worktree = was.worktree
+    if (!('needsSetup' in a) && was.needsSetup !== undefined) keep.needsSetup = was.needsSetup
+    return Object.keys(keep).length ? { ...a, ...keep } : a
+  })
 }
 
 export type FolderPurpose = 'build' | 'review'
@@ -135,6 +183,12 @@ export const launchFolder = (facts: FolderFacts, agent: FolderAgent, purpose: Fo
 /** Where a conversation resumes: always the folder it recorded (none recorded: the project folder). */
 export const resumeFolder = (projectPath: string, s: FolderSession): string => s.cwd || projectPath
 
+/** The retired home a conversation resumes in, by its folder's name (#1552: its pane says so); null elsewhere. */
+export function resumeHome(facts: FolderFacts, s: FolderSession): string | null {
+  const folder = resumeFolder(facts.projectPath, s)
+  return facts.homes.some((h) => samePath(h, folder)) ? (folder.split(/[\\/]/).filter(Boolean).pop() ?? folder) : null
+}
+
 /** Where the agent works now: its running session's folder (a retired home included), else where it would start. */
 export const currentFolder = (facts: FolderFacts, agent: FolderAgent, running: { cwd: string } | null): string => running?.cwd ?? launchFolder(facts, agent, defaultPurpose(agent.role))
 
@@ -212,4 +266,43 @@ export function agentPlaces(facts: FolderFacts, agent: FolderAgent, running: { c
   const launch = place(p.folder, why)
   return { now: running ? place(running.cwd, 'session') : launch, launch }
 }
+
+/**
+ * What kind of place an agent's folder is, as the window shows it (#1442): a slot it builds in (`slot`), its carried
+ * slot (`carried`, #1441), a retired home (`home`), its 0.9 worktree not migrated yet (`legacy`), or the project folder.
+ */
+export type ShownPlaceKind = 'slot' | 'carried' | 'home' | 'legacy' | 'project'
+
+/** Where an agent works now, for the window (#1442): its folder, the kind of place, its short name, and its branch. */
+export interface ShownPlace {
+  folder: string
+  is: ShownPlaceKind
+  /** The slot's name, or the home's or 0.9 worktree's folder name; null in the project folder. */
+  name: string | null
+  /** Its line (a card's branch in a slot, a carried slot's or 0.9 worktree's own), when known. */
+  branch: string | null
+  /** A 0.9 worktree's: the branch it was made from. */
+  base?: string
+}
+
+/** A project's folder other than its own, named for the window (#1442): a slot, or a retired home. */
+export interface NamedFolder {
+  path: string
+  name: string
+  is: 'slot' | 'home'
+}
+
+const leafOf = (folder: string): string => folder.split(/[\\/]/).filter(Boolean).pop() ?? folder
+
+/** The window's view of `now` (an `agentPlaces` answer) for the agent, with its line (`branch`, main's `agentPlace`). */
+export function shownPlace(facts: FolderFacts, agent: FolderAgent, now: AgentPlace, branch: string | null): ShownPlace {
+  const slot = now.slot ? (facts.slots.find((s) => s.name === now.slot) ?? null) : null
+  if (slot) return { folder: now.path, is: slot.open?.kind === 'carried' && slot.open.agent === agent.id ? 'carried' : 'slot', name: slot.name, branch }
+  if (facts.homes.some((h) => samePath(h, now.path))) return { folder: now.path, is: 'home', name: leafOf(now.path), branch: null }
+  if (agent.legacy && samePath(agent.legacy.path, now.path)) return { folder: now.path, is: 'legacy', name: leafOf(now.path), branch: agent.legacy.branch }
+  return { folder: now.path, is: 'project', name: null, branch: null }
+}
+
+/** The project's slots and retired homes, named (#1442): what the window names a session's or a card's folder by. */
+export const namedFolders = (facts: FolderFacts): NamedFolder[] => [...facts.slots.map((s) => ({ path: s.folder, name: s.name, is: 'slot' as const })), ...facts.homes.map((h) => ({ path: h, name: leafOf(h), is: 'home' as const }))]
 

@@ -75,7 +75,7 @@ describe.skipIf(!SRC)('the slots migration on a copy of a 0.9 workspace (#1441)'
     const { adoptWorkspace } = await import('../../src/main/workflow/adoption')
     const { migrateSlots, keptFor, startSlotMigration, stopSlotMigration } = await import('../../src/main/slotMigration')
     const { folderAgent, folderFacts } = await import('../../src/main/agentFolders')
-    const { canResumeNow } = await import('../../src/shared/agentFolders')
+    const { canResumeNow, legacyWorktree } = await import('../../src/shared/agentFolders')
     const ws = createWorkspaceService()
     startSlotMigration()
     try {
@@ -106,7 +106,7 @@ describe.skipIf(!SRC)('the slots migration on a copy of a 0.9 workspace (#1441)'
           const resumes = agent ? bound.filter((r) => canResumeNow(facts, folderAgent(agent), r)).length : 0
           return `${s.name} (${agent?.name ?? '?'}, ${s.open?.kind ?? 'free'}, kept for ${kept ? ('lane' in kept ? 'a lane' : `#${kept.card}`) : 'nothing'}; ${bound.length} conversation(s) bound, ${resumes} resuming in place)`
         })
-        report.push(`${name}: migrated ${facts.migrated}; ${facts.slots.length} slot(s)${rows.length ? `: ${rows.join('; ')}` : ''}; ${facts.homes.length} retired home(s); not migrated (worktree not there): ${cfg.agents.filter((a) => a.worktree && !facts.migratedAgents.includes(a.id)).map((a) => a.name).join(', ') || 'none'}`)
+        report.push(`${name}: migrated ${facts.migrated}; ${facts.slots.length} slot(s)${rows.length ? `: ${rows.join('; ')}` : ''}; ${facts.homes.length} retired home(s); not migrated (worktree not there): ${cfg.agents.filter((a) => legacyWorktree(a) && !facts.migratedAgents.includes(a.id)).map((a) => a.name).join(', ') || 'none'}`)
         expect(facts.migrated).toBe(true)
         for (const s of facts.slots) expect(under(s.folder, base)).toBe(true)
       }

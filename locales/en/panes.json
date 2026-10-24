@@ -67,9 +67,21 @@
     "defaultMessage": "The session has ended. Resume it, or start a new one.",
     "description": "The bar under an agent's ended session (one pane)."
   },
+  "panes.body.inCarried": {
+    "defaultMessage": "Works in <code>{name}</code>, the slot kept for it.",
+    "description": "A stopped agent's pane: its carried slot ({name}: its name, such as hb2, shown as code; keep the <code> tags around it), its own worktree from before 1.0, kept for it as a slot. Glossary: slot."
+  },
+  "panes.body.inSlot": {
+    "defaultMessage": "Works in <code>{name}</code>.",
+    "description": "A stopped agent's pane: the slot it works in ({name}: its name, such as slot-b, shown as code; keep the <code> tags around it). Glossary: slot."
+  },
   "panes.body.notRunning": {
     "defaultMessage": "<b>{agent}</b> is not running.",
     "description": "A pane of an agent that isn't running ({agent}: its name, in bold; keep the <b> tags around it)."
+  },
+  "panes.body.resumesInHome": {
+    "defaultMessage": "A new conversation starts in the project folder; Resume opens its last one in its old folder, <code>{name}</code>.",
+    "description": "A stopped agent's pane, for a reviewer whose own worktree from before 1.0 was kept as its retired home: new conversations start in the project folder, and Resume reopens its last conversation in that old folder ({name}: the folder's name, shown as code; keep the <code> tags around it)."
   },
   "panes.body.retrySetup": {
     "defaultMessage": "Retry Setup",
@@ -362,6 +374,10 @@
   "panes.menu.moveUp": {
     "defaultMessage": "Move Up",
     "description": "Menu item (an agent's menu, a grid layout): moves the agent's pane one cell up."
+  },
+  "panes.menu.releaseHeld": {
+    "defaultMessage": "Release Slot…",
+    "description": "Menu item (an agent's menu): a slot the agent's last session there still holds (it ended, but Hive doesn't know everything it started has) is freed for other work (asks first, showing what Hive knows)."
   },
   "panes.menu.releaseSlot": {
     "defaultMessage": "Release Slot…",
@@ -686,6 +702,14 @@
   "panes.table.rolePrefix": {
     "defaultMessage": "role {value}",
     "description": "The agent's role in the workflow in a line of text (screen readers): {value} is its name (\"Reviewer\"). Lower case."
+  },
+  "panes.table.slot": {
+    "defaultMessage": "Slot",
+    "description": "An agents table's column heading: where the agent works (\"in slot-b\", \"carried: hb2\", \"home: hr4\"; empty in the project folder). Glossary: slot."
+  },
+  "panes.table.slotPrefix": {
+    "defaultMessage": "works {value}",
+    "description": "Where the agent works in a line of text (screen readers): {value} is agents.place.short (\"in slot-b\", \"carried: hb2\"). Lower case."
   },
   "panes.table.state": {
     "defaultMessage": "State",

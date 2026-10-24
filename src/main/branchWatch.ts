@@ -1,5 +1,5 @@
 import { basename } from 'path'
-import type { AgentBranchStatus, AgentWorktree, HiveEvent, ProjectInfo } from '../shared/types'
+import type { AgentBranchStatus, HiveEvent, ProjectInfo } from '../shared/types'
 import { leasedLine, legacyWorktree } from './agentFolders'
 import { boardRead } from './boardStore'
 import { emit, onHiveEvent } from './events'
@@ -41,7 +41,7 @@ function projectsOf(ws = openWorkspaces()): ProjectInfo[] {
  * The line an agent's status is about (#1451): its open lease's (dispatch, else carried) in that slot, counted against
  * the slot's target when it has one; else its 0.9 worktree. Null: none to watch.
  */
-function findAgent(projectPath: string, agentId: string): { project: ProjectInfo; worktree: AgentWorktree; target?: string } | null {
+function findAgent(projectPath: string, agentId: string): { project: ProjectInfo; worktree: wt.WorktreeRef; target?: string } | null {
   const p = projectPath.toLowerCase()
   const ws = workspaceFor(projectPath)
   const project = projectsOf(ws ? [ws] : undefined).find((x) => x.path.toLowerCase() === p)

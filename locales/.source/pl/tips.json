@@ -3,6 +3,8 @@
   "tips.advancedSettings.title": "Fix a CLI change yourself",
   "tips.agentConsole.text": "Settings → Agent API → Let agents read the developer console gives agents a read-only tool showing their CLI's hooks and status line next to what Hive made of each, redacted, so they can debug what Hive sees.",
   "tips.agentConsole.title": "Let agents see what their CLI sends",
+  "tips.agentInSlot.text": "Beside an agent's name on its pane: in slot-b while it builds a card in a slot (click it for Branches & remotes), carried: hb2 in the slot kept for it, home: hr4 for a reviewer's retired home. The project's hover lists them in a Slot column.",
+  "tips.agentInSlot.title": "See where each agent works",
   "tips.agentLayouts.text": "Each agent has its own pane: choose a layout at the right of the session toolbar, and drag a pane by its header to rearrange them. File locks stop two agents editing the same file.",
   "tips.agentLayouts.title": "Several agents side by side",
   "tips.agentMenu.text": "An agent's pane header keeps to its state, its card and Stop. Compact, Hand Over, Merge…, its settings and anything that needs a look (a dot on ⋯ says so) are in its ⋯ menu, or right-click the header. {key}",
@@ -340,6 +342,8 @@
   "tips.silentUnknown.title": "An agent silent with its state unknown",
   "tips.skillsDelivered.text": "The switch beside each Hive skill, in the Skills view or a project's Skills tab, says whether agents get it (Delivered to agents). Copies Hive puts in a folder for Codex and Copilot are removed once no agent works there, as Settings → Advanced says.",
   "tips.skillsDelivered.title": "Choose which skills agents get",
+  "tips.slotHeld.text": "When Hive can't tell that everything an agent's session started in a slot has ended, it keeps the slot for it rather than guess. Release Slot… in the agent's ⋯ menu shows what Hive knows, ends what it lists if you want, and frees the slot.",
+  "tips.slotHeld.title": "Free a slot held after Hive closed",
   "tips.slotOptions.text": "Version Control → Workflow → Slots and copies holds the script run in a new slot, the files copied into it and the slots in use, and how many review copies the project keeps. They save as you change them.",
   "tips.slotOptions.title": "Set up slots in Version Control",
   "tips.slotResume.text": "A builder's conversation stays in its card's slot. Once the card ends, Resume All leaves it so the slot stays free for new work; its own Resume takes the slot back while nothing else has used it.",
@@ -393,7 +397,7 @@
   "tips.unexpectedClose.title": "Know when Hive closed unexpectedly",
   "tips.unmerged.text": "The agent's tab shows how many commits aren't merged yet, Merge… in its ⋯ menu says what is left, and Git → Changes shows everything the agent changed since it branched.",
   "tips.unmerged.title": "See what a worktree agent has to merge",
-  "tips.unusedWorktrees.text": "Removed an agent but kept its worktree? Git → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, remove the merged ones with their branches, or give one back to an agent.",
+  "tips.unusedWorktrees.text": "Removed an agent but kept its worktree? Git → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, or remove the merged ones with their branches.",
   "tips.unusedWorktrees.title": "Tidy kept worktrees",
   "tips.versionControlSwitch.text": "Click None or Git atop a project’s Version Control tab to switch it from its next card; cards in flight keep the old rules. Each keeps its own workflow options, and when the folder changes (git init, say), Hive offers the switch there.",
   "tips.versionControlSwitch.title": "Switch between None and Git",
@@ -412,9 +416,5 @@
   "tips.workspaceMovedDefender.text": "If Hive had Defender skip the workspace's folders, Repair… after a move offers to move those exclusions to the new folders, with one administrator prompt, so none is left on a folder that's gone. Exclusions you made yourself stay as they are.",
   "tips.workspaceMovedDefender.title": "Defender exclusions follow a moved workspace",
   "tips.workspaceNotes.text": "Workspace notes, pinned first in Shared Notes, is for what's true of this machine, like a full path. Every agent gets it when it starts, in any folder, so it needn't go in a committed AGENTS.md. A section headed with a project's name is that project's alone.",
-  "tips.workspaceNotes.title": "Notes about this machine for every agent",
-  "tips.worktreeReuse.text": "Adding an agent with a new worktree named like one you kept (B4, and B4's worktree is unused)? If it's merged and clean, Hive gives the agent that folder, brought up to main: its node_modules are already there.",
-  "tips.worktreeReuse.title": "A kept worktree is used again",
-  "tips.worktrees.text": "In Add Agent…, choose New worktree: the agent works on its own branch, and Merge… brings its work back when you're happy with it.",
-  "tips.worktrees.title": "Give an agent its own worktree"
+  "tips.workspaceNotes.title": "Notes about this machine for every agent"
 }

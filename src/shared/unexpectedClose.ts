@@ -47,6 +47,8 @@ export interface LaunchProcesses {
   projectPath: string
   agentId: string
   agentName: string
+  /** The launch's run (#1506: Release Slot… lists these for a held writer of that run only); absent in a marker from before. */
+  runId?: string
   processes: AgentProcess[]
 }
 
@@ -100,7 +102,8 @@ function parseLaunches(v: unknown): LaunchProcesses[] {
       const parent = Number.isSafeInteger(p.parent) && (p.parent as number) > 0 ? { parent: p.parent as number } : {}
       processes.push({ pid: p.pid as number, name, label: str(p.label, 300) ? p.label : name, created: p.created, ...parent, ...run })
     }
-    if (processes.length) out.push({ projectPath: r.projectPath, agentId: r.agentId, agentName: str(r.agentName, 300) ? r.agentName : '', processes })
+    const runId = str(r.runId, 100) && r.runId ? { runId: r.runId } : {}
+    if (processes.length) out.push({ projectPath: r.projectPath, agentId: r.agentId, agentName: str(r.agentName, 300) ? r.agentName : '', ...runId, processes })
   }
   return out
 }

@@ -1072,6 +1072,16 @@ kbd {
 .agents-table.cols-5 .agents-table-card > span {
   max-width: min(260px, calc(var(--agents-room) * 0.28));
 }
+/* Six (#1442: the hover's Slot beside Role and Waiting for). */
+.agents-table.cols-6 .agents-table-cut > span {
+  max-width: min(170px, calc(var(--agents-room) * 0.15));
+}
+.agents-table.cols-6 .agents-table-name > span {
+  max-width: min(130px, calc(var(--agents-room) * 0.12));
+}
+.agents-table.cols-6 .agents-table-card > span {
+  max-width: min(230px, calc(var(--agents-room) * 0.24));
+}
 /* An agent's role in the workflow (#1430): a word ("Reviewer"), so a small share. */
 .agents-table-role > span {
   max-width: min(110px, calc(var(--agents-room) * 0.12));
@@ -1143,12 +1153,33 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.item-table td > .tip-wrap:has(> .short-path) {
+.item-table td > .tip-wrap:has(> .short-path),
+.item-table td > span[aria-hidden] > .tip-wrap:has(> .short-path) {
   display: block;
   max-width: 100%;
 }
 .item-table td .short-path {
   display: block;
+}
+/* Cut in the middle (#1447): the head shrinks with an ellipsis, the last name stays whole (and is cut only if it alone
+   doesn't fit). */
+.short-path-text.short-path-split {
+  display: flex;
+  min-width: 0;
+}
+.short-path-head {
+  flex: 0 1 auto;
+  min-width: 1.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.short-path-tail {
+  flex: 0 0 auto;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* Text for screen readers only (a table's plain-text form, #572). */
 .visually-hidden {
@@ -6222,6 +6253,23 @@ body.pane-resizing .monaco-editor {
 .pane-header-bar > .tip-wrap:has(> .agent-name) {
   min-width: 24px;
 }
+/* Where it works (#1442): "in slot-b" (a link to Branches & remotes), "carried: hb2", "home: hr4". */
+.agent-place {
+  white-space: nowrap;
+  font-size: 12px;
+}
+button.agent-place {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--info);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+button.agent-place:hover {
+  text-decoration: underline;
+}
 /* The status gives way entirely before the name does (its shrink far outweighs the name's), and the review and
    safeguard shields with it. */
 .pane-header-bar > .tip-wrap:has(> .pane-status),
@@ -6407,6 +6455,13 @@ body.pane-resizing .monaco-editor {
 }
 .pane-placeholder p {
   margin: 0 0 4px;
+}
+/* A folder or branch it names (#1552): marked as code, as in Markdown, so "hb2" reads as a name whatever its letters. */
+.pane-placeholder code {
+  background: var(--bg-elevated);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.9em;
 }
 .pane-placeholder .btns {
   display: flex;

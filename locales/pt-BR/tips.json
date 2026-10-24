@@ -3,6 +3,8 @@
   "tips.advancedSettings.title": "Corrija você mesmo uma mudança de CLI",
   "tips.agentConsole.text": "Configurações → Agent API → Permitir que agentes leiam o console do desenvolvedor dá aos agentes uma ferramenta somente leitura que mostra os hooks e a linha de status da CLI deles ao lado do que o Hive entendeu de cada um, com dados sensíveis ocultos, para que possam depurar o que o Hive vê.",
   "tips.agentConsole.title": "Deixe os agentes verem o que a CLI deles envia",
+  "tips.agentInSlot.text": "Ao lado do nome de um agente no painel dele: em slot-b enquanto faz um cartão em um slot (clique para ir a Branches e remotes), adotado: hb2 no slot adotado para ele, casa: hr4 na casa aposentada de um revisor. O hover do projeto lista esses lugares em uma coluna Slot.",
+  "tips.agentInSlot.title": "Veja onde cada agente trabalha",
   "tips.agentLayouts.text": "Cada agente tem o próprio painel: escolha um layout à direita da barra da sessão e arraste um painel pelo cabeçalho para reorganizá-los. Os bloqueios de arquivo impedem que dois agentes editem o mesmo arquivo.",
   "tips.agentLayouts.title": "Vários agentes lado a lado",
   "tips.agentMenu.text": "O cabeçalho do painel de um agente mostra só o estado, o cartão e Parar. Compactar, Passar para, Fazer merge…, as configurações dele e tudo o que precisa de atenção (um ponto no ⋯ avisa) ficam no menu ⋯, ou clique com o botão direito no cabeçalho. {key}",
@@ -340,6 +342,8 @@
   "tips.silentUnknown.title": "Um agente em silêncio, com estado desconhecido",
   "tips.skillsDelivered.text": "O interruptor ao lado de cada skill do Hive, na visualização Skills ou na aba Skills de um projeto, diz se os agentes a recebem (Entregue aos agentes). As cópias que o Hive coloca numa pasta para o Codex e o Copilot são removidas quando nenhum agente trabalha mais lá, como diz Configurações → Avançado.",
   "tips.skillsDelivered.title": "Escolha quais skills os agentes recebem",
+  "tips.slotHeld.text": "Quando o Hive não consegue saber se terminou tudo o que a sessão de um agente iniciou em um slot, ele o mantém reservado em vez de adivinhar. Liberar slot… no menu ⋯ do agente mostra o que o Hive sabe, encerra o que ele lista se você quiser e libera o slot.",
+  "tips.slotHeld.title": "Libere um slot retido depois que o Hive fechou",
   "tips.slotOptions.text": "Controle de versão → Fluxo de trabalho → Slots e cópias reúne o script executado num slot novo, os arquivos copiados para ele, os slots em uso e quantas cópias de revisão o projeto mantém. Tudo é salvo conforme você muda.",
   "tips.slotOptions.title": "Configure os slots no Controle de versão",
   "tips.slotResume.text": "A conversa de um executor fica no slot do cartão dele. Quando o cartão termina, Retomar todos a deixa, para que o slot fique livre para trabalho novo; o próprio Retomar dela pega o slot de volta enquanto nada mais o tiver usado.",
@@ -393,7 +397,7 @@
   "tips.unexpectedClose.title": "Saiba quando o Hive fechou inesperadamente",
   "tips.unmerged.text": "A aba do agente mostra quantos commits ainda não passaram por merge, Fazer merge… no menu ⋯ dele diz o que falta, e Git → Alterações mostra tudo o que o agente alterou desde que criou o branch.",
   "tips.unmerged.title": "Veja o que um agente em worktree ainda precisa mesclar",
-  "tips.unusedWorktrees.text": "Removeu um agente, mas manteve o worktree dele? Git → Alterações abre nos worktrees que nenhum agente usa, dizendo quem fez cada um: abra um para ver o trabalho e fazer merge, remova os mesclados com os branches deles, ou devolva um a um agente.",
+  "tips.unusedWorktrees.text": "Removeu um agente, mas manteve o worktree dele? Git → Alterações abre nos worktrees que nenhum agente usa, dizendo quem fez cada um: abra um para ver o trabalho e fazer merge, ou remova os mesclados com os branches deles.",
   "tips.unusedWorktrees.title": "Organize os worktrees mantidos",
   "tips.versionControlSwitch.text": "Clique em Nenhum ou Git no topo da aba Controle de versão para mudar a partir do próximo cartão; cartões em andamento mantêm as regras antigas. Cada um guarda suas opções do fluxo de trabalho, e se a pasta mudar (git init), o Hive oferece a troca ali.",
   "tips.versionControlSwitch.title": "Alternar entre Nenhum e Git",
@@ -412,9 +416,5 @@
   "tips.workspaceMovedDefender.text": "Se o Hive fez o Defender ignorar as pastas do espaço de trabalho, Reparar… depois de mover oferece mover essas exclusões para as pastas novas, com um só pedido de administrador, para que nenhuma fique numa pasta que não existe mais. As exclusões criadas por você continuam como estão.",
   "tips.workspaceMovedDefender.title": "As exclusões do Defender acompanham um espaço de trabalho movido",
   "tips.workspaceNotes.text": "Workspace notes, fixada no topo de Notas compartilhadas, é para o que vale nesta máquina, como um caminho completo. Todo agente a recebe ao iniciar, em qualquer pasta, então isso não precisa ir para um AGENTS.md commitado. Uma seção com o nome de um projeto é só desse projeto.",
-  "tips.workspaceNotes.title": "Notas sobre esta máquina para cada agente",
-  "tips.worktreeReuse.text": "Vai adicionar um agente com um novo worktree de nome igual ao de um que você manteve (B4, e o worktree de B4 está sem uso)? Se ele estiver mesclado e limpo, o Hive dá essa pasta ao agente, atualizada com a main: o node_modules dela já está lá.",
-  "tips.worktreeReuse.title": "Um worktree mantido volta a ser usado",
-  "tips.worktrees.text": "Em Adicionar agente…, escolha Novo worktree: o agente trabalha no próprio branch, e Fazer merge… traz o trabalho de volta quando você estiver satisfeito.",
-  "tips.worktrees.title": "Dê a um agente o próprio worktree"
+  "tips.workspaceNotes.title": "Notas sobre esta máquina para cada agente"
 }

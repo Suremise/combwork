@@ -19,8 +19,8 @@ import { HIVE_TEMPLATES, templateTitle } from '../src/shared/templateDefaults'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '../src/shared/workflow/roles'
 import { AGENT_LIMIT_DEFAULT } from '../src/shared/defaults'
 import { englishText } from '../src/shared/advanced'
-import type { AgentDef } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { legacyWorktree, type StoredAgent } from '../src/shared/agentFolders'
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10000
@@ -52,9 +52,9 @@ const { placeKey } = await import('../src/main/fsutil')
 const v2 = (t: Record<string, unknown> & { agents: Record<string, unknown>[] }): Record<string, unknown> => ({ version: TEMPLATE_VERSION, savedAt: '', layout: 'auto', ...t, agents: t.agents.map((a) => ({ role: 'builder', ...a })) })
 
 describe('the template format', () => {
-  const agents: AgentDef[] = [
+  const agents: StoredAgent[] = [
     { id: 'a1', name: 'Builder', role: 'UI work', workflowRole: 'builder', pairedWith: 'Reviewer', provider: 'claude-code', model: 'opus', effort: 'high', permissionMode: 'acceptEdits', use200kContext: true, lastSessionId: 's1', worktree: { path: 'C:/w/b', branch: 'hive/builder', base: 'main' }, needsSetup: true },
-    { id: 'a2', name: 'Reviewer', mode: 'x' } as AgentDef
+    { id: 'a2', name: 'Reviewer', mode: 'x' } as StoredAgent
   ]
   it("saves each agent's role in the workflow, note, settings and provider, its pairs, the layout and the project's preset; never sessions, paths, setup state or modes", () => {
     const t = templateFrom('  Build and review ', agents, 'columns2', () => 'codex', new Date('2026-10-05T10:00:00Z'), 'pair')
@@ -160,7 +160,7 @@ describe('the template format', () => {
       expect(templateAgentNames(kept.map((name, i) => ({ name, role: named(order)[i].role })), 'AP')).toEqual(order.map((n) => n.replace('AM', 'AP')))
     }
     expect([namesFollowKey(['HB1', 'HR1'], 'HI'), namesFollowKey(['HI-B1', 'Docs'], 'HI'), namesFollowKey(['HI-B1'], null), namesFollowKey(['AM-B1'], 'HI')]).toEqual([false, true, false, false])
-    const team: AgentDef[] = [
+    const team: StoredAgent[] = [
       { id: 'b1', name: 'HI-B1', workflowRole: 'builder', pairedWith: 'HI-R1', provider: 'claude-code' },
       { id: 'b2', name: 'HI-B2', workflowRole: 'builder', pairedWith: 'HI-R2', provider: 'claude-code' },
       { id: 'r1', name: 'HI-R1', workflowRole: 'reviewer', provider: 'codex' },
@@ -281,15 +281,15 @@ describe('saving and loading templates', () => {
    * An agent with a 0.9 worktree, as a project upgraded from 0.9 has one (#1451: 1.0 adds none): a worktree on its own
    * branch from main, and the agent written into project.json with it (its setup still to run when the project has one).
    */
-  const legacyAgent = (p: string, name: string, branch = `hive/legacy-${++legacyNo}`): AgentDef => {
+  const legacyAgent = (p: string, name: string, branch = `hive/legacy-${++legacyNo}`): StoredAgent => {
     const path = join(p, '..', `${basename(p)}-wt-${legacyNo}-${name.replace(/\W+/g, '-').toLowerCase()}`)
     git(p, 'worktree', 'add', '-q', '-b', branch, path, 'main')
     const cfg = cfgOf(p)
-    const def: AgentDef = { id: `a-legacy${legacyNo}`, name, provider: 'claude-code', worktree: { path, branch, base: 'main' }, ...(cfg.worktreeSetup?.trim() ? { needsSetup: true } : {}) }
+    const def: StoredAgent = { id: `a-legacy${legacyNo}`, name, provider: 'claude-code', worktree: { path, branch, base: 'main' }, ...(cfg.worktreeSetup?.trim() ? { needsSetup: true } : {}) }
     writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ ...cfg, agents: [...cfg.agents, def] }))
     return def
   }
-  const names = (p: string) => cfgOf(p).agents.map((a: AgentDef) => a.name)
+  const names = (p: string) => cfgOf(p).agents.map((a: StoredAgent) => a.name)
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
   // Pair's agents loaded into beta: alpha has Builder and Reviewer, and names are unique across the workspace (#702).
   const B = ['BBuilder', 'BReviewer']
@@ -373,14 +373,14 @@ describe('saving and loading templates', () => {
     const cfg = cfgOf(beta)
     expect(cfg.layout).toBe('columns2')
     // Each with its role in the workflow and note (alpha's "builder" note), in the project folder (#1436).
-    expect(cfg.agents.map((a: AgentDef) => [a.name, a.workflowRole, a.role, a.model, a.provider, a.worktree])).toEqual([['BBuilder', 'builder', 'builder', 'opus', 'claude-code', undefined], ['BReviewer', 'reviewer', undefined, undefined, 'claude-code', undefined]])
-    expect(cfg.agents.some((a: AgentDef) => a.id === 'b1')).toBe(false)
+    expect(cfg.agents.map((a: StoredAgent) => [a.name, a.workflowRole, a.role, a.model, a.provider, a.worktree])).toEqual([['BBuilder', 'builder', 'builder', 'opus', 'claude-code', undefined], ['BReviewer', 'reviewer', undefined, undefined, 'claude-code', undefined]])
+    expect(cfg.agents.some((a: StoredAgent) => a.id === 'b1')).toBe(false)
     const card = (await run(() => tasks.allTasks())).find((c) => c.title === 'Old work')!
     expect([card.agent, card.column]).toEqual([null, 'todo'])
   })
 
   it('refuses while an agent runs, a worktree has uncommitted work, a provider is off, or the agents changed meanwhile', async () => {
-    const ids = () => cfgOf(beta).agents.map((a: AgentDef) => a.id)
+    const ids = () => cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     const first = ids()[0]
     live.add(first)
     expect((await run(() => templates.templatePlan(beta, 'workspace', 'pair.json'))).blocked).toEqual([expect.stringMatching(/Builder is running or starting: stop it first/)])
@@ -426,7 +426,7 @@ describe('saving and loading templates', () => {
   })
 
   it('a start under way blocks the load; one tried during the load is refused; the fence goes however the load ends', async () => {
-    const ids = (): string[] => cfgOf(beta).agents.map((a: AgentDef) => a.id)
+    const ids = (): string[] => cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     // A start that began before the load and hasn't finished (reserved, not live yet).
     const slow = run(() => sessions.start(beta, { agentId: ids()[0] })).catch((e: Error) => e.message)
     await vi.waitFor(() => expect(sessions.startingFor(beta, ids()[0])).toBe(true), { timeout: HUNG_MS })
@@ -466,7 +466,7 @@ describe('saving and loading templates', () => {
       seen.push(...names(alpha))
       if (name === 'Tree B') throw new Error('git ran out of disk')
     }
-    await expect(run(() => templates.loadTemplate(alpha, 'project', 'trees.json', before.agents.map((a: AgentDef) => a.id)))).rejects.toThrow(/Nothing was changed: git ran out of disk/)
+    await expect(run(() => templates.loadTemplate(alpha, 'project', 'trees.json', before.agents.map((a: StoredAgent) => a.id)))).rejects.toThrow(/Nothing was changed: git ran out of disk/)
     expect(seen).toEqual([...names(alpha), ...names(alpha)])
     expect(cfgOf(alpha)).toEqual(before)
     expect(trees()).toBe(treesBefore)
@@ -477,8 +477,8 @@ describe('saving and loading templates', () => {
     templates.testHooks.staged = async (name) => {
       if (name === 'Builder') await run(() => addAgent(alpha, { name: 'Concurrent', location: 'project' }))
     }
-    await expect(run(() => templates.loadTemplate(alpha, 'workspace', 'pair.json', before.agents.map((a: AgentDef) => a.id)))).rejects.toThrow(/changed while the template was loading: nothing was changed/)
-    expect(names(alpha)).toEqual([...before.agents.map((a: AgentDef) => a.name), 'Concurrent'])
+    await expect(run(() => templates.loadTemplate(alpha, 'workspace', 'pair.json', before.agents.map((a: StoredAgent) => a.id)))).rejects.toThrow(/changed while the template was loading: nothing was changed/)
+    expect(names(alpha)).toEqual([...before.agents.map((a: StoredAgent) => a.name), 'Concurrent'])
     expect(cfgOf(alpha).layout).toBe(before.layout)
   })
 
@@ -486,7 +486,7 @@ describe('saving and loading templates', () => {
     const before = names(alpha)
     const def = await run(() => templates.addAgentFromTemplate(alpha, 'workspace', 'pair.json', 0))
     expect(def.name).toBe('Builder 2')
-    expect([def.role, def.workflowRole, def.worktree]).toEqual(['builder', 'builder', undefined])
+    expect([def.role, def.workflowRole, legacyWorktree(def)]).toEqual(['builder', 'builder', null])
     expect(names(alpha)).toEqual([...before, 'Builder 2'])
     await expect(run(() => templates.addAgentFromTemplate(alpha, 'workspace', 'pair.json', 9))).rejects.toThrow(/no longer in the template/)
   })
@@ -635,7 +635,7 @@ describe('saving and loading templates', () => {
     // alpha has a worktree agent of its own (from 0.9); beta has a setup command (which a load no longer runs: no worktrees).
     const source = legacyAgent(alpha, 'Alpha tree', 'hive/tree-a')
     writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), worktreeSetup: 'npm install' }))
-    const ids = cfgOf(beta).agents.map((a: AgentDef) => a.id)
+    const ids = cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     const branches = git(beta, 'branch', '--list').toString()
     const trees = git(beta, 'worktree', 'list', '--porcelain').toString()
     const plan = await run(() => templates.templatePlan(beta, 'project', 'trees.json', alpha))
@@ -646,19 +646,19 @@ describe('saving and loading templates', () => {
     expect(r.created).toEqual(['Tree A', 'Tree B'])
     expect(cfgOf(beta).layout).toBe(plan.layout)
     // In beta's folder: no worktree, branch or setup made; alpha's own untouched.
-    expect(cfgOf(beta).agents.map((a: AgentDef) => [a.name, a.workflowRole, a.role, a.worktree, a.needsSetup])).toEqual([['Tree A', 'builder', undefined, undefined, undefined], ['Tree B', 'reviewer', 'checks', undefined, undefined]])
+    expect(cfgOf(beta).agents.map((a: StoredAgent) => [a.name, a.workflowRole, a.role, a.worktree, a.needsSetup])).toEqual([['Tree A', 'builder', undefined, undefined, undefined], ['Tree B', 'reviewer', 'checks', undefined, undefined]])
     expect(git(beta, 'branch', '--list').toString()).toBe(branches)
     expect(git(beta, 'worktree', 'list', '--porcelain').toString()).toBe(trees)
-    expect(cfgOf(alpha).agents.find((a: AgentDef) => a.id === source.id)?.worktree).toEqual(source.worktree)
+    expect(cfgOf(alpha).agents.find((a: StoredAgent) => a.id === source.id)?.worktree).toEqual(source.worktree)
   })
 
   gitIt("Hive's Team 3×3 (#1436): six agents named from the project's key, paired both ways, in a grid, none in a worktree; a provider that can't run is swapped, said on its row", async () => {
-    const ids = cfgOf(beta).agents.map((a: AgentDef) => a.id)
+    const ids = cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     // Names made from the key that can't be read (beta has none yet): refused, never a guessed key (#1440).
     await expect(run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))).rejects.toThrow(/couldn't read beta's key/)
     await expect(run(() => templates.addAgentFromTemplate(beta, 'hive', 'team-3x3.json', 0))).rejects.toThrow(/couldn't read beta's key/)
     await expect(run(() => templates.saveTemplate(beta, 'workspace', 'Unkeyed', false, true))).rejects.toThrow(/couldn't read beta's key/)
-    expect(cfgOf(beta).agents.map((a: AgentDef) => a.id)).toEqual(ids)
+    expect(cfgOf(beta).agents.map((a: StoredAgent) => a.id)).toEqual(ids)
     const { keyProjects, projectKeyOf } = await import('../src/main/projectKeys')
     await run(() => keyProjects(w))
     const key = (await run(() => projectKeyOf(w, beta)))!
@@ -670,7 +670,7 @@ describe('saving and loading templates', () => {
     await run(() => templates.loadTemplate(beta, 'hive', 'team-3x3.json', ids))
     const made = cfgOf(beta)
     expect(made.layout).toBe('grid6')
-    expect(made.agents.map((a: AgentDef) => [a.name, a.workflowRole, a.provider, a.pairedWith, a.worktree])).toEqual([
+    expect(made.agents.map((a: StoredAgent) => [a.name, a.workflowRole, a.provider, a.pairedWith, a.worktree])).toEqual([
       [want[0], 'builder', 'claude-code', want[3], undefined],
       [want[1], 'builder', 'claude-code', want[4], undefined],
       [want[2], 'builder', 'claude-code', want[5], undefined],
@@ -758,7 +758,7 @@ describe('saving and loading templates', () => {
     expect(pending()).toContain(placeKey(keeper.worktree!.path))
     // Its setup done: removed, its worktree kept, nothing remembered.
     const done = legacyAgent(beta, 'Done')
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), agents: cfgOf(beta).agents.map((a: AgentDef) => (a.id === done.id ? { ...a, needsSetup: false } : a)) }))
+    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), agents: cfgOf(beta).agents.map((a: StoredAgent) => (a.id === done.id ? { ...a, needsSetup: false } : a)) }))
     await run(() => removeAgent(beta, done.id, { deleteWorktree: false }))
     expect(pending()).not.toContain(placeKey(done.worktree!.path))
     // A worktree another agent still works in is that agent's: nothing is remembered for it.
@@ -798,9 +798,9 @@ describe('saving and loading templates', () => {
     const plan = await run(() => templates.templatePlan(beta, 'workspace', keyed!.file))
     expect([plan.create.map((a) => a.name), plan.templateNames, plan.taken, plan.pairs]).toEqual([[`${kb}-B1`, `${kb}-R1`], [`${kb}-B1`, `${kb}-R1`], [], [{ builder: 0, reviewer: 1 }]])
     // One agent of it under the name chosen in its dialog; a name another agent has is refused, naming a free one.
-    const before = cfgOf(beta).agents.map((a: AgentDef) => a.id)
+    const before = cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     const def = await run(() => templates.addAgentFromTemplate(beta, 'workspace', keyed!.file, 1, undefined, 'Checker 2'))
-    expect([def.name, def.workflowRole, def.worktree]).toEqual(['Checker 2', 'reviewer', undefined])
+    expect([def.name, def.workflowRole, legacyWorktree(def)]).toEqual(['Checker 2', 'reviewer', null])
     await expect(run(() => templates.addAgentFromTemplate(beta, 'workspace', keyed!.file, 0, undefined, `${ka}-B1`))).rejects.toThrow(/already an agent called/)
     await w.mutateProjectConfig(beta, (c) => ({ agents: c.agents.filter((a) => before.includes(a.id)) }))
     await w.mutateProjectConfig(alpha, () => ({ agents: alphaBefore }))

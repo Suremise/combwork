@@ -15,6 +15,14 @@
     "defaultMessage": "Let agents see what their CLI sends",
     "description": "A tip's title."
   },
+  "tips.agentInSlot.text": {
+    "defaultMessage": "Beside an agent's name on its pane: in slot-b while it builds a card in a slot (click it for Branches & remotes), carried: hb2 in the slot kept for it, home: hr4 for a reviewer's retired home. The project's hover lists them in a Slot column.",
+    "description": "A tip. A slot is a working folder (a worktree) Hive lends to a card or a lane; in slot-b, carried: hb2 and home: hr4 are examples of agents.place.short, as Hive shows them. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: slot."
+  },
+  "tips.agentInSlot.title": {
+    "defaultMessage": "See where each agent works",
+    "description": "A tip's title (#1442)."
+  },
   "tips.agentLayouts.text": {
     "defaultMessage": "Each agent has its own pane: choose a layout at the right of the session toolbar, and drag a pane by its header to rearrange them. File locks stop two agents editing the same file.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1363,6 +1371,14 @@
     "defaultMessage": "Choose which skills agents get",
     "description": "A tip's title."
   },
+  "tips.slotHeld.text": {
+    "defaultMessage": "When Hive can't tell that everything an agent's session started in a slot has ended, it keeps the slot for it rather than guess. Release Slot… in the agent's ⋯ menu shows what Hive knows, ends what it lists if you want, and frees the slot.",
+    "description": "A tip. A slot: a folder Hive lends to a card or a lane. Release Slot… is a menu item: keep it as Hive shows it; ⋯ is the agent's menu button."
+  },
+  "tips.slotHeld.title": {
+    "defaultMessage": "Free a slot held after Hive closed",
+    "description": "A tip's title (#1506). A slot: a folder Hive lends to a card or a lane."
+  },
   "tips.slotOptions.text": {
     "defaultMessage": "Version Control → Workflow → Slots and copies holds the script run in a new slot, the files copied into it and the slots in use, and how many review copies the project keeps. They save as you change them.",
     "description": "A tip. A slot: a folder Hive lends to a card or a lane; a review copy: a folder at exactly the revision a reviewer reviews. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1576,7 +1592,7 @@
     "description": "A tip's title."
   },
   "tips.unusedWorktrees.text": {
-    "defaultMessage": "Removed an agent but kept its worktree? Git → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, remove the merged ones with their branches, or give one back to an agent.",
+    "defaultMessage": "Removed an agent but kept its worktree? Git → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, or remove the merged ones with their branches.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.unusedWorktrees.title": {
@@ -1653,22 +1669,6 @@
   },
   "tips.workspaceNotes.title": {
     "defaultMessage": "Notes about this machine for every agent",
-    "description": "A tip's title."
-  },
-  "tips.worktreeReuse.text": {
-    "defaultMessage": "Adding an agent with a new worktree named like one you kept (B4, and B4's worktree is unused)? If it's merged and clean, Hive gives the agent that folder, brought up to main: its node_modules are already there.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
-  },
-  "tips.worktreeReuse.title": {
-    "defaultMessage": "A kept worktree is used again",
-    "description": "A tip's title."
-  },
-  "tips.worktrees.text": {
-    "defaultMessage": "In Add Agent…, choose New worktree: the agent works on its own branch, and Merge… brings its work back when you're happy with it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
-  },
-  "tips.worktrees.title": {
-    "defaultMessage": "Give an agent its own worktree",
     "description": "A tip's title."
   }
 }

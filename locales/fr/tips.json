@@ -3,6 +3,8 @@
   "tips.advancedSettings.title": "Corriger toi-même un changement de CLI",
   "tips.agentConsole.text": "Paramètres → Agent API → Permettre aux agents de lire la console de développement donne aux agents un outil en lecture seule qui montre les hooks et la ligne d’état de leur CLI à côté de ce que Hive en a compris, expurgés, pour qu’ils puissent déboguer ce que voit Hive.",
   "tips.agentConsole.title": "Montrer aux agents ce que leur CLI envoie",
+  "tips.agentInSlot.text": "À côté du nom d’un agent sur son volet : dans slot-b pendant qu’il réalise une carte dans un emplacement (clique dessus pour Branches et dépôts distants), repris : hb2 dans l’emplacement repris pour lui, foyer : hr4 pour l’ancien foyer d’un relecteur. Le survol du projet les liste dans une colonne Emplacement.",
+  "tips.agentInSlot.title": "Voir où travaille chaque agent",
   "tips.agentLayouts.text": "Chaque agent a son propre volet : choisis une disposition à droite de la barre de la session, et fais glisser un volet par son en-tête pour les réorganiser. Les verrous de fichiers empêchent deux agents de modifier le même fichier.",
   "tips.agentLayouts.title": "Plusieurs agents côte à côte",
   "tips.agentMenu.text": "L’en-tête du volet d’un agent se limite à son état, sa carte et Arrêter. Compacter, Passer le relais, Fusionner…, ses paramètres et tout ce qui demande un coup d’œil (un point sur ⋯ le signale) sont dans son menu ⋯, ou fais un clic droit sur l’en-tête. {key}",
@@ -340,6 +342,8 @@
   "tips.silentUnknown.title": "Un agent silencieux, d’état inconnu",
   "tips.skillsDelivered.text": "L’interrupteur à côté de chaque compétence de Hive, dans la vue Compétences ou l’onglet Compétences d’un projet, indique si les agents la reçoivent (Fournie aux agents). Les copies que Hive place dans un dossier pour Codex et Copilot sont supprimées dès qu’aucun agent n’y travaille, comme le dit Paramètres → Avancé.",
   "tips.skillsDelivered.title": "Choisis les compétences que reçoivent les agents",
+  "tips.slotHeld.text": "Quand Hive ne peut pas dire si tout ce que la session d’un agent a lancé dans un emplacement est terminé, il lui garde l’emplacement plutôt que de deviner. Libérer l’emplacement… dans le menu ⋯ de l’agent montre ce que Hive sait, arrête ce qu’il liste si vous le souhaitez et libère l’emplacement.",
+  "tips.slotHeld.title": "Libérer un emplacement retenu après la fermeture de Hive",
   "tips.slotOptions.text": "Gestion de versions → Flux de travail → Emplacements et copies réunit le script lancé dans un nouvel emplacement, les fichiers qui y sont copiés, les emplacements utilisés et le nombre de copies de relecture du projet. Tout est enregistré à mesure que vous changez.",
   "tips.slotOptions.title": "Régler les emplacements dans Gestion de versions",
   "tips.slotResume.text": "La conversation d’un auteur reste dans l’emplacement de sa carte. Une fois la carte terminée, Tout reprendre la laisse, pour que l’emplacement reste libre pour du nouveau travail ; son propre Reprendre récupère l’emplacement tant que rien d’autre ne l’a utilisé.",
@@ -393,7 +397,7 @@
   "tips.unexpectedClose.title": "Savoir quand Hive s’est fermé de façon inattendue",
   "tips.unmerged.text": "L’onglet de l’agent montre combien de commits ne sont pas encore fusionnés, Fusionner… dans son menu ⋯ dit ce qui reste, et Git → Modifications montre tout ce que l’agent a changé depuis la création de sa branche.",
   "tips.unmerged.title": "Voir ce qu’un agent en worktree a à fusionner",
-  "tips.unusedWorktrees.text": "Tu as retiré un agent mais gardé son worktree ? Git → Modifications s’ouvre sur les worktrees qu’aucun agent n’utilise, en indiquant qui a créé chacun : ouvre-en un pour voir son travail et le fusionner, retire ceux qui sont fusionnés avec leurs branches, ou rends-en un à un agent.",
+  "tips.unusedWorktrees.text": "Tu as retiré un agent mais gardé son worktree ? Git → Modifications s’ouvre sur les worktrees qu’aucun agent n’utilise, en indiquant qui a créé chacun : ouvres-en un pour voir son travail et le fusionner, ou retire ceux qui sont fusionnés avec leurs branches.",
   "tips.unusedWorktrees.title": "Faire le tri dans les worktrees conservés",
   "tips.versionControlSwitch.text": "Clique sur Aucune ou Git en haut de l’onglet Gestion de versions pour changer dès la prochaine carte ; les cartes lancées gardent les anciennes règles. Chacune a ses options du flux de travail, et si le dossier change (git init), Hive y propose de changer.",
   "tips.versionControlSwitch.title": "Basculer entre Aucune et Git",
@@ -412,9 +416,5 @@
   "tips.workspaceMovedDefender.text": "Si Hive a fait ignorer à Defender les dossiers de l’espace de travail, Réparer… après un déplacement propose de déplacer ces exclusions vers les nouveaux dossiers, avec une seule demande d’administrateur, pour qu’aucune ne reste sur un dossier disparu. Les exclusions que tu as créées toi-même restent telles quelles.",
   "tips.workspaceMovedDefender.title": "Les exclusions Defender suivent un espace de travail déplacé",
   "tips.workspaceNotes.text": "Workspace notes, épinglée en tête des Notes partagées, sert à ce qui est vrai pour cette machine, comme un chemin complet. Chaque agent la reçoit à son démarrage, dans n’importe quel dossier : inutile de le mettre dans un AGENTS.md commité. Une section portant le nom d’un projet n’est qu’à ce projet.",
-  "tips.workspaceNotes.title": "Des notes sur cette machine pour chaque agent",
-  "tips.worktreeReuse.text": "Tu ajoutes un agent avec un nouveau worktree du même nom qu’un worktree conservé (B4, et le worktree de B4 n’est pas utilisé) ? S’il est fusionné et propre, Hive donne ce dossier à l’agent, mis à jour avec main : ses node_modules y sont déjà.",
-  "tips.worktreeReuse.title": "Un worktree conservé resservi",
-  "tips.worktrees.text": "Dans Ajouter un agent…, choisis Nouveau worktree : l’agent travaille sur sa propre branche, et Fusionner… ramène son travail quand il te convient.",
-  "tips.worktrees.title": "Donner son propre worktree à un agent"
+  "tips.workspaceNotes.title": "Des notes sur cette machine pour chaque agent"
 }
