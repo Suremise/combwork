@@ -106,6 +106,7 @@
   "workspace.banners.showProject": "显示项目",
   "workspace.banners.showProjectLabel": "显示项目：{title}",
   "workspace.changes.aboutAgent": "{agent} 的工作树：{branch} 自离开 {base} 以来的所有内容。“合并…”会将它并入 {base}。",
+  "workspace.changes.aboutSlot": "{is, select, carried {{agent} 在为其接管的槽位 {name} 中工作} other {{agent} 在 {name} 中构建}}：{known, select, yes {其分支自离开 {base} 以来的所有内容。} other {那里尚未提交的内容。}}",
   "workspace.changes.aboutProject": "项目文件夹：尚未提交的内容，来自你或直接在该文件夹中工作的智能体（没有工作树的智能体）。",
   "workspace.changes.aboutUnusedOne": "未使用的工作树：{branch} 上所有不在 {into} 中的内容。可以合并它，或回到“未使用的工作树”将它删除。",
   "workspace.changes.aboutUnusedShort": "{project} 中没有智能体使用的工作树：打开一个可查看并合并其更改，或将它删除。",

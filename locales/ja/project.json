@@ -68,6 +68,7 @@
   "project.card.writtenToCache": "キャッシュに書き込まれたトークン",
   "project.changes.agentSetup": "エージェントのセットアップ",
   "project.changes.agentWorktree": "{agent}のワークツリー · {branch}",
+  "project.changes.agentSlot": "{agent} · {place}{known, select, yes { · {branch}} other {}}",
   "project.changes.binary": "バイナリファイルのため、テキストの差分はありません。",
   "project.changes.cantShow": "{project}の変更を表示できません：{problem}",
   "project.changes.checkingAgain": "再確認しています…",
