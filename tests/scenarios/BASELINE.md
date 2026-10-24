@@ -36,6 +36,33 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## What agents are told about slots (P7): fakes, Claude Code, Codex, fixtures v76, 24 October 2026
+
+#1444 changes the lines P7 made wrong: work-on-card (a card's folder is its slot: work and run checks there; a move to
+another folder is a new conversation; `hive-progress --check --isolated`), card-loop (a pool reviewer joins no lane),
+review-agent-work (review in the review copy the start names, never the builder's slot or folder), merge-ready,
+coordinate-agents, run-lanes and split-work (no agent has a worktree of its own), the session contract's folder line,
+and `hive_agent_activity`'s description. The start review reply now lists its files by name ("M greet.js", where
+`[object Object]` stood) and puts the review copy first. Three new scenarios: **slot-start** (a builder starts a card
+where cards are built in slots: a slot lent, no worktree of its own, nothing changed in the project folder),
+**review-in-copy** (a reviewer reviews in the copy its start names) and **pool-reviewer-wake** (a reviewer from the pool,
+given a card, reviews it and joins no lane). Source 63e6bc21 (1.0.0) with the change uncommitted.
+- **Fakes**: the whole set before (`fake-1444-before`, `2026-10-23T23-02-58-fake`) and after (`fake-1444-after`,
+  `2026-10-24T00-27-12-fake`) passes, 100 of 100 and 103 of 103; each agent session's guidance grows by 24 bytes (the
+  contract) and its skills by 717. The fake Codex runs the three new ones (`2026-10-24T01-36-43-fake-codex`). The
+  benchmark kept only its first 100 scenarios, so 103 dropped the last three: it keeps 200 now (`BENCHMARK_LIMITS`).
+- **Claude Code** (CLI 2.1.310, its default model, the test home): slot-start 3 of 3, review-in-copy 3 of 3,
+  pool-reviewer-wake 2 of 2 (`2026-10-24T01-04-29-claude-code`, `…01-13-45-…`, `…01-37-48-…`; the $2 budget ended the
+  first run's third samples). worktree-isolation passes 2 of 2.
+- **Codex** (0.164.0, its default model, its test home, `2026-10-24T01-16-19-codex`): slot-start 3 of 3,
+  pool-reviewer-wake 3 of 3, worktree-isolation 3 of 3. review-in-copy failed 3 of 3 at first: Codex calls the hive
+  tools from its code tool, printing a card's JSON and the start review reply in one output, and never saw the copy's
+  folder at the reply's end; it diffed the revisions from the project folder. With the copy first in the reply, 3 of 3
+  (`2026-10-24T01-34-27-codex`), reviewing in the copy.
+- **work-on-card** and **review-card** fail 3 checks in every sample on both models, as before this change: the agents
+  start, submit and review with the intent tools, and the fixture's project, with no review set, moves a submitted card
+  on past Review, where the checks still expect the 0.9 board moves (#1536 rewrites them for the intents).
+
 ## The Assistant's override, fixed scenarios: fakes, Claude Code, Codex, fixtures v74, 22 October 2026
 
 #1474 fixes the two scenario faults #1322's trial found (below). **assistant-override-reason**'s repository now shows the

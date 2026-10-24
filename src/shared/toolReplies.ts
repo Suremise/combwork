@@ -141,8 +141,11 @@ const INTENT_LIST_MAX = 20
 /** "HI-12: active → review. revision: 3f2a…; base: 9c1d…" and a line per warning. */
 export function intentText(d: IntentDone): string {
   const where = d.from && d.to ? (d.from === d.to ? `still ${d.to}` : `${d.from} → ${d.to}`) : 'done'
+  // A list's item: a changed file as git's letter and its path ("M greet.js", #1444: start review's files read
+  // [object Object]), anything else as it is.
+  const item = (x: unknown): string => (x && typeof x === 'object' && typeof (x as { path?: unknown }).path === 'string' ? `${(x as { status?: string }).status ? `${(x as { status: string }).status} ` : ''}${(x as { path: string }).path}` : typeof x === 'object' ? JSON.stringify(x) : String(x))
   const value = (v: unknown): string =>
-    Array.isArray(v) ? (v.length > INTENT_LIST_MAX ? `${v.slice(0, INTENT_LIST_MAX).join(', ')} and ${v.length - INTENT_LIST_MAX} more` : v.join(', ') || 'none') : typeof v === 'object' ? JSON.stringify(v) : String(v)
+    Array.isArray(v) ? (v.length > INTENT_LIST_MAX ? `${v.slice(0, INTENT_LIST_MAX).map(item).join(', ')} and ${v.length - INTENT_LIST_MAX} more` : v.map(item).join(', ') || 'none') : typeof v === 'object' ? JSON.stringify(v) : String(v)
   const facts = Object.entries(d.data ?? {})
     .filter(([, v]) => v !== undefined && v !== null && v !== '')
     .map(([k, v]) => `${k}: ${value(v)}`)

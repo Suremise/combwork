@@ -6,7 +6,8 @@ const fs = require('fs')
 const path = require('path')
 
 const SCHEMA = 'hive-benchmark/1'
-const LIMITS = { scenarios: 100, samples: 20, checks: 60, failedChecks: 20, skills: 60, text: 200, resultsKept: 30, baselinesKept: 5 }
+// scenarios: as src/shared/benchmark.ts's (200 since #1444).
+const LIMITS = { scenarios: 200, samples: 20, checks: 60, failedChecks: 20, skills: 60, text: 200, resultsKept: 30, baselinesKept: 5 }
 
 /** Short text with no paths in it (an error can quote one): at most LIMITS.text characters. */
 const clean = (v) =>

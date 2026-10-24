@@ -11,8 +11,8 @@ You are the reviewer: find what's wrong, don't fix it. Leave the code, the branc
 
 ## 1. Find exactly what to review
 
-- **A card** (#n): read it with `hive_read_task`. Its description says what was meant, and its comments say what was done and where. Start the review with `hive_start_review`: its reply names the revision, base and files to review (the latest submission; `submission` names an earlier one). The card stays in Review with the agent that did the work. You are recorded as its reviewer, separately. In a card loop, review the commit its builder names: work sent uncommitted gets a request for a commit (`hive_request_builder`), not a verdict (card-loop, Reviewer). A card an intent says has no workflow is reviewed on the board instead: `hive_update_task` with `review: "start"`, and the verdict as `review: "passed"` (with `column: "passed"`) or `"failed"`.
-- **A worktree branch**: `git worktree list`, then `git diff <base>...<branch>` and `git log <base>..<branch>`.
+- **A card** (#n): read it with `hive_read_task`. Its description says what was meant, and its comments say what was done and where. Start the review with `hive_start_review`: its reply names the revision, base and files to review (the latest submission; `submission` names an earlier one), and the review copy to read and run checks in when the project has them: review there, never in the builder's slot or folder. The card stays in Review with the agent that did the work. You are recorded as its reviewer, separately. In a card loop, review the commit its builder names: work sent uncommitted gets a request for a commit (`hive_request_builder`), not a verdict (card-loop, Reviewer). A card an intent says has no workflow is reviewed on the board instead: `hive_update_task` with `review: "start"`, and the verdict as `review: "passed"` (with `column: "passed"`) or `"failed"`.
+- **A branch**: `git diff <base>...<branch>` and `git log <base>..<branch>`.
 - **Commits**: `git show` for the range named.
 - **Uncommitted changes**: `git status`, `git diff` and `git diff --staged` in that folder.
 
