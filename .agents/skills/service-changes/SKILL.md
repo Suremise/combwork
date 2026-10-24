@@ -9,11 +9,7 @@ The workspace's shared note `conventions/engineering-quality.md` (`hive_read_sha
 
 ## Workspaces and windows
 
-Each window has its own workspace. Calls without a path (`workspace.path`, `skillsDir`) need the current work's workspace:
-
-- IPC and Agent API calls have it;
-- background code uses `workspaceOf(projectPath)` or `inWorkspace(ws, fn)`;
-- window-specific events go through `emitTo(win, …)`.
+Each window has its own workspace: AGENTS.md (Gotchas: Several windows) says which calls need the current work's workspace and how background code and window events get theirs.
 
 ## Scope and authorisation
 
@@ -29,7 +25,7 @@ The Assistant's changes go through `assistantChange()` (control level, recorded 
 ## Locks and races
 
 - Check ownership and permission inside the same lock as the write, against the record as it is then, for every item of a batch. A check made before the lock doesn't count.
-- Kept files (`project.json`, `workspace.json`, `config.json`) and session records (in hive.db) change only through their locked helpers (`mutateProjectConfig`, `mutateSessions`, `writeKeptJson`).
+- Kept files and session records change only through their locked helpers (AGENTS.md, Gotchas: Kept files, project.json / sessions).
 - A slow call can see its world change: an agent stopped, a card moved, a window closed. Check again after each await that matters.
 
 ## Files Hive manages
@@ -49,7 +45,7 @@ The Assistant's changes go through `assistantChange()` (control level, recorded 
 
 ## Privacy
 
-- User text in log lines goes through `userText()`.
+- User text in log lines goes through `userText()` (AGENTS.md, Logging).
 - Transcript fixtures have personal text removed.
 - Diagnostics redact names and paths.
 
