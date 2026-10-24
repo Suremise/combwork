@@ -135,11 +135,7 @@ describe('one owner per rule', () => {
   ]
   // Places stating one besides its owner today, until lanes A and B (#1524–#1528) and #1530 rewrite them. The list only
   // shrinks: one no longer stating it fails until it's taken off.
-  const NOT_YET: Record<string, string[]> = {
-    'agent: Done means merged': ['card-loop', 'merge-ready', 'review-agent-work'],
-    "agent: Passed isn't merged": ['review-agent-work'],
-    'agent: wait with a watch': ['merge-ready']
-  }
+  const NOT_YET: Record<string, string[]> = {}
   const tools = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
   const descriptions = [...tools.matchAll(/description:\s*(?:ASSISTANT\s*\?\s*)?(["'`])((?:\\.|(?!\1).)*)\1(?:\s*:\s*(["'`])((?:\\.|(?!\3).)*)\3)?/g)].map((m) => `${m[2]}\n${m[4] ?? ''}`).join('\n')
   const places = (role: 'agent' | 'assistant'): [string, string][] => [
@@ -159,8 +155,10 @@ describe('one owner per rule', () => {
       }
     })
   }
-  it('keeps each rule somewhere an agent reads it', () => {
-    for (const [rule, re] of RULES) expect(places('agent').some(([, text]) => (text.match(re) ?? []).length > 0), rule).toBe(true)
+  // "Done means merged" is Hive's now (report merge's containment check) and depends on the card's kind (#1524: a no-code
+  // card is Done with no merge), so no text states it whole; the others stay guidance an agent reads somewhere.
+  it('keeps each rule that is still guidance somewhere an agent reads it', () => {
+    for (const [rule, re] of RULES.filter(([r]) => r !== 'Done means merged')) expect(places('agent').some(([, text]) => (text.match(re) ?? []).length > 0), rule).toBe(true)
   })
 })
 
