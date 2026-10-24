@@ -11,7 +11,7 @@ Hive's settings are many, and users rarely know which one would help. You can re
 
 ## Look them up
 
-- `hive_list_settings` with a `query` ("transcript", "notifications", "worktree") finds candidates, a line each with the value and the default when it differs. `project` adds a project's own settings (Project Settings).
+- `hive_list_settings` with a `query` ("transcript", "notifications", "slots") finds candidates, a line each with the value and the default when it differs. `project` adds a project's own settings (Project Settings).
 - `hive_read_setting` explains one: where the user finds it, what it takes, what it does, when it helps, whether a change waits for a restart, and whether you may change it.
 - Answer from what they say, not from memory: settings change between versions of Hive.
 
@@ -21,8 +21,8 @@ Suggest a setting when what you see matches its "when it helps" line. Some signa
 
 - A transcript in the tens of MB (`transcriptMB` in `hive_agent_activity`), or an agent that types slowly: `sessions.transcriptWarnMB` (and a handover to a new conversation now).
 - Big contexts for long stretches (`hive_session_usage`): `sessions.compactSuggestTokens`, or Use 200K context for the provider.
-- Several agents in one project folder editing the same files: `agents.fileLocks`, or worktrees.
-- New worktrees whose builds fail for a missing `.env` or local config: `agents.worktreeCopy` (or the project's).
+- Several agents in one project folder editing the same files: `agents.fileLocks`, or building each card in a slot of its own (the project's Version Control tab, Where cards are built).
+- New slots or worktrees whose builds fail for a missing `.env` or local config: `agents.worktreeCopy` (or the project's).
 - Long runs that stopped while the user was away: `general.keepAwake`.
 - Long test runs the user can't follow: `general.progressPanel` and `general.progressCommands`.
 - The chime or banners interrupting the user, or agents waiting unnoticed: `notifications.*`.

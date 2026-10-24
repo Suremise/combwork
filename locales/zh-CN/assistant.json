@@ -420,7 +420,7 @@
   "assistant.skills.shipped.mergeReady": "让分支准备好在 Hive 中评审和合并：提交任务的工作、运行检查、与基准分支比较、写总结。用于被要求收尾，或让分支或工作树准备好合并时。合并和推送另行进行。",
   "assistant.skills.shipped.pickUp": "根据交接说明继续之前的工作，并对照当前状态核实。用于被要求继续、恢复或接手之前的工作，或阅读交接说明时。并非每个新会话都需要。",
   "assistant.skills.shipped.reviewAgentWork": "评审其他智能体的工作（“评审”列中的卡片、分支、提交或未提交的更改）并报告发现，不做改动。用于被要求评审、检查或核实工作时。",
-  "assistant.skills.shipped.runLanes": "以 Hive Assistant 的身份带领团队：在卡片循环中运行构建者和评审者通道，按文件规划，下达任务说明并监视到结束。用于有三个或更多智能体、构建者和评审者搭档或工作树智能体时，被要求使用通道时，或因通道被唤醒时。",
+  "assistant.skills.shipped.runLanes": "以 Hive Assistant 的身份带领团队：在卡片循环中运行构建者和评审者通道，按文件规划，下达任务说明并监视到结束。用于有三个或更多智能体或多组构建者和评审者搭档时，被要求使用通道时，或因通道被唤醒时。",
   "assistant.skills.shipped.splitWork": "规划是否以及如何在智能体之间无冲突地拆分任务，并保存计划。用于被问到如何在智能体之间拆分工作、如何并行，或如何让多个智能体处理它时。只做规划：启动智能体另行进行。",
   "assistant.skills.shipped.triageReport": "以 Hive Assistant 的身份把报告的问题变成附有证据的卡片：先找原因，再查重复。用于用户报告问题时。",
   "assistant.skills.shipped.tuneSettings": "以 Hive Assistant 的身份解释和建议 Hive 的设置；只有用户同意时才更改。用于被问到某个设置的作用、如何让 Hive 换一种行为，或某个设置能解决你看到的问题时。",
