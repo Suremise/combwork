@@ -301,6 +301,53 @@ describe('coordinator guidance', () => {
   })
 })
 
+// #1532 (P8): what Hive enforces for every project is its gates' (SPEC §16.11) and the bundled skills'. AGENTS.md keeps
+// only this repository's own conventions, and points to Hive's development skills rather than repeating them.
+describe("the repository's AGENTS.md", () => {
+  const text = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')
+  it('states no rule a gate owns (the design note §10, "Becomes a gate")', () => {
+    for (const gate of [
+      /\bcommit (?:each round |the card's work )?before (?:moving it to )?Review\b/i,
+      /\breview the exact commit\b/i,
+      /\bPassed (?:is not|isn't|≠) merged\b/i,
+      /\bDone (?:means|=) merged\b/i,
+      /\bdependencies (?:merged|done) before\b/i,
+      /\bmerge slot\b|\bhive_merge_slot\b/i,
+      /\bthe builder merges\b/i,
+      /\bcards? (?:in)?to a running lane\b|\brestart (?:its|the) lane\b/i,
+      /\ba decision wakes\b/i
+    ])
+      expect(text).not.toMatch(gate)
+  })
+  it("keeps this repository's own conventions", () => {
+    for (const own of [
+      /Design is settled before code/,
+      /Outside a card loop, \*\*commit only when the user asks\*\*/,
+      /\*\*Never run `prettier --write`\*\*/,
+      /\*\*Line endings\*\*/,
+      /\*\*Translations\*\*/,
+      /`TIP_ENTRIES`/,
+      /\*\*Merge checks\*\*, this repository's \(#1010\): a merge into main or an integration branch .* runs typecheck, lint, the unit tests and the cards' own focused e2e suites/,
+      /never open the main checkout .* with one until the 1\.0 baseline is installed \(#1288\)/,
+      /\*\*Test isolation\*\*/,
+      /\*\*The machine is shared\*\*/,
+      /\*\*Providers\*\*/
+    ])
+      expect(text).toMatch(own)
+  })
+  it("points to Hive's development skills for what they own", () => {
+    expect(text).toMatch(/is the `verify-hive-ui` skill/)
+    expect(text).toMatch(/use the `investigate-flake` skill/)
+    // Moved there (#1532): AGENTS.md no longer carries them.
+    for (const moved of [/EventID=5007/, /HIVE_TEST_SLOW_IPC/, /HIVE_UPDATE_FEED/, /make it cheaper unasked/]) expect(text).not.toMatch(moved)
+    const skill = (name: string): string => readFileSync(join(ROOT, '.claude/skills', name, 'SKILL.md'), 'utf8')
+    expect(skill('investigate-flake')).toMatch(/EventID=5007/)
+    expect(skill('investigate-flake')).toMatch(/make it cheaper unasked/)
+    expect(skill('verify-hive-ui')).toMatch(/HIVE_TEST_SLOW_IPC/)
+    expect(skill('verify-hive-ui')).toMatch(/HIVE_UPDATE_FEED/)
+  })
+})
+
 describe("Hive's development skills", () => {
   const claude = '.claude/skills'
   const agents = '.agents/skills'
