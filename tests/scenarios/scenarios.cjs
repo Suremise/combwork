@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 77
+const FIXTURES_VERSION = 78
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -2398,7 +2398,7 @@ module.exports.SCENARIOS = [
   {
     id: 'review-in-copy',
     title: "A reviewer reviews in the review copy its start names (#1444, #1439): it reads and runs the checks there, not in the builder's folder, and gives its verdict",
-    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n", 'test.js': "const greet = require('./greet'); if (greet(' Ada ') !== 'Hello, Ada') { console.error('greet does not trim'); process.exit(1) }\nconsole.log('ok')\n" },
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n", 'test.js': "const greet = require('./greet'); if (greet(' Ada ') !== 'Hello, Ada') { console.error('greet does not trim'); process.exit(1) }\nrequire('fs').writeFileSync(require('path').join(__dirname, 'ran.txt'), 'ran')\nconsole.log('ok')\n" },
     async setup(c) {
       await inReview(c)
       c.copyLeases = new Set()
@@ -2423,6 +2423,8 @@ module.exports.SCENARIOS = [
         ['Hive lent it a review copy at its start', c.copyLeases.size > 0 || !!copyReply, [...c.copyLeases].join(', ')],
         ['the reply it saw named the copy, with its folder', !!copyReply, hiveReplies(o, 'hive_start_review').map((t) => t.result.slice(0, 300)).join(' | ')],
         ['read or ran its checks in the review copy', inCopy.length > 0, `${copy} | ${o.tools.map((t) => t.input.slice(0, 80)).join(' | ')}`],
+        // test.js leaves ran.txt beside itself: one in the project folder is a check run there, not in the copy (#1559).
+        ['ran no command in the project folder (no ran.txt there)', !require('fs').existsSync(require('path').join(c.ws, 'alpha', 'ran.txt'))],
         ['gave a verdict (a Verdict fact)', factsOf(o, 'r', 'Verdict').length > 0],
         ["changed nothing of the builder's (a review only reads)", o.gitStatus.trim() === '', o.gitStatus]
       ]
