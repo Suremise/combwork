@@ -61,8 +61,8 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
   const setup = path.join(tools, 'setup.js')
   fs.writeFileSync(setup, `require('fs').appendFileSync(${JSON.stringify(setupLog)}, process.env.HIVE_SLOT + ' ' + require('fs').readFileSync('package-lock.json', 'utf8').trim() + '\\n')\n`)
   const env = lib.fakeClaude(userData, home, [alpha, ws, slotA])
-  // #1553: every read of the agents' input recorded (fake-input.jsonl), for what B1's terminal got around its held run.
-  fs.writeFileSync(path.join(home, 'fake-log-input.txt'), '')
+  // #1553: every read of the agents' input recorded (fake-input.jsonl), for typeLine and what B1's terminal got around its held run.
+  lib.logFakeInput(home)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
@@ -176,39 +176,12 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     fs.writeFileSync(hold, `const fs = require('fs'); const t = Date.now(); const tick = () => { if (fs.existsSync(${JSON.stringify(holdGo)})) { fs.writeFileSync(${JSON.stringify(holdSaw)}, fs.readFileSync(require('path').join(fs.readFileSync('.git', 'utf8').replace('gitdir:', '').trim(), 'HEAD'), 'utf8').replace('ref: refs/heads/', '').trim()); process.exit(0) } if (Date.now() - t > 120000) process.exit(3); setTimeout(tick, 100) }; tick()\n`)
     const progressRuns = async () => (await inv('progress:snapshot')).runs.filter((r) => r.state === 'running' || r.state === 'queued')
     // B1's command typed as its shell would get it. Hive may type a wake into B1 at the same moment (card 1's Done, #1553):
-    // its Ctrl+U then clears the suite's line, or its line and the suite's mix, or the line lands while B1 is busy with the
-    // wake and is dropped. So the line goes in only once B1's CLI has read it whole with nothing of Hive's around it
-    // (fake-input.jsonl: every read of its input), and is typed again when it was disturbed or dropped.
-    const jsonl = (f) => (fs.existsSync(path.join(home, f)) ? fs.readFileSync(path.join(home, f), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((r) => r.agent === 'B1')
-    // What B1's CLI read since `from`, its key sequences (a bracketed paste's marks) left out.
-    const readSince = (from) => jsonl('fake-input.jsonl').slice(from).map((r) => r.data).join('').replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
-    const holdCmd = `shell: hive-progress --title "B1 holds slot-a" -- node "${hold}"`
-    const lost = []
-    for (let tries = 0; tries < 3 && (await progressRuns()).length === 0; tries++) {
-      await until(async () => ['ready', 'finished'].includes((await live(b1.id))?.status), HUNG_MS)
-      const from = jsonl('fake-input.jsonl').length
-      const dropped = jsonl('fake-dropped.jsonl').length
-      await inv('pty:write', lib.ptyKey(alpha, b1.id), holdCmd)
-      // Read whole before its Enter (the fake reads a line).
-      await until(() => readSince(from).includes(holdCmd), HUNG_MS)
-      await inv('pty:write', lib.ptyKey(alpha, b1.id), '\r')
-      const read = await until(() => {
-        const s = readSince(from)
-        const i = s.indexOf(holdCmd)
-        return i >= 0 && s.indexOf('\r', i) >= 0 ? s : null
-      }, HUNG_MS)
-      // Intact: nothing on the line before it (since the last Enter or Ctrl+U), and nothing between it and its Enter.
-      const typedAt = read ? read.indexOf(holdCmd) : -1
-      const intact = !!read && read.slice(0, typedAt).split(/[\r\x15]/).pop() === '' && read.slice(typedAt + holdCmd.length, read.indexOf('\r', typedAt)) === ''
-      if (!intact) {
-        lost.push(`disturbed: ${JSON.stringify(read)}`)
-        continue
-      }
-      // Taken: its run starts, or B1 was busy and dropped it.
-      await until(async () => (await progressRuns()).length > 0 || jsonl('fake-dropped.jsonl').length > dropped, HUNG_MS)
-      if (jsonl('fake-dropped.jsonl').length > dropped) lost.push('dropped while busy')
-    }
-    if (lost.length) console.log(`(B1's line typed again: ${lost.join('; ')})`)
+    // typeLine types it again when the wake disturbed it or B1 dropped it.
+    await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), home, 'B1', `shell: hive-progress --title "B1 holds slot-a" -- node "${hold}"`, {
+      ready: async () => ['ready', 'finished'].includes((await live(b1.id))?.status),
+      taken: async () => (await progressRuns()).length > 0,
+      hungMs: HUNG_MS,
+    })
     // What B1's CLI read, took as a wake, or dropped (#1553: a run that never started).
     const inputs = () => ['fake-input.jsonl', 'fake-wakes.jsonl', 'fake-dropped.jsonl', 'fake-shell.jsonl'].map((f) => (fs.existsSync(path.join(home, f)) ? `${f}:\n${fs.readFileSync(path.join(home, f), 'utf8').slice(-4000)}` : `${f}: none`)).join('\n')
     check("B1's run is going in slot-a", !!(await until(async () => (await progressRuns()).length > 0, HUNG_MS)), `${JSON.stringify(await progressRuns())}\n${inputs()}`)

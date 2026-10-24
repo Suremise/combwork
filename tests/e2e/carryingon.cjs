@@ -37,6 +37,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
 ;(async () => {
   for (const d of [userData, ws, claudeHome, codexHome, shots]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [claudeHome, codexHome, shots]) fs.mkdirSync(d, { recursive: true })
+  // Every read of the Claude agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "unelevated"\n')
   lib.gitProject(alpha)
   lib.enableProviders(userData, ['claude-code', 'codex'])
@@ -68,6 +70,9 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const status = async (id) => (await live(id))?.status
     const idle = async (id) => ['ready', 'finished'].includes(await status(id))
     const say = async (id, text) => {
+      // Into Claude Code typed again if a wake of Hive's disturbed it (lib.typeLine, #1560). The fake Codex keeps no input
+      // log: typed, then a pause before its Enter on purpose (it reads a typed line before its Enter, as a CLI does).
+      if (id !== codex.id) return lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
       await inv('pty:write', lib.ptyKey(alpha, id), text)
       await lib.sleep(300)
       await inv('pty:write', lib.ptyKey(alpha, id), '\r')
@@ -202,9 +207,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     // --- 5. The Assistant follows Settings' switch (it has no project): its watch's wake waits in its inbox, its panel's ⋯
     // shows it unread, and Deliver Now there types its line once.
     const asst = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase())
-    await inv('pty:write', lib.ptyKey(home, 'assistant'), `hive hive_wait_for_tasks ${JSON.stringify({ cards: [n], changes: ['comment'], wake: true })}`)
-    await lib.sleep(300)
-    await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
+    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    await lib.typeLine(inv, lib.ptyKey(home, 'assistant'), claudeHome, null, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [n], changes: ['comment'], wake: true })}`, { live: asst })
     check('the Assistant watches the card', !!(await until(async () => (await asst())?.status === 'watching', HUNG_MS)), (await asst())?.status)
     await inv('tasks:comment', n, 'A note for the watch.')
     const asstUnread = async () => (await asst())?.inbox?.unread ?? []

@@ -27,6 +27,8 @@ const until = async (fn, ms = 10000) => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [alpha, claudeHome]) fs.mkdirSync(d, { recursive: true })
+  // Every read of the agent's input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')

@@ -57,6 +57,8 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
 ;(async () => {
   for (const d of [userData, ws, claudeHome, tools, shots]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [claudeHome, tools, shots]) fs.mkdirSync(d, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine.
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', '.gitignore': '.hive/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.gitProject(beta, { 'b.ts': 'export const b = 1\n', '.gitignore': '.hive/\n' })
@@ -130,14 +132,17 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
       const f = path.join(claudeHome, 'fake-shell.jsonl')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
     }
-    /** Types a shell command into an agent's fake session; resolves with its record once it has ended. */
+    /**
+     * Types a shell command into an agent's fake session, again when a wake of Hive's disturbed it (typeLine): taken once
+     * a turn of its starts (the command may be held). Resolves with its record once it has ended.
+     */
     const shell = async (id, cmd, project = alpha) => {
       const before = shells().length
-      await until(async () => (await live(id, project))?.status !== 'working', HUNG_MS)
-      await inv('pty:write', lib.ptyKey(project, id), `shell: ${cmd}`)
-      // Typed, then entered (the fake reads a line), as progressreport does.
-      await lib.sleep(300)
-      await inv('pty:write', lib.ptyKey(project, id), '\r')
+      await lib.typeLine(inv, lib.ptyKey(project, id), claudeHome, (await live(id, project))?.agentName, `shell: ${cmd}`, {
+        ready: async () => (await live(id, project))?.status !== 'working',
+        live: () => live(id, project),
+        hungMs: HUNG_MS,
+      })
       // Its own record: the first of its command after those there before it was typed (another agent's may come first).
       const index = await until(() => {
         const i = shells().findIndex((x, n) => n >= before && x.cmd === cmd && !taken.has(n))
