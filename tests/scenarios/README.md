@@ -93,6 +93,9 @@ The checks are positive and negative:
     builder and reviewer pair's one card runs as a lane; a card reaching Review outside a lane gets its idle reviewer
     started; a running lane is watched with `lanes` and none of its cards; a second failed review in a ten-round lane is
     left to the loop; and a no-code card that passed (its lane ended) is neither moved nor its lane ended again;
+  - in Coordinator mode, looking before asking (#1346 items 1 and 5, #1528): a card whose deploy details are in a doc
+    it names is looked up and started without asking the user; asked whether a card should wait for another lane, it
+    reads the board and the lanes first and changes nothing;
   - in every mode (#325, #402): cards it plans are complete (80+ characters each), an open design question reaches the
     user, and one card on one agent loads no run-lanes and starts no lane.
 

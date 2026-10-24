@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 79
+const FIXTURES_VERSION = 80
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -3560,6 +3560,53 @@ module.exports.SCENARIOS.push(
       ["asked the user nothing (no notification, request or question)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)]
     ],
     fakeSkips: ["asked the user nothing (no notification, request or question)"]
+  },
+  // #1346 items 1 and 5 (#1528, the Coordinator mode): a fact the card points to is looked up, not asked for, and the
+  // user's request is the OK; a question about running work is answered from the state, looked at first.
+  {
+    id: 'coordinator-fact-before-asking',
+    title: "Coordinator mode asked to have an agent publish a card whose deploy details are in a doc the card names (#1346 item 1): reads the card and the doc, starts it, and asks the user nothing",
+    role: 'assistant',
+    control: 'agents',
+    mode: 'coordinator',
+    async setup(c) {
+      require('fs').mkdirSync(require('path').join(c.alpha, 'docs'), { recursive: true })
+      c.write('docs/DEPLOY.md', '# Deploying alpha\n\n## Production\n\nOnly from a release tag.\n\n## Staging\n\nRun `npm run deploy:staging`. The host is staging.example.com; the build needs `ALPHA_ENV=staging`.\n')
+      await c.card('p', { title: 'Publish the greeting page to staging', description: 'Publish the current greeting page to staging. How to deploy: docs/DEPLOY.md, its Staging section.' })
+    },
+    prompt: (c) => `Have Coder publish #${c.cards.p} to staging.`,
+    fake: (c) => `skill coordinate-agents then hive hive_read_task {"number":${c.cards.p}} then hive hive_read_section {"project":"alpha","path":"docs/DEPLOY.md","heading":"Staging"}`,
+    expect: (o, c) => {
+      const p = c.cards.p
+      const lookedUp = ran(o, 'hive_read_task').some((x) => field(x.args, 'number', p)) || ['hive_read_section', 'hive_doc_outline'].some((t) => ran(o, t).some((x) => /DEPLOY\.md/i.test(String(x.args))))
+      return [
+        ['looked the card or its doc up (hive_read_task, or the doc through hive_doc_outline / hive_read_section)', lookedUp, o.hiveCalls.map((x) => x.tool).join(',')],
+        ["asked the user nothing: no notification and no question (the deploy details are in the doc, and the request is the OK)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
+        ['started Coder on the card', ran(o, 'hive_start_task').some((x) => field(x.args, 'number', p)) || briefsTo(o, 'Coder').some((t) => names(t, p)), o.hiveCalls.map((x) => x.tool).join(',')]
+      ]
+    },
+    fakeSkips: ["asked the user nothing: no notification and no question (the deploy details are in the doc, and the request is the OK)", 'started Coder on the card']
+  },
+  {
+    id: 'coordinator-look-before-asking',
+    title: "Coordinator mode asked whether a card should wait for another lane or run beside it (#1346 item 5): looks at the board and the lanes before it answers or asks",
+    role: 'assistant',
+    control: 'agents',
+    mode: 'coordinator',
+    async setup(c) {
+      await twoLanes(c, { aColumn: 'review' })
+    },
+    prompt: (c) => `Should Builder2 wait for Coder's lane to finish before starting #${c.cards.c}, or run it alongside?`,
+    fake: 'hive hive_lane {"action":"list"} then hive hive_list_tasks {"project":"alpha"}',
+    expect: (o) => {
+      const looked = ['hive_list_tasks', 'hive_lane', 'hive_project_status', 'hive_list_projects', 'hive_read_task'].some((t) => ran(o, t).length > 0)
+      return [
+        ['looked at the board, the lanes or the agents first', looked, o.hiveCalls.map((x) => x.tool).join(',')],
+        ['started, stopped or changed nothing (it was asked a question)', !['hive_start_task', 'hive_start_agent', 'hive_prompt_agent', 'hive_stop_agent', 'hive_update_task', 'hive_update_tasks'].some((t) => called(o, t).length > 0) && !called(o, 'hive_lane').some((x) => argsOf(x).action !== 'list'), o.hiveCalls.map((x) => x.tool).join(',')],
+        ['answered from what it found: names the files or cards the lanes touch', /greet|README|#?\d+/i.test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)]
+      ]
+    },
+    fakeSkips: ['answered from what it found: names the files or cards the lanes touch']
   }
 )
 
