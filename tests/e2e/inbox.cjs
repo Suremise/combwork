@@ -29,6 +29,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
 ;(async () => {
   for (const d of [userData, ws, ws + '.worktrees', claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   for (const p of [alpha, beta]) {
     lib.gitProject(p)
     git(p, 'config', 'user.email', 't@t')

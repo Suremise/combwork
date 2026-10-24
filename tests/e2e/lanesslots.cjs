@@ -148,10 +148,8 @@ const lines = (file) => {
     const copy = (started.body?.data?.reviewCopy ?? '').match(/Review in (.+?) at /)?.[1] ?? null
     check('R1 reviews in copy-1', started.status === 200 && !!copy && copy.endsWith('copy-1'), JSON.stringify(started.body))
     await until(async () => ['ready', 'finished'].includes((await live(r1.id))?.status), HUNG_MS)
-    await inv('pty:write', lib.ptyKey(alpha, r1.id), `shell: cd /d "${copy}" && hive-progress --check quick`)
-    // Typed, then entered (the fake reads a line).
-    await lib.sleep(300)
-    await inv('pty:write', lib.ptyKey(alpha, r1.id), '\r')
+    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    await lib.typeLine(inv, lib.ptyKey(alpha, r1.id), home, null, `shell: cd /d "${copy}" && hive-progress --check quick`, { live: () => live(r1.id) })
     const checkRun = await until(async () => (await inv('progress:snapshot')).runs.find((r) => r.check === 'quick' && r.card === c1 && r.copy === 'copy-1' && r.state !== 'running'), HUNG_MS)
     check("the check ran in copy-1, linked to the card and its revision", !!checkRun && checkRun.revision === rev && same(lines(checkLog).at(-1), copy), JSON.stringify({ checkRun, ran: lines(checkLog) }))
     await tab('runs').click()
