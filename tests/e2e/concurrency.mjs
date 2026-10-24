@@ -12,7 +12,9 @@
 // holds a lane of its own (its own ports and folders) and its own logs folder; each worktree's build is made once (the
 // build lock), stamped as its source (by its runs, or by another checker's started in the same worktree, #282); no build lock is left held; each e2e run's record names its own worktree's code;
 // and the decoy is untouched and no Node process but the runners themselves got the NODE_OPTIONS (#208). --repeat N
-// runs N rounds, stopping at the first that fails.
+// runs N rounds, stopping at the first that fails. Before the rounds, in the second worktree with no dev build yet: a
+// packaged run (HIVE_EXE) whose suites can't run on it makes no build, writes its record (not valid, each suite NOT
+// RUN with why) and fails (#1591).
 //
 // --heavy checks the machine-wide limit on heavy runs instead (slots.mjs), in a pool of slots of its own (so real runs
 // on the machine neither wait for it nor make it wait): three heavy runs (a repeat) started at once from three
@@ -379,6 +381,30 @@ async function laneWaitCheck(wt) {
   }
 }
 
+/**
+ * A packaged run (HIVE_EXE) of suites none of which can run on it, in the second worktree before anything builds it
+ * (#1591): no dev build is made or needed, and the run still writes its record, not valid ("nothing was tested"), with
+ * each suite NOT RUN and why, and fails. HIVE_EXE names no file: a run that started a Hive would fail on it.
+ */
+async function packagedNothingCheck(wt) {
+  console.log('\n--- A packaged run where no suite chosen can run, with no dev build (#1591)')
+  const built = join(wt, 'out', 'main', 'index.js')
+  check('the second worktree has no dev build yet', !existsSync(built), built)
+  const work = join(RUN, 'packaged-work', 'e2e')
+  const r = await start({ name: 'packaged, nothing runnable', cwd: wt, script: 'tests/e2e/run.mjs', args: ['cardloop', 'wakepaste-codex', '--build', '--record', '--no-progress'], polluted: false, env: { HIVE_EXE: join(RUN, 'no-such', 'Hive.exe'), HIVE_E2E_DIR: work } })
+  check(`${r.name}: fails (nothing was tested)`, r.code === 1, `exit ${r.code}\n${r.out.slice(-800)}`)
+  check(`${r.name}: makes no dev build`, !/^Building \(the dev build/m.test(r.out) && !/No dev build/.test(r.out) && !existsSync(built), r.out.slice(0, 800))
+  const logs = /Logs: `?([^`\r\n]+?)`?$/m.exec(r.out)?.[1]?.trim()
+  const read = (f) => (logs && existsSync(join(logs, f)) ? readFileSync(join(logs, f), 'utf8') : '')
+  const md = read('run-record.md')
+  let json = null
+  try {
+    json = JSON.parse(read('run-record.json'))
+  } catch {}
+  check(`${r.name}: its Markdown record says it is not valid, and why each suite was NOT RUN`, md.startsWith("**Not valid — don't trust this record:** no suite chosen can run on a packaged build: nothing was tested.") && /\| cardloop \| \*\*NOT RUN\*\*: it starts this checkout's Electron itself/.test(md) && /\| wakepaste-codex \| \*\*NOT RUN\*\*: wakepaste-cli\/run\.cjs: /.test(md), md.slice(0, 800) || `no record in ${logs}`)
+  check(`${r.name}: its JSON record too`, json?.valid === false && !!json.packaged && json.results?.length === 2 && json.results.every((x) => x.notRun && !x.ok), JSON.stringify(json)?.slice(0, 800) ?? `no JSON record in ${logs}`)
+}
+
 const made = []
 let decoyHead = null
 try {
@@ -396,6 +422,8 @@ try {
   } else {
     made.push(addWorktree(root, RUN, 'worktree'))
     console.log(`Second worktree: ${made[0]}\nBuild locks: ${BUILD_LOCKS}`)
+    // Before the rounds build that worktree.
+    if (!laneWaitOnly) await packagedNothingCheck(made[0])
   }
   for (let k = 1; k <= repeat; k++) {
     if (heavy) await heavyRound(k, [root, ...made])
