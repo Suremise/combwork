@@ -12,6 +12,7 @@ import { ASSISTANT_ONLY_TOOLS, assistantTools } from '../src/shared/assistantToo
 import { parseSkillFrontmatter, skillFor } from '../src/main/skills'
 import type { SkillAudience, TaskCard } from '../src/shared/types'
 import { WORKSPACE_NOTES_PATH } from '../src/shared/workspaceNotes'
+import type { Finisher, ReviewBy } from '../src/shared/workflow/options'
 
 const ROOT = join(__dirname, '..')
 const SKILLS = join(ROOT, 'resources', 'skills')
@@ -198,30 +199,294 @@ describe('the bundled skills', () => {
     expect(end).toMatch(/needs the user \(a commit or merge your CLI or a permission check refuses/)
     // Since #1274: a rule it can't keep is a request for the user (§16.8.6), on that card.
     expect(end).toMatch(/is `hive_cannot_within_rules` on that card/)
-    // A lane takes one card at a time (#1270): merge-ready merges each card as it passes, never "at the lane's end".
+    // A lane takes one card at a time (#1270): merge-ready never merges "at the lane's end". Since #1525 (P8) whether a
+    // lane waits for a card's merge is Hive's (the lane's `next`), and who merges the project's (G5): merge-ready says
+    // each way, and a card that passed waits on it.
     const merge = catalog.get('merge-ready')!.text
     expect(merge).not.toMatch(/at the lane's end/)
-    expect(merge).toMatch(/each card as it passes, before the lane's next card starts/)
+    expect(merge).toMatch(/how its work lands is the card's own rules/)
+    expect(merge).not.toMatch(/at the lane's end|before the lane's next card starts/)
     expect(line('**Stop and ask**')).toMatch(/on a merge step that needs the user/)
   })
 
   // #1074: reviewers split over uncommitted work (some failed the round, some reviewed it by fingerprint). The builder
-  // commits before Review and names the commit; a reviewer handed uncommitted work asks for the commit, and the
-  // builder's watch counts comments so the request wakes it.
-  it('the builder commits before Review and the reviewer asks for a commit rather than failing on that alone', () => {
+  // commits each round and names the commit; a reviewer handed uncommitted work asks for the commit, and the
+  // builder's watch counts comments so the request wakes it. Since #1524 (P8): a submission is a revision, and the rule
+  // that it is committed is the project's gate, so the skill says what to do, not the rule.
+  it('the builder commits each round and the reviewer asks for a commit rather than failing on that alone', () => {
     const text = catalog.get('card-loop')!.text
     const line = (starts: string): string => text.split(/\r?\n/).find((l) => l.startsWith(starts)) ?? ''
-    expect(line('1. Do its work')).toMatch(/\*\*Commit the card's work before submitting it\*\*, every round, and name the commit/)
-    expect(line('2. Review it')).toMatch(/\*\*Review the commit the builder names\.\*\* Work sent uncommitted .* isn't a failed round on that alone/)
+    // In Git only (HR1's #1524 round 1 finding 1): a no-code card submits a summary, a project without version control its files' state.
+    expect(line('1. Do its work')).toMatch(/for a code card in Git, commit each round's work and name the commit in its summary; a no-code card has nothing to commit/)
+    expect(line('2. Review it')).toMatch(/`hive_start_review` names what to review \(a revision, or a no-code card's summary\)\. For a code card in Git, work that revision doesn't hold \(uncommitted, or no commit named\) isn't a failed round on that alone/)
     expect(line('- builder: the card')).toMatch(/changes: \["verdict", "column", "comment"\]/)
-    expect(line('- reviewer, after asking for a commit')).toMatch(/changes: \["comment"\]/)
+    expect(line('- reviewer, after asking the builder for something')).toMatch(/changes: \["comment"\]/)
     // run-lanes' sample brief leaves the procedure to card-loop and the rules to Hive (a brief saying "commit once it
     // passes" undid it; since #1527 a submission's commit is Hive's to check, so the brief says nothing of it).
     const brief = catalog.get('run-lanes')!.text
     expect(brief).toMatch(/Use card-loop as the builder\./)
     expect(brief).not.toMatch(/After each card passes: commit/)
     // A reviewer that reads only review-agent-work is pointed there (haiku passed uncommitted work so).
-    expect(catalog.get('review-agent-work')!.text).toMatch(/In a card loop, review the commit its builder names: work sent uncommitted gets a request for a commit \(`hive_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
+    // The revision start review names is the one reviewed (HR1's #1525 round 1 finding 1): a summary naming another
+    // commit gets a question, never a review of that commit.
+    expect(catalog.get('review-agent-work')!.text).toMatch(/What start review names is what you review, and what your verdict is recorded against: if the builder's summary names another commit, ask the builder \(`hive_request_builder`\) rather than review that one\. For a code card in Git, work that revision doesn't hold \(sent uncommitted\) gets a request for a commit \(`hive_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
+  })
+})
+
+// #1524 (P8, SPEC §16.17): work-on-card and card-loop describe the intents and the gates; what a gate owns isn't stated
+// again as a rule (the design note's §10, "Becomes a gate"), and where the outcome depends on the project's options, the
+// card's kind or the rules' switch, they say it depends rather than state one case as the rule.
+// Rules a gate now owns, as the skills used to state them: each phrase was in a bundled skill before P8.
+const GATE_RULES: [string, RegExp][] = [
+  ['commit before Review', /\bcommit (the card's work )?before (Review|submitting|moving it)\b/i],
+  ['review the exact commit', /\breview the commit (the|its) builder names\b/i],
+  ['dependencies done before start', /\bcards it depends on \(`blockedBy`\) that aren't done block it\b/i],
+  ['no cards into a running lane', /\b(a running loop never sees a card added|no cards? (in)?to a running lane)\b/i],
+  ['Passed is not merged', /\bPassed means it passed review, not that it's merged\b/i],
+  ['Done = merged, moved by the agent', /\bmove (your|the|a) card (there|to `?done`?) once its work is merged\b/i],
+  ['a decision wakes the lane', /\brecorded decision wakes (nobody|no one)\b/i],
+  ['a late message reopens nothing', /\blate message\b/i],
+  ['old column moves as the way to work', /\bmove (it|the card|a card) to `?(doing|review|passed|done)`?(?! with `hive_update_task`)/i],
+  ['the old review parameter', /\breview: "(start|passed|failed)"/],
+  ['ending the lane with a merge commit', /\bmergeCommit\b|\babandoned: true\b/]
+]
+describe('the skills follow the gates (#1524)', () => {
+  const GATED = ['work-on-card', 'card-loop']
+  it("state no rule a gate owns", () => {
+    for (const name of GATED) for (const [rule, re] of GATE_RULES) expect(catalog.get(name)!.text, `${name}: ${rule}`).not.toMatch(re)
+  })
+
+  it('name the intent tools, each one an agent has', () => {
+    const intents = ['hive_start_card', 'hive_submit', 'hive_put_back', 'hive_report_merge', 'hive_ask_user', 'hive_cannot_within_rules']
+    const loop = ['hive_start_review', 'hive_verdict', 'hive_request_builder', 'hive_loop_step', 'hive_lane']
+    const named = (name: string): string[] => toolsNamed(catalog.get(name)!.text)
+    expect(named('work-on-card')).toEqual(expect.arrayContaining(intents))
+    // Finishing (report merge among its ways) is work-on-card's, which card-loop points to.
+    expect(named('card-loop')).toEqual(expect.arrayContaining([...loop, 'hive_start_card', 'hive_submit', 'hive_ask_user', 'hive_cannot_within_rules']))
+    for (const t of [...intents, ...loop]) {
+      expect(TOOLS, t).toContain(t)
+      expect(ASSISTANT_ONLY_TOOLS, t).not.toContain(t)
+    }
+  })
+
+  it('stay conditional where the gates are: review off, the rules off, a no-code card, the lane\'s rounds', () => {
+    const woc = catalog.get('work-on-card')!.text
+    const loop = catalog.get('card-loop')!.text
+    // Review off: submitting moves the card on past Review.
+    expect(woc).toMatch(/or on past it where the project has no review/)
+    // The rules off: nothing is refused, and nothing counts rounds.
+    expect(woc).toMatch(/With the rules switched off nothing is refused/)
+    const limit = loop.split(/\r?\n/).find((l) => l.includes('**The round limit**')) ?? ''
+    expect(limit).toMatch(/the lane's rounds/)
+    expect(limit).toMatch(/Where the project's rules are enforced, Hive counts/)
+    expect(limit).toMatch(/With the rules off nothing counts them/)
+    // What a submission is depends on two separate dimensions, the platform and the card's kind (HR1's #1524 findings:
+    // round 1's 1 and 3, round 2's 1): only a code card in Git has a commit, its default the card's own revision (in a
+    // shared folder not the folder's head); a no-code card submits its summary on either platform.
+    const SUBMITS: [platform: 'Git' | 'None', kind: 'code' | 'no-code', says: RegExp][] = [
+      ['Git', 'code', /for a code card in Git, a revision, by default the card's own \(its line's head, or its newest commit in a folder shared with other agents; the reply names it\), so commit what it should hold first/],
+      ['Git', 'no-code', /for a no-code card, such as a decision or a write-up, its summary alone/],
+      ['None', 'code', /without version control, the state of the card's files \(`paths`\)/],
+      ['None', 'no-code', /for a no-code card, such as a decision or a write-up, its summary alone/]
+    ]
+    for (const [platform, kind, says] of SUBMITS) expect(woc, `${platform} × ${kind}`).toMatch(says)
+    expect(woc).not.toMatch(/by default your folder's head/)
+    expect(loop).toMatch(/a no-code card has nothing to commit/)
+    // Review decides where a submission goes, and only a reviewer agent asks for a missing commit (in Git, code only).
+    const REVIEW: [review: 'agent' | 'user' | 'off', skill: string, says: RegExp][] = [
+      ['agent', 'card-loop', /`hive_start_review` names what to review \(a revision, or a no-code card's summary\)/],
+      ['user', 'work-on-card', /The reply says where the card went: Review/],
+      ['off', 'work-on-card', /or on past it where the project has no review/]
+    ]
+    for (const [review, skill, says] of REVIEW) expect(catalog.get(skill)!.text, `review ${review}`).toMatch(says)
+    // Every clause telling an agent to commit, or about a commit to name or ask for, is scoped to a code card in Git,
+    // never to Git alone. Clauses split at sentence, semicolon and colon breaks outside parentheses.
+    const clauses = (text: string): string[] => {
+      const out: string[] = []
+      let depth = 0
+      let cur = ''
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i]
+        if (ch === '(') depth++
+        if (ch === ')') depth = Math.max(0, depth - 1)
+        if (ch === '\n' || (depth === 0 && /[.;:]/.test(ch) && /\s/.test(text[i + 1] ?? ''))) {
+          out.push(cur)
+          cur = ''
+        } else cur += ch
+      }
+      return [...out, cur]
+    }
+    for (const name of GATED) {
+      const commits = clauses(catalog.get(name)!.text).filter((c) => /\bcommit (each|it|what)\b|\(committed\b|\bnaming the commit\b|\bno commit named\b/i.test(c))
+      expect(commits.length, name).toBeGreaterThan(0)
+      for (const c of commits) expect(c, name).toMatch(/\bfor a code card in Git\b/i)
+    }
+    // The check catches what round 2 left: "in Git" alone.
+    expect(clauses('Fix the findings (committed, in Git), then submit.').every((c) => !/\(committed\b/.test(c) || /for a code card in Git/.test(c))).toBe(false)
+    // Who finishes is the project's: every supported way, none stated as the rule (finding 2: Not checked).
+    expect(woc).toMatch(/how it finishes is the project's: the reply, then `hive_read_task`, says what's next/)
+    expect(woc).toMatch(/Where Hive merges, the card's `merge` follows it through the queue/)
+    expect(woc).toMatch(/Where you merge, use merge-ready, then `hive_report_merge` with the merge commit/)
+    expect(woc).toMatch(/Where merges aren't checked, `hive_report_merge` says it's finished, with no merge to prove/)
+    expect(woc).toMatch(/Where the user's OK comes first, it waits for them/)
+    expect(woc).toMatch(/Where the work is done once committed, accepted \(no version control\) or reviewed, and for a no-code card, it finishes on its own/)
+    expect(loop).toMatch(/its finish is the project's, and the card says what's next \(work-on-card, Finish\)/)
+    // A lane one card at a time is the project's rule, said so.
+    expect(loop).toMatch(/where the project's rules hold a lane to one card at a time/)
+    for (const name of GATED) {
+      const text = catalog.get(name)!.text
+      // No round count or wait written in: they are the lane's (the project's Card loops settings).
+      expect(text, name).not.toMatch(/\b\d+ rounds?\b|\brounds: \d+|\b\d+ hours\b/)
+      // Never "Done when it passes" (or the like) without the card's kind and the project's finish.
+      expect(text, name).not.toMatch(/\b(done|finished) (when|once) it passes\b/i)
+      expect(text, name).not.toMatch(/\bmoves? (it|the card) to Passed\b/)
+    }
+  })
+
+  it('read, act, then ack the inbox, for every CLI, and say why', () => {
+    const woc = catalog.get('work-on-card')!.text
+    expect(woc).toMatch(/1\. \*\*Read it then\*\*[\s\S]*2\. \*\*Act on each\*\*[\s\S]*3\. \*\*Then ack it\*\*/)
+    expect(woc).toMatch(/Reading isn't acking, whatever CLI you run in: one not acked within 30 minutes shows as overdue/)
+    expect(catalog.get('card-loop')!.text).toMatch(/`hive_inbox` first[^.]*act, then ack/)
+  })
+
+  it('stay smaller than before P8 (work-on-card 8,991 and card-loop 15,776 characters)', () => {
+    expect(catalog.get('work-on-card')!.text.length).toBeLessThan(8991)
+    expect(catalog.get('card-loop')!.text.length).toBeLessThan(11000)
+  })
+})
+
+// #1525 (P8): review-agent-work and merge-ready on the intents, the review copy and the merge queue; what Hive enforces
+// is a line pointing at its refusal, and who finishes a card (G5) is the project's, each way said.
+describe('the review and merge skills follow the gates (#1525)', () => {
+  const review = (): string => catalog.get('review-agent-work')!.text
+  const merge = (): string => catalog.get('merge-ready')!.text
+
+  it('state no rule a gate owns, outside a card with no workflow', () => {
+    for (const name of ['review-agent-work', 'merge-ready']) {
+      for (const l of catalog.get(name)!.text.split(/\r?\n/)) {
+        // Only the line for a card with no workflow, which still reviews on the board (`review: "start"`).
+        if (l.startsWith('- **A card with no workflow**')) continue
+        for (const [rule, re] of GATE_RULES) expect(l, `${name}: ${rule}`).not.toMatch(re)
+      }
+    }
+  })
+
+  it('review in the review copy start review names, with each command run there, and give the verdict by intent', () => {
+    const text = review()
+    expect(toolsNamed(text)).toEqual(expect.arrayContaining(['hive_start_review', 'hive_verdict', 'hive_request_builder', 'hive_ask_user']))
+    expect(text).toMatch(/`hive_start_review`: its reply names what to review \(a revision with its base and files, or a no-code card's summary/)
+    expect(text).toMatch(/Review there, never in the builder's slot or folder/)
+    // #1559's decision: guidance, not another start folder.
+    expect(text).toMatch(/run every command with the review copy as its working directory: change into it first/)
+    // #1443: a pooled reviewer's start is its assignment, no lane to join.
+    expect(text).toMatch(/A reviewer from the project's pool is told of each card it is given in its inbox: that is its start/)
+    // #533: the run records Hive keeps of the revision are checked, not repeated.
+    expect(text).toMatch(/the runs Hive recorded as the card's checks of that revision/)
+  })
+
+  it("say where the rules decide, never one case as the rule: self-review, the latest submission, a second reviewer, the user's OK", () => {
+    const text = review()
+    expect(text).toMatch(/Where the project's rules forbid it, Hive refuses a review of work you built/)
+    expect(text).toMatch(/Where the rules hold, a verdict on a submission that isn't the latest, or with a decision on the card you haven't read, is refused, saying what to do/)
+    expect(text).toMatch(/Hive moves it on by the project's rules \(another reviewer's pass where it asks for two, the user's OK, its merge, or Done\): the reply says where/)
+    // A convention (G4's screenshots) is the brief's or an option's, which Hive asks for itself.
+    expect(text).toMatch(/A convention your brief or the card names/)
+    expect(text).toMatch(/Where the project's options ask for the user's OK, Hive asks them itself/)
+    expect(text).not.toMatch(/Hive moves it on \(to Passed, or to its merge\)/)
+  })
+
+  it('merge-ready says what the agent does for each way a card finishes (G5), by its own rules, with the rules on or off', () => {
+    const text = merge()
+    const ways = text.split(/\r?\n/).filter((l) => l.startsWith('- **'))
+    const way = (starts: string): string => ways.find((l) => l.startsWith(`- **${starts}`)) ?? ''
+    const context = text.split(/\r?\n/).find((l) => l.startsWith('The ways a card finishes, for context:')) ?? ''
+    // The next step is the one Hive names, never inferred from a column or a missing field (HR1's #1525 round 2, the
+    // Assistant's m3822): the agent merges on Hive's word, waits on a request for the user, leaves the queue's card alone.
+    expect(text).toMatch(/Never infer the next step from the card's column: do the one Hive names\./)
+    expect(way('"Merge it and report the merge"')).toMatch(/\(Hive tells you once the merge is yours\): merge it and report it \(below\); Hive checks the work is in the base before Done/)
+    // …and the report is for the cards Hive told it to merge, wherever they are (in Doing, with no review).
+    expect(text).toMatch(/`hive_report_merge` for each card Hive told you to merge/)
+    expect(text).not.toMatch(/Cards still in Review or Doing stay where they are/)
+    expect(way('A request waiting for the user')).toMatch(/\(For you: their review, their OK before merging, their acceptance\): wait for their answer/)
+    expect(way("The card's `merge`")).toMatch(/Hive's merge queue has it, and merges it or returns it with why/)
+    expect(text).not.toMatch(/with no `merge`|no `merge`[^.\n]*(yours|merge it)|In Passed[^.\n]*merge is yours/)
+    // Each finish is context, conditional. Keyed by the options' own values: a new way to finish fails to compile here
+    // until the skill says it.
+    const FINISH: Record<Finisher, RegExp> = {
+      hiveMerges: /^The ways a card finishes, for context: Hive merges;/,
+      agentMerges: /the agent merges \(after a passing review where there is one, after the user's OK where the rules ask for it, else straight after its submission, the card staying in Doing\)/,
+      notChecked: /merges not checked \(once it passes, merged as the brief says and reported, nothing checked\)/,
+      committed: /committed is done, and no-code cards \(Done once passed or submitted\)/,
+      accept: /no version control \(accepted, after the user's approval where the rules ask for it\)/
+    }
+    for (const [finish, says] of Object.entries(FINISH)) expect(context, finish).toMatch(says)
+    // HR1's counterexamples, each a cell the guidance must get right: [platform, review, finish, the user's OK, what the agent does].
+    const CASES: [platform: 'Git' | 'None', review: ReviewBy, finish: Finisher, ok: boolean, does: RegExp][] = [
+      ['None', 'agentThenYou', 'accept', false, /\(For you: [^)]*their acceptance\): wait for their answer/],
+      ['Git', 'agent', 'agentMerges', true, /\(For you: [^)]*their OK before merging[^)]*\): wait for their answer/],
+      ['Git', 'none', 'agentMerges', false, /else straight after its submission, the card staying in Doing/]
+    ]
+    for (const [platform, reviewBy, finish, ok, does] of CASES) expect(text, `${platform} · review ${reviewBy} · ${finish}${ok ? ' · OK first' : ''}`).toMatch(does)
+    // The card's own rules decide (HR1's #1525 round 1 finding 2): a project's options changed after it started don't.
+    expect(text).toMatch(/how its work lands is the card's own rules: those it started under \(unless the user applied changed options to it\), never the project's options now, which \(`hive_project_status`'s `workflow`, a lane's brief\) say how new cards finish/)
+    // Hive merges with the rules off (finding 3): nothing is refused, the queue pauses, and the card finishes as before.
+    expect(way("The card's `merge`")).toMatch(/Don't merge it yourself: while the rules are enforced Hive refuses that\. With them switched off the queue pauses \(its `merge` says so\) and the card is finished as before them: as your brief says, then `hive_report_merge`/)
+    expect(text).not.toMatch(/switch (the rules|it) (back )?on|turn (the rules|it) on/i)
+    // What the queue owns isn't the agent's to do under Hive merges: the slot's steps are for merging that is yours.
+    expect(text).toMatch(/## Merging, when it is yours/)
+  })
+
+  // #1162: Codex's --no-commit merge into the base also checks the combined tree; the skill keeps the branch merge and
+  // says why, so merge-main-moved's check ("it merged the moved base into the branch first") and the skill agree.
+  it('merges the base into the branch, not the branch into the base with --no-commit, and says why', () => {
+    expect(merge()).toMatch(/Merge it into the branch, not the branch into the base with `--no-commit`: a failure is then fixed on the branch, and the base's checkout is never left mid-merge where others work/)
+    expect(readFileSync(join(ROOT, 'tests', 'scenarios', 'scenarios.cjs'), 'utf8')).toMatch(/\['it merged the moved base into the branch first'/)
+  })
+
+  it('stay smaller than before P8 (review-agent-work 7,475 and merge-ready 5,291 characters, LF)', () => {
+    expect(review().replace(/\r/g, '').length).toBeLessThan(7475)
+    expect(merge().replace(/\r/g, '').length).toBeLessThan(5291)
+  })
+})
+
+// #1526 (P8): the other skills checked against the gates. They mostly describe judgement; what Hive now owns (where cards
+// are built, the order cards start in, refusals) is said as the project's or pointed at, and none grows.
+describe('the other bundled skills follow the gates (#1526)', () => {
+  // Their sizes before P8 (LF): each stays at or under it.
+  const BEFORE: Record<string, number> = { 'split-work': 2757, handover: 2284, 'pick-up': 1924, 'workspace-note': 3216, 'use-hive-api': 2711, 'licence-audit': 2869 }
+
+  it('state no rule a gate owns, and stay at or under their size before P8', () => {
+    for (const [name, size] of Object.entries(BEFORE)) {
+      const text = catalog.get(name)!.text
+      for (const [rule, re] of GATE_RULES) expect(text, `${name}: ${rule}`).not.toMatch(re)
+      expect(text.replace(/\r/g, '').length, name).toBeLessThanOrEqual(size)
+    }
+  })
+
+  it("split-work plans by files around the project's own option for where cards are built, and leaves the order to blockedBy", () => {
+    const text = catalog.get('split-work')!.text
+    // Slots are Hive's (§16.10): a plan doesn't choose a worktree or a slot per part.
+    expect(text).not.toMatch(/\bworktrees?\b/i)
+    expect(text).not.toMatch(/\*\*Where\*\*: project folder or/)
+    expect(text).toMatch(/Where cards are built is the project's option \(`hive_project_status`'s `workflow`\)/)
+    expect(text).toMatch(/In a shared folder, give parts files that don't overlap; with slots, parts that change the same files merge one after another, so order them/)
+    expect(text).toMatch(/a card's `blockedBy`: where the project's rules check it, Hive won't start a card before those are done/)
+  })
+
+  it('handover names the folder as a slot or the project folder', () => {
+    expect(catalog.get('handover')!.text).toMatch(/the branch and folder \(slot or project folder\)/)
+    expect(catalog.get('handover')!.text).not.toMatch(/\bworktree\b/i)
+  })
+
+  it("use-hive-api names the card intents and a workflow refusal's next step", () => {
+    const text = catalog.get('use-hive-api')!.text
+    expect(text).toMatch(/A card's steps are its intents, `POST \/v1\/tasks\/\{card\}\/<intent>`/)
+    expect(text).toMatch(/A workflow refusal \(`refused: true`\) also names its `rule` and `next` step: take it/)
+    // The routes and refusal fields it names are the Agent API's.
+    const api = readFileSync(join(ROOT, 'docs', 'AGENT_API.md'), 'utf8')
+    expect(api).toMatch(/`POST \/v1\/tasks\/\{card\}\/<intent>`/)
+    expect(api).toMatch(/"refused": true, "rule", "message", "next"/)
   })
 })
 
