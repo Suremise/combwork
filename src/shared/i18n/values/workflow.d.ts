@@ -257,6 +257,8 @@ interface HiveMessageValues {
   'workflow.refused.move.notFromHere.nextNone': undefined
   'workflow.refused.move.useIntent.message': undefined
   'workflow.refused.move.useIntent.next': { intent: string | number }
+  'workflow.refused.paths.excluded.message': { card: string | number; path: string | number; folder: string | number }
+  'workflow.refused.paths.excluded.next': { folder: string | number }
   'workflow.refused.platform.unknown.message': { card: string | number; what: string | number; rule: string | number }
   'workflow.refused.platform.unknown.next': undefined
   'workflow.refused.platform.unknown.nextGone': undefined

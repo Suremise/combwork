@@ -907,7 +907,7 @@ A project's workflow is how its cards move from Todo to Done: who reviews the wo
 | Cards start only when the cards they wait for are merged | On | On | On | On | It's cheap, and no card is built on work that isn't in yet. |
 | Warn when a commit includes another agent's files | On | — | — | — | In a shared folder, one agent's commit can take in another's half-done files. Hive knows an agent's files from its file locks while it works a card, so with file locks Off it can't warn. |
 
-Without version control, **Solo** has no review (a card is done when its builder submits it), **Pair** has a reviewer agent check each card after the quick checks pass, and **Team** has a reviewer agent and then you check each card, after the quick checks and the tests; all three leave `node_modules` and `.venv` out of what the work is, and have cards wait for the cards they depend on.
+Without version control, **Solo** has no review (a card is done when its builder submits it), **Pair** has a reviewer agent check each card after the quick checks pass, and **Team** has a reviewer agent and then you check each card, after the quick checks and the tests; all three leave `node_modules` and `.venv` out of what the work is, and have cards wait for the cards they depend on. A card's paths (the files its work covers) can only narrow that: Hive refuses a path inside `node_modules`, `.venv`, `.git`, `.hive` or another folder the project leaves out, and a folder's files inside them never count.
 
 ### Workflow defaults
 

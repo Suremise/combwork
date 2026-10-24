@@ -10,6 +10,8 @@ import { reconcile } from '../../src/main/workflow/reconcile'
 import { runCheck } from '../../src/main/workflow/checks'
 import { detect, offer } from '../../src/main/platform/registry'
 import { isRefusal } from '../../src/main/workflow/runtime'
+import { NoneAdapter } from '../../src/main/platform/none'
+import { tempDir } from '../tempDir'
 
 let env: Env | null = null
 afterEach(() => {
@@ -176,6 +178,79 @@ describe('workflow scenarios, None', () => {
     // A deliverable written during the run: uncounted.
     const during = await runCheck(e.wf, { card: e.store.card(other.id), name: 'lint', by: 'B2', exec: async () => (writeFileSync(join(e.project, 'docs/a.md'), 'written during\n'), { ok: true }) })
     expect(during).toMatchObject({ counted: false, whyNot: 'changed' })
+  })
+
+  // #1511 (decided: refuse): a card's paths narrow the deliverables, never widen them.
+  it('#1511: a path under node_modules, .venv, .git or .hive is refused by declare paths and submit; a declared folder leaves its excluded descendants out; paths stored from before are left out of the revision, and said so', async () => {
+    const e = (env = setup({ ...preset('none', 'team'), preChecks: [] }, { files: { 'src/a.md': 'a\n', 'src/node_modules/y.js': 'y\n', 'node_modules/pad/index.js': 'pad\n', '.venv/lib/x.py': 'x\n' } }))
+    const card = e.wf.createCard({ title: 'Src', paths: ['src/a.md'] })
+    moved(await e.wf.start(card.key, B1))
+    for (const [path, folder] of [['node_modules/pad/index.js', 'node_modules'], ['node_modules', 'node_modules'], ['src/node_modules/y.js', 'node_modules'], ['.venv/lib/x.py', '.venv'], ['.git/config', '.git'], ['.hive/project.json', '.hive']]) {
+      const r = await e.wf.declarePaths(card.key, B1, ['src/a.md', path])
+      expect(isRefusal(r) && r.rule === 'paths.excluded' && r.values).toMatchObject({ path, folder })
+      expect(e.wf.store.card(card.id).paths).toEqual(['src/a.md'])
+    }
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'x', paths: ['src/a.md', 'node_modules/pad/index.js'] }), 'paths.excluded')
+    // A declared folder: its excluded descendants are left out, as before (an edit there is no new revision).
+    const folder = async () => {
+      const r = await e.wf.declarePaths(card.key, B1, ['src'])
+      if (isRefusal(r)) throw new Error(r.message)
+      return r.revision
+    }
+    const r1 = await folder()
+    put(e.project, 'src/node_modules/y.js', 'y, a cache write\n')
+    expect(await folder()).toBe(r1)
+    put(e.project, 'src/a.md', 'a, written\n')
+    const r2 = await folder()
+    expect(r2).not.toBe(r1)
+    // Paths stored before #1511 under an excluded folder: the revision is the rest's, and the submit says what it left out.
+    e.wf.store.updateCard(card.id, { paths: ['src', 'node_modules/pad/index.js'] })
+    const m = await e.wf.submit(card.key, B1, { summary: 'src' })
+    moved(m)
+    expect(e.wf.state(card).latest?.revision).toBe(r2)
+    expect((m as { warnings?: string[] }).warnings?.join(' ')).toMatch(/left out of .*'s revision: node_modules\/pad\/index\.js/)
+  })
+
+  // HR4's #1511 round 1: Windows resolves names whatever their case, so an alias is left out as the name is; and a starting
+  // manifest recorded before #1511 holds such a path, which the submitted change leaves out too.
+  it('#1511: what is left out matches whatever its case where the file system does (as NoneAdapter is told), never otherwise', () => {
+    const dir = tempDir('none-case-')
+    expect(new NoneAdapter(dir, ['node_modules', 'Cache'], true).excludedPart('src/NODE_MODULES/x.js')).toBe('NODE_MODULES')
+    expect(new NoneAdapter(dir, ['node_modules', 'Cache'], true).excludedPart('cache/x.bin')).toBe('cache')
+    expect(new NoneAdapter(dir, ['node_modules'], true).excludedPart('.HIVE/project.json')).toBe('.HIVE')
+    expect(new NoneAdapter(dir, ['node_modules'], false).excludedPart('NODE_MODULES/x.js')).toBeNull()
+    expect(new NoneAdapter(dir, ['node_modules'], false).excludedPart('node_modules/x.js')).toBe('node_modules')
+  })
+
+  it.runIf(process.platform === 'win32')('#1511: on Windows, a case alias of .hive, .git or an excluded folder is refused by both intents, skipped in a folder, left out when stored; a starting manifest from before leaves it out of the change', async () => {
+    const e = (env = setup({ ...preset('none', 'team'), preChecks: [], excluded: ['node_modules', '.venv', 'cache'] }, { files: { 'src/a.md': 'a\n', 'src/Node_Modules/y.js': 'y\n', 'node_modules/pad.js': 'p\n', 'cache/x.bin': 'x\n' } }))
+    const card = e.wf.createCard({ title: 'Src', paths: ['src/a.md'] })
+    moved(await e.wf.start(card.key, B1))
+    for (const [path, folder] of [['NODE_MODULES/pad.js', 'NODE_MODULES'], ['.HIVE/project.json', '.HIVE'], ['.Git/config', '.Git'], ['.VENV/lib/x.py', '.VENV'], ['Cache/x.bin', 'Cache']]) {
+      const r = await e.wf.declarePaths(card.key, B1, ['src/a.md', path])
+      expect(isRefusal(r) && r.rule === 'paths.excluded' && r.values).toMatchObject({ path, folder })
+      const sub = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x', paths: ['src/a.md', path] }), 'paths.excluded')
+      expect(sub.values).toMatchObject({ path, folder })
+      expect(e.wf.store.card(card.id).paths).toEqual(['src/a.md'])
+    }
+    // A folder's walk skips Node_Modules as node_modules: a write there is no new revision.
+    const folder = async () => {
+      const r = await e.wf.declarePaths(card.key, B1, ['src'])
+      if (isRefusal(r)) throw new Error(r.message)
+      return r.revision
+    }
+    const r1 = await folder()
+    put(e.project, 'src/Node_Modules/y.js', 'y, a cache write\n')
+    expect(await folder()).toBe(r1)
+    // Started before #1511 with NODE_MODULES/pad.js among its paths: its starting manifest holds it. The submission's
+    // change leaves it out, as its revision does (never a "D" for a file the card never covered).
+    put(e.project, 'src/a.md', 'a, written\n')
+    e.wf.store.updateCard(card.id, { paths: ['src', 'NODE_MODULES/pad.js'] })
+    const s = e.wf.state(card)
+    const legacy = { ...s, started: { ...s.started!, manifest: { ...s.started!.manifest, 'NODE_MODULES/pad.js': 'f00d', 'node_modules/gone.js': 'beef' } } }
+    const plan = await e.wf.platform({ ...preset('none', 'team') }).submission(e.wf.store.card(card.id), legacy, preset('none', 'team'), { agent: 'B1', guards: [], predicted: true } as never)
+    expect(plan.ok && plan.files.map((f) => f.path)).toEqual(['src/a.md'])
+    expect(plan.ok && plan.warnings.join(' ')).toMatch(/left out of .*'s revision: NODE_MODULES\/pad\.js/)
   })
 
   it('S20: .git removed → Git\'s rules hold (unknown) and None is offered; a None project gets git init → Git offered', async () => {

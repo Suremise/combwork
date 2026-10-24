@@ -255,6 +255,8 @@
   "workflow.refused.move.notFromHere.nextNone": "Rien n’attend d’être fait là pour l’instant.",
   "workflow.refused.move.useIntent.message": "Les agents ne déplacent pas les cartes d’une colonne à l’autre.",
   "workflow.refused.move.useIntent.next": "Utilise plutôt l’intention {intent}.",
+  "workflow.refused.paths.excluded.message": "{card} : {path} est dans {folder}, qu’un projet sans gestion de versions laisse hors de son travail.",
+  "workflow.refused.paths.excluded.next": "Déclare seulement les fichiers du travail, hors de {folder} : les chemins d’une carte restreignent le travail du projet, sans jamais l’élargir.",
   "workflow.refused.platform.unknown.message": "Carte {card} : Hive n’a pas pu lire {what}, donc la règle {rule} ne peut pas être vérifiée.",
   "workflow.refused.platform.unknown.next": "Vérifie la configuration des agents ou le dossier, puis réessaie.",
   "workflow.refused.platform.unknown.nextGone": "Le dépôt Git du projet a disparu : demande à l’utilisateur de le restaurer, ou de passer le projet à Aucune dans son onglet Gestion de versions (à partir de la prochaine carte).",
