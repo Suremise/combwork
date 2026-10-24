@@ -145,7 +145,43 @@ function unsettled<T>(path: string, bak: string | null, fallback: T): T {
   return ok ? (ok.value as T) : fallback
 }
 
-export async function readKeptJson<T>(path: string, fallback: T): Promise<T> {
+/**
+ * A kept file still being saved by something else, read for a change (#1600): its value can't be known yet, so the change
+ * isn't made. `retryWhileSaving` runs the change again a few times first.
+ */
+export class KeptFileBusy extends HiveError {
+  constructor(path: string) {
+    super(withValues(msg({ id: 'service.fsutil.keptBusy', defaultMessage: '{file} is being saved by something else: nothing was changed. Try again in a moment.', description: "An error: one of Hive's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Hive's change to it wasn't made." }), { file: path }), { kind: 'conflict' })
+  }
+}
+
+/** How a read for a change treats a file still changing after the pauses: as today (the .bak's value), or `throw` (KeptFileBusy). */
+export type KeptReadOptions = { unsettled?: 'bak' | 'throw' }
+
+/** How many times in all `retryWhileSaving` runs a change (each read waits out the pauses first, about 1 s). */
+export const KEPT_TRIES = 3
+
+/**
+ * Runs a read-modify-write of a kept file (read with `unsettled: 'throw'`) again while the file is still being saved by
+ * something else, KEPT_TRIES times in all: still busy, its KeptFileBusy is thrown, nothing written. `fn` must take its
+ * lock and read the file again each time.
+ */
+export async function retryWhileSaving<T>(fn: () => Promise<T>): Promise<T> {
+  for (let n = 1; ; n++) {
+    try {
+      return await fn()
+    } catch (e) {
+      if (!(e instanceof KeptFileBusy) || n >= KEPT_TRIES) throw e
+    }
+  }
+}
+
+/**
+ * A kept file's value. Read for a change written back (read-modify-write), pass `{ unsettled: 'throw' }`: a file still
+ * being saved by something else throws KeptFileBusy rather than giving the .bak's value, which written back would undo
+ * that save once it finishes (#1600).
+ */
+export async function readKeptJson<T>(path: string, fallback: T, opts: KeptReadOptions = {}): Promise<T> {
   let text: string
   try {
     text = await readFile(path, 'utf8')
@@ -159,6 +195,10 @@ export async function readKeptJson<T>(path: string, fallback: T): Promise<T> {
     const settled = await settle(path)
     if (settled === 'missing') return fallback
     if (typeof settled === 'object') return settled.value as T
+    if (settled === 'unsettled' && opts.unsettled === 'throw') {
+      log.warn(`${userText(path)} was still changing after ${SETTLE_MS} ms and doesn't parse: a change to it waits for it`)
+      throw new KeptFileBusy(path)
+    }
     const bak = await readFile(`${path}.bak`, 'utf8').catch(() => null)
     if (settled === 'unsettled') return unsettled(path, bak, fallback)
     const r = recoverText(path, bak)!

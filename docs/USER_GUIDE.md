@@ -1711,6 +1711,7 @@ In the terminal, Ctrl+C copies when text is selected (otherwise it interrupts th
 ## Troubleshooting <a id="troubleshooting"></a>
 
 - **"… was damaged and has been restored"** — one of Hive's settings or record files couldn't be read (for example after a hand edit). Hive went back to its last good copy (`.bak`) and kept the damaged file next to it as `.corrupt-<date>`.
+- **"… is being saved by something else: nothing was changed"** — another program (an editor, a sync tool) was still writing one of Hive's files, such as a project's `project.json`, when Hive went to change it. Hive waited a few seconds and then left the file alone rather than write over that save. Once the other program has finished saving, try again.
 - **"Claude Code is required" / "Codex is required"** — install the CLI from **Help → Agent Setup…**, or set its path in the provider's settings page. Having the VS Code extension isn't enough; Hive needs the standalone CLI.
 - **"… is turned off"** — turn the provider on in **Settings → Providers**.
 - **"Git isn't installed (or isn't on Hive's PATH)"**, or **Git** in red in the status bar — install Git for Windows 2.38 or later, or add the folder holding `git.exe` to your PATH, then **Check again** in Agent Setup: see [Git](#git).
