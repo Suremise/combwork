@@ -1,10 +1,11 @@
 // Strict, G8 (#1352, SPEC §16.9.1 step 3; S55's strict part): a project set to "Hive merges" into `integration` (checked
 // out in no folder) with Work is up to date with its target branch before it merges on, fake Claude Code agents acting
-// by their own tokens (each builder in its own worktree, one reviewer), the Assistant off.
+// by their own tokens (one builder in the project folder, building each card on the slot its start lends, as 1.0 does:
+// #1573; one reviewer), the Assistant off.
 // - The form offers G8 beside G9 when Hive merges (screenshots of its row, both themes), and saves it.
 // - The target moves after the review passed: the queue brings the reviewed revision up to date on its own ref
-//   (`Updated`, carried), merges it, and the builder's worktree is untouched (its HEAD and status).
-// - A conflict with the moved target: back to the builder (notUpToDate) with the file, its worktree untouched; the
+//   (`Updated`, carried), merges it, and the card's slot is untouched (its HEAD and status).
+// - A conflict with the moved target: back to the builder (notUpToDate) with the file, its slot untouched; the
 //   builder brings its line up to date there, submits, the review passes, and it merges with no update.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -64,26 +65,27 @@ const who = ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.ident
 
     const reviewer = await q.agent(fx, h, 'R1')
     check('the reviewer has its token', !!reviewer.token)
+    const builder = await q.agent(fx, h, 'B1')
 
-    /** A card built in a new builder's worktree and submitted; the target moved (`move`) before its review passes. */
+    /** A card built on the slot its start lends and submitted; the target moved (`move`) before its review passes. */
     const build = async (title, files, move) => {
       const n = (await h.inv('tasks:create', { title, project: 'alpha' })).number
-      const builder = await q.agent(fx, h, `B${n}`, { worktree: true })
-      const steps = { start: await q.intent(h, builder, n, 'start') }
-      for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(builder.folder, name), text)
-      lib.git(builder.folder, [...who, 'add', '-A'])
-      lib.git(builder.folder, [...who, 'commit', '-qm', title])
-      const revision = lib.git(builder.folder, ['rev-parse', 'HEAD']).trim()
+      const steps = { start: await q.startCard(fx, h, builder, n) }
+      const folder = builder.folder
+      for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(folder, name), text)
+      lib.git(folder, [...who, 'add', '-A'])
+      lib.git(folder, [...who, 'commit', '-qm', title])
+      const revision = lib.git(folder, ['rev-parse', 'HEAD']).trim()
       steps.submit = await q.intent(h, builder, n, 'submit', { summary: `${title}: ready` })
       const moved = move()
-      const worktree = { head: revision, status: lib.git(builder.folder, ['status', '--porcelain']).trim() }
+      const worktree = { head: revision, status: lib.git(folder, ['status', '--porcelain']).trim() }
       steps.review = await q.intent(h, reviewer, n, 'start-review')
       steps.verdict = await q.intent(h, reviewer, n, 'verdict', { pass: true, comment: `${title}: passed` })
-      return { n, builder, revision, moved, worktree, steps }
+      return { n, builder, folder, revision, moved, worktree, steps }
     }
-    const untouched = (b) => lib.git(b.builder.folder, ['rev-parse', 'HEAD']).trim() === b.worktree.head && lib.git(b.builder.folder, ['status', '--porcelain']).trim() === b.worktree.status
+    const untouched = (b) => lib.git(b.folder, ['rev-parse', 'HEAD']).trim() === b.worktree.head && lib.git(b.folder, ['status', '--porcelain']).trim() === b.worktree.status
 
-    // --- S55 (strict): the target moved after the pass; updated on the queue's own ref, merged; the worktree untouched.
+    // --- S55 (strict): the target moved after the pass; updated on the queue's own ref, merged; the slot untouched.
     q.steer(fx, 'pass')
     const one = await build('One', { 'one.txt': 'one\n' }, () => q.commitOn(fx, 'integration', { 'meanwhile.txt': 'meanwhile\n' }, 'the target moves'))
     check('the card is approved (start, submit, review, pass)', Object.values(one.steps).every((s) => s.status === 200), JSON.stringify(one.steps))
@@ -91,18 +93,18 @@ const who = ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.ident
     const [up] = await facts(one.n, 'Updated')
     check('…brought up to date by the queue: Updated, carried, from the reviewed revision', up?.data?.carried === true && up.data.from === one.revision && up.data.how === 'mergedTarget', JSON.stringify(up))
     check('…the update contains the moved target, and the merge brought it in, naming both revisions', ancestor(one.moved, up?.data?.to ?? one.revision) && lib.git(fx.alpha, ['log', '-1', '--format=%B', 'integration']).includes(`Hive-Updated: ${up?.data?.to}`) && lib.git(fx.alpha, ['log', '-1', '--format=%B', 'integration']).includes(`Hive-Revision: ${one.revision}`))
-    check("…the builder's worktree untouched: its HEAD and status as they were, its branch at the reviewed revision", untouched(one) && lib.git(fx.alpha, ['rev-parse', `refs/heads/${(await h.facts(one.n)).find((x) => x.kind === 'Started')?.data?.line}`]).trim() === one.revision)
+    check("…the card's slot untouched: its HEAD and status as they were, its branch at the reviewed revision", untouched(one) && lib.git(fx.alpha, ['rev-parse', `refs/heads/${(await h.facts(one.n)).find((x) => x.kind === 'Started')?.data?.line}`]).trim() === one.revision)
     const key1 = (await h.card(one.n)).key
     check("…its entry's update ref dropped with the outcome", !!(await waitHung(() => !lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/hive/queue/']).includes(`${key1}-e`))))
 
-    // --- A conflict with the moved target: returned (notUpToDate) with the file; the builder resumes in its worktree.
+    // --- A conflict with the moved target: returned (notUpToDate) with the file; the builder resumes in its slot.
     const two = await build('Two', { 'a.txt': 'one\ntwo by the builder\nthree\n' }, () => q.commitOn(fx, 'integration', { 'a.txt': 'one\nTWO by someone\nthree\n' }, 'someone changes a.txt'))
     const atTwo = q.head(fx)
     const failure = await waitHung(async () => (await facts(two.n, 'IntegrationFailed'))[0])
     check('a conflict with the moved target returns it: notUpToDate, naming a.txt, back in Doing', failure?.data?.reason === 'notUpToDate' && JSON.stringify(failure.data.files) === '["a.txt"]' && (await column(two.n)) === 'doing', JSON.stringify(failure))
-    check("…nothing merged, the builder's worktree untouched", q.head(fx) === atTwo && untouched(two) && (await facts(two.n, 'Updated')).length === 0)
-    // The builder brings its line up to date in its own worktree (its side of the conflict kept), and submits again.
-    lib.git(two.builder.folder, [...who, 'merge', '-q', '-X', 'ours', '-m', 'integration in', 'integration'])
+    check("…nothing merged, the card's slot untouched", q.head(fx) === atTwo && untouched(two) && (await facts(two.n, 'Updated')).length === 0)
+    // The builder brings its line up to date in its card's slot (its side of the conflict kept), and submits again.
+    lib.git(two.folder, [...who, 'merge', '-q', '-X', 'ours', '-m', 'integration in', 'integration'])
     const again = await q.intent(h, two.builder, two.n, 'submit', { summary: 'Two: up to date' })
     const review = await q.intent(h, reviewer, two.n, 'start-review')
     const verdict = await q.intent(h, reviewer, two.n, 'verdict', { pass: true, comment: 'Two: passed again' })

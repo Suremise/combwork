@@ -95,10 +95,13 @@ function launches(fx) {
 async function agent(fx, h, name, { worktree = false, project = fx.alpha } = {}) {
   const a = await lib.addAgent(h.inv, project, { name, ...(worktree ? { location: 'new-worktree' } : {}) })
   const folder = a.worktree?.path ?? project
-  // The fake trusts the folders it is told of (its trust prompt never shows).
+  // The fake trusts the folders it is told of (its trust prompt never shows), the project's slots too (#1567): an agent
+  // left at the prompt in one is never quiet, so Hive never prepares its next card's slot.
+  const slotRoot = path.join(`${fx.ws}.worktrees`, path.basename(project))
+  const slots = 'abcdefgh'.split('').map((x) => path.join(slotRoot, `slot-${x}`).toLowerCase())
   const trusted = path.join(fx.claudeHome, 'fake-trusted.json')
   const was = fs.existsSync(trusted) ? JSON.parse(fs.readFileSync(trusted, 'utf8')) : []
-  fs.writeFileSync(trusted, JSON.stringify([...new Set([...was, fx.ws.toLowerCase(), project.toLowerCase(), folder.toLowerCase()])]))
+  fs.writeFileSync(trusted, JSON.stringify([...new Set([...was, fx.ws.toLowerCase(), project.toLowerCase(), folder.toLowerCase(), ...slots])]))
   await h.inv('session:start', project, { agentId: a.id })
   const live = async () => (await h.inv('session:live')).find((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === a.id)
   const sessionId = await lib.until(async () => (await live())?.sessionId, HUNG_MS, 200)
@@ -110,9 +113,11 @@ async function agent(fx, h, name, { worktree = false, project = fx.alpha } = {})
 
 /**
  * An agent added before (`agent`), started again in a new run of Hive (#1351: suites that restart Hive reuse their
- * agents, under the project's agent limit): its token, which each launch has its own of.
+ * agents, under the project's agent limit): its token, which each launch has its own of. Slots held by the run of a Hive
+ * that ended at a seam are released first (`releaseHeld`).
  */
 async function rejoin(fx, h, a) {
+  await releaseHeld(fx, h)
   // This launch's, never an earlier one's (a resumed session keeps its id).
   const before = launches(fx).length
   await h.inv('session:start', fx.alpha, { agentId: a.id })
@@ -120,14 +125,67 @@ async function rejoin(fx, h, a) {
   const sessionId = await lib.until(async () => (await live())?.sessionId, HUNG_MS, 200)
   const launch = await lib.until(() => launches(fx).slice(before).find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS, 200)
   const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-  return { ...a, token: hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null }
+  return { ...a, ...(launch ? { folder: launch.cwd } : {}), token: hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null }
 }
 
-/** approve() with a builder of the caller's (one agent for many cards, in its own worktree): { n, revision, steps }. */
+/**
+ * Release Slot… on each slot whose writer is held (#1434, #1506): a builder's run in a Hive that ended without quitting
+ * (a seam) keeps its slot until the user releases it, and with one builder the pool soon has no free slot. What the user
+ * does after such an end; the queue's own recovery doesn't depend on it. Returns the slots released.
+ */
+async function releaseHeld(fx, h) {
+  const out = []
+  for (const s of await h.inv('slots:list', fx.alpha)) {
+    if (!s.writer?.held) continue
+    const w = await h.inv('slots:heldWriter', fx.alpha, s.name)
+    if (w) await h.inv('slots:releaseWriter', fx.alpha, s.name, w.run, false)
+    out.push(s.name)
+  }
+  return out
+}
+
+const sameDir = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
+
+/**
+ * A card started by its builder as 1.0 builds it (#1567, SPEC §16.10): in the folder the start names (a slot lent for it),
+ * once Hive has made its line there, the builder followed into it. Hive starts the builder again there in a new
+ * conversation unless it already works there, and each launch has its own token: `builder`'s folder and token become
+ * that launch's. Returns the start's { status, body }.
+ */
+async function startCard(fx, h, builder, n) {
+  const live = async () => (await h.inv('session:live')).find((s) => s.projectPath.toLowerCase() === fx.alpha.toLowerCase() && s.agentId === builder.id)
+  const free = async () => (await h.inv('slots:list', fx.alpha)).some((s) => !s.lease && !s.writer)
+  let before = 0
+  let start = null
+  // No slot free yet (the last card's: its builder's session there just ended with its lease, until its processes are
+  // known to have ended): as an agent told "Wait for a slot to be free", started again once one is (a few times at most).
+  // A start sent as Hive stops it (401, its token ended with that session): once it has, started again.
+  for (let tries = 0; tries < 4 && (!start || start.status === 401 || start.body?.rule === 'start.slotAvailable'); tries++) {
+    if (start?.status === 401) await lib.until(async () => !(await live()), HUNG_MS, 200)
+    else if (start) await lib.until(free, HUNG_MS, 200)
+    // Stopped by Hive meanwhile (its session ended with its slot's lease, as a card's Done or its recovery after a seam
+    // ends it): started again, with its new launch's token.
+    if (!(await live())) Object.assign(builder, await rejoin(fx, h, builder))
+    before = launches(fx).length
+    start = await intent(h, builder, n, 'start')
+  }
+  const { folder, line } = start.body?.data ?? {}
+  if (start.status !== 200 || !folder || folder === 'project') return start
+  await lib.until(() => (lib.git(folder, ['branch', '--show-current']).trim() === line ? true : null), HUNG_MS, 200).catch(() => null)
+  const launch = await lib.until(async () => {
+    const s = await live()
+    return s && sameDir(s.cwd, folder) ? launches(fx).slice(before).find((l) => l.sessionId === s.sessionId && l.opts['--mcp-config']) ?? (sameDir(builder.folder, folder) ? 'same' : null) : null
+  }, HUNG_MS, 200)
+  if (launch && launch !== 'same') builder.token = JSON.parse(fs.readFileSync(JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token
+  builder.folder = folder
+  return start
+}
+
+/** approve() with a builder of the caller's (one agent for many cards, each on the slot its start lends): { n, revision, steps }. */
 async function approveBy(fx, h, builder, reviewer, title, files) {
   const n = (await h.inv('tasks:create', { title, project: 'alpha' })).number
   const steps = {}
-  steps.start = await intent(h, builder, n, 'start')
+  steps.start = await startCard(fx, h, builder, n)
   for (const [f, text] of Object.entries(files)) fs.writeFileSync(path.join(builder.folder, f), text)
   lib.git(builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
   lib.git(builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', title])
@@ -282,4 +340,4 @@ function otherProfile(fx, suffix) {
   return { ...fx, userData }
 }
 
-module.exports = { HUNG_MS, queueProject, prepare, steer, queueOptions, startHive, agent, rejoin, intent, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }
+module.exports = { HUNG_MS, queueProject, prepare, steer, queueOptions, startHive, agent, rejoin, intent, startCard, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }

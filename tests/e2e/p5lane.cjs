@@ -1,19 +1,20 @@
-// S55, P5's RC scenario end to end (#1358, SPEC §16.18, §16.19.1-2): "Pair (Hive merges)" with agent worktrees, the
-// Assistant off, on fake Claude Code agents acting by their own tokens (their hive tools' calls). The project's options
-// are set through Version Control → Workflow (#1355's form: Pair, with G8 strict on); lanes are started from the board.
+// S55, P5's RC scenario end to end (#1358, SPEC §16.18, §16.19.1-2), as 1.0 builds it (#1573: §16.10's slots, no
+// worktree agents): "Pair (Hive merges)", the Assistant off, on fake Claude Code agents acting by their own tokens (their
+// hive tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
+// (#1355's form: Pair, with G8 strict on); lanes are started from the board, each lent a slot that B1 then works in.
 // The quick check is the project's `typecheck` script, steered from outside the repository (queueFixture.cjs's check),
 // run by the builder through hive-progress --check before each submit (counted) and by the queue on the merged result.
 // Lane A (merge commits, strict):
-// - One: built in B1's worktree (the next card's start refused meanwhile: one card at a time), submitted, passed; the
-//   queue merges B1's branch at the approved revision (testing shown in the Merges tab): Done, and only then does Two
-//   start, its base the new merge base;
+// - One: built on its line in the lane's slot (the next card's start refused meanwhile: one card at a time), submitted,
+//   passed; the queue merges its line at the approved revision (testing shown in the Merges tab): Done, and only then
+//   does Two start, its line from main's head (One in it), One's merged line deleted once Two's is out;
 // - Two: main moves while it is in review; strict: the queue brings it up to date on its own ref (Updated) and merges
-//   it, B1's worktree untouched;
-// - Three: main changes the same line while it is in review: returned (notUpToDate) naming the file, B1's worktree
+//   it, the slot untouched;
+// - Three: main changes the same line while it is in review: returned (notUpToDate) naming the file, the slot
 //   untouched; B1 resumes in it cleanly (merges main, checks, submits), the review passes, merged with no update. The
 //   lane ends verified (S21's queue part: started and answered from the window, the Assistant off).
-// Lane B (G6 squash): Four and Five squash-merged by the queue; after Four, Hive brings B1's branch to main (LineMoved)
-// before Five, whose change is only its own. The lane ends verified (after its last card, nothing moves).
+// Lane B (G6 squash): Four and Five squash-merged by the queue; Five's line is made from main with Four's squash in, so
+// its change is only its own (no branch moved: LineMoved is a 0.9 worktree's, §16.19.2). The lane ends verified.
 // A screenshot of the lane and the Merges tab at each stage, once the window shows it. Dev build, throwaway profile,
 // workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -79,15 +80,16 @@ const ancestor = (x, y) => {
     await save.getByRole('button', { name: 'Save', exact: true }).click()
     await save.waitFor({ state: 'detached', timeout: HUNG_MS })
     const options = await waitHung(() => (projectJson().workflow?.options?.finish === 'hiveMerges' && projectJson().workflow.options.strict === true ? projectJson().workflow.options : null))
-    check("Pair (Hive merges) saved from the form, strict on: Hive merges into main, agent worktrees, typecheck before review and on the merged result, the repository's identity",!!options && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email,JSON.stringify(projectJson().workflow))
+    check("Pair (Hive merges) saved from the form, strict on: Hive merges into main, cards on slots, typecheck before review and on the merged result, the repository's identity",!!options && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email,JSON.stringify(projectJson().workflow))
     await page.keyboard.press('Escape')
     const identity = options?.identity ?? fx.identity
     const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, '-c', `user.email=${identity.email}`, ...args]).trim()
 
-    const b1 = await q.agent(fx, h, 'B1', { worktree: true })
+    const b1 = await q.agent(fx, h, 'B1')
     const r1 = await q.agent(fx, h, 'R1')
-    const wt = b1.folder
-    check('B1 builds in its own worktree; each agent has its own token', wt.toLowerCase() !== alpha.toLowerCase() && fs.existsSync(wt) && !!b1.token && !!r1.token, wt)
+    // The slot a lane's cards are built in (its start's folder): the lane's, B1's from the lane's start.
+    let wt = null
+    check('B1 runs in the project folder (no worktree of its own); each agent has its own token', b1.folder.toLowerCase() === alpha.toLowerCase() && !!b1.token && !!r1.token, b1.folder)
     const tokens = { b1: b1.token, r1: r1.token }
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
     const keyOf = async (n) => (await card(n)).key
@@ -203,9 +205,15 @@ const ancestor = (x, y) => {
     }
     const done = async (n) => !!(await waitHung(async () => (await card(n)).column === 'done'))
     const integrated = async (n) => (await factsOf(n, 'Integrated')).at(-1)
+    /** A card's start by B1: in the lane's slot (`wt` from then on), on its line once Hive has made it there. */
     const start = async (n) => {
       const s = await intent('b1', n, 'start')
-      return { s, base: (await factsOf(n, 'Started')).at(-1)?.data?.base }
+      const started = (await factsOf(n, 'Started')).at(-1)?.data
+      if (s.status === 200 && s.body?.data?.folder) {
+        wt = s.body.data.folder
+        await waitHung(() => git(wt, 'branch', '--show-current') === s.body.data.line)
+      }
+      return { s, base: started?.base, line: started?.line }
     }
 
     // The window: the board, and the Progress panel's Lanes and Merges tabs.
@@ -262,8 +270,10 @@ const ancestor = (x, y) => {
     await shoot('1-laneA-started', 'lanes', async () => (await onBoard('Todo', c1)) && /B1 \/ R1/.test(await laneText(a?.id)))
 
     // --- One: merged by the queue at the approved revision; the next card waits for it.
-    const s1 = await intent('b1', c1, 'start')
-    check("One starts in B1's worktree", s1.status === 200 && s1.body?.data?.folder?.toLowerCase() === wt.toLowerCase(), JSON.stringify(s1.body))
+    const lentA = (await laneNow(a?.id))?.slot
+    const { s: s1, base: base1, line: line1 } = await start(c1)
+    check("One starts in the lane's slot, on its line from main's head", s1.status === 200 && !!lentA && path.basename(wt ?? '') === lentA && base1 === head() && git(wt, 'rev-parse', 'HEAD') === base1, JSON.stringify({ lane: lentA, start: s1.body }))
+    check('…B1 works there now', !!(await waitHung(async () => (await live(b1.id))?.cwd?.toLowerCase() === wt?.toLowerCase())), JSON.stringify(await live(b1.id)))
     const early = await intent('b1', c2, 'start')
     check('…the next card waits for it (one card at a time)', early.status === 409 && early.body?.rule === 'lane.oneAtATime', JSON.stringify(early.body))
     const one = await round(c1, 'one.txt', { merge: 'wait' })
@@ -279,10 +289,11 @@ const ancestor = (x, y) => {
     check('One is merged by the queue: Done', await done(c1), JSON.stringify(await kinds(c1)))
     const i1 = await integrated(c1)
     const msg1 = git(alpha, 'log', '-1', '--format=%B', 'main')
-    check("…Integrated by Hive at the approved revision: a merge commit of B1's branch, Hive's trailers", i1?.data?.by === 'hive' && i1.data.result === head() && git(alpha, 'rev-parse', 'main^2') === one.rev && msg1.includes(`Hive-Card: ${k1}`) && msg1.includes(`Hive-Revision: ${one.rev}`), JSON.stringify(i1))
+    check("…Integrated by Hive at the approved revision: a merge commit of One's line, Hive's trailers", i1?.data?.by === 'hive' && i1.data.result === head() && git(alpha, 'rev-parse', 'main^2') === one.rev && msg1.includes(`Hive-Card: ${k1}`) && msg1.includes(`Hive-Revision: ${one.rev}`), JSON.stringify(i1))
+    const main1 = head()
     const s2 = await start(c2)
-    const base2 = git(alpha, 'merge-base', 'main', git(wt, 'rev-parse', 'HEAD'))
-    check("only then does Two start; its base is the new merge base (One's revision, in main)", s2.s.status === 200 && s2.base === base2 && s2.base === one.rev, JSON.stringify(s2))
+    check("only then does Two start, in the lane's slot still, its line from main's head (One merged in)", s2.s.status === 200 && path.basename(wt ?? '') === lentA && s2.base === main1 && ancestor(one.rev, s2.base) && git(wt, 'rev-parse', 'HEAD') === s2.base, JSON.stringify(s2))
+    check("…One's line, merged, deleted once Two's is out (LineDeleted)", !!(await waitHung(async () => (await kinds(c1)).includes('LineDeleted'))) && !git(alpha, 'branch', '--list', line1), JSON.stringify(await kinds(c1)))
     await shoot('3-one-merged', 'lanes', async () => (await onBoard('Done', c1)) && (await onBoard('Active', c2)))
 
     // --- Two: main moves while it is in review; strict brings it up to date on the queue's own ref.
@@ -291,7 +302,7 @@ const ancestor = (x, y) => {
     const [up] = await factsOf(c2, 'Updated')
     check('…brought up to date by the queue (strict): Updated, carried, from the reviewed revision', up?.data?.carried === true && up.data.from === two.rev, JSON.stringify(up))
     check("…merged with the user's commit kept, naming both revisions", git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Updated: ${up?.data?.to}`) && git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Revision: ${two.rev}`) && ancestor(two.moved, 'main'))
-    check("…B1's worktree untouched (its HEAD and status as they were)", untouched(two.was), JSON.stringify({ now: worktreeNow(), was: two.was }))
+    check("…the slot untouched (its HEAD and status as they were)", untouched(two.was), JSON.stringify({ now: worktreeNow(), was: two.was }))
 
     // --- Three: main changes the same line while it is in review: returned (notUpToDate); B1 resumes cleanly.
     const s3 = await start(c3)
@@ -300,13 +311,13 @@ const ancestor = (x, y) => {
     const atThree = head()
     const back = await waitHung(async () => ((await card(c3)).column === 'doing' ? (await factsOf(c3, 'IntegrationFailed'))[0] : null))
     check('Three is returned: notUpToDate, naming a.txt; nothing merged', back?.data?.reason === 'notUpToDate' && JSON.stringify(back.data.files) === '["a.txt"]' && head() === atThree, JSON.stringify(back))
-    check("…B1's worktree untouched", untouched(three.was) && (await factsOf(c3, 'Updated')).length === 0, JSON.stringify(worktreeNow()))
+    check('…the slot untouched', untouched(three.was) && (await factsOf(c3, 'Updated')).length === 0, JSON.stringify(worktreeNow()))
     const k3 = await keyOf(c3)
     await shoot('4-three-returned', 'merges', async () => (await queueText()).includes(`${k3} returned`) && (await onBoard('Active', c3)))
-    // B1 brings its line up to date in its own worktree (its side kept), checks and submits again; the review passes.
+    // B1 brings its line up to date in the slot (its side kept), checks and submits again; the review passes.
     git(wt, 'merge', '-q', '-X', 'ours', '-m', 'main in', 'main')
     const resumed = await round(c3, 'a.txt', { commitIt: false })
-    check('…B1 resumed cleanly in its worktree: merged main, a new revision checked and passed', resumed.rev !== three.rev && git(wt, 'status', '--porcelain') === '')
+    check('…B1 resumed cleanly in the slot: merged main, a new revision checked and passed', resumed.rev !== three.rev && git(wt, 'status', '--porcelain') === '')
     check('Three merged with no update (already up to date): Done, B1\'s side of a.txt', (await done(c3)) && (await factsOf(c3, 'Updated')).length === 0 && lib.git(alpha, ['show', 'main:a.txt']).replace(/\r\n/g, '\n') === 'one\ntwo by B1\nthree\n', JSON.stringify(await kinds(c3)))
     const endedA = await endedVerified(a?.id, c3)
     check("lane A ends verified: its merge commit Three's result (S21's queue part, the Assistant off)", !!endedA, JSON.stringify(await laneNow(a?.id)))
@@ -320,21 +331,22 @@ const ancestor = (x, y) => {
     const b = await startLane(laneB)
     check('lane B is started from the board with the squash options', !!b, JSON.stringify(await inv('lanes:list')))
     await retoken()
+    const lentB = (await laneNow(b?.id))?.slot
+    const main3 = head()
     const s4 = await start(c4)
-    check('Four starts on the merge base', s4.s.status === 200 && s4.base === git(alpha, 'merge-base', 'main', git(wt, 'rev-parse', 'HEAD')), JSON.stringify(s4))
+    check("Four starts in lane B's slot, on its line from main's head", s4.s.status === 200 && !!lentB && path.basename(wt ?? '') === lentB && s4.base === main3 && git(wt, 'rev-parse', 'HEAD') === main3, JSON.stringify({ lane: lentB, s4 }))
 
-    // --- Four: squash-merged by the queue; B1's branch brought to main before Five.
+    // --- Four: squash-merged by the queue; Five's line made from main with it.
     const four = await round(c4, 'four.txt')
     check('Four squash-merged by the queue: Done, one commit on main with its trailers', (await done(c4)) && git(alpha, 'rev-list', '--parents', '-1', 'main').split(' ').length === 2 && git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Revision: ${four.rev}`), JSON.stringify(await kinds(c4)))
     const main4 = head()
-    const moved4 = await waitHung(async () => (await factsOf(c4, 'LineMoved'))[0])
-    check("B1 idle and its worktree clean: its branch is brought to main (LineMoved)", !!moved4 && moved4.data?.to === main4 && git(wt, 'rev-parse', 'HEAD') === main4, JSON.stringify(moved4?.data))
     const s5 = await start(c5)
-    check('Five starts on the moved branch: its base is main', s5.s.status === 200 && s5.base === main4, JSON.stringify(s5))
+    check("Five starts on a line of its own from main (Four's squash in), no branch moved", s5.s.status === 200 && s5.base === main4 && git(wt, 'rev-parse', 'HEAD') === main4 && s5.line !== s4.line && !(await kinds(c4)).includes('LineMoved'), JSON.stringify(s5))
+    check("…Four's line, squashed into main, deleted once Five's is out (LineDeleted)", !!(await waitHung(async () => (await kinds(c4)).includes('LineDeleted'))) && !git(alpha, 'branch', '--list', s4.line), JSON.stringify(await kinds(c4)))
     const k5 = await keyOf(c5)
     await shoot('6-four-squashed', 'lanes', async () => (await onBoard('Done', c4)) && (await onBoard('Active', c5)))
 
-    // --- Five: only its own work; squash-merged; the branch moved again; the lane ends verified.
+    // --- Five: only its own work; squash-merged; the lane ends verified.
     await round(c5, 'five.txt', { merge: 'wait' })
     check("Five's change is only its own work (not Four's)", (await submittedFiles(c5)) === JSON.stringify(['five.txt']), await submittedFiles(c5))
     check("the queue tests Five's squash", !!(await waitHung(() => fs.existsSync(fx.started))))
@@ -343,8 +355,8 @@ const ancestor = (x, y) => {
     check('Five squash-merged: Done', await done(c5), JSON.stringify(await kinds(c5)))
     const endedB = await endedVerified(b?.id, c5)
     check("lane B ends verified: its merge commit Five's result", !!endedB, JSON.stringify(await laneNow(b?.id)))
-    // The branch is brought to the target only before a lane's next card: after its last, nothing waits, nothing moves.
-    check("…after its last card B1's branch is left where it is (no next card to bring it up to date for)", !(await kinds(c5)).includes('LineMoved'), JSON.stringify(await kinds(c5)))
+    // Each card's own line from the target: after the last, nothing is moved.
+    check('…after its last card no line is moved', !(await kinds(c5)).includes('LineMoved'), JSON.stringify(await kinds(c5)))
     await shoot('8-laneB-ended', 'lanes', async () => (await onBoard('Done', c5)) && !!(await laneNow(b?.id))?.state)
   } catch (e) {
     check('no exception', false, e.stack)

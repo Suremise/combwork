@@ -1,15 +1,17 @@
-// S54, P4's RC scenario end to end (#1287, SPEC §16.18, §16.19.1-2): "Pair (the agent merges)" with agent worktrees,
-// the Assistant off, on fake Claude Code agents acting by their own tokens (their hive tools' calls). The project's
-// options are set through Version Control → Workflow (#1278); a lane is started from the board (#1280). Card 1: the
-// builder starts it in its own worktree (the next card's start refused meanwhile: one card at a time), commits, runs
-// the quick check through hive-progress --check (counted), submits; the reviewer starts its review and passes it; the
-// builder merges it (a merge commit) and reports the merge, which done.contained checks: Done, and only then does the
-// next card start. Cards 2 and 3 are squash-merged in a row, each brought to main before the next card (HR2's round
-// 1: two continuations): after card 2 the next card waits while the builder is busy (the lane says why), after card 3
-// while its worktree has an untracked file; each time, once that clears, Hive brings the branch to main (LineMoved),
-// the next card starts there and its change is only its own. Card 4 is squash-merged after a commit made past its
-// approval: For you, nothing moved, card 5 waits. Each check's run through hive-progress --check is counted. A
-// screenshot at each stage, once the window shows it. Dev build (or HIVE_EXE), throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// S54, P4's RC scenario end to end (#1287, SPEC §16.18, §16.19.1), as 1.0 builds it (#1573: §16.10's slots, no worktree
+// agents): "Pair (the agent merges)", the Assistant off, on fake Claude Code agents acting by their own tokens (their
+// hive tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
+// (#1278); a lane is started from the board (#1280), lent a slot that B1 then works in. Card 1: the builder starts it
+// on its line in the slot (the next card's start refused meanwhile: one card at a time), commits, runs the quick check
+// through hive-progress --check (counted), submits; the reviewer starts its review and passes it; the builder merges
+// it (a merge commit) and reports the merge, which done.contained checks: Done, and only then does the next card start,
+// on a line of its own from main (card 1's, merged, deleted). Cards 2 and 3 are squash-merged in a row: card 3 starts
+// while B1 is busy and its slot is left as it is until B1 is quiet, then its line is made from main; each card's change
+// is only its own and no branch is moved (LineMoved is a 0.9 worktree's, §16.19.2). Card 4 is squash-merged after a
+// commit made past its approval: card 5 starts on its own line, and card 4's line, holding work that isn't in main, is
+// kept (looked at once card 5, merged, has its line deleted after card 6 starts: a pass that deleted it had looked at
+// card 4's first). Each check's run through hive-progress --check is counted. A screenshot at each stage, once the window shows
+// it. Dev build (or HIVE_EXE), throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -69,18 +71,22 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     await save.waitFor({ timeout: HUNG_MS })
     await save.getByRole('button', { name: 'Save', exact: true }).click()
     const options = await until(() => (projectJson().workflow?.preset === 'pairAgent' ? projectJson().workflow.options : null), HUNG_MS)
-    check('Pair (the agent merges) saved from the form: the agent merges, agent worktrees, the quick check', !!options && options.finish === 'agentMerges' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]', JSON.stringify(projectJson().workflow))
+    check('Pair (the agent merges) saved from the form: the agent merges, cards on slots, the quick check', !!options && options.finish === 'agentMerges' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]', JSON.stringify(projectJson().workflow))
     if (options?.identity) identity = options.identity
 
-    const b1 = await lib.addAgent(inv, alpha, { name: 'B1', location: 'new-worktree' })
+    const b1 = await lib.addAgent(inv, alpha, { name: 'B1' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1' })
-    const wt = b1.worktree?.path
-    const line = b1.worktree?.branch
-    fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws, alpha, wt].filter(Boolean).map((d) => d.toLowerCase())))
-    check("B1 builds in its own worktree", !!wt && fs.existsSync(wt), JSON.stringify(b1.worktree))
+    // The fake trusts the folders it is told of (its trust prompt never shows): the project's slots too, as B1 works in
+    // the lane's (one left at the prompt is never quiet, so Hive would never prepare its next card's line).
+    const slotRoot = path.join(`${ws}.worktrees`, 'alpha')
+    fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws, alpha, ...'abcdefgh'.split('').map((x) => path.join(slotRoot, `slot-${x}`))].map((d) => d.toLowerCase())))
+    check('B1 is a builder in the project folder (no worktree of its own)', !b1.worktree, JSON.stringify(b1))
+    /** The slot the lane's cards are built in (a card's start names it), and the line of the card started last. */
+    let wt = null
+    let line = null
     const cards = []
-    for (const title of ['One', 'Two', 'Three', 'Four', 'Five']) cards.push((await inv('tasks:create', { title, project: 'alpha' })).number)
-    const [c1, c2, c3, c4, c5] = cards
+    for (const title of ['One', 'Two', 'Three', 'Four', 'Five', 'Six']) cards.push((await inv('tasks:create', { title, project: 'alpha' })).number)
+    const [c1, c2, c3, c4, c5, c6] = cards
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
     const keyOf = async (n) => (await card(n)).key
     const facts = async (n) => inv('tasks:facts', n)
@@ -90,7 +96,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     // --- A lane from the board (#1280): the Todo column's Start Lane with These Cards….
     await page.getByRole('button', { name: 'Task Board' }).click()
     const column = (label) => page.locator('.board-column', { has: page.locator('.board-column-header', { hasText: label }) })
-    await until(async () => (await column('Todo').locator('.task-card').count()) === 5, HUNG_MS)
+    await until(async () => (await column('Todo').locator('.task-card').count()) === 6, HUNG_MS)
     await column('Todo').locator('.board-column-header').click({ button: 'right' })
     const item = (label) => page.locator('.menu[role="menu"] .menu-item', { hasText: label })
     await until(async () => (await item('Start Lane with These Cards…').count()) === 1, HUNG_MS)
@@ -101,9 +107,16 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     await dialog.locator('#lane-start-reviewer').selectOption(r1.id)
     await dialog.getByRole('button', { name: /^(Start Lane|Wait and Start)$/ }).click()
     const lane = await until(async () => (await inv('lanes:list')).find((l) => l.builder.id === b1.id && l.state !== 'ended'), HUNG_MS)
-    check('the lane is started from the board: B1 / R1, its five cards in order', !!lane && lane.reviewer?.id === r1.id && JSON.stringify(lane.cards.map((x) => x.number)) === JSON.stringify(cards), JSON.stringify(lane))
-    const laneNow = async () => (await inv('lanes:list')).find((l) => l.id === lane?.id)
-    check('both agents run', !!(await until(async () => !!(await live(b1.id)) && !!(await live(r1.id)), HUNG_MS)))
+    check('the lane is started from the board: B1 / R1, its six cards in order', !!lane && lane.reviewer?.id === r1.id && JSON.stringify(lane.cards.map((x) => x.number)) === JSON.stringify(cards), JSON.stringify(lane))
+    const lentSlot = await until(async () => (await inv('lanes:list')).find((l) => l.id === lane?.id)?.slot, HUNG_MS)
+    const lent = lentSlot ? path.join(slotRoot, lentSlot) : null
+    check('the lane is lent a slot', !!lent, JSON.stringify((await inv('lanes:list')).find((l) => l.id === lane?.id)?.slot ?? null))
+    const idleIn = async (id, folder) => {
+      const s = await live(id)
+      return !!s && ['ready', 'finished'].includes(s.status) && (!folder || s.cwd?.toLowerCase() === folder.toLowerCase())
+    }
+    // B1 is started again in the lane's slot (a new conversation, a launch with its own token): read once it runs there.
+    check("both agents run, B1 in the lane's slot", !!(await until(async () => (await idleIn(b1.id, lent)) && (await idleIn(r1.id)), HUNG_MS)), JSON.stringify(await live(b1.id)))
 
     // The agents' own tokens, from their launches, as their hive tools read them (progressgates').
     const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
@@ -197,11 +210,22 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       git(alpha, 'commit', '-qm', message)
       return git(alpha, 'rev-parse', 'main')
     }
-    /** A card's start, and its Started fact's base. */
-    const start = async (n) => {
+    /**
+     * A card's start, and its Started fact's base and line. Started, it is built in the folder the start names (`wt`, the
+     * lane's slot) on its line (`line`) once Hive has made it there (`made: false` skips that wait).
+     */
+    const start = async (n, { made = true } = {}) => {
       const s = await intent('b1', n, 'start')
-      return { s, base: (await facts(n)).find((f) => f.kind === 'Started')?.data?.base }
+      const started = (await facts(n)).find((f) => f.kind === 'Started')?.data
+      if (s.status === 200 && s.body?.data?.folder) {
+        wt = s.body.data.folder
+        line = s.body.data.line
+        if (made) await until(() => git(wt, 'branch', '--show-current') === line, HUNG_MS)
+      }
+      return { s, base: started?.base, line: started?.line }
     }
+    const onLine = () => git(wt, 'branch', '--show-current') === line
+    const branchExists = (name) => git(alpha, 'branch', '--list', name) !== ''
     const panel = page.locator('.progress-panel')
     await page.locator('.progress-rail').click().catch(() => undefined)
     await until(async () => (await panel.count()) === 1, HUNG_MS)
@@ -215,74 +239,80 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     }
     await shoot('1-lane-started', async () => (await onBoard('Todo', c1)) && /B1 \/ R1/.test(await topText()))
 
-    // --- Card 1: built in B1's worktree, checked, submitted, reviewed and passed; merged (a merge commit) and reported.
-    const s1 = await intent('b1', c1, 'start')
-    check("card 1 starts in B1's worktree", s1.status === 200 && s1.body?.data?.folder?.toLowerCase() === wt?.toLowerCase(), JSON.stringify(s1.body))
+    // --- Card 1: built on its line in the slot, checked, submitted, reviewed and passed; merged (a merge commit) and reported.
+    const main0 = git(alpha, 'rev-parse', 'main')
+    const { s: s1, base: base1, line: line1 } = await start(c1)
+    check("card 1 starts in the lane's slot, on its line from main's head", s1.status === 200 && wt?.toLowerCase() === lent?.toLowerCase() && base1 === main0 && onLine() && git(wt, 'rev-parse', 'HEAD') === main0, JSON.stringify(s1.body))
     const early = await intent('b1', c2, 'start')
     check('…the next card waits for it (one card at a time)', early.status === 409 && early.body?.rule === 'lane.oneAtATime', JSON.stringify(early.body))
     await build(c1, 'one.txt')
     await shoot('2-card1-passed', () => onBoard('Approved', c1))
     const notMerged = await intent('b1', c1, 'report-merge')
     check('a merge reported before it is in main is refused (done.contained)', notMerged.status === 409 && notMerged.body?.rule === 'done.contained', JSON.stringify(notMerged.body))
-    git(alpha, 'merge', '-q', '--no-ff', '-m', 'merge card 1', line)
+    git(alpha, 'merge', '-q', '--no-ff', '-m', 'merge card 1', line1)
     const done1 = await reportMerge(c1)
     check('merged and reported: Done, its merge checked', done1.ok, JSON.stringify(done1.r.body))
-    // A merge commit leaves the branch in main: nothing to bring up to date, the next card starts.
+    // The next card starts on a line of its own from main (card 1 in it); card 1's line, merged, goes once that is out.
+    const main1 = git(alpha, 'rev-parse', 'main')
     const s2 = await start(c2)
-    check('only then does card 2 start; a merge commit needs no update of the branch', s2.s.status === 200 && !(await kinds(c1)).includes('LineMoved'), JSON.stringify(s2.s.body))
+    check('only then does card 2 start, in the slot still, on its own line from main (card 1 merged in)', s2.s.status === 200 && wt?.toLowerCase() === lent?.toLowerCase() && s2.base === main1 && s2.line !== line1 && git(wt, 'rev-parse', 'HEAD') === main1 && !(await kinds(c1)).includes('LineMoved'), JSON.stringify(s2))
+    check("…card 1's line, merged, deleted (LineDeleted)", !!(await until(async () => (await kinds(c1)).includes('LineDeleted'), HUNG_MS)) && !branchExists(line1), JSON.stringify(await kinds(c1)))
 
-    // --- Card 2, the first squash: merged while B1 is busy, the next card waits (the lane says why); idle, it moves.
+    // --- Card 2, the first squash: merged while B1 is busy; card 3 starts, its slot left as it is until B1 is quiet.
     const wakesBefore = wakes('B1').length
     await build(c2, 'two.txt')
-    // B1 in a turn (until the suite lets it go) as it merges: its branch must wait for it. The verdict's loop wake taken
+    const line2 = line
+    // B1 in a turn (until the suite lets it go) as it merges: its slot must wait for it. The verdict's loop wake taken
     // first (typed while the suite types, it would end that turn at once), then B1 idle.
     await until(() => wakes('B1').length > wakesBefore, HUNG_MS)
     await until(() => idle(b1.id), HUNG_MS)
     await typeTo(b1.id, 'holduntil p4lane-go')
     check('B1 is working', !!(await until(async () => (await live(b1.id))?.status === 'working', HUNG_MS)))
-    const main2 = squash(line, 'card 2 (squash)')
+    const main2 = squash(line2, 'card 2 (squash)')
     const done2 = await reportMerge(c2)
     check('card 2 squash-merged and reported: Done (contained by its replay)', done2.ok, JSON.stringify(done2.r.body))
-    const waiting = await until(async () => ((await laneNow())?.status?.reason === 'lineUpdate' ? (await laneNow()).status : null), HUNG_MS)
-    check("…the lane waits while B1's branch is brought up to date", !!waiting && waiting.card === c3, JSON.stringify((await laneNow())?.status))
-    const held = await intent('b1', c3, 'start')
-    check("…card 3 can't start yet (lane.lineBehind), nothing moved while B1 works", held.status === 409 && held.body?.rule === 'lane.lineBehind' && !(await kinds(c2)).includes('LineMoved'), JSON.stringify(held.body))
-    const why3 = `bringing the builder’s branch up to date before ${await keyOf(c3)}`
-    await shoot('3-waiting-for-the-branch', async () => (await topText()).includes(why3) && (await onBoard('Done', c2)))
+    const s3 = await start(c3, { made: false })
+    const prepared = async (n) => (await kinds(n)).includes('SlotPrepared')
+    check('card 3 starts while B1 works; its slot not touched yet (still on card 2\'s line, not prepared)', s3.s.status === 200 && s3.base === main2 && git(wt, 'branch', '--show-current') === line2 && !(await prepared(c3)), JSON.stringify({ s3, branch: git(wt, 'branch', '--show-current'), kinds: await kinds(c3) }))
+    await shoot('3-card3-waits-for-b1', async () => (await onBoard('Done', c2)) && (await onBoard('Active', c3)))
     fs.writeFileSync(path.join(claudeHome, 'p4lane-go'), '')
-    const moved2 = await until(async () => (await facts(c2)).find((f) => f.kind === 'LineMoved'), HUNG_MS)
-    check('B1 idle and its worktree clean: its branch is brought to main, recorded (LineMoved)', !!moved2 && moved2.data?.to === main2 && git(wt, 'rev-parse', 'HEAD') === main2, JSON.stringify(moved2?.data))
-    const s3 = await start(c3)
-    check('card 3 starts on the moved branch: its base is main', s3.s.status === 200 && s3.base === main2, JSON.stringify(s3))
+    check("B1 quiet: card 3's line is made in the slot from main (card 2's squash in), no branch moved", !!(await until(async () => (await prepared(c3)) && onLine(), HUNG_MS)) && git(wt, 'rev-parse', 'HEAD') === main2 && !(await kinds(c2)).includes('LineMoved'), JSON.stringify({ branch: git(wt, 'branch', '--show-current'), kinds: await kinds(c3) }))
+    check("…card 2's line, squashed into main, deleted (LineDeleted)", !!(await until(async () => (await kinds(c2)).includes('LineDeleted'), HUNG_MS)) && !branchExists(line2), JSON.stringify(await kinds(c2)))
 
-    // --- Card 3, the second squash: the worktree not clean, it waits; clean, it moves again, and card 4 starts there.
+    // --- Card 3, the second squash: card 4 starts on its own line from main.
     await build(c3, 'three.txt')
-    fs.writeFileSync(path.join(wt, 'scratch.txt'), 'not yet\n')
     const main3 = squash(line, 'card 3 (squash)')
     const done3 = await reportMerge(c3)
     check('card 3 squash-merged and reported: Done', done3.ok, JSON.stringify(done3.r.body))
-    check('…with an untracked file in its worktree, the branch waits (the lane says why)', !!(await until(async () => (await laneNow())?.status?.reason === 'lineUpdate', HUNG_MS)) && !(await kinds(c3)).includes('LineMoved'), JSON.stringify((await laneNow())?.status))
-    // The builder cleans up in its own turn: once it is idle again, Hive looks and moves the branch.
-    fs.rmSync(path.join(wt, 'scratch.txt'))
-    await typeTo(b1.id, 'work 1')
-    const moved3 = await until(async () => (await facts(c3)).find((f) => f.kind === 'LineMoved'), HUNG_MS)
-    check('clean, its branch is brought to main again (the second LineMoved)', !!moved3 && moved3.data?.to === main3 && git(wt, 'rev-parse', 'HEAD') === main3, JSON.stringify(moved3?.data))
     const s4 = await start(c4)
-    check('card 4 starts on main again: its base is the second LineMoved', s4.s.status === 200 && s4.base === main3, JSON.stringify(s4))
+    check('card 4 starts on its own line from main (card 3\'s squash in), no branch moved', s4.s.status === 200 && s4.base === main3 && git(wt, 'rev-parse', 'HEAD') === main3 && !(await kinds(c3)).includes('LineMoved'), JSON.stringify(s4))
     await shoot('4-card4-on-main', async () => (await onBoard('Active', c4)) && (await onBoard('Done', c3)))
 
-    // --- Card 4: squash-merged after a commit made past its approval: For you, nothing moved, card 5 waits.
+    // --- Card 4: squash-merged after a commit made past its approval: card 5 starts on its own line, and card 4's line,
+    // holding work that isn't in main, is kept (only a line its target contains is deleted, §16.10).
     const approved4 = await build(c4, 'four.txt')
-    commit('late.txt')
-    squash(approved4, 'card 4 (squash)')
+    const line4 = line
+    const late = commit('late.txt')
+    const main4 = squash(approved4, 'card 4 (squash)')
     const done4 = await reportMerge(c4)
     check('card 4 squash-merged (its approved revision) and reported: Done', done4.ok, JSON.stringify(done4.r.body))
-    const asked = await until(async () => (await inv('tasks:forYou')).items?.find((i) => i.card === c5), HUNG_MS)
-    check('the commit after approval stops it: For you (Decide) names it, nothing moved', !!asked && asked.kind === 'decide' && /late\.txt/.test(asked.text ?? '') && !(await kinds(c4)).includes('LineMoved') && git(wt, 'log', '-1', '--format=%s') === 'late.txt', JSON.stringify(asked))
-    check('…the lane is paused for you', !!(await until(async () => (await laneNow())?.status?.reason === 'you', HUNG_MS)), JSON.stringify((await laneNow())?.status))
-    const held5 = await intent('b1', c5, 'start')
-    check('…and card 5 waits', held5.status === 409, JSON.stringify(held5.body))
-    await shoot('5-paused-for-you', async () => /waiting for you/.test(await topText()) && (await column('Todo').locator('.task-card', { hasText: await keyOf(c5) }).locator('.task-for-you').count()) > 0)
+    const s5 = await start(c5)
+    check("card 5 starts on its own line from main: its change won't carry card 4's late commit", s5.s.status === 200 && s5.base === main4 && git(wt, 'rev-parse', 'HEAD') === main4 && !fs.existsSync(path.join(wt, 'late.txt')), JSON.stringify(s5))
+    await shoot('5-card5-started', async () => (await onBoard('Active', c5)) && (await onBoard('Done', c4)))
+
+    // --- Card 5, merged, is the checkpoint (HR4's round 1): a pass deletes the lane's Done cards' merged lines one after
+    // another in the lane's order (slotCards.ts, settleOnce's step 3), so card 5's LineDeleted, once card 6's line is
+    // out, comes from a pass that has already looked at card 4's line, which no slot has had checked out since card 5
+    // started. Card 4's line is then still there, the late commit its tip, and no deletion of it was begun.
+    await build(c5, 'five.txt')
+    const line5 = line
+    git(alpha, 'merge', '-q', '--no-ff', '-m', 'merge card 5', line5)
+    const done5 = await reportMerge(c5)
+    check('card 5 merged and reported: Done', done5.ok, JSON.stringify(done5.r.body))
+    const s6 = await start(c6)
+    check('card 6 starts on its own line from main', s6.s.status === 200 && s6.base === git(alpha, 'rev-parse', 'main') && onLine(), JSON.stringify(s6))
+    check("…card 5's line, merged, deleted (LineDeleted): a pass has looked at card 4's line after it", !!(await until(async () => (await kinds(c5)).includes('LineDeleted'), HUNG_MS)) && !branchExists(line5), JSON.stringify(await kinds(c5)))
+    check("…card 4's line kept, the commit made after its approval its tip (not in main, so not deleted), no deletion begun", branchExists(line4) && git(alpha, 'rev-parse', line4) === late && !(await kinds(c4)).some((k) => k === 'LineDeleting' || k === 'LineDeleted'), JSON.stringify({ kinds: await kinds(c4), branch: branchExists(line4) }))
   } finally {
     await app.close().catch(() => undefined)
   }
