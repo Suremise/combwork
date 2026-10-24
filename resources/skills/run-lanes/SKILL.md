@@ -15,7 +15,7 @@ The loop runs itself: the builder builds each card and sends it to Review, the r
 
 ## Plan lanes by files
 
-- Split the cards so that agents sharing a folder never edit the same files: group them by the files they touch. A builder working beside others is best in its own worktree (add one only if the user agrees; a team setup they chose with worktrees, such as a template, counts); a reviewer needs none.
+- Split the cards so that agents sharing a folder never edit the same files: group them by the files they touch. A builder working beside others is best in a slot of its own, which Hive lends its lane where the project builds cards in slots (set it only if the user agrees; a team setup they chose, such as a template, counts); a reviewer needs none: it reviews in a review copy.
 - Cards that depend on each other go in the same lane, in order. Name overlaps between lanes in both briefs ("lane 2 also edits the settings view: merge main before each card and keep to your sections").
 - A follow-up card belongs to the lane that owns its files: add it to that builder's list (below), or put it in Todo saying which lane should take it.
 
@@ -24,17 +24,17 @@ The loop runs itself: the builder builds each card and sends it to Review, the r
 Each agent reads only what you send it, and each lane starts in a new conversation (coordinate-agents, A new lane). A builder's brief, to adapt:
 
 ```
-Use card-loop as the builder. Cards, in order: #12, #15. Your reviewer is R1. Worktree <folder> (branch <branch>).
+Use card-loop as the builder. Cards, in order: #12, #15. Your reviewer is R1. Each card's start names its slot and branch: work there.
 First, and before each card: merge main, and install dependencies if the lock file changed.
-Commit each round on your branch before sending the card to Review (card-loop).
-Lane end: claim the merge slot, use merge-ready, merge your branch into main, move the cards to Done, report the merge commit on the last card, release the slot, then stop. No push, release or installer.
+Commit each round on the card's branch before sending the card to Review (card-loop).
+Lane end: claim the merge slot, use merge-ready, merge the branch into main, move the cards to Done, report the merge commit on the last card, release the slot, then stop. No push, release or installer.
 Follow-ups go to Todo as new cards.
 ```
 
-Then what this lane needs: test homes or other safety rules, risky areas, overlaps with other lanes, a merge point mid-lane, and the project's own conventions agents can't know otherwise, such as the user OK-ing a visible change from before and after screenshots before the merge (then the brief says who takes them, when, and that the last card waits, blocked, for the OK). Write them in now: anything you add later reaches a busy agent only as a message (`hive_message_agent`), read from its inbox at its next tool call or turn's end. A reviewer's brief: `Use card-loop as the reviewer. Cards, in order: #12, #15. Your builder is B1, in <folder>.`, with what to look at closely on risky cards.
+Then what this lane needs: test homes or other safety rules, risky areas, overlaps with other lanes, a merge point mid-lane, and the project's own conventions agents can't know otherwise, such as the user OK-ing a visible change from before and after screenshots before the merge (then the brief says who takes them, when, and that the last card waits, blocked, for the OK). Write them in now: anything you add later reaches a busy agent only as a message (`hive_message_agent`), read from its inbox at its next tool call or turn's end. A reviewer's brief: `Use card-loop as the reviewer. Cards, in order: #12, #15. Your builder is B1.`, with what to look at closely on risky cards.
 
 - Give rounds and a wait only when the user did; otherwise the lane takes the project's card-loop settings.
-- Agents working in the project folder, with no worktree, have nothing to merge: their brief says to commit, and to move a passed card to Done.
+- Agents working in the project folder, with no slot, have nothing to merge: their brief says to commit, and to move a passed card to Done.
 - Explain the goal and the handoffs, give a sensible default and leave room for judgement: ask agents to say when they do something else, and why.
 - Start the lane yourself with `hive_lane` `start`, so the user sees it at once.
 

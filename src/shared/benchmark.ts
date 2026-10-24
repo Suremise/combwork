@@ -22,7 +22,8 @@ export const BENCHMARK_SCHEMA = 'hive-benchmark/1'
 export const METRICS_EXPORT_SCHEMA = 'hive-metrics/1'
 
 /** Bounds on what is read and kept: an artifact is checked as untrusted input. */
-export const BENCHMARK_LIMITS = { fileBytes: 2 * 1024 * 1024, scenarios: 100, samples: 20, checks: 60, failedChecks: 20, skills: 60, text: 200, kept: 20, projects: 100, series: 2000 }
+// scenarios: 200 since #1444 took the set past 100 (the last ones were dropped from benchmarks).
+export const BENCHMARK_LIMITS = { fileBytes: 2 * 1024 * 1024, scenarios: 200, samples: 20, checks: 60, failedChecks: 20, skills: 60, text: 200, kept: 20, projects: 100, series: 2000 }
 
 /**
  * What a comparison is about: the whole workspace, the workspace's own work (no project's: the Assistant, scripts), or
