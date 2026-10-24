@@ -1,5 +1,6 @@
-import { readdirSync, readFileSync, writeFileSync } from 'fs'
+import { readdirSync, readFileSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { Worker } from 'worker_threads'
 import { describe, expect, it } from 'vitest'
 import { onCorruptFile, readKeptJson, readKeptJsonSync, writeKeptJson } from '../src/main/fsutil'
 import { tempDir } from './tempDir'
@@ -39,6 +40,55 @@ describe('kept files', () => {
     expect(await readKeptJson(join(dir, 'missing.json'), 7)).toBe(7)
     expect(reports.length).toBe(before)
   })
+
+  it('sets aside an empty file that was emptied a while ago', async () => {
+    const f = join(dir, 'd.json')
+    await writeKeptJson(f, { n: 4 })
+    writeFileSync(f, '')
+    const old = new Date(Date.now() - 60_000)
+    utimesSync(f, old, old)
+    expect(await readKeptJson(f, null)).toEqual({ n: 4 })
+    expect(readdirSync(dir).some((n) => n.startsWith('d.json.corrupt-'))).toBe(true)
+  })
+
+  // #1598: something outside Hive saving in place (truncate, then write) while Hive reads must never look like damage.
+  for (const sync of [false, true]) {
+    it(`never sets aside a file being saved in place while it is read${sync ? ' (sync)' : ''}`, async () => {
+      const f = join(dir, `save-${sync ? 'sync' : 'async'}.json`)
+      const versions = [0, 1].map((v) => JSON.stringify({ v, items: Array.from({ length: 2000 }, (_, i) => `item ${i}`) }))
+      await writeKeptJson(f, JSON.parse(versions[0]))
+      const shared = new Int32Array(new SharedArrayBuffer(8)) // [0]: stop, [1]: saves made
+      const writer = new Worker(
+        `const { workerData: { f, versions, shared } } = require('worker_threads')
+        const { openSync, writeSync, closeSync } = require('fs')
+        const pause = new Int32Array(new SharedArrayBuffer(4))
+        for (let n = 0; !Atomics.load(shared, 0); n++) {
+          const text = versions[n % 2]
+          const fd = openSync(f, 'w')
+          writeSync(fd, text.slice(0, text.length >> 1))
+          Atomics.wait(pause, 0, 0, 5) // a slow save: half written
+          writeSync(fd, text.slice(text.length >> 1))
+          closeSync(fd)
+          Atomics.add(shared, 1, 1)
+          Atomics.wait(pause, 0, 0, 20) // and saved again a moment later
+        }`,
+        { eval: true, workerData: { f, versions, shared } }
+      )
+      const before = reports.length
+      try {
+        for (let reads = 0; reads < 100 || Atomics.load(shared, 1) < 30; reads++) {
+          const got = (sync ? readKeptJsonSync(f, null) : await readKeptJson(f, null)) as { v: number } | null
+          expect([0, 1]).toContain(got?.v)
+          if (sync) await new Promise((r) => setImmediate(r))
+        }
+      } finally {
+        Atomics.store(shared, 0, 1)
+        await new Promise((r) => writer.once('exit', r))
+      }
+      expect(reports.length).toBe(before)
+      expect(readdirSync(dir).filter((n) => n.startsWith(`save-${sync ? 'sync' : 'async'}.json.corrupt-`))).toEqual([])
+    })
+  }
 })
 
 describe('spawn log lines', () => {

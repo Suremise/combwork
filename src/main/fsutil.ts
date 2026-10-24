@@ -18,8 +18,9 @@ export async function readJson<T>(path: string, fallback: T): Promise<T> {
 
 // ---------------------------------------------------------------------------
 // Kept files: Hive's own settings and records (config.json, workspace.json, project.json, sessions.json).
-// Each save also writes <file>.bak, the last good version. A file that can't be read as JSON is set aside
-// as <file>.corrupt-<time> and the .bak restored, so one bad file never turns into lost settings or records.
+// Each save also writes <file>.bak, the last good version. A file that can't be read as JSON (once it has stopped
+// changing: below) is set aside as <file>.corrupt-<time> and the .bak restored, so one bad file never turns into
+// lost settings or records.
 // ---------------------------------------------------------------------------
 
 type CorruptReport = (file: string, aside: string, restored: boolean) => void
@@ -51,6 +52,85 @@ function recoverText(path: string, bak: string | null): { value: unknown; restor
   return { value: null, restored: false, aside }
 }
 
+// A file that doesn't parse may be mid-save by something outside Hive: an editor or `fs.writeFileSync` saving in
+// place truncates it, then writes (#1598). Before calling it damaged, it is read again after short pauses (about
+// 1 s in all, only when it doesn't parse) until it parses, or two reads in a row see the same text, size and mtime.
+// An empty file changed within that time is still counted as a save in progress.
+const SETTLE_PAUSES = [25, 50, 100, 150, 250, 400]
+const SETTLE_MS = SETTLE_PAUSES.reduce((a, b) => a + b, 0)
+
+/** One read of a kept file: its text and what its stat said (null: missing or locked). */
+type Sample = { text: string; size: number; mtimeMs: number } | null
+
+const parses = (text: string): { value: unknown } | null => {
+  try {
+    return { value: JSON.parse(text) }
+  } catch {
+    return null
+  }
+}
+
+/** Whether a read that didn't parse is still worth reading again, given the read before it. */
+function stillSaving(prev: Sample, cur: Sample): boolean {
+  if (!cur || !prev) return true
+  if (cur.size === 0 && Date.now() - cur.mtimeMs < SETTLE_MS) return true
+  return prev.size !== cur.size || prev.mtimeMs !== cur.mtimeMs || prev.text !== cur.text
+}
+
+async function sample(path: string): Promise<Sample> {
+  try {
+    const s = await stat(path)
+    return { text: await readFile(path, 'utf8'), size: s.size, mtimeMs: s.mtimeMs }
+  } catch {
+    return null
+  }
+}
+
+function sampleSync(path: string): Sample {
+  try {
+    const s = statSync(path)
+    return { text: readFileSync(path, 'utf8'), size: s.size, mtimeMs: s.mtimeMs }
+  } catch {
+    return null
+  }
+}
+
+/** What reading a kept file that didn't parse came to: its value once it did, or damaged, or missing after all. */
+type Settled = { value: unknown } | 'damaged' | 'missing'
+
+/** Reads a kept file that didn't parse again while it looks mid-save (above). */
+async function settle(path: string): Promise<Settled> {
+  let prev = await sample(path)
+  const ok = prev && parses(prev.text)
+  if (ok) return ok
+  for (const ms of SETTLE_PAUSES) {
+    await new Promise((r) => setTimeout(r, ms))
+    const cur = await sample(path)
+    const got = cur && parses(cur.text)
+    if (got) return got
+    if (!stillSaving(prev, cur)) return 'damaged'
+    prev = cur
+  }
+  return prev ? 'damaged' : 'missing'
+}
+
+/** The same, synchronously: blocks the thread for at most SETTLE_MS, and only for a file that doesn't parse. */
+function settleSync(path: string): Settled {
+  const pause = new Int32Array(new SharedArrayBuffer(4))
+  let prev = sampleSync(path)
+  const ok = prev && parses(prev.text)
+  if (ok) return ok
+  for (const ms of SETTLE_PAUSES) {
+    Atomics.wait(pause, 0, 0, ms)
+    const cur = sampleSync(path)
+    const got = cur && parses(cur.text)
+    if (got) return got
+    if (!stillSaving(prev, cur)) return 'damaged'
+    prev = cur
+  }
+  return prev ? 'damaged' : 'missing'
+}
+
 export async function readKeptJson<T>(path: string, fallback: T): Promise<T> {
   let text: string
   try {
@@ -62,6 +142,9 @@ export async function readKeptJson<T>(path: string, fallback: T): Promise<T> {
   try {
     return JSON.parse(text) as T
   } catch {
+    const settled = await settle(path)
+    if (settled === 'missing') return fallback
+    if (settled !== 'damaged') return settled.value as T
     const bak = await readFile(`${path}.bak`, 'utf8').catch(() => null)
     const r = recoverText(path, bak)!
     if (r.restored) await writeTextAtomic(path, bak!).catch(() => undefined)
@@ -81,6 +164,9 @@ export function readKeptJsonSync<T>(path: string, fallback: T): T {
   try {
     return JSON.parse(text) as T
   } catch {
+    const settled = settleSync(path)
+    if (settled === 'missing') return fallback
+    if (settled !== 'damaged') return settled.value as T
     let bak: string | null = null
     try {
       bak = readFileSync(`${path}.bak`, 'utf8')
