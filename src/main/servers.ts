@@ -39,6 +39,8 @@ import type { Refusal } from '../shared/workflow/refusals'
 import { agentWorkflowRole, isWorkflowRole, type WorkflowRole } from '../shared/workflow/roles'
 import { deleteEntry, JournalBusy, JournalError, readEntry, recall, updateEntry, writeEntry } from './journal'
 import { journalSettingsOf, journalSuggestion } from './journalService'
+import { recordBuild } from './buildFacts'
+import { buildFactOf } from '../shared/buildFacts'
 import type { JournalSettings } from '../shared/journal'
 import { emit, onHiveEvent, toast } from './events'
 import { msg, tr } from '../shared/i18n'
@@ -1338,6 +1340,14 @@ route('DELETE', '/v1/journal/:id', async ({ params }) => {
   const id = entryId(params[0])
   if (!journalCall(() => deleteEntry(home, id))) throw new HttpError(404, `There is no entry ${id}.`)
   return { id, deleted: true }
+})
+
+// A successful build of Hive itself (#1534): scripts/buildFact.mjs, from npm run dist or npm run release, with the
+// workspace token or the agent's own (an agent running the build). Hive writes it into the workspace's journal as its fact.
+route('POST', '/v1/builds', async ({ body }) => {
+  const f = buildFactOf(body)
+  if ('error' in f) throw new HttpError(400, f.error)
+  return recordBuild(requireWorkspace(), f)
 })
 
 /** Who is calling hive_inbox: a project agent (its own), or the Assistant (its home's). */

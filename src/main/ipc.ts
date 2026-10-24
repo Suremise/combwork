@@ -1,3 +1,4 @@
+import { pickUpBuilds } from './buildFacts'
 import { checkDocRef } from './docSections'
 import { legacyWorktree } from '../shared/agentFolders'
 import { BrowserWindow, ClipboardItem, app, clipboard, dialog, ipcMain, nativeImage, shell } from 'electron'
@@ -354,6 +355,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     void copyV09Templates(opening)
       .then(() => sayV09TemplatesOnce(opening))
       .catch((e) => log.warn("copying 0.9's agent templates (tried again at the next open)", e))
+    // Builds of Hive left for it while it was closed (#1534), into the journal once.
+    void pickUpBuilds(ws).catch((e) => log.warn('recording the builds left for Hive', e))
     // What failed or interrupted saves and the project-id migration left in the .hive folders (#1016).
     void sweepWorkspaceLeftovers(ws).catch((e) => log.warn('removing leftover temp and backup files', e))
     // Moved since it was last opened (#146)? In the background: the window opens meanwhile, and a banner follows.

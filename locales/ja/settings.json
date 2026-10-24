@@ -170,6 +170,8 @@
   "settings.advanced.hive.inbox.idleWakes.title": "アイドルのエージェントを起こす",
   "settings.advanced.hive.inbox.stopContinuation.desc": "エージェントが受信箱に未読の項目を残したままターンを終えようとすると、Hiveはターンごとに一度、先にそれを読むよう続けさせます。CodexとCopilotでは停止を保留し、Claude Codeでは停止に一行加えます。オフにすると、ターンはCLIが終えるとおりに終わり、項目はアイドル時の起こしまで受信箱で待ちます。プロジェクトは「プロジェクト設定」→「セッション」で独自に設定できます。",
   "settings.advanced.hive.inbox.stopContinuation.title": "未読を残して止まるエージェントを続けさせる",
+  "settings.advanced.hive.journal.builds.desc": "Hive自身のインストーラーをソースコードからビルドすると（npm run dist または npm run release）、Hiveはそのビルドを自身のエントリとしてHive Assistantのジャーナルに書き込みます。バージョン、コミット、ビルドの種類、インストーラーの場所です。書き込むのは成功したビルドだけで、ジャーナルがオンで、その範囲にイベントが含まれている間に限ります。オフにするとビルドは書き込まれず、Hiveが閉じている間に残されたビルドはワークスペースを開いたときに破棄されます。",
+  "settings.advanced.hive.journal.builds.title": "ビルドをジャーナルに記録する",
   "settings.advanced.hive.mcp.connectSeconds.desc": "エージェントの準備ができてから、そのCLIがHiveのツールに接続するのをHiveが待つ時間です。この時間が過ぎると、接続を待たずに新しい作業を知らせます。再開したセッションはツールより先に準備ができることがあり、その時点のメッセージはツールなしのターンになります（#865）。CLIがHiveのツールに接続しないエージェントにメッセージが遅れて届く場合は、値を下げてください。",
   "settings.advanced.hive.mcp.connectSeconds.title": "hiveツール：接続の待機",
   "settings.advanced.hive.mcp.replySeconds.desc": "hive MCPサーバーが、ツールへのHiveの応答を待つ時間です（待機ツール自体の時間はこれに加わります）。遅いマシンや非常に忙しいマシンで、hiveツールが「Hive didn't reply within 300 s」で失敗する場合に増やしてください（#371）。",

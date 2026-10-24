@@ -172,6 +172,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.inbox.idleWakes.title': undefined
   'settings.advanced.hive.inbox.stopContinuation.desc': undefined
   'settings.advanced.hive.inbox.stopContinuation.title': undefined
+  'settings.advanced.hive.journal.builds.desc': undefined
+  'settings.advanced.hive.journal.builds.title': undefined
   'settings.advanced.hive.mcp.connectSeconds.desc': undefined
   'settings.advanced.hive.mcp.connectSeconds.title': undefined
   'settings.advanced.hive.mcp.replySeconds.desc': undefined
