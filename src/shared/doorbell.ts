@@ -55,12 +55,15 @@ function idList(items: readonly NoticeItem[]): string {
 
 /**
  * The notice for what an agent has unread, at a checkpoint, before its turn ends, or as the doorbell. Empty when there is
- * nothing. One line: the doorbell is typed as the CLI's prompt.
+ * nothing. One line: the doorbell is typed as the CLI's prompt. With anything to ack (#903, #1530: not only card events
+ * and notices, deliveries.ts' needsAck), each says to act on it, then ack.
  */
 export function inboxNotice(at: NoticeAt, items: readonly NoticeItem[]): string {
   if (!items.length) return ''
   const what = `${noticeCounts(items)} (${idList(items)})`
-  if (at === 'checkpoint') return `${NOTICE_PREFIX}New in your inbox: ${what}. Call hive_inbox now to read ${items.length === 1 ? 'it' : 'them'}, then carry on.`
-  if (at === 'drain') return `${NOTICE_PREFIX}Before you finish: your inbox has ${what} you haven't read. Call hive_inbox, act on ${items.length === 1 ? 'it' : 'them'} and ack before you end your turn.`
-  return `${NOTICE_PREFIX}New in your inbox: ${what}. Call hive_inbox to read ${items.length === 1 ? 'it' : 'them'}.`
+  const it = items.length === 1 ? 'it' : 'them'
+  const ack = items.some((i) => i.kind !== 'card-event' && i.kind !== 'control')
+  if (at === 'checkpoint') return `${NOTICE_PREFIX}New in your inbox: ${what}. Call hive_inbox now to read ${it}${ack ? `; act on ${it} and ack ${it}` : ''}, then carry on.`
+  if (at === 'drain') return `${NOTICE_PREFIX}Before you finish: your inbox has ${what} you haven't read. Call hive_inbox${ack ? `, act on ${it} and ack ${it}` : ` and act on ${it}`} before you end your turn.`
+  return `${NOTICE_PREFIX}New in your inbox: ${what}. Call hive_inbox to read ${it}${ack ? `, act on ${it}, then ack ${it}` : ''}.`
 }

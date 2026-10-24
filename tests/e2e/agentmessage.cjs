@@ -106,7 +106,7 @@ const check = (name, ok, extra = '') => {
   const sent = tool('hive_message_agent', { project: 'alpha', agent: 'Reviewer', text: `Darren answered #${c1}: review it when it returns.` })
   check('a message to a watching agent is told at once, with its id', !sent.isError && sent.text === 'Told Reviewer now (m1): it reads it with hive_inbox; its watch carries on.', sent.text)
   // Its doorbell (#650): the id, never the text, and that its watch carries on; it reads the message with hive_inbox.
-  check('…its doorbell names it and says its watch carries on', !!(await until(async () => bells('Reviewer').some((t) => t.startsWith(`[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it. (Your watch is still on, waiting for #${c1} → Review:`)), 15000)), JSON.stringify(bells('Reviewer')))
+  check('…its doorbell names it and says its watch carries on', !!(await until(async () => bells('Reviewer').some((t) => t.startsWith(`[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it, act on it, then ack it. (Your watch is still on, waiting for #${c1} → Review:`)), 15000)), JSON.stringify(bells('Reviewer')))
   check('…and the reviewer reads it in its inbox', wakes('Reviewer').includes(`Darren answered #${c1}: review it when it returns.`) && !bells('Reviewer').some((t) => t.includes('Darren answered')), JSON.stringify(wakes('Reviewer')))
   check('…and is watching the card again after it', !!(await until(async () => (await live(alpha, reviewer.id))?.status === 'watching' && (await live(alpha, reviewer.id))?.watch?.cards?.[0] === c1, 15000)))
   await inv('tasks:update', c1, { column: 'review' })
@@ -131,7 +131,7 @@ const check = (name, ok, extra = '') => {
   const waiting = activity('Builder')
   check('its activity lists the message waiting', waiting.inbox?.unread === 1 && waiting.inbox.deliveries.at(-1)?.id === mid && waiting.inbox.deliveries.at(-1)?.from === 'the Assistant' && waiting.inbox.deliveries.at(-1)?.state === 'queued', JSON.stringify(waiting))
   check('…not typed while it works', !wakes('Builder').length)
-  check('once idle, its doorbell is typed, and the builder reads it', !!(await until(async () => wakes('Builder').some((t) => t === `Add #${c1}'s follow-up to your lane after it.`), 30000)) && bells('Builder').includes(`[Hive] New in your inbox: 1 message (${mid}). Call hive_inbox to read it.`), JSON.stringify(wakeLog('Builder')))
+  check('once idle, its doorbell is typed, and the builder reads it', !!(await until(async () => wakes('Builder').some((t) => t === `Add #${c1}'s follow-up to your lane after it.`), 30000)) && bells('Builder').includes(`[Hive] New in your inbox: 1 message (${mid}). Call hive_inbox to read it, act on it, then ack it.`), JSON.stringify(wakeLog('Builder')))
   // Read (#650: the only receipt): received through the inbox, and no longer unread in the pane; still the builder's to ack.
   check('…received as it reads it, and no longer unread in its pane', !!(await until(async () => lastDelivery('Builder')?.state === 'received' && lastDelivery('Builder')?.receivedVia === 'inbox' && !(await unread()), 15000)), JSON.stringify(lastDelivery('Builder')))
   const done = activity('Builder')

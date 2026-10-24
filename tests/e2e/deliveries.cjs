@@ -134,7 +134,7 @@ async function start() {
   // A message left now is told at once; had m1 been offered after it was received, its doorbell would name it too.
   const second = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'Then take #2.' })
   check('a message for the idle builder is told at once', !second.isError && second.text === 'Told Builder now (m2): it reads it with hive_inbox.', second.text)
-  check('…its doorbell names it by id, never its text (#650)', !!(await until(() => bells().includes('[Hive] New in your inbox: 1 message (m2). Call hive_inbox to read it.'), HUNG_MS)), JSON.stringify(bells()))
+  check('…its doorbell names it by id, never its text (#650)', !!(await until(() => bells().includes('[Hive] New in your inbox: 1 message (m2). Call hive_inbox to read it, act on it, then ack it.'), HUNG_MS)), JSON.stringify(bells()))
   check('…and the builder reads it in its inbox', !!(await until(() => wakes().includes('Then take #2.'), HUNG_MS)), JSON.stringify(wakes()))
   check('…the message it had fetched is never offered again', !wakes().some((t) => t.includes('Rebase on main')) && !bells().some((t) => /\bm1\b/.test(t)), JSON.stringify(wakeLog()))
   check('…offered (its doorbell typed), and received once it read it', !!(await until(async () => wakes().length > 0 && delivery('m2')?.state === 'received' && (await idle(builder.id)), HUNG_MS)) && delivery('m2')?.receivedVia === 'inbox' && !!delivery('m2')?.offered, JSON.stringify(delivery('m2')))

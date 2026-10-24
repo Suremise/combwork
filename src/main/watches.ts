@@ -1161,7 +1161,7 @@ function noteToldAgents(store: Store, watcher: string, told: Map<string, number>
   if (store.wokeAgents.size > MAX_WATCHES) store.wokeAgents.delete(store.wokeAgents.keys().next().value!)
 }
 
-export type AgentWatchResult = { watching: TaskWatchInfo; replaced?: string; dropped?: string[] } | { already: string[] }
+export type AgentWatchResult = ({ watching: TaskWatchInfo } | { already: string[] }) & { replaced?: string; dropped?: string[] }
 
 /**
  * Starts (or replaces) an agent's agent watch (#416): Hive types one line into it when one of `cond`'s agents finishes
@@ -1215,15 +1215,17 @@ export async function registerAgentWatch(ws: WorkspaceService, projectPath: stri
       }
     }
     stopDelivery(store, old)
+    // A card watch it had ends: said, so it isn't thought to be still running. So do the agents an agent watch it had
+    // followed and this call doesn't (#1346 item 6: a second watch dropped the first's agents unsaid), with a new watch
+    // or with an answer at once (HR2's #1530 round 1: that ends the earlier watch too).
+    const dropped = old?.agents ? old.agents.agents.filter((o) => !cond.agents.some((a) => same(a.projectPath, o.projectPath) && a.agentId === o.agentId)).map((o) => `${o.name} (${o.project})`) : []
+    const ended = { ...(old && !old.agents ? { replaced: infoOf(old).label } : {}), ...(dropped.length ? { dropped } : {}) }
     if (!rec) {
       noteToldAgents(store, watcher, toldNow)
-      return { already }
+      return { already, ...ended }
     }
     log.info(`${userText(agentId)} watches ${cond.agents.map((a) => userText(a.name)).join(', ')}`)
-    // A card watch it had ends: said, so it isn't thought to be still running. So do the agents an agent watch it had
-    // followed and this one doesn't (#1346 item 6: a second watch dropped the first's agents unsaid).
-    const dropped = old?.agents ? old.agents.agents.filter((o) => !cond.agents.some((a) => same(a.projectPath, o.projectPath) && a.agentId === o.agentId)).map((o) => `${o.name} (${o.project})`) : []
-    return { watching: infoOf(rec), ...(old && !old.agents ? { replaced: infoOf(old).label } : {}), ...(dropped.length ? { dropped } : {}) }
+    return { watching: infoOf(rec), ...ended }
   })
   sessions.watchChanged(projectPath, agentId)
   // Checked again once in place: an agent that finished while it was being set up isn't missed.

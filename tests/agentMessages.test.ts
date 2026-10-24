@@ -68,7 +68,12 @@ describe('messages left for agents (#530, #647)', async () => {
   const states = async (agentId = 'b1') => (await deliveries.deliveriesOf(alpha, agentId)).map((r) => `${r.id} ${r.state}${r.detail ? `: ${r.detail}` : ''}`)
   const tryAll = () => deliveries.offerAllForTests()
   /** The doorbell (#650) naming these deliveries: Hive's fixed words with counts and ids. */
-  const bell = (what: string, ids: string, tail = '') => `[Hive] New in your inbox: ${what} (${ids}). Call hive_inbox to read ${ids.includes(',') ? 'them' : 'it'}.${tail}`
+  const bell = (what: string, ids: string, tail = '') => {
+    const them = ids.includes(',') ? 'them' : 'it'
+    // Anything to ack (not only card events): act on it, then ack (#1530).
+    const ack = /\b(message|task|answer|handover)s?\b/.test(what) ? `, act on ${them}, then ack ${them}` : ''
+    return `[Hive] New in your inbox: ${what} (${ids}). Call hive_inbox to read ${them}${ack}.${tail}`
+  }
   beforeEach(async () => {
     // Each test its own project, so ids start at m1.
     alpha = join(base, `alpha${++n}`)

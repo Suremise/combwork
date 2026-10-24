@@ -109,25 +109,25 @@ describe('a card by intent (#1267)', () => {
     const started = await act(w, card, builder, { kind: 'start' })
     expect(started.done).toMatchObject({ ok: true, from: 'todo', to: 'active', data: { folder: wt, line: 'card', target: 'main' } })
     expect(started.card).toMatchObject({ column: 'doing', agent: 'a1' })
-    // Each reply names what can come next on the card, by its rules (#1530).
-    expect(started.done.next).toEqual(['submit', 'put back'])
+    // Each reply names what comes next on the card, by its state and rules (#1530; the grid: tests/workflow/nextStep.test.ts).
+    expect(started.done.next).toEqual({ step: 'intents', intents: ['submit', 'put back'] })
     commit(wt, 'b.txt')
     // Submit: Review, its summary a comment.
     const submitted = await act(w, card, builder, { kind: 'submit', summary: 'Round 1 ready' })
     expect(submitted.done).toMatchObject({ from: 'active', to: 'review' })
     expect(submitted.card.column).toBe('review')
-    expect(submitted.done.next).toEqual(['start review', 'verdict'])
+    expect(submitted.done.next).toEqual({ step: 'review' })
     expect(submitted.card.comments.at(-1)?.text).toBe('Round 1 ready')
     // The builder can't review its own work.
     expect(await refused(act(w, card, builder, { kind: 'startReview' }))).toBe('review.notAuthor')
     // The reviewer starts, and fails it (content): back to the builder, the round counted.
     const review = await act(w, card, reviewer, { kind: 'startReview' })
     expect(review.card.review?.agent).toBe('a2')
-    expect(review.done.next).toEqual(['verdict'])
+    expect(review.done.next).toEqual({ step: 'intents', intents: ['verdict'] })
     const failed = await act(w, card, reviewer, { kind: 'verdict', pass: false, failKind: 'content', comment: 'Round 1: FAILED. 1. Add a test.' })
     expect(failed.done).toMatchObject({ from: 'review', to: 'active' })
     expect(failed.card.column).toBe('doing')
-    expect(failed.done.next).toEqual(['submit', 'put back'])
+    expect(failed.done.next).toEqual({ step: 'intents', intents: ['submit', 'put back'] })
     expect(failed.card.history.some((h) => h.what === 'Review failed')).toBe(true)
     expect(foldCard(facts(w, card)).rounds).toBe(1)
     // The same revision again: refused without a note (S32), a new round with one.
@@ -140,7 +140,7 @@ describe('a card by intent (#1267)', () => {
     const passed = await act(w, card, reviewer, { kind: 'verdict', pass: true, comment: 'Round 2: PASSED.' })
     expect(passed.done).toMatchObject({ from: 'review', to: 'approved' })
     expect(passed.card.column).toBe('passed')
-    expect(passed.done.next).toEqual(['report merge'])
+    expect(passed.done.next).toEqual({ step: 'merge' })
     // A comment never moves an Approved card (S2).
     await inWorkspace(w, () => tasks.commentTask(card, 'A thought after the pass', builder))
     expect(foldCard(facts(w, card)).stage).toBe('approved')
@@ -149,7 +149,7 @@ describe('a card by intent (#1267)', () => {
     const merged = await act(w, card, builder, { kind: 'reportMerge' })
     expect(merged.done).toMatchObject({ from: 'approved', to: 'done' })
     expect(merged.card.column).toBe('done')
-    expect(merged.done.next).toBeUndefined()
+    expect(merged.done.next).toEqual({ step: 'done' })
     const k = kinds(w, card)
     for (const once of ['Started', 'Integrated']) expect(k.filter((x) => x === once)).toHaveLength(1)
     expect(k.filter((x) => x === 'Verdict')).toHaveLength(2)
@@ -199,7 +199,7 @@ describe('a card by intent (#1267)', () => {
     expect(facts(w, card).find((f) => f.kind === 'ApprovalRequested')?.data).toMatchObject({ kind: 'test', text: 'Does it install?', revision: head, checklist: ['Install it', 'Open the app'] })
     const back = await act(w, card, builder, { kind: 'putBack', why: 'Waiting for #9 first.' })
     expect(back.done).toMatchObject({ from: 'active', to: 'todo' })
-    expect(back.done.next).toEqual(['start'])
+    expect(back.done.next).toEqual({ step: 'intents', intents: ['start'] })
     expect(back.card.comments.at(-1)?.text).toBe('Waiting for #9 first.')
     expect(facts(w, card).findLast((f) => f.kind === 'Moved')?.data).toMatchObject({ to: 'todo', cause: 'intent', why: 'Waiting for #9 first.' })
   })
@@ -664,7 +664,7 @@ describe("the intents' routes and tools (#1267)", () => {
     // Start review's files (#1444): each as git's letter and its path, never [object Object].
     expect(intentText({ ok: true, card: '#3', from: 'review', to: 'review', data: { files: [{ path: 'greet.js', status: 'M' }, { path: 'test.js', status: 'A' }] } })).toBe('#3: still review. files: M greet.js, A test.js')
     // What's next, as the hive tools (#1530).
-    expect(intentText({ ok: true, card: 'HI-12', from: 'active', to: 'review', next: ['start review', 'verdict'] })).toBe('HI-12: active → review. Next on it: hive_start_review or hive_verdict.')
+    expect(intentText({ ok: true, card: 'HI-12', from: 'review', to: 'review', next: { step: 'intents', intents: ['verdict'] } })).toBe('HI-12: still review. Next on it: hive_verdict.')
   })
 
   it('every agent has the intent tools, Codex too (#913: enabled_tools is HIVE_TOOLS); the Assistant at Control agents, never start_card', () => {

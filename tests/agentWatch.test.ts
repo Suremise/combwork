@@ -144,6 +144,8 @@ describe('what an agent watch counts', () => {
     expect(agentWatchText({ watching: 'Waiting for B6 to finish', limitAt: 'x', replaced: 'Waiting for #12 → Review' })).toMatch(/It replaces your card watch \(waiting for #12 → Review\)\.$/)
     expect(agentWatchText({ watching: 'Waiting for B6 to finish', limitAt: 'x', dropped: ['R6 (hive)', 'B5 (hive)'] })).toMatch(/It replaces your watch on R6 \(hive\), B5 \(hive\): pass every agent you're following\.$/)
     expect(agentWatchText({ already: ['B6 (hive) is idle: "Done."'] })).toBe('Already: B6 (hive) is idle: "Done.".')
+    expect(agentWatchText({ already: ['B6 (hive) is idle: "Done."'], dropped: ['R6 (hive)'] })).toBe(`Already: B6 (hive) is idle: "Done.". Your watch on R6 (hive) has ended: watch again, passing every agent you're following.`)
+    expect(agentWatchText({ already: ['B6 (hive) is idle: "Done."'], replaced: 'Waiting for #12 → Review' })).toBe('Already: B6 (hive) is idle: "Done.". Your card watch (waiting for #12 → Review) has ended.')
     expect(agentWatchText({ done: 'Cancelled your agent watch.' })).toBe('Cancelled your agent watch.')
   })
 })
@@ -240,6 +242,11 @@ describe('agent watches (main/watches.ts)', async () => {
     expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [second(alpha)], ignoreBackground: false })).toMatchObject({ dropped: ['Reviewer (alpha)'] })
     // The same agents again, or more: nothing dropped.
     expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [second(alpha), reviewer(alpha)], ignoreBackground: false })).not.toHaveProperty('dropped')
+    // An answer at once (the agent asked about is idle) ends the earlier watch too: said (HR2's #1530 round 1).
+    move(st, alpha, 'a3', nowOf({ status: 'finished', reply: 'Done.' }))
+    const r = await watches.registerAgentWatch(w, alpha, 'a1', { agents: [second(alpha)], ignoreBackground: false })
+    expect(r).toMatchObject({ already: [expect.stringMatching(/^Second \(alpha\)/)], dropped: ['Reviewer (alpha)'] })
+    expect(savedOf(w.path!)).toEqual([])
     await disposeWorkspaceService(w)
   })
 
@@ -1521,7 +1528,8 @@ describe('agent watches (main/watches.ts)', async () => {
     const agentNow = sessions.agentNow
     sessions.agentNow = (p: string, id: string) => (id === 'b1' ? { status: 'finished', runId: 'r2', prompts: 1, pending: false, statusMessage: null, backgroundTasks: 0, reply: 'Card #9 is done.' } : agentNow(p, id))
     try {
-      expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [other], ignoreBackground: false })).toEqual({ already: ['Other (beta) is idle'] })
+      // The card watch it had ends with the answer: said (HR2's #1530 round 1).
+      expect(await watches.registerAgentWatch(w, alpha, 'a1', { agents: [other], ignoreBackground: false })).toEqual({ already: ['Other (beta) is idle'], replaced: `Waiting for #${c.number}` })
     } finally {
       sessions.agentNow = agentNow
     }

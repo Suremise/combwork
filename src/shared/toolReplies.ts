@@ -12,6 +12,7 @@ import { cardName, cardRef, namedBy, namesFrom, namesOf } from './projectKeys'
 import { shortDuration } from './progress'
 import { LANE_DEFAULT_EVENTS, type LaneEvent, type LaneWatchCards } from './laneWatch'
 import type { StageId } from './workflow/facts'
+import type { NextStep } from './workflow/nextStep'
 import type { QueuePublic } from './workflow/queue'
 import { INBOX_SWITCHES, type InboxSwitch } from './inboxSwitches'
 
@@ -133,8 +134,26 @@ export interface IntentDone {
   to: string
   data?: Record<string, unknown>
   warnings?: string[]
-  /** The intents the card can take next under its rules (#1530), by name ("submit", "start review"). */
-  next?: string[]
+  /** What comes next on the card under its rules (#1530, shared/workflow/nextStep.ts). */
+  next?: NextStep
+}
+
+/** What a reply says comes next (#1530): an agent follows it rather than infer the step from a column. */
+function nextText(n: NextStep): string {
+  switch (n.step) {
+    case 'intents':
+      return `Next on it: ${n.intents.map((i) => INTENT_TOOL[i] ?? i).join(' or ')}.`
+    case 'review':
+      return "Next: a reviewer's verdict."
+    case 'user':
+      return "Next: the user's OK, asked under For you: wait for it."
+    case 'merge':
+      return 'Next: its builder merges it, then reports the merge (hive_report_merge).'
+    case 'queue':
+      return "Next: Hive's merge queue merges it."
+    case 'done':
+      return 'Done: nothing more on it.'
+  }
 }
 
 /** The hive tool of each intent: an old move's reply says to call it next time (#1268), an intent's names what's next (#1530). */
@@ -154,8 +173,7 @@ export function intentText(d: IntentDone): string {
   const facts = Object.entries(d.data ?? {})
     .filter(([, v]) => v !== undefined && v !== null && v !== '')
     .map(([k, v]) => `${k}: ${value(v)}`)
-  const next = (d.next ?? []).map((n) => INTENT_TOOL[n] ?? n)
-  return [`${d.card}: ${where}.${facts.length ? ` ${facts.join('; ')}` : ''}${next.length ? ` Next on it: ${next.join(' or ')}.` : ''}`, ...(d.warnings ?? []).map((w) => `Warning: ${w}`)].join('\n')
+  return [`${d.card}: ${where}.${facts.length ? ` ${facts.join('; ')}` : ''}${d.next ? ` ${nextText(d.next)}` : ''}`, ...(d.warnings ?? []).map((w) => `Warning: ${w}`)].join('\n')
 }
 
 /** One of the Assistant's changes as GET /v1/assistant/changes lists it (#1282). */
@@ -488,10 +506,10 @@ function waitText(r: WaitReply): string {
  */
 export function agentWatchText(r: { done?: string; watching?: string; limitAt?: string; replaced?: string; dropped?: string[]; already?: string[] }): string {
   if (r.done) return r.done
-  if (r.already) return `Already: ${r.already.join('; ')}.`
   const replaced = r.replaced ? ` It replaces your card watch (${r.replaced.replace(/^Waiting/, 'waiting')}).` : ''
-  // #1346 item 6: the agents your earlier agent watch followed and this one doesn't.
+  // #1346 item 6: the agents your earlier agent watch followed and this call doesn't; an answer at once ends it too.
   const dropped = r.dropped?.length ? ` It replaces your watch on ${r.dropped.join(', ')}: pass every agent you're following.` : ''
+  if (r.already) return `Already: ${r.already.join('; ')}.${r.replaced ? ` Your card watch (${r.replaced.replace(/^Waiting/, 'waiting')}) has ended.` : ''}${r.dropped?.length ? ` Your watch on ${r.dropped.join(', ')} has ended: watch again, passing every agent you're following.` : ''}`
   return `${r.watching}. End your turn now: Hive types a line into this session when one finishes, waits for the user or stops, or at ${r.limitAt ?? 'the limit'} if none does. Nothing runs meanwhile.${replaced}${dropped}`
 }
 
