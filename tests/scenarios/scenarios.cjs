@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 78
+const FIXTURES_VERSION = 79
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -129,6 +129,12 @@ function handMerged(c, n) {
   c.git('checkout', '-q', base)
   c.git('merge', '-q', '--no-ff', '-m', `Merge branch '${branch}'`, branch)
   return { branch, base }
+}
+/** Coder builds and Implementer reviews (their workflow roles), in a project whose work an agent reviews (#1527). */
+async function reviewedPair(c) {
+  await pairInProject(c)
+  await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'builder' })
+  await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'reviewer' })
 }
 /**
  * A card of Implementer's in Review (#1444): its work committed in alpha's own folder and submitted, as the user moves it,
@@ -3426,6 +3432,134 @@ module.exports.SCENARIOS.push(
     },
     // Only the fake Claude Code acts out wakes (fake-wakes-<agent>.txt); the told-the-user check needs a model.
     fakeSkips: (p) => (p === 'fake' ? ['told the user both are done'] : ["Hive's first wake said lanes are still running, to watch them all again", "woken by Builder2's lane ending, it watched Coder's lane's end again", "woken again by Coder's lane ending", 'both lanes ended', 'swept the board on a wake (cards, lanes or agents, after its first watch)', 'told the user both are done'])
+  },
+  // #1346 (a Haiku Assistant asked wherever a default wasn't written; #1527 wrote them): a pair runs even one card as a
+  // lane; a card in Review outside a lane gets a reviewer without asking; a lane is watched with lanes only; a failed
+  // review below the lane's round limit is the loop's; a no-code card finishes through its review and its lane ends by
+  // itself.
+  {
+    id: 'coordinator-one-card-lane',
+    title: "Coordinator mode asked to have the builder of a builder and reviewer pair do one card (#1346 item 2): runs it as a lane with the reviewer, without asking",
+    role: 'assistant',
+    control: 'agents',
+    mode: 'coordinator',
+    async setup(c) {
+      await reviewedPair(c)
+      await c.card('o', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".' })
+    },
+    prompt: (c) => `Have Coder do #${c.cards.o}.`,
+    fake: (c) =>
+      [
+        'skill coordinate-agents',
+        `hive hive_lane {"action":"start","project":"alpha","builder":"Coder","reviewer":"Implementer","cards":[${c.cards.o}]}`,
+        `hive hive_start_agent {"project":"alpha","agent":"Coder","prompt":"Use card-loop as the builder. Cards: #${c.cards.o}. Your reviewer is Implementer. (work 1)"}`,
+        `hive hive_start_agent {"project":"alpha","agent":"Implementer","prompt":"Use card-loop as the reviewer. Cards: #${c.cards.o}. Your builder is Coder. (work 1)"}`,
+        'hive hive_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}'
+      ].join(' then '),
+    expect: (o, c) => {
+      const n = c.cards.o
+      const lane = (o.lanes ?? []).find((l) => l.builder?.name === 'Coder' && (l.cards ?? []).some((x) => x.number === n))
+      return [
+        ['ran the card as a lane: Coder builds it, Implementer reviews', !!lane && lane.reviewer?.name === 'Implementer', JSON.stringify((o.lanes ?? []).map((l) => [l.builder?.name, l.reviewer?.name, l.cards?.map((x) => x.number)]))],
+        ['briefed Implementer as its reviewer (card-loop, the card)', briefsTo(o, 'Implementer').some((t) => names(t, 'card[- ]loop', n)), briefsTo(o, 'Implementer').join(' | ').slice(0, 300)],
+        ["didn't ask the user (no notification, no question)", called(o, 'hive_notify').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)]
+      ]
+    },
+    fakeSkips: ["didn't ask the user (no notification, no question)"]
+  },
+  {
+    id: 'coordinator-start-reviewer',
+    title: "Coordinator mode woken as a card started on its builder alone reaches Review, in a project whose work an agent reviews (#1346 item 2): starts the idle reviewer on it without asking",
+    role: 'assistant',
+    control: 'agents',
+    mode: 'coordinator',
+    async setup(c) {
+      await reviewedPair(c)
+      await c.card('r', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'review', comments: ['Ready: greet() returns "Hi, <name>", with a test. Committed.'] })
+    },
+    prompt: (c) => `[Hive] #${c.cards.r} (Coder's card) is in Review; latest comment by Coder: "Ready: greet() returns "Hi, <name>", with a test. Committed." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`,
+    fake: (c) => `skill coordinate-agents then hive hive_start_agent {"project":"alpha","agent":"Implementer","prompt":"Review #${c.cards.r} with the review-agent-work skill. (work 1)"}`,
+    expect: (o, c) => {
+      const n = c.cards.r
+      return [
+        ['started Implementer on its review', briefsTo(o, 'Implementer').some((t) => names(t, 'review', n)) || ran(o, 'hive_lane').some((x) => argsOf(x).action === 'start' && /implementer/i.test(String(argsOf(x).reviewer ?? ''))), briefsTo(o, 'Implementer').join(' | ').slice(0, 300)],
+        ["didn't ask the user whether it should be reviewed", called(o, 'hive_notify').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
+        ['moved the card nowhere and gave no verdict of its own', !called(o, 'hive_update_task').some((x) => field(x.args, 'number', n) && (argsOf(x).column || argsOf(x).review)) && called(o, 'hive_verdict').length === 0, o.hiveCalls.map((x) => x.tool).join(',')]
+      ]
+    },
+    fakeSkips: ["didn't ask the user whether it should be reviewed"]
+  },
+  {
+    id: 'coordinator-lanes-only-watch',
+    title: 'Coordinator mode asked to follow a running lane (#1346 item 3): one lane watch, with none of its cards added (they would wake it on every move)',
+    role: 'assistant',
+    control: 'agents',
+    mode: 'coordinator',
+    async setup(c) {
+      await reviewedPair(c)
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder' })
+      const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
+      const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
+      if (r.status !== 200) throw new Error(`lane: ${r.text}`)
+    },
+    prompt: (c) => `A card loop is running in alpha: Coder builds #${c.cards.a}, then #${c.cards.b}, and Implementer reviews them. Follow it to the end.`,
+    fake: 'skill run-lanes then hive hive_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}',
+    expect: (o, c) => {
+      const mine = [c.cards.a, c.cards.b]
+      return [
+        ['read the run-lanes skill', read(o, 'run-lanes'), o.skillsRead.join(',')],
+        ['ended its turn on a lane watch (its live watch)', o.status === 'watching' && (o.watch?.lanes ?? []).length > 0, liveWatch(o)],
+        ["added none of the lane's cards to it", !(o.watch?.cards ?? []).some((n) => mine.includes(n)), liveWatch(o)]
+      ]
+    }
+  },
+  {
+    id: 'coordinator-ten-rounds',
+    title: "Coordinator mode woken by a card's second failed review in a ten-round lane, on unrelated findings (#1346 item 4): the loop's to fix, so it asks nothing and watches again",
+    role: 'assistant',
+    control: 'agents',
+    mode: 'coordinator',
+    async setup(c) {
+      await reviewedPair(c)
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>", and README.md shows it.', agent: 'coder', column: 'review' })
+      const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
+      const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [a, b], rounds: 10, name: 'greetings' })
+      if (r.status !== 200) throw new Error(`lane: ${r.text}`)
+      for (const text of ["Round 1: FAILED. 1. greet.js has no test.", 'Fixed: greet.test.js covers greet().', "Round 2: FAILED. 1. README.md's example still says Hello."]) await c.api('POST', `/v1/tasks/${a}/comments`, { text })
+    },
+    prompt: (c) =>
+      `[Hive] #${c.cards.a} (Coder's card) is in Review: Implementer failed it; latest comment by Implementer: "Round 2: FAILED. 1. README.md's example still says Hello." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).${LANES_RUNNING_TAIL}`,
+    fake: (c) => `hive hive_read_task {"number":${c.cards.a},"latestComment":true} then hive hive_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}`,
+    expect: (o, c) => [
+      ["asked the user nothing (no notification, request or question)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
+      ['left the fix to the loop: no decision, nothing sent to Coder or Implementer, no verdict', !(o.cards.a?.decisions ?? []).length && !called(o, 'hive_message_agent').length && !called(o, 'hive_prompt_agent').length && !called(o, 'hive_verdict').length, o.hiveCalls.map((x) => x.tool).join(',')],
+      ['ended its turn watching the lane again (its live watch)', liveWatchCovers(o, [c.cards.b]), liveWatch(o)]
+    ],
+    fakeSkips: ["asked the user nothing (no notification, request or question)"]
+  },
+  {
+    id: 'coordinator-no-code-done',
+    title: "Coordinator mode woken as a no-code card passes its review and its lane ends (#1346 item 4): Hive finished both, so it moves, ends and asks nothing",
+    role: 'assistant',
+    control: 'agents',
+    mode: 'coordinator',
+    async setup(c) {
+      await reviewedPair(c)
+      const r = await c.api('POST', '/v1/tasks', { project: 'alpha', title: 'Which greeting style?', description: 'Research: compare "Hi" and "Hello" in three style guides and recommend one, in a comment.', kind: 'no-code', agent: c.agents.coder.id })
+      if (r.status !== 200) throw new Error(`card: ${r.text}`)
+      c.cards.n = r.body.number
+      const l = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.n], name: 'research' })
+      if (l.status !== 200) throw new Error(`lane: ${l.text}`)
+      await c.api('POST', `/v1/tasks/${c.cards.n}/comments`, { text: 'Passed: the comparison is sound; "Hi" is recommended.' })
+      await c.api('PATCH', `/v1/tasks/${c.cards.n}`, { column: 'done' })
+    },
+    prompt: (c) => `[Hive] #${c.cards.n} (Coder's card) is in Done; latest comment by Implementer: "Passed: the comparison is sound; "Hi" is recommended." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`,
+    fake: (c) => `skill coordinate-agents then hive hive_read_task {"number":${c.cards.n},"latestComment":true} then hive hive_lane {"action":"list"}`,
+    expect: (o) => [
+      ['moved no card and ended or abandoned no lane', !called(o, 'hive_update_task').some((x) => argsOf(x).column) && !called(o, 'hive_lane').some((x) => argsOf(x).action === 'end'), o.hiveCalls.map((x) => x.tool).join(',')],
+      ["asked the user nothing (no notification, request or question)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)]
+    ],
+    fakeSkips: ["asked the user nothing (no notification, request or question)"]
   }
 )
 

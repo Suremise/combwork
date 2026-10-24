@@ -215,9 +215,10 @@ describe('the bundled skills', () => {
     expect(line('2. Review it')).toMatch(/\*\*Review the commit the builder names\.\*\* Work sent uncommitted .* isn't a failed round on that alone/)
     expect(line('- builder: the card')).toMatch(/changes: \["verdict", "column", "comment"\]/)
     expect(line('- reviewer, after asking for a commit')).toMatch(/changes: \["comment"\]/)
-    // run-lanes' sample brief agrees, leaving the procedure to card-loop (a brief saying "commit once it passes" undid it).
+    // run-lanes' sample brief leaves the procedure to card-loop and the rules to Hive (a brief saying "commit once it
+    // passes" undid it; since #1527 a submission's commit is Hive's to check, so the brief says nothing of it).
     const brief = catalog.get('run-lanes')!.text
-    expect(brief).toMatch(/Commit each round on the card's branch before sending the card to Review \(card-loop\)\./)
+    expect(brief).toMatch(/Use card-loop as the builder\./)
     expect(brief).not.toMatch(/After each card passes: commit/)
     // A reviewer that reads only review-agent-work is pointed there (haiku passed uncommitted work so).
     expect(catalog.get('review-agent-work')!.text).toMatch(/In a card loop, review the commit its builder names: work sent uncommitted gets a request for a commit \(`hive_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
@@ -291,8 +292,63 @@ describe('coordinator guidance', () => {
   const text = (): string => catalog.get('coordinate-agents')!.text
   // In run-lanes, which a lane's wake leads to (the Assistant read only it on a failed review's wake).
   it('brings the user a simpler option when the same kind of finding keeps coming back, leaving card-loop as it is', () => {
-    expect(catalog.get('run-lanes')!.text).toMatch(/\*\*A finding that keeps coming back\.\*\* When a card fails review a second or third time on the same kind of finding .* don't let its loop run on: bring the user a simpler option with your recommendation/)
+    // Judgement, never a count of failures (#1527): the loop not converging, as the reviewer's "recurring" or new edge cases of one mechanism show.
+    expect(catalog.get('run-lanes')!.text).toMatch(/\*\*A finding that keeps coming back\*\*: when the reviewer marks a finding recurring, or the rounds keep turning up new edge cases of one mechanism, .*not a count of failures\. Bring the user a simpler option with your recommendation/)
+    expect(catalog.get('run-lanes')!.text).toMatch(/a design step \(`hive_loop_step`\)/)
     expect(catalog.get('card-loop')!.text).toMatch(/\*\*A finding that comes back\*\* \(the fix missed part of it\): the reviewer says so in the failed verdict \("recurring from round 2"\) and the loop carries on/)
+  })
+  // #1527 (#1346's fixes 2–4: a Haiku Assistant asked wherever a default wasn't written): the defaults are written, and
+  // each says what Hive does in the project's configuration, never a fixed rule.
+  describe("the lane skills' written defaults (#1527)", () => {
+    const both = (): [string, string][] => ['coordinate-agents', 'run-lanes'].map((n) => [n, catalog.get(n)!.text])
+    const line = (skill: string, starts: string): string => catalog.get(skill)!.text.split(/\r?\n/).find((l) => l.includes(starts)) ?? ''
+    it('run even one card of a builder and reviewer pair as a lane, and start a reviewer on a card in Review without asking, where an agent reviews', () => {
+      const review = line('coordinate-agents', '**Its review**')
+      expect(review).toMatch(/with a builder and a reviewer in the project, run even one card as a lane/)
+      // Conditional on review (#1524's cases): with no review, nothing is to start.
+      expect(review).toMatch(/in a project whose work is reviewed by an agent: start an idle reviewer on it .* without asking the user/)
+    })
+    it('watch a lane with lanes only: its cards added wake on every move', () => {
+      expect(line('run-lanes', '**One lane watch covers the whole team.**')).toMatch(/and no `cards` of the lanes.*A lane's cards added as `cards` would wake you on every move of them/)
+      expect(line('coordinate-agents', 'To be told when agents are done')).toMatch(/never a lane's own cards, which would wake you on each of their moves/)
+    })
+    it('have no fixed round count and no Done on a pass without the kind', () => {
+      for (const [name, body] of both()) {
+        expect(body, name).not.toMatch(/\b(?:second|third|twice|two|three|four|five|ten) (?:times?|rounds?|failed reviews?)\b|\b\d+ (?:rounds|failed reviews)\b/i)
+        expect(body, name).not.toMatch(/(?:goes|moves?|go) to Done when (?:it|they) pass/i)
+      }
+      // The limit is the lane's configured rounds, where Hive asks; none with the rules off, and then the Assistant asks.
+      const limit = line('run-lanes', '**The round limit**')
+      expect(limit).toMatch(/the lane's rounds .*Hive asks the user itself, under For you/)
+      expect(limit).toMatch(/With workflow rules off .* Hive asks nothing at the limit/)
+      expect(line('run-lanes', '**A failed review is the loop\'s**')).toMatch(/at any round below the lane's limit/)
+      // A card finishes by its kind and the project's options.
+      const finish = line('coordinate-agents', '**How a card finishes**')
+      expect(finish).toMatch(/its kind and the project's workflow options: a no-code card finishes through its review .* a code card as Who merges says/)
+    })
+    it("leave Hive's steps to Hive: merges, a lane's end, a decision's wakes; and say what the switches turn off", () => {
+      expect(line('run-lanes', '**A merge due**')).toMatch(/Never ask whether to merge/)
+      expect(line('run-lanes', "**A lane's end**")).toMatch(/ends by itself once every card is Done/)
+      expect(line('coordinate-agents', '**Ask the user only for what Hive leaves to them**')).toMatch(/a decision .*a block or a question waiting on them, a conflict between lanes, and publishing/)
+      // A decision wakes the loop, unless its loop wakes are off.
+      expect(line('coordinate-agents', 'When the user decides something about a card')).toMatch(/in a loop wakes its builder and, while the card is in Review or Passed, its reviewer, unless the project turned its loop wakes off/)
+      expect(line('coordinate-agents', '**With workflow rules off**')).toMatch(/Hive enforces none of the project's rules/)
+    })
+    it('describe the pool and Hive-owned lane lists, with no worktree, merge-point or junction leftovers', () => {
+      const lanes = catalog.get('run-lanes')!.text
+      expect(lanes).toMatch(/\*\*A shared pool\*\*: a lane has no reviewer of its own\. Hive gives each submitted card to the next free reviewer/)
+      expect(line('run-lanes', "A lane's list is Hive's")).toMatch(/queued until that card is Done, and Hive tells the builder when it applies/)
+      for (const [name, body] of both()) expect(body, name).not.toMatch(/merge point|junction|worktree agents|agents in worktrees|only if the user (?:asked for it|agrees)/i)
+    })
+    it("say a message reaches the agent's inbox and leave how it is told to the tool's reply (#1544)", () => {
+      const msg = line('coordinate-agents', 'To tell it something about the work it has')
+      expect(msg).toMatch(/it goes to the agent's inbox, and the tool's reply says how and when the agent will be told/)
+      expect(msg).not.toMatch(/at its next tool call or before its turn ends/)
+    })
+    it('read right for a solo user, a pair and a team', () => {
+      const fit = catalog.get('coordinate-agents')!.text
+      for (const who of ['**One agent** (a solo user)', '**A builder and a reviewer**', '**Three or more agents**']) expect(fit).toContain(who)
+    })
   })
   it("has a push or release OK given in the agent's own pane, not relayed", () => {
     expect(text()).toMatch(/An agent needs the user's OK to push or release, even one the user gives you to pass on: ask the user to answer in that agent's own pane, and don't relay it \(no message, prompt or start note carrying it/)
