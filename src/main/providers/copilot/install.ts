@@ -8,6 +8,7 @@ import { COPILOT, COPILOT_DESCRIPTOR } from '../../../shared/copilot'
 import { providerSettings } from '../../../shared/providers'
 import { config } from '../../config'
 import { createLogger, userText } from '../../logger'
+import { plainHttpsJson } from '../../plainHttpsJson'
 import { listOf } from '../../../shared/advanced'
 import { EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, signedOutIssue, toSpawnable, updateIssue } from '../common'
 import type { CommandSpec, UpdateRetry } from '../types'
@@ -207,12 +208,7 @@ export function copilotReadiness(info: AgentInstallInfo, hiveEnv: NodeJS.Process
 /** The newest release on npm (the WinGet package follows it). */
 export async function copilotLatestVersion(): Promise<string | null> {
   try {
-    const ctrl = new AbortController()
-    const t = setTimeout(() => ctrl.abort(), 6000)
-    const res = await fetch(`https://registry.npmjs.org/${NPM_PACKAGE}/latest`, { signal: ctrl.signal })
-    clearTimeout(t)
-    if (!res.ok) return null
-    return ((await res.json()) as { version?: string }).version ?? null
+    return ((await plainHttpsJson(`https://registry.npmjs.org/${NPM_PACKAGE}/latest`, { timeoutMs: 6000 })) as { version?: string }).version ?? null
   } catch {
     return null
   }
