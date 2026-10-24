@@ -204,6 +204,9 @@ export const COPIES_QUIET_WAIT = 'hive.copies.quietWaitMinutes'
 /** Ctrl+C and Ctrl+V in an agent's pane go to its CLI rather than Hive's copy and paste (#1286, #966 row 24): read by TerminalView. */
 export const CTRL_CV_TO_CLI = 'hive.terminal.ctrlCVToCli'
 
+/** Successful builds of Hive itself (npm run dist, npm run release) go into the journal as Hive's facts (#1534): read by main's buildFacts. */
+export const JOURNAL_BUILDS = 'hive.journal.builds'
+
 /** The Assistant gets Hive's start view at each start and compaction (#1286, #966 row 28): read by main's startContext. */
 export const ASSISTANT_START_VIEW = 'hive.assistant.startView'
 
@@ -746,6 +749,19 @@ const SOURCES: readonly AdvancedSource[] = [
     kind: 'boolean',
     default: true,
     // Read at each start and compaction (assistantStartView), so a running Assistant takes a change at its next one.
+    applies: 'now'
+  },
+  {
+    id: JOURNAL_BUILDS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.journal.builds.title', defaultMessage: 'Record builds in the journal', description: "An advanced setting's title (Settings → Advanced), listed under Hive. The journal is the Hive Assistant's record of decisions and events; builds are installers made from Hive's own source code." }),
+    desc: msg({
+      id: 'settings.advanced.hive.journal.builds.desc',
+      defaultMessage: "When Hive's own installer is built from its source code (npm run dist, or npm run release), Hive writes the build into the Hive Assistant's journal as its own entry: the version, the commit, what kind of build it was and where the installer is. Only a successful build is written, and only while the journal is on with events in its scope. Turned off, builds aren't written, and a build left for Hive while it was closed is dropped when the workspace opens.",
+      description: 'What the advanced setting "Record builds in the journal" does (Settings → Advanced, under Hive). npm run dist and npm run release are commands: keep them as they are.'
+    }),
+    kind: 'boolean',
+    default: true,
     applies: 'now'
   },
   {

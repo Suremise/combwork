@@ -85,8 +85,8 @@ const slash = (p) => p.replace(/\\/g, '/')
     q.checkWith(fx, 'requires', "const fs = require('fs'); const missing = fs.readdirSync('.').filter((f) => f.endsWith('.js')).flatMap((f) => [...fs.readFileSync(f, 'utf8').matchAll(/require\\('([^']+)'\\)/g)].map((m) => m[1])).filter((d) => !fs.existsSync('node_modules/' + d)); if (missing.length) { console.error(\"Cannot find module '\" + missing[0] + \"'\"); process.exit(1) }")
     // The second card is under way before the first merges (as in a lane): the queue keeps its worktree, warm, for it.
     const useOdd = { n: (await inv('tasks:create', { title: 'Use is-odd', project: 'alpha' })).number }
-    useOdd.builder = await q.agent(fx, h, `B${useOdd.n}`, { worktree: true })
-    const useSteps = [await q.intent(h, useOdd.builder, useOdd.n, 'start')]
+    useOdd.builder = await q.agent(fx, h, `B${useOdd.n}`)
+    const useSteps = [await q.startCard(fx, h, useOdd.builder, useOdd.n)]
     const addOdd = await q.approve(fx, h, reviewer, 'Add is-odd', { 'package.json': '{"dependencies":{"left-pad":"1","is-odd":"1"}}\n' })
     check('the first card is approved', Object.values(addOdd.steps).every((x) => x.status === 200), JSON.stringify(addOdd.steps))
     check('S13: the first card (is-odd added to package.json) is merged', await done(addOdd.n), JSON.stringify(await h.kinds(addOdd.n)))
@@ -175,8 +175,8 @@ const slash = (p) => p.replace(/\\/g, '/')
     fs.writeFileSync(gpg, `#!/bin/sh\nexec node "${slash(waiter)}"\n`)
     // The card's own commit made before signing is on (the builder's commit would wait too).
     const n = (await inv('tasks:create', { title: 'Signed', project: 'alpha' })).number
-    const builder = await q.agent(fx, h, `B${n}`, { worktree: true })
-    const signedSteps = [await q.intent(h, builder, n, 'start')]
+    const builder = await q.agent(fx, h, `B${n}`)
+    const signedSteps = [await q.startCard(fx, h, builder, n)]
     fs.writeFileSync(path.join(builder.folder, 'signed.txt'), 'signed\n')
     lib.git(builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
     lib.git(builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'Signed'])
@@ -222,8 +222,8 @@ const slash = (p) => p.replace(/\\/g, '/')
     // --- S14 under Hive merges (G10): a release card under "your OK for release" waits on For you (Approve), unqueued.
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: f.options({ mergeInstall: 'onManifestChange', okBefore: { mode: 'labels', labels: ['release'] } }) })
     const rn = (await inv('tasks:create', { title: 'Release notes', project: 'alpha', labels: ['release'] })).number
-    const rb = await q.agent(fx, h, `B${rn}`, { worktree: true })
-    const rSteps = [await q.intent(h, rb, rn, 'start')]
+    const rb = await q.agent(fx, h, `B${rn}`)
+    const rSteps = [await q.startCard(fx, h, rb, rn)]
     fs.writeFileSync(path.join(rb.folder, 'notes.md'), 'notes\n')
     lib.git(rb.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
     lib.git(rb.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'Release notes'])

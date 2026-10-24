@@ -4,7 +4,7 @@ import { ASSISTANT_AGENT_ID, ASSISTANT_DIR } from '../shared/assistant'
 import { HIVE_DIR } from '../shared/defaults'
 import { readKeptJson } from './fsutil'
 import { journalSettings, inScope, type JournalEdit, type JournalFilter, type JournalForgetPreview, type JournalForgetResult, type JournalSettings, type LinkType } from '../shared/journal'
-import { browseEntry, closeJournal, deleteEntry, deleteJournal, forgetJournal, forgetPreview, journalFile, journalFileBytes, journalSize, leaveEntry, onJournalChange, pruneJournal, updateEntry, writeEntry } from './journal'
+import { browseEntry, closeJournal, deleteEntry, deleteJournal, forgetJournal, forgetPreview, journalFile, journalFileBytes, journalSize, leaveEntry, onJournalChange, pruneJournal, updateEntry, writeEntry, writeEntryOnce } from './journal'
 import { emit } from './events'
 import { createLogger } from './logger'
 import type { WorkspaceService } from './workspace'
@@ -136,14 +136,17 @@ export async function journalFactAt(workspacePath: string, fact: Fact): Promise<
 
 /**
  * Records a fact in the workspace's journal: only while it is on and its scope has events; never fails what it records
- * (a fact that can't be written is logged).
+ * (a fact that can't be written is logged). With `once`, a fact the journal already has (the same summary and detail,
+ * linked to it) isn't written again, and counts as recorded.
  */
-export function journalFact(ws: WorkspaceService | null | undefined, fact: Fact): boolean {
+export function journalFact(ws: WorkspaceService | null | undefined, fact: Fact, once?: { type: LinkType; ref: string }): boolean {
   if (!ws?.path) return false
   const s = journalSettingsOf(ws)
   if (!s.enabled || !inScope(s, 'event')) return false
   try {
-    writeEntry(ws.assistantHome, s, { kind: 'event', ...fact, tags: ['hive', ...(fact.tags ?? [])] }, 'hive')
+    const input = { kind: 'event', ...fact, tags: ['hive', ...(fact.tags ?? [])] }
+    if (once) writeEntryOnce(ws.assistantHome, s, input, 'hive', once)
+    else writeEntry(ws.assistantHome, s, input, 'hive')
     return true
   } catch (e) {
     log.warn('recording a fact in the journal', e)

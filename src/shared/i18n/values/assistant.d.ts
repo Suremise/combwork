@@ -16,6 +16,17 @@ interface HiveMessageValues {
   'assistant.journal.allKinds': undefined
   'assistant.journal.allProjects': undefined
   'assistant.journal.allSources': undefined
+  'assistant.journal.build.built': { version: string | number; kind: string | number; commit: string | number; branch: string | number }
+  'assistant.journal.build.builtAt': { when: string | number }
+  'assistant.journal.build.builtDetached': { version: string | number; kind: string | number; commit: string | number }
+  'assistant.journal.build.installer': { path: string | number }
+  'assistant.journal.build.kind.baseline': undefined
+  'assistant.journal.build.kind.beta': undefined
+  'assistant.journal.build.kind.rc': undefined
+  'assistant.journal.build.kind.release': undefined
+  'assistant.journal.build.uploaded': { version: string | number; kind: string | number; commit: string | number; branch: string | number }
+  'assistant.journal.build.uploadedDetached': { version: string | number; kind: string | number; commit: string | number }
+  'assistant.journal.build.uploadedNote': undefined
   'assistant.journal.cancel': undefined
   'assistant.journal.clearFilters': undefined
   'assistant.journal.close': undefined

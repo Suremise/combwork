@@ -8,6 +8,7 @@ import { confirm, notify, set, setActivity, useDateStyle, useLanguage, useStore 
 import { cx } from '../util'
 import { AssistantMark } from './AssistantMark'
 import { TaskChip } from './CardChip'
+import { journalBuildDetail, journalSummary } from './journalBuilds'
 import { Icon, IconButton, InfoTip, Markdown, SearchInput, Tooltip } from './ui'
 
 /**
@@ -463,10 +464,10 @@ function JournalRowView({ r, selected, onOpen }: { r: JournalRow; selected: bool
   const time = formatTime(r.at)
   return (
     <li className={cx('journal-row', selected && 'selected', r.supersededBy !== null && 'superseded')} data-entry={r.id} data-kind={r.kind}>
-      <button className="journal-row-main" aria-current={selected || undefined} aria-label={tr(M.openEntry, { kind, when: formatDateTime(r.at), summary: r.summary })} onClick={onOpen}>
+      <button className="journal-row-main" aria-current={selected || undefined} aria-label={tr(M.openEntry, { kind, when: formatDateTime(r.at), summary: journalSummary(r) })} onClick={onOpen}>
         <span className="journal-time faint">{time}</span>
         <Icon name={KIND_ICON[r.kind]} className="journal-kind-mark" title={kind} />
-        <span className="journal-summary">{r.summary}</span>
+        <span className="journal-summary">{journalSummary(r)}</span>
         {r.importance >= KEPT_IMPORTANCE && <Icon name={r.importance > KEPT_IMPORTANCE ? 'star-full' : 'star-half'} className="journal-important" title={tr(IMPORTANCE[r.importance])} />}
         {r.supersededBy !== null && <span className="badge journal-superseded-badge">{tr(M.superseded)}</span>}
         {r.digestOf && <span className="badge">{r.digestOf}</span>}
@@ -496,7 +497,7 @@ function EntryPane({ id, version, scope, onOpen, onClose }: { id: number; versio
   useEffect(load, [load, version])
   const remove = (): void => {
     if (!entry) return
-    void confirm({ title: tr(M.deleteTitle), message: tr(M.deleteMessage, { summary: entry.summary }), confirmLabel: tr(M.deleteButton), danger: true }).then((ok) => {
+    void confirm({ title: tr(M.deleteTitle), message: tr(M.deleteMessage, { summary: journalSummary(entry) }), confirmLabel: tr(M.deleteButton), danger: true }).then((ok) => {
       if (!ok) return
       setBusy(true)
       void call('journal:deleteEntry', entry.id)
@@ -508,7 +509,7 @@ function EntryPane({ id, version, scope, onOpen, onClose }: { id: number; versio
     })
   }
   return (
-    <aside className="journal-entry" aria-label={entry ? entry.summary : undefined} onKeyDown={(e) => e.key === 'Escape' && !editing && (e.stopPropagation(), onClose())}>
+    <aside className="journal-entry" aria-label={entry ? journalSummary(entry) : undefined} onKeyDown={(e) => e.key === 'Escape' && !editing && (e.stopPropagation(), onClose())}>
       <div className="editor-toolbar journal-entry-toolbar">
         <span className="path">{entry && <>
           <Icon name={KIND_ICON[entry.kind]} /> <strong>{tr(KIND[entry.kind])}</strong>
@@ -540,9 +541,10 @@ function EntryRead({ entry, onOpen }: { entry: JournalEntryView; onOpen: (id: nu
       {text}
     </button>
   )
+  const buildDetail = journalBuildDetail(entry)
   return (
     <>
-      <h2 className="journal-entry-summary">{entry.summary}</h2>
+      <h2 className="journal-entry-summary">{journalSummary(entry)}</h2>
       <dl className="journal-meta">
         <dt>{tr(M.when)}</dt>
         <dd>
@@ -564,7 +566,15 @@ function EntryRead({ entry, onOpen }: { entry: JournalEntryView; onOpen: (id: nu
       {entry.detail && (
         <section>
           <h3>{tr(M.detail)}</h3>
-          <Markdown source={entry.detail} className="journal-detail" />
+          {buildDetail ? (
+            <div className="journal-detail">
+              {buildDetail.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </div>
+          ) : (
+            <Markdown source={entry.detail} className="journal-detail" />
+          )}
         </section>
       )}
       {entry.why && (

@@ -297,7 +297,7 @@ interface State {
   newAgents: Record<string, string[]>
   modesVersion: number
   docsPage: string
-  /** A heading of the shown doc to scroll to (Learn more on a tip), cleared once there. */
+  /** The id of a heading of the shown doc to scroll to (Learn more on a tip, #1535), cleared once there. */
   docsAnchor: string | null
   settingsSection: string
   settingsQuery: string

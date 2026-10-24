@@ -4,7 +4,10 @@
 // See RELEASING.md.
 import { execSync, spawnSync } from 'child_process'
 import { existsSync, readFileSync } from 'fs'
+import { join } from 'path'
+import { fileURLToPath } from 'url'
 import { MANIFEST, manifestStale } from './testedClis.mjs'
+import { recordBuild } from './buildFact.mjs'
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 let token
@@ -52,3 +55,7 @@ if (exists && JSON.parse(view.stdout.toString() || '{}').isDraft !== true) {
 if (!exists) run('gh', ['release', 'create', tag, '--draft', '--title', `"Hive Desktop ${pkg.version}"`, '--notes', '""'])
 run('npx', ['electron-builder', '--win', '--publish', 'always'])
 console.log(`\nDraft release v${pkg.version} uploaded. Review it at https://github.com/Suremise/hive-desktop/releases and publish it there.`)
+// The uploaded build, recorded in Hive's journal (buildFact.mjs, #1534): run() exits first on any failure.
+const root = fileURLToPath(new URL('..', import.meta.url))
+const git = (...a) => execSync(`git ${a.join(' ')}`, { cwd: root }).toString().trim()
+console.log(await recordBuild({ root, version: pkg.version, commit: git('rev-parse', 'HEAD'), branch: git('branch', '--show-current') || null, installer: join(root, 'dist', `Hive-Setup-${pkg.version}.exe`), by: 'release' }))

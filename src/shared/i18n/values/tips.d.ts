@@ -378,6 +378,8 @@ interface HiveMessageValues {
   'tips.testedClis.title': undefined
   'tips.tileStrip.text': undefined
   'tips.tileStrip.title': undefined
+  'tips.tileStripOrder.text': undefined
+  'tips.tileStripOrder.title': undefined
   'tips.tilesView.text': undefined
   'tips.tilesView.title': undefined
   'tips.triageReport.text': undefined

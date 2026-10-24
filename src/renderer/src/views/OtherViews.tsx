@@ -2,6 +2,7 @@ import { Children, useEffect, useRef, useState } from 'react'
 import type { McpServerInfo, SkillInfo } from '@shared/types'
 import { enabledProviders } from '@shared/providers'
 import { APP_NAME } from '@shared/appName'
+import { guideTarget } from '@shared/userGuide'
 import iconUrl from '../assets/icon.svg'
 import guideMd from '@docs/USER_GUIDE.md?raw'
 import apiMd from '@docs/AGENT_API.md?raw'
@@ -550,13 +551,16 @@ export function DocsView() {
   const doc = DOCS.find((d) => d.id === page) ?? DOCS[0]
   const api = useStore((s) => s.api)
   const source = api?.url ? doc.source().replace(/http:\/\/127\.0\.0\.1:47821/g, api.url) : doc.source()
-  // Opened at a heading (a tip's Learn more): scroll to it once the page has rendered, and mark it briefly.
+  // Opened at a heading by its id (a tip's Learn more, #1535): scroll to it once the page has rendered, and mark it briefly.
   const anchor = useStore((s) => s.docsAnchor)
   const pageRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!anchor) return
     const t = setTimeout(() => {
-      const h = [...(pageRef.current?.querySelectorAll('h1, h2, h3, h4') ?? [])].find((x) => x.textContent?.trim() === anchor)
+      // Resolved as card references and hive_read_section resolve a heading: an id none or several carry goes nowhere.
+      const slug = guideTarget(source, anchor)
+      if (!slug) console.warn(`Docs: no single heading has the id "${anchor}"`) // i18n-ignore: a developer's console line
+      const h = slug ? [...(pageRef.current?.querySelectorAll('h1, h2, h3, h4, h5, h6') ?? [])].find((x) => x.id === slug) : undefined
       if (h) {
         h.scrollIntoView({ block: 'start' })
         h.classList.add('docs-target')
@@ -565,7 +569,7 @@ export function DocsView() {
       set({ docsAnchor: null })
     }, 50)
     return () => clearTimeout(t)
-  }, [anchor, doc.id])
+  }, [anchor, doc.id, source])
   return (
     <div className="split">
       <div className="split-list" style={{ width: listWidth }}>
