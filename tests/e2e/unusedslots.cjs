@@ -5,6 +5,7 @@
 // carried for its agent. Remove is refused for a slot with unmerged commits (it has no Remove; main refuses it, saying
 // why), and "Remove all merged" removes the merged free slot beyond the pool through the guarded clean-up. Screenshots
 // in both themes. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR (no agent is started).
+// Dev build only (#1578): its slots are lent through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')

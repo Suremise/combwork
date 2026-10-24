@@ -41,8 +41,9 @@ async function call(h, who, method, url, body) {
     q.steer(fx, 'wait')
     const first = await q.approve(fx, h, reviewer, 'First', { 'first.txt': 'first\n' })
     check('a first card is approved and its check is running', Object.values(first.steps).every((s) => s.status === 200) && !!(await until(() => fs.existsSync(fx.started), HUNG_MS)), JSON.stringify(first.steps))
-    q.commitOn(fx, 'integration', { 'a.txt': 'one\nTWO by someone\nthree\n' }, 'someone changes a.txt')
-    const card = await q.approve(fx, h, reviewer, 'Conflicting', { 'a.txt': 'one\ntwo by the builder\nthree\n' })
+    // Someone's change lands once the card's line is made (a line is made from the target's head).
+    const someone = () => q.commitOn(fx, 'integration', { 'a.txt': 'one\nTWO by someone\nthree\n' }, 'someone changes a.txt')
+    const card = await q.approve(fx, h, reviewer, 'Conflicting', { 'a.txt': 'one\ntwo by the builder\nthree\n' }, { afterStart: someone })
     check('the card is approved (start, submit, review, pass)', Object.values(card.steps).every((s) => s.status === 200), JSON.stringify(card.steps))
     const key = (await h.card(card.n)).key
     const before = q.head(fx)

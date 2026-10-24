@@ -10,6 +10,8 @@
 // 4. Both releases are in its actions (release-slot), and its panel lists them as Can't be undone (screenshots, light
 //    and dark).
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1578): B2 is a 0.9 worktree agent on purpose (agents:testLegacy), and slot-a's writer is planted
+// through slots:test; a packaged build refuses both test channels.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')

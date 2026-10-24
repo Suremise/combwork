@@ -139,8 +139,8 @@ const nothingToArchive = (dialog) => {
     // (labelled ui) in Approved beside the queued one in Merging.
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { okBefore: { mode: 'labels', labels: ['ui'] } }) })
     const okCard = (await inv('tasks:create', { title: 'Needs your OK', project: 'alpha', labels: ['ui'] })).number
-    const okBuilder = await q.agent(fx, h, 'B7', { worktree: true })
-    await q.intent(h, okBuilder, okCard, 'start')
+    const okBuilder = await q.agent(fx, h, 'B7')
+    await q.startCard(fx, h, okBuilder, okCard)
     fs.writeFileSync(path.join(okBuilder.folder, 'ok.txt'), 'ok\n')
     lib.git(okBuilder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
     lib.git(okBuilder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'ok'])
@@ -177,7 +177,7 @@ const nothingToArchive = (dialog) => {
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { okBefore: { mode: 'every', labels: [] } }) })
     q.steer(fx, 'wait')
     const oldRules = (await inv('tasks:create', { title: 'Old rules', project: 'alpha' })).number
-    await q.intent(h, okBuilder, oldRules, 'start')
+    await q.startCard(fx, h, okBuilder, oldRules)
     fs.writeFileSync(path.join(okBuilder.folder, 'old.txt'), 'old\n')
     lib.git(okBuilder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
     lib.git(okBuilder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'old rules'])
@@ -215,9 +215,9 @@ const nothingToArchive = (dialog) => {
 
     // --- Options changed to No review while a card is in Review: Review stays until the card leaves it.
     q.steer(fx, 'pass')
-    const builder = await q.agent(fx, h, 'B9', { worktree: true })
+    const builder = await q.agent(fx, h, 'B9')
     const inReview = (await inv('tasks:create', { title: 'In review', project: 'alpha' })).number
-    await q.intent(h, builder, inReview, 'start')
+    await q.startCard(fx, h, builder, inReview)
     fs.writeFileSync(path.join(builder.folder, 'r.txt'), 'r\n')
     lib.git(builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
     lib.git(builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'in review'])

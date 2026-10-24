@@ -11,6 +11,9 @@
 //   edited after: the Work section shows the state (folder, branch, ref, each file and its side, no command) and the
 //   For you request's "Show the files and commands" brings it into view.
 // Screenshots of each, both themes. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1578): BD is a 0.9 worktree agent on purpose (the Merge dialog on an agent's branch), and the slow
+// and failing reads and the crash are test seams (HIVE_TEST_SLOW_IPC, _FAIL_IPC, _QUEUE_CRASH); the other cards'
+// builders are on slots, as 1.0 has them.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -83,9 +86,14 @@ const f = q.folderHelpers(fx)
 
     // --- A conflict's return, with its files: One merges a line, Two changes the same line from the same base.
     q.steer(fx, 'pass')
-    const one = await q.approve(fx, h, reviewer, 'One', { 'a.txt': 'one\nTWO by one\nthree\n' })
-    check('One is merged', !!(await until(async () => (await column(one.n)) === 'done', HUNG_MS)))
-    const two = await q.approve(fx, h, reviewer, 'Two', { 'a.txt': 'one\nTWO by two\nthree\n' })
+    // One is approved and merged once Two's line is made (a line is made from the target's head).
+    let one = null
+    const two = await q.approve(fx, h, reviewer, 'Two', { 'a.txt': 'one\nTWO by two\nthree\n' }, {
+      afterStart: async () => {
+        one = await q.approve(fx, h, reviewer, 'One', { 'a.txt': 'one\nTWO by one\nthree\n' })
+        check('One is merged', !!(await until(async () => (await column(one.n)) === 'done', HUNG_MS)))
+      }
+    })
     check('Two is returned: a conflict', !!(await until(async () => (await column(two.n)) === 'doing', HUNG_MS)))
     part = await openCard(two.n)
     const conflict = await until(async () => {

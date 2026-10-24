@@ -11,6 +11,8 @@
 // - workflow rules turned off during its check: no advance (paused); on again, it is merged;
 // - Hive ended right after the target moved, before `Integrated` (S33c): the next start records it, once.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Builders on slots (#1578). S33c ends Hive at a crash seam (HIVE_TEST_QUEUE_CRASH): NOT RUN on a packaged build
+// (HIVE_EXE), where the rest runs.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const q = require('./queueFixture.cjs')
@@ -63,9 +65,10 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await h.inv('tasks:archive', one.n, true)
 
     // --- A conflict: back to its builder with the files.
-    q.commitOn(fx, 'integration', { 'a.txt': 'one\nTWO by someone\nthree\n' }, 'someone changes a.txt')
+    // Someone's change lands once Two's line is made (a line is made from the target's head).
+    const someone = () => q.commitOn(fx, 'integration', { 'a.txt': 'one\nTWO by someone\nthree\n' }, 'someone changes a.txt')
+    const two = await q.approve(fx, h, reviewer, 'Two', { 'a.txt': 'one\ntwo by the builder\nthree\n' }, { afterStart: someone })
     const before = q.head(fx)
-    const two = await q.approve(fx, h, reviewer, 'Two', { 'a.txt': 'one\ntwo by the builder\nthree\n' })
     const [f2] = await firstFailure(two.n)
     check('a conflict returns it: IntegrationFailed (conflict) naming a.txt, back in Doing', f2?.data?.reason === 'conflict' && JSON.stringify(f2.data.files) === '["a.txt"]' && (await column(two.n)) === 'doing', JSON.stringify(f2))
     check('…the target unmoved', q.head(fx) === before)
@@ -144,40 +147,42 @@ ${JSON.stringify(await h.kinds(five.n))}`)
     await h.app.close().catch(() => {})
   }
 
-  // --- S33c: Hive ends right after the target moved, before Integrated; the next start records it, once.
-  let crashed = null
-  try {
-    h = await q.startHive(fx, { port: PORT, env: { HIVE_TEST_QUEUE_CRASH: 'afterAdvance' }, keepOptions: true })
-    // Its process's end, seen as it happens (the page goes with it).
-    const proc = h.app.process()
-    let ended = false
-    proc.once('exit', () => (ended = true))
-    const reviewer = await q.agent(fx, h, 'R2')
-    q.steer(fx, 'pass')
-    // Approved: the queue merges it and Hive ends as the target moves (a reply may not come back).
-    crashed = await q.approve(fx, h, reviewer, 'Nine', { 'nine.txt': 'nine\n' }).catch(() => null)
-    check('S33c: the card was approved', !!crashed)
-    check('S33c: Hive ended right after the advance', !!(await until(() => ended, HUNG_MS)))
-  } catch (e) {
-    check('no exception before the crash', false, e.stack)
-  } finally {
-    await h.app.close().catch(() => {})
-  }
-  if (crashed) {
-    const afterCrash = q.head(fx)
-    const queueRefs = () => lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/hive/queue/']).split(/\r?\n/).filter(Boolean)
-    const refsAtCrash = queueRefs()
+  if (q.devSeam('S33c (Hive ended right after the advance, HIVE_TEST_QUEUE_CRASH)')) {
+    // --- S33c: Hive ends right after the target moved, before Integrated; the next start records it, once.
+    let crashed = null
     try {
-      h = await q.startHive(fx, { port: PORT, keepOptions: true })
-      const restartedDone = await until(async () => (await h.card(crashed.n))?.column === 'done', HUNG_MS)
-      const integ = (await h.facts(crashed.n)).filter((f) => f.kind === 'Integrated')
-      check('…restarted: Done, Integrated (observed) once, its result the target as the crash left it', !!restartedDone && integ.length === 1 && integ[0].data.result === afterCrash && q.head(fx) === afterCrash, JSON.stringify(integ))
-      const crashedRef = `refs/hive/queue/${(await h.card(crashed.n)).key}`
-      check("…its test merge's ref, there at the crash, dropped by the recovery", refsAtCrash.includes(crashedRef) && !!(await until(() => !queueRefs().includes(crashedRef), HUNG_MS)), JSON.stringify({ refsAtCrash, now: queueRefs() }))
+      h = await q.startHive(fx, { port: PORT, env: { HIVE_TEST_QUEUE_CRASH: 'afterAdvance' }, keepOptions: true })
+      // Its process's end, seen as it happens (the page goes with it).
+      const proc = h.app.process()
+      let ended = false
+      proc.once('exit', () => (ended = true))
+      const reviewer = await q.agent(fx, h, 'R2')
+      q.steer(fx, 'pass')
+      // Approved: the queue merges it and Hive ends as the target moves (a reply may not come back).
+      crashed = await q.approve(fx, h, reviewer, 'Nine', { 'nine.txt': 'nine\n' }).catch(() => null)
+      check('S33c: the card was approved', !!crashed)
+      check('S33c: Hive ended right after the advance', !!(await until(() => ended, HUNG_MS)))
     } catch (e) {
-      check('no exception after the restart', false, e.stack)
+      check('no exception before the crash', false, e.stack)
     } finally {
       await h.app.close().catch(() => {})
+    }
+    if (crashed) {
+      const afterCrash = q.head(fx)
+      const queueRefs = () => lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/hive/queue/']).split(/\r?\n/).filter(Boolean)
+      const refsAtCrash = queueRefs()
+      try {
+        h = await q.startHive(fx, { port: PORT, keepOptions: true })
+        const restartedDone = await until(async () => (await h.card(crashed.n))?.column === 'done', HUNG_MS)
+        const integ = (await h.facts(crashed.n)).filter((f) => f.kind === 'Integrated')
+        check('…restarted: Done, Integrated (observed) once, its result the target as the crash left it', !!restartedDone && integ.length === 1 && integ[0].data.result === afterCrash && q.head(fx) === afterCrash, JSON.stringify(integ))
+        const crashedRef = `refs/hive/queue/${(await h.card(crashed.n)).key}`
+        check("…its test merge's ref, there at the crash, dropped by the recovery", refsAtCrash.includes(crashedRef) && !!(await until(() => !queueRefs().includes(crashedRef), HUNG_MS)), JSON.stringify({ refsAtCrash, now: queueRefs() }))
+      } catch (e) {
+        check('no exception after the restart', false, e.stack)
+      } finally {
+        await h.app.close().catch(() => {})
+      }
     }
   }
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

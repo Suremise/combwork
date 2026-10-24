@@ -11,6 +11,8 @@
 //    its tools/call (and hive_start_task's) given them anyway is refused too, adding nothing and leaving the card as it was.
 // 4. Storage counts each slot on disk once: lent (to its agent), and still once its lease ends and it waits free.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1578): B2 is a 0.9 worktree agent on purpose (agents:testLegacy), and B1's slot is lent through
+// slots:test; a packaged build refuses both test channels.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')

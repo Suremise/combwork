@@ -3,6 +3,7 @@
 // card), a card of it blocked (with why), and every card passed so its merge is due; nothing for a plain move into
 // Review, and nothing when Settings → Notifications has notifications off. A quiet test copy records each notice in
 // HIVE_TEST_NOTIFY_LOG, which this reads. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1578): it starts this checkout's Electron itself.
 const lib = require('./lib.cjs')
 const { showBoard, openByTitle } = require('./queueFixture.cjs')
 const { _electron } = require('playwright-core')

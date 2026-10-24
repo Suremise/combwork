@@ -5,11 +5,10 @@
 // named from its key, builders and reviewers paired both ways, in a grid of six, none in a worktree, Codex's agents on
 // Claude Code with a note on their rows; Pair loaded from + Add ▾ → Templates with "Also switch this project to Pair…"
 // ticked lands in Version Control → Workflow with Pair chosen and not saved. Screenshots of the Hive templates, and of
-// the load dialog's suggestion and swap note, in both themes. Dev build, throwaway profile, workspace and
+// the load dialog's suggestion and swap note, in both themes. Dev build (or HIVE_EXE), throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR; a quiet test copy. (0.9's templates copied at the board's real upgrade, and the upgrade waiting:
 // tests/upgradeTemplates.test.ts, on boards made 0.9's.)
 const lib = require('./lib.cjs')
-const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -51,14 +50,10 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47800), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
-  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
+  // Through lib.launch, so HIVE_EXE runs it on a packaged build (#1578).
+  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47800), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 900 } })
   try {
-    const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    await lib.fitWindow(app, page, { width: 1500, height: 900 })
-    await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await lib.waitForProvider(inv)
     const projectCfg = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8'))
