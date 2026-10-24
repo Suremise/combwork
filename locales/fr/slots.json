@@ -1,4 +1,8 @@
 {
+  "slots.release.changed": "{slot} a changé entre-temps : ce qui y écrit n’est plus ce qui est affiché. Regardez à nouveau.",
+  "slots.release.live": "Ce qui écrit dans {slot} tourne encore dans ce Hive : arrêtez d’abord l’agent, ou arrêtez ou gardez ce qu’il a laissé tourner.",
+  "slots.release.notEnded": "Certains des processus listés tournent encore : Windows n’a pas laissé Hive les arrêter, donc {slot} n’a pas été libéré. Réessayez, ou libérez-le sans les arrêter.",
+  "slots.release.otherHive": "{slot} est retenu par un autre Hive qui tourne encore (processus {pid}) : libérez-le là-bas, ou quittez d’abord ce Hive.",
   "slots.setting.bad": "Ce paramètre de slot n’existe pas dans Hive.",
   "slots.setting.badSize": "Le nombre de copies de revue et de vérification est un nombre entier de 1 à 32.",
   "slots.setting.badText": "Un script de slot ou une liste de fichiers est un texte d’au plus 4 000 caractères."

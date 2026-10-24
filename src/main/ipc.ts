@@ -106,6 +106,7 @@ import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
 import { settleSlotsUpToDate } from './workflow/slotsUpToDateStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
+import { heldWriter, releaseHeldWriter } from './agentFolders'
 import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
 import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
@@ -809,6 +810,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
     'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
     'slots:releaseCarried': (p, agentId) => releaseCarried(workspace, workspace.assertProject(p), String(agentId)),
+    'slots:heldWriter': (p, slot) => heldWriter(workspace.assertProject(p), String(slot)),
+    'slots:releaseWriter': (p, slot, run, end) => releaseHeldWriter(workspace.assertProject(p), String(slot), String(run), { end: end === true }),
     'copies:list': (p) => copyViews(workspace, workspace.assertProject(p)),
     'slots:test': async (p, op) => {
       if (app.isPackaged) throw new Error('slots:test is for test copies') // i18n-ignore: a test channel, never shown

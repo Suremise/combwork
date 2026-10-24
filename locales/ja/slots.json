@@ -1,4 +1,8 @@
 {
+  "slots.release.changed": "{slot} はその間に変わりました。書き込んでいるのは表示されたセッションではなくなっています。もう一度確認してください。",
+  "slots.release.live": "{slot} に書き込んでいるセッションはこの Hive でまだ実行中です。先にエージェントを停止するか、残したプロセスを終了または保持してください。",
+  "slots.release.notEnded": "一覧のプロセスの一部がまだ実行中です。Windows が Hive による終了を許可しなかったため、{slot} は解放されませんでした。もう一度試すか、終了せずに解放してください。",
+  "slots.release.otherHive": "{slot} は、まだ実行中の別の Hive (プロセス {pid}) が保持しています。そちらで解放するか、先にその Hive を終了してください。",
   "slots.setting.bad": "Hive にそのスロット設定はありません。",
   "slots.setting.badSize": "レビュー用とチェック用のコピーの数は 1 から 32 までの整数です。",
   "slots.setting.badText": "スロットのスクリプトやファイルの一覧は 4,000 文字以内のテキストです。"

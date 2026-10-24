@@ -1,4 +1,20 @@
 {
+  "slots.release.changed": {
+    "defaultMessage": "{slot} changed meanwhile: its writer is no longer the one shown. Look again.",
+    "description": "Release Slot… refused: the slot ({slot}, such as slot-b) was released or taken by another run while the question was open."
+  },
+  "slots.release.live": {
+    "defaultMessage": "{slot}'s writer is still running in this Hive: stop the agent, or end or keep what it left running, first.",
+    "description": "Release Slot… refused: the session writing in the slot ({slot}) still runs in this Hive, or Hive still follows the processes it left running (End or Keep Running in the agent's ⋯ menu settles them)."
+  },
+  "slots.release.notEnded": {
+    "defaultMessage": "Some of the processes listed still run: Windows didn't let Hive end them, so {slot} wasn't released. Try again, or release it without ending them.",
+    "description": "Release Slot… with \"End these processes first\": ending the listed processes failed (Windows refused), so the slot ({slot}) was left as it was."
+  },
+  "slots.release.otherHive": {
+    "defaultMessage": "{slot} is held by another Hive that is still running (process {pid}): release it there, or quit that Hive first.",
+    "description": "Release Slot… refused: another running copy of Hive (its process id {pid}) holds the slot ({slot})."
+  },
   "slots.setting.bad": {
     "defaultMessage": "That isn’t a slot setting Hive has.",
     "description": "An error: a request to change a setting of “Slots and copies” named one that doesn’t exist."

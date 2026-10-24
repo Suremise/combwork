@@ -340,6 +340,8 @@
   "tips.silentUnknown.title": "智能体沉默，状态未知",
   "tips.skillsDelivered.text": "在“技能”视图或项目的“技能”选项卡中，Hive 每个技能旁的开关表示智能体是否获得它（向智能体提供）。Hive 为 Codex 和 Copilot 放在文件夹中的副本，会在那里不再有智能体工作时按“设置”→“高级”的设定删除。",
   "tips.skillsDelivered.title": "选择智能体获得哪些技能",
+  "tips.slotHeld.text": "当 Hive 无法确定代理会话在槽位中启动的一切是否都已结束时，它会保留这个槽位而不是猜测。代理 ⋯ 菜单中的“释放槽位…”会显示 Hive 所知道的情况，按你的意愿结束它列出的进程，并释放槽位。",
+  "tips.slotHeld.title": "释放 Hive 关闭后仍被占用的槽位",
   "tips.slotOptions.text": "版本控制 → 工作流程 → 槽位和副本 包含在新槽位中运行的脚本、复制到其中的文件、正在使用的槽位，以及项目保留的评审副本数量。更改时即保存。",
   "tips.slotOptions.title": "在版本控制中设置槽位",
   "tips.slotResume.text": "构建者的对话留在其卡片的槽位中。卡片结束后，“全部恢复”会跳过它，让槽位留给新工作；只要槽位没被其他工作用过，它自己的“恢复”就能取回该槽位。",

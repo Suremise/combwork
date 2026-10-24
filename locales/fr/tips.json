@@ -340,6 +340,8 @@
   "tips.silentUnknown.title": "Un agent silencieux, d’état inconnu",
   "tips.skillsDelivered.text": "L’interrupteur à côté de chaque compétence de Hive, dans la vue Compétences ou l’onglet Compétences d’un projet, indique si les agents la reçoivent (Fournie aux agents). Les copies que Hive place dans un dossier pour Codex et Copilot sont supprimées dès qu’aucun agent n’y travaille, comme le dit Paramètres → Avancé.",
   "tips.skillsDelivered.title": "Choisis les compétences que reçoivent les agents",
+  "tips.slotHeld.text": "Quand Hive ne peut pas dire si tout ce que la session d’un agent a lancé dans un emplacement est terminé, il lui garde l’emplacement plutôt que de deviner. Libérer l’emplacement… dans le menu ⋯ de l’agent montre ce que Hive sait, arrête ce qu’il liste si vous le souhaitez et libère l’emplacement.",
+  "tips.slotHeld.title": "Libérer un emplacement retenu après la fermeture de Hive",
   "tips.slotOptions.text": "Gestion de versions → Flux de travail → Emplacements et copies réunit le script lancé dans un nouvel emplacement, les fichiers qui y sont copiés, les emplacements utilisés et le nombre de copies de relecture du projet. Tout est enregistré à mesure que vous changez.",
   "tips.slotOptions.title": "Régler les emplacements dans Gestion de versions",
   "tips.slotResume.text": "La conversation d’un auteur reste dans l’emplacement de sa carte. Une fois la carte terminée, Tout reprendre la laisse, pour que l’emplacement reste libre pour du nouveau travail ; son propre Reprendre récupère l’emplacement tant que rien d’autre ne l’a utilisé.",
