@@ -348,6 +348,31 @@ describe("the repository's AGENTS.md", () => {
   })
 })
 
+// #1533 (P8): RELEASING.md owns the release path and the list of the user's OKs; release-hive and AGENTS.md point to it.
+describe('RELEASING.md on the 1.0 path', () => {
+  const releasing = readFileSync(join(ROOT, 'RELEASING.md'), 'utf8')
+  const section = (heading: string): string => releasing.split(/^## /m).find((s) => s.startsWith(heading)) ?? ''
+  it('goes from phases on the integration branch to a baseline install, then an RC and the release', () => {
+    const path = section('The 1.0 path')
+    expect(path).toMatch(/\*\*integration branch\*\* \(`1\.0\.0`\)/)
+    expect(path).toMatch(/1\. \*\*Phases\.\*\*[\s\S]*\*\*checks card\*\*, #1449/)
+    expect(path).toMatch(/2\. \*\*The baseline install\*\* \(#1288\)[\s\S]*\*\*The user installs\.\*\* Nothing is pushed, tagged or uploaded\./)
+    expect(path).toMatch(/3\. \*\*The RC, then the release\*\* \(#1541\)[\s\S]*the integration branch is merged into `main` \(asked/)
+    expect(path).toMatch(/`dist\/build-info\.json`/)
+    expect(section('Release notes')).toMatch(/\*\*back up first, there's no going back\*\*/)
+  })
+  it("lists every publishing step as the user's OK, which release-hive and AGENTS.md point to without repeating", () => {
+    const ok = section("The user's OK")
+    for (const step of [/`npm run dist`/, /changing the version/, /pushing/, /merging an integration branch into `main`/, /`npm run release`/, /publishing the draft, and creating tags/, /GitHub issue/]) expect(ok).toMatch(step)
+    for (const copy of ['.claude', '.agents']) {
+      const skill = readFileSync(join(ROOT, copy, 'skills', 'release-hive', 'SKILL.md'), 'utf8')
+      expect(skill).toMatch(/RELEASING\.md's \*\*The user's OK\*\* lists the decisions that are the user's/)
+      expect(skill).not.toMatch(/^- creating tags;/m)
+    }
+    expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/RELEASING\.md's \*\*The user's OK\*\* lists each step that needs it/)
+  })
+})
+
 describe("Hive's development skills", () => {
   const claude = '.claude/skills'
   const agents = '.agents/skills'
