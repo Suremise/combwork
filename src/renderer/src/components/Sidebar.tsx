@@ -606,6 +606,8 @@ function NotesPanel() {
       <div key={n.path}>
         <div
           className={cx('row', selected === n.path && 'selected')}
+          // Its path in .hive/shared (#1571): what a test finds a note or folder by, whatever the window's language.
+          data-note={n.relPath}
           style={{ paddingLeft: 12 + depth * 14 }}
           onClick={() => (n.isDir ? setExpanded((e) => ({ ...e, [n.relPath]: !e[n.relPath] })) : set({ selectedNote: n.path }))}
           onContextMenu={(e) =>

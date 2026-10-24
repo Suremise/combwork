@@ -6269,6 +6269,18 @@ body.pane-resizing .monaco-editor {
   white-space: nowrap;
   font-size: 12px;
 }
+/* Short of room (#1568), it gives way after the status and before the name, shortened with an ellipsis (its tooltip
+   says where it works). */
+.pane-header-bar > .tip-wrap:has(> .agent-place) {
+  min-width: 0;
+  overflow: hidden;
+  flex-shrink: 100;
+}
+.pane-header-bar .agent-place {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 button.agent-place {
   background: none;
   border: none;

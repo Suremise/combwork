@@ -25,6 +25,7 @@ const M = {
   aboutUnusedTip: msg({ id: 'workspace.changes.aboutUnusedTip', defaultMessage: "Kept when their agent was removed (by hand, or when a template's agents replaced it), or made outside Hive (by an agent's own git worktree add, say). Loading a template gives none of them to its agents.{known, select, yes { Those merged into {into} and clean can go with their branches; the others hold work that is nowhere else.} other {}}", description: "The ⓘ beside Unused worktrees' heading: where they come from and which can be removed. Keep git worktree add as it is; {into} is the main branch." }),
   aboutUnusedOne: msg({ id: 'workspace.changes.aboutUnusedOne', defaultMessage: "An unused worktree: everything on {branch} that isn't on {into}. Merge it, or go back to Unused worktrees to remove it.", description: "The Changes tab, over an unused worktree's changes. Unused worktrees is the page's name." }),
   aboutAgent: msg({ id: 'workspace.changes.aboutAgent', defaultMessage: "{agent}'s worktree: everything on {branch} since it left {base}. Merge… brings it into {base}.", description: "The Changes tab, over an agent's worktree's changes. Merge… is the button." }),
+  aboutSlot: msg({ id: 'workspace.changes.aboutSlot', defaultMessage: '{is, select, carried {{agent} works in {name}, the slot kept for it} other {{agent} builds in {name}}}: {known, select, yes {everything on its branch since it left {base}.} other {what isn\'t committed there yet.}}', description: "The Changes tab, over the changes in the slot an agent works in (#1569): a slot it builds a card in, or the slot kept for it (its own worktree from before 1.0); {name} is the slot's name, such as slot-b; {base} the branch its work started from. Glossary: slot." }),
   aboutProject: msg({ id: 'workspace.changes.aboutProject', defaultMessage: "The project folder: what isn't committed yet, from you or the agents working in the folder itself (those without a worktree).", description: "The Changes tab, over the project folder's changes." }),
   lostCommits: msg({ id: 'workspace.unused.lostCommits', defaultMessage: '{count, plural, one {# commit} other {# commits}} on {branch} not on {known, select, yes {{into}} other {any other branch}}', description: "What removing an unused worktree anyway loses: a line of the confirmation's list." }),
   lostDetached: msg({ id: 'workspace.unused.lostDetached', defaultMessage: '{count, plural, one {# commit on no branch (only its detached HEAD has it)} other {# commits on no branch (only its detached HEAD has them)}}', description: "What removing an unused worktree anyway loses: a line of the confirmation's list." }),
@@ -102,6 +103,8 @@ export const CHANGES_ABOUT = {
   unusedTip: (into: string | null): string => tr(M.aboutUnusedTip, { known: into ? 'yes' : 'no', into: into ?? '' }),
   unusedOne: (branch: string, into: string): string => tr(M.aboutUnusedOne, { branch, into }),
   agent: (name: string, branch: string, base: string): string => tr(M.aboutAgent, { agent: name, branch, base }),
+  /** An agent's slot, or the slot kept for it (#1569). */
+  slot: (agent: string, is: 'slot' | 'carried', name: string, base: string | null): string => tr(M.aboutSlot, { agent, is, name, known: base ? 'yes' : 'no', base: base ?? '' }),
   get project(): string {
     return tr(M.aboutProject)
   }
