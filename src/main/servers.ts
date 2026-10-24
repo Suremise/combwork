@@ -36,7 +36,7 @@ import { docOutline, findHeading, sectionText, type DocHeading } from '../shared
 import { providerService } from './providerService'
 import { config } from './config'
 import type { Refusal } from '../shared/workflow/refusals'
-import { agentWorkflowRole, isWorkflowRole, type WorkflowRole } from '../shared/workflow/roles'
+import { agentWorkflowRole, isWorkflowRole, workflowPairs, type WorkflowRole } from '../shared/workflow/roles'
 import { deleteEntry, JournalBusy, JournalError, readEntry, recall, updateEntry, writeEntry } from './journal'
 import { journalSettingsOf, journalSuggestion } from './journalService'
 import { recordBuild } from './buildFacts'
@@ -66,10 +66,10 @@ import { releasableSlots, releaseSlot, SlotReleaseRefused, type HeldRow } from '
 import { slotAt } from '../shared/agentFolders'
 import { cardStall, laneOrderView, stepWaitOf } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
-import { ackDeliveries, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
+import { ackDeliveries, ackThenRead, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
 import { INBOX_SWITCHES, type InboxSwitch } from '../shared/inboxSwitches'
 import { isDoorbell } from '../shared/doorbell'
-import type { DeliverySender } from '../shared/deliveries'
+import type { DeliverySender, InboxItem } from '../shared/deliveries'
 import * as tasks from './tasks'
 import { runCardIntent, type CardIntent, type CardRefIn } from './cardIntents'
 import { pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
@@ -500,6 +500,8 @@ async function projectSummary(p: string) {
       // The guidance and skill revisions it launched with (compare with GET /v1/status's to spot an old launch).
       launched: a.live?.launched ?? null
     })),
+    // Its builder and reviewer pairs (#1531): its running lanes', then by name; empty without either.
+    pairs: workflowPairs(info.agents, await lanes.listLanes(workspaceOf(p), { project: basename(p) }).catch(() => [])),
     // The workspace's MCP servers (#713): all available to the project, on only where turned on.
     mcp: { available: servers.filter((m) => m.def).map((m) => m.name), on: mcpOn },
     // Its version control, what Hive finds in its folder now, and the switch it offers when they differ (#1419): never
@@ -1359,16 +1361,20 @@ function inboxOwner(): { host: string; agentId: string } {
 }
 
 // hive_inbox (#647): the caller's deliveries not received yet (a card's events in one item), now received; with ack, marks
-// those ids acked. An id that isn't the caller's is unknown, like one that doesn't exist.
+// those ids acked and lists nothing. With ack and read: true (#1531, opt-in), both in one call: the ack first, by the
+// ack's own rules, then the read, whose items are received only (an item is never acked by being read). An id that
+// isn't the caller's is unknown, like one that doesn't exist.
 route('POST', '/v1/inbox', async ({ body }) => {
   const { host, agentId } = inboxOwner()
+  if (body?.read !== undefined && typeof body.read !== 'boolean') throw new HttpError(400, 'read is true or false')
+  // Its rows name cards by key, for the hive tools' words (#1219).
+  const named = <T extends { items: InboxItem[] }>(inbox: T) => ({ ...inbox, ...withNames(inbox.items.flatMap((i) => (i.card ? [i.card] : []))) })
   if (body?.ack !== undefined) {
     if (!Array.isArray(body.ack) || !body.ack.length || body.ack.length > 200 || !body.ack.every((x: unknown) => typeof x === 'string' && x.length <= 32)) throw new HttpError(400, 'ack is a list of delivery ids ("m12"), at most 200')
-    return ackDeliveries(host, agentId, (body.ack as string[]).map((x) => x.trim()))
+    const ids = (body.ack as string[]).map((x) => x.trim())
+    return body.read === true ? named(await ackThenRead(host, agentId, ids)) : ackDeliveries(host, agentId, ids)
   }
-  // Its rows name cards by key, for the hive tools' words (#1219).
-  const inbox = await readInbox(host, agentId)
-  return { ...inbox, ...withNames(inbox.items.flatMap((i) => (i.card ? [i.card] : []))) }
+  return named(await readInbox(host, agentId))
 })
 
 // An agent's deliveries with their states and times (#647): the newest `limit` (default 20, at most 200).
@@ -1545,8 +1551,9 @@ route('POST', '/v1/agents/wait', async ({ body }) => {
     const agents: WatchedAgent[] = []
     for (const t of unique) agents.push({ projectPath: t.p, agentId: t.id, name: (await agentDefOf(t.p, t.id)).name, project: basename(t.p) })
     const r = await registerAgentWatch(requireWorkspace(), who.projectPath, who.agentId, { agents, ignoreBackground: !throughBackground }, limit)
-    if ('already' in r) return { already: r.already }
-    return { watching: r.watching.label, limitAt: r.watching.limitAt, ...(r.replaced ? { replaced: r.replaced } : {}) }
+    const ended = { ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.dropped ? { dropped: r.dropped } : {}) }
+    if ('already' in r) return { already: r.already, ...ended }
+    return { watching: r.watching.label, limitAt: r.watching.limitAt, ...ended }
   }
   const limit = Math.min(waitMaxSeconds('agents'), Math.max(5, Number(body?.timeoutSeconds) || 300)) * 1000
   const t0 = Date.now()

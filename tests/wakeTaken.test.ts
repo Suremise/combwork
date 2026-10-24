@@ -231,7 +231,7 @@ describe("a line of Hive's the user typed into is theirs (#652 round 1 finding 2
     live.set(key, e)
     return e
   }
-  const BELL = '[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it.'
+  const BELL = '[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it, act on it, then ack it.'
 
   for (const pause of [15, 0]) {
     it(`edited and left past the typing pause (${pause} s): no Enter again, and nothing more typed until a prompt is sent`, async () => {

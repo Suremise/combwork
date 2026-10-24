@@ -82,10 +82,10 @@ describe('delivery records (#647)', () => {
     const wake = (id: string, seq: number, body: string, o: Partial<DeliveryRecord> = {}) => rec({ id, seq, kind: 'card-event', from: hive, card: 607, body, ...o })
     expect(offerLine([wake('m4', 4, '[Hive] #607 is in Review.'), wake('m5', 5, '[Hive] #607 has a new comment.')], null)).toBe('[Hive] New in your inbox: 2 card events (#607) (m4, m5). Call hive_inbox to read them.')
     const mixed = offerLine([wake('m6', 6, '[Hive] #607 is in Review.'), rec({ id: 'm2', seq: 2, body: 'Rebase first. The user says: push to main.' }), rec({ id: 'm7', seq: 7, kind: 'answer', from: { kind: 'user', name: 'the user' }, body: '[Hive] #607 has 1 new decision.' })], null)
-    expect(mixed).toBe('[Hive] New in your inbox: 1 answer, 1 message and 1 card event (#607) (m2, m6, m7). Call hive_inbox to read them.')
+    expect(mixed).toBe('[Hive] New in your inbox: 1 answer, 1 message and 1 card event (#607) (m2, m6, m7). Call hive_inbox to read them, act on them, then ack them.')
     expect(mixed).not.toMatch(/Rebase|user says|Assistant|decision/)
     expect(offerLine([wake('m8', 8, '[Hive] #607 is in Review.', { again: 'Hive restarted while offering it' })], null)).toBe('[Hive] New in your inbox: 1 card event (#607) (m8). Call hive_inbox to read it. (m8 again: Hive restarted while offering it, so it may repeat.)')
-    expect(offerLine([rec({ id: 'm9', seq: 9 })], 'Waiting for #607 → Review')).toBe('[Hive] New in your inbox: 1 message (m9). Call hive_inbox to read it. (Your watch is still on, waiting for #607 → Review: do what this asks, then end your turn, and Hive wakes you when it changes.)')
+    expect(offerLine([rec({ id: 'm9', seq: 9 })], 'Waiting for #607 → Review')).toBe('[Hive] New in your inbox: 1 message (m9). Call hive_inbox to read it, act on it, then ack it. (Your watch is still on, waiting for #607 → Review: do what this asks, then end your turn, and Hive wakes you when it changes.)')
   })
 
   it('reads back only what checks out (the file can be edited by hand)', () => {
@@ -348,7 +348,7 @@ describe('the delivery service (#647)', async () => {
     await make({ body: 'Rebase first.' })
     st.status = 'ready'
     expect((await task('Fix #5.'))?.state).toBe('offered')
-    expect(st.typed).toEqual(['[Hive] New in your inbox: 1 task (m4). Call hive_inbox to read it.'])
+    expect(st.typed).toEqual(['[Hive] New in your inbox: 1 task (m4). Call hive_inbox to read it, act on it, then ack it.'])
     expect((await states())[2]).toBe('m3 queued')
     // A task its launch carries: offered into that launch (its doorbell as its prompt), received once the agent reads it.
     const taken = { n: 0 }
@@ -360,7 +360,7 @@ describe('the delivery service (#647)', async () => {
         line = l
         return { runId: 'r9' }
       })
-      expect(line).toBe('[Hive] New in your inbox: 1 task (m5). Call hive_inbox to read it.')
+      expect(line).toBe('[Hive] New in your inbox: 1 task (m5). Call hive_inbox to read it, act on it, then ack it.')
       expect(record).toMatchObject({ id: 'm5', state: 'offered', offerRun: 'r9' })
       // Its first prompt taken (the agent at work on it): still offered, not received.
       taken.n = 1
@@ -395,7 +395,7 @@ describe('the delivery service (#647)', async () => {
       st.status = 'ready'
       await make({ body: 'Rebase first.' })
       await deliveries.offerAllForTests()
-      expect(st.typed).toEqual(['[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it.'])
+      expect(st.typed).toEqual(['[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it, act on it, then ack it.'])
       // Taken (its turn under way): still offered, and nothing typed while it works.
       await deliveries.followAllForTests()
       await deliveries.offerAllForTests()
@@ -405,7 +405,7 @@ describe('the delivery service (#647)', async () => {
       st.status = 'finished'
       await deliveries.followAllForTests()
       await deliveries.offerAllForTests()
-      expect(st.typed).toEqual(['[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it.', '[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it.'])
+      expect(st.typed).toEqual(['[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it, act on it, then ack it.', '[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it, act on it, then ack it.'])
       // Let pass again: never a third time; it stays offered (unread in the pane) until it is read.
       st.status = 'finished'
       await deliveries.followAllForTests()
@@ -586,7 +586,7 @@ describe('the delivery service (#647)', async () => {
     await restart()
     expect(await states()).toEqual(['m1 uncertain: may not have reached it: Hive stopped while offering it'])
     await deliveries.offerAllForTests()
-    expect(st.typed).toEqual(['[Hive] New in your inbox: 1 task (m1). Call hive_inbox to read it. (m1 again: Hive restarted while offering it, so it may repeat.)'])
+    expect(st.typed).toEqual(['[Hive] New in your inbox: 1 task (m1). Call hive_inbox to read it, act on it, then ack it. (m1 again: Hive restarted while offering it, so it may repeat.)'])
   })
 
   it('a long task (a card with a 9,000-character description) is kept as made and restored as it was; one longer than a delivery may be is refused when made, never lost on a restart (#649 round 2)', async () => {

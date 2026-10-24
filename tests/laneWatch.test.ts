@@ -782,6 +782,11 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await watches.evaluateWatches(w)
     await watches.settled()
     expect(st.typed).toHaveLength(2)
+    // A lane's own card listed beside it (#1531, #1346 item 3): the watch is kept as asked, and the reply warns.
+    const dup = await watchWith(w, home, st, [a, rel])
+    expect(dup.cards).toEqual({ now: [a, rel], inLanes: [a] })
+    expect(dup.watching.cards).toEqual([a, rel])
+    expect(taskWaitText({ watching: dup.watching.label, limitAt: 'T', events: [...LANE_DEFAULT_EVENTS], cards: dup.cards })).toContain(`Warning: #${a} is a card of the lanes you watch: listed too, it wakes you on every move. For a lane, pass lanes only.`)
     await disposeWorkspaceService(w)
   })
 

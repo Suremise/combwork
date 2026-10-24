@@ -13,6 +13,7 @@ import { resolve as resolvePath } from 'path'
 import { agentActor, agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, loopStepSide, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
+import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
 import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
 import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusals'
@@ -502,6 +503,13 @@ export class Workflow {
 
   private notFrom(card: CardRecord, actor: Actor, s: CardState, move: string): Promise<Refusal> {
     return this.refuse(card, actor, move, { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move, moves: this.movesFrom(s.stage, this.rulesetOf(card, s), s).join(', ') } })
+  }
+
+  /** What comes next on card `n` from where it is now, under its rules (#1530: an intent's reply names it). */
+  nextFor(n: number): NextStep | null {
+    const card = this.store.card(n)
+    const s = this.state(card)
+    return nextStep(s, this.rulesetOf(card, s))
   }
 
   /** The intents an agent can use from a stage under a ruleset (§16.7.2's table): what a refusal offers as the next step. */

@@ -945,7 +945,7 @@ describe('card decisions', () => {
     try {
       // Typed: its doorbell, for one decision (#650).
       await decisionWakes.tellNow(w, alpha, 'a1')
-      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it.`])
+      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it, act on it, then ack it.`])
       // Its CLI takes the line and the agent reads its inbox (the receipt), whose save is held; a newer decision then.
       const held = new Promise<void>((r) => (release = r))
       let holding = false
@@ -975,7 +975,7 @@ describe('card decisions', () => {
       status = 'finished'
       await decisionWakes.tellNow(w, alpha, 'a1')
       expect(sent).toHaveLength(2)
-      expect(sent[1]).toBe(`[Hive] New in your inbox: 1 answer (#${n}) (m2). Call hive_inbox to read it.`)
+      expect(sent[1]).toBe(`[Hive] New in your inbox: 1 answer (#${n}) (m2). Call hive_inbox to read it, act on it, then ack it.`)
       taken = 2
       status = 'working'
       expect((await deliveries.readInbox(alpha, 'a1')).items.map((i) => i.text)).toEqual([expect.stringMatching(new RegExp(`#${n} has 1 new decision from the user`))])
@@ -1010,7 +1010,7 @@ describe('card decisions', () => {
     writer.testHooks.takeMs = 20
     try {
       await decisionWakes.tellNow(w, alpha, 'a1')
-      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it.`])
+      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it, act on it, then ack it.`])
       // Another decision before it reads, told again (the board's settle, its turn's end): the rung line covers it.
       await laterMs()
       await run(() => tasks.updateTask(n, { decision: 'Close on the counter.' }, assistant))
@@ -1053,7 +1053,7 @@ describe('card decisions', () => {
     try {
       await decisionWakes.tellNow(w, alpha, 'a1')
       expect(saves).toBeGreaterThan(2)
-      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it.`])
+      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it, act on it, then ack it.`])
     } finally {
       deliveries.setBeforeSaveForTests(null)
       writer.testHooks.takeMs = undefined
@@ -1829,7 +1829,7 @@ describe('removal and board under faults', () => {
         expect([started.card.column, started.card.agent]).toEqual(['doing', 'r1'])
         expect(started.card.history.at(-1)).toMatchObject({ by: 'Assistant', what: 'Moved to Doing' })
         // Launched with its doorbell (#650), and the task, read from the agent's inbox, says what to do.
-        expect(prompts.at(-1)).toMatch(new RegExp(`^\\[Hive\\] New in your inbox: 1 task \\(#${c.number}\\) \\(m\\d+\\)\\. Call hive_inbox to read it\\.$`))
+        expect(prompts.at(-1)).toMatch(new RegExp(`^\\[Hive\\] New in your inbox: 1 task \\(#${c.number}\\) \\(m\\d+\\)\\. Call hive_inbox to read it, act on it, then ack it\\.$`))
         expect((await deliveries.deliveriesOf(join(wsPath, 'resumer'), 'r1')).at(-1)?.body).toMatch(
           new RegExp(`^Work on task #${c.number} from the Hive task board: Back from ${from}\n\nIt was in ${from === 'review' ? 'Review' : 'Done'} and is back in Doing for more work\\.\n\nAddress the latest review comment\\.$`)
         )

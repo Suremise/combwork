@@ -30,6 +30,33 @@ export function agentWorkflowRole(a: { name: string; role?: string; workflowRole
   return /review/i.test(a.name) || REVIEWER_NAME.test(a.name.trim()) ? 'reviewer' : 'builder'
 }
 
+/**
+ * A project's builder and reviewer pairs (#1531, #1346 item 2: an Assistant named another project's reviewer, the agents
+ * having no roles it could see): each running lane's builder with its reviewer (or the pool), then, by name, a builder
+ * and a reviewer in no running lane whose names end in the same number (HB2 and HR2, HI-B1 and HI-R1), only where that
+ * number gives exactly one reviewer. A guess by name says so (`byName`).
+ */
+export interface WorkflowPair {
+  builder: string
+  /** Null with the pool. */
+  reviewer: string | null
+  pool?: true
+  lane?: string
+  byName?: true
+}
+
+export function workflowPairs(agents: readonly { name: string; role?: string; workflowRole?: WorkflowRole }[], lanes: readonly { id: string; state: string; builder: { name: string }; reviewer: { name: string } | null; pool?: boolean }[]): WorkflowPair[] {
+  const out: WorkflowPair[] = lanes.filter((l) => l.state === 'active' || l.state === 'paused').map((l) => ({ builder: l.builder.name, reviewer: l.reviewer?.name ?? null, ...(l.pool ? { pool: true as const } : {}), lane: l.id }))
+  const taken = new Set(out.flatMap((p) => [p.builder, p.reviewer]).filter((n): n is string => !!n).map((n) => n.toLowerCase()))
+  const free = agents.filter((a) => !taken.has(a.name.toLowerCase()))
+  const number = (name: string): string | undefined => /(\d+)$/.exec(name.trim())?.[1]
+  for (const b of free.filter((a) => agentWorkflowRole(a) === 'builder' && number(a.name))) {
+    const reviewers = free.filter((r) => agentWorkflowRole(r) === 'reviewer' && number(r.name) === number(b.name))
+    if (reviewers.length === 1) out.push({ builder: b.name, reviewer: reviewers[0].name, byName: true })
+  }
+  return out
+}
+
 /** Whether an agent of this role builds cards (an either-role agent does both). */
 export const buildsWork = (role: WorkflowRole): boolean => role !== 'reviewer'
 

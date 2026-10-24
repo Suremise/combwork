@@ -87,7 +87,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
         // Idle: the doorbell, or nothing typed at all.
         st.status = 'ready'
         expect(await deliveries.offerNow(alpha, 'b1')).toBe(c.idleWakes)
-        expect(st.typed).toEqual(c.idleWakes ? [`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox to read it.`] : [])
+        expect(st.typed).toEqual(c.idleWakes ? [`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox to read it, act on it, then ack it.`] : [])
         // Typed or not, it is unread until the agent reads it: never dropped.
         expect(await unread()).toEqual([m.id])
         // The agent reads its inbox whenever it next calls hive_inbox: it is all there.
@@ -107,7 +107,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     // Deliver Now (the pane's, session:deliverNow): one line naming both, typed once.
     const { deliverWaiting } = await import('../src/main/agentMessages')
     expect(await deliverWaiting(alpha, 'b1')).toBe(true)
-    expect(st.typed).toEqual([`[Hive] New in your inbox: 1 message and 1 card event (#1432) (${e.id}, ${m.id}). Call hive_inbox to read them.`])
+    expect(st.typed).toEqual([`[Hive] New in your inbox: 1 message and 1 card event (#1432) (${e.id}, ${m.id}). Call hive_inbox to read them, act on them, then ack them.`])
     // The agent idle again without reading them: nothing rings again by itself.
     st.status = 'ready'
     await deliveries.offerAllForTests()
@@ -123,7 +123,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
     const [tick, asked] = await Promise.all([deliveries.offerNow(alpha, 'b1'), deliverWaiting(alpha, 'b1')])
     expect(tick).toBe(false)
     expect(asked).toBe(true)
-    expect(st.typed).toEqual([`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox to read it.`])
+    expect(st.typed).toEqual([`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox to read it, act on it, then ack it.`])
   })
 
   it('idle wakes off: Deliver Now whose line is overtaken as it is typed (its source no longer wants it as made) makes it again at once and types it, a bounded number of times (#1504)', async () => {
@@ -242,7 +242,7 @@ describe('carrying on: the inbox switches (#1432)', async () => {
       const { deliverWaiting } = await import('../src/main/agentMessages')
       expect(await deliverWaiting(alpha, 'b1')).toBe(true)
       expect(asked).toBeGreaterThan(2)
-      expect(st.typed).toEqual([`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox to read it.`])
+      expect(st.typed).toEqual([`[Hive] New in your inbox: 1 message (${m.id}). Call hive_inbox to read it, act on it, then ack it.`])
     } finally {
       writer.onLineComing(() => false)
     }

@@ -223,10 +223,11 @@ export function inboxText(items: readonly InboxItem[], unacked: readonly string[
   return [`${items.length} new:`, ...rows, ...(older ? [older] : []), 'Ack each with hive_inbox (ack: its ids) once you have acted on it.'].join('\n')
 }
 
-/** hive_inbox ack's reply. */
-export function ackText(acked: readonly string[], unknown: readonly string[], unread: readonly string[] = []): string {
+/** hive_inbox ack's reply; `reading`: with read: true (#1531), the ids not read yet are in the read that follows. */
+export function ackText(acked: readonly string[], unknown: readonly string[], unread: readonly string[] = [], reading = false): string {
   const a = acked.length ? `Acked ${idList(acked)}.` : 'Nothing acked.'
-  const notRead = unread.length ? ` Not read yet: ${idList(unread)}: read ${unread.length === 1 ? 'it' : 'them'} with hive_inbox first.` : ''
+  const it = unread.length === 1 ? 'it' : 'them'
+  const notRead = unread.length ? (reading ? ` Not read before: ${idList(unread)}, not acked: ack ${it} once you have acted on ${it}.` : ` Not read yet: ${idList(unread)}: read ${it} with hive_inbox first.`) : ''
   return `${a}${notRead}${unknown.length ? ` Not in your inbox: ${idList(unknown)}.` : ''}`
 }
 
