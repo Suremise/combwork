@@ -62,33 +62,53 @@ function tokenOf(env) {
   return env.HIVE_API_TOKEN && !env.HIVE_API_TOKEN.includes('${') ? env.HIVE_API_TOKEN : null
 }
 
-/** POSTs the fact; resolves to Hive's reply ({ recorded, reason? }), or null when Hive can't be reached or refuses. */
+/**
+ * POSTs the fact; resolves to Hive's reply ({ recorded, reason? }), or null when Hive can't be reached, refuses, or the
+ * exchange ends any other way (a reply cut off, the connection closed early, no answer within timeoutMs for the whole
+ * exchange). It always settles, once, and never rejects (#1534 round 1: a cut-off reply left it pending, and the script
+ * ended with an unsettled await after a good build): the caller then leaves a marker.
+ */
 export function postBuild(fact, { url, token, workspace }, timeoutMs = 10_000) {
   return new Promise((resolve) => {
-    let u
-    try {
-      u = new URL('/v1/builds', url)
-    } catch {
-      return resolve(null)
+    let req = null
+    let settled = false
+    const done = (reply) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      req?.destroy()
+      resolve(reply)
     }
-    const body = JSON.stringify(fact)
-    const headers = { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body), authorization: `Bearer ${token}` }
-    if (workspace) headers['x-hive-workspace'] = encodeURIComponent(workspace)
-    const req = request(u, { method: 'POST', headers, timeout: timeoutMs }, (res) => {
-      let text = ''
-      res.setEncoding('utf8')
-      res.on('data', (c) => (text += c))
-      res.on('end', () => {
-        try {
-          resolve(res.statusCode >= 200 && res.statusCode < 300 ? JSON.parse(text) : null)
-        } catch {
-          resolve(null)
-        }
+    const timer = setTimeout(() => done(null), timeoutMs)
+    try {
+      const u = new URL('/v1/builds', url)
+      const body = JSON.stringify(fact)
+      const headers = { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body), authorization: `Bearer ${token}` }
+      if (workspace) headers['x-hive-workspace'] = encodeURIComponent(workspace)
+      req = request(u, { method: 'POST', headers }, (res) => {
+        let text = ''
+        res.setEncoding('utf8')
+        res.on('data', (c) => (text += c))
+        res.on('end', () => {
+          // A body cut off but ended cleanly doesn't parse: null too.
+          if (!res.complete || res.statusCode < 200 || res.statusCode >= 300) return done(null)
+          try {
+            const reply = JSON.parse(text)
+            done(reply && typeof reply === 'object' && typeof reply.recorded === 'boolean' ? reply : null)
+          } catch {
+            done(null)
+          }
+        })
+        res.on('aborted', () => done(null))
+        res.on('error', () => done(null))
+        res.on('close', () => done(null))
       })
-    })
-    req.on('timeout', () => req.destroy())
-    req.on('error', () => resolve(null))
-    req.end(body)
+      // Closed before any reply: a socket hang up, an error.
+      req.on('error', () => done(null))
+      req.end(body)
+    } catch {
+      done(null)
+    }
   })
 }
 
@@ -117,7 +137,9 @@ export async function recordBuild({ root, version, commit, branch = null, instal
   const workspace = workspaceOf(root, env)
   const token = tokenOf(env)
   if (env.HIVE_API_URL && token) {
-    const reply = await post(fact, { url: env.HIVE_API_URL, token, workspace })
+    const reply = await Promise.resolve()
+      .then(() => post(fact, { url: env.HIVE_API_URL, token, workspace }))
+      .catch(() => null)
     if (reply) return reply.recorded ? `Build recorded in Hive's journal (${fact.kind}).` : `Build not recorded in Hive's journal: ${reply.reason}`
   }
   if (!workspace) return "Build not recorded in Hive's journal: no Hive workspace holds this checkout (HIVE_WORKSPACE names one)."

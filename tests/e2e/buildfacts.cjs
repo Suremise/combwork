@@ -82,14 +82,25 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'hive' })).
     // Hive closed: the build is left as a marker, then recorded once as the workspace opens.
     await app.close()
     app = null
+    // Another build (its own time: the same build sent twice is recorded once).
+    succeeded()
     const left = fakeBuild(null)
     check('with Hive closed, the build is left for it', left.startsWith("Build left for Hive's journal (baseline)"), left)
     check('…as one marker in the workspace', fs.existsSync(markers) && fs.readdirSync(markers).filter((n) => n.endsWith('.json')).length === 1)
-    ;({ app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT) }, viewport: { width: 1400, height: 900 } }))
+    // Opened in German this time: the journal stores the line in English, and the window shows it in the user's language.
+    ;({ app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), HIVE_LANG: 'de' }, viewport: { width: 1400, height: 900 } }))
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
     check('opening the workspace records it', !!(await lib.until(async () => (await builds(inv)).length === 2, HUNG_MS)), JSON.stringify(await builds(inv)))
     check('…and takes the marker away', !!(await lib.until(() => fs.readdirSync(markers).length === 0, HUNG_MS)), JSON.stringify(fs.readdirSync(markers)))
+    await page.locator('.activity-btn[aria-label="Hive Assistant"]').click()
+    await page.locator('.row[data-section="journal"]').click()
+    const german = page.locator('.journal .journal-row', { hasText: `Hive 9.9.9-rc.1 (Baseline) aus ${head().slice(0, 8)} auf main gebaut` })
+    check('in German, Journal → Timeline shows both builds in German', !!(await lib.until(async () => (await german.count()) === 2, HUNG_MS)), await page.locator('.journal').innerText().catch(() => ''))
+    await german.first().locator('.journal-row-main').click()
+    const detail = page.locator('.journal-entry .journal-detail')
+    check("…and the entry's detail too", !!(await lib.until(async () => /^Installer: .*Hive-Setup-9\.9\.9-rc\.1\.exe\nGebaut: /.test(await detail.innerText().catch(() => '')), HUNG_MS)), await detail.innerText().catch(() => ''))
+    await page.screenshot({ path: path.join(lib.WORK, 'buildfacts-journal-de.png') })
   } catch (e) {
     check('no unexpected error', false, e.stack)
   } finally {

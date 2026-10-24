@@ -50,3 +50,22 @@ export function buildFactSummary(f: BuildFact): string {
   const what = f.by === 'release' ? 'Uploaded a draft of' : 'Built'
   return `${what} Hive ${f.version} (${KIND_WORDS[f.kind]}) from ${f.commit.slice(0, 8)}${f.branch ? ` on ${f.branch}` : ''}`
 }
+
+/** A build fact's one line read back (the window shows it in the user's language, #1534 round 1), or null for another line. */
+export function parseBuildSummary(summary: string): { by: BuildFact['by']; version: string; kind: BuildKind; commit: string; branch: string | null } | null {
+  const m = /^(Built|Uploaded a draft of) Hive (\S+) \((beta|baseline|release candidate|release)\) from ([0-9a-f]{7,64})(?: on (.+))?$/.exec(summary)
+  if (!m) return null
+  const kind = (Object.keys(KIND_WORDS) as BuildKind[]).find((k) => KIND_WORDS[k] === m[3])!
+  return { by: m[1] === 'Built' ? 'dist' : 'release', version: m[2], kind, commit: m[4], branch: m[5] ?? null }
+}
+
+/** The detail Hive writes for a build fact. */
+export function buildFactDetail(f: Pick<BuildFact, 'installer' | 'builtAt' | 'by'>): string {
+  return `Installer: ${f.installer}\nBuilt: ${f.builtAt}${f.by === 'release' ? '\nUploaded to a draft GitHub release (npm run release).' : ''}`
+}
+
+/** A build fact's detail read back, or null for another detail. */
+export function parseBuildDetail(detail: string): { installer: string; builtAt: string; uploaded: boolean } | null {
+  const m = /^Installer: (.+)\r?\nBuilt: (\S+)(\r?\nUploaded to a draft GitHub release \(npm run release\)\.)?$/.exec(detail)
+  return m && !Number.isNaN(Date.parse(m[2])) ? { installer: m[1], builtAt: m[2], uploaded: !!m[3] } : null
+}
