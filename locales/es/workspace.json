@@ -109,7 +109,7 @@
   "workspace.changes.aboutProject": "La carpeta del proyecto: lo que aún no tiene commit, tuyo o de los agentes que trabajan en la propia carpeta (los que no tienen worktree).",
   "workspace.changes.aboutUnusedOne": "Un worktree sin usar: todo lo que hay en {branch} y no está en {into}. Fusiónalo, o vuelve a Worktrees sin usar para quitarlo.",
   "workspace.changes.aboutUnusedShort": "Worktrees en los que no trabaja ningún agente del proyecto {project}: abre uno para ver sus cambios y fusionarlos, o quítalo.",
-  "workspace.changes.aboutUnusedTip": "Se conservaron al quitar su agente, se crearon fuera de Hive (por ejemplo, con un git worktree add del propio agente) o vienen de otra plantilla (al cargar esa plantilla, vuelven a sus agentes).{known, select, yes { Los que están fusionados en {into} y limpios pueden quitarse junto con sus ramas; los demás contienen trabajo que no está en ningún otro sitio.} other {}}",
+  "workspace.changes.aboutUnusedTip": "Se conservaron al quitar su agente (a mano o al reemplazarlo los agentes de una plantilla) o se crearon fuera de Hive (por ejemplo, con un git worktree add del propio agente). Al cargar una plantilla, ninguno pasa a sus agentes.{known, select, yes { Los que están fusionados en {into} y limpios pueden quitarse junto con sus ramas; los demás contienen trabajo que no está en ningún otro sitio.} other {}}",
   "workspace.docs.about": "Acerca de {app}",
   "workspace.docs.api": "Agent API",
   "workspace.docs.changelog": "Notas de la versión",

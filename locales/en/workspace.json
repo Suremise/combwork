@@ -440,7 +440,7 @@
     "description": "The Changes tab's Unused worktrees page, at the top, in one sentence (#1314; its ⓘ says where they come from and what Remove does)."
   },
   "workspace.changes.aboutUnusedTip": {
-    "defaultMessage": "Kept when their agent was removed, made outside Hive (by an agent's own git worktree add, say), or from another template (loading that template gives them back to its agents).{known, select, yes { Those merged into {into} and clean can go with their branches; the others hold work that is nowhere else.} other {}}",
+    "defaultMessage": "Kept when their agent was removed (by hand, or when a template's agents replaced it), or made outside Hive (by an agent's own git worktree add, say). Loading a template gives none of them to its agents.{known, select, yes { Those merged into {into} and clean can go with their branches; the others hold work that is nowhere else.} other {}}",
     "description": "The ⓘ beside Unused worktrees' heading: where they come from and which can be removed. Keep git worktree add as it is; {into} is the main branch."
   },
   "workspace.docs.about": {
