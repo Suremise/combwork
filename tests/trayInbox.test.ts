@@ -50,7 +50,7 @@ describe('tray menu', () => {
       const path = `C:/${name}/p`
       const agents = waiting.map(([id, since]) => {
         states.push({ projectPath: path, agentId: id, status: 'waiting', statusSince: since } as LiveSessionState)
-        return { id, name: id, live: null } as unknown as AgentInfo
+        return { id, name: id, live: null, place: { folder: path, is: 'project', name: null, branch: null } } as unknown as AgentInfo
       })
       const window = { name, isMinimized: () => false, restore: () => undefined, show: () => undefined, focus: () => undefined }
       return { path: `C:/${name}`, window, info: () => ({ projects: [{ name, path, agents } as unknown as ProjectInfo], assistant: null }), activeNames: () => [] }

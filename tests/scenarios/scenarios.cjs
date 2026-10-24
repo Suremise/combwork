@@ -2463,7 +2463,8 @@ module.exports.SCENARIOS = [
       const cfg = JSON.parse(require('fs').readFileSync(file, 'utf8'))
       require('fs').writeFileSync(file, JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project', preChecks: ['quick'], commands: { quick: 'node check.js' } } } }, null, 2))
       c.checkLog = path.join(c.ws, 'quick-runs.jsonl')
-      c.write('check.js', `const { execSync } = require('child_process')\nrequire('fs').appendFileSync(${JSON.stringify(c.checkLog)}, JSON.stringify({ cwd: process.cwd(), head: execSync('git rev-parse HEAD').toString().trim() }) + '\\n')\nconsole.log('quick: ok')\n`)
+      // check.js is the project's own check, run by Hive's check runner with its environment, not a child of the harness.
+      c.write('check.js', `const cp = require('child_process')\nrequire('fs').appendFileSync(${JSON.stringify(c.checkLog)}, JSON.stringify({ cwd: process.cwd(), head: cp.execSync('git rev-parse HEAD').toString().trim() }) + '\\n')\nconsole.log('quick: ok')\n`)
       const n = await c.card('q', { title: 'Greeting comma', description: 'greet.js returns "Hello, <name>" with a comma. Its check is the workflow check quick.', agent: 'coder' })
       await c.inv('tasks:move', n, 'doing')
       // Coder's work on the card, committed in the shared folder.
