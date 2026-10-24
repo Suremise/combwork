@@ -231,7 +231,7 @@
   "git.tags.pushTo": "Push it to",
   "git.tags.title": "Tag {commit}",
   "git.tags.titleNoCommit": "Tag the commit",
-  "git.tip.click": "Click for Git → Branches & remotes.",
+  "git.tip.click": "Click for Version Control → Branches & remotes.",
   "git.tip.detached": "HEAD is detached at {commit}",
   "git.tip.fetched": "As of the last fetch, {when}. Hive never fetches by itself.",
   "git.tip.gone": "It tracked {upstream}, which is gone from the remote.",

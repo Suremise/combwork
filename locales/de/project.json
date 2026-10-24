@@ -168,7 +168,7 @@
   "project.header.stopAllTip": "{count, plural, one {Den laufenden Agenten stoppen} other {Alle # laufenden Agenten stoppen}}",
   "project.header.stopMany": "Stoppen ({count})",
   "project.header.workingOn": "Du arbeitest an diesem Projekt",
-  "project.key.aliases": "Seine alten Schlüssel, die seine Karten weiterhin finden: {keys}",
+  "project.key.aliases": "Frühere Schlüssel, unter denen die Karten weiterhin zu finden sind: {keys}",
   "project.key.change": "Ändern",
   "project.key.changed": "Seine Karten heißen jetzt {key}; {old} findet sie weiterhin.",
   "project.key.failed": "Der Projektschlüssel konnte nicht geändert werden",

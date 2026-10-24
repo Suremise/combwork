@@ -29,7 +29,7 @@
   "performance.cards.project": "Proyecto",
   "performance.cards.reviewer": "Revisor",
   "performance.cards.rounds": "Rondas",
-  "performance.cards.roundsTip": "Rondas de revisión: cada revisión fallida es una, y la que está en curso o se aprobó, la siguiente. Ninguna antes de que pasara por primera vez a Revisión.",
+  "performance.cards.roundsTip": "Rondas de revisión: cada revisión fallida es una, y la que está en curso o se superó, la siguiente. Ninguna antes de que pasara por primera vez a Revisión.",
   "performance.cards.tip": "Cada tarjeta que tuvieron sus agentes en {range, select, 24h {las últimas 24 horas} 7d {los últimos 7 días} other {los últimos 30 días}}: lo que usó su autor mientras estaba en En curso y su revisor desde el inicio de la revisión hasta su veredicto, según lo informaron los proveedores (el costo completo de cada tarjeta, porque Uso de los proveedores cuenta sesiones completas). ≈ es una estimación de Hive; Desconocido, lo que no se sabe (nunca {zero}). Los tokens, al pasar el puntero. Lo que usaron los agentes de un carril sin tener ninguna tarjeta son sus gastos generales, al pasar el puntero sobre el carril en el panel Progreso.",
   "performance.cards.unknown": "+ {n, number} desconocido",
   "performance.col.p50": "p50",

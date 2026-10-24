@@ -3,7 +3,8 @@
     "board-hygiene": [
       "0572c5dcda525e1c",
       "053f431d60a616b7",
-      "1a85f53ba82fca85"
+      "1a85f53ba82fca85",
+      "82c7af80f3668358"
     ],
     "card-loop": [
       "7fca2f34d9b1d72a",
@@ -72,7 +73,10 @@
       "919aaea51b50d4cb",
       "dea7fc62d4b22c0c",
       "6ee2a37dba0f3acc",
-      "25dbcfd4369f0120"
+      "25dbcfd4369f0120",
+      "98ff49055761ad5e",
+      "7c3e418dbb0f3449",
+      "0c7bc3dbf776f8f5"
     ],
     "handover": [
       "60ac1268a067e829",
@@ -82,7 +86,8 @@
     "journal": [
       "a5944f6b716d5f3e",
       "9d8e5f27b9ad5ac3",
-      "a029628dae30f337"
+      "a029628dae30f337",
+      "12049ff66579193d"
     ],
     "licence-audit": [
       "fbeedbd277f91f4c"
@@ -139,7 +144,10 @@
       "be5d6f7a441bed4a",
       "0d9e752a3c871dd5",
       "5354696ed20567a2",
-      "96f3c7892bcd3335"
+      "96f3c7892bcd3335",
+      "42edb8d867523814",
+      "f8538c809baf8438",
+      "c4545aeb8100e1f7"
     ],
     "split-work": [
       "9f3b17bc4a73bdd1",
@@ -148,10 +156,12 @@
     ],
     "triage-report": [
       "d854ef7b080ac6e2",
-      "7ca7cd68a3f66813"
+      "7ca7cd68a3f66813",
+      "7c11bbf9bdbbeddb"
     ],
     "tune-settings": [
-      "734ef492088145a7"
+      "734ef492088145a7",
+      "40332ddcbf85451a"
     ],
     "use-hive-api": [
       "c0281b780bf4d213",
@@ -189,7 +199,8 @@
   "modes": {
     "coordinator": [
       "2cd699f6b4a7c3b1",
-      "8ab80fcd42401537"
+      "8ab80fcd42401537",
+      "6db5d571e5be0c11"
     ],
     "orchestrator": [
       "21ce0d9749e31d4d",
@@ -205,14 +216,17 @@
       "038463ff624effe4",
       "105748c5136c8384",
       "3eff9745091ff58c",
-      "20e2ba7c90ec0932"
+      "20e2ba7c90ec0932",
+      "a49bb6ce9684d37f"
     ],
     "qa-triager": [
       "1fac81c2d6f4fa25",
-      "f2a025454728a429"
+      "f2a025454728a429",
+      "d7f529987f8e311b"
     ],
     "release-manager": [
-      "bbd2aa88c583d7b0"
+      "bbd2aa88c583d7b0",
+      "2965ab64c0035612"
     ],
     "reviewer": [
       "1e0061343258e607",

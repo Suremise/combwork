@@ -135,6 +135,38 @@
     "defaultMessage": "Status line: weekly limit field",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.claude-code.subagent.descriptionField.desc": {
+    "defaultMessage": "The field of that result with what the subagent was asked to do, in a few words. Wrong, Hive still counts it but has no description of it.",
+    "description": "What the advanced setting \"Transcript: background subagent's description field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.claude-code.subagent.descriptionField.title": {
+    "defaultMessage": "Transcript: background subagent's description field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.subagent.idField.desc": {
+    "defaultMessage": "The field of that result with the subagent's id, which its notification names when it ends. Wrong, Hive doesn't count background subagents.",
+    "description": "What the advanced setting \"Transcript: background subagent's id field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.claude-code.subagent.idField.title": {
+    "defaultMessage": "Transcript: background subagent's id field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.subagent.launched.desc": {
+    "defaultMessage": "The status of the Agent tool's result when it runs a subagent (or a workflow) in the background (#1584). Wrong, Hive doesn't count those subagents, and shows the agent finished while they work.",
+    "description": "What the advanced setting \"Transcript: background subagent launched\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.claude-code.subagent.launched.title": {
+    "defaultMessage": "Transcript: background subagent launched",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.subagent.resumedField.desc": {
+    "defaultMessage": "The field of a message's result with the id of a finished subagent the message started again. Wrong, Hive doesn't count a resumed subagent while it works.",
+    "description": "What the advanced setting \"Transcript: resumed subagent field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.claude-code.subagent.resumedField.title": {
+    "defaultMessage": "Transcript: resumed subagent field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.claude-code.trust.prompt.desc": {
     "defaultMessage": "Claude Code's question before a folder's first session. Hive shows the agent as waiting for you while it is on screen.",
     "description": "What the advanced setting \"Trust question\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -325,6 +357,38 @@
   },
   "settings.advanced.codex.signIn.expired.title": {
     "defaultMessage": "Sign-in refused: error message",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.codex.subagent.item.desc": {
+    "defaultMessage": "The kind of item Codex records when a subagent it spawned starts or ends (#1584). Wrong, Hive doesn't count Codex's subagents among an agent's background tasks.",
+    "description": "What the advanced setting \"Session file: subagent's activity\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.subagent.item.title": {
+    "defaultMessage": "Session file: subagent's activity",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.codex.subagent.started.desc": {
+    "defaultMessage": "The kind of that activity when the subagent starts; any other kind ends it. Wrong, Hive doesn't count Codex's subagents.",
+    "description": "What the advanced setting \"Session file: subagent started\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.subagent.started.title": {
+    "defaultMessage": "Session file: subagent started",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.codex.subagent.taskField.desc": {
+    "defaultMessage": "The field of that activity with the subagent's task name. Wrong, Hive still counts it but has no description of it.",
+    "description": "What the advanced setting \"Session file: subagent's task field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.subagent.taskField.title": {
+    "defaultMessage": "Session file: subagent's task field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.codex.subagent.threadField.desc": {
+    "defaultMessage": "The field of that activity with the subagent's thread, which tells its start and its end apart from another's. Wrong, Hive doesn't count Codex's subagents.",
+    "description": "What the advanced setting \"Session file: subagent's thread field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.subagent.threadField.title": {
+    "defaultMessage": "Session file: subagent's thread field",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.codex.title.items.desc": {

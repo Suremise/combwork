@@ -36,7 +36,7 @@
   "errors.log.none": "To uruchomienie nie zgłosiło logu.",
   "errors.log.notFullPath": "Uruchomienie zgłosiło log bez pełnej ścieżki: {path}",
   "errors.log.notText": "Hive otwiera tylko tekstowe logi i raporty, nie {file}: użyj „Pokaż w folderze”.",
-  "errors.merge.queueMerges": "Hive scala {card} przez kolejkę scalania. Scal ją tam albo wybierz Scal mimo to w oknie Scal.",
+  "errors.merge.queueMerges": "Hive scala kartę {card} przez kolejkę scalania. Scal ją tam albo wybierz „Scal mimo to” w oknie scalania.",
   "errors.mergeSlot.holdRequired": "Trzeba podać, którą blokadę zwolnić",
   "errors.pref.notProjectPref": "To nie jest preferencja projektu.",
   "errors.pref.notValue": "Nieprawidłowa wartość dla {pref}.",

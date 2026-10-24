@@ -16,6 +16,7 @@ import { config } from '../../config'
 import { placeMatcher } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { hiveError } from '../../hiveError'
+import { plainHttpsJson } from '../../plainHttpsJson'
 import { findSecretWarnings } from '../../mcpSecrets'
 import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import { storePwshFirst, storePwshIssue } from './storePwsh'
@@ -609,12 +610,8 @@ export class CodexAdapter implements ProviderAdapter {
 
   async latestVersion(): Promise<string | null> {
     try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 6000)
-      const res = await fetch('https://api.github.com/repos/openai/codex/releases/latest', { signal: ctrl.signal, headers: { Accept: 'application/vnd.github+json' } })
-      clearTimeout(t)
-      if (!res.ok) return null
-      const tag = ((await res.json()) as { tag_name?: string }).tag_name ?? ''
+      const reply = await plainHttpsJson('https://api.github.com/repos/openai/codex/releases/latest', { timeoutMs: 6000, headers: { Accept: 'application/vnd.github+json' } })
+      const tag = (reply as { tag_name?: string }).tag_name ?? ''
       return /(\d+\.\d+\.\d+)/.exec(tag)?.[1] ?? null
     } catch {
       return null

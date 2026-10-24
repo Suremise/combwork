@@ -312,7 +312,7 @@
   "project.skills.select": "Wybierz umiejętność, aby ją wyświetlić. Umiejętności <b>Hive</b> trafiają do agentów każdego projektu (te tylko dla Hive Assistant nie są tu wymienione) i edytuje się je w widoku Umiejętności obszaru roboczego; umiejętności <b>lokalne</b> należą do tego projektu i jednego dostawcy, a tutaj możesz je dodawać, edytować i usuwać.",
   "project.skills.showOf": "Pokaż umiejętności dostawcy",
   "project.skills.target": "umiejętności",
-  "project.skills.turnOn": "Włącz agenta kodującego w Ustawienia → Dostawcy, aby zobaczyć jego umiejętności.",
+  "project.skills.turnOn": "Włącz agenta programistycznego w Ustawienia → Dostawcy, aby zobaczyć jego umiejętności.",
   "project.skills.user": "Użytkownik",
   "project.tab.attachments": "Załączniki",
   "project.tab.files": "Pliki",
