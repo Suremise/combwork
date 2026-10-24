@@ -36,7 +36,7 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
-## What agents are told about slots (P7): fakes, Claude Code, Codex, fixtures v76, 24 October 2026
+## What agents are told about slots (P7): fakes, Claude Code, Codex, fixtures v76–v77, 24 October 2026
 
 #1444 changes the lines P7 made wrong: work-on-card (a card's folder is its slot: work and run checks there; a move to
 another folder is a new conversation; `hive-progress --check --isolated`), card-loop (a pool reviewer joins no lane),
@@ -46,11 +46,21 @@ and `hive_agent_activity`'s description. The start review reply now lists its fi
 `[object Object]` stood) and puts the review copy first. Three new scenarios: **slot-start** (a builder starts a card
 where cards are built in slots: a slot lent, no worktree of its own, nothing changed in the project folder),
 **review-in-copy** (a reviewer reviews in the copy its start names) and **pool-reviewer-wake** (a reviewer from the pool,
-given a card, reviews it and joins no lane). Source 63e6bc21 (1.0.0) with the change uncommitted.
-- **Fakes**: the whole set before (`fake-1444-before`, `2026-10-23T23-02-58-fake`) and after (`fake-1444-after`,
-  `2026-10-24T00-27-12-fake`) passes, 100 of 100 and 103 of 103; each agent session's guidance grows by 24 bytes (the
-  contract) and its skills by 717. The fake Codex runs the three new ones (`2026-10-24T01-36-43-fake-codex`). The
-  benchmark kept only its first 100 scenarios, so 103 dropped the last three: it keeps 200 now (`BENCHMARK_LIMITS`).
+given a card, reviews it and joins no lane), and in round 2 (v77) **isolated-check** (a builder runs its card's check
+while other agents edit the shared folder: with `--isolated`, in a check copy at the card's revision, which the check
+records).
+- **Fakes, compared** (round 2, after HR3's round 1): both sides fixtures v77, on 152440e6, neither changing while it ran.
+  Before: the pre-change guidance (the skills, the contract, `hive-mcp.ts`, `toolReplies.ts`, `servers.ts` and
+  `bundledHistory.json` as on 1.0.0 df336407) with the new scenarios (`fake-1444-before-v77`,
+  `2026-10-24T01-59-35-fake`); after: the change (`fake-1444-after-v77`, `2026-10-24T02-35-52-fake`). Each has 124 of 124
+  scenarios passing (the fakes act from scripts, so the change can't move them; they check the harness and Hive's
+  costs). The only differences: the contract 24 bytes longer in 87 scenarios (48 and 96 in two with more sessions), the
+  skills 264–3,148 bytes longer (721 in most agent sessions), and 5 fewer characters of tool replies in 3 (start review's
+  files as "M greet.js"); requests, tool calls and everything else the same.
+- **Round 1's fake runs** (`fake-1444-before`, v75 on 63e6bc21, and `fake-1444-after`, v76, whose source changed during the
+  run) passed whole but aren't a comparison: their fixture versions differ and the after side wasn't settled. They also
+  showed the benchmark kept only its first 100 scenarios (of 120 and 123 run), so it keeps 200 now (`BENCHMARK_LIMITS`).
+  The fake Codex runs the new ones (`2026-10-24T01-36-43-fake-codex`, `…01-51-41-…` for isolated-check).
 - **Claude Code** (CLI 2.1.310, its default model, the test home): slot-start 3 of 3, review-in-copy 3 of 3,
   pool-reviewer-wake 2 of 2 (`2026-10-24T01-04-29-claude-code`, `…01-13-45-…`, `…01-37-48-…`; the $2 budget ended the
   first run's third samples). worktree-isolation passes 2 of 2.
@@ -59,6 +69,12 @@ given a card, reviews it and joins no lane). Source 63e6bc21 (1.0.0) with the ch
   tools from its code tool, printing a card's JSON and the start review reply in one output, and never saw the copy's
   folder at the reply's end; it diffed the revisions from the project folder. With the copy first in the reply, 3 of 3
   (`2026-10-24T01-34-27-codex`), reviewing in the copy.
+- **isolated-check** (round 2, v77): Codex 3 of 3 (`2026-10-24T01-54-35-codex`): it read work-on-card and ran
+  `hive-progress --check quick --isolated`, which ran in copies/copy-1 at the card's revision. Claude Code 2 of 3
+  (`2026-10-24T01-52-10-claude-code`): it read the card and the project's files rather than work-on-card, and ran the
+  check with `--isolated` twice; the third time it ran the check in a clone of its own in its scratchpad, at the right
+  revision but outside Hive's check copy. The scenario checks what it does, not which skill it read (Claude Code read
+  none in the three).
 - **work-on-card** and **review-card** fail 3 checks in every sample on both models, as before this change: the agents
   start, submit and review with the intent tools, and the fixture's project, with no review set, moves a submitted card
   on past Review, where the checks still expect the 0.9 board moves (#1536 rewrites them for the intents).
