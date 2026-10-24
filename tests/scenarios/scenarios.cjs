@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 76
+const FIXTURES_VERSION = 77
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -2448,6 +2448,46 @@ module.exports.SCENARIOS = [
         ['started no lane of its own', !ran(o, 'hive_lane').some((x) => argsOf(x).action === 'start')]
       ]
     }
+  },
+  {
+    id: 'isolated-check',
+    title: "A builder runs its card's check while other agents edit the shared folder (#1444, #1435): it runs it isolated, in a check copy at the card's revision",
+    files: { 'greet.js': "module.exports = (name) => 'Hello ' + name\n" },
+    async setup(c) {
+      const path = require('path')
+      // The project folder shared (no slots), with the workflow's check "quick": node check.js, which records where and
+      // at which revision it ran, in the workspace (outside the project and its copies).
+      const file = path.join(c.ws, 'alpha', '.hive', 'project.json')
+      const cfg = JSON.parse(require('fs').readFileSync(file, 'utf8'))
+      require('fs').writeFileSync(file, JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project', preChecks: ['quick'], commands: { quick: 'node check.js' } } } }, null, 2))
+      c.checkLog = path.join(c.ws, 'quick-runs.jsonl')
+      c.write('check.js', `const { execSync } = require('child_process')\nrequire('fs').appendFileSync(${JSON.stringify(c.checkLog)}, JSON.stringify({ cwd: process.cwd(), head: execSync('git rev-parse HEAD').toString().trim() }) + '\\n')\nconsole.log('quick: ok')\n`)
+      const n = await c.card('q', { title: 'Greeting comma', description: 'greet.js returns "Hello, <name>" with a comma. Its check is the workflow check quick.', agent: 'coder' })
+      await c.inv('tasks:move', n, 'doing')
+      // Coder's work on the card, committed in the shared folder.
+      c.write('greet.js', "module.exports = (name) => 'Hello, ' + name\n")
+      c.git('add', '-A')
+      c.git('-c', 'user.name=Coder', '-c', 'user.email=c@example.com', 'commit', '-qm', 'Greeting comma')
+      c.revision = c.git('rev-parse', 'HEAD').trim()
+      c.key = (await c.api('GET', `/v1/tasks/${n}`)).body?.key
+    },
+    prompt: (c) => `Card #${c.cards.q} is yours, in Doing, and its work is committed. Run its check quick now and tell me the result. Other agents are editing files in this folder at the moment, so their edits mustn't affect the check.`,
+    fake: (c) => `skill work-on-card then shell: hive-progress --check quick --isolated --card "${c.key}"`,
+    expect: (o, c) => {
+      const fs = require('fs')
+      const ranAt = fs.existsSync(c.checkLog) ? fs.readFileSync(c.checkLog, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)) : []
+      const isolated = runs(o, '--isolated').filter((t) => /hive-progress[^\n]*--check\s+quick/.test(t.input))
+      const inCopy = ranAt.filter((r) => /[\\/]copies[\\/]/i.test(r.cwd))
+      // What it does is the check, not which skill it read: Claude Code found --isolated without reading work-on-card (#1444).
+      return [
+        ['ran the check isolated (hive-progress --check quick --isolated)', isolated.length > 0, o.tools.map((t) => t.input.slice(0, 100)).join(' | ')],
+        ['the check ran in a check copy, not the shared folder', inCopy.length > 0 && ranAt.every((r) => /[\\/]copies[\\/]/i.test(r.cwd)), JSON.stringify(ranAt)],
+        ["…at the card's revision", inCopy.length > 0 && inCopy.every((r) => r.head === c.revision), `${c.revision} | ${JSON.stringify(ranAt)}`],
+        ['changed nothing in the shared folder', o.gitStatus.trim() === '', o.gitStatus]
+      ]
+    },
+    // The fakes' shell steps aren't tool calls in their transcripts: where the check ran shows it.
+    fakeSkips: ['ran the check isolated (hive-progress --check quick --isolated)']
   },
   {
     id: 'card-loop-design-first',
