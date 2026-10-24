@@ -7,6 +7,8 @@
 // (the workspace's token) taken. The fake Claude Code and fake Codex, and the real Copilot CLI offline against the
 // stand-in model (fake-copilot-api.cjs) where Copilot is installed (else its part is skipped, said). Dev build,
 // throwaway profile, workspace, CLAUDE_CONFIG_DIR, CODEX_HOME and COPILOT_HOME.
+// Dev build only (#1580): it starts this checkout's Electron itself, and each CLI's -W agent is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build), for a launch outside the project folder.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

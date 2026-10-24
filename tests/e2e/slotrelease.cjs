@@ -9,6 +9,7 @@
 //    the run and the Hive that is gone, and says Hive doesn't know what still runs; Release frees the slot, and B1
 //    starts there again.
 // Screenshots of both questions, light and dark. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): slot-a is lent through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
 const { processes, descendantsIn, endExactly, childrenFirst } = require('./folderProcesses.cjs')
 const fs = require('fs')

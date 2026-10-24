@@ -7,6 +7,8 @@
 // unless Everywhere; a skill switched off isn't copied, in Claude Code's plugin or named. Codex and Copilot share the
 // copies' code (syncAgentsSkills), so the fake Codex runs it. Runs the fake Claude Code and fake Codex. Dev build,
 // throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Treva is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build), for a folder of Hive's other than the project's.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

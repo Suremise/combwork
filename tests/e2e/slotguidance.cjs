@@ -12,6 +12,7 @@
 //    and the system prompt it sends have them too.
 // No text delivered to any of them tells an agent to use a worktree of its own. Dev build, throwaway profile, workspace,
 // CLAUDE_CONFIG_DIR, CODEX_HOME and COPILOT_HOME.
+// Dev build only (#1580): its slots are lent through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')

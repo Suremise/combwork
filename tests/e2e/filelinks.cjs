@@ -2,6 +2,8 @@
 // agent's worktree for a worktree agent, in another project for a path into it). Only files that exist are
 // linked, and a plain click doesn't open anything. The agents run the fake Claude Code (fake-claude/), which
 // prints each prompt back. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Two is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build), for links into a folder other than the project's.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
