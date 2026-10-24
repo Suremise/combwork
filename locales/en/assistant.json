@@ -568,7 +568,7 @@
     "description": "The name of a mode of the Hive Assistant that ships with Hive: it takes a release through its checklist. Shown in its menus and the Assistant view; keep it short."
   },
   "assistant.modes.shippedDescription.coordinator": {
-    "defaultMessage": "Runs the work across the agents: state first, short status tables, lane prompts from settled cards, decisions only when they are real.",
+    "defaultMessage": "Runs the work across the agents: state first, facts looked up before asked, short status tables, lane prompts from settled cards, decisions only when they are real.",
     "description": "What a mode of the Hive Assistant that ships with Hive (Coordinator) is for, in a line: under its name in the mode menu and the Assistant view."
   },
   "assistant.modes.shippedDescription.planner": {
@@ -580,7 +580,7 @@
     "description": "What a mode of the Hive Assistant that ships with Hive (QA triager) is for, in a line: under its name in the mode menu and the Assistant view."
   },
   "assistant.modes.shippedDescription.releaseManager": {
-    "defaultMessage": "Takes a release through its checklist: notes, licences, packaged checks; the version, tags and publishing only when asked.",
+    "defaultMessage": "Takes a release through the project's release path, stage by stage: notes, licences, packaged checks; each build, version, merge, tag and publish only when asked.",
     "description": "What a mode of the Hive Assistant that ships with Hive (Release manager) is for, in a line: under its name in the mode menu and the Assistant view."
   },
   "assistant.modes.shipsMissing": {

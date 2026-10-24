@@ -1,9 +1,9 @@
 {
-  "slots.release.changed": "{slot} zmienił się w międzyczasie: zapisuje w nim już nie ta sesja, która jest pokazana. Sprawdź ponownie.",
-  "slots.release.live": "Sesja zapisująca w {slot} nadal działa w tym Hive: najpierw zatrzymaj agenta albo zakończ lub zachowaj to, co zostawił uruchomione.",
-  "slots.release.notEnded": "Niektóre z wymienionych procesów nadal działają: Windows nie pozwolił Hive ich zakończyć, więc {slot} nie został zwolniony. Spróbuj ponownie albo zwolnij go bez kończenia ich.",
-  "slots.release.otherHive": "{slot} jest zajęty przez inny Hive, który nadal działa (proces {pid}): zwolnij go tam albo najpierw zamknij tamten Hive.",
+  "slots.release.changed": "Slot {slot} zmienił się w międzyczasie: zapisuje w nim już nie ta sesja, która jest pokazana. Sprawdź ponownie.",
+  "slots.release.live": "Sesja zapisująca w slocie {slot} nadal działa w tym Hive: najpierw zatrzymaj agenta albo zakończ lub zachowaj to, co zostawił uruchomione.",
+  "slots.release.notEnded": "Niektóre z wymienionych procesów nadal działają: Windows nie pozwolił Hive ich zakończyć, więc slot {slot} nie został zwolniony. Spróbuj ponownie albo zwolnij go bez kończenia ich.",
+  "slots.release.otherHive": "Slot {slot} jest zajęty przez inny Hive, który nadal działa (proces {pid}): zwolnij go tam albo najpierw zamknij tamten Hive.",
   "slots.setting.bad": "Hive nie ma takiego ustawienia slotów.",
-  "slots.setting.badSize": "Liczba kopii do przeglądu i sprawdzeń to liczba całkowita od 1 do 32.",
+  "slots.setting.badSize": "Liczba kopii do recenzji i sprawdzeń to liczba całkowita od 1 do 32.",
   "slots.setting.badText": "Skrypt slotu lub lista plików to tekst o długości najwyżej 4000 znaków."
 }

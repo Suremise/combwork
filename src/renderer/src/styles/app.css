@@ -7306,14 +7306,14 @@ button.agent-place:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* A description wraps onto a second line before it is cut (#886: the permission modes'). */
+/* A description wraps onto more lines before it is cut (#886: the permission modes'; #1126: three, as German's and Polish's mode descriptions run a little past two). */
 .menu-detail {
   font-size: 11px;
   color: var(--fg-muted);
   white-space: normal;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
 }
 .menu-item.muted .menu-label,
 .menu-item.muted > .codicon {
@@ -7595,6 +7595,10 @@ button.mode-badge.badge:hover {
 }
 .kb-table td.kb-label {
   overflow-wrap: break-word;
+}
+/* A table cell's own min-width doesn't hold it, so the id under the name does: German's long compounds ("Benachrichtigungseinstellungen") otherwise broke mid-word in a column 100 px wide (#1126). */
+.kb-table td.kb-label .kb-id {
+  min-inline-size: 11rem;
 }
 /* A narrow pane can be narrower than the table (it then scrolls sideways): the row's buttons stay in view at its right
    edge (#887). */
@@ -10990,6 +10994,25 @@ button.progress-run-show:focus-visible {
   min-width: 0;
   margin-top: 2px;
 }
+/* A queued card's key stays whole ("BI-1" broke after its hyphen in a narrow panel, #1126); the title gives way. */
+.progress-queue-list > li > .progress-run-card {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+/* The queue's name keeps room for a few words, and Resume/Pause wraps onto a row of its own rather than squeeze it to a
+   few letters (#1126: "Warteschlange fortsetzen" left "billi…"), as a notice's actions do (#1574). */
+.progress-queue-card > .progress-merge-top {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.progress-queue-card > .progress-merge-top > .progress-merge-who {
+  flex: 1 1 9em;
+  /* Its project, name and target wrap rather than lose the queue's name ("Kolejka scalania · integration") to "…". */
+  white-space: normal;
+}
+.progress-queue-card > .progress-merge-top > :is(.btn, .tip-wrap) {
+  margin-inline-start: auto;
+}
 .progress-queue-title {
   flex: 1 1 auto;
   min-width: 0;
@@ -11297,8 +11320,12 @@ button.progress-run-show:focus-visible {
 .progress-lane > .tip-wrap > .progress-lane-top {
   flex: 1;
 }
+/* The pair gives way too, after the project and the reason (#1126): long agent names beside a slot and a longer state
+   ("festgefahren") pushed the card and the count past the row's end in a narrow panel. It keeps a few letters; its
+   hover names the lane whole. */
 .progress-lane-pair {
-  flex-shrink: 0;
+  flex-shrink: 0.2;
+  min-width: 4em;
   max-width: 55%;
   overflow: hidden;
   text-overflow: ellipsis;

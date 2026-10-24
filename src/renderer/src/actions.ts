@@ -1435,7 +1435,7 @@ export async function removeAgent(path: string, agentId: string): Promise<void> 
   focusAfterRemoving(p, agentId)
   await refreshWorkspace()
   // Kept, it is an unused worktree now (#353): said once, with where to tidy it.
-  if (own && !deleteWorktree) notify('info', tr(msg({ id: 'actions.remove.keptTitle', defaultMessage: "{agent}'s worktree is kept", description: "A notification's title: a removed agent's ({agent}) worktree was kept." }), { agent: a.name }), tr(msg({ id: 'actions.remove.keptMessage', defaultMessage: "{branch} in {path}. Git → Changes lists the project's unused worktrees, merged or not.", description: "Under the notification that a removed agent's worktree was kept: its branch ({branch}) and folder ({path}). Git → Changes is a project tab: use its translated names." }), { branch: own.branch, path: own.path }), [reviewUnused(path)])
+  if (own && !deleteWorktree) notify('info', tr(msg({ id: 'actions.remove.keptTitle', defaultMessage: "{agent}'s worktree is kept", description: "A notification's title: a removed agent's ({agent}) worktree was kept." }), { agent: a.name }), tr(msg({ id: 'actions.remove.keptMessage', defaultMessage: "{branch} in {path}. Version Control → Changes lists the project's unused worktrees, merged or not.", description: "Under the notification that a removed agent's worktree was kept: its branch ({branch}) and folder ({path}). Version Control → Changes is a project tab: use its translated names." }), { branch: own.branch, path: own.path }), [reviewUnused(path)])
 }
 
 /** A notification's button to the project's unused worktrees (#353). */

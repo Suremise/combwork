@@ -92,7 +92,7 @@
   "content.templates.noAgents": "Este projeto não tem agentes para salvar.",
   "content.templates.noFile": "Esse arquivo não está lá.",
   "content.templates.noKey": "O Hive não conseguiu ler a chave de {project}, e os nomes de agente deste modelo são formados a partir dela. Tente de novo ou verifique a chave em Configurações do projeto → Agentes e worktrees.",
-  "content.templates.noKeySave": "O Hive não conseguiu ler a chave de {project}, então os nomes não podem ser salvos com ela. Tente de novo ou salve sem \"Usar a chave do projeto nos nomes\".",
+  "content.templates.noKeySave": "O Hive não conseguiu ler a chave de {project}, então os nomes não podem ser salvos com ela. Tente de novo ou salve sem “Usar a chave do projeto nos nomes”.",
   "content.templates.noWorkspace": "Abra um espaço de trabalho primeiro.",
   "content.templates.nothing": "{problem} Nada foi alterado.",
   "content.templates.provider": "{problem, select, unknown {Este Hive não conhece o agente de código “{provider}” (atualize o Hive)} off {O {provider} está desativado (Configurações → Provedores)} other {O {provider} não está instalado (Configuração de agentes)}}",

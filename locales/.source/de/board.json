@@ -565,7 +565,7 @@
   "board.queue.pause.checkedOut": "{target} is checked out in a folder. Hive merges into it there now: resume to carry on.",
   "board.queue.pause.folderBusy": "The folder {target} is checked out in was busy (an operation such as a merge or rebase was going on there).",
   "board.queue.pause.hookTimedOut": "A hook of the merge commit was still running when signing's time ran out.",
-  "board.queue.pause.identity": "The repository has no commit identity, so Hive can't make its merge commit. Set one in Git → Branches & remotes, then resume.",
+  "board.queue.pause.identity": "The repository has no commit identity, so Hive can't make its merge commit. Set one in Version Control → Branches & remotes, then resume.",
   "board.queue.pause.needsYou": "Needs you: Hive stopped part way and changes nothing more on its own. Open the card for its state and the commands that finish or undo it.",
   "board.queue.pause.other": "Paused ({reason}).",
   "board.queue.pause.rulesOff": "The workflow's rules are off (Settings → Advanced), so the queue doesn't merge.",

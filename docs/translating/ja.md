@@ -78,13 +78,33 @@ The words Japanese uses for Hive's terms ([glossary.md](glossary.md)). Use them 
 | persona | ペルソナ | |
 | task board / board | タスクボード / ボード | The *Tasks* tab is 「タスク」. |
 | card | カード | Never 「タスク」 for a card in running text. |
-| On Hold / Todo / Doing / Review / Passed / Done | 保留 / 未着手 / 進行中 / レビュー / 承認済み / 完了 | *完了* means merged; *承認済み* means it passed its review but isn't merged. Agents' tool text keeps the English ids. |
+| On Hold / Todo / Active / Review / Approved / Done (categories and stages; *Active* was *Doing*, *Approved* was *Passed*) | 保留 / 未着手 / 進行中 / レビュー / 承認済み / 完了 | *完了* means merged (or accepted, without version control); *承認済み* means it passed its review (or your OK) but isn't merged. Agents' tool text keeps the English ids (`doing`, `passed`). |
+| Merging (a stage in Approved) | マージ中 | |
+| category / stage | カテゴリ / ステージ | Never 段階 for a stage. |
 | decision | 決定事項 | |
 | blocked / stalled | ブロック中 / 停滞 | |
 | builder / reviewer | ビルダー / レビュアー | |
 | review (the act) | レビュー | |
 | card loop / lane / round | カードループ / レーン / ラウンド | |
-| merge slot | マージ枠 | |
+| merge slot | マージ枠 | Agents' turn-taking when they merge themselves. Hive's own merging is the merge queue. |
+| merge queue / test merge / Pause queue / Resume queue | マージキュー / テストマージ / キューを一時停止 / キューを再開 | |
+| merge checks / checks before review / check | マージ前のチェック / レビュー前のチェック / チェック | |
+| slot / pool / ready (a slot) | スロット / プール / 準備済み | A slot is a working folder Hive lends to a card or lane. |
+| Version Control (the tab) / version control / None | 「バージョン管理」タブ / バージョン管理 / なし | The tab was called Git before 1.0. |
+| workflow / workflow options / preset | ワークフロー / ワークフローのオプション / プリセット | Presets: ソロ、ペア、チーム、カスタム. |
+| rule / old rules | ルール / 旧ルール | |
+| target branch / up to date | マージ先ブランチ / 最新の状態 | Never ターゲットブランチ. |
+| revision / change / same change | リビジョン / 変更 / 同じ変更 | |
+| pass / fail (a verdict) | 合格 / 不合格 | A reviewer's pass is never 承認, which is only your OK. |
+| carries over / stale (a pass) | 引き継がれる / 失効 | |
+| approval / For you | 承認 / 要対応 | What a For you card asks: 判断、テスト、承認、サインイン. |
+| review copy | レビュー用コピー | |
+| refused / returned (to its builder) | 拒否 / 差し戻し | |
+| override / Move anyway | 例外 / それでも移動 | |
+| no-code card / before 1.0 / outside Hive | コードなしのカード / 1.0以前 / Hiveの外 | |
+| work (a card's Work section) / deliverables | 作業 / 成果物 | |
+| either (a workflow role, beside builder and reviewer) | どちらも | |
+| Start lane… | レーンを開始… | |
 | inbox / message / wake | 受信箱 / メッセージ / ウェイク（起こす） | |
 | handover / shared notes | 引き継ぎ（引き継ぎメモ） / 共有ノート | |
 | skill / template | スキル / テンプレート | A skill's own name (`work-on-card`) stays as it is. |

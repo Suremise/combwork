@@ -108,7 +108,7 @@
   "sessions.menu.showAgent": "Mostrar el agente {agent}",
   "sessions.menu.showAssistant": "Mostrar el Asistente",
   "sessions.origin.agent": "Agente {agent} ({id}).",
-  "sessions.origin.named": "{is, select, slot {Slot · {name}} other {Hogar · {name}}}",
+  "sessions.origin.named": "{is, select, slot {Slot · {name}} other {Carpeta antigua · {name}}}",
   "sessions.origin.noAgent": "No hay ningún agente registrado (se adoptó, o es de antes de que Hive registrara los agentes).",
   "sessions.origin.projectFolder": "Carpeta del proyecto",
   "sessions.origin.ranIn": "Se ejecutó en {folder}",
