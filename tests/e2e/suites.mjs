@@ -56,6 +56,7 @@ export const SUITES = [
   { name: 'boardstages' },
   { name: 'boardupgrade' },
   { name: 'bridgereport' },
+  { name: 'buildfacts' },
   { name: 'bursts' },
   { name: 'busy' },
   { name: 'cardchip' },

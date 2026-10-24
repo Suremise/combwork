@@ -282,6 +282,8 @@ The changes below are the Assistant's only: other callers get `403`.
 | `PATCH /v1/journal/{id}` `{ "summary"?, "detail"?, "why"?, "importance"?, "supersededBy"?, "addLinks"?, "addTags"? }` | Changes it; `404` when there is none |
 | `DELETE /v1/journal/{id}` | Deletes it (its links and tags too) |
 
+**Builds** (#1534): `POST /v1/builds` `{ "kind" (beta, baseline, rc or release), "version", "commit", "branch"?, "installer", "builtAt", "by" (dist or release) }` records a successful build of Hive itself in the workspace's journal as Hive's fact; `{ "recorded": true }`, or `{ "recorded": false, "reason" }` while Settings → Advanced → Record builds in the journal or the journal is off. Hive's own build scripts call it (`scripts/buildFact.mjs`) with the workspace token or an agent's own; a field missing or wrong is `400`, saying which.
+
 Changing the task board (`POST /v1/tasks`, `PATCH /v1/tasks/{n}`, comments) is open to other callers too; for the Assistant it needs Control agents and counts as a change.
 
 With **Look and advise** these return `403`. There is no limit on how many changes the Assistant makes for a message (#1170): the user can undo them (below). Every change, and every refusal, is listed in the Assistant's panel and in `hive.log`. There is no call to remove agents, discard worktrees, archive or delete cards, or remove projects. For the Assistant, `POST /v1/projects/{name}/sessions`, `/stop` and `/input` answer `400` (it uses the calls above), and `/deactivate` needs Control agents.
