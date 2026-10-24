@@ -106,6 +106,7 @@
   "workspace.banners.showProject": "プロジェクトを表示",
   "workspace.banners.showProjectLabel": "プロジェクトを表示：{title}",
   "workspace.changes.aboutAgent": "{agent}のワークツリー：{base}から分岐して以降の{branch}のすべての変更です。「マージ…」で{base}に取り込みます。",
+  "workspace.changes.aboutSlot": "{is, select, carried {{agent}は引き継いだスロット {name} で作業中} other {{agent}は {name} で作業中}}：{known, select, yes {{base}から分岐して以降、そのブランチにあるすべての変更です。} other {そこでまだコミットされていない変更です。}}",
   "workspace.changes.aboutProject": "プロジェクトフォルダー：まだコミットされていない変更です（自分の変更と、フォルダーで直接作業しているワークツリーなしのエージェントの変更）。",
   "workspace.changes.aboutUnusedOne": "未使用のワークツリー：{into}にない{branch}のすべての変更です。マージするか、「未使用のワークツリー」に戻って削除してください。",
   "workspace.changes.aboutUnusedShort": "{project}のどのエージェントも作業していないワークツリーです。開くと変更を確認してマージでき、不要なら削除できます。",

@@ -107,6 +107,7 @@
   "workspace.banners.showProjectLabel": "Show the project: {title}",
   "workspace.changes.aboutAgent": "{agent}'s worktree: everything on {branch} since it left {base}. Merge… brings it into {base}.",
   "workspace.changes.aboutProject": "The project folder: what isn't committed yet, from you or the agents working in the folder itself (those without a worktree).",
+  "workspace.changes.aboutSlot": "{is, select, carried {{agent} works in {name}, the slot kept for it} other {{agent} builds in {name}}}: {known, select, yes {everything on its branch since it left {base}.} other {what isn't committed there yet.}}",
   "workspace.changes.aboutUnusedOne": "An unused worktree: everything on {branch} that isn't on {into}. Merge it, or go back to Unused worktrees to remove it.",
   "workspace.changes.aboutUnusedShort": "Worktrees no agent of {project} works in: open one to see its changes and merge them, or remove it.",
   "workspace.changes.aboutUnusedTip": "Kept when their agent was removed (by hand, or when a template's agents replaced it), or made outside Hive (by an agent's own git worktree add, say). Loading a template gives none of them to its agents.{known, select, yes { Those merged into {into} and clean can go with their branches; the others hold work that is nowhere else.} other {}}",

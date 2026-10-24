@@ -93,6 +93,8 @@ export interface FolderSlot {
   state: string
   /** Its block of ports (HIVE_SLOT_PORT_BASE). */
   portBase: number
+  /** The branch its lines merge into, when it has one (#1569: the base the Changes tab compares its work with). */
+  target?: string | null
   open: FolderLease | null
   /** Its newest lease (the open one, else the last that ended), and its last revision (null: not recorded yet, its session draining). */
   last: (FolderLease & { ended: boolean; endRev?: string | null }) | null
@@ -281,7 +283,7 @@ export interface ShownPlace {
   name: string | null
   /** Its line (a card's branch in a slot, a carried slot's or 0.9 worktree's own), when known. */
   branch: string | null
-  /** A 0.9 worktree's: the branch it was made from. */
+  /** A 0.9 worktree's: the branch it was made from; a slot's: the branch its lines merge into, when known (#1569). */
   base?: string
 }
 
@@ -297,7 +299,7 @@ const leafOf = (folder: string): string => folder.split(/[\\/]/).filter(Boolean)
 /** The window's view of `now` (an `agentPlaces` answer) for the agent, with its line (`branch`, main's `agentPlace`). */
 export function shownPlace(facts: FolderFacts, agent: FolderAgent, now: AgentPlace, branch: string | null): ShownPlace {
   const slot = now.slot ? (facts.slots.find((s) => s.name === now.slot) ?? null) : null
-  if (slot) return { folder: now.path, is: slot.open?.kind === 'carried' && slot.open.agent === agent.id ? 'carried' : 'slot', name: slot.name, branch }
+  if (slot) return { folder: now.path, is: slot.open?.kind === 'carried' && slot.open.agent === agent.id ? 'carried' : 'slot', name: slot.name, branch, ...(slot.target ? { base: slot.target } : {}) }
   if (facts.homes.some((h) => samePath(h, now.path))) return { folder: now.path, is: 'home', name: leafOf(now.path), branch: null }
   if (agent.legacy && samePath(agent.legacy.path, now.path)) return { folder: now.path, is: 'legacy', name: leafOf(now.path), branch: agent.legacy.branch }
   return { folder: now.path, is: 'project', name: null, branch: null }

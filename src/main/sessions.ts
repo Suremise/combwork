@@ -1295,7 +1295,8 @@ class SessionManager {
       const at = await agentPlace(projectPath, a, l ? { cwd: l.state.cwd } : null, shownFacts).catch(() => null)
       const legacy = legacyWorktree(a)
       const shown = at ? shownPlace(shownFacts, folderAgent(a), at.now, at.branch) : { folder: projectPath, is: 'project' as const, name: null, branch: null }
-      const place = shown.is === 'legacy' && legacy?.base ? { ...shown, base: legacy.base } : shown
+      // Its 0.9 worktree's base, also for the slot it was carried into while that slot has no target (#1569).
+      const place = (shown.is === 'legacy' || (shown.is === 'carried' && !shown.base)) && legacy?.base ? { ...shown, base: legacy.base } : shown
       agents.push({ ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}), ...(home ? { home } : {}) },...(carried ? { carriedSlot: carried } : {}), ...(held.has(a.id) ? { heldSlot: held.get(a.id) } : {}), place })
     }
     const primary = agents.find((a) => a.live)

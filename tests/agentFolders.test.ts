@@ -134,6 +134,11 @@ describe('where an agent is, as the window shows it (#1442)', () => {
     expect(shown(facts([slot('hb3', { open: lease('l3', 'hb3', 'b9', 'carried') })]), builder, { cwd: slotFolder('hb3') }).is).toBe('slot')
   })
 
+  it("a slot with a target: its base, what the Changes tab compares the slot's work with (#1569)", () => {
+    const f = facts([{ ...slot('slot-b', { open: lease('l1', 'slot-b', 'b1') }), target: 'main' }])
+    expect(shown(f, builder, null, 'hive/card-12')).toEqual({ folder: slotFolder('slot-b'), is: 'slot', name: 'slot-b', branch: 'hive/card-12', base: 'main' })
+  })
+
   it('a reviewer resumed in its retired home: "home", by the folder\'s name; in the project folder: nothing to name', () => {
     const home = slotFolder('hr4')
     const f = facts([], { homes: [home] })
