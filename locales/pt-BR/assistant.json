@@ -672,6 +672,7 @@
   "assistant.undo.why.reportMerge": "O merge que ele informou fica no trabalho do cartão.",
   "assistant.undo.why.request": "O pedido dele ao executor fica como comentário.",
   "assistant.undo.why.retriedMerge": "O “Tentar o merge de novo” dele fica no trabalho do cartão.",
+  "assistant.undo.why.slotReleased": "Um slot que ele liberou não volta a ser reservado nem ocupado: o próximo trabalho que precisar de um slot pode usá-lo.",
   "assistant.undo.why.start": "O início fica no trabalho do cartão: desfazer move o cartão de volta, mas não desfaz o início.",
   "assistant.undo.why.startReview": "A revisão que ele iniciou fica no trabalho do cartão.",
   "assistant.undo.why.submit": "O envio fica no trabalho do cartão.",

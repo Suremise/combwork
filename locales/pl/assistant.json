@@ -672,6 +672,7 @@
   "assistant.undo.why.reportMerge": "Zgłoszone scalenie zostaje w pracy karty.",
   "assistant.undo.why.request": "Jego prośba do wykonawcy zostaje jako komentarz.",
   "assistant.undo.why.retriedMerge": "Jego „Ponów scalanie” zostaje w pracy karty.",
+  "assistant.undo.why.slotReleased": "Zwolniony slot nie jest ponownie zachowany ani zajęty: następna praca, która potrzebuje slotu, może go wziąć.",
   "assistant.undo.why.start": "Rozpoczęcie zostaje w pracy karty: cofnięcie przenosi kartę z powrotem, ale nie odwołuje rozpoczęcia.",
   "assistant.undo.why.startReview": "Rozpoczęta recenzja zostaje w pracy karty.",
   "assistant.undo.why.submit": "Zgłoszenie zostaje w pracy karty.",

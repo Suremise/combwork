@@ -86,7 +86,8 @@ const FINAL: Record<UndoFinalWhy, Msg> = {
   removedFromQueue: msg({ id: 'assistant.undo.why.removedFromQueue', defaultMessage: "Taking it out of the merge queue stays in the card's work: it is queued again only by Retry merge or a new approval.", description: "What of the Assistant taking a card out of the merge queue stays when it is undone. Retry merge: a command on the card (use it as Hive shows it)." }),
   retriedMerge: msg({ id: 'assistant.undo.why.retriedMerge', defaultMessage: "Its Retry merge stays in the card's work.", description: "What of the Assistant's Retry merge on a card (a command that queues a returned card again) stays when it is undone." }),
   queuePaused: msg({ id: 'assistant.undo.why.queuePaused', defaultMessage: 'A merge queue it paused stays paused: resume it if it should run.', description: "Why a change of the Assistant's can't be undone: it paused a project's merge queue." }),
-  queueResumed: msg({ id: 'assistant.undo.why.queueResumed', defaultMessage: "A merge queue it resumed isn't paused again: pause it if it shouldn't run.", description: "Why a change of the Assistant's can't be undone: it resumed a project's merge queue." })
+  queueResumed: msg({ id: 'assistant.undo.why.queueResumed', defaultMessage: "A merge queue it resumed isn't paused again: pause it if it shouldn't run.", description: "Why a change of the Assistant's can't be undone: it resumed a project's merge queue." }),
+  slotReleased: msg({ id: 'assistant.undo.why.slotReleased', defaultMessage: "A slot it released isn't kept or held again: the next work that needs a slot may take it.", description: "Why a change of the Assistant's can't be undone: it released a slot (a folder cards are built in) that was kept for an agent or held by an agent's ended session." })
 }
 
 const fieldsText = (fields: readonly string[]): string => fmt.list(fields.map((field) => tr(FIELD, { field })))

@@ -554,6 +554,27 @@ From api.version 9 (#1353). With a project's workflow set to **Hive merges**, Hi
 
 The event stream sends `queue-changed` (`{ workspacePath, project, target }`: read the queue again) when a target's queue changes: a card queued, its step, an outcome, a pause.
 
+### Release Slot
+
+From api.version 9 (#1561). The two releases an agent's ⋯ menu offers in Hive's window (SPEC §16.10.3), by slot name: a **carried slot** (an agent's 0.9 worktree, kept for it as a slot since the upgrade) stops being kept for it, and a **held writer** (an agent's run that has ended but still holds its slot, because Hive doesn't know that everything it started there has ended: Hive closed unexpectedly with it running, or its processes were kept running) is cleared. Anyone who may read the project lists them (a project agent its own project's). Releasing is the user's (in Hive's window) and the Hive Assistant's within Settings → Assistant → Control (Control agents): a project agent is refused (`403`), and so is a script (`403`). Each release the Assistant makes is in its actions (`release-slot`), and undo can't take it back.
+
+`GET /v1/projects/{name}/slots/releasable` — what the project has to release:
+
+```json
+{ "project": "alpha",
+  "carried": [{ "slot": "hb2", "agent": "B2" }],
+  "held": [{ "slot": "slot-a", "agent": "B1", "run": "3f9a1c…", "hive": "gone (process 4120)",
+             "processes": { "list": [{ "pid": 5150, "label": "node serve.js" }], "more": 0 } }] }
+```
+
+`held` lists the writers Hive's window offers Release for: the run is over in this Hive (`hive`: `this Hive`) or its Hive has gone (`gone (process n)`). `processes` is what Hive lists of what that run left running (its leftovers, or, its Hive gone, those of its processes the notice that Hive closed unexpectedly lists that still run); `null`: Hive doesn't know.
+
+`POST /v1/projects/{name}/slots/{slot}/release` — `{ "kind": "writer", "confirm": { "slot": "slot-a", "run": "3f9a1c…" }, "end": true }`:
+- `kind` is `carried` or `writer`; left out when the slot has only one of them (`400` when it has both, `409` when it has neither).
+- A carried slot's lease ends (its folder and branch stay; Hive lends it to new work once it is clean). `409` when it is no longer kept for an agent.
+- A held writer needs `confirm`, the slot and the run the user agreed to release, as the listing gave them (`400` without it). `end: true` ends the processes listed for its run first; if Windows doesn't let Hive end them, nothing is released (`409`). Refused (`409`) while its run is still live in this Hive (its session, or the processes it left still followed), while another Hive holding it still runs (or can't be told), and when its writer is no longer that run (a release or a start meanwhile: one of them wins, the other is refused).
+- Replies `{ "project", "kind", "slot", "agent", "ended"? }` (`ended`: the listed processes were ended first).
+
 ### Skills and MCP
 
 `GET /v1/skills[?project=name]` — the workspace's Hive skills, each provider's user (`level: "machine"`) and plugin skills, plus, if a project is given, the project's local skills, and then only the Hive skills its agents get (not those whose audience is `assistant`): `{ name, description, level, provider?, plugin?, audience?, bundled?, updateAvailable? }`, without folder paths. `audience` (Hive skills) is who gets it: `agents`, `assistant` or `all` (its `SKILL.md`'s `metadata.audience`; `agents` without one). `problem` (Hive skills) says why nobody gets it: its header can't be read, or its audience isn't `agents`, `assistant` or `all`. `bundled` is `same` or `changed` for Hive skills that ship with Hive, and `updateAvailable` marks a changed copy made from a version this Hive knows to be older than its own. A project agent may list only its own project's skills (`403` for another's).
@@ -722,6 +743,7 @@ Nothing private is added: no prompt or message text and no setting's value, the 
 | `lane-end` | Ended a lane (merged or abandoned) | `{ "kind": "lane-end", "ok": true, "lane": "lane-0f89a0", "project": "hive", "cards": [713, 763], "agent": { "id": "a-745674db", "name": "HB3" } }` |
 | `queue-pause` | Paused a project's merge queue | `{ "kind": "queue-pause", "ok": true, "project": "alpha" }` |
 | `queue-resume` | Resumed a project's merge queue (`ok: true` also when it stayed paused for its cause) | `{ "kind": "queue-resume", "ok": true, "project": "alpha" }` |
+| `release-slot` | Released a slot: a carried slot, or a held writer once the user agreed (`agent`: whose it was) | `{ "kind": "release-slot", "ok": true, "project": "alpha", "agent": { "id": "a-7b21e4aa", "name": "B1" } }` |
 | `create-project` | Created a project | `{ "kind": "create-project", "ok": true, "project": "apiary" }` |
 | `activate-project` | Turned a project on | `{ "kind": "activate-project", "ok": true, "project": "apiary" }` |
 | `deactivate-project` | Was refused turning a project off (only refusals are listed) | `{ "kind": "deactivate-project", "ok": false, "error": "Not allowed by Settings → Assistant → Control", "project": "apiary" }` |
@@ -788,6 +810,7 @@ The Hive Assistant's `hive` server always runs (even with this setting or the Ag
 | `hive_update_setting` | `PATCH /v1/settings/{id}`, old → new | Change settings on (any level) |
 | `hive_undo` | `GET /v1/assistant/changes` (`list`), `POST /v1/assistant/undo`: what was undone, what was left and why | Control agents |
 | `hive_queue` | `GET /v1/queue` (`list`: any), `POST /v1/queue/pause`, `…/resume`, `…/remove`, `…/retry` (Control agents): the queue in a few lines, or the card and where it went | any (list); Control agents |
+| `hive_release_slot` | `GET /v1/projects/{name}/slots/releasable` (`list`: a line per carried slot and held writer, with the `confirm` a writer's release needs), `POST /v1/projects/{name}/slots/{slot}/release` (`release`): what was released | any (list); Control agents |
 
 It also has the board tools above (the card intents too, but not `hive_start_card`: it starts cards on agents with `hive_start_task`); Claude Code runs `hive_create_task`, `hive_update_task`, `hive_update_tasks`, `hive_reorder_tasks`, the card intents and `hive_lane` without asking from Control agents up. Claude Code runs these without asking (they are Hive's own, and limited by the control level); Codex gets a 15-minute tool timeout for them, since waiting and asking the user can take minutes.
 

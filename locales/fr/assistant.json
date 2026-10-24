@@ -672,6 +672,7 @@
   "assistant.undo.why.reportMerge": "La fusion qu’il a signalée reste dans le travail de la carte.",
   "assistant.undo.why.request": "Sa demande à l’auteur reste en commentaire.",
   "assistant.undo.why.retriedMerge": "Son « Réessayer la fusion » reste dans le travail de la carte.",
+  "assistant.undo.why.slotReleased": "Un emplacement libéré n’est ni réservé ni occupé à nouveau : le prochain travail qui a besoin d’un emplacement peut le prendre.",
   "assistant.undo.why.start": "Son démarrage reste dans le travail de la carte : l’annulation remet la carte en place, sans annuler le démarrage.",
   "assistant.undo.why.startReview": "La relecture qu’il a commencée reste dans le travail de la carte.",
   "assistant.undo.why.submit": "Sa soumission reste dans le travail de la carte.",

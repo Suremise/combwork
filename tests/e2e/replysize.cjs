@@ -447,6 +447,10 @@ const prose = (seed, n) => {
   const relabel = changeLines.split('\n').find((l) => new RegExp(`#${todo[33]}\\b`).test(l) && /\(labels\)/.test(l))
   const undone = measure('hive_undo', tool('hive_undo', { change: relabel?.split(':')[0] ?? '' }, 'assistant'), 300)
   check('an undo says what it did, in a line', undone === 'Undid 1 of 1 change in full.', `${relabel} → ${undone}`)
+  // Release Slot (#1561): alpha has nothing to release, said in a line; project agents aren't given the tool.
+  const releasable = measure('hive_release_slot (list)', tool('hive_release_slot', { action: 'list', project: 'alpha' }, 'assistant'), 200)
+  check('release slot: nothing to release, in a line', releasable.startsWith('Nothing to release in alpha: '), releasable)
+  check('…the tool is the Assistant\'s, not offered to project agents', toolDescription('hive_release_slot') === '' && toolDescription('hive_release_slot', 'assistant').length > 0)
 
   console.log('\n--- Agent API routes not behind a tool')
   const route = async (label, method, p, body) => measure(`API ${label}`, (await api(method, p, body)).text)

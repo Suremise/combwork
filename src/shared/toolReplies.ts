@@ -753,6 +753,36 @@ export function queueResumedText(r: { resumed: boolean; queue: QueuePublic }): s
   return r.resumed ? queueText(r.queue) : `Still paused: its cause is still there. ${queueText(r.queue)}`
 }
 
+/** A project's slots to release as the Agent API lists them (#1561, GET /v1/projects/{name}/slots/releasable). */
+export interface ReleasablePublic {
+  project: string
+  carried: { slot: string; agent: string }[]
+  held: { slot: string; agent: string; run: string; hive: string; processes: { list: { pid: number; label: string }[]; more: number } | null }[]
+}
+
+/** How many processes a held writer's line names (the rest counted). */
+const PROCESSES_SHOWN = 5
+
+/**
+ * hive_release_slot list (#1561): a line per carried slot and per held writer, each with what release needs (a writer's
+ * confirm, and its processes, which end: true ends first), or that there is none.
+ */
+export function releasableText(r: ReleasablePublic): string {
+  if (!r.carried.length && !r.held.length) return `Nothing to release in ${r.project}: no slot is kept for an agent, and no ended run holds one.`
+  const lines = r.carried.map((c) => `${c.slot}: kept for ${c.agent} (kind carried).`)
+  for (const h of r.held) {
+    const more = h.processes ? h.processes.list.length + h.processes.more - PROCESSES_SHOWN : 0
+    const procs = h.processes?.list.length ? ` Its run left running: ${h.processes.list.slice(0, PROCESSES_SHOWN).map((p) => `${clip(p.label, 40)} (${p.pid})`).join(', ')}${more > 0 ? `, ${more} more` : ''} (end: true ends them first).` : " Hive doesn't know which of its processes still run."
+    lines.push(`${h.slot}: held by ${h.agent}'s ended run ${h.run}, its Hive ${h.hive} (kind writer, confirm {"slot":"${h.slot}","run":"${h.run}"}).${procs}`)
+  }
+  return lines.join('\n')
+}
+
+/** hive_release_slot release (#1561): what was released. */
+export function slotReleasedText(r: { project: string; kind: 'carried' | 'writer'; slot: string; agent: string; ended?: boolean }): string {
+  return r.kind === 'carried' ? `Released ${r.slot} in ${r.project}: no longer kept for ${r.agent}; its folder and branch stay.` : `Released ${r.slot} in ${r.project}: ${r.agent}'s ended run no longer holds it${r.ended ? ', its listed processes ended first' : ''}.`
+}
+
 /** How Hive tells an agent of what waits for it, by the carrying-on switch that does it (#1432, shared/inboxSwitches.ts). */
 const TELLS: Record<InboxSwitch, string> = { checkpoints: 'at its next tool call', stopContinuation: "at its turn's end", idleWakes: 'once it is idle' }
 

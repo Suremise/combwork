@@ -672,6 +672,7 @@
   "assistant.undo.why.reportMerge": "La fusión que notificó se queda en el trabajo de la tarjeta.",
   "assistant.undo.why.request": "Su solicitud al autor se queda como comentario.",
   "assistant.undo.why.retriedMerge": "Su «Reintentar la fusión» se queda en el trabajo de la tarjeta.",
+  "assistant.undo.why.slotReleased": "Un slot que liberó no se vuelve a reservar ni a ocupar: el siguiente trabajo que necesite un slot puede tomarlo.",
   "assistant.undo.why.start": "Su inicio se queda en el trabajo de la tarjeta: deshacer devuelve la tarjeta, pero no anula el inicio.",
   "assistant.undo.why.startReview": "La revisión que inició se queda en el trabajo de la tarjeta.",
   "assistant.undo.why.submit": "Su envío se queda en el trabajo de la tarjeta.",

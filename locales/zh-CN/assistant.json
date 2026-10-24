@@ -672,6 +672,7 @@
   "assistant.undo.why.reportMerge": "它报告的合并保留在卡片的工作记录中。",
   "assistant.undo.why.request": "它对构建者的请求保留为评论。",
   "assistant.undo.why.retriedMerge": "它执行的“重试合并”保留在卡片的工作记录中。",
+  "assistant.undo.why.slotReleased": "它释放的槽位不会再次被保留或占用：下一个需要槽位的工作可以使用它。",
   "assistant.undo.why.start": "它的开始保留在卡片的工作记录中：撤销会把卡片移回，但不会取消开始。",
   "assistant.undo.why.startReview": "它开始的评审保留在卡片的工作记录中。",
   "assistant.undo.why.submit": "它的提交保留在卡片的工作记录中。",

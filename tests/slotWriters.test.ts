@@ -59,6 +59,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const { boardFile, onBoardCommitted } = await import('../src/main/boardStore')
 const { SlotPool, SlotStore, fileSlotConn } = await import('../src/main/slots')
 const { heldSlots, heldWriter, releaseHeldWriter, setWriterHost, writerOver } = await import('../src/main/agentFolders')
+const { releasableSlots, releaseSlot, SlotReleaseRefused } = await import('../src/main/slotRelease')
 const { settleRunForTests } = await import('../src/main/agentProcesses')
 const { sessions } = await import('../src/main/sessions')
 const { config } = await import('../src/main/config')
@@ -87,6 +88,7 @@ function writeProject(o: { worktree?: string; setup?: string } = {}): void {
   writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, worktreeSetup: o.setup ?? '', agents: [agent] }))
 }
 const writer = () => store.slot('slot-a')?.writer ?? null
+const carriedLease = () => store.openLease('slot-a')
 
 beforeAll(async () => {
   // The project a Git repository and slot-a a worktree of it (what the pool's refresh looks for).
@@ -421,5 +423,98 @@ describe('Release Slot… on a held writer (#1506)', () => {
     expect(released.status).toBe('fulfilled')
     if (started.status === 'fulfilled') expect(writer()?.run).toBe(started.value.runId)
     else expect(writer()).toBeNull()
+  })
+})
+
+describe('Release Slot through the Agent API and the Assistant (#1561)', () => {
+  /** slot-a's writer as another Hive (process pid) left it, under b1's carried lease. */
+  const plant = (run: string) => {
+    const lease = store.openLease('slot-a')!.id
+    return store.conn.write((db) => db.prepare('UPDATE slots SET writer_run = ?, writer_lease = ?, writer_agent = ?, writer_pid = ?, writer_started = ? WHERE project = ? AND name = ?').run(run, lease, 'b1', me.pid + 1, 5, projectId, 'slot-a'))
+  }
+  const list = () => inWorkspace(ws, () => releasableSlots(project))
+  const release = (slot: string, o: Parameters<typeof releaseSlot>[3]) => inWorkspace(ws, () => releaseSlot(ws, project, slot, o))
+  /** A refusal's status, or the message of anything else thrown. */
+  const refusal = async (p: Promise<unknown>): Promise<number | string> => {
+    try {
+      await p
+      return 'released'
+    } catch (e) {
+      return e instanceof SlotReleaseRefused ? e.status : String((e as Error).message)
+    }
+  }
+
+  it('lists the carried slot and a held writer of a Hive gone; another Hive still running holds its own (not listed)', async () => {
+    hostOn(true)
+    await plant('r-alive')
+    expect(await list()).toEqual({ carried: [{ slot: 'slot-a', agent: { id: 'b1', name: 'B1' } }], held: [] })
+    await store.clearWriterRun('r-alive')
+    hostOn(false)
+    await plant('r-gone')
+    expect(await list()).toMatchObject({ carried: [{ slot: 'slot-a' }], held: [{ slot: 'slot-a', run: 'r-gone', agent: 'b1', agentName: 'B1', hive: { self: false, alive: false } }] })
+  })
+
+  it("refuses before anything changes: an unknown slot, which of the two when both, a writer's release without the user's confirmation of its slot and run", async () => {
+    hostOn(false)
+    await plant('r-c')
+    expect(await refusal(release('slot-z', {}))).toBe(404)
+    expect(await refusal(release('slot-a', {}))).toBe(400)
+    expect(await refusal(release('slot-a', { kind: 'writer' }))).toBe(400)
+    expect(await refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-b', run: 'r-c' } }))).toBe(400)
+    expect(await refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a' } }))).toBe(400)
+    expect(writer()?.run).toBe('r-c')
+    expect(carriedLease()).not.toBeNull()
+    // A run the user wasn't shown (the writer changed since list): the window's own refusal, nothing released.
+    expect(await refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run: 'r-old' } }))).toMatch(/changed meanwhile/)
+    expect(writer()?.run).toBe('r-c')
+    // Confirmed: released, the carried lease untouched; nothing left for a writer's release.
+    expect(await release('SLOT-A', { kind: 'writer', confirm: { slot: 'slot-a', run: 'r-c' }, end: true })).toEqual({ kind: 'writer', slot: 'slot-a', agent: { id: 'b1', name: 'B1' }, ended: false })
+    expect(writer()).toBeNull()
+    expect(carriedLease()).not.toBeNull()
+    expect(await refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run: 'r-c' } }))).toBe(409)
+  })
+
+  it("the window's refusals: its run live in this Hive, or another Hive holding it still running (or not known)", async () => {
+    hostOn()
+    const run = (await start()).runId
+    expect(await refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run } }))).toMatch(/still running in this Hive/)
+    expect(writer()?.run).toBe(run)
+    manager.live.clear()
+    manager.runs.clear()
+    manager.writers.clear()
+    live.delete(run)
+    await store.clearWriterRun(run)
+    for (const others of [true, null]) {
+      hostOn(others)
+      await plant(`r-${others}`)
+      expect(await refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run: `r-${others}` } }))).toMatch(/another Hive that is still running/)
+      expect(writer()?.run).toBe(`r-${others}`)
+      await store.clearWriterRun(`r-${others}`)
+    }
+  })
+
+  it('two releases at once, or a release racing a start in the slot: one outcome', async () => {
+    hostOn(false)
+    await plant('r-race')
+    const both = await Promise.all([0, 1].map(() => refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run: 'r-race' } }))))
+    expect(both.filter((r) => r === 'released')).toHaveLength(1)
+    expect(both.filter((r) => r !== 'released')[0]).toMatch(/changed meanwhile|^409$/)
+    expect(writer()).toBeNull()
+    await plant('r-start')
+    hostOn(false)
+    const [released, started] = await Promise.allSettled([release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run: 'r-start' } }), start()])
+    expect(released.status).toBe('fulfilled')
+    if (started.status === 'fulfilled') expect(writer()?.run).toBe(started.value.runId)
+    else expect(writer()).toBeNull()
+  })
+
+  it('a carried slot: kind left out when it has only that, released once; then nothing to release', async () => {
+    hostOn(false)
+    expect(writer()).toBeNull()
+    expect(await release('slot-a', {})).toEqual({ kind: 'carried', slot: 'slot-a', agent: { id: 'b1', name: 'B1' } })
+    expect(carriedLease()).toBeNull()
+    expect(await list()).toEqual({ carried: [], held: [] })
+    expect(await refusal(release('slot-a', {}))).toBe(409)
+    expect(await refusal(release('slot-a', { kind: 'carried' }))).toBe(409)
   })
 })
