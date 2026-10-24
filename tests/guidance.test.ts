@@ -12,6 +12,7 @@ import { ASSISTANT_ONLY_TOOLS, assistantTools } from '../src/shared/assistantToo
 import { parseSkillFrontmatter, skillFor } from '../src/main/skills'
 import type { SkillAudience, TaskCard } from '../src/shared/types'
 import { WORKSPACE_NOTES_PATH } from '../src/shared/workspaceNotes'
+import type { Finisher } from '../src/shared/workflow/options'
 
 const ROOT = join(__dirname, '..')
 const SKILLS = join(ROOT, 'resources', 'skills')
@@ -198,10 +199,12 @@ describe('the bundled skills', () => {
     expect(end).toMatch(/needs the user \(a commit or merge your CLI or a permission check refuses/)
     // Since #1274: a rule it can't keep is a request for the user (§16.8.6), on that card.
     expect(end).toMatch(/is `hive_cannot_within_rules` on that card/)
-    // A lane takes one card at a time (#1270): merge-ready merges each card as it passes, never "at the lane's end".
+    // A lane takes one card at a time (#1270): merge-ready never merges "at the lane's end". Since #1525 (P8) whether a
+    // lane waits for a card's merge is Hive's (the lane's `next`), and who merges the project's (G5): merge-ready says
+    // each way, and a card that passed waits on it.
     const merge = catalog.get('merge-ready')!.text
     expect(merge).not.toMatch(/at the lane's end/)
-    expect(merge).toMatch(/each card as it passes, before the lane's next card starts/)
+    expect(merge).toMatch(/how its work lands is the project's[^\n]*a card that passed waits on it/)
     expect(line('**Stop and ask**')).toMatch(/on a merge step that needs the user/)
   })
 
@@ -222,29 +225,29 @@ describe('the bundled skills', () => {
     expect(brief).toMatch(/Commit each round on the card's branch before sending the card to Review \(card-loop\)\./)
     expect(brief).not.toMatch(/After each card passes: commit/)
     // A reviewer that reads only review-agent-work is pointed there (haiku passed uncommitted work so).
-    expect(catalog.get('review-agent-work')!.text).toMatch(/In a card loop, review the commit its builder names: work sent uncommitted gets a request for a commit \(`hive_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
+    expect(catalog.get('review-agent-work')!.text).toMatch(/In a card loop, for a code card in Git, review the commit its builder names: work sent uncommitted gets a request for a commit \(`hive_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
   })
 })
 
 // #1524 (P8, SPEC §16.17): work-on-card and card-loop describe the intents and the gates; what a gate owns isn't stated
 // again as a rule (the design note's §10, "Becomes a gate"), and where the outcome depends on the project's options, the
 // card's kind or the rules' switch, they say it depends rather than state one case as the rule.
+// Rules a gate now owns, as the skills used to state them: each phrase was in a bundled skill before P8.
+const GATE_RULES: [string, RegExp][] = [
+  ['commit before Review', /\bcommit (the card's work )?before (Review|submitting|moving it)\b/i],
+  ['review the exact commit', /\breview the commit the builder names\b/i],
+  ['dependencies done before start', /\bcards it depends on \(`blockedBy`\) that aren't done block it\b/i],
+  ['no cards into a running lane', /\b(a running loop never sees a card added|no cards? (in)?to a running lane)\b/i],
+  ['Passed is not merged', /\bPassed means it passed review, not that it's merged\b/i],
+  ['Done = merged, moved by the agent', /\bmove (your|the|a) card (there|to `?done`?) once its work is merged\b/i],
+  ['a decision wakes the lane', /\brecorded decision wakes (nobody|no one)\b/i],
+  ['a late message reopens nothing', /\blate message\b/i],
+  ['old column moves as the way to work', /\bmove (it|the card|a card) to `?(doing|review|passed|done)`?(?! with `hive_update_task`)/i],
+  ['the old review parameter', /\breview: "(start|passed|failed)"/],
+  ['ending the lane with a merge commit', /\bmergeCommit\b|\babandoned: true\b/]
+]
 describe('the skills follow the gates (#1524)', () => {
   const GATED = ['work-on-card', 'card-loop']
-  // Rules a gate now owns, as the skills used to state them: each phrase was in a bundled skill before P8.
-  const GATE_RULES: [string, RegExp][] = [
-    ['commit before Review', /\bcommit (the card's work )?before (Review|submitting|moving it)\b/i],
-    ['review the exact commit', /\breview the commit the builder names\b/i],
-    ['dependencies done before start', /\bcards it depends on \(`blockedBy`\) that aren't done block it\b/i],
-    ['no cards into a running lane', /\b(a running loop never sees a card added|no cards? (in)?to a running lane)\b/i],
-    ['Passed is not merged', /\bPassed means it passed review, not that it's merged\b/i],
-    ['Done = merged, moved by the agent', /\bmove (your|the|a) card (there|to `?done`?) once its work is merged\b/i],
-    ['a decision wakes the lane', /\brecorded decision wakes (nobody|no one)\b/i],
-    ['a late message reopens nothing', /\blate message\b/i],
-    ['old column moves as the way to work', /\bmove (it|the card|a card) to `?(doing|review|passed|done)`?(?! with `hive_update_task`)/i],
-    ['the old review parameter', /\breview: "(start|passed|failed)"/],
-    ['ending the lane with a merge commit', /\bmergeCommit\b|\babandoned: true\b/]
-  ]
   it("state no rule a gate owns", () => {
     for (const name of GATED) for (const [rule, re] of GATE_RULES) expect(catalog.get(name)!.text, `${name}: ${rule}`).not.toMatch(re)
   })
@@ -346,6 +349,74 @@ describe('the skills follow the gates (#1524)', () => {
   it('stay smaller than before P8 (work-on-card 8,991 and card-loop 15,776 characters)', () => {
     expect(catalog.get('work-on-card')!.text.length).toBeLessThan(8991)
     expect(catalog.get('card-loop')!.text.length).toBeLessThan(11000)
+  })
+})
+
+// #1525 (P8): review-agent-work and merge-ready on the intents, the review copy and the merge queue; what Hive enforces
+// is a line pointing at its refusal, and who finishes a card (G5) is the project's, each way said.
+describe('the review and merge skills follow the gates (#1525)', () => {
+  const review = (): string => catalog.get('review-agent-work')!.text
+  const merge = (): string => catalog.get('merge-ready')!.text
+
+  it('state no rule a gate owns, outside a card with no workflow', () => {
+    for (const name of ['review-agent-work', 'merge-ready']) {
+      for (const l of catalog.get(name)!.text.split(/\r?\n/)) {
+        if (/has no workflow/.test(l)) continue
+        for (const [rule, re] of GATE_RULES) expect(l, `${name}: ${rule}`).not.toMatch(re)
+      }
+    }
+  })
+
+  it('review in the review copy start review names, with each command run there, and give the verdict by intent', () => {
+    const text = review()
+    expect(toolsNamed(text)).toEqual(expect.arrayContaining(['hive_start_review', 'hive_verdict', 'hive_request_builder', 'hive_ask_user']))
+    expect(text).toMatch(/`hive_start_review`: its reply names what to review \(a revision with its base and files, or a no-code card's summary/)
+    expect(text).toMatch(/Review there, never in the builder's slot or folder/)
+    // #1559's decision: guidance, not another start folder.
+    expect(text).toMatch(/run every command with the review copy as its working directory: change into it first/)
+    // #1443: a pooled reviewer's start is its assignment, no lane to join.
+    expect(text).toMatch(/A reviewer from the project's pool is told of each card it is given in its inbox: that is its start/)
+    // #533: the run records Hive keeps of the revision are checked, not repeated.
+    expect(text).toMatch(/the runs Hive recorded as the card's checks of that revision/)
+  })
+
+  it("say where the rules decide, never one case as the rule: self-review, the latest submission, a second reviewer, the user's OK", () => {
+    const text = review()
+    expect(text).toMatch(/Where the project's rules forbid it, Hive refuses a review of work you built/)
+    expect(text).toMatch(/Where the rules hold, a verdict on a submission that isn't the latest, or with a decision on the card you haven't read, is refused, saying what to do/)
+    expect(text).toMatch(/Hive moves it on by the project's rules \(another reviewer's pass where it asks for two, the user's OK, its merge, or Done\): the reply says where/)
+    // A convention (G4's screenshots) is the brief's or an option's, which Hive asks for itself.
+    expect(text).toMatch(/A convention your brief or the card names/)
+    expect(text).toMatch(/Where the project's options ask for the user's OK, Hive asks them itself/)
+    expect(text).not.toMatch(/Hive moves it on \(to Passed, or to its merge\)/)
+  })
+
+  it('merge-ready says what the agent does for each way a project finishes a card (G5)', () => {
+    const text = merge()
+    // Keyed by the options' own values: a new way to finish fails to compile here until the skill says it.
+    const FINISH: Record<Finisher, RegExp> = {
+      hiveMerges: /- \*\*Hive merges\*\*: its merge queue checks it on the target as it is then and merges it, or returns it to its builder with why[^\n]*Don't merge it yourself: the card's `merge`/,
+      agentMerges: /- \*\*The agent merges\*\*: you merge it \(below\), then `hive_report_merge` with the merge commit; Hive checks the work is in the base before the card is Done/,
+      notChecked: /- \*\*Merges aren't checked\*\*: merge as your brief says, then `hive_report_merge`; nothing is checked/,
+      committed: /- \*\*Committed is done\*\*, or a project without version control: there is nothing to merge/,
+      accept: /a project without version control: there is nothing to merge; the card finishes on its own/
+    }
+    for (const [finish, says] of Object.entries(FINISH)) expect(text, finish).toMatch(says)
+    expect(text).toMatch(/how its work lands is the project's \(its options, in `hive_project_status`'s `workflow`/)
+    // What the queue owns isn't the agent's to do under Hive merges: the slot's steps are for merging that is yours.
+    expect(text).toMatch(/## Merging, when it is yours/)
+  })
+
+  // #1162: Codex's --no-commit merge into the base also checks the combined tree; the skill keeps the branch merge and
+  // says why, so merge-main-moved's check ("it merged the moved base into the branch first") and the skill agree.
+  it('merges the base into the branch, not the branch into the base with --no-commit, and says why', () => {
+    expect(merge()).toMatch(/Merge it into the branch, not the branch into the base with `--no-commit`: a failure is then fixed on the branch, and the base's checkout is never left mid-merge where others work/)
+    expect(readFileSync(join(ROOT, 'tests', 'scenarios', 'scenarios.cjs'), 'utf8')).toMatch(/\['it merged the moved base into the branch first'/)
+  })
+
+  it('stay smaller than before P8 (review-agent-work 7,475 and merge-ready 5,291 characters, LF)', () => {
+    expect(review().replace(/\r/g, '').length).toBeLessThan(7475)
+    expect(merge().replace(/\r/g, '').length).toBeLessThan(5291)
   })
 })
 
