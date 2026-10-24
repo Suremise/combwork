@@ -1297,14 +1297,6 @@ export interface ProjectProviderConfig {
   use200kContext: Inherit<'on' | 'off'>
 }
 
-/** A worktree an agent works in: its own checkout of the project on its own branch. */
-export interface AgentWorktree {
-  path: string
-  branch: string
-  /** Branch it was created from, and merges back into. */
-  base: string
-}
-
 /** One of a project's agents (up to Agents per project, #562). Settings left undefined follow the project's. */
 export interface AgentDef {
   /** Random and never reused, so session records of removed agents don't attach to new ones. */
@@ -1312,7 +1304,6 @@ export interface AgentDef {
   name: string
   /** The CLI this agent runs. Always stored when the agent is added. */
   provider?: ProviderId
-  worktree?: AgentWorktree
   model?: string
   effort?: EffortLevel
   permissionMode?: PermissionMode
@@ -1320,8 +1311,6 @@ export interface AgentDef {
   use200kContext?: boolean
   /** Session to resume for this agent. */
   lastSessionId?: string
-  /** The worktree's setup command hasn't run successfully yet. */
-  needsSetup?: boolean
   /** The Hive Assistant only: this workspace's mode, over Settings → Assistant. */
   mode?: string
   /** A note on what the agent is for (free text, #126; shown as Note since #1430): saved in templates. */

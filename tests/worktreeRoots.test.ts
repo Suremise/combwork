@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import type { ProjectConfig } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { legacyWorktree } from '../src/shared/agentFolders'
 
 const base = tempDir('hive-worktreeroots-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -80,13 +81,13 @@ describe("agents' worktrees follow the newest config read, in whatever order rea
       await hold.held()
       // Meanwhile the agent moves to another worktree, and a newer refresh reports it.
       await run(() => w.mutateProjectConfig(alpha(), moveTo('new')))
-      expect((await run(() => w.refresh())).projects.find((p) => p.path === alpha())?.agents[0].worktree?.path).toBe(tree('new'))
+      expect(legacyWorktree((await run(() => w.refresh())).projects.find((p) => p.path === alpha())?.agents[0])?.path).toBe(tree('new'))
       hold.release()
       await first
     } finally {
       hold.restore()
     }
-    expect(w.info()?.projects.find((p) => p.path === alpha())?.agents[0].worktree?.path).toBe(tree('new'))
+    expect(legacyWorktree(w.info()?.projects.find((p) => p.path === alpha())?.agents[0])?.path).toBe(tree('new'))
     expect(routed(tree('new'))).toEqual(current(alpha()))
     expect(routed(tree('old'))).toEqual(unknown)
   })
@@ -97,10 +98,10 @@ describe("agents' worktrees follow the newest config read, in whatever order rea
       const first = older(() => w.projectInfo(alpha()))
       await hold.held()
       writeFileSync(join(alpha(), '.hive', 'project.json'), JSON.stringify(withTree(tree('new'))))
-      expect((await run(() => w.projectInfo(alpha()))).agents[0].worktree?.path).toBe(tree('new'))
+      expect(legacyWorktree((await run(() => w.projectInfo(alpha()))).agents[0])?.path).toBe(tree('new'))
       hold.release()
       // What it read is from before: it says so to its caller, and routes nothing.
-      expect((await first).agents[0].worktree?.path).toBe(tree('old'))
+      expect(legacyWorktree((await first).agents[0])?.path).toBe(tree('old'))
     } finally {
       hold.restore()
     }

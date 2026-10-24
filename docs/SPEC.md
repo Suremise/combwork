@@ -3146,6 +3146,17 @@ over #1451's `agentPlace`; the window's helpers in `renderer/src/agentPlace.ts`)
 - **Off switches:** none needed: it only shows where agents are; G11 another value has no slots, so every agent reads
   as the project folder (or its 0.9 worktree).
 
+**Built [#1452], the type's removal:** `AgentDef` no longer has `worktree` or `needsSetup`, and `AgentWorktree` is gone
+(`worktrees.ts`' git operations take a `WorktreeRef`). 0.9.3's fields are `LegacyAgentFields` in `shared/agentFolders.ts`,
+read only through `legacyWorktree` and `legacySetupPending`; `StoredAgent` types an agent with them for their own
+readers and writers (the migration, Repair's recreate, unlink and branch renames, project removal, a template load's
+check of the agents it replaces, the session's setup run, the test copies' 0.9 agent through `updateLegacyAgent`).
+- **Kept for 0.9.3:** every save of the agents carries them through (`carryLegacyAgentFields` in `mutateProjectConfig`):
+  an agent written again without a `worktree` or `needsSetup` key keeps the stored one, byte for byte; only a writer that
+  means to drop one (Repair's unlink) writes the key. 1.0 never writes a new worktree.
+- **The gate:** `tests/legacyWorktreeGate.test.ts` fails on any `<name>.worktree` in `src` but those it lists, each of
+  something other than an agent (a request, a reply, a branch row, a merge target, a message key).
+
 #### 16.10.4 Fresh conversations and hand-overs
 
 Designed in P7 with Darren [#1123 c]: start fresh for idle agents (#1086), a fresh conversation after an idle gap

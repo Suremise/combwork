@@ -12,6 +12,7 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { join } from 'path'
 import { projectAgents } from '../../shared/defaults'
+import { legacyWorktree } from '../../shared/agentFolders'
 import { HISTORY } from '../../shared/taskHistory'
 import type { StoredText, TaskCard } from '../../shared/types'
 import type { Actor, Fact, FileChange, StageId } from '../../shared/workflow/facts'
@@ -151,9 +152,10 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
   recorderTestHooks.onRead?.(p.number)
   const projectPath = join(ws.path!, p.project)
   const cfg = await ws.projectConfig(projectPath)
-  const def = projectAgents(cfg).find((a) => a.id === p.agent)
-  const folder = def?.worktree?.path ?? projectPath
-  const r: Reads = { agent: p.agent!, folder: def?.worktree ? folder : 'project', line: null, head: null, target: null, base: null, files: [], key: null, unknown: {}, unknownText: {} }
+  // Its agent's 0.9 worktree (#1452: through legacyWorktree), else the project folder.
+  const tree = legacyWorktree(projectAgents(cfg).find((a) => a.id === p.agent))
+  const folder = tree?.path ?? projectPath
+  const r: Reads = { agent: p.agent!, folder: tree ? folder : 'project', line: null, head: null, target: null, base: null, files: [], key: null, unknown: {}, unknownText: {} }
   const texts = r.unknownText!
   // The ruleset the card starts under (HR4's round 1 finding 7): the project's options as #1218 keeps them, compiled.
   // A card of a running lane starts under the lane's ruleset, the one in force when the lane started (#1270, §16.11.1).
@@ -182,7 +184,7 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
   }
   r.line = take('line', await G.branch(folder))
   r.head = take('head', await G.head(folder))
-  r.target = def?.worktree?.base ?? take('target', await G.defaultBranch(folder))
+  r.target = tree?.base ?? take('target', await G.defaultBranch(folder))
   if (p.why === 'start') {
     const targetHead = r.target ? take('base', await G.lineHead(folder, r.target)) : null
     r.base = r.head && targetHead ? take('base', await G.mergeBase(folder, r.head, targetHead)) : null

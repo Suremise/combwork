@@ -20,7 +20,7 @@ import { trash } from './trash'
 import { boardWrite } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { forgetProjectQueues } from './workflow/queueRunner'
-import { slotsMigrated } from './agentFolders'
+import { legacyWorktree, slotsMigrated } from './agentFolders'
 import { deleteBlocks, projectFolders, releaseDelete, removeFolders, reserveDelete, reserveRefusal, trashFolders } from './projectFolders'
 import { folderWhat } from '../shared/projectFolders'
 
@@ -76,8 +76,9 @@ export async function checkedWorktrees(ws: WorkspaceService, p: string, all: Age
   const ok: AgentDef[] = []
   const refused: string[] = []
   for (const a of agents) {
-    if (!a.worktree) continue
-    const t = resolve(a.worktree.path)
+    const tree = legacyWorktree(a)
+    if (!tree) continue
+    const t = resolve(tree.path)
     const why = !registered.has(realPath(t).toLowerCase())
       ? tr(msg({ id: 'main.removal.why.notListed', defaultMessage: "git doesn't list it as one of the project's worktrees", description: "Why Hive won't remove or delete an agent's worktree with its project: a clause in brackets (main.removal.refusedTree)." }))
       : containsPlace(t, p) || containsPlace(t, ws.path!)
@@ -99,13 +100,14 @@ export async function removalInfo(projectPath: string): Promise<ProjectRemovalIn
   const worktrees: ProjectRemovalInfo['worktrees'] = []
   for (const a of projectAgents(await ws.projectConfig(p))) {
     // Its 0.9 worktree, until the slots' migration took it over (#1441: then it is one of the slots below).
-    if (!a.worktree || (await slotsMigrated(p, a.id))) continue
+    const tree = legacyWorktree(a)
+    if (!tree || (await slotsMigrated(p, a.id))) continue
     // Unknown is not clean: a worktree git can't check counts as holding work.
-    const st = await wt.branchStatus(p, a.worktree).then(
+    const st = await wt.branchStatus(p, tree).then(
       (s) => ({ ahead: s.ahead, dirty: s.dirty, error: undefined as string | undefined }),
       (e: Error) => ({ ahead: 0, dirty: 0, error: e.message })
     )
-    worktrees.push({ agent: a.name, path: a.worktree.path, branch: a.worktree.branch, ...st })
+    worktrees.push({ agent: a.name, path: tree.path, branch: tree.branch, ...st })
   }
   return {
     name,
@@ -205,7 +207,7 @@ async function removeFromHive(ws: WorkspaceService, p: string, info: ProjectRemo
   // Its slots and copies (#1447): through their pools' guarded clean-up; what is kept stays, said in the result.
   const folders = await removeFolders(ws, p, true)
   // The worktrees have nothing left that isn't in the project: they and their agents go.
-  for (const a of ok) await wt.removeWorktree(p, a.worktree!, true)
+  for (const a of ok) await wt.removeWorktree(p, legacyWorktree(a)!, true)
   if (ok.length) {
     const gone = new Set(ok.map((a) => a.id))
     await ws.mutateProjectConfig(p, (now) => ({ agents: now.agents.filter((a) => !gone.has(a.id)) }))
@@ -245,7 +247,7 @@ async function deleteProject(ws: WorkspaceService, p: string, info: ProjectRemov
     if (refusal) throw blocked(reserveRefusal(folders, refusal))
     held = true
     const { ok, refused } = await checkedWorktrees(ws, p, agents)
-    const trees = ok.map((a) => a.worktree!.path).filter((t) => existsSync(t))
+    const trees = ok.map((a) => legacyWorktree(a)!.path).filter((t) => existsSync(t))
     // The folder first: it is what Windows most often can't move (a program has it open), and until it has gone
     // nothing else is touched, so a refusal leaves the project as it was (its slots let go, below).
     const resume = suspendWatching([p, ...trees])

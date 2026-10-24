@@ -8,6 +8,7 @@ import { chosenName, effortName, modelIdName, resolvedModel, runsAsName, type Mo
 import { msg, tr as trNow, type Msg } from './i18n'
 import type { Tr } from './tasks'
 import { samePath } from './movePaths'
+import { legacyWorktree } from './agentFolders'
 
 export const HIVE_DIR = '.hive'
 
@@ -765,8 +766,8 @@ export function effortLabel(provider: string, live: string | undefined, chosen: 
 }
 
 /** Whether a session record ran in the folder an agent works in (its worktree, or the project folder). */
-export function sessionInAgentFolder(projectPath: string, a: Pick<AgentDef, 'worktree'>, rec: Pick<SessionRecord, 'cwd'>): boolean {
-  const folder = (a.worktree?.path ?? projectPath).toLowerCase()
+export function sessionInAgentFolder(projectPath: string, a: object, rec: Pick<SessionRecord, 'cwd'>): boolean {
+  const folder = (legacyWorktree(a)?.path ?? projectPath).toLowerCase()
   return (rec.cwd ?? projectPath).toLowerCase() === folder
 }
 
@@ -779,7 +780,7 @@ export function sessionInAgentFolder(projectPath: string, a: Pick<AgentDef, 'wor
  */
 export function resumeRecord<R extends Pick<SessionRecord, 'id' | 'archived' | 'lastActiveAt'> & Partial<Pick<SessionRecord, 'cwd' | 'agentId' | 'sub'>>>(
   projectPath: string,
-  a: Pick<AgentDef, 'id' | 'worktree' | 'lastSessionId'>,
+  a: Pick<AgentDef, 'id' | 'lastSessionId'>,
   records: R[],
   open: Set<string>,
   agentIds: Set<string> = new Set([a.id]),
@@ -791,7 +792,7 @@ export function resumeRecord<R extends Pick<SessionRecord, 'id' | 'archived' | '
     .sort((x, y) => (y.lastActiveAt ?? '').localeCompare(x.lastActiveAt ?? ''))
   return (
     usable.find((r) => r.id === a.lastSessionId) ??
-    usable.find((r) => !!a.worktree || r.agentId === a.id) ??
+    usable.find((r) => !!legacyWorktree(a) || r.agentId === a.id) ??
     usable.find((r) => !r.agentId || !agentIds.has(r.agentId)) ??
     null
   )
