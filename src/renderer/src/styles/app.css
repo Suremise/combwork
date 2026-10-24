@@ -6456,6 +6456,13 @@ button.agent-place:hover {
 .pane-placeholder p {
   margin: 0 0 4px;
 }
+/* A folder or branch it names (#1552): marked as code, as in Markdown, so "hb2" reads as a name whatever its letters. */
+.pane-placeholder code {
+  background: var(--bg-elevated);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
 .pane-placeholder .btns {
   display: flex;
   gap: 8px;

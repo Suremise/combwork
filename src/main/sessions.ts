@@ -18,7 +18,7 @@ import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { assistantTools } from '../shared/assistantTools'
 import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
-import { defaultPurpose, legacyWorktree, namedFolders, resumeHold, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
+import { defaultPurpose, legacyWorktree, namedFolders, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
 import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter } from './agentFolders'
 import { slotEnv } from './slots'
@@ -1287,6 +1287,8 @@ class SessionManager {
       const folder = workspace.isAssistantHome(projectPath) ? (workspaceOf(projectPath).path ?? projectPath) : projectPath
       const r = l ? null : resumeRecord(folder, a, records.filter((x) => recordProvider(x) === provider), openIds, ids, slotFolders)
       const hold = r && facts ? resumeHold(facts, folderAgent(a), r) : null
+      // Its last conversation resumes in a retired home (#1441), though a new one starts elsewhere: its pane says so (#1552).
+      const home = r && facts ? resumeHome(facts, r) : null
       // Its adopted worktree's slot (#1441), while it holds it carried.
       const carried = facts?.slots.find((s) => s.open?.kind === 'carried' && s.open.agent === a.id)?.name
       // Where it works now, as the window shows it (#1442).
@@ -1294,7 +1296,7 @@ class SessionManager {
       const legacy = legacyWorktree(a)
       const shown = at ? shownPlace(shownFacts, folderAgent(a), at.now, at.branch) : { folder: projectPath, is: 'project' as const, name: null, branch: null }
       const place = shown.is === 'legacy' && legacy?.base ? { ...shown, base: legacy.base } : shown
-      agents.push({ ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}) }, ...(carried ? { carriedSlot: carried } : {}), ...(held.has(a.id) ? { heldSlot: held.get(a.id) } : {}), place })
+      agents.push({ ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}), ...(home ? { home } : {}) },...(carried ? { carriedSlot: carried } : {}), ...(held.has(a.id) ? { heldSlot: held.get(a.id) } : {}), place })
     }
     const primary = agents.find((a) => a.live)
     return { live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, agents, folders: namedFolders(shownFacts) }

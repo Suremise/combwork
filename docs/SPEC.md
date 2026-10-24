@@ -3135,7 +3135,11 @@ over #1451's `agentPlace`; the window's helpers in `renderer/src/agentPlace.ts`)
   "carried: hb2", "home: hr4" or "0.9 worktree: hb1" as text, nothing in the project folder; the same in a Slot column
   of the project hover's agents table (when an agent works outside the project folder), Project Settings' agent list,
   Agent Settings' Works in, the Assistant's overview, and the agent's hover with the folder's path. The Sessions tab
-  names a session's folder by its slot ("Slot · slot-b") or home ("Home · hr4"), else as before.
+  names a session's folder by its slot ("Slot · slot-b") or home ("Home · hr4"), else as before. A stopped agent's pane
+  (no terminal yet) says where it works (#1552): "Works in slot-b.", "Works in hb2, the slot kept for it.", its 0.9
+  worktree's branch until it's migrated, and for one whose last conversation resumes in a retired home (`ResumeTarget.home`,
+  `resumeHome`), "A new conversation starts in the project folder; Resume opens its last one in its old folder, hr4.";
+  nothing in the project folder.
 - **Add Agent** has no worktree choice: an agent is added in the project folder with its workflow role, and nothing is
   sent for a worktree (`AddAgentOptions.location` may be left out). A note says a builder takes a slot for each card.
   Quick add sends no location either.

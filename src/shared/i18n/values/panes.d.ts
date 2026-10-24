@@ -18,7 +18,10 @@ interface HiveMessageValues {
   'panes.body.empty': undefined
   'panes.body.ended': undefined
   'panes.body.endedLong': undefined
+  'panes.body.inCarried': { name: string | number }
+  'panes.body.inSlot': { name: string | number }
   'panes.body.notRunning': { agent: string | number }
+  'panes.body.resumesInHome': { name: string | number }
   'panes.body.retrySetup': undefined
   'panes.body.setupFailed': undefined
   'panes.body.setupFirst': undefined

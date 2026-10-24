@@ -13,7 +13,7 @@ import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { fileSlotConn, SlotStore } from '../src/main/slots'
 import { claimIn, ClaimRefused, leasedLine, legacyWorktree, rebindSession, RebindRefused, slotsIn } from '../src/main/agentFolders'
 import { readSessionRecords, writeSessionRecords } from '../src/main/schema/sessionDeliveryTables'
-import { agentPlaces, canResumeByUser, canResumeNow, currentFolder, defaultPurpose, launchFolder, namedFolders, resumeFolder, resumeHold, shownPlace, type FolderAgent, type FolderFacts, type FolderLease, type FolderSlot, type ResumeHold } from '../src/shared/agentFolders'
+import { agentPlaces, canResumeByUser, canResumeNow, currentFolder, defaultPurpose, launchFolder, namedFolders, resumeFolder, resumeHold, resumeHome, shownPlace, type FolderAgent, type FolderFacts, type FolderLease, type FolderSlot, type ResumeHold } from '../src/shared/agentFolders'
 import { agentsToResume, resumeAll, type ResumeAllAgent } from '../src/shared/resumeAll'
 import { holdShort, holdText, resumeBlock, type ResumeContext } from '../src/shared/sessionResume'
 import { shownText } from '../src/shared/advanced'
@@ -83,6 +83,17 @@ describe('where a new conversation starts, and where an agent works now', () => 
   it('a conversation resumes in the folder it recorded; an older row without one, in the project folder', () => {
     expect(resumeFolder(P, { cwd: slotFolder('slot-b') })).toBe(slotFolder('slot-b'))
     expect(resumeFolder(P, {})).toBe(P)
+  })
+
+  it('names the retired home a conversation resumes in (#1552), by its folder whatever its case; none elsewhere', () => {
+    const home = 'C:\\ws.worktrees\\project\\hr1'
+    const f = facts([slot('slot-b')], { homes: [home] })
+    expect(resumeHome(f, { cwd: home })).toBe('hr1')
+    expect(resumeHome(f, { cwd: home.toUpperCase() })).toBe('HR1')
+    expect(resumeHome(f, { cwd: slotFolder('slot-b') })).toBeNull()
+    expect(resumeHome(f, { cwd: P })).toBeNull()
+    expect(resumeHome(f, {})).toBeNull()
+    expect(resumeHome(facts([]), { cwd: home })).toBeNull()
   })
 })
 
