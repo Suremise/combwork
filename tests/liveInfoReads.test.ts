@@ -88,6 +88,8 @@ describe("a refresh's running agents share the workspace's reads (#1002)", () =>
     const live = info.projects.flatMap((p) => p.agents.filter((a) => a.live))
     expect(live).toHaveLength(RUNNING * projects.length)
     expect(live.every((a) => !a.restartNeeded)).toBe(true)
+    // Each agent says where it works (#1442): these, with no slots, in their projects' folders.
+    expect(info.projects.flatMap((p) => p.agents.map((a) => [a.place.is, a.place.folder === p.path]))).toEqual(info.projects.flatMap((p) => p.agents.map(() => ['project', true])))
   })
 
   it("a change to the workspace's skills or servers still asks every running agent for a restart, at the next refresh", async () => {

@@ -172,6 +172,8 @@
   "panes.table.projectPrefix": "プロジェクト：{value}",
   "panes.table.role": "役割",
   "panes.table.rolePrefix": "役割：{value}",
+  "panes.table.slot": "スロット",
+  "panes.table.slotPrefix": "{value}",
   "panes.table.state": "状態",
   "panes.table.waiting": "待機対象",
   "panes.table.waitingFor": "{what}を待機中",

@@ -435,6 +435,10 @@
     "defaultMessage": "Agent {agent} ({id}).",
     "description": "A session's origin hover (the Sessions tab): the agent that ran it, by name ({agent}) and id ({id})."
   },
+  "sessions.origin.named": {
+    "defaultMessage": "{is, select, slot {Slot · {name}} other {Home · {name}}}",
+    "description": "Where a session ran (the Sessions tab): in one of the project's slots (a working folder Hive lends to cards; {name} is its name, such as slot-b) or a reviewer's retired home ({name}: its folder's name, such as hr4). Glossary: slot."
+  },
   "sessions.origin.noAgent": {
     "defaultMessage": "No agent recorded (adopted, or from before Hive recorded agents).",
     "description": "A session's origin hover (the Sessions tab): Hive has no record of which agent ran it."
@@ -476,8 +480,8 @@
     "description": "Tooltip of Resume when no agent can run the session: Resume adds one."
   },
   "sessions.resume.agentDetail": {
-    "defaultMessage": "{where, select, worktree {worktree · {branch}} other {project folder}}{running, select, yes { · running, its current session stops first} other {}}",
-    "description": "Under an agent in the Resume in menu: where it works (a worktree and its branch, or the project folder; lower case), and, when it runs, that its current session stops first."
+    "defaultMessage": "{where, select, worktree {worktree · {branch}} place {{place}} other {project folder}}{running, select, yes { · running, its current session stops first} other {}}",
+    "description": "Under an agent in the Resume in menu: where it works (its worktree from before 1.0 and its branch; a slot, carried slot or home ({place}: agents.place.short, such as \"in slot-b\"); or the project folder; lower case), and, when it runs, that its current session stops first."
   },
   "sessions.resume.menuHeader": {
     "defaultMessage": "Resume in",

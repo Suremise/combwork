@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'crypto'
-import { legacyWorktree } from '../shared/agentFolders'
+import { legacyWorktree, type NamedFolder } from '../shared/agentFolders'
 import { basename, dirname, join, resolve, sep } from 'path'
 import { mkdir, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, statSync, watch, type FSWatcher as RootWatcher } from 'original-fs'
@@ -116,7 +116,7 @@ export interface SessionsFile {
 }
 
 /** `scope`: the refresh the project is read for (#1002), whose projects' running agents share one read of the workspace's skills and servers. */
-type LiveProvider = (projectPath: string, cfg: ProjectConfig, scope?: object) => Promise<{ live: LiveSessionState | null; restartNeeded: boolean; agents: AgentInfo[] }>
+type LiveProvider = (projectPath: string, cfg: ProjectConfig, scope?: object) => Promise<{ live: LiveSessionState | null; restartNeeded: boolean; agents: AgentInfo[]; folders?: NamedFolder[] }>
 
 /**
  * What a read of the projects' ids saw of each one (#514): its folder, its id, where it was last opened (project.json's
@@ -148,7 +148,7 @@ export class WorkspaceService {
   private scheduled: { done: Promise<void>; tell: () => void } | null = null
   /** Scheduled refreshes running now, until each has finished (refreshesSettled waits for them too, #1143 round 2). */
   private scheduledRuns = new Set<Promise<void>>()
-  private static liveProvider: LiveProvider = async (_p, cfg) => ({ live: null, restartNeeded: false, agents: projectAgents(cfg).map((a) => ({ ...a, live: null, restartNeeded: false, resume: null })) })
+  private static liveProvider: LiveProvider = async (p, cfg) => ({ live: null, restartNeeded: false, agents: projectAgents(cfg).map((a) => ({ ...a, live: null, restartNeeded: false, resume: null, place: { folder: p, is: 'project' as const, name: null, branch: null } })) })
   /** Called each time a workspace opens, in its context; `fresh` when Hive set the folder up just now (it had no .hive). */
   static onOpened: ((fresh: boolean) => Promise<unknown>) | null = null
   /** Each read of the projects' ids (#514): the workspace's record of their names follows it (projectNames.ts). Never awaited. */
@@ -176,6 +176,8 @@ export class WorkspaceService {
    */
   private rootsAt = new Map<string, number>()
   private rootTickets = 0
+  /** Each project's slots and retired homes as its last read found them (#1442: lower-cased project → folders): roots too. */
+  private folderRoots = new Map<string, string[]>()
   /**
    * Each project's latest project.json write (lower-cased project → its ticket), and the ticket each ProjectInfo was read
    * at (#999): a refresh that read a project before a later write found the config from before, e.g. an agent order two
@@ -419,6 +421,7 @@ export class WorkspaceService {
     // The closed workspace's agent worktrees and settings must not route to (or be allowed by) the next one.
     this.roots.clear()
     this.rootsAt.clear()
+    this.folderRoots.clear()
     this.savedAt.clear()
     // Every write stamp forgotten at once: the floor is the newest stamp, so each old snapshot still reads a change.
     this.configWrites.clear()
@@ -885,19 +888,24 @@ export class WorkspaceService {
   /**
    * Records a project's agent worktrees, from a config read or written in generation `gen` (none once the workspace has
    * closed or switched since) with `ticket` (none when a later read or write has recorded them already, #784).
+   * `folders`: its slots and retired homes as that read found them (#1442), kept for later writes only when the read is
+   * the newest (the same fence: a late read neither publishes nor caches folders a newer one has dropped).
    */
-  private registerRoots(projectPath: string, cfg: ProjectConfig, gen: number, ticket: number): void {
+  private registerRoots(projectPath: string, cfg: ProjectConfig, gen: number, ticket: number, folders?: readonly string[]): void {
     const key = projectPath.toLowerCase()
     if (gen !== this.generation || ticket < (this.rootsAt.get(key) ?? 0)) return
     // A project gone as the last refresh listed the folders, read before that: the read is older than its going.
     if (this.listedAt && ticket < this.listedAt.ticket && !this.listedAt.known.has(key)) return
     this.rootsAt.set(key, ticket)
+    if (folders) this.folderRoots.set(key, [...folders])
     for (const [k, v] of this.roots) if (v.toLowerCase() === projectPath.toLowerCase()) this.roots.delete(k)
-    // Agents' 0.9 worktrees (#1451: through legacyWorktree; slots are found by the slots' own tables).
+    // Agents' 0.9 worktrees (#1451: through legacyWorktree), and the project's slots and retired homes as last read
+    // (#1442: the Files tab and file links open the folder an agent works in).
     for (const a of cfg.agents ?? []) {
       const w = legacyWorktree(a)
       if (w) this.roots.set(resolve(w.path).toLowerCase(), projectPath)
     }
+    for (const f of this.folderRoots.get(key) ?? []) this.roots.set(resolve(f).toLowerCase(), projectPath)
   }
 
   /** Changes one agent's definition. */
@@ -1151,7 +1159,9 @@ export class WorkspaceService {
     if (!this.isAssistantHome(projectPath) && !existsSync(join(projectPath, HIVE_DIR, 'project.json'))) await this.ensureProject(projectPath).catch((e) => log.warn(`ensureProject ${userText(projectPath)}`, e))
     const cfg = await this.projectConfig(projectPath)
     this.registerRoots(projectPath, cfg, gen, ticket)
-    const { live, restartNeeded, agents } = await WorkspaceService.liveProvider(projectPath, cfg, scope)
+    const { live, restartNeeded, agents, folders } = await WorkspaceService.liveProvider(projectPath, cfg, scope)
+    // Its slots and homes are roots from this read on (#1442), fenced as its worktrees are (registerRoots' ticket).
+    if (!this.isAssistantHome(projectPath)) this.registerRoots(projectPath, cfg, gen, ticket, (folders ?? []).map((f) => f.path))
     const info: ProjectInfo = {
       name: basename(projectPath),
       path: projectPath,
@@ -1162,6 +1172,7 @@ export class WorkspaceService {
       live,
       restartNeeded,
       agents,
+      ...(folders?.length ? { folders } : {}),
       unmanagedMcp: await this.unmanagedMcp(projectPath),
       removedData: await removedData(projectPath),
       // Ensured at each refresh, so a repository made later (git init) gets it too (#345).
@@ -1243,6 +1254,7 @@ export class WorkspaceService {
     this.listedAt = { ticket: listed, known: assistant ? new Set([...known, this.assistantHome.toLowerCase()]) : known }
     for (const [k, v] of this.roots) if (!known.has(v.toLowerCase()) && (this.rootsAt.get(v.toLowerCase()) ?? 0) < listed) this.roots.delete(k)
     for (const [project, at] of this.rootsAt) if (!known.has(project) && at < listed) this.rootsAt.delete(project)
+    for (const project of this.folderRoots.keys()) if (!known.has(project) && !this.rootsAt.has(project)) this.folderRoots.delete(project)
     for (const [project, at] of this.savedAt) if (!this.listedAt.known.has(project) && at < listed) this.savedAt.delete(project)
     for (const [project, w] of this.configWrites) if (!this.listedAt.known.has(project) && w.ticket < listed) this.forgetConfigWrites(project)
     // A project gone is said again if it comes back.

@@ -17,6 +17,7 @@ import { cx, formatDuration, formatKeybinding, formatTokens, sessionLabel, timeA
 import { useSessions } from './ProjectTabs'
 import { useScopedLoad } from '../scopedLoad'
 import { sessionOrigin, type SessionOrigin } from '@shared/sessionOrigin'
+import { legacyOf, placeText } from '../agentPlace'
 import { MAX_TREE_PREFS } from '@shared/uiPrefs'
 import { shownText } from '@shared/advanced'
 import { rememberProjectPref } from '../projectPrefs'
@@ -98,7 +99,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
   const isLive = (id: string): boolean => liveById.has(id)
   const many = project.agents.length > 1
   // Where each session ran and whose it was, as it recorded (the Assistant's conversations have one place to run).
-  const origin = (s: SessionListItem): SessionOrigin | null => (assistant ? null : sessionOrigin(project.path, project.agents, s))
+  const origin = (s: SessionListItem): SessionOrigin | null => (assistant ? null : sessionOrigin(project.path, project.agents, s, project.folders))
   const sessionName = (s: SessionListItem): string => sessionLabel(s, project.name, tr)
   const menu = useContextMenu()
   const resumeMenu = useContextMenu()
@@ -649,7 +650,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                                 icon: a.id === target ? 'debug-continue' : 'person',
                                 // Starting already (#1177).
                                 disabled: !!get().starting[startingKey(project.path, a.id)],
-                                detail: tr(msg({ id: 'sessions.resume.agentDetail', defaultMessage: '{where, select, worktree {worktree · {branch}} other {project folder}}{running, select, yes { · running, its current session stops first} other {}}', description: 'Under an agent in the Resume in menu: where it works (a worktree and its branch, or the project folder; lower case), and, when it runs, that its current session stops first.' }), { where: a.worktree ? 'worktree' : 'folder', branch: a.worktree?.branch ?? '', running: a.live ? 'yes' : 'no' }),
+                                detail: tr(msg({ id: 'sessions.resume.agentDetail', defaultMessage: '{where, select, worktree {worktree · {branch}} place {{place}} other {project folder}}{running, select, yes { · running, its current session stops first} other {}}', description: 'Under an agent in the Resume in menu: where it works (its worktree from before 1.0 and its branch; a slot, carried slot or home ({place}: agents.place.short, such as "in slot-b"); or the project folder; lower case), and, when it runs, that its current session stops first.' }), { where: legacyOf(a) ? 'worktree' : placeText(a.place) ? 'place' : 'folder', branch: legacyOf(a)?.branch ?? '', place: placeText(a.place) ?? '', running: a.live ? 'yes' : 'no' }),
                                 onClick: () => void actions.resumeSession(project.path, selected, a.id)
                               }))
                             ])

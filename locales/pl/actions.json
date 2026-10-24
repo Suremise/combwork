@@ -146,7 +146,7 @@
   "actions.remove.message": "Agent {agent} zostanie usunięty z projektu {project}. Jego sesje zostają w zakładce Sesje.",
   "actions.remove.reviewUnused": "Przejrzyj nieużywane worktree",
   "actions.remove.title": "Usunąć agenta {agent}?",
-  "actions.remove.worktreeDetail": "Zachowaj worktree i gałąź, aby później je scalić lub użyć ponownie (Dodaj agenta → Istniejący worktree), albo usuń oba. Sesje agenta i tak zostają w zakładce Sesje.",
+  "actions.remove.worktreeDetail": "Zachowaj worktree i gałąź, aby później je scalić, albo usuń oba. Sesje agenta i tak zostają w zakładce Sesje.",
   "actions.remove.worktreeMessage": "Agent {agent} pracuje we własnym worktree na gałęzi {branch}.",
   "actions.removeAll.branchKept": "gałąź {branch} ({why}; jej worktree usunięto)",
   "actions.removeAll.checkFailed": "Nie udało się sprawdzić worktree",

@@ -3,6 +3,8 @@
   "tips.advancedSettings.title": "Fix a CLI change yourself",
   "tips.agentConsole.text": "Settings → Agent API → Let agents read the developer console gives agents a read-only tool showing their CLI's hooks and status line next to what Hive made of each, redacted, so they can debug what Hive sees.",
   "tips.agentConsole.title": "Let agents see what their CLI sends",
+  "tips.agentInSlot.text": "Beside an agent's name on its pane: in slot-b while it builds a card in a slot (click it for Branches & remotes), carried: hb2 in the slot kept for it, home: hr4 for a reviewer's retired home. The project's hover lists them in a Slot column.",
+  "tips.agentInSlot.title": "See where each agent works",
   "tips.agentLayouts.text": "Each agent has its own pane: choose a layout at the right of the session toolbar, and drag a pane by its header to rearrange them. File locks stop two agents editing the same file.",
   "tips.agentLayouts.title": "Several agents side by side",
   "tips.agentMenu.text": "An agent's pane header keeps to its state, its card and Stop. Compact, Hand Over, Merge…, its settings and anything that needs a look (a dot on ⋯ says so) are in its ⋯ menu, or right-click the header. {key}",
@@ -414,9 +416,5 @@
   "tips.workspaceMovedDefender.text": "If Hive had Defender skip the workspace's folders, Repair… after a move offers to move those exclusions to the new folders, with one administrator prompt, so none is left on a folder that's gone. Exclusions you made yourself stay as they are.",
   "tips.workspaceMovedDefender.title": "Defender exclusions follow a moved workspace",
   "tips.workspaceNotes.text": "Workspace notes, pinned first in Shared Notes, is for what's true of this machine, like a full path. Every agent gets it when it starts, in any folder, so it needn't go in a committed AGENTS.md. A section headed with a project's name is that project's alone.",
-  "tips.workspaceNotes.title": "Notes about this machine for every agent",
-  "tips.worktreeReuse.text": "Adding an agent with a new worktree named like one you kept (B4, and B4's worktree is unused)? If it's merged and clean, Hive gives the agent that folder, brought up to main: its node_modules are already there.",
-  "tips.worktreeReuse.title": "A kept worktree is used again",
-  "tips.worktrees.text": "In Add Agent…, choose New worktree: the agent works on its own branch, and Merge… brings its work back when you're happy with it.",
-  "tips.worktrees.title": "Give an agent its own worktree"
+  "tips.workspaceNotes.title": "Notes about this machine for every agent"
 }

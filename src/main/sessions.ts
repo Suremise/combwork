@@ -18,9 +18,9 @@ import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { assistantTools } from '../shared/assistantTools'
 import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
-import { defaultPurpose, resumeHold, slotAt, type FolderPurpose, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
+import { defaultPurpose, legacyWorktree, namedFolders, resumeHold, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
-import { bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter } from './agentFolders'
+import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter } from './agentFolders'
 import { slotEnv } from './slots'
 import { copiesDirOf, grantsCopies } from './copies'
 import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
@@ -1256,7 +1256,7 @@ class SessionManager {
    * Every agent of a project with its running session, for ProjectInfo. `scope`: the refresh it is for (#1002), whose
    * projects' running agents share one read of the workspace's skills and servers; without, this call's agents do.
    */
-  async liveInfo(projectPath: string, cfg: ProjectConfig, scope?: object): Promise<{ live: LiveSessionState | null; restartNeeded: boolean; agents: AgentInfo[] }> {
+  async liveInfo(projectPath: string, cfg: ProjectConfig, scope?: object): Promise<{ live: LiveSessionState | null; restartNeeded: boolean; agents: AgentInfo[]; folders: NamedFolder[] }> {
     const reads = scope ? launchReadsOf(scope) : new LaunchReads()
     const agents: AgentInfo[] = []
     const records = (await workspace.sessionsFile(projectPath)).sessions
@@ -1266,6 +1266,8 @@ class SessionManager {
     // The project's slots and leases (#1434): an agent's conversations in its slots, and whether each may resume now.
     const facts = await folderFacts(projectPath).catch(() => null)
     const slotFolders = facts?.slots.map((s) => s.folder) ?? []
+    // Unreadable: no slots or homes, a 0.9 worktree still its agent's (as the contract reads a project not migrated).
+    const shownFacts: FolderFacts = facts ?? { projectPath, migrated: false, migratedAgents: [], homes: [], slots: [] }
     // Slots held by an agent's run that is over, its processes not known ended (#1506): its ⋯ offers Release Slot….
     const held = facts?.slots.some((s) => s.writer) ? await heldSlots(projectPath).catch(() => new Map<string, string>()) : new Map<string, string>()
     for (const a of projectAgents(cfg)) {
@@ -1287,10 +1289,15 @@ class SessionManager {
       const hold = r && facts ? resumeHold(facts, folderAgent(a), r) : null
       // Its adopted worktree's slot (#1441), while it holds it carried.
       const carried = facts?.slots.find((s) => s.open?.kind === 'carried' && s.open.agent === a.id)?.name
-      agents.push({ ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}) }, ...(carried ? { carriedSlot: carried } : {}), ...(held.has(a.id) ? { heldSlot: held.get(a.id) } : {}) })
+      // Where it works now, as the window shows it (#1442).
+      const at = await agentPlace(projectPath, a, l ? { cwd: l.state.cwd } : null, shownFacts).catch(() => null)
+      const legacy = legacyWorktree(a)
+      const shown = at ? shownPlace(shownFacts, folderAgent(a), at.now, at.branch) : { folder: projectPath, is: 'project' as const, name: null, branch: null }
+      const place = shown.is === 'legacy' && legacy?.base ? { ...shown, base: legacy.base } : shown
+      agents.push({ ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}) }, ...(carried ? { carriedSlot: carried } : {}), ...(held.has(a.id) ? { heldSlot: held.get(a.id) } : {}), place })
     }
     const primary = agents.find((a) => a.live)
-    return { live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, agents }
+    return { live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, agents, folders: namedFolders(shownFacts) }
   }
 
   private backupPath(projectPath: string, sessionId: string, archived = false): string {

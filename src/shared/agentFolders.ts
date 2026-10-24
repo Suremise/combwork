@@ -213,3 +213,42 @@ export function agentPlaces(facts: FolderFacts, agent: FolderAgent, running: { c
   return { now: running ? place(running.cwd, 'session') : launch, launch }
 }
 
+/**
+ * What kind of place an agent's folder is, as the window shows it (#1442): a slot it builds in (`slot`), its carried
+ * slot (`carried`, #1441), a retired home (`home`), its 0.9 worktree not migrated yet (`legacy`), or the project folder.
+ */
+export type ShownPlaceKind = 'slot' | 'carried' | 'home' | 'legacy' | 'project'
+
+/** Where an agent works now, for the window (#1442): its folder, the kind of place, its short name, and its branch. */
+export interface ShownPlace {
+  folder: string
+  is: ShownPlaceKind
+  /** The slot's name, or the home's or 0.9 worktree's folder name; null in the project folder. */
+  name: string | null
+  /** Its line (a card's branch in a slot, a carried slot's or 0.9 worktree's own), when known. */
+  branch: string | null
+  /** A 0.9 worktree's: the branch it was made from. */
+  base?: string
+}
+
+/** A project's folder other than its own, named for the window (#1442): a slot, or a retired home. */
+export interface NamedFolder {
+  path: string
+  name: string
+  is: 'slot' | 'home'
+}
+
+const leafOf = (folder: string): string => folder.split(/[\\/]/).filter(Boolean).pop() ?? folder
+
+/** The window's view of `now` (an `agentPlaces` answer) for the agent, with its line (`branch`, main's `agentPlace`). */
+export function shownPlace(facts: FolderFacts, agent: FolderAgent, now: AgentPlace, branch: string | null): ShownPlace {
+  const slot = now.slot ? (facts.slots.find((s) => s.name === now.slot) ?? null) : null
+  if (slot) return { folder: now.path, is: slot.open?.kind === 'carried' && slot.open.agent === agent.id ? 'carried' : 'slot', name: slot.name, branch }
+  if (facts.homes.some((h) => samePath(h, now.path))) return { folder: now.path, is: 'home', name: leafOf(now.path), branch: null }
+  if (agent.legacy && samePath(agent.legacy.path, now.path)) return { folder: now.path, is: 'legacy', name: leafOf(now.path), branch: agent.legacy.branch }
+  return { folder: now.path, is: 'project', name: null, branch: null }
+}
+
+/** The project's slots and retired homes, named (#1442): what the window names a session's or a card's folder by. */
+export const namedFolders = (facts: FolderFacts): NamedFolder[] => [...facts.slots.map((s) => ({ path: s.folder, name: s.name, is: 'slot' as const })), ...facts.homes.map((h) => ({ path: h, name: leafOf(h), is: 'home' as const }))]
+

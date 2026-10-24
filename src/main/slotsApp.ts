@@ -228,7 +228,11 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
         }
       },
       removeIdle: () => advanced.get(SLOTS_REMOVE_IDLE) !== false,
-      ended: (lease, slot) => stopLeaseSession(projectPath, lease, slot),
+      ended: (lease, slot) => {
+        stopLeaseSession(projectPath, lease, slot)
+        // Where its agent works changes (#1442: an idle builder's "in slot-b" goes): the window reads it again.
+        if (!ws.lifetime.aborted) ws.scheduleRefresh()
+      },
       writerOver: (w) => writerOver(w),
       removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }), // i18n-ignore: the log's reason (English)
       renamer: renamerFor(ws, projectPath)
