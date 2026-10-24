@@ -280,8 +280,22 @@ function checkTags(v: unknown): string[] {
  * transaction with its links and tags; the index follows by trigger.
  */
 export function writeEntry(home: string, settings: JournalSettings, input: EntryInput, source: JournalSource): number {
+  return writeEntryUnless(home, settings, input, source, null)!
+}
+
+/**
+ * As writeEntry, once: nothing is written (null) when the journal already has an entry by `source` with this summary
+ * and detail, linked to `link` (#1534: a build sent twice, its reply cut off and then its marker). Checked in the
+ * write's own transaction, so two at once write one; found through the links index, however many entries share it.
+ */
+export function writeEntryOnce(home: string, settings: JournalSettings, input: EntryInput, source: JournalSource, link: { type: LinkType; ref: string }): number | null {
+  return writeEntryUnless(home, settings, input, source, link)
+}
+
+function writeEntryUnless(home: string, settings: JournalSettings, input: EntryInput, source: JournalSource, once: { type: LinkType; ref: string } | null): number | null {
   const e = entryOf(settings, input)
-  const id = insertEntry(journalOf(home).writer, e, source)
+  const id = insertEntry(journalOf(home).writer, e, source, once)
+  if (id === null) return null
   pruneSoon(home, settings)
   told(home)
   return id
@@ -301,7 +315,7 @@ export function leaveEntry(home: string, settings: JournalSettings, input: Entry
   if (deleting.has(deletingKey(at))) throw new JournalBusy('The journal is being deleted: try again in a moment.')
   const db = openJournalDb(at.file)
   try {
-    return insertEntry(db.writer, e, source)
+    return insertEntry(db.writer, e, source)!
   } finally {
     db.close()
   }
@@ -325,11 +339,18 @@ function entryOf(settings: JournalSettings, input: EntryInput) {
   }
 }
 
-/** writeEntry's transaction, on the connection given: the entry with its links and tags; returns its id. */
-function insertEntry(w: Db['writer'], e: ReturnType<typeof entryOf>, source: JournalSource): number {
+/**
+ * writeEntry's transaction, on the connection given: the entry with its links and tags; returns its id. With `once`,
+ * nothing (null) when an entry by `source` with this summary and detail is already linked to it.
+ */
+function insertEntry(w: Db['writer'], e: ReturnType<typeof entryOf>, source: JournalSource, once: { type: LinkType; ref: string } | null = null): number | null {
   const { kind, summary, detail, why, project, digestOf, importance, links, tags } = e
   const d = storedDetail(detail)
   return transaction(w, () => {
+    if (once) {
+      const same = w.prepare('SELECT e.detail, e.detail_z FROM links l JOIN entries e ON e.id = l.entry_id WHERE l.type = ? AND l.ref = ? AND e.source = ? AND e.summary = ?').all(once.type, once.ref, source, summary) as { detail: unknown; detail_z: unknown }[]
+      if (same.some((r) => detailText(r.detail, r.detail_z) === detail)) return null
+    }
     for (const l of links.filter((x) => x.type === 'entry')) if (!w.prepare('SELECT 1 FROM entries WHERE id = ?').get(Number(l.ref))) fail(`There is no entry ${l.ref} to link to.`)
     const r = w
       .prepare('INSERT INTO entries (at, kind, project, summary, detail, detail_z, why, source, importance, digest_of) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')

@@ -586,6 +586,17 @@ describe('RELEASING.md on the 1.0 path', () => {
     expect(path).toMatch(/`dist\/build-info\.json`/)
     expect(section('Release notes')).toMatch(/\*\*back up first, there's no going back\*\*/)
   })
+  // The user, 24 Oct (m3757, on #1288, #1537, #1539, #1541): the baseline's checks are lighter, and it doesn't wait for Electron.
+  it("gives the baseline its own prerequisites and lighter checks, the full ones before a proper release", () => {
+    const path = section('The 1.0 path')
+    expect(path).toMatch(/It waits for the last phase's checks card \(#1539\), the translation review \(#1126\) and #1582[^\n]*Electron's CVE fix \(#1503\) comes before the RC \(#1541\), not the baseline/)
+    expect(path).toMatch(/\*\*Its checks are lighter than a release's\*\*[^\n]*a \*\*smoke run\*\*: Claude Code and Codex each run the key scenarios once, with no repeats, no Haiku and no Copilot\. The full trials, the full e2e set and the real tier come before a proper release/)
+    expect(path).toMatch(/`npm run dist -- --kind baseline` \(asked\)/)
+    // #1534: where each build is recorded.
+    expect(path).toMatch(/also goes into the Hive Assistant's journal as Hive's entry[^\n]*\*\*Settings → Advanced → Record builds in the journal\*\* turns it off/)
+    expect(section('What a release checks')).toMatch(/unlike the baseline's lighter checks/)
+    for (const copy of ['.claude', '.agents']) expect(readFileSync(join(ROOT, copy, 'skills', 'release-hive', 'SKILL.md'), 'utf8')).toMatch(/Its checks are lighter than an uploaded release's \(the model trials a smoke run: RELEASING says which\)/)
+  })
   it("lists every publishing step as the user's OK, which release-hive and AGENTS.md point to without repeating", () => {
     const ok = section("The user's OK")
     for (const step of [/`npm run dist`/, /changing the version/, /pushing/, /merging an integration branch into `main`/, /`npm run release`/, /publishing the draft, and creating tags/, /GitHub issue/]) expect(ok).toMatch(step)
