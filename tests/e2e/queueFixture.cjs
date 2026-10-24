@@ -154,11 +154,21 @@ const sameDir = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.r
  */
 async function startCard(fx, h, builder, n) {
   const live = async () => (await h.inv('session:live')).find((s) => s.projectPath.toLowerCase() === fx.alpha.toLowerCase() && s.agentId === builder.id)
-  // Stopped by Hive meanwhile (its session ended with its slot's lease, as a card's recovery after a seam ends it): started
-  // again, with its new launch's token.
-  if (!(await live())) Object.assign(builder, await rejoin(fx, h, builder))
-  const before = launches(fx).length
-  const start = await intent(h, builder, n, 'start')
+  const free = async () => (await h.inv('slots:list', fx.alpha)).some((s) => !s.lease && !s.writer)
+  let before = 0
+  let start = null
+  // No slot free yet (the last card's: its builder's session there just ended with its lease, until its processes are
+  // known to have ended): as an agent told "Wait for a slot to be free", started again once one is (a few times at most).
+  // A start sent as Hive stops it (401, its token ended with that session): once it has, started again.
+  for (let tries = 0; tries < 4 && (!start || start.status === 401 || start.body?.rule === 'start.slotAvailable'); tries++) {
+    if (start?.status === 401) await lib.until(async () => !(await live()), HUNG_MS, 200)
+    else if (start) await lib.until(free, HUNG_MS, 200)
+    // Stopped by Hive meanwhile (its session ended with its slot's lease, as a card's Done or its recovery after a seam
+    // ends it): started again, with its new launch's token.
+    if (!(await live())) Object.assign(builder, await rejoin(fx, h, builder))
+    before = launches(fx).length
+    start = await intent(h, builder, n, 'start')
+  }
   const { folder, line } = start.body?.data ?? {}
   if (start.status !== 200 || !folder || folder === 'project') return start
   await lib.until(() => (lib.git(folder, ['branch', '--show-current']).trim() === line ? true : null), HUNG_MS, 200).catch(() => null)

@@ -1,6 +1,7 @@
 // Merging into a target checked out in a folder (#1351, SPEC §16.9.2; S27, S34a–c, S42, OP-40): a project set to "Hive
 // merges" into `main`, checked out in the project folder, fake Claude Code agents acting by their own tokens (a reviewer
-// whose session lives in the project folder, idle; builders in worktrees), the Assistant off.
+// whose session lives in the project folder, idle; one builder, building each card on the slot its start lends, as 1.0
+// does: #1573), the Assistant off.
 // - Ask each time (chosen: Automatically is the default since this card's crash tests passed): the card waits with
 //   "update main in <folder> now?" in For you (screenshots of the card dialog's request, both themes); Approve merges it.
 // - Automatically, the default (the setting reset; nothing asked): S27/S42, the user commits in the folder and the Git view switches branches during the merge checks,
@@ -35,6 +36,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
   q.prepare(fx)
   let h = await q.startHive(fx, { port: PORT, keepOptions: true })
   let reviewer = null
+  let builder = null
   try {
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: f.options() })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -45,12 +47,13 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     // S42: the reviewer's session lives in the project folder, idle, reviewing in a review copy: it doesn't hold the queue up.
     reviewer = await q.agent(fx, h, 'R1')
     check('the reviewer has its token, its session in the project folder', !!reviewer.token && same(reviewer.folder, fx.alpha))
+    builder = await q.agent(fx, h, 'B1')
 
     // --- Ask each time, chosen: For you, then Approve.
     await h.inv('advanced:set', 'hive.queue.checkedOutTarget', 'ask')
     q.steer(fx, 'pass')
     const atAsk = main()
-    const one = await q.approve(fx, h, reviewer, 'One', { 'one.txt': 'one\n' })
+    const one = await q.approveBy(fx, h, builder, reviewer, 'One', { 'one.txt': 'one\n' })
     check('the card is approved (start, submit, review, pass)', Object.values(one.steps).every((s) => s.status === 200), JSON.stringify(one.steps))
     const asked = await waitHung(async () => (await h.inv('tasks:forYou')).items?.find((i) => i.card === one.n && i.gate === 'queueAdvance'))
     check('Ask each time: tested, it waits for the Approve in For you, its message naming main and the folder', !!asked && asked.kind === 'approve' && asked.shown?.id === 'workflow.forYou.queueAdvance' && asked.shown.values?.target === 'main', JSON.stringify(asked))
@@ -70,7 +73,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
     // --- S27 / S42: the user commits in the folder and the Git view switches branches during the checks.
     q.steer(fx, 'wait')
-    const two = await q.approve(fx, h, reviewer, 'Two', { 'two.txt': 'two\n' })
+    const two = await q.approveBy(fx, h, builder, reviewer, 'Two', { 'two.txt': 'two\n' })
     check('S42: its check is running', !!(await waitHung(() => fs.existsSync(fx.started))))
     fs.writeFileSync(path.join(fx.alpha, 'mine.txt'), 'the user commits\n')
     lib.git(fx.alpha, ['add', 'mine.txt'])
@@ -90,7 +93,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     // --- S42 / S34c: the user's edit in a file the merge changes: paused, named, the edit untouched.
     q.steer(fx, 'pass')
     fs.writeFileSync(path.join(fx.alpha, 'a.txt'), 'the user is editing a.txt\n')
-    const three = await q.approve(fx, h, reviewer, 'Three', { 'a.txt': 'one\ntwo by Three\nthree\n' })
+    const three = await q.approveBy(fx, h, builder, reviewer, 'Three', { 'a.txt': 'one\ntwo by Three\nthree\n' })
     const p3 = await paused('unstagedChanges')
     check("S34c: the user's edit in a file the merge changes pauses the queue, naming it", JSON.stringify(p3?.files) === '["a.txt"]', JSON.stringify(p3))
     check('…not returned: still merging; the edit untouched', (await column(three.n)) !== 'doing' && !(await h.kinds(three.n)).includes('IntegrationStarted') && f.text('a.txt') === 'the user is editing a.txt\n')
@@ -103,7 +106,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     // --- S34c: anything staged pauses it, naming the files.
     fs.writeFileSync(path.join(fx.alpha, 'staged.txt'), 'staged by the user\n')
     lib.git(fx.alpha, ['add', 'staged.txt'])
-    const four = await q.approve(fx, h, reviewer, 'Four', { 'four.txt': 'four\n' })
+    const four = await q.approveBy(fx, h, builder, reviewer, 'Four', { 'four.txt': 'four\n' })
     const p4 = await paused('staged')
     check('S34c: something staged pauses the queue, naming it; the index untouched', JSON.stringify(p4?.files) === '["staged.txt"]' && lib.git(fx.alpha, ['diff', '--cached', '--name-only']).trim() === 'staged.txt', JSON.stringify(p4))
     lib.git(fx.alpha, ['reset', '-q'])
@@ -112,7 +115,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
     // --- S34b: the folder on another branch: main checked out nowhere, merged by compare-and-swap; the folder untouched.
     lib.git(fx.alpha, ['checkout', '-q', '-b', 'elsewhere'])
-    const five = await q.approve(fx, h, reviewer, 'Five', { 'five.txt': 'five\n' })
+    const five = await q.approveBy(fx, h, builder, reviewer, 'Five', { 'five.txt': 'five\n' })
     check('S34b: the folder on another branch: merged into main all the same', await done(five.n))
     check('…by compare-and-swap: the folder still on its branch, its files untouched', lib.git(fx.alpha, ['branch', '--show-current']).trim() === 'elsewhere' && f.text('five.txt') === null && f.status() === '' && !(await h.facts(five.n)).find((x) => x.kind === 'IntegrationStarted')?.data?.checkedOut)
     lib.git(fx.alpha, ['checkout', '-q', 'main'])
@@ -130,7 +133,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const r = await q.rejoin(fx, h, reviewer)
     const atRace = main()
     q.steer(fx, 'pass')
-    const six = await q.approve(fx, h, r, 'Six', { 'six.txt': 'six\n' })
+    const six = await q.approveBy(fx, h, builder, r, 'Six', { 'six.txt': 'six\n' })
     const doneSix = await waitHung(async () => (await h.card(six.n))?.column === 'done')
     const failures = (await h.facts(six.n)).filter((x) => x.kind === 'IntegrationFailed')
     check('S34a: the swap found main moved: failed (target moved) once, then merged', !!doneSix && failures.length === 1 && failures[0].data.reason === 'targetMoved', JSON.stringify(await h.kinds(six.n)))
