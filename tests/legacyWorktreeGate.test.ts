@@ -1,23 +1,28 @@
 // 0.9.3's agent field `worktree` (#1452, SPEC §16.10.3): `AgentDef` no longer types it, and an agent's stored one is read
-// only through `legacyWorktree` (shared/agentFolders.ts, its module). This gate finds every `<name>.worktree` in src
-// and allows only those of other things, named here with what they are: a request, a reply, a branch row, a merge
-// target, a message key. A new one on an agent fails: read it with `legacyWorktree(agent)`, where the folder contract
-// doesn't already say where the agent works (`agentPlace`, `currentFolder`).
+// only through `legacyWorktree` (shared/agentFolders.ts, its module). This gate parses every source in src (Babel's
+// TypeScript and JSX parser, as scripts/i18nGuard.mjs does: TypeScript 7 has no compiler API to call) and finds each
+// read of `worktree`: `x.worktree`, `x?.worktree`, `x['worktree']`, and a destructuring of it, through casts and calls
+// too (`(a as StoredAgent).worktree` is a's). It allows only those of other things, named here with what they are: a
+// request, a reply, a branch row, a merge target, legacyWorktree's own. A new one on an agent fails: read it with
+// `legacyWorktree(agent)`, where the folder contract doesn't already say where the agent works (`agentPlace`).
 import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'fs'
 import { join, resolve } from 'path'
+import { parse } from '@babel/parser'
+import traverseModule, { type NodePath } from '@babel/traverse'
+import type * as t from '@babel/types'
+
+// @babel/traverse is CommonJS: its default export is the function, once or twice wrapped.
+const traverse = ((traverseModule as unknown as { default?: typeof traverseModule }).default ?? traverseModule) as typeof traverseModule
 
 const ROOT = resolve(__dirname, '..')
 
-/** `<receiver>.worktree` or `<receiver>?.worktree`, not inside a message id or a quoted name. */
-const ACCESS = /([A-Za-z_$][\w$]*)\??\.worktree\b/g
-
 /** Each file's receivers whose `.worktree` isn't an agent's, with what it is. */
 const ALLOWED: Record<string, Record<string, string>> = {
-  'src/shared/agentFolders.ts': { was: "carryLegacyAgentFields' stored agent", keep: 'the fields it carries' },
+  'src/shared/agentFolders.ts': { raw: "legacyWorktree's own read", was: "carryLegacyAgentFields' stored agent", keep: 'the fields it carries' },
   'src/main/branchWatch.ts': { found: "findAgent's answer: an agent's 0.9 worktree, from legacyWorktree" },
   'src/main/gitRepo.ts': { local: "a local branch's checkout (GitBranch.worktree)" },
-  'src/main/projectAgents.ts': { result: "Remove's reply (RemovedAgent.worktree)" },
+  'src/main/projectAgents.ts': { result: "Remove's reply (RemovedAgent.worktree)", worktreeOf: "worktreeOf's answer, from legacyWorktree" },
   'src/main/servers.ts': { body: "an Agent API request's worktree, refused (#1451)" },
   'src/main/taskStart.ts': { target: "a card start's request for a new agent (refused by add-agent, #1451)" },
   'src/main/workflow/upgrade.ts': { at: "an adoption's place (AdoptionAt.worktree)" },
@@ -36,104 +41,106 @@ function sources(dir = 'src'): string[] {
   })
 }
 
-/**
- * The code of a source, with the text of its strings, template literals and comments blanked out (their characters
- * become spaces, line breaks kept, so offsets and line numbers stay): message ids ('panes.tab.worktree') and comments
- * aren't reads, but a template's `${…}` is code, nested and over several lines too. Regex literals are taken as code;
- * none in src holds `.worktree`.
- */
-function codeOf(source: string): string {
-  const out = source.split('')
-  const blank = (i: number): void => {
-    if (out[i] !== '\n' && out[i] !== '\r') out[i] = ' '
-  }
-  // What each open `${` or `{` inside a template's expression closes into: 'template' (back to its text) or 'code'.
-  const braces: ('template' | 'code')[] = []
-  let i = 0
-  const n = source.length
-  /** Blanks a template literal's text from i (just past its backtick or a `}` closing an expression) to its end or `${`. */
-  const templateText = (): void => {
-    while (i < n) {
-      const c = source[i]
-      if (c === '\\') {
-        blank(i)
-        blank(i + 1)
-        i += 2
-      } else if (c === '`') {
-        i++
-        return
-      } else if (c === '$' && source[i + 1] === '{') {
-        braces.push('template')
-        i += 2
-        return
-      } else {
-        blank(i)
-        i++
-      }
+/** The name a receiver comes down to: through casts, `!`, `await`, calls and member chains, to its first identifier. */
+function rootName(node: t.Node | null | undefined): string {
+  let n: t.Node | null | undefined = node
+  for (let i = 0; n && i < 50; i++) {
+    switch (n.type) {
+      case 'Identifier':
+        return n.name
+      case 'ThisExpression':
+        return 'this'
+      case 'TSAsExpression':
+      case 'TSSatisfiesExpression':
+      case 'TSNonNullExpression':
+      case 'TSTypeAssertion':
+      case 'ParenthesizedExpression':
+        n = n.expression
+        break
+      case 'AwaitExpression':
+        n = n.argument
+        break
+      case 'CallExpression':
+      case 'OptionalCallExpression':
+        n = n.callee
+        break
+      case 'MemberExpression':
+      case 'OptionalMemberExpression':
+        n = n.object
+        break
+      default:
+        return `(${n.type})`
     }
   }
-  while (i < n) {
-    const c = source[i]
-    if (c === '/' && source[i + 1] === '/') {
-      while (i < n && source[i] !== '\n') blank(i++)
-    } else if (c === '/' && source[i + 1] === '*') {
-      const end = source.indexOf('*/', i + 2)
-      const stop = end < 0 ? n : end + 2
-      while (i < stop) blank(i++)
-    } else if (c === "'" || c === '"') {
-      i++
-      while (i < n && source[i] !== c && source[i] !== '\n') {
-        if (source[i] === '\\') blank(i++)
-        blank(i++)
-      }
-      i++
-    } else if (c === '`') {
-      i++
-      templateText()
-    } else if (c === '{') {
-      if (braces.length) braces.push('code')
-      i++
-    } else if (c === '}' && braces.length) {
-      i++
-      if (braces.pop() === 'template') templateText()
-    } else i++
-  }
-  return out.join('')
+  return '(?)'
 }
 
-/** The `.worktree` reads in a file that aren't allowed: "file:line: receiver.worktree". */
-function unexpected(rel: string, source: string): string[] {
-  const allowed = ALLOWED[rel] ?? {}
-  const code = codeOf(source)
-  const out: string[] = []
-  for (const m of code.matchAll(ACCESS)) {
-    if (m[1] in allowed) continue
-    const line = code.slice(0, m.index).split('\n').length
-    out.push(`${rel}:${line}: ${m[0]}`)
+/** Whether a member expression's property is `worktree`: `.worktree` or `['worktree']`. */
+const isWorktreeKey = (property: t.Node, computed: boolean): boolean => (computed ? property.type === 'StringLiteral' && property.value === 'worktree' : property.type === 'Identifier' && property.name === 'worktree')
+
+/** Every read of `worktree` in a source: its receiver's root name and its line. */
+function worktreeReads(source: string, tsx: boolean): { receiver: string; line: number }[] {
+  const ast = parse(source, { sourceType: 'module', plugins: tsx ? ['typescript', 'jsx'] : ['typescript'] })
+  const out: { receiver: string; line: number }[] = []
+  const member = (p: NodePath<t.MemberExpression | t.OptionalMemberExpression>): void => {
+    if (isWorktreeKey(p.node.property, p.node.computed)) out.push({ receiver: rootName(p.node.object), line: p.node.loc?.start.line ?? 0 })
   }
+  traverse(ast, {
+    MemberExpression: member,
+    OptionalMemberExpression: member,
+    // `const { worktree } = a` (and `{ worktree: w } = a`): a read of a's.
+    VariableDeclarator(p) {
+      if (p.node.id.type !== 'ObjectPattern') return
+      for (const prop of p.node.id.properties) {
+        if (prop.type === 'ObjectProperty' && !prop.computed && prop.key.type === 'Identifier' && prop.key.name === 'worktree') out.push({ receiver: rootName(p.node.init), line: prop.loc?.start.line ?? 0 })
+      }
+    }
+  })
   return out
 }
 
+/** The reads in a file that aren't allowed: "file:line: receiver.worktree". */
+function unexpected(rel: string, source: string): string[] {
+  const allowed = ALLOWED[rel] ?? {}
+  return worktreeReads(source, rel.endsWith('.tsx'))
+    .filter((r) => !(r.receiver in allowed))
+    .map((r) => `${rel}:${r.line}: ${r.receiver}.worktree`)
+}
+
 describe("an agent's 0.9 worktree is read only through legacyWorktree (#1452)", () => {
-  it('no `.worktree` in src but the allowed ones, each of something other than an agent', () => {
+  it('no read of `worktree` in src but the allowed ones, each of something other than an agent', () => {
     const found = sources().flatMap((rel) => unexpected(rel, readFileSync(join(ROOT, rel), 'utf8')))
     expect(found).toEqual([])
   })
 
-  it('finds an agent read, so the gate can fail: in code, and in a template literal\'s expressions (HR2\'s round 1)', () => {
-    expect(unexpected('src/main/example.ts', 'const p = agent.worktree?.path\nconst q = def.worktree')).toEqual(['src/main/example.ts:1: agent.worktree', 'src/main/example.ts:2: def.worktree'])
-    expect(unexpected('src/main/example.ts', 'const p = `${agent.worktree.path}`')).toEqual(['src/main/example.ts:1: agent.worktree'])
-    // Over several lines, nested in another template and in an object literal's braces.
-    const multi = 'log(`moved ${a.name}\nfrom ${`${x.worktree?.path}`} to ${{ p: def.worktree }.p}`)'
-    expect(unexpected('src/main/example.ts', multi)).toEqual(['src/main/example.ts:2: x.worktree', 'src/main/example.ts:2: def.worktree'])
-    // Text isn't a read: a message id, a comment, a template's own text, an escaped backtick.
-    expect(unexpected('src/main/example.ts', "msg({ id: 'panes.tab.worktree' }) // a.worktree in a comment\n/* b.worktree */ const t = `c.worktree \\` ${'d.worktree'}`")).toEqual([])
+  it('finds an agent read, so the gate can fail: in code, in template expressions, after regex literals, through casts', () => {
+    const at = (source: string, tsx = false) => unexpected(tsx ? 'src/main/example.tsx' : 'src/main/example.ts', source)
+    expect(at('const p = agent.worktree?.path\nconst q = def.worktree')).toEqual(['src/main/example.ts:1: agent.worktree', 'src/main/example.ts:2: def.worktree'])
+    // Template expressions (round 1), nested and over several lines.
+    expect(at('const p = `${agent.worktree.path}`')).toEqual(['src/main/example.ts:1: agent.worktree'])
+    expect(at('log(`moved ${a.name}\nfrom ${`${x.worktree?.path}`} to ${{ p: def.worktree }.p}`)')).toEqual(['src/main/example.ts:2: x.worktree', 'src/main/example.ts:2: def.worktree'])
+    // A regex holding a quote, then a read (HR2's round 2), and a character class of quotes.
+    expect(at("const quote = /'/; const p = agent.worktree?.path")).toEqual(['src/main/example.ts:1: agent.worktree'])
+    expect(at('const q = /["\'`]/.test(s) && def.worktree')).toEqual(['src/main/example.ts:1: def.worktree'])
+    // Through a cast, an await and a call; an element read; a destructuring.
+    expect(at("const p = (agent as StoredAgent).worktree\nconst q = (await load(id)).worktree\nconst r = a['worktree']\nconst { worktree } = def")).toEqual([
+      'src/main/example.ts:1: agent.worktree',
+      'src/main/example.ts:2: load.worktree',
+      'src/main/example.ts:3: a.worktree',
+      'src/main/example.ts:4: def.worktree'
+    ])
+    // In JSX too.
+    expect(at('const v = <span title={agent.worktree?.path}>x</span>', true)).toEqual(['src/main/example.tsx:1: agent.worktree'])
   })
 
-  it('every allowed file still has what it allows (the list only shrinks)', () => {
+  it('text is not a read: message ids, comments, template text, JSX text, a regex', () => {
+    const source = "msg({ id: 'panes.tab.worktree' }) // a.worktree in a comment\n/* b.worktree */ const t = `c.worktree \\` ${'d.worktree'}`\nconst r = /e\\.worktree/\nconst j = <p>f.worktree</p>"
+    expect(unexpected('src/main/example.tsx', source)).toEqual([])
+  })
+
+  it('every allowed receiver is still read in its file (the list only shrinks)', () => {
     for (const [rel, receivers] of Object.entries(ALLOWED)) {
-      const code = codeOf(readFileSync(join(ROOT, rel), 'utf8'))
-      const seen = new Set([...code.matchAll(ACCESS)].map((m) => m[1]))
+      const seen = new Set(worktreeReads(readFileSync(join(ROOT, rel), 'utf8'), rel.endsWith('.tsx')).map((r) => r.receiver))
       for (const r of Object.keys(receivers)) expect(seen.has(r), `${rel}: ${r}.worktree`).toBe(true)
     }
   })
