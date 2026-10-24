@@ -250,7 +250,7 @@
   "shell.palette.command": "{category} : {command}",
   "shell.palette.goToProject": "Aller au projet : {project}",
   "shell.palette.noMatch": "Aucune commande correspondante",
-  "shell.palette.openCard": "Ouvrir la carte : {card} {title}",
+  "shell.palette.openCard": "Ouvrir la carte : {card} {title}",
   "shell.palette.placeholder": "Tape une commande ou un nom de projet",
   "shell.palette.projectsPlaceholder": "Aller au projet",
   "shell.path.copied": "Chemin copié",

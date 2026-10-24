@@ -126,7 +126,7 @@
   "service.keys.prefix": "{key} e a chave {other} de outro projeto começam igual: nenhuma chave pode ser o começo de outra.",
   "service.keys.taken": "{key} é a chave de outro projeto, ou já foi: uma chave fica com seu projeto para sempre.",
   "service.keys.unknownProject": "Esse projeto ainda não tem id, então não pode ter chave: abra-o primeiro no Hive.",
-  "service.laneStart.busy": "{agent} {status, select, working {está trabalhando} starting {está iniciando} waiting {está aguardando sua resposta} background {está aguardando tarefas em segundo plano que iniciou} signin {precisa que você entre de novo} other {está aguardando cartões (uma observação de cartões)}}. Inicie a raia quando ele estiver livre ou escolha outro agente.",
+  "service.laneStart.busy": "{agent} {status, select, working {está trabalhando} starting {está iniciando} waiting {está aguardando sua resposta} background {está aguardando tarefas em segundo plano que iniciou} signin {precisa que você entre de novo} other {está aguardando cartões (uma observação de cartões)}}. Inicie a raia quando ele estiver ocioso ou escolha outro agente.",
   "service.laneStart.done": "{card} já está concluído.",
   "service.laneStart.needsReviewer": "As regras de {project} fazem um agente revisor revisar cada cartão: escolha um revisor.",
   "service.laneStart.noCards": "Escolha os cartões da raia.",

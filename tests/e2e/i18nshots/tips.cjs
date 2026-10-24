@@ -18,6 +18,21 @@ async function shown(ctx, locator, what) {
 const setTips = (ctx, on) => ctx.inv('settings:update', { general: { showTips: on } })
 
 /**
+ * Next Project until the window shows the project named (its title starts with it): earlier areas' cases leave other
+ * projects in the workspace (mainbeta, errorsgit), so the next one isn't always it. Throws if it never comes.
+ */
+async function showProject(ctx, name, what) {
+  const { page, lib } = ctx
+  const at = async () => (await page.title()).startsWith(name)
+  for (let i = 0; i < 8 && !(await at()); i++) {
+    const before = await page.title()
+    await ctx.command('project.next')
+    await lib.until(async () => (await page.title()) !== before, ctx.hungMs)
+  }
+  if (!(await lib.until(at, ctx.hungMs))) throw new Error(what)
+}
+
+/**
  * The tip card: with tips on, a project of its own gets its second agent, and its session toolbar offers the second-agent
  * moment's tip (the route starts with tips off, so the moment is still unused). Its first agent is added before tips
  * are on, so the toolbar offers it only when the second one comes.
@@ -38,9 +53,8 @@ async function tipCard(ctx) {
   await shown(ctx, page.locator('.tips-switch .switch.on'), "Help → Tips' switch on")
   if (!(await lib.until(async () => (await page.locator('.tips-list').count()) === 0 || (await page.keyboard.press('Escape').then(() => false)), ctx.hungMs))) throw new Error("Help → Tips didn't close")
   // The other project, shown, then its second agent.
-  await ctx.command('project.next')
+  await showProject(ctx, 'tipsbeta', 'the other project was not selected')
   await ctx.command('project.tab.session')
-  if (!(await lib.until(async () => (await page.title()).startsWith('tipsbeta'), ctx.hungMs))) throw new Error('the other project was not selected')
   await lib.addAgent(inv, beta, { name: 'Tipster' })
   return shown(ctx, page.locator('.tip-card'), 'the tip card')
 }
@@ -57,8 +71,8 @@ async function closeNotice(ctx) {
   const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: 2000 }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.toasts .toast').count()) === 0 || (await dismiss()), ctx.hungMs))) throw new Error("the notice didn't close")
   await setTips(ctx, false)
-  // Back to alpha (two projects: the next one is it).
-  await ctx.command('project.next')
+  // Back to alpha.
+  await showProject(ctx, path.basename(ctx.project), 'alpha was not selected again')
 }
 
 /** Help → Tips, open. */

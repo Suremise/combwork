@@ -138,7 +138,7 @@ describe('the sentences once built by hand read as before, in English', () => {
       'Git is cherry-picking: finish or abort it in a terminal.',
       'Tracks origin/main: 1 commit to push, nothing to pull.',
       'As of the last fetch, 5m ago. Hive never fetches by itself.',
-      'Click for Git → Branches & remotes.'
+      'Click for Version Control → Branches & remotes.'
     ])
     expect(gitStatusTip(summary({ upstream: { name: 'origin/main', remote: 'origin', ahead: 3, behind: 2 }, remotes: ['origin'] }), null)).toContain('Tracks origin/main: 3 commits to push, 2 commits to pull.')
     // #915: the counts are numbers in the window's language.

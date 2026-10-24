@@ -106,7 +106,7 @@
   "files.revealInExplorer": "Afficher dans l’Explorateur de fichiers",
   "files.root.place": "{agent} · {place}",
   "files.root.projectFolder": "Dossier du projet",
-  "files.root.tip": "Afficher le dossier du projet, ou le dossier où travaille un agent : son emplacement ou son worktree",
+  "files.root.tip": "Afficher le dossier du projet, ou le dossier où travaille un agent : son emplacement ou son worktree",
   "files.root.worktree": "Worktree de l’agent {agent} · {branch}",
   "files.save": "Enregistrer",
   "files.saveAll.changedOnDisk": "{file} : modifié sur le disque depuis son ouverture",

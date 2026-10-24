@@ -924,8 +924,8 @@
     "description": "Title of the Create tag form before the commit is known."
   },
   "git.tip.click": {
-    "defaultMessage": "Click for Git → Branches & remotes.",
-    "description": "Last line of the status bar's git tooltip. Git → Branches & remotes is the tab and its section: keep them as they are named there."
+    "defaultMessage": "Click for Version Control → Branches & remotes.",
+    "description": "Last line of the status bar's git tooltip. Version Control → Branches & remotes is the tab and its section: keep them as they are named there."
   },
   "git.tip.detached": {
     "defaultMessage": "HEAD is detached at {commit}",

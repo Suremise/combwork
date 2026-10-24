@@ -7295,14 +7295,14 @@ button.agent-place:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* A description wraps onto a second line before it is cut (#886: the permission modes'). */
+/* A description wraps onto more lines before it is cut (#886: the permission modes'; #1126: three, as German's and Polish's mode descriptions run a little past two). */
 .menu-detail {
   font-size: 11px;
   color: var(--fg-muted);
   white-space: normal;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
 }
 .menu-item.muted .menu-label,
 .menu-item.muted > .codicon {
@@ -7584,6 +7584,10 @@ button.mode-badge.badge:hover {
 }
 .kb-table td.kb-label {
   overflow-wrap: break-word;
+}
+/* A table cell's own min-width doesn't hold it, so the id under the name does: German's long compounds ("Benachrichtigungseinstellungen") otherwise broke mid-word in a column 100 px wide (#1126). */
+.kb-table td.kb-label .kb-id {
+  min-inline-size: 11rem;
 }
 /* A narrow pane can be narrower than the table (it then scrolls sideways): the row's buttons stay in view at its right
    edge (#887). */

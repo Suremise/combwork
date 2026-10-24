@@ -27,7 +27,7 @@
   "providers.claude.hint.model": "Claude Codeはこのモデルを認識できません。「エージェント設定」で別のモデルを選んでください。",
   "providers.claude.hint.signIn": "Claude Codeにサインインしていません。もう一度起動して、ターミナルでサインインしてください。",
   "providers.cmdTooLong": "{file}はcmd.exe経由で実行する必要があります。cmd.exeのコマンドラインは最大{max, number}文字ですが、この起動には約{length, number}文字必要です。「設定」でCLIのパスを.exeに設定してください（またはスタンドアロンのCLIをインストールしてください）。.exeにはこの制限がありません。",
-  "providers.codex.developerUnread.agentMessage": "このセッションがどのdeveloper_instructionsを受け取るかをCodexが示せなかったため、Hiveはあなたのものをそのまま残し、今回はガイダンスを加えていません。エージェントはガイダンスなしでHiveのツールを使えます。もう一度試すにはエージェントを再起動してください。",
+  "providers.codex.developerUnread.agentMessage": "このセッションがどのdeveloper_instructionsを受け取るかをCodexが示せなかったため、Hiveは既存のものをそのまま残し、今回はガイダンスを加えていません。エージェントはガイダンスなしでHiveのツールを使えます。もう一度試すにはエージェントを再起動してください。",
   "providers.codex.developerUnread.agentTitle": "このエージェントにはHiveのガイダンスがありません",
   "providers.codex.developerUnread.assistantMessage": "このセッションがどのdeveloper_instructionsを受け取るかをCodexが示せなかったため、今回Hiveはアシスタントに役割だけを渡し、それらもHiveのガイダンスも渡していません。もう一度試すにはアシスタントを再起動してください。",
   "providers.codex.developerUnread.assistantTitle": "アシスタントは役割だけで起動しました",

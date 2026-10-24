@@ -568,8 +568,8 @@
     "description": "Button: removes the agent and keeps its worktree and branch."
   },
   "actions.remove.keptMessage": {
-    "defaultMessage": "{branch} in {path}. Git → Changes lists the project's unused worktrees, merged or not.",
-    "description": "Under the notification that a removed agent's worktree was kept: its branch ({branch}) and folder ({path}). Git → Changes is a project tab: use its translated names."
+    "defaultMessage": "{branch} in {path}. Version Control → Changes lists the project's unused worktrees, merged or not.",
+    "description": "Under the notification that a removed agent's worktree was kept: its branch ({branch}) and folder ({path}). Version Control → Changes is a project tab: use its translated names."
   },
   "actions.remove.keptTitle": {
     "defaultMessage": "{agent}'s worktree is kept",

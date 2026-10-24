@@ -108,7 +108,7 @@
   "sessions.menu.showAgent": "Afficher {agent}",
   "sessions.menu.showAssistant": "Afficher l’Assistant",
   "sessions.origin.agent": "Agent {agent} ({id}).",
-  "sessions.origin.named": "{is, select, slot {Emplacement · {name}} other {Foyer · {name}}}",
+  "sessions.origin.named": "{is, select, slot {Emplacement · {name}} other {Ancien dossier · {name}}}",
   "sessions.origin.noAgent": "Aucun agent enregistré (session adoptée, ou antérieure à l’enregistrement des agents par Hive).",
   "sessions.origin.projectFolder": "Dossier du projet",
   "sessions.origin.ranIn": "Exécutée dans {folder}",

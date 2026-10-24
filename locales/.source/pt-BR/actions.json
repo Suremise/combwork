@@ -141,7 +141,7 @@
   "actions.remove.deleteTitle": "Delete the worktree and branch?",
   "actions.remove.failed": "Could not remove agent",
   "actions.remove.keepWorktree": "Keep worktree and branch",
-  "actions.remove.keptMessage": "{branch} in {path}. Git → Changes lists the project's unused worktrees, merged or not.",
+  "actions.remove.keptMessage": "{branch} in {path}. Version Control → Changes lists the project's unused worktrees, merged or not.",
   "actions.remove.keptTitle": "{agent}'s worktree is kept",
   "actions.remove.message": "{agent} is removed from {project}. Its sessions stay in the Sessions tab.",
   "actions.remove.reviewUnused": "Review unused worktrees",

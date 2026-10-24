@@ -36,7 +36,7 @@
   "errors.log.none": "この実行はログを報告していません。",
   "errors.log.notFullPath": "この実行はログをフルパスではなく報告しました：{path}",
   "errors.log.notText": "Hiveが開くのはテキストのログとレポートだけです。{file}は開けません。「フォルダーに表示」を使ってください。",
-  "errors.merge.queueMerges": "Hive は {card} をマージキューでマージします。そこでマージするか、マージダイアログで「それでもマージ」を選んでください。",
+  "errors.merge.queueMerges": "Hiveは{card}をマージキューでマージします。キューでマージするか、「マージ」ダイアログで「それでもマージ」を選んでください。",
   "errors.mergeSlot.holdRequired": "解放する確保を指定してください",
   "errors.pref.notProjectPref": "プロジェクトの設定項目ではありません。",
   "errors.pref.notValue": "{pref}の値ではありません。",

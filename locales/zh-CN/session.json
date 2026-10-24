@@ -159,7 +159,7 @@
   "session.start.repairing": "Hive 正在修复这个已移动的工作区：请在“修复”完成后再启动智能体。",
   "session.start.slotBusy": "{slot} 中仍有另一个会话，或某个会话留在那里运行的进程。它们结束后，{agent} 即可在其中启动。",
   "session.start.slotChanged": "{slot} 已不再属于 {agent}：它的卡片或通道已结束，或已被另一个智能体的工作占用。请重新启动或恢复 {agent}。",
-  "session.start.slotSetup": "{slot} 仍在设置中。准备就绪后，{agent} 即可在其中启动。",
+  "session.start.slotSetup": "{slot} 仍在准备中。准备就绪后，{agent} 即可在其中启动。",
   "session.start.subSession": "该会话是 {provider} 为另一个会话运行的 {kind}，不是对话：无法恢复。",
   "session.start.turnedOff": "{agent} 启动期间，{provider} 已关闭。",
   "session.start.worktreeMissing": "{agent} 的工作树文件夹不存在：{folder}。从 {agent} 的窗格启动它，即可在其分支上重新创建工作树（如果工作区已移动，请先“修复…”），或删除该智能体。",
