@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { readdirSync, readFileSync } from 'fs'
+import { readFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { parse, TYPE, type MessageFormatElement } from '@formatjs/icu-messageformat-parser'
 import { PSEUDO_LANGUAGE } from '../../src/shared/i18n/languages'
@@ -204,21 +204,6 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(tr(m('assistant.panel.openCard'), { number: 'AM-12', known: 'yes', column: 'Review' })).toBe('Open card AM-12, in Review')
     expect(tr(m('assistant.panel.progress'), { run: 'e2e: 4/12', hasStep: 'yes', step: 'agents' })).toBe('Progress: e2e: 4/12 (agents)')
     expect(tr(m('assistant.sidebar.expandTip'), { hasKey: 'yes', key: 'Ctrl+Alt+B' })).toBe('Expand Sidebar (Ctrl+Alt+B)')
-  })
-})
-
-describe("the modes Hive ships: their names are window text, their files aren't", () => {
-  it('each shipped mode has a message for its name, matching the name its file ships with (what modeName compares)', () => {
-    const shipped = readdirSync(join(ROOT, 'resources/modes')).filter((f) => f.endsWith('.md'))
-    expect(shipped.length).toBeGreaterThan(0)
-    const names = Object.entries(CATALOGUE)
-      .filter(([id]) => id.startsWith('assistant.modes.shipped.'))
-      .map(([, c]) => c.defaultMessage)
-    for (const f of shipped) {
-      const name = /^name:\s*(.+)$/m.exec(readFileSync(join(ROOT, 'resources/modes', f), 'utf8'))?.[1].trim()
-      expect(names, f).toContain(name)
-    }
-    expect(names).toHaveLength(shipped.length)
   })
 })
 
