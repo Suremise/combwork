@@ -14,7 +14,7 @@ import { AREAS, DOCS_ONLY, EVERYTHING, REAL_TIER, UNIT_ONLY, affectedSuites, und
 // @ts-expect-error: plain .mjs modules without types
 import { fingerprint } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, selectSuites, suiteOutcome } from './e2e/runner.mjs'
+import { DEV_SEAMS, EVERY_COPY_SEAMS, PACKAGED_SEAMS, TEST_CHANNELS, devBuildOnly, isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, resultLines, selectSuites, suiteOutcome, suiteSource } from './e2e/runner.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { recordJson, recordMarkdown, selectionLine, selectionOf } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -65,31 +65,54 @@ describe('the e2e suite list', () => {
     for (const s of suites) if ('serial' in s) expect(typeof s.serial === 'string' && s.serial.length > 3, s.name).toBe(true)
   })
 
-  it("suites run on a packaged build, or say in their header why they can't (#1578, #1580)", () => {
-    // A packaged Hive (HIVE_EXE) refuses the test copies' channels (0.9 worktree agents through agents:testLegacy,
-    // slots:test) and ignores the HIVE_TEST_ seams, and a suite starting Electron itself never starts it: a suite that
-    // needs one is a dev-build test on purpose and says so, or skips that part there (queueFixture's devSeam) and says so.
-    // (`{ worktree: true })`: an agent asked for in a worktree (q.agent), not a 0.9 template's data, as templatesv2 imports.)
-    // Every suite for the test channels (#1580); the queue suites, and those #1578 named beside them, for the seams and
-    // starting Electron too, as the packaged checks (#1539) run them. A worktree agent asked of agents:add is refused
-    // by any 1.0 build (gitmissing checks that), so isn't one.
-    const channels = /agents:testLegacy|slots:test|\{ worktree: true \}\)|['"](new|existing)-worktree['"]/
-    const devOnly = new RegExp(`${channels.source}|HIVE_TEST_(SLOW_IPC|FAIL_IPC|QUEUE_[A-Z_]+)|_electron\\.launch`)
+  it("suites run on a packaged build, or say in their header why they can't (#1578, #1580, #1591)", () => {
+    // Under HIVE_EXE the runner reports a suite devBuildOnly names NOT RUN, with why, so no header is needed for that
+    // (#1591). Two kinds still say so in their header: one using the test copies' channels, which a packaged Hive
+    // refuses (#1580: 0.9 worktree agents and slots:test, dev-build tests on purpose); and a queue suite, or one #1578
+    // named beside them, that can't run packaged at all, as the packaged checks (#1539) run them. One that handles
+    // HIVE_EXE itself (its dev-only parts say NOT RUN: queueFixture's devSeam) says that in its header.
     const named = ['agentapislots', 'gitbranchcards', 'mergedialogslots', 'slotreleaseapi', 'templatesv2']
     const unsaid: string[] = []
     for (const n of names) {
-      const lines = readFileSync(join(dir, `${n}.cjs`), 'utf8').split(/\r?\n/)
-      const queue = named.includes(n) || lines.some((l) => /require\('\.\/queueFixture\.cjs'\)/.test(l))
-      const marks = queue ? devOnly : channels
-      const header = lines
-        .slice(0, lines.findIndex((l) => !l.startsWith('//')))
-        .map((l) => l.replace(/^\/\/\s*/, ''))
-        .join(' ')
-      const needs = lines.filter((l) => !l.trimStart().startsWith('//') && !/inv\('agents:add'/.test(l)).find((l) => marks.test(l))
-      const skips = /NOT RUN on a packaged build/.test(header) && lines.some((l) => /q\.devSeam\(|process\.env\.HIVE_EXE/.test(l))
-      if (needs && !/Dev build only/.test(header) && !skips) unsaid.push(`${n}.cjs: ${marks.exec(needs)?.[0]}`)
+      const src = readFileSync(join(dir, `${n}.cjs`), 'utf8')
+      const { header, code } = suiteSource(src)
+      const why = devBuildOnly(src)
+      const queue = named.includes(n) || code.some((l: string) => /require\('\.\/queueFixture\.cjs'\)/.test(l))
+      const handles = code.some((l: string) => /q\.devSeam\(|process\.env\.HIVE_EXE/.test(l))
+      const channel = handles ? null : code.filter((l: string) => !/inv\('agents:add'/.test(l)).find((l: string) => TEST_CHANNELS.test(l))
+      if (/Dev build only/.test(header)) continue
+      if (channel) unsaid.push(`${n}.cjs: ${TEST_CHANNELS.exec(channel)?.[0]}`)
+      else if (queue && why) unsaid.push(`${n}.cjs: ${why}`)
+      else if (queue && handles && code.some((l: string) => DEV_SEAMS.some((s: string) => l.includes(s))) && !/NOT RUN on a packaged build/.test(header)) unsaid.push(`${n}.cjs: a dev-only part on a packaged build, without "NOT RUN on a packaged build" in its header`)
     }
     expect(unsaid).toEqual([])
+  })
+
+  it("names every HIVE_TEST_ seam Hive reads: one a packaged build ignores, honours, or every test copy gets (#1591)", () => {
+    const src = execFileSync('git', ['ls-files', 'src'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter((f) => /\.(ts|tsx|mts|cjs|mjs|js)$/.test(f))
+    const read = new Set(src.flatMap((f) => readFileSync(join(root, f), 'utf8').match(/HIVE_TEST_[A-Z0-9_]*[A-Z0-9]/g) ?? []))
+    const listed = [...DEV_SEAMS, ...PACKAGED_SEAMS, ...EVERY_COPY_SEAMS]
+    expect(new Set(listed).size, 'a seam is in two lists').toBe(listed.length)
+    expect([...read].filter((s) => !listed.includes(s)).sort(), 'add each to DEV_SEAMS (runner.mjs) unless a packaged build honours it').toEqual([])
+    expect(listed.filter((s) => !read.has(s)), 'no longer read by Hive: take it off its list').toEqual([])
+  })
+
+  it('says why a suite would test the dev build on a packaged one (devBuildOnly, #1591)', () => {
+    const hdr = '// A suite.\n'
+    expect(devBuildOnly(`${hdr}const h = await lib.launch({ userData })\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}// Dev build only: it makes 0.9 worktree agents.\nconst h = await lib.launch({ userData })\n`)).toBe('its header says "Dev build only"')
+    expect(devBuildOnly(`${hdr}const app = await _electron.launch({\n  executablePath: lib.ELECTRON,\n  args: [lib.ROOT] })\n`)).toMatch(/starts this checkout's Electron itself/)
+    // Starting HIVE_EXE when set, or a packaged build by path, is not the dev build.
+    expect(devBuildOnly(`${hdr}_electron.launch({ executablePath: process.env.HIVE_EXE || lib.ELECTRON })\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}_electron.launch({ executablePath: path.join(lib.ROOT, 'dist/win-unpacked/Hive.exe') })\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}lib.launch({ env: { HIVE_TEST_SLOW_IPC: 'git:diff=1500' } })\n`)).toBe('it needs HIVE_TEST_SLOW_IPC, a test seam a packaged build ignores')
+    // Seams a packaged build honours, or every test copy gets, don't count; nor does a seam in a comment.
+    expect(devBuildOnly(`${hdr}lib.launch({ env: { HIVE_TEST_TIPS: 'off', HIVE_TEST_NOTIFY_LOG: log } })\n  // HIVE_TEST_SLOW_IPC once\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}await inv('slots:test', 'lend')\n`)).toBe('it uses a test channel a packaged build refuses (slots:test)')
+    expect(devBuildOnly(`${hdr}await inv('agents:add', p, { worktree: true })\n`)).toBe(null)
+    // A suite handling HIVE_EXE itself runs: its dev-only parts say NOT RUN. Starting Electron itself it can't handle.
+    expect(devBuildOnly(`${hdr}if (q.devSeam('S7')) env.HIVE_TEST_QUEUE_CRASH = 'afterFiles'\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}if (process.env.HIVE_EXE) return\n_electron.launch({ executablePath: lib.ELECTRON })\n`)).toMatch(/Electron itself/)
   })
 
   it('no fixed wait of 1 s or more without a reason: wait for the condition (lib.until) instead', () => {
@@ -414,6 +437,28 @@ describe('the real tier and environment failures (card #191)', () => {
     expect(md).toContain('Not run: the real tier (`--real`): agents, quit.')
     expect(md).toMatch(/\*\*Skipped for the environment\*\* .*: codex\./)
     expect(recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results: [results[0]], logDir: 'x', summary: 's' })).not.toMatch(/Not run|environment/)
+  })
+
+  it('on a packaged build, the record names it, the suites not run and why, and the parts a suite left out (#1591)', () => {
+    const out = 'PASS a\nNOT RUN S34a (main moved just before the swap) needs an unpackaged build: not run with HIVE_EXE\nPASS b\n'
+    const p4 = { name: 'mergequeuefolder', ...suiteOutcome({ code: 0, out }), seconds: 50 }
+    expect(p4).toMatchObject({ ok: true, partsNotRun: ['S34a (main moved just before the swap) needs an unpackaged build: not run with HIVE_EXE'] })
+    expect(resultLines('mergequeuefolder', p4)).toEqual(['mergequeuefolder      pass  50s  (1 part NOT RUN)', '    NOT RUN S34a (main moved just before the swap) needs an unpackaged build: not run with HIVE_EXE'])
+    const why = "it starts this checkout's Electron itself (executablePath: lib.ELECTRON), not lib.launch"
+    expect(resultLines('cardloop', { notRun: why })).toEqual([`cardloop              NOT RUN  (${why})`])
+    const results = [p4, { name: 'cardloop', notRun: why }]
+    const md = recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results, logDir: 'x', summary: '1 passed, 0 failed, 0 skipped, 1 not run', packaged: 'C:\\sb\\Hive.exe' })
+    expect(md).toMatch(/^\*\*e2e run record\*\* .* · packaged build `C:\\sb\\Hive\.exe` \(HIVE_EXE\)$/m)
+    expect(md).toContain(`| cardloop | **NOT RUN**: ${why} | – |`)
+    expect(md).toContain('| mergequeuefolder | pass (1 part NOT RUN) | 50s |')
+    expect(md).toContain('**Not run on the packaged build** (they would test the dev build; why in the table): cardloop.')
+    expect(md).toContain('**Parts not run** (the suite said NOT RUN): mergequeuefolder: S34a')
+    const json = recordJson({ code: 'abc', when: 'now', results, packaged: 'C:\\sb\\Hive.exe' })
+    expect(json.packaged).toBe('C:\\sb\\Hive.exe')
+    expect(json.results).toEqual([expect.objectContaining({ name: 'mergequeuefolder', ok: true, partsNotRun: p4.partsNotRun }), expect.objectContaining({ name: 'cardloop', ok: false, notRun: why })])
+    // A dev run's record has none of it.
+    expect(recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results: [{ name: 'board', ok: true, seconds: 3 }], logDir: 'x', summary: 's' })).not.toMatch(/packaged|NOT RUN|Not run/)
+    expect(recordJson({ code: 'abc', when: 'now', results: [{ name: 'board', ok: true }] })).not.toHaveProperty('packaged')
   })
 
   it('the record says how its suites were picked (#628): the full set, or what --affected selected and why', () => {

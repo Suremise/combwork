@@ -45,7 +45,7 @@ import { e2eProgress, slotWaitProgress } from '../progressReport.mts'
 import { SUITES } from './suites.mjs'
 import { affectedSuites, changedFiles, mergeBase } from './affected.mjs'
 import { CLI_LOG, fingerprint, readCliLog, realCliHomes, realCliVersions, recordJson, recordMarkdown, selectionOf } from './record.mjs'
-import { LANG_SUITE, isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, repeatStatus, resultLines, selectSuites, suiteOutcome } from './runner.mjs'
+import { LANG_SUITE, devBuildOnly, isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, repeatStatus, resultLines, selectSuites, suiteOutcome } from './runner.mjs'
 import { devBuild, ensureBuild } from './build.mjs'
 import { FAILED_KEEP_MS, finishRunDirs, keepSuiteFiles, logsRootFor, markRunFailed, newRunDir, omittedLine, pruneRunDirsReleasing } from './logs.mjs'
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from './lanes.mjs'
@@ -117,6 +117,17 @@ if (notRun.length) console.log(`Not run: the real tier (add --real): ${notRun.ma
 if (!chosen.length) {
   console.log(`\nNo suite to run${opts.affected ? ' for these changes' : ''}.`)
   process.exit(0)
+}
+// A packaged build (HIVE_EXE, the Sandbox checks): a suite that can't run on one would test the dev build and pass for
+// it, so it is NOT RUN, with why, in the output and the record (#1591, runner.mjs devBuildOnly). The parts of a suite
+// that runs which need the dev build say NOT RUN themselves (queueFixture devSeam).
+const packagedExe = process.env.HIVE_EXE || null
+const devOnly = new Map(packagedExe ? chosen.map((s) => [s.name, devBuildOnly(readFileSync(join(here, `${s.name}.cjs`), 'utf8'))]).filter(([, why]) => why) : [])
+if (packagedExe) console.log(`Packaged build: ${packagedExe} (HIVE_EXE)${devOnly.size ? `. NOT RUN, as they would test the dev build: ${devOnly.size} of ${chosen.length} suites (each said with why)` : ''}.\n`)
+if (devOnly.size === chosen.length) {
+  for (const [name, why] of devOnly) for (const line of resultLines(name, { notRun: why })) console.log(line)
+  console.log('\nNo suite chosen can run on a packaged build: nothing was tested.')
+  process.exit(1)
 }
 
 // --- A heavy run (more than a few suites, or a repeat) waits for a test slot: at most a few go at once on this machine,
@@ -360,9 +371,10 @@ const rank = (s) => Math.max(-1, ...(s.needs ?? []).map((n) => NEEDS.indexOf(n))
 const needs = (s, n) => (s.needs ?? []).includes(n)
 const isLast = (s) => !!s.serial || needs(s, 'packaged')
 const isCli = (s) => !isLast(s) && (needs(s, 'claude') || needs(s, 'codex'))
-const sideBySide = jobs === 1 ? [] : chosen.filter((s) => !isLast(s) && !isCli(s))
-const cliLane = jobs === 1 ? [] : chosen.filter(isCli).sort((a, b) => rank(a) - rank(b))
-const last = jobs === 1 ? [...chosen].sort((a, b) => rank(a) - rank(b)) : chosen.filter(isLast).sort((a, b) => rank(a) - rank(b))
+const runnable = chosen.filter((s) => !devOnly.has(s.name))
+const sideBySide = jobs === 1 ? [] : runnable.filter((s) => !isLast(s) && !isCli(s))
+const cliLane = jobs === 1 ? [] : runnable.filter(isCli).sort((a, b) => rank(a) - rank(b))
+const last = jobs === 1 ? [...runnable].sort((a, b) => rank(a) - rank(b)) : runnable.filter(isLast).sort((a, b) => rank(a) - rank(b))
 const order = [...sideBySide, ...cliLane, ...last].map((s) => s.name)
 const { repeat } = opts
 // One progress run for the whole repeat: a step per suite in each run.
@@ -396,6 +408,10 @@ async function runOnce(k) {
     progress.suite(finished, [...running].map((n) => step(k, n)).join(', '))
   }
   if (repeat > 1) console.log(`\n--- Run ${k} of ${repeat}`)
+  for (const [name, why] of devOnly) {
+    results.push({ name, notRun: why })
+    for (const line of resultLines(name, { notRun: why })) console.log(line)
+  }
 
   function finish(s, r) {
     finished++
@@ -455,7 +471,7 @@ async function runOnce(k) {
   for (const r of results.filter((x) => x.skipped && x.seconds === undefined)) console.log(`${r.name.padEnd(22)}skipped: ${r.skipped}`)
   const failed = results.filter((r) => r.ok === false)
   const minutes = ((Date.now() - startedAt) / 60_000).toFixed(1)
-  const summary = `${results.filter((r) => r.ok).length} passed, ${failed.length} failed, ${results.filter((r) => r.skipped).length} skipped in ${minutes} min`
+  const summary = `${results.filter((r) => r.ok).length} passed, ${failed.length} failed, ${results.filter((r) => r.skipped).length} skipped${devOnly.size ? `, ${devOnly.size} not run (they need the dev build)` : ''} in ${minutes} min`
   console.log(`\n${repeat > 1 ? `Run ${k} of ${repeat}: ` : ''}${summary}. Logs: ${logDir}`)
   if (filesKept.length) console.log(`Kept the screenshots and files of ${filesKept.join(', ')} in ${filesKept.length === 1 ? `${logDir}\\${filesKept[0]}` : `${logDir}\\<suite>`} (--keep-files).`)
   // A failed run outlives KEEP_RUNS for a day, with its failed suites' screenshots (#223): a path a builder cites in a
@@ -511,8 +527,8 @@ if (opts.record) {
   const when = new Date().toISOString().slice(0, 16).replace('T', ' ')
   // The real CLIs the real suites ran, as their Hive selected them (#365: the release's tested-with manifest).
   const clis = realCliVersions(lastRun.results, SUITES)
-  const md = `${recordMarkdown({ code: codeBefore, when, jobs, results: lastRun.results, logDir: lastRun.logDir, summary, problems, notRun: notRun.map((s) => s.name), runs: repeat > 1 ? Object.assign(runs, { repeat }) : null, clis, homes, selection }).trimEnd()}\n\n${binLine}\n`
-  const json = `${JSON.stringify(recordJson({ code: codeBefore, when, results: lastRun.results, problems, notRun: notRun.map((s) => s.name), clis, selection }), null, 2)}
+  const md = `${recordMarkdown({ code: codeBefore, when, jobs, results: lastRun.results, logDir: lastRun.logDir, summary, problems, notRun: notRun.map((s) => s.name), runs: repeat > 1 ? Object.assign(runs, { repeat }) : null, clis, homes, selection, packaged: packagedExe }).trimEnd()}\n\n${binLine}\n`
+  const json = `${JSON.stringify(recordJson({ code: codeBefore, when, results: lastRun.results, problems, notRun: notRun.map((s) => s.name), clis, selection, packaged: packagedExe }), null, 2)}
 `
   for (const r of runs) {
     writeFileSync(join(r.logDir, 'run-record.md'), md)

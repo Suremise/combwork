@@ -432,6 +432,15 @@ minutes, the network off and Hive's fake CLIs only: no real CLI, sign-in or cred
   `tests/e2esuites.test.ts` fails on a queue suite that needs one of these without saying so, and on any suite that
   uses the test channels without saying so (#1580: the suites making 0.9 worktree agents or lending slots through
   `slots:test` are all dev-build tests, each header saying why).
+- **What can't run on a packaged build is NOT RUN, never a pass** (#1591). With `HIVE_EXE` set, the runner doesn't
+  start a suite that would test the dev build all the same: one whose header says "Dev build only", one that starts
+  this checkout's Electron itself (`executablePath: lib.ELECTRON`, not `lib.launch`), and, unless it reads `HIVE_EXE`
+  or uses `q.devSeam` (it then handles the packaged build itself), one that needs a `HIVE_TEST_…` seam a packaged
+  build ignores or a test channel it refuses. Each is listed `NOT RUN` with why, in the output and the run record,
+  which names the packaged build; a `NOT RUN <what>` line a suite prints for a part it leaves out is in the record
+  too. The test is `devBuildOnly` in `runner.mjs`, which `tests/e2esuites.test.ts` uses for the headers; its
+  `DEV_SEAMS` must name every seam `src` reads that a packaged build ignores (the unit test lists one missing). A run
+  where nothing chosen can run packaged fails, saying so.
 
 ## What they need
 

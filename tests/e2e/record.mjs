@@ -135,7 +135,7 @@ export function selectionLine(sel, max = 5) {
  * tested-with manifest from it (#365). The code, whether it can be trusted, the real CLIs' versions, each suite's
  * result (the last run's, for a repeat: a valid record had every run pass) with the CLIs its Hive selected.
  */
-export function recordJson({ code, when, results, problems = [], notRun = [], clis = {}, selection = null }) {
+export function recordJson({ code, when, results, problems = [], notRun = [], clis = {}, selection = null, packaged = null }) {
   return {
     code,
     when,
@@ -143,7 +143,17 @@ export function recordJson({ code, when, results, problems = [], notRun = [], cl
     problems,
     clis,
     ...(selection ? { selection } : {}),
-    results: results.map((r) => ({ name: r.name, ok: !!r.ok, skipped: r.skipped ?? null, environment: !!r.environment, clis: r.clis ?? [], ...(windowsOf(r).length ? { windows: windowsOf(r) } : {}) })),
+    ...(packaged ? { packaged } : {}),
+    results: results.map((r) => ({
+      name: r.name,
+      ok: !!r.ok,
+      skipped: r.skipped ?? null,
+      environment: !!r.environment,
+      clis: r.clis ?? [],
+      ...(r.notRun ? { notRun: r.notRun } : {}),
+      ...(r.partsNotRun?.length ? { partsNotRun: r.partsNotRun } : {}),
+      ...(windowsOf(r).length ? { windows: windowsOf(r) } : {})
+    })),
     notRun
   }
 }
@@ -155,26 +165,34 @@ const windowsOf = (r) => (r.ok === false ? [...(describeExit(r.code) ? [`exit ${
  * first, if it can't be trusted (recordStatus), why. After the table: how the suites were picked (selection), the real CLIs' versions (clis, when real suites
  * ran), the real tier not run (notRun), and the suites skipped for the environment (a real CLI's usage limit, sign-in,
  * network), which are no result for the code. */
-export function recordMarkdown({ code, when, jobs, results, logDir, summary, problems = [], runs = null, notRun = [], clis = {}, homes = [], selection = null }) {
+export function recordMarkdown({ code, when, jobs, results, logDir, summary, problems = [], runs = null, notRun = [], clis = {}, homes = [], selection = null, packaged = null }) {
   // A skip's reason can quote the CLI: no | to break the table.
   const skippedCell = (r) => `skipped: ${r.skipped.replace(/\|/g, '/')}`
-  const cell = (r) => (!r ? '–' : r.skipped ? skippedCell(r) : `${r.ok ? 'pass' : `**FAIL**${r.failed?.length ? ` (${r.failed.length} check${r.failed.length === 1 ? '' : 's'})` : ''}`} ${r.seconds ?? '–'}s`)
+  // A suite not run on a packaged build (#1591), with why: never a pass.
+  const notRunCell = (r) => `**NOT RUN**: ${r.notRun.replace(/\|/g, '/')}`
+  const parts = (r) => (r.partsNotRun?.length ? ` (${r.partsNotRun.length} part${r.partsNotRun.length === 1 ? '' : 's'} NOT RUN)` : '')
+  const result = (r) => (r.notRun ? notRunCell(r) : r.skipped ? skippedCell(r) : `${r.ok ? 'pass' : `**FAIL**${r.failed?.length ? ` (${r.failed.length} check${r.failed.length === 1 ? '' : 's'})` : ''}`}${parts(r)}`)
+  const cell = (r) => (!r ? '–' : r.notRun || r.skipped ? result(r) : `${result(r)} ${r.seconds ?? '–'}s`)
   // A record that can't be trusted says so first, so nobody matches its fingerprint by mistake.
   const warning = problems.length ? [`**Not valid — don't trust this record:** ${problems.join('; ')}.`, ''] : []
-  const head = `**e2e run record** · code \`${code}\` · ${when} · ${jobs > 1 ? `${jobs} at a time` : 'one at a time'}`
+  const head = `**e2e run record** · code \`${code}\` · ${when} · ${jobs > 1 ? `${jobs} at a time` : 'one at a time'}${packaged ? ` · packaged build \`${packaged}\` (HIVE_EXE)` : ''}`
   const envSkipped = [...new Set((runs ?? [{ results }]).flatMap((r) => r.results.filter((x) => x.environment).map((x) => x.name)))]
   const windows = results.filter((r) => windowsOf(r).length).map((r) => `${r.name}: ${windowsOf(r).join('; ')}`)
+  const devOnly = results.filter((r) => r.notRun).map((r) => r.name)
+  const partsLeft = results.filter((r) => r.partsNotRun?.length).map((r) => `${r.name}: ${r.partsNotRun.join('; ')}`)
   const notes = [
     ...(selection ? [selectionLine(selection)] : []),
     ...(windows.length ? [`Windows codes (#599): ${windows.join(' · ')}.`] : []),
     ...(Object.keys(clis).length ? [`Real CLIs (as Hive selected them): ${cliLine(clis)}.`] : []),
     ...(homes.length ? [`Real CLIs' homes (#368): ${homes.join('; ')}.`] : []),
     ...(notRun.length ? [`Not run: the real tier (\`--real\`): ${notRun.join(', ')}.`] : []),
+    ...(devOnly.length ? [`**Not run on the packaged build** (they would test the dev build; why in the table): ${devOnly.join(', ')}.`] : []),
+    ...(partsLeft.length ? [`**Parts not run** (the suite said NOT RUN): ${partsLeft.join(' · ').replace(/\|/g, '/')}.`] : []),
     ...(envSkipped.length ? [`**Skipped for the environment** (no result for the code; the reviewer decides whether a merge needs them run again): ${envSkipped.join(', ')}.`] : [])
   ]
   const tail = notes.length ? ['', ...notes] : []
   if (!runs) {
-    const rows = results.map((r) => `| ${r.name} | ${r.skipped ? skippedCell(r) : r.ok ? 'pass' : `**FAIL**${r.failed?.length ? ` (${r.failed.length} check${r.failed.length === 1 ? '' : 's'})` : ''}`} | ${r.seconds ?? '–'}s |`)
+    const rows = results.map((r) => `| ${r.name} | ${result(r)} | ${r.notRun ? '–' : `${r.seconds ?? '–'}s`} |`)
     return [...warning, head, '', '| Suite | Result | Time |', '|---|---|---|', ...rows, '', `${summary}. Logs: \`${logDir}\``, ...tail].join('\n')
   }
   // A repeat (--repeat N): each run's result, time and logs, then each suite's result in each run.
