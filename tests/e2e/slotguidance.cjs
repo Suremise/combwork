@@ -42,7 +42,7 @@ const readOr = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
 const SLOT_LINE = /that folder is the slot: work and run checks there, never in another one/
 const ISOLATED = /with `--isolated` it runs in a check copy of its own/
 const COPY_LINE = /the review copy to read and run checks in when the project has them: review there, never in the builder's slot or folder/
-const CONTRACT = /Hive sets your folder \(a card's or lane's slot, or the review copy a review names\)/
+const CONTRACT = /Hive sets your folder \(the project's, a card's or lane's slot, or the review copy a review names\)/
 // What nothing delivered may say any more: a worktree of an agent's own (tests/guidance.test.ts has the same).
 const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown (?:git )?worktree\b|\bagents? with (?:its|their) own\b/i
 

@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 78
+const FIXTURES_VERSION = 79
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -631,6 +631,11 @@ const testRuns = (o) => o.tools.filter((t) => !/^(Write|Edit|MultiEdit|Read)$/i.
 /** Whether the session's contract was the one with long commands wrapped (`on`) or not, by its measured size. */
 /** How many worktrees git lists for the scenario's project (its own folder included). */
 const worktreeCount = (c) => c.git('worktree', 'list', '--porcelain').split(/\r?\n/).filter((l) => l.startsWith('worktree ')).length
+/** The delivery of the message the Assistant left (`c.sent`, its reply naming the id: "Told Coder now (m12): …"), in `c.got`. */
+const sentMessage = (c) => {
+  const id = /\((m\d+)\b/.exec(c.sent ?? '')?.[1]
+  return id ? (c.got ?? []).find((d) => d.id === id) : undefined
+}
 const contractWas = (o, on) => o.measures?.coreChars === require('../../src/shared/hiveGuidance.ts').hiveInstructions('alpha', 'agent', on).length
 
 module.exports.FIXTURES_VERSION = FIXTURES_VERSION
@@ -1084,6 +1089,46 @@ module.exports.SCENARIOS = [
         ["didn't reopen the passed card", o.cards.a?.column === 'passed', history(o.cards.a).join(' | ')]
       ]
     }
+  },
+  {
+    id: 'inbox-act-then-ack',
+    title: "An idle agent's doorbell brings it work from the Assistant (#903, #1529): it reads it with hive_inbox, does it, then acks it before its turn ends (a fresh user's agents read and never acked, so it showed overdue)",
+    files: { 'greeting.txt': 'Hello\n' },
+    assistantMessages: true,
+    async setup(c) {
+      await c.card('a', { title: 'Friendlier greeting', description: 'Change greeting.txt to say "Hi there!".' })
+      await c.startAssistant()
+    },
+    // Once its first turn has ended, the Assistant leaves it the work: typed to it as the doorbell.
+    async during(c, status) {
+      if (!c.sentAt && ['ready', 'finished'].includes(status)) {
+        c.sentAt = Date.now()
+        c.sent = await c.assistantMessage('coder', `Please work on card #${c.cards.a} now.`)
+      }
+      if (c.sentAt) c.got = await c.deliveries('coder')
+    },
+    // Until the message is acked or has ended, at most 4 minutes after it was left.
+    keepWaiting: async (c) => {
+      const msg = sentMessage(c)
+      return !c.sentAt || (Date.now() - c.sentAt < 240000 && !(msg && (msg.state === 'acked' || !!msg.ended)))
+    },
+    prompt: () => 'Read greeting.txt and tell me what it says. Nothing else for now.',
+    fake: () => 'hive hive_list_tasks {}',
+    fakeWakes: (c) => [`skill work-on-card then boardmove ${c.cards.a} doing then boardmove ${c.cards.a} review`],
+    expect: (o, c) => {
+      const msg = sentMessage(c)
+      const review = historyAt(o.cards.a, /^Moved to (the (top|bottom) of )?Review\b/)
+      return [
+        ['the Assistant left it the message while it was idle (typed: the doorbell)', (c.sent ?? '').startsWith('Told') && !!msg, `${c.sent} ${JSON.stringify(msg)}`],
+        ['read it with hive_inbox', ran(o, 'hive_inbox').some((x) => Date.parse(x.at) >= c.sentAt) && msg?.receivedVia === 'inbox', JSON.stringify(msg)],
+        ['acked it before its turn ended', msg?.state === 'acked', JSON.stringify(msg)],
+        ['did the work: the card is in Review', review > 0 && o.cards.a?.column === 'review', history(o.cards.a).join(' | ')],
+        // The fakes ack as they read (fake-follow-notices); only a model shows the order.
+        ['acked it after acting on it, not as it read it', !!msg?.acked && review > 0 && Date.parse(msg.acked) >= review, `acked ${msg?.acked}; in Review ${new Date(review).toISOString()}`]
+      ]
+    },
+    // Only the fake Claude Code acts out a wake (its wake script); none of the fakes acts before acking.
+    fakeSkips: (provider) => ['acked it after acting on it, not as it read it', ...(provider === 'fake' ? [] : ['did the work: the card is in Review'])]
   },
   {
     id: 'review-against-decision',
