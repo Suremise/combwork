@@ -2,7 +2,7 @@
 // folder and card kind is walked from Todo to Done on a real repository (or a None folder), through each refusal's next
 // step, approvals and a quorum of two; every contradiction is refused when saved.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { B1, commit, moved, put, R1, R2, setup, sh, type Env } from './harness'
+import { B1, commit, moved, put, R1, R2, refusedBy, setup, sh, type Env } from './harness'
 import { allOff, contradictions, type Finisher, type FolderMode, type ReviewBy, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { compile } from '../../src/shared/workflow/compile'
 import { isRefusal } from '../../src/main/workflow/runtime'
@@ -140,5 +140,62 @@ describe('S36: every combination', () => {
     if (c.platform === 'none' && c.kind === 'code') expect(end.accepted?.revision).toBe(end.latest!.revision)
     if (c.review !== 'none' && c.reviewers === 2 && c.review !== 'you') expect(new Set(end.verdicts.filter((v) => v.pass).map((v) => v.reviewer)).size).toBe(2)
     if (c.review !== 'none') expect(end.rounds, 'one failed round').toBe(1)
+  })
+})
+
+// #1592 (decided (a)): G10 applies under "who finishes: not checked" as under the agent merges. For every card or by
+// label, with no review or a reviewer agent, Approved asks for the OK and the report of the merge waits for it; a card
+// without the labels is reported straight away. A reviewer agent then you already asks you (the OK is part of your
+// review: okWithReview), and the report waits for that answer the same way.
+describe('#1592: the OK before merging under not checked', () => {
+  let e: Env
+  beforeAll(() => {
+    e = setup({ platform: 'git' })
+  })
+  afterAll(() => e.close())
+
+  const cases: { review: ReviewBy; ok: 'never' | 'every' | 'labels'; labelled: boolean }[] = [{ review: 'agentThenYou', ok: 'never', labelled: false }]
+  for (const review of ['none', 'agent'] as ReviewBy[])
+    for (const [ok, labelled] of [['every', false], ['labels', true], ['labels', false]] as const) cases.push({ review, ok, labelled })
+
+  let n = 0
+  it.each(cases.map((c) => [`review ${c.review} · OK before merging ${c.ok}${c.ok === 'labels' ? (c.labelled ? ', labelled' : ', not labelled') : ''}`, c] as const))('%s', async (_, c) => {
+    const i = ++n
+    Object.assign(e.options, { ...allOff('git'), review: c.review, noSelfReview: c.review !== 'none', finish: 'notChecked', folder: 'slots', target: 'main', okBefore: { mode: c.ok, labels: c.ok === 'labels' ? ['release'] : [] } } satisfies WorkflowOptions)
+    expect(contradictions(e.options)).toEqual([])
+    const card = e.wf.createCard({ title: `Unchecked ${i}`, labels: c.labelled ? ['release'] : [] })
+    moved(await e.wf.start(card.key, B1))
+    const folder = e.wf.folderOf(e.wf.state(card))
+    put(folder, `u${i}.txt`, `${i}\n`)
+    commit(folder, {}, `${card.key}: work`)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    if (c.review !== 'none') {
+      moved(await e.wf.startReview(card.key, R1))
+      moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+    }
+    const review = e.wf.state(card).requests.find((r) => r.gate === 'review')
+    expect(!!review, 'your review asked').toBe(c.review === 'agentThenYou')
+    if (review) {
+      refusedBy(await e.wf.reportMerge(card.key, B1), 'move.notFromHere')
+      moved(await e.wf.answer(card.key, review.request, 'approved'))
+    }
+    const applies = c.ok === 'every' || c.labelled
+    const s = e.wf.state(card)
+    if (!applies && c.review === 'none') {
+      // Nothing to approve: done on submit, as before.
+      expect(s.stage).toBe('done')
+      return
+    }
+    expect(s.stage).toBe('approved')
+    const ok = s.requests.find((r) => r.gate === 'okBefore')
+    if (!applies) expect(ok).toBeUndefined()
+    else {
+      expect(ok, 'Hive asks for the OK').toMatchObject({ kind: 'approve', for: 'user' })
+      refusedBy(await e.wf.reportMerge(card.key, B1), 'approval.given')
+      moved(await e.wf.answer(card.key, ok!.request, 'approved'))
+      expect(e.wakes.at(-1)).toMatchObject({ agent: 'B1', why: expect.stringContaining('approved: merge it and report the merge') })
+    }
+    moved(await e.wf.reportMerge(card.key, B1))
+    expect(e.wf.state(card).stage).toBe('done')
   })
 })

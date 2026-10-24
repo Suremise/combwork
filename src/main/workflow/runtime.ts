@@ -1000,8 +1000,11 @@ export class Workflow {
         }
         return
       case 'notChecked':
-        if (o.review !== 'none') w.move('approved', 'derived')
-        else {
+        // G10 applies here too (decided on #1592): the OK is asked in Approved, and the report of the merge waits for it.
+        if (o.review !== 'none' || needOk) {
+          w.move('approved', 'derived')
+          if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
+        } else {
           w.move('done', 'derived')
           w.action('endLaneIfDone', {})
           w.action('releaseSlot', {})
@@ -1600,7 +1603,7 @@ export class Workflow {
     if ((past('review') || past('approved')) && (r.options.review !== 'none' || okBeforeApplies(r, card.labels))) out.add('integrate.approved')
     if (to === 'done' && card.kind === 'code') {
       if (r.options.finish === 'hiveMerges') r.guards.integrate.filter((g) => g !== 'integrate.approved').forEach((g) => out.add(g))
-      if (r.options.finish === 'agentMerges') r.guards.reportMerge.forEach((g) => out.add(g))
+      if (r.options.finish === 'agentMerges' || r.options.finish === 'notChecked') r.guards.reportMerge.forEach((g) => out.add(g))
       if (r.options.finish === 'committed') r.guards.finish.forEach((g) => out.add(g))
     }
     return [...out]
