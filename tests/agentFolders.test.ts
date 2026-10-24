@@ -11,9 +11,9 @@ import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { fileSlotConn, SlotStore } from '../src/main/slots'
-import { claimIn, ClaimRefused, legacyWorktree, rebindSession, RebindRefused, slotsIn } from '../src/main/agentFolders'
+import { claimIn, ClaimRefused, leasedLine, legacyWorktree, rebindSession, RebindRefused, slotsIn } from '../src/main/agentFolders'
 import { readSessionRecords, writeSessionRecords } from '../src/main/schema/sessionDeliveryTables'
-import { canResumeByUser, canResumeNow, currentFolder, defaultPurpose, launchFolder, resumeFolder, resumeHold, type FolderAgent, type FolderFacts, type FolderLease, type FolderSlot, type ResumeHold } from '../src/shared/agentFolders'
+import { agentPlaces, canResumeByUser, canResumeNow, currentFolder, defaultPurpose, launchFolder, resumeFolder, resumeHold, type FolderAgent, type FolderFacts, type FolderLease, type FolderSlot, type ResumeHold } from '../src/shared/agentFolders'
 import { agentsToResume, resumeAll, type ResumeAllAgent } from '../src/shared/resumeAll'
 import { holdShort, holdText, resumeBlock, type ResumeContext } from '../src/shared/sessionResume'
 import { shownText } from '../src/shared/advanced'
@@ -83,6 +83,32 @@ describe('where a new conversation starts, and where an agent works now', () => 
   it('a conversation resumes in the folder it recorded; an older row without one, in the project folder', () => {
     expect(resumeFolder(P, { cwd: slotFolder('slot-b') })).toBe(slotFolder('slot-b'))
     expect(resumeFolder(P, {})).toBe(P)
+  })
+})
+
+describe('where an agent is, as the Agent API names it (#1451)', () => {
+  it('an idle builder with a dispatch lease: in its slot (lease), now and next; its running session elsewhere: there (session)', () => {
+    const f = facts([slot('slot-b', { open: lease('l1', 'slot-b', 'b1') })])
+    expect(agentPlaces(f, builder, null)).toEqual({ now: { path: slotFolder('slot-b'), at: 'slot-b', why: 'lease', slot: 'slot-b' }, launch: { path: slotFolder('slot-b'), at: 'slot-b', why: 'lease', slot: 'slot-b' } })
+    expect(agentPlaces(f, builder, { cwd: P }).now).toEqual({ path: P, at: 'project', why: 'session', slot: null })
+  })
+
+  it('a carried agent: its adopted slot (carried); a 0.9 worktree not migrated yet: there (carried), by its path', () => {
+    expect(agentPlaces(facts([slot('hb2', { open: lease('l2', 'hb2', 'b1', 'carried') })]), builder, null).now).toEqual({ path: slotFolder('hb2'), at: 'hb2', why: 'carried', slot: 'hb2' })
+    const old: FolderAgent = { ...builder, legacy: { path: slotFolder('b1'), branch: 'hive/b1' } }
+    expect(agentPlaces(facts([], { migrated: false }), old, null).now).toEqual({ path: slotFolder('b1'), at: slotFolder('b1'), why: 'carried', slot: null })
+  })
+
+  it('a reviewer: the project folder next; resumed in its retired home, there now (home: <name>)', () => {
+    const home = slotFolder('hr1')
+    const f = facts([], { homes: [home] })
+    const p = agentPlaces(f, reviewer, { cwd: home })
+    expect([p.now, p.launch]).toEqual([
+      { path: home, at: 'home: hr1', why: 'session', slot: null },
+      { path: P, at: 'project', why: 'project', slot: null }
+    ])
+    // An either agent mid-build reviews in the project folder only when it starts afresh for that: its next conversation (a build) is its slot.
+    expect(agentPlaces(facts([slot('slot-c', { open: lease('l3', 'slot-c', 'e1') })]), either, null).launch.at).toBe('slot-c')
   })
 })
 
@@ -206,6 +232,23 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
   }
   const leaseOf = (db: DatabaseSync, id = 's1'): string | null => (db.prepare("SELECT lease FROM sessions WHERE host = 'p1' AND id = ?").get(id) as { lease: string | null }).lease
   const writerOf = (store: SlotStore, name = 'slot-b') => store.slot(name)?.writer ?? null
+
+  it("an agent's watched line (#1451, branchWatch's): its dispatch lease's before its carried one, the card last started there, this project's only", () => {
+    const { db } = board()
+    // b1's card lease on slot-b, its card not started there yet: no line.
+    expect(leasedLine(db, 'p1', 'b1')).toEqual({ folder: slotFolder('slot-b'), target: null, line: null, carried: false })
+    db.prepare("INSERT INTO cards (number, title, description, project, col, ord, created_at, created_by, updated_at) VALUES (12, 'Fix', '', 'p1', 'doing', 1, ?, 'test', ?)").run(at, at)
+    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 1, 'Started', ?, 'hive', 'recorded', ?)").run(at, JSON.stringify({ lease: 'l1', line: 'hive/P1/P1-12-fix' }))
+    expect(leasedLine(db, 'p1', 'b1')?.line).toBe('hive/P1/P1-12-fix')
+    // A carried lease too (its 0.9 worktree, adopted): the dispatch lease's still wins; another agent's carried one is its own.
+    db.prepare("UPDATE slots SET target = 'main' WHERE name = 'slot-c'").run()
+    db.prepare("INSERT INTO slot_leases (id, project, slot, kind, agent, from_at) VALUES ('l2', 'p1', 'slot-c', 'carried', 'b1', ?)").run(at)
+    expect(leasedLine(db, 'p1', 'b1')).toMatchObject({ folder: slotFolder('slot-b'), carried: false })
+    db.prepare("UPDATE slot_leases SET ended_at = ? WHERE id = 'l1'").run(at)
+    expect(leasedLine(db, 'p1', 'b1')).toEqual({ folder: slotFolder('slot-c'), target: 'main', line: null, carried: true })
+    // Another project's agent of the same id: none.
+    expect(leasedLine(db, 'p2', 'b1')).toBeNull()
+  })
   /** A claim as claimPlace makes it, its facts read before the write (as `before` has them). */
   const claim = (store: SlotStore, o: { run: string; existing?: { id: string; cwd: string; lease?: string } | null; auto?: boolean; head?: string | null; folder?: string; agent?: FolderAgent }) =>
     store.conn.write((db) => claimIn(db, store, { facts: facts([]), folder: o.folder ?? slotFolder('slot-b'), agent: o.agent ?? builder, existing: o.existing === undefined ? null : o.existing, purpose: 'build', auto: o.auto ?? false, run: o.run, sessionsHost: 'p1', me: ME, head: o.head ?? null }))

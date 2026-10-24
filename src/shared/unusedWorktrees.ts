@@ -141,15 +141,6 @@ export function reuseNote(r: WorktreeReuse, t?: Tr): string {
   return t ? t(M.alreadyAt, { branch: r.branch, base: r.base }) : `reused ${r.branch}, already at ${r.base}` // i18n-ignore: the Agent API's reply and the log (English)
 }
 
-/**
- * Files whose change means a reused worktree runs the project's worktree setup again (#456): the lockfiles of the usual
- * package managers. A worktree brought up to the base without one of them changing doesn't (its node_modules is there).
- */
-const SETUP_FILES = /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|Cargo\.lock|go\.sum|poetry\.lock|uv\.lock|Pipfile\.lock|Gemfile\.lock|composer\.lock|packages\.lock\.json)$/i
-
-/** Whether any of these changed files (git's paths) is a lockfile, so a reused worktree's setup runs again (#456). */
-export const lockfileChanged = (files: readonly string[]): boolean => files.some((f) => SETUP_FILES.test(f.trim()))
-
 /** The Overview's line (#400): "7 unused worktrees (7 merged)", or null with none. */
 export function unusedSummary(list: UnusedWorktree[]): string | null {
   if (!list.length) return null

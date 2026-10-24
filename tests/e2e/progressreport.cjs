@@ -15,6 +15,9 @@ const claudeHome = path.join(lib.WORK, 'progressreport-claude-home')
 const alpha = path.join(ws, 'alpha')
 // A checkout of alpha at an older commit (#1273), beside the workspace so it isn't one of its projects.
 const older = path.join(lib.WORK, 'progressreport-older')
+// The runners' timings for the runs it starts, its own (#1518): the machine's file keeps its newest 300 keys, which on a
+// busy machine lost `about`'s within hours, and with it the estimate checked.
+const timings = path.join(lib.WORK, 'progressreport-timings.json')
 const PORT = Number(lib.port(47913))
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -23,7 +26,7 @@ const check = (name, ok, extra = '') => {
 }
 
 ;(async () => {
-  for (const d of [userData, ws, claudeHome, older]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [userData, ws, claudeHome, older, timings]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
   lib.gitProject(alpha)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
@@ -255,7 +258,8 @@ const check = (name, ok, extra = '') => {
 
   // --- Hive's own runners in an agent's session: shown in this Hive's panel as the agent's, with steps and estimates.
   const root = lib.ROOT
-  const unitCmd = `cd /d "${root}" && npx vitest run tests/tips.test.ts tests/e2esuites.test.ts`
+  const withTimings = `set "HIVE_TEST_PROGRESS_TIMINGS=${timings}"&& `
+  const unitCmd = `${withTimings}cd /d "${root}" && npx vitest run tests/tips.test.ts tests/e2esuites.test.ts`
   known = (await runs()).map((r) => r.id)
   const unit1 = await shell(builder.id, unitCmd, 120000)
   const u1 = (await runs()).find((r) => !known.includes(r.id) && /^unit: 2 files$/.test(r.title))
@@ -269,8 +273,12 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(1500) // A fixed wait on purpose: this checks that nothing is reported.
   check('HIVE_PROGRESS=0: the tests run, nothing is reported', off?.code === 0 && (await runs()).every((r) => known.includes(r.id)), JSON.stringify((await runs()).filter((r) => !known.includes(r.id))))
 
+  // An earlier run of the suite, its time kept; then the run checked, with its estimate from that one.
+  const aboutCmd = `${withTimings}cd /d "${root}" && node tests/e2e/run.mjs about`
+  const earlier = await shell(builder.id, aboutCmd, 180000)
+  check('…an earlier e2e run of the suite passes, its time kept', earlier?.code === 0, earlier?.stdout)
   known = (await runs()).map((r) => r.id)
-  const e2e = await shell(builder.id, `cd /d "${root}" && node tests/e2e/run.mjs about`, 180000)
+  const e2e = await shell(builder.id, aboutCmd, 180000)
   const e1 = (await runs()).find((r) => !known.includes(r.id) && r.title === 'e2e: 1 suite')
   check('npm run e2e reports "e2e: 1 suite" as the agent, with its step and the estimate from earlier runs', e2e?.code === 0 && e1?.agentName === 'Builder' && e1?.total === 1 && e1?.state === 'passed' && lib.hadEstimate(e1), JSON.stringify({ code: e2e?.code, out: e2e?.stdout?.slice(-300), e1 }))
   check('…and its output is the runner\'s usual', /about\s+pass/.test(e2e?.stdout ?? '') && /1 passed, 0 failed, 0 skipped/.test(e2e?.stdout ?? ''), e2e?.stdout)

@@ -129,11 +129,17 @@ export function runMatches(r: ProgressRun, f: RunsFilter, words: (r: ProgressRun
 }
 
 /**
- * The Runs tab's Agent filter's value for a run's agent: its agent, or Hive's merge queue for Hive's own runs (#1356: the
- * filter has "Hive (merge queue)"); null for the Assistant and scripts, which the filter doesn't offer.
+ * The Runs tab's Agent filter's value for a run's agent: its agent, or for Hive's own runs who in Hive ran it (#1356: the
+ * filter has "Hive (merge queue)"; #1446: "Hive (slot slot-b)" and "Hive (copy copy-1)", one each); null for the
+ * Assistant and scripts, which the filter doesn't offer.
  */
 export const HIVE_RUNS = ':hive'
-export const runAgentKey = (r: Pick<ProgressRun, 'agentId' | 'source'>): string | null => r.agentId ?? (r.source === 'hive' ? HIVE_RUNS : null)
+/** The Agent filter's value for a slot's warming runs, "Hive (slot <name>)" (#1446). */
+export const slotRunsKey = (slot: string): string => `${HIVE_RUNS}:slot:${slot.toLowerCase()}`
+/** The Agent filter's value for a review or check copy's setup runs, "Hive (copy <name>)" (#1446). */
+export const copyRunsKey = (copy: string): string => `${HIVE_RUNS}:copy:${copy.toLowerCase()}`
+export const runAgentKey = (r: Pick<ProgressRun, 'agentId' | 'source' | 'defaultName' | 'slot' | 'copy'>): string | null =>
+  r.agentId ?? (r.source !== 'hive' ? null : r.defaultName === 'slot' && r.slot ? slotRunsKey(r.slot) : r.defaultName === 'copy' && r.copy ? copyRunsKey(r.copy) : HIVE_RUNS)
 
 /**
  * The tabs' badges (#1309): merges waiting (agents waiting for a merge slot, and cards queued in the merge queues shown,

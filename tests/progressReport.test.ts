@@ -2,13 +2,13 @@
 // test runners (main/progressReporters/report.mts), against a stand-in for #136's Agent API: output and exit codes pass
 // through; Hive reachable, unreachable or absent; step lines; estimates after one run; updates coalesced.
 import { spawnSync } from 'child_process'
-import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { createServer, type Server } from 'http'
 import { join } from 'path'
 import { createRequire } from 'module'
 import { pathToFileURL } from 'url'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { estimateFor, ProgressRun, progressTarget, recordTiming, wrappedLines } from '../src/main/progressReporters/report.mts'
+import { estimateFor, evictionOrder, KEEP_KEYS, ProgressRun, progressTarget, recordTiming, wrappedLines } from '../src/main/progressReporters/report.mts'
 import { cmdEscapeArgument, commandEnv, commandLabel, parseArgs, parseProcessList, runWrapped, spawnSpec, StepFilter, stepLine, timingKey, treeToEnd, wasInterrupted } from '../src/main/progressReporters/wrapper'
 import { installShims, shimFiles, withBinOnPath } from '../src/main/progressReporters/shims'
 import { hiveInstructions, progressRule, wrapsLongCommands } from '../src/shared/hiveGuidance'
@@ -574,13 +574,55 @@ describe('the shared reporter and timings', () => {
     expect(estimateFor(file, 'k')).toBeUndefined()
     for (const ms of [100, 900, 200, 300, 250, 260]) recordTiming(file, 'k', ms)
     expect(estimateFor(file, 'k')).toBe(260)
-    for (let i = 0; i < 305; i++) recordTiming(file, `k${i}`, 1, 1000 + i)
+    // A full file (written as it would be, rather than a thousand records), then six more keys run once: each pushes out
+    // the oldest key run once.
+    const runs = JSON.parse(readFileSync(file, 'utf8')).runs
+    for (let i = 0; i < KEEP_KEYS - 1; i++) runs[`k${i}`] = { ms: [1], at: 1000 + i }
+    writeFileSync(file, JSON.stringify({ version: 1, runs }))
+    for (let i = KEEP_KEYS - 1; i < KEEP_KEYS + 5; i++) recordTiming(file, `k${i}`, 1, 1000 + i)
     expect(estimateFor(file, 'k0')).toBeUndefined()
-    expect(estimateFor(file, 'k304')).toBe(1)
+    expect(estimateFor(file, 'k5')).toBeUndefined()
+    expect(estimateFor(file, 'k6')).toBe(1)
+    expect(estimateFor(file, `k${KEEP_KEYS + 4}`)).toBe(1)
+    // 'k', with a history, outlasts a file's worth of keys run once (#1549).
+    expect(estimateFor(file, 'k')).toBe(260)
     writeFileSync(file, '{ damaged')
-    expect(estimateFor(file, 'k304')).toBeUndefined()
+    expect(estimateFor(file, `k${KEEP_KEYS + 4}`)).toBeUndefined()
     recordTiming(file, 'k', 50)
     expect(estimateFor(file, 'k')).toBe(50)
+  })
+
+  // #1549: a full file gives up the keys run once first, then those with a history, each oldest first; never the key
+  // just recorded.
+  /** A timings file holding `runs`, as recordTiming writes it. */
+  const timingsWith = (name: string, runs: Record<string, { ms: number[]; at: number }>): string => {
+    const file = join(dir, name, 'timings.json')
+    mkdirSync(join(dir, name), { recursive: true })
+    writeFileSync(file, JSON.stringify({ version: 1, runs }))
+    return file
+  }
+
+  it('evicts keys run once before keys with a history, oldest first, never the one just recorded', () => {
+    const runs = { suite: { ms: [5, 6], at: 1 }, probe: { ms: [1], at: 3 }, daily: { ms: [7, 8, 9], at: 2 }, old: { ms: [1], at: 0 }, now: { ms: [1], at: 9 } }
+    expect(evictionOrder(runs, 'now')).toEqual(['old', 'probe', 'suite', 'daily'])
+    // A file full of keys with a history keeps a new key: the oldest with a history goes instead.
+    const file = timingsWith('timings-full', Object.fromEntries([...Array(KEEP_KEYS).keys()].map((i) => [`h${i}`, { ms: [1, 2], at: 1000 + i }])))
+    recordTiming(file, 'new', 3, 5000)
+    expect(estimateFor(file, 'new')).toBe(3)
+    expect(estimateFor(file, 'h0')).toBeUndefined()
+    expect(estimateFor(file, 'h1')).toBe(1)
+  })
+
+  it("a day of several lanes' one-off keys leaves every suite's estimate (#1549)", () => {
+    // 300 suites run twice in the morning, then a file's worth of one-off keys (probe folders' commands, unit-test
+    // selections), and 300 more recorded on top: the file is full of one-offs, each new one pushing out the oldest.
+    const suites = [...Array(300).keys()].map((i) => [`e2e:s${i}`, { ms: [10, 20], at: 1000 + i }])
+    const onceKeys = [...Array(KEEP_KEYS - 300).keys()].map((i) => [`once${i}`, { ms: [1], at: 10_000 + i }])
+    const file = timingsWith('timings-day', Object.fromEntries([...suites, ...onceKeys]))
+    for (let i = KEEP_KEYS - 300; i < KEEP_KEYS; i++) recordTiming(file, `once${i}`, 1, 10_000 + i)
+    expect([...Array(300).keys()].every((i) => estimateFor(file, `e2e:s${i}`) === 10)).toBe(true)
+    expect(estimateFor(file, 'once0')).toBeUndefined()
+    expect(estimateFor(file, `once${KEEP_KEYS - 1}`)).toBe(1)
   })
 })
 

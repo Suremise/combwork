@@ -44,7 +44,7 @@ const samePath = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toL
     try {
       await lib.openWorkspace(inv, page, scratch)
       const added = []
-      for (const name of ['JB1', 'JB2', 'JB3', 'JB4']) added.push(await inv('agents:add', juniper, { location: 'new-worktree', name }))
+      for (const name of ['JB1', 'JB2', 'JB3', 'JB4']) added.push(await inv('agents:testLegacy', juniper, { location: 'new-worktree', name }))
       check('the agents work on branches named after Scratch', JSON.stringify(agentsOf(juniper).map((a) => a.worktree.branch)) === JSON.stringify(['hive/Scratch/juniper/jb1', 'hive/Scratch/juniper/jb2', 'hive/Scratch/juniper/jb3', 'hive/Scratch/juniper/jb4']), JSON.stringify(agentsOf(juniper).map((a) => a.worktree?.branch)))
       // JB1's card, started from the window: its work is on JB1's branch. Its session is stopped (Repair waits for that).
       card = (await inv('tasks:create', { title: 'Work on JB1’s branch', project: 'juniper' })).number

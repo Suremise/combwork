@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { OwnWorkflowProblem, ProjectInfo, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
 import type { PlatformId } from '@shared/platform/descriptors'
-import { allOff, CONTRADICTIONS, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, isAllOff, liveContradictions, NOT_OFFERED, reviewerAgent, setOption, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
-import { GROUP_TEXT, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NEEDS_TEXT, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
+import { allOff, CONTRADICTIONS, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, isAllOff, liveContradictions, reviewerAgent, setOption, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
+import { GROUP_TEXT, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import { LOOP_ROUNDS, loopDefaults } from '@shared/lanes'
 import { compile, mustCompile } from '@shared/workflow/compile'
 import { STAGE_TEXT, stageNameProblems, stageNameProblemText, type StageNames } from '@shared/workflow/stages'
@@ -10,8 +10,11 @@ import type { StageId } from '@shared/workflow/facts'
 import { shownText } from '@shared/advanced'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { cardLabelOf, confirm, notify, openProjectSettings, openVersionControl, set as setStore, setActivity, useStore } from '../store'
+import { agentProviderOf, cardLabelOf, confirm, notify, openProjectSettings, openVersionControl, set as setStore, setActivity, useStore } from '../store'
 import { cx } from '../util'
+import { SlotsAndCopies } from './SlotsAndCopies'
+import { providerDescriptor } from '@shared/providers'
+import { agentWorkflowRole, reviewsWork } from '@shared/workflow/roles'
 import { Icon, Switch, Tooltip } from './ui'
 
 /**
@@ -44,7 +47,6 @@ const T = {
     folderGit: msg({ id: 'workflow.form.neverOff.folderGit', defaultMessage: 'No branch switch, pull or other git that changes the folder while an agent works there.', description: 'A protection that stays on with every rule off.' }),
     queue: msg({ id: 'workflow.form.neverOff.queue', defaultMessage: 'The merge queue moves a target branch only if nothing else moved it meanwhile.', description: 'A protection that stays on with every rule off (glossary 2.1: merge queue).' })
   },
-  unavailable: msg({ id: 'workflow.form.unavailable', defaultMessage: '{preset}: {why}', description: 'A preset that can’t be chosen yet, under the preset choice. {preset} is its name, {why} a whole sentence saying why.' }),
   from: {
     preset: msg({ id: 'workflow.form.from.preset', defaultMessage: 'From the preset', description: 'Where a workflow option’s value comes from: the preset chosen.' }),
     project: msg({ id: 'workflow.form.from.project', defaultMessage: 'Set for this project', description: 'Where a workflow option’s value comes from: set in this project.' }),
@@ -70,7 +72,8 @@ const T = {
   noneValue: msg({ id: 'workflow.form.noneValue', defaultMessage: 'None', description: 'An empty value in the list of what changes before saving workflow options: no checks, no commands, no folders.' }),
   noChecks: msg({ id: 'workflow.form.noChecks', defaultMessage: 'No checks.', description: 'Under “Checks pass before review” when it has none.' }),
   folders: msg({ id: 'workflow.form.folders', defaultMessage: 'Folders and files, separated by commas', description: 'The placeholder of the field “What the work is” (folders and files left out).' }),
-  worktree: msg({ id: 'workflow.form.worktree', defaultMessage: 'In this version, a card’s own folder is its builder’s worktree.', description: 'Under “Where cards are built” in Project Settings → Workflow.' }),
+  carried: msg({ id: 'workflow.form.carried', defaultMessage: 'Agents’ old worktrees finish their current work first: {agents}. Then they work in slots too.', description: 'Under “Where cards are built” (G11) while agents still hold their worktrees from before 1.0 (#1441), kept until their current card or lane ends. {agents} is a list of agent names (glossary 2.5: slot).' }),
+  readOnly: msg({ id: 'workflow.form.readOnly', defaultMessage: '{agents} can’t be given review copies by their coding agent, so they review the builder’s folder read-only.', description: 'Under “Reviewers” (G17) when some reviewing agents use a coding agent that Hive can’t give review copies (folders at the exact revision, glossary 2.5: review copy). {agents} is a list of agent names.' }),
   stageName: msg({ id: 'workflow.form.stageName', defaultMessage: 'Name of the stage {stage}', description: 'Accessible name of a stage’s name box under “Stage names” (glossary 2.2: stage). {stage} is its default name.' }),
   stageNamesValue: msg({ id: 'workflow.form.stageNamesValue', defaultMessage: '{n, plural, =0 {The default names} one {# stage renamed} other {# stages renamed}}', description: 'A value of “Stage names” in the list of what changes before saving workflow options, and in a preset’s preview (glossary 2.2: stage).' }),
   fileLocks: msg({ id: 'workflow.form.fileLocks', defaultMessage: 'File locks', description: 'A read-only row of Project Settings → Workflow for a project without version control (glossary 2.6, N7).' }),
@@ -121,7 +124,7 @@ const T = {
 }
 
 /** A problem's sentence, in the window's language (an English reason when it has no message). */
-const ownProblemText = (p: OwnWorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'notOffered' ? tr(NOT_OFFERED[p.id]) : p.kind === 'stageName' ? shownText(stageNameProblemText(p)) : p.why)
+const ownProblemText = (p: OwnWorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'stageName' ? shownText(stageNameProblemText(p)) : p.why)
 
 /** A problem's lines: an inheriting project's (a level's save, #1422) names it, its reason on a line of its own. */
 const problemLines = (p: WorkflowProblem): string[] => (p.kind === 'inheritor' ? [tr(T.inheritor, { project: p.project }), ownProblemText(p.problem)] : [ownProblemText(p)])
@@ -457,7 +460,12 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
   )
   const controlNote = (key: OptionKey): React.ReactNode => {
     if (key === 'identity') return <div className="s-desc">{form.identity ? tr(T.identity, { name: form.identity.name, email: form.identity.email }) : tr(T.noIdentity)}</div>
-    if (key === 'folder' && effective.folder === 'slots') return <div className="s-desc">{tr(T.worktree)}</div>
+    // Agents still on their worktrees from before 1.0 (#1441) finish their current work there first.
+    const carried = project?.agents.filter((a) => a.carriedSlot) ?? []
+    if (key === 'folder' && effective.folder === 'slots' && carried.length) return <div className="s-desc" data-note="carried">{tr(T.carried, { agents: fmt.list(carried.map((a) => a.name)) })}</div>
+    // A reviewer whose CLI can't be given folders reviews the builder's folder read-only (§16.10.5).
+    const readOnly = project?.agents.filter((a) => reviewsWork(agentWorkflowRole(a)) && !providerDescriptor(agentProviderOf(project, a)).capabilities.extraDirs) ?? []
+    if (key === 'reviewerMode' && readOnly.length) return <div className="s-desc" data-note="read-only">{tr(T.readOnly, { agents: fmt.list(readOnly.map((a) => a.name)) })}</div>
     return null
   }
   const controlOf = (key: OptionKey): React.ReactNode => {
@@ -483,6 +491,8 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
         return select('style', [['merge', tr(V.style.merge)], ['squash', tr(V.style.squash)]])
       case 'folder':
         return select('folder', [['slots', tr(V.folder.slots)], ['project', tr(V.folder.project)]])
+      case 'reviewerMode':
+        return select('reviewerMode', [['lane', tr(V.reviewerMode.lane)], ['pool', tr(V.reviewerMode.pool)]])
       case 'target':
         return <DraftText value={effective.target} placeholder={tr(T.defaultBranch)} onCommit={(v) => set('target', v.trim())} />
       case 'okBefore':
@@ -502,6 +512,7 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
       case 'noSelfReview':
         return <Switch checked={effective.noSelfReview || reviewerAgent(effective.review)} disabled={reviewerAgent(effective.review)} onChange={(v) => set('noSelfReview', v)} />
       case 'stopOwnRuns':
+      case 'slotsUpToDate':
       case 'strict':
       case 'dependenciesDone':
       case 'sharedFolderWarning':
@@ -524,7 +535,7 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
 
   const rounds = project?.config.loopRounds ?? workspaceLoops.rounds ?? LOOP_ROUNDS
   const hours = project?.config.loopWaitHours ?? workspaceLoops.waitHours
-  const choices: Choice[] = [...form.presets.filter((p) => !p.needs).map((p) => p.id), 'allOff']
+  const choices: Choice[] = [...form.presets.map((p) => p.id), 'allOff']
   const choiceName = (c: Choice): string => tr(c === 'allOff' ? T.allOff : PRESET_TEXT[c])
   const presetNow = draft.preset ? (custom ? tr(T.startedFrom, { preset: tr(PRESET_TEXT[draft.preset]) }) : tr(PRESET_TEXT[draft.preset])) : tr(T.noPreset)
   const shownChoice = preview ? choiceOptions(preview) : null
@@ -562,13 +573,6 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
         </div>
         {/* Git's presets only: None has no merged result. */}
         {platform === 'git' && draft.preset && PRESET_NOTE_TEXT[draft.preset] && <div className="s-desc workflow-preset-note">{tr(PRESET_NOTE_TEXT[draft.preset]!)}</div>}
-        {form.presets
-          .filter((p) => p.needs)
-          .map((p) => (
-            <div className="s-desc workflow-unavailable" key={p.id}>
-              {tr(T.unavailable, { preset: tr(PRESET_TEXT[p.id]), why: tr(PRESET_NEEDS_TEXT[p.needs!]) })}
-            </div>
-          ))}
         {preview && shownChoice && <ChoicePreview choice={preview} name={choiceName(preview)} options={shownChoice} effective={effective} valueText={valueText} onUse={() => choose(preview)} onClose={() => setPreview(null)} />}
       </section>
       {FORM_GROUPS[platform].map((g) => {
@@ -588,10 +592,14 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
         const rows = g.options.filter((k) => formShows(k, effective))
         if (!rows.length) return null
         return (
-          <section className="workflow-group" data-group={g.id} key={g.id}>
-            <h3 className="workflow-group-h">{tr(GROUP_TEXT[g.id])}</h3>
-            {rows.map(rowOf)}
-          </section>
+          <Fragment key={g.id}>
+            <section className="workflow-group" data-group={g.id}>
+              <h3 className="workflow-group-h">{tr(GROUP_TEXT[g.id])}</h3>
+              {rows.map(rowOf)}
+            </section>
+            {/* A Git project's slots and copies, after where cards are built (a level has none: they're a project's). */}
+            {g.id === 'where' && project && <SlotsAndCopies project={project} slots={effective.folder === 'slots'} />}
+          </Fragment>
         )
       })}
       {isAllOff(effective) && <NeverOff />}

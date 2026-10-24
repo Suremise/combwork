@@ -60,7 +60,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   // --- Add Agent 2 in the project folder and Agent 3 in a new worktree
   const a2 = await inv('agents:add', proj, { location: 'project' })
   check('Agent 2 added', a2.name === 'Agent 2' && !a2.worktree, JSON.stringify(a2))
-  const a3 = await inv('agents:add', proj, { location: 'new-worktree', name: 'Reviewer', model: 'sonnet' })
+  const a3 = await inv('agents:testLegacy', proj, { location: 'new-worktree', name: 'Reviewer', model: 'sonnet' })
   check('worktree agent added', !!a3.worktree && a3.worktree.branch === 'hive/agents-ws/demo/reviewer', JSON.stringify(a3.worktree))
   const wtPath = a3.worktree.path
   check('worktree next to the workspace', path.resolve(wtPath).toLowerCase() === path.resolve(wtRoot, 'demo', 'reviewer').toLowerCase(), wtPath)

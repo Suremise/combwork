@@ -730,6 +730,8 @@
   "settings.project.metadata.title": "Plik ustawień",
   "settings.project.reset.desc": "Wszystko na tej stronie wraca do opcji Dziedzicz. Agenci oraz wyłączenia umiejętności i MCP zostają zachowani.",
   "settings.project.reset.title": "Resetuj ustawienia projektu",
+  "settings.project.slotOptions.desc": "Skrypty przygotowania i archiwizacji, pliki kopiowane do nowych slotów oraz kopie do recenzji ustawia się w karcie Kontrola wersji projektu, w sekcji Przepływ pracy → Sloty i kopie.",
+  "settings.project.slotOptions.title": "Sloty i kopie",
   "settings.project.storage.desc": "Mierzone w tle; Odśwież mierzy ponownie. Własne transkrypcje agentów kodujących (w ~/.claude, ~/.codex i ~/.copilot) nie są liczone, a ani Wyczyść…, ani Wyczyść całkowicie… nigdy ich nie ruszają.",
   "settings.project.storage.title": "Co przechowuje Hive",
   "settings.project.suggestFreshStart.desc": "Powiadomienie, gdy praca w tym projekcie jest skończona, z Zacznij od nowa (bezczynni agenci).",
