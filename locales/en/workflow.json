@@ -1403,6 +1403,10 @@
     "defaultMessage": "Slots and copies",
     "description": "A heading of the Version Control tab’s Workflow section (Git): the project’s slots (worktrees Hive lends to cards and lanes) and its review and check copies (glossary 2.5: slot, review copy)."
   },
+  "workflow.slots.held": {
+    "defaultMessage": "Held by {agent}'s ended session",
+    "description": "In the list of slots (Version Control → Slots and copies): the agent's ({agent}) last session there has ended, but Hive doesn't know that everything it started has, so nothing else uses the slot until it is released (#1506)."
+  },
   "workflow.slots.inUse": {
     "defaultMessage": "Slots in use and ready",
     "description": "A read-only list under “Slots and copies”: the project’s slots, what each is lent to, and those ready (glossary 2.5: slot)."
@@ -1438,6 +1442,10 @@
   "workflow.slots.openAdvanced": {
     "defaultMessage": "Open Advanced",
     "description": "A button beside “Reviewers review in review copies”: opens Settings → Advanced."
+  },
+  "workflow.slots.release": {
+    "defaultMessage": "Release…",
+    "description": "A button beside a held slot in the list of slots: asks, then frees it for other work (#1506)."
   },
   "workflow.slots.reviewCopies": {
     "defaultMessage": "Reviewers review in review copies",

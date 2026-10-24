@@ -338,13 +338,37 @@ async function detectedProvider(resolve: () => ProviderId, auto: () => boolean):
 }
 
 /**
+ * A slot the agent holds whose folder is gone (#1447): made again on its line, with its commits, and the agent started,
+ * its lease kept; or released (the slot is made again at its next lease) when its line is gone or the user prefers.
+ */
+async function goneSlot(path: string, agentId: string, gone: { agentName: string; path: string; branch: string; branchExists: boolean; slot?: string }): Promise<boolean> {
+  const release = { label: tr(msg({ id: 'actions.slot.release', defaultMessage: 'Release the Slot', description: "Button: the agent gives up the slot whose folder is gone; Hive makes the slot again the next time it lends it." })), value: 'release' }
+  const choice = await choose({
+    title: tr(msg({ id: 'actions.slot.goneTitle', defaultMessage: 'The slot is gone', description: "Title of the question when the folder of a slot an agent holds (a working folder Hive lends it for a card or lane) is missing." })),
+    message: gone.branchExists
+      ? tr(msg({ id: 'actions.slot.goneMessage', defaultMessage: "{agent}'s slot {slot} is missing its folder ({path}). Its branch {branch} is still in the repository: make the slot again on it, with its commits, and start?", description: "The question when a slot's ({slot}) folder ({path}) is missing; the agent ({agent}) holds it, and its branch ({branch}) is still there." }), { agent: gone.agentName, slot: gone.slot ?? '', path: gone.path, branch: gone.branch })
+      : tr(msg({ id: 'actions.slot.goneNoBranch', defaultMessage: "{agent}'s slot {slot} is missing its folder ({path}), and its branch is gone too. Release the slot? Hive makes it again the next time it lends it.", description: "The question when a slot's ({slot}) folder ({path}) and its branch are missing; the agent ({agent}) holds it." }), { agent: gone.agentName, slot: gone.slot ?? '', path: gone.path }),
+    detail: tr(msg({ id: 'actions.slot.goneDetail', defaultMessage: 'If the workspace moved, Repair… in its banner can also locate the folder.', description: "Under the question when a slot's folder is missing: Repair… is a button in the workspace's banner." })),
+    choices: gone.branchExists ? [release, { label: tr(msg({ id: 'actions.slot.recreate', defaultMessage: 'Recreate and Start', description: 'Button: makes the slot again on its branch and starts the agent.' })), value: 'recreate' }] : [release]
+  })
+  if (choice === 'release') {
+    await attempt(tr(msg({ id: 'actions.slot.releaseFailed', defaultMessage: 'Could not release the slot', description: "An error's title: releasing a slot whose folder is gone failed." })), () => call('agents:unlinkWorktree', path, agentId))
+    return false
+  }
+  if (choice !== 'recreate') return false
+  return !!(await attempt(tr(msg({ id: 'actions.slot.recreateFailed', defaultMessage: 'Could not make the slot again', description: "An error's title: making a slot whose folder was gone again failed." })), () => call('agents:recreateWorktree', path, agentId)))
+}
+
+/**
  * A worktree agent whose folder is gone (#146): its branch lives in the repository, so the worktree can be made again
  * on it before the agent starts (or, with the branch gone too, made new from its base, or the link removed).
  */
 async function ensureWorktree(path: string, agentId: string): Promise<boolean> {
-  if (!agentOf(project(path), agentId)?.worktree) return true
+  // Its 0.9 worktree, or a slot it holds (#1447): asked of main for every agent, since a slot isn't on the agent.
+  if (!agentOf(project(path), agentId)) return true
   const gone = await call('agents:missingWorktree', path, agentId).catch(() => null)
   if (!gone) return true
+  if (gone.slot) return goneSlot(path, agentId, gone)
   const setup = tr(msg({ id: 'actions.worktree.setup', defaultMessage: "Hive copies in the files it copies into new worktrees, and the project's worktree setup command, if it has one, runs before the agent starts. Nothing is deleted.", description: "Under the question before recreating an agent's missing worktree: what making it again involves." }))
   if (gone.branchExists) {
     return confirm({
@@ -1521,6 +1545,34 @@ export async function releaseCarriedSlot(path: string, agentId: string): Promise
   if (!ok) return
   await attempt(tr(msg({ id: 'actions.releaseSlot.failed', defaultMessage: "Could not release the slot", description: "An error's title: releasing an agent's slot failed." })), () => call('slots:releaseCarried', path, agentId))
   await refreshWorkspace()
+}
+
+/**
+ * Release Slot… on a held writer (#1506): a slot an agent's run that is over still holds, its processes not known to have
+ * ended (Hive quit or closed with it running, its processes kept running, or not tracked). Shows who held it and what
+ * Hive lists of its processes, offers to end those first, and releases it once the user confirms; main refuses while
+ * its Hive or run still lives, or when the slot changed meanwhile (the refusal stays in the dialog).
+ */
+export async function releaseHeldSlot(path: string, slot: string): Promise<void> {
+  const w = await attempt(tr(msg({ id: 'actions.releaseHeld.readFailed', defaultMessage: "Could not read the slot's writer", description: "An error's title: Hive couldn't read who holds a slot, before Release Slot…'s question." })), () => call('slots:heldWriter', path, slot))
+  if (!w) return
+  const agent = agentOf(project(path), w.agent)?.name ?? w.agent
+  let end = !!w.processes?.list.length
+  const ok = await confirm({
+    title: tr(msg({ id: 'actions.releaseHeld.title', defaultMessage: "Release {agent}'s slot {slot}?", description: "Title of the question before releasing a slot ({slot}, such as slot-b) that an agent's ({agent}) last session there still holds: it has ended, but Hive doesn't know that everything it started has." }), { agent, slot }),
+    message: w.hive.self
+      ? tr(msg({ id: 'actions.releaseHeld.messageSelf', defaultMessage: "{agent}'s last session in {slot} (run {run}) has ended in this Hive (process {pid}, running), but Hive doesn't know that everything it started there has: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Hive; its processes were kept running or Hive could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Hive's process id: they tell one launch from another." }), { agent, slot, run: w.run, pid: w.hive.pid })
+      : tr(msg({ id: 'actions.releaseHeld.messageGone', defaultMessage: "{slot} is held by {agent}'s session (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another." }), { agent, slot, run: w.run, pid: w.hive.pid }),
+    ...(w.processes?.list.length ? { list: w.processes.list.map((p) => tr(msg({ id: 'actions.releaseHeld.process', defaultMessage: '{label} (process {pid})', description: "Release Slot…: one process the agent's session left running, as listed: what it runs ({label}, such as node serve.js) and its process id ({pid})." }), { label: p.label, pid: p.pid })), listOnly: true } : {}),
+    detail: w.processes?.list.length
+      ? tr(msg({ id: 'actions.releaseHeld.detailListed', defaultMessage: '{n, plural, one {Hive lists # process its session left running.} other {Hive lists # processes its session left running.}} Released while they run, they may still write in the slot as other work uses it.', description: "Release Slot…: under the list of processes the agent's session left running ({n}: how many)." }), { n: w.processes.list.length + w.processes.more })
+      : tr(msg({ id: 'actions.releaseHeld.detailUnknown', defaultMessage: "Hive doesn't know which of the processes its session started still run. Release it once you know nothing of it still writes in the slot.", description: "Release Slot…: Hive lists no processes the agent's session left running, so it can't say whether any still run." })),
+    ...(w.processes?.list.length ? { check: { label: tr(msg({ id: 'actions.releaseHeld.endFirst', defaultMessage: 'End these processes first', description: "Release Slot…: a tick box, on by default: Hive ends the listed processes before releasing the slot." })), initial: true, set: (v: boolean) => (end = v) } } : {}),
+    confirmLabel: tr(msg({ id: 'actions.releaseHeld.confirm', defaultMessage: 'Release', description: 'Button: releases the slot.' })),
+    danger: true,
+    run: () => call('slots:releaseWriter', path, slot, w.run, end)
+  })
+  if (ok) await refreshWorkspace()
 }
 
 export async function discardAgent(path: string, agentId: string): Promise<void> {

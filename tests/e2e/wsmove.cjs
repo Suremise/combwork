@@ -339,7 +339,9 @@ async function launch() {
     await lib.openWorkspace(r.inv, r.page, wsB2)
     check('worktrees left behind: the banner shows', !!(await lib.until(async () => (await r.page.locator('.moved-banner').count()) === 1, 15000)))
     const plan = await r.inv('workspace:movePlan')
-    const stay = plan?.hosts.find((h) => h.name === 'beta')?.worktrees.find((w) => w.agentName === 'Stay')
+    // Stay's worktree is still git's at its place, so the slots' migration adopted it at this opening (#1441): Repair plans
+    // it as its carried slot (#1447), linked where it is, as it planned the agent's worktree before.
+    const stay = plan?.hosts.find((h) => h.name === 'beta')?.worktrees.find((w) => w.agentName === 'Stay' || (w.of?.kind === 'slot' && w.of.agent === 'Stay'))
     check('…the worktree stayed where it was, to be linked to the moved project', stay?.how === 'stayed' && same(stay.to, wtB), JSON.stringify(stay))
     const report = await r.inv('workspace:moveRepair')
     check('…Repair finishes', report.complete && report.failed.length === 0, JSON.stringify(report))

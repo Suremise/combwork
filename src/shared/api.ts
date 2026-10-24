@@ -8,6 +8,7 @@ import type {
   SlotTestOp,
   SlotOptions,
   SlotView,
+  HeldWriter,
   BoardState,
   SetAsideCard,
   ArchiveRequest,
@@ -340,6 +341,10 @@ export interface HiveRequests {
   'slots:setSetting': (projectPath: string, key: 'setup' | 'archive' | 'copy' | 'copiesSize', value: string | number | null) => { slots: SlotOptions; copies: { size?: number } }
   /** Ends an agent's carried lease (#1441, Release Slot… in its menu): its adopted worktree stops being its own. Whether it did. */
   'slots:releaseCarried': (projectPath: string, agentId: string) => boolean
+  /** A slot's writer as Release Slot… shows it (#1506): its holder, whether its run is live, what is listed of its processes. Null: none. */
+  'slots:heldWriter': (projectPath: string, slot: string) => HeldWriter | null
+  /** Release Slot… on a held writer (#1506): `end` ends its listed processes first; refused while its Hive or run lives, or it changed. */
+  'slots:releaseWriter': (projectPath: string, slot: string, run: string, end: boolean) => void
   /** The project's review and check copies (#1435, SPEC §16.10.5), each with its lease not freed. */
   'copies:list': (projectPath: string) => CopyView[]
   /** Test copies only (unpackaged): lend, release, tidy or remove in the project's slot pool, as #1438 and #1447 will. */

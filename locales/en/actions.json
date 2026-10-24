@@ -479,6 +479,42 @@
     "defaultMessage": "Remove from Recent",
     "description": "Button: forgets the recent workspace whose folder is gone."
   },
+  "actions.releaseHeld.confirm": {
+    "defaultMessage": "Release",
+    "description": "Button: releases the slot."
+  },
+  "actions.releaseHeld.detailListed": {
+    "defaultMessage": "{n, plural, one {Hive lists # process its session left running.} other {Hive lists # processes its session left running.}} Released while they run, they may still write in the slot as other work uses it.",
+    "description": "Release Slot…: under the list of processes the agent's session left running ({n}: how many)."
+  },
+  "actions.releaseHeld.detailUnknown": {
+    "defaultMessage": "Hive doesn't know which of the processes its session started still run. Release it once you know nothing of it still writes in the slot.",
+    "description": "Release Slot…: Hive lists no processes the agent's session left running, so it can't say whether any still run."
+  },
+  "actions.releaseHeld.endFirst": {
+    "defaultMessage": "End these processes first",
+    "description": "Release Slot…: a tick box, on by default: Hive ends the listed processes before releasing the slot."
+  },
+  "actions.releaseHeld.messageGone": {
+    "defaultMessage": "{slot} is held by {agent}'s session (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.",
+    "description": "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another."
+  },
+  "actions.releaseHeld.messageSelf": {
+    "defaultMessage": "{agent}'s last session in {slot} (run {run}) has ended in this Hive (process {pid}, running), but Hive doesn't know that everything it started there has: until you release it, nothing else uses the slot.",
+    "description": "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Hive; its processes were kept running or Hive could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Hive's process id: they tell one launch from another."
+  },
+  "actions.releaseHeld.process": {
+    "defaultMessage": "{label} (process {pid})",
+    "description": "Release Slot…: one process the agent's session left running, as listed: what it runs ({label}, such as node serve.js) and its process id ({pid})."
+  },
+  "actions.releaseHeld.readFailed": {
+    "defaultMessage": "Could not read the slot's writer",
+    "description": "An error's title: Hive couldn't read who holds a slot, before Release Slot…'s question."
+  },
+  "actions.releaseHeld.title": {
+    "defaultMessage": "Release {agent}'s slot {slot}?",
+    "description": "Title of the question before releasing a slot ({slot}, such as slot-b) that an agent's ({agent}) last session there still holds: it has ended, but Hive doesn't know that everything it started has."
+  },
   "actions.releaseSlot.confirm": {
     "defaultMessage": "Release",
     "description": "Button: releases the agent's slot."
@@ -734,6 +770,38 @@
   "actions.sessionView.failed": {
     "defaultMessage": "Could not change the view",
     "description": "An error's title: switching a project's Session tab between Panes and Tiles failed."
+  },
+  "actions.slot.goneDetail": {
+    "defaultMessage": "If the workspace moved, Repair… in its banner can also locate the folder.",
+    "description": "Under the question when a slot's folder is missing: Repair… is a button in the workspace's banner."
+  },
+  "actions.slot.goneMessage": {
+    "defaultMessage": "{agent}'s slot {slot} is missing its folder ({path}). Its branch {branch} is still in the repository: make the slot again on it, with its commits, and start?",
+    "description": "The question when a slot's ({slot}) folder ({path}) is missing; the agent ({agent}) holds it, and its branch ({branch}) is still there."
+  },
+  "actions.slot.goneNoBranch": {
+    "defaultMessage": "{agent}'s slot {slot} is missing its folder ({path}), and its branch is gone too. Release the slot? Hive makes it again the next time it lends it.",
+    "description": "The question when a slot's ({slot}) folder ({path}) and its branch are missing; the agent ({agent}) holds it."
+  },
+  "actions.slot.goneTitle": {
+    "defaultMessage": "The slot is gone",
+    "description": "Title of the question when the folder of a slot an agent holds (a working folder Hive lends it for a card or lane) is missing."
+  },
+  "actions.slot.recreate": {
+    "defaultMessage": "Recreate and Start",
+    "description": "Button: makes the slot again on its branch and starts the agent."
+  },
+  "actions.slot.recreateFailed": {
+    "defaultMessage": "Could not make the slot again",
+    "description": "An error's title: making a slot whose folder was gone again failed."
+  },
+  "actions.slot.release": {
+    "defaultMessage": "Release the Slot",
+    "description": "Button: the agent gives up the slot whose folder is gone; Hive makes the slot again the next time it lends it."
+  },
+  "actions.slot.releaseFailed": {
+    "defaultMessage": "Could not release the slot",
+    "description": "An error's title: releasing a slot whose folder is gone failed."
   },
   "actions.startAll.archiveMessage": {
     "defaultMessage": "{n, plural, one {{agent}'s session is archived in {project}, and each starts a fresh one:} other {The sessions of these # agents are archived in {project}, and each starts a fresh one:}}",

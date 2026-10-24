@@ -38,6 +38,7 @@
   "worktrees.missing.noAgent": "Diesen Agenten gibt es nicht mehr.",
   "worktrees.missing.noBranch": "Der Branch {branch} von Agent {agent} ist weg, und der Projektordner ist auf keinem Branch, von dem aus ein neuer angelegt werden könnte.",
   "worktrees.missing.noTree": "Agent {agent} arbeitet nicht in einem Worktree.",
+  "worktrees.missing.slotFailed": "Der Slot {slot} von {agent} konnte nicht neu angelegt werden: {why}",
   "worktrees.missing.stillListed": "Git führt {folder} noch als Worktree (vielleicht ist er gesperrt): Entsperre ihn oder führe git worktree prune aus und versuche es dann erneut.",
   "worktrees.missing.stopFirst": "Stoppe zuerst Agent {agent}.",
   "worktrees.missing.thereRecreate": "Der Worktree-Ordner von Agent {agent} ist vorhanden ({folder}): Es gibt nichts neu anzulegen.",

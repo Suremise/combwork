@@ -411,6 +411,54 @@
     "defaultMessage": "Hive's Defender exclusions couldn't be moved to the new folders ({why}).",
     "description": "A line of Repair's report, after a workspace moved to another folder: moving Hive's Microsoft Defender exclusions from the old folders to the new ones failed. {why} is the system's message."
   },
+  "main.move.folder.busy": {
+    "defaultMessage": "Hive is using it now",
+    "description": "Why Repair couldn't update its record of a slot or copy (in main.move.folder.failed's {why}): one of Hive's own steps (setting it up, removing it) holds it now. A clause."
+  },
+  "main.move.folder.failed": {
+    "defaultMessage": "{host}: {what} at {path} couldn't be recorded ({why}). Repair tries again.",
+    "description": "A line of Repair's report, after a workspace or project moved: one of the project's slots, copies or old reviewer folders ({what}: its name) was found at {path}, but Hive's record of it couldn't be updated ({why}). {host} is the project."
+  },
+  "main.move.folder.forgotten": {
+    "defaultMessage": "{host}: {what} is no longer kept (it was at {path}); its conversations can't be resumed there.",
+    "description": "A line of Repair's report: an old reviewer folder ({what}) that wasn't found is forgotten, as the user chose; the conversations that ran there can be read, not resumed there. {host} is the project, {path} where it was."
+  },
+  "main.move.folder.homeMissing": {
+    "defaultMessage": "{host}: {what} wasn't found (it was at {path}). Locate it, or forget it.",
+    "description": "A line of Repair's report: an old reviewer folder ({what}), where its conversations resume, wasn't found; Repair waits for the user's choice. {host} is the project, {path} where it was."
+  },
+  "main.move.folder.later": {
+    "defaultMessage": "{host}: {what} wasn't found; it's made again at {path} when it is next used.",
+    "description": "A line of Repair's report: a free slot or a review copy ({what}: its name) whose folder wasn't found; Hive makes it again at {path} the next time it lends it. {host} is the project."
+  },
+  "main.move.folder.movedTo": {
+    "defaultMessage": "{host}: {what} is now at {path}.",
+    "description": "A line of Repair's report, after a workspace or project moved: one of the project's slots, copies or old reviewer folders ({what}: its name) is now at {path}. {host} is the project."
+  },
+  "main.move.folder.original": {
+    "defaultMessage": "{host}: {what} at {path} stays linked to the project at {project}, which is still there.",
+    "description": "A line of Repair's report: one of the project's slots, copies or old reviewer folders ({what}) stays with the project folder it was made from ({project}), which is still there (a copy was moved). {host} is the project, {path} the folder."
+  },
+  "main.move.folder.recreateFailed": {
+    "defaultMessage": "{host}: {what} couldn't be made again: {why}",
+    "description": "A line of Repair's report: a lent slot whose folder was gone couldn't be made again ({why}: the reason, often in English from git). {what} is its name, {host} the project."
+  },
+  "main.move.folder.recreated": {
+    "defaultMessage": "{host}: {what} was made again on {branch}, at {path}.",
+    "description": "A line of Repair's report: a slot lent to an agent, whose folder was gone, was made again on its branch ({branch}) at {path}; the agent keeps it. {what} is its name, {host} the project."
+  },
+  "main.move.folder.released": {
+    "defaultMessage": "{host}: {what} was released; it's made again where it belongs when it is next lent.",
+    "description": "A line of Repair's report: a lent slot whose folder was gone was released (its agent no longer has it); Hive makes it again at its next use. {what} is its name, {host} the project."
+  },
+  "main.move.folder.relinked": {
+    "defaultMessage": "{host}: {what} at {path} is linked to the project again.",
+    "description": "A line of Repair's report, after a workspace or project moved: one of the project's slots, review copies or old reviewer folders ({what}: its name, such as \"slot-b (HI-B1, AM-12)\") is linked to the project again. {host} is the project, {path} the folder."
+  },
+  "main.move.folder.slotMissing": {
+    "defaultMessage": "{hasBranch, select, yes {{host}: {what} wasn't found (it was at {path}). Recreate it on {branch}, locate it, or release it.} other {{host}: {what} wasn't found (it was at {path}), and its branch is gone too. Locate it, or release it.}}",
+    "description": "A line of Repair's report: a lent slot ({what}: its name) wasn't found; Repair waits for the user's choice: make it again on its branch ({branch}), pick its folder, or release it. {host} is the project, {path} where it was."
+  },
   "main.move.gitFailed": {
     "defaultMessage": "{command} failed",
     "description": "Why git couldn't do something, when it said nothing itself. {command} is the git command: keep it."
@@ -499,6 +547,14 @@
     "defaultMessage": "couldn't be updated: {why}",
     "description": "Repair's report, the Result column: a step failed ({why}: the system's message); the next Repair tries again."
   },
+  "main.move.result.folderMissing": {
+    "defaultMessage": "{kind, select, home {not found: locate or forget it} other {{gone, select, yes {not found, its branch gone too: locate or release it} other {not found: recreate, locate or release it}}}}",
+    "description": "Repair's report, the Result column: a lent slot or an old reviewer folder ({kind}: slot or home) wasn't found; Repair waits for the user's choice (#1447)."
+  },
+  "main.move.result.forgotten": {
+    "defaultMessage": "no longer kept",
+    "description": "Repair's report, the Result column: an old reviewer folder that wasn't found is forgotten (#1447)."
+  },
   "main.move.result.given": {
     "defaultMessage": "given to {to}: {what}",
     "description": "Repair's report, the Result column of a board row: what was saved under a project's old name went to the project ({to}); {what} lists it (\"9 cards, 1 lane\")."
@@ -506,6 +562,10 @@
   "main.move.result.gone": {
     "defaultMessage": "gone, so it isn't renamed",
     "description": "Repair's report, the Result column: an agent's branch to rename no longer exists."
+  },
+  "main.move.result.later": {
+    "defaultMessage": "made again here when next used",
+    "description": "Repair's report, the Result column: a free slot or review copy wasn't found, and is made again at its new place when next used (#1447)."
   },
   "main.move.result.linked": {
     "defaultMessage": "linked again",
@@ -542,6 +602,10 @@
   "main.move.result.recreated": {
     "defaultMessage": "{made, select, new {made new (its branch was gone)} other {recreated on its branch}}",
     "description": "Repair's report, the Result column: an agent's worktree made again on its branch, or new when its branch was gone. The branch's name is in the agent's branch row (Repair may rename it in the same run)."
+  },
+  "main.move.result.released": {
+    "defaultMessage": "released; made again when next lent",
+    "description": "Repair's report, the Result column: a lent slot whose folder was gone was released, and is made again at its next use (#1447)."
   },
   "main.move.result.renameFailed": {
     "defaultMessage": "couldn't be renamed: {why}",
@@ -647,13 +711,65 @@
     "defaultMessage": "Its cards couldn't all be deleted: {why}",
     "description": "A warning after Delete: some of the project's cards stayed. {why} is the system's message."
   },
+  "main.removal.deleteBlocked": {
+    "defaultMessage": "Delete can't go ahead: {folders}. Nothing was deleted.",
+    "description": "Why Delete refused (#1447): the project's slots or old folders that stop it ({folders}: each one's name and why, a list). Nothing was changed."
+  },
   "main.removal.dirty": {
     "defaultMessage": "{n, plural, one {# uncommitted file} other {# uncommitted files}}",
     "description": "Work in an agent's worktree that stops Remove from Hive: its files not committed. {n} is how many."
   },
+  "main.removal.folder.copyBusy": {
+    "defaultMessage": "Hive is setting it up or removing it now",
+    "description": "Remove Project (#1447): a review copy is kept because one of Hive's steps holds it. A clause."
+  },
+  "main.removal.folder.copyHeld": {
+    "defaultMessage": "it is in use ({by})",
+    "description": "Remove Project (#1447): a review copy is kept because something runs in it ({by}: what, in English). A clause."
+  },
+  "main.removal.folder.copyLeased": {
+    "defaultMessage": "a review uses it now",
+    "description": "Remove Project (#1447): a review copy is kept because a review or check uses it. A clause."
+  },
+  "main.removal.folder.deleting": {
+    "defaultMessage": "another Delete of this project holds its slots",
+    "description": "Why Delete can't go ahead (#1447): another Hive window or process is deleting the same project now. A clause."
+  },
+  "main.removal.folder.heldNow": {
+    "defaultMessage": "one of Hive's steps or a session took it up meanwhile",
+    "description": "Why Delete can't go ahead (#1447): between the dialog's check and Delete's start, one of the project's slots or copies was taken up (set up, renamed, a session started in it, a review copy leased), or a new one made. A clause."
+  },
+  "main.removal.folder.home": {
+    "defaultMessage": "left as it is: its conversations resume there",
+    "description": "Remove Project (#1447): an old reviewer folder (a reviewer's own worktree from before 1.0) stays where it is. A clause."
+  },
+  "main.removal.folder.notForgotten": {
+    "defaultMessage": "Hive's record of the project's slots couldn't all be cleared: {why}",
+    "description": "A warning after Delete (#1447): the project's slot or copy records stayed in Hive's database ({why}: the system's message)."
+  },
+  "main.removal.folder.notHeld": {
+    "defaultMessage": "{n, plural, one {# slot or copy was} other {# slots or copies were}} taken up by another step, and left",
+    "description": "A warning's reason after Delete (#1447): records of the project's slots or copies Delete didn't hold, so it didn't delete them. Follows main.removal.folder.notForgotten's colon."
+  },
+  "main.removal.folder.notHives": {
+    "defaultMessage": "left as it is: it isn't in Hive's worktrees folder for the project",
+    "description": "Remove Project (#1447): a slot whose folder Hive didn't make (outside <workspace>.worktrees/<project>) stays. A clause."
+  },
+  "main.removal.folder.notTrashed": {
+    "defaultMessage": "{path} couldn't be moved to the Recycle Bin: {why}",
+    "description": "A warning after Delete (#1447): one of the project's slots, copies or old folders ({path}) couldn't go to the Recycle Bin ({why}: the system's message)."
+  },
+  "main.removal.folder.outsideDelete": {
+    "defaultMessage": "it isn't in Hive's worktrees folder for the project, and would be left without its repository: release its slot and move or remove it first",
+    "description": "Why Delete can't go ahead (#1447): a slot outside <workspace>.worktrees/<project> (one Hive didn't make) would keep its files but lose the repository Delete sends to the Recycle Bin. Release its slot is a command in the agent's menu (Release Slot…). A clause."
+  },
   "main.removal.folderGone": {
     "defaultMessage": "The folder {folder} is no longer in the workspace. Put it back, or forget it.",
     "description": "An error restoring a project whose folder has gone. Forget is the button that stops listing it."
+  },
+  "main.removal.folderKept": {
+    "defaultMessage": "Left in place: {what} at {path} ({why}).",
+    "description": "A warning after Remove from Hive or Delete (#1447): a slot, review copy or old reviewer folder ({what}: its name) that was kept, at {path}, and why ({why}: a clause)."
   },
   "main.removal.handoverKept": {
     "defaultMessage": "{note} stayed in the shared notes (a copy is packed in the folder): {why}",

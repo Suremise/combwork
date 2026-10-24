@@ -340,6 +340,8 @@
   "tips.silentUnknown.title": "Agent milczy, a jego stan jest nieznany",
   "tips.skillsDelivered.text": "Przełącznik obok każdej umiejętności Hive, w widoku Umiejętności albo na karcie Umiejętności projektu, mówi, czy agenci ją dostają (Dostarczana agentom). Kopie, które Hive umieszcza w folderze dla Codex i Copilot, są usuwane, gdy nie pracuje tam już żaden agent, tak jak mówią Ustawienia → Zaawansowane.",
   "tips.skillsDelivered.title": "Wybierz, jakie umiejętności dostają agenci",
+  "tips.slotHeld.text": "Gdy Hive nie wie, czy zakończyło się wszystko, co sesja agenta uruchomiła w slocie, zatrzymuje slot dla niej, zamiast zgadywać. Zwolnij slot… w menu ⋯ agenta pokazuje, co Hive wie, na życzenie kończy to, co wymienia, i zwalnia slot.",
+  "tips.slotHeld.title": "Zwolnij slot zajęty po zamknięciu Hive",
   "tips.slotOptions.text": "Kontrola wersji → Przepływ pracy → Sloty i kopie zawiera skrypt uruchamiany w nowym slocie, kopiowane do niego pliki, zajęte sloty i liczbę kopii do recenzji w projekcie. Zmiany zapisują się od razu.",
   "tips.slotOptions.title": "Ustaw sloty w Kontroli wersji",
   "tips.slotResume.text": "Rozmowa wykonawcy zostaje w slocie jego karty. Gdy karta się zakończy, „Wznów wszystkich” ją pomija, żeby slot został wolny dla nowej pracy; jej własne Wznów zabiera slot z powrotem, dopóki nic innego go nie użyło.",
