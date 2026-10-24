@@ -811,6 +811,14 @@
     "defaultMessage": "Hear how a lane goes, without the Assistant",
     "description": "A tip's title. A lane is Hive's record of a card loop (a builder and a reviewer taking cards in turn)."
   },
+  "tips.laneSlots.text": {
+    "defaultMessage": "In the Progress panel, a lane names its slot after its agents (· slot-b): point at it for the branch being built there and whether the slot is ready, or click it for Branches & remotes.",
+    "description": "A tip. A slot is a working folder Hive lends to a lane (glossary 2.5: slot). Branches & remotes is a section of the Version Control tab: keep its name as Hive shows it."
+  },
+  "tips.laneSlots.title": {
+    "defaultMessage": "See where a lane builds",
+    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
+  },
   "tips.laneStart.text": {
     "defaultMessage": "Right-click the Todo column and choose Start Lane with These Cards…: pick the builder and the reviewer, put the cards in order, and both start with a brief. End or abandon a lane from its row in the Progress panel.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane."
@@ -1354,6 +1362,14 @@
   "tips.skillsDelivered.title": {
     "defaultMessage": "Choose which skills agents get",
     "description": "A tip's title."
+  },
+  "tips.slotOptions.text": {
+    "defaultMessage": "Version Control → Workflow → Slots and copies holds the script run in a new slot, the files copied into it and the slots in use, and how many review copies the project keeps. They save as you change them.",
+    "description": "A tip. A slot: a folder Hive lends to a card or a lane; a review copy: a folder at exactly the revision a reviewer reviews. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.slotOptions.title": {
+    "defaultMessage": "Set up slots in Version Control",
+    "description": "A tip's title. A slot: a folder Hive lends to a card or a lane."
   },
   "tips.slotResume.text": {
     "defaultMessage": "A builder's conversation stays in its card's slot. Once the card ends, Resume All leaves it so the slot stays free for new work; its own Resume takes the slot back while nothing else has used it.",

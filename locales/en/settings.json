@@ -2923,6 +2923,14 @@
     "defaultMessage": "Reset project settings",
     "description": "A setting's title (Project Settings → Advanced)."
   },
+  "settings.project.slotOptions.desc": {
+    "defaultMessage": "The setup and archive scripts, the files copied into new slots and the review copies are set in the project’s Version Control tab, under Workflow → Slots and copies.",
+    "description": "What the setting \"Slots and copies\" is, under its title (Project Settings → Agents & Worktrees), beside its Open Version Control button. Version Control (the tab), Workflow (its section) and Slots and copies (its group): as translated there."
+  },
+  "settings.project.slotOptions.title": {
+    "defaultMessage": "Slots and copies",
+    "description": "A setting's title (Project Settings → Agents & Worktrees): the project's slot scripts and copied files, and its review and check copies, set in its Version Control tab (glossary 2.5: slot)."
+  },
   "settings.project.storage.desc": {
     "defaultMessage": "Measured in the background; Refresh measures again. The coding agents’ own transcripts (in ~/.claude, ~/.codex and ~/.copilot) aren’t counted, and Clean Up… and Purge… never touch them.",
     "description": "What the setting \"What Hive keeps\" does, under its title (Project Settings → Storage). Clean Up… and Purge… are buttons: use their names as translated there."

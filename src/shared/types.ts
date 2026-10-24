@@ -18,7 +18,7 @@ import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
 import type { PlatformId, ProjectPlatform } from './platform/descriptors'
 import type { SwitchRefusal } from './platform/switching'
-import type { Contradiction, NOT_OFFERED, PresetId, PresetNeeds, WorkflowOptions } from './workflow/options'
+import type { Contradiction, PresetId, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { ReviewerMode, WorkflowRole } from './workflow/roles'
 import type { ResumeHold } from './agentFolders'
@@ -961,7 +961,8 @@ export interface TaskPatch {
 export type TaskMoveResult = { moved: TaskCard; stopped?: Refusal } | { ask: string[] } | { refused: Refusal }
 
 /** Which agent Start gives a card to. */
-export type TaskStartTarget = { kind: 'agent'; agentId: string } | { kind: 'new-agent'; worktree: boolean; name?: string; provider?: ProviderId }
+/** `worktree` (0.9's own worktree for a new agent) is refused since 1.0 (#1451); the window stops sending it (#1442). */
+export type TaskStartTarget = { kind: 'agent'; agentId: string } | { kind: 'new-agent'; worktree?: boolean; name?: string; provider?: ProviderId }
 
 /** How a project leaves Hive (the main menu's Project → Remove Project…). */
 export type ProjectRemoval = 'hide' | 'remove' | 'delete'
@@ -1051,7 +1052,7 @@ export interface WorkflowForm {
   inherited: WorkflowOptions
   inheritedOrigins: Record<keyof WorkflowOptions, WorkflowOptionOrigin>
   /** The presets offered, in order, each with its options for this project; `needs`: shown unavailable, with why. */
-  presets: { id: PresetId; needs?: PresetNeeds; options: WorkflowOptions }[]
+  presets: { id: PresetId; options: WorkflowOptions }[]
   /** The project's commit identity from its git config (G12), or null. */
   identity: { name: string; email: string } | null
   /** Settings → Advanced → Workflow rules are enforced: off, the options are saved but no rule applies. */
@@ -1076,7 +1077,7 @@ export type WorkflowProblem = OwnWorkflowProblem | { kind: 'inheritor'; project:
  * A problem of the options being saved themselves; an inheritor's (#1422): a project inheriting a level's change would
  * have that problem in its own options.
  */
-export type OwnWorkflowProblem = { kind: 'contradiction'; id: Contradiction } | { kind: 'notOffered'; id: keyof typeof NOT_OFFERED } | ({ kind: 'stageName' } & StageNameProblem) | { kind: 'bad'; why: string }
+export type OwnWorkflowProblem = { kind: 'contradiction'; id: Contradiction } | ({ kind: 'stageName' } & StageNameProblem) | { kind: 'bad'; why: string }
 
 /** The levels of workflow defaults the window edits (#1422): Hive's (config) and the workspace's (workspace.json). */
 export type WorkflowLevel = 'global' | 'workspace'
@@ -1206,6 +1207,11 @@ export interface ProjectConfig {
    * read-only in P3 (P4's Version Control tab edits them).
    */
   workflow?: ProjectWorkflow
+  /**
+   * The one-time upgrade steps settled in this project (#1445's `workflow.slotsUpToDateFromBeforeP7`), each recorded in
+   * the same write as its change, so a later run can tell it from a choice the user made since, after a failure too.
+   */
+  stepsDone?: string[]
   fileLocks: Inherit<FileLockMode>
   /** Overrides settings.agents.worktreeCopy; null inherits. */
   worktreeCopy: string | null
@@ -1391,7 +1397,8 @@ export interface AddAgentOptions {
   /**
    * #456: new-worktree, work in the project's unused worktree on that branch instead when it is merged into the base and
    * clean, brought up to the base; existing-worktree, bring the one chosen up to the base when it is merged and clean.
-   * The Add Agent dialog and the Agent API ask for it; templates reuse their own way (#289).
+   * The Add Agent dialog and the Agent API ask for it; templates reuse their own way (#289). 1.0 (#1451): no agent gets a
+   * worktree, so it does nothing.
    */
   reuseWorktree?: boolean
 }
@@ -2341,8 +2348,13 @@ export interface ProjectStorage {
   archiveRaw?: number
   /** Files pasted or dropped into sessions (.hive/attachments). */
   attachments: number
-  /** The agents' worktree folders. */
-  worktrees: { agent: string; path: string; bytes: number }[]
+  /**
+   * The folders agents work in (#1451): each of the project's slots on disk (`slot`, and the agent it is lent to now, if
+   * any), and an agent's 0.9 worktree while its project isn't migrated; each folder once.
+   */
+  worktrees: { agent?: string; path: string; bytes: number; slot?: string }[]
+  /** The project's review and check copies (#1435), one folder, when it has any. */
+  copies?: { path: string; bytes: number }
   /** Worktrees no agent works in (#353), counted in the total. */
   unusedWorktrees?: { path: string; branch: string | null; bytes: number }[]
   total: number
@@ -2973,6 +2985,13 @@ export interface LaneInfo {
   stages: StageId[] | null
   /** The slot a running lane's builder works in (#1438: its lease's), or null (none yet, or slots don't apply). */
   slot: string | null
+  /** That slot as its row's hover tells it (#1446): its line, ready or being prepared, its lease's start; null with none. */
+  slotInfo?: LaneSlotInfo | null
+  /**
+   * A lane reviewed by the pool (#1443, #1446): who gave its current card's last verdict (and whether it passed), and who
+   * reviews it now, by name; absent for other lanes, or with no current card.
+   */
+  poolReview?: { lastVerdict: { name: string; pass: boolean } | null; reviewing: string | null }
 }
 
 /**
@@ -2982,8 +3001,22 @@ export interface LaneInfo {
  * (#1336): its builder's or reviewer's hooks aren't arriving, so Hive can't tell what it does and types nothing into it.
  * `checkCopy` (#1435): its card's review or isolated check waits for a review or check copy to be free. `slot` (#1438):
  * the lane has no slot yet (every one is lent), so its builder can't start; it pauses the lane until one is free.
+ * `preparing` (#1446): its slot is being prepared (G15's warming: its setup or an install), which doesn't pause it.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing'
+
+/**
+ * A running lane's slot as its row shows it (#1446): its name, whether the lane works in its builder's carried slot (a
+ * 0.9 worktree adopted at the upgrade, #1441) rather than one lent to the lane, the current card's line (its branch
+ * there), whether the slot is ready or being prepared (G15's warming, its setup or install), and when its lease began.
+ */
+export interface LaneSlotInfo {
+  name: string
+  carried: boolean
+  line: string | null
+  state: 'ready' | 'preparing'
+  since: string
+}
 
 /** Start lane… from the window (#1280): who builds and reviews, the cards in order, the user's note and a name. */
 export interface LaneStartRequest {
@@ -3023,6 +3056,8 @@ export interface LaneStatus {
   ask?: 'approve' | 'decide' | 'test' | 'signIn' | 'other'
   /** hooks: the agent whose hooks aren't arriving, by name. */
   agent?: string
+  /** preparing (#1446): the slot being prepared. */
+  slot?: string
 }
 
 /**

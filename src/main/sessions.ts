@@ -578,9 +578,44 @@ async function typeInto(key: string, text: string, still: () => boolean = () => 
  * break would send the prompt early and a tab complete a word); its other control characters are left out either way.
  */
 export function promptInput(line: string, paste: boolean, asTyped: boolean): string {
+  line = withoutInvisible(line)
   if (!asTyped) return paste ? line.replace(/[\x00-\x1f\x7f-\x9f]/g, '') : line
   const kept = paste ? line.replace(/\r\n?|\n/g, '\r') : line.replace(/\r\n?|[\n\t]/g, ' ')
   return kept.replace(paste ? /[\x00-\x08\x0a-\x0c\x0e-\x1f\x7f-\x9f]/g : /[\x00-\x1f\x7f-\x9f]/g, '')
+}
+
+const INVISIBLE = /[\p{Cf}\u{fe00}-\u{fe0f}\u{e0100}-\u{e01ef}]/u
+const PICTOGRAPH = /\p{Extended_Pictographic}/u
+const MODIFIER = /\p{Emoji_Modifier}/u
+const SELECTOR = /[\u{fe0e}\u{fe0f}]/u
+const TAG = /[\u{e0020}-\u{e007f}]/u
+
+/**
+ * A line without its invisible characters (#1547): Unicode's format characters (zero-width spaces and joiners, soft
+ * hyphens, direction marks, a byte order mark) and variation selectors, but for those an emoji is made of (a joiner
+ * between two pictographs, a selector after one or in a keycap, a flag's tags). Claude Code 2.1.309 takes such a
+ * character out of a prompt and leaves the prompt unsent ("Removed 1 invisible character · review and press Enter to
+ * send"), the same characters inside an emoji sent as they are (tried with each: #1547's comment).
+ */
+export function withoutInvisible(line: string): string {
+  if (!INVISIBLE.test(line)) return line
+  const cs = [...line]
+  let out = ''
+  // The last character kept: what an emoji's joiner, selector or tag follows.
+  let prev = ''
+  for (let i = 0; i < cs.length; i++) {
+    const c = cs[i]
+    const next = cs[i + 1] ?? ''
+    const keep =
+      !INVISIBLE.test(c) ||
+      (c === '‍' && (PICTOGRAPH.test(prev) || MODIFIER.test(prev) || SELECTOR.test(prev)) && PICTOGRAPH.test(next)) ||
+      (SELECTOR.test(c) && (PICTOGRAPH.test(prev) || (/^[0-9#*]$/.test(prev) && next === '⃣'))) ||
+      (TAG.test(c) && (prev === '\u{1f3f4}' || TAG.test(prev)))
+    if (!keep) continue
+    out += c
+    prev = c
+  }
+  return out
 }
 
 /**
@@ -2117,7 +2152,7 @@ class SessionManager {
         writePty(key, '\x15')
         await pause(150)
       }
-      const text = l.adapter.descriptor.capabilities.compactFocus ? (focus ?? '').replace(/\s+/g, ' ').trim() : ''
+      const text = l.adapter.descriptor.capabilities.compactFocus ? withoutInvisible(focus ?? '').replace(/\s+/g, ' ').trim() : ''
       // Written in one go, a long line counts as a paste, and pasted input is sent as a message even when
       // it starts with "/compact". So type the command on its own, then the focus in small pieces.
       writePty(key, '/compact')

@@ -21,6 +21,7 @@ import type { VcSection } from '@shared/gitRepo'
 import type { ProgressFilter } from '@shared/progress'
 import type { TemplateAgent, TemplateRef } from '@shared/templates'
 import type { GitTool } from '@shared/gitTool'
+import type { RunsFilter } from '@shared/progressTabs'
 import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, QuitScope, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type { PresetId } from '@shared/workflow/options'
 import type {
@@ -441,6 +442,8 @@ interface State {
   taskStartFor: number | null
   /** Start lane… (#1280): open for a project (its path; null: the first with agents), with these cards chosen first. */
   laneStartFor: { project: string | null; cards: number[] } | null
+  /** The Progress panel's Runs tab asked for with this filter (#1446: what a lane waits for); the panel takes it and clears it. */
+  runsShow: RunsFilter | null
   /** The Archive All dialog (#351): a column's (or the whole board's, column null) cards as the board shows them. */
   boardArchiveAll: ArchiveAllRequest | null
   /** A card being moved to Doing: the Move to Doing dialog asks who has it. */
@@ -602,6 +605,7 @@ export const useStore = create<State>(() => ({
   taskOpen: null,
   taskStartFor: null,
   laneStartFor: null,
+  runsShow: null,
   boardArchiveAll: null,
   taskDoing: null,
   removeProjectFor: null,

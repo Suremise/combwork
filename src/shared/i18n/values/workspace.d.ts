@@ -448,7 +448,9 @@ interface HiveMessageValues {
   'workspace.storage.beforeCompression': { size: string | number }
   'workspace.storage.cancel': undefined
   'workspace.storage.cleanUp': undefined
+  'workspace.storage.copies': undefined
   'workspace.storage.deletedSession': { id: string | number }
+  'workspace.storage.freeSlot': { slot: string | number }
   'workspace.storage.goneBackups': undefined
   'workspace.storage.goneBackupsDesc': undefined
   'workspace.storage.goneWarning': undefined
@@ -487,6 +489,7 @@ interface HiveMessageValues {
   'workspace.storage.reviewInChanges': undefined
   'workspace.storage.size': undefined
   'workspace.storage.skipped': { count: number }
+  'workspace.storage.slot': { slot: string | number; agent: string | number }
   'workspace.storage.storage': undefined
   'workspace.storage.title': { name: string | number }
   'workspace.storage.total': undefined

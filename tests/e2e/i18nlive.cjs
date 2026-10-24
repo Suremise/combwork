@@ -99,7 +99,7 @@ const check = (name, ok, extra = '') => {
     await speak('de', {
       'settings.projectSection.agents.label': 'Agenten und Arbeitsbäume',
       'settings.projectSection.agents.desc': 'Die Agenten des Projekts und wie neue Arbeitsbäume eingerichtet werden.',
-      'settings.project.worktreeSetup.title': 'Einrichtungsbefehl'
+      'settings.project.slotOptions.title': 'Slots und Kopien'
     })
     await command('project.tab.settings')
     const navLabel = page.locator('.settings-nav .row.selected .label')
@@ -111,10 +111,10 @@ const check = (name, ok, extra = '') => {
       return got[0] === want.label && got[1] === want.label && got[2] === want.desc && got[3].includes(want.row)
     }, HUNG_MS)
     const seen = async () => JSON.stringify([await navLabel.innerText().catch(() => ''), await heading.innerText().catch(() => ''), await about.innerText().catch(() => '')])
-    check('Project Settings opened in German shows its section (list, heading, description) and its rows in German', !!(await shows({ label: 'Agenten und Arbeitsbäume', desc: 'Die Agenten des Projekts und wie neue Arbeitsbäume eingerichtet werden.', row: 'Einrichtungsbefehl' })), await seen())
+    check('Project Settings opened in German shows its section (list, heading, description) and its rows in German', !!(await shows({ label: 'Agenten und Arbeitsbäume', desc: 'Die Agenten des Projekts und wie neue Arbeitsbäume eingerichtet werden.', row: 'Slots und Kopien' })), await seen())
     // English while it is open: all of it follows at once.
     await speak('en', {})
-    check('…and follows a change of language while it is open', !!(await shows({ label: 'Agents & Worktrees', desc: 'The project’s agents and their providers, file locks between them, and how new worktrees are set up.', row: 'Setup command' })), await seen())
+    check('…and follows a change of language while it is open', !!(await shows({ label: 'Agents & Worktrees', desc: 'The project’s agents and their providers, file locks between them, and how new worktrees are set up.', row: 'Slots and copies' })), await seen())
 
     // Its provider section (#861): the permission mode row says what the mode in use does, and names its choices, in the
     // window's language, following a change while it is open; the choices' values stay the modes' ids.

@@ -730,6 +730,8 @@
   "settings.project.metadata.title": "设置文件",
   "settings.project.reset.desc": "此页上的所有设置都会恢复为“继承”。智能体以及技能和 MCP 的停用选择会保留。",
   "settings.project.reset.title": "重置项目设置",
+  "settings.project.slotOptions.desc": "准备脚本和归档脚本、复制到新槽位的文件以及评审副本，都在项目的“版本控制”标签页的 工作流程 → 槽位和副本 中设置。",
+  "settings.project.slotOptions.title": "槽位和副本",
   "settings.project.storage.desc": "在后台测量；点“刷新”重新测量。编程智能体自己的会话记录（位于 ~/.claude、~/.codex 和 ~/.copilot）不计入，“清理…”和“彻底清除…”也从不触及它们。",
   "settings.project.storage.title": "Hive 保存的内容",
   "settings.project.suggestFreshStart.desc": "此项目的工作完成时发出提示，并附带“重新开始（空闲的智能体）”。",

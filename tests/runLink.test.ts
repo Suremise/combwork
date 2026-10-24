@@ -179,7 +179,7 @@ describe("a card's run through its platform adapter (#1233)", () => {
   })
 
   it("Git, a shared folder: the card's revision is its newest attributed commit, not the folder's head", async () => {
-    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', preChecks: [], mergeChecks: [], target: '' }))
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', slotsUpToDate: false, preChecks: [], mergeChecks: [], target: '' }))
     const a = e.wf.createCard({ title: 'A' })
     const b = e.wf.createCard({ title: 'B' })
     moved(await e.wf.start(a.key, B1))
@@ -336,6 +336,17 @@ describe('runs keep what they ran for (#1220)', () => {
     expect(runDetails(s.start(agent, { title: 'e2e' }), 'hive', 2000, tr).map((d) => d.label)).not.toContain('Card')
   })
 
+  // #1446: the folder it ran in is the run's own, kept as it ran, whatever its agent works in now.
+  it('its details show the folder it ran in, not where its agent is now', () => {
+    setLanguage('en', {})
+    const s = store()
+    const slotB = join(PROJECT, '..', 'slot-b')
+    const r: ProgressRun = s.start(agent, { title: 'unit tests' }, { card: 1061, folder: slotB })
+    // Its agent moved on to another slot since: the run's record keeps where it ran.
+    expect(runDetails(r, 'hive', 2000, tr)).toContainEqual({ label: 'Folder', text: slotB, code: true })
+    expect(runDetails(s.start(agent, { title: 'e2e' }), 'hive', 2000, tr).map((d) => d.label)).not.toContain('Folder')
+  })
+
   // #1273: what it was tested on, beside the card's revision, only when they differ.
   it('its details show what it was tested on when that is not the card\'s revision', () => {
     setLanguage('en', {})
@@ -344,9 +355,12 @@ describe('runs keep what they ran for (#1220)', () => {
     const same = runDetails({ ...run, revision: id, testedCheckout: id }, 'hive', 2000, tr)
     expect(same.map((d) => d.label)).not.toContain('Tested on')
     const other = 'c'.repeat(40)
-    const rows = runDetails({ ...run, revision: id, testedCheckout: other }, 'hive', 2000, tr)
+    // With the folder it ran in (#1446) too: Tested on still follows the Revision it qualifies (#1554), the folder after it.
+    const rows = runDetails({ ...run, revision: id, testedCheckout: other, folder: 'D:\\work\\older' }, 'hive', 2000, tr)
     expect(rows).toContainEqual({ label: 'Revision', text: id, code: true })
     expect(rows).toContainEqual({ label: 'Tested on', text: other, code: true })
-    expect(rows.map((d) => d.label).indexOf('Tested on')).toBe(rows.map((d) => d.label).indexOf('Revision') + 1)
+    const labels = rows.map((d) => d.label)
+    expect(labels.indexOf('Tested on')).toBe(labels.indexOf('Revision') + 1)
+    expect(labels.indexOf('Folder')).toBe(labels.indexOf('Tested on') + 1)
   })
 })

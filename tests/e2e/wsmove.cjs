@@ -101,10 +101,10 @@ async function launch() {
   {
     const { app, page, inv } = await launch()
     await lib.openWorkspace(inv, page, ws1)
-    const builder = await inv('agents:add', alpha1, { location: 'new-worktree', name: 'Builder' })
-    await inv('agents:add', alpha1, { location: 'new-worktree', name: 'Second' })
+    const builder = await inv('agents:testLegacy', alpha1, { location: 'new-worktree', name: 'Builder' })
+    await inv('agents:testLegacy', alpha1, { location: 'new-worktree', name: 'Second' })
     // Third has work on its branch: the worktree recreated after the move must have it.
-    const third = await inv('agents:add', alpha1, { location: 'new-worktree', name: 'Third' })
+    const third = await inv('agents:testLegacy', alpha1, { location: 'new-worktree', name: 'Third' })
     fs.writeFileSync(path.join(third.worktree.path, 'third.txt'), 'third\n')
     gitOut(third.worktree.path, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'add', 'third.txt'])
     gitOut(third.worktree.path, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'third work'])
@@ -330,7 +330,7 @@ async function launch() {
     lib.gitProject(betaB1)
     let r = await launch()
     await lib.openWorkspace(r.inv, r.page, wsB1)
-    await r.inv('agents:add', betaB1, { location: 'new-worktree', name: 'Stay' })
+    await r.inv('agents:testLegacy', betaB1, { location: 'new-worktree', name: 'Stay' })
     await lib.until(() => readJson(path.join(betaB1, '.hive', 'project.json')).lastPath, 10000)
     await r.app.close()
     fs.mkdirSync(path.dirname(wsB2), { recursive: true })

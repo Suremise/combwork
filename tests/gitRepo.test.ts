@@ -36,11 +36,13 @@ vi.mock('../src/main/workspace', () => ({
       if (![proj, nested].some((x) => x.toLowerCase() === p.toLowerCase())) throw new Error(`Not a project in the open workspace: ${p}`)
       return p
     },
-    projectConfig: async () => ({ version: 2, agents })
+    projectConfig: async () => ({ version: 2, agents }),
+    // The folder contract (#1451) reads no slots here: no Assistant home, no board.
+    isAssistantHome: () => false
   },
   workspaceOf: () => ({ refresh: async () => ({}) })
 }))
-vi.mock('../src/main/sessions', () => ({ sessions: { liveFor: (_p: string, id: string) => (live[id] ? { status: live[id] } : null), agentNow: (_p: string, id: string) => (live[id] ? { pending: pendingInput.has(id) } : null), lineWaiting: (_p: string, id: string) => typedWaiting.has(id) } }))
+vi.mock('../src/main/sessions', () => ({ sessions: { liveFor: (_p: string, id: string) => (live[id] ? { status: live[id], cwd: agents.find((x) => x.id === id)?.worktree?.path ?? proj } : null), agentNow: (_p: string, id: string) => (live[id] ? { pending: pendingInput.has(id) } : null), lineWaiting: (_p: string, id: string) => typedWaiting.has(id) } }))
 vi.mock('../src/main/mergeSlotHost', () => ({ mergeSlots: { list: () => slots, asUser } }))
 vi.mock('../src/main/branchWatch', () => ({ checkProject: async () => undefined }))
 vi.mock('../src/main/fsutil', async (importOriginal) => {
@@ -355,7 +357,7 @@ describe('switching branch', () => {
     // Creating one without switching moves nothing.
     expect(await repo.createBranch(proj, 'other', true)).toMatch(/^Created other at /)
     expect(git(proj, 'symbolic-ref', '--short', 'HEAD')).toBe('main')
-    // An agent working in its own worktree doesn't hold the folder.
+    // An agent working in its own folder (its session there: a 0.9 worktree here, a slot alike) doesn't hold the folder.
     slots = []
     agents = [{ id: 'a3', name: 'B3', worktree: { path: join(outer, 'wt'), branch: 'hive/b3', base: 'main' } }]
     live = { a3: 'working' }

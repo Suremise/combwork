@@ -732,6 +732,8 @@ interface HiveMessageValues {
   'settings.project.metadata.title': undefined
   'settings.project.reset.desc': undefined
   'settings.project.reset.title': undefined
+  'settings.project.slotOptions.desc': undefined
+  'settings.project.slotOptions.title': undefined
   'settings.project.storage.desc': undefined
   'settings.project.storage.title': undefined
   'settings.project.suggestFreshStart.desc': undefined

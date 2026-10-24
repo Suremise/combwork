@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from 'crypto'
+import { legacyWorktree } from '../shared/agentFolders'
 import { basename, dirname, join, resolve, sep } from 'path'
 import { mkdir, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, statSync, watch, type FSWatcher as RootWatcher } from 'original-fs'
@@ -892,7 +893,11 @@ export class WorkspaceService {
     if (this.listedAt && ticket < this.listedAt.ticket && !this.listedAt.known.has(key)) return
     this.rootsAt.set(key, ticket)
     for (const [k, v] of this.roots) if (v.toLowerCase() === projectPath.toLowerCase()) this.roots.delete(k)
-    for (const a of cfg.agents ?? []) if (a.worktree?.path) this.roots.set(resolve(a.worktree.path).toLowerCase(), projectPath)
+    // Agents' 0.9 worktrees (#1451: through legacyWorktree; slots are found by the slots' own tables).
+    for (const a of cfg.agents ?? []) {
+      const w = legacyWorktree(a)
+      if (w) this.roots.set(resolve(w.path).toLowerCase(), projectPath)
+    }
   }
 
   /** Changes one agent's definition. */

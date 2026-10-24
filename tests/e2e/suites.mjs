@@ -14,6 +14,7 @@
 export const SUITES = [
   { name: 'about' },
   { name: 'advanced' },
+  { name: 'agentapislots' },
   { name: 'agentguidance' },
   { name: 'agentmessage' },
   { name: 'agentrole' },
@@ -142,6 +143,7 @@ export const SUITES = [
   { name: 'keys' },
   { name: 'keysui' },
   { name: 'lanenotices' },
+  { name: 'lanesslots' },
   { name: 'lanestages' },
   { name: 'lanestart' },
   { name: 'lanewatch' },
@@ -245,6 +247,7 @@ export const SUITES = [
   { name: 'skillprefs' },
   { name: 'skills', serial: 'the shared Codex test home', codexHome: 'test' },
   { name: 'slotcards' },
+  { name: 'slotoptions' },
   { name: 'slotpool' },
   { name: 'slotrecovery' },
   { name: 'slotsessions' },
@@ -302,5 +305,4 @@ export const SUITES = [
   { name: 'wsmove' },
   { name: 'wsoverview' },
   { name: 'wtrecreate' },
-  { name: 'wtreuse' }
 ]

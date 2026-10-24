@@ -1787,9 +1787,17 @@
     "defaultMessage": "Clean Up…",
     "description": "Storage: opens the Clean Up dialog."
   },
+  "workspace.storage.copies": {
+    "defaultMessage": "Review and check copies",
+    "description": "Storage (#1451): the folder of the project's review and check copies (folders Hive keeps at one revision for a reviewer, or an isolated check). Glossary: review copy."
+  },
   "workspace.storage.deletedSession": {
     "defaultMessage": "Deleted session {id}",
     "description": "Storage, a folder of attachments to clean up: its session was deleted. {id} is the start of its id (8 characters)."
+  },
+  "workspace.storage.freeSlot": {
+    "defaultMessage": "{slot}, not lent",
+    "description": "Storage (#1451): one of the project's slots (a working folder Hive lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), kept on disk but lent to no one now. Glossary: slot."
   },
   "workspace.storage.goneBackups": {
     "defaultMessage": "Backups of archived sessions the CLI no longer has",
@@ -1942,6 +1950,10 @@
   "workspace.storage.skipped": {
     "defaultMessage": "{count, plural, one {# item skipped:} other {# items skipped:}}",
     "description": "Under the notice after Clean Up: items that couldn't be moved (each follows on a line)."
+  },
+  "workspace.storage.slot": {
+    "defaultMessage": "{slot}, lent to {agent}",
+    "description": "Storage (#1451): one of the project's slots (a working folder Hive lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), lent now to the agent {agent}. Glossary: slot."
   },
   "workspace.storage.storage": {
     "defaultMessage": "Storage",

@@ -90,7 +90,8 @@ function pathWithoutGit() {
   await page.keyboard.press('Escape')
   await lib.until(async () => (await add.count()) === 0, HUNG_MS)
   const refused = await inv('agents:add', repo, { name: 'Nope', provider: 'claude-code', location: 'new-worktree' }).then(() => null, (e) => String(e?.message ?? e))
-  check('adding a worktree agent anyway is refused, saying git is missing', !!refused && refused.includes(MISSING), refused ?? 'added')
+  // 1.0 (#1451) pins no agent to a worktree: refused whether git runs or not.
+  check('adding a worktree agent anyway is refused', !!refused && /pinned to worktrees/.test(refused), refused ?? 'added')
 
   // --- The Changes tab.
   const status = await inv('git:status', repo)

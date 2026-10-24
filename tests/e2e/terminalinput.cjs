@@ -114,6 +114,12 @@ const check = (name, ok, extra = '') => {
     check('…and the CLI gets the prompt as written', !!(await lib.until(async () => transcriptHas(inTranscript('Card two\n\nPlan one:\n  step A\n\nstep B')), HUNG_MS, 200)))
     await inv('advanced:set', AS_TYPED, false)
 
+    // Invisible characters (#1547): Claude Code 2.1.309 leaves a prompt with one unsent until Enter again, so Hive leaves
+    // them out; those an emoji is made of stay.
+    from = readsOfInput().length
+    started = await startCard('Card three', 'Zero​width﻿ and a family \u{1f468}‍\u{1f469}')
+    check('a card with invisible characters is typed without them, an emoji kept whole', !!(await lib.until(async () => inputSince(from).includes('Card three Zerowidth and a family \u{1f468}‍\u{1f469}\x1b[201~'), HUNG_MS, 100)), JSON.stringify(inputSince(from)))
+
     // ---- 2. Ctrl+C and Ctrl+V. Text to select: typed into the CLI's input, never sent.
     const TEXT = 'SELECTME alpha beta delta'
     const textAt = (t) => page.evaluate(([k, x]) => window.__hiveTerminalTextAt(k, x), [key, t])
