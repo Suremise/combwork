@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'crypto'
-import { legacyWorktree, type NamedFolder } from '../shared/agentFolders'
+import { carryLegacyAgentFields, legacyWorktree, type LegacyAgentFields, type NamedFolder, type StoredAgent } from '../shared/agentFolders'
 import { basename, dirname, join, resolve, sep } from 'path'
 import { mkdir, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, statSync, watch, type FSWatcher as RootWatcher } from 'original-fs'
@@ -908,6 +908,14 @@ export class WorkspaceService {
     for (const f of this.folderRoots.get(key) ?? []) this.roots.set(resolve(f).toLowerCase(), projectPath)
   }
 
+  /**
+   * Writes 0.9.3's fields of one agent (#1452: they aren't AgentDef's): its 0.9 worktree's setup run done, or a test
+   * copy's 0.9 agent (`agents:testLegacy`). 1.0 makes no new worktree; Repair writes through mutateProjectConfig.
+   */
+  async updateLegacyAgent(projectPath: string, agentId: string, fields: LegacyAgentFields): Promise<StoredAgent> {
+    return this.updateAgent(projectPath, agentId, fields as Partial<AgentDef>)
+  }
+
   /** Changes one agent's definition. */
   /** `check`: sees the agent as saved, under the project's lock, before the change; throwing refuses it (#1282's undo). */
   async updateAgent(projectPath: string, agentId: string, patch: Partial<AgentDef>, check?: (current: AgentDef) => void): Promise<AgentDef> {
@@ -1015,6 +1023,8 @@ export class WorkspaceService {
         const had = projectAgents(cfg).map((a) => a.id)
         const patch = fn(cfg)
         let updated = { ...cfg, ...patch }
+        // 0.9.3's agent fields (#1452): an agent written again without them keeps what is stored.
+        if ('agents' in patch && Array.isArray(updated.agents)) updated = { ...updated, agents: carryLegacyAgentFields(projectAgents(cfg), updated.agents) }
         // An agent leaving, outside this workspace's board change: nothing written, so it runs again inside one.
         if (board && !inBoardWrite(board) && 'agents' in patch) {
           const now = new Set(projectAgents(updated).map((a) => a.id))

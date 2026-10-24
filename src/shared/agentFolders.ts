@@ -11,16 +11,64 @@
 //   or a refusal saying why.
 
 import { samePath } from './movePaths'
-import type { AgentWorktree } from './types'
+import type { AgentDef } from './types'
 import type { WorkflowRole } from './workflow/roles'
+
+/** An agent's 0.9 worktree: its own checkout of the project on its own branch, made from `base` (0.9.3's `worktree`). */
+export interface LegacyWorktree {
+  path: string
+  branch: string
+  /** Branch it was created from, and merges back into. */
+  base: string
+}
+
+/**
+ * What 0.9.3 stored on an agent in project.json that 1.0's `AgentDef` doesn't type (#1452): its worktree and whether that
+ * worktree's setup command has still to run. 1.0 reads them only here, carries them through every save unchanged
+ * (`carryLegacyAgentFields`), so 0.9.3 finds them after a return, and makes no new worktree.
+ */
+export interface LegacyAgentFields {
+  worktree?: LegacyWorktree
+  needsSetup?: boolean
+}
+
+/** An agent as project.json may store it: 1.0's definition with 0.9.3's fields. For the readers and writers of those only. */
+export type StoredAgent = AgentDef & LegacyAgentFields
+
+/** The agent as stored, for the readers and writers of 0.9.3's fields (migration, Repair, the 0.9 worktree's actions). */
+export const storedAgent = <A extends AgentDef>(a: A): A & LegacyAgentFields => a as A & LegacyAgentFields
 
 /**
  * An agent's 0.9 worktree, as project.json stores it (`worktree`). Only the migration (#1441), Repair (#1447), the folder
  * contract and what still knows a project not migrated yet read it (#1451): everything else asks where an agent works.
  */
-export function legacyWorktree(raw: { worktree?: AgentWorktree | null } | null | undefined): AgentWorktree | null {
-  const w = raw?.worktree
-  return w && typeof w.path === 'string' && w.path ? w : null
+export function legacyWorktree(raw: object | null | undefined): LegacyWorktree | null {
+  const w = (raw as LegacyAgentFields | null | undefined)?.worktree
+  return w && typeof w === 'object' && typeof w.path === 'string' && w.path ? w : null
+}
+
+/** Whether an agent's 0.9 worktree still has its setup command to run before its next session (0.9.3's `needsSetup`). */
+export const legacySetupPending = (raw: object | null | undefined): boolean => !!legacyWorktree(raw) && (raw as LegacyAgentFields).needsSetup === true
+
+/**
+ * 0.9.3's fields carried through a save of the agents (#1452, the keep-what-you-don't-own rule P6's `writeWorkflow` has):
+ * an agent of `before` written again without a `worktree` or `needsSetup` key keeps the stored one, so a return to 0.9.3
+ * finds it. A writer that means to drop one (Repair's unlink) writes the key, `undefined`.
+ */
+export function carryLegacyAgentFields<A extends object>(before: readonly object[], after: readonly A[]): A[] {
+  const old = new Map<string, LegacyAgentFields>()
+  for (const a of before) {
+    const id = (a as { id?: unknown }).id
+    if (typeof id === 'string') old.set(id, a as LegacyAgentFields)
+  }
+  return after.map((a) => {
+    const was = old.get((a as { id?: unknown }).id as string)
+    if (!was) return a
+    const keep: LegacyAgentFields = {}
+    if (!('worktree' in a) && was.worktree !== undefined) keep.worktree = was.worktree
+    if (!('needsSetup' in a) && was.needsSetup !== undefined) keep.needsSetup = was.needsSetup
+    return Object.keys(keep).length ? { ...a, ...keep } : a
+  })
 }
 
 export type FolderPurpose = 'build' | 'review'

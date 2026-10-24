@@ -32,7 +32,7 @@ import {
   type TemplateScope
 } from '../shared/templates'
 import { HIVE_TEMPLATES, hiveTemplate, type HiveTemplate } from '../shared/templateDefaults'
-import type { AgentBranchStatus, AgentDef, AgentWorktree, ProjectConfig, ProviderId, TemplateLoadPlan } from '../shared/types'
+import type { AgentBranchStatus, AgentDef, ProjectConfig, ProviderId, TemplateLoadPlan } from '../shared/types'
 import { config } from './config'
 import { placeKey, readKeptJson, withFileLock, writeKeptJson, writeTextAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
@@ -43,6 +43,7 @@ import { sessions } from './sessions'
 import { endReviews, releaseAgentCards } from './tasks'
 import { workspace, workspaceOf } from './workspace'
 import * as wt from './worktrees'
+import { legacySetupPending, legacyWorktree } from '../shared/agentFolders'
 import { englishText, listOf, shownText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
 import { msg, tr, type Msg } from '../shared/i18n'
 import { errorText, HiveError } from './hiveError'
@@ -406,7 +407,7 @@ function providerProblem(id: ProviderId): { problem: NonNullable<TemplateLoadPla
 const refFor = (projectPath: string, scope: TemplateScope, file: string, from?: string): TemplateRef => ({ scope: checkScope(scope), project: scope === 'project' && from ? from : projectPath, file })
 
 /** A worktree's `branchStatus`, as one plan reads it (#732: once each, though the plan looks at one twice). */
-type StatusOf = (w: AgentWorktree) => Promise<AgentBranchStatus>
+type StatusOf = (w: wt.WorktreeRef) => Promise<AgentBranchStatus>
 
 /** `branchStatus` read once per worktree and branch for one operation (#732), with its reads of the repository. */
 function statusReads(projectPath: string, reads: wt.RepoReads): StatusOf {
@@ -478,17 +479,19 @@ async function planFor(projectPath: string, scope: TemplateScope, file: string, 
   for (const a of current) {
     const running = busy(projectPath, a.id)
     let dirty = 0
-    if (a.worktree && existsSync(a.worktree.path)) {
+    // Its 0.9 worktree (#1452: through legacyWorktree), checked before the load replaces it.
+    const tree = legacyWorktree(a)
+    if (tree && existsSync(tree.path)) {
       // As Remove Agent checks before a worktree goes: strictly, so a git that fails never reads as "nothing to lose".
       try {
-        dirty = (await status(a.worktree)).dirty
+        dirty = (await status(tree)).dirty
       } catch (e) {
-        blocked.push(withValues(msg({ id: 'content.templates.checkFailed', defaultMessage: "Hive couldn't check {agent}'s worktree ({folder}): {error}", description: "Why a template can't be loaded: git couldn't tell whether the worktree {folder} of the agent {agent} it would remove has uncommitted work; {error} is why (often git's own words)." }), { agent: a.name, folder: a.worktree.path, error: firstLine(e) }))
+        blocked.push(withValues(msg({ id: 'content.templates.checkFailed', defaultMessage: "Hive couldn't check {agent}'s worktree ({folder}): {error}", description: "Why a template can't be loaded: git couldn't tell whether the worktree {folder} of the agent {agent} it would remove has uncommitted work; {error} is why (often git's own words)." }), { agent: a.name, folder: tree.path, error: firstLine(e) }))
       }
     }
-    remove.push({ id: a.id, name: a.name, running, dirty, ...(a.worktree ? { worktree: { path: a.worktree.path, branch: a.worktree.branch } } : {}) })
+    remove.push({ id: a.id, name: a.name, running, dirty, ...(tree ? { worktree: { path: tree.path, branch: tree.branch } } : {}) })
     if (running) blocked.push(withValues(msg({ id: 'content.templates.running', defaultMessage: '{agent} is running or starting: stop it first.', description: "Why a template can't be loaded: the agent {agent} it would replace is running." }), { agent: a.name }))
-    if (dirty) blocked.push(withValues(msg({ id: 'content.templates.uncommitted', defaultMessage: '{agent} has uncommitted work in its worktree ({folder}): commit or discard it first.', description: "Why a template can't be loaded: the worktree {folder} of the agent {agent} it would replace has work not committed." }), { agent: a.name, folder: a.worktree!.path }))
+    if (dirty) blocked.push(withValues(msg({ id: 'content.templates.uncommitted', defaultMessage: '{agent} has uncommitted work in its worktree ({folder}): commit or discard it first.', description: "Why a template can't be loaded: the worktree {folder} of the agent {agent} it would replace has work not committed." }), { agent: a.name, folder: tree!.path }))
   }
   // Hive's own: an agent whose provider can't run here runs one that can (#1436: never a silent failure, said on its
   // row). A template the user made stays as it is: refused, saying what to turn on or install.
@@ -626,7 +629,7 @@ export async function loadTemplate(projectPath: string, scope: TemplateScope, fi
           if (staged.length > limit) throw refusal(M.nothing, { problem: templateLimitText(staged.length, limit) })
           old = list
           // A removed agent's worktree whose setup never ran is remembered for the next agent given it (#289).
-          const pending = [...(Array.isArray(now.setupPending) ? now.setupPending.filter((p) => typeof p === 'string') : []), ...list.filter((a) => a.worktree && a.needsSetup).map((a) => a.worktree!.path)]
+          const pending = [...(Array.isArray(now.setupPending) ? now.setupPending.filter((p) => typeof p === 'string') : []), ...list.filter((a) => legacySetupPending(a)).map((a) => legacyWorktree(a)!.path)]
           return { agents: staged.map((s) => s.def), layout: plan.layout, setupPending: [...new Map(pending.map((p) => [placeKey(p), p])).values()].slice(-50) }
         })
       })

@@ -204,7 +204,7 @@ async function branchesOf(ws: WorkspaceService, project: string, worktrees: read
   const pending = (cfg.pendingBranchRenames ?? []).filter((r) => agents.some((a) => a.id === r.agentId))
   const later = (id: string): boolean => worktrees.some((w) => !w.of && w.agentId === id && (w.how === 'missing' || w.how === 'unlink' || w.how === 'original'))
   const recreated = (id: string): boolean => worktrees.some((w) => w.agentId === id && w.how === 'recreate' && w.branchExists)
-  const todo = agents.filter((a) => a.worktree?.branch && !later(a.id) && !pending.some((r) => r.agentId === a.id))
+  const todo = agents.filter((a) => legacyWorktree(a)?.branch && !later(a.id) && !pending.some((r) => r.agentId === a.id))
   if (!todo.length && !pending.length) return []
   const branches = await localBranches(project)
   const has = (b: string): boolean => branches.some((x) => x.toLowerCase() === b.toLowerCase())
@@ -219,7 +219,7 @@ async function branchesOf(ws: WorkspaceService, project: string, worktrees: read
     out.push({ agentId: a.id, agentName: a.name, from: r.from, to: r.to, pending: true, ...(remote ? { remote } : {}) })
   }
   for (const a of todo) {
-    const from = a.worktree!.branch
+    const from = legacyWorktree(a)!.branch
     const to = branchHere(from, home)
     if (!to || (!has(from) && !recreated(a.id))) continue
     const remote = await remoteOf(from)
@@ -797,7 +797,8 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
         // The new path, and the move its data follows until that is copied, in one locked change.
         const m = { from: w.from, to: w.to!, ...owned({ kind: 'worktree', agent: w.agentName }) }
         await ws.mutateProjectConfig(h.path, (cfg) => ({
-          agents: projectAgents(cfg).map((a) => (a.id === w.agentId && a.worktree ? { ...a, worktree: { ...a.worktree, path: w.to! } } : a)),
+          // Repair writes 0.9.3's field (#1452): the worktree the agent had, at its new path.
+          agents: projectAgents(cfg).map((a) => { const t = legacyWorktree(a); return a.id === w.agentId && t ? { ...a, worktree: { ...t, path: w.to! } } : a }),
           ...(samePath(w.from, w.to!) ? {} : { pendingCopies: withPending(cfg.pendingCopies, m) })
         }))
         say(
@@ -833,7 +834,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
       try {
         // Its new path and the move its sessions and data follow are written together (in recreateWorktree).
         const def = await recreateWorktree(h.path, w.agentId, { prefer: w.to ?? undefined, alsoRecreating: remake.map((x) => x.from) })
-        const to = def.worktree!.path
+        const to = legacyWorktree(def)!.path
         say(
           report,
           'done',
@@ -952,7 +953,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
         await renameCardLines(ws, h.path, b.from, b.to)
         const space = b.to.split('/')[1]
         await ws.mutateProjectConfig(h.path, (cfg) => ({
-          agents: projectAgents(cfg).map((a) => (a.id === b.agentId && a.worktree && a.worktree.branch.toLowerCase() === b.from.toLowerCase() ? { ...a, worktree: { ...a.worktree, branch: b.to } } : a)),
+          agents: projectAgents(cfg).map((a) => { const t = legacyWorktree(a); return a.id === b.agentId && t && t.branch.toLowerCase() === b.from.toLowerCase() ? { ...a, worktree: { ...t, branch: b.to } } : a }),
           pendingBranchRenames: dropRename(cfg.pendingBranchRenames, b.agentId),
           // A workspace part this project's branches hadn't had is recorded, so it stays this project's (#703 round 3).
           ...(space && space.toLowerCase() !== refPart(basename(ws.path ?? ''), 'workspace').toLowerCase() && !(cfg.branchSpaces ?? []).some((s) => s.toLowerCase() === space.toLowerCase()) ? { branchSpaces: [...(cfg.branchSpaces ?? []), space] } : {})

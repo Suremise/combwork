@@ -153,6 +153,7 @@ export const SUITES = [
   { name: 'leftovers-claude', needs: ['claude'], claudeHome: 'test' },
   { name: 'leftovers-codex', needs: ['codex'] },
   { name: 'leftovers-restart' },
+  { name: 'legacyworktree' },
   { name: 'loadfail' },
   { name: 'longsession' },
   { name: 'loopwakes' },

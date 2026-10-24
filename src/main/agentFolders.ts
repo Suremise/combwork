@@ -67,7 +67,7 @@ export function setWriterHost(h: WriterHost | null): void {
 export { legacyWorktree }
 
 /** An agent as the contract reads it. */
-export const folderAgent = (a: Pick<AgentDef, 'id' | 'name' | 'role' | 'workflowRole' | 'worktree'>): FolderAgent => {
+export const folderAgent = (a: Pick<AgentDef, 'id' | 'name' | 'role' | 'workflowRole'>): FolderAgent => {
   const w = legacyWorktree(a)
   return { id: a.id, role: agentWorkflowRole(a), legacy: w ? { path: w.path, branch: w.branch } : null }
 }
@@ -134,7 +134,7 @@ export async function folderFacts(projectPath: string): Promise<FolderFacts> {
  * (`agentPlaces`), and `branch`, the line of the slot it is in now: the card last started under that slot's open lease,
  * else a carried slot's or 0.9 worktree's own branch. `facts`: read once for several agents.
  */
-export async function agentPlace(projectPath: string, agent: Pick<AgentDef, 'id' | 'name' | 'role' | 'workflowRole' | 'worktree'>, running: { cwd: string } | null, facts?: FolderFacts): Promise<{ now: AgentPlace; launch: AgentPlace; branch: string | null }> {
+export async function agentPlace(projectPath: string, agent: Pick<AgentDef, 'id' | 'name' | 'role' | 'workflowRole'>, running: { cwd: string } | null, facts?: FolderFacts): Promise<{ now: AgentPlace; launch: AgentPlace; branch: string | null }> {
   const f = facts ?? (await folderFacts(projectPath))
   const places = agentPlaces(f, folderAgent(agent), running)
   const slot = places.now.slot ? (f.slots.find((s) => s.name === places.now.slot) ?? null) : null

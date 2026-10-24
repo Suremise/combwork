@@ -1,7 +1,14 @@
 import { basename, dirname, join, resolve } from 'path'
 import { copyFile, mkdir } from 'original-fs/promises'
 import { existsSync } from 'original-fs'
-import type { AgentBranchStatus, AgentWorktree, MergeResult, WorktreeCheck } from '../shared/types'
+import type { AgentBranchStatus, MergeResult, WorktreeCheck } from '../shared/types'
+
+/** A worktree with its branch and the branch it was made from: an agent's 0.9 one, or an unused one (#1452: no longer `WorktreeRef`). */
+export interface WorktreeRef {
+  path: string
+  branch: string
+  base: string
+}
 import type { TextPart } from '../shared/advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { gitProblemData, gitProblemText } from '../shared/gitTool'
@@ -194,7 +201,7 @@ export async function createWorktree(projectPath: string, dest: string, branch: 
   log.info(`Created worktree ${userText(dest)} on ${userText(branch)} from ${userText(base)}`)
 }
 
-export async function removeWorktree(projectPath: string, wt: AgentWorktree, deleteBranch: boolean): Promise<void> {
+export async function removeWorktree(projectPath: string, wt: WorktreeRef, deleteBranch: boolean): Promise<void> {
   if (existsSync(wt.path)) {
     const r = await unwatchedWhile([wt.path], () => git(projectPath, ['worktree', 'remove', '--force', wt.path]))
     if (!r.ok) throw gitError(r.err, 'git worktree remove') // i18n-ignore: a git command, as it is
@@ -260,7 +267,7 @@ export async function dirtyCount(cwd: string): Promise<number | null> {
  * A worktree branch's commits not merged and its uncommitted files. A git command that fails (git missing included)
  * throws, never counting as nothing to merge or nothing to lose (#346).
  */
-export async function branchStatus(projectPath: string, wt: AgentWorktree, reads?: RepoReads, target?: string): Promise<AgentBranchStatus> {
+export async function branchStatus(projectPath: string, wt: WorktreeRef, reads?: RepoReads, target?: string): Promise<AgentBranchStatus> {
   // Detached is a real answer (counted against the base); a failed read isn't, and stops here. A target named (the Merge
   // dialog's branch picked with its target, #1450) is counted against instead of the project folder's branch.
   const into =
@@ -322,7 +329,7 @@ export async function unmergedCommits(projectPath: string, into: string, tip: st
  * counts as not removable. `tip` is the commit checked, for `removeCheckedWorktree`. Shared by Remove All (#291) and
  * loading templates (#289).
  */
-export async function worktreeCheck(projectPath: string, wt: AgentWorktree, reads?: RepoReads): Promise<WorktreeCheck> {
+export async function worktreeCheck(projectPath: string, wt: WorktreeRef, reads?: RepoReads): Promise<WorktreeCheck> {
   const into = reads ? await reads.primaryBranchStrict().catch(() => null) : await primaryBranch(projectPath)
   // Git that can't run says nothing about the repository: that is the reason, not "no main branch" (#346).
   const unusable = (reason: () => string): WorktreeCheck => ({ removable: false, into, reason: gitProblemText(gitTool()) ?? reason() })
@@ -352,7 +359,7 @@ export function workLeft(ahead: number, dirty: number, into: string): string {
 export const notChecked = (): string => tr(msg({ id: 'worktrees.why.notChecked', defaultMessage: 'not checked', description: "Why Hive kept a worktree: it wasn't checked for unmerged or uncommitted work. A clause, lower case." }))
 
 /** Why the refs a check rested on no longer hold, or null when both still point at the commits checked. */
-async function refsMoved(projectPath: string, wt: AgentWorktree, into: string, tip: string, intoTip: string): Promise<string | null> {
+async function refsMoved(projectPath: string, wt: WorktreeRef, into: string, tip: string, intoTip: string): Promise<string | null> {
   const [t, m] = await Promise.all([tipOf(projectPath, wt.branch), tipOf(projectPath, into)])
   const changed = msg({ id: 'worktrees.why.changed', defaultMessage: '{branch} changed since it was checked', description: "Why Hive kept a worktree or its branch: the branch {branch} moved after Hive checked it was merged. A clause, lower case." })
   return t !== tip ? tr(changed, { branch: wt.branch }) : m !== intoTip ? tr(changed, { branch: into }) : null
@@ -363,7 +370,7 @@ async function refsMoved(projectPath: string, wt: AgentWorktree, into: string, t
  * the main branch still points at the commit it was found merged into and deletes the branch only from the commit
  * checked. Null when deleted; otherwise why it was kept.
  */
-export async function deleteCheckedBranch(projectPath: string, wt: AgentWorktree, into: string, tip: string, intoTip: string): Promise<string | null> {
+export async function deleteCheckedBranch(projectPath: string, wt: WorktreeRef, into: string, tip: string, intoTip: string): Promise<string | null> {
   const tx = ['start', `verify refs/heads/${into} ${intoTip}`, `delete refs/heads/${wt.branch} ${tip}`, 'prepare', 'commit', ''].join('\n')
   const r = await git(projectPath, ['update-ref', '--stdin'], undefined, tx)
   return r.ok ? null : ((await refsMoved(projectPath, wt, into, tip, intoTip)) ?? gitKept(r.err, 'update-ref'))
@@ -383,7 +390,7 @@ function gitKept(err: string, command: string): string {
  * the reply says so; the worktree, clean, is then gone but its commits stay on the branch). Never the forced removal
  * Discard uses. Returns what it did: `deleted` the worktree, `branchKept` with the reason.
  */
-export async function removeCheckedWorktree(projectPath: string, wt: AgentWorktree, check: WorktreeCheck, expectInto?: string | null): Promise<{ deleted: boolean; branchKept?: boolean; reason?: string }> {
+export async function removeCheckedWorktree(projectPath: string, wt: WorktreeRef, check: WorktreeCheck, expectInto?: string | null): Promise<{ deleted: boolean; branchKept?: boolean; reason?: string }> {
   const { into, tip, intoTip } = check
   if (!check.removable || !into || !tip || !intoTip) return { deleted: false, reason: check.reason ?? notChecked() }
   const now = await primaryBranch(projectPath)
@@ -438,7 +445,7 @@ async function alreadyMerged(projectPath: string, into: string, branch: string):
  * committed, the branch moved only from where it was); one checked out in another folder is refused. The caller holds
  * the repository lock (repoLock.ts).
  */
-export async function mergeWorktree(projectPath: string, wt: AgentWorktree, opts: { squash: boolean; message: string; moveBranch?: boolean; target?: string }): Promise<MergeResult> {
+export async function mergeWorktree(projectPath: string, wt: WorktreeRef, opts: { squash: boolean; message: string; moveBranch?: boolean; target?: string }): Promise<MergeResult> {
   const message = opts.message.trim() || `Merge ${wt.branch}` // i18n-ignore: a git commit message, kept in the repository
   const dirty = existsSync(wt.path) ? await dirtyCount(wt.path) : 0
   // Git can't say what is uncommitted there: merging (and removing the worktree afterwards) could lose it.
@@ -498,7 +505,7 @@ export async function mergeWorktree(projectPath: string, wt: AgentWorktree, opts
 }
 
 /** A merge's result once the target has moved: its commit, and the agent's branch moved after a squash when asked. */
-async function afterMerge(projectPath: string, wt: AgentWorktree, into: string, mergeCommit: string | undefined, move: boolean): Promise<MergeResult> {
+async function afterMerge(projectPath: string, wt: WorktreeRef, into: string, mergeCommit: string | undefined, move: boolean): Promise<MergeResult> {
   const done: MergeResult = { ok: true, ...(mergeCommit ? { mergeCommit } : {}) }
   if (!move) return done
   const moved = await moveBranchTo(projectPath, wt, into)
@@ -535,7 +542,7 @@ async function branchNamed(projectPath: string, name: string): Promise<string | 
  * tip (and the branch's, unless squashed), and the target moved to it only from that tip (update-ref's compare and swap).
  * No folder's files change, so a target checked out in another worktree is refused: its files would no longer match.
  */
-async function mergeElsewhere(projectPath: string, wt: AgentWorktree, into: string, squash: boolean, message: string, moveBranch?: boolean): Promise<MergeResult> {
+async function mergeElsewhere(projectPath: string, wt: WorktreeRef, into: string, squash: boolean, message: string, moveBranch?: boolean): Promise<MergeResult> {
   const fail = (why: string): MergeResult => ({ ok: false, error: tr(M.nothingMerged, { why }) })
   const listed = await git(projectPath, ['worktree', 'list', '--porcelain'])
   if (!listed.ok) return fail(listed.err || 'git worktree list') // i18n-ignore: a git command, as it is
@@ -577,7 +584,7 @@ async function mergeElsewhere(projectPath: string, wt: AgentWorktree, into: stri
  * old commits. Only when merging the branch again would change nothing (git merge-tree), and with
  * `reset --keep`, which refuses rather than lose uncommitted changes. Returns true, or why it didn't.
  */
-export async function moveBranchTo(projectPath: string, wt: AgentWorktree, into: string): Promise<true | string> {
+export async function moveBranchTo(projectPath: string, wt: WorktreeRef, into: string): Promise<true | string> {
   if (!existsSync(wt.path)) return tr(msg({ id: 'worktrees.move.missing', defaultMessage: '{folder} is missing.', description: "Why the agent's branch wasn't moved after a squash merge: its worktree folder {folder} is gone." }), { folder: wt.path })
   const head = await git(wt.path, ['symbolic-ref', '--short', 'HEAD'])
   if (!head.ok || head.out.trim() !== wt.branch) return tr(msg({ id: 'worktrees.move.notOnBranch', defaultMessage: "The worktree isn't on {branch}.", description: "Why the agent's branch wasn't moved after a squash merge: its worktree has another branch than {branch} checked out." }), { branch: wt.branch })

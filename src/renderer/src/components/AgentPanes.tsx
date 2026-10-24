@@ -41,6 +41,7 @@ import { hooksMissingNote, hooksMissingText, unknownStateText } from '@shared/ru
 import { Icon, IconButton, ReviewMark, SafeguardMark, signInNote, statusText, Tooltip, useContextMenu, useFolds, type MenuEntry } from './ui'
 import { startBlockedReason, useStartBlocked } from './BoardUpgrade'
 import { awayFromProject, legacyOf, placeText, placeTip } from '../agentPlace'
+import { legacySetupPending } from '@shared/agentFolders'
 
 /** Height of an agent pane's header (who it is, its controls) and footer (its session's details). */
 export const PANE_HEADER = 26
@@ -1769,7 +1770,7 @@ function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectI
     return <EmptyCell project={project} cell={cell} canAdd={project.agents.length < limit} />
   }
   const own = legacyOf(a)
-  const setupPending = !!own && a.needsSetup && !!project.config.worktreeSetup.trim()
+  const setupPending = !!own && legacySetupPending(a) && !!project.config.worktreeSetup.trim()
   if (a.live) return null
   if (hasTerminal && failure && !setupPending) return <StartFailedBar project={project} a={a} failure={failure} single={single} />
   if (hasTerminal) {

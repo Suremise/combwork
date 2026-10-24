@@ -16,6 +16,7 @@ import { workspace, workspaceOf } from './workspace'
 import { copyIgnored, createWorktree, currentBranch, GIT_FAILED, listWorktrees, uniqueFolder } from './worktrees'
 import { workflowFor } from './workflow/service'
 import { legacyWorktree, slotsMigrated } from './agentFolders'
+import type { StoredAgent } from '../shared/agentFolders'
 import { projectFolders, recreateSlot, releaseSlotLease, type ProjectFolder } from './projectFolders'
 
 /**
@@ -142,8 +143,8 @@ export async function recreateWorktree(projectPath: string, agentId: string, opt
     if (why) throw hiveError(msg({ id: 'worktrees.missing.slotFailed', defaultMessage: "{agent}'s slot {slot} couldn't be made again: {why}", description: "An error: a slot lent to the agent {agent} (its name), whose folder was gone, couldn't be made again ({slot}: the slot's name; {why}: why, often git's message in English)." }), { agent: a.name, slot: f.name, why })
     return a
   }
-  if (!a.worktree) throw hiveError(M.noTree, { agent: a.name })
-  const old = a.worktree
+  const old = legacyWorktree(a)
+  if (!old) throw hiveError(M.noTree, { agent: a.name })
   if (existsSync(old.path)) throw hiveError(msg({ id: 'worktrees.missing.thereRecreate', defaultMessage: "{agent}'s worktree folder is there ({folder}): there's nothing to recreate.", description: "An error: the worktree folder {folder} of the agent {agent} (its name) exists, so it isn't missing." }), { agent: a.name, folder: old.path })
   if (sessions.liveFor(projectPath, agentId)) throw hiveError(msg({ id: 'worktrees.missing.stopFirst', defaultMessage: 'Stop {agent} first.', description: "An error: the agent {agent} (its name) is running; its missing worktree can't be recreated until it stops." }), { agent: a.name })
   const others = (await prunable(projectPath)).filter((p) => !samePlace(p, old.path) && !(opts.alsoRecreating ?? []).some((q) => samePlace(p, q)))
@@ -173,12 +174,14 @@ export async function recreateWorktree(projectPath: string, agentId: string, opt
   const moved = !samePath(dest, old.path)
   // Its cards' work follows it first (#1343). Should that fail, reconciliation follows it later from the agent's record.
   if (moved) await moveCardFolders(projectPath, old.path, dest).catch((e) => log.warn(`moving ${userText(a.name)}'s cards to its recreated worktree`, e))
-  let next: AgentDef | undefined
+  // Repair writes 0.9.3's fields (#1452: StoredAgent): the worktree it had, at its new place; never a new one.
+  let next: StoredAgent | undefined
   await workspace.mutateProjectConfig(projectPath, (now) => {
     const setup = !!now.worktreeSetup.trim()
     const agents = projectAgents(now).map((x) => {
-      if (x.id !== agentId || !x.worktree) return x
-      next = { ...x, worktree: { ...x.worktree, path: dest, base }, ...(setup ? { needsSetup: true } : {}) }
+      const w = legacyWorktree(x)
+      if (x.id !== agentId || !w) return x
+      next = { ...x, worktree: { ...w, path: dest, base }, ...(setup ? { needsSetup: true } : {}) }
       return next
     })
     const m = { from: old.path, to: dest, of: `${a.name}'s worktree` } // i18n-ignore: what a pending copy is of, for the log
@@ -201,14 +204,16 @@ export async function unlinkMissingWorktree(projectPath: string, agentId: string
     await releaseSlotLease(workspaceOf(projectPath), projectPath, f)
     return now
   }
-  let next: AgentDef | undefined
+  let next: StoredAgent | undefined
   await workspace.mutateProjectConfig(projectPath, (cfg) => {
     const agents = projectAgents(cfg).map((x) => {
       if (x.id !== agentId) return x
-      if (!x.worktree) throw hiveError(M.noTree, { agent: x.name })
-      if (existsSync(x.worktree.path)) throw hiveError(msg({ id: 'worktrees.missing.thereUnlink', defaultMessage: "{agent}'s worktree folder is there ({folder}): remove the agent to remove its worktree.", description: "An error: the worktree folder {folder} of the agent {agent} (its name) exists, so its link can't be dropped as a missing one." }), { agent: x.name, folder: x.worktree.path })
+      const w = legacyWorktree(x)
+      if (!w) throw hiveError(M.noTree, { agent: x.name })
+      if (existsSync(w.path)) throw hiveError(msg({ id: 'worktrees.missing.thereUnlink', defaultMessage: "{agent}'s worktree folder is there ({folder}): remove the agent to remove its worktree.", description: "An error: the worktree folder {folder} of the agent {agent} (its name) exists, so its link can't be dropped as a missing one." }), { agent: x.name, folder: w.path })
+      // Written as undefined, so the save carries no stored one back (carryLegacyAgentFields).
       next = { ...x, worktree: undefined, needsSetup: undefined }
-      log.info(`Removed ${userText(x.name)}'s link to its missing worktree ${userText(x.worktree.path)}`)
+      log.info(`Removed ${userText(x.name)}'s link to its missing worktree ${userText(w.path)}`)
       return next
     })
     return { agents }

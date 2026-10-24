@@ -11,6 +11,7 @@ import { BusyButton, Icon, InfoTip } from './ui'
 import { ItemTable, ShortPath, type ItemRow } from './ItemTable'
 import { useStorageRequests } from './Storage'
 import { msg, tr } from '@shared/i18n'
+import { agentFolder } from '../agentPlace'
 
 const M = {
   loading: msg({ id: 'workspace.unusedList.loading', defaultMessage: 'Loading…', description: "The Changes tab's Unused worktrees while git lists them." }),
@@ -73,8 +74,9 @@ export function useUnusedWorktrees(project: ProjectInfo): { data: UnusedWorktree
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const loads = useRef(0)
-  // The agents' worktrees: one removed (its worktree kept) or given to an agent changes the list.
-  const trees = project.agents.map((a) => a.worktree?.path ?? '').join('|')
+  // The folders the agents work in (#1452: their place, a 0.9 worktree or a slot): one an agent leaves (removed, its
+  // worktree kept, or a lease ended) changes the list.
+  const trees = project.agents.map((a) => agentFolder(a)).join('|')
   const version = useStore((s) => s.unusedVersion[project.path] ?? 0)
   const reload = useCallback(() => {
     const n = ++loads.current
