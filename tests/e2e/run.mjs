@@ -204,7 +204,9 @@ const runBuild = () => {
   devBuild(root)
 }
 // Only the installer's suites: they test dist/win-unpacked, not out/ (needsDevBuild), so out/ isn't looked at (#274).
-const devBuildNeeded = needsDevBuild(chosen)
+// Nor when none can run on the packaged build HIVE_EXE names: nothing would use it, and the run's record is still due.
+const runnable = chosen.filter((s) => !devOnly.has(s.name))
+const devBuildNeeded = !nothingRan && needsDevBuild(runnable)
 let buildCheck = { stale: false, built: false, waited: false, why: null }
 try {
   if (devBuildNeeded) buildCheck = ensureBuild({ root, build: opts.build, runBuild })
@@ -367,7 +369,6 @@ const rank = (s) => Math.max(-1, ...(s.needs ?? []).map((n) => NEEDS.indexOf(n))
 const needs = (s, n) => (s.needs ?? []).includes(n)
 const isLast = (s) => !!s.serial || needs(s, 'packaged')
 const isCli = (s) => !isLast(s) && (needs(s, 'claude') || needs(s, 'codex'))
-const runnable = chosen.filter((s) => !devOnly.has(s.name))
 const sideBySide = jobs === 1 ? [] : runnable.filter((s) => !isLast(s) && !isCli(s))
 const cliLane = jobs === 1 ? [] : runnable.filter(isCli).sort((a, b) => rank(a) - rank(b))
 const last = jobs === 1 ? [...runnable].sort((a, b) => rank(a) - rank(b)) : runnable.filter(isLast).sort((a, b) => rank(a) - rank(b))

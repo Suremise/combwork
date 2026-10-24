@@ -144,6 +144,8 @@ describe('the e2e suite list', () => {
     expect(runner).toContain('const problems = [...(nothingRan ? [nothingRan] : []),')
     expect(runner).toContain('process.exit(!lastRun.ok || recordInvalid || nothingRan ? 1 : 0)')
     expect(runner).not.toMatch(/nothingRan[^\n]*\n[^\n]*process\.exit\(1\)/)
+    // Nor does it need a dev build for suites it won't run (concurrency.mjs runs it in a worktree with none).
+    expect(runner).toContain('const devBuildNeeded = !nothingRan && needsDevBuild(runnable)')
   })
 
   it('no fixed wait of 1 s or more without a reason: wait for the condition (lib.until) instead', () => {
