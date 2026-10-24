@@ -432,11 +432,11 @@
     "description": "The Changes tab, over the project folder's changes."
   },
   "workspace.changes.aboutUnusedOne": {
-    "defaultMessage": "An unused worktree: everything on {branch} that isn't on {into}. Merge it, or go back to Unused worktrees to give it to an agent or remove it.",
+    "defaultMessage": "An unused worktree: everything on {branch} that isn't on {into}. Merge it, or go back to Unused worktrees to remove it.",
     "description": "The Changes tab, over an unused worktree's changes. Unused worktrees is the page's name."
   },
   "workspace.changes.aboutUnusedShort": {
-    "defaultMessage": "Worktrees no agent of {project} works in: open one to see its changes and merge them, or give it to an agent.",
+    "defaultMessage": "Worktrees no agent of {project} works in: open one to see its changes and merge them, or remove it.",
     "description": "The Changes tab's Unused worktrees page, at the top, in one sentence (#1314; its ⓘ says where they come from and what Remove does)."
   },
   "workspace.changes.aboutUnusedTip": {
@@ -2138,10 +2138,6 @@
   "workspace.unusedList.gitProblem": {
     "defaultMessage": "{problem}, so Hive can't list the unused worktrees.",
     "description": "The Changes tab's Unused worktrees when git can't run ({problem}: what is wrong with git)."
-  },
-  "workspace.unusedList.give": {
-    "defaultMessage": "Give to an agent…",
-    "description": "An unused worktree's button: an agent works in it again."
   },
   "workspace.unusedList.heading": {
     "defaultMessage": "Unused worktrees",

@@ -536,7 +536,6 @@ interface HiveMessageValues {
   'workspace.unusedList.colState': undefined
   'workspace.unusedList.detached': undefined
   'workspace.unusedList.gitProblem': { problem: string | number }
-  'workspace.unusedList.give': undefined
   'workspace.unusedList.heading': undefined
   'workspace.unusedList.keptMany': { count: number }
   'workspace.unusedList.keptReason': undefined
