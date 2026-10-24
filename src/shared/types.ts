@@ -5,6 +5,7 @@ import type { Text, TextPart } from './advanced'
 import type { AvOffer } from './antivirus'
 import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActivity'
 import type { AttachmentKind } from './attachments'
+import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { TipsState } from './tips'
 import type { SuggestedPreset, TemplateAgent, TemplateScope } from './templates'
@@ -981,6 +982,11 @@ export interface ProjectRemovalInfo {
   /** Worktree agents: their folder, and work not merged into the project folder (commits ahead, uncommitted files). */
   /** `error`: git couldn't check it, which counts as holding work. */
   worktrees: { agent: string; path: string; branch: string; ahead: number; dirty: number; error?: string }[]
+  /**
+   * Its slots, copies and retired homes (#1447), with what removing the project would do to each: `kept`, why it would
+   * stay (the guarded clean-up's reason, or a home's, or a folder Hive didn't make), or null: removed.
+   */
+  folders?: { of: ProjectFolderOf; path: string; kept: string | null; blocksDelete?: string }[]
 }
 
 /** A project folder holding what Remove from Hive packed into its .hive/removed. */
@@ -1238,8 +1244,28 @@ export interface SlotView {
   warmError: string | null
   warmLog: string | null
   lease: { id: string; kind: 'card' | 'lane' | 'carried'; agent: string; card: number | null; lane: string | null } | null
-  /** The session run writing in it now (#1434): its agent and the lease it started under, until it has exited. */
-  writer: { agent: string; lease: string } | null
+  /**
+   * The session run writing in it now (#1434): its agent and the lease it started under, until it has exited. `held`
+   * (#1506): its run is over but its processes aren't known to have ended (nor its Hive running), so only Release Slot…
+   * frees it.
+   */
+  writer: { agent: string; lease: string; held: boolean } | null
+}
+
+/** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */
+export interface HeldWriter {
+  slot: string
+  agent: string
+  run: string
+  /** The Hive holding it: this one (`self`), or another and whether that one still runs (null: can't be told). */
+  hive: { pid: number; self: boolean; alive: boolean | null }
+  /** Its run is still live in this Hive (its session, or the processes it left still followed): Release is refused. */
+  live: boolean
+  /**
+   * What Hive lists of the processes its run left running: its leftovers (the agent's ⋯ lists them), or, its Hive gone,
+   * the agent's processes that the notice that Hive closed unexpectedly lists and that still run. Null: not known.
+   */
+  processes: { list: AgentProcess[]; more: number; from: 'leftovers' | 'restart' } | null
 }
 
 /** One of a project's review and check copies as the window reads it (#1435, copies.ts): its state and its lease not freed. */
@@ -1359,6 +1385,8 @@ export interface AgentInfo extends AgentDef {
   resume: ResumeTarget | null
   /** Its adopted worktree's slot, while it holds it under a carried lease (#1441): Release Slot… in its menu ends it. */
   carriedSlot?: string
+  /** A slot its run that is over still holds as writer, its processes not known ended (#1506): Release Slot… frees it. */
+  heldSlot?: string
   /** Where it works now (#1442): its running session's folder, else where its next conversation starts. */
   place: ShownPlace
 }
@@ -2004,12 +2032,28 @@ export interface MoveBranch {
  * branch is gone (`to`: where, if that place can be used); unlink: the agent's worktree link is to be removed;
  * original: the project is still at its old folder too (a copy), which keeps the worktree.
  */
+/**
+ * A folder Hive keeps for a project besides an agent's 0.9 worktree (#1447), as Repair and project removal name it: a
+ * slot (its lease's agent and the cards it held, by key; `carried`: an agent's adopted worktree), a review or check copy,
+ * or a reviewer's retired home (its agent).
+ */
+export type ProjectFolderOf =
+  | { kind: 'slot'; name: string; agent: string | null; cards: string[]; carried: boolean }
+  | { kind: 'copy'; name: string }
+  | { kind: 'home'; agent: string | null }
+
+/**
+ * A worktree Repair looks at: an agent's 0.9 worktree, or (`of`, #1447) one of the project's slots, copies or retired
+ * homes, keyed then as `slot:<name>`, `copy:<name>` or `home:<n>` in `agentId` (`agentName`: its name for the log).
+ * `later`: a free slot or copy not found, made again where it belongs at its next lease.
+ */
 export interface MoveWorktree {
   agentId: string
   agentName: string
   from: string
   to: string | null
-  how: 'moved' | 'stayed' | 'located' | 'missing' | 'recreate' | 'unlink' | 'original'
+  how: 'moved' | 'stayed' | 'located' | 'missing' | 'recreate' | 'unlink' | 'original' | 'later'
+  of?: ProjectFolderOf
   /** missing and recreate: its branch, and whether the branch survives (Recreate) or not (Create a new worktree). */
   branch?: string
   branchExists?: boolean
@@ -2022,6 +2066,8 @@ export interface WorktreeGone {
   branch: string
   base: string
   branchExists: boolean
+  /** A gone slot the agent holds (#1447): its name; Recreate makes it again on its line (`branch`), Release frees it. */
+  slot?: string
 }
 
 /** A CLI's per-path folder copied for a moved folder: files to copy, and files already there with other content (kept). */
@@ -2060,6 +2106,7 @@ export interface MoveOptions {
 /** What a row of Repair's report is about (#1313): the dialog words it as the plan's What column does. */
 export type MoveReportWhat =
   | { kind: 'worktree' | 'branch'; agent: string }
+  | { kind: 'folder'; of: ProjectFolderOf }
   | { kind: 'sessions' }
   | { kind: 'copy'; provider: ProviderId }
   | { kind: 'board'; from: string }

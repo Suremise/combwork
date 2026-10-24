@@ -1371,6 +1371,14 @@
     "defaultMessage": "Choose which skills agents get",
     "description": "A tip's title."
   },
+  "tips.slotHeld.text": {
+    "defaultMessage": "When Hive can't tell that everything an agent's session started in a slot has ended, it keeps the slot for it rather than guess. Release Slot… in the agent's ⋯ menu shows what Hive knows, ends what it lists if you want, and frees the slot.",
+    "description": "A tip. A slot: a folder Hive lends to a card or a lane. Release Slot… is a menu item: keep it as Hive shows it; ⋯ is the agent's menu button."
+  },
+  "tips.slotHeld.title": {
+    "defaultMessage": "Free a slot held after Hive closed",
+    "description": "A tip's title (#1506). A slot: a folder Hive lends to a card or a lane."
+  },
   "tips.slotOptions.text": {
     "defaultMessage": "Version Control → Workflow → Slots and copies holds the script run in a new slot, the files copied into it and the slots in use, and how many review copies the project keeps. They save as you change them.",
     "description": "A tip. A slot: a folder Hive lends to a card or a lane; a review copy: a folder at exactly the revision a reviewer reviews. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1584,7 +1592,7 @@
     "description": "A tip's title."
   },
   "tips.unusedWorktrees.text": {
-    "defaultMessage": "Removed an agent but kept its worktree? Git → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, remove the merged ones with their branches, or give one back to an agent.",
+    "defaultMessage": "Removed an agent but kept its worktree? Git → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, or remove the merged ones with their branches.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.unusedWorktrees.title": {

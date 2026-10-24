@@ -32,6 +32,7 @@ const SAMPLE: RefusalValues = {
   step: 'followUp',
   minutes: 12,
   files: 'src/a.ts',
+  path: 'node_modules/pad/index.js',
   folder: 'D:\\work\\am',
   commit: 'b4c5d6e',
   command: 'npm test',

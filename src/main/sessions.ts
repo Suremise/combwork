@@ -20,7 +20,7 @@ import { assistantTools } from '../shared/assistantTools'
 import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, legacyWorktree, namedFolders, resumeHold, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
-import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, releaseWriter, settleWriter } from './agentFolders'
+import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter } from './agentFolders'
 import { slotEnv } from './slots'
 import { copiesDirOf, grantsCopies } from './copies'
 import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
@@ -1268,6 +1268,8 @@ class SessionManager {
     const slotFolders = facts?.slots.map((s) => s.folder) ?? []
     // Unreadable: no slots or homes, a 0.9 worktree still its agent's (as the contract reads a project not migrated).
     const shownFacts: FolderFacts = facts ?? { projectPath, migrated: false, migratedAgents: [], homes: [], slots: [] }
+    // Slots held by an agent's run that is over, its processes not known ended (#1506): its ⋯ offers Release Slot….
+    const held = facts?.slots.some((s) => s.writer) ? await heldSlots(projectPath).catch(() => new Map<string, string>()) : new Map<string, string>()
     for (const a of projectAgents(cfg)) {
       const l = this.live.get(liveId(projectPath, a.id))
       let restartNeeded = false
@@ -1292,7 +1294,7 @@ class SessionManager {
       const legacy = legacyWorktree(a)
       const shown = at ? shownPlace(shownFacts, folderAgent(a), at.now, at.branch) : { folder: projectPath, is: 'project' as const, name: null, branch: null }
       const place = shown.is === 'legacy' && legacy?.base ? { ...shown, base: legacy.base } : shown
-      agents.push({ ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}) }, ...(carried ? { carriedSlot: carried } : {}), place })
+      agents.push({ ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}) }, ...(carried ? { carriedSlot: carried } : {}), ...(held.has(a.id) ? { heldSlot: held.get(a.id) } : {}), place })
     }
     const primary = agents.find((a) => a.live)
     return { live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, agents, folders: namedFolders(shownFacts) }

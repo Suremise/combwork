@@ -31,7 +31,7 @@ import { basename, join } from 'path'
 import { samePlace } from './fsutil'
 import { git } from './git'
 import { createLogger, userText } from './logger'
-import { IDLE_MS, lockHash, OpLost, quiet, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRunner, type SlotRunEnd } from './slots'
+import { deletingIn, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRunner, type SlotRunEnd } from './slots'
 import { copyIgnored, listWorktrees } from './worktrees'
 
 const log = createLogger('copies')
@@ -241,6 +241,8 @@ export class CopyStore {
     try {
       return await this.conn.write((db) => {
         const at = this.iso()
+        // The project being deleted (#1447): no copy leased or made until its reservation ends.
+        if (deletingIn(db, this.project)) return { ok: false as const, size: 0 }
         const all = (db.prepare('SELECT * FROM copies WHERE project = ? ORDER BY name').all(this.project) as Row[]).map(copyOfRow)
         const leased = (c: Copy): boolean => !!db.prepare('SELECT 1 FROM copy_leases WHERE project = ? AND copy = ? AND freed_at IS NULL').get(this.project, c.name)
         const free = all.filter((c) => (c.state === 'free' || c.state === 'dirty' || c.state === 'gone') && !c.warmError && !c.op && !c.job && !leased(c) && !o.skip?.has(c.name))
@@ -346,6 +348,14 @@ export class CopyStore {
   }
 
   /** A free copy whose folder is gone: marked so (it is made again at its next lease). */
+  /**
+   * A copy's folder moved by Repair (#1447): its row follows it, only while no operation or job holds it; with `gone` (not
+   * found), marked gone at its place in the moved pool, so its next lease makes it again there. Whether it was.
+   */
+  async relocate(name: string, folder: string, o: { gone?: boolean } = {}): Promise<boolean> {
+    return this.conn.write((db) => Number(db.prepare(`UPDATE copies SET folder = ?${o.gone ? ", state = 'gone'" : ''} WHERE project = ? AND name = ? AND op IS NULL AND job IS NULL`).run(folder, this.project, name).changes) === 1)
+  }
+
   async markGone(name: string): Promise<void> {
     await this.conn.write((db) => db.prepare(`UPDATE copies SET state = 'gone' WHERE project = ? AND name = ? AND state = 'free' AND ${FREE}`).run(this.project, name))
   }
@@ -642,6 +652,7 @@ export class CopyPool {
    * is over returned, returning copies tried through the barrier, a free copy whose folder is gone marked gone.
    */
   async refresh(): Promise<void> {
+    await this.releaseStaleDelete()
     for (const c of this.store.copies()) {
       if (this.closed) return
       if (c.op) {
@@ -663,9 +674,22 @@ export class CopyPool {
     }
   }
 
+  /** A Delete's reservation whose holder is gone (#1447), as the slots' pool releases it: whole, in one write. */
+  private async releaseStaleDelete(): Promise<void> {
+    const project = this.store.project
+    const d = this.store.conn.read((db) => deletingIn(db, project))
+    if (!d || (d.token && !(await this.holderGone(d.pid, d.started, d.token)))) return
+    await this.store.conn.write((db) => {
+      if (deletingIn(db, project)?.token === d.token) releaseDeleteIn(db, project, d.token)
+    })
+    log.warn(`Released a Delete's hold on the project's slots and copies: process ${d.pid}, which held it, is gone`)
+  }
+
   /** Takes over an operation whose holder is gone, from inside an operation of this pool's (eligibility re-checked there). */
   private async recover(c: Copy): Promise<void> {
     const was = c.op!
+    // A Delete's (#1447): never taken over copy by copy, only released whole (`releaseStaleDelete`).
+    if (this.store.conn.read((db) => deletingIn(db, this.store.project))?.token === was.token) return
     const token = newToken()
     await this.op(token, async () => {
       const now = this.store.copy(c.name)

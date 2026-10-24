@@ -121,6 +121,9 @@ interface HiveMessageValues {
   'workspace.docs.seeAlso': { file: string | number }
   'workspace.docs.shortcuts': undefined
   'workspace.docs.title': undefined
+  'workspace.folder.copy': { name: string | number }
+  'workspace.folder.home': { hasAgent: string; agent: string | number }
+  'workspace.folder.slot': { carried: string; name: string | number; agent: string | number; hasAgent: string; hasCards: string; cards: string | number }
   'workspace.mcpView.builtIn': undefined
   'workspace.mcpView.builtInText': { hasUrl: string; url: string | number }
   'workspace.mcpView.deleteServer': undefined
@@ -284,15 +287,23 @@ interface HiveMessageValues {
   'workspace.removal.colHappens': undefined
   'workspace.removal.colWhat': undefined
   'workspace.removal.delete': undefined
+  'workspace.removal.deleteBlocked': undefined
   'workspace.removal.deleteSummary': undefined
   'workspace.removal.deletedDone': { name: string | number }
   'workspace.removal.deleting': undefined
   'workspace.removal.discard': undefined
   'workspace.removal.discardFailed': undefined
   'workspace.removal.drafts': undefined
+  'workspace.removal.folderBlocks': { why: string | number }
   'workspace.removal.folderGone': undefined
   'workspace.removal.folderHow': { how: string }
+  'workspace.removal.folderKept': { why: string | number }
+  'workspace.removal.folderLeft': undefined
+  'workspace.removal.folderRemoved': undefined
   'workspace.removal.folderThing': undefined
+  'workspace.removal.folderTrashed': undefined
+  'workspace.removal.foldersHow': { how: string }
+  'workspace.removal.foldersThing': { count: number }
   'workspace.removal.forget': undefined
   'workspace.removal.forgetFailed': { name: string | number }
   'workspace.removal.handoversHow': { how: string }
@@ -338,16 +349,21 @@ interface HiveMessageValues {
   'workspace.repair.board': { from: string | number }
   'workspace.repair.branch': { agent: string | number }
   'workspace.repair.choose': { gone: string }
+  'workspace.repair.chooseFolder': { kind: string; gone: string }
   'workspace.repair.chooseShort': undefined
   'workspace.repair.conversations': { provider: string | number }
   'workspace.repair.copy': { count: number; stays: string }
   'workspace.repair.createShort': undefined
   'workspace.repair.defender': undefined
   'workspace.repair.folders': { count: number }
+  'workspace.repair.forget': undefined
+  'workspace.repair.forgetHome': undefined
+  'workspace.repair.forgetShort': undefined
   'workspace.repair.give': { what: string | number; hasCards: string; cards: string | number; to: string | number }
   'workspace.repair.hideFolders': undefined
   'workspace.repair.keptFiles': { count: number }
   'workspace.repair.keptTip': { count: number; files: string | number; more: number }
+  'workspace.repair.later': undefined
   'workspace.repair.leaveExclusion': undefined
   'workspace.repair.listNew': undefined
   'workspace.repair.markAgain': { projects: string | number }
@@ -365,7 +381,12 @@ interface HiveMessageValues {
   'workspace.repair.recent': undefined
   'workspace.repair.recheck': undefined
   'workspace.repair.recreate': { exists: string; branch: string | number }
+  'workspace.repair.recreateOn': { branch: string | number }
   'workspace.repair.recreateShort': undefined
+  'workspace.repair.recreateSlot': undefined
+  'workspace.repair.release': undefined
+  'workspace.repair.releaseShort': undefined
+  'workspace.repair.releaseSlot': undefined
   'workspace.repair.relink': { located: string }
   'workspace.repair.rename': { remote: string }
   'workspace.repair.result': undefined
@@ -515,7 +536,6 @@ interface HiveMessageValues {
   'workspace.unusedList.colState': undefined
   'workspace.unusedList.detached': undefined
   'workspace.unusedList.gitProblem': { problem: string | number }
-  'workspace.unusedList.give': undefined
   'workspace.unusedList.heading': undefined
   'workspace.unusedList.keptMany': { count: number }
   'workspace.unusedList.keptReason': undefined

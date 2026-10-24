@@ -432,11 +432,11 @@
     "description": "The Changes tab, over the project folder's changes."
   },
   "workspace.changes.aboutUnusedOne": {
-    "defaultMessage": "An unused worktree: everything on {branch} that isn't on {into}. Merge it, or go back to Unused worktrees to give it to an agent or remove it.",
+    "defaultMessage": "An unused worktree: everything on {branch} that isn't on {into}. Merge it, or go back to Unused worktrees to remove it.",
     "description": "The Changes tab, over an unused worktree's changes. Unused worktrees is the page's name."
   },
   "workspace.changes.aboutUnusedShort": {
-    "defaultMessage": "Worktrees no agent of {project} works in: open one to see its changes and merge them, or give it to an agent.",
+    "defaultMessage": "Worktrees no agent of {project} works in: open one to see its changes and merge them, or remove it.",
     "description": "The Changes tab's Unused worktrees page, at the top, in one sentence (#1314; its ⓘ says where they come from and what Remove does)."
   },
   "workspace.changes.aboutUnusedTip": {
@@ -478,6 +478,18 @@
   "workspace.docs.title": {
     "defaultMessage": "Documentation",
     "description": "The Documentation view's heading."
+  },
+  "workspace.folder.copy": {
+    "defaultMessage": "{name}",
+    "description": "What a project's review or check copy is called in Repair's plan and report and in Remove Project (#1447): its name ({name}, such as copy-1). Usually left as it is."
+  },
+  "workspace.folder.home": {
+    "defaultMessage": "{hasAgent, select, yes {{agent}'s old folder} other {an old reviewer folder}}",
+    "description": "What a retired home is called in Repair's plan and report and in Remove Project (#1447): a reviewer agent's ({agent}) own worktree from before 1.0, where its conversations still resume."
+  },
+  "workspace.folder.slot": {
+    "defaultMessage": "{carried, select, yes {{name} (carried, {agent})} other {{hasAgent, select, yes {{hasCards, select, yes {{name} ({agent}, {cards})} other {{name} ({agent})}}} other {{hasCards, select, yes {{name} ({cards})} other {{name}}}}}}}",
+    "description": "What a project's slot is called in Repair's plan and report and in Remove Project (#1447): its name ({name}, such as slot-b), the agent it is lent to ({agent}) and the cards it held ({cards}, keys such as AM-12, a list). carried: an agent's own worktree from before 1.0, kept as a slot for it (carried is Hive's term: translate it as a short word)."
   },
   "workspace.mcpView.builtIn": {
     "defaultMessage": "Built-in Hive MCP server",
@@ -1131,8 +1143,12 @@
     "defaultMessage": "Delete",
     "description": "Remove Project: a choice, and the dialog's button for it."
   },
+  "workspace.removal.deleteBlocked": {
+    "defaultMessage": "Delete can't go ahead while a slot or old folder listed above stops it.",
+    "description": "Remove Project, with Delete chosen (#1447): why its button is off: a slot or old folder in the list says why it stops Delete."
+  },
   "workspace.removal.deleteSummary": {
-    "defaultMessage": "The project folder, its worktrees and its handovers go to the Recycle Bin, and its cards are deleted.",
+    "defaultMessage": "The project folder, its worktrees, slots and copies, and its handovers go to the Recycle Bin, and its cards are deleted.",
     "description": "Remove Project: what Delete does."
   },
   "workspace.removal.deletedDone": {
@@ -1155,6 +1171,10 @@
     "defaultMessage": "Files of this project have unsaved edits in Hive. They are lost.",
     "description": "Remove Project, before Delete."
   },
+  "workspace.removal.folderBlocks": {
+    "defaultMessage": "stops Delete: {why}",
+    "description": "Remove Project, What it touches, with Delete chosen (#1447): a slot or old folder that stops Delete, and why ({why}: a clause)."
+  },
   "workspace.removal.folderGone": {
     "defaultMessage": "The folder is no longer in the workspace.",
     "description": "Under a hidden project whose folder is gone."
@@ -1163,9 +1183,33 @@
     "defaultMessage": "{how, select, delete {to the Recycle Bin} remove {stays where it is} other {stays, hidden from Hive}}",
     "description": "Remove Project, What it touches, What happens to the project folder, for the choice made."
   },
+  "workspace.removal.folderKept": {
+    "defaultMessage": "kept: {why}",
+    "description": "Remove Project, What it touches (#1447): a slot, copy or old folder that stays, and why ({why}: a clause, such as \"2 files in it aren't committed\")."
+  },
+  "workspace.removal.folderLeft": {
+    "defaultMessage": "left as it is",
+    "description": "Remove Project, What it touches, with Hide chosen (#1447): a slot, copy or old folder isn't touched."
+  },
+  "workspace.removal.folderRemoved": {
+    "defaultMessage": "removed",
+    "description": "Remove Project, What it touches (#1447): a slot or copy that goes, nothing in it being lost."
+  },
   "workspace.removal.folderThing": {
     "defaultMessage": "Folder",
     "description": "Remove Project, What it touches, the What column: the project's folder (its name follows; the full path on hover)."
+  },
+  "workspace.removal.folderTrashed": {
+    "defaultMessage": "to the Recycle Bin",
+    "description": "Remove Project, What it touches, with Delete chosen (#1447): a slot, copy or old folder goes to the Recycle Bin with the project, with whatever is in it."
+  },
+  "workspace.removal.foldersHow": {
+    "defaultMessage": "{how, select, hide {left as they are} delete {to the Recycle Bin, with what is in them} other {removed when clean and merged; the rest stay, listed}}",
+    "description": "Remove Project, What it touches, what happens to the project's slots, copies and old folders for the choice made (#1447): Hive removes those with nothing to lose, and keeps the others."
+  },
+  "workspace.removal.foldersThing": {
+    "defaultMessage": "{count, plural, one {# slot, copy or old folder} other {# slots, copies and old folders}}",
+    "description": "Remove Project, What it touches, the What column (#1447): the project's slots (working folders Hive lends to cards), review copies and old reviewer folders, each on a row under it."
   },
   "workspace.removal.forget": {
     "defaultMessage": "Forget",
@@ -1347,6 +1391,10 @@
     "defaultMessage": "{gone, select, yes {its branch is gone too: create, locate or remove its link} other {recreate, locate or remove its link}}",
     "description": "Repair's plan, the Will do column, in the warning colour: a missing worktree waits for a choice (the row's buttons)."
   },
+  "workspace.repair.chooseFolder": {
+    "defaultMessage": "{kind, select, home {locate or forget it} other {{gone, select, yes {its branch is gone too: locate or release it} other {recreate, locate or release it}}}}",
+    "description": "Repair's plan, the Will do column, in the warning colour (#1447): a lent slot or an old reviewer folder ({kind}: slot or home) wasn't found and waits for a choice (the row's buttons)."
+  },
   "workspace.repair.chooseShort": {
     "defaultMessage": "choose",
     "description": "Repair's plan, the Will do column, in the warning colour: a missing worktree waits for one of the row's buttons (Recreate, Locate…, Remove link; its tooltip says so in full)."
@@ -1371,6 +1419,18 @@
     "defaultMessage": "{count, plural, one {# folder} other {# folders}}",
     "description": "Repair's plan: how many of a coding agent's folders are copied (one per moved folder)."
   },
+  "workspace.repair.forget": {
+    "defaultMessage": "forget it",
+    "description": "Repair's plan, the Will do column: a missing old reviewer folder is forgotten (#1447)."
+  },
+  "workspace.repair.forgetHome": {
+    "defaultMessage": "Forget it: its conversations can be read, but not resumed there",
+    "description": "Repair's plan, a missing old reviewer folder's button, in full (its tooltip; #1447)."
+  },
+  "workspace.repair.forgetShort": {
+    "defaultMessage": "Forget",
+    "description": "Repair's plan, a missing old reviewer folder's compact button (#1447; its tooltip: workspace.repair.forgetHome)."
+  },
   "workspace.repair.give": {
     "defaultMessage": "give {what}{hasCards, select, yes { ({cards})} other {}} to {to}",
     "description": "Repair's plan, the Will do column of the board's row ({what}: \"9 cards and 1 lane\"; {cards}: their numbers; {to}: the project now)."
@@ -1386,6 +1446,10 @@
   "workspace.repair.keptTip": {
     "defaultMessage": "{count, plural, one {# file is} other {# files are}} already in the new folder with other content and won't be overwritten: {files}{more, plural, =0 {} other { and # more}}.",
     "description": "Repair's plan: the tooltip of a coding agent's files left as they are ({files}: up to five names)."
+  },
+  "workspace.repair.later": {
+    "defaultMessage": "made again here when next used",
+    "description": "Repair's plan, the Will do column: a free slot or review copy wasn't found; Hive makes it again at its new place the next time it's used (#1447)."
   },
   "workspace.repair.leaveExclusion": {
     "defaultMessage": "leave Hive's exclusion as it is",
@@ -1455,9 +1519,29 @@
     "defaultMessage": "{exists, select, yes {recreate on {branch}} other {create new on {branch}}}",
     "description": "Repair's plan, the Will do column: the worktree is made again on its branch, or new ({branch}: the branch)."
   },
+  "workspace.repair.recreateOn": {
+    "defaultMessage": "make again on {branch}",
+    "description": "Repair's plan, the Will do column: a lent slot's folder made again on its branch ({branch}; #1447)."
+  },
   "workspace.repair.recreateShort": {
     "defaultMessage": "Recreate",
     "description": "Repair's plan, a missing worktree's compact button (its tooltip says it in full: workspace.move.recreateButton)."
+  },
+  "workspace.repair.recreateSlot": {
+    "defaultMessage": "Recreate the slot on its branch",
+    "description": "Repair's plan, a missing lent slot's button, in full (its tooltip; #1447): make the slot's folder again on its branch, the agent keeping it."
+  },
+  "workspace.repair.release": {
+    "defaultMessage": "release it",
+    "description": "Repair's plan, the Will do column: a missing lent slot is released (#1447)."
+  },
+  "workspace.repair.releaseShort": {
+    "defaultMessage": "Release",
+    "description": "Repair's plan, a missing lent slot's compact button (#1447; its tooltip: workspace.repair.releaseSlot)."
+  },
+  "workspace.repair.releaseSlot": {
+    "defaultMessage": "Release the slot: it is made again when next lent",
+    "description": "Repair's plan, a missing lent slot's button, in full (its tooltip; #1447): its agent gives it up, and Hive makes it again the next time it lends it."
   },
   "workspace.repair.relink": {
     "defaultMessage": "{located, select, yes {located · } other {}}git worktree repair",
@@ -2054,10 +2138,6 @@
   "workspace.unusedList.gitProblem": {
     "defaultMessage": "{problem}, so Hive can't list the unused worktrees.",
     "description": "The Changes tab's Unused worktrees when git can't run ({problem}: what is wrong with git)."
-  },
-  "workspace.unusedList.give": {
-    "defaultMessage": "Give to an agent…",
-    "description": "An unused worktree's button: an agent works in it again."
   },
   "workspace.unusedList.heading": {
     "defaultMessage": "Unused worktrees",

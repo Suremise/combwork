@@ -39,6 +39,7 @@
   "worktrees.missing.noAgent": "That agent no longer exists.",
   "worktrees.missing.noBranch": "{agent}'s branch {branch} is gone, and the project folder isn't on a branch to start a new one from.",
   "worktrees.missing.noTree": "{agent} doesn't work in a worktree.",
+  "worktrees.missing.slotFailed": "{agent}'s slot {slot} couldn't be made again: {why}",
   "worktrees.missing.stillListed": "git still lists {folder} as a worktree (it may be locked): unlock it, or run git worktree prune, then try again.",
   "worktrees.missing.stopFirst": "Stop {agent} first.",
   "worktrees.missing.thereRecreate": "{agent}'s worktree folder is there ({folder}): there's nothing to recreate.",

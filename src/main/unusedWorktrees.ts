@@ -211,7 +211,7 @@ const CANT_CHECK = msg({ id: 'main.unused.slot.cantCheck', defaultMessage: "Hive
 const SLOT_GUARDED = msg({ id: 'main.unused.why.slotGuarded', defaultMessage: 'it is a slot, which Hive removes only when it is clean and its work is merged', description: "Why Hive won't remove a slot anyway from Unused worktrees (#1450): slots go only through the guarded clean-up. A clause." })
 
 /** Why the pool keeps a slot (#1450), in the window's language: a row's reason, and Remove's refusal. */
-async function keptText(projectPath: string, k: SlotKept): Promise<string> {
+export async function keptText(projectPath: string, k: SlotKept): Promise<string> {
   switch (k.why) {
     case 'leased': {
       const agent = projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === k.agent)?.name ?? k.agent

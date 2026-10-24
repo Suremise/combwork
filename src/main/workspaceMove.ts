@@ -6,6 +6,9 @@ import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { fmt, msg, tr } from '../shared/i18n'
 import { moveHasWork, rebase, rebaseAny, samePath, worktreeCandidates, type PathMove } from '../shared/movePaths'
 import { moveCardFolders, PruneBlocked, recreateWorktree } from './agentWorktree'
+import { legacyWorktree, slotsMigrated } from './agentFolders'
+import { projectFolders as foldersOf, recreateSlot, relocateFolder, releaseSlotLease, type ProjectFolder } from './projectFolders'
+import { folderWhat } from '../shared/projectFolders'
 import { config } from './config'
 import { realPath, samePlace } from './fsutil'
 import { git } from './git'
@@ -108,28 +111,32 @@ async function movedHosts(ws: WorkspaceService): Promise<{ from: string | null; 
   return { from: wsFrom, hosts }
 }
 
-/** Where each agent worktree of a moved project is now, or why it can't be repaired. */
+/**
+ * Where each worktree of a moved project is now, or why it can't be repaired: its agents' 0.9 worktrees (only agents
+ * the slots' migration hasn't taken over, #1441), then its slots, copies and retired homes (#1447, projectFolders.ts).
+ */
 async function worktreesOf(ws: WorkspaceService, host: Host, wsMove: PathMove, opts: MoveOptions): Promise<MoveWorktree[]> {
   if (host.assistant) return []
   const out: MoveWorktree[] = []
   const projectMove = { from: host.from, to: host.folder }
   const copied = existsSync(host.from)
   for (const a of projectAgents(await ws.projectConfig(host.path))) {
-    if (!a.worktree) continue
+    const legacy = legacyWorktree(a)
+    if (!legacy || (await slotsMigrated(host.path, a.id))) continue
     const key = `${host.path}#${a.id}`
-    const base = { agentId: a.id, agentName: a.name, from: a.worktree.path }
+    const base = { agentId: a.id, agentName: a.name, from: legacy.path }
     if (opts.unlink?.includes(key)) {
       out.push({ ...base, to: null, how: 'unlink' })
       continue
     }
     const picked = opts.locate?.[key]
     if (picked && (await isWorktreeFolder(picked))) {
-      if (!(await linked(host.path, picked)) || !samePlace(picked, a.worktree.path)) out.push({ ...base, to: resolve(picked), how: 'located' })
+      if (!(await linked(host.path, picked)) || !samePlace(picked, legacy.path)) out.push({ ...base, to: resolve(picked), how: 'located' })
       continue
     }
     // Already right (repaired before, or a worktree the move didn't touch).
-    if (await linked(host.path, a.worktree.path)) continue
-    const candidates = worktreeCandidates(a.worktree.path, wsMove, projectMove)
+    if (await linked(host.path, legacy.path)) continue
+    const candidates = worktreeCandidates(legacy.path, wsMove, projectMove)
     let found: string | null = null
     for (const c of candidates) {
       if (await isWorktreeFolder(c)) {
@@ -139,14 +146,49 @@ async function worktreesOf(ws: WorkspaceService, host: Host, wsMove: PathMove, o
     }
     if (!found) {
       // Its branch lives in the repository: Recreate makes the worktree again on it (where it would have moved to).
-      const branch = { branch: a.worktree.branch, branchExists: (await git(host.path, ['rev-parse', '--verify', '--quiet', `refs/heads/${a.worktree.branch}`])).ok }
+      const branch = { branch: legacy.branch, branchExists: (await git(host.path, ['rev-parse', '--verify', '--quiet', `refs/heads/${legacy.branch}`])).ok }
       out.push(opts.recreate?.includes(key) ? { ...base, ...branch, to: candidates[0], how: 'recreate' } : { ...base, ...branch, to: null, how: 'missing' })
     }
     // Still at its old place while the project is at its old folder too: a copy, and the original keeps its worktree.
-    else if (samePath(found, a.worktree.path) && copied) out.push({ ...base, to: null, how: 'original' })
-    else out.push({ ...base, to: found, how: samePath(found, a.worktree.path) ? 'stayed' : 'moved' })
+    else if (samePath(found, legacy.path) && copied) out.push({ ...base, to: null, how: 'original' })
+    else out.push({ ...base, to: found, how: samePath(found, legacy.path) ? 'stayed' : 'moved' })
   }
+  for (const f of await foldersOf(ws, host.path)) out.push(...(await folderOf(host, f, wsMove, projectMove, copied, opts)))
   return out
+}
+
+/**
+ * Where one of a project's slots, copies or retired homes is now (#1447), as its agent's worktree is found: linked
+ * already (nothing), Locate…'s choice, then its candidates. Not found: a leased slot is Recreate's (on its line) or
+ * Release's (`unlink`), a free slot or a copy is made again where it belongs at its next lease (`later`), and a home is
+ * Locate's or Forget's (`unlink`). Copies have no Locate.
+ */
+async function folderOf(host: Host, f: ProjectFolder, wsMove: PathMove, projectMove: PathMove, copied: boolean, opts: MoveOptions): Promise<MoveWorktree[]> {
+  const key = `${host.path}#${f.key}`
+  const base = { agentId: f.key, agentName: f.name, from: f.folder, of: f.of }
+  const choosable = f.of.kind === 'home' || !!f.lease
+  if (choosable && opts.unlink?.includes(key)) return [{ ...base, to: null, how: 'unlink' }]
+  const picked = f.of.kind === 'copy' ? undefined : opts.locate?.[key]
+  if (picked && (await isWorktreeFolder(picked))) return !(await linked(host.path, picked)) || !samePath(picked, f.folder) ? [{ ...base, to: resolve(picked), how: 'located' }] : []
+  if (await linked(host.path, f.folder)) return []
+  const candidates = worktreeCandidates(f.folder, wsMove, projectMove)
+  let found: string | null = null
+  for (const c of candidates) {
+    if (await isWorktreeFolder(c)) {
+      found = c
+      break
+    }
+  }
+  if (found) {
+    if (samePath(found, f.folder) && copied) return [{ ...base, to: null, how: 'original' }]
+    return [{ ...base, to: found, how: samePath(found, f.folder) ? 'stayed' : 'moved' }]
+  }
+  if (f.of.kind === 'slot' && f.lease) {
+    const branch = { branch: f.line ?? '', branchExists: !!f.line && (await git(host.path, ['rev-parse', '--verify', '--quiet', `refs/heads/${f.line}`])).ok }
+    return [opts.recreate?.includes(key) && branch.branchExists ? { ...base, ...branch, to: candidates[0], how: 'recreate' } : { ...base, ...branch, to: null, how: 'missing' }]
+  }
+  if (f.of.kind === 'home') return [{ ...base, to: null, how: 'missing' }]
+  return [{ ...base, to: candidates[0] ?? f.folder, how: 'later' }]
 }
 
 /**
@@ -160,7 +202,7 @@ async function branchesOf(ws: WorkspaceService, project: string, worktrees: read
   const cfg = await ws.projectConfig(project)
   const agents = projectAgents(cfg)
   const pending = (cfg.pendingBranchRenames ?? []).filter((r) => agents.some((a) => a.id === r.agentId))
-  const later = (id: string): boolean => worktrees.some((w) => w.agentId === id && (w.how === 'missing' || w.how === 'unlink' || w.how === 'original'))
+  const later = (id: string): boolean => worktrees.some((w) => !w.of && w.agentId === id && (w.how === 'missing' || w.how === 'unlink' || w.how === 'original'))
   const recreated = (id: string): boolean => worktrees.some((w) => w.agentId === id && w.how === 'recreate' && w.branchExists)
   const todo = agents.filter((a) => a.worktree?.branch && !later(a.id) && !pending.some((r) => r.agentId === a.id))
   if (!todo.length && !pending.length) return []
@@ -272,7 +314,27 @@ const R = {
   cards: msg({ id: 'main.move.result.cards', defaultMessage: '{n, plural, one {# card, with its agents} other {# cards, with their agents}}', description: "Repair's report: cards that went to a project, in a list (main.move.result.given's {what}). {n} is how many." }),
   notGiven: msg({ id: 'main.move.result.notGiven', defaultMessage: "couldn't all be given to {to}: {why}", description: "Repair's report, the Result column: what was saved under an old name couldn't all go to its project ({to}: the project, or none known; {why}: the system's message). Repair tries again." }),
   working: msg({ id: 'main.move.result.working', defaultMessage: 'marked again: {projects}', description: "Repair's report, the Result column of Working on: the projects ({projects}) are marked Working on again." }),
-  recent: msg({ id: 'main.move.result.recent', defaultMessage: 'lists the new folder', description: "Repair's report, the Result column of Open Recent: the new folder replaces the old one." })
+  recent: msg({ id: 'main.move.result.recent', defaultMessage: 'lists the new folder', description: "Repair's report, the Result column of Open Recent: the new folder replaces the old one." }),
+  released: msg({ id: 'main.move.result.released', defaultMessage: 'released; made again when next lent', description: "Repair's report, the Result column: a lent slot whose folder was gone was released, and is made again at its next use (#1447)." }),
+  later: msg({ id: 'main.move.result.later', defaultMessage: 'made again here when next used', description: "Repair's report, the Result column: a free slot or review copy wasn't found, and is made again at its new place when next used (#1447)." }),
+  forgotten: msg({ id: 'main.move.result.forgotten', defaultMessage: 'no longer kept', description: "Repair's report, the Result column: an old reviewer folder that wasn't found is forgotten (#1447)." }),
+  folderMissing: msg({ id: 'main.move.result.folderMissing', defaultMessage: "{kind, select, home {not found: locate or forget it} other {{gone, select, yes {not found, its branch gone too: locate or release it} other {not found: recreate, locate or release it}}}}", description: "Repair's report, the Result column: a lent slot or an old reviewer folder ({kind}: slot or home) wasn't found; Repair waits for the user's choice (#1447)." })
+}
+
+/** Repair's lines about a project's slots, copies and retired homes (#1447): {what} is folderWhat's name for it. */
+const F = {
+  relinked: msg({ id: 'main.move.folder.relinked', defaultMessage: '{host}: {what} at {path} is linked to the project again.', description: "A line of Repair's report, after a workspace or project moved: one of the project's slots, review copies or old reviewer folders ({what}: its name, such as \"slot-b (HI-B1, AM-12)\") is linked to the project again. {host} is the project, {path} the folder." }),
+  movedTo: msg({ id: 'main.move.folder.movedTo', defaultMessage: '{host}: {what} is now at {path}.', description: "A line of Repair's report, after a workspace or project moved: one of the project's slots, copies or old reviewer folders ({what}: its name) is now at {path}. {host} is the project." }),
+  failed: msg({ id: 'main.move.folder.failed', defaultMessage: "{host}: {what} at {path} couldn't be recorded ({why}). Repair tries again.", description: "A line of Repair's report, after a workspace or project moved: one of the project's slots, copies or old reviewer folders ({what}: its name) was found at {path}, but Hive's record of it couldn't be updated ({why}). {host} is the project." }),
+  busy: msg({ id: 'main.move.folder.busy', defaultMessage: 'Hive is using it now', description: "Why Repair couldn't update its record of a slot or copy (in main.move.folder.failed's {why}): one of Hive's own steps (setting it up, removing it) holds it now. A clause." }),
+  recreated: msg({ id: 'main.move.folder.recreated', defaultMessage: '{host}: {what} was made again on {branch}, at {path}.', description: "A line of Repair's report: a slot lent to an agent, whose folder was gone, was made again on its branch ({branch}) at {path}; the agent keeps it. {what} is its name, {host} the project." }),
+  recreateFailed: msg({ id: 'main.move.folder.recreateFailed', defaultMessage: "{host}: {what} couldn't be made again: {why}", description: "A line of Repair's report: a lent slot whose folder was gone couldn't be made again ({why}: the reason, often in English from git). {what} is its name, {host} the project." }),
+  released: msg({ id: 'main.move.folder.released', defaultMessage: "{host}: {what} was released; it's made again where it belongs when it is next lent.", description: "A line of Repair's report: a lent slot whose folder was gone was released (its agent no longer has it); Hive makes it again at its next use. {what} is its name, {host} the project." }),
+  later: msg({ id: 'main.move.folder.later', defaultMessage: "{host}: {what} wasn't found; it's made again at {path} when it is next used.", description: "A line of Repair's report: a free slot or a review copy ({what}: its name) whose folder wasn't found; Hive makes it again at {path} the next time it lends it. {host} is the project." }),
+  forgotten: msg({ id: 'main.move.folder.forgotten', defaultMessage: "{host}: {what} is no longer kept (it was at {path}); its conversations can't be resumed there.", description: "A line of Repair's report: an old reviewer folder ({what}) that wasn't found is forgotten, as the user chose; the conversations that ran there can be read, not resumed there. {host} is the project, {path} where it was." }),
+  slotMissing: msg({ id: 'main.move.folder.slotMissing', defaultMessage: "{hasBranch, select, yes {{host}: {what} wasn't found (it was at {path}). Recreate it on {branch}, locate it, or release it.} other {{host}: {what} wasn't found (it was at {path}), and its branch is gone too. Locate it, or release it.}}", description: "A line of Repair's report: a lent slot ({what}: its name) wasn't found; Repair waits for the user's choice: make it again on its branch ({branch}), pick its folder, or release it. {host} is the project, {path} where it was." }),
+  homeMissing: msg({ id: 'main.move.folder.homeMissing', defaultMessage: "{host}: {what} wasn't found (it was at {path}). Locate it, or forget it.", description: "A line of Repair's report: an old reviewer folder ({what}), where its conversations resume, wasn't found; Repair waits for the user's choice. {host} is the project, {path} where it was." }),
+  original: msg({ id: 'main.move.folder.original', defaultMessage: '{host}: {what} at {path} stays linked to the project at {project}, which is still there.', description: "A line of Repair's report: one of the project's slots, copies or old reviewer folders ({what}) stays with the project folder it was made from ({project}), which is still there (a copy was moved). {host} is the project, {path} the folder." })
 }
 
 /**
@@ -316,7 +378,8 @@ function movesOf(host: Pick<Host, 'from' | 'folder' | 'assistant'>, worktrees: M
     if (!out.some((x) => samePath(x.from, m.from) && samePath(x.to, m.to))) out.push(m)
   }
   add({ from: host.from, to: host.folder, ...owned(host.assistant ? { kind: 'assistant' } : { kind: 'project' }) })
-  for (const w of worktrees) if (w.to && !samePath(w.from, w.to)) add({ from: w.from, to: w.to, ...owned({ kind: 'worktree', agent: w.agentName }) })
+  // A copy's sessions (none: reviewers run in the project folder) and a folder made again later (`later`) have nothing to follow.
+  for (const w of worktrees) if (w.to && !samePath(w.from, w.to) && w.how !== 'later' && w.of?.kind !== 'copy') add({ from: w.from, to: w.to, ...owned({ kind: 'worktree', agent: w.agentName }) })
   for (const m of pending) add(m)
   return out
 }
@@ -678,6 +741,9 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
     let open = false
     // Worktrees: git's links both ways, checked, then the agent's record.
     const fix = h.worktrees.filter((w) => w.to && (w.how === 'moved' || w.how === 'stayed' || w.how === 'located'))
+    const folders = await foldersOf(ws, h.path)
+    const folderOfRow = (w: MoveWorktree): ProjectFolder | undefined => (w.of ? folders.find((f) => f.key === w.agentId) : undefined)
+    const whatOf = (w: MoveWorktree): MoveReportRow['what'] => (w.of ? { kind: 'folder', of: w.of } : { kind: 'worktree', agent: w.agentName })
     if (fix.length) {
       const r = await git(h.path, ['worktree', 'repair', ...fix.map((w) => w.to!)])
       const listed = await listWorktrees(h.path)
@@ -691,8 +757,33 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
             r.ok
               ? tr(msg({ id: 'main.move.notRepaired', defaultMessage: "{host}: {agent}'s worktree at {path} couldn't be repaired.", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the worktree." }), { host: h.name, agent: w.agentName, path: w.to! })
               : tr(msg({ id: 'main.move.notRepairedWhy', defaultMessage: "{host}: {agent}'s worktree at {path} couldn't be repaired ({why}).", description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the worktree, {why} git's message." }), { host: h.name, agent: w.agentName, path: w.to!, why }),
-            { host: h.name, what: { kind: 'worktree', agent: w.agentName }, was: w.from, now: w.to!, result: tr(R.notRepaired, { hasWhy: why ? 'yes' : 'no', why }) }
+            { host: h.name, what: whatOf(w), was: w.from, now: w.to!, result: tr(R.notRepaired, { hasWhy: why ? 'yes' : 'no', why }) }
           )
+          continue
+        }
+        // A slot, copy or home (#1447): its cards follow it (slots), then its record, then its sessions and data
+        // (pending, as an agent's worktree's: slots and homes, not copies, whose reviewers run in the project folder).
+        const f = folderOfRow(w)
+        if (w.of) {
+          const what = folderWhat(w.of)
+          const failed = (why: string): void => say(report, 'failed', tr(F.failed, { host: h.name, what, path: w.to!, why }), { host: h.name, what: whatOf(w), was: w.from, now: w.to!, result: tr(R.failedWhy, { why }) })
+          try {
+            // The move its sessions and data follow is saved first (HR1's round 1): cut short after the record below, the
+            // pending move is still there for this Repair's last step or the next Repair to finish.
+            if (w.of.kind !== 'copy' && !samePath(w.from, w.to!)) {
+              const m = { from: w.from, to: w.to!, ...owned({ kind: 'worktree', agent: w.agentName }) }
+              await ws.mutateProjectConfig(h.path, (cfg) => ({ pendingCopies: withPending(cfg.pendingCopies, m) }))
+            }
+            if (w.of.kind === 'slot') await moveCardFolders(h.path, w.from, w.to!)
+            if (!f || !(await relocateFolder(ws, h.path, f, w.to!))) {
+              failed(tr(F.busy))
+              continue
+            }
+          } catch (e) {
+            failed(e instanceof Error ? e.message : String(e))
+            continue
+          }
+          say(report, 'done', samePath(w.from, w.to!) ? tr(F.relinked, { host: h.name, what, path: w.to! }) : tr(F.movedTo, { host: h.name, what, path: w.to! }), { host: h.name, what: whatOf(w), was: w.from, now: w.to!, result: tr(R.linked) })
           continue
         }
         // Its cards' work follows it first (#1343), so a Repair cut short before the record below writes it again.
@@ -722,6 +813,23 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
     // Worktrees to make again: after the repairs above, so git's prune can't drop a link they still needed.
     const remake = h.worktrees.filter((w) => w.how === 'recreate')
     for (const w of remake) {
+      if (w.of) {
+        // A gone leased slot (#1447): made again on its line by its pool, its lease kept; its cards and sessions follow.
+        const f = folderOfRow(w)
+        const what = folderWhat(w.of)
+        // The move its sessions and data follow, saved before the slot is made (HR1's round 1), dropped if it isn't.
+        const m = w.to && !samePath(w.from, w.to) ? { from: w.from, to: w.to, ...owned({ kind: 'worktree', agent: w.agentName }) } : null
+        if (m) await ws.mutateProjectConfig(h.path, (cfg) => ({ pendingCopies: withPending(cfg.pendingCopies, m) }))
+        const why = f && w.to ? await recreateSlot(ws, h.path, f, w.to) : 'not found' // i18n-ignore: the log's reason
+        if (why) {
+          if (m) await ws.mutateProjectConfig(h.path, (cfg) => ({ pendingCopies: (cfg.pendingCopies ?? []).filter((x) => !(samePath(x.from, m.from) && samePath(x.to, m.to))) }))
+          say(report, 'failed', tr(F.recreateFailed, { host: h.name, what, why }), { host: h.name, what: whatOf(w), was: w.from, result: tr(R.recreateFailed, { made: 'again', why }) })
+          continue
+        }
+        await moveCardFolders(h.path, w.from, w.to!).catch((e) => log.warn(`moving ${userText(w.agentName)}'s cards to its recreated slot`, e))
+        say(report, 'done', tr(F.recreated, { host: h.name, what, branch: w.branch ?? '', path: w.to! }), { host: h.name, what: whatOf(w), was: w.from, now: w.to!, result: tr(R.recreated, { made: 'again' }) })
+        continue
+      }
       try {
         // Its new path and the move its sessions and data follow are written together (in recreateWorktree).
         const def = await recreateWorktree(h.path, w.agentId, { prefer: w.to ?? undefined, alsoRecreating: remake.map((x) => x.from) })
@@ -754,6 +862,28 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
       }
     }
     for (const w of h.worktrees) {
+      if (w.of) {
+        const f = folderOfRow(w)
+        const what = folderWhat(w.of)
+        const row = { host: h.name, what: whatOf(w), was: w.from }
+        if (w.how === 'unlink' && f && w.of.kind === 'slot') {
+          // Release: its lease ends; the slot, free, is made again where it belongs at its next lease.
+          const ok = await releaseSlotLease(ws, h.path, f)
+          say(report, ok ? 'done' : 'failed', ok ? tr(F.released, { host: h.name, what }) : tr(F.failed, { host: h.name, what, path: w.from, why: tr(F.busy) }), { ...row, result: ok ? tr(R.released) : tr(R.failedWhy, { why: tr(F.busy) }) })
+          if (!ok) open = true
+        } else if (w.how === 'unlink' && f) {
+          await relocateFolder(ws, h.path, f, w.from, { gone: true })
+          say(report, 'done', tr(F.forgotten, { host: h.name, what, path: w.from }), { ...row, result: tr(R.forgotten) })
+        } else if (w.how === 'later' && f && w.to) {
+          const ok = await relocateFolder(ws, h.path, f, w.to, { gone: true })
+          say(report, ok ? 'done' : 'failed', ok ? tr(F.later, { host: h.name, what, path: w.to }) : tr(F.failed, { host: h.name, what, path: w.to, why: tr(F.busy) }), { ...row, now: w.to, result: ok ? tr(R.later) : tr(R.failedWhy, { why: tr(F.busy) }) })
+          if (!ok) open = true
+        } else if (w.how === 'missing') {
+          open = true
+          say(report, 'skipped', w.of.kind === 'home' ? tr(F.homeMissing, { host: h.name, what, path: w.from }) : tr(F.slotMissing, { host: h.name, what, path: w.from, hasBranch: w.branchExists ? 'yes' : 'no', branch: w.branch ?? '' }), { ...row, result: tr(R.folderMissing, { kind: w.of.kind, gone: w.branchExists ? 'no' : 'yes' }) })
+        } else if (w.how === 'original') say(report, 'skipped', tr(F.original, { host: h.name, what, path: w.from, project: h.from }), { ...row, result: tr(R.original) })
+        continue
+      }
       if (w.how === 'unlink') {
         await ws.mutateProjectConfig(h.path, (cfg) => ({ agents: projectAgents(cfg).map((a) => (a.id === w.agentId ? { ...a, worktree: undefined } : a)) }))
         say(report, 'done', tr(msg({ id: 'main.move.unlinked', defaultMessage: '{host}: {agent} no longer has a worktree (its folder {path} was left as it was).', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). {host} is the project (or the Assistant) it is about; {agent} an agent. {path} is the old worktree." }), { host: h.name, agent: w.agentName, path: w.from }), { host: h.name, what: { kind: 'worktree', agent: w.agentName }, was: w.from, result: tr(R.unlinked) })

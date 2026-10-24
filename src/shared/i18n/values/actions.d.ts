@@ -121,6 +121,15 @@ interface HiveMessageValues {
   'actions.recent.notFoundTitle': undefined
   'actions.recent.removeFailed': undefined
   'actions.recent.removeFromRecent': undefined
+  'actions.releaseHeld.confirm': undefined
+  'actions.releaseHeld.detailListed': { n: number }
+  'actions.releaseHeld.detailUnknown': undefined
+  'actions.releaseHeld.endFirst': undefined
+  'actions.releaseHeld.messageGone': { slot: string | number; agent: string | number; run: string | number; pid: string | number }
+  'actions.releaseHeld.messageSelf': { agent: string | number; slot: string | number; run: string | number; pid: string | number }
+  'actions.releaseHeld.process': { label: string | number; pid: string | number }
+  'actions.releaseHeld.readFailed': undefined
+  'actions.releaseHeld.title': { agent: string | number; slot: string | number }
   'actions.releaseSlot.confirm': undefined
   'actions.releaseSlot.detail': { agent: string | number }
   'actions.releaseSlot.failed': undefined
@@ -185,6 +194,14 @@ interface HiveMessageValues {
   'actions.session.resumeFailed': undefined
   'actions.session.startFailed': undefined
   'actions.sessionView.failed': undefined
+  'actions.slot.goneDetail': undefined
+  'actions.slot.goneMessage': { agent: string | number; slot: string | number; path: string | number; branch: string | number }
+  'actions.slot.goneNoBranch': { agent: string | number; slot: string | number; path: string | number }
+  'actions.slot.goneTitle': undefined
+  'actions.slot.recreate': undefined
+  'actions.slot.recreateFailed': undefined
+  'actions.slot.release': undefined
+  'actions.slot.releaseFailed': undefined
   'actions.startAll.archiveMessage': { n: number; agent: string | number; project: string | number }
   'actions.startAll.failed': { all: string; tried: number; failed: string | number }
   'actions.startAll.noAgents': undefined

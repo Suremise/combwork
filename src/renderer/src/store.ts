@@ -352,8 +352,6 @@ interface State {
   compactFor: AgentRef | null
   /** Project whose Add Agent dialog is open. */
   addAgentFor: string | null
-  /** Add Agent opened on an existing worktree, chosen (#353's Give to an agent…). */
-  addAgentPreset: { project: string; worktreePath: string } | null
   /** Agent whose settings dialog (name, model, effort, permission mode) is open. */
   agentSettingsFor: AgentRef | null
   /** The Agent Settings dialog for a template's agent (#271): open while set; it answers the template editor. */
@@ -562,7 +560,6 @@ export const useStore = create<State>(() => ({
   keepAwake: 0,
   compactFor: null,
   addAgentFor: null,
-  addAgentPreset: null,
   agentSettingsFor: null,
   templateAgentFor: null,
   templateEdits: {},
@@ -1054,11 +1051,6 @@ export function showUnusedWorktrees(path: string): void {
 /** The project's unused worktrees changed outside their list (#400): it reloads. */
 export function bumpUnused(path: string): void {
   set((s) => ({ unusedVersion: { ...s.unusedVersion, [path]: (s.unusedVersion[path] ?? 0) + 1 } }))
-}
-
-/** Opens Add Agent on one of the project's worktrees (#353). */
-export function giveWorktreeToAgent(path: string, worktreePath: string): void {
-  set({ addAgentPreset: { project: path, worktreePath }, addAgentFor: path })
 }
 
 /** Opens a project's Overview at one agent's session (picked there, and scrolled to). */

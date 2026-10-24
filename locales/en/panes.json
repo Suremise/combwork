@@ -363,6 +363,10 @@
     "defaultMessage": "Move Up",
     "description": "Menu item (an agent's menu, a grid layout): moves the agent's pane one cell up."
   },
+  "panes.menu.releaseHeld": {
+    "defaultMessage": "Release Slot…",
+    "description": "Menu item (an agent's menu): a slot the agent's last session there still holds (it ended, but Hive doesn't know everything it started has) is freed for other work (asks first, showing what Hive knows)."
+  },
   "panes.menu.releaseSlot": {
     "defaultMessage": "Release Slot…",
     "description": "Menu item (an agent's menu): its own worktree from before 1.0, kept for it as a slot since the upgrade, stops being kept for it (asks first)."

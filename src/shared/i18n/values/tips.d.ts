@@ -344,6 +344,8 @@ interface HiveMessageValues {
   'tips.silentUnknown.title': undefined
   'tips.skillsDelivered.text': undefined
   'tips.skillsDelivered.title': undefined
+  'tips.slotHeld.text': undefined
+  'tips.slotHeld.title': undefined
   'tips.slotOptions.text': undefined
   'tips.slotOptions.title': undefined
   'tips.slotResume.text': undefined
