@@ -29,7 +29,7 @@ describe("0.9.3's agent fields, carried through (pure)", () => {
 describe("0.9.3's agent fields survive the workspace's saves", async () => {
   const base = tempDir('hive-legacyfields-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
-  const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
+  const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')
 
   it('renaming an agent, changing its model, reordering and a whole agents list sent without it: the stored worktree is byte-identical', async () => {
     const ws = join(base, 'ws')
@@ -59,6 +59,30 @@ describe("0.9.3's agent fields survive the workspace's saves", async () => {
       expect(JSON.parse(stored())).toEqual({ worktree: TREE, needsSetup: false })
     } finally {
       await disposeWorkspaceService(w)
+    }
+  })
+
+  it("updateLegacyAgent goes to its project's workspace, whichever is current (#1452 round 1, HR2's case)", async () => {
+    const first = createWorkspaceService()
+    const second = createWorkspaceService()
+    const a = join(base, 'first', 'alpha')
+    const b = join(base, 'second', 'beta')
+    for (const p of [a, b]) {
+      mkdirSync(join(p, '.hive'), { recursive: true })
+      writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'B1', ...(p === a ? { worktree: TREE, needsSetup: true } : {}) }] }))
+    }
+    try {
+      await first.open(join(base, 'first'))
+      await first.refreshesSettled()
+      await second.open(join(base, 'second'))
+      await second.refreshesSettled()
+      // Asked while the second workspace is current: written in the first's project, recorded by the first.
+      await inWorkspace(second, () => workspace.updateLegacyAgent(a, 'a1', { needsSetup: false }))
+      expect(JSON.parse(readFileSync(join(a, '.hive', 'project.json'), 'utf8')).agents[0].needsSetup).toBe(false)
+      expect([second.projectForRoot(TREE.path), first.projectForRoot(TREE.path)]).toEqual([null, a])
+    } finally {
+      await disposeWorkspaceService(first)
+      await disposeWorkspaceService(second)
     }
   })
 })

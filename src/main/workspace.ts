@@ -1427,7 +1427,7 @@ export function workspaceOf(p: string): WorkspaceService {
 
 /** Methods whose first argument is a project or worktree path: they go to the workspace owning it. */
 const BY_PATH = new Set<string>([
-  'isProjectPath', 'assertProject', 'assertRoot', 'assertChangesRoot', 'noteUnusedWorktrees', 'projectForRoot', 'updateAgent', 'ensureProject', 'ensureGitExclude', 'branch',
+  'isProjectPath', 'assertProject', 'assertRoot', 'assertChangesRoot', 'noteUnusedWorktrees', 'projectForRoot', 'updateAgent', 'updateLegacyAgent', 'ensureProject', 'ensureGitExclude', 'branch',
   'projectConfig', 'updateProjectConfig', 'mutateProjectConfig', 'sessionsFile', 'sessionScope', 'mutateSessions', 'upsertSession', 'setActive',
   'unmanagedMcp', 'projectInfo', 'isAssistantHome', 'assertSessionHost'
 ])

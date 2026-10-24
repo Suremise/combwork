@@ -36,15 +36,81 @@ function sources(dir = 'src'): string[] {
   })
 }
 
+/**
+ * The code of a source, with the text of its strings, template literals and comments blanked out (their characters
+ * become spaces, line breaks kept, so offsets and line numbers stay): message ids ('panes.tab.worktree') and comments
+ * aren't reads, but a template's `${…}` is code, nested and over several lines too. Regex literals are taken as code;
+ * none in src holds `.worktree`.
+ */
+function codeOf(source: string): string {
+  const out = source.split('')
+  const blank = (i: number): void => {
+    if (out[i] !== '\n' && out[i] !== '\r') out[i] = ' '
+  }
+  // What each open `${` or `{` inside a template's expression closes into: 'template' (back to its text) or 'code'.
+  const braces: ('template' | 'code')[] = []
+  let i = 0
+  const n = source.length
+  /** Blanks a template literal's text from i (just past its backtick or a `}` closing an expression) to its end or `${`. */
+  const templateText = (): void => {
+    while (i < n) {
+      const c = source[i]
+      if (c === '\\') {
+        blank(i)
+        blank(i + 1)
+        i += 2
+      } else if (c === '`') {
+        i++
+        return
+      } else if (c === '$' && source[i + 1] === '{') {
+        braces.push('template')
+        i += 2
+        return
+      } else {
+        blank(i)
+        i++
+      }
+    }
+  }
+  while (i < n) {
+    const c = source[i]
+    if (c === '/' && source[i + 1] === '/') {
+      while (i < n && source[i] !== '\n') blank(i++)
+    } else if (c === '/' && source[i + 1] === '*') {
+      const end = source.indexOf('*/', i + 2)
+      const stop = end < 0 ? n : end + 2
+      while (i < stop) blank(i++)
+    } else if (c === "'" || c === '"') {
+      i++
+      while (i < n && source[i] !== c && source[i] !== '\n') {
+        if (source[i] === '\\') blank(i++)
+        blank(i++)
+      }
+      i++
+    } else if (c === '`') {
+      i++
+      templateText()
+    } else if (c === '{') {
+      if (braces.length) braces.push('code')
+      i++
+    } else if (c === '}' && braces.length) {
+      i++
+      if (braces.pop() === 'template') templateText()
+    } else i++
+  }
+  return out.join('')
+}
+
 /** The `.worktree` reads in a file that aren't allowed: "file:line: receiver.worktree". */
 function unexpected(rel: string, source: string): string[] {
   const allowed = ALLOWED[rel] ?? {}
+  const code = codeOf(source)
   const out: string[] = []
-  source.split(/\r?\n/).forEach((line, i) => {
-    // Message ids ('panes.tab.worktree') and comments aren't reads.
-    const code = line.replace(/'[^']*'|"[^"]*"|`[^`]*`/g, "''").replace(/\/\/.*$/, '')
-    for (const m of code.matchAll(ACCESS)) if (!(m[1] in allowed)) out.push(`${rel}:${i + 1}: ${m[0]}`)
-  })
+  for (const m of code.matchAll(ACCESS)) {
+    if (m[1] in allowed) continue
+    const line = code.slice(0, m.index).split('\n').length
+    out.push(`${rel}:${line}: ${m[0]}`)
+  }
   return out
 }
 
@@ -54,17 +120,19 @@ describe("an agent's 0.9 worktree is read only through legacyWorktree (#1452)", 
     expect(found).toEqual([])
   })
 
-  it('finds an agent read, so the gate can fail', () => {
+  it('finds an agent read, so the gate can fail: in code, and in a template literal\'s expressions (HR2\'s round 1)', () => {
     expect(unexpected('src/main/example.ts', 'const p = agent.worktree?.path\nconst q = def.worktree')).toEqual(['src/main/example.ts:1: agent.worktree', 'src/main/example.ts:2: def.worktree'])
-    expect(unexpected('src/main/example.ts', "msg({ id: 'panes.tab.worktree' }) // a.worktree in a comment")).toEqual([])
+    expect(unexpected('src/main/example.ts', 'const p = `${agent.worktree.path}`')).toEqual(['src/main/example.ts:1: agent.worktree'])
+    // Over several lines, nested in another template and in an object literal's braces.
+    const multi = 'log(`moved ${a.name}\nfrom ${`${x.worktree?.path}`} to ${{ p: def.worktree }.p}`)'
+    expect(unexpected('src/main/example.ts', multi)).toEqual(['src/main/example.ts:2: x.worktree', 'src/main/example.ts:2: def.worktree'])
+    // Text isn't a read: a message id, a comment, a template's own text, an escaped backtick.
+    expect(unexpected('src/main/example.ts', "msg({ id: 'panes.tab.worktree' }) // a.worktree in a comment\n/* b.worktree */ const t = `c.worktree \\` ${'d.worktree'}`")).toEqual([])
   })
 
   it('every allowed file still has what it allows (the list only shrinks)', () => {
     for (const [rel, receivers] of Object.entries(ALLOWED)) {
-      const code = readFileSync(join(ROOT, rel), 'utf8')
-        .split(/\r?\n/)
-        .map((l) => l.replace(/'[^']*'|"[^"]*"|`[^`]*`/g, "''").replace(/\/\/.*$/, ''))
-        .join('\n')
+      const code = codeOf(readFileSync(join(ROOT, rel), 'utf8'))
       const seen = new Set([...code.matchAll(ACCESS)].map((m) => m[1]))
       for (const r of Object.keys(receivers)) expect(seen.has(r), `${rel}: ${r}.worktree`).toBe(true)
     }

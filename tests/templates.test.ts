@@ -19,7 +19,6 @@ import { HIVE_TEMPLATES, templateTitle } from '../src/shared/templateDefaults'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '../src/shared/workflow/roles'
 import { AGENT_LIMIT_DEFAULT } from '../src/shared/defaults'
 import { englishText } from '../src/shared/advanced'
-import type { AgentDef } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { legacyWorktree, type StoredAgent } from '../src/shared/agentFolders'
 
