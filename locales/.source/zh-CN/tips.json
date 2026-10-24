@@ -395,7 +395,7 @@
   "tips.unexpectedClose.title": "Know when Hive closed unexpectedly",
   "tips.unmerged.text": "The agent's tab shows how many commits aren't merged yet, Merge… in its ⋯ menu says what is left, and Git → Changes shows everything the agent changed since it branched.",
   "tips.unmerged.title": "See what a worktree agent has to merge",
-  "tips.unusedWorktrees.text": "Removed an agent but kept its worktree? Git → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, remove the merged ones with their branches, or give one back to an agent.",
+  "tips.unusedWorktrees.text": "Removed an agent but kept its worktree? Git → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, or remove the merged ones with their branches.",
   "tips.unusedWorktrees.title": "Tidy kept worktrees",
   "tips.versionControlSwitch.text": "Click None or Git atop a project’s Version Control tab to switch it from its next card; cards in flight keep the old rules. Each keeps its own workflow options, and when the folder changes (git init, say), Hive offers the switch there.",
   "tips.versionControlSwitch.title": "Switch between None and Git",

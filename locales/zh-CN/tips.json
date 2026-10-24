@@ -395,7 +395,7 @@
   "tips.unexpectedClose.title": "了解 Hive 何时意外关闭",
   "tips.unmerged.text": "智能体的标签页会显示尚未合并的提交数，它的 ⋯ 菜单中的“合并…”会说明还剩什么，“Git”→“更改”会显示智能体自建立分支以来更改的所有内容。",
   "tips.unmerged.title": "查看工作树智能体有哪些待合并",
-  "tips.unusedWorktrees.text": "删除了智能体但保留了它的工作树？“Git”→“更改”会打开未被任何智能体使用的工作树，并注明各自由谁创建：打开一个查看并合并其工作，连同分支删除已合并的工作树，或把一个工作树交还给某个智能体。",
+  "tips.unusedWorktrees.text": "删除了智能体但保留了它的工作树？“Git”→“更改”会打开未被任何智能体使用的工作树，并注明各自由谁创建：打开一个查看并合并其工作，或连同分支删除已合并的工作树。",
   "tips.unusedWorktrees.title": "整理保留的工作树",
   "tips.versionControlSwitch.text": "点击项目“版本控制”标签页顶部的“无”或 Git，即可从下一张卡片起切换；已开始的卡片保持旧规则。两者各自保留自己的工作流程选项；当文件夹发生变化（例如 git init）时，Hive 会在那里提出切换。",
   "tips.versionControlSwitch.title": "在“无”和 Git 之间切换",
