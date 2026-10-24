@@ -1,8 +1,8 @@
 // Where a run's logs go (run.mjs): a folder of its own for each run, so no run overwrites another's logs or record, and
-// only the latest few finished ones kept. A run still going (this runner's or another's) is marked active and never
+// only the latest few finished ones kept, with those of the last day up to a size (pruneRunDirs). A run still going (this runner's or another's) is marked active and never
 // pruned. A runner started inside a suite (progressreport runs one) keeps its runs apart, under logs/nested, so they
 // never push real runs out.
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { parentSuite } from './runner.mjs'
@@ -11,6 +11,14 @@ const { linkOnPath } = createRequire(import.meta.url)('./evidence.cjs')
 
 /** How many run folders are kept, at the top level and under nested/ each. */
 export const KEEP_RUNS = 10
+/**
+ * Beyond KEEP_RUNS, every run that started in the last KEEP_HOURS is kept too (#1595: with several lanes testing, ten
+ * newer runs came within the hour, before a reviewer opened the run a builder cited), as long as the run folders under
+ * a root come to no more than KEEP_MB: past it, the oldest passing runs the window keeps go first, then the failed
+ * ones. Never one of the newest KEEP_RUNS. HIVE_E2E_KEEP_HOURS and HIVE_E2E_KEEP_MB change them (logRetention).
+ */
+export const KEEP_HOURS = 24
+export const KEEP_MB = 2048
 const RUN_DIR = /^run-(\d{8}-\d{6})(?:-(\d+))?$/
 /** In a run folder while its runner is still going: the runner's process id. */
 const ACTIVE = '.active'
@@ -197,15 +205,67 @@ export function runDirsInOrder(names) {
 }
 
 /**
- * Removes all but the newest `keep` finished run folders under root. Never one still active (another runner's, or an
- * unfinished repeat's earlier runs), never one in `protect` (the runner prunes once, after saving its record, and
- * protects its own runs, so a repeat of more than `keep` keeps them all until the next runner prunes), and nothing that
- * isn't a run folder (nested/, run-record.md). Nor one spare(path) keeps (#253: a card cites it as evidence, or the board
- * can't be read: evidence.cjs); those don't count towards `keep`. Nor a failed run less than a day old (the newest
- * FAILED_MAX of them: #223).
+ * The window and size cap from the environment (KEEP_HOURS, KEEP_MB): HIVE_E2E_KEEP_HOURS and HIVE_E2E_KEEP_MB, each a
+ * number of 0 or more (0 hours: only the newest KEEP_RUNS and failed runs; 0 MB: nothing past KEEP_RUNS by size). A
+ * value that isn't one keeps the default and is named in `bad`. Returns { keepMs, maxBytes, bad }.
  */
-export function pruneRunDirs(root, keep = KEEP_RUNS, protect = [], alive = processAlive, spare = () => null, { now = Date.now() } = {}) {
-  const old = runDirsToPrune(root, keep, protect, alive, spare, { now })
+export function logRetention(env = process.env) {
+  const bad = []
+  const read = (name, fallback) => {
+    const raw = env[name]
+    if (raw === undefined || raw.trim() === '') return fallback
+    const n = Number(raw)
+    if (Number.isFinite(n) && n >= 0) return n
+    bad.push(`${name}=${raw}`)
+    return fallback
+  }
+  return { keepMs: read('HIVE_E2E_KEEP_HOURS', KEEP_HOURS) * 3_600_000, maxBytes: read('HIVE_E2E_KEEP_MB', KEEP_MB) * 1024 * 1024, bad }
+}
+
+/** When a run started (ms), from its folder's name (local time), or null. */
+export function runStartedAt(name) {
+  const m = RUN_DIR.exec(name)
+  if (!m) return null
+  const at = (from, to) => Number(m[1].slice(from, to))
+  return new Date(at(0, 4), at(4, 6) - 1, at(6, 8), at(9, 11), at(11, 13), at(13, 15)).getTime()
+}
+
+/** The bytes of the files in a folder, at any depth, never through a link (a file gone meanwhile counts nothing). */
+export function folderBytes(dir) {
+  let total = 0
+  let entries
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return 0
+  }
+  for (const e of entries) {
+    if (e.isSymbolicLink()) continue
+    if (e.isDirectory()) total += folderBytes(join(dir, e.name))
+    else if (e.isFile()) {
+      try {
+        total += lstatSync(join(dir, e.name)).size
+      } catch {
+        // Gone meanwhile.
+      }
+    }
+  }
+  return total
+}
+
+/**
+ * Removes the finished run folders under root that nothing keeps. Kept are: the newest `keep` finished ones; every one
+ * that started within `keepMs` (#1595); and a failed run less than a day old (the newest FAILED_MAX of them: #223). The
+ * window and the failed runs are bounded by `maxBytes`: while the run folders under root (every one left, active ones
+ * too) come to more, the oldest passing runs only they keep go, then the failed ones (never the newest `keep`).
+ * Never pruned at all: one still active (another runner's, or an unfinished repeat's earlier runs), one in `protect`
+ * (the runner prunes once, after saving its record, and protects its own runs, so a repeat of more than `keep` keeps
+ * them all until the next runner prunes), and nothing that isn't a run folder (nested/, run-record.md). Nor one
+ * spare(path) keeps (#253: a card cites it as evidence, or the board can't be read: evidence.cjs); those don't count
+ * towards `keep`. onOverCap(names, bytes), if given, is told of the runs the cap removes and the size before them.
+ */
+export function pruneRunDirs(root, keep = KEEP_RUNS, protect = [], alive = processAlive, spare = () => null, options = {}) {
+  const old = runDirsToPrune(root, keep, protect, alive, spare, options)
   for (const name of old) rmSync(join(root, name), { recursive: true, force: true })
   return old
 }
@@ -214,8 +274,8 @@ export function pruneRunDirs(root, keep = KEEP_RUNS, protect = [], alive = proce
  * pruneRunDirs for the runner (#285): before each run folder goes, release(runDir) removes what the run kept outside it
  * (its failed suites' folders in a lane: evidence.cjs releaseKept), awaited, in lanes it may work in.
  */
-export async function pruneRunDirsReleasing(root, keep = KEEP_RUNS, protect = [], alive = processAlive, spare = () => null, { now = Date.now(), release = async () => {} } = {}) {
-  const old = runDirsToPrune(root, keep, protect, alive, spare, { now })
+export async function pruneRunDirsReleasing(root, keep = KEEP_RUNS, protect = [], alive = processAlive, spare = () => null, { release = async () => {}, ...options } = {}) {
+  const old = runDirsToPrune(root, keep, protect, alive, spare, options)
   for (const name of old) {
     await release(join(root, name))
     rmSync(join(root, name), { recursive: true, force: true })
@@ -224,10 +284,18 @@ export async function pruneRunDirsReleasing(root, keep = KEEP_RUNS, protect = []
 }
 
 /** The run folders pruneRunDirs removes (oldest first), without removing them. */
-export function runDirsToPrune(root, keep = KEEP_RUNS, protect = [], alive = processAlive, spare = () => null, { now = Date.now() } = {}) {
+export function runDirsToPrune(
+  root,
+  keep = KEEP_RUNS,
+  protect = [],
+  alive = processAlive,
+  spare = () => null,
+  { now = Date.now(), keepMs = KEEP_HOURS * 3_600_000, maxBytes = KEEP_MB * 1024 * 1024, bytesOf = folderBytes, onOverCap = () => {} } = {}
+) {
   if (!existsSync(root)) return []
   const mine = new Set(protect.map((p) => p.split(/[\\/]/).pop()))
-  const finished = runDirsInOrder(readdirSync(root)).filter((name) => !runDirActive(join(root, name), alive) && !spare(join(root, name)))
+  const all = runDirsInOrder(readdirSync(root))
+  const finished = all.filter((name) => !runDirActive(join(root, name), alive) && !spare(join(root, name)))
   const failedRecently = new Set(
     finished
       .filter((name) => {
@@ -236,5 +304,21 @@ export function runDirsToPrune(root, keep = KEEP_RUNS, protect = [], alive = pro
       })
       .slice(-FAILED_MAX)
   )
-  return finished.slice(0, Math.max(0, finished.length - keep)).filter((name) => !mine.has(name) && !failedRecently.has(name))
+  const beyond = finished.slice(0, Math.max(0, finished.length - keep)).filter((name) => !mine.has(name))
+  const inWindow = (name) => now - runStartedAt(name) < keepMs
+  const old = beyond.filter((name) => !failedRecently.has(name) && !inWindow(name))
+  // What the window and the failed runs keep, in the order the size cap takes them: passing runs, then failed, oldest first.
+  const capped = beyond.filter((name) => !old.includes(name))
+  if (!capped.length) return old
+  const sizes = new Map(all.filter((name) => !old.includes(name)).map((name) => [name, bytesOf(join(root, name))]))
+  const before = [...sizes.values()].reduce((a, b) => a + b, 0)
+  let total = before
+  const over = []
+  for (const name of [...capped.filter((n) => !failedRecently.has(n)), ...capped.filter((n) => failedRecently.has(n))]) {
+    if (total <= maxBytes) break
+    over.push(name)
+    total -= sizes.get(name)
+  }
+  if (over.length) onOverCap(over, before)
+  return runDirsInOrder([...old, ...over])
 }

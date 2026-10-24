@@ -44,7 +44,8 @@ counted, showed) go after the step, outside it. The runner skips real suites up 
 when their CLI isn't installed, Claude Code says its test home isn't signed in (`claude auth status`, only for
 `claudeHome: 'test'` suites), or the Codex test home has no sign-in. A suite that can't run on a machine says so with `lib.skip('<why>')`. The runner prints a summary; each suite's output
 is kept in a folder of its own for each run, `logs/run-<date>-<time>` under the work folder, with `-2`, `-3`… when
-another run started in the same second. The last ten finished runs are kept: a run still going (`.active` in its folder,
+another run started in the same second. The last ten finished runs are kept, and every run started in the last 24 hours
+up to 2 GB of logs (Where they work, below): a run still going (`.active` in its folder,
 with its runner's process id) is never pruned, so runners started side by side don't remove each other's logs. A runner started inside a suite (`progressreport`
 runs one) keeps its runs under `logs/nested`, so they never push real runs out (`logs.mjs`). It knows it is inside a
 suite from `E2E_RUN_SUITE`, which the runner sets for each suite: Hive drops `HIVE_` variables from its sessions, so
@@ -535,7 +536,12 @@ Everything goes in `%LOCALAPPDATA%\hive-test\e2e` (override with `HIVE_E2E_DIR`)
   suite passes (or skips), the whole folder is removed; when it fails, it stays for a look (the runner prints where,
   and copies its screenshots and reports into the run's log folder) and goes with that run's logs.
 - `logs\run-<date>-<time>`: each run's logs and run record, from every lane (above); `logs\run-record.md` is the latest
-  record. The newest ten finished runs are kept, counted across every worktree's and agent's runs. A run that **failed**
+  record. The newest ten finished runs are kept, counted across every worktree's and agent's runs, and besides them
+  every run that started in the last 24 hours (#1595: with several lanes testing, ten newer runs came within the hour,
+  before a reviewer opened the run a builder cited), as long as the logs' run folders come to no more than 2 GB: past
+  that, the oldest of those runs go first, passing ones before failed ones, and the runner says how many went early.
+  The newest ten are never pruned for size. `HIVE_E2E_KEEP_HOURS` (0: only the newest ten, and failed runs) and `HIVE_E2E_KEEP_MB`
+  change the window and the cap for a runner (a value that isn't a number of 0 or more is ignored, and said so). A run that **failed**
   (a suite failed, or its record isn't valid) is kept a day beyond that (the newest twenty such; #223), and its failed
   suites' own files are copied into it, in `<run folder>\<suite>`: the files at the top of the suite's folder
   (screenshots, notification logs, reports) and its folders of screenshots and reports at any depth (`*shots`, such as
@@ -621,7 +627,7 @@ kept and why, without removing anything; `--days N` sets the age, default 3).
   stays is tied to the run.
 - **A suite's folder** in its lane (`lanes\<k>\<suite>`): when the suite passes, the whole folder goes; when it fails
   (or something in it must stay), it is tied to the run (`.kept-folders.json` in the run's log folder) and goes when
-  that run's logs are pruned (the newest ten runs, a failed run a day): only in a lane the pruning runner may work in
+  that run's logs are pruned (the newest ten runs, a day's runs up to 2 GB, a failed run a day): only in a lane the pruning runner may work in
   (its own, or an idle one it claims; in a lane another runner holds it is left, and the clean-up removes it once the
   lane is idle, since no run claims it then), and only if every entry of that list is a suite folder in a lane
   (`e2e\lanes\<k>\<suite>`, or a nested run's inside one), never a test home, results or a lane itself. While an earlier run keeps `<suite>`, a run

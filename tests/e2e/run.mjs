@@ -47,7 +47,7 @@ import { affectedSuites, changedFiles, mergeBase } from './affected.mjs'
 import { CLI_LOG, fingerprint, readCliLog, realCliHomes, realCliVersions, recordJson, recordMarkdown, selectionOf } from './record.mjs'
 import { LANG_SUITE, isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, repeatStatus, packagedPlan, resultLines, selectSuites, suiteOutcome } from './runner.mjs'
 import { devBuild, ensureBuild } from './build.mjs'
-import { FAILED_KEEP_MS, finishRunDirs, keepSuiteFiles, logsRootFor, markRunFailed, newRunDir, omittedLine, pruneRunDirsReleasing } from './logs.mjs'
+import { FAILED_KEEP_MS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFor, markRunFailed, newRunDir, omittedLine, pruneRunDirsReleasing } from './logs.mjs'
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from './lanes.mjs'
 import { describeClaim, heavySlots, needsSlot, preMerge, waitForSlot, waitLine } from './slots.mjs'
 import { usesCodexHome, waitForCodexHome } from './codexHomeLock.mjs'
@@ -262,8 +262,8 @@ const suiteClis = (dir) => {
  * Each suite has a folder of its own in the lane's, made fresh when it starts (`<suite>`, or `<suite>-2`… while an
  * earlier one is kept). When it passes (or skips), the whole folder goes (#285), unless the board, read as it is then,
  * says it must stay (a card cites it, or the board can't be read: said at the end). When it fails, it stays for a look.
- * What stays is tied to the run (evidence.cjs recordKept) and goes when the run's logs are pruned (KEEP_RUNS, and a
- * failed run a day: logs.mjs), so copies never pile up.
+ * What stays is tied to the run (evidence.cjs recordKept) and goes when the run's logs are pruned (KEEP_RUNS, a day's
+ * runs up to a size, and a failed run a day: logs.mjs), so copies never pile up.
  */
 
 const run = (name, port) =>
@@ -540,8 +540,15 @@ if (opts.record) {
 // card cites (evidence.cjs).
 finishRunDirs(runs.map((r) => r.logDir))
 // A pruned run's kept suite folders go with it, in lanes this runner may work in (its own, still held, or an idle one
-// it claims); in a lane another runner holds they are left for the clean-up (evidence.cjs releaseKept).
+// it claims); in a lane another runner holds they are left for the clean-up (evidence.cjs releaseKept). Runs of the
+// last day are kept too, up to a size (#1595: HIVE_E2E_KEEP_HOURS, HIVE_E2E_KEEP_MB).
+const retention = logRetention()
+if (retention.bad.length) console.log(`\nIgnored ${retention.bad.join(', ')}: not a number of 0 or more (the default is used).`)
 await pruneRunDirsReleasing(logsRoot, undefined, runs.map((r) => r.logDir), undefined, (p) => evidence.protects(p), {
+  keepMs: retention.keepMs,
+  maxBytes: retention.maxBytes,
+  onOverCap: (names, bytes) =>
+    console.log(`\nThe logs came to ${Math.round(bytes / 1024 / 1024)} MB, over ${Math.round(retention.maxBytes / 1024 / 1024)} MB: pruned ${names.length} run${names.length === 1 ? '' : 's'} of the last ${retention.keepMs / 3_600_000} hours early (${names.slice(0, 3).join(', ')}${names.length > 3 ? ', …' : ''}).`),
   release: (d) => releaseKept(d, evidence, { hold: (k) => holdLane(runContext.LANES_DIR, k) })
 })
 if (keptAfterPass.length) console.log(`\nKept the folders of ${keptAfterPass.length} passed suite${keptAfterPass.length === 1 ? '' : 's'}: ${keptAfterPass.slice(0, 3).join('; ')}${keptAfterPass.length > 3 ? '; …' : ''}`)

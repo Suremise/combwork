@@ -4,7 +4,7 @@
 import { execFileSync, spawn } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync, utimesSync, writeFileSync } from 'fs'
 import { userInfo } from 'os'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { pathToFileURL } from 'url'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
@@ -28,7 +28,7 @@ import { describeClaim, heavySlots, holdsMergeSlot, isFullUnitRun, isHeavy, laun
 // @ts-expect-error: plain .mjs modules without types
 import { addWorktree, invocationDir, keepDir, removeInvocation, removeStale, removeWorktree } from './e2e/tempWorktrees.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { FAILED_KEEP_MS, FAILED_MAX, KEEP_RUNS, finishRunDirs, keepSuiteFiles, logsRootFor, markRunFailed, newRunDir, pruneRunDirs, runDirActive, runDirsInOrder, runFailedAt } from './e2e/logs.mjs'
+import { FAILED_KEEP_MS, FAILED_MAX, KEEP_HOURS, KEEP_MB, KEEP_RUNS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFor, markRunFailed, newRunDir, pruneRunDirs, runDirActive, runDirsInOrder, runDirsToPrune, runFailedAt, runStartedAt } from './e2e/logs.mjs'
 import { createRequire } from 'module'
 import { ProgressStore } from '../src/main/progress'
 import { tempDir } from './tempDir'
@@ -973,6 +973,84 @@ describe("each run's own log folder (logs.mjs)", () => {
     } finally {
       rmSync(runsDir, { recursive: true, force: true })
     }
+  })
+
+  it('a passing run of the last day survives twenty newer runs; an older one goes (#1595)', () => {
+    const runsDir = tempDir('hive-window-')
+    try {
+      const now = Date.now()
+      const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000)
+      const old = newRunDir(runsDir, at(25 * 60))
+      const cited = newRunDir(runsDir, at(60))
+      const failed = newRunDir(runsDir, at(59))
+      markRunFailed(failed, 'board')
+      for (let i = 0; i < 20; i++) newRunDir(runsDir, new Date(now - 50 * 60_000 + i * 1000))
+      finishRunDirs(runDirsInOrder(readdirSync(runsDir)).map((n: string) => join(runsDir, n)))
+      expect(runStartedAt(basename(cited))).toBe(Math.floor(at(60).getTime() / 1000) * 1000)
+      // Only the run from before the window goes.
+      expect(runDirsToPrune(runsDir, KEEP_RUNS, [], () => false, () => null, { now })).toEqual([basename(old)])
+      // With no window (HIVE_E2E_KEEP_HOURS=0), the newest ten and the failed run stay, as before.
+      const noWindow = runDirsToPrune(runsDir, KEEP_RUNS, [], () => false, () => null, { now, keepMs: 0 })
+      expect(noWindow).toHaveLength(12)
+      expect(noWindow).toContain(basename(cited))
+      expect(noWindow).not.toContain(basename(failed))
+      // A window of two hours keeps it too; past it, it goes.
+      expect(pruneRunDirs(runsDir, KEEP_RUNS, [], () => false, () => null, { now, keepMs: 2 * 3_600_000 })).toEqual([basename(old)])
+      expect(existsSync(cited)).toBe(true)
+      expect(runDirsToPrune(runsDir, KEEP_RUNS, [], () => false, () => null, { now: now + 2 * 3_600_000, keepMs: 2 * 3_600_000 })).toContain(basename(cited))
+    } finally {
+      rmSync(runsDir, { recursive: true, force: true })
+    }
+  })
+
+  it('past the size cap, the oldest passing runs of the window go first, then failed ones, never the newest ten (#1595)', () => {
+    const runsDir = tempDir('hive-cap-')
+    try {
+      const now = Date.now()
+      const run = (minutesAgo: number) => {
+        const runDir = newRunDir(runsDir, new Date(now - minutesAgo * 60_000))
+        mkdirSync(join(runDir, 'board'))
+        writeFileSync(join(runDir, 'board', 'shot.png'), 'x'.repeat(600))
+        writeFileSync(join(runDir, 'board.log'), 'x'.repeat(400))
+        return basename(runDir)
+      }
+      // The oldest is a failed run; two passing runs after it; then the newest ten. 1000 bytes each.
+      const failed = run(120)
+      markRunFailed(join(runsDir, failed), 'board')
+      const passing = [run(110), run(100)]
+      const newest = Array.from({ length: KEEP_RUNS }, (_, i) => run(90 - i))
+      finishRunDirs(runDirsInOrder(readdirSync(runsDir)).map((n: string) => join(runsDir, n)))
+      const prune = (maxBytes: number) => {
+        const told: [string[], number][] = []
+        const gone = runDirsToPrune(runsDir, KEEP_RUNS, [], () => false, () => null, { now, maxBytes, onOverCap: (early: string[], bytes: number) => told.push([early, bytes]) })
+        return { gone, told }
+      }
+      // 13 006 bytes in all (the failed run's mark is 6).
+      const total = 13_006
+      expect(prune(total)).toEqual({ gone: [], told: [] })
+      // A cap a run below it: the oldest passing run goes, not the older failed one.
+      expect(prune(total - 1000)).toEqual({ gone: [passing[0]], told: [[[passing[0]], total]] })
+      expect(prune(total - 2000).gone).toEqual(passing)
+      // Then the failed one; never the newest ten, however small the cap.
+      expect(prune(total - 2001).gone).toEqual([failed, ...passing])
+      expect(pruneRunDirs(runsDir, KEEP_RUNS, [], () => false, () => null, { now, maxBytes: 0 })).toEqual([failed, ...passing])
+      expect(runDirsInOrder(readdirSync(runsDir))).toEqual(newest)
+    } finally {
+      rmSync(runsDir, { recursive: true, force: true })
+    }
+  })
+
+  it('the window and the cap come from HIVE_E2E_KEEP_HOURS and HIVE_E2E_KEEP_MB (#1595)', () => {
+    expect(logRetention({})).toEqual({ keepMs: KEEP_HOURS * 3_600_000, maxBytes: KEEP_MB * 1024 * 1024, bad: [] })
+    expect(KEEP_HOURS).toBe(24)
+    expect(KEEP_MB).toBe(2048)
+    expect(logRetention({ HIVE_E2E_KEEP_HOURS: '48', HIVE_E2E_KEEP_MB: '512' })).toEqual({ keepMs: 48 * 3_600_000, maxBytes: 512 * 1024 * 1024, bad: [] })
+    expect(logRetention({ HIVE_E2E_KEEP_HOURS: '0', HIVE_E2E_KEEP_MB: ' ' })).toEqual({ keepMs: 0, maxBytes: KEEP_MB * 1024 * 1024, bad: [] })
+    expect(logRetention({ HIVE_E2E_KEEP_HOURS: 'a day', HIVE_E2E_KEEP_MB: '-1' })).toEqual({
+      keepMs: KEEP_HOURS * 3_600_000,
+      maxBytes: KEEP_MB * 1024 * 1024,
+      bad: ['HIVE_E2E_KEEP_HOURS=a day', 'HIVE_E2E_KEEP_MB=-1']
+    })
   })
 
   it("a run folder counts as still going only while its runner's process is alive (a crashed runner's is pruned)", () => {
