@@ -43,6 +43,8 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
 
 ;(async () => {
   q.prepare(fx)
+  // Every read of the agents' input recorded, for typeLine.
+  lib.logFakeInput(fx.claudeHome)
   // The repository's own identity, which Pair takes as G12's (p5lane's), and its quick check from its scripts (the
   // script's path quoted: the test root may have a space in it).
   lib.git(alpha, ['config', 'user.name', fx.identity.name])
@@ -299,27 +301,13 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
       const file = path.join(fx.claudeHome, 'fake-shell.jsonl')
       return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
     }
-    const wakes = (agent) => {
-      const file = path.join(fx.claudeHome, 'fake-wakes.jsonl')
-      return (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent)
-    }
-    const typeTo = async (id, line) => {
-      await inv('pty:write', lib.ptyKey(alpha, id), line)
-      // Typed, then entered (the fake reads a line), as progressgates does.
-      await lib.sleep(300)
-      await inv('pty:write', lib.ptyKey(alpha, id), '\r')
-    }
     const shell = async (cmd) => {
       const before = shells().length
-      // A wake Hive types into B1 as the suite types is taken with the suite's line as one wake: typed again then.
-      for (let tries = 0; tries < 3 && shells().length === before; tries++) {
-        await waitHung(() => idle(b1.id))
-        const taken = wakes('B1').length
-        await typeTo(b1.id, `shell: ${cmd}`)
-        await waitHung(() => shells().length > before || wakes('B1').length > taken)
-      }
+      // Hive may type a wake into B1 as the suite types: typeLine types it again when the wake took or wiped it.
+      await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), fx.claudeHome, 'B1', `shell: ${cmd}`, { ready: () => idle(b1.id), live: () => live(b1.id), hungMs: HUNG_MS })
+      await waitHung(() => shells().length > before)
       await waitHung(() => idle(b1.id))
-      if (!shells().slice(before).some((s) => s.cmd === cmd)) throw new Error(`B1 didn't run "${cmd}" (its line was taken with a wake each time)`)
+      if (!shells().slice(before).some((s) => s.cmd === cmd)) throw new Error(`B1 didn't run "${cmd}" (its line wasn't taken)`)
     }
     const counted = (x) => x.kind === 'CheckRan' && x.data?.counted === true
     /** The quick check through hive-progress on the card's revision now (passing): a new counted CheckRan on it. */

@@ -123,10 +123,8 @@ const commitIn = (dir, files, message, trailer) => {
     /** An agent's turn held until the test says so ("holduntil"): it isn't free meanwhile. */
     const hold = async (p, id, file) => {
       await idle(p, id)
-      await inv('pty:write', lib.ptyKey(p, id), `holduntil ${file}`)
-      // Typed, then entered (the fake reads a line).
-      await lib.sleep(300)
-      await inv('pty:write', lib.ptyKey(p, id), '\r')
+      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      await lib.typeLine(inv, lib.ptyKey(p, id), home, null, `holduntil ${file}`, { live: () => live(p, id) })
       return until(async () => (await live(p, id))?.status === 'working', HUNG_MS)
     }
 

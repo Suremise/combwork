@@ -235,6 +235,8 @@ function fakeClaude(userData, home, trusted = []) {
   fs.rmSync(home, { recursive: true, force: true })
   fs.mkdirSync(home, { recursive: true })
   fs.writeFileSync(path.join(home, 'fake-trusted.json'), JSON.stringify(trusted.map((f) => f.toLowerCase())))
+  // Its input log on, for typeLine (#1560).
+  logFakeInput(home)
   return { CLAUDE_CONFIG_DIR: home }
 }
 
@@ -931,6 +933,106 @@ async function sendPrompt(inv, key, text, { submitted, tries = 3, waitMs = 20000
  */
 const TURN_HUNG_MS = 60000
 
+/** Whether a fake Claude Code takes a prompt now, by its session:live entry: idle, its turn not running. */
+const FAKE_IDLE = (s) => ['ready', 'finished', 'watching', 'background'].includes(s?.status) && s?.turn?.state !== 'running'
+
+/**
+ * Turns on the fake Claude Code's input log in its home (CLAUDE_CONFIG_DIR): each read of its input goes into
+ * fake-input.jsonl there (#1286), which typeLine() reads. Before the fake starts: it looks for the switch only then.
+ */
+function logFakeInput(home) {
+  fs.mkdirSync(home, { recursive: true })
+  fs.writeFileSync(path.join(home, 'fake-log-input.txt'), '')
+}
+
+/**
+ * Types a line into a fake Claude Code (pty `key`, its home `home`, the agent's name `agent`, or null for live()'s
+ * agentName: its HIVE_AGENT, which the fake's records carry) that Hive may type a wake
+ * into at the same moment (#1553, #1560): the wake's Ctrl+U clears the line, or the two lines mix, or the line lands
+ * while the agent is busy with the wake and is dropped (fake-dropped.jsonl). So its Enter goes only once the CLI has
+ * read the line whole (fake-input.jsonl: logFakeInput() before the fake starts), the line counts only when nothing
+ * else was on it (since the last Enter or Ctrl+U) or between it and its Enter, and it is typed again when it was
+ * disturbed, dropped, or not taken within `hungMs`.
+ * - live(): the agent's session:live entry. The line is taken once its turn is another than just before it was typed
+ *   (each attempt's own, so a wake's turn before it doesn't count): a turn's start, not its end, so a line whose
+ *   command runs long isn't typed again.
+ * - taken(): true once the line was taken, instead (a run it starts showing in Progress, the agent working on a
+ *   held turn): something seen as the line starts, never as its work ends. One of live and taken is required.
+ * - ready(): waited for before each attempt; with live and no ready, until the fake takes prompts (idle, its turn not
+ *   running, as fakePrompts has it). Not ready within `hungMs`, the line is typed anyway (and said why).
+ * - A slash command (/rename, /compact) starts no turn: taken once it was read intact and not dropped.
+ * - disturb: for the suite that shows the helper types again (progressreport), the first attempt disturbed as a wake
+ *   would: 'enter', a Ctrl+U between the line and its Enter; 'before', a wake's text on the line (read) before it.
+ * Returns { attempt, lost }: the attempt taken (1 = the first; 0 if none of `tries` was), and why each before it wasn't.
+ */
+async function typeLine(inv, key, home, agent, text, { live = null, taken = null, ready = null, tries = 3, hungMs = TURN_HUNG_MS, disturb = null } = {}) {
+  if (!live && !taken) throw new Error('typeLine: give it live or taken')
+  if (!fs.existsSync(path.join(home, 'fake-log-input.txt'))) throw new Error(`typeLine: the fake's input log is off in ${home} (lib.logFakeInput before it starts)`)
+  const name = agent ?? (live ? (await live())?.agentName : null)
+  if (!name) throw new Error(`typeLine: no agent name for ${key} (its session isn't live)`)
+  if (live && !ready) ready = async () => FAKE_IDLE((await live()) ?? null)
+  const jsonl = (f) => (fs.existsSync(path.join(home, f)) ? fs.readFileSync(path.join(home, f), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((r) => r.agent === name)
+  // All the agent's CLI has read, its key sequences (a bracketed paste's marks) left out: what is on its line as the
+  // suite types can have come before (a wake's Ctrl+U and text, read just before the suite's line, #1560).
+  const readAll = () => jsonl('fake-input.jsonl').map((r) => r.data).join('').replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
+  const lost = []
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    if (ready && !(await until(ready, hungMs, 250))) lost.push(`not ready within ${hungMs / 1000} s, typed anyway`)
+    const turn = async () => (await live())?.turn?.id ?? null
+    const turnBefore = live && !taken ? await turn() : null
+    const took = async () => (taken ? await taken() : text.startsWith('/') || (await turn()) !== turnBefore)
+    const from = readAll().length
+    const readSince = () => readAll().slice(from)
+    const dropped = jsonl('fake-dropped.jsonl').length
+    // Its line empty first: a wake Hive is typing (its Ctrl+U and text read, its Enter not yet) is let finish. Bounded:
+    // what never clears is typed over, and seen as disturbed below.
+    await until(() => readAll().split(/[\r\x15]/).pop() === '', hungMs)
+    if (disturb === 'before' && attempt === 1) {
+      const wake = '[Hive] A wake typed as the suite types.'
+      await inv('pty:write', key, wake)
+      await until(() => readSince().includes(wake), hungMs)
+    }
+    await inv('pty:write', key, text)
+    // Read whole before its Enter (the fake reads a line, as a CLI does).
+    if (!(await until(() => readSince().includes(text), hungMs))) {
+      lost.push('never read')
+      continue
+    }
+    if (disturb === 'enter' && attempt === 1) {
+      await inv('pty:write', key, '\x15')
+      await until(() => readSince().includes(`${text}\x15`), hungMs)
+    }
+    await inv('pty:write', key, '\r')
+    const read = await until(() => {
+      const s = readAll()
+      const i = s.indexOf(text, from)
+      return i >= 0 && s.indexOf('\r', i) >= 0 ? s : null
+    }, hungMs)
+    // Intact: nothing on the line before it (since the last Enter or Ctrl+U, however long before it was read), and
+    // nothing between it and its Enter.
+    const at = read ? read.indexOf(text, from) : -1
+    const intact = !!read && read.slice(0, at).split(/[\r\x15]/).pop() === '' && read.slice(at + text.length, read.indexOf('\r', at)) === ''
+    if (!intact) {
+      lost.push(`disturbed: ${JSON.stringify((read ?? readAll()).slice(Math.max(0, from - 200)))}`)
+      continue
+    }
+    const droppedNow = () => jsonl('fake-dropped.jsonl').slice(dropped).some((r) => text.includes(r.text.slice(0, 50)))
+    await until(async () => droppedNow() || (await took()), hungMs, 250)
+    // Dropped first: a wake's turn can pass for the line's (the agent working).
+    if (droppedNow()) {
+      lost.push('dropped while busy')
+      continue
+    }
+    if (await took()) {
+      if (lost.length) console.log(`(${name}'s line typed again: ${lost.join('; ')})`)
+      return { attempt, lost }
+    }
+    lost.push(`not taken within ${hungMs / 1000} s`)
+  }
+  console.log(`(${name}'s line not taken: ${lost.join('; ')})`)
+  return { attempt: 0, lost }
+}
+
 /**
  * Prompts typed into the fake Claude Code (fake-claude/) in a session (pty `key`; `live()` gives its session:live entry),
  * each waited for by its own turn (#672, #684). Two gaps open under load when a suite types a prompt and then waits for
@@ -953,10 +1055,9 @@ const TURN_HUNG_MS = 60000
  */
 function fakePrompts(inv, key, live, { hungMs = TURN_HUNG_MS, home = null, why = null } = {}) {
   const screen = async () => (await inv('pty:buffer', key).catch(() => '')) ?? ''
-  const idle = (s) => ['ready', 'finished', 'watching', 'background'].includes(s?.status) && s?.turn?.state !== 'running'
   const takesPrompts = async () => {
     const b = await screen()
-    return idle(await live()) && b.lastIndexOf('✻ Worked for') >= b.lastIndexOf('(esc to interrupt)')
+    return FAKE_IDLE(await live()) && b.lastIndexOf('✻ Worked for') >= b.lastIndexOf('(esc to interrupt)')
   }
   /** Its conversation from item `from` on (all of it by default), as the Sessions tab reads it. */
   const conversation = async (from) => {
@@ -972,9 +1073,14 @@ function fakePrompts(inv, key, live, { hungMs = TURN_HUNG_MS, home = null, why =
     if (looks > 1) console.log(`  (it took prompts again ${Date.now() - t} ms after ${short(text)} was due)`)
     const before = (await live())?.turn?.id ?? null
     const items = (await conversation()).total
-    await inv('pty:write', key, text)
-    await sleep(300) // on purpose: the fake reads a typed line before its Enter, as a CLI does
-    await inv('pty:write', key, '\r')
+    // With the fake's input log on (lib.fakeClaude turns it on), typed as typeLine types (a wake of Hive's may disturb
+    // it, #1560); without, a pause before its Enter, on purpose: the fake reads a typed line before its Enter, as a CLI does.
+    if (home && fs.existsSync(path.join(home, 'fake-log-input.txt'))) await typeLine(inv, key, home, null, text, { live, ready: takesPrompts, hungMs })
+    else {
+      await inv('pty:write', key, text)
+      await sleep(300)
+      await inv('pty:write', key, '\r')
+    }
     return { text, before, items }
   }
   const over = async ({ text, before, items }) => {
@@ -1310,4 +1416,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { unkey, KEYED, cardLabel, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, TURN_HUNG_MS, fakePrompts, skip }
+module.exports = { unkey, KEYED, cardLabel, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, TURN_HUNG_MS, logFakeInput, typeLine, fakePrompts, skip }
