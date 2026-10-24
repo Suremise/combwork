@@ -52,6 +52,8 @@ function commits(wt, n) {
 ;(async () => {
   for (const d of [userData, ws, ws + '.worktrees', claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   lib.gitProject(beta)
   lib.enableProviders(userData)

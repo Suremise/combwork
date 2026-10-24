@@ -24,6 +24,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   fs.mkdirSync(alpha, { recursive: true })
   lib.gitProject(alpha, { 'README.md': '# Alpha\n' })
   lib.enableProviders(userData)

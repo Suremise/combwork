@@ -37,6 +37,8 @@ const commit = (dir, file, text, message) => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   // A project with no version control: None.
   fs.mkdirSync(notes, { recursive: true })
@@ -62,9 +64,8 @@ const commit = (dir, file, text, message) => {
   const idle = async (p, id) => ['ready', 'finished'].includes((await live(p, id))?.status)
   const say = async (p, id, text) => {
     await lib.until(() => idle(p, id), HUNG_MS)
-    await inv('pty:write', lib.ptyKey(p, id), text)
-    await lib.sleep(300) // A pause between the text and Enter, as a person makes: the CLI takes them as one prompt.
-    await inv('pty:write', lib.ptyKey(p, id), '\r')
+    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    await lib.typeLine(inv, lib.ptyKey(p, id), claudeHome, null, text, { live: () => live(p, id) })
   }
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
 

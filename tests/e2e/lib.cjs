@@ -235,6 +235,8 @@ function fakeClaude(userData, home, trusted = []) {
   fs.rmSync(home, { recursive: true, force: true })
   fs.mkdirSync(home, { recursive: true })
   fs.writeFileSync(path.join(home, 'fake-trusted.json'), JSON.stringify(trusted.map((f) => f.toLowerCase())))
+  // Its input log on, for typeLine (#1560).
+  logFakeInput(home)
   return { CLAUDE_CONFIG_DIR: home }
 }
 
@@ -931,6 +933,9 @@ async function sendPrompt(inv, key, text, { submitted, tries = 3, waitMs = 20000
  */
 const TURN_HUNG_MS = 60000
 
+/** Whether a fake Claude Code takes a prompt now, by its session:live entry: idle, its turn not running. */
+const FAKE_IDLE = (s) => ['ready', 'finished', 'watching', 'background'].includes(s?.status) && s?.turn?.state !== 'running'
+
 /**
  * Turns on the fake Claude Code's input log in its home (CLAUDE_CONFIG_DIR): each read of its input goes into
  * fake-input.jsonl there (#1286), which typeLine() reads. Before the fake starts: it looks for the switch only then.
@@ -941,7 +946,8 @@ function logFakeInput(home) {
 }
 
 /**
- * Types a line into a fake Claude Code (pty `key`, its home `home`, the agent's name `agent`) that Hive may type a wake
+ * Types a line into a fake Claude Code (pty `key`, its home `home`, the agent's name `agent`, or null for live()'s
+ * agentName: its HIVE_AGENT, which the fake's records carry) that Hive may type a wake
  * into at the same moment (#1553, #1560): the wake's Ctrl+U clears the line, or the two lines mix, or the line lands
  * while the agent is busy with the wake and is dropped (fake-dropped.jsonl). So its Enter goes only once the CLI has
  * read the line whole (fake-input.jsonl: logFakeInput() before the fake starts), the line counts only when nothing
@@ -952,7 +958,9 @@ function logFakeInput(home) {
  *   command runs long isn't typed again.
  * - taken(): true once the line was taken, instead (a run it starts showing in Progress, the agent working on a
  *   held turn): something seen as the line starts, never as its work ends. One of live and taken is required.
- * - ready(): waited for before each attempt (the agent idle), if given.
+ * - ready(): waited for before each attempt; with live and no ready, until the fake takes prompts (idle, its turn not
+ *   running, as fakePrompts has it). Not ready within `hungMs`, the line is typed anyway (and said why).
+ * - A slash command (/rename, /compact) starts no turn: taken once it was read intact and not dropped.
  * - disturb: for the suite that shows the helper types again (progressreport), the first attempt disturbed as a wake
  *   would: 'enter', a Ctrl+U between the line and its Enter; 'before', a wake's text on the line (read) before it.
  * Returns { attempt, lost }: the attempt taken (1 = the first; 0 if none of `tries` was), and why each before it wasn't.
@@ -960,19 +968,19 @@ function logFakeInput(home) {
 async function typeLine(inv, key, home, agent, text, { live = null, taken = null, ready = null, tries = 3, hungMs = TURN_HUNG_MS, disturb = null } = {}) {
   if (!live && !taken) throw new Error('typeLine: give it live or taken')
   if (!fs.existsSync(path.join(home, 'fake-log-input.txt'))) throw new Error(`typeLine: the fake's input log is off in ${home} (lib.logFakeInput before it starts)`)
-  const jsonl = (f) => (fs.existsSync(path.join(home, f)) ? fs.readFileSync(path.join(home, f), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((r) => r.agent === agent)
+  const name = agent ?? (live ? (await live())?.agentName : null)
+  if (!name) throw new Error(`typeLine: no agent name for ${key} (its session isn't live)`)
+  if (live && !ready) ready = async () => FAKE_IDLE((await live()) ?? null)
+  const jsonl = (f) => (fs.existsSync(path.join(home, f)) ? fs.readFileSync(path.join(home, f), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((r) => r.agent === name)
   // All the agent's CLI has read, its key sequences (a bracketed paste's marks) left out: what is on its line as the
   // suite types can have come before (a wake's Ctrl+U and text, read just before the suite's line, #1560).
   const readAll = () => jsonl('fake-input.jsonl').map((r) => r.data).join('').replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
   const lost = []
   for (let attempt = 1; attempt <= tries; attempt++) {
-    if (ready && !(await until(ready, hungMs, 250))) {
-      lost.push(`not ready within ${hungMs / 1000} s`)
-      break
-    }
+    if (ready && !(await until(ready, hungMs, 250))) lost.push(`not ready within ${hungMs / 1000} s, typed anyway`)
     const turn = async () => (await live())?.turn?.id ?? null
-    const turnBefore = live ? await turn() : null
-    const took = async () => (live ? (await turn()) !== turnBefore : await taken())
+    const turnBefore = live && !taken ? await turn() : null
+    const took = async () => (taken ? await taken() : text.startsWith('/') || (await turn()) !== turnBefore)
     const from = readAll().length
     const readSince = () => readAll().slice(from)
     const dropped = jsonl('fake-dropped.jsonl').length
@@ -1016,12 +1024,12 @@ async function typeLine(inv, key, home, agent, text, { live = null, taken = null
       continue
     }
     if (await took()) {
-      if (lost.length) console.log(`(${agent}'s line typed again: ${lost.join('; ')})`)
+      if (lost.length) console.log(`(${name}'s line typed again: ${lost.join('; ')})`)
       return { attempt, lost }
     }
     lost.push(`not taken within ${hungMs / 1000} s`)
   }
-  console.log(`(${agent}'s line not taken: ${lost.join('; ')})`)
+  console.log(`(${name}'s line not taken: ${lost.join('; ')})`)
   return { attempt: 0, lost }
 }
 
@@ -1047,10 +1055,9 @@ async function typeLine(inv, key, home, agent, text, { live = null, taken = null
  */
 function fakePrompts(inv, key, live, { hungMs = TURN_HUNG_MS, home = null, why = null } = {}) {
   const screen = async () => (await inv('pty:buffer', key).catch(() => '')) ?? ''
-  const idle = (s) => ['ready', 'finished', 'watching', 'background'].includes(s?.status) && s?.turn?.state !== 'running'
   const takesPrompts = async () => {
     const b = await screen()
-    return idle(await live()) && b.lastIndexOf('✻ Worked for') >= b.lastIndexOf('(esc to interrupt)')
+    return FAKE_IDLE(await live()) && b.lastIndexOf('✻ Worked for') >= b.lastIndexOf('(esc to interrupt)')
   }
   /** Its conversation from item `from` on (all of it by default), as the Sessions tab reads it. */
   const conversation = async (from) => {
@@ -1066,9 +1073,14 @@ function fakePrompts(inv, key, live, { hungMs = TURN_HUNG_MS, home = null, why =
     if (looks > 1) console.log(`  (it took prompts again ${Date.now() - t} ms after ${short(text)} was due)`)
     const before = (await live())?.turn?.id ?? null
     const items = (await conversation()).total
-    await inv('pty:write', key, text)
-    await sleep(300) // on purpose: the fake reads a typed line before its Enter, as a CLI does
-    await inv('pty:write', key, '\r')
+    // With the fake's input log on (lib.fakeClaude turns it on), typed as typeLine types (a wake of Hive's may disturb
+    // it, #1560); without, a pause before its Enter, on purpose: the fake reads a typed line before its Enter, as a CLI does.
+    if (home && fs.existsSync(path.join(home, 'fake-log-input.txt'))) await typeLine(inv, key, home, null, text, { live, ready: takesPrompts, hungMs })
+    else {
+      await inv('pty:write', key, text)
+      await sleep(300)
+      await inv('pty:write', key, '\r')
+    }
     return { text, before, items }
   }
   const over = async ({ text, before, items }) => {
