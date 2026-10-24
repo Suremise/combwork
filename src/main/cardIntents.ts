@@ -61,6 +61,9 @@ export interface CardRefIn {
  * caller's view (another project's is unknown to an agent), its runtime's intent with the card named as the runtime takes
  * it (an agent's plain number refused there), and the card's 0.9 fields in each write. Throws the runtime's refusal.
  */
+/** The intents after which a reply says what comes next (#1530): those that can change it. */
+const NEXT_AFTER = new Set<CardIntent['kind']>(['start', 'putBack', 'submit', 'verdict', 'reportMerge', 'removeFromQueue', 'retryMerge'])
+
 export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: CardIntent): Promise<{ done: IntentDone; card: TaskCard }> {
   const ws = workspace
   const before = await readTask(ref.n, actor)
@@ -162,5 +165,8 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   const m = reply as Moved
   // A start: how long a design waits for its check here (Card loops → Design check wait), for a watch set before posting one.
   if (intent.kind === 'start') m.data = { ...m.data, designWaitMinutes: stepWait }
-  return { done: { ok: true, card: card.key ?? `#${ref.n}`, from: m.from, to: m.to, ...(m.data ? { data: m.data } : {}), ...(m.warnings?.length ? { warnings: m.warnings } : {}) }, card }
+  // What comes next on it (#1530), from its state and rules, after the intents that change what's next (a submit or a
+  // verdict that leaves it where it was too: the agent merges, a quorum); the verdict after a review starts.
+  const next = intent.kind === 'startReview' ? { step: 'intents' as const, intents: ['verdict'] } : NEXT_AFTER.has(intent.kind) ? wf.nextFor(ref.n) : null // i18n-ignore: an intent's name, agent-facing
+  return { done: { ok: true, card: card.key ?? `#${ref.n}`, from: m.from, to: m.to, ...(m.data ? { data: m.data } : {}), ...(m.warnings?.length ? { warnings: m.warnings } : {}), ...(next ? { next } : {}) }, card }
 }

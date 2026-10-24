@@ -1153,6 +1153,16 @@ export async function ackDeliveries(host: string, agentId: string, ids: readonly
 }
 
 /**
+ * hive_inbox's combined form (#1531, opt-in: ack with read): the ack first, by ackDeliveries' own rules (an id not read
+ * yet is `unread` and stays as it is; another agent's is `unknown`), then the read. What the read gives is received, never
+ * acked: nothing is acked by being read, so an item listed here is acked by a later call, after acting on it.
+ */
+export async function ackThenRead(host: string, agentId: string, ids: readonly string[]): Promise<{ acked: string[]; unknown: string[]; unread: string[]; items: InboxItem[]; unacked: string[] }> {
+  const acked = await ackDeliveries(host, agentId, ids)
+  return { ...acked, ...(await readInbox(host, agentId)) }
+}
+
+/**
  * Applies, in a draft, what sources said as their deliveries were made again: cancelled, or their text and context as
  * they are now (that version, saved with it). One already offered keeps the version it was offered as while that still
  * holds; one that no longer does is made again (#650: its doorbell named it by id, never its text, so it can be, rather

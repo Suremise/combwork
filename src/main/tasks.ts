@@ -14,6 +14,7 @@ import type { HiveErrorKind, TaskMoveResult } from '../shared/types'
 import { workflowMessage } from '../shared/workflow/texts'
 import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, UnarchiveResult } from '../shared/types'
 import { returnRound } from '../shared/watch'
+import { INTENT_TOOL } from '../shared/toolReplies'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
 import { actorOf, changeByRuntime, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
@@ -1123,9 +1124,6 @@ interface AgentGate {
   /** Doing: the agent the card is started for, when the change gives it to another. */
   builder?: string
 }
-
-/** The hive tool of each intent an agent's old move stands for: what its reply says to call next time (#1268). */
-const INTENT_TOOL: Record<string, string> = { start: 'hive_start_card', submit: 'hive_submit', verdict: 'hive_verdict', 'report merge': 'hive_report_merge', 'put back': 'hive_put_back', 'start review': 'hive_start_review' }
 
 /**
  * Whether a project agent's change (its own token) is an old move translated into an intent, for one transition (#1268,

@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { copilot, copilotHooks, copilotMcpServer } from '../src/main/providers/copilot/adapter'
+import { copilot, copilotHooks, copilotMcpServer, HIVE_TOOL_NAMES } from '../src/main/providers/copilot/adapter'
 import { COPILOT_ENV_STRIP, copilotEnv } from '../src/main/providers/copilot/home'
 import { parseCopilotModels } from '../src/main/providers/copilot/models'
 import type { LaunchContext } from '../src/main/providers/types'
@@ -114,7 +114,8 @@ describe('Copilot launch', () => {
     expect(COPILOT_ENV_STRIP).toEqual(['GH_TOKEN', 'GITHUB_TOKEN'])
     expect(env?.COPILOT_GITHUB_TOKEN).toBe('github_pat_x')
     expect(env).toMatchObject({ PATH: 'C:\\Windows', HIVE_HOOK_TOKEN: 'tok123', COPILOT_HOOK_ALLOW_LOCALHOST: '1', COPILOT_AUTO_UPDATE: 'false' })
-    expect(env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBeUndefined()
+    // Its custom instructions: the hive tools' names (#1530).
+    expect(env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(join(ctx.privateDir, 'instructions'))
     // The token never goes on the command line.
     expect(args.join(' ')).not.toContain('tok123')
   })
@@ -194,7 +195,7 @@ describe('Copilot launch', () => {
     expect(hooks).toEqual(copilotHooks(ctx.hookUrl, 'tok123'))
     expect(JSON.parse(readFileSync(join(ctx.privateDir, 'plugin', 'plugin.json'), 'utf8')).name).toBe('hive-launch')
     expect(JSON.parse(readFileSync(join(ctx.privateDir, 'mcp.json'), 'utf8'))).toEqual({ mcpServers: { hive: { type: 'local', command: 'node', args: ['hive-mcp.js'], env: { HIVE_PROJECT: 'proj' }, tools: ['*'] } } })
-    expect(readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'hive.instructions.md'), 'utf8')).toBe("---\napplyTo: '**'\n---\nRole: assistant.\n")
+    expect(readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'hive.instructions.md'), 'utf8')).toBe(`---\napplyTo: '**'\n---\n${HIVE_TOOL_NAMES}\n\nRole: assistant.\n`)
   })
 
   it('is ended with Ctrl+C before it is killed, so it writes its token totals (#465)', async () => {

@@ -583,6 +583,25 @@ const prose = (seed, n) => {
 ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/shared/journal.ts').DEFAULT_SCOPE)}`)
   check("metrics: the Assistant's launch is the workspace's own, its core, role and mode each measured, and the journal's rule as its custom part", ga?.launches >= 1 && ga.guidanceBytes > 0 && ga.roleBytes > 0 && ga.modeBytes > 0 && ga.customBytes === journalBytes, `${JSON.stringify(ga)}; the journal's rule: ${journalBytes}`)
 
+  // --- hive_inbox's three forms (#1531), by each caller: the Assistant (its tool), a script with an agent's own token
+  // (the API), the agent (its tool), and the workspace's token, which has no inbox. After the metrics' checks: the
+  // agent's fake reads the message on its doorbell, starting a hive server the catalog would count.
+  check("inbox: the Assistant's ack with read: the ack line, then the read", measure('hive_inbox (ack, read)', tool('hive_inbox', { ack: ['m99'], read: true }, 'assistant'), 200) === 'Nothing acked. Not in your inbox: m99.\nNothing new.', texts['hive_inbox (ack, read)'])
+  // A delivery the token's own agent has received (alpha's latest launch: the agent a card was started on, its task):
+  // read with its token, it is that agent's to ack, whoever it is.
+  const firstRead = await api('POST', '/v1/inbox', {}, coderToken)
+  check('inbox: a read with the agent\'s own token: { items, unacked }', firstRead.status === 200 && Object.keys(firstRead.body).filter((k) => k !== 'names').sort().join() === 'items,unacked', firstRead.text)
+  const coderMessage = [...(firstRead.body?.unacked ?? []), ...(firstRead.body?.items ?? []).flatMap((i) => i.ids)][0]
+  check('…with one received, its to ack', !!coderMessage, firstRead.text)
+  const both = await api('POST', '/v1/inbox', { ack: [coderMessage, 'm99999'], read: true }, coderToken)
+  check("inbox: ack with read, with the agent's own token: acked, an id not its own unknown, then the read", both.status === 200 && both.body.acked?.join() === coderMessage && both.body.unknown?.join() === 'm99999' && Array.isArray(both.body.unread) && Array.isArray(both.body.items) && Array.isArray(both.body.unacked) && !both.body.unacked.includes(coderMessage), both.text)
+  const ackOnly = await api('POST', '/v1/inbox', { ack: [coderMessage] }, coderToken)
+  check('inbox: ack only lists nothing: { acked, unknown, unread }', ackOnly.status === 200 && Object.keys(ackOnly.body).sort().join() === 'acked,unknown,unread' && ackOnly.body.acked.join() === coderMessage, ackOnly.text)
+  check("inbox: read isn't a flag of any kind", (await api('POST', '/v1/inbox', { ack: [coderMessage], read: 'yes' }, coderToken)).status === 400)
+  check("inbox: the workspace's token has no inbox, combined or not", (await api('POST', '/v1/inbox', { ack: [coderMessage], read: true })).status === 400 && (await api('POST', '/v1/inbox', {})).status === 400)
+  const coderBoth = asCoder('tools/call', { name: 'hive_inbox', arguments: { ack: [coderMessage], read: true } }).content[0].text
+  check("inbox: the agent's tool, ack with read: the ack line, then the read's", coderBoth.split('\n')[0] === `Acked ${coderMessage}.` && /^(Nothing new\.|\d+ new:)/.test(coderBoth.split('\n')[1] ?? '') && coderBoth.length <= 2000, coderBoth)
+
   // A card's intents (#1267), as the coder with its own token: where the card went, in a line; a plain number refused.
   const intent = (name, args) => {
     const r = asCoder('tools/call', { name, arguments: args })
@@ -592,11 +611,14 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   const designLane = tool('hive_lane', { action: 'start', cards: [todo[40]], reviewer: 'Tester', name: 'design step' }).text.match(/lane-[0-9a-f]+$/)?.[0]
   const startedOwn = measure('hive_start_card', intent('hive_start_card', { card: `#${todo[40]}` }), 400)
   check('an intent says where the card went', new RegExp(`^[A-Z]+-\\d+: todo → active\\. folder: `).test(startedOwn), startedOwn)
+  // …and what can come next on it, as its rules have it (#1530).
+  check('…and what comes next on it', startedOwn.split('\n')[0].endsWith(' Next on it: hive_submit or hive_put_back.'), startedOwn)
   // A card loop's design step (#1382): nothing moves, and the reply says how long to wait for the check.
   const designed = measure('hive_loop_step', intent('hive_loop_step', { card: `#${todo[40]}`, step: 'design', text: 'Design: one line.' }), 160)
   check('a design step says the card stays, names the design and when its check is due', /^[A-Z]+-\d+: still active\. design: [A-Z]+-\d+\/s\d+; until: \S+; waitMinutes: 30$/.test(designed), designed)
   check('…and its lane ends', !!designLane && tool('hive_lane', { action: 'end', lane: designLane, abandoned: true }).text.startsWith('Lane abandoned: '), designLane)
-  measure('hive_put_back', intent('hive_put_back', { card: `#${todo[40]}`, why: 'Not yet.' }), 200)
+  const putBack = measure('hive_put_back', intent('hive_put_back', { card: `#${todo[40]}`, why: 'Not yet.' }), 200)
+  check('put back names the start as next', putBack.endsWith(' Next on it: hive_start_card.'), putBack)
   const plainRefused = intent('hive_put_back', { card: String(todo[40]), why: 'Not yet.' })
   check("an intent refuses the coder's plain number, naming the card's forms", plainRefused.isError && plainRefused.text.includes(`#${todo[40]}`) && plainRefused.text.length <= 600, plainRefused.text)
   check('metrics: a project agent has no role or mode', g?.roleBytes === 0 && g?.modeBytes === 0, JSON.stringify(g))

@@ -1161,7 +1161,7 @@ function noteToldAgents(store: Store, watcher: string, told: Map<string, number>
   if (store.wokeAgents.size > MAX_WATCHES) store.wokeAgents.delete(store.wokeAgents.keys().next().value!)
 }
 
-export type AgentWatchResult = { watching: TaskWatchInfo; replaced?: string } | { already: string[] }
+export type AgentWatchResult = ({ watching: TaskWatchInfo } | { already: string[] }) & { replaced?: string; dropped?: string[] }
 
 /**
  * Starts (or replaces) an agent's agent watch (#416): Hive types one line into it when one of `cond`'s agents finishes
@@ -1215,13 +1215,18 @@ export async function registerAgentWatch(ws: WorkspaceService, projectPath: stri
       }
     }
     stopDelivery(store, old)
+    // A card watch it had ends: said, so it isn't thought to be still running. So do the agents an agent watch it had
+    // followed and this call doesn't follow now (#1346 item 6: a second watch dropped the first's agents unsaid): those
+    // the new watch leaves out, or, answered at once with no watch made, every one (HR2's #1530 rounds 1 and 2).
+    const followedNow = rec ? cond.agents : []
+    const dropped = old?.agents ? old.agents.agents.filter((o) => !followedNow.some((a) => same(a.projectPath, o.projectPath) && a.agentId === o.agentId)).map((o) => `${o.name} (${o.project})`) : []
+    const ended = { ...(old && !old.agents ? { replaced: infoOf(old).label } : {}), ...(dropped.length ? { dropped } : {}) }
     if (!rec) {
       noteToldAgents(store, watcher, toldNow)
-      return { already }
+      return { already, ...ended }
     }
     log.info(`${userText(agentId)} watches ${cond.agents.map((a) => userText(a.name)).join(', ')}`)
-    // A card watch it had ends: said, so it isn't thought to be still running.
-    return { watching: infoOf(rec), ...(old && !old.agents ? { replaced: infoOf(old).label } : {}) }
+    return { watching: infoOf(rec), ...ended }
   })
   sessions.watchChanged(projectPath, agentId)
   // Checked again once in place: an agent that finished while it was being set up isn't missed.
@@ -1494,7 +1499,11 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     const laneSince = told?.at ?? since
     const toldMarks = told ? Object.fromEntries(told.marks) : undefined
     const nows = await lanesNow(store, { scope, lanes: cond, laneSince, ...(toldMarks ? { laneMarks: toldMarks } : {}) })
-    const started = new Map((await listLanes(ws, { all: true })).map((l) => [l.id, l.startedAt]))
+    const allLanes = await listLanes(ws, { all: true })
+    const started = new Map(allLanes.map((l) => [l.id, l.startedAt]))
+    // The watched lanes' own cards (#1531, #1346 item 3): listed as cards too, each wakes it on every move.
+    const watchedIds = new Set(nows.map((n) => n.id))
+    const laneCards = new Set(allLanes.filter((l) => watchedIds.has(l.id)).flatMap((l) => l.cards.map((c) => c.number)))
     const laneMarks: Record<string, LaneMark> = {}
     for (const n of nows) {
       const t = told?.marks.get(n.id)
@@ -1536,9 +1545,10 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     const cardCond: WatchCondition = cards.length ? { cards, changes, blocked: true } : NO_CARDS
     const from = cards.length ? { seen, ...(bySelf && self ? { self } : {}) } : {}
     const had = last?.cards ?? []
+    const inLanes = cards.filter((n) => laneCards.has(n))
     const cardsOut: LaneWatchCards | undefined =
       cards.length || dropped.length || (!keep && had.length)
-        ? { now: cards, ...(keep ? { kept: true as const } : {}), ...(!keep && had.length && (had.length !== cards.length || had.some((n) => !cards.includes(n))) ? { replaced: [...had] } : {}), ...(dropped.length ? { dropped } : {}) }
+        ? { now: cards, ...(keep ? { kept: true as const } : {}), ...(!keep && had.length && (had.length !== cards.length || had.some((n) => !cards.includes(n))) ? { replaced: [...had] } : {}), ...(dropped.length ? { dropped } : {}), ...(inLanes.length ? { inLanes } : {}) }
         : undefined
     // The waits for the user it starts from (#726): the watch it replaces, else what its last wake told, else when this
     // call began.

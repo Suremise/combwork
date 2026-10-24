@@ -50,21 +50,45 @@ describe('the session contract', () => {
       const without = hiveInstructions('web', 'agent', true, new Set([off]))
       expect(named(without), off).toEqual(all.filter((n) => n !== off))
       // The board rules stay whatever is switched off.
-      expect(without, off).toMatch(/Board rules, whatever a skill says, or if it is missing/)
+      expect(without, off).toMatch(/Board rules \(Hive's, whatever a skill says, or if it is missing\)/)
     }
     expect(named(hiveInstructions('web', 'agent', true, new Set(all)))).toEqual([])
   })
 
   it('keeps the board boundaries a session needs when its skills are missing', () => {
     expect(agent).toMatch(/or if it is missing/)
-    expect(agent).toMatch(/Working on a card: move it to doing first \(also when it is back from review\), then to review with a comment saying what you did/)
-    expect(agent).toMatch(/Reviewing a card is not working on it: it stays in review with its agent/)
-    expect(agent).toMatch(/then failed, or passed with column passed/)
-    expect(agent).toMatch(/If it leaves review meanwhile, your review is over: leave the card where it is \(not back to review or on to passed\)/)
-    expect(agent).toMatch(/Done means merged: move a card to done only once its work is merged \(in the project folder: committed\), or when the user asks/)
+    // #1529 (P8): the intents, and that Hive enforces the rest (§16.8): what the project's rules refuse is the refusal's to say.
+    for (const t of ['hive_start_card', 'hive_submit', 'hive_start_review', 'hive_verdict', 'hive_report_merge']) expect(agent, t).toContain(t)
+    expect(agent).toMatch(/Hive refuses what the project's rules don't allow, saying why and what to do next/)
+    expect(agent).toMatch(/a column move \(hive_update_task\) is translated into its intent/)
     expect(agent).toMatch(/On hold is the user's: never move cards in or out unasked/)
     expect(agent).toMatch(/Add cards for follow-up work rather than doing it unasked/)
     expect(agent).toMatch(/use the hive tools for them, not the file system/)
+  })
+
+  // #1529 (#903): a fresh user's Claude agents read their inbox and never acked, so it showed overdue. Every CLI gets the contract.
+  it('says read, act, then ack, and why, to agents and the Assistant', () => {
+    for (const text of [agent, assistant]) {
+      expect(text).toMatch(/read it with hive_inbox, act on it, then ack it \(hive_inbox with ack\) before you wait or end your turn/)
+      expect(text).toMatch(/one not acked within 30 minutes shows the user it's overdue/)
+    }
+  })
+
+  // #1529 (P8): whether a card needs review, who merges and how many rounds are the project's options, its kind and
+  // hive.workflow.enforce: the contract names the intents and leaves each case to Hive's reply or refusal. Every session
+  // gets the same contract, so each line reads right for a solo user with the rules off as for a Git team with them on.
+  it('stays conditional where the gates are: no round count, no review or merge stated as the rule', () => {
+    for (const text of [agent, hiveInstructions('web', 'agent', false)]) {
+      // hive.workflow.enforce off: no round limit, no one card at a time, lane edits at once.
+      expect(text).not.toMatch(/\b\d+ rounds?\b|\bround limit\b|\bone (?:card )?at a time\b/i)
+      // Review off or by the user: a card can finish on submit, with no reviewer.
+      expect(text).not.toMatch(/\b(?:move|moves) (?:it|a card|the card) to (?:doing|review|passed|done)\b|\ba reviewer (?:is|gets|takes)\b/i)
+      // Finish not checked, or no version control: Done isn't proven merged; a no-code card has no commit.
+      expect(text).not.toMatch(/\bDone (?:means|=|is) merged\b|\bonce it passes\b|\bcommit(?:ted|s)?\b|\bHEAD\b/i)
+      // Cards built in the shared project folder: the folder line names it beside slots and review copies.
+      expect(text).toMatch(/Hive sets your folder \(the project's, a card's or lane's slot, or the review copy a review names\)/)
+      expect(text).toMatch(/hive_report_merge for a merge you made/)
+    }
   })
 
   it('names only hive tools that exist', () => {
@@ -76,9 +100,12 @@ describe('the session contract', () => {
     // hive-progress line added about 180, #170's On Hold, Passed and Done-means-merged about 80, #476's worktree
     // boundary about 160, #509's scratch rule about 220, #613's stop-what-you-start line about 260, #650's inbox line
     // about 280 (and 160 for the Assistant's), #817's long-documents line about 110 (both), #1129's Done in the project
-    // folder about 35.
-    expect(withLatestHandover(agent, 'handovers/2026-10-03-web-auth-refactor.md').length).toBeLessThan(2800)
-    expect(assistant.length).toBeLessThan(710)
+    // folder about 35. #1529 (P8) held the agent's at its 1.0.0 size (2,656 characters, 2,787 with a handover): the
+    // board rules became the intents and Hive's refusals, and #903's act-then-ack line came in within it; the
+    // Assistant's grew by that line, about 140.
+    expect(agent.length).toBeLessThanOrEqual(2656)
+    expect(withLatestHandover(agent, 'handovers/2026-10-03-web-auth-refactor.md').length).toBeLessThanOrEqual(2787)
+    expect(assistant.length).toBeLessThan(820)
     for (const level of ['look', 'agents', 'projects'] as const) expect(controlRules(level).length).toBeLessThan(1200)
     const card = { number: 7, title: 'T', description: 'D', blockedBy: [], comments: [] } as unknown as TaskCard
     expect(taskPrompt(card, true).length - taskPrompt(card, false).length).toBeLessThan(40)
@@ -95,6 +122,60 @@ describe('the session contract', () => {
     expect(catalog.get('journal')?.audience).toBe('assistant')
     for (const t of toolsNamed(rule)) expect(assistantTools('projects', false, true), t).toContain(t)
     expect(journalRule(['decision', 'plan', 'event', 'incident', 'insight', 'preference', 'moment']).length).toBeLessThan(600)
+  })
+})
+
+// #1529 (P8, AGENTS.md's one owner per rule): a rule a skill owns is stated once in everything a session of that role
+// reads (its contract, the skills it gets, the tools' descriptions), and never in the contract, which points to the skill.
+describe('one owner per rule', () => {
+  const RULES: [string, RegExp][] = [
+    ['Done means merged', /\bDone (?:means|=|is) merged\b|\bwhich means merged\b/gi],
+    ["Passed isn't merged", /\bPassed (?:isn't|is not|means it passed review, not that it's) merged\b|\breviewed, (?:not merged|waiting to be merged)\b/gi],
+    ['wait with a watch', /\bwait with a watch\b/gi]
+  ]
+  // Places stating one besides its owner today, until lanes A and B (#1524–#1528) and #1530 rewrite them. The list only
+  // shrinks: one no longer stating it fails until it's taken off.
+  const NOT_YET: Record<string, string[]> = {}
+  const tools = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+  const descriptions = [...tools.matchAll(/description:\s*(?:ASSISTANT\s*\?\s*)?(["'`])((?:\\.|(?!\1).)*)\1(?:\s*:\s*(["'`])((?:\\.|(?!\3).)*)\3)?/g)].map((m) => `${m[2]}\n${m[4] ?? ''}`).join('\n')
+  const places = (role: 'agent' | 'assistant'): [string, string][] => [
+    ['contract', role === 'agent' ? hiveInstructions('web') : [hiveInstructions('', 'assistant'), controlRules('projects', true), journalRule(['decision'])].join('\n')],
+    ...[...catalog].filter(([, s]) => skillFor(s.audience, role)).map(([name, s]): [string, string] => [name, s.text]),
+    ['tool descriptions', descriptions]
+  ]
+
+  for (const role of ['agent', 'assistant'] as const) {
+    it(`states each skill-owned rule once for the ${role}, never in the contract`, () => {
+      for (const [rule, re] of RULES) {
+        const stating = places(role).filter(([, text]) => (text.match(re) ?? []).length > 0).map(([place]) => place)
+        expect(stating, `${role}: ${rule}`).not.toContain('contract')
+        const extra = NOT_YET[`${role}: ${rule}`] ?? []
+        for (const p of extra) expect(stating, `${role}: ${rule} is no longer in ${p}: take it off NOT_YET`).toContain(p)
+        expect(stating.filter((p) => !extra.includes(p)).length, `${role}: ${rule} in ${stating.join(', ')}`).toBeLessThanOrEqual(1)
+      }
+    })
+  }
+  // "Done means merged" is Hive's now (report merge's containment check) and depends on the card's kind (#1524: a no-code
+  // card is Done with no merge), so no text states it whole; the others stay guidance an agent reads somewhere.
+  it('keeps each rule that is still guidance somewhere an agent reads it', () => {
+    for (const [rule, re] of RULES.filter(([r]) => r !== 'Done means merged')) expect(places('agent').some(([, text]) => (text.match(re) ?? []).length > 0), rule).toBe(true)
+  })
+})
+
+// #1530 (P8): the tools' texts say arguments, side effects and refusals as Hive enforces them, and stay true for every
+// project's options (no version control, review off, merges not checked, a shared folder); #1346's text fixes.
+describe("the tools' descriptions", () => {
+  const tools = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+  it('describe moves as the intents, with no workflow stated as the rule', () => {
+    // The old moves are one sentence of hive_update_task's: translated where the rules apply, as asked elsewhere.
+    expect(tools).toMatch(/Moves are the intent tools' \(hive_start_card, hive_submit, hive_start_review, hive_verdict, hive_report_merge, hive_put_back\): where the project's workflow rules apply, column and review here are translated into those intents/)
+    // A revision isn't always a commit, nor the folder's head (a shared folder, no version control, a no-code card).
+    expect(tools).not.toMatch(/the head of the card's folder|The revision it is about \(a commit\)/)
+    expect(tools).toMatch(/Report a card's work merged, where its agent merges it or merges aren't checked/)
+  })
+  it("carry #1346's text fixes: a lane watch takes lanes only; a decision nudges the Assistant's journal", () => {
+    expect(tools).toMatch(/For a lane, pass lanes only: adding its cards wakes you on every move\./)
+    expect(tools).toMatch(/ASSISTANT && JOURNAL && typeof a\.decision === 'string'[^\n]*Note it in your journal \(hive_journal_write\)\./)
   })
 })
 

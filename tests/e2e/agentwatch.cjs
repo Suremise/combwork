@@ -115,6 +115,13 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await lastWaitReply(watcher.id)) !== null && (await idle(watcher.id)), HUNG_MS)
   const already = await lastWaitReply(watcher.id)
   check('watching an idle agent answers at once: already, and no watch', (already ?? '').startsWith('Already: Worker (alpha) is idle') && !(await live(watcher.id))?.watch, already)
+  // …and that answer ends a watch it had, saying so, the busy agent asked about again included (#1530, HR2's rounds 1-2).
+  await say(watcher.id, watchOn('Slow'))
+  await until(async () => (await live(watcher.id))?.status === 'watching', HUNG_MS)
+  await say(watcher.id, `hive hive_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Slow' }, { project: 'alpha', agent: 'Worker' }], wake: true })}`)
+  await until(async () => ((await lastWaitReply(watcher.id)) ?? '').startsWith('Already: ') && (await idle(watcher.id)), HUNG_MS)
+  const ended = await lastWaitReply(watcher.id)
+  check("…and ends a watch it had, saying so: every agent it followed", (ended ?? '').startsWith('Already: Worker (alpha) is idle') && (ended ?? '').endsWith(" Your watch on Slow (alpha) has ended: watch again, passing every agent you're following.") && !(await live(watcher.id))?.watch, ended)
 
   // --- Finishing its turn: one line, with its reply. Its turn is held until the watcher watches (not a fixed time,
   // which a loaded machine outran: #667).
