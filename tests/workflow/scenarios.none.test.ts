@@ -247,7 +247,7 @@ describe('workflow scenarios, None', () => {
     put(e.project, 'src/a.md', 'a, written\n')
     e.wf.store.updateCard(card.id, { paths: ['src', 'NODE_MODULES/pad.js'] })
     const s = e.wf.state(card)
-    const legacy = { ...s, started: { ...s.started!, manifest: { ...(s.started!.manifest ?? {}), 'NODE_MODULES/pad.js': 'f00d', 'node_modules/gone.js': 'beef' } } }
+    const legacy = { ...s, started: { ...s.started!, manifest: { ...s.started!.manifest, 'NODE_MODULES/pad.js': 'f00d', 'node_modules/gone.js': 'beef' } } }
     const plan = await e.wf.platform({ ...preset('none', 'team') }).submission(e.wf.store.card(card.id), legacy, preset('none', 'team'), { agent: 'B1', guards: [], predicted: true } as never)
     expect(plan.ok && plan.files.map((f) => f.path)).toEqual(['src/a.md'])
     expect(plan.ok && plan.warnings.join(' ')).toMatch(/left out of .*'s revision: NODE_MODULES\/pad\.js/)
