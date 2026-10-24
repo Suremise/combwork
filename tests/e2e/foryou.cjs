@@ -36,6 +36,8 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.rmSync(notifyLog, { force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   lib.gitProject(beta)
   const trust = (...dirs) => fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify(dirs.map((d) => d.toLowerCase())))
@@ -65,9 +67,8 @@ const check = (name, ok, extra = '') => {
     }
     const told = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8') : '')
     const say = async (id, text) => {
-      await inv('pty:write', lib.ptyKey(alpha, id), text)
-      await lib.sleep(300)
-      await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
     }
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
     const lane = async () => (await inv('lanes:list')).find((l) => l.project === 'alpha')
@@ -140,9 +141,8 @@ const check = (name, ok, extra = '') => {
     const makerIdle = async () => ['ready', 'finished'].includes((await liveIn(beta, maker.id))?.status)
     const makerSays = async (text) => {
       await lib.until(makerIdle, HUNG_MS)
-      await inv('pty:write', lib.ptyKey(beta, maker.id), text)
-      await lib.sleep(300)
-      await inv('pty:write', lib.ptyKey(beta, maker.id), '\r')
+      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      await lib.typeLine(inv, lib.ptyKey(beta, maker.id), claudeHome, null, text, { live: () => liveIn(beta, maker.id) })
     }
     await inv('session:start', beta, { agentId: maker.id })
     check('the beta builder starts', !!(await lib.until(makerIdle, HUNG_MS)))

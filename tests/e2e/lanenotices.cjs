@@ -28,6 +28,8 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.rmSync(notifyLog, { force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -54,9 +56,8 @@ const check = (name, ok, extra = '') => {
       return v
     }
     const say = async (id, text) => {
-      await inv('pty:write', lib.ptyKey(alpha, id), text)
-      await lib.sleep(300)
-      await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
     }
     const idle = async (id) => ['ready', 'finished', 'watching'].includes((await live(id))?.status)
     /** The lane notices recorded so far (Windows notifications a quiet copy records); they name cards as the window does (#1221). */

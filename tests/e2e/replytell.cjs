@@ -24,6 +24,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), ws.toLowerCase()]))
   lib.enableProviders(userData)
@@ -55,8 +57,14 @@ const check = (name, ok, extra = '') => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === 'Assistant').map((w) => w.text)
   }
-  /** Types into a terminal as the user does; Enter separately when asked. */
+  /**
+   * Types into a terminal as the user does; Enter separately when asked. Into the Assistant (its watches), typed again if
+   * a wake of Hive's disturbed it (lib.typeLine, #1560). Into the builder not (#1560's exemption): its typing is the
+   * user's reply under test, which a second try would send twice; a pause before its Enter, on purpose: the fake reads
+   * a typed line before its Enter, as a CLI does.
+   */
   const type = async (p, id, text, enter = true) => {
+    if (p === home && enter) return lib.typeLine(inv, lib.ptyKey(p, id), claudeHome, null, text, { live: () => live(p, id) })
     await inv('pty:write', lib.ptyKey(p, id), text)
     if (!enter) return
     await lib.sleep(300)
