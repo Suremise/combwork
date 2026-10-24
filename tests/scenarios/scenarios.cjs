@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 83
+const FIXTURES_VERSION = 84
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -2312,7 +2312,7 @@ module.exports.SCENARIOS = [
       }
       if (!c.compactAt) {
         if (!(await c.answered(c.fake ? 'work 1' : 'Reply with the one word'))) return
-        // Only Claude Code takes the view so far (#1065): the others are asked straight after their first turn.
+        // Only Claude Code's session is compacted here (Copilot starts none after one): the others are asked straight after their first turn.
         if (c.provider !== 'claude-code') return ask()
         c.compactAt = Date.now()
         await c.inv('session:compact', c.home, undefined, 'assistant')
@@ -2333,19 +2333,19 @@ module.exports.SCENARIOS = [
       const has = (x) => x.text.includes('"Welcome back!"') && x.text.includes(`#${c.entry} `) && x.text.includes(`#${c.cards.g} Doing`)
       const compactViews = views.filter((x) => x.source === 'compact' && Date.parse(x.at) >= (c.compactAt ?? Infinity))
       const recalled = ran(o, 'hive_journal_recall').filter((x) => Date.parse(x.at) >= (c.askedAt ?? Infinity))
-      // Only Claude Code takes the view so far (#1065): Hive gives the others none.
-      const takesView = c.provider === 'claude-code'
+      // Every CLI takes the view at its start since #1065; the scenario compacts only Claude Code's session (above).
+      const compacts = c.provider === 'claude-code'
       return [
-        ...(takesView
+        ["Hive gave the state view at its start, with the board and last week's decision", views.some((x) => x.source !== 'compact' && has(x)), views.map((x) => x.source).join(',')],
+        ...(compacts
           ? [
-              ["Hive gave the state view at its start, with the board and last week's decision", views.some((x) => x.source === 'startup' && has(x)), views.map((x) => x.source).join(',')],
               ['and again after the compaction', compactViews.some(has), compactViews.map((x) => x.text.slice(0, 200)).join(' | ') || `${views.length} views`],
-              ['each view within its budget (9,000 bytes)', views.length > 0 && views.every((x) => Buffer.byteLength(x.text, 'utf8') <= 9000), views.map((x) => Buffer.byteLength(x.text, 'utf8')).join(',')]
+              ['asked after the compaction was over', !!c.askedAt && c.askedAt > (c.compactAt ?? Infinity), `compact ${c.compactAt ?? '-'}, asked ${c.askedAt ?? '-'}`]
             ]
-          : [['Hive gave no view to a CLI that cannot take it (#1065)', views.length === 0, `${views.length} views`]]),
-        ...(takesView ? [['asked after the compaction was over', !!c.askedAt && c.askedAt > (c.compactAt ?? Infinity), `compact ${c.compactAt ?? '-'}, asked ${c.askedAt ?? '-'}`]] : []),
+          : []),
+        ['each view within its budget (9,000 bytes)', views.length > 0 && views.every((x) => Buffer.byteLength(x.text, 'utf8') <= 9000), views.map((x) => Buffer.byteLength(x.text, 'utf8')).join(',')],
         ['the question was answered in its own turn (its prompt, then a reply, the session idle)', !!c.questionAnswered, `asked ${c.askedAt ?? '-'}`],
-        ['recalled it from its journal (hive_journal_recall worked), or answered from the view', recalled.length > 0 || (takesView && /Welcome back/i.test(o.finalReply ?? '')), `${recalled.length} recalls; ${(o.finalReply ?? '').slice(0, 200)}`],
+        ['recalled it from its journal (hive_journal_recall worked), or answered from the view', recalled.length > 0 || /Welcome back/i.test(o.finalReply ?? ''), `${recalled.length} recalls; ${(o.finalReply ?? '').slice(0, 200)}`],
         ['its answer names the decision', /Welcome back/i.test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)],
         ['changed nothing on the board', o.cards.g?.column === 'doing', o.cards.g?.column]
       ]
@@ -3084,6 +3084,8 @@ module.exports.SCENARIOS = [
     async keepWaiting(c) {
       if (c.blockedAt && !c.returnedAt) return true
       if (!c.returnedAt || Date.now() - c.returnedAt > 240000) return false
+      // Only the fake Claude Code answers the wake (its wake script): the other fakes are done once the card is back.
+      if (c.fake && c.provider !== 'claude-code') return false
       const card = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
       return !(card?.history ?? []).some((h) => /^Coder\b/.test(h.by) && /^Review (passed|failed)/.test(h.what) && Date.parse(h.at) > c.returnedAt)
     },
