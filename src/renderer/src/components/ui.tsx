@@ -1057,7 +1057,11 @@ export function ContextMenu({ x, y, above, items, keyboard, onClose }: { x: numb
       if (!ref.current?.contains(e.target as Node)) onClose()
     }
     const key = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') return onClose()
+      // Taken: what listens after it (the focus view's Escape back to the tiles, #1053) leaves it alone.
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        return onClose()
+      }
       const order = items.map((it, i) => (choosable(it) ? i : -1)).filter((i) => i >= 0)
       const at = order.indexOf(activeRef.current)
       const it = items[activeRef.current]
