@@ -5,8 +5,6 @@ import { JOURNAL_BUILDS } from '../shared/advanced'
 import { BUILD_MARKERS_DIR, buildFactDetail, buildFactOf, buildFactSummary, type BuildFact } from '../shared/buildFacts'
 import { HIVE_DIR } from '../shared/defaults'
 import { advanced } from './advanced'
-import { existsSync } from 'original-fs'
-import { journalFile, readEntry, recall } from './journal'
 import { journalFact, journalSettingsOf } from './journalService'
 import { inScope } from '../shared/journal'
 import { createLogger, userText } from './logger'
@@ -31,30 +29,20 @@ export function recordBuild(ws: WorkspaceService, f: BuildFact): BuildRecorded {
   if (advanced.get(JOURNAL_BUILDS) === false) return { recorded: false, reason: 'Settings → Advanced → Record builds in the journal is off.' }
   const s = journalSettingsOf(ws)
   if (!s.enabled || !inScope(s, 'event')) return { recorded: false, reason: JOURNAL_OFF }
-  const summary = buildFactSummary(f)
-  const detail = buildFactDetail(f)
   // Once per build: a script whose reply was cut off leaves a marker too, and its time makes the detail the build's own.
-  if (recordedBefore(ws, f.commit, summary, detail)) return { recorded: true }
-  const written = journalFact(ws, {
-    summary,
-    detail,
-    importance: f.kind === 'release' || f.kind === 'baseline' ? 2 : 1,
-    links: [{ type: 'commit', ref: f.commit }],
-    tags: ['build', f.kind]
-  })
+  const commit = { type: 'commit', ref: f.commit } as const
+  const written = journalFact(
+    ws,
+    {
+      summary: buildFactSummary(f),
+      detail: buildFactDetail(f),
+      importance: f.kind === 'release' || f.kind === 'baseline' ? 2 : 1,
+      links: [commit],
+      tags: ['build', f.kind]
+    },
+    commit
+  )
   return written ? { recorded: true } : { recorded: false, reason: JOURNAL_OFF }
-}
-
-/** Whether the workspace's journal already has this build (same summary and detail, its time included). */
-function recordedBefore(ws: WorkspaceService, commit: string, summary: string, detail: string): boolean {
-  if (!ws.path || !existsSync(journalFile(ws.assistantHome))) return false
-  try {
-    const home = ws.assistantHome
-    return recall(home, { link: { type: 'commit', ref: commit }, tag: 'build', superseded: true, limit: 50 }).some((r) => r.source === 'hive' && r.summary === summary && readEntry(home, r.id)?.detail === detail)
-  } catch (e) {
-    log.warn('checking the journal for a build', e)
-    return false
-  }
 }
 
 /** A marker being taken ends in this; one older than CLAIM_STALE_MS was left by a pickup that never finished, and is taken again. */

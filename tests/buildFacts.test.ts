@@ -237,6 +237,30 @@ describe('Hive records a build in the journal', () => {
     expect(facts()).toHaveLength(1)
   })
 
+  // #1534 round 2: the check found only the newest 50 builds of a commit, so an older one replayed after 51 more was
+  // written again. It is exact now, in the write's own transaction, however many entries share the commit.
+  it('records a build once however many later builds share its commit', () => {
+    const entries = (): number => journal.journalSize(w.assistantHome)?.entries ?? 0
+    const before = entries()
+    const first = { ...fact, version: '1.0.0-rc.8', builtAt: '2026-10-24T08:00:00.000Z' }
+    expect(builds.recordBuild(w, buildFactOf(first) as never)).toEqual({ recorded: true })
+    for (let i = 1; i <= 51; i++) expect(builds.recordBuild(w, buildFactOf({ ...first, builtAt: new Date(Date.parse(first.builtAt) + i * 60_000).toISOString() }) as never)).toEqual({ recorded: true })
+    expect(entries()).toBe(before + 52)
+    // The first again, past 50 later builds of the same commit: still 52.
+    expect(builds.recordBuild(w, buildFactOf(first) as never)).toEqual({ recorded: true })
+    expect(entries()).toBe(before + 52)
+  })
+
+  it("keeps a long detail's entry once too (kept compressed)", () => {
+    const long = { kind: 'event', summary: 'A fact with a long detail', detail: 'x'.repeat(5000), links: [{ type: 'commit', ref: 'abcdef1' }] }
+    const settings = service.journalSettingsOf(w)
+    expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'hive', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
+    expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'hive', { type: 'commit', ref: 'abcdef1' })).toBeNull()
+    // Another detail, or by the Assistant, is another entry.
+    expect(journal.writeEntryOnce(w.assistantHome, settings, { ...long, detail: 'y'.repeat(5000) }, 'hive', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
+    expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'assistant', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
+  })
+
   // #1534 round 1, finding 3: two pickups at once (a workspace reopened while the last one's runs) took the same marker.
   it('pickups at once take a marker once', async () => {
     leave('2026-10-24T10-59-00-000Z-zz.json', { ...fact, version: '1.0.0-rc.7' })
