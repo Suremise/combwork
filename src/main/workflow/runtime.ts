@@ -1382,7 +1382,7 @@ export class Workflow {
     }
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.reportMerge(ref, actor, args))
     const out = await this.write(card, r, actor, (w) => {
-      const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+      const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) ?? this.staleUnchecked(w, r, rev) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (bad) return bad
       if (contained === true) w.fact('Integrated', { revision: rev!, target, result: args.result ?? (!isUnknown(th) && th ? th : rev!), method, by: 'agent' }) // i18n-ignore: a fact's kind and codes, not text
       const open = hive ? openEntry(w.state()) : undefined
@@ -1394,6 +1394,16 @@ export class Workflow {
     })
     if (out) return this.refuse(card, actor, 'report merge', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, s.stage, 'done')
+  }
+
+  /**
+   * Under Not checked, nothing checks what was merged, so the OK before merging (G10) must still be for the work in the
+   * folder (HR2's #1592 round 1): a stale pass refuses the report, whether the OK was given or only asked. `approval.given`
+   * passes a stale card (it waits for its new submission's OK), and the agent merging has `done.contained` besides.
+   */
+  private staleUnchecked(w: Write, r: Ruleset, rev: string | null): GuardRefusal | null {
+    if (r.options.finish !== 'notChecked' || !this.enforced() || !okBeforeApplies(r, w.card.labels) || !w.state().stale) return null
+    return { rule: 'integrate.approved', values: { card: w.card.key, revision: rev ? rev.slice(0, 7) : '—', cause: 'stale' } } as GuardRefusal
   }
 
   /**

@@ -2022,7 +2022,7 @@ folder (the folder's line is the target); G10 is hidden when R includes you; Q =
 | Review | **user approves** (R = you, or agent then you after the quorum) | `approval.given` | **Finish** |
 | Review | **user declines** | — | Active · wake the builder; a round |
 | Approved | **user approves** (G10's request) | `approval.given` | **Finish (merge step)** |
-| Approved | **report merge** (builder; M = the agent merges, or not checked) | `done.contained` (not with not checked); `approval.given` when G10 applies (#1592) | Done · `recordIntegrated (by agent)`; with not checked, Done with no `Integrated` (nothing was checked, and §16.8.4 never fakes one; a later observed integration adds it) [P2] |
+| Approved | **report merge** (builder; M = the agent merges, or not checked) | `done.contained` (not with not checked); `approval.given` when G10 applies, and with not checked a stale pass refuses it too (`integrate.approved`, cause stale: nothing checks what was merged, so the OK must be for the work there) (#1592) | Done · `recordIntegrated (by agent)`; with not checked, Done with no `Integrated` (nothing was checked, and §16.8.4 never fakes one; a later observed integration adds it) [P2] |
 | Approved | **submit** after a stale pass | as Active's submit | Review |
 | Merging | queue: merged | `integrate.*`, `done.contained` | Done · `recordIntegrated`, `releaseSlot`, `endLaneIfDone` |
 | Merging | queue: returned | — | Active · `returnToBuilder` (§16.9) |

@@ -6,6 +6,7 @@ import { B1, commit, moved, put, R1, R2, refusedBy, setup, sh, type Env } from '
 import { allOff, contradictions, type Finisher, type FolderMode, type ReviewBy, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { compile } from '../../src/shared/workflow/compile'
 import { isRefusal } from '../../src/main/workflow/runtime'
+import { reconcile } from '../../src/main/workflow/reconcile'
 import type { CardKind } from '../../src/shared/workflow/facts'
 
 interface Combo {
@@ -195,6 +196,47 @@ describe('#1592: the OK before merging under not checked', () => {
       moved(await e.wf.answer(card.key, ok!.request, 'approved'))
       expect(e.wakes.at(-1)).toMatchObject({ agent: 'B1', why: expect.stringContaining('approved: merge it and report the merge') })
     }
+    moved(await e.wf.reportMerge(card.key, B1))
+    expect(e.wf.state(card).stage).toBe('done')
+  })
+
+  // HR2's round 1: the work changed after the pass (stale) is never reported Done on an OK that isn't for it, given or
+  // only asked; submitted again, it is reviewed and asked again. A card G10 doesn't apply to reports as before.
+  it.each([
+    ['the OK only asked', 'every', [], false],
+    ['the OK given before the change', 'every', [], true],
+    ['a card without the labels', 'labels', [], false]
+  ] as const)('a stale pass under not checked: %s', async (_, mode, labels, given) => {
+    const i = ++n
+    Object.assign(e.options, { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'notChecked', folder: 'slots', target: 'main', okBefore: { mode, labels: mode === 'labels' ? ['release'] : [] } } satisfies WorkflowOptions)
+    const card = e.wf.createCard({ title: `Stale ${i}`, labels: [...labels] })
+    moved(await e.wf.start(card.key, B1))
+    const folder = e.wf.folderOf(e.wf.state(card))
+    commit(folder, { [`s${i}.txt`]: 'one\n' }, `${card.key}: work`)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+    const ok = e.wf.state(card).requests.find((r) => r.gate === 'okBefore')
+    expect(!!ok).toBe(mode === 'every')
+    if (given) moved(await e.wf.answer(card.key, ok!.request, 'approved'))
+    commit(folder, { [`s${i}.txt`]: 'two\n' }, `${card.key}: changed`)
+    await reconcile(e.wf, card)
+    expect(e.wf.state(card)).toMatchObject({ stage: 'approved', stale: expect.anything() })
+    if (mode !== 'every') {
+      moved(await e.wf.reportMerge(card.key, B1))
+      expect(e.wf.state(card).stage).toBe('done')
+      return
+    }
+    expect(refusedBy(await e.wf.reportMerge(card.key, B1), 'integrate.approved')).toMatchObject({ values: { cause: 'stale' } })
+    expect(e.wf.state(card).stage).toBe('approved')
+    // Submitted again: reviewed, then the OK is asked for this work, and the report waits for it.
+    moved(await e.wf.submit(card.key, B1, { summary: 'again' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+    const again = e.wf.state(card).requests.find((r) => r.gate === 'okBefore')
+    expect(again).toBeDefined()
+    refusedBy(await e.wf.reportMerge(card.key, B1), 'approval.given')
+    moved(await e.wf.answer(card.key, again!.request, 'approved'))
     moved(await e.wf.reportMerge(card.key, B1))
     expect(e.wf.state(card).stage).toBe('done')
   })
