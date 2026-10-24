@@ -406,7 +406,23 @@ function helpers(h) {
     fs.writeFileSync(fx.go, 'go')
     check('the first card merged: Done', await x.done(a1), JSON.stringify(await x.kinds(a1)))
     const i1 = await x.fact(a1, 'Integrated')
-    check("…into main in the project folder, after the user's commit (tested again on it)", !!i1 && isIn(alpha, rev1, 'main') && isIn(alpha, userCommit, 'main') && git(alpha, 'branch', '--show-current') === 'main', JSON.stringify(i1))
+    check("…into main in the project folder, after the user's commit", !!i1 && isIn(alpha, rev1, 'main') && isIn(alpha, userCommit, 'main') && git(alpha, 'branch', '--show-current') === 'main', JSON.stringify(i1))
+    // S42's swap caught the moved main and tested again (HR1's round 1): the merge checks ran first on a candidate without
+    // the user's commit, then passed, counted, on the one that has it, and that tested candidate is what was merged. A
+    // merge onto the moved main with no check of it has no such run, and fails here.
+    // The queue's checks: those after the merge was asked for.
+    const all1 = await x.facts(a1)
+    const asked = all1.findIndex((f) => f.kind === 'IntegrationRequested')
+    const queueChecks = all1.slice(asked + 1).filter((f) => f.kind === 'CheckRan' && f.data.counted === true)
+    /** Both merge checks passed, counted, on the merged candidate, which has the user's commit; checked before it too. */
+    const retestedIn = (checks) => {
+      const onMoved = checks.filter((f) => isIn(alpha, userCommit, f.data.tested))
+      const checked = [...new Set(checks.filter((f) => !isIn(alpha, userCommit, f.data.tested)).map((f) => f.data.name))]
+      return checked.length === 2 && checked.every((n) => onMoved.some((f) => f.data.name === n && f.data.result === 'passed' && f.data.tested === i1?.data?.result))
+    }
+    check("S42: the moved main was tested again: both merge checks passed on the candidate with the user's commit, the one merged", retestedIn(queueChecks), JSON.stringify({ result: i1?.data?.result, userCommit, checks: queueChecks.map((f) => [f.data.name, f.data.result, f.data.tested]) }))
+    // The same test given this run's facts with the moved candidate's checks left out (a merge with no retest): it fails.
+    check('…and that test fails for a merge onto the moved main with no check of it', !retestedIn(queueChecks.filter((f) => !isIn(alpha, userCommit, f.data.tested))))
     // The next card in the same slot, from the new main.
     const s2 = await startIn(b1, a2, slotA)
     check('S43: the next card starts once the first is Done, in the same slot, from the main that has it', s2.ok && isIn(slotA.folder, rev1, 'HEAD'), s2.why)
