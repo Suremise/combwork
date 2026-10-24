@@ -6,7 +6,7 @@
   "worktrees.agent.gone": "そのエージェントはもう存在しません。",
   "worktrees.agent.nameTaken": "「{name}」という名前のエージェントがすでにあります。",
   "worktrees.agent.noTree": "このエージェントはワークツリーではなく、プロジェクトフォルダーで作業しています。",
-  "worktrees.agent.notPinned": "1.0 ではエージェントはワークツリーに固定されません。スロットはカードまたはレーンごとに貸し出されます。",
+  "worktrees.agent.notPinned": "1.0ではエージェントはワークツリーに固定されません。スロットはカードまたはレーンごとに貸し出されます。",
   "worktrees.agent.removing": "そのワークツリーはすでに削除中かマージ中です。",
   "worktrees.agent.roleTooLong": "役割は{max}文字以内にしてください。",
   "worktrees.agent.sharedTree": "そのワークツリーではすでに別のエージェントが作業しています。",
