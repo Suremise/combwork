@@ -45,7 +45,7 @@ import { cx, formatDuration, formatNumber, formatTokens, resetsIn, timeAgo } fro
 import { useLiveUsage, useNow } from '../usage'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { samePath } from '@shared/movePaths'
-import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
+import { agentFolder, awayFromProject, legacyOf, placeText, workFolderOf } from '../agentPlace'
 
 const M = {
   loading: msg({ id: 'project.loading', defaultMessage: 'Loading…', description: 'A project tab while its data loads.' }),
@@ -162,6 +162,7 @@ const C = {
   unusedFailed: msg({ id: 'project.changes.unusedFailed', defaultMessage: "Unused worktrees (couldn't list)", description: "The picker's entry for all unused worktrees when listing them failed." }),
   inUseGroup: msg({ id: 'project.changes.inUseGroup', defaultMessage: 'Worktrees in use', description: "A group of the Changes tab's folder picker: agents' worktrees." }),
   agentWorktree: msg({ id: 'project.changes.agentWorktree', defaultMessage: "{agent}'s worktree · {branch}", description: "An agent's worktree in the picker. {branch} is its git branch." }),
+  agentSlot: msg({ id: 'project.changes.agentSlot', defaultMessage: '{agent} · {place}{known, select, yes { · {branch}} other {}}', description: "An agent's slot in the picker (#1569): the agent, where it works ({place}: \"in slot-b\", or \"carried: hb2\" for the slot kept for it) and its git branch ({branch}), when known. Glossary: slot." }),
   projectGroup: msg({ id: 'project.changes.projectGroup', defaultMessage: 'Project folder', description: "A group of the Changes tab's folder picker." }),
   projectFolder: msg({ id: 'project.changes.projectFolder', defaultMessage: 'Project folder · {branch}', description: "The project folder in the picker. {branch} is its git branch (or the project's name)." }),
   worktreeOf: msg({ id: 'project.changes.worktreeOf', defaultMessage: "{agent}'s worktree", description: "Who the changes shown are: an agent's worktree." }),
@@ -880,8 +881,9 @@ function ChangesSplit({ listWidth, children }: { listWidth: number; children: Re
  * worktrees agents work in, then the project folder, last (agents working in the folder itself, and you).
  */
 function ChangesPicker({ project, value, onChange, unused, looking, listed }: { project: ProjectInfo; value: string; onChange: (id: string) => void; unused: UnusedWorktree[]; looking: boolean; listed: boolean }) {
-  // Agents still in their 0.9 worktrees (#1442); a slot's changes are under the unused worktrees and slots.
-  const inUse = project.agents.flatMap((a) => { const own = legacyOf(a); return own ? [{ a, own }] : [] })
+  // The folders agents work in (#1569): a slot, the slot kept for one, or a 0.9 worktree, each once; a free slot's
+  // changes are under the unused worktrees.
+  const inUse = project.agents.flatMap((a) => { const own = workFolderOf(a); return own ? [{ a, own }] : [] }).filter((x, i, all) => all.findIndex((y) => samePath(y.own.path, x.own.path)) === i)
   return (
     <div className="root-row">
       <Tooltip content={tr(C.pickerTip)}>
@@ -900,7 +902,7 @@ function ChangesPicker({ project, value, onChange, unused, looking, listed }: { 
             <optgroup label={tr(C.inUseGroup)}>
               {inUse.map(({ a, own }) => (
                 <option key={a.id} value={a.id}>
-                  {tr(C.agentWorktree, { agent: a.name, branch: own.branch })}
+                  {a.place.is === 'legacy' ? tr(C.agentWorktree, { agent: a.name, branch: own.branch ?? '' }) : tr(C.agentSlot, { agent: a.name, place: placeText(a.place) ?? '', known: own.branch ? 'yes' : 'no', branch: own.branch ?? '' })}
                 </option>
               ))}
             </optgroup>
@@ -933,20 +935,23 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   // ones), else the project folder. Not known yet (no agent's worktree, no list yet): Unused worktrees, looking, until
   // a list says whether there are any. A listing that failed says nothing: the page stays, with the error and Retry,
   // until one succeeds (only a list that came back empty means the project folder).
-  const hasWorktrees = owner.agents.some((a) => legacyOf(a)) || unusedList.length > 0
+  const hasWorktrees = owner.agents.some((a) => workFolderOf(a)) || unusedList.length > 0
   const resolving = !hasWorktrees && !unusedData
   const shownId = rootId ?? (hasWorktrees || resolving ? UNUSED_ROOT : '')
   const listingUnused = shownId === UNUSED_ROOT
   const spare = shownId.startsWith(`${UNUSED_ROOT}:`) ? (unusedList.find((w) => unusedRoot(w.path) === shownId && (w.branch || w.slot)) ?? null) : null
-  // A worktree agent's changes are everything on its branch since it left its base branch; an unused one's, since the
+  // An agent's folder's changes (its slot, the slot kept for it or its 0.9 worktree, #1569) are everything on its branch
+  // since it left its base branch (only what isn't committed when the base isn't known); an unused one's, since the
   // branch it would merge into.
-  const agent = owner.agents.find((a) => a.id === shownId && legacyOf(a))
-  const own = agent ? legacyOf(agent) : null
+  const agent = owner.agents.find((a) => a.id === shownId && workFolderOf(a))
+  const own = agent ? workFolderOf(agent) : null
+  // Its 0.9 worktree: Merge… merges it (the agent's merge); a slot's branch is merged as a branch, as an unused slot's.
+  const legacy = agent ? legacyOf(agent) : null
   const root = own?.path ?? spare?.path ?? owner.path
   const base = own?.base ?? spare?.check.into ?? undefined
   const project = agent || spare ? { ...owner, path: root } : owner
-  // Who the worktree is, in its labels: the agent, or the unused worktree's branch.
-  const whose = agent ? tr(C.worktreeOf, { agent: agent.name }) : spare ? unusedName(spare) : null
+  // Who the worktree is, in its labels: the agent's 0.9 worktree, its slot, or the unused worktree's branch.
+  const whose = agent ? (legacy ? tr(C.worktreeOf, { agent: agent.name }) : (agent.place.name ?? agent.name)) : spare ? unusedName(spare) : null
 
   const [statusError, setStatusError] = useState<string | null>(null)
   const [diffTry, setDiffTry] = useState(0)
@@ -1018,7 +1023,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   // unused worktrees page has its own header, UnusedHeading).
   const about = (
     <div className="changes-about changes-page-head" data-about={spare ? 'unused-one' : agent ? 'agent' : 'project'}>
-      {spare ? CHANGES_ABOUT.unusedOne(unusedName(spare), spare.check.into ?? tr(C.mainBranch)) : agent ? CHANGES_ABOUT.agent(agent.name, own?.branch ?? '', own?.base ?? '') : CHANGES_ABOUT.project}
+      {spare ? CHANGES_ABOUT.unusedOne(unusedName(spare), spare.check.into ?? tr(C.mainBranch)) : agent && legacy ? CHANGES_ABOUT.agent(agent.name, legacy.branch, legacy.base) : agent ? CHANGES_ABOUT.slot(agent.name, agent.place.is === 'carried' ? 'carried' : 'slot', agent.place.name ?? '', own?.base ?? null) : CHANGES_ABOUT.project}
     </div>
   )
 
@@ -1104,7 +1109,8 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
         <div className="pane-header" style={{ paddingLeft: 14 }}>
           {tr(C.changes)} <span className="badge" style={{ marginLeft: 6 }}>{status.files.length}</span>
           <div className="actions">
-            {agent && <IconButton icon="git-merge" action="merge-agent" title={mergeBlocked(agent.name, agent.live?.status) ?? tr(C.mergeAgent, { agent: agent.name })} disabled={!!mergeBlocked(agent.name, agent.live?.status)} onClick={() => set({ mergeFor: { project: owner.path, agentId: agent.id } })} />}
+            {agent && !legacy && own?.branch && <IconButton icon="git-merge" action="merge-slot" title={tr(C.mergeBranch, { branch: own.branch })} onClick={() => set({ branchMergeFor: { project: owner.path, branch: own.branch! } })} />}
+            {agent && legacy && <IconButton icon="git-merge" action="merge-agent" title={mergeBlocked(agent.name, agent.live?.status) ?? tr(C.mergeAgent, { agent: agent.name })} disabled={!!mergeBlocked(agent.name, agent.live?.status)} onClick={() => set({ mergeFor: { project: owner.path, agentId: agent.id } })} />}
             {spare?.branch && !spare.check.removable && <IconButton icon="git-merge" action="merge-unused" title={tr(C.mergeBranch, { branch: spare.branch! })} onClick={() => set(spare.slot ? { branchMergeFor: { project: owner.path, branch: spare.branch! } } : { mergeFor: { project: owner.path, agentId: '', worktree: { path: spare.path, branch: spare.branch! } } })} />}
             <IconButton icon="refresh" title={tr(M.refresh)} onClick={load} />
           </div>
@@ -1120,10 +1126,10 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
           </div>
         )}
         <div className="muted" style={{ padding: '0 14px 8px', fontSize: 12 }}>
-          <Icon name="git-branch" /> {status.branch} {whose ? <span className="faint">{tr(C.sinceLeft, { base: base ?? '' })}</span> : <>{status.ahead > 0 && `↑${status.ahead}`} {status.behind > 0 && `↓${status.behind}`}</>}
+          <Icon name="git-branch" /> {status.branch} {whose && base ? <span className="faint">{tr(C.sinceLeft, { base: base ?? '' })}</span> : <>{status.ahead > 0 && `↑${status.ahead}`} {status.behind > 0 && `↓${status.behind}`}</>}
         </div>
         <div className="pane-body">
-          {status.files.length === 0 && <div className="pane-empty">{agent ? tr(C.noAgentChanges, { branch: own?.branch ?? '' }) : spare ? tr(C.nothingOn, { branch: unusedName(spare), base: base ?? '' }) : tr(C.clean)}</div>}
+          {status.files.length === 0 && <div className="pane-empty">{agent && own?.branch ? tr(C.noAgentChanges, { branch: own.branch }) : agent ? tr(C.clean) : spare ? tr(C.nothingOn, { branch: unusedName(spare), base: base ?? '' }) : tr(C.clean)}</div>}
           {status.files.map((f) => (
             <Tooltip block key={f.path} content={tr(f.staged ? C.staged : C.unstaged, { status: tr(C.gitStatus, { status: f.status === '?' ? 'untracked' : f.status }), path: f.path })}>
               <div className={cx('row', file === f.path && 'selected')} style={{ width: '100%' }} onClick={() => setFile(f.path)}>

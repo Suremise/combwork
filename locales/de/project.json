@@ -68,6 +68,7 @@
   "project.card.writtenToCache": "Tokens in den Cache geschrieben",
   "project.changes.agentSetup": "Agent-Einrichtung",
   "project.changes.agentWorktree": "Worktree von {agent} · {branch}",
+  "project.changes.agentSlot": "{agent} · {place}{known, select, yes { · {branch}} other {}}",
   "project.changes.binary": "Binärdatei – kein Text-Diff.",
   "project.changes.cantShow": "{problem}, deshalb kann Hive die Änderungen von {project} nicht anzeigen.",
   "project.changes.checkingAgain": "Wird erneut geprüft…",

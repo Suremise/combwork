@@ -431,6 +431,10 @@
     "defaultMessage": "The project folder: what isn't committed yet, from you or the agents working in the folder itself (those without a worktree).",
     "description": "The Changes tab, over the project folder's changes."
   },
+  "workspace.changes.aboutSlot": {
+    "defaultMessage": "{is, select, carried {{agent} works in {name}, the slot kept for it} other {{agent} builds in {name}}}: {known, select, yes {everything on its branch since it left {base}.} other {what isn't committed there yet.}}",
+    "description": "The Changes tab, over the changes in the slot an agent works in (#1569): a slot it builds a card in, or the slot kept for it (its own worktree from before 1.0); {name} is the slot's name, such as slot-b; {base} the branch its work started from. Glossary: slot."
+  },
   "workspace.changes.aboutUnusedOne": {
     "defaultMessage": "An unused worktree: everything on {branch} that isn't on {into}. Merge it, or go back to Unused worktrees to remove it.",
     "description": "The Changes tab, over an unused worktree's changes. Unused worktrees is the page's name."

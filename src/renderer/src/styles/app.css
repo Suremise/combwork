@@ -3309,10 +3309,21 @@ p.hint {
   max-height: 40vh;
   overflow: auto;
 }
+/* Two long actions wrap onto a second row rather than run past the notice's edge (#1574: "Start Fresh with a Handover"
+   in fr, es, pl and pt-BR); in a narrow window a label longer than the notice wraps inside its button. */
 .toast-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
+}
+.toast-actions .btn {
+  max-width: 100%;
+  height: auto;
+  min-height: 24px;
+  padding-block: 2px;
+  white-space: normal;
+  text-align: start;
 }
 @keyframes slideIn {
   from { transform: translateY(8px); opacity: 0; }
@@ -6257,6 +6268,18 @@ body.pane-resizing .monaco-editor {
 .agent-place {
   white-space: nowrap;
   font-size: 12px;
+}
+/* Short of room (#1568), it gives way after the status and before the name, shortened with an ellipsis (its tooltip
+   says where it works). */
+.pane-header-bar > .tip-wrap:has(> .agent-place) {
+  min-width: 0;
+  overflow: hidden;
+  flex-shrink: 100;
+}
+.pane-header-bar .agent-place {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 button.agent-place {
   background: none;

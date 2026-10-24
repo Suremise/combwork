@@ -329,7 +329,7 @@ function commits(wt, n) {
         // Narrower: the name never shrinks while the status still has room to give.
         if (prev && r.name < prev.name - 0.5) check(`${label}${role} at ${w}px: the name shortens only once the status has given way`, r.status <= 1 || prev.status <= 1, JSON.stringify({ prev, r }))
         prev = r
-        if (w !== 900 && w !== 240) continue
+        if (![900, 420, 320, 240].includes(w)) continue
         await shot(`${prefix}-${role}-${w}.png`)
         await theme('light')
         await fits(`${label}light theme, ${role} pane at ${w}px`)

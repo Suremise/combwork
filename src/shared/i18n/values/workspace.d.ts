@@ -109,6 +109,7 @@ interface HiveMessageValues {
   'workspace.banners.showProjectLabel': { title: string | number }
   'workspace.changes.aboutAgent': { agent: string | number; branch: string | number; base: string | number }
   'workspace.changes.aboutProject': undefined
+  'workspace.changes.aboutSlot': { is: string; agent: string | number; name: string | number; known: string; base: string | number }
   'workspace.changes.aboutUnusedOne': { branch: string | number; into: string | number }
   'workspace.changes.aboutUnusedShort': { project: string | number }
   'workspace.changes.aboutUnusedTip': { known: string; into: string | number }

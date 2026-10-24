@@ -68,6 +68,7 @@
   "project.card.writtenToCache": "jetons écrits dans le cache",
   "project.changes.agentSetup": "Configuration des agents",
   "project.changes.agentWorktree": "Worktree de l’agent {agent} · {branch}",
+  "project.changes.agentSlot": "{agent} · {place}{known, select, yes { · {branch}} other {}}",
   "project.changes.binary": "Fichier binaire : pas de diff texte.",
   "project.changes.cantShow": "{problem}, donc Hive ne peut pas afficher les modifications du projet {project}.",
   "project.changes.checkingAgain": "Nouvelle vérification…",
