@@ -7,6 +7,8 @@
 // for them; the Agent API's project status counts them for the Assistant (no way to remove them). Without git, nothing is
 // removed. Then one is merged from Changes and removed after (its commit on the main branch, its folder and branch gone). A throwaway repository with worktree agents
 // added through Hive (not started), fake Claude Code configured, throwaway profile and workspace, quiet.
+// Dev build only (#1580): 0.9 worktrees on purpose: Merged, Ahead and Claudette are 0.9 worktree agents
+// (agents:testLegacy, refused by a packaged build), whose worktrees are left unused.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')

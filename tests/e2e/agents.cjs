@@ -3,6 +3,8 @@
 // conflicting), remove. Throwaway profile, throwaway git project in the work folder.
 // The agents run the fake Claude Code (fake-claude/, #195), never sent a prompt; that a real Claude Code session
 // starts in a worktree is claude-real's. Clipboard untouched.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Reviewer is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build): adding one is part of what it tests.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs'), path = require('path')

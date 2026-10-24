@@ -10,6 +10,8 @@
 // place, not renamed yet. With project.json
 // unwritable, Repair fails JB2's before git is touched and says JB1's isn't recorded yet; writable again, it finishes
 // both. Dev build, throwaway profile and folders, the fake Claude Code; quiet.
+// Dev build only (#1580): 0.9 worktrees on purpose: JB1–JB4 are 0.9 worktree agents (agents:testLegacy, refused by a
+// packaged build), whose branches Repair renames.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
 const fs = require('fs')

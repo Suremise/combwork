@@ -131,13 +131,18 @@ const prose = (seed, n) => {
   }
   const sizes = {}
   const texts = {}
-  /** Records a reply's size; with `max`, checks it worked and stays within it. */
+  // The checkout's path (in the fake CLI's path the settings list) counts as this token, so a reply measures the same
+  // from any checkout or review copy, however long its path (#1586).
+  const CHECKOUT = '<checkout>'
+  const sized = (text) => text.replaceAll(lib.ROOT, CHECKOUT)
+  /** Records a reply's size (the checkout's path as `CHECKOUT`); with `max`, checks it worked and stays within it. Returns the reply as it is. */
   const measure = (label, r, max) => {
     const text = typeof r === 'string' ? r : r.text
-    sizes[label] = text.length
+    const size = sized(text).length
+    sizes[label] = size
     texts[label] = text
-    console.log(`${String(text.length).padStart(8)}  ${label}${r.isError ? `  (error: ${text.slice(0, 120)})` : ''}`)
-    if (max !== undefined) check(`${label}: at most ${max.toLocaleString('en')} characters`, !r.isError && text.length <= max, `${text.length}: ${text.slice(0, 200)}`)
+    console.log(`${String(size).padStart(8)}  ${label}${r.isError ? `  (error: ${text.slice(0, 120)})` : ''}`)
+    if (max !== undefined) check(`${label}: at most ${max.toLocaleString('en')} characters`, !r.isError && size <= max, `${size}: ${text.slice(0, 200)}`)
     return text
   }
   const todo = numbers.slice(0, 50)
@@ -320,9 +325,11 @@ const prose = (seed, n) => {
   // added the workspace's Card loop rounds and wait (about 100 characters); 7,400 since #636 added Let agents read the
   // developer console (about 70 characters); 7,500 since #767 added Language (about 30 characters); 7,800 since #975
   // added Default view, #984 Resume agents after an unexpected close (about 85 characters each) and #976 Tile order
-  // (about 40 characters).
-  const settingsList = measure('hive_list_settings', tool('hive_list_settings', {}, 'assistant'), 7800)
-  check('settings: a line each, id = value, read-only ones marked', /^sessions\.compactSuggestTokens = 200000 · Suggest compacting above$/m.test(settingsList) && /^agentApi\.port = \d+ \[read-only\] · /m.test(settingsList) && /^advanced\.showDeveloperFeatures = off · /m.test(settingsList) && !/^advanced\.(logs|data|reset) /m.test(settingsList), settingsList.slice(0, 300))
+  // (about 40 characters). 7,780 since #1586 measures the checkout's path as `CHECKOUT` (10 characters, where the
+  // 7,800 assumed a checkout of about 40).
+  const settingsList = measure('hive_list_settings', tool('hive_list_settings', {}, 'assistant'), 7780)
+  check("settings: the fake CLI's path as it is set, whatever its length (#1586)",settingsList.split('\n').some((l) => l.startsWith(`claude-code.executablePath = ${path.join(__dirname, 'fake-claude', 'fake-claude.cmd')} `)), settingsList.split('\n').find((l) => l.startsWith('claude-code.executablePath')))
+  check('settings: a line each, id = value, read-only ones marked',/^sessions\.compactSuggestTokens = 200000 · Suggest compacting above$/m.test(settingsList) && /^agentApi\.port = \d+ \[read-only\] · /m.test(settingsList) && /^advanced\.showDeveloperFeatures = off · /m.test(settingsList) && !/^advanced\.(logs|data|reset) /m.test(settingsList), settingsList.slice(0, 300))
   // 1,800 and 11 lines since #1286's Advanced switches The Assistant starts with Hive's start view and Clear the CLI's
   // draft before Hive types, whose text names compaction and Compact (about 120 characters each).
   const compactList = measure('hive_list_settings (query)', tool('hive_list_settings', { query: 'compact' }, 'assistant'), 1800)

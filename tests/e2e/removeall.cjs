@@ -5,6 +5,8 @@
 // opt-in box deletes only merged, clean ones (unmerged work is kept even ticked); a failure is reported with the rest
 // still removed. Cancel changes nothing. Fake Claude Code (fake-claude/), throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR; a quiet test copy. Two projects: alpha (the default) and beta (the box ticked, one removal failing).
+// Dev build only (#1580): it starts this checkout's Electron itself, and Merged and Unmerged are 0.9 worktree agents
+// (agents:testLegacy, refused by a packaged build): what Remove All does with their worktrees is part of what it tests.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

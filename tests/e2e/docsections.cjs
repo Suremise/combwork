@@ -5,6 +5,8 @@
 // lists the closest (404); paths outside the project (.., a junction out of it), into .hive or .git, or not Markdown are
 // refused before anything is read. The agent runs the fake Claude Code. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
+// Dev build only (#1580): it starts this checkout's Electron itself, and Alfie is a 0.9 worktree agent
+// (agents:testLegacy, refused by a packaged build), whose copy of the plan differs from the project folder's.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')

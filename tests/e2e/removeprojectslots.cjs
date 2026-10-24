@@ -4,6 +4,8 @@
 // then Remove from Hive removes the clean slot and the copy through their pools' guarded clean-up, keeps the slot with
 // unmerged work and the home, and says so in its result. With Delete chosen, the dialog sends every one to the Recycle Bin
 // with the project instead (#1447, HR1's round 1: the repository goes with it), screenshots too. Dev build, throwaway profile and workspace; no agent runs.
+// Dev build only (#1580): beta's slots, review copy and leases are made through slots:test, which a packaged build
+// refuses.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
