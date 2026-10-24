@@ -449,6 +449,46 @@ describe('the review and merge skills follow the gates (#1525)', () => {
   })
 })
 
+// #1526 (P8): the other skills checked against the gates. They mostly describe judgement; what Hive now owns (where cards
+// are built, the order cards start in, refusals) is said as the project's or pointed at, and none grows.
+describe('the other bundled skills follow the gates (#1526)', () => {
+  // Their sizes before P8 (LF): each stays at or under it.
+  const BEFORE: Record<string, number> = { 'split-work': 2757, handover: 2284, 'pick-up': 1924, 'workspace-note': 3216, 'use-hive-api': 2711, 'licence-audit': 2869 }
+
+  it('state no rule a gate owns, and stay at or under their size before P8', () => {
+    for (const [name, size] of Object.entries(BEFORE)) {
+      const text = catalog.get(name)!.text
+      for (const [rule, re] of GATE_RULES) expect(text, `${name}: ${rule}`).not.toMatch(re)
+      expect(text.replace(/\r/g, '').length, name).toBeLessThanOrEqual(size)
+    }
+  })
+
+  it("split-work plans by files around the project's own option for where cards are built, and leaves the order to blockedBy", () => {
+    const text = catalog.get('split-work')!.text
+    // Slots are Hive's (§16.10): a plan doesn't choose a worktree or a slot per part.
+    expect(text).not.toMatch(/\bworktrees?\b/i)
+    expect(text).not.toMatch(/\*\*Where\*\*: project folder or/)
+    expect(text).toMatch(/Where cards are built is the project's option \(`hive_project_status`'s `workflow`\)/)
+    expect(text).toMatch(/In a shared folder, give parts files that don't overlap; with slots, parts that change the same files merge one after another, so order them/)
+    expect(text).toMatch(/a card's `blockedBy`: where the project's rules check it, Hive won't start a card before those are done/)
+  })
+
+  it('handover names the folder as a slot or the project folder', () => {
+    expect(catalog.get('handover')!.text).toMatch(/the branch and folder \(slot or project folder\)/)
+    expect(catalog.get('handover')!.text).not.toMatch(/\bworktree\b/i)
+  })
+
+  it("use-hive-api names the card intents and a workflow refusal's next step", () => {
+    const text = catalog.get('use-hive-api')!.text
+    expect(text).toMatch(/A card's steps are its intents, `POST \/v1\/tasks\/\{card\}\/<intent>`/)
+    expect(text).toMatch(/A workflow refusal \(`refused: true`\) also names its `rule` and `next` step: take it/)
+    // The routes and refusal fields it names are the Agent API's.
+    const api = readFileSync(join(ROOT, 'docs', 'AGENT_API.md'), 'utf8')
+    expect(api).toMatch(/`POST \/v1\/tasks\/\{card\}\/<intent>`/)
+    expect(api).toMatch(/"refused": true, "rule", "message", "next"/)
+  })
+})
+
 // #408: the QA triager mode had the habit but no procedure; triage-report is it, for the Assistant only.
 describe('triage-report', () => {
   it('is the QA triager mode\'s procedure: cause first, a duplicate check including Passed and unmerged work, then the card', () => {
