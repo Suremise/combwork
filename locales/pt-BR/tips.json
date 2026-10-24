@@ -376,6 +376,8 @@
   "tips.testedClis.title": "Veja com quais versões de CLI o Hive foi testado",
   "tips.tileStrip.text": "Na visão de foco de um agente (Blocos), a faixa à esquerda mostra o cartão de cada agente como um pequeno chip, com a cor da coluna do quadro em que ele está; clique em um para abrir o cartão. Arraste a borda da faixa para alargá-la e clique duas vezes na borda para redefini-la.",
   "tips.tileStrip.title": "O cartão de cada agente, ao lado do nome dele",
+  "tips.tileStripOrder.text": "Na visão de foco de um agente (Blocos), arraste um agente para cima ou para baixo na faixa à esquerda, ou pressione Alt+Seta para cima ou Alt+Seta para baixo sobre ele. Os blocos e os painéis seguem a mesma ordem.",
+  "tips.tileStripOrder.title": "Reordene os agentes pela visão de foco",
   "tips.tilesView.text": "Blocos mostra cada agente como um pequeno bloco: estado, status, cartão, progresso e última resposta, doze por página. Clique em um para abrir o painel dele em tamanho grande ao lado dos outros; Esc volta. Configurações → Sessões → Ordem dos blocos pode colocar primeiro os agentes aguardando você.",
   "tips.tilesView.title": "Veja uma equipe inteira de uma vez em blocos",
   "tips.triageReport.text": "Conte ao Assistente no modo Triagem de QA o que você fez e viu, ou cole uma captura de tela. Ele encontra a causa no código, verifica se algum cartão já cobre o problema (mesmo um ainda não mesclado) e então cria um cartão com as evidências.",

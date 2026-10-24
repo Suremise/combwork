@@ -376,6 +376,8 @@
   "tips.testedClis.title": "Voir avec quelles versions des CLI Hive a été testé",
   "tips.tileStrip.text": "Dans la vue focalisée d’un agent (Tuiles), le bandeau de gauche montre la carte de chaque agent sous forme de petite pastille, teintée de la couleur de la colonne du tableau où elle se trouve ; clique sur une pastille pour ouvrir la carte. Fais glisser le bord du bandeau pour l’élargir, et double-clique sur le bord pour le réinitialiser.",
   "tips.tileStrip.title": "La carte de chaque agent, à côté de son nom",
+  "tips.tileStripOrder.text": "Dans la vue focalisée d’un agent (Tuiles), fais glisser un agent vers le haut ou vers le bas dans le bandeau de gauche, ou appuie sur Alt+Haut ou Alt+Bas sur celui-ci. Les tuiles et les volets suivent le même ordre.",
+  "tips.tileStripOrder.title": "Réorganise les agents depuis la vue focalisée",
   "tips.tilesView.text": "Tuiles montre chaque agent comme une petite tuile : son état, son statut, sa carte, sa progression et sa dernière réponse, douze par page. Clique sur une tuile pour ouvrir son volet en grand à côté des autres ; Échap revient. Paramètres → Sessions → Ordre des tuiles peut mettre en premier les agents qui attendent ta réponse.",
   "tips.tilesView.title": "Toute une équipe d’un coup d’œil, en tuiles",
   "tips.triageReport.text": "Dis à l’Assistant en mode Tri QA ce que tu as fait et vu, ou colle une capture d’écran. Il trouve la cause dans le code, vérifie si une carte la couvre déjà (même une pas encore fusionnée), puis crée une carte avec les preuves.",
