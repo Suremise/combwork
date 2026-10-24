@@ -771,6 +771,38 @@
     "defaultMessage": "Could not change the view",
     "description": "An error's title: switching a project's Session tab between Panes and Tiles failed."
   },
+  "actions.slot.goneDetail": {
+    "defaultMessage": "If the workspace moved, Repair… in its banner can also locate the folder.",
+    "description": "Under the question when a slot's folder is missing: Repair… is a button in the workspace's banner."
+  },
+  "actions.slot.goneMessage": {
+    "defaultMessage": "{agent}'s slot {slot} is missing its folder ({path}). Its branch {branch} is still in the repository: make the slot again on it, with its commits, and start?",
+    "description": "The question when a slot's ({slot}) folder ({path}) is missing; the agent ({agent}) holds it, and its branch ({branch}) is still there."
+  },
+  "actions.slot.goneNoBranch": {
+    "defaultMessage": "{agent}'s slot {slot} is missing its folder ({path}), and its branch is gone too. Release the slot? Hive makes it again the next time it lends it.",
+    "description": "The question when a slot's ({slot}) folder ({path}) and its branch are missing; the agent ({agent}) holds it."
+  },
+  "actions.slot.goneTitle": {
+    "defaultMessage": "The slot is gone",
+    "description": "Title of the question when the folder of a slot an agent holds (a working folder Hive lends it for a card or lane) is missing."
+  },
+  "actions.slot.recreate": {
+    "defaultMessage": "Recreate and Start",
+    "description": "Button: makes the slot again on its branch and starts the agent."
+  },
+  "actions.slot.recreateFailed": {
+    "defaultMessage": "Could not make the slot again",
+    "description": "An error's title: making a slot whose folder was gone again failed."
+  },
+  "actions.slot.release": {
+    "defaultMessage": "Release the Slot",
+    "description": "Button: the agent gives up the slot whose folder is gone; Hive makes the slot again the next time it lends it."
+  },
+  "actions.slot.releaseFailed": {
+    "defaultMessage": "Could not release the slot",
+    "description": "An error's title: releasing a slot whose folder is gone failed."
+  },
   "actions.startAll.archiveMessage": {
     "defaultMessage": "{n, plural, one {{agent}'s session is archived in {project}, and each starts a fresh one:} other {The sessions of these # agents are archived in {project}, and each starts a fresh one:}}",
     "description": "Archive and Start New (All)'s question, above the table of {n} agents ({agent}: the one's name) of a project ({project})."

@@ -1,5 +1,6 @@
 // Reconciliation in the dev build (#1217; with workflow rules enforced since #1263, a Doing card still only gets marks): a card started by its agent, which works in a git worktree
-// on its own branch; a commit made there with plain git, outside Hive, is seen by the watcher and recorded on the card as
+// (P7: its carried slot, where the slot's preparation makes the card's own line; never taken for gone before, #1551);
+// a commit made there with plain git, outside Hive, is seen by the watcher and recorded on the card as
 // an observed HeadMoved within the debounce, read over IPC; the card doesn't move. Then the branch merged into main by
 // hand: Integrated, by outside, the card still where it was. No agents run. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
@@ -44,7 +45,13 @@ const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'u
     await inv('tasks:update', n, { column: 'doing', agent: 'b1' })
     const facts = () => inv('tasks:facts', n)
     const started = (await facts()).find((f) => f.kind === 'Started')
-    check('started in its worktree, on its line, toward main', started?.data.folder.toLowerCase() === wt.toLowerCase() && started.data.line === 'card' && started.data.target === 'main', JSON.stringify(started?.data))
+    // P7 (#1441): Builder's 0.9 worktree is its carried slot; the card's own line is made there by the slot's preparation.
+    check('started in its worktree (its carried slot), on a line of its own, toward main', started?.data.folder.toLowerCase() === wt.toLowerCase() && !!started.data.slot && /^hive\/AL\/AL-\d+-/.test(started.data.line) && started.data.target === 'main', JSON.stringify(started?.data))
+    const prepared = await lib.until(async () => (await facts()).find((f) => f.kind === 'SlotPrepared'), HUNG_MS)
+    const branch = () => git(wt, 'branch', '--show-current')
+    check('…its slot prepared: the worktree on the card\'s line', !!prepared && !!(await lib.until(() => branch() === started.data.line, HUNG_MS)), JSON.stringify({ prepared: prepared?.data, branch: branch() }))
+    // #1551: its line didn't exist until then, and was never taken for gone, nor its head for moved to nothing.
+    check('…its line never taken for gone before it was made', !(await facts()).some((f) => (f.kind === 'Gone' && f.data.what === 'line') || (f.kind === 'HeadMoved' && f.data.to === null)), JSON.stringify((await facts()).map((f) => f.kind)))
 
     // A commit made with plain git, outside Hive.
     fs.writeFileSync(path.join(wt, 'b.txt'), 'two\n')
@@ -56,7 +63,7 @@ const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'u
     check('…and the card stays in Doing', (await inv('tasks:list')).find((c) => c.number === n)?.column === 'doing')
 
     // Merged into main by hand: Integrated by outside; nothing moves in P3.
-    git(alpha, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
+    git(alpha, 'merge', '-q', '--no-ff', '-m', 'merge card', started.data.line)
     // An unfinished card's integration shows once it has passed; here, its branch's work is in main: MergedInPart.
     const part = await lib.until(async () => (await facts()).find((f) => f.kind === 'MergedInPart' || f.kind === 'Integrated'), HUNG_MS)
     check('the hand merge is observed (its work in main), recorded and nothing else', !!part && part.source === 'observed' && (await facts()).filter((f) => f.kind === 'Moved').length === 1, JSON.stringify((await facts()).map((f) => [f.kind, f.source])))

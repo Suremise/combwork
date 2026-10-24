@@ -15,6 +15,8 @@ import { sessions } from './sessions'
 import { workspace, workspaceOf } from './workspace'
 import { copyIgnored, createWorktree, currentBranch, GIT_FAILED, listWorktrees, uniqueFolder } from './worktrees'
 import { workflowFor } from './workflow/service'
+import { legacyWorktree, slotsMigrated } from './agentFolders'
+import { projectFolders, recreateSlot, releaseSlotLease, type ProjectFolder } from './projectFolders'
 
 /**
  * An agent's worktree whose folder is gone (#146): deleted after its work was merged, or a workspace copied to another
@@ -33,11 +35,29 @@ const M = {
 
 const branchExists = async (repo: string, branch: string): Promise<boolean> => (await git(repo, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])).ok
 
-/** The agent's worktree when its folder is missing, with whether its branch survives; null when there's nothing missing. */
+/**
+ * The agent's worktree when its folder is missing, with whether its branch survives; null when there's nothing missing.
+ * Its 0.9 worktree while the slots' migration hasn't taken it over (#1441); after, the slot it holds (#1447: its card's
+ * or lane's, else its carried one), whose folder is gone: `slot` names it, `branch` is its line.
+ */
 export async function missingWorktree(projectPath: string, agentId: string): Promise<WorktreeGone | null> {
   const a = projectAgents(await workspace.projectConfig(projectPath)).find((x) => x.id === agentId)
-  if (!a?.worktree || existsSync(a.worktree.path)) return null
-  return { agentName: a.name, path: a.worktree.path, branch: a.worktree.branch, base: a.worktree.base, branchExists: await branchExists(projectPath, a.worktree.branch) }
+  if (!a) return null
+  const legacy = legacyWorktree(a)
+  if (legacy && !(await slotsMigrated(projectPath, agentId))) {
+    if (existsSync(legacy.path)) return null
+    return { agentName: a.name, path: legacy.path, branch: legacy.branch, base: legacy.base, branchExists: await branchExists(projectPath, legacy.branch) }
+  }
+  const f = await goneSlotOf(projectPath, agentId)
+  if (!f) return null
+  return { agentName: a.name, path: f.folder, branch: f.line ?? '', base: '', branchExists: !!f.line && (await branchExists(projectPath, f.line)), slot: f.name }
+}
+
+/** The agent's held slot whose folder is gone (#1447): its card's or lane's first, then its carried one. */
+async function goneSlotOf(projectPath: string, agentId: string): Promise<ProjectFolder | null> {
+  const mine = (await projectFolders(workspaceOf(projectPath), projectPath)).filter((f) => f.of.kind === 'slot' && f.lease?.agent === agentId)
+  const f = mine.find((x) => x.lease?.kind !== 'carried') ?? mine[0]
+  return f && !existsSync(f.folder) ? f : null
 }
 
 /**
@@ -65,7 +85,7 @@ export async function moveCardFolders(projectPath: string, from: string, to: str
  * drops git's link to a worktree, which a moved one still needs to be repaired, so it only runs when it would remove
  * nothing but the entries being recreated.
  */
-async function prunable(repo: string): Promise<string[]> {
+export async function prunable(repo: string): Promise<string[]> {
   const r = await git(repo, ['worktree', 'prune', '--dry-run', '--verbose'])
   if (!r.ok) return []
   const common = (await git(repo, ['rev-parse', '--git-common-dir'])).out.trim()
@@ -113,6 +133,15 @@ export async function recreateWorktree(projectPath: string, agentId: string, opt
   const cfg = await workspace.projectConfig(projectPath)
   const a = projectAgents(cfg).find((x) => x.id === agentId)
   if (!a) throw hiveError(M.noAgent, undefined, { kind: 'notFound' })
+  // A gone slot it holds (#1447): made again where it was, on its line, by its pool; its lease kept.
+  if (!(legacyWorktree(a) && !(await slotsMigrated(projectPath, agentId)))) {
+    const f = await goneSlotOf(projectPath, agentId)
+    if (!f) throw hiveError(M.noTree, { agent: a.name })
+    if (sessions.liveFor(projectPath, agentId)) throw hiveError(msg({ id: 'worktrees.missing.stopFirst', defaultMessage: 'Stop {agent} first.', description: "An error: the agent {agent} (its name) is running; its missing worktree can't be recreated until it stops." }), { agent: a.name })
+    const why = await recreateSlot(workspaceOf(projectPath), projectPath, f, f.folder)
+    if (why) throw hiveError(msg({ id: 'worktrees.missing.slotFailed', defaultMessage: "{agent}'s slot {slot} couldn't be made again: {why}", description: "An error: a slot lent to the agent {agent} (its name), whose folder was gone, couldn't be made again ({slot}: the slot's name; {why}: why, often git's message in English)." }), { agent: a.name, slot: f.name, why })
+    return a
+  }
   if (!a.worktree) throw hiveError(M.noTree, { agent: a.name })
   const old = a.worktree
   if (existsSync(old.path)) throw hiveError(msg({ id: 'worktrees.missing.thereRecreate', defaultMessage: "{agent}'s worktree folder is there ({folder}): there's nothing to recreate.", description: "An error: the worktree folder {folder} of the agent {agent} (its name) exists, so it isn't missing." }), { agent: a.name, folder: old.path })
@@ -160,8 +189,18 @@ export async function recreateWorktree(projectPath: string, agentId: string, opt
   return next
 }
 
-/** Drops the worktree link of an agent whose worktree folder is missing: it works in the project folder from now on. */
+/**
+ * Drops the worktree link of an agent whose worktree folder is missing: it works in the project folder from now on. For
+ * a gone slot it holds (#1447): the slot's lease released instead (the slot, free, is made again at its next lease).
+ */
 export async function unlinkMissingWorktree(projectPath: string, agentId: string): Promise<AgentDef> {
+  const now = projectAgents(await workspace.projectConfig(projectPath)).find((x) => x.id === agentId)
+  if (now && !(legacyWorktree(now) && !(await slotsMigrated(projectPath, agentId)))) {
+    const f = await goneSlotOf(projectPath, agentId)
+    if (!f) throw hiveError(M.noTree, { agent: now.name })
+    await releaseSlotLease(workspaceOf(projectPath), projectPath, f)
+    return now
+  }
   let next: AgentDef | undefined
   await workspace.mutateProjectConfig(projectPath, (cfg) => {
     const agents = projectAgents(cfg).map((x) => {
