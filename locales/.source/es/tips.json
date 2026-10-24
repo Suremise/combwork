@@ -376,6 +376,8 @@
   "tips.testedClis.title": "See which CLI versions Hive was tested with",
   "tips.tileStrip.text": "In an agent's focus view (Tiles), the strip on the left shows each agent's card as a small chip, tinted with the colour of the board column it is in; click one to open the card. Drag the strip's edge to make it wider, and double-click the edge to reset it.",
   "tips.tileStrip.title": "Each agent's card, beside its name",
+  "tips.tileStripOrder.text": "In an agent's focus view (Tiles), drag an agent up or down the strip on the left, or press Alt+Up or Alt+Down on it. The tiles and the panes follow the same order.",
+  "tips.tileStripOrder.title": "Reorder agents from the focus view",
   "tips.tilesView.text": "Tiles shows each agent as a small tile: its state, status, card, progress and latest reply, twelve to a page. Click one to open its pane large beside the others; Esc goes back. Settings → Sessions → Tile order can put the agents waiting for you first.",
   "tips.tilesView.title": "See a whole team at once as tiles",
   "tips.triageReport.text": "Tell the Assistant in QA triager mode what you did and saw, or paste a screenshot. It finds the cause in the code, checks for a card that already covers it (even one not merged yet), then files a card with the evidence.",

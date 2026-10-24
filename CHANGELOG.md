@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Reorder agents from the focus view.** In an agent's focus view (Tiles), drag an agent up or down the strip on the left, a line showing where it will go, or press **Alt+Up** or **Alt+Down** on it (its right-click menu has Move Up and Move Down too). It's the same order as the tiles' and the panes': they follow it, and the agent you're looking at stays shown (#1053).
 - **A notice's buttons stay inside it.** A notice in the corner with two long buttons kept them on one row, so in French, Spanish, Polish and Portuguese the resume refusal's **Start Fresh with a Handover** ran past its edge, cut off in Portuguese (#1574). The buttons now wrap onto a second row when they don't fit, and in a narrow window a long label wraps inside its button.
 - **Resizing the window no longer stops Hive reading an agent's screen.** Narrowing and shortening an agent's terminal at once, then widening it again, could make the screen Hive keeps of it fail on the agent's next output, after which Hive no longer saw its footer, menus or prompt (#1572). Hive now keeps the screen whole, and starts it afresh, saying so in its log, if a resize ever leaves it broken.
 - **The Hive Assistant can free a stuck slot.** Asked, and with **Control agents**, it lists the slots kept for an agent or held by an agent's ended session (which Hive and which processes), and releases one once you agree, as **Release Slot…** in an agent's **⋯** menu does. Scripts and the Assistant read the same list through the Agent API (`GET /v1/projects/{name}/slots/releasable`).

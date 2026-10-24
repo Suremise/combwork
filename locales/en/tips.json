@@ -1507,6 +1507,14 @@
     "defaultMessage": "Each agent's card, beside its name",
     "description": "A tip's title."
   },
+  "tips.tileStripOrder.text": {
+    "defaultMessage": "In an agent's focus view (Tiles), drag an agent up or down the strip on the left, or press Alt+Up or Alt+Down on it. The tiles and the panes follow the same order.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands (Tiles): keep them as Hive shows them."
+  },
+  "tips.tileStripOrder.title": {
+    "defaultMessage": "Reorder agents from the focus view",
+    "description": "A tip's title (#1053)."
+  },
   "tips.tilesView.text": {
     "defaultMessage": "Tiles shows each agent as a small tile: its state, status, card, progress and latest reply, twelve to a page. Click one to open its pane large beside the others; Esc goes back. Settings → Sessions → Tile order can put the agents waiting for you first.",
     "description": "A tip. Names of Hive's menus, views, settings and commands (Tiles, Tile order): keep them as Hive shows them."

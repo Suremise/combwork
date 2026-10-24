@@ -376,6 +376,8 @@
   "tips.testedClis.title": "Sprawdź, z jakimi wersjami CLI testowano Hive",
   "tips.tileStrip.text": "W widoku skupienia agenta (Kafelki) pasek po lewej pokazuje kartę każdego agenta jako mały znacznik w kolorze kolumny tablicy, w której się znajduje; kliknij go, aby otworzyć kartę. Przeciągnij krawędź paska, aby go poszerzyć, a kliknij ją dwukrotnie, aby przywrócić szerokość.",
   "tips.tileStrip.title": "Karta każdego agenta obok jego nazwy",
+  "tips.tileStripOrder.text": "W widoku skupienia agenta (Kafelki) przeciągnij agenta w górę lub w dół na pasku po lewej albo naciśnij na nim Alt+Strzałka w górę lub Alt+Strzałka w dół. Kafelki i panele zachowują tę samą kolejność.",
+  "tips.tileStripOrder.title": "Zmieniaj kolejność agentów z widoku skupienia",
   "tips.tilesView.text": "Kafelki pokazują każdego agenta jako mały kafelek: stan, status, kartę, postęp i ostatnią odpowiedź, dwanaście na stronę. Kliknij kafelek, aby otworzyć duży panel agenta obok pozostałych; Esc wraca. Ustawienia → Sesje → Kolejność kafelków może stawiać na początku agentów, którzy czekają na Ciebie.",
   "tips.tilesView.title": "Cały zespół naraz jako kafelki",
   "tips.triageReport.text": "Powiedz Asystentowi w trybie Triażysta QA, co zrobiłeś i co zobaczyłeś, albo wklej zrzut ekranu. Znajdzie przyczynę w kodzie, sprawdzi, czy jakaś karta już to obejmuje (nawet jeszcze niescalona), i założy kartę z dowodami.",
