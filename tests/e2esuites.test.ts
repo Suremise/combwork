@@ -69,11 +69,14 @@ describe('the e2e suite list', () => {
     // A packaged Hive (HIVE_EXE) refuses the test copies' channels (0.9 worktree agents through agents:testLegacy,
     // slots:test) and ignores the HIVE_TEST_ seams, and a suite starting Electron itself never starts it: a suite that
     // needs one is a dev-build test on purpose and says so, or skips that part there (queueFixture's devSeam) and says so.
-    const devOnly = /agents:testLegacy|slots:test|\bworktree: true\b|['"]new-worktree['"]|HIVE_TEST_(SLOW_IPC|FAIL_IPC|QUEUE_[A-Z_]+)|_electron\.launch/
+    // (`{ worktree: true })`: an agent asked for in a worktree (q.agent), not a 0.9 template's data, as templatesv2 imports.)
+    const devOnly = /agents:testLegacy|slots:test|\{ worktree: true \}\)|['"]new-worktree['"]|HIVE_TEST_(SLOW_IPC|FAIL_IPC|QUEUE_[A-Z_]+)|_electron\.launch/
+    // The queue suites, and those #1578 named beside them (the rest are #1580's).
+    const named = ['agentapislots', 'gitbranchcards', 'mergedialogslots', 'slotreleaseapi', 'templatesv2']
     const unsaid: string[] = []
     for (const n of names) {
       const lines = readFileSync(join(dir, `${n}.cjs`), 'utf8').split(/\r?\n/)
-      if (!lines.some((l) => /require\('\.\/queueFixture\.cjs'\)/.test(l))) continue
+      if (!named.includes(n) && !lines.some((l) => /require\('\.\/queueFixture\.cjs'\)/.test(l))) continue
       const header = lines
         .slice(0, lines.findIndex((l) => !l.startsWith('//')))
         .map((l) => l.replace(/^\/\/\s*/, ''))
