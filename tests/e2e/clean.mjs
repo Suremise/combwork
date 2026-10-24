@@ -10,8 +10,8 @@
 //
 // What goes:
 // - In an idle e2e lane (no runner holds its claim: lanes.mjs; the clean-up claims it while it works, so no runner starts
-//   in it meanwhile): every suite folder no run claims (a failed suite's is claimed by its run's logs until KEEP_RUNS
-//   prunes them: #285), and anything left from before suites had folders of their own, whatever their age. In an idle
+//   in it meanwhile): every suite folder no run claims (a failed suite's is claimed by its run's logs until they are
+//   pruned: logs.mjs, #285), and anything left from before suites had folders of their own, whatever their age. In an idle
 //   scenario lane: numbered copies (`<scenario>-2`…) whatever their age, the rest (what --keep left) by age.
 // - In the e2e work folder: anything but `lanes` and `logs` older than the age (suites run on their own, probes).
 // - Anything else in hive-test older than the age (one-off folders and files: reviewers' and builders' probes).
@@ -137,7 +137,7 @@ export function plan({ root, days = PRUNE_DAYS, now = Date.now(), held = () => f
     else out.push({ ...item, remove: false, why: `newer than ${maxDays} day${maxDays === 1 ? '' : 's'}` })
   }
   // An e2e lane holds the folders of suites running now (only in a lane a runner holds) and of failed suites, which
-  // their run's logs claim (evidence.cjs recordKept) until KEEP_RUNS prunes them. Anything else in an idle lane is left
+  // their run's logs claim (evidence.cjs recordKept) until those are pruned (logs.mjs). Anything else in an idle lane is left
   // over, whatever its age (#285). A scenario lane holds what --keep left, by age, but not numbered copies (`-2`…),
   // which only pile up.
   const lane = (dir, k, kind) => {
