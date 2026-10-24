@@ -12,7 +12,7 @@ import { ASSISTANT_ONLY_TOOLS, assistantTools } from '../src/shared/assistantToo
 import { parseSkillFrontmatter, skillFor } from '../src/main/skills'
 import type { SkillAudience, TaskCard } from '../src/shared/types'
 import { WORKSPACE_NOTES_PATH } from '../src/shared/workspaceNotes'
-import type { Finisher } from '../src/shared/workflow/options'
+import type { Finisher, ReviewBy } from '../src/shared/workflow/options'
 
 const ROOT = join(__dirname, '..')
 const SKILLS = join(ROOT, 'resources', 'skills')
@@ -399,20 +399,38 @@ describe('the review and merge skills follow the gates (#1525)', () => {
     const text = merge()
     const ways = text.split(/\r?\n/).filter((l) => l.startsWith('- **'))
     const way = (starts: string): string => ways.find((l) => l.startsWith(`- **${starts}`)) ?? ''
-    // Keyed by the options' own values: a new way to finish fails to compile here until the skill says it. Each is told
-    // apart by what the card shows (its `merge`, its column), not by the project's options.
-    const FINISH: Record<Finisher, [way: string, says: RegExp]> = {
-      hiveMerges: ['Hive merges it', /\(the card shows `merge`, where it is in the queue\): the queue checks it on the target as it is then and merges it, or returns it to its builder with why/],
-      agentMerges: ['In Passed with no `merge`', /the merge is yours\. Merge it \(below\), then `hive_report_merge` with the merge commit: Hive checks the work is in the base before the card is Done, refusing with what's missing/],
-      notChecked: ['In Passed with no `merge`', /unless the card's rules don't check merges/],
-      committed: ['Done once passed or submitted', /\(committed is done, [^)]*\): there is nothing to merge/],
-      accept: ['Done once passed or submitted', /a project without version control[^)]*\): there is nothing to merge/]
+    const context = text.split(/\r?\n/).find((l) => l.startsWith('The ways a card finishes, for context:')) ?? ''
+    // The next step is the one Hive names, never inferred from a column or a missing field (HR1's #1525 round 2, the
+    // Assistant's m3822): the agent merges on Hive's word, waits on a request for the user, leaves the queue's card alone.
+    expect(text).toMatch(/Never infer the next step from the card's column: do the one Hive names\./)
+    expect(way('"Merge it and report the merge"')).toMatch(/\(Hive tells you once the merge is yours\): merge it and report it \(below\); Hive checks the work is in the base before Done/)
+    // …and the report is for the cards Hive told it to merge, wherever they are (in Doing, with no review).
+    expect(text).toMatch(/`hive_report_merge` for each card Hive told you to merge/)
+    expect(text).not.toMatch(/Cards still in Review or Doing stay where they are/)
+    expect(way('A request waiting for the user')).toMatch(/\(For you: their review, their OK before merging, their acceptance\): wait for their answer/)
+    expect(way("The card's `merge`")).toMatch(/Hive's merge queue has it, and merges it or returns it with why/)
+    expect(text).not.toMatch(/with no `merge`|no `merge`[^.\n]*(yours|merge it)|In Passed[^.\n]*merge is yours/)
+    // Each finish is context, conditional. Keyed by the options' own values: a new way to finish fails to compile here
+    // until the skill says it.
+    const FINISH: Record<Finisher, RegExp> = {
+      hiveMerges: /^The ways a card finishes, for context: Hive merges;/,
+      agentMerges: /the agent merges \(after a passing review where there is one, after the user's OK where the rules ask for it, else straight after its submission, the card staying in Doing\)/,
+      notChecked: /merges not checked \(once it passes, merged as the brief says and reported, nothing checked\)/,
+      committed: /committed is done, and no-code cards \(Done once passed or submitted\)/,
+      accept: /no version control \(accepted, after the user's approval where the rules ask for it\)/
     }
-    for (const [finish, [starts, says]] of Object.entries(FINISH)) expect(way(starts), finish).toMatch(says)
+    for (const [finish, says] of Object.entries(FINISH)) expect(context, finish).toMatch(says)
+    // HR1's counterexamples, each a cell the guidance must get right: [platform, review, finish, the user's OK, what the agent does].
+    const CASES: [platform: 'Git' | 'None', review: ReviewBy, finish: Finisher, ok: boolean, does: RegExp][] = [
+      ['None', 'agentThenYou', 'accept', false, /\(For you: [^)]*their acceptance\): wait for their answer/],
+      ['Git', 'agent', 'agentMerges', true, /\(For you: [^)]*their OK before merging[^)]*\): wait for their answer/],
+      ['Git', 'none', 'agentMerges', false, /else straight after its submission, the card staying in Doing/]
+    ]
+    for (const [platform, reviewBy, finish, ok, does] of CASES) expect(text, `${platform} · review ${reviewBy} · ${finish}${ok ? ' · OK first' : ''}`).toMatch(does)
     // The card's own rules decide (HR1's #1525 round 1 finding 2): a project's options changed after it started don't.
     expect(text).toMatch(/how its work lands is the card's own rules: those it started under \(unless the user applied changed options to it\), never the project's options now, which \(`hive_project_status`'s `workflow`, a lane's brief\) say how new cards finish/)
     // Hive merges with the rules off (finding 3): nothing is refused, the queue pauses, and the card finishes as before.
-    expect(way('Hive merges it')).toMatch(/Don't merge it yourself: while the rules are enforced Hive refuses that\. With them switched off the queue pauses \(its `merge` says so\) and the card is finished as before them: as your brief says, then `hive_report_merge`/)
+    expect(way("The card's `merge`")).toMatch(/Don't merge it yourself: while the rules are enforced Hive refuses that\. With them switched off the queue pauses \(its `merge` says so\) and the card is finished as before them: as your brief says, then `hive_report_merge`/)
     expect(text).not.toMatch(/switch (the rules|it) (back )?on|turn (the rules|it) on/i)
     // What the queue owns isn't the agent's to do under Hive merges: the slot's steps are for merging that is yours.
     expect(text).toMatch(/## Merging, when it is yours/)
