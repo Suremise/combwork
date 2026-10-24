@@ -92,6 +92,8 @@ describe('what comes next on a card (#1530)', () => {
     }
     expect(e.wf.state(card).stage, `${name(c)}: ${steps.join(' → ')}`).toBe('done')
     expect(next).toEqual({ step: 'done' })
+    // An OK before every merge is asked whoever merges, Hive not checking it too (#1592): the user is a step.
+    if (c.platform === 'git' && c.kind === 'code' && c.ok === 'every' && c.finish !== 'committed') expect(steps, `${name(c)}: ${steps.join(' → ')}`).toContain('user')
   })
 
   it("names the step HR2 found missing or wrong: the agent's merge with no review, a pending OK, None's acceptance", async () => {
@@ -118,6 +120,20 @@ describe('what comes next on a card (#1530)', () => {
     moved(await e.wf.verdict(b.key, R1, { pass: true, comment: 'ok' }))
     expect(e.wf.state(b).stage).toBe('approved')
     expect(e.wf.nextFor(b.id)).toEqual({ step: 'user' })
+    // The same under not checked, by label (#1592): the user's OK, then the merge.
+    Object.assign(e.options, { ...optionsOf({ platform: 'git', review: 'agent', finish: 'notChecked', folder: 'slots', kind: 'code', ok: 'never' }), okBefore: { mode: 'labels', labels: ['release'] } })
+    const u = e.wf.createCard({ title: 'OK first, unchecked', labels: ['release'] })
+    moved(await e.wf.start(u.key, B1))
+    const fu = e.wf.folderOf(e.wf.state(u))
+    put(fu, 'u.txt', 'u\n')
+    commit(fu, {}, `${u.key}: work`)
+    moved(await e.wf.submit(u.key, B1, { summary: 'done' }))
+    moved(await e.wf.startReview(u.key, R1))
+    moved(await e.wf.verdict(u.key, R1, { pass: true, comment: 'ok' }))
+    expect(e.wf.state(u).stage).toBe('approved')
+    expect(e.wf.nextFor(u.id)).toEqual({ step: 'user' })
+    moved(await e.wf.answer(u.key, e.wf.state(u).requests.find((q) => q.gate === 'okBefore')!.request, 'approved'))
+    expect(e.wf.nextFor(u.id)).toEqual({ step: 'merge' })
     // None, a reviewer agent then the user: the pass waits for the user's acceptance.
     const nn = envs.none!
     Object.assign(nn.options, optionsOf({ platform: 'none', review: 'agentThenYou', finish: 'accept', folder: 'project', kind: 'code', ok: 'never' }))
