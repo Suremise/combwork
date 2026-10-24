@@ -2727,7 +2727,8 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
   if (actor.kind !== 'assistant') {
     const { done, card } = await runCardIntent(ref, actor, intent)
     const copy = await reviewCopyAfter(actor, card, { start: intent.kind === 'startReview', verdict: intent.kind === 'verdict' })
-    return copy ? { ...done, data: { ...done.data, reviewCopy: copy } } : done
+    // The copy first (#1444): a CLI that shortens a long reply (Codex's code tool) still shows where to review.
+    return copy ? { ...done, data: { reviewCopy: copy, ...done.data } } : done
   }
   const was = await tasks.getTask(ref.n).catch(() => null)
   const what = INTENT_WORDS[intent.kind]

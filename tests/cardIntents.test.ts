@@ -651,6 +651,8 @@ describe("the intents' routes and tools (#1267)", () => {
     const files = Array.from({ length: 25 }, (_, i) => `f${i}.ts`)
     expect(intentText({ ok: true, card: '#3', from: 'review', to: 'review', data: { revision: 'r1', files } })).toBe(`#3: still review. revision: r1; files: ${files.slice(0, 20).join(', ')} and 5 more`)
     expect(intentText({ ok: true, card: '#3', from: '', to: '', warnings: ["b.ts is another agent's"] })).toBe("#3: done.\nWarning: b.ts is another agent's")
+    // Start review's files (#1444): each as git's letter and its path, never [object Object].
+    expect(intentText({ ok: true, card: '#3', from: 'review', to: 'review', data: { files: [{ path: 'greet.js', status: 'M' }, { path: 'test.js', status: 'A' }] } })).toBe('#3: still review. files: M greet.js, A test.js')
   })
 
   it('every agent has the intent tools, Codex too (#913: enabled_tools is HIVE_TOOLS); the Assistant at Control agents, never start_card', () => {

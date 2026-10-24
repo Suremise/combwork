@@ -133,6 +133,23 @@ describe('the bundled skills', () => {
     }
   })
 
+  it("tell no agent to use a worktree of its own or to review in the builder's folder (#1444: P7's slots and review copies)", () => {
+    const own = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown (?:git )?worktree\b|\bagents? with (?:its|their) own\b/i
+    const builders = /\breview\w* (?:in|from) (?:the )?builder's (?:worktree|folder|slot)\b/i
+    const tools = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+    const descriptions = [...tools.matchAll(/description:\s*(?:ASSISTANT\s*\?\s*)?(["'`])((?:\\.|(?!\1).)*)\1/g)].map((m) => m[2])
+    expect(descriptions.length).toBeGreaterThan(50)
+    for (const [name, s] of catalog) {
+      expect(s.text, name).not.toMatch(own)
+      expect(s.text, name).not.toMatch(builders)
+    }
+    for (const d of descriptions) {
+      expect(d).not.toMatch(own)
+      expect(d).not.toMatch(builders)
+    }
+    for (const text of [hiveInstructions('web'), hiveInstructions('', 'assistant')]) expect(text).not.toMatch(own)
+  })
+
   it('link only to files inside their own folder', () => {
     for (const [name, s] of catalog) {
       for (const m of s.text.matchAll(/\]\(([^)#]+)(#[^)]*)?\)/g)) {
@@ -200,7 +217,7 @@ describe('the bundled skills', () => {
     expect(line('- reviewer, after asking for a commit')).toMatch(/changes: \["comment"\]/)
     // run-lanes' sample brief agrees, leaving the procedure to card-loop (a brief saying "commit once it passes" undid it).
     const brief = catalog.get('run-lanes')!.text
-    expect(brief).toMatch(/Commit each round on your branch before sending the card to Review \(card-loop\)\./)
+    expect(brief).toMatch(/Commit each round on the card's branch before sending the card to Review \(card-loop\)\./)
     expect(brief).not.toMatch(/After each card passes: commit/)
     // A reviewer that reads only review-agent-work is pointed there (haiku passed uncommitted work so).
     expect(catalog.get('review-agent-work')!.text).toMatch(/In a card loop, review the commit its builder names: work sent uncommitted gets a request for a commit \(`hive_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
