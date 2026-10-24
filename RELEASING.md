@@ -41,7 +41,7 @@ An agent takes the OK in its own pane: the release-hive skill says how.
 2. **The baseline install** (#1288): a 1.0 build the user installs and uses day to day, before anything is uploaded. Features from On Hold are then built on top of it for a while.
    - The checks on the integration branch's head: the last checks card's results stand if the branch hasn't moved since; otherwise run them again.
    - The release notes (below).
-   - The version is `1.0.0-rc.<n>` (asked). A pre-release version means the updater never offers a 0.9.x release over it, and a later RC or 1.0.0 updates it.
+   - The version is `1.0.0-rc.<n>` (asked), set before the build: no current-version candidate comes first (that's Step 1, for an uploaded release). A pre-release version means the updater never offers a 0.9.x release over it, and a later RC or 1.0.0 updates it.
    - `npm run dist` (asked), built from the integration branch's head. From a worktree, it copies the installer into the main checkout's `dist` (Notes).
    - `npm run e2e -- packaged-mcp packaged-progress` against `dist/win-unpacked`, and the Sandbox checks (the release-hive skill), including the one-way upgrade from 0.9.3.
    - An install note for the user: back up first, close every 0.9.3 Hive on the workspace, and what to expect. **The user installs.** Nothing is pushed, tagged or uploaded.
