@@ -10,9 +10,8 @@
 //   history says so); R1's verdict returns copy-1, which E1 is then leased and told of (its inbox);
 // - R2's session ending gives its review up: copy-2 is returned and freed; with review copies off, R2 started again has
 //   no --add-dir and its start review leases nothing.
-// Dev build, throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
+// Dev build (or HIVE_EXE), throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
 const lib = require('./lib.cjs')
-const { _electron } = require('playwright-core')
 const { execFileSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
@@ -67,13 +66,10 @@ const starts = () => lines(started)
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off' }) })
+  // Through lib.launch, so HIVE_EXE runs it on a packaged build (#1591: the packaged checks' review in a review copy, #1539).
+  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 850 } })
   try {
-    const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    await lib.fitWindow(app, page, { width: 1400, height: 850 })
-    await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     await lib.waitForProvider(inv, 'codex')
     await lib.openWorkspace(inv, page, ws)
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, folder: 'project', commands: { quick: `node "${script}"` } } })
