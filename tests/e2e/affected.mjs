@@ -216,6 +216,7 @@ export const AREAS = [
   { paths: ['tests/e2e/slotcards.cjs', 'tests/e2e/slotrecovery.cjs', 'src/main/slotCards.ts', 'src/main/laneStart.ts', 'src/main/platform/gitPlatform.ts', 'src/main/workflow/service.ts'], suites: ['slotcards', 'slotrecovery', 'lanestart'] },
   { paths: ['tests/e2e/slotpool.cjs', 'src/main/slots.ts', 'src/main/slotsApp.ts', 'src/main/slotJobs.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts'], suites: ['slotpool', 'slotsessions'] },
   { paths: ['tests/e2e/startfresh.cjs', 'src/main/freshStarts.ts', 'src/shared/freshStarts.ts', 'src/renderer/src/components/NoticeBanners.tsx'], suites: ['startfresh'] },
+  { paths: ['tests/e2e/repairslots.cjs', 'tests/e2e/removeprojectslots.cjs', 'src/main/projectFolders.ts', 'src/shared/projectFolders.ts', 'src/main/projectRemoval.ts', 'src/renderer/src/components/MoveRepair.tsx', 'src/renderer/src/components/ProjectRemoval.tsx', 'src/main/agentWorktree.ts'], suites: ['repairslots', 'removeprojectslots', 'wsmove', 'wtrecreate', 'repairbranches'] },
   { paths: ['tests/e2e/slotupgrade.cjs', 'src/main/slotMigration.ts', 'src/main/workspaceMove.ts'], suites: ['slotupgrade', 'wsmove', 'repairbranches'] },
   { paths: ['tests/e2e/slotsessions.cjs', 'src/main/agentFolders.ts', 'src/shared/agentFolders.ts', 'src/shared/sessionResume.ts', 'src/shared/resumeAll.ts', 'src/main/sessions.ts'], suites: ['slotsessions'] },
   // The Agent API's agents on slots (#1451): where each is, and adding none in a worktree.

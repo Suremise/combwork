@@ -338,13 +338,37 @@ async function detectedProvider(resolve: () => ProviderId, auto: () => boolean):
 }
 
 /**
+ * A slot the agent holds whose folder is gone (#1447): made again on its line, with its commits, and the agent started,
+ * its lease kept; or released (the slot is made again at its next lease) when its line is gone or the user prefers.
+ */
+async function goneSlot(path: string, agentId: string, gone: { agentName: string; path: string; branch: string; branchExists: boolean; slot?: string }): Promise<boolean> {
+  const release = { label: tr(msg({ id: 'actions.slot.release', defaultMessage: 'Release the Slot', description: "Button: the agent gives up the slot whose folder is gone; Hive makes the slot again the next time it lends it." })), value: 'release' }
+  const choice = await choose({
+    title: tr(msg({ id: 'actions.slot.goneTitle', defaultMessage: 'The slot is gone', description: "Title of the question when the folder of a slot an agent holds (a working folder Hive lends it for a card or lane) is missing." })),
+    message: gone.branchExists
+      ? tr(msg({ id: 'actions.slot.goneMessage', defaultMessage: "{agent}'s slot {slot} is missing its folder ({path}). Its branch {branch} is still in the repository: make the slot again on it, with its commits, and start?", description: "The question when a slot's ({slot}) folder ({path}) is missing; the agent ({agent}) holds it, and its branch ({branch}) is still there." }), { agent: gone.agentName, slot: gone.slot ?? '', path: gone.path, branch: gone.branch })
+      : tr(msg({ id: 'actions.slot.goneNoBranch', defaultMessage: "{agent}'s slot {slot} is missing its folder ({path}), and its branch is gone too. Release the slot? Hive makes it again the next time it lends it.", description: "The question when a slot's ({slot}) folder ({path}) and its branch are missing; the agent ({agent}) holds it." }), { agent: gone.agentName, slot: gone.slot ?? '', path: gone.path }),
+    detail: tr(msg({ id: 'actions.slot.goneDetail', defaultMessage: 'If the workspace moved, Repair… in its banner can also locate the folder.', description: "Under the question when a slot's folder is missing: Repair… is a button in the workspace's banner." })),
+    choices: gone.branchExists ? [release, { label: tr(msg({ id: 'actions.slot.recreate', defaultMessage: 'Recreate and Start', description: 'Button: makes the slot again on its branch and starts the agent.' })), value: 'recreate' }] : [release]
+  })
+  if (choice === 'release') {
+    await attempt(tr(msg({ id: 'actions.slot.releaseFailed', defaultMessage: 'Could not release the slot', description: "An error's title: releasing a slot whose folder is gone failed." })), () => call('agents:unlinkWorktree', path, agentId))
+    return false
+  }
+  if (choice !== 'recreate') return false
+  return !!(await attempt(tr(msg({ id: 'actions.slot.recreateFailed', defaultMessage: 'Could not make the slot again', description: "An error's title: making a slot whose folder was gone again failed." })), () => call('agents:recreateWorktree', path, agentId)))
+}
+
+/**
  * A worktree agent whose folder is gone (#146): its branch lives in the repository, so the worktree can be made again
  * on it before the agent starts (or, with the branch gone too, made new from its base, or the link removed).
  */
 async function ensureWorktree(path: string, agentId: string): Promise<boolean> {
-  if (!agentOf(project(path), agentId)?.worktree) return true
+  // Its 0.9 worktree, or a slot it holds (#1447): asked of main for every agent, since a slot isn't on the agent.
+  if (!agentOf(project(path), agentId)) return true
   const gone = await call('agents:missingWorktree', path, agentId).catch(() => null)
   if (!gone) return true
+  if (gone.slot) return goneSlot(path, agentId, gone)
   const setup = tr(msg({ id: 'actions.worktree.setup', defaultMessage: "Hive copies in the files it copies into new worktrees, and the project's worktree setup command, if it has one, runs before the agent starts. Nothing is deleted.", description: "Under the question before recreating an agent's missing worktree: what making it again involves." }))
   if (gone.branchExists) {
     return confirm({

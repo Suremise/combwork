@@ -38,6 +38,7 @@
   "worktrees.missing.noAgent": "そのエージェントはもう存在しません。",
   "worktrees.missing.noBranch": "{agent}のブランチ{branch}がなくなっており、新しいブランチを作る元になるブランチもプロジェクトフォルダーにありません。",
   "worktrees.missing.noTree": "{agent}はワークツリーで作業していません。",
+  "worktrees.missing.slotFailed": "{agent}のスロット{slot}を再作成できませんでした：{why}",
   "worktrees.missing.stillListed": "gitは{folder}をまだワークツリーとして登録しています（ロックされている可能性があります）。ロックを解除するか、git worktree pruneを実行してから、もう一度試してください。",
   "worktrees.missing.stopFirst": "先に{agent}を停止してください。",
   "worktrees.missing.thereRecreate": "{agent}のワークツリーフォルダーは存在します（{folder}）。再作成するものはありません。",
