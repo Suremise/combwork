@@ -13,13 +13,18 @@ export interface CodexBackgroundMemo {
   known: Set<string>
   /** Commands taken as running from a simple script that printed no id: its source, by stand-in id. */
   unnamed: Map<string, string>
+  /** Subagents seen to end (by thread id), so one started again (resume_agent) counts again (#1584). */
+  subagentsEnded: Set<string>
 }
 
 const MAX_KEPT = 50
 
 export function codexBackgroundMemo(): CodexBackgroundMemo {
-  return { open: new Map(), known: new Set(), unnamed: new Map() }
+  return { open: new Map(), known: new Set(), unnamed: new Map(), subagentsEnded: new Set() }
 }
+
+/** A subagent's activity that doesn't end it (any other but `started` does: one missed rather than one counted that ended). */
+const SUBAGENT_RUNNING = new Set(['running', 'pending_init'])
 
 /** Drops the oldest entry past MAX_KEPT (a call whose output, or a command whose end, never came). */
 function bound(kept: Map<string, unknown> | Set<string>): void {
@@ -73,6 +78,10 @@ function sessionId(text: string): string | undefined {
  *   gets a stand-in id and ends with the CommandExecution of the same command text.
  * Anything less clear (a loop, a condition, a failed or aborted script, an end that could be its own) counts nothing:
  * a command missed rather than one counted that isn't running.
+ *
+ * Subagents (#1584, Codex 0.164's spawn_agent): one runs on after the turn that spawned it ends. The parent's rollout
+ * records a SubAgentActivity item `started` and, when it ends, `completed` (Codex writes it under the spawning turn's
+ * id and starts no turn for it), by its thread id; its task name (agent_path) describes it.
  */
 export function codexBackgroundTasks(appended: string, memo: CodexBackgroundMemo = codexBackgroundMemo()): BackgroundTaskEvent[] {
   const out: BackgroundTaskEvent[] = []
@@ -82,7 +91,7 @@ export function codexBackgroundTasks(appended: string, memo: CodexBackgroundMemo
     out.push({ kind: 'start', id, at })
   }
   for (const line of appended.split('\n')) {
-    if (!/session_id|session ID|process_id|custom_tool_call/.test(line)) continue
+    if (!/session_id|session ID|process_id|custom_tool_call|SubAgentActivity/.test(line)) continue
     let o: Record<string, any>
     try {
       o = JSON.parse(line)
@@ -92,6 +101,19 @@ export function codexBackgroundTasks(appended: string, memo: CodexBackgroundMemo
     const at = Date.parse(o.timestamp) || Date.now()
     const p = o.payload
     if (!p || typeof p !== 'object') continue
+    const sub = p.item
+    if (o.type === 'event_msg' && p.type === 'item_completed' && sub?.type === 'SubAgentActivity' && typeof sub.agent_thread_id === 'string' && sub.agent_thread_id) {
+      const id: string = sub.agent_thread_id
+      if (sub.kind === 'started') {
+        const again = memo.subagentsEnded.delete(id)
+        out.push({ kind: 'start', id, at, type: 'subagent', ...(typeof sub.agent_path === 'string' ? { description: sub.agent_path } : {}), ...(again ? { resumed: true as const } : {}) })
+      } else if (!SUBAGENT_RUNNING.has(sub.kind)) {
+        memo.subagentsEnded.add(id)
+        bound(memo.subagentsEnded)
+        out.push({ kind: 'end', id, at })
+      }
+      continue
+    }
     if (o.type === 'event_msg' && p.type === 'item_completed' && p.item?.type === 'CommandExecution' && p.item.process_id != null) {
       const pid = String(p.item.process_id)
       out.push({ kind: 'end', id: pid, at })
