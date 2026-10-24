@@ -19,7 +19,7 @@ import { HiveError, hiveError } from './hiveError'
 import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSessionState, ProjectConfig, ProjectInfo, RemovedData, SessionRecord, WorkspaceConfig, WorkspaceInfo, WorkspaceMoved } from '../shared/types'
 import { config } from './config'
 import { emit, emitTo } from './events'
-import { containsPlace, insideReal, isDir, placeKey, readJson, readKeptJson, removePath, samePlace, withFileLock, writeKeptJson } from './fsutil'
+import { containsPlace, insideReal, isDir, placeKey, readJson, readKeptJson, removePath, retryWhileSaving, samePlace, withFileLock, writeKeptJson, type KeptReadOptions } from './fsutil'
 import { admit, dismiss, setFenceReason } from './openingFence'
 import { createLogger, userText } from './logger'
 import { changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
@@ -974,8 +974,9 @@ export class WorkspaceService {
     }
   }
 
-  async projectConfig(projectPath: string): Promise<ProjectConfig> {
-    const raw = await readKeptJson<Record<string, unknown>>(join(projectPath, HIVE_DIR, 'project.json'), {})
+  /** A project's config; `opts` for a read that is written back (mutateProjectConfig, #1600). */
+  async projectConfig(projectPath: string, opts?: KeptReadOptions): Promise<ProjectConfig> {
+    const raw = await readKeptJson<Record<string, unknown>>(join(projectPath, HIVE_DIR, 'project.json'), {}, opts)
     const cfg = mergeDefaults(structuredClone(DEFAULT_PROJECT_CONFIG), migrateProjectConfig(raw))
     // The Assistant's "project" settings are Settings → Assistant; its file keeps the workspace's own choices.
     return this.isAssistantHome(projectPath) ? assistantProjectConfig(cfg, config.settings) : cfg
@@ -1007,8 +1008,11 @@ export class WorkspaceService {
    * reviewer and writes in one board change, so a removal is either before it (no reviewer: refused) or after it, never
    * between its read and its write. Detected from the change itself (the ids before `fn` against the config it makes),
    * so no caller can bypass it. Outside a board change, such a change writes nothing, lets go of the file and runs
-   * again inside one (lock order: the agent names lock, the board, then this file), so **`fn` may run twice**: it must
-   * only compute its change from `cfg` (what it records on the side is overwritten by the run that writes).
+   * again inside one (lock order: the agent names lock, the board, then this file), so **`fn` may run more than once**:
+   * it must only compute its change from `cfg` (what it records on the side is overwritten by the run that writes).
+   *
+   * project.json still being saved by something else (an editor) is read again a few times, and then the change is
+   * refused (KeptFileBusy, #1600): never written over that save with the value from before it.
    */
   async mutateProjectConfig(projectPath: string, fn: (cfg: ProjectConfig) => Partial<ProjectConfig>): Promise<ProjectConfig> {
     const gen = this.generation
@@ -1018,8 +1022,8 @@ export class WorkspaceService {
     // The board an agent leaving publishes under: this workspace's, for one of its projects (the Assistant's home has none).
     const board = this.path && !this.isAssistantHome(projectPath) ? this.path : null
     const publish = (): Promise<ProjectConfig | null> =>
-      withFileLock(file, async () => {
-        const cfg = await this.projectConfig(projectPath)
+      retryWhileSaving(() => withFileLock(file, async () => {
+        const cfg = await this.projectConfig(projectPath, { unsettled: 'throw' })
         const had = projectAgents(cfg).map((a) => a.id)
         const patch = fn(cfg)
         let updated = { ...cfg, ...patch }
@@ -1042,7 +1046,7 @@ export class WorkspaceService {
         if (gen === this.generation) this.configWrites.set(projectPath.toLowerCase(), { stamp, ticket })
         else this.configFloor = Math.max(this.configFloor, stamp)
         return updated
-      })
+      }))
     const next =
       (await publish()) ??
       (await (async () => {
