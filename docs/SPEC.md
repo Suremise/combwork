@@ -3200,7 +3200,11 @@ detached worktree at that revision from a small warm pool shared with check copi
 by the setup script (not junctions into a slot: AGENTS.md's junction gotcha). A review copy is **leased** to one
 reviewer for one submission (start review) and returned at its verdict; it's reset to the next revision only then.
 The reviewer's session stays in the project folder; the review copy is where it reads and runs commands. Its runs name
-the card and revision, so they are checks of that revision (§16.13).
+the card and revision, so they are checks of that revision (§16.13). Its shell starts in the project folder too, so a
+command that doesn't change folder runs there (Haiku, 1 run in 7: #1559). Decided 24 Oct: guidance, not a different
+start folder. review-agent-work says to run every command with the review copy as its working directory (change into it
+first, or give the command its working directory), and start review's reply names the copy as the place to run them;
+reviewcopiesreal's per-turn report (#1546) names any recurrence [#1559].
 
 **Access** [P1, answering HB3's round 1 finding 10]: review copies live outside the reviewer's CLI folder, so the
 reviewer's launch grants the **review-copy pool's folder** (one fixed path per project, so the grant doesn't change
@@ -3243,7 +3247,7 @@ for a day go hourly (Remove idle slots after a day).
 - **Start review** (the old `review: "start"` or `hive_start_review`: any path that sets the card's review mark for an
   agent) leases a copy for the card's latest submission (`kind: review`, `ref` its submission), only for a session
   granted the folder (else nothing: it reviews the builder's folder read-only). Ready within 2 s, the reply names it
-  ("Review in … at <revision>: read and run commands there; your session stays where it is": in `changes` of a short
+  ("Review in … at <revision>: read and run commands there, with it as their working directory; your session stays where it is": in `changes` of a short
   reply, `reviewCopy` of a whole card or of an intent's `data`). A first copy's setup takes longer, so otherwise it
   replies "Waiting for a review copy (why): Hive tells you when one is ready", the card's history says *R1 is waiting for
   a review copy* (the window's text, a message), and once leased the reviewer is told in its inbox (a message from

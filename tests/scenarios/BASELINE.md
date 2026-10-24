@@ -36,6 +36,20 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## A reviewer's commands in its review copy (#1559): fakes, Claude Code Haiku, fixtures v77–v78, 24 October 2026
+
+review-agent-work now says to run every command with the review copy as its working directory (a reviewer's session and
+shell stay in the project folder, so a command that doesn't change folder runs there), and start review's reply names the
+copy as their working directory. In v78 **review-in-copy**'s `test.js` leaves `ran.txt` beside itself, and a new check
+fails a run that leaves one in the project folder.
+- **Fakes, compared** (v77, the 16 review scenarios): before `hb2-1559-before` (`2026-10-24T03-17-30-fake`, 1.0.0
+  03dd3c1f), after `2026-10-24T03-24-23-fake`. All checks pass on both sides; the only differences are review-agent-work
+  343 bytes longer in each, and the start review reply 36 characters longer in review-in-copy and pool-reviewer-wake.
+- **Model trial**, review-in-copy v78, Claude Code Haiku `--repeat 3` (`2026-10-24T03-31-51-claude-code`, $0.024): 3 of
+  3, each changing into the copy (`cd "<copy>" && …`) before every command, `node test.js` among them; no `ran.txt` in
+  the project folder. Before the change, #1546's reviewcopiesreal saw Haiku run its command in the project folder 1 run
+  in 7.
+
 ## What agents are told about slots (P7): fakes, Claude Code, Codex, fixtures v76–v77, 24 October 2026
 
 #1444 changes the lines P7 made wrong: work-on-card (a card's folder is its slot: work and run checks there; a move to
