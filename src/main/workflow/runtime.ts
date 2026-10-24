@@ -1936,7 +1936,7 @@ export class Workflow {
 
   /** Deliverables changed since the card started that are in neither its paths nor its pre-fill: for it to add or leave. */
   unclaimed(card: CardRecord): string[] {
-    const before = this.state(card).started?.deliverables ?? {}
+    const before = this.none.covering(this.state(card).started?.deliverables ?? {})
     const all = this.none.deliverables()
     if (isUnknown(all)) return []
     const now = this.none.manifest(all)

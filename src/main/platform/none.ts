@@ -31,7 +31,13 @@ export class NoneAdapter {
   constructor(
     readonly project: string,
     /** Names of folders left out of the deliverables (N4); `.hive` always is. */
-    private excluded: string[] = []
+    private excluded: string[] = [],
+    /**
+     * Whether names match whatever their case, as the file system resolves them (Windows: `NODE_MODULES` is
+     * `node_modules`, #1511 round 1): what is left out is matched so everywhere, a declared path, a folder's walk, a stored
+     * path and N4's writes.
+     */
+    private readonly anyCase = process.platform === 'win32'
   ) {}
 
   /** The folders left out changed (the project's options, #1263): what is hashed follows from the next read. */
@@ -52,7 +58,14 @@ export class NoneAdapter {
   }
 
   private skip(name: string): boolean {
-    return name === '.hive' || name === '.git' || this.excluded.includes(name)
+    const fold = (s: string): string => (this.anyCase ? s.toLowerCase() : s)
+    const n = fold(name)
+    return n === '.hive' || n === '.git' || this.excluded.some((x) => fold(x) === n)
+  }
+
+  /** A manifest without the paths a card's work never covers (#1511): a starting one recorded before, compared with now. */
+  covering(m: Manifest): Manifest {
+    return Object.fromEntries(Object.entries(m).filter(([p]) => this.excludedPart(p) === null))
   }
 
   /** The deliverable files under a path of the project (a file, or a folder's files), relative and with `/`. */

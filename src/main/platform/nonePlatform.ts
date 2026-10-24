@@ -70,7 +70,8 @@ export class NonePlatform implements PlatformAdapter {
     const paths = card.paths ?? []
     const rev = this.hashing.revision(paths)
     if (isUnknown(rev)) return { ok: false, refusal: { rule: 'platform.unknown', values: { card: card.key, what: rev.whatText ?? rev.what, rule: 'submit' } } }
-    const files = NoneAdapter.diff(s.started!.manifest ?? {}, rev.manifest)
+    // A starting manifest recorded before #1511 may hold a path now left out: left out of the change too.
+    const files = NoneAdapter.diff(this.hashing.covering(s.started!.manifest ?? {}), rev.manifest)
     if (!files.length && rev.revision === s.started!.base) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key } } }
     // Paths stored from before #1511 under an excluded folder: left out of the revision, and said so.
     const left = this.hashing.leftOut(paths)
