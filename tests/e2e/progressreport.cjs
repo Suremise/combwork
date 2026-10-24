@@ -28,6 +28,7 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome, older, timings]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
   lib.enableProviders(userData)
@@ -57,17 +58,25 @@ const check = (name, ok, extra = '') => {
     const f = path.join(claudeHome, 'fake-shell.jsonl')
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
   }
-  /** Has the agent start a command (as its shell would); resolves to a wait for what it recorded. */
-  const startShell = async (id, cmd, ms = 30000) => {
+  /**
+   * Has the agent start a command (as its shell would), typed again if a wake of Hive's disturbed it (typeLine): taken
+   * once its run shows in Progress or it ran. Resolves to a wait for what it recorded. `disturb`: typeLine's own check.
+   */
+  const startShell = async (id, cmd, ms = 30000, { disturb = false } = {}) => {
     const before = shells().length
-    await until(async () => (await live(id))?.status !== 'working', 15000)
-    await inv('pty:write', lib.ptyKey(alpha, id), `shell: ${cmd}`)
-    await lib.sleep(300)
-    await inv('pty:write', lib.ptyKey(alpha, id), '\r')
-    return async () => {
+    const runsBefore = (await inv('progress:list')).length
+    const typed = await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, 'Builder', `shell: ${cmd}`, {
+      ready: async () => (await live(id))?.status !== 'working',
+      taken: async () => shells().length > before || (await inv('progress:list')).length > runsBefore,
+      hungMs: Math.max(ms, HUNG_MS),
+      disturb,
+    })
+    const wait = async () => {
       await until(() => shells().length > before, ms)
       return shells()[before]
     }
+    wait.typed = typed
+    return wait
   }
   const shell = async (id, cmd, ms) => (await startShell(id, cmd, ms))()
   // A screenshot in a theme (#1250): the page must reach the theme, its Progress panel's background must be that
@@ -114,7 +123,10 @@ const check = (name, ok, extra = '') => {
   check('the agent starts', !!(await until(async () => (await live(builder.id))?.status === 'ready', HUNG_MS)))
 
   const bin = path.join(userData, 'bin')
-  const where = await shell(builder.id, 'where hive-progress')
+  // Typed with a Ctrl+U between the line and its Enter, as a wake of Hive's would clear it (#1560): typed again.
+  const whereRun = await startShell(builder.id, 'where hive-progress', 30000, { disturb: true })
+  check('a line a wake disturbed is typed again (typeLine)', whereRun.typed.attempt === 2 && whereRun.typed.lost[0]?.startsWith('disturbed'), JSON.stringify(whereRun.typed))
+  const where = await whereRun()
   // where lists the sh script (for Git Bash) too; cmd and PowerShell run the .cmd beside it, as with npm's pair.
   const found = (where?.stdout ?? '').trim().split(/\r?\n/).map((l) => l.toLowerCase())
   const mine = [path.join(bin, 'hive-progress'), path.join(bin, 'hive-progress.cmd')].map((f) => f.toLowerCase())

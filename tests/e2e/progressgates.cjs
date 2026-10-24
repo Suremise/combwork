@@ -30,6 +30,8 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
 ;(async () => {
   for (const d of [userData, ws, claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [claudeHome, shots]) fs.mkdirSync(d, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine.
+  lib.logFakeInput(claudeHome)
   // ok.txt is what the check looks for: ignored, so making it leaves the folder clean (a dirty one wouldn't count).
   lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', '.gitignore': '.hive/\nok.txt\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
@@ -88,14 +90,11 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
       const f = path.join(claudeHome, 'fake-shell.jsonl')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
     }
+    // Typed again when a wake of Hive's (the lane's) disturbed it (typeLine).
     const shell = async (id, cmd) => {
       const before = shells().length
-      await until(async () => (await live(id))?.status !== 'working', HUNG_MS)
-      await inv('pty:write', lib.ptyKey(alpha, id), `shell: ${cmd}`)
-      // Typed, then entered (the fake reads a line), as progressreport does.
-      await lib.sleep(300)
-      await inv('pty:write', lib.ptyKey(alpha, id), '\r')
-      await until(() => shells().length > before, 60000)
+      const name = id === builder.id ? 'B1' : 'R1'
+      await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, name, `shell: ${cmd}`, { ready: async () => (await live(id))?.status !== 'working', taken: () => shells().length > before, hungMs: 60000 })
       return shells()[before]
     }
 

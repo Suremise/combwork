@@ -932,6 +932,81 @@ async function sendPrompt(inv, key, text, { submitted, tries = 3, waitMs = 20000
 const TURN_HUNG_MS = 60000
 
 /**
+ * Turns on the fake Claude Code's input log in its home (CLAUDE_CONFIG_DIR): each read of its input goes into
+ * fake-input.jsonl there (#1286), which typeLine() reads. Before the fake starts: it looks for the switch only then.
+ */
+function logFakeInput(home) {
+  fs.mkdirSync(home, { recursive: true })
+  fs.writeFileSync(path.join(home, 'fake-log-input.txt'), '')
+}
+
+/**
+ * Types a line into a fake Claude Code (pty `key`, its home `home`, the agent's name `agent`) that Hive may type a wake
+ * into at the same moment (#1553, #1560): the wake's Ctrl+U clears the line, or the two lines mix, or the line lands
+ * while the agent is busy with the wake and is dropped (fake-dropped.jsonl). So its Enter goes only once the CLI has
+ * read the line whole (fake-input.jsonl: logFakeInput() before the fake starts), the line counts only when nothing
+ * else was on it (since the last Enter or Ctrl+U) or between it and its Enter, and it is typed again when it was
+ * disturbed, dropped, or not taken within `hungMs`.
+ * - taken(): true once the line has done what it was typed for (a shell step recorded, a run started): required.
+ * - ready(): waited for before each attempt (the agent idle), if given.
+ * - disturb: a Ctrl+U written between the first attempt's line and its Enter, as a wake's would: for the suite that
+ *   shows the helper types again (progressreport).
+ * Returns { attempt, lost }: the attempt taken (1 = the first; 0 if none of `tries` was), and why each before it wasn't.
+ */
+async function typeLine(inv, key, home, agent, text, { taken, ready = null, tries = 3, hungMs = TURN_HUNG_MS, disturb = false } = {}) {
+  if (!fs.existsSync(path.join(home, 'fake-log-input.txt'))) throw new Error(`typeLine: the fake's input log is off in ${home} (lib.logFakeInput before it starts)`)
+  const jsonl = (f) => (fs.existsSync(path.join(home, f)) ? fs.readFileSync(path.join(home, f), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((r) => r.agent === agent)
+  // What the agent's CLI read since record `from`, its key sequences (a bracketed paste's marks) left out.
+  const readSince = (from) => jsonl('fake-input.jsonl').slice(from).map((r) => r.data).join('').replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
+  const lost = []
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    if (ready && !(await until(ready, hungMs, 250))) {
+      lost.push(`not ready within ${hungMs / 1000} s`)
+      break
+    }
+    const from = jsonl('fake-input.jsonl').length
+    const dropped = jsonl('fake-dropped.jsonl').length
+    await inv('pty:write', key, text)
+    // Read whole before its Enter (the fake reads a line, as a CLI does).
+    if (!(await until(() => readSince(from).includes(text), hungMs))) {
+      lost.push('never read')
+      continue
+    }
+    if (disturb && attempt === 1) {
+      await inv('pty:write', key, '\x15')
+      await until(() => readSince(from).includes(`${text}\x15`), hungMs)
+    }
+    await inv('pty:write', key, '\r')
+    const read = await until(() => {
+      const s = readSince(from)
+      const i = s.indexOf(text)
+      return i >= 0 && s.indexOf('\r', i) >= 0 ? s : null
+    }, hungMs)
+    // Intact: nothing on the line before it, and nothing between it and its Enter.
+    const at = read ? read.indexOf(text) : -1
+    const intact = !!read && read.slice(0, at).split(/[\r\x15]/).pop() === '' && read.slice(at + text.length, read.indexOf('\r', at)) === ''
+    if (!intact) {
+      lost.push(`disturbed: ${JSON.stringify(read ?? readSince(from))}`)
+      continue
+    }
+    const droppedNow = () => jsonl('fake-dropped.jsonl').slice(dropped).some((r) => text.includes(r.text.slice(0, 50)))
+    await until(async () => droppedNow() || (await taken()), hungMs, 250)
+    // Dropped first: a wake's turn can pass for the line's (the agent working).
+    if (droppedNow()) {
+      lost.push('dropped while busy')
+      continue
+    }
+    if (await taken()) {
+      if (lost.length) console.log(`(${agent}'s line typed again: ${lost.join('; ')})`)
+      return { attempt, lost }
+    }
+    lost.push(`not taken within ${hungMs / 1000} s`)
+  }
+  console.log(`(${agent}'s line not taken: ${lost.join('; ')})`)
+  return { attempt: 0, lost }
+}
+
+/**
  * Prompts typed into the fake Claude Code (fake-claude/) in a session (pty `key`; `live()` gives its session:live entry),
  * each waited for by its own turn (#672, #684). Two gaps open under load when a suite types a prompt and then waits for
  * the status: the status is still the last turn's "finished" until the fake takes the new prompt, so the wait returns
@@ -1310,4 +1385,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { unkey, KEYED, cardLabel, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, TURN_HUNG_MS, fakePrompts, skip }
+module.exports = { unkey, KEYED, cardLabel, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, TURN_HUNG_MS, logFakeInput, typeLine, fakePrompts, skip }

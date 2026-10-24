@@ -38,6 +38,8 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
 ;(async () => {
   for (const d of [userData, ws, claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [claudeHome, shots]) fs.mkdirSync(d, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine.
+  lib.logFakeInput(claudeHome)
   // A quick check from the project's scripts, as the preset offers it: `typecheck`, which passes.
   lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', 'package.json': JSON.stringify({ name: 'alpha', scripts: { typecheck: 'node -e "process.exit(0)"' } }), '.gitignore': '.hive/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
@@ -148,25 +150,15 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       const f = path.join(claudeHome, 'fake-wakes.jsonl')
       return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent)
     }
-    const typeTo = async (id, text) => {
-      await inv('pty:write', lib.ptyKey(alpha, id), text)
-      // Typed, then entered (the fake reads a line), as progressgates does.
-      await lib.sleep(300)
-      await inv('pty:write', lib.ptyKey(alpha, id), '\r')
-    }
+    // A line typed into B1 (typeLine): Hive may type a wake into it at the same moment (a verdict's, a line moved's), and
+    // the line is typed again when the wake disturbed it or B1 dropped it.
+    const typeTo = (text, taken) => lib.typeLine(inv, lib.ptyKey(alpha, b1.id), claudeHome, 'B1', text, { ready: () => idle(b1.id), taken, hungMs: 60000 })
     const shell = async (cmd) => {
       const before = shells().length
-      // A wake Hive types into B1 as the suite types (a verdict's, a line moved's) is taken with the suite's line as one
-      // wake, and the command isn't run: seen as that wake taken, it is typed again (a few times at most).
-      for (let tries = 0; tries < 3 && shells().length === before; tries++) {
-        await until(() => idle(b1.id), HUNG_MS)
-        const taken = wakes('B1').length
-        await typeTo(b1.id, `shell: ${cmd}`)
-        await until(() => shells().length > before || wakes('B1').length > taken, 60000)
-      }
+      await typeTo(`shell: ${cmd}`, () => shells().length > before)
       await until(() => idle(b1.id), HUNG_MS)
       const ran = shells().slice(before).find((s) => s.cmd === cmd)
-      if (!ran) throw new Error(`B1 didn't run "${cmd}" (its line was taken with a wake each time)`)
+      if (!ran) throw new Error(`B1 didn't run "${cmd}" (its line wasn't taken)`)
       return ran
     }
     /** The quick check through hive-progress on the card's revision now: true once a new counted CheckRan is on the card. */
@@ -265,9 +257,9 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     // B1 in a turn (until the suite lets it go) as it merges: its slot must wait for it. The verdict's loop wake taken
     // first (typed while the suite types, it would end that turn at once), then B1 idle.
     await until(() => wakes('B1').length > wakesBefore, HUNG_MS)
-    await until(() => idle(b1.id), HUNG_MS)
-    await typeTo(b1.id, 'holduntil p4lane-go')
-    check('B1 is working', !!(await until(async () => (await live(b1.id))?.status === 'working', HUNG_MS)))
+    const holding = async () => (await live(b1.id))?.status === 'working'
+    await typeTo('holduntil p4lane-go', holding)
+    check('B1 is working', !!(await until(holding, HUNG_MS)))
     const main2 = squash(line2, 'card 2 (squash)')
     const done2 = await reportMerge(c2)
     check('card 2 squash-merged and reported: Done (contained by its replay)', done2.ok, JSON.stringify(done2.r.body))
