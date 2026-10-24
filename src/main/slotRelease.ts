@@ -69,9 +69,11 @@ export async function releasableSlots(projectPath: string): Promise<Releasable> 
 /**
  * Releases `slot`: its carried lease (`carried`), or its held writer (`writer`), which needs `confirm` naming the slot
  * and the run the user was shown, and with `end` ends what Hive lists of that run's processes first. `kind` may be left
- * out when the slot has only one of them.
+ * out when the slot has only one of them. `guard`: the Assistant's change boundary (Control, its session), run again just
+ * before processes are ended and inside the write that ends the lease or clears the writer, so a change it no longer
+ * allows by then changes nothing.
  */
-export async function releaseSlot(ws: WorkspaceService, projectPath: string, slot: string, o: { kind?: ReleaseKind; confirm?: { slot?: unknown; run?: unknown } | null; end?: boolean }): Promise<Released> {
+export async function releaseSlot(ws: WorkspaceService, projectPath: string, slot: string, o: { kind?: ReleaseKind; confirm?: { slot?: unknown; run?: unknown } | null; end?: boolean; guard?: () => void }): Promise<Released> {
   const facts = await folderFacts(projectPath)
   const s = facts.slots.find((x) => x.name.toLowerCase() === slot.toLowerCase())
   if (!s) throw new SlotReleaseRefused(404, `No slot ${slot} in this project${facts.slots.length ? ` (its slots: ${facts.slots.map((x) => x.name).join(', ')})` : ''}.`)
@@ -83,7 +85,7 @@ export async function releaseSlot(ws: WorkspaceService, projectPath: string, slo
   if (!kind) throw new SlotReleaseRefused(400, `${s.name} is both kept for ${name(carried!)} (kind: carried) and held by a run (kind: writer): say which to release.`)
   if (kind === 'carried') {
     if (!carried) throw new SlotReleaseRefused(409, `${s.name} isn't kept for an agent (no carried lease).`)
-    if (!(await releaseCarried(ws, projectPath, carried))) throw new SlotReleaseRefused(409, `${s.name} changed meanwhile: it is no longer kept for ${name(carried)}. Look again.`)
+    if (!(await releaseCarried(ws, projectPath, carried, o.guard))) throw new SlotReleaseRefused(409, `${s.name} changed meanwhile: it is no longer kept for ${name(carried)}. Look again.`)
     return { kind, slot: s.name, agent: { id: carried, name: name(carried) } }
   }
   const w = await heldWriter(projectPath, s.name)
@@ -92,6 +94,6 @@ export async function releaseSlot(ws: WorkspaceService, projectPath: string, slo
   const run = typeof o.confirm?.run === 'string' ? o.confirm.run : ''
   const named = typeof o.confirm?.slot === 'string' ? o.confirm.slot : ''
   if (!run || named.toLowerCase() !== s.name.toLowerCase()) throw new SlotReleaseRefused(400, `Releasing ${s.name}'s writer needs confirm: { slot: "${s.name}", run: "<its run>" }, the slot and run the user agreed to release (list shows them).`)
-  await releaseHeldWriter(projectPath, s.name, run, { end: o.end === true })
+  await releaseHeldWriter(projectPath, s.name, run, { end: o.end === true, ...(o.guard ? { guard: o.guard } : {}) })
   return { kind, slot: s.name, agent: { id: w.agent, name: name(w.agent) }, ended: o.end === true && !!w.processes?.list.length }
 }

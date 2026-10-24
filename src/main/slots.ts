@@ -658,9 +658,12 @@ export class SlotStore {
     })
   }
 
-  /** A writer whose run has ended (or whose Hive is gone) cleared, only while it is still that run. Whether it was. */
-  async clearWriter(name: string, run: string): Promise<boolean> {
-    return this.conn.write((db) => Number(db.prepare('UPDATE slots SET writer_run = NULL, writer_lease = NULL, writer_agent = NULL, writer_pid = NULL, writer_started = NULL WHERE project = ? AND name = ? AND writer_run = ?').run(this.project, name, run).changes) === 1)
+  /**
+   * A writer whose run has ended (or whose Hive is gone) cleared, only while it is still that run. Whether it was.
+   * `guard` runs in the write first (#1561: the Assistant's Control and session, still allowing it): a throw changes nothing.
+   */
+  async clearWriter(name: string, run: string, guard?: () => void): Promise<boolean> {
+    return this.conn.write((db) => (guard?.(), Number(db.prepare('UPDATE slots SET writer_run = NULL, writer_lease = NULL, writer_agent = NULL, writer_pid = NULL, writer_started = NULL WHERE project = ? AND name = ? AND writer_run = ?').run(this.project, name, run).changes) === 1))
   }
 
   /** A slot's newest lease, open or ended (#1434: whose work it holds). */

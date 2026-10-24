@@ -247,13 +247,14 @@ export async function keptGoing(ws: WorkspaceService, kept: KeptFor, stage: (car
  * Release Slot… (#1441, the agent's menu, asked first in the window): its carried lease ended (`released`), so its
  * adopted worktree is no longer kept for it; the pool's guards then decide what becomes of the folder (a free slot, lent
  * once clean; renamed to a slot's name once nothing holds it). Its branch is kept. Whether a carried lease was ended.
+ * `guard` (#1561: the Assistant's) runs in the write that ends the lease: a throw ends nothing.
  */
-export async function releaseCarried(ws: WorkspaceService, projectPath: string, agentId: string): Promise<boolean> {
+export async function releaseCarried(ws: WorkspaceService, projectPath: string, agentId: string, guard?: () => void): Promise<boolean> {
   const id = await projectId(ws, projectPath)
   const c = carriedOf(ws, id, agentId)
   if (!c) return false
   const { poolFor } = await import('./slotsApp')
-  const ended = await (await poolFor(ws, projectPath)).release(c.lease, 'released')
+  const ended = await (await poolFor(ws, projectPath)).release(c.lease, 'released', guard && (() => (guard(), true)))
   if (ended) log.info(`${userText(agentId)}'s adopted slot ${userText(c.slot)} released by the user (lease ${c.lease})`)
   return ended
 }

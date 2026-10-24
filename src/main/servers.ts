@@ -1893,8 +1893,8 @@ route('POST', '/v1/projects/:name/slots/:slot/release', async ({ params, body })
   const kind = body?.kind === undefined ? undefined : body.kind === 'carried' || body.kind === 'writer' ? body.kind : null
   if (kind === null) throw new HttpError(400, 'kind is carried or writer')
   const confirm = body?.confirm && typeof body.confirm === 'object' ? (body.confirm as { slot?: unknown; run?: unknown }) : null
-  return assistantChange('agents', `release slot ${slot} in ${basename(p)}`, { kind: 'release-slot', project: basename(p) }, async () => {
-    const r = await releaseSlot(requireWorkspace(), p, slot, { ...(kind ? { kind } : {}), confirm, end: body?.end === true }).catch((e) => {
+  return assistantChange('agents', `release slot ${slot} in ${basename(p)}`, { kind: 'release-slot', project: basename(p) }, async (guard) => {
+    const r = await releaseSlot(requireWorkspace(), p, slot, { ...(kind ? { kind } : {}), confirm, end: body?.end === true, guard }).catch((e) => {
       throw slotRefusal(e)
     })
     await workspaceOf(p).refresh()

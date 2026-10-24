@@ -508,6 +508,40 @@ describe('Release Slot through the Agent API and the Assistant (#1561)', () => {
     else expect(writer()).toBeNull()
   })
 
+  it("the Assistant's Control turned down, or its session ended, while the release waits: nothing released, no process ended after it (HR4's round 1)", async () => {
+    const listed = { processes: [{ pid: 4242, name: 'node.exe', label: 'node serve.js' }], more: 0, restored: true }
+    for (const why of ['The user turned Settings → Assistant → Control down', "The Assistant's session ended"]) {
+      let revoked = false
+      /** assistant.admit's guard, as the route passes it: refuses once the change is no longer allowed. */
+      const guard = () => {
+        if (revoked) throw new Error(why)
+      }
+      // Revoked while the release reads whether the holder's Hive still runs: its listed processes aren't ended.
+      hostOn(false)
+      setWriterHost({ self: async () => me, alive: async (pid) => ((revoked = true), pid === me.pid), live, track: async () => pool.trackWriter(), drained: async (_p, slot) => pool.drained(slot) })
+      await plant('r-guard')
+      tracker.listed.set('r-guard', listed)
+      expect(await refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run: 'r-guard' }, end: true, guard }))).toBe(why)
+      expect(tracker.ended).toEqual([])
+      expect(writer()?.run).toBe('r-guard')
+      // Revoked as the processes are ended (allowed until then): the write that clears the writer refuses, so it stays.
+      revoked = false
+      hostOn(false)
+      tracker.writerAt = () => ((revoked = true), writer()?.run ?? null)
+      expect(await refusal(release('slot-a', { kind: 'writer', confirm: { slot: 'slot-a', run: 'r-guard' }, end: true, guard }))).toBe(why)
+      expect(tracker.ended).toEqual([{ run: 'r-guard', at: 'r-guard' }])
+      expect(writer()?.run).toBe('r-guard')
+      tracker.ended.length = 0
+      tracker.writerAt = () => null
+      tracker.listed.delete('r-guard')
+      await store.clearWriterRun('r-guard')
+      // A carried slot: refused in the write that would end its lease, which stays open.
+      revoked = true
+      expect(await refusal(release('slot-a', { kind: 'carried', guard }))).toBe(why)
+      expect(carriedLease()).not.toBeNull()
+    }
+  })
+
   it('a carried slot: kind left out when it has only that, released once; then nothing to release', async () => {
     hostOn(false)
     expect(writer()).toBeNull()
