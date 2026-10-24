@@ -109,7 +109,7 @@
   "workspace.changes.aboutProject": "Der Projektordner: was noch nicht committet ist, von dir oder den Agenten, die direkt im Ordner arbeiten (denen ohne Worktree).",
   "workspace.changes.aboutUnusedOne": "Ein ungenutzter Worktree: alles auf {branch}, was nicht auf {into} ist. Merge ihn, oder geh zurück zu „Ungenutzte Worktrees“, um ihn zu entfernen.",
   "workspace.changes.aboutUnusedShort": "Worktrees, in denen kein Agent von {project} arbeitet: Öffne einen, um seine Änderungen zu sehen und sie zu mergen, oder entferne ihn.",
-  "workspace.changes.aboutUnusedTip": "Behalten, als ihr Agent entfernt wurde, außerhalb von Hive angelegt (etwa durch ein eigenes git worktree add eines Agenten) oder aus einer anderen Vorlage (beim Laden dieser Vorlage bekommen ihre Agenten sie zurück).{known, select, yes { Die in {into} gemergten und sauberen können mit ihren Branches weg; die anderen enthalten Arbeit, die es sonst nirgends gibt.} other {}}",
+  "workspace.changes.aboutUnusedTip": "Behalten, als ihr Agent entfernt wurde (von Hand oder als die Agenten einer Vorlage ihn ersetzten), oder außerhalb von Hive angelegt (etwa durch ein eigenes git worktree add eines Agenten). Beim Laden einer Vorlage bekommen deren Agenten keinen davon.{known, select, yes { Die in {into} gemergten und sauberen können mit ihren Branches weg; die anderen enthalten Arbeit, die es sonst nirgends gibt.} other {}}",
   "workspace.docs.about": "Über {app}",
   "workspace.docs.api": "Agent API",
   "workspace.docs.changelog": "Versionshinweise",

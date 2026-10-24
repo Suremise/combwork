@@ -109,7 +109,7 @@
   "workspace.changes.aboutProject": "项目文件夹：尚未提交的内容，来自你或直接在该文件夹中工作的智能体（没有工作树的智能体）。",
   "workspace.changes.aboutUnusedOne": "未使用的工作树：{branch} 上所有不在 {into} 中的内容。可以合并它，或回到“未使用的工作树”将它删除。",
   "workspace.changes.aboutUnusedShort": "{project} 中没有智能体使用的工作树：打开一个可查看并合并其更改，或将它删除。",
-  "workspace.changes.aboutUnusedTip": "在其智能体被删除时保留下来、在 Hive 之外创建（例如智能体自己运行 git worktree add），或来自另一个模板（加载该模板会将它们交还给其智能体）。{known, select, yes {已合并到 {into} 且没有改动的工作树可以连同其分支一起删除；其他工作树中有别处没有的工作。} other {}}",
+  "workspace.changes.aboutUnusedTip": "在其智能体被删除时（手动删除，或被某个模板的智能体替换时）保留下来，或在 Hive 之外创建（例如智能体自己运行 git worktree add）。加载模板不会把它们交给该模板的智能体。{known, select, yes {已合并到 {into} 且没有改动的工作树可以连同其分支一起删除；其他工作树中有别处没有的工作。} other {}}",
   "workspace.docs.about": "关于 {app}",
   "workspace.docs.api": "Agent API",
   "workspace.docs.changelog": "发行说明",
