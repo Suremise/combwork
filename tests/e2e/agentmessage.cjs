@@ -147,6 +147,11 @@ const check = (name, ok, extra = '') => {
   const state = (id) => (activity('Builder').inbox?.deliveries ?? []).find((d) => d.id === id)
   check('the builder acks the first and reads the second in one call (ack with read): the first acked, the second received only', !!(await until(async () => state(mid)?.state === 'acked' && state(mid2)?.state === 'received' && state(mid2)?.receivedVia === 'inbox', 15000)), JSON.stringify([state(mid), state(mid2)]))
   await until(() => idle(builder.id), 15000)
+  // The reply it got, from its transcript: the ack line, then the read with the second, to ack once acted on.
+  const s = await live(alpha, builder.id)
+  const items = s?.sessionId ? ((await inv('transcript:read', alpha, s.sessionId).catch(() => null))?.items ?? []) : []
+  const reply = items.filter((x) => x.kind === 'tool' && x.tool.name === 'hive · hive_inbox').at(-1)?.tool.result ?? ''
+  check('…its reply: the ack line, then the second, received', reply === `Acked ${mid}.\n1 new:\n${mid2} · the Assistant: And note it in the README.\nAck each with hive_inbox (ack: its ids) once you have acted on it.`, reply)
   await say(builder.id, `hive hive_inbox {"ack":["${mid2}"]}`)
   check('the builder acks it (hive_inbox): acked', !!(await until(async () => lastDelivery('Builder')?.state === 'acked' && !(await unread()), 15000)), JSON.stringify(lastDelivery('Builder')))
 
