@@ -48,6 +48,7 @@ interface HiveMessageValues {
   'service.files.notKept': undefined
   'service.files.outside': undefined
   'service.files.throughLink': undefined
+  'service.fsutil.keptBusy': { file: string | number }
   'service.fsutil.notCopied': { name: string | number }
   'service.git.exitCode': { code: string | number }
   'service.git.failed': { command: string | number; why: string | number }

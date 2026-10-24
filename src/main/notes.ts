@@ -1,11 +1,11 @@
 import { join, relative, resolve, sep, dirname, basename } from 'path'
-import { mkdir, readdir, readFile, rename, stat, writeFile } from 'original-fs/promises'
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'original-fs/promises'
 import { existsSync } from 'original-fs'
 import { handoverHeader, handoverProject, handoverSession, type HandoverAuthor } from '../shared/hiveGuidance'
 import { HIVE_DIR } from '../shared/defaults'
 import { isProjectId } from '../shared/projectIds'
 import type { NoteFile } from '../shared/types'
-import { hashText, insideReal, readKeptJson, withFileLock, writeKeptJson, writeTextAtomic } from './fsutil'
+import { hashText, insideReal, readKeptJson, retryWhileSaving, withFileLock, writeKeptJson, writeTextAtomic } from './fsutil'
 import { msg } from '../shared/i18n'
 import { hiveError } from './hiveError'
 import { nameJournal, nameJournalNow as nameJournalNowOf, ownerOfName, ownersOfName } from './projectNames'
@@ -90,7 +90,7 @@ export async function renameNote(p: string, newName: string): Promise<string> {
   }
   // A handover keeps its project (#514): the file and its owner's record change together, in the record's lock (an
   // adoption lists the handovers in it too, so it never sees one under a name its record doesn't have).
-  return withFileLock(at.owners, async () => {
+  return retryWhileSaving(() => withFileLock(at.owners, async () => {
     stillOpen(at)
     const owners = await readOwners(at.owners)
     stillOpen(at)
@@ -109,7 +109,7 @@ export async function renameNote(p: string, newName: string): Promise<string> {
       throw e
     }
     return dest
-  })
+  }))
 }
 
 // ---------------------------------------------------------------------------
@@ -161,8 +161,9 @@ async function handoverFiles(at: WorkspaceAt): Promise<NoteFile[]> {
   return ((await notesTree(at.shared)).find((n) => n.isDir && n.name === 'handovers')?.children ?? []).filter((f) => !f.isDir && isHandoverFile(f.name))
 }
 
+/** The record of handovers' owners, read to be changed and written back: still being saved by something else, KeptFileBusy (#1600). */
 async function readOwners(file: string): Promise<Record<string, string>> {
-  const raw = await readKeptJson<unknown>(file, null)
+  const raw = await readKeptJson<unknown>(file, null, { unsettled: 'throw' })
   const o = raw && typeof raw === 'object' ? (raw as { owners?: unknown }).owners : null
   const out: Record<string, string> = {}
   if (o && typeof o === 'object' && !Array.isArray(o)) for (const [f, id] of Object.entries(o)) if (isProjectId(id) && plainName(f)) out[f] = id
@@ -171,13 +172,13 @@ async function readOwners(file: string): Promise<Record<string, string>> {
 
 /** Records that a handover is a project's (by its id): Hive wrote it for it. */
 async function ownHandover(at: WorkspaceAt, file: string, id: string): Promise<void> {
-  await withFileLock(at.owners, async () => {
+  await retryWhileSaving(() => withFileLock(at.owners, async () => {
     stillOpen(at)
     const owners = await readOwners(at.owners)
     stillOpen(at)
     owners[file] = id
     await writeKeptJson(at.owners, { version: 1, owners })
-  })
+  }))
 }
 
 /**
@@ -225,7 +226,7 @@ export async function adoptHandovers(ws: WorkspaceService): Promise<Map<string, 
   if (!at) return new Map()
   await nameJournal(ws)
   stillOpen(at)
-  return withFileLock(at.owners, async () => {
+  return retryWhileSaving(() => withFileLock(at.owners, async () => {
     stillOpen(at)
     // Listed in the lock: a handover renamed (renameNote, in this lock) is never seen by its old name here.
     const files = await handoverFiles(at)
@@ -268,7 +269,7 @@ export async function adoptHandovers(ws: WorkspaceService): Promise<Map<string, 
     stillOpen(at)
     if (changed) await writeKeptJson(at.owners, { version: 1, owners })
     return new Map(Object.entries(owners))
-  })
+  }))
 }
 
 /** Which projects ran each conversation (sessions.json), by its id. */
@@ -323,7 +324,13 @@ export async function createHandover(project: string, title: string, content: st
   for (let n = 2; ; n++) {
     try {
       await writeFile(file, header + content.trim() + '\n', { flag: 'wx' })
-      if (owner) await ownHandover(at, basename(file), owner)
+      // Its owner not recorded (the record still being saved by something else, #1600): no handover either, so one
+      // written again isn't a second copy.
+      if (owner)
+        await ownHandover(at, basename(file), owner).catch(async (e) => {
+          await rm(file, { force: true }).catch(() => undefined)
+          throw e
+        })
       return file
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'EEXIST' || n > 1000) throw e

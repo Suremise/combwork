@@ -46,6 +46,7 @@
   "service.files.notKept": "To nie jest żaden z załączników sesji przechowywanych przez Hive.",
   "service.files.outside": "Ścieżka wychodzi poza projekt",
   "service.files.throughLink": "Ścieżka prowadzi poza projekt (przez łącze)",
+  "service.fsutil.keptBusy": "Inny program zapisuje teraz plik {file}: nic nie zostało zmienione. Spróbuj ponownie za chwilę.",
   "service.fsutil.notCopied": "Nie udało się skopiować: {name}",
   "service.git.exitCode": "kod wyjścia {code}",
   "service.git.failed": "Polecenie {command} nie powiodło się: {why}",
