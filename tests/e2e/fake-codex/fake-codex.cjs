@@ -118,7 +118,7 @@ const project = path.basename(process.cwd())
 const resuming = args[0] === 'resume' && /^[0-9a-f-]{36}$/i.test(args[1] ?? '')
 const sessionId = resuming ? args[1] : randomUUID()
 // Options that take a value, so a first prompt (the last plain argument, as Hive's adapter gives one) can be told apart.
-const WITH_VALUE = new Set(['-c', '--config', '-m', '--model', '-s', '--sandbox', '-a', '--ask-for-approval', '-C', '--cd', '-p', '--profile', '-i', '--image'])
+const WITH_VALUE = new Set(['-c', '--config', '-m', '--model', '-s', '--sandbox', '-a', '--ask-for-approval', '-C', '--cd', '-p', '--profile', '-i', '--image', '--add-dir'])
 let firstPrompt = ''
 for (let i = resuming ? 2 : 0; i < args.length; i++) {
   if (WITH_VALUE.has(args[i])) i++

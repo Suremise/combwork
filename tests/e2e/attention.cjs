@@ -57,7 +57,7 @@ const check = (name, ok, extra = '') => {
   const asking = await lib.addAgent(inv, proj, { name: 'Asking', provider: 'codex', permissionMode: 'ask' })
   const live = async (id) => (await inv('session:live')).find((s) => s.agentId === id)
   for (const a of [reviewed, asking]) await inv('session:start', proj, { agentId: a.id })
-  check('the agents start', !!(await until(async () => (await live(reviewed.id))?.status === 'ready' && (await live(asking.id))?.status === 'ready', 20000)))
+  check('the agents start', !!(await until(async () => (await live(reviewed.id))?.status === 'ready' && (await live(asking.id))?.status === 'ready', 20000)), `${(await live(reviewed.id))?.status} ${(await live(asking.id))?.status}`)
   check('in their modes', (await live(reviewed.id))?.permissionMode === 'approve-for-me' && (await live(asking.id))?.permissionMode === 'ask', `${(await live(reviewed.id))?.permissionMode} ${(await live(asking.id))?.permissionMode}`)
 
   // Every state an agent goes through (status | message | question | review), and the times Hive says it needs you (the log).
