@@ -36,6 +36,8 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     fs.writeFileSync(path.join(p, 'docs', 'PLAN.md'), PLAN(path.basename(p)))
     fs.writeFileSync(path.join(p, 'notes.txt'), 'not markdown')
   }
+  // A section copied with its explicit id (#1535): two headings carry #setup.
+  fs.writeFileSync(path.join(alpha, 'docs', 'IDS.md'), '# Ids\n\n## Version Control <a id="git"></a>\n\nGit.\n\n## First <a id="setup"></a>\n\nOne.\n\n## Second <a id="setup"></a>\n\nTwo.\n')
   lib.gitProject(alpha)
   lib.gitProject(beta)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), beta.toLowerCase()]))
@@ -106,6 +108,15 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     check('…and a numbered slug without # is the second', r.status === 200 && r.body.content.includes('Second.'), JSON.stringify(r.body))
     r = await section(agentToken, { path: 'docs/PLAN.md', heading: 'core contract' })
     check('an unknown heading: the closest, never an empty section', r.status === 404 && r.body.error.includes('Closest: #core-contracts') && r.body.closest?.[0]?.slug === 'core-contracts', JSON.stringify(r.body))
+    // An explicit id (#1535) finds its heading in any form; one two headings carry is ambiguous in every form, never the first.
+    for (const heading of ['#git', 'git', 'GIT']) {
+      r = await section(agentToken, { path: 'docs/IDS.md', heading })
+      check(`an explicit id finds its heading (${heading})`, r.status === 200 && r.body.content.startsWith('## Version Control'), JSON.stringify(r.body))
+    }
+    for (const heading of ['#setup', 'setup', 'SETUP', '#Setup']) {
+      r = await section(agentToken, { path: 'docs/IDS.md', heading })
+      check(`an id two headings carry: ambiguous (${heading}), both listed`, r.status === 409 && r.body.matches?.map((m) => m.text).join() === 'First,Second', JSON.stringify(r.body))
+    }
     r = await outline(agentToken, { path: 'docs/PLAN.md', project: 'beta' })
     check("another project's documents: refused (403)", r.status === 403, JSON.stringify(r))
 
@@ -167,6 +178,8 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     check('hive_read_section with no heading: the whole document', !t.isError && t.text.startsWith('docs/PLAN.md (') && t.text.includes('## Setup'), t.text.slice(0, 200))
     t = tool('hive_read_section', { path: 'docs/PLAN.md', heading: 'errors' })
     check('hive_read_section: where it is, then its text', !t.isError && t.text.startsWith('docs/PLAN.md#errors (') && t.text.endsWith('### Errors\n\nErrors.'), t.text)
+    t = tool('hive_read_section', { path: 'docs/IDS.md', heading: 'setup' })
+    check('hive_read_section: an id two headings carry is an error listing both, never the first', t.isError && t.text.includes('#setup (First, line 7)') && t.text.includes('#setup-1 (Second, line 11)') && !t.text.includes('One.'), t.text)
     t = tool('hive_read_section', { path: 'shared:plans/design.md', heading: 'nothing like it' })
     check('…an unknown heading is an error naming the closest', t.isError && /Closest: /.test(t.text), t.text)
 

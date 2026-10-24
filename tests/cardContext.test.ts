@@ -136,8 +136,9 @@ describe('references that no longer resolve (#819)', () => {
   })
   it('an explicit id two headings carry (a section copied with its anchor): a reference to it, or to the copy, is ambiguous, never the first picked', async () => {
     writeFileSync(join(alpha, 'docs', 'PLAN.md'), PLAN.replace('## Setup', '## Setup <a id="setup"></a>').replace('## Release', '## Setup again <a id="setup"></a>\n\nAnother.\n\n## Release'))
-    expect(await check(['docs/PLAN.md#setup', 'docs/PLAN.md#setup-1'])).toEqual([
+    expect(await check(['docs/PLAN.md#setup', 'docs/PLAN.md#SETUP', 'docs/PLAN.md#setup-1'])).toEqual([
       { ref: 'docs/PLAN.md#setup', problem: 'ambiguous', closest: ['setup', 'setup-1'] },
+      { ref: 'docs/PLAN.md#SETUP', problem: 'ambiguous', closest: ['setup', 'setup-1'] },
       { ref: 'docs/PLAN.md#setup-1', problem: 'ambiguous', closest: ['setup', 'setup-1'] }
     ])
   })

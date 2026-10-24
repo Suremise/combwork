@@ -167,25 +167,27 @@ function distance(a: string, b: string): number {
  *   headings carry is ambiguous, listing them;
  * - a heading's text (any case, with or without its `#` marks and a space): that heading; several with that text are
  *   ambiguous, listed each with its own slug;
- * - a slug (`core-contracts`, `setup-1`): that heading.
+ * - a slug (`core-contracts`, `setup-1`): that heading; an explicit id several headings carry is ambiguous, as with `#`.
  * None: the closest headings.
  */
 export function findHeading(outline: DocHeading[], asked: string): SectionMatch {
   const q = asked.trim()
-  if (/^#[^#\s]/.test(q)) {
-    // An explicit id several headings carry names none of them for sure (#1535).
-    const sharing = outline.filter((h) => h.sharedId === q.slice(1) || h.sharedId === q.slice(1).toLowerCase())
-    if (sharing.length) return { ambiguous: sharing }
-    const exact = outline.find((h) => h.slug === q.slice(1) || h.slug === q.slice(1).toLowerCase())
-    return exact ? { heading: exact } : { closest: closest(outline, q.slice(1)) }
-  }
+  if (/^#[^#\s]/.test(q)) return bySlug(outline, q.slice(1)) ?? { closest: closest(outline, q.slice(1)) }
   const text = q.replace(/^#+\s+/, '')
   const plain = (t: string): string => headingText(t).toLowerCase()
   const byText = outline.filter((h) => plain(h.text) === plain(text))
   if (byText.length > 1) return { ambiguous: byText }
   if (byText.length === 1) return { heading: byText[0] }
-  const bySlug = outline.find((h) => h.slug === text || h.slug === text.toLowerCase())
-  return bySlug ? { heading: bySlug } : { closest: closest(outline, text) }
+  return bySlug(outline, text) ?? { closest: closest(outline, text) }
+}
+
+/** The heading a slug names (any case), or null; an explicit id several headings carry names none of them for sure (#1535). */
+function bySlug(outline: DocHeading[], slug: string): SectionMatch | null {
+  const is = (s: string | undefined): boolean => s === slug || s === slug.toLowerCase()
+  const sharing = outline.filter((h) => is(h.sharedId))
+  if (sharing.length) return { ambiguous: sharing }
+  const exact = outline.find((h) => is(h.slug))
+  return exact ? { heading: exact } : null
 }
 
 /** The headings closest to one asked for that none is: containing it or contained in it first, then by edit distance. */
