@@ -155,6 +155,7 @@ export const SUITES = [
   { name: 'leftovers-codex', needs: ['codex'] },
   { name: 'leftovers-restart' },
   { name: 'legacyworktree' },
+  { name: 'linecarried' },
   { name: 'loadfail' },
   { name: 'longsession' },
   { name: 'loopwakes' },

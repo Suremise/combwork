@@ -4356,6 +4356,12 @@ later phase. Lanes keep working, and everything works with the Assistant off, in
 
 #### 16.19.2 Agent worktrees between cards (P4–P6)
 
+**In 1.0** [#1579, the Assistant's call]: this applies only to a lane carried over the upgrade on its builder's 0.9
+worktree (S56, #1441's carried leases), which runs there until it ends. 1.0 adds no worktree agents, and a lane on slots
+gives each card a line of its own, so nothing moves (S54 and S55 since #1573). The e2e suite `linecarried` covers it on
+the dev build, with a 0.9 worktree builder made through the test channel: a merge commit, two squashes (the builder
+busy, then the worktree dirty) and a commit made past approval.
+
 [P1, answering HB3's round 3 finding 2 and HR2's round 3 finding 3] In agent-worktree mode a builder's branch carries
 on from card to card, so after each Done Hive checks, **before the lane's next card starts**, that the branch is an
 ancestor of the target (a merge commit or a fast-forward leaves it so). If it isn't (a squash):
