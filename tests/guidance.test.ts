@@ -204,7 +204,8 @@ describe('the bundled skills', () => {
     // each way, and a card that passed waits on it.
     const merge = catalog.get('merge-ready')!.text
     expect(merge).not.toMatch(/at the lane's end/)
-    expect(merge).toMatch(/how its work lands is the project's[^\n]*a card that passed waits on it/)
+    expect(merge).toMatch(/how its work lands is the card's own rules/)
+    expect(merge).not.toMatch(/at the lane's end|before the lane's next card starts/)
     expect(line('**Stop and ask**')).toMatch(/on a merge step that needs the user/)
   })
 
@@ -225,7 +226,9 @@ describe('the bundled skills', () => {
     expect(brief).toMatch(/Commit each round on the card's branch before sending the card to Review \(card-loop\)\./)
     expect(brief).not.toMatch(/After each card passes: commit/)
     // A reviewer that reads only review-agent-work is pointed there (haiku passed uncommitted work so).
-    expect(catalog.get('review-agent-work')!.text).toMatch(/In a card loop, for a code card in Git, review the commit its builder names: work sent uncommitted gets a request for a commit \(`hive_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
+    // The revision start review names is the one reviewed (HR1's #1525 round 1 finding 1): a summary naming another
+    // commit gets a question, never a review of that commit.
+    expect(catalog.get('review-agent-work')!.text).toMatch(/What start review names is what you review, and what your verdict is recorded against: if the builder's summary names another commit, ask the builder \(`hive_request_builder`\) rather than review that one\. For a code card in Git, work that revision doesn't hold \(sent uncommitted\) gets a request for a commit \(`hive_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
   })
 })
 
@@ -235,7 +238,7 @@ describe('the bundled skills', () => {
 // Rules a gate now owns, as the skills used to state them: each phrase was in a bundled skill before P8.
 const GATE_RULES: [string, RegExp][] = [
   ['commit before Review', /\bcommit (the card's work )?before (Review|submitting|moving it)\b/i],
-  ['review the exact commit', /\breview the commit the builder names\b/i],
+  ['review the exact commit', /\breview the commit (the|its) builder names\b/i],
   ['dependencies done before start', /\bcards it depends on \(`blockedBy`\) that aren't done block it\b/i],
   ['no cards into a running lane', /\b(a running loop never sees a card added|no cards? (in)?to a running lane)\b/i],
   ['Passed is not merged', /\bPassed means it passed review, not that it's merged\b/i],
@@ -361,7 +364,8 @@ describe('the review and merge skills follow the gates (#1525)', () => {
   it('state no rule a gate owns, outside a card with no workflow', () => {
     for (const name of ['review-agent-work', 'merge-ready']) {
       for (const l of catalog.get(name)!.text.split(/\r?\n/)) {
-        if (/has no workflow/.test(l)) continue
+        // Only the line for a card with no workflow, which still reviews on the board (`review: "start"`).
+        if (l.startsWith('- **A card with no workflow**')) continue
         for (const [rule, re] of GATE_RULES) expect(l, `${name}: ${rule}`).not.toMatch(re)
       }
     }
@@ -391,18 +395,25 @@ describe('the review and merge skills follow the gates (#1525)', () => {
     expect(text).not.toMatch(/Hive moves it on \(to Passed, or to its merge\)/)
   })
 
-  it('merge-ready says what the agent does for each way a project finishes a card (G5)', () => {
+  it('merge-ready says what the agent does for each way a card finishes (G5), by its own rules, with the rules on or off', () => {
     const text = merge()
-    // Keyed by the options' own values: a new way to finish fails to compile here until the skill says it.
-    const FINISH: Record<Finisher, RegExp> = {
-      hiveMerges: /- \*\*Hive merges\*\*: its merge queue checks it on the target as it is then and merges it, or returns it to its builder with why[^\n]*Don't merge it yourself: the card's `merge`/,
-      agentMerges: /- \*\*The agent merges\*\*: you merge it \(below\), then `hive_report_merge` with the merge commit; Hive checks the work is in the base before the card is Done/,
-      notChecked: /- \*\*Merges aren't checked\*\*: merge as your brief says, then `hive_report_merge`; nothing is checked/,
-      committed: /- \*\*Committed is done\*\*, or a project without version control: there is nothing to merge/,
-      accept: /a project without version control: there is nothing to merge; the card finishes on its own/
+    const ways = text.split(/\r?\n/).filter((l) => l.startsWith('- **'))
+    const way = (starts: string): string => ways.find((l) => l.startsWith(`- **${starts}`)) ?? ''
+    // Keyed by the options' own values: a new way to finish fails to compile here until the skill says it. Each is told
+    // apart by what the card shows (its `merge`, its column), not by the project's options.
+    const FINISH: Record<Finisher, [way: string, says: RegExp]> = {
+      hiveMerges: ['Hive merges it', /\(the card shows `merge`, where it is in the queue\): the queue checks it on the target as it is then and merges it, or returns it to its builder with why/],
+      agentMerges: ['In Passed with no `merge`', /the merge is yours\. Merge it \(below\), then `hive_report_merge` with the merge commit: Hive checks the work is in the base before the card is Done, refusing with what's missing/],
+      notChecked: ['In Passed with no `merge`', /unless the card's rules don't check merges/],
+      committed: ['Done once passed or submitted', /\(committed is done, [^)]*\): there is nothing to merge/],
+      accept: ['Done once passed or submitted', /a project without version control[^)]*\): there is nothing to merge/]
     }
-    for (const [finish, says] of Object.entries(FINISH)) expect(text, finish).toMatch(says)
-    expect(text).toMatch(/how its work lands is the project's \(its options, in `hive_project_status`'s `workflow`/)
+    for (const [finish, [starts, says]] of Object.entries(FINISH)) expect(way(starts), finish).toMatch(says)
+    // The card's own rules decide (HR1's #1525 round 1 finding 2): a project's options changed after it started don't.
+    expect(text).toMatch(/how its work lands is the card's own rules: those it started under \(unless the user applied changed options to it\), never the project's options now, which \(`hive_project_status`'s `workflow`, a lane's brief\) say how new cards finish/)
+    // Hive merges with the rules off (finding 3): nothing is refused, the queue pauses, and the card finishes as before.
+    expect(way('Hive merges it')).toMatch(/Don't merge it yourself: while the rules are enforced Hive refuses that\. With them switched off the queue pauses \(its `merge` says so\) and the card is finished as before them: as your brief says, then `hive_report_merge`/)
+    expect(text).not.toMatch(/switch (the rules|it) (back )?on|turn (the rules|it) on/i)
     // What the queue owns isn't the agent's to do under Hive merges: the slot's steps are for merging that is yours.
     expect(text).toMatch(/## Merging, when it is yours/)
   })

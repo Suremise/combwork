@@ -11,26 +11,20 @@ In Hive a card's work is often on its own branch, in the slot (a working folder)
 
 ## Steps
 
-1. **Where you are.** `git branch --show-current` and `git worktree list`. This prepares a separate branch. On the project's main branch there is nothing to merge: say so, and do what the user asked (commit there only if they asked you to).
+1. **Where you are.** `git branch --show-current` and `git worktree list`. On the project's main branch there is nothing to merge: say so, and do what the user asked (commit there only if they asked you to).
 2. **Finish loose work.** `git status`. Commit the work that belongs to this task, with clear messages, and only that. Leave out build output, logs, local config and secrets. List anything you left uncommitted, and why.
-3. **Run the checks.** Use the project's own commands (package scripts, a Makefile, the README, CI config): tests, typecheck, lint, and whatever else the change needs. Fix failures this branch caused. Report failures that were there before, without fixing unrelated code.
-4. **Compare with the base** (usually `main` or `master`): `git log --oneline <base>..HEAD` and `git diff --stat <base>...HEAD`. Look for files changed by accident, debug code, commented-out code and leftover TODOs. If the base has moved on, say whether it merges cleanly (`git merge-tree --write-tree <base> HEAD`). Files `.gitattributes` merges with `merge=union` (often a changelog) never conflict: after merging the base, glance over them for an entry that appears twice in two wordings.
-5. **Summarise for the reviewer**:
-   - **What**: the change in a few sentences.
-   - **Why**: the problem it solves (and the card, if there is one).
-   - **How to check**: what to try or look at.
-   - **Checks**: what you ran, and the results.
-   - **Watch out for**: risky areas, follow-ups, anything unfinished.
+3. **Run the checks.** Use the project's own commands (package scripts, the README, CI config): tests, typecheck, lint, and whatever else the change needs. Fix failures this branch caused. Report failures that were there before, without fixing unrelated code.
+4. **Compare with the base** (usually `main` or `master`): `git log --oneline <base>..HEAD` and `git diff --stat <base>...HEAD`. Look for files changed by accident, debug code, commented-out code and leftover TODOs. If the base has moved on, say whether it merges cleanly (`git merge-tree --write-tree <base> HEAD`). Files merged with `merge=union` (`.gitattributes`) never conflict: after merging the base, look in them for an entry there twice in two wordings.
+5. **Summarise for the reviewer**: what changed, why (and the card), how to check it, the checks you ran and their results, and what to watch out for (risky areas, follow-ups, anything unfinished).
 
 ## Who merges
 
-Give the user the summary and say plainly whether the branch is ready, and if not, what's in the way. For a card, how its work lands is the project's (its options, in `hive_project_status`'s `workflow`; a lane's brief says it too), and a card that passed waits on it:
-- **Hive merges**: its merge queue checks it on the target as it is then and merges it, or returns it to its builder with why (fix and submit again). Don't merge it yourself: the card's `merge` (`hive_read_task`) says where it is.
-- **The agent merges**: you merge it (below), then `hive_report_merge` with the merge commit; Hive checks the work is in the base before the card is Done, and refuses saying what's missing.
-- **Merges aren't checked**: merge as your brief says, then `hive_report_merge`; nothing is checked.
-- **Committed is done**, or a project without version control: there is nothing to merge; the card finishes on its own.
+Give the user the summary and say plainly whether the branch is ready, and if not, what's in the way. For a card, how its work lands is the card's own rules: those it started under (unless the user applied changed options to it), never the project's options now, which (`hive_project_status`'s `workflow`, a lane's brief) say how new cards finish. The card says which (`hive_read_task`, and the replies to its submission and verdict):
+- **Hive merges it** (the card shows `merge`, where it is in the queue): the queue checks it on the target as it is then and merges it, or returns it to its builder with why (fix and submit again). Don't merge it yourself: while the rules are enforced Hive refuses that. With them switched off the queue pauses (its `merge` says so) and the card is finished as before them: as your brief says, then `hive_report_merge`.
+- **In Passed with no `merge`**: the merge is yours. Merge it (below), then `hive_report_merge` with the merge commit: Hive checks the work is in the base before the card is Done, refusing with what's missing, unless the card's rules don't check merges.
+- **Done once passed or submitted** (committed is done, a project without version control, a no-code card): there is nothing to merge.
 
-Outside a card, or with no workflow: the user merges from Hive, or you when they ask. Rebase, push, delete the branch or publish only when the user asks you to; for their OK on one (a push, a release), ask on the card with `hive_ask_user` (`kind: "approve"`): their answer comes to your inbox. If the user isn't watching this agent, a short `hive_notify` that the branch is ready helps them notice.
+Outside a card, or with no workflow: the user merges from Hive, or you when they ask. Rebase, push, delete the branch or publish only when the user asks you to; for their OK on one (a push, a release), ask on the card with `hive_ask_user` (`kind: "approve"`): their answer comes to your inbox.
 
 ## Merging, when it is yours
 
