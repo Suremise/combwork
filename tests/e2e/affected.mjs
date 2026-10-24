@@ -206,6 +206,8 @@ export const AREAS = [
   { paths: ['tests/e2e/p5lane.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/workflow/lineUpdates.ts', 'src/main/laneStart.ts', 'src/main/workflow/optionsForm.ts'], suites: ['p5lane'] },
   // P6's acceptance (#1425): a project from added to Done through the Version Control tab, Solo, all off, S19 and S20.
   { paths: ['tests/e2e/p6lane.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/presetStep.ts', 'src/renderer/src/components/PresetStep.tsx', 'src/main/workflow/platformSwitch.ts', 'src/renderer/src/boardStages.ts', 'src/main/laneStart.ts', 'src/main/workflow/optionsForm.ts'], suites: ['p6lane'] },
+  // P7's acceptance (#1448): Team 6×6 on slots with review copies, two lanes, S42, S43, the pool, Resume All and restart.
+  { paths: ['tests/e2e/p7lane.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/laneStart.ts', 'src/main/slots.ts', 'src/main/slotsApp.ts', 'src/main/slotCards.ts', 'src/main/copies.ts', 'src/main/copiesApp.ts', 'src/main/reviewCopies.ts', 'src/main/agentFolders.ts'], suites: ['p7lane'] },
   { paths: ['tests/e2e/p6rules.cjs', 'tests/e2e/queueFixture.cjs', 'src/shared/workflow/guards.ts', 'src/shared/workflow/compile.ts', 'src/main/workflow/runtime.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/platform/nonePlatform.ts'], suites: ['p6rules'] },
   { paths: ['tests/e2e/p5scenarios.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueChecks.ts', 'src/main/workflow/queueChecksApp.ts', 'src/shared/progressQueue.ts'], suites: ['p5scenarios'] },
   { paths: ['tests/e2e/queuelease.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueHost.ts'], suites: ['queuelease'] },
@@ -387,7 +389,7 @@ export const AREAS = [
   // The run context: every suite (above); isolation checks what it gives a test Hive and the children a suite starts.
   { paths: ['tests/e2e/runContext.cjs', 'src/main/testQuiet.ts'], suites: ['isolation'] },
   // The fake Codex CLI: every suite that runs it.
-  { paths: ['tests/e2e/fake-codex/'], suites: ['carryingon', 'codexqueued', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance'] },
+  { paths: ['tests/e2e/fake-codex/'], suites: ['carryingon', 'codexqueued', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance', 'p7lane'] },
   // Hive's bundled skills and modes, read at runtime (not documentation).
   { paths: ['resources/skills/', 'src/main/bundledHistory.json'], suites: ['skills', 'skillaudience', 'skilldelivery', 'cardloop', 'replysize', 'slotguidance'] },
   { paths: ['resources/modes/', 'src/main/assistantMode.ts'], suites: ['assistant', 'assistant-control', 'assistantend', 'assistantmode', 'assistantresume'] },
