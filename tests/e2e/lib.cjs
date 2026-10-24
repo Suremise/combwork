@@ -947,56 +947,75 @@ function logFakeInput(home) {
  * read the line whole (fake-input.jsonl: logFakeInput() before the fake starts), the line counts only when nothing
  * else was on it (since the last Enter or Ctrl+U) or between it and its Enter, and it is typed again when it was
  * disturbed, dropped, or not taken within `hungMs`.
- * - taken(): true once the line has done what it was typed for (a shell step recorded, a run started): required.
+ * - live(): the agent's session:live entry. The line is taken once its turn is another than just before it was typed
+ *   (each attempt's own, so a wake's turn before it doesn't count): a turn's start, not its end, so a line whose
+ *   command runs long isn't typed again.
+ * - taken(): true once the line was taken, instead (a run it starts showing in Progress, the agent working on a
+ *   held turn): something seen as the line starts, never as its work ends. One of live and taken is required.
  * - ready(): waited for before each attempt (the agent idle), if given.
- * - disturb: a Ctrl+U written between the first attempt's line and its Enter, as a wake's would: for the suite that
- *   shows the helper types again (progressreport).
+ * - disturb: for the suite that shows the helper types again (progressreport), the first attempt disturbed as a wake
+ *   would: 'enter', a Ctrl+U between the line and its Enter; 'before', a wake's text on the line (read) before it.
  * Returns { attempt, lost }: the attempt taken (1 = the first; 0 if none of `tries` was), and why each before it wasn't.
  */
-async function typeLine(inv, key, home, agent, text, { taken, ready = null, tries = 3, hungMs = TURN_HUNG_MS, disturb = false } = {}) {
+async function typeLine(inv, key, home, agent, text, { live = null, taken = null, ready = null, tries = 3, hungMs = TURN_HUNG_MS, disturb = null } = {}) {
+  if (!live && !taken) throw new Error('typeLine: give it live or taken')
   if (!fs.existsSync(path.join(home, 'fake-log-input.txt'))) throw new Error(`typeLine: the fake's input log is off in ${home} (lib.logFakeInput before it starts)`)
   const jsonl = (f) => (fs.existsSync(path.join(home, f)) ? fs.readFileSync(path.join(home, f), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((r) => r.agent === agent)
-  // What the agent's CLI read since record `from`, its key sequences (a bracketed paste's marks) left out.
-  const readSince = (from) => jsonl('fake-input.jsonl').slice(from).map((r) => r.data).join('').replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
+  // All the agent's CLI has read, its key sequences (a bracketed paste's marks) left out: what is on its line as the
+  // suite types can have come before (a wake's Ctrl+U and text, read just before the suite's line, #1560).
+  const readAll = () => jsonl('fake-input.jsonl').map((r) => r.data).join('').replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
   const lost = []
   for (let attempt = 1; attempt <= tries; attempt++) {
     if (ready && !(await until(ready, hungMs, 250))) {
       lost.push(`not ready within ${hungMs / 1000} s`)
       break
     }
-    const from = jsonl('fake-input.jsonl').length
+    const turn = async () => (await live())?.turn?.id ?? null
+    const turnBefore = live ? await turn() : null
+    const took = async () => (live ? (await turn()) !== turnBefore : await taken())
+    const from = readAll().length
+    const readSince = () => readAll().slice(from)
     const dropped = jsonl('fake-dropped.jsonl').length
+    // Its line empty first: a wake Hive is typing (its Ctrl+U and text read, its Enter not yet) is let finish. Bounded:
+    // what never clears is typed over, and seen as disturbed below.
+    await until(() => readAll().split(/[\r\x15]/).pop() === '', hungMs)
+    if (disturb === 'before' && attempt === 1) {
+      const wake = '[Hive] A wake typed as the suite types.'
+      await inv('pty:write', key, wake)
+      await until(() => readSince().includes(wake), hungMs)
+    }
     await inv('pty:write', key, text)
     // Read whole before its Enter (the fake reads a line, as a CLI does).
-    if (!(await until(() => readSince(from).includes(text), hungMs))) {
+    if (!(await until(() => readSince().includes(text), hungMs))) {
       lost.push('never read')
       continue
     }
-    if (disturb && attempt === 1) {
+    if (disturb === 'enter' && attempt === 1) {
       await inv('pty:write', key, '\x15')
-      await until(() => readSince(from).includes(`${text}\x15`), hungMs)
+      await until(() => readSince().includes(`${text}\x15`), hungMs)
     }
     await inv('pty:write', key, '\r')
     const read = await until(() => {
-      const s = readSince(from)
-      const i = s.indexOf(text)
+      const s = readAll()
+      const i = s.indexOf(text, from)
       return i >= 0 && s.indexOf('\r', i) >= 0 ? s : null
     }, hungMs)
-    // Intact: nothing on the line before it, and nothing between it and its Enter.
-    const at = read ? read.indexOf(text) : -1
+    // Intact: nothing on the line before it (since the last Enter or Ctrl+U, however long before it was read), and
+    // nothing between it and its Enter.
+    const at = read ? read.indexOf(text, from) : -1
     const intact = !!read && read.slice(0, at).split(/[\r\x15]/).pop() === '' && read.slice(at + text.length, read.indexOf('\r', at)) === ''
     if (!intact) {
-      lost.push(`disturbed: ${JSON.stringify(read ?? readSince(from))}`)
+      lost.push(`disturbed: ${JSON.stringify((read ?? readAll()).slice(Math.max(0, from - 200)))}`)
       continue
     }
     const droppedNow = () => jsonl('fake-dropped.jsonl').slice(dropped).some((r) => text.includes(r.text.slice(0, 50)))
-    await until(async () => droppedNow() || (await taken()), hungMs, 250)
+    await until(async () => droppedNow() || (await took()), hungMs, 250)
     // Dropped first: a wake's turn can pass for the line's (the agent working).
     if (droppedNow()) {
       lost.push('dropped while busy')
       continue
     }
-    if (await taken()) {
+    if (await took()) {
       if (lost.length) console.log(`(${agent}'s line typed again: ${lost.join('; ')})`)
       return { attempt, lost }
     }

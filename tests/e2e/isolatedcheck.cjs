@@ -138,11 +138,9 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
      */
     const shell = async (id, cmd, project = alpha) => {
       const before = shells().length
-      const turn = async () => (await live(id, project))?.turn?.id ?? null
-      const turnBefore = await turn()
       await lib.typeLine(inv, lib.ptyKey(project, id), claudeHome, (await live(id, project))?.agentName, `shell: ${cmd}`, {
         ready: async () => (await live(id, project))?.status !== 'working',
-        taken: async () => (await turn()) !== turnBefore,
+        live: () => live(id, project),
         hungMs: HUNG_MS,
       })
       // Its own record: the first of its command after those there before it was typed (another agent's may come first).

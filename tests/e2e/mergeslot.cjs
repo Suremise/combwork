@@ -74,9 +74,7 @@ const check = (name, ok, extra = '') => {
    * Typed again when a wake of Hive's disturbed it (typeLine).
    */
   const say = async (dir, agent, text) => {
-    const before = (await live(dir, agent.id))?.turn?.id ?? null
-    const taken = async () => ((await live(dir, agent.id))?.turn?.id ?? null) !== before
-    await lib.typeLine(inv, lib.ptyKey(dir, agent.id), claudeHome, agent.name, text, { ready: async () => ['ready', 'finished'].includes((await live(dir, agent.id))?.status), taken, hungMs: 60000 })
+    await lib.typeLine(inv, lib.ptyKey(dir, agent.id), claudeHome, agent.name, text, { ready: async () => ['ready', 'finished'].includes((await live(dir, agent.id))?.status), live: () => live(dir, agent.id), hungMs: 60000 })
   }
   const slot = (args) => `hive hive_merge_slot ${JSON.stringify(args)}`
   const shellRuns = () => {

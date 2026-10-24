@@ -304,7 +304,8 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     const shell = async (cmd) => {
       const before = shells().length
       // Hive may type a wake into B1 as the suite types: typeLine types it again when the wake took or wiped it.
-      await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), fx.claudeHome, 'B1', `shell: ${cmd}`, { ready: () => idle(b1.id), taken: () => shells().length > before, hungMs: HUNG_MS })
+      await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), fx.claudeHome, 'B1', `shell: ${cmd}`, { ready: () => idle(b1.id), live: () => live(b1.id), hungMs: HUNG_MS })
+      await waitHung(() => shells().length > before)
       await waitHung(() => idle(b1.id))
       if (!shells().slice(before).some((s) => s.cmd === cmd)) throw new Error(`B1 didn't run "${cmd}" (its line wasn't taken)`)
     }

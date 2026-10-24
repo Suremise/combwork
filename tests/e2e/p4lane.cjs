@@ -152,10 +152,11 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     }
     // A line typed into B1 (typeLine): Hive may type a wake into it at the same moment (a verdict's, a line moved's), and
     // the line is typed again when the wake disturbed it or B1 dropped it.
-    const typeTo = (text, taken) => lib.typeLine(inv, lib.ptyKey(alpha, b1.id), claudeHome, 'B1', text, { ready: () => idle(b1.id), taken, hungMs: 60000 })
+    const typeTo = (text, taken) => lib.typeLine(inv, lib.ptyKey(alpha, b1.id), claudeHome, 'B1', text, { ready: () => idle(b1.id), ...(taken ? { taken } : { live: () => live(b1.id) }), hungMs: 60000 })
     const shell = async (cmd) => {
       const before = shells().length
-      await typeTo(`shell: ${cmd}`, () => shells().length > before)
+      await typeTo(`shell: ${cmd}`)
+      await until(() => shells().length > before, 60000)
       await until(() => idle(b1.id), HUNG_MS)
       const ran = shells().slice(before).find((s) => s.cmd === cmd)
       if (!ran) throw new Error(`B1 didn't run "${cmd}" (its line wasn't taken)`)

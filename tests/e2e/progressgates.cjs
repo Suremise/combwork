@@ -94,8 +94,8 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     const shell = async (id, cmd) => {
       const before = shells().length
       const name = id === builder.id ? 'B1' : 'R1'
-      await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, name, `shell: ${cmd}`, { ready: async () => (await live(id))?.status !== 'working', taken: () => shells().length > before, hungMs: 60000 })
-      return shells()[before]
+      await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, name, `shell: ${cmd}`, { ready: async () => (await live(id))?.status !== 'working', live: () => live(id), hungMs: 60000 })
+      return until(() => shells().slice(before).find((s) => s.cmd === cmd), 60000)
     }
 
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)

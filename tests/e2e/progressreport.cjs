@@ -60,20 +60,22 @@ const check = (name, ok, extra = '') => {
   }
   /**
    * Has the agent start a command (as its shell would), typed again if a wake of Hive's disturbed it (typeLine): taken
-   * once its run shows in Progress or it ran. Resolves to a wait for what it recorded. `disturb`: typeLine's own check.
+   * once a turn of its starts. Resolves to a wait for what it recorded. `disturb`: typeLine's own check.
    */
-  const startShell = async (id, cmd, ms = 30000, { disturb = false } = {}) => {
+  const startShell = async (id, cmd, ms = 30000, { disturb = null } = {}) => {
     const before = shells().length
-    const runsBefore = (await inv('progress:list')).length
     const typed = await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, 'Builder', `shell: ${cmd}`, {
       ready: async () => (await live(id))?.status !== 'working',
-      taken: async () => shells().length > before || (await inv('progress:list')).length > runsBefore,
+      live: () => live(id),
       hungMs: Math.max(ms, HUNG_MS),
       disturb,
     })
+    // Its own record (a line a wake disturbed may have run too, typeLine), once the agent is quiet: a record it writes
+    // late isn't taken for the next command's.
     const wait = async () => {
-      await until(() => shells().length > before, ms)
-      return shells()[before]
+      const ran = await until(() => shells().slice(before).find((s) => s.cmd === cmd), ms)
+      await until(async () => (await live(id))?.status !== 'working', HUNG_MS)
+      return ran
     }
     wait.typed = typed
     return wait
@@ -123,9 +125,14 @@ const check = (name, ok, extra = '') => {
   check('the agent starts', !!(await until(async () => (await live(builder.id))?.status === 'ready', HUNG_MS)))
 
   const bin = path.join(userData, 'bin')
-  // Typed with a Ctrl+U between the line and its Enter, as a wake of Hive's would clear it (#1560): typed again.
-  const whereRun = await startShell(builder.id, 'where hive-progress', 30000, { disturb: true })
-  check('a line a wake disturbed is typed again (typeLine)', whereRun.typed.attempt === 2 && whereRun.typed.lost[0]?.startsWith('disturbed'), JSON.stringify(whereRun.typed))
+  // typeLine's own check (#1560): a line a wake of Hive's disturbed is typed again, whether the wake's Ctrl+U came
+  // between the line and its Enter, or its text was on the line before the line was typed.
+  const disturbed = await startShell(builder.id, 'where hive-progress', 30000, { disturb: 'enter' })
+  check('a line a Ctrl+U cleared before its Enter is typed again (typeLine)', disturbed.typed.attempt === 2 && disturbed.typed.lost[0]?.startsWith('disturbed'), JSON.stringify(disturbed.typed))
+  await disturbed()
+  const whereRun = await startShell(builder.id, 'where hive-progress', 30000, { disturb: 'before' })
+  // Typed again at once or, the mixed line taken as a turn, once more after that turn dropped it.
+  check("…and one typed after a wake's text on the line", whereRun.typed.attempt >= 2 && whereRun.typed.lost[0]?.startsWith('disturbed'), JSON.stringify(whereRun.typed))
   const where = await whereRun()
   // where lists the sh script (for Git Bash) too; cmd and PowerShell run the .cmd beside it, as with npm's pair.
   const found = (where?.stdout ?? '').trim().split(/\r?\n/).map((l) => l.toLowerCase())
