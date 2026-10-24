@@ -179,4 +179,62 @@ describe("agents' worktrees follow the newest config read, in whatever order rea
       w.setLiveProvider(async (p, cfg) => ({ live: null, restartNeeded: false, agents: (cfg.agents ?? []).map((a) => ({ ...a, live: null, restartNeeded: false, resume: null, place: { folder: p, is: 'project' as const, name: null, branch: null } })) }))
     }
   })
+
+  // A read of `target` in the 'older' context, held once it has its folders (as a slow read ending late), finding `folders()`.
+  const holdFolderRead = (target: string, folders: () => string[]) => {
+    const gate: { open: () => void; reached: () => void } = { open: () => undefined, reached: () => undefined }
+    const released = new Promise<void>((r) => (gate.open = r))
+    const reached = new Promise<void>((r) => (gate.reached = r))
+    w.setLiveProvider(async (p, cfg) => {
+      const found = p === target ? folders().map((f) => ({ path: f, name: 'x', is: 'slot' as const })) : []
+      if (p === target && mine.getStore() === 'older') {
+        gate.reached()
+        await released
+      }
+      return { live: null, restartNeeded: false, agents: (cfg.agents ?? []).map((a) => ({ ...a, live: null, restartNeeded: false, resume: null, place: { folder: p, is: 'project' as const, name: null, branch: null } })), folders: found }
+    })
+    return { reached, release: () => gate.open() }
+  }
+  const plainProvider = () => w.setLiveProvider(async (p, cfg) => ({ live: null, restartNeeded: false, agents: (cfg.agents ?? []).map((a) => ({ ...a, live: null, restartNeeded: false, resume: null, place: { folder: p, is: 'project' as const, name: null, branch: null } })) }))
+
+  it("a late read's slots (#1442 round 1, HR2's case) neither come back as roots nor return at the next config write", async () => {
+    let now = [tree('slot-old')]
+    const hold = holdFolderRead(alpha(), () => now)
+    try {
+      const first = older(() => w.projectInfo(alpha()))
+      await hold.reached
+      now = [tree('slot-new')]
+      await run(() => w.projectInfo(alpha()))
+      hold.release()
+      await first
+      expect([routed(tree('slot-old')), routed(tree('slot-new'))]).toEqual([unknown, current(alpha())])
+      // A config write records the roots again from what the newest read found, never the late one's.
+      await run(() => w.mutateProjectConfig(alpha(), () => ({ layout: 'auto' })))
+      expect([routed(tree('slot-old')), routed(tree('slot-new'))]).toEqual([unknown, current(alpha())])
+    } finally {
+      hold.release()
+      plainProvider()
+    }
+  })
+
+  it("a read begun before a refresh found its project gone records none of its slots, nor keeps them for later", async () => {
+    const hold = holdFolderRead(gamma(), () => [tree('gamma-slot')])
+    try {
+      const first = older(() => w.projectInfo(gamma()))
+      await hold.reached
+      renameSync(gamma(), join(wsPath, '.gamma-gone'))
+      await run(() => w.refresh())
+      hold.release()
+      await first.catch(() => undefined)
+      expect(routed(tree('gamma-slot'))).toEqual(unknown)
+      // Back again, read with no slots: still none.
+      plainProvider()
+      renameSync(join(wsPath, '.gamma-gone'), gamma())
+      await run(() => w.refresh())
+      expect([routed(tree('gamma-slot')), routed(tree('gamma'))]).toEqual([unknown, current(gamma())])
+    } finally {
+      hold.release()
+      plainProvider()
+    }
+  })
 })

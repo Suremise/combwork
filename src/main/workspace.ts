@@ -888,13 +888,16 @@ export class WorkspaceService {
   /**
    * Records a project's agent worktrees, from a config read or written in generation `gen` (none once the workspace has
    * closed or switched since) with `ticket` (none when a later read or write has recorded them already, #784).
+   * `folders`: its slots and retired homes as that read found them (#1442), kept for later writes only when the read is
+   * the newest (the same fence: a late read neither publishes nor caches folders a newer one has dropped).
    */
-  private registerRoots(projectPath: string, cfg: ProjectConfig, gen: number, ticket: number): void {
+  private registerRoots(projectPath: string, cfg: ProjectConfig, gen: number, ticket: number, folders?: readonly string[]): void {
     const key = projectPath.toLowerCase()
     if (gen !== this.generation || ticket < (this.rootsAt.get(key) ?? 0)) return
     // A project gone as the last refresh listed the folders, read before that: the read is older than its going.
     if (this.listedAt && ticket < this.listedAt.ticket && !this.listedAt.known.has(key)) return
     this.rootsAt.set(key, ticket)
+    if (folders) this.folderRoots.set(key, [...folders])
     for (const [k, v] of this.roots) if (v.toLowerCase() === projectPath.toLowerCase()) this.roots.delete(k)
     // Agents' 0.9 worktrees (#1451: through legacyWorktree), and the project's slots and retired homes as last read
     // (#1442: the Files tab and file links open the folder an agent works in).
@@ -1157,11 +1160,8 @@ export class WorkspaceService {
     const cfg = await this.projectConfig(projectPath)
     this.registerRoots(projectPath, cfg, gen, ticket)
     const { live, restartNeeded, agents, folders } = await WorkspaceService.liveProvider(projectPath, cfg, scope)
-    // Its slots and homes are roots from this read on (#1442), recorded as its worktrees are (registerRoots' ticket).
-    if (gen === this.generation && !this.isAssistantHome(projectPath)) {
-      this.folderRoots.set(projectPath.toLowerCase(), (folders ?? []).map((f) => f.path))
-      this.registerRoots(projectPath, cfg, gen, ticket)
-    }
+    // Its slots and homes are roots from this read on (#1442), fenced as its worktrees are (registerRoots' ticket).
+    if (!this.isAssistantHome(projectPath)) this.registerRoots(projectPath, cfg, gen, ticket, (folders ?? []).map((f) => f.path))
     const info: ProjectInfo = {
       name: basename(projectPath),
       path: projectPath,
