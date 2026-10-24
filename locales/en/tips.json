@@ -644,7 +644,7 @@
     "description": "A tip's title."
   },
   "tips.gitRemotes.text": {
-    "defaultMessage": "Git → Branches & remotes: Push to… sends this branch, or every branch and tag, to any remote without changing what the branch tracks. A remote can be renamed or removed there, and a branch's Track… chooses what Pull and Push use.",
+    "defaultMessage": "Version Control → Branches & remotes: Push to… sends this branch, or every branch and tag, to any remote without changing what the branch tracks. A remote can be renamed or removed there, and a branch's Track… chooses what Pull and Push use.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.gitRemotes.title": {
@@ -1592,7 +1592,7 @@
     "description": "A tip's title."
   },
   "tips.unmerged.text": {
-    "defaultMessage": "The agent's tab shows how many commits aren't merged yet, Merge… in its ⋯ menu says what is left, and Git → Changes shows everything the agent changed since it branched.",
+    "defaultMessage": "The agent's tab shows how many commits aren't merged yet, Merge… in its ⋯ menu says what is left, and Version Control → Changes shows everything the agent changed since it branched.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.unmerged.title": {
@@ -1600,7 +1600,7 @@
     "description": "A tip's title."
   },
   "tips.unusedWorktrees.text": {
-    "defaultMessage": "Removed an agent but kept its worktree? Git → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, or remove the merged ones with their branches.",
+    "defaultMessage": "Removed an agent but kept its worktree? Version Control → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, or remove the merged ones with their branches.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.unusedWorktrees.title": {

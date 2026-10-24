@@ -23,7 +23,7 @@
   "performance.cards.cost": "Koszt",
   "performance.cards.empty": "Żaden agent nie zajmował się kartą w ciągu ostatnich {range, select, 24h {24 godzin} 7d {7 dni} other {30 dni}}.",
   "performance.cards.heading": "Karty",
-  "performance.cards.lastHeld": "Ostatnio w pracy",
+  "performance.cards.lastHeld": "Ostatnio u agenta",
   "performance.cards.loadTarget": "kosztu kart",
   "performance.cards.open": "Otwórz {number}",
   "performance.cards.project": "Projekt",
