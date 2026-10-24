@@ -9,7 +9,8 @@
 // while B1 is busy and its slot is left as it is until B1 is quiet, then its line is made from main; each card's change
 // is only its own and no branch is moved (LineMoved is a 0.9 worktree's, §16.19.2). Card 4 is squash-merged after a
 // commit made past its approval: card 5 starts on its own line, and card 4's line, holding work that isn't in main, is
-// kept. Each check's run through hive-progress --check is counted. A screenshot at each stage, once the window shows
+// kept (looked at once card 5, merged, has its line deleted after card 6 starts: a pass that deleted it had looked at
+// card 4's first). Each check's run through hive-progress --check is counted. A screenshot at each stage, once the window shows
 // it. Dev build (or HIVE_EXE), throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -84,8 +85,8 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     let wt = null
     let line = null
     const cards = []
-    for (const title of ['One', 'Two', 'Three', 'Four', 'Five']) cards.push((await inv('tasks:create', { title, project: 'alpha' })).number)
-    const [c1, c2, c3, c4, c5] = cards
+    for (const title of ['One', 'Two', 'Three', 'Four', 'Five', 'Six']) cards.push((await inv('tasks:create', { title, project: 'alpha' })).number)
+    const [c1, c2, c3, c4, c5, c6] = cards
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
     const keyOf = async (n) => (await card(n)).key
     const facts = async (n) => inv('tasks:facts', n)
@@ -95,7 +96,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     // --- A lane from the board (#1280): the Todo column's Start Lane with These Cards….
     await page.getByRole('button', { name: 'Task Board' }).click()
     const column = (label) => page.locator('.board-column', { has: page.locator('.board-column-header', { hasText: label }) })
-    await until(async () => (await column('Todo').locator('.task-card').count()) === 5, HUNG_MS)
+    await until(async () => (await column('Todo').locator('.task-card').count()) === 6, HUNG_MS)
     await column('Todo').locator('.board-column-header').click({ button: 'right' })
     const item = (label) => page.locator('.menu[role="menu"] .menu-item', { hasText: label })
     await until(async () => (await item('Start Lane with These Cards…').count()) === 1, HUNG_MS)
@@ -106,7 +107,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     await dialog.locator('#lane-start-reviewer').selectOption(r1.id)
     await dialog.getByRole('button', { name: /^(Start Lane|Wait and Start)$/ }).click()
     const lane = await until(async () => (await inv('lanes:list')).find((l) => l.builder.id === b1.id && l.state !== 'ended'), HUNG_MS)
-    check('the lane is started from the board: B1 / R1, its five cards in order', !!lane && lane.reviewer?.id === r1.id && JSON.stringify(lane.cards.map((x) => x.number)) === JSON.stringify(cards), JSON.stringify(lane))
+    check('the lane is started from the board: B1 / R1, its six cards in order', !!lane && lane.reviewer?.id === r1.id && JSON.stringify(lane.cards.map((x) => x.number)) === JSON.stringify(cards), JSON.stringify(lane))
     const lentSlot = await until(async () => (await inv('lanes:list')).find((l) => l.id === lane?.id)?.slot, HUNG_MS)
     const lent = lentSlot ? path.join(slotRoot, lentSlot) : null
     check('the lane is lent a slot', !!lent, JSON.stringify((await inv('lanes:list')).find((l) => l.id === lane?.id)?.slot ?? null))
@@ -297,10 +298,21 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     check('card 4 squash-merged (its approved revision) and reported: Done', done4.ok, JSON.stringify(done4.r.body))
     const s5 = await start(c5)
     check("card 5 starts on its own line from main: its change won't carry card 4's late commit", s5.s.status === 200 && s5.base === main4 && git(wt, 'rev-parse', 'HEAD') === main4 && !fs.existsSync(path.join(wt, 'late.txt')), JSON.stringify(s5))
-    // Card 5 placed: the pass that deletes a lane's previous line once the next card's is out has looked at card 4's.
-    await until(async () => (await kinds(c5)).includes('BuilderPlaced'), HUNG_MS)
-    check("…card 4's line kept, the commit made after its approval on it (not in main, so not deleted)", branchExists(line4) && git(alpha, 'rev-parse', line4) === late && !(await kinds(c4)).some((k) => k === 'LineDeleting' || k === 'LineDeleted'), JSON.stringify({ kinds: await kinds(c4), branch: branchExists(line4) }))
     await shoot('5-card5-started', async () => (await onBoard('Active', c5)) && (await onBoard('Done', c4)))
+
+    // --- Card 5, merged, is the checkpoint (HR4's round 1): a pass deletes the lane's Done cards' merged lines one after
+    // another in the lane's order (slotCards.ts, settleOnce's step 3), so card 5's LineDeleted, once card 6's line is
+    // out, comes from a pass that has already looked at card 4's line, which no slot has had checked out since card 5
+    // started. Card 4's line is then still there, the late commit its tip, and no deletion of it was begun.
+    await build(c5, 'five.txt')
+    const line5 = line
+    git(alpha, 'merge', '-q', '--no-ff', '-m', 'merge card 5', line5)
+    const done5 = await reportMerge(c5)
+    check('card 5 merged and reported: Done', done5.ok, JSON.stringify(done5.r.body))
+    const s6 = await start(c6)
+    check('card 6 starts on its own line from main', s6.s.status === 200 && s6.base === git(alpha, 'rev-parse', 'main') && onLine(), JSON.stringify(s6))
+    check("…card 5's line, merged, deleted (LineDeleted): a pass has looked at card 4's line after it", !!(await until(async () => (await kinds(c5)).includes('LineDeleted'), HUNG_MS)) && !branchExists(line5), JSON.stringify(await kinds(c5)))
+    check("…card 4's line kept, the commit made after its approval its tip (not in main, so not deleted), no deletion begun", branchExists(line4) && git(alpha, 'rev-parse', line4) === late && !(await kinds(c4)).some((k) => k === 'LineDeleting' || k === 'LineDeleted'), JSON.stringify({ kinds: await kinds(c4), branch: branchExists(line4) }))
   } finally {
     await app.close().catch(() => undefined)
   }
