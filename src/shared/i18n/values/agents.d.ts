@@ -2,40 +2,17 @@
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
   'agents.add.add': undefined
-  'agents.add.basedOn': undefined
-  'agents.add.branch': undefined
-  'agents.add.branchHint': undefined
   'agents.add.checking': undefined
-  'agents.add.createdIn': { folder: string | number; copied: string }
-  'agents.add.currentBranch': { branch: string | number }
-  'agents.add.detached': undefined
-  'agents.add.existingMerged': { branch: string | number }
-  'agents.add.existingMergedCurrent': undefined
-  'agents.add.existingNote': undefined
-  'agents.add.existingWorktree': undefined
   'agents.add.failed': undefined
   'agents.add.full': { limit: string | number }
-  'agents.add.gitError': { error: string | number }
-  'agents.add.gitProblem': { problem: string | number }
-  'agents.add.heldWorktree': { branch: string | number; why: string | number }
   'agents.add.nameTaken': { project: string | number; agent: string | number }
   'agents.add.nameTakenHere': { project: string | number; agent: string | number }
-  'agents.add.needsRepo': undefined
-  'agents.add.newWorktree': undefined
-  'agents.add.newWorktreeNote': undefined
-  'agents.add.noUnused': undefined
-  'agents.add.projectFolder': undefined
-  'agents.add.projectFolderNote': undefined
   'agents.add.providerOff': { cli: string | number; whose: string }
-  'agents.add.reuses': { path: string | number; branch: string | number; base: string | number }
-  'agents.add.setupAgain': { setup: string | number }
-  'agents.add.setupNone': undefined
-  'agents.add.setupRuns': { setup: string | number; cli: string | number }
   'agents.add.startNow': undefined
   'agents.add.title': { project: string | number }
   'agents.add.useSuggestion': { name: string | number }
   'agents.add.where': undefined
-  'agents.add.worktreeNotice': { agent: string | number; reused: string }
+  'agents.add.whereNote': undefined
   'agents.batch.busy': { status: string }
   'agents.batch.outcome': { kind: string }
   'agents.batch.stoppedThen': { note: string; kind: string }
@@ -146,7 +123,6 @@ interface HiveMessageValues {
   'agents.dialog.projectFolder': undefined
   'agents.dialog.settings': undefined
   'agents.dialog.worksIn': undefined
-  'agents.dialog.worktree': undefined
   'agents.effort.inherited': { effort: string | number }
   'agents.efforts.cliDefault': { provider: string | number }
   'agents.efforts.default': undefined
@@ -321,6 +297,8 @@ interface HiveMessageValues {
   'agents.picker.noEffort': { model: string | number }
   'agents.picker.notOffered': { effort: string | number; model: string | number }
   'agents.picker.showOlder': undefined
+  'agents.place.short': { is: string; name: string | number }
+  'agents.place.tip': { is: string; name: string | number; path: string | number }
   'agents.provider.automatic': { state: string; provider: string | number }
   'agents.provider.compactDefault': { provider: string | number; at: number }
   'agents.provider.compactDefaultFor': { provider: string | number; at: number; why: string; estimate: string }

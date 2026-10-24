@@ -173,6 +173,8 @@ interface HiveMessageValues {
   'panes.table.projectPrefix': { value: string | number }
   'panes.table.role': undefined
   'panes.table.rolePrefix': { value: string | number }
+  'panes.table.slot': undefined
+  'panes.table.slotPrefix': { value: string | number }
   'panes.table.state': undefined
   'panes.table.waiting': undefined
   'panes.table.waitingFor': { what: string | number }

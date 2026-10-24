@@ -137,7 +137,7 @@
   "actions.remove.message": "{agent}を{project}から削除します。セッションは「セッション履歴」タブに残ります。",
   "actions.remove.reviewUnused": "未使用のワークツリーを確認",
   "actions.remove.title": "{agent}を削除しますか？",
-  "actions.remove.worktreeDetail": "ワークツリーとブランチを残して後でマージや再利用をするか（「エージェントを追加」→「既存のワークツリー」）、両方を削除できます。どちらの場合も、セッションは「セッション履歴」タブに残ります。",
+  "actions.remove.worktreeDetail": "ワークツリーとブランチを残して後でマージするか、両方を削除できます。どちらの場合も、セッションは「セッション履歴」タブに残ります。",
   "actions.remove.worktreeMessage": "{agent}は専用のワークツリーで、ブランチ{branch}上で作業しています。",
   "actions.removeAll.branchKept": "ブランチ{branch}（{why}。ワークツリーは削除済み）",
   "actions.removeAll.checkFailed": "ワークツリーを確認できませんでした",

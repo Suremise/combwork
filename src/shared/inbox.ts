@@ -78,7 +78,8 @@ export function inbox(
     const isAssistant = p === assistant
     for (const a of p.agents) {
       const live = a.live
-      const branch = a.worktree ? branchOf(p.path, a.id) : null
+      // Its 0.9 worktree's work not merged yet, while it still works there (#1442).
+      const branch = a.place.is === 'legacy' ? branchOf(p.path, a.id) : null
       const item = (kind: InboxItem['kind']): InboxItem => ({
         projectPath: p.path,
         projectName: isAssistant ? tr(ASSISTANT_NAME) : p.name,

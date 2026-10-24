@@ -3069,6 +3069,28 @@ Whether a conversation may resume there is its **hold** (none: it may):
   `agents:testLegacy`, through `lib.addAgent`); `wtreuse` (reusing an unused worktree for a new agent) is retired with
   the feature.
 
+**Built [#1442], the window** (`AgentInfo.place` from `shownPlace` in `shared/agentFolders.ts`, made in `sessions.liveInfo`
+over #1451's `agentPlace`; the window's helpers in `renderer/src/agentPlace.ts`):
+- **Where an agent is, as the window shows it:** each agent's `place` comes with its live state: its current folder, the
+  kind of place (`slot`: a slot under a card's or lane's lease; `carried`: its own carried slot, #1441; `home`: a retired
+  home; `legacy`: its 0.9 worktree, until #1441 migrates it; `project`), the place's short name and its line. A project
+  also sends its slots and homes by name (`ProjectInfo.folders`). Facts that can't be read count as no slots or homes.
+  The window reads `AgentDef.worktree` nowhere: what acted on an agent's worktree acts on its 0.9 worktree only
+  (`legacyOf`: Review Changes, Merge, Discard Worktree and Branch, Remove's keep-or-delete, Remove All's tick box,
+  Recreate before a start, its branch's unmerged work in the inbox and hover). Everything that means "the folder it
+  works in" uses its place (`agentFolder`): the Files tab's folder picker and root, file links, a card's Work files,
+  Antivirus's count, and which agents count as working in the project folder (switching its branch, Resume in).
+- **Shown:** "in slot-b" beside the agent's name on its pane's header (a link to Version Control → Branches & remotes),
+  "carried: hb2", "home: hr4" or "0.9 worktree: hb1" as text, nothing in the project folder; the same in a Slot column
+  of the project hover's agents table (when an agent works outside the project folder), Project Settings' agent list,
+  Agent Settings' Works in, the Assistant's overview, and the agent's hover with the folder's path. The Sessions tab
+  names a session's folder by its slot ("Slot · slot-b") or home ("Home · hr4"), else as before.
+- **Add Agent** has no worktree choice: an agent is added in the project folder with its workflow role, and nothing is
+  sent for a worktree (`AddAgentOptions.location` may be left out). A note says a builder takes a slot for each card.
+  Quick add sends no location either.
+- **Off switches:** none needed: it only shows where agents are; G11 another value has no slots, so every agent reads
+  as the project folder (or its 0.9 worktree).
+
 #### 16.10.4 Fresh conversations and hand-overs
 
 Designed in P7 with Darren [#1123 c]: start fresh for idle agents (#1086), a fresh conversation after an idle gap

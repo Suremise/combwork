@@ -21,7 +21,7 @@ import type { SwitchRefusal } from './platform/switching'
 import type { Contradiction, PresetId, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { ReviewerMode, WorkflowRole } from './workflow/roles'
-import type { ResumeHold } from './agentFolders'
+import type { NamedFolder, ResumeHold, ShownPlace } from './agentFolders'
 import type { StageNameProblem } from './workflow/stages'
 import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
@@ -1359,6 +1359,8 @@ export interface AgentInfo extends AgentDef {
   resume: ResumeTarget | null
   /** Its adopted worktree's slot, while it holds it under a carried lease (#1441): Release Slot… in its menu ends it. */
   carriedSlot?: string
+  /** Where it works now (#1442): its running session's folder, else where its next conversation starts. */
+  place: ShownPlace
 }
 
 export interface ResumeTarget {
@@ -1373,7 +1375,8 @@ export interface ResumeTarget {
 
 export interface AddAgentOptions {
   name?: string
-  location: 'project' | 'new-worktree' | 'existing-worktree'
+  /** Absent: the project folder (#1442: the window sends none; #1451 refuses a worktree). */
+  location?: 'project' | 'new-worktree' | 'existing-worktree'
   /** new-worktree: branch to create (default hive/<workspace>/<project>/<name>, #703) and the branch to base it on (default the current one). */
   branch?: string
   base?: string
@@ -1877,6 +1880,8 @@ export interface ProjectInfo {
   restartNeeded: boolean
   /** Every agent, in the order added, with its running session. */
   agents: AgentInfo[]
+  /** Its slots and retired homes, named (#1442): how the window names a session's or a card's folder. */
+  folders?: NamedFolder[]
   /** MCP servers defined in the project's own config (.mcp.json, .codex/config.toml) that are not deployed to the workspace. */
   unmanagedMcp: string[]
   /** The folder holds what Remove from Hive packed (handovers, board cards), which Hive offers to restore. */

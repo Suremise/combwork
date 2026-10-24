@@ -110,6 +110,7 @@ interface HiveMessageValues {
   'sessions.menu.showAgent': { agent: string | number }
   'sessions.menu.showAssistant': undefined
   'sessions.origin.agent': { agent: string | number; id: string | number }
+  'sessions.origin.named': { is: string; name: string | number }
   'sessions.origin.noAgent': undefined
   'sessions.origin.projectFolder': undefined
   'sessions.origin.ranIn': { folder: string | number }
@@ -120,7 +121,7 @@ interface HiveMessageValues {
   'sessions.rename.failed': undefined
   'sessions.rename.title': undefined
   'sessions.resume.addsTip': undefined
-  'sessions.resume.agentDetail': { where: string; branch: string | number; running: string }
+  'sessions.resume.agentDetail': { where: string; branch: string | number; place: string | number; running: string }
   'sessions.resume.menuHeader': undefined
   'sessions.resume.startFresh': undefined
   'sessions.row.archived': undefined

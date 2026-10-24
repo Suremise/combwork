@@ -3,6 +3,8 @@
   "tips.advancedSettings.title": "Corrige tú mismo un cambio de la CLI",
   "tips.agentConsole.text": "Configuración → Agent API → Permitir que los agentes lean la consola de desarrollador da a los agentes una herramienta de solo lectura que muestra los hooks y la línea de estado de su CLI junto a lo que Hive entendió de cada uno, con los datos sensibles ocultos, para que puedan depurar lo que ve Hive.",
   "tips.agentConsole.title": "Que los agentes vean lo que envía su CLI",
+  "tips.agentInSlot.text": "Junto al nombre de un agente en su panel: en slot-b mientras hace una tarjeta en un slot (haz clic para ir a Ramas y remotos), adoptado: hb2 en el slot adoptado para él, hogar: hr4 para el hogar retirado de un revisor. El cuadro emergente del proyecto los lista en una columna Slot.",
+  "tips.agentInSlot.title": "Mira dónde trabaja cada agente",
   "tips.agentLayouts.text": "Cada agente tiene su propio panel: elige un diseño a la derecha de la barra de la sesión y arrastra un panel por su encabezado para reorganizarlos. Los bloqueos de archivos impiden que dos agentes editen el mismo archivo.",
   "tips.agentLayouts.title": "Varios agentes lado a lado",
   "tips.agentMenu.text": "El encabezado del panel de un agente se limita a su estado, su tarjeta y Detener. Compactar, Traspasar, Fusionar…, su configuración y todo lo que requiera atención (lo indica un punto en ⋯) están en su menú ⋯, o haz clic derecho en el encabezado. {key}",
@@ -412,9 +414,5 @@
   "tips.workspaceMovedDefender.text": "Si Hive hizo que Defender omitiera las carpetas del espacio de trabajo, Reparar… después de moverlo ofrece mover esas exclusiones a las carpetas nuevas, con una sola solicitud de administrador, para que ninguna quede en una carpeta que ya no existe. Las exclusiones que creaste tú se quedan como están.",
   "tips.workspaceMovedDefender.title": "Las exclusiones de Defender siguen a un espacio de trabajo movido",
   "tips.workspaceNotes.text": "Workspace notes, fijada arriba en Notas compartidas, es para lo que vale en este equipo, como una ruta completa. Cada agente la recibe al iniciarse, en cualquier carpeta, así que no hace falta ponerlo en un AGENTS.md confirmado. Una sección titulada con el nombre de un proyecto es solo de ese proyecto.",
-  "tips.workspaceNotes.title": "Notas sobre este equipo para cada agente",
-  "tips.worktreeReuse.text": "¿Agregas un agente con un worktree nuevo que se llama como uno que conservaste (B4, y el worktree de B4 está sin usar)? Si está fusionado y limpio, Hive le da al agente esa carpeta, actualizada con main: su node_modules ya está ahí.",
-  "tips.worktreeReuse.title": "Un worktree conservado se vuelve a usar",
-  "tips.worktrees.text": "En Agregar agente…, elige Worktree nuevo: el agente trabaja en su propia rama, y Fusionar… trae su trabajo de vuelta cuando estés conforme.",
-  "tips.worktrees.title": "Dale a un agente su propio worktree"
+  "tips.workspaceNotes.title": "Notas sobre este equipo para cada agente"
 }

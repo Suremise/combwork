@@ -112,7 +112,7 @@ describe('saving the order', () => {
         move.taken = true
         await new Promise<void>((r) => held.push(r))
       }
-      return { live: null, restartNeeded: false, agents: projectAgents(cfg).map((a) => ({ ...a, live: null, restartNeeded: false, resume: null })) }
+      return { live: null, restartNeeded: false, agents: projectAgents(cfg).map((a) => ({ ...a, live: null, restartNeeded: false, resume: null, place: { folder: p, is: 'project' as const, name: null, branch: null } })) }
     }
     // Each order reported, and whether every move had saved by then. While the moves are made, a report may be a move
     // behind project.json (#1229: a refresh that read it just before a move's file landed, as Hive records that save, is

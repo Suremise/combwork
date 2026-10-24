@@ -40,6 +40,7 @@ import { unpricedModel, unpricedText } from '@shared/prices'
 import { hooksMissingNote, hooksMissingText, unknownStateText } from '@shared/runtime'
 import { Icon, IconButton, ReviewMark, SafeguardMark, signInNote, statusText, Tooltip, useContextMenu, useFolds, type MenuEntry } from './ui'
 import { startBlockedReason, useStartBlocked } from './BoardUpgrade'
+import { awayFromProject, legacyOf, placeText, placeTip } from '../agentPlace'
 
 /** Height of an agent pane's header (who it is, its controls) and footer (its session's details). */
 export const PANE_HEADER = 26
@@ -143,7 +144,7 @@ function sessionPickerItems(project: ProjectInfo, a: AgentInfo, list: SessionLis
     const bits = [timeAgo(s.lastActivity)]
     if (holder) bits.push(tr(msg({ id: 'panes.resume.openIn', defaultMessage: 'open in {agent} — click to show it', description: "A session in the session picker that another agent has open ({agent}: its name). Lower case: it follows how long ago it ran." }), { agent: holder.name }))
     else {
-      if (many && !a.worktree && ranBy && ranBy.id !== a.id) bits.push(tr(msg({ id: 'panes.resume.lastRunBy', defaultMessage: 'last run by {agent}', description: 'A session in the session picker that another agent ({agent}: its name) ran last. Lower case.' }), { agent: ranBy.name }))
+      if (many && !legacyOf(a) && ranBy && ranBy.id !== a.id) bits.push(tr(msg({ id: 'panes.resume.lastRunBy', defaultMessage: 'last run by {agent}', description: 'A session in the session picker that another agent ({agent}: its name) ran last. Lower case.' }), { agent: ranBy.name }))
       if (s.recache && !s.recache.warm && s.recache.tokens > 20000) bits.push(tr(msg({ id: 'panes.resume.recache', defaultMessage: 'cache expired, ~{tokens} to re-cache', description: "A session in the session picker whose prompt cache has expired: resuming it re-reads about {tokens} tokens (\"120K\"). Lower case." }), { tokens: formatTokens(s.recache.tokens) }))
     }
     items.push({
@@ -435,7 +436,9 @@ function compactDetail(live: LiveSessionState, usage?: { empty: boolean; suggest
  * the pane knows of its conversation, for Compact… (unavailable while it is empty, recommended past the threshold).
  */
 function agentMenu(project: ProjectInfo, a: AgentInfo, pick: () => void, usage?: { empty: boolean; suggested: boolean; session?: SessionUsage | null }): MenuEntry[] {
-  const worktree = !!a.worktree
+  // Its 0.9 worktree, while it still works there (#1442): Review Changes, Merge and Discard act on it.
+  const own = legacyOf(a)
+  const worktree = !!own
   const archiveItem = { label: tr(msg({ id: 'panes.menu.archiveStartNew', defaultMessage: 'Archive and Start New…', description: "Menu item (an agent's menu): archives the agent's conversation and starts a new one." })), icon: 'archive', action: 'archive-start' as const, onClick: () => void actions.archiveCurrent(project.path, a.id) }
   // What is left to merge, under Merge… (its count was the header's Merge button's before #977).
   const unmerged = worktree ? unmergedWork(useStore.getState().branchStatus[projectKey(project.path, a.id)], tr) : null
@@ -466,10 +469,10 @@ function agentMenu(project: ProjectInfo, a: AgentInfo, pick: () => void, usage?:
     ...(a.carriedSlot ? [{ label: tr(msg({ id: 'panes.menu.releaseSlot', defaultMessage: 'Release Slot…', description: "Menu item (an agent's menu): its own worktree from before 1.0, kept for it as a slot since the upgrade, stops being kept for it (asks first)." })), icon: 'unlock', detail: a.carriedSlot, onClick: () => void actions.releaseCarriedSlot(project.path, a.id) }] : []),
     { separator: true },
     { label: tr(AGENT_SETTINGS), icon: 'settings', onClick: () => set({ agentSettingsFor: { project: project.path, agentId: a.id } }) },
-    ...(a.worktree
+    ...(own
       ? // Its branch under Review Changes (the pane's header showed it as a mark before #977).
         [
-          { label: tr(msg({ id: 'panes.menu.reviewChanges', defaultMessage: 'Review Changes', description: "Menu item (a worktree agent's menu): shows its changes in the Git tab." })), icon: 'git-compare', detail: a.worktree.branch, onClick: () => reviewChanges(project, a) },
+          { label: tr(msg({ id: 'panes.menu.reviewChanges', defaultMessage: 'Review Changes', description: "Menu item (a worktree agent's menu): shows its changes in the Git tab." })), icon: 'git-compare', detail: own.branch, onClick: () => reviewChanges(project, a) },
           { label: tr(MERGE), icon: 'git-merge', disabled: !!blocked, detail: blocked ?? (unmerged?.badge ? unmerged.text : undefined), onClick: () => set({ mergeFor: { project: project.path, agentId: a.id } }) },
           { separator: true },
           { label: tr(REMOVE_AGENT), icon: 'close', action: 'remove' as const, onClick: () => void actions.removeAgent(project.path, a.id) },
@@ -538,8 +541,9 @@ function reviewChanges(project: ProjectInfo, a: AgentInfo): void {
 
 /** A worktree agent's work not merged into the project folder yet (null: not a worktree agent, or not checked yet). */
 function useUnmerged(project: ProjectInfo, a: AgentInfo): ReturnType<typeof unmergedWork> {
-  const st = useStore((s) => (a.worktree ? s.branchStatus[projectKey(project.path, a.id)] : undefined))
-  return a.worktree ? unmergedWork(st, tr) : null
+  const own = !!legacyOf(a)
+  const st = useStore((s) => (own ? s.branchStatus[projectKey(project.path, a.id)] : undefined))
+  return own ? unmergedWork(st, tr) : null
 }
 
 const TO_MERGE = msg({ id: 'panes.worktree.toMerge', defaultMessage: 'To merge: {work}', description: "In a worktree agent's hover: what is left to merge ({work}: \"2 commits not merged into main\")." })
@@ -651,7 +655,7 @@ function paneItems(project: ProjectInfo, a: AgentInfo, left: AgentLeftovers | un
       onClick: (k) =>
         sub(
           [
-            { header: true, label: a.worktree ? tr(LOCKS_TITLE) : tr(LOCKS_TITLE_SHARED) },
+            { header: true, label: awayFromProject(a) ? tr(LOCKS_TITLE) : tr(LOCKS_TITLE_SHARED) },
             ...files.slice(0, 20).map((f) => ({ label: f, disabled: true })),
             ...(files.length > 20 ? [{ label: tr(MORE_LINES, { n: files.length - 20 }), disabled: true }] : [])
           ],
@@ -766,7 +770,10 @@ function AgentTabTip({ project, a }: { project: ProjectInfo; a: AgentInfo }) {
   for (const c of reviewing) lines.push(tr(msg({ id: 'panes.tab.reviewing', defaultMessage: 'Reviewing {card} {title}', description: "A line of an agent tab's hover: a card it reviews (its name (its key, such as AM-12, or #12 for a card with none) and title, the user's own words)." }), { card: cardLabel(c), title: c.title }))
   if (live) lines.push(tr(msg({ id: 'panes.tab.session', defaultMessage: 'Session: {session}', description: "A line of an agent tab's hover: the session it runs ({session}: its name)." }), { session: liveSessionLabel(project, live, usage) }))
   else if (a.resume) lines.push(tr(msg({ id: 'panes.tab.resumeOpens', defaultMessage: 'Resume opens: {session} ({when})', description: "A line of a stopped agent tab's hover: the session Resume opens ({session}: its name) and when it was last active ({when}: \"5 min ago\")." }), { session: sessionLabel(a.resume, project.name), when: timeAgo(a.resume.lastActiveAt) }))
-  if (a.worktree) lines.push(tr(msg({ id: 'panes.tab.worktree', defaultMessage: 'Worktree {path} on {branch}, branched from {base}', description: "A line of a worktree agent tab's hover: its folder, its branch and the branch it was made from." }), { path: a.worktree.path, branch: a.worktree.branch, base: a.worktree.base }))
+  // Where it works (#1442): its 0.9 worktree with its branches, else a slot, carried slot or home with its folder.
+  const own = legacyOf(a)
+  if (own) lines.push(tr(msg({ id: 'panes.tab.worktree', defaultMessage: 'Worktree {path} on {branch}, branched from {base}', description: "A line of a worktree agent tab's hover: its folder, its branch and the branch it was made from." }), { path: own.path, branch: own.branch, base: own.base }))
+  else if (awayFromProject(a)) lines.push(placeTip(a.place))
   if (unmerged?.badge) lines.push(tr(TO_MERGE, { work: unmerged.text }))
   return <span style={{ whiteSpace: 'pre-line' }}>{lines.join('\n')}</span>
 }
@@ -1265,6 +1272,7 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
       <Tooltip content={<AgentTabTip project={project} a={a} />}>
         <span className="agent-name">{a.name}</span>
       </Tooltip>
+      {!narrow && <PlaceMark project={project} a={a} />}
       {live?.hooksMissing ? (
         // Its hooks aren't reaching Hive (#1336): its status may be wrong, so it says unknown; the project's banner over
         // the panes has the whole note and Restart session for the focused agent.
@@ -1676,6 +1684,28 @@ function StartFailedBar({ project, a, failure, single }: { project: ProjectInfo;
   )
 }
 
+/**
+ * Where the agent works, beside its name (#1442): "in slot-b", a link to Version Control's Branches & remotes, while it
+ * builds in a slot; "carried: hb2", "home: hr4" or "0.9 worktree: hb1" as text; nothing in the project folder.
+ */
+function PlaceMark({ project, a }: { project: ProjectInfo; a: AgentInfo }) {
+  const text = placeText(a.place)
+  if (!text) return null
+  return (
+    <Tooltip content={placeTip(a.place)}>
+      {a.place.is === 'slot' ? (
+        <button type="button" className="link agent-place" data-place={a.place.is} onClick={(e) => { e.stopPropagation(); openVersionControl(project.path, 'branches') }}>
+          {text}
+        </button>
+      ) : (
+        <span className="faint agent-place" data-place={a.place.is}>
+          {text}
+        </span>
+      )}
+    </Tooltip>
+  )
+}
+
 /** "<b>B1</b> is not running.", the agent's name in bold. */
 const notRunningText = (agent: string): ReactNode[] => tRich<ReactNode>(msg({ id: 'panes.body.notRunning', defaultMessage: '<b>{agent}</b> is not running.', description: "A pane of an agent that isn't running ({agent}: its name, in bold; keep the <b> tags around it)." }), { agent, b: (chunks) => <strong key="b">{chunks}</strong> })
 
@@ -1736,7 +1766,8 @@ function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectI
     if (single) return null
     return <EmptyCell project={project} cell={cell} canAdd={project.agents.length < limit} />
   }
-  const setupPending = !!a.worktree && a.needsSetup && !!project.config.worktreeSetup.trim()
+  const own = legacyOf(a)
+  const setupPending = !!own && a.needsSetup && !!project.config.worktreeSetup.trim()
   if (a.live) return null
   if (hasTerminal && failure && !setupPending) return <StartFailedBar project={project} a={a} failure={failure} single={single} />
   if (hasTerminal) {
@@ -1778,7 +1809,7 @@ function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectI
   return (
     <div className="pane-placeholder">
       <p>{notRunningText(a.name)}</p>
-      {a.worktree && <p className="faint">{ownWorktreeText(a.worktree.branch)}</p>}
+      {own && <p className="faint">{ownWorktreeText(own.branch)}</p>}
       {setupPending && <p className="faint">{tr(msg({ id: 'panes.body.setupFirst', defaultMessage: 'Its setup command runs first.', description: "A stopped worktree agent's pane: its worktree setup command runs before its next session." }))}</p>}
       <div className="btns">
         <Tooltip content={startBlocked}>

@@ -137,7 +137,7 @@
   "actions.remove.message": "将从 {project} 中删除 {agent}。它的会话保留在“会话历史”标签页中。",
   "actions.remove.reviewUnused": "查看未使用的工作树",
   "actions.remove.title": "删除 {agent}？",
-  "actions.remove.worktreeDetail": "可以保留工作树和分支，以后再合并或重用（“添加智能体”→“现有工作树”），也可以将两者一并删除。无论哪种方式，它的会话都会保留在“会话历史”标签页中。",
+  "actions.remove.worktreeDetail": "可以保留工作树和分支，以后再合并，也可以将两者一并删除。无论哪种方式，它的会话都会保留在“会话历史”标签页中。",
   "actions.remove.worktreeMessage": "{agent} 在自己的工作树中工作，分支为 {branch}。",
   "actions.removeAll.branchKept": "分支 {branch}（{why}；其工作树已删除）",
   "actions.removeAll.checkFailed": "无法检查工作树",

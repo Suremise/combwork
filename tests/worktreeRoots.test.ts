@@ -159,4 +159,24 @@ describe("agents' worktrees follow the newest config read, in whatever order rea
     await run(() => w.refresh())
     expect(routed(tree('gamma'))).toEqual(current(gamma()))
   })
+
+  it("a project's slots and retired homes (#1442) are roots from the read that found them until one that doesn't, a config change between", async () => {
+    const found: { folders: { path: string; name: string; is: 'slot' | 'home' }[] } = { folders: [{ path: tree('slot-a'), name: 'slot-a', is: 'slot' }, { path: tree('hr1'), name: 'hr1', is: 'home' }] }
+    w.setLiveProvider(async (p, cfg) => ({ live: null, restartNeeded: false, agents: (cfg.agents ?? []).map((a) => ({ ...a, live: null, restartNeeded: false, resume: null, place: { folder: p, is: 'project' as const, name: null, branch: null } })), folders: p === alpha() ? found.folders : [] }))
+    try {
+      await run(() => w.refresh())
+      expect([routed(tree('slot-a')), routed(tree('hr1'))]).toEqual([current(alpha()), current(alpha())])
+      // A change to alpha's config records its worktrees again: its slots stay.
+      await run(() => w.mutateProjectConfig(alpha(), moveTo('new')))
+      expect([routed(tree('slot-a')), routed(tree('new'))]).toEqual([current(alpha()), current(alpha())])
+      // A read that finds the slot gone: no longer a root.
+      found.folders = [found.folders[1]]
+      await run(() => w.refresh())
+      expect([routed(tree('slot-a')), routed(tree('hr1'))]).toEqual([unknown, current(alpha())])
+      await w.close()
+      expect(routed(tree('hr1'))).toEqual(unknown)
+    } finally {
+      w.setLiveProvider(async (p, cfg) => ({ live: null, restartNeeded: false, agents: (cfg.agents ?? []).map((a) => ({ ...a, live: null, restartNeeded: false, resume: null, place: { folder: p, is: 'project' as const, name: null, branch: null } })) }))
+    }
+  })
 })

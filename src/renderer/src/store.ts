@@ -1077,7 +1077,7 @@ export function applyLiveState(state: LiveSessionState): void {
       const agents = known
         ? p.agents.map((a) => (a.id === agentId ? { ...a, live, restartNeeded: live ? a.restartNeeded : false } : a))
         : live
-          ? [...p.agents, { id: agentId, name: state.agentName ?? 'Agent', live, restartNeeded: false, resume: null }] // i18n-ignore: a stand-in agent name until the project's own list arrives
+          ? [...p.agents, { id: agentId, name: state.agentName ?? 'Agent', live, restartNeeded: false, resume: null, place: { folder: state.cwd, is: 'project' as const, name: null, branch: null } }] // i18n-ignore: a stand-in agent name until the project's own list arrives
           : p.agents
       const primary = agents.find((a) => a.live)
       return { ...p, agents, live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, active: live ? true : p.active }

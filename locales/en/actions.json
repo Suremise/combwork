@@ -552,8 +552,8 @@
     "description": "Title of the question before removing an agent ({agent})."
   },
   "actions.remove.worktreeDetail": {
-    "defaultMessage": "Keep the worktree and branch to merge or reuse them later (Add Agent → Existing worktree), or delete both. Its sessions stay in the Sessions tab either way.",
-    "description": "Under the question before removing a worktree agent. Add Agent → Existing worktree is where: use the translated names."
+    "defaultMessage": "Keep the worktree and branch to merge them later, or delete both. Its sessions stay in the Sessions tab either way.",
+    "description": "Under the question before removing an agent that works in its own worktree from before 1.0."
   },
   "actions.remove.worktreeMessage": {
     "defaultMessage": "{agent} works in its own worktree on branch {branch}.",

@@ -5,6 +5,8 @@ interface HiveMessageValues {
   'tips.advancedSettings.title': undefined
   'tips.agentConsole.text': undefined
   'tips.agentConsole.title': undefined
+  'tips.agentInSlot.text': undefined
+  'tips.agentInSlot.title': undefined
   'tips.agentLayouts.text': undefined
   'tips.agentLayouts.title': undefined
   'tips.agentMenu.text': { key: string | number }
@@ -415,8 +417,4 @@ interface HiveMessageValues {
   'tips.workspaceMovedDefender.title': undefined
   'tips.workspaceNotes.text': undefined
   'tips.workspaceNotes.title': undefined
-  'tips.worktreeReuse.text': undefined
-  'tips.worktreeReuse.title': undefined
-  'tips.worktrees.text': undefined
-  'tips.worktrees.title': undefined
 }

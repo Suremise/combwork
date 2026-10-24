@@ -137,7 +137,7 @@
   "actions.remove.message": "Se quita el agente {agent} del proyecto {project}. Sus sesiones siguen en la pestaña Sesiones.",
   "actions.remove.reviewUnused": "Revisar los worktrees sin usar",
   "actions.remove.title": "¿Quitar el agente {agent}?",
-  "actions.remove.worktreeDetail": "Conserva el worktree y la rama para fusionarlos o reutilizarlos más tarde (Agregar agente → Worktree existente), o elimina ambos. En los dos casos, sus sesiones siguen en la pestaña Sesiones.",
+  "actions.remove.worktreeDetail": "Conserva el worktree y la rama para fusionarlos más tarde, o elimina ambos. En los dos casos, sus sesiones siguen en la pestaña Sesiones.",
   "actions.remove.worktreeMessage": "El agente {agent} trabaja en su propio worktree, en la rama {branch}.",
   "actions.removeAll.branchKept": "rama {branch} ({why}; se eliminó su worktree)",
   "actions.removeAll.checkFailed": "No se pudieron comprobar los worktrees",
