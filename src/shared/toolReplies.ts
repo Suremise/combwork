@@ -488,7 +488,7 @@ function waitText(r: WaitReply): string {
     // The cards beside its lanes (#726): kept from the last lane watch, replacing its cards, or left (done or gone).
     const c = r.cards
     const list = (ns: number[]): string => ns.map((n) => `${cardRef(n)}`).join(', ')
-    const cards = c ? `${c.kept && c.now.length ? ` It kept ${list(c.now)} from your last lane watch (cards: [] for none).` : ''}${c.replaced?.length ? (c.now.length ? ` Its cards replace ${list(c.replaced)}.` : ` It no longer watches ${list(c.replaced)}.`) : ''}${c.dropped?.length ? ` ${list(c.dropped)} left it (done or gone).` : ''}` : ''
+    const cards = c ? `${c.kept && c.now.length ? ` It kept ${list(c.now)} from your last lane watch (cards: [] for none).` : ''}${c.replaced?.length ? (c.now.length ? ` Its cards replace ${list(c.replaced)}.` : ` It no longer watches ${list(c.replaced)}.`) : ''}${c.dropped?.length ? ` ${list(c.dropped)} left it (done or gone).` : ''}${c.inLanes?.length ? ` Warning: ${list(c.inLanes)} ${c.inLanes.length === 1 ? 'is a card' : 'are cards'} of the lanes you watch: listed too, ${c.inLanes.length === 1 ? 'it wakes' : 'they wake'} you on every move. For a lane, pass lanes only.` : ''}` : ''
     return `${r.watching}${own ? ` (${r.events.join(', ')})` : ''}. End your turn now: Hive types a line into this session on a lane event${c?.now.length ? ` or a change to ${list(c.now)}` : ''}, or at ${r.limitAt ?? 'the limit'} if none comes.${r.replaced ? ` It replaces your watch (${r.replaced.replace(/^Waiting/, 'waiting')}).` : ''}${cards}`
   }
   const line = (c: WaitChange): string =>

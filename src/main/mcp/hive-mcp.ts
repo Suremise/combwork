@@ -255,7 +255,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_project_status',
-    description: "One project's status and settings, its workflow options in force (workflow: which the project, the workspace or Hive's settings set), and its agents (each with its folder: a slot, the project folder or a retired home) with their ids, branches and running sessions, as JSON.",
+    description: "One project's status and settings, its workflow options in force (workflow: which the project, the workspace or Hive's settings set), and its agents (each with its folder: a slot, the project folder or a retired home; and its workflowRole: builder, reviewer or either) with their ids, branches and running sessions, and pairs: its builder and reviewer pairs (each running lane's, then by name, byName), as JSON.",
     inputSchema: { type: 'object', properties: { project: projectArg } },
     run: (a) => api('GET', `/v1/projects/${proj(a)}`)
   },
@@ -351,12 +351,15 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_inbox',
-    description: `What Hive has for you to read (messages left for you, tasks, the user's decisions, card events), oldest first: each with its id, who it is from and its card; a card's events come as one item. Listing them marks them received. Once you have read and acted on a message, task, handover or decision, ack it (ack: its ids, as listed; one not read yet isn't acked): not acked ${OVERDUE_MINUTES} minutes after it was made, it shows as overdue to the user and the Assistant; a card event needs no ack. Replies with what is new, and the ids received before and not acked.`,
-    inputSchema: { type: 'object', properties: { ack: { type: 'array', items: { type: 'string' }, description: 'Ids to ack ("m12") once you have acted on them.' } } },
+    description: `What Hive has for you to read (messages left for you, tasks, the user's decisions, card events), oldest first: each with its id, who it is from and its card; a card's events come as one item. Listing them marks them received. Once you have read and acted on a message, task, handover or decision, ack it (ack: its ids, as listed; one not read yet isn't acked): not acked ${OVERDUE_MINUTES} minutes after it was made, it shows as overdue to the user and the Assistant; a card event needs no ack. Three forms: no ack reads; ack alone acks and lists nothing; ack with read=true acks, then reads in the same call (for when more has come in while you acted: what it lists is received, not acked). Replies with what is new, and the ids received before and not acked.`,
+    inputSchema: { type: 'object', properties: { ack: { type: 'array', items: { type: 'string' }, description: 'Ids to ack ("m12") once you have acted on them.' }, read: { type: 'boolean', description: 'With ack: also read what is new, in the same call.' } } },
     run: async (a) => {
       if (Array.isArray(a.ack) && a.ack.length) {
-        const r = (await api('POST', '/v1/inbox', { ack: a.ack.map(String) })) as { acked: string[]; unknown: string[]; unread?: string[] }
-        return ackText(r.acked, r.unknown, r.unread ?? [])
+        // #1531: with read, the ack and then the read, in one call; what the read lists is received, never acked.
+        const both = a.read === true
+        const r = (await api('POST', '/v1/inbox', { ack: a.ack.map(String), ...(both ? { read: true } : {}) })) as { acked: string[]; unknown: string[]; unread?: string[]; items?: InboxItem[]; unacked?: string[] }
+        const acked = ackText(r.acked, r.unknown, r.unread ?? [], both)
+        return both ? `${acked}\n${namedBy(namesFrom((r as { names?: Record<string, string> }).names), () => inboxText(r.items ?? [], r.unacked ?? []))}` : acked
       }
       const r = (await api('POST', '/v1/inbox', {})) as { items: InboxItem[]; unacked: string[] }
       return namedBy(namesFrom((r as { names?: Record<string, string> }).names), () => inboxText(r.items, r.unacked))

@@ -1499,7 +1499,11 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     const laneSince = told?.at ?? since
     const toldMarks = told ? Object.fromEntries(told.marks) : undefined
     const nows = await lanesNow(store, { scope, lanes: cond, laneSince, ...(toldMarks ? { laneMarks: toldMarks } : {}) })
-    const started = new Map((await listLanes(ws, { all: true })).map((l) => [l.id, l.startedAt]))
+    const allLanes = await listLanes(ws, { all: true })
+    const started = new Map(allLanes.map((l) => [l.id, l.startedAt]))
+    // The watched lanes' own cards (#1531, #1346 item 3): listed as cards too, each wakes it on every move.
+    const watchedIds = new Set(nows.map((n) => n.id))
+    const laneCards = new Set(allLanes.filter((l) => watchedIds.has(l.id)).flatMap((l) => l.cards.map((c) => c.number)))
     const laneMarks: Record<string, LaneMark> = {}
     for (const n of nows) {
       const t = told?.marks.get(n.id)
@@ -1541,9 +1545,10 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     const cardCond: WatchCondition = cards.length ? { cards, changes, blocked: true } : NO_CARDS
     const from = cards.length ? { seen, ...(bySelf && self ? { self } : {}) } : {}
     const had = last?.cards ?? []
+    const inLanes = cards.filter((n) => laneCards.has(n))
     const cardsOut: LaneWatchCards | undefined =
       cards.length || dropped.length || (!keep && had.length)
-        ? { now: cards, ...(keep ? { kept: true as const } : {}), ...(!keep && had.length && (had.length !== cards.length || had.some((n) => !cards.includes(n))) ? { replaced: [...had] } : {}), ...(dropped.length ? { dropped } : {}) }
+        ? { now: cards, ...(keep ? { kept: true as const } : {}), ...(!keep && had.length && (had.length !== cards.length || had.some((n) => !cards.includes(n))) ? { replaced: [...had] } : {}), ...(dropped.length ? { dropped } : {}), ...(inLanes.length ? { inLanes } : {}) }
         : undefined
     // The waits for the user it starts from (#726): the watch it replaces, else what its last wake told, else when this
     // call began.

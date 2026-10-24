@@ -117,3 +117,23 @@ describe('its readers (#1430)', () => {
     expect(cfg.workflow.options.review).not.toBe('agent')
   })
 })
+
+// #1531 (#1346 item 2): hive_project_status's pairs, so the Assistant doesn't guess which agent reviews whose work.
+describe('builder and reviewer pairs', async () => {
+  const { workflowPairs } = await import('../src/shared/workflow/roles')
+  const lane = (id: string, builder: string, reviewer: string | null, state = 'active', pool = false) => ({ id, state, builder: { name: builder }, reviewer: reviewer ? { name: reviewer } : null, ...(pool ? { pool } : {}) })
+  it("each running lane's pair first, then a builder and reviewer by their names' number, only where it is one reviewer", () => {
+    const agents = [{ name: 'HB1' }, { name: 'HR1' }, { name: 'HB2' }, { name: 'HR2' }, { name: 'HB3' }, { name: 'HB4' }, { name: 'Pool R4', workflowRole: 'reviewer' as const }, { name: 'HR4' }, { name: 'Writer' }]
+    expect(workflowPairs(agents, [lane('lane-a', 'HB1', 'HR2'), lane('lane-b', 'HB3', null, 'paused', true), lane('lane-c', 'HB2', 'HR1', 'ended')])).toEqual([
+      { builder: 'HB1', reviewer: 'HR2', lane: 'lane-a' },
+      { builder: 'HB3', reviewer: null, pool: true, lane: 'lane-b' }
+    ])
+    // Not in a running lane: HB2 has no reviewer by number (HR2 is in a lane); HB4 has two (Pool R4, HR4): no guess.
+    expect(workflowPairs(agents.slice(0, 4), [])).toEqual([
+      { builder: 'HB1', reviewer: 'HR1', byName: true },
+      { builder: 'HB2', reviewer: 'HR2', byName: true }
+    ])
+    expect(workflowPairs(agents, [lane('lane-a', 'HB1', 'HR2')]).filter((x) => x.byName)).toEqual([])
+    expect(workflowPairs([{ name: 'Solo' }], [])).toEqual([])
+  })
+})

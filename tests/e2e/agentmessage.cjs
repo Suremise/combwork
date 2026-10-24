@@ -137,7 +137,17 @@ const check = (name, ok, extra = '') => {
   const done = activity('Builder')
   check('…and its activity says when it was offered and received', done.inbox?.unread === 0 && !!done.inbox.deliveries.at(-1)?.offered && !!done.inbox.deliveries.at(-1)?.received, JSON.stringify(done))
   await until(() => idle(builder.id), 15000)
-  await say(builder.id, `hive hive_inbox {"ack":["${mid}"]}`)
+  // While it acts on that one, a second comes (#1531): one call acks the first and reads the second (ack with read),
+  // which is received, not acked.
+  await say(builder.id, `waitfile agentmessage-ack-go then hive hive_inbox {"ack":["${mid}"],"read":true}`)
+  await until(async () => (await live(alpha, builder.id))?.status === 'working', 10000)
+  const second = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'And note it in the README.' })
+  const mid2 = /\((m\d+), working\)/.exec(second.text)?.[1] ?? '?'
+  fs.writeFileSync(path.join(claudeHome, 'agentmessage-ack-go'), '')
+  const state = (id) => (activity('Builder').inbox?.deliveries ?? []).find((d) => d.id === id)
+  check('the builder acks the first and reads the second in one call (ack with read): the first acked, the second received only', !!(await until(async () => state(mid)?.state === 'acked' && state(mid2)?.state === 'received' && state(mid2)?.receivedVia === 'inbox', 15000)), JSON.stringify([state(mid), state(mid2)]))
+  await until(() => idle(builder.id), 15000)
+  await say(builder.id, `hive hive_inbox {"ack":["${mid2}"]}`)
   check('the builder acks it (hive_inbox): acked', !!(await until(async () => lastDelivery('Builder')?.state === 'acked' && !(await unread()), 15000)), JSON.stringify(lastDelivery('Builder')))
 
   // --- 3. Cancelled by the user from the pane: never typed.

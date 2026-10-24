@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 81
+const FIXTURES_VERSION = 82
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -642,6 +642,8 @@ const sentMessage = (c) => {
   const id = /\((m\d+)\b/.exec(c.sent ?? '')?.[1]
   return id ? (c.got ?? []).find((d) => d.id === id) : undefined
 }
+/** The delivery of the second message the Assistant left (`c.sent2`), as sentMessage. */
+const secondMessage = (c) => sentMessage({ sent: c.sent2, got: c.got })
 const contractWas = (o, on) => o.measures?.coreChars === require('../../src/shared/hiveGuidance.ts').hiveInstructions('alpha', 'agent', on).length
 
 module.exports.FIXTURES_VERSION = FIXTURES_VERSION
@@ -1135,6 +1137,47 @@ module.exports.SCENARIOS = [
     },
     // Only the fake Claude Code acts out a wake (its wake script); none of the fakes acts before acking.
     fakeSkips: (provider) => ['acked it after acting on it, not as it read it', ...(provider === 'fake' ? [] : ['did the work: the card is in Review'])]
+  },
+  {
+    id: 'inbox-ack-and-read',
+    title: "A second message arrives while an agent acts on the first (#1531, #1346 item 7): it acks the first and reads the second in one hive_inbox call (ack with read), then acks the second once it has acted on it",
+    files: { 'greeting.txt': 'Hello\n' },
+    assistantMessages: true,
+    async setup(c) {
+      await c.card('a', { title: 'Friendlier greeting', description: 'Change greeting.txt to say "Hi there!".' })
+      await c.startAssistant()
+    },
+    // The first once it works; the second once it has read the first (it is acting on it).
+    async during(c, status) {
+      if (status === 'working' && !c.sent) c.sent = await c.assistantMessage('coder', `On #${c.cards.a}: the greeting is "Welcome!", not "Hi there!".`)
+      if (c.sent) c.got = await c.deliveries('coder')
+      if (c.sent && !c.sent2 && sentMessage(c)?.received) {
+        c.sent2 = await c.assistantMessage('coder', `Also on #${c.cards.a}: add a second line, "Have fun.".`)
+        c.sent2At = Date.now()
+      }
+    },
+    // Until the second is acked or has ended, at most 4 minutes after it was left.
+    keepWaiting: async (c) => {
+      const second = secondMessage(c)
+      return !c.sent2At || (Date.now() - c.sent2At < 240000 && !(second && (second.state === 'acked' || !!second.ended)))
+    },
+    prompt: (c) => `Work on card #${c.cards.a}.`,
+    fake: (c) => `skill work-on-card then boardmove ${c.cards.a} doing then work 3 then checkpoint then work 4 then checkpoint then boardmove ${c.cards.a} review`,
+    expect: (o, c) => {
+      const first = sentMessage(c)
+      const second = secondMessage(c)
+      const reads = ran(o, 'hive_inbox')
+      const both = reads.find((x) => /"read"\s*:\s*true/.test(String(x.args)) && first && String(x.args).includes(first.id))
+      return [
+        ['both messages were left while it worked', !!first && !!second, `${c.sent} | ${c.sent2}`],
+        ['read each through hive_inbox', first?.receivedVia === 'inbox' && second?.receivedVia === 'inbox', JSON.stringify([first, second])],
+        ['acked both', first?.state === 'acked' && second?.state === 'acked', JSON.stringify([first, second])],
+        // A model's: the fakes ack each as they read it (fake-follow-notices).
+        ['acked the first and read the second in one call (ack with read)', !!both, reads.map((x) => String(x.args)).join(' | ')],
+        ['three hive_inbox calls at most: read, ack with read, ack', reads.length <= 3, String(reads.length)]
+      ]
+    },
+    fakeSkips: ['acked the first and read the second in one call (ack with read)', 'three hive_inbox calls at most: read, ack with read, ack']
   },
   {
     id: 'review-against-decision',
