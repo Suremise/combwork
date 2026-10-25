@@ -1011,9 +1011,17 @@
     "defaultMessage": "From {stage}, use: {moves}.",
     "description": "The next step: the intents possible from the stage. {moves} lists them."
   },
+  "workflow.refused.move.notFromHere.nextBuilder": {
+    "defaultMessage": "It waits for its reviewer's verdict: wait for that, which brings it back if there is more to do.",
+    "description": "The next step after a card's builder was refused a move while the card waits in Review for its reviewer (#1604): the review's verdict comes first. Read by agents and shown in the window alike: it names no one."
+  },
   "workflow.refused.move.notFromHere.nextNone": {
     "defaultMessage": "Nothing waits to be done there now.",
     "description": "The next step after a refused move when nothing is possible from the card's stage (the request it answered is no longer open)."
+  },
+  "workflow.refused.move.notFromHere.nextReviewer": {
+    "defaultMessage": "{back, select, yes {Its review is over: it went back for more work. Leave it where it is, with no verdict, and wait for it to come back to Review.} other {Its review is over: it has moved on from Review. Leave it where it is, with no verdict.}}",
+    "description": "The next step after a reviewer's review or verdict was refused because the card is no longer in Review (#1604): its review ended. back (select): yes when the card went back to be worked on (Todo or Active), other when it moved on (approved, merged). Review is a stage name: use it as Hive shows it. Read by agents and shown in the window alike: it names no one. Translate each sentence."
   },
   "workflow.refused.move.useIntent.message": {
     "defaultMessage": "Agents don't move cards between columns.",

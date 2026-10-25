@@ -91,10 +91,10 @@ describe('the workflow text in every locale', () => {
     }
   })
 
-  it('shows the names in a refusal through their messages in the window, and as they are to agents', async () => {
+  it('shows the names in a refusal through their messages in the window, and intents as they are to agents', async () => {
     const agents = refusal('move.notFromHere', SAMPLE)
-    expect(agents.message).toBe("AM-12 is in approved: start review isn't possible from there.")
-    expect(agents.next).toBe('From approved, use: submit, put back.')
+    expect(agents.message).toBe("AM-12 is in Approved: start review isn't possible from there.")
+    expect(agents.next).toBe('From Approved, use: submit, put back.')
     expect(refusalLines('move.notFromHere', SAMPLE, WINDOW)).toMatchObject({ message: "AM-12 is in Approved: Start review isn't possible from there.", next: 'From Approved, use: Submit for review and Put back.' })
     expect(refusalLines('move.needsOverride', { ...SAMPLE, stage: 'merging' }, WINDOW).message).toBe('Moving AM-12 to Merging skips: Checks pass before review and Your OK before merging.')
     // Nothing possible from there: the next step says so, never "use: ." (#1264).
@@ -108,13 +108,28 @@ describe('the workflow text in every locale', () => {
     expect(refusalLines('move.needsOverride', SAMPLE, WINDOW).message).toContain(tr(RULE_NAMES['submit.checksPassed']))
   })
 
-  it("names a refusal's stages by their stage names in every locale, as they are to agents (HR2's #1290 round 1)", async () => {
-    expect(refusal('move.noStage', SAMPLE).next).toBe('Move it to one of its steps: todo, active, done.')
+  it("names a refusal's stages by their stage names in every locale, and to agents as the board does (HR2's #1290 round 1, #1604)", async () => {
+    expect(refusal('move.noStage', SAMPLE).next).toBe('Move it to one of its steps: Todo, Active, Done.')
     for (const code of ['en', ...LOCALES]) {
       if (code !== 'en') setLanguage(code, await loadCatalogue(code), code)
       const next = refusalLines('move.noStage', SAMPLE, WINDOW).next
       for (const stage of ['todo', 'active', 'done'] as const) expect(next, `${code} ${stage}`).toContain(tr(STAGE_TEXT[stage]))
       if (code !== 'en') expect(next, code).not.toMatch(/\btodo\b|\bactive\b/)
+    }
+  })
+
+  it("gives a refused reviewer or builder its own side's next step, in every locale (#1604)", async () => {
+    const reviewer = { ...SAMPLE, stage: 'active', move: 'verdict', whose: 'reviewer', back: 'yes' }
+    expect(refusal('move.notFromHere', reviewer)).toMatchObject({ message: "AM-12 is in Active: verdict isn't possible from there.", next: 'Its review is over: it went back for more work. Leave it where it is, with no verdict, and wait for it to come back to Review.' })
+    expect(refusal('move.notFromHere', { ...reviewer, stage: 'approved', back: 'no' }).next).toBe('Its review is over: it has moved on from Review. Leave it where it is, with no verdict.')
+    expect(refusal('move.notFromHere', { ...SAMPLE, stage: 'review', move: 'put back', whose: 'builder' }).next).toBe("It waits for its reviewer's verdict: wait for that, which brings it back if there is more to do.")
+    for (const code of LOCALES) {
+      setLanguage(code, await loadCatalogue(code), code)
+      for (const values of [reviewer, { ...reviewer, back: 'no' }, { ...SAMPLE, stage: 'review', whose: 'builder' }]) {
+        const next = refusalLines('move.notFromHere', values, WINDOW).next
+        expect(next, `${code} ${values.whose}`).not.toMatch(/[{}]/)
+        expect(next, `${code} ${values.whose}`).not.toBe(refusal('move.notFromHere', values).next)
+      }
     }
   })
 

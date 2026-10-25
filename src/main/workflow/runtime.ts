@@ -196,6 +196,9 @@ export type LockSeen = { card: number; cycle: number } | { at: string }
 /** The stages in which a card's lock record counts (G16, #1481): started and not finished. */
 const LOCK_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'merging']
 
+/** A reviewer's intents (§16.7.2): refused outside Review, their next step is the reviewer's (`sideOf`, #1604). */
+const REVIEW_MOVES: ReadonlySet<string> = new Set(['start review', 'verdict']) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+
 /** The user's choice at the round limit, as an agent's wake says it (English). */
 const CHOICE_WORDS: Record<RoundChoice, string> = { carryOn: 'carry on', split: 'split it', accept: 'accept it with follow-ups', takeOver: 'the user takes it over' } // i18n-ignore: a wake, agent-facing
 
@@ -493,12 +496,29 @@ export class Workflow {
   async refuse(card: CardRecord | null, actor: Actor, move: string, g: GuardRefusal, override: Refusal['override'] = 'the user'): Promise<Refusal> { // i18n-ignore: the override field, agent-facing (§16.8.3)
     // A Git card refused for what couldn't be read, its repository gone (S20): the next step is the offer (#1419).
     if (g.rule === 'platform.unknown' && card && this.rulesetOf(card).options.platform === 'git' && this.cfg.repositoryGone?.()) g = { ...g, values: { ...g.values, offer: 'repositoryGone' } }
+    const side = g.rule === 'move.notFromHere' && card ? this.sideOf(card, actor, move, g.values.stage) : null
+    if (side) g = { ...g, values: { ...g.values, ...side } }
     const out = refusal(g.rule, g.values, override)
     if (card && actor !== 'user') {
       // Under the store's lock, as every write (in the app, a change of the board).
       await this.locked(() => this.store.tx((tx) => tx.append(card.id, { kind: 'Refused', actor, source: 'recorded', data: { move, rule: g.rule, message: out.message, next: out.next, values: g.values } }))) // i18n-ignore: a fact's kind and codes, not text
     }
     return out
+  }
+
+  /**
+   * An agent refused a move for where its card is, when that stage's intents are the other side's (#1604): a reviewer's
+   * review or verdict on a card that left Review (its review is over: it waits for the card's return, or leaves it), or
+   * its builder's move while the card waits in Review (it waits for the verdict). Null for the user, or where the
+   * stage's own intents are the agent's next step.
+   */
+  private sideOf(card: CardRecord, actor: Actor, move: string, stage: unknown): { whose: 'reviewer' | 'builder'; back?: 'yes' | 'no' } | null {
+    const agent = agentOf(actor)
+    if (!agent || typeof stage !== 'string') return null
+    const builds = this.state(card).builders.includes(agent)
+    if (REVIEW_MOVES.has(move) && stage !== 'review' && !builds) return { whose: 'reviewer', back: stage === 'todo' || stage === 'active' ? 'yes' : 'no' }
+    if (!REVIEW_MOVES.has(move) && stage === 'review' && builds) return { whose: 'builder' }
+    return null
   }
 
   private notFrom(card: CardRecord, actor: Actor, s: CardState, move: string): Promise<Refusal> {
