@@ -162,4 +162,38 @@ describe('checkpoints out of the commits (#1633)', () => {
       db.close()
     }
   })
+  it("a checkpoint that throws counts towards the fallback too, is tried again at the triggers' pace, and one that finishes takes the fallback off (round 4)", () => {
+    wal.checkpointLimits.incomplete = 2
+    const db = open(wal.checkpointWhenIdle)
+    try {
+      write(db.writer, 5)
+      // A statement of the writer's still running: SQLite refuses the checkpoint ("database table is locked").
+      const rows = db.writer.prepare('SELECT id FROM t').iterate()
+      rows.next()
+      expect(db.writer.isTransaction).toBe(false)
+      const step = wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
+      const failed = wal.checkpointStats.failed
+      let t = performance.now()
+      wal.checkpointTick(t)
+      wal.checkpointTick((t += step))
+      expect(wal.checkpointStats.failed).toBe(failed + 1)
+      expect(autoPages(db.writer)).toBe(0)
+      // Not again at the next tick: at the triggers' pace.
+      wal.checkpointTick(t + 1000)
+      wal.checkpointTick(t + wal.checkpointLimits.everyMs - 1)
+      expect(wal.checkpointStats.failed).toBe(failed + 1)
+      wal.checkpointTick((t += step))
+      expect(wal.checkpointStats.failed).toBe(failed + 2)
+      expect(autoPages(db.writer)).toBe(1000)
+      expect(wal.checkpointsInCommits(db.writer)).toBe(true)
+      // The statement ends: the next checkpoint due finishes, and the fallback goes.
+      rows.return?.()
+      const done = wal.checkpointStats.done
+      wal.checkpointTick((t += step))
+      expect(wal.checkpointStats.done).toBe(done + 1)
+      expect(autoPages(db.writer)).toBe(0)
+    } finally {
+      db.close()
+    }
+  })
 })

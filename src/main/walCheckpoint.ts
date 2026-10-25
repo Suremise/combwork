@@ -17,8 +17,9 @@ import { createLogger } from './logger'
  * again from its beginning at the writer's next write after a whole checkpoint, as before.
  *
  * Bounded: `incomplete` checkpoints in a row that couldn't copy the whole WAL (a reader on an old snapshot, another
- * process's checkpoint) give the writer SQLite's own auto-checkpoint back, logged; one that copies it whole takes it
- * off again. Kept simple on purpose: an off-thread checkpointer is a later card's, if the field's logs call for it.
+ * process's checkpoint) or threw (a statement of the writer's still running, an I/O error) give the writer SQLite's own
+ * auto-checkpoint back, logged; one that copies it whole takes it off again. A failed one is tried again at the
+ * triggers' pace (its attempt counts as its last checkpoint), never at every tick. Kept simple on purpose: an off-thread checkpointer is a later card's, if the field's logs call for it.
  */
 
 const log = createLogger('db')
@@ -89,31 +90,40 @@ const walStat = (file: string): { size: number; mtime: number } => {
   }
 }
 
-/** Checkpoints `r` now (PASSIVE, on its writer), counting one that couldn't copy the whole WAL towards the fallback. */
+/**
+ * Checkpoints `r` now (PASSIVE, on its writer). One that couldn't copy the whole WAL, or threw (a statement of the
+ * writer's still running, an I/O error), counts towards the fallback alike, and the database stays due from this
+ * attempt on: tried again at the triggers' pace, not at every tick.
+ */
 function checkpoint(r: Registered, now: number, why: string): void {
   const t = performance.now()
+  r.last = now
   let res: { busy: number; log: number; checkpointed: number }
   try {
     res = r.writer.prepare('PRAGMA wal_checkpoint(PASSIVE)').get() as typeof res // i18n-ignore: SQL
   } catch (e) {
     checkpointStats.failed++
     log.warn(`checkpointing ${basename(r.file)}'s WAL`, e)
+    unfinished(r, 'failed') // i18n-ignore: for the log
     return
   }
   const ms = performance.now() - t
-  r.last = now
-  r.dirty = false
   if (ms >= SLOW_MS) log.info(`checkpointed ${basename(r.file)}'s WAL in ${Math.round(ms)} ms (${why}; ${res.checkpointed} of ${res.log} pages)`)
   if (res.busy || res.checkpointed < res.log) {
     checkpointStats.incomplete++
-    // Not whole: looked at again once it is due.
-    r.dirty = true
-    if (++r.short >= checkpointLimits.incomplete) setAuto(r, true, `${r.short} checkpoints in a row couldn't copy its whole WAL`) // i18n-ignore: for the log
+    unfinished(r, "couldn't copy its whole WAL") // i18n-ignore: for the log
     return
   }
   checkpointStats.done++
+  r.dirty = false
   r.short = 0
   setAuto(r, false, 'a checkpoint copied its whole WAL') // i18n-ignore: for the log
+}
+
+/** A checkpoint that didn't finish: still due, and `incomplete` in a row give SQLite its own back until one finishes. */
+function unfinished(r: Registered, how: string): void {
+  r.dirty = true
+  if (++r.short >= checkpointLimits.incomplete) setAuto(r, true, `${r.short} checkpoints in a row failed or ${how}`) // i18n-ignore: for the log
 }
 
 /** One look at each database: checkpointed if it is idle and due, or its WAL is growing past the bound. */
