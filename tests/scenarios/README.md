@@ -82,8 +82,19 @@ The checks are positive and negative:
   whose work an agent reviews and requires them: started, committed, submitted, stopping in Review. Most other
   scenarios' projects have every rule off (a new project's options before a preset). There a submission goes past
   Review, since nothing reviews the work, so a builder's check takes either: the card in Review, or past it by the
-  agent's own submission, and never finished by a move of its own (`handedOn`). The `old-move-*` scenarios test Hive
-  translating the old moves.
+  agent's own submission, and never finished by a move of its own (`handedOn`). A reviewer's check takes where its
+  verdict leaves the card (`verdictLeft`): a fail back with its builder in Doing, a pass in Passed, or Done where nothing
+  comes after review. The `old-move-*` scenarios test Hive translating the old moves.
+- **The fakes act as the shipped guidance does** (#1536): their scripts use the intents (`fakeStart`, `fakeSubmit`,
+  `fakeStartReview`, `fakeVerdict`, `hive_report_merge`), so a passing fake run shows the checks take what a model
+  following the skills does. A fixture whose card a failed verdict would have sent back is in Doing, and one whose
+  loop has a reviewer runs in a reviewed project. The old moves left in the fakes, each for a reason:
+  - **old-move-submit** and **old-move-review**: they test the translation.
+  - **done-card-more-work**: `hive_update_task` with `column: "doing"` is what work-on-card says for a card back from
+    Passed or Done.
+  - **assistant-override-***, **assistant-bulk-move**: the Assistant moves cards with `hive_update_task(s)` and an
+    override reason.
+  - **prioritise**: an order within Todo, not a move between stages.
 - **A gate's refusal and its next step** (#1536):
   - **intent-submit-refused**: a submission of uncommitted work is refused with "commit, then submit". The builder
     commits and submits again, overriding nothing and moving nothing by hand.
