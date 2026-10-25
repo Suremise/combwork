@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { WorkBadge, WorkView } from '@shared/workflow/workView'
+import { makeBadgeSource, NO_BADGES } from '@shared/workflow/badgeSource'
 import { useScopedLoad } from './scopedLoad'
 import { useStore } from './store'
 
@@ -24,10 +25,8 @@ export function useCardWork(n: number | null): { view: WorkView | null; error: s
 }
 
 /**
- * Every live card's badges, by number; empty while loading. One source for the window, however many views show them
- * (#1629: each view read them for itself, four or five reads of every board change): read when the board, a project's
- * workflow or the projects change, one read at a time (a change during one reads once more after it). A badge that
- * didn't change keeps its object, and the map stays the same one when none did, so views showing them don't redraw.
+ * Every live card's badges, by number; empty while loading. One source for the window however many views show them
+ * (makeBadgeSource, #1629), read again when the board, a project's workflow or the projects change.
  */
 export function useWorkBadges(): Map<number, WorkBadge> {
   const ws = useStore((s) => s.workspace?.path ?? '')
@@ -43,58 +42,5 @@ export function useWorkBadges(): Map<number, WorkBadge> {
   return shown.ws === ws ? shown.badges : NO_BADGES
 }
 
-const NO_BADGES = new Map<number, WorkBadge>()
-
-/** The window's work badges (useWorkBadges): the workspace they are of and the latest read. */
-export const badgeSource = (() => {
-  let shown: { ws: string; badges: Map<number, WorkBadge> } = { ws: '', badges: NO_BADGES }
-  const listeners = new Set<() => void>()
-  // What the last read was asked for (the same values from another view ask nothing more), and a read under way.
-  let asked: { ws: string; why: readonly unknown[] } | null = null
-  let reading: string | null = null
-  let again = false
-  const read = (ws: string): void => {
-    reading = ws
-    again = false
-    void window.hive.invoke('tasks:workBadges').then(
-      (list) => {
-        if (reading !== ws) return
-        if (asked?.ws === ws) take(ws, list)
-        done(ws)
-      },
-      () => done(ws)
-    )
-  }
-  const done = (ws: string): void => {
-    if (reading !== ws) return
-    reading = null
-    if (again && asked?.ws === ws) read(ws)
-  }
-  const take = (ws: string, list: WorkBadge[]): void => {
-    const before = shown.ws === ws ? shown.badges : NO_BADGES
-    let same = before.size === list.length
-    const next = new Map<number, WorkBadge>()
-    for (const b of list) {
-      const had = before.get(b.card)
-      const keep = had && JSON.stringify(had) === JSON.stringify(b)
-      if (!keep) same = false
-      next.set(b.card, keep ? had : b)
-    }
-    if (same && shown.ws === ws) return
-    shown = { ws, badges: next }
-    for (const l of listeners) l()
-  }
-  return {
-    ask(ws: string, why: readonly unknown[]): void {
-      if (asked && asked.ws === ws && asked.why.length === why.length && asked.why.every((x, i) => x === why[i])) return
-      asked = { ws, why }
-      if (reading === ws) again = true
-      else read(ws)
-    },
-    subscribe(l: () => void): () => void {
-      listeners.add(l)
-      return () => void listeners.delete(l)
-    },
-    get: () => shown
-  }
-})()
+/** The window's work badges (useWorkBadges). */
+export const badgeSource = makeBadgeSource(() => window.hive.invoke('tasks:workBadges'))

@@ -32,6 +32,7 @@ const { advanced } = await import('../src/main/advanced')
 const service = await import('../src/main/workflow/service')
 const { MergeQueue } = await import('../src/main/workflow/mergeQueue')
 const { markQueueSeen, pauseQueue, queueCardChange, queueViews, resumeQueue } = await import('../src/main/workflow/queueControls')
+const { forgetBadges, workBadges } = await import('../src/main/workflow/cardWork')
 const { keptLive, nextFold, queueKey, shownReturns, unseenReturns, withKept, RETURN_SEEN_SHOWN_MS } = await import('../src/shared/progressQueue')
 const { runCardIntent } = await import('../src/main/cardIntents')
 const { allOff } = await import('../src/shared/workflow/options')
@@ -541,5 +542,62 @@ describe('the queue on the card, in the Git tab and in the Merge dialog (#1357)'
     await advanced.set(service.ENFORCE, true)
     await inWorkspace(w, () => mergedOutsideQueue(w, repo, card, 'release today'))
     expect(facts(w, card).filter((f) => f.kind === 'Override').at(-1)?.data).toEqual({ rules: ['integrate'], move: 'merge outside the queue', by: 'user', reason: 'release today' })
+  })
+})
+
+describe("the window's merge queues and badges on a board shaped like a long-used one (#1629)", () => {
+  it('list the cards in flight as reading every card did, and each read takes under 50 ms', { timeout: 120_000 }, async () => {
+    const { w, wt, repo } = await workspace()
+    const store_ = FactStore.forBoard(w, { project: 'p', key: 'p' })
+    // As Darren's board: 1,277 archived cards from before 1.0 and 140 live ones in Todo and Done.
+    await store.boardWrite(w, async () => {
+      for (let i = 0; i < 1417; i++) store_.createCard({ title: `Card ${i}`, kind: 'code', labels: [], blockedBy: [], preWorkflow: true, stage: i % 2 ? 'done' : 'todo' })
+      store.workspaceDb(w.path!).writer.prepare('UPDATE cards SET archived = 1 WHERE number < (SELECT min(number) + 1277 FROM cards)').run()
+    })
+    // In flight: one queued, ten started (one of them since Done, and one put back in Todo: neither in flight).
+    const queued = await approved(w, wt)
+    const started = { folder: 'project', line: 'hive/x', base: 'base0000aaaa', target: 'main', builder: 'Builder', cardKind: 'code' as const }
+    const others: number[] = []
+    for (let i = 0; i < 10; i++) others.push((await inWorkspace(w, () => tasks.createTask({ title: `Started ${i}`, project: 'p' }, user))).number)
+    await store.boardWrite(w, async () =>
+      store_.tx((tx) => {
+        for (const c of others) {
+          tx.append(c, { kind: 'Started', actor: 'agent:Builder', source: 'recorded', data: started })
+          tx.setStage(c, c === others[0] ? 'done' : c === others[1] ? 'todo' : 'active')
+        }
+      })
+    )
+    const wf = (await service.workflowFor(w, repo))!
+    // What reading every live card gave (before #1629), and what the listing gives now.
+    const everyCard = wf.store.cards().filter((c) => {
+      const s = wf.state(c)
+      return !!s.started && s.stage !== 'todo' && s.stage !== 'done'
+    })
+    expect(everyCard.map((c) => c.id)).toEqual([queued, ...others.slice(2)])
+    const main = async () => (await inWorkspace(w, () => queueViews(w, repo, undefined, true))).find((v) => v.target === 'main')
+    expect((await main())?.inFlight).toEqual(everyCard.map((c) => c.id))
+
+    // Each read's median of 7, `before` run first each time (untimed).
+    const median = async (fn: () => unknown, before: () => Promise<unknown> = async () => undefined): Promise<number> => {
+      const ms: number[] = []
+      for (let i = 0; i < 7; i++) {
+        await before()
+        const t = performance.now()
+        await fn()
+        ms.push(performance.now() - t)
+      }
+      return ms.sort((a, b) => a - b)[3]
+    }
+    // The badges as the window reads them: made afresh (a window's first read), after a board change (a fact on one
+    // card), and with none.
+    const change = () => store.boardWrite(w, async () => store_.tx((tx) => tx.append(others[2], { kind: 'Unblocked', actor: 'user', source: 'recorded', data: {} })))
+    const timed = {
+      queueList: await median(main),
+      badgesFirst: await median(() => workBadges(w), async () => forgetBadges(w)),
+      badgesAfterChange: await median(() => workBadges(w), change),
+      badgesUnchanged: await median(() => workBadges(w))
+    }
+    console.log('#1629 timings (median of 7, ms):', JSON.stringify(Object.fromEntries(Object.entries(timed).map(([name, v]) => [name, Math.round(v * 10) / 10]))))
+    for (const v of Object.values(timed)) expect(v).toBeLessThan(50)
   })
 })

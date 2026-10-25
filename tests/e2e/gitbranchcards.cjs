@@ -51,6 +51,9 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 150)
     const text = async (l) => ((await l.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
     check("Active: the branch's row shows the card's key and its stage", !!(await waitHung(async () => (await chip(line).getAttribute('data-stage').catch(() => null)) === 'active' && (await text(chip(line))).includes(key) && (await text(chip(line))).includes('Active'))), await text(row(line)))
     check("…in the stage's category colour (Active's stripes)", (await chip(line).locator('.lane-seg.doing').count()) === 1)
+    // A swatch, not a lane: its stripes stand still (#1629: they move on a ::before the swatch stops).
+    const swatchMoves = await chip(line).locator('.lane-seg.doing').evaluate((e) => getComputedStyle(e, '::before').animationName)
+    check('…and stand still', swatchMoves === 'none', swatchMoves)
     check("…the agent's worktree badge stays", (await row(line).locator('[data-worktree]').innerText()) === "B1's worktree", await text(row(line)))
     check('…and the worktree names its card the same way', !!(await waitHung(async () => (await worktreeChip.count()) === 1 && (await text(worktreeChip)).includes(key))), await text(page.locator('.git-worktree').first()))
     const shoot = async (name) => {

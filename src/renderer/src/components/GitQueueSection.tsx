@@ -5,7 +5,7 @@ import { revisionShort } from '@shared/platform/descriptors'
 import { nextChange, queueShown, returnRun, returnWhy, runCheckName } from '@shared/progressQueue'
 import type { ProjectInfo } from '@shared/types'
 import type { QueueRecent, QueueView } from '@shared/workflow/queue'
-import { call } from '../api'
+import { call, callShared } from '../api'
 import { set, useLanguage, useStore } from '../store'
 import { timeAgo } from '../util'
 import { QueueCard } from './ProgressQueue'
@@ -48,7 +48,7 @@ export function useProjectQueues(projectPath: string): QueueView[] | null {
   const [, tick] = useState(0)
   useEffect(() => {
     let live = true
-    void call('queue:list', projectPath).then(
+    void callShared('queue:list', projectPath).then(
       (v) => live && setRead({ for: projectPath, views: v }),
       () => live && setRead({ for: projectPath, views: [] })
     )

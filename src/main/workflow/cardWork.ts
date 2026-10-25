@@ -81,6 +81,11 @@ const BADGES_ONE_BY_ONE = 40
 
 /** Each workspace's badges by card, with the key each was made from (workBadges); a workspace opened again starts afresh. */
 const badges = new WeakMap<WorkspaceService, { path: string | null; life: unknown; cards: Map<number, { key: string; badge: WorkBadge }> }>()
+/** Drops a workspace's kept badges: its next workBadges makes every one afresh (tests compare the two). */
+export function forgetBadges(ws: WorkspaceService): void {
+  badges.delete(ws)
+}
+
 function badgeCache(ws: WorkspaceService): Map<number, { key: string; badge: WorkBadge }> {
   let c = badges.get(ws)
   if (!c || c.path !== ws.path || c.life !== ws.lifetime) badges.set(ws, (c = { path: ws.path, life: ws.lifetime, cards: new Map() }))

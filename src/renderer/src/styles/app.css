@@ -11315,10 +11315,6 @@ button.progress-run-show:focus-visible {
 .progress-lane.abandoned .lane-seg {
   filter: saturate(0.45);
 }
-.progress-lane.ended .lane-seg::before,
-.progress-lane.abandoned .lane-seg::before {
-  animation: none;
-}
 .progress-lane-top {
   display: flex;
   align-items: center;
@@ -11471,10 +11467,6 @@ button.progress-lane-why:focus-visible,
   flex: 0 0 22px;
   cursor: default;
 }
-.lanes-legend-swatch.lane-seg::before,
-.git-branch-card-swatch.lane-seg::before {
-  animation: none;
-}
 .lanes-legend-name {
   flex-shrink: 0;
 }
@@ -11565,6 +11557,13 @@ button.progress-lane-why:focus-visible,
   to {
     transform: translateX(11.3px);
   }
+}
+/* Still: a legend's or a branch's swatch, and an ended or abandoned lane (after the animation, which they override). */
+.lanes-legend-swatch.lane-seg::before,
+.git-branch-card-swatch.lane-seg::before,
+.progress-lane.ended .lane-seg::before,
+.progress-lane.abandoned .lane-seg::before {
+  animation: none;
 }
 .lane-seg.review {
   background: color-mix(in srgb, var(--warning) 22%, var(--bg));

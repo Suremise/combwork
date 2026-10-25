@@ -16,7 +16,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
-const { cardWork, factRow, workBadges } = await import('../src/main/workflow/cardWork')
+const { cardWork, factRow, forgetBadges, workBadges } = await import('../src/main/workflow/cardWork')
 const { onHiveEvent } = await import('../src/main/events')
 const { revisionShort } = await import('../src/shared/platform/descriptors')
 
@@ -125,6 +125,34 @@ describe("a card's work from the board (#1223)", () => {
     const later = workBadges(w)
     expect(later.map((b) => b.card)).not.toContain(flight[0])
     expect(later.find((b) => b.card === flight[1])?.stage).toBe('active')
+  })
+
+  it('gives the same badges kept as made afresh, through facts, moves, archiving and a change of rules (#1629)', async () => {
+    const w = await workspace()
+    const facts = FactStore.forBoard(w, { project: 'p', key: 'P' })
+    const cards: number[] = []
+    for (let i = 0; i < 6; i++) cards.push(await cardWithWork(w, `Card ${i}`))
+    const todo = (await inWorkspace(w, () => tasks.createTask({ title: 'Todo', project: 'p' }, user))).number
+    // What the kept badges give, then the same read with nothing kept (every card folded again, as before #1629).
+    const same = (now?: ReadonlyMap<string, string>): void => {
+      const kept = workBadges(w, now)
+      forgetBadges(w)
+      expect(kept).toEqual(workBadges(w, now))
+    }
+    same()
+    await store.boardWrite(w, async () => facts.tx((tx) => tx.append(cards[0], { kind: 'Verdict', actor: 'agent:R1', source: 'recorded', data: { reviewer: 'R1', submission: 1, revision: 'rev1111aaaa', pass: false, round: 1, generation: 0, comment: 'no' } })))
+    same()
+    await store.boardWrite(w, async () => facts.tx((tx) => tx.setStage(cards[1], 'approved')))
+    same()
+    await inWorkspace(w, () => tasks.updateTask(todo, { column: 'doing' }, user))
+    same()
+    await inWorkspace(w, () => tasks.archiveTask(cards[2], true))
+    same()
+    await inWorkspace(w, () => tasks.archiveTask(cards[2], false))
+    same()
+    // The project's rules changed (#1421's old rules marks), and back.
+    same(new Map([['p', 'another-ruleset']]))
+    same()
   })
 
   it("gives the Agent API's card its stage: the stage column, else its column's", async () => {
