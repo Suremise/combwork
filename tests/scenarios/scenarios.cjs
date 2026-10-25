@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 86
+const FIXTURES_VERSION = 87
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -197,6 +197,21 @@ async function trustSlot(c, status) {
   else if (/trust this folder/i.test(screen) && !(await lib.acceptClaudeTrust(c.inv, c.alpha, c.agents.coder.id, 3000))) await c.inv('pty:write', key, '\r')
   else return
   c.trustedSlot = true
+}
+/**
+ * Card `key` of agent `who` ('coder' or 'implementer') in Review with a real submission (#1537): started, its work on
+ * src/greet.js committed, and submitted as the user moves it, so a project's rules leave it there.
+ */
+async function submittedCard(c, key, card, who = 'coder') {
+  const n = await c.card(key, { ...card, agent: who })
+  await userMove(c, n, 'doing')
+  require('fs').mkdirSync(require('path').join(c.alpha, 'src'), { recursive: true })
+  c.write('src/greet.js', 'module.exports = (name) => `Hi, ${name}`\n')
+  c.git('add', '-A')
+  c.git('-c', `user.name=${who}`, '-c', `user.email=${who}@example.com`, 'commit', '-qm', card.title)
+  await userMove(c, n, 'review')
+  for (const text of card.after ?? []) await c.api('POST', `/v1/tasks/${n}/comments`, { text })
+  return n
 }
 /** The worktrees alpha has (git's own list), as lower-case paths. */
 const worktreesOf = (c) => c.git('worktree', 'list', '--porcelain').split(/\r?\n/).filter((l) => l.startsWith('worktree ')).map((l) => require('path').resolve(l.slice(9)).toLowerCase())
@@ -3774,7 +3789,8 @@ module.exports.SCENARIOS.push(
     mode: 'coordinator',
     async setup(c) {
       await reviewedPair(c)
-      await c.card('r', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'review', comments: ['Ready: greet() returns "Hi, <name>", with a test. Committed.'] })
+      // Coder's work committed and submitted (#1537: a card set in Review with nothing committed stayed in Doing).
+      await submittedCard(c, 'r', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', after: ['Ready: greet() returns "Hi, <name>", with a test. Committed.'] })
     },
     prompt: (c) => `[Hive] #${c.cards.r} (Coder's card) is in Review; latest comment by Coder: "Ready: greet() returns "Hi, <name>", with a test. Committed." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`,
     fake: (c) => `skill coordinate-agents then hive hive_start_agent {"project":"alpha","agent":"Implementer","prompt":"Review #${c.cards.r} with the review-agent-work skill. (work 1)"}`,
@@ -3820,14 +3836,15 @@ module.exports.SCENARIOS.push(
     mode: 'coordinator',
     async setup(c) {
       await reviewedPair(c)
-      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>", and README.md shows it.', agent: 'coder', column: 'review' })
+      // Back in Doing with Coder after round 2's failed review, as a failed verdict leaves it.
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>", and README.md shows it.', agent: 'coder', column: 'doing' })
       const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
       const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [a, b], rounds: 10, name: 'greetings' })
       if (r.status !== 200) throw new Error(`lane: ${r.text}`)
       for (const text of ["Round 1: FAILED. 1. greet.js has no test.", 'Fixed: greet.test.js covers greet().', "Round 2: FAILED. 1. README.md's example still says Hello."]) await c.api('POST', `/v1/tasks/${a}/comments`, { text })
     },
     prompt: (c) =>
-      `[Hive] #${c.cards.a} (Coder's card) is in Review: Implementer failed it; latest comment by Implementer: "Round 2: FAILED. 1. README.md's example still says Hello." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).${LANES_RUNNING_TAIL}`,
+      `[Hive] #${c.cards.a} (Coder's card) is in Doing: Implementer failed it; latest comment by Implementer: "Round 2: FAILED. 1. README.md's example still says Hello." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).${LANES_RUNNING_TAIL}`,
     fake: (c) => `hive hive_read_task {"number":${c.cards.a},"latestComment":true} then hive hive_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}`,
     expect: (o, c) => [
       ["asked the user nothing (no notification, request or question)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
