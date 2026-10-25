@@ -7,11 +7,13 @@ import { createLogger, userText } from './logger'
 import { openWorkspaces, workspaceFor } from './workspace'
 import * as wt from './worktrees'
 import { gitProblem } from './gitTool'
+import * as G from './platform/git'
+import { isUnknown } from './platform/types'
 
 const log = createLogger('branches')
 
 /**
- * What each agent's line has not merged (commits ahead of the project folder's branch, uncommitted files), for the
+ * What each agent's line has not merged (commits ahead of the branch it merges into, uncommitted files), for the
  * Merge… button and the agent's tab. An agent's line (#1451) is its open lease's in that slot (a card's or a lane's,
  * else its carried one's: the card last started there, a carried slot's own branch), else its 0.9 worktree's while the
  * project isn't migrated; an agent with none isn't watched. Git is asked when an agent's turn ends or it stops, when a window
@@ -37,11 +39,19 @@ function projectsOf(ws = openWorkspaces()): ProjectInfo[] {
   return ws.flatMap((w) => w.info()?.projects ?? [])
 }
 
+/** An agent's watched line: its project, its folder and branch, and for a slot's line the branch it merges into. */
+export interface Watched {
+  project: ProjectInfo
+  worktree: wt.WorktreeRef
+  slot?: true
+  target?: string
+}
+
 /**
  * The line an agent's status is about (#1451): its open lease's (dispatch, else carried) in that slot, counted against
- * the slot's target when it has one; else its 0.9 worktree. Null: none to watch.
+ * its target (its card's, else the slot's: #1627); else its 0.9 worktree. Null: none to watch.
  */
-function findAgent(projectPath: string, agentId: string): { project: ProjectInfo; worktree: wt.WorktreeRef; target?: string } | null {
+function findAgent(projectPath: string, agentId: string): Watched | null {
   const p = projectPath.toLowerCase()
   const ws = workspaceFor(projectPath)
   const project = projectsOf(ws ? [ws] : undefined).find((x) => x.path.toLowerCase() === p)
@@ -57,9 +67,24 @@ function findAgent(projectPath: string, agentId: string): { project: ProjectInfo
   }
   if (leased) {
     const branch = leased.line ?? (leased.carried ? (legacy?.branch ?? null) : null)
-    return branch ? { project, worktree: { path: leased.folder, branch, base: leased.target ?? legacy?.base ?? '' }, ...(leased.target ? { target: leased.target } : {}) } : null
+    return branch ? { project, worktree: { path: leased.folder, branch, base: leased.target ?? legacy?.base ?? '' }, slot: true, ...(leased.target ? { target: leased.target } : {}) } : null
   }
   return legacy ? { project, worktree: legacy } : null
+}
+
+/**
+ * A line's unmerged work. A slot's is counted against its target, else the project's default branch (#1627: never the
+ * branch the project folder has checked out, which needn't be where the line merges), and isn't asked about until its
+ * branch is made (a card's line is made as it starts there, after its lease names it): null then, quietly. A 0.9
+ * worktree's is counted against the project folder's branch, which its Merge… merges into.
+ */
+export async function lineStatus(found: Watched): Promise<AgentBranchStatus | null> {
+  const { project, worktree } = found
+  if (!found.slot) return wt.branchStatus(project.path, worktree)
+  if ((await G.lineHead(project.path, worktree.branch)) === null) return null
+  const fallback = found.target ? null : await G.defaultBranch(project.path)
+  const target = found.target ?? (fallback && !isUnknown(fallback) ? fallback : undefined)
+  return wt.branchStatus(project.path, target ? { ...worktree, base: worktree.base || target } : worktree, undefined, target)
 }
 
 /** Records a status (from a check here or the Merge dialog's) and tells the window when it changed. */
@@ -81,8 +106,7 @@ export function check(projectPath: string, agentId: string): Promise<void> {
     forget(key)
     return Promise.resolve()
   }
-  const p = wt
-    .branchStatus(found.project.path, found.worktree, undefined, found.target)
+  const p = lineStatus(found)
     .then(
       (st) => record(found.project.path, agentId, st),
       (e) => {

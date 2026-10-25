@@ -137,6 +137,8 @@ describe('where an agent is, as the window shows it (#1442)', () => {
   it("a slot with a target: its base, what the Changes tab compares the slot's work with (#1569)", () => {
     const f = facts([{ ...slot('slot-b', { open: lease('l1', 'slot-b', 'b1') }), target: 'main' }])
     expect(shown(f, builder, null, 'hive/card-12')).toEqual({ folder: slotFolder('slot-b'), is: 'slot', name: 'slot-b', branch: 'hive/card-12', base: 'main' })
+    // Its card's target, where the line merges, before the slot's (#1627: a lane's slot lent before targets were passed on).
+    expect(shownPlace(f, builder, agentPlaces(f, builder, null).now, 'hive/card-12', '1.0.0').base).toBe('1.0.0')
   })
 
   it('a reviewer resumed in its retired home: "home", by the folder\'s name; in the project folder: nothing to name', () => {
@@ -297,6 +299,17 @@ describe("a slot's writer: claimed in one write with the resume authority, held 
     expect(leasedLine(db, 'p1', 'b1')).toEqual({ folder: slotFolder('slot-c'), target: 'main', line: null, carried: true })
     // Another project's agent of the same id: none.
     expect(leasedLine(db, 'p2', 'b1')).toBeNull()
+  })
+
+  it("a line's target is its card's, as it started (#1627): a lane's slot keeps the target it was lent with", () => {
+    const { db } = board()
+    db.prepare("UPDATE slots SET target = 'main' WHERE name = 'slot-b'").run()
+    db.prepare("INSERT INTO cards (number, title, description, project, col, ord, created_at, created_by, updated_at) VALUES (12, 'Fix', '', 'p1', 'doing', 1, ?, 'test', ?)").run(at, at)
+    // Started before 1.0's facts named a target: the slot's.
+    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 1, 'Started', ?, 'hive', 'recorded', ?)").run(at, JSON.stringify({ lease: 'l1', line: 'hive/P1/P1-12-fix' }))
+    expect(leasedLine(db, 'p1', 'b1')).toMatchObject({ line: 'hive/P1/P1-12-fix', target: 'main' })
+    db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (12, 2, 'Started', ?, 'hive', 'recorded', ?)").run(new Date(Date.parse(at) + 1000).toISOString(), JSON.stringify({ lease: 'l1', line: 'hive/P1/P1-12-fix', target: '1.0.0' }))
+    expect(leasedLine(db, 'p1', 'b1')).toMatchObject({ line: 'hive/P1/P1-12-fix', target: '1.0.0' })
   })
   /** A claim as claimPlace makes it, its facts read before the write (as `before` has them). */
   const claim = (store: SlotStore, o: { run: string; existing?: { id: string; cwd: string; lease?: string } | null; auto?: boolean; head?: string | null; folder?: string; agent?: FolderAgent }) =>
