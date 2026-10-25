@@ -36,14 +36,30 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
-## P8's scenarios for the intents and gates (#1536): the three fakes, fixtures v84, 24–25 October 2026
+## P8's scenarios for the intents and gates (#1536): the three fakes, fixtures v85, 24–25 October 2026
 
 The baseline for P8's trials (#1537) and the checks card (#1539), on the guidance that ships (lanes A–D merged, 1.0.0
 6e9eeb47), saved as `p8-scenarios` (fake Claude Code), `p8-scenarios-fake-codex` and `p8-scenarios-fake-copilot`.
 - **Before**, v82 (`p8-e-before`, `2026-10-24T17-38-41-fake`): all 134 pass on the fake Claude Code.
-- **After**, v84, source 74cd1802, guidance `3ef4abb443998e00`: **137 of 137 pass on each fake**. Fake Claude Code
-  `2026-10-24T22-08-07-fake` (CLI 2.1.999), fake Codex `2026-10-24T22-49-54-fake-codex` (0.160.0), Copilot offline
-  `2026-10-24T23-31-51-fake-copilot` (1.0.98). Not comparable with v82 (another fixtures version).
+- **After**, v85, source 1d426b63, guidance `3ef4abb443998e00`: **138 of 138 pass on each fake**. Fake Claude Code
+  `2026-10-25T00-35-32-fake` (CLI 2.1.999), fake Codex `2026-10-25T01-13-50-fake-codex` (0.160.0), Copilot offline
+  `2026-10-25T01-55-23-fake-copilot` (1.0.98). Not comparable with v82 (another fixtures version).
+
+What changed in v85 (review round 2):
+- **work-on-card** runs in a project whose work an agent reviews, and requires the intents: started with
+  `hive_start_card`, committed, submitted with `hive_submit`, stopping in Review, never moved on by the agent itself.
+- **Builders' checks on projects with every rule off** take what the intents do there (`handedOn`): the card in Review,
+  or past it by the agent's own submission, since nothing reviews the work. They never take a finish by a move of the
+  agent's own. Before, a model following the skills (submit, so Done) failed "ends in Review". This covers every
+  builder scenario whose check named Review: the decision, inbox, skill, card-loop and dispatch scenarios.
+  test-waits-write's fake now uses the intents, so the fakes cover the submission past Review. inbox-stale, whose
+  premise is a reviewed card, runs in a reviewed project.
+- **A gate's refusal and its next step**:
+  - **intent-submit-refused** (new): a submission of uncommitted work is refused (`submit.empty`: commit, then submit).
+    The builder commits and submits again, with no Override and no move by hand.
+  - **review-interrupted**, rewritten: started with `hive_start_review` on a real submission, then the card goes back
+    to its builder, so the verdict is refused. The reviewer retries no verdict and moves nothing. Its refusal names
+    the builder's moves, "From active, use: submit, put back": carded as #1604.
 
 What changed (v83–v84):
 - **New**:
