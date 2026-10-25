@@ -10565,6 +10565,11 @@ button.progress-run-show:focus-visible {
 .progress-tab-pulse > .progress-body {
   flex: 0 1 auto;
 }
+/* The lanes keep the whole lanes they show (#1620): the runs give way and scroll. Shrinking with them squeezed the list
+   to part of a lane behind a scroll bar; how many fit, leaving the runs RUNS_KEEP_PX, is LanesSection's to measure. */
+.progress-tab-pulse > .progress-lanes {
+  flex-shrink: 0;
+}
 .progress-tab-merges {
   overflow-y: auto;
 }
