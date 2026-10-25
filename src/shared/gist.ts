@@ -4,24 +4,30 @@
  * together lists. The whole stays where it is read in full.
  */
 
-/** Markdown's marks taken out, block by block, and the text run into one line. */
+/**
+ * Markdown's marks taken out, block by block, and the text run into one line. A code span's text is kept as written
+ * (HR4's #1635 round 1: `__init__.py`, a glob): it is set aside before the other marks are read and put back after.
+ */
 export function plainMarkdown(md: string): string {
+  const code: string[] = []
   return (
     md
       .replace(/\r\n?/g, '\n')
       // A fenced block says nothing a gist can show.
       .replace(/^ {0,3}(```|~~~)[^\n]*\n[\s\S]*?(^ {0,3}\1[^\n]*$|(?![\s\S]))/gm, ' ')
+      // A code span: its text between runs of the same number of backticks, one space each side trimmed (CommonMark).
+      .replace(/(`+)(?!`)([\s\S]*?[^`])\1(?!`)/g, (_, _ticks: string, text: string) => `${code.push(text.replace(/\n/g, ' ').replace(/^ (.*) $/, '$1')) - 1}`)
       .replace(/^ {0,3}#{1,6}\s+/gm, '')
       .replace(/^ {0,3}>\s?/gm, '')
       .replace(/^\s*(?:[-*+]|\d+[.)])\s+/gm, '')
       .replace(/^ {0,3}([-*_])(\s*\1){2,}\s*$/gm, ' ')
       // Images and links: their text.
       .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-      .replace(/`+([^`]*)`+/g, '$1')
       .replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, '$2')
       .replace(/(^|[^\w*])[*_](?=\S)([^*_\n]*?\S)[*_](?!\w)/g, '$1$2')
       .replace(/~~(?=\S)([\s\S]*?\S)~~/g, '$1')
       .replace(/\s+/g, ' ')
+      .replace(/(\d+)/g, (_, i: string) => code[Number(i)])
       .trim()
   )
 }

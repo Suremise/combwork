@@ -12,6 +12,13 @@ describe('plainMarkdown', () => {
     expect(plainMarkdown('Run this:\n\n```sh\nnpm test\n```\nthen tell me.')).toBe('Run this: then tell me.')
     expect(plainMarkdown('Run this:\n```\nnpm test')).toBe('Run this:')
   })
+  it("keeps a code span's text as written: file names, globs and patterns aren't read as Markdown (HR4's round 1)", () => {
+    expect(gist('Should I keep `__init__.py`?')).toBe('Should I keep __init__.py?')
+    expect(gist('Should we remove `__pycache__`?')).toBe('Should we remove __pycache__?')
+    expect(plainMarkdown('Match `**/*.ts` and `**/*.tsx`, or only `src/*_test_*.ts`?')).toBe('Match **/*.ts and **/*.tsx, or only src/*_test_*.ts?')
+    expect(plainMarkdown('Is ``a `tick` inside`` fine, and `[x](y)` too?')).toBe('Is a `tick` inside fine, and [x](y) too?')
+    expect(plainMarkdown('**Keep** `__init__.py` _here_?')).toBe('Keep __init__.py here?')
+  })
   it('keeps words with underscores and stars between them', () => {
     expect(plainMarkdown('snake_case_name and 2*3*4')).toBe('snake_case_name and 2*3*4')
   })
