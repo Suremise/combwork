@@ -110,7 +110,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
-- **Fewer pauses while the disk is busy:** the board's and the Assistant's journal's databases are tidied up (their write-ahead log copied into the file) on a background thread, not in the middle of a save on Hive's main thread, where it could pause typing in every terminal while a slot was being prepared. A save or a merge lock slow enough to be felt is named in Hive's log (#1633).
+- **Fewer pauses while the disk is busy:** the board's and the Assistant's journal's databases are tidied up (their write-ahead log copied into the file) once they have been idle for a moment, not in the middle of a save, where it could pause typing in every terminal while a slot was being prepared. A save or a merge lock slow enough to be felt is named in Hive's log (#1633).
 - **A lane's notice is shown once:** once a lane ended, Hive told its card's failed review again on every look at the lanes, stacking identical notices and filling the card's history with them (#1631).
 - **A long card title in Approved no longer squeezes the board's other columns.** A collapsed card's one-line title set how narrow the Approved and Merging group could get, so it took most of the board and On Hold, Todo, Active and Review shrank to their least width; every column now keeps its share (#1619).
 - **Security: version checks no longer decompress network replies.** Hive's checks for a newer Claude Code, Codex or GitHub Copilot refuse compressed replies, closing CVE-2026-111497's path (a flaw in Node's Brotli decoder) until Electron bundles Node 24.22.1 (#1582).

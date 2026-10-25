@@ -7,7 +7,7 @@ import { basename, dirname, join } from 'path'
  * and the Assistant's journal in a file of its own, #989) is opened, set up and migrated here, with Node's built-in
  * `node:sqlite` (no native module to rebuild for each Electron). Nothing else imports `node:sqlite`, so another library
  * would be a change to this file only. Its calls are synchronous: at these sizes a query or a commit takes well under a
- * millisecond on main's thread, once the WAL's checkpoints, which fsync the file, are off it (`checkpointer`, #1633). The usage history (`.hive/usage.db`, #1106) is opened here too, by the usage worker on a
+ * millisecond on main's thread, once the WAL's checkpoints, which fsync the file, are out of the commits (`checkpointer`, #1633). The usage history (`.hive/usage.db`, #1106) is opened here too, by the usage worker on a
  * thread of its own (usageWorker.ts): nothing here is tied to main's thread.
  */
 
@@ -30,13 +30,10 @@ export interface PendingGroup {
   to: number
 }
 
-/**
- * Another connection (another Hive) has the file open, so a group's exclusive lock couldn't be had: nothing changed. Also
- * thrown by a close whose checkpoint worker still had the file open (#1633): its own connections are closed all the same.
- */
+/** Another connection (another Hive) has the file open, so a group's exclusive lock couldn't be had: nothing changed. */
 export class DbInUseError extends Error {
-  constructor(file: string, where = 'in another process') {
-    super(`${basename(file)} is open ${where}`) // i18n-ignore: the board turns it into its message; this is for the log
+  constructor(file: string) {
+    super(`${basename(file)} is open in another process`) // i18n-ignore: the board turns it into its message; this is for the log
     this.name = 'DbInUseError'
   }
 }
@@ -65,11 +62,10 @@ export interface OpenOptions {
   /** For tests: runs once a group's steps are committed, its lock still held (another process trying to open the file meanwhile). */
   whileGroupLocked?: () => void
   /**
-   * Takes the WAL's checkpoints off the writer's thread (#1633, walCheckpoint.ts): called once the file is open and
-   * writable, with its writer; returns what stops it, called first when the database closes, false when a connection
-   * of its own still has the file (the close then throws DbInUseError once its own connections are closed).
+   * Takes the WAL's checkpoints out of the writer's commits (#1633, walCheckpoint.ts: checkpointed when it is idle):
+   * called once the file is open and writable, with its writer; returns what stops it, called first when it closes.
    */
-  checkpointer?: (file: string, writer: DatabaseSync) => () => boolean
+  checkpointer?: (file: string, writer: DatabaseSync) => () => void
 }
 
 /** An open database: a writer and a reader connection to one file. */
@@ -83,7 +79,6 @@ export interface Db {
   newer: number | null
   /** A group of steps this file waits for, not approved (opened read-only), else null. */
   pending: PendingGroup | null
-  /** Closes both connections; throws DbInUseError after that when its checkpointer's connection still has the file. */
   close: () => void
 }
 
@@ -332,7 +327,7 @@ export function openDb(file: string, opts: OpenOptions): Db {
       newer,
       pending,
       close: () => {
-        const drained = stopCheckpoints?.() ?? true
+        stopCheckpoints?.()
         // The reader first (#1324): while it has the file mapped, Windows refuses the checkpoint's truncation of a file
         // that shrank (incremental vacuum), silently, and the close after it has nothing left to copy, so the file kept
         // its biggest size for good.
@@ -347,7 +342,6 @@ export function openDb(file: string, opts: OpenOptions): Db {
           // Closing anyway.
         }
         writer.close()
-        if (!drained) throw new DbInUseError(file, "by its checkpoint, which hasn't stopped") // i18n-ignore: for the log
       }
     }
   } catch (e) {
