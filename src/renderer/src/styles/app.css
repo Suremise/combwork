@@ -9404,39 +9404,37 @@ textarea.input.task-blocked-input {
 .git-queue-history-h {
   font-weight: 600;
 }
+/* Its history (#1641): a data table as the archived cards' one, a line a row. The title takes the room left and is
+   ellipsised (its tooltip has it whole); the other columns never wrap, and a table narrower than them scrolls sideways
+   in its .table-wrap. */
 .git-queue-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-.git-queue-table th {
-  text-align: start;
-  color: var(--fg-muted);
-  font-weight: normal;
-  border-bottom: 1px solid var(--border);
-  padding: 4px 6px;
+  container-type: inline-size;
 }
 .git-queue-table td {
-  padding: 4px 6px;
-  border-bottom: 1px solid var(--border-subtle);
-  vertical-align: top;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
-.git-queue-table .link {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--info);
-  cursor: pointer;
+.git-queue-table td.git-queue-title-cell {
+  width: 100%;
+  max-width: 0;
+  min-width: 80px;
 }
-.git-queue-table tr[data-outcome='merged'] .codicon {
-  color: var(--success);
-}
-.git-queue-table tr[data-outcome='returned'] .codicon {
-  color: var(--error);
+/* Narrow (the window at its narrowest): the merge commit is left to the outcome's tooltip, so When stays in view. */
+@container (max-width: 620px) {
+  .git-queue-table .git-queue-result {
+    display: none;
+  }
 }
 .git-queue-title {
-  overflow-wrap: anywhere;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg-strong);
+}
+.git-queue-outcome[data-outcome='merged'] .codicon {
+  color: var(--success);
+}
+.git-queue-outcome[data-outcome='returned'] .codicon {
+  color: var(--error);
 }
 /* The Merge dialog for merges outside cards (#1450): the branch and its target side by side, each as wide as it can be. */
 .branch-merge-pick {

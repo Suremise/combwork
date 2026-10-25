@@ -1,14 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { fmt, msg, tr } from '@shared/i18n'
 import { formatDateTime } from '@shared/dates'
 import { revisionShort } from '@shared/platform/descriptors'
 import { nextChange, queueShown, returnRun, returnWhy, runCheckName } from '@shared/progressQueue'
-import type { ProjectInfo } from '@shared/types'
+import type { ProgressRun, ProjectInfo } from '@shared/types'
 import type { QueueRecent, QueueView } from '@shared/workflow/queue'
 import { call, callShared } from '../api'
 import { set, useLanguage, useStore } from '../store'
 import { timeAgo } from '../util'
-import { QueueCard } from './ProgressQueue'
+import { DataTable, useDateColumns, type DataColumn } from './DataTable'
+import { QueueCard, RevisionButton } from './ProgressQueue'
 import { Icon } from './ui'
 
 /**
@@ -30,11 +31,20 @@ const M = {
   revision: msg({ id: 'git.queue.revision', defaultMessage: 'Revision', description: "A column heading of the Git tab's merge queue history: the card's revision the entry was for (a short commit id). Glossary: revision." }),
   outcome: msg({ id: 'git.queue.outcome', defaultMessage: 'Outcome', description: "A column heading of the Git tab's merge queue history: merged (with the result), returned (with why) or taken out." }),
   when: msg({ id: 'git.queue.when', defaultMessage: 'When', description: "A column heading of the Git tab's merge queue history: how long ago it happened." }),
-  open: msg({ id: 'git.queue.open', defaultMessage: 'Open {card}', description: "Tooltip of a card's key in the Git tab's merge queue history: opens the card ({card})." }),
-  merged: msg({ id: 'git.queue.merged', defaultMessage: 'Merged as {result}', description: "An outcome in the Git tab's merge queue history: the card was merged; the target's new commit follows ({result}: a short commit id)." }),
-  returned: msg({ id: 'git.queue.returned', defaultMessage: 'Returned: {why}', description: "An outcome in the Git tab's merge queue history: the queue returned the card to its builder, and why ({why}: conflict in tasks.ts, checks failed: unit…). Glossary 2.4: returned." }),
-  cancelled: msg({ id: 'git.queue.cancelled', defaultMessage: 'Taken out ({reason, select, removed {Remove from queue} stale {its pass no longer counts} hold {On Hold} decision {a decision} integratedOutside {merged outside Hive} other {cancelled}})', description: "An outcome in the Git tab's merge queue history: the card's entry was taken out of the queue, and why. Keep the select keys." })
+  title: msg({ id: 'git.queue.title', defaultMessage: 'Title', description: "A column heading of the Git tab's merge queue history: the card's title." }),
+  result: msg({ id: 'git.queue.result', defaultMessage: 'Merge commit', description: "A column heading of the Git tab's merge queue history: for a merged card, the target's new commit (a short commit id)." }),
+  open: msg({ id: 'git.queue.open', defaultMessage: 'Open {card}', description: "Accessible name of a row of the Git tab's merge queue history: opens the card ({card}: its key)." }),
+  mergedShort: msg({ id: 'git.queue.mergedShort', defaultMessage: 'Merged', description: "An outcome in the Git tab's merge queue history (one short word or two: the full outcome is its tooltip): the card was merged." }),
+  returnedShort: msg({ id: 'git.queue.returnedShort', defaultMessage: 'Returned', description: "An outcome in the Git tab's merge queue history (one short word or two: why is its tooltip): the queue returned the card to its builder. Glossary 2.4: returned." }),
+  cancelledShort: msg({ id: 'git.queue.cancelledShort', defaultMessage: 'Taken out', description: "An outcome in the Git tab's merge queue history (one short word or two: why is its tooltip): the card's entry was taken out of the queue." }),
+  merged: msg({ id: 'git.queue.merged', defaultMessage: 'Merged as {result}', description: "Tooltip of an outcome in the Git tab's merge queue history: the card was merged; the target's new commit follows ({result}: a short commit id)." }),
+  returned: msg({ id: 'git.queue.returned', defaultMessage: 'Returned: {why}', description: "Tooltip of an outcome in the Git tab's merge queue history: the queue returned the card to its builder, and why ({why}: conflict in tasks.ts, checks failed: unit…). Glossary 2.4: returned." }),
+  cancelled: msg({ id: 'git.queue.cancelled', defaultMessage: 'Taken out ({reason, select, removed {Remove from queue} stale {its pass no longer counts} hold {On Hold} decision {a decision} integratedOutside {merged outside Hive} other {cancelled}})', description: "Tooltip of an outcome in the Git tab's merge queue history: the card's entry was taken out of the queue, and why. Keep the select keys." })
 }
+
+const OUTCOMES: QueueRecent['outcome'][] = ['merged', 'returned', 'cancelled']
+const outcomeIcon = (o: QueueRecent['outcome']): string => (o === 'merged' ? 'pass' : o === 'returned' ? 'error' : 'circle-slash')
+const outcomeLabel = (o: string): string => tr(o === 'merged' ? M.mergedShort : o === 'returned' ? M.returnedShort : M.cancelledShort)
 
 /**
  * The project's queues, read for themselves (the Progress panel on or off), again on each `queue-changed`. Only this
@@ -94,8 +104,55 @@ export function GitQueueSection({ project }: { project: ProjectInfo }) {
   )
 }
 
+/**
+ * The history's columns (#1641, as the archived cards' table): one line a row, the title ellipsised with its whole text
+ * as a tooltip, revisions short in a column that never wraps (a click copies the whole id), the outcome a short label
+ * with its detail (the merge commit, why it was returned or taken out) as its tooltip.
+ */
+function historyColumns(v: QueueView, runs: readonly ProgressRun[], short: (id: string) => string): DataColumn<QueueRecent>[] {
+  // A red check named by its run, as the panel names it (when Hive still keeps the run).
+  const why = (r: QueueRecent): string => {
+    const run = returnRun(v, r, runs)
+    return returnWhy(r, run ? runCheckName(run) : null, v.target, tr, list)
+  }
+  const detail = (r: QueueRecent): string => (r.outcome === 'merged' ? tr(M.merged, { result: r.result ? short(r.result) : '' }) : r.outcome === 'returned' ? tr(M.returned, { why: why(r) }) : tr(M.cancelled, { reason: r.reason ?? 'other' /* i18n-ignore: a select's key, never shown */ }))
+  const revision = (id: string | undefined): React.ReactNode => (id ? <RevisionButton revision={id} short={short} /> : <span className="faint">–</span>)
+  return [
+    { key: 'card', header: tr(M.card), className: 'nowrap', cell: (r) => <span className="task-number">{r.key}</span>, sortValue: (r) => r.card, filter: { kind: 'text', value: (r) => r.key } },
+    {
+      key: 'title',
+      header: tr(M.title),
+      className: 'git-queue-title-cell',
+      cell: (r) => (
+        <span className="git-queue-title" title={r.title}>
+          {r.title}
+        </span>
+      ),
+      sortValue: (r) => r.title,
+      filter: { kind: 'text', value: (r) => r.title }
+    },
+    { key: 'revision', header: tr(M.revision), className: 'nowrap', cell: (r) => revision(r.revision) },
+    {
+      key: 'outcome',
+      header: tr(M.outcome),
+      className: 'nowrap',
+      cell: (r) => (
+        <span className="git-queue-outcome" data-outcome={r.outcome} title={detail(r)}>
+          <Icon name={outcomeIcon(r.outcome)} /> {outcomeLabel(r.outcome)}
+        </span>
+      ),
+      sortValue: (r) => OUTCOMES.indexOf(r.outcome),
+      filter: { kind: 'choice', value: (r) => r.outcome },
+      choiceLabel: outcomeLabel
+    },
+    { key: 'result', header: tr(M.result), className: 'nowrap git-queue-result', cell: (r) => revision(r.outcome === 'merged' ? r.result : undefined) },
+    { key: 'when', header: tr(M.when), className: 'nowrap', descFirst: true, cell: (r) => <span title={formatDateTime(r.at)}>{timeAgo(r.at)}</span>, sortValue: (r) => r.at }
+  ]
+}
+
 /** A target's history: its latest 50 outcomes, newest first. */
 function QueueHistory({ project, view: v }: { project: ProjectInfo; view: QueueView }) {
+  const language = useLanguage()
   const version = useStore((s) => s.queueVersion)
   const [rows, setRows] = useState<QueueRecent[] | null>(null)
   useEffect(() => {
@@ -109,46 +166,30 @@ function QueueHistory({ project, view: v }: { project: ProjectInfo; view: QueueV
     }
   }, [project.path, v.target, version])
   const runs = useStore((s) => s.progressRuns)
-  // A red check named by its run, as the panel names it (when Hive still keeps the run).
-  const why = (r: QueueRecent): string => {
-    const run = returnRun(v, r, runs)
-    return returnWhy(r, run ? runCheckName(run) : null, v.target, tr, list)
-  }
   const platform = project.platform?.id
-  const short = (id: string): string => (platform ? revisionShort(platform, id) : id.slice(0, 7))
+  const columns = useDateColumns(
+    useMemo(() => {
+      const short = (id: string): string => (platform ? revisionShort(platform, id) : id.slice(0, 7))
+      return historyColumns(v, runs, short)
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [v, runs, platform, language])
+  )
   return (
     <div className="git-queue-history">
       <div className="git-queue-history-h">{tr(M.history, { target: v.target })}</div>
-      {rows && !rows.length && <div className="faint">{tr(M.noHistory)}</div>}
-      {rows && rows.length > 0 && (
-        <table className="git-queue-table">
-          <thead>
-            <tr>
-              <th>{tr(M.card)}</th>
-              <th>{tr(M.revision)}</th>
-              <th>{tr(M.outcome)}</th>
-              <th>{tr(M.when)}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={`${r.entry}:${r.outcome}`} data-outcome={r.outcome} data-entry={r.entry}>
-                <td>
-                  <button type="button" className="link" title={tr(M.open, { card: r.key })} onClick={() => set({ taskOpen: r.card })}>
-                    {r.key}
-                  </button>{' '}
-                  <span className="faint git-queue-title">{r.title}</span>
-                </td>
-                <td>{r.revision ? <code>{short(r.revision)}</code> : <span className="faint">–</span>}</td>
-                <td>
-                  <Icon name={r.outcome === 'merged' ? 'pass' : r.outcome === 'returned' ? 'error' : 'circle-slash'} />{' '}
-                  {r.outcome === 'merged' ? tr(M.merged, { result: r.result ? short(r.result) : '' }) : r.outcome === 'returned' ? tr(M.returned, { why: why(r) }) : tr(M.cancelled, { reason: r.reason ?? 'other' /* i18n-ignore: a select's key, never shown */ })}
-                </td>
-                <td title={formatDateTime(r.at)}>{timeAgo(r.at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {rows && (
+        <DataTable
+          id="queue-history"
+          className="git-queue-table"
+          rows={rows}
+          columns={columns}
+          rowKey={(r) => `${r.entry}:${r.outcome}`}
+          defaultSort={{ key: 'when', desc: true }}
+          defaultPageSize={20}
+          empty={tr(M.noHistory)}
+          onRowClick={(r) => set({ taskOpen: r.card })}
+          rowLabel={(r) => tr(M.open, { card: r.key })}
+        />
       )}
     </div>
   )

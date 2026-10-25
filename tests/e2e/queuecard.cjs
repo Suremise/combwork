@@ -115,10 +115,26 @@ const f = q.folderHelpers(fx)
     const section = page.locator('.git-queue')
     const history = section.locator('.git-queue-target[data-target="integration"] .git-queue-table')
     const rows = await until(async () => ((await history.locator('tbody tr').count()) >= 3 ? history.locator('tbody tr') : null), HUNG_MS)
-    const historyText = await text(history)
-    check('Git tab: the queue card and its history, newest first: Two returned, One merged, Red returned', !!rows && (await section.locator('.progress-queue-card').count()) === 1 && /Returned: conflict in a\.txt/.test(historyText) && /Merged as/.test(historyText) && /checks failed: quick/.test(historyText) && historyText.indexOf((await h.card(two.n)).key) < historyText.indexOf((await h.card(one.n)).key), historyText)
-    check('…each with its revision', (await history.locator('tbody tr code').count()) >= 3)
+    // Each row a line (#1641): a short outcome, its detail (the merge commit, why it was returned) the outcome's tooltip.
+    const outcomes = async () => (await history.locator('[data-outcome]').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-outcome')} ${e.textContent.trim()} | ${e.getAttribute('title')}`))).join('\n')
+    const historyText = `${await text(history)}\n${await outcomes()}`
+    check('Git tab: the queue card and its history, newest first: Two returned, One merged, Red returned', !!rows && (await section.locator('.progress-queue-card').count()) === 1 && /Returned \| Returned: conflict in a\.txt/.test(historyText) && /Merged \| Merged as \w+/.test(historyText) && /checks failed: quick/.test(historyText) && historyText.indexOf((await h.card(two.n)).key) < historyText.indexOf((await h.card(one.n)).key), historyText)
+    check('…each with its revision, the merged one with its merge commit', (await history.locator('tbody tr').nth(0).locator('code').count()) === 1 && (await history.locator('tbody tr').filter({ has: page.locator('[data-outcome="merged"]') }).locator('code').count()) === 2, await text(history))
+    const heights = await history.locator('tbody tr').evaluateAll((trs) => trs.map((r) => r.getBoundingClientRect().height))
+    check('…one line a row: every row as tall as the others', heights.length >= 3 && Math.max(...heights) - Math.min(...heights) < 2, JSON.stringify(heights))
     await shoot(section, 'git-section')
+    // At the window's narrowest (900 wide), still a line a row: the title gives way, the hashes never wrap.
+    await lib.fitWindow(h.app, page, { width: 900, height: 700 })
+    const narrow = await until(async () => {
+      const hs = await history.locator('tbody tr').evaluateAll((trs) => trs.map((r) => r.getBoundingClientRect().height))
+      const codes = await history.locator('tbody code:visible').evaluateAll((cs) => cs.map((c) => c.getClientRects().length))
+      const wrap = history.locator('.table-wrap')
+      const fits = await wrap.evaluate((w) => w.scrollWidth <= w.clientWidth + 1)
+      return hs.length >= 3 && Math.max(...hs) - Math.min(...hs) < 2 && codes.length >= 3 && codes.every((n) => n === 1) && fits ? { hs, codes } : null
+    }, HUNG_MS)
+    check('…and at the narrowest window: a line a row, each hash on one line, no sideways scroll (the merge commit left to the tooltip)', !!narrow, JSON.stringify(narrow))
+    await shoot(section, 'git-section-narrow')
+    await lib.fitWindow(h.app, page, { width: 1400, height: 900 })
 
     // --- Old rules: the options switch to the agent merging while a card is in its checks.
     q.steer(fx, 'wait')
@@ -134,7 +150,7 @@ const f = q.folderHelpers(fx)
     check('…and the Git tab\'s section too', !!(await until(async () => (await text(section)).includes(`${lateKey} + integration`), HUNG_MS)), await text(section))
     fs.writeFileSync(fx.go, 'go')
     check('…through to its outcome: merged', !!(await until(async () => (await column(late.n)) === 'done', HUNG_MS)))
-    check('…the Git tab\'s history has it merged', !!(await until(async () => new RegExp(`${lateKey}.*Merged as`).test(await text(history)), HUNG_MS)), await text(history))
+    check('…the Git tab\'s history has it merged', !!(await until(async () => (await history.locator('tbody tr', { hasText: lateKey }).locator('[data-outcome="merged"]').count()) === 1, HUNG_MS)), await text(history))
     part = await openCard(late.n)
     check('…its Work section: merged (the merge line), no queue part left', !!(await until(async () => /Merged into integration as/.test(await text(dialog.locator('.card-work'))) && (await part.count()) === 0, HUNG_MS)), await text(dialog.locator('.card-work')))
     await closeCard()

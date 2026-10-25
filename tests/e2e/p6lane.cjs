@@ -625,7 +625,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
       }
       // Then the old queue as the board has it, with its history: the repository gone takes none of it away.
       const body = page.locator('.git-body')
-      check('None, the repository gone: the Merge queue section shows the queue and its history', !!(await waitHung(async () => (await body.locator('.git-queue-target[data-target="main"]').count()) === 1 && (await body.locator('.git-queue-table tr[data-outcome="merged"]').count()) >= 2)), JSON.stringify({ html: (await body.innerHTML().catch(() => '')).slice(0, 600) }))
+      check('None, the repository gone: the Merge queue section shows the queue and its history', !!(await waitHung(async () => (await body.locator('.git-queue-target[data-target="main"]').count()) === 1 && (await body.locator('.git-queue-table [data-outcome="merged"]').count()) >= 2)), JSON.stringify({ html: (await body.innerHTML().catch(() => '')).slice(0, 600) }))
       await shootSections('none-queue', ['queue'])
     }
   } catch (e) {

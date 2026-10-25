@@ -153,17 +153,22 @@ interface HiveMessageValues {
   'git.pushTo.title': undefined
   'git.pushTo.what': undefined
   'git.queue.cancelled': { reason: string }
+  'git.queue.cancelledShort': undefined
   'git.queue.card': undefined
   'git.queue.history': { target: string | number }
   'git.queue.merged': { result: string | number }
+  'git.queue.mergedShort': undefined
   'git.queue.noHistory': undefined
   'git.queue.none': undefined
   'git.queue.open': { card: string | number }
   'git.queue.outcome': undefined
   'git.queue.reading': undefined
   'git.queue.region': undefined
+  'git.queue.result': undefined
   'git.queue.returned': { why: string | number }
+  'git.queue.returnedShort': undefined
   'git.queue.revision': undefined
+  'git.queue.title': undefined
   'git.queue.when': undefined
   'git.reading': undefined
   'git.remote.change': undefined
