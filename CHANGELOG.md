@@ -130,6 +130,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 - **Menus near the window's right edge keep their width** (#1329), and **a notice's buttons wrap** rather than run past its edge (#1574).
 - **The Assistant's journal gives back the space its size cap frees.**
 - **No more "Permission mode changed"** when an agent starts a new conversation with its mode unchanged.
+- **A card's unmerged commits are counted against where it merges.** An agent's unmerged work in a slot (its pane's Merge… and its Changes tab) was counted against `main` when its lane's slot was lent before the project's target branch was passed on, so a card heading for another branch (such as `1.0.0`) showed hundreds of commits. It's now counted against the card's target, else the project's default branch, and a card's branch that isn't made yet no longer logs a warning (#1627).
 
 ## 0.9.3 — 2026-10-20
 
@@ -236,7 +237,6 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 - **Changing many cards at once is faster on a big board.** Hive read through the whole board's folder each time a card was saved, so on a board of 500 cards a change to 30 cards at once took about 0.8 s; it now takes about 0.1 s, whatever the board's size. Cards edited by hand or by another program still show on the board at once (#588).
 - **An agent releasing the merge slot releases its own.** An agent that claimed the slot for main and then checked its branch out in the project folder (as merging main into its branch does) and released it without naming main kept holding main's slot, and other agents waited for up to an hour. Releasing now gives up the agent's own hold, whatever branch the folder is on, and when it holds nothing there the reply says which slots it does hold (#586).
 - **Your answer reaches a builder waiting at its lane's end.** When a card loop's builder blocks its last card, in Passed, to ask you something (its commit was refused, say), and you answer as a decision on the card or through the Assistant, Hive now tells the builder, as it does for a card in Doing. Before, the builder never heard and kept waiting (#877).
-- **A card's unmerged commits are counted against where it merges.** An agent's unmerged work in a slot (its pane's Merge… and its Changes tab) was counted against `main` when its lane's slot was lent before the project's target branch was passed on, so a card heading for another branch (such as `1.0.0`) showed hundreds of commits. It's now counted against the card's target, else the project's default branch, and a card's branch that isn't made yet no longer logs a warning (#1627).
 
 ## 0.8.0 — 16 October 2026
 
