@@ -637,7 +637,7 @@
   "board.reviewSkip.reason": "Dlaczego (opcjonalnie)",
   "board.reviewSkip.reviewed": "Recenzowana",
   "board.reviewSkip.skipped": "Recenzja pominięta",
-  "board.reviewSkip.skippedTip": "{by, select, assistant {Recenzja pominięta, ustawił Asystent: {reason}} other {{reason, select, none {Recenzja pominięta, ustawione przez ciebie.} other {Recenzja pominięta, ustawione przez ciebie: {reason}}}}}",
+  "board.reviewSkip.skippedTip": "{who, select, assistant {Recenzja pominięta, ustawił Asystent: {reason}} note {Recenzja pominięta, ustawione przez ciebie: {reason}} other {Recenzja pominięta, ustawione przez ciebie.}}",
   "board.reviewSkip.working": "Zapisywanie…",
   "board.run.agentStopped": "Jego agent zatrzymał się przed końcem",
   "board.run.failedAfter": "Nieudane po {took}",

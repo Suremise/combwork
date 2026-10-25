@@ -637,7 +637,7 @@
   "board.reviewSkip.reason": "Why (optional)",
   "board.reviewSkip.reviewed": "Reviewed",
   "board.reviewSkip.skipped": "Review skipped",
-  "board.reviewSkip.skippedTip": "{by, select, assistant {Review skipped, set by the Assistant: {reason}} other {{reason, select, none {Review skipped, set by you.} other {Review skipped, set by you: {reason}}}}}",
+  "board.reviewSkip.skippedTip": "{who, select, assistant {Review skipped, set by the Assistant: {reason}} note {Review skipped, set by you: {reason}} other {Review skipped, set by you.}}",
   "board.reviewSkip.working": "Saving…",
   "board.run.agentStopped": "Its agent stopped before it finished",
   "board.run.failedAfter": "Failed after {took}",

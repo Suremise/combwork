@@ -637,7 +637,7 @@
   "board.reviewSkip.reason": "原因（可选）",
   "board.reviewSkip.reviewed": "需评审",
   "board.reviewSkip.skipped": "已跳过评审",
-  "board.reviewSkip.skippedTip": "{by, select, assistant {已跳过评审，由助手设置：{reason}} other {{reason, select, none {已跳过评审，由你设置。} other {已跳过评审，由你设置：{reason}}}}}",
+  "board.reviewSkip.skippedTip": "{who, select, assistant {已跳过评审，由助手设置：{reason}} note {已跳过评审，由你设置：{reason}} other {已跳过评审，由你设置。}}",
   "board.reviewSkip.working": "正在保存…",
   "board.run.agentStopped": "运行它的智能体在其完成前已停止",
   "board.run.failedAfter": "运行 {took}后失败",

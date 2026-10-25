@@ -637,7 +637,7 @@
   "board.reviewSkip.reason": "理由（任意）",
   "board.reviewSkip.reviewed": "レビューあり",
   "board.reviewSkip.skipped": "レビュー省略",
-  "board.reviewSkip.skippedTip": "{by, select, assistant {レビュー省略（アシスタントが設定）: {reason}} other {{reason, select, none {レビュー省略（自分で設定）。} other {レビュー省略（自分で設定）: {reason}}}}}",
+  "board.reviewSkip.skippedTip": "{who, select, assistant {レビュー省略（アシスタントが設定）: {reason}} note {レビュー省略（自分で設定）: {reason}} other {レビュー省略（自分で設定）。}}",
   "board.reviewSkip.working": "保存中…",
   "board.run.agentStopped": "終了前にエージェントが停止しました",
   "board.run.failedAfter": "{took}後に失敗",

@@ -637,7 +637,7 @@
   "board.reviewSkip.reason": "Por qué (opcional)",
   "board.reviewSkip.reviewed": "Se revisa",
   "board.reviewSkip.skipped": "Revisión omitida",
-  "board.reviewSkip.skippedTip": "{by, select, assistant {Revisión omitida, por decisión del Asistente: {reason}} other {{reason, select, none {Revisión omitida, por decisión tuya.} other {Revisión omitida, por decisión tuya: {reason}}}}}",
+  "board.reviewSkip.skippedTip": "{who, select, assistant {Revisión omitida, por decisión del Asistente: {reason}} note {Revisión omitida, por decisión tuya: {reason}} other {Revisión omitida, por decisión tuya.}}",
   "board.reviewSkip.working": "Guardando…",
   "board.run.agentStopped": "Su agente se detuvo antes de terminar",
   "board.run.failedAfter": "Falló tras {took}",

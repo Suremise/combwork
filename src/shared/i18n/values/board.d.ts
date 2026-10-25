@@ -639,7 +639,7 @@ interface HiveMessageValues {
   'board.reviewSkip.reason': undefined
   'board.reviewSkip.reviewed': undefined
   'board.reviewSkip.skipped': undefined
-  'board.reviewSkip.skippedTip': { by: string; reason: string }
+  'board.reviewSkip.skippedTip': { who: string; reason: string | number }
   'board.reviewSkip.working': undefined
   'board.run.agentStopped': undefined
   'board.run.failedAfter': { took: string | number }
