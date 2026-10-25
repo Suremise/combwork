@@ -42,7 +42,7 @@ card-loop-follow-up-check failed once on fake Copilot (#1537's v89 run): its onl
 builder's follow-up (or design) before the subject starts, so Hive's loop wake rings its doorbell as the session becomes
 idle, just as the harness types the prompt; in every sample the doorbell's turn came first, with the prompt typed into
 the busy session, and once the prompt was lost. Scenarios now have `beforePrompt`: these two wait until the wake is
-read and the session is idle again. Fake Copilot, both ×8 with 2 spinner workers: 16 of 16
+read and its turn is over (idle, or watching once it has acted on the wake, as a model does). Fake Copilot, both ×8 with 2 spinner workers: 16 of 16
 (`results/2026-10-25T16-04-10-fake-copilot`); fake Claude Code and fake Codex once each: all pass
 (`2026-10-25T16-09-43-fake`, `2026-10-25T16-10-36-fake-codex`). Every fake now reads the wake before the prompt.
 

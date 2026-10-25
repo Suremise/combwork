@@ -135,8 +135,9 @@ async function userMove(c, n, column) {
 async function wakeRead(c, key) {
   const wakeIsRead = async () => {
     const mine = (await c.deliveries('coder')).filter((d) => d.card === c.cards[key])
-    // Read, and none waiting to ring (one replaced by a newer wake is cancelled).
-    return mine.some((d) => ['received', 'acked'].includes(d.state)) && !mine.some((d) => ['queued', 'offered', 'uncertain'].includes(d.state)) && ['ready', 'finished'].includes(await c.subjectStatus())
+    // Read, and none waiting to ring (one replaced by a newer wake is cancelled); its turn over, ending idle or, having
+    // acted on the wake (answered and armed a watch), watching.
+    return mine.some((d) => ['received', 'acked'].includes(d.state)) && !mine.some((d) => ['queued', 'offered', 'uncertain'].includes(d.state)) && ['ready', 'finished', 'watching'].includes(await c.subjectStatus())
   }
   if (!(await require('../e2e/lib.cjs').until(wakeIsRead, 120000))) throw new Error(`setup: Coder's wake for #${c.cards[key]} wasn't read: ${JSON.stringify(await c.deliveries('coder'))}, ${await c.subjectStatus()}`)
 }
