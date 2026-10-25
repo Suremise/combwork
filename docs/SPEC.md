@@ -2828,7 +2828,9 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   read (the Assistant's requirement).
 - **The Git tab's Merge queue section** (`GitQueueSection.tsx`, a section of its own for P6 to move): per target, the
   Progress panel's queue card (reused) and its history (`queue:history`: the latest 50 outcomes, each with its card,
-  revision, the result or why, and when). A target shows by #1356's rule, or while it has a history. The panel's
+  revision, the result or why, and when), a `DataTable` as the archived cards' (#1641): a line a row, the title
+  ellipsised, the outcome a short label with the result or why as its tooltip, the merge commit its own column
+  (left to the tooltip when narrow), the headings and filters sticky over a box of its own that scrolls. A target shows by #1356's rule, or while it has a history. The panel's
   *Queue in Version Control* opens it.
 - **The Merge dialog** (OP-13): for an agent's worktree branch whose card in flight has Hive merge it under its own
   ruleset, with the rules enforced (`worktrees:branchCards`), it says so and where the card stands (not queued yet,
