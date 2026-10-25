@@ -117,6 +117,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 - **Resizing the window no longer stops Hive reading an agent's screen** (#1572).
 - **Upgrading a workspace's board needs no restart:** the merge queues, project keys, card ids and the other steps Hive skips while a board waits for its upgrade run once you choose Upgrade, and nothing logs errors about the read-only board meanwhile (#1621).
 - **The Progress panel's lanes show whole lanes again:** with many runs above them, the Lanes section shrank with the runs, leaving part of a lane behind a small scroll bar however its top edge was dragged. The runs now give way and scroll (#1620).
+- **Quitting Hive no longer logs a slot warning:** Hive's look at its slots (leases to release, lanes waiting for one, merged branches to delete) could still be running as Hive closed its boards, and failed with *No workspace is open*. Hive now finishes it before closing, starts no agent in a slot while quitting, and leaves anything it didn't get to for the next start (#1628).
 - **Prompts Hive types aren't held back by an invisible character** (a zero-width space, a soft hyphen) pasted into a task: Claude Code 2.1.309 waited for another Enter (#1547).
 - **Codex agents aren't left marked "A line Hive typed wasn't taken"** after reading it while compacting (#1514).
 - **The Microsoft Store PowerShell notice gives its steps in the order that works:** uninstall the Store copy first, then install with winget (#1512, GitHub #8).

@@ -56,7 +56,7 @@ import { releaseQueueRunners } from './workflow/queueRunner'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { poolFor, startSlots, stopSlots } from './slotsApp'
 import { setSlotPools } from './unusedWorktrees'
-import { startSlotCards, stopSlotCards } from './slotCards'
+import { quitSlotCards, startSlotCards, stopSlotCards } from './slotCards'
 import { startSlotMigration, stopSlotMigration } from './slotMigration'
 import { startReviewerPool, stopReviewerPool } from './reviewerPool'
 import { startFreshNudges } from './freshStarts'
@@ -607,10 +607,14 @@ async function quitNow(tellUser: boolean): Promise<void> {
       apiTitle
     )
   }
+  // The slots' passes (#1628): none starts as the sessions stop (no builder placed), and one running ends before the
+  // boards close (will-quit); what it didn't get to is the next start's.
+  const slotsQuiet = quitSlotCards()
   await sessions.stopAllAndWait(3000)
   await quitLeftovers()
   // The merge queues' runners: their processes ended and their leases given up, so another Hive can run them at once.
   await releaseQueueRunners()
+  await slotsQuiet
   await usageHistory.stop()
   await progress.saveNow().catch(() => undefined)
   await flushMetrics().catch(() => undefined)
