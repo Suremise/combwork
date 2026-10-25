@@ -34,7 +34,7 @@ Use card-loop as the builder. Lane "<name>": cards, in order, #12, #15. Your rev
 Follow-ups go to Todo as new cards.
 ```
 
-Then what this lane needs and the rules can't know: test homes or other safety rules, risky areas, overlaps with other lanes, and the project's own conventions agents can't know otherwise. Write them in now: anything you add later reaches a busy agent only as a message (`hive_message_agent`). A reviewer's brief: `Use card-loop as the reviewer. Cards, in order: #12, #15. Your builder is B1.`, with what to look at closely on risky cards.
+Then what this lane needs and the rules can't know: test homes or other safety rules, risky areas, overlaps with other lanes, and the project's own conventions agents can't know otherwise. Write them in now: anything you add later reaches a busy agent only as a message (`hive_message_agent`). A reviewer's brief is coordinate-agents' (A new lane), with what to look at closely on risky cards.
 
 - Give rounds and a wait only when the user did; otherwise the lane takes the project's card-loop settings.
 - Explain the goal and the handoffs, give a sensible default and leave room for judgement: ask agents to say when they do something else, and why.
