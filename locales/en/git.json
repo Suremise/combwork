@@ -605,7 +605,11 @@
   },
   "git.queue.cancelled": {
     "defaultMessage": "Taken out ({reason, select, removed {Remove from queue} stale {its pass no longer counts} hold {On Hold} decision {a decision} integratedOutside {merged outside Hive} other {cancelled}})",
-    "description": "An outcome in the Git tab's merge queue history: the card's entry was taken out of the queue, and why. Keep the select keys."
+    "description": "Tooltip of an outcome in the Git tab's merge queue history: the card's entry was taken out of the queue, and why. Keep the select keys."
+  },
+  "git.queue.cancelledShort": {
+    "defaultMessage": "Taken out",
+    "description": "An outcome in the Git tab's merge queue history (one short word or two: why is its tooltip): the card's entry was taken out of the queue."
   },
   "git.queue.card": {
     "defaultMessage": "Card",
@@ -617,7 +621,11 @@
   },
   "git.queue.merged": {
     "defaultMessage": "Merged as {result}",
-    "description": "An outcome in the Git tab's merge queue history: the card was merged; the target's new commit follows ({result}: a short commit id)."
+    "description": "Tooltip of an outcome in the Git tab's merge queue history: the card was merged; the target's new commit follows ({result}: a short commit id)."
+  },
+  "git.queue.mergedShort": {
+    "defaultMessage": "Merged",
+    "description": "An outcome in the Git tab's merge queue history (one short word or two: the full outcome is its tooltip): the card was merged."
   },
   "git.queue.noHistory": {
     "defaultMessage": "Nothing merged or returned yet.",
@@ -629,7 +637,7 @@
   },
   "git.queue.open": {
     "defaultMessage": "Open {card}",
-    "description": "Tooltip of a card's key in the Git tab's merge queue history: opens the card ({card})."
+    "description": "Accessible name of a row of the Git tab's merge queue history: opens the card ({card}: its key)."
   },
   "git.queue.outcome": {
     "defaultMessage": "Outcome",
@@ -643,13 +651,25 @@
     "defaultMessage": "Merge queues",
     "description": "Accessible name of the Git tab's Merge queue section: the project's merge queues, a part per target branch. Glossary 2.5: merge queue."
   },
+  "git.queue.result": {
+    "defaultMessage": "Merge commit",
+    "description": "A column heading of the Git tab's merge queue history: for a merged card, the target's new commit (a short commit id)."
+  },
   "git.queue.returned": {
     "defaultMessage": "Returned: {why}",
-    "description": "An outcome in the Git tab's merge queue history: the queue returned the card to its builder, and why ({why}: conflict in tasks.ts, checks failed: unit…). Glossary 2.4: returned."
+    "description": "Tooltip of an outcome in the Git tab's merge queue history: the queue returned the card to its builder, and why ({why}: conflict in tasks.ts, checks failed: unit…). Glossary 2.4: returned."
+  },
+  "git.queue.returnedShort": {
+    "defaultMessage": "Returned",
+    "description": "An outcome in the Git tab's merge queue history (one short word or two: why is its tooltip): the queue returned the card to its builder. Glossary 2.4: returned."
   },
   "git.queue.revision": {
     "defaultMessage": "Revision",
     "description": "A column heading of the Git tab's merge queue history: the card's revision the entry was for (a short commit id). Glossary: revision."
+  },
+  "git.queue.title": {
+    "defaultMessage": "Title",
+    "description": "A column heading of the Git tab's merge queue history: the card's title."
   },
   "git.queue.when": {
     "defaultMessage": "When",

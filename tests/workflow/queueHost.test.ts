@@ -4,12 +4,30 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
-import { endHolderWatches, holderWatchState, kickQueue, setHolderWatch } from '../../src/main/workflow/queueHost'
+import { endHolderWatches, holderWatchState, kickQueue, setHolderWatch, startQueueHosts, stopQueueHosts } from '../../src/main/workflow/queueHost'
+import { emit } from '../../src/main/events'
 import type { Workflow } from '../../src/main/workflow/runtime'
 import type { WorkspaceService } from '../../src/main/workspace'
 
-const ctx = vi.hoisted(() => ({ wf: null as Workflow | null, folder: '', enforced: true, heldBy: null as { profile: string; pid: number; renewedAt: string } | null, acquired: 0 }))
-vi.mock('../../src/main/workflow/service', () => ({ workflowFor: async () => ctx.wf, workflowEnforced: () => ctx.enforced }))
+const ctx = vi.hoisted(() => ({
+  wf: null as Workflow | null,
+  folder: '',
+  enforced: true,
+  heldBy: null as { profile: string; pid: number; renewedAt: string } | null,
+  acquired: 0,
+  // The board's side (#1621): whether it takes no writes (a 0.9 board waiting for its upgrade), and the upgrade's listeners.
+  readOnly: false,
+  upgraded: new Set<(ws: WorkspaceService) => void>(),
+  open: [] as WorkspaceService[],
+  workflowsAsked: 0
+}))
+vi.mock('../../src/main/workflow/service', () => ({ workflowFor: async () => (ctx.workflowsAsked++, ctx.wf), workflowEnforced: () => ctx.enforced }))
+vi.mock('../../src/main/boardStore', async (original) => ({
+  ...(await original<typeof import('../../src/main/boardStore')>()),
+  boardReadOnly: () => ctx.readOnly,
+  onBoardUpgraded: (fn: (ws: WorkspaceService) => void) => (ctx.upgraded.add(fn), () => ctx.upgraded.delete(fn))
+}))
+vi.mock('../../src/main/workspace', async (original) => ({ ...(await original<typeof import('../../src/main/workspace')>()), openWorkspaces: () => ctx.open }))
 vi.mock('../../src/main/agentProcesses', () => ({ processSupervisor: () => ({}) }))
 vi.mock('../../src/main/workflow/queueChecksApp', () => ({ appQueueChecks: () => ({ runCheck: async () => ({ ok: true, output: '' }) }) }))
 vi.mock('../../src/main/repoLock', () => ({ withRepoLock: async (_p: string, fn: () => Promise<unknown>) => fn() }))
@@ -43,6 +61,10 @@ afterEach(() => {
   ctx.enforced = true
   ctx.heldBy = null
   ctx.acquired = 0
+  ctx.readOnly = false
+  ctx.open = []
+  ctx.workflowsAsked = 0
+  stopQueueHosts()
   setHolderWatch(null)
 })
 
@@ -240,5 +262,58 @@ describe("another Hive's runner, watched (#1455, S50; HR4's #1358 round 1)", () 
     aGone()
     expect(ctx.acquired).toBe(1)
     expect(e.kinds(card.id)).not.toContain('Integrated')
+  })
+})
+
+/** A card approved under Team and queued for main (its IntegrationRequested written; no queue has run it yet). */
+async function approved() {
+  const e = (env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], mergeChecks: [], okBefore: { mode: 'never', labels: [] } }))
+  sh(e.project, 'checkout', '-q', '--detach')
+  const card = e.wf.createCard({ title: 'Approved' })
+  const s = await e.wf.start(card.key, B1)
+  moved(s)
+  commit(s.data!.folder as string, { 'src/approved.txt': 'approved\n' }, `${card.key}: Approved`)
+  moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  moved(await e.wf.startReview(card.key, R1))
+  moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+  ctx.wf = e.wf
+  ctx.folder = `${e.home}/queue`
+  const ws = { path: e.home, lifetime: new AbortController().signal, worktreesRoot: `${e.home}/worktrees`, emit: () => undefined, info: () => ({ projects: [{ path: e.project, name: 'project', platform: 'git' }] }) } as unknown as WorkspaceService
+  return { e, card, ws }
+}
+
+describe("a workspace's merge queues start as it opens, or once its board is upgraded (#1621)", () => {
+  it('opened with its board waiting for the upgrade: nothing read or run (no "no such table"); upgraded, the queue merges the approved card with no restart', async () => {
+    const { e, card, ws } = await approved()
+    ctx.readOnly = true
+    ctx.open = [ws]
+    startQueueHosts()
+    emit({ type: 'workspace-changed', workspace: null })
+    // startOpen looks at the board before its first wait: had it gone on, it would have asked for the project's workflow
+    // (and read the board's facts, which a 0.9 board hasn't got) by now.
+    expect(ctx.workflowsAsked).toBe(0)
+    expect(ctx.acquired).toBe(0)
+    expect(e.kinds(card.id)).not.toContain('Integrated')
+    // The user says Upgrade: the board takes writes, and the upgrade's listeners run.
+    ctx.readOnly = false
+    expect(ctx.upgraded.size).toBe(1)
+    for (const fn of ctx.upgraded) fn(ws)
+    await vi.waitFor(() => expect(e.wf.state(card).stage).toBe('done'), HUNG)
+    expect(e.kinds(card.id).filter((k) => k === 'Integrated')).toHaveLength(1)
+  })
+
+  it('opened with its board upgraded already: the queue starts as it opens, as before', async () => {
+    const { e, card, ws } = await approved()
+    ctx.open = [ws]
+    startQueueHosts()
+    emit({ type: 'workspace-changed', workspace: null })
+    await vi.waitFor(() => expect(e.wf.state(card).stage).toBe('done'), HUNG)
+  })
+
+  it('stopping the hosts stops following upgrades', () => {
+    startQueueHosts()
+    expect(ctx.upgraded.size).toBe(1)
+    stopQueueHosts()
+    expect(ctx.upgraded.size).toBe(0)
   })
 })

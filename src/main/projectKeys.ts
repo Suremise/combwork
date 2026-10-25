@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { randomUUID } from 'crypto'
 import { resolve } from 'path'
-import { addProjectKeys, boardOpen, boardWrite, boardChanged, cardKeyOf, cardNamed, hasCard, keysNoticeDue, keysNoticeSaid, projectKeys, setProjectKey } from './boardStore'
+import { addProjectKeys, boardOpen, boardReadOnly, boardWrite, boardChanged, cardKeyOf, cardNamed, hasCard, keysNoticeDue, keysNoticeSaid, projectKeys, setProjectKey } from './boardStore'
 import { fmt, msg, tr } from '../shared/i18n'
 import { projectNow } from '../shared/projectIds'
 import { keyProblem, KEY_FORM, nameWithKey, normalKey, setCardNaming, suggestKey, type CardNames, type KeyHeld } from '../shared/projectKeys'
@@ -87,7 +87,8 @@ export async function keyProjects(ws: WorkspaceService): Promise<string[]> {
   // closes this one, meanwhile gets nothing written, in either.
   const path = ws.path
   const life = ws.lifetime
-  if (!path) return []
+  // A board waiting for its upgrade to 1.0 takes no writes: its projects get their keys once it is upgraded (#1621).
+  if (!path || boardReadOnly(ws)) return []
   const ids = await ws.projectIds()
   if (!stillIn(ws, path, life)) return []
   const projects = [...ids.byId].map(([id, p]) => ({ id, name: folderOf(p), path: resolve(p).toLowerCase() })).sort((a, b) => a.name.localeCompare(b.name, 'en'))

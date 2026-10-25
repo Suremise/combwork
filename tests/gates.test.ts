@@ -493,7 +493,7 @@ describe('drags run the intents they stand for (#1290)', () => {
     const card = await create(w)
     await update(w, card, { column: 'doing' })
     const r = await move(w, card, 'review')
-    expect(r).toMatchObject({ refused: { rule: 'move.noStage', next: expect.stringContaining('done') } })
+    expect(r).toMatchObject({ refused: { rule: 'move.noStage', next: expect.stringContaining('Done') } })
     expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('doing')
     expect((await update(w, card, { column: 'review' })).column).toBe('review')
   })

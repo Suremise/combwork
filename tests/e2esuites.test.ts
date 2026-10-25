@@ -28,7 +28,7 @@ import { describeClaim, heavySlots, holdsMergeSlot, isFullUnitRun, isHeavy, laun
 // @ts-expect-error: plain .mjs modules without types
 import { addWorktree, invocationDir, keepDir, removeInvocation, removeStale, removeWorktree } from './e2e/tempWorktrees.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { FAILED_KEEP_MS, FAILED_MAX, KEEP_HOURS, KEEP_MB, KEEP_RUNS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFor, markRunFailed, newRunDir, pruneRunDirs, runDirActive, runDirsInOrder, runDirsToPrune, runFailedAt, runStartedAt } from './e2e/logs.mjs'
+import { FAILED_KEEP_MS, FAILED_MAX, KEEP_HOURS, KEEP_MB, KEEP_RUNS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFor, markRunFailed, newRunDir, pruneRunDirs, pruneRunDirsReleasing, runDirActive, runDirsInOrder, runDirsToPrune, runFailedAt, runStartedAt } from './e2e/logs.mjs'
 import { createRequire } from 'module'
 import { ProgressStore } from '../src/main/progress'
 import { tempDir } from './tempDir'
@@ -1067,6 +1067,47 @@ describe("each run's own log folder (logs.mjs)", () => {
       expect(pruneRunDirs(crashed, 0, [], () => false)).toHaveLength(2)
     } finally {
       rmSync(crashed, { recursive: true, force: true })
+    }
+  })
+
+  it.runIf(process.platform === 'win32')("a run folder something still holds is kept and named, never a failure; a later prune removes it (#1616)", async () => {
+    const logs = tempDir('hive-held-')
+    let holder: ReturnType<typeof spawn> | null = null
+    try {
+      const held = newRunDir(logs, new Date(2026, 9, 4, 15, 0, 0))
+      const free = newRunDir(logs, new Date(2026, 9, 4, 15, 0, 1))
+      finishRunDirs([held, free])
+      mkdirSync(join(held, 'suite'))
+      // Another process works in it (a lane's, a scan): Windows refuses to remove a folder a process has as its own. Its
+      // folder is held once the process runs (not yet at 'spawn'), so it says when it does.
+      holder = spawn(process.execPath, ['-e', "process.stdout.write('ready'); process.stdin.resume()"], { cwd: join(held, 'suite'), stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true, env: {} })
+      await new Promise<void>((resolve, reject) => {
+        holder!.once('error', reject).once('exit', (code) => reject(new Error(`the holder ended (${code})`)))
+        holder!.stdout!.once('data', () => resolve())
+      })
+      holder.removeAllListeners('exit')
+      const kept: [string, string][] = []
+      const onKept = (name: string, code: string) => kept.push([name, code])
+      expect(pruneRunDirs(logs, 0, [], () => false, () => null, { onKept })).toEqual([basename(free)])
+      expect(kept).toHaveLength(1)
+      expect(kept[0][0]).toBe(basename(held))
+      expect(['EPERM', 'EBUSY', 'ENOTEMPTY', 'EACCES']).toContain(kept[0][1])
+      expect(existsSync(held)).toBe(true)
+      // The runner's prune keeps it the same way, after releasing what the run kept.
+      const released: string[] = []
+      expect(await pruneRunDirsReleasing(logs, 0, [], () => false, () => null, { onKept, release: async (d: string) => void released.push(basename(d)) })).toEqual([])
+      expect(released).toEqual([basename(held)])
+      expect(kept.map(([n]) => n)).toEqual([basename(held), basename(held)])
+      // Let go: the next prune removes it.
+      const exited = new Promise((resolve) => holder!.once('exit', resolve))
+      holder.stdin!.end()
+      await exited
+      holder = null
+      expect(pruneRunDirs(logs, 0, [], () => false, () => null, { onKept })).toEqual([basename(held)])
+      expect(existsSync(held)).toBe(false)
+    } finally {
+      holder?.kill()
+      rmSync(logs, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 })
     }
   })
 

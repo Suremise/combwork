@@ -1705,6 +1705,17 @@ const isoOf = (at: string): string => at.replace(/T(\d\d)-(\d\d)-(\d\d)-(\d{3})Z
 /** The user's errors for another Hive on the file (SQLite's lock or a fresh presence marker). */
 const inUse = (e: unknown): boolean => e instanceof DbInUseError || e instanceof OtherHiveError
 
+const upgradedListeners = new Set<(ws: WorkspaceService) => void>()
+/**
+ * Called once a workspace's board was upgraded (#1621), after its lock is let go: what a service skipped as the
+ * workspace opened, its board then read-only (the merge queues, the repairs that write), it runs now, without a restart.
+ * Returns the unsubscribe.
+ */
+export function onBoardUpgraded(fn: (ws: WorkspaceService) => void): () => void {
+  upgradedListeners.add(fn)
+  return () => upgradedListeners.delete(fn)
+}
+
 /**
  * Upgrades the board to 1.0, the user having said yes: under the board's lock (no change of it under way), the board
  * closed and opened again with the 1.0 group approved, which db.ts runs with the file locked to this Hive, after a copy
@@ -1714,6 +1725,7 @@ const inUse = (e: unknown): boolean => e instanceof DbInUseError || e instanceof
 export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: string | null }> {
   const path = pathOf(ws)
   const key = keyOf(path)
+  let upgraded = false
   const out = await withFileLock(boardLock(path), async () => {
     const pending = boardOf(path).db.pending
     if (!pending) return { backup: null }
@@ -1739,9 +1751,17 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
     const kept = from09 ? copy09(path) : undefined
     log.info(`upgraded the board of ${userText(path)} to 1.0 (from v${pending.from}); ${kept ? `the 0.9 board is kept as ${basename(kept.file)}` : 'it was a 1.0 board already'}`)
     replaced(path)
+    upgraded = true
     return { backup: kept?.file ?? null }
   })
   emit({ type: 'tasks-changed', workspacePath: path })
+  if (upgraded) for (const fn of upgradedListeners) {
+    try {
+      fn(ws)
+    } catch (e) {
+      log.warn('a service following the upgraded board', e)
+    }
+  }
   return out
 }
 

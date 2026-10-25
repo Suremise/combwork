@@ -314,6 +314,8 @@
   "tips.resumeAll.title": "Resume all agents at once",
   "tips.reviewCopies.text": "A reviewer reviews in a review copy: a folder at exactly the submitted revision, which nothing else writes, so the builder can carry on meanwhile. Its checks there count for that submission. Settings → Advanced turns it off.",
   "tips.reviewCopies.title": "Reviewers test exactly what was submitted",
+  "tips.reviewSkip.text": "Building an installer or a quick trial needs no reviewer? Tick Skip review in the New Card dialog: submitting the card finishes it, and a code card still goes on to its merge, with its merge checks.",
+  "tips.reviewSkip.title": "Cards that don't need a review",
   "tips.reviewerPool.text": "With the workflow option Reviewers set to A shared pool, Start Lane offers the reviewer pool: each card submitted goes to the next free reviewer, oldest first, never to its own builder.",
   "tips.reviewerPool.title": "Share reviewers between lanes",
   "tips.safeguardStops.text": "A shield beside an agent's status means its CLI's safety classifier stopped a response: hover it for when, the model, and the agent's last tool calls before it. Orange means its model changed since, or it waits on you.",

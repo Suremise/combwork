@@ -190,11 +190,16 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const widths = await row1.locator('.lane-seg').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))
   check('segments are equal widths', Math.max(...widths) - Math.min(...widths) <= 1, JSON.stringify(widths))
   // Each state its own pattern as well as colour: no two states draw the same.
-  const looks = await row1.locator('.lane-seg').evaluateAll((els) => els.map((e) => { const s = getComputedStyle(e); return `${s.backgroundImage}|${s.backgroundColor}|${s.boxShadow}|${s.animationName}` }))
+  const looks = await row1.locator('.lane-seg').evaluateAll((els) => els.map((e) => { const s = getComputedStyle(e); return `${s.backgroundImage}|${s.backgroundColor}|${s.boxShadow}|${getComputedStyle(e, '::before').animationName}` }))
   const byState = {}
   lane1.forEach((n, i) => (byState[want[n]] = looks[i]))
   check('every state looks different', new Set(Object.values(byState)).size === Object.keys(byState).length, JSON.stringify(byState))
   check('doing is animated, and the others are not', /lane-stripes/.test(byState.doing) && Object.entries(byState).every(([k, v]) => k === 'doing' || !/lane-stripes/.test(v)))
+  // Under reduced motion the stripes stand still (#1629: they move on the segment's ::before).
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const reduced = await row1.locator(`.lane-seg[data-card="${n4}"]`).evaluate((e) => getComputedStyle(e, '::before').animationName)
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  check('…and still under reduced motion', reduced === 'none', reduced)
   const row2 = section.locator(`.progress-lane[data-lane="${l2}"]`)
   check("a long lane folds its finished cards into one '✓ n'", ((await row2.locator('.lane-seg.finished').innerText().catch(() => '')) === '✓ 18') && (await row2.locator('.lane-seg[data-card]').count()) === 4)
   // A paused lane says why in the paused colour (#1279), and that it is paused in its accessible name.
@@ -318,7 +323,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await page.keyboard.press('ArrowUp')
   check('…and back to five', !!(await until(async () => showsWhole(await fit(), 5) && (await kept()) === 5, HUNG_MS)), JSON.stringify(await fit()))
   // Ended and abandoned lanes are still: nothing in them animates, and they show no current card.
-  const still = await section.locator(`[data-lane="${l4}"] .lane-seg, [data-lane="${l5}"] .lane-seg`).evaluateAll((els) => els.map((e) => getComputedStyle(e).animationName))
+  const still = await section.locator(`[data-lane="${l4}"] .lane-seg, [data-lane="${l5}"] .lane-seg`).evaluateAll((els) => els.map((e) => getComputedStyle(e, '::before').animationName))
   check('ended and abandoned lanes never animate, and name no current card', still.length === 4 && still.every((a) => a === 'none') && (await section.locator(`[data-lane="${l4}"] .progress-lane-current, [data-lane="${l5}"] .progress-lane-current`).count()) === 0, JSON.stringify(still))
   const panelBox = await panel.boundingBox()
   const sectionBox = await section.boundingBox()
@@ -485,7 +490,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // …but not the abandoned lane's (#512): B6's lane had #5 in Todo when it was given up, and B1's lane works it now.
   const row5 = section.locator(`.progress-lane[data-lane="${l5}"]`)
   const seg5 = (await row5.locator(`.lane-seg[data-card="${n5}"]`).getAttribute('class')) ?? ''
-  check('the abandoned lane keeps the card as it left it, unanimated, while another lane works it', /\btodo\b/.test(seg5) && !/\bdoing\b/.test(seg5) && (await row5.locator(`.lane-seg[data-card="${n5}"]`).evaluate((e) => getComputedStyle(e).animationName)) === 'none', seg5)
+  check('the abandoned lane keeps the card as it left it, unanimated, while another lane works it', /\btodo\b/.test(seg5) && !/\bdoing\b/.test(seg5) && (await row5.locator(`.lane-seg[data-card="${n5}"]`).evaluate((e) => getComputedStyle(e, '::before').animationName)) === 'none', seg5)
   await row5.locator(`.lane-seg[data-card="${n5}"]`).hover()
   check("…and its hover says it's as the lane left it", !!(await until(async () => /when the lane ended/.test((await page.locator('.tip').allInnerTexts()).join(' ')), HUNG_MS)))
   // R1's lane was paused on its blocked card; its builder moves on to the next one: working, not paused, on that card.

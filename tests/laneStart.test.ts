@@ -4,13 +4,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 type Live = { status: string; sessionId: string }
-const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[] }))
+const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void> }))
 
 vi.mock('../src/main/sessions', () => ({
   sessions: {
     liveFor: (_p: string, id: string) => state.live.get(id) ?? null,
     start: async (_p: string, o: { agentId: string }) => {
       state.calls.push(`start ${o.agentId}`)
+      state.onStart?.(o.agentId)
       state.live.set(o.agentId, { status: 'starting', sessionId: `new-${o.agentId}` })
       return { runId: `run-${o.agentId}` }
     },
@@ -37,6 +38,10 @@ vi.mock('../src/main/lanes', () => ({
     state.calls.push('record')
     state.afterRecord?.()
     return { lane: { id: 'lane-1', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' } }, did: 'started', replaced: null }
+  },
+  rawLanes: async () => {
+    await state.lanesHeld
+    return state.lanes
   }
 }))
 vi.mock('../src/main/tasks', () => ({
@@ -45,7 +50,7 @@ vi.mock('../src/main/tasks', () => ({
 vi.mock('../src/main/workflow/service', () => ({ workflowEnforced: () => state.enforced }))
 vi.mock('../src/main/workflow/rulesets', () => ({ resolvedOf: () => ({ options: state.options }) }))
 
-const { laneStartInfo, startLaneFromWindow } = await import('../src/main/laneStart')
+const { laneStartInfo, startLaneFromWindow, startWaitingLane } = await import('../src/main/laneStart')
 const { allOff } = await import('../src/shared/workflow/options')
 
 const ws = {
@@ -62,6 +67,9 @@ beforeEach(() => {
   state.options = null
   state.recorded.length = 0
   state.briefs.length = 0
+  state.onStart = null
+  state.lanes = []
+  state.lanesHeld = null
 })
 
 describe('Start Lane… with the reviewer pool (#1443)', () => {
@@ -137,5 +145,36 @@ describe('Start lane… in main (#1280)', () => {
     const r = await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b1', reviewer: 'r1', cards: [1] })
     expect(state.calls).not.toContain('newConversation r1')
     expect(r.started.find((s) => s.name === 'R1')?.how).toBe('failed')
+  })
+})
+
+describe('a lane waiting for a slot, started as Hive quits (#1628)', () => {
+  const waiting = (): void => void (state.lanes = [{ id: 'lane-1', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1] }])
+
+  it('quitting while its lane is read: nothing is started, and it keeps waiting (false)', async () => {
+    waiting()
+    let quitting = false
+    let release!: () => void
+    state.lanesHeld = new Promise<void>((r) => (release = r))
+    const started = startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => quitting)
+    quitting = true
+    release()
+    expect(await started).toBe(false)
+    expect(state.calls).toEqual([])
+  })
+
+  it("quitting while its builder starts: its reviewer isn't launched, nothing counts as failed, and it keeps waiting", async () => {
+    waiting()
+    let quitting = false
+    state.onStart = (id) => void (id === 'b1' && (quitting = true))
+    expect(await startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => quitting)).toBe(false)
+    expect(state.calls).toEqual(['start b1'])
+    expect(state.briefs).toHaveLength(1)
+  })
+
+  it('not quitting: both are started', async () => {
+    waiting()
+    expect(await startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => false)).toBe(true)
+    expect(state.calls).toEqual(['start b1', 'start r1'])
   })
 })

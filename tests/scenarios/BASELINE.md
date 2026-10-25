@@ -36,6 +36,39 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## Reading the owning skill, recorded (#1611): the three fakes, fixtures v91, 25 October 2026
+
+Claude Code's #1537 trial relayed the user's answer to a watching reviewer correctly without reading coordinate-agents.
+The Assistant's call: the scenario checks the behaviour. assistant-message-watching's "read the coordinate-agents
+skill" is now an observation (`observe`: in `results.json` and each benchmark sample, never a pass or a failure); the
+relay's checks are unchanged. The three fakes pass its four checks and record the read (`2026-10-25T16-52-41-fake`,
+`2026-10-25T16-53-01-fake-codex`, `2026-10-25T16-53-28-fake-copilot`). The real rerun is #1539's final step.
+
+## Ack with the next read (#1608): the three fakes, fixtures v90, 25 October 2026
+
+Codex's #1537 trial acked two messages in a call of their own. `hive_inbox`'s description now says to ack the ids you've
+acted on in your next hive_inbox call, not in a call of their own (the tool owns it; work-on-card doesn't repeat it).
+The check is unchanged: inbox-ack-and-read passes on the three fakes (`2026-10-25T16-44-54-fake`,
+`2026-10-25T16-45-34-fake-codex`, `2026-10-25T16-46-10-fake-copilot`). The real rerun is #1539's final step.
+
+## A refusal's next step is the task's (#1609): the three fakes, fixtures v90, 25 October 2026
+
+Claude Code's #1537 trial asked the user rather than commit when `hive_submit` was refused ("Commit the work, then
+submit"). work-on-card now says a refusal's next step is part of the task, even one naming only the refused tool, taken
+without asking unless it would discard or overwrite work or needs the user's decision. The scenario is unchanged:
+intent-submit-refused passes on the three fakes (`2026-10-25T16-39-12-fake`, `2026-10-25T16-39-35-fake-codex`,
+`2026-10-25T16-39-58-fake-copilot`). The real rerun is #1539's final step.
+
+## A wake left by setup rings before the prompt (#1613): the three fakes, fixtures v90, 25 October 2026
+
+card-loop-follow-up-check failed once on fake Copilot (#1537's v89 run): its only turn read the inbox. Setup posts the
+builder's follow-up (or design) before the subject starts, so Hive's loop wake rings its doorbell as the session becomes
+idle, just as the harness types the prompt; in every sample the doorbell's turn came first, with the prompt typed into
+the busy session, and once the prompt was lost. Scenarios now have `beforePrompt`: these two wait until the wake is
+read and its turn is over (idle, or watching once it has acted on the wake, as a model does). Fake Copilot, both ×8 with 2 spinner workers: 16 of 16
+(`results/2026-10-25T16-04-10-fake-copilot`); fake Claude Code and fake Codex once each: all pass
+(`2026-10-25T16-09-43-fake`, `2026-10-25T16-10-36-fake-codex`). Every fake now reads the wake before the prompt.
+
 ## P8's smoke trials (#1537): Claude Code and Codex, fixtures v86–v89, 25 October 2026
 
 Darren's scope (24 Oct): each key scenario once on Claude Code and on Codex, with no `--repeat`, Haiku or Copilot. The

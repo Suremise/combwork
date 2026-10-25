@@ -41,8 +41,11 @@ export function KindMark({ b }: { b: WorkBadge | undefined }) {
   return (
     <Tooltip content={text}>
       <span className={proposed ? 'task-kind proposed' : 'task-kind'} aria-label={text} data-kind={proposed ? 'proposed' : 'no-code'}>
-        <Icon name="note" /> {tr(M.noCode)}
-        {proposed ? '?' : ''}
+        <Icon name="note" />
+        <span className="task-chip-label">
+          {tr(M.noCode)}
+          {proposed ? '?' : ''}
+        </span>
       </span>
     </Tooltip>
   )

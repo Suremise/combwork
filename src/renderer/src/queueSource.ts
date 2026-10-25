@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { keptLive, nextFold, queueKey, withKept, type KeptReturn } from '@shared/progressQueue'
 import type { QueueRecent, QueueView } from '@shared/workflow/queue'
-import { call } from './api'
+import { call, callShared } from './api'
 import { get, set, setProgressOpen, useStore } from './store'
 import { PROGRESS_TABS } from '@shared/progressTabs'
 
@@ -23,7 +23,7 @@ async function loadProject(projectPath: string): Promise<void> {
   const key = projectPath.toLowerCase()
   const n = ++seq
   reads.set(key, n)
-  const views = await call('queue:list', projectPath).catch(() => null)
+  const views = await callShared('queue:list', projectPath).catch(() => null)
   if (!views || reads.get(key) !== n || get().workspace?.path !== ws) return
   set((s) => ({ queues: [...s.queues.filter((q) => !same(q.projectPath, projectPath)), ...views] }))
   // Returns wait beyond the list (#1356's returns policy): read again once the first one seen folds and frees its slot,

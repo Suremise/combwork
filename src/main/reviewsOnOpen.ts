@@ -1,4 +1,5 @@
 import { join } from 'path'
+import { onBoardUpgraded } from './boardStore'
 import { createLogger } from './logger'
 import { sessions } from './sessions'
 import { endReviewsWithoutSession } from './tasks'
@@ -15,7 +16,7 @@ let started = false
 export function initReviewsOnOpen(): void {
   if (started) return
   started = true
-  WorkspaceService.openedListeners.add((ws) => {
+  const repair = (ws: WorkspaceService): void => {
     const path = ws.path
     const life = ws.lifetime
     if (!path) return
@@ -28,7 +29,10 @@ export function initReviewsOnOpen(): void {
       .catch((e) => log.warn('ending the reviews of sessions that ended', e))
       .finally(() => running.delete(run))
     running.add(run)
-  })
+  }
+  WorkspaceService.openedListeners.add(repair)
+  // Opened while its board waited for the upgrade to 1.0 (it takes no writes until then): repaired once it is upgraded (#1621).
+  onBoardUpgraded(repair)
 }
 
 const running = new Set<Promise<unknown>>()

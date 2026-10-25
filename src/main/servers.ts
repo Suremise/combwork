@@ -83,7 +83,7 @@ import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor,
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
-import { cardFacts, cardKind, factRow } from './workflow/cardWork'
+import { cardFacts, cardKind, cardReviewSkip, factRow } from './workflow/cardWork'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
 import { detect, projectPlatform } from './platform/registry'
@@ -2197,9 +2197,11 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
   const stage = cardStages(workspace, [c.number]).get(c.number) ?? CATEGORY_STAGE[c.column]
   // Its kind (#1277: code or no-code) and a kind an agent proposed, not answered yet: additive too.
   const k = cardKind(workspace, c.number)
+  // Whether it skips review (#1625), and an agent's proposal of it not answered yet: additive, only when there is one.
+  const rs = cardReviewSkip(workspace, c.number)
   // Who merges it and where it is with the merge queue, by its own rules (#1354): additive, only when Hive merges it.
   const merge = c.project && !c.archived ? await queueLineFor(c.project, c.number) : null
-  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), stage, ...(merge ? { merge } : {}) }
+  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), stage, ...(merge ? { merge } : {}) }
 }
 
 /** The project a project agent's calls are confined to on the board, or null (the Assistant and scripts see it all). */
@@ -2346,7 +2348,7 @@ route('POST', '/v1/tasks', async ({ body }) => {
   requireWorkspace()
   const title = String(body?.title ?? '').trim()
   if (!title) throw new HttpError(400, 'title is required')
-  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}) }
+  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}) }
   const actor = await taskActor()
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, []) : taskView(c))
   if (actor.kind !== 'assistant') return reply(await tasks.createTask(input, actor))
@@ -2373,6 +2375,8 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   if (kind !== undefined) tasks.kindOf(kind)
   // The override's reason is the kind change's when no column moves with it.
   if (kind !== undefined && patch.column === undefined) delete patch.override
+  // Whether it skips review (#1625): the user's reason (the Assistant's), or false; checked before anything is written.
+  const skipReview = body?.skipReview === undefined ? undefined : tasks.reviewSkipArg(body.skipReview)
   const write = async (commit?: () => void): Promise<TaskCard> => {
     if (confirmKind !== undefined) {
       await tasks.confirmKind(n, confirmKind, actor, { commit })
@@ -2382,13 +2386,17 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
       await tasks.setKind(n, kind, actor, { commit, reason: body?.override && typeof body.override === 'object' ? String((body.override as { reason?: unknown }).reason ?? '') : '' })
       changes.push(`Kind: ${kind}`)
     }
+    if (skipReview !== undefined) {
+      await tasks.setReviewSkip(n, skipReview !== false, actor, { commit, reason: skipReview || '' })
+      changes.push(skipReview !== false ? 'Skips review' : 'Reviewed')
+    }
     // A change and its comment are saved together: a card watch woken by the change names this comment.
     const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit }) : comment ? await tasks.commentTask(n, comment, actor) : await tasks.readTask(n, actor)
     if (comment) changes.push('Commented')
     return c
   }
   // A change of its kind with anything else is one board change (HR3's #1277 round 1): refused part way, none of it.
-  const apply = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
+  const apply = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, changes) : taskView(c))
   if (actor.kind !== 'assistant') {
     const c = await apply()
@@ -2416,6 +2424,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
       patch.decision !== undefined ? 'recorded a decision' : '',
       confirmKind !== undefined ? (confirmKind ? 'confirmed it as no code' : 'kept it as code') : '',
       kind !== undefined ? `made it ${kind}` : '',
+      skipReview !== undefined ? (skipReview !== false ? 'set it to skip review' : 'set it to be reviewed') : '',
       Object.keys(patch).some((k) => k !== 'column' && k !== 'before' && k !== 'position' && k !== 'decision') ? 'changed it' : ''
     ]
       .filter(Boolean)

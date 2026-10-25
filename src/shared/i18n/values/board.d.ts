@@ -314,6 +314,9 @@ interface HiveMessageValues {
   'board.forYou.rounds': undefined
   'board.forYou.send': undefined
   'board.forYou.showStuck': undefined
+  'board.forYou.tipAsks': { kind: string; who: string | number }
+  'board.forYou.tipMore': { n: number }
+  'board.forYou.tipOpen': undefined
   'board.inbox.asks': undefined
   'board.inbox.asksWhat': { message: string | number }
   'board.inbox.assistant': undefined
@@ -623,6 +626,24 @@ interface HiveMessageValues {
   'board.review.tip': { agent: string | number; ago: string | number }
   'board.review.tipNotRunning': { agent: string | number; ago: string | number }
   'board.review.tipRemoved': { agent: string | number; ago: string | number }
+  'board.reviewSkip.askMessage': undefined
+  'board.reviewSkip.askTitle': { card: string | number }
+  'board.reviewSkip.change': { skip: string }
+  'board.reviewSkip.confirm': undefined
+  'board.reviewSkip.confirmLabel': undefined
+  'board.reviewSkip.failed': undefined
+  'board.reviewSkip.field': undefined
+  'board.reviewSkip.keep': undefined
+  'board.reviewSkip.newChoice': undefined
+  'board.reviewSkip.note': undefined
+  'board.reviewSkip.proposal': { reason: string | number }
+  'board.reviewSkip.proposedMark': undefined
+  'board.reviewSkip.proposedTip': undefined
+  'board.reviewSkip.reason': undefined
+  'board.reviewSkip.reviewed': undefined
+  'board.reviewSkip.skipped': undefined
+  'board.reviewSkip.skippedTip': { who: string; reason: string | number }
+  'board.reviewSkip.working': undefined
   'board.run.agentStopped': undefined
   'board.run.failedAfter': { took: string | number }
   'board.run.finishing': { took: string | number }

@@ -411,11 +411,13 @@ export interface HiveRequests {
   'tasks:setAside': () => SetAsideCard[]
   'tasks:addSetAside': (file: string) => TaskCard
   'tasks:discardSetAside': (file: string) => void
-  'tasks:create': (input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; context?: string[]; kind?: 'code' | 'no-code' }) => TaskCard
+  'tasks:create': (input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; context?: string[]; kind?: 'code' | 'no-code'; skipReview?: string }) => TaskCard
   /** Changes a card's kind after it was made (#1277): an override, asked first (`ask`) unless `confirm`, with its reason. */
   'tasks:setKind': (n: number, kind: 'code' | 'no-code', opts?: { confirm?: boolean; reason?: string }) => { ask: true } | TaskCard
   /** Answers an agent's proposed kind (#1277): `accept` makes it the card's kind, else the card stays code. */
   'tasks:confirmKind': (n: number, accept: boolean) => TaskCard
+  /** Makes a card skip review, or review it after all (#1625), answering an agent's proposal too: `reason`, the user's optional note. */
+  'tasks:setReviewSkip': (n: number, skip: boolean, opts?: { reason?: string }) => TaskCard
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }
   'tasks:update': (n: number, patch: TaskPatch) => TaskCard

@@ -98,7 +98,7 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note']
   check("a folder of the user's with a copy's name is left as it is", fs.readFileSync(path.join(codexDir, 'hive-handover', 'SKILL.md'), 'utf8').includes('MY OWN') && !fs.existsSync(path.join(codexDir, 'hive-handover', '.hive-copy')))
   check("Hive's copies are kept out of git", fs.readFileSync(path.join(proj, '.git', 'info', 'exclude'), 'utf8').includes('/.agents/skills/hive-*/'))
   const told = developer(codexLaunch(proj))
-  check('Codex is told the session contract: the board skills and their boundaries', /work-on-card skill/.test(told) && /review-agent-work/.test(told) && /move a card to done only once its work is merged \(in the project folder: committed\), or when the user asks/.test(told) && !/coordinate-agents/.test(told), told.slice(0, 300))
+  check('Codex is told the session contract: the board skills and their boundaries', /work-on-card skill/.test(told) && /review-agent-work/.test(told) && /Board rules\b.*\bhive_report_merge\b.*On hold is the user's/.test(told) && !/coordinate-agents/.test(told), told.slice(0, 300))
   const status = await inv('workspace:refresh').then((w) => w.projects.find((p) => p.name === 'alpha').agents.find((a) => a.id === codex.id).live)
   check('the agent records what it launched with', /^[0-9a-f]{16}$/.test(status?.launched?.guidance ?? '') && !!status.launched.skills['work-on-card'], JSON.stringify(status?.launched))
   // What was delivered, not what was asked for: the user's own hive-handover kept Hive's handover out.

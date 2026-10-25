@@ -11,7 +11,7 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
 import { agentActor, agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, loopStepSide, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
-import { awaitsAgentMerge, compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
+import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
 import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
@@ -31,7 +31,7 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
 
-import { ownRuleset } from '../../shared/workflow/workView'
+import { ownRuleset, reviewSkipOf } from '../../shared/workflow/workView'
 
 export { APPLY_OPTIONS } from '../../shared/workflow/workView'
 
@@ -196,8 +196,14 @@ export type LockSeen = { card: number; cycle: number } | { at: string }
 /** The stages in which a card's lock record counts (G16, #1481): started and not finished. */
 const LOCK_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'merging']
 
+/** A reviewer's intents (§16.7.2): refused outside Review, their next step is the reviewer's (`sideOf`, #1604). */
+const REVIEW_MOVES: ReadonlySet<string> = new Set(['start review', 'verdict']) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+
 /** The user's choice at the round limit, as an agent's wake says it (English). */
 const CHOICE_WORDS: Record<RoundChoice, string> = { carryOn: 'carry on', split: 'split it', accept: 'accept it with follow-ups', takeOver: 'the user takes it over' } // i18n-ignore: a wake, agent-facing
+
+/** How much of the question an answer's wake quotes before the user's reply (#1626). */
+const QUESTION_QUOTE_MAX = 200
 
 /** A write inside one transaction, for one card: facts with the ruleset and actor, the stage cache, actions. */
 export class Write {
@@ -379,16 +385,35 @@ export class Workflow {
    * the lane started), else the current one.
    */
   rulesetOf(card: CardRecord, s: CardState = this.state(card)): Ruleset {
+    const facts = this.store.facts(card.id)
+    const base = this.baseRulesetOf(card, s, facts)
+    // A card that skips review (#1625) runs under its rules with no review, whenever the skip was set.
+    if (!reviewSkipOf(facts).skip) return base
+    const skipped = skipReviewOf(base)
+    if (skipped !== base) this.skippedBases.set(skipped.id, base)
+    return skipped
+  }
+
+  /** Each ruleset with review skipped that `rulesetOf` gave, by id, and its base: a write stores both (#1625). */
+  private readonly skippedBases = new Map<string, Ruleset>()
+
+  /** The rules a card keeps (§16.5.4) or starts under, before its review skip (#1625) is applied. */
+  private baseRulesetOf(card: CardRecord, s: CardState, facts: Fact[]): Ruleset {
     // A card back in Todo (put back, or a Done card reopened) starts its next cycle under the rules then (§16.5.4,
     // HR2's #1290 round 1): its last cycle's ruleset isn't its own any more.
-    const own = s.started && s.stage !== 'todo' ? ownRuleset(this.store.facts(card.id), s) : null
-    if (own) return this.store.ruleset(own)
+    const own = s.started && s.stage !== 'todo' ? ownRuleset(facts, s) : null
+    if (own) return this.store.ruleset(baseRulesetId(own))
     if (card.lane) {
       const lane = this.lane(card.lane)
       if (lane && !lane.ended && lane.ruleset) return this.store.ruleset(lane.ruleset)
     }
     // Not stored here (a read): a write naming it stores it in its own transaction (write()).
     return this.currentRuleset(false)
+  }
+
+  /** The rules a card's review skip (#1625) would leave out of: its base rules, as `rulesetOf` reads them. */
+  reviewedRuleset(card: CardRecord, s: CardState = this.state(card)): Ruleset {
+    return this.baseRulesetOf(card, s, this.store.facts(card.id))
   }
 
   /** The card's folder on disk: its own, or the project folder. */
@@ -460,6 +485,9 @@ export class Workflow {
       const r = this.store.tx((tx) => {
         // The ruleset its facts name, stored with them.
         if (ruleset) tx.saveRuleset(ruleset)
+        // Its base too (#1625): the rules it is found again by once its review skip is undone.
+        const base = ruleset && this.skippedBases.get(ruleset.id)
+        if (base) tx.saveRuleset(base)
         w = new Write(tx, tx.card(card.id), ruleset, actor, tx.card(card.id).stage)
         return fn(w, prepared)
       })
@@ -493,12 +521,29 @@ export class Workflow {
   async refuse(card: CardRecord | null, actor: Actor, move: string, g: GuardRefusal, override: Refusal['override'] = 'the user'): Promise<Refusal> { // i18n-ignore: the override field, agent-facing (§16.8.3)
     // A Git card refused for what couldn't be read, its repository gone (S20): the next step is the offer (#1419).
     if (g.rule === 'platform.unknown' && card && this.rulesetOf(card).options.platform === 'git' && this.cfg.repositoryGone?.()) g = { ...g, values: { ...g.values, offer: 'repositoryGone' } }
+    const side = g.rule === 'move.notFromHere' && card ? this.sideOf(card, actor, move, g.values.stage) : null
+    if (side) g = { ...g, values: { ...g.values, ...side } }
     const out = refusal(g.rule, g.values, override)
     if (card && actor !== 'user') {
       // Under the store's lock, as every write (in the app, a change of the board).
       await this.locked(() => this.store.tx((tx) => tx.append(card.id, { kind: 'Refused', actor, source: 'recorded', data: { move, rule: g.rule, message: out.message, next: out.next, values: g.values } }))) // i18n-ignore: a fact's kind and codes, not text
     }
     return out
+  }
+
+  /**
+   * An agent refused a move for where its card is, when that stage's intents are the other side's (#1604): a reviewer's
+   * review or verdict on a card that left Review (its review is over: it waits for the card's return, or leaves it), or
+   * its builder's move while the card waits in Review (it waits for the verdict). Null for the user, or where the
+   * stage's own intents are the agent's next step.
+   */
+  private sideOf(card: CardRecord, actor: Actor, move: string, stage: unknown): { whose: 'reviewer' | 'builder'; back?: 'yes' | 'no' } | null {
+    const agent = agentOf(actor)
+    if (!agent || typeof stage !== 'string') return null
+    const builds = this.state(card).builders.includes(agent)
+    if (REVIEW_MOVES.has(move) && stage !== 'review' && !builds) return { whose: 'reviewer', back: stage === 'todo' || stage === 'active' ? 'yes' : 'no' }
+    if (!REVIEW_MOVES.has(move) && stage === 'review' && builds) return { whose: 'builder' }
+    return null
   }
 
   private notFrom(card: CardRecord, actor: Actor, s: CardState, move: string): Promise<Refusal> {
@@ -1308,7 +1353,10 @@ export class Workflow {
       if (!st.requests.some((x) => x.request === request)) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'answer', moves: '' } } as GuardRefusal
       w.fact('Approval', { request, answer, ...(note ? { note } : {}), generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}), ...(choice ? { choice } : {}), ...(rounds ? { rounds } : {}) }) // i18n-ignore: a fact's kind and codes, not text
       const builder = st.started?.builder
-      const said = `${card.key}: the user ${answer === 'approved' ? 'approved' : answer === 'declined' ? 'declined' : 'answered'} "${req.text}"${choice ? `: ${CHOICE_WORDS[choice]}${rounds ? ` (${rounds} more round${rounds === 1 ? '' : 's'})` : ''}` : ''}${note ? `: ${note}` : ''}` // i18n-ignore: a wake, agent-facing
+      // The question quoted short (its asker has it), so the reply after it is never cut off the wake (#1626).
+      const asked = [...req.text.replace(/\s+/g, ' ').trim()]
+      const quoted = asked.length > QUESTION_QUOTE_MAX ? `${asked.slice(0, QUESTION_QUOTE_MAX - 1).join('')}…` : asked.join('')
+      const said = `${card.key}: the user ${answer === 'approved' ? 'approved' : answer === 'declined' ? 'declined' : 'answered'} "${quoted}"${choice ? `: ${CHOICE_WORDS[choice]}${rounds ? ` (${rounds} more round${rounds === 1 ? '' : 's'})` : ''}` : ''}${note ? `: ${note}` : ''}` // i18n-ignore: a wake, agent-facing
       w.answer = said
       if (req.gate === ROUND_LIMIT_GATE) {
         this.wake(w, builder, said, 'answer')

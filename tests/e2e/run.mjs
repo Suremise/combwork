@@ -550,6 +550,8 @@ await pruneRunDirsReleasing(logsRoot, undefined, runs.map((r) => r.logDir), unde
   maxBytes: retention.maxBytes,
   onOverCap: (names, bytes) =>
     console.log(`\nThe logs came to ${Math.round(bytes / 1024 / 1024)} MB, over ${Math.round(retention.maxBytes / 1024 / 1024)} MB: pruned ${names.length} run${names.length === 1 ? '' : 's'} of the last ${retention.keepMs / 3_600_000} hours early (${names.slice(0, 3).join(', ')}${names.length > 3 ? ', …' : ''}).`),
+  // Held by something (#1616): kept for a later run to prune; this run's result stays its suites'.
+  onKept: (name, code) => console.log(`\nKept ${join(logsRoot, name)}: something still holds it (${code}), so a later run prunes it.`),
   release: (d) => releaseKept(d, evidence, { hold: (k) => holdLane(runContext.LANES_DIR, k) })
 })
 if (keptAfterPass.length) console.log(`\nKept the folders of ${keptAfterPass.length} passed suite${keptAfterPass.length === 1 ? '' : 's'}: ${keptAfterPass.slice(0, 3).join('; ')}${keptAfterPass.length > 3 ? '; …' : ''}`)

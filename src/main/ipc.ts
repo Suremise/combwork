@@ -44,7 +44,7 @@ import { slotBranch } from './mergeSlots'
 import { endLane, listLanes, stampLaneProjects } from './lanes'
 import { laneStartInfo, startLaneFromWindow } from './laneStart'
 import { sweepWorkspaceLeftovers } from './leftovers'
-import { boardState, cardHeads, exportBoard, movedNames, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
+import { boardState, cardHeads, exportBoard, movedNames, onBoardUpgraded, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
@@ -322,39 +322,50 @@ async function authorizedMerge(path: string, branch: string | null | undefined, 
   if (r.ok && queued && out) await mergedOutsideQueue(workspace, path, queued.card, typeof out.reason === 'string' ? out.reason.slice(0, 2000) : '').catch((e) => log.warn('recording a merge outside the queue', e))
   return r
 }
+/**
+ * What a workspace's opening does with its board, each step in the background. A 0.9 board waiting for its upgrade takes
+ * no writes, so the steps that write skip it quietly, and all of them run again once it is upgraded (#1621), with no
+ * restart; each changes nothing the second time.
+ */
+function boardSteps(ws: WorkspaceService): void {
+  // Each card, lane and card watch names its project by its stable id (#508), then old Done cards are archived.
+  void tasks
+    .stampCardProjects(ws)
+    .catch((e) => log.warn("giving the cards their projects' ids", e))
+    .then(() => stampLaneProjects(ws).catch((e) => log.warn("giving the lanes their projects' ids", e)))
+    .then(() => stampWatchProjects(ws).catch((e) => log.warn("giving the card watches their projects' ids", e)))
+    // Each project its key (#1219), and once after the upgrade gave them, a quiet notice saying so.
+    .then(() => keyProjects(ws).catch((e) => log.warn('giving the projects their keys', e)))
+    .then(() => sayKeysOnce(ws))
+    .then(() => tasks.archiveOldDone(ws))
+    .catch((e) => log.warn('archiving old Done cards', e))
+  // The cards' actions a crash or a close left pending (#1215, SPEC §16.4.5): run once, in the order written.
+  void runActions(ws)
+  // The 1.0 upgrade's adoption (#1218, SPEC §16.17): each project's options and its old cards, until it has run once;
+  // then what changed in its projects while it was closed, recorded as observed facts (#1217): the cards adopted too.
+  // Then its agents' worktrees become slots (#1441), each project once, before what changed is observed.
+  // And G15 saved before P7 settled once (#1445), so a Pair or Team project gets its preset's On.
+  void adoptWorkspace(ws)
+    .then(() => settleSlotsUpToDate(ws))
+    .then(() => migrateSlots(ws))
+    .finally(() => reconcileWorkspace(ws))
+  // 0.9's agent templates copied into the 0.9 backup once after the upgrade (#1436), and a quiet notice saying so.
+  void copyV09Templates(ws)
+    .then(() => sayV09TemplatesOnce(ws))
+    .catch((e) => log.warn("copying 0.9's agent templates (tried again at the next open)", e))
+}
+
 export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info']>, quitControl: QuitControl): void {
+  // A board upgraded to 1.0 while its workspace is open: what its opening skipped, now (#1621).
+  onBoardUpgraded(boardSteps)
   // Each time a workspace opens: Hive's bundled skills and modes it hasn't got, or has untouched older copies of.
   WorkspaceService.onOpened = async (fresh) => {
     await syncBundled({ fresh }).catch((e) => log.warn("updating the workspace's bundled skills and modes", e))
     const ws = workspace
     // Its usage history imports the sessions it had, the first time (#1106), in the background.
     void usageHistory.opened(contextWorkspace()!)
-    // Each card, lane and card watch names its project by its stable id (#508), then old Done cards are archived.
-    void tasks
-      .stampCardProjects(ws)
-      .catch((e) => log.warn("giving the cards their projects' ids", e))
-      .then(() => stampLaneProjects(ws).catch((e) => log.warn("giving the lanes their projects' ids", e)))
-      .then(() => stampWatchProjects(ws).catch((e) => log.warn("giving the card watches their projects' ids", e)))
-      // Each project its key (#1219), and once after the upgrade gave them, a quiet notice saying so.
-      .then(() => keyProjects(ws).catch((e) => log.warn('giving the projects their keys', e)))
-      .then(() => sayKeysOnce(ws))
-      .then(() => tasks.archiveOldDone(ws))
-      .catch((e) => log.warn('archiving old Done cards', e))
-    // The cards' actions a crash or a close left pending (#1215, SPEC §16.4.5): run once, in the order written.
-    void runActions(contextWorkspace()!)
-    // The 1.0 upgrade's adoption (#1218, SPEC §16.17): each project's options and its old cards, until it has run once;
-    // then what changed in its projects while it was closed, recorded as observed facts (#1217): the cards adopted too.
-    const opening = contextWorkspace()!
-    // Then its agents' worktrees become slots (#1441), each project once, before what changed is observed.
-    // And G15 saved before P7 settled once (#1445), so a Pair or Team project gets its preset's On.
-    void adoptWorkspace(opening)
-      .then(() => settleSlotsUpToDate(opening))
-      .then(() => migrateSlots(opening))
-      .finally(() => reconcileWorkspace(opening))
-    // 0.9's agent templates copied into the 0.9 backup once after the upgrade (#1436), and a quiet notice saying so.
-    void copyV09Templates(opening)
-      .then(() => sayV09TemplatesOnce(opening))
-      .catch((e) => log.warn("copying 0.9's agent templates (tried again at the next open)", e))
+    // Its board's steps: skipped while the board waits for its upgrade to 1.0, and run again once it is upgraded.
+    boardSteps(contextWorkspace()!)
     // Builds of Hive left for it while it was closed (#1534), into the journal once.
     void pickUpBuilds(ws).catch((e) => log.warn('recording the builds left for Hive', e))
     // What failed or interrupted saves and the project-id migration left in the .hive folders (#1016).
@@ -677,16 +688,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'board:state': () => boardState(currentWorkspace()),
     'board:upgrade': async () => {
       const ws = currentWorkspace()
-      const out = await upgradeBoard(ws)
-      // Then the upgrade's adoption, in the background (#1218), its agents' worktrees adopted as slots after it (#1441),
-      // and 0.9's templates copied aside (#1436).
-      void adoptWorkspace(ws)
-        .then(() => settleSlotsUpToDate(ws))
-        .then(() => migrateSlots(ws))
-      void copyV09Templates(ws)
-        .then(() => sayV09TemplatesOnce(ws))
-        .catch((e) => log.warn("copying 0.9's agent templates (tried again at the next open)", e))
-      return out
+      // Then what the workspace's opening skipped (boardSteps, through onBoardUpgraded): the adoption (#1218), its
+      // agents' worktrees adopted as slots (#1441), 0.9's templates copied aside (#1436), the cards' ids and keys.
+      return upgradeBoard(ws)
     },
     'board:restore09': () => {
       const ws = currentWorkspace()
@@ -704,6 +708,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'tasks:create': (input) => tasks.createTask(input, { kind: 'user' }),
     'tasks:setKind': (n, kind, opts) => tasks.setKind(n, kind, { kind: 'user' }, opts ?? {}),
     'tasks:confirmKind': (n, accept) => tasks.confirmKind(n, accept === true, { kind: 'user' }),
+    'tasks:setReviewSkip': (n, skip, opts) => tasks.setReviewSkip(n, skip === true, { kind: 'user' }, { reason: opts?.reason }),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
     'tasks:update': (n, patch) => tasks.updateTask(n, patch, { kind: 'user' }, { ask: true }),
     'tasks:move': (n, column, opts) => tasks.moveTask(n, column, opts ?? {}),

@@ -2,7 +2,7 @@ import { resolve } from 'path'
 import { SKILLS_REMOVE_IDLE_COPIES } from '../shared/advanced'
 import { samePath } from '../shared/movePaths'
 import { advanced } from './advanced'
-import { boardRead, boardWrite, boardWriteOp } from './boardStore'
+import { boardRead, boardReadOnly, boardWrite, boardWriteOp, onBoardUpgraded } from './boardStore'
 import { createLogger, userText } from './logger'
 import { removeHiveCopies } from './providers/common'
 import type { SkillCopyBook, SkillCopyRecord } from './providers/types'
@@ -89,7 +89,8 @@ export function sessionEnded(projectPath: string, folder: string): Promise<strin
 
 /** At start (a workspace opening): the copies in folders whose sessions are gone, as the switch says. */
 export async function sweepIdleCopies(ws: WorkspaceService): Promise<void> {
-  if (idleCopies() === 'never') return
+  // A board waiting for its upgrade to 1.0 has no record yet: swept once it is upgraded (#1621).
+  if (idleCopies() === 'never' || boardReadOnly(ws)) return
   let folders: { folder: string; project: string }[]
   try {
     folders = recordedFolders(ws)
@@ -112,13 +113,16 @@ export function initSkillCopies(busy: (folder: string) => boolean): void {
   busyIn = busy
   if (started) return
   started = true
-  WorkspaceService.openedListeners.add((ws) => {
+  const sweep = (ws: WorkspaceService): void => {
     if (!ws.path) return
     const run = sweepIdleCopies(ws)
       .catch((e) => log.warn("sweeping Hive's idle skill copies", e))
       .finally(() => running.delete(run))
     running.add(run)
-  })
+  }
+  WorkspaceService.openedListeners.add(sweep)
+  // Opened while its board waited for the upgrade to 1.0: swept once it is upgraded (#1621).
+  onBoardUpgraded(sweep)
 }
 
 /** For tests: every sweep under way has finished. */

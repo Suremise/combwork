@@ -2064,6 +2064,23 @@ needs `override.reason`; either records one `Override` (`card.kind`); agents nev
 card shows **No code** on its tile and in its dialog's **Kind** (with **Make It Code…** / **Make It No Code…**); the
 Agent API's card adds `kind` and, while one is open, `kindProposed` after its document's fields, just before `stage`.
 
+**Review: Skip (#1625; Darren, 25 Oct).** Any card, code or no code, can skip its review, decided when it is made or
+before it is submitted: not a project option, and Pair and Team still review everything else. Set, the card runs under
+its rules with no review (`skipReviewOf`: its ruleset compiled with `review: none`, its id the base's with
+`~skipReview`, so the base is found again and *old rules* compares the base), whenever the skip was set: its submission
+finishes it. A no-code card is Done; a code card goes on as its finish says (Hive merges: straight to the merge queue,
+whose merge checks and `done.contained` still hold; G10's OK before merging still applies, as it isn't a review). Who:
+the user (the New Card dialog's **Skip review**, with an optional note; the card dialog's **Review**: **Skip Review…** /
+**Review It**), and the Assistant only with the user's reason (`skipReview` on `POST /v1/tasks`, `PATCH /v1/tasks/{n}`,
+`hive_create_task` and `hive_update_task`; `false` sets it back). A project agent's (or the workspace token's)
+`skipReview` at creation is only **proposed** (a `ReviewSkipProposed` fact with its reason; the tile shows *Skip
+review?*, the dialog **Skip Review** / **Keep Review**), answered by the user or the Assistant, the Assistant with the
+user's reason, never the agent's (kept in the fact as `proposed`, for history); agents never set or answer it (`403`).
+Each decision is a `ReviewSkipSet` fact (`skip`, `by`, `reason`). Refused where the card's rules have no review
+(nothing to skip), and once a submission waits for review or later (in Review: the way past it is the user's override
+of the move; approved, merging or Done: nothing left to skip). The tile and the dialog show **Review skipped** with who
+set it and why; the Agent API's card adds `reviewSkipped: { by, reason }` and `reviewSkipProposed` when there is one.
+
 #### 16.7.4 Other moves
 
 [P1, answering HB3's round 1 finding 15]
@@ -2245,11 +2262,16 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   `npm run i18n:extract` after adding them [#1120 c, `locales/glossary-1.0.md` §1].
 - **Read by both** [#1264]: the sentences never name "the user" (the window says *you*, glossary §1 rule 10): a
   `change` says where the rule is set ("This rule is set in Version Control → …"), and `override` who can skip it. A
-  value that is a name in the code (`{stage}`, `{move}`, `{intent}`, `{moves}`, `{rule}`, `{rules}`) reaches agents as
-  it is and the window through its own message (`shared/workflow/texts.ts`: stage, move and rule names, the rules
-  worded as the Version Control options); what a platform couldn't read (`{what}`) is a message of its own, kept as
-  data (`StoredText`) beside its English. `refusal()` builds the agent's English, `refusalLines()` the window's lines.
-  A `move.notFromHere` with nothing possible from the stage says so as its next step, never an empty list.
+  value that is a name in the code (`{move}`, `{intent}`, `{moves}`, `{rule}`, `{rules}`) reaches agents as it is
+  (the intents they call) and the window through its own message (`shared/workflow/texts.ts`: stage, move and rule
+  names, the rules worded as the Version Control options); a stage (`{stage}`, `{stages}`) reaches both by the name the
+  board shows, agents in English ("Active", never the id `active`, #1604); what a platform couldn't read (`{what}`) is
+  a message of its own, kept as data (`StoredText`) beside its English. `refusal()` builds the agent's English,
+  `refusalLines()` the window's lines. A `move.notFromHere` with nothing possible from the stage says so as its next
+  step, never an empty list; one whose stage's intents are the other side's gives the refused agent's own (#1604, its
+  `whose` value): a reviewer's review or verdict on a card no longer in Review hears that its review is over (back for
+  more work: leave it with no verdict and wait for its return to Review; moved on: leave it), and the card's builder
+  refused a move while the card waits in Review hears to wait for the verdict.
 - `next` is the exact next step the agent can take, possible under the card's ruleset (§16.5.4); `override` says who
   can override (never the agent).
 - Every refused intent appends a `Refused` fact (so the lane shows it) [#1120 c]; the window collapses repeats.
@@ -2328,13 +2350,18 @@ no loop: it reaches an agent working on its own, with no lane or reviewer (*"…
 asked"*), and the card's history says so (*Told B1 (hive) of your answer*), as long as the project's loop wakes are on. Each request records whom it is for
 (`for: 'user'`). The window lists what waits with `tasks:forYou` (a project's or the workspace's: each request's card,
 kind, gate, English text and Hive's message for it, when it was asked and who asked; a count), read again on
-`tasks-changed`. **In the window (#1276):** a card with requests shows a **For you** chip (a bell, the kind, each
-request in its tooltip and accessible name; the accent colour, pill-shaped) on its tile, folded or not; the Task Board
+`tasks-changed`. **In the window (#1276):** a card with requests shows a **For you** chip (a bell, the kind; the accent colour,
+pill-shaped). Its tooltip is short (#1635): for each of the first two requests who asks for what ("HB5 asks you to
+decide") over its first sentence or two as plain text (Markdown's marks taken out), a count of any more, and where to
+answer (a click opens the card, whose For you section has each in full); its accessible name gives each request's kind
+and start. The chip sits on its tile, folded or not; the Task Board
 icon on the activity bar counts the cards (its accessible name "3 cards wait for you"; Review's count stays in the board
 sidebar's Waiting for review); the board's toolbar has a **For you** filter (remembered per board view, composing with
 the search); the card dialog's **For you** section lists each request (its kind, its text in the window's language or
 the agent's words, who asked and when, a Test request's checklist) with its answers: **Approve** / **Decline…** (a
-reason, required) for an approval, a reply (**Send Reply**) or **Record as Decision** for a question, and the four
+reason, required) for an approval, a reply (**Send Reply**: the user's comment on the card, and to the agent waiting
+on it an `answer` delivery from the user quoting the reply whole, its question quoted short, #1626) or **Record as
+Decision** for a question, and the four
 ways on (carry on with its rounds) at the round limit. A refused answer (answered or retired meanwhile) is said in a
 toast and the board read again; an answer clears the chip at once (`tasks-changed`).
 
@@ -2813,7 +2840,9 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   read (the Assistant's requirement).
 - **The Git tab's Merge queue section** (`GitQueueSection.tsx`, a section of its own for P6 to move): per target, the
   Progress panel's queue card (reused) and its history (`queue:history`: the latest 50 outcomes, each with its card,
-  revision, the result or why, and when). A target shows by #1356's rule, or while it has a history. The panel's
+  revision, the result or why, and when), a `DataTable` as the archived cards' (#1641): a line a row, the title
+  ellipsised, the outcome a short label with the result or why as its tooltip, the merge commit its own column
+  (left to the tooltip when narrow), the headings and filters sticky over a box of its own that scrolls. A target shows by #1356's rule, or while it has a history. The panel's
   *Queue in Version Control* opens it.
 - **The Merge dialog** (OP-13): for an agent's worktree branch whose card in flight has Hive merge it under its own
   ruleset, with the rules enforced (`worktrees:branchCards`), it says so and where the card stands (not queued yet,
@@ -4146,7 +4175,11 @@ deliveries keep their in-memory store (published after each transaction), the ta
   refused before anything runs ("This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents"), and
   reading the workspace's stores moves no old file in (a host's `sessions.json` waits for the upgrade). The workspace
   stays open for reading; the banner says the board is read-only and agents can't start, and New Session and Resume in
-  the session view and the agent's menus are off with that as their tooltip [#1230]. **When the file is replaced
+  the session view and the agent's menus are off with that as their tooltip [#1230]. The opening's steps that write the
+  board (the merge queues, the cards', lanes' and watches' project ids, the projects' keys, archiving old Done cards,
+  ending the reviews of sessions that ended, sweeping idle skill copies, the adoption) skip it quietly, logging nothing,
+  and **run once the upgrade completes**, in the same session (`onBoardUpgraded`) [#1621: the merge queues had failed
+  with "no such table: card_facts" and started only after a restart]. **When the file is replaced
   under the services** (the upgrade, Restore) [HR1's round 2 finding]: what they keep from it in memory (deliveries,
   card watches, metrics, lanes' and sessions' "moved in" marks) was read before, and a 0.9 Hive may have written since
   (while the upgrade waited), so each reads it again from the file as it is then; the workspace database's
@@ -4361,7 +4394,7 @@ Each is a test P2's spike passes without UI (`tests/workflow/` or a unit suite),
 | P6 Version Control tab | #1122 | The tab replaces P4's plain form: options worded and laid out, presets documented, detection, switching (§16.6, §16.3.5); stages on the board; Progress P6. **Built** (24 Oct): #1416–#1425 are in 1.0.0. **What changed against the plan:** None can be chosen for a Git folder, with a warning (Darren, 22 Oct, #1419); the window says Active and Approved for Doing and Passed, the ids unchanged (OP-1, #1417); Merging is a stage inside Approved that takes no drop (#1420); Hive's and the workspace's workflow defaults got a place in the window (#1422); a project added since 1.0 asks "How do you work?" (#1423) | Checks only (#1426, on 9846ea3a) |
 | P7 Slots | #1123 | Slots, review copies, sessions, templates v2, names, migration (§16.10); override switches C; Progress P7. **Built** (24 Oct): #1429–#1452 and the "P7 fixes" lanes (to c62a118b) are in 1.0.0. **What changed against the plan:** the upgrade is one-way (Darren, 22 Oct): the board backup brings back the cards and their history, with no way back for worktrees, sessions or lanes; agents' worktrees are carried into slots in place and renamed later (#1441); a reviewer pool (G17, #1443); six shipped templates named from the project's key, the 0.9 ones no longer used (#1436, #1440) | Checks only (#1449, round 2 on 50add517: the real tier and the Sandbox upgrade at 6×6 and solo) |
 | Translation review | #1126 | §16.16 | — |
-| P8 Guidance and 1.0.0 | #1124 | Skills describe the rules; AGENTS.md, RELEASING.md; memory rules retired; scenarios and trials; 1.0.0. **Built** (25 Oct, but for scenarios and trials): the skills and modes (#1524–#1528), the contract and tool texts (#1529–#1531), AGENTS.md, RELEASING.md and builds as facts (#1532–#1534), the user guide's heading ids (#1535), the translation review (#1126) and #1582's workaround for Electron's CVE are in 1.0.0; the scenarios and trials (#1536, #1537) and P8's checks (#1539) are still to come. **What changed against the plan:** P8 ends with Darren's daily 1.0 baseline (#1288), not 1.0.0, which comes after the On Hold stretch (#1540, #1541) (Darren, 23 Oct); the baseline's trials are a smoke run and it doesn't wait for Electron's fix (#1503) (Darren, 24 Oct); the memory rules are retired after the baseline is installed (#1538) | The 1.0 baseline (#1288) |
+| P8 Guidance and 1.0.0 | #1124 | Skills describe the rules; AGENTS.md, RELEASING.md; memory rules retired; scenarios and trials; 1.0.0. **Built** (25 Oct): the skills and modes (#1524–#1528), the contract and tool texts (#1529–#1531), AGENTS.md, RELEASING.md and builds as facts (#1532–#1534), the user guide's heading ids (#1535), the translation review (#1126), #1582's workaround for Electron's CVE, the scenarios for the intents and presets on the three fakes (#1536), Claude Code's and Codex's smoke trials (#1537) and the fold-ins their findings raised (#1604, #1607–#1611, #1613–#1617) are in 1.0.0; P8's checks (#1539) run beside the baseline's build (Darren, 25 Oct). **What changed against the plan:** P8 ends with Darren's daily 1.0 baseline (#1288), not 1.0.0, which comes after the On Hold stretch (#1540, #1541) (Darren, 23 Oct); the baseline's trials are a smoke run and it doesn't wait for Electron's fix (#1503) (Darren, 24 Oct); the memory rules are retired after the baseline is installed (#1538) | The 1.0 baseline (#1288) |
 
 #### 16.19.1 What each RC offers
 

@@ -254,7 +254,9 @@ interface HiveMessageValues {
   'workflow.refused.move.noStage.next': { stages: string | number }
   'workflow.refused.move.notFromHere.message': { card: string | number; stage: string | number; move: string | number }
   'workflow.refused.move.notFromHere.next': { stage: string | number; moves: string | number }
+  'workflow.refused.move.notFromHere.nextBuilder': undefined
   'workflow.refused.move.notFromHere.nextNone': undefined
+  'workflow.refused.move.notFromHere.nextReviewer': { back: string }
   'workflow.refused.move.useIntent.message': undefined
   'workflow.refused.move.useIntent.next': { intent: string | number }
   'workflow.refused.paths.excluded.message': { card: string | number; path: string | number; folder: string | number }
