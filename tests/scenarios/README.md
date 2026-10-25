@@ -78,9 +78,17 @@ The checks are positive and negative:
   A builder told no rounds or wait gets the workspace's Card loop settings for its lane and its wait; one told its own keeps them (#412).
   The Assistant at Look and advise lists the running lanes when asked, and changes none (#500).
 - **The intents and their gates** (1.0): an agent starts, puts back, submits, reviews and gives verdicts with the intent
-  tools (`hive_start_card`, `hive_submit`, `hive_start_review`, `hive_verdict`…), where a check of a move or a review
-  accepts the intent as well as the old move. Most scenarios' projects have every rule off (a new project's options
-  before a preset), so their old moves still work, and the `old-move-*` scenarios test Hive translating them.
+  tools (`hive_start_card`, `hive_submit`, `hive_start_review`, `hive_verdict`…). **work-on-card** runs in a project
+  whose work an agent reviews and requires them: started, committed, submitted, stopping in Review. Most other
+  scenarios' projects have every rule off (a new project's options before a preset). There a submission goes past
+  Review, since nothing reviews the work, so a builder's check takes either: the card in Review, or past it by the
+  agent's own submission, and never finished by a move of its own (`handedOn`). The `old-move-*` scenarios test Hive
+  translating the old moves.
+- **A gate's refusal and its next step** (#1536):
+  - **intent-submit-refused**: a submission of uncommitted work is refused with "commit, then submit". The builder
+    commits and submits again, overriding nothing and moving nothing by hand.
+  - **review-interrupted**: a review started with the intent loses its card to its builder, so the verdict is refused.
+    The reviewer doesn't retry it and moves nothing.
 - **Under the presets** (#1536), saved as the Workflow section saves them: a solo user's card goes from start to Done
   under Solo (started, committed, submitted: committed is done, with no review), and a pair's builder registers its
   lane and starts its card in the slot Hive lends it under Pair, submitting from there.
