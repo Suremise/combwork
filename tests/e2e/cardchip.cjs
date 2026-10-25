@@ -25,6 +25,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
   lib.enableProviders(userData)
@@ -60,9 +62,8 @@ const check = (name, ok, extra = '') => {
   await until(async () => ['waiting', 'ready'].includes((await live(coder.id))?.status), HUNG_MS)
   if ((await live(coder.id))?.status === 'waiting') await inv('pty:write', lib.ptyKey(alpha, coder.id), '\r')
   await until(async () => (await live(coder.id))?.status === 'ready', HUNG_MS)
-  await inv('pty:write', lib.ptyKey(alpha, coder.id), 'hello')
-  await lib.sleep(300)
-  await inv('pty:write', lib.ptyKey(alpha, coder.id), '\r')
+  // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+  await lib.typeLine(inv, lib.ptyKey(alpha, coder.id), claudeHome, null, 'hello', { live: () => live(coder.id) })
   check('Coder ran once', !!(await until(async () => (await live(coder.id))?.status === 'finished', HUNG_MS)))
   const sessionId = (await live(coder.id)).sessionId
 

@@ -9,6 +9,7 @@ import type { PlatformId } from '../shared/platform/descriptors'
 import type { WorkflowOptions } from '../shared/workflow/options'
 import { readKeptJsonSync, writeKeptJson, writeTextAtomic } from './fsutil'
 import { createLogger } from './logger'
+import { takesTestSeams } from './testQuiet'
 
 const log = createLogger('config')
 
@@ -36,6 +37,14 @@ export function parseUiState(text: string | null): UiState {
   } catch {
     return {}
   }
+}
+
+/**
+ * Whether a test copy starts with tips off (HIVE_TEST_TIPS=off, which every test copy is given), so no tip card covers
+ * what a suite clicks: unpackaged builds and quiet packaged ones (takesTestSeams, #1599), never the installed app.
+ */
+export function testTipsOff(env: NodeJS.ProcessEnv = process.env, packaged = app.isPackaged): boolean {
+  return takesTestSeams(env, packaged) && env.HIVE_TEST_TIPS === 'off'
 }
 
 /** App-level configuration stored in %APPDATA%/Hive/config.json. */
@@ -83,8 +92,8 @@ class ConfigStore {
     if (state.boardFold) this.data.ui.boardFold = state.boardFold
     if (state.modelCatalogs) this.data.modelCatalogs = state.modelCatalogs
     if (state.boardFold || state.modelCatalogs) this.stateWritten = text
-    // Tests (unpackaged builds): no tip card over what a suite clicks, unless its profile turns tips on.
-    if (!app.isPackaged && process.env.HIVE_TEST_TIPS === 'off' && raw?.settings?.general?.showTips === undefined) this.data.settings.general.showTips = false
+    // Tests: no tip card over what a suite clicks, unless its profile turns tips on.
+    if (testTipsOff() && raw?.settings?.general?.showTips === undefined) this.data.settings.general.showTips = false
   }
 
   /**

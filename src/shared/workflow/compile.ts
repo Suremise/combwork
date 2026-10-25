@@ -107,7 +107,9 @@ function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
     g.verdict.push('review.decisionsReceived')
   }
   if (review || o.okBefore.mode !== 'never') g.approve.push('approval.given')
-  if (o.finish === 'agentMerges') g.reportMerge.push(...(o.okBefore.mode !== 'never' ? (['approval.given'] as const) : []), 'done.contained')
+  // G10 holds the report of a merge Hive doesn't check too (#1592): only its containment isn't checked.
+  if ((o.finish === 'agentMerges' || o.finish === 'notChecked') && o.okBefore.mode !== 'never') g.reportMerge.push('approval.given')
+  if (o.finish === 'agentMerges') g.reportMerge.push('done.contained')
   if (o.finish === 'hiveMerges') {
     if (review) g.integrate.push('integrate.approved')
     if (o.strict) g.integrate.push('integrate.upToDate')

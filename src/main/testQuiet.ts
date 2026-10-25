@@ -11,10 +11,19 @@ import { app, screen, type BrowserWindow } from 'electron'
  * profile alone doesn't make it so. Never on in normal use: `npm run dev` has no HIVE_USER_DATA, and the installed app
  * is started without HIVE_TEST_QUIET.
  */
-export function testQuiet(): boolean {
-  const quiet = process.env.HIVE_TEST_QUIET
-  if (app.isPackaged) return quiet === '1'
-  return quiet === '1' || (quiet !== '0' && !!process.env.HIVE_USER_DATA)
+export function testQuiet(env: NodeJS.ProcessEnv = process.env, packaged = app.isPackaged): boolean {
+  const quiet = env.HIVE_TEST_QUIET
+  if (packaged) return quiet === '1'
+  return quiet === '1' || (quiet !== '0' && !!env.HIVE_USER_DATA)
+}
+
+/**
+ * Whether this copy honours the test seams every test copy is given (HIVE_TEST_NOTIFY_LOG, HIVE_TEST_TRASH_DIR,
+ * HIVE_TEST_TIPS): any unpackaged build, and a packaged one only when quiet (HIVE_TEST_QUIET=1: a copy a test started,
+ * #1253, #1599). The installed app is never started quiet, so it takes none of them.
+ */
+export function takesTestSeams(env: NodeJS.ProcessEnv = process.env, packaged = app.isPackaged): boolean {
+  return !packaged || testQuiet(env, packaged)
 }
 
 /** How far left of every screen a quiet test window's right edge is: well beyond any width a suite gives it. */
@@ -50,7 +59,7 @@ export function keepOffScreen(win: BrowserWindow): void {
 
 /** One line to HIVE_TEST_NOTIFY_LOG, if set (unpackaged builds and quiet packaged ones only). */
 export function testNotifyLog(entry: { kind: 'notification' | 'flash' | 'chime' | 'dialog'; title?: string; body?: string; projectPath?: string; on?: boolean }): void {
-  const file = !app.isPackaged || testQuiet() ? process.env.HIVE_TEST_NOTIFY_LOG : undefined
+  const file = takesTestSeams() ? process.env.HIVE_TEST_NOTIFY_LOG : undefined
   if (!file) return
   try {
     appendFileSync(file, `${JSON.stringify({ at: Date.now(), ...entry })}\n`)

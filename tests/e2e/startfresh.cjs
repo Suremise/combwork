@@ -50,9 +50,8 @@ const check = (name, ok, extra = '') => {
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id) ?? null
     const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
     const say = async (id, text) => {
-      await inv('pty:write', lib.ptyKey(alpha, id), text)
-      await lib.sleep(300)
-      await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      await lib.typeLine(inv, lib.ptyKey(alpha, id), home, null, text, { live: () => live(id) })
     }
     const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
     /** The nudges Hive told, by what ended (its log line names it). */

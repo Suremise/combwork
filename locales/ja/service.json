@@ -46,6 +46,7 @@
   "service.files.notKept": "Hiveが保存しているセッションの添付ファイルではありません。",
   "service.files.outside": "パスがプロジェクトの外にあります",
   "service.files.throughLink": "パスが（リンクを通じて）プロジェクトの外を指しています",
+  "service.fsutil.keptBusy": "{file} は別のプログラムが保存中です。何も変更していません。少し待ってからもう一度お試しください。",
   "service.fsutil.notCopied": "{name}をコピーできませんでした",
   "service.git.exitCode": "終了コード{code}",
   "service.git.failed": "{command}が失敗しました：{why}",

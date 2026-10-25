@@ -28,6 +28,7 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome, older, timings]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
   lib.enableProviders(userData)
@@ -57,17 +58,27 @@ const check = (name, ok, extra = '') => {
     const f = path.join(claudeHome, 'fake-shell.jsonl')
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
   }
-  /** Has the agent start a command (as its shell would); resolves to a wait for what it recorded. */
-  const startShell = async (id, cmd, ms = 30000) => {
+  /**
+   * Has the agent start a command (as its shell would), typed again if a wake of Hive's disturbed it (typeLine): taken
+   * once a turn of its starts. Resolves to a wait for what it recorded. `disturb`: typeLine's own check.
+   */
+  const startShell = async (id, cmd, ms = 30000, { disturb = null } = {}) => {
     const before = shells().length
-    await until(async () => (await live(id))?.status !== 'working', 15000)
-    await inv('pty:write', lib.ptyKey(alpha, id), `shell: ${cmd}`)
-    await lib.sleep(300)
-    await inv('pty:write', lib.ptyKey(alpha, id), '\r')
-    return async () => {
-      await until(() => shells().length > before, ms)
-      return shells()[before]
+    const typed = await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, 'Builder', `shell: ${cmd}`, {
+      ready: async () => (await live(id))?.status !== 'working',
+      live: () => live(id),
+      hungMs: Math.max(ms, HUNG_MS),
+      disturb,
+    })
+    // Its own record (a line a wake disturbed may have run too, typeLine), once the agent is quiet: a record it writes
+    // late isn't taken for the next command's.
+    const wait = async () => {
+      const ran = await until(() => shells().slice(before).find((s) => s.cmd === cmd), ms)
+      await until(async () => (await live(id))?.status !== 'working', HUNG_MS)
+      return ran
     }
+    wait.typed = typed
+    return wait
   }
   const shell = async (id, cmd, ms) => (await startShell(id, cmd, ms))()
   // A screenshot in a theme (#1250): the page must reach the theme, its Progress panel's background must be that
@@ -114,7 +125,15 @@ const check = (name, ok, extra = '') => {
   check('the agent starts', !!(await until(async () => (await live(builder.id))?.status === 'ready', HUNG_MS)))
 
   const bin = path.join(userData, 'bin')
-  const where = await shell(builder.id, 'where hive-progress')
+  // typeLine's own check (#1560): a line a wake of Hive's disturbed is typed again, whether the wake's Ctrl+U came
+  // between the line and its Enter, or its text was on the line before the line was typed.
+  const disturbed = await startShell(builder.id, 'where hive-progress', 30000, { disturb: 'enter' })
+  check('a line a Ctrl+U cleared before its Enter is typed again (typeLine)', disturbed.typed.attempt === 2 && disturbed.typed.lost[0]?.startsWith('disturbed'), JSON.stringify(disturbed.typed))
+  await disturbed()
+  const whereRun = await startShell(builder.id, 'where hive-progress', 30000, { disturb: 'before' })
+  // Typed again at once or, the mixed line taken as a turn, once more after that turn dropped it.
+  check("…and one typed after a wake's text on the line", whereRun.typed.attempt >= 2 && whereRun.typed.lost[0]?.startsWith('disturbed'), JSON.stringify(whereRun.typed))
+  const where = await whereRun()
   // where lists the sh script (for Git Bash) too; cmd and PowerShell run the .cmd beside it, as with npm's pair.
   const found = (where?.stdout ?? '').trim().split(/\r?\n/).map((l) => l.toLowerCase())
   const mine = [path.join(bin, 'hive-progress'), path.join(bin, 'hive-progress.cmd')].map((f) => f.toLowerCase())
@@ -221,10 +240,14 @@ const check = (name, ok, extra = '') => {
   // A revision that isn't what's checked out is refused before the command runs; a check runs the project's command.
   const refused = await shell(builder.id, `hive-progress --card "#${card.number}" --revision HEAD~1 -- node -e "require('fs').writeFileSync('refused-ran.txt', 'x')"`)
   check("a --revision that isn't checked out is refused, and the command never runs", refused?.code === 2 && /isn't what's checked out here/.test(refused?.stderr ?? '') && !fs.existsSync(path.join(alpha, 'refused-ran.txt')), JSON.stringify(refused))
-  const projectFile = path.join(alpha, '.hive', 'project.json')
-  const pj = JSON.parse(fs.readFileSync(projectFile, 'utf8'))
-  pj.workflow = { options: { commands: { quick: `node -e "require('fs').writeFileSync('check-ran.txt', 'yes')"` } } }
-  fs.writeFileSync(projectFile, JSON.stringify(pj, null, 2))
+  // The check commands are set through the app's own save (#1594): a direct write of project.json, made in place, could
+  // be read half written by Hive meanwhile, taken as damaged and replaced by its .bak, losing the commands.
+  const commands = { quick: `node -e "require('fs').writeFileSync('check-ran.txt', 'yes')"` }
+  const setCommands = async () => {
+    const form = await inv('workflow:setOptions', alpha, { preset: null, options: { commands } })
+    check('the check commands are saved', JSON.stringify(form?.own?.commands) === JSON.stringify(commands), JSON.stringify(form?.own))
+  }
+  await setCommands()
   known = (await runs()).map((r) => r.id)
   const checked = await shell(builder.id, 'hive-progress --check quick')
   const quick = (await runs()).find((r) => !known.includes(r.id) && r.check === 'quick')
@@ -239,8 +262,8 @@ const check = (name, ok, extra = '') => {
   await quickRow.locator('.progress-title').click()
   const quickDetails = async () => (await quickRow.locator('.progress-details').textContent().catch(() => '')) ?? ''
   check('…and its details say it counts as the check', !!(await until(async () => (await quickDetails()).includes('CheckCounts as check: quick'), 10000)), await quickDetails())
-  pj.workflow.options.commands.edit = `node -e "const fs = require('fs'); const t = fs.readFileSync('b.ts'); fs.writeFileSync('b.ts', 'edited'); fs.writeFileSync('b.ts', t)"`
-  fs.writeFileSync(projectFile, JSON.stringify(pj, null, 2))
+  commands.edit = `node -e "const fs = require('fs'); const t = fs.readFileSync('b.ts'); fs.writeFileSync('b.ts', 'edited'); fs.writeFileSync('b.ts', t)"`
+  await setCommands()
   known = (await runs()).map((r) => r.id)
   const edited = await shell(builder.id, 'hive-progress --check edit')
   const editRun = (await runs()).find((r) => !known.includes(r.id) && r.check === 'edit')

@@ -26,6 +26,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   fs.mkdirSync(path.join(ws, 'beta'), { recursive: true })
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
@@ -170,9 +172,8 @@ const check = (name, ok, extra = '') => {
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   // One typed exchange, so the conversation has usage to show: 30 in context (its 20 input and 10 output).
   await until(async () => ['ready', 'finished'].includes((await live())?.status), 15000)
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), 'hello')
-  await lib.sleep(300)
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), String.fromCharCode(13))
+  // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+  await lib.typeLine(inv, lib.ptyKey(alpha, agent.id), claudeHome, null, 'hello', { live })
   check('the first conversation shows its usage', !!(await until(async () => /\bctx 30\b/.test(await footer.innerText().catch(() => '')), 15000)), await footer.innerText().catch(() => ''))
   const first = (await live())?.sessionId
   // Its usage is now slow to read: a new conversation shows a placeholder, never the old one's numbers.

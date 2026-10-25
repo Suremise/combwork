@@ -27,6 +27,8 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [claudeHome, shots]) fs.mkdirSync(d, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine.
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   lib.git(alpha, ['branch', '-M', 'main'])
   // The lane's slot too (#1438): its builder works in slot-a, a new branch per card.
@@ -90,11 +92,10 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     }
 
     // --- HR6's round 1: B1 busy, Wait and Start, then Cancel: when B1 is idle again, nothing starts.
-    await inv('pty:write', lib.ptyKey(alpha, b1.id), 'holduntil lanestart-cancel-go')
-    // Typed, then entered (the fake reads a line).
-    await lib.sleep(300)
-    await inv('pty:write', lib.ptyKey(alpha, b1.id), '\r')
-    check('B1 is working', !!(await until(async () => (await live(b1.id))?.status === 'working', HUNG_MS)))
+    // Typed again when a wake of Hive's disturbed it (typeLine): taken once B1 works.
+    const working = async () => (await live(b1.id))?.status === 'working'
+    await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), claudeHome, 'B1', 'holduntil lanestart-cancel-go', { ready: async () => ['ready', 'finished'].includes((await live(b1.id))?.status), taken: working, hungMs: HUNG_MS })
+    check('B1 is working', !!(await until(working, HUNG_MS)))
     await openFromTodo()
     const waitButton = dialog.getByRole('button', { name: 'Wait and Start' })
     check('the dialog says B1 is busy and offers to wait', !!(await until(async () => (await waitButton.count()) === 1 && /B1 is busy now/.test(await dialog.innerText()), HUNG_MS)), await dialog.innerText().catch(() => ''))

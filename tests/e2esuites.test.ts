@@ -4,7 +4,7 @@
 import { execFileSync, spawn } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync, utimesSync, writeFileSync } from 'fs'
 import { userInfo } from 'os'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { pathToFileURL } from 'url'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
@@ -14,7 +14,7 @@ import { AREAS, DOCS_ONLY, EVERYTHING, REAL_TIER, UNIT_ONLY, affectedSuites, und
 // @ts-expect-error: plain .mjs modules without types
 import { fingerprint } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, selectSuites, suiteOutcome } from './e2e/runner.mjs'
+import { DEV_SEAMS, PACKAGED_SEAMS, TEST_CHANNELS, devBuildOnly, isRealCli, keepLimits, needsDevBuild, packagedPlan, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, resultLines, selectSuites, suiteDevOnly, suiteFiles as filesOfSuite, suiteOutcome, suiteSource } from './e2e/runner.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { recordJson, recordMarkdown, selectionLine, selectionOf } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -28,7 +28,7 @@ import { describeClaim, heavySlots, holdsMergeSlot, isFullUnitRun, isHeavy, laun
 // @ts-expect-error: plain .mjs modules without types
 import { addWorktree, invocationDir, keepDir, removeInvocation, removeStale, removeWorktree } from './e2e/tempWorktrees.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { FAILED_KEEP_MS, FAILED_MAX, KEEP_RUNS, finishRunDirs, keepSuiteFiles, logsRootFor, markRunFailed, newRunDir, pruneRunDirs, runDirActive, runDirsInOrder, runFailedAt } from './e2e/logs.mjs'
+import { FAILED_KEEP_MS, FAILED_MAX, KEEP_HOURS, KEEP_MB, KEEP_RUNS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFor, markRunFailed, newRunDir, pruneRunDirs, runDirActive, runDirsInOrder, runDirsToPrune, runFailedAt, runStartedAt } from './e2e/logs.mjs'
 import { createRequire } from 'module'
 import { ProgressStore } from '../src/main/progress'
 import { tempDir } from './tempDir'
@@ -65,31 +65,87 @@ describe('the e2e suite list', () => {
     for (const s of suites) if ('serial' in s) expect(typeof s.serial === 'string' && s.serial.length > 3, s.name).toBe(true)
   })
 
-  it("suites run on a packaged build, or say in their header why they can't (#1578, #1580)", () => {
-    // A packaged Hive (HIVE_EXE) refuses the test copies' channels (0.9 worktree agents through agents:testLegacy,
-    // slots:test) and ignores the HIVE_TEST_ seams, and a suite starting Electron itself never starts it: a suite that
-    // needs one is a dev-build test on purpose and says so, or skips that part there (queueFixture's devSeam) and says so.
-    // (`{ worktree: true })`: an agent asked for in a worktree (q.agent), not a 0.9 template's data, as templatesv2 imports.)
-    // Every suite for the test channels (#1580); the queue suites, and those #1578 named beside them, for the seams and
-    // starting Electron too, as the packaged checks (#1539) run them. A worktree agent asked of agents:add is refused
-    // by any 1.0 build (gitmissing checks that), so isn't one.
-    const channels = /agents:testLegacy|slots:test|\{ worktree: true \}\)|['"](new|existing)-worktree['"]/
-    const devOnly = new RegExp(`${channels.source}|HIVE_TEST_(SLOW_IPC|FAIL_IPC|QUEUE_[A-Z_]+)|_electron\\.launch`)
+  it("suites run on a packaged build, or say in their header why they can't (#1578, #1580, #1591)", () => {
+    // Under HIVE_EXE the runner reports a suite devBuildOnly names NOT RUN, with why, so no header is needed for that
+    // (#1591). Two kinds still say so in their header: one using the test copies' channels, which a packaged Hive
+    // refuses (#1580: 0.9 worktree agents and slots:test, dev-build tests on purpose); and a queue suite, or one #1578
+    // named beside them, that can't run packaged at all, as the packaged checks (#1539) run them. One that handles
+    // HIVE_EXE itself (its dev-only parts say NOT RUN: queueFixture's devSeam) says that in its header.
     const named = ['agentapislots', 'gitbranchcards', 'mergedialogslots', 'slotreleaseapi', 'templatesv2']
     const unsaid: string[] = []
     for (const n of names) {
-      const lines = readFileSync(join(dir, `${n}.cjs`), 'utf8').split(/\r?\n/)
-      const queue = named.includes(n) || lines.some((l) => /require\('\.\/queueFixture\.cjs'\)/.test(l))
-      const marks = queue ? devOnly : channels
-      const header = lines
-        .slice(0, lines.findIndex((l) => !l.startsWith('//')))
-        .map((l) => l.replace(/^\/\/\s*/, ''))
-        .join(' ')
-      const needs = lines.filter((l) => !l.trimStart().startsWith('//') && !/inv\('agents:add'/.test(l)).find((l) => marks.test(l))
-      const skips = /NOT RUN on a packaged build/.test(header) && lines.some((l) => /q\.devSeam\(|process\.env\.HIVE_EXE/.test(l))
-      if (needs && !/Dev build only/.test(header) && !skips) unsaid.push(`${n}.cjs: ${marks.exec(needs)?.[0]}`)
+      const src = readFileSync(join(dir, `${n}.cjs`), 'utf8')
+      const { header, code } = suiteSource(src)
+      const why = suiteDevOnly(n, dir)
+      const queue = named.includes(n) || code.some((l: string) => /require\('\.\/queueFixture\.cjs'\)/.test(l))
+      const handles = code.some((l: string) => /q\.devSeam\(|process\.env\.HIVE_EXE/.test(l))
+      const channel = handles ? null : code.filter((l: string) => !/inv\('agents:add'/.test(l)).find((l: string) => TEST_CHANNELS.test(l))
+      if (/Dev build only/.test(header)) continue
+      if (channel) unsaid.push(`${n}.cjs: ${TEST_CHANNELS.exec(channel)?.[0]}`)
+      else if (queue && why) unsaid.push(`${n}.cjs: ${why}`)
+      else if (queue && handles && code.some((l: string) => DEV_SEAMS.some((s: string) => l.includes(s))) && !/NOT RUN on a packaged build/.test(header)) unsaid.push(`${n}.cjs: a dev-only part on a packaged build, without "NOT RUN on a packaged build" in its header`)
     }
     expect(unsaid).toEqual([])
+  })
+
+  it("names every HIVE_TEST_ seam Hive reads: one a packaged build ignores or honours (#1591, #1599)", () => {
+    const src = execFileSync('git', ['ls-files', 'src'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter((f) => /\.(ts|tsx|mts|cjs|mjs|js)$/.test(f))
+    const read = new Set(src.flatMap((f) => readFileSync(join(root, f), 'utf8').match(/HIVE_TEST_[A-Z0-9_]*[A-Z0-9]/g) ?? []))
+    const listed = [...DEV_SEAMS, ...PACKAGED_SEAMS]
+    expect(new Set(listed).size, 'a seam is in two lists').toBe(listed.length)
+    expect([...read].filter((s) => !listed.includes(s)).sort(), 'add each to DEV_SEAMS (runner.mjs) unless a packaged build honours it').toEqual([])
+    expect(listed.filter((s) => !read.has(s)), 'no longer read by Hive: take it off its list').toEqual([])
+  })
+
+  it('says why a suite would test the dev build on a packaged one (devBuildOnly, #1591)', () => {
+    const hdr = '// A suite.\n'
+    expect(devBuildOnly(`${hdr}const h = await lib.launch({ userData })\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}// Dev build only: it makes 0.9 worktree agents.\nconst h = await lib.launch({ userData })\n`)).toBe('its header says "Dev build only"')
+    expect(devBuildOnly(`${hdr}const app = await _electron.launch({\n  executablePath: lib.ELECTRON,\n  args: [lib.ROOT] })\n`)).toMatch(/starts this checkout's Electron itself/)
+    // Starting HIVE_EXE when set, or a packaged build by path, is not the dev build.
+    expect(devBuildOnly(`${hdr}_electron.launch({ executablePath: process.env.HIVE_EXE || lib.ELECTRON })\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}_electron.launch({ executablePath: path.join(lib.ROOT, 'dist/win-unpacked/Hive.exe') })\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}lib.launch({ env: { HIVE_TEST_SLOW_IPC: 'git:diff=1500' } })\n`)).toBe('it needs HIVE_TEST_SLOW_IPC, a test seam a packaged build ignores')
+    // Seams a packaged build honours (the tips and trash ones every test copy gets too) don't count; nor does a seam in a comment.
+    expect(devBuildOnly(`${hdr}lib.launch({ env: { HIVE_TEST_TIPS: 'off', HIVE_TEST_NOTIFY_LOG: log } })\n  // HIVE_TEST_SLOW_IPC once\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}await inv('slots:test', 'lend')\n`)).toBe('it uses a test channel a packaged build refuses (slots:test)')
+    expect(devBuildOnly(`${hdr}await inv('agents:add', p, { worktree: true })\n`)).toBe(null)
+    // A suite handling HIVE_EXE itself runs: its dev-only parts say NOT RUN. Starting Electron itself it can't handle.
+    expect(devBuildOnly(`${hdr}if (q.devSeam('S7')) env.HIVE_TEST_QUEUE_CRASH = 'afterFiles'\n`)).toBe(null)
+    expect(devBuildOnly(`${hdr}if (process.env.HIVE_EXE) return\n_electron.launch({ executablePath: lib.ELECTRON })\n`)).toMatch(/Electron itself/)
+  })
+
+  it('judges a suite with the helpers it uses: its own folder and what it requires, not lib.cjs (suiteDevOnly, #1591)', () => {
+    // wakepaste-codex is a few lines handing over to wakepaste-cli/run.cjs, which starts Electron itself.
+    expect(filesOfSuite('wakepaste-codex', dir)).toContain('wakepaste-cli/run.cjs')
+    expect(suiteDevOnly('wakepaste-codex', dir)).toMatch(/^wakepaste-cli\/run\.cjs: it starts this checkout's Electron itself/)
+    // A suite's own folder (i18nshots/) counts; the shared launch helpers don't (lib.cjs honours HIVE_EXE).
+    expect(filesOfSuite('i18nshots', dir)).toEqual(expect.arrayContaining(['i18nshots/main.cjs', 'layoutReport.cjs']))
+    expect(filesOfSuite('p4lane', dir)).not.toContain('lib.cjs')
+    expect(filesOfSuite('wakepaste-codex', dir)).not.toContain('lib.cjs')
+    // A queue suite: queueFixture handles HIVE_EXE (devSeam), so it runs; #1539's packaged suites all do.
+    expect(filesOfSuite('p5lane', dir)).toContain('queueFixture.cjs')
+    for (const n of ['p4lane', 'p5lane', 'reviewcopies', 'mergequeuefolder']) expect(suiteDevOnly(n, dir), n).toBe(null)
+  })
+
+  it('a packaged run of suites none of which can run tested nothing: its record says so and it fails (#1591)', () => {
+    const pick = (...n: string[]) => suites.filter((s) => n.includes(s.name))
+    const exe = 'C:\\sb\\Hive.exe'
+    const none = packagedPlan(pick('cardloop', 'wakepaste-codex'), dir, exe)
+    expect([...none.devOnly.keys()]).toEqual(['cardloop', 'wakepaste-codex'])
+    expect(none.nothingRan).toMatch(/nothing was tested/)
+    const some = packagedPlan(pick('cardloop', 'p4lane'), dir, exe)
+    expect([...some.devOnly.keys()]).toEqual(['cardloop'])
+    expect(some.nothingRan).toBe(null)
+    // Without HIVE_EXE nothing changes.
+    expect(packagedPlan(pick('cardloop'), dir, null)).toEqual({ devOnly: new Map(), nothingRan: null })
+    // run.mjs doesn't stop before its record: the record is not valid for it, and the run fails.
+    const runner = readFileSync(join(dir, 'run.mjs'), 'utf8')
+    expect(runner).toContain('const problems = [...(nothingRan ? [nothingRan] : []),')
+    expect(runner).toContain('process.exit(!lastRun.ok || recordInvalid || nothingRan ? 1 : 0)')
+    expect(runner).not.toMatch(/nothingRan[^\n]*\n[^\n]*process\.exit\(1\)/)
+    // Nor does it need a dev build for suites it won't run (concurrency.mjs runs it in a worktree with none).
+    expect(runner).toContain('const devBuildNeeded = !nothingRan && needsDevBuild(runnable)')
   })
 
   it('no fixed wait of 1 s or more without a reason: wait for the condition (lib.until) instead', () => {
@@ -414,6 +470,28 @@ describe('the real tier and environment failures (card #191)', () => {
     expect(md).toContain('Not run: the real tier (`--real`): agents, quit.')
     expect(md).toMatch(/\*\*Skipped for the environment\*\* .*: codex\./)
     expect(recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results: [results[0]], logDir: 'x', summary: 's' })).not.toMatch(/Not run|environment/)
+  })
+
+  it('on a packaged build, the record names it, the suites not run and why, and the parts a suite left out (#1591)', () => {
+    const out = 'PASS a\nNOT RUN S34a (main moved just before the swap) needs an unpackaged build: not run with HIVE_EXE\nPASS b\n'
+    const p4 = { name: 'mergequeuefolder', ...suiteOutcome({ code: 0, out }), seconds: 50 }
+    expect(p4).toMatchObject({ ok: true, partsNotRun: ['S34a (main moved just before the swap) needs an unpackaged build: not run with HIVE_EXE'] })
+    expect(resultLines('mergequeuefolder', p4)).toEqual(['mergequeuefolder      pass  50s  (1 part NOT RUN)', '    NOT RUN S34a (main moved just before the swap) needs an unpackaged build: not run with HIVE_EXE'])
+    const why = "it starts this checkout's Electron itself (executablePath: lib.ELECTRON), not lib.launch"
+    expect(resultLines('cardloop', { notRun: why })).toEqual([`cardloop              NOT RUN  (${why})`])
+    const results = [p4, { name: 'cardloop', notRun: why }]
+    const md = recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results, logDir: 'x', summary: '1 passed, 0 failed, 0 skipped, 1 not run', packaged: 'C:\\sb\\Hive.exe' })
+    expect(md).toMatch(/^\*\*e2e run record\*\* .* · packaged build `C:\\sb\\Hive\.exe` \(HIVE_EXE\)$/m)
+    expect(md).toContain(`| cardloop | **NOT RUN**: ${why} | – |`)
+    expect(md).toContain('| mergequeuefolder | pass (1 part NOT RUN) | 50s |')
+    expect(md).toContain('**Not run on the packaged build** (they would test the dev build; why in the table): cardloop.')
+    expect(md).toContain('**Parts not run** (the suite said NOT RUN): mergequeuefolder: S34a')
+    const json = recordJson({ code: 'abc', when: 'now', results, packaged: 'C:\\sb\\Hive.exe' })
+    expect(json.packaged).toBe('C:\\sb\\Hive.exe')
+    expect(json.results).toEqual([expect.objectContaining({ name: 'mergequeuefolder', ok: true, partsNotRun: p4.partsNotRun }), expect.objectContaining({ name: 'cardloop', ok: false, notRun: why })])
+    // A dev run's record has none of it.
+    expect(recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results: [{ name: 'board', ok: true, seconds: 3 }], logDir: 'x', summary: 's' })).not.toMatch(/packaged|NOT RUN|Not run/)
+    expect(recordJson({ code: 'abc', when: 'now', results: [{ name: 'board', ok: true }] })).not.toHaveProperty('packaged')
   })
 
   it('the record says how its suites were picked (#628): the full set, or what --affected selected and why', () => {
@@ -897,6 +975,84 @@ describe("each run's own log folder (logs.mjs)", () => {
     } finally {
       rmSync(runsDir, { recursive: true, force: true })
     }
+  })
+
+  it('a passing run of the last day survives twenty newer runs; an older one goes (#1595)', () => {
+    const runsDir = tempDir('hive-window-')
+    try {
+      const now = Date.now()
+      const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000)
+      const old = newRunDir(runsDir, at(25 * 60))
+      const cited = newRunDir(runsDir, at(60))
+      const failed = newRunDir(runsDir, at(59))
+      markRunFailed(failed, 'board')
+      for (let i = 0; i < 20; i++) newRunDir(runsDir, new Date(now - 50 * 60_000 + i * 1000))
+      finishRunDirs(runDirsInOrder(readdirSync(runsDir)).map((n: string) => join(runsDir, n)))
+      expect(runStartedAt(basename(cited))).toBe(Math.floor(at(60).getTime() / 1000) * 1000)
+      // Only the run from before the window goes.
+      expect(runDirsToPrune(runsDir, KEEP_RUNS, [], () => false, () => null, { now })).toEqual([basename(old)])
+      // With no window (HIVE_E2E_KEEP_HOURS=0), the newest ten and the failed run stay, as before.
+      const noWindow = runDirsToPrune(runsDir, KEEP_RUNS, [], () => false, () => null, { now, keepMs: 0 })
+      expect(noWindow).toHaveLength(12)
+      expect(noWindow).toContain(basename(cited))
+      expect(noWindow).not.toContain(basename(failed))
+      // A window of two hours keeps it too; past it, it goes.
+      expect(pruneRunDirs(runsDir, KEEP_RUNS, [], () => false, () => null, { now, keepMs: 2 * 3_600_000 })).toEqual([basename(old)])
+      expect(existsSync(cited)).toBe(true)
+      expect(runDirsToPrune(runsDir, KEEP_RUNS, [], () => false, () => null, { now: now + 2 * 3_600_000, keepMs: 2 * 3_600_000 })).toContain(basename(cited))
+    } finally {
+      rmSync(runsDir, { recursive: true, force: true })
+    }
+  })
+
+  it('past the size cap, the oldest passing runs of the window go first, then failed ones, never the newest ten (#1595)', () => {
+    const runsDir = tempDir('hive-cap-')
+    try {
+      const now = Date.now()
+      const run = (minutesAgo: number) => {
+        const runDir = newRunDir(runsDir, new Date(now - minutesAgo * 60_000))
+        mkdirSync(join(runDir, 'board'))
+        writeFileSync(join(runDir, 'board', 'shot.png'), 'x'.repeat(600))
+        writeFileSync(join(runDir, 'board.log'), 'x'.repeat(400))
+        return basename(runDir)
+      }
+      // The oldest is a failed run; two passing runs after it; then the newest ten. 1000 bytes each.
+      const failed = run(120)
+      markRunFailed(join(runsDir, failed), 'board')
+      const passing = [run(110), run(100)]
+      const newest = Array.from({ length: KEEP_RUNS }, (_, i) => run(90 - i))
+      finishRunDirs(runDirsInOrder(readdirSync(runsDir)).map((n: string) => join(runsDir, n)))
+      const prune = (maxBytes: number) => {
+        const told: [string[], number][] = []
+        const gone = runDirsToPrune(runsDir, KEEP_RUNS, [], () => false, () => null, { now, maxBytes, onOverCap: (early: string[], bytes: number) => told.push([early, bytes]) })
+        return { gone, told }
+      }
+      // 13 006 bytes in all (the failed run's mark is 6).
+      const total = 13_006
+      expect(prune(total)).toEqual({ gone: [], told: [] })
+      // A cap a run below it: the oldest passing run goes, not the older failed one.
+      expect(prune(total - 1000)).toEqual({ gone: [passing[0]], told: [[[passing[0]], total]] })
+      expect(prune(total - 2000).gone).toEqual(passing)
+      // Then the failed one; never the newest ten, however small the cap.
+      expect(prune(total - 2001).gone).toEqual([failed, ...passing])
+      expect(pruneRunDirs(runsDir, KEEP_RUNS, [], () => false, () => null, { now, maxBytes: 0 })).toEqual([failed, ...passing])
+      expect(runDirsInOrder(readdirSync(runsDir))).toEqual(newest)
+    } finally {
+      rmSync(runsDir, { recursive: true, force: true })
+    }
+  })
+
+  it('the window and the cap come from HIVE_E2E_KEEP_HOURS and HIVE_E2E_KEEP_MB (#1595)', () => {
+    expect(logRetention({})).toEqual({ keepMs: KEEP_HOURS * 3_600_000, maxBytes: KEEP_MB * 1024 * 1024, bad: [] })
+    expect(KEEP_HOURS).toBe(24)
+    expect(KEEP_MB).toBe(2048)
+    expect(logRetention({ HIVE_E2E_KEEP_HOURS: '48', HIVE_E2E_KEEP_MB: '512' })).toEqual({ keepMs: 48 * 3_600_000, maxBytes: 512 * 1024 * 1024, bad: [] })
+    expect(logRetention({ HIVE_E2E_KEEP_HOURS: '0', HIVE_E2E_KEEP_MB: ' ' })).toEqual({ keepMs: 0, maxBytes: KEEP_MB * 1024 * 1024, bad: [] })
+    expect(logRetention({ HIVE_E2E_KEEP_HOURS: 'a day', HIVE_E2E_KEEP_MB: '-1' })).toEqual({
+      keepMs: KEEP_HOURS * 3_600_000,
+      maxBytes: KEEP_MB * 1024 * 1024,
+      bad: ['HIVE_E2E_KEEP_HOURS=a day', 'HIVE_E2E_KEEP_MB=-1']
+    })
   })
 
   it("a run folder counts as still going only while its runner's process is alive (a crashed runner's is pruned)", () => {

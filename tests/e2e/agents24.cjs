@@ -26,6 +26,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(crowd)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([crowd.toLowerCase()]))
   // What each run is: it lasts until the release file exists (3 minutes at the most, in case).
@@ -63,9 +65,8 @@ const check = (name, ok, extra = '') => {
     }
     /** Types a prompt into an agent (as the user does), Enter included. */
     const say = async (id, text) => {
-      await inv('pty:write', lib.ptyKey(crowd, id), text)
-      await lib.sleep(300)
-      await inv('pty:write', lib.ptyKey(crowd, id), '\r')
+      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      await lib.typeLine(inv, lib.ptyKey(crowd, id), claudeHome, null, text, { live: () => live(id) })
     }
     const openRuns = async () => (await inv('progress:list')).filter((r) => r.finishedAt === null && r.projectPath?.toLowerCase() === crowd.toLowerCase())
 

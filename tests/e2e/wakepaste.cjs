@@ -28,6 +28,8 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   lib.gitProject(alpha)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase(), path.join(ws, '.hive', 'assistant').toLowerCase()]))
   lib.enableProviders(userData)
@@ -65,9 +67,8 @@ const check = (name, ok, extra = '') => {
   /** Hive's check of the agent's nth wake has ended, and no mark stays: it counts the line taken. */
   const hiveSawTaken = async (p, id, n) => !!(await lib.until(async () => settled(id) >= n && !(await live(p, id))?.untakenLine, HUNG_MS))
   const say = async (p, id, text) => {
-    await inv('pty:write', lib.ptyKey(p, id), text)
-    await lib.sleep(300) // on purpose: the fake reads a typed line before its Enter, as a CLI does
-    await inv('pty:write', lib.ptyKey(p, id), '\r')
+    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    await lib.typeLine(inv, lib.ptyKey(p, id), claudeHome, null, text, { live: () => live(p, id) })
   }
   const idle = async (p, id) => ['ready', 'finished'].includes((await live(p, id))?.status)
 

@@ -37,6 +37,8 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
 ;(async () => {
   for (const d of [userData, ws, claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [claudeHome, shots]) fs.mkdirSync(d, { recursive: true })
+  // Every read of the agents' input recorded, for typeLine (#1560).
+  lib.logFakeInput(claudeHome)
   // A quick check from the project's scripts, as the preset offers it: `typecheck`, which passes.
   lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', 'package.json': JSON.stringify({ name: 'alpha', scripts: { typecheck: 'node -e "process.exit(0)"' } }), '.gitignore': '.hive/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
@@ -138,10 +140,8 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent)
     }
     const typeTo = async (id, text) => {
-      await inv('pty:write', lib.ptyKey(alpha, id), text)
-      // Typed, then entered (the fake reads a line), as progressgates does.
-      await lib.sleep(300)
-      await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
     }
     const shell = async (cmd) => {
       const before = shells().length
