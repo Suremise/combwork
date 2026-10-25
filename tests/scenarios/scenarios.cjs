@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 88
+const FIXTURES_VERSION = 89
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -46,12 +46,13 @@ const asksTheUser = (text) =>
 /**
  * Starts Coder on a long task without a card before the subject's prompt (#416): ready (a trust question answered), then
  * the task typed in, until it is working. The fakes do "work N" (`fakeSecs`: the wake quotes Coder's reply, which the
- * fake Assistant then does too, within the fakes' minute); a model runs the command (`secs`, long enough to watch).
+ * fake Assistant then does too, within the fakes' minute); a model runs the command (`secs`, long enough to watch). `why`:
+ * what the task is for, before it (#1537: a bare wait read as unrelated to the scenario's work).
  */
-async function busyCoder(c, fakeSecs, secs, agent = c.agents.coder) {
+async function busyCoder(c, fakeSecs, secs, agent = c.agents.coder, why = '') {
   const providers = (await c.inv('settings:get')).providers ?? {}
   if (c.fake || Object.values(providers).some((p) => /fake-(claude|codex)/i.test(String(p?.executablePath ?? '')))) secs = fakeSecs
-  await coderTask(c, `Run this in the shell and wait for it to end, then reply "built": node -e "setTimeout(() => {}, ${secs * 1000})" (work ${secs})`, agent)
+  await coderTask(c, `${why}Run this in the shell and wait for it to end, then reply "built": node -e "setTimeout(() => {}, ${secs * 1000})" (work ${secs})`, agent)
 }
 /** Coder's (or `agent`'s) live session (status, runId, sessionId), or undefined. */
 const coderLive = async (c, agent = c.agents.coder) => (await c.inv('session:live')).find((s) => s.projectPath.toLowerCase() === c.alpha.toLowerCase() && s.agentId === agent.id)
@@ -3897,12 +3898,24 @@ module.exports.SCENARIOS.push(
     async setup(c) {
       await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'builder' })
       await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'reviewer' })
-      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'passed', comments: ['Round 1: PASSED.'] })
-      const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder', column: 'passed', comments: ['Round 1: PASSED.'] })
+      // The lane's work on its branch, reviewed and not merged yet (#1537: with no work anywhere, a model rightly asked).
+      const base = c.git('branch', '--show-current').trim()
+      c.git('checkout', '-qb', 'greetings')
+      require('fs').mkdirSync(require('path').join(c.alpha, 'src'), { recursive: true })
+      const done = []
+      for (const [text, msg] of [['module.exports = (name) => `Hi, ${name}`\n', 'greet() says Hi'], ['module.exports = (name) => `Hi, ${String(name).trim()}`\n', 'greet() trims the name']]) {
+        c.write('src/greet.js', text)
+        c.git('add', '-A')
+        c.git('-c', 'user.name=Coder', '-c', 'user.email=coder@example.com', 'commit', '-qm', msg)
+        done.push(c.git('rev-parse', '--short', 'HEAD').trim())
+      }
+      c.git('checkout', '-q', base)
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'passed', comments: [`Done on branch greetings (${done[0]}).`, 'Round 1: PASSED.'] })
+      const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder', column: 'passed', comments: [`Done on branch greetings (${done[1]}).`, 'Round 1: PASSED.'] })
       const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
       if (r.status !== 200) throw new Error(`lane: ${r.text}`)
       // Coder at its lane's end, merging the lane's work as its card loop says: working, not stalled.
-      await busyCoder(c, 20, 600)
+      await busyCoder(c, 20, 600, c.agents.coder, `The greetings lane's cards have passed: you're merging branch greetings into ${base} at the lane's end. Its merge checks are first: `)
       c.head = c.git('rev-parse', 'HEAD').trim()
     },
     // Hive's lane wake for it (laneWakeLine in src/shared/laneWatch.ts).
