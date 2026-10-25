@@ -44,6 +44,7 @@ import { BoardWorkflowLink, useBoardProjects } from './BoardWorkflow'
 import { useAdvancedValue } from '../advanced'
 import type { StageId } from '@shared/workflow/facts'
 import { parseDocRef, splitDocRefs } from '@shared/docRefs'
+import { gist } from '@shared/gist'
 
 const NO_TASKS: TaskCard[] = []
 const NO_FOLD: BoardFold = {}
@@ -644,7 +645,7 @@ function CardTile({
               </span>
             )}
             {!!c.decisions?.length && (
-              <Tooltip content={tr(msg({ id: 'board.card.decisionsTip', defaultMessage: 'Decisions: {n}. {decisions}', description: "Tooltip on a card's decision count: how many decisions the user recorded ({n}), then each one, cut short ({decisions}, the user's own words, separated by ·)." }), { n: c.decisions.length, decisions: c.decisions.map((d) => (d.text.length > 80 ? `${d.text.slice(0, 79)}…` : d.text)).join(' · ') })}>
+              <Tooltip content={tr(msg({ id: 'board.card.decisionsTip', defaultMessage: 'Decisions: {n}. {decisions}', description: "Tooltip on a card's decision count: how many decisions the user recorded ({n}), then each one, cut short ({decisions}, the user's own words, separated by ·)." }), { n: c.decisions.length, decisions: c.decisions.map((d) => gist(d.text, 80)).join(' · ') })}>
                 <span className="faint task-decision-count" aria-label={tr(msg({ id: 'board.card.decisionsCount', defaultMessage: 'Decisions: {n}', description: "Accessible name of a card's decision count: how many decisions the user recorded about it." }), { n: c.decisions.length })}>
                   <Icon name="law" /> {c.decisions.length}
                 </span>
