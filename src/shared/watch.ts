@@ -453,6 +453,8 @@ export function wakeLine(change: CardChange, more = 0): string {
 /** How much of a reviewer's request a wake line quotes, and of Hive's own note (a returned card's needs its next step). */
 const REQUEST_MAX = 200
 const NOTE_MAX = 600
+/** And of the user's answer (#1626): its reply whole, up to this; the card's comment has it in full. */
+export const ANSWER_MAX = 4000
 
 export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string): string {
   const who =
@@ -464,7 +466,7 @@ export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: stri
   // A reviewer's request (#912), a card loop's step (#1382) or Hive's own note (stale, an answer, what came back from the
   // merge queue and what to do next: #1354, up to NOTE_MAX): what it says, short, before what to do.
   const said = text ? [...text.replace(/\s+/g, ' ').trim()] : []
-  const max = kind === 'request' || kind === 'step' || kind === 'stepAnswer' || kind === 'stepNotice' ? REQUEST_MAX : NOTE_MAX
+  const max = kind === 'request' || kind === 'step' || kind === 'stepAnswer' || kind === 'stepNotice' ? REQUEST_MAX : kind === 'answer' ? ANSWER_MAX : NOTE_MAX
   const whose = kind === 'request' ? 'The reviewer asks' : kind === 'step' || kind === 'stepNotice' ? 'The builder' : kind === 'stepAnswer' ? 'The reviewer' : 'Hive'
   const what = !said.length ? '' : `. ${whose}: "${said.length > max ? `${said.slice(0, max - 1).join('')}…` : said.join('')}"`
   return lineOf(change, `${what}. ${who} (hive_read_task with latestComment for the comment in full).`)

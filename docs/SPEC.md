@@ -2327,7 +2327,9 @@ icon on the activity bar counts the cards (its accessible name "3 cards wait for
 sidebar's Waiting for review); the board's toolbar has a **For you** filter (remembered per board view, composing with
 the search); the card dialog's **For you** section lists each request (its kind, its text in the window's language or
 the agent's words, who asked and when, a Test request's checklist) with its answers: **Approve** / **Decline…** (a
-reason, required) for an approval, a reply (**Send Reply**) or **Record as Decision** for a question, and the four
+reason, required) for an approval, a reply (**Send Reply**: the user's comment on the card, and to the agent waiting
+on it an `answer` delivery from the user quoting the reply whole, its question quoted short, #1626) or **Record as
+Decision** for a question, and the four
 ways on (carry on with its rounds) at the round limit. A refused answer (answered or retired meanwhile) is said in a
 toast and the board read again; an answer clears the chip at once (`tasks-changed`).
 

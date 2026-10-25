@@ -3,7 +3,7 @@ import { projectAgents } from '../shared/defaults'
 import { pendingStep } from '../shared/tasks'
 import type { TaskCard, TaskHistoryEntry } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
-import { cardChange, LOOP_WAKE_KINDS, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
+import { ANSWER_MAX, cardChange, LOOP_WAKE_KINDS, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
 import { onHiveEvent } from './events'
 import { onLanesWritten } from './lanes'
 import { loopReviewerOf, poolCard } from './loopReviewer'
@@ -41,6 +41,8 @@ const log = createLogger('loopWakes')
 
 /** Hive's own deliveries come from it. */
 const HIVE = { kind: 'hive', name: 'Hive' } as const
+/** The user's answer comes from them, as a decision does (decisionWakes.ts). */
+const USER = { kind: 'user', name: 'the user' } as const
 
 const keyOf = (projectPath: string, agentId: string, n: number): string => `${projectPath.toLowerCase()}#${agentId}#${n}`
 /** How long a wake waits for its agent to be idle (its session running) before it is dropped. */
@@ -148,8 +150,10 @@ async function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard
   await withCardNames(ws, async () => {
     if (!ws.path || !ws.isProjectPath(projectPath)) return
     const kinds = kindsOf(w.kind)
-    const meta = { n: card.number, kind: w.kind, agentName: to.name, sinceAt: w.since?.at ?? '', sinceId: w.since?.id ?? '', ...(w.text ? { text: w.text.slice(0, 600) } : {}) }
-    await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: 'card-event', from: HIVE, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: wakeAbout(card, kinds, to.id) }, w.kind, w.text), expiresMs: KEEP_MS, source: 'loop', ref: `#${card.number}`, replace: true, meta, ...(action ? { action } : {}) })
+    const answer = w.kind === 'answer'
+    const meta = { n: card.number, kind: w.kind, agentName: to.name, sinceAt: w.since?.at ?? '', sinceId: w.since?.id ?? '', ...(w.text ? { text: w.text.slice(0, answer ? ANSWER_MAX + 400 : 600) } : {}) }
+    // The user's answer is an answer from them (#1626: acked, never coalesced into the card's events); the rest, Hive's card events.
+    await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: answer ? 'answer' : 'card-event', from: answer ? USER : HIVE, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: wakeAbout(card, kinds, to.id) }, w.kind, w.text), expiresMs: KEEP_MS, source: 'loop', ref: `#${card.number}`, replace: true, meta, ...(action ? { action } : {}) })
     await offerNow(projectPath, to.id)
   }, scopeOfHost(projectPath))
 }

@@ -176,6 +176,32 @@ describe('For you on the board (#1269)', () => {
     expect(told.every((t) => t.includes('The user answered: carry on from where you asked'))).toBe(true)
   })
 
+  it("Send Reply to an agent's long question: the reply reaches the asker whole, as the user's answer, and is on the card (#1626)", async () => {
+    const { w } = await workspace({ ...allOff('git'), review: 'agent', finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    // Three options, each explained: longer than a wake's note, which used to cut the reply off after the question.
+    const option = (k: string) => `(${k}) ${'keep the old behaviour behind a setting and explain why in the user guide, '.repeat(3)}`
+    const question = `Which way for the retries? ${option('a')}${option('b')}${option('c')}`
+    expect(question.length).toBeGreaterThan(600)
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: question }))
+    const req = forYou(w).items[0]
+    expect(req).toMatchObject({ kind: 'decide', asker: 'a1' })
+    const after = await answer(w, card, req.request, { outcome: 'answered', reply: 'Option b, and say so in the changelog' })
+    expect(forYou(w).count).toBe(0)
+    // On the card as the user's comment; no decision.
+    expect(after.comments.at(-1)).toMatchObject({ by: 'You', text: 'Option b, and say so in the changelog' })
+    expect(after.decisions ?? []).toEqual([])
+    // In the asker's inbox: an answer from the user (acked, not a card event), with the reply.
+    await deliveredTo(w, 'a1')
+    const rows = store.workspaceDb(w.path!).reader.prepare("SELECT kind, body FROM deliveries WHERE agent_id = ? AND source = 'loop' ORDER BY seq").all('a1') as { kind: string; body: string }[]
+    expect(rows).toHaveLength(1)
+    expect(rows[0].kind).toBe('answer')
+    expect(rows[0].body).toContain(': Option b, and say so in the changelog')
+    expect(rows[0].body).toContain('The user answered: carry on from where you asked')
+  })
+
   it("an agent's question: a decision as its answer is recorded on the card (a new generation), the asker told", async () => {
     const { w } = await workspace({ ...allOff('git'), review: 'agent', finish: 'agentMerges', folder: 'slots' })
     const card = await create(w)
