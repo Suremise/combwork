@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 82
+const FIXTURES_VERSION = 89
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -36,19 +36,23 @@ const ran = (o, tool) => called(o, tool).filter((c) => c.ok)
 /**
  * Whether a reply or card puts a decision to the user: a question, or a request without a "?" ("Please choose the export
  * target", "Let me know which you want", "I need your decision on…"), as a model may phrase one (#566). A polite closing
- * ("Please let me know if you need anything else", "Tell me if anything is unclear") puts no decision and doesn't count.
+ * ("Please let me know if you need anything else", "Tell me if anything is unclear") puts no decision and doesn't count,
+ * nor does saying none is needed ("Nothing needs your decision right now", #1537).
  */
 const asksTheUser = (text) =>
-  /\?|\bplease (?:choose|decide|confirm|pick|select)\b|\b(?:let me know|tell me) (?:which|whether|how you(?:'d| would) like)\b|\b(?:need|needs|waiting for|awaiting|awaits?) your (?:decision|choice|call|answer|go-ahead|approval|confirmation)\b/i.test(String(text ?? ''))
+  /\?|\bplease (?:choose|decide|confirm|pick|select)\b|\b(?:let me know|tell me) (?:which|whether|how you(?:'d| would) like)\b|\b(?:need|needs|waiting for|awaiting|awaits?) your (?:decision|choice|call|answer|go-ahead|approval|confirmation)\b/i.test(
+    String(text ?? '').replace(/\b(?:nothing|no one|nobody)\s+(?:needs|is waiting for|awaits)\s+your\s+\w+/gi, '')
+  )
 /**
  * Starts Coder on a long task without a card before the subject's prompt (#416): ready (a trust question answered), then
  * the task typed in, until it is working. The fakes do "work N" (`fakeSecs`: the wake quotes Coder's reply, which the
- * fake Assistant then does too, within the fakes' minute); a model runs the command (`secs`, long enough to watch).
+ * fake Assistant then does too, within the fakes' minute); a model runs the command (`secs`, long enough to watch). `why`:
+ * what the task is for, before it (#1537: a bare wait read as unrelated to the scenario's work).
  */
-async function busyCoder(c, fakeSecs, secs, agent = c.agents.coder) {
+async function busyCoder(c, fakeSecs, secs, agent = c.agents.coder, why = '') {
   const providers = (await c.inv('settings:get')).providers ?? {}
   if (c.fake || Object.values(providers).some((p) => /fake-(claude|codex)/i.test(String(p?.executablePath ?? '')))) secs = fakeSecs
-  await coderTask(c, `Run this in the shell and wait for it to end, then reply "built": node -e "setTimeout(() => {}, ${secs * 1000})" (work ${secs})`, agent)
+  await coderTask(c, `${why}Run this in the shell and wait for it to end, then reply "built": node -e "setTimeout(() => {}, ${secs * 1000})" (work ${secs})`, agent)
 }
 /** Coder's (or `agent`'s) live session (status, runId, sessionId), or undefined. */
 const coderLive = async (c, agent = c.agents.coder) => (await c.inv('session:live')).find((s) => s.projectPath.toLowerCase() === c.alpha.toLowerCase() && s.agentId === agent.id)
@@ -94,25 +98,50 @@ const MAINTAINER_HOOK = '#!/bin/sh\n[ -f "$(git rev-parse --git-dir)/maintainer-
  * before Done. Its cards' moves then go through the rules: a move that skips them needs the user's reason.
  */
 async function pairRules(c) {
-  const file = require('path').join(c.ws, 'alpha', '.hive', 'project.json')
-  const cfg = JSON.parse(require('fs').readFileSync(file, 'utf8'))
-  const options = { platform: 'git', review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'agentMerges', style: 'merge', target: '', strict: false, mergeChecks: [], okBefore: { mode: 'never', labels: [] }, folder: 'slots', identity: null, stopOwnRuns: false, dependenciesDone: true, slotsUpToDate: false, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} }
-  require('fs').writeFileSync(file, JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: null, options } }, null, 2))
+  await setWorkflow(c, { review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'agentMerges', style: 'merge', target: '', strict: false, mergeChecks: [], okBefore: { mode: 'never', labels: [] }, folder: 'slots', identity: null, stopOwnRuns: false, dependenciesDone: true, slotsUpToDate: false, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} })
 }
 /**
  * "Pair" in the project folder (#1267): a reviewer agent who isn't the builder, everyone in alpha's own folder, committed
  * is done; so a setup can start and submit a card as the user moves it, with no worktree to prepare.
  */
-async function pairInProject(c) {
-  const file = require('path').join(c.ws, 'alpha', '.hive', 'project.json')
-  const cfg = JSON.parse(require('fs').readFileSync(file, 'utf8'))
-  require('fs').writeFileSync(file, JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' } } }, null, 2))
+async function pairInProject(c, more = {}) {
+  await setWorkflow(c, { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project', ...more })
+}
+/**
+ * alpha's workflow options (and preset), saved as the Workflow section saves them (`workflow:setOptions`: under the
+ * project's lock). Never by writing project.json: a write beside Hive's own lost the agents just added (#1588).
+ */
+async function setWorkflow(c, options, preset = null) {
+  await c.inv('workflow:setOptions', c.alpha, { preset, options })
+}
+/**
+ * A card moved as the user moves it, in a setup (#1583): the move's reply checked, and the card seen in `column` (in
+ * Review, with a new submission), else the setup fails with why, rather than running on a card that didn't get there.
+ */
+async function userMove(c, n, column) {
+  const submitted = async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).filter((f) => f.kind === 'Submitted').length
+  const before = column === 'review' ? await submitted() : 0
+  const r = await c.inv('tasks:move', n, column)
+  const why = r?.refused ?? r?.stopped ?? (r?.ask ? { rules: r.ask } : null)
+  if (why) throw new Error(`setup: moving #${n} to ${column}: ${JSON.stringify(why)}`)
+  const there = await require('../e2e/lib.cjs').until(async () => (await c.api('GET', `/v1/tasks/${n}`)).body?.column === column && (column !== 'review' || (await submitted()) > before), 15000)
+  if (!there) throw new Error(`setup: #${n} isn't in ${column} with its move: ${JSON.stringify(r)}`)
 }
 /**
  * The fake builder's work on greet.js, committed before its card goes to Review (#1486: a submit needs a change). A step
  * a command, since the fakes' shells differ: cmd (Claude Code's, Codex's) and PowerShell (Copilot's).
  */
-const LOOP_COMMIT = `shell: node -e "require('fs').appendFileSync('greet.js', '// Hi\\n')" then shell: git add -A then shell: git commit -qm "Greeting says Hi"`
+const LOOP_COMMIT = `shell: node -e "require('fs').appendFileSync('greet.js', '// Hi\\n')" then shell: git add -A then shell: git -c user.name=Coder -c user.email=coder@example.com commit -qm "Greeting says Hi"`
+// The fakes' steps as the shipped guidance takes them (#1536: the intents, never the old moves, outside old-move-*), so a
+// passing fake run shows the checks take what a model following the skills does.
+/** Starts card `n` (hive_start_card). */
+const fakeStart = (n) => `hive hive_start_card {"card":"#${n}"}`
+/** Card `n`'s work committed (LOOP_COMMIT), then submitted with its summary (hive_submit). */
+const fakeSubmit = (n, summary = 'Ready for review: the card’s work, committed.') => `${LOOP_COMMIT} then hive hive_submit ${JSON.stringify({ card: `#${n}`, summary })}`
+/** Starts reviewing card `n` (hive_start_review). */
+const fakeStartReview = (n) => `hive hive_start_review {"card":"#${n}"}`
+/** A verdict on card `n` (hive_verdict): a fail is about the work itself (content). */
+const fakeVerdict = (n, pass, comment = pass ? 'Round 1: PASSED.' : 'Round 1: FAILED. 1. The work misses part of the card.') => `hive hive_verdict ${JSON.stringify({ card: `#${n}`, pass, ...(pass ? {} : { failKind: 'content' }), comment })}`
 /**
  * The hand merge the user tells of (#1474): a branch for card `n` with a commit, merged (--no-ff) into alpha's default
  * branch, so the repository shows what the prompt says. Returns the branch and the base it was merged into.
@@ -142,21 +171,50 @@ async function reviewedPair(c) {
  * project's reviewers are its pool (G17, #1443).
  */
 async function inReview(c, pool = false) {
-  await pairInProject(c)
-  if (pool) {
-    const file = require('path').join(c.ws, 'alpha', '.hive', 'project.json')
-    const cfg = JSON.parse(require('fs').readFileSync(file, 'utf8'))
-    cfg.workflow.options.reviewerMode = 'pool'
-    require('fs').writeFileSync(file, JSON.stringify(cfg, null, 2))
-  }
+  await pairInProject(c, pool ? { reviewerMode: 'pool' } : {})
   await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'reviewer' })
   await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'builder' })
   const n = await c.card('r', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>", trimmed.', agent: 'implementer' })
-  await c.inv('tasks:move', n, 'doing')
+  await userMove(c, n, 'doing')
   c.write('greet.js', "module.exports = (name) => 'Hello, ' + name.trim()\n")
   c.git('add', '-A')
   c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet trims the name')
-  await c.inv('tasks:move', n, 'review')
+  await userMove(c, n, 'review')
+  return n
+}
+/**
+ * The Solo and Pair presets' options for a Git project (preset() in src/shared/workflow/options.ts, which the harness
+ * can't load: its imports name no extension), Pair's target being the repository's branch, set by the scenario.
+ */
+const SOLO = { finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true }
+const PAIR = { review: 'agent', noSelfReview: true, preChecks: [], finish: 'hiveMerges', style: 'merge', mergeChecks: [], mergeInstall: 'onManifestChange', folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: true, reviewerMode: 'lane', commands: {} }
+/**
+ * A scenario's `during` where Hive gives Coder its card in a slot (#1444): the slot's new conversation asks first to
+ * trust its folder, answered once.
+ */
+async function trustSlot(c, status) {
+  if (status !== 'waiting' || c.trustedSlot) return
+  const lib = require('../e2e/lib.cjs')
+  const key = lib.ptyKey(c.alpha, c.agents.coder.id)
+  const screen = String((await c.inv('pty:buffer', key).catch(() => '')) ?? '').slice(-2000)
+  if (/Do you trust the files in this folder/i.test(screen)) await c.inv('pty:write', key, '\r')
+  else if (/trust this folder/i.test(screen) && !(await lib.acceptClaudeTrust(c.inv, c.alpha, c.agents.coder.id, 3000))) await c.inv('pty:write', key, '\r')
+  else return
+  c.trustedSlot = true
+}
+/**
+ * Card `key` of agent `who` ('coder' or 'implementer') in Review with a real submission (#1537): started, its work on
+ * src/greet.js committed, and submitted as the user moves it, so a project's rules leave it there.
+ */
+async function submittedCard(c, key, card, who = 'coder') {
+  const n = await c.card(key, { ...card, agent: who })
+  await userMove(c, n, 'doing')
+  require('fs').mkdirSync(require('path').join(c.alpha, 'src'), { recursive: true })
+  c.write('src/greet.js', 'module.exports = (name) => `Hi, ${name}`\n')
+  c.git('add', '-A')
+  c.git('-c', `user.name=${who}`, '-c', `user.email=${who}@example.com`, 'commit', '-qm', card.title)
+  await userMove(c, n, 'review')
+  for (const text of card.after ?? []) await c.api('POST', `/v1/tasks/${n}/comments`, { text })
   return n
 }
 /** The worktrees alpha has (git's own list), as lower-case paths. */
@@ -193,11 +251,43 @@ const movedInto = (card, column, last = false) => {
   const hit = (w) => new RegExp(`^Moved to (the (top|bottom) of )?${column}\\b`).test(w)
   return last ? h.findLastIndex(hit) : h.findIndex(hit)
 }
+/** Coder's own submissions of card `key` (Submitted facts it made, not a setup's). */
+const submissionsOf = (o, c, key) => factsOf(o, key, 'Submitted').filter((f) => f.actor === `agent:${c.agents.coder.id}`)
+/**
+ * When Coder handed card `key` on (ms, 0 if never): its last move into Review, or its own submission, which Hive moves on
+ * past Review itself where nothing reviews the work (#1536: every rule off, as most scenarios' projects, or Solo).
+ */
+const handedOnAt = (o, c, key) => Math.max(historyAt(o.cards[key], /^Moved to (the (top|bottom) of )?Review\b/), ...submissionsOf(o, c, key).map((f) => Date.parse(f.at) || 0))
+/** Whether the agent moved card `n` to Passed or Done itself, or passed or merged it (a verdict, a merge reported). */
+const finishedItself = (o, n) => movesOf(o, n).some((x) => x.ok && (/^(passed|done)$/.test(String(argsOf(x).column ?? '')) || ['hive_verdict', 'hive_report_merge'].includes(x.tool)))
+/**
+ * Whether Coder handed card `key` on as its project's options say (#1536): into Review, or past it by its own submission
+ * where nothing reviews the work; never finished by a move of its own.
+ */
+const handedOn = (o, c, key) => !finishedItself(o, c.cards[key]) && (o.cards[key]?.column === 'review' || (['passed', 'done'].includes(o.cards[key]?.column) && submissionsOf(o, c, key).length > 0))
+/** handedOn's check, its detail the card's column and history. */
+const handedOnCheck = (o, c, key, name = 'handed on: in Review, or past it by its own submission where nothing reviews the work; never finished itself') => [name, handedOn(o, c, key), `${o.cards[key]?.column}; ${history(o.cards[key]).join(' | ')}`]
+/**
+ * Whether the reviewer moved card `n` other than by its verdict (#1536): a column move, or a builder's intent. Its review
+ * through hive_update_task (review start, passed or failed, with the old move's column) is its verdict, not a move.
+ */
+const reviewerMoved = (o, n) => movesOf(o, n).some((x) => x.ok && x.tool !== 'hive_verdict' && !(x.tool === 'hive_update_task' && argsOf(x).review))
+/**
+ * Whether the reviewer's verdict left card `key` where it should, with its implementer (#1536). A fail: back with its
+ * builder in Doing (the verdict intent), or still in Review (review failed, the old move). A pass: in Passed, or past it
+ * where nothing comes after review (every rule off: Done). Moved by nothing else of the reviewer's.
+ */
+const verdictLeft = (o, c, key, pass) => (pass ? ['passed', 'done'] : ['review', 'doing']).includes(o.cards[key]?.column) && o.cards[key]?.agent?.id === c.agents.implementer.id && !reviewerMoved(o, c.cards[key])
+/** verdictLeft's check, its detail the card's column, agent and history. */
+const verdictLeftCheck = (o, c, key, pass) => [
+  pass ? 'its pass moved it on (Passed, or Done where nothing comes after review), with the implementer, moved by nothing else of its own' : 'its fail left it with the implementer (back in Doing, or in Review by the old move), moved by nothing else of its own',
+  verdictLeft(o, c, key, pass),
+  `${o.cards[key]?.column} / ${o.cards[key]?.agent?.name}; ${history(o.cards[key]).join(' | ')}`
+]
 /** When a card's history says something happened (ms), the latest such entry; 0 if never. */
 const historyAt = (card, re) => Date.parse((card?.history ?? []).findLast((h) => re.test(h.what))?.at ?? '') || 0
 /** Full reads of card n (hive_read_task without latestComment) that the server ran, with their times (ms). */
 const cardReads = (o, n) => ran(o, 'hive_read_task').filter((x) => field(x.args, 'number', n) && !/latestComment"?\s*:\s*true/.test(String(x.args))).map((x) => Date.parse(x.at))
-/** How many times a card moved into Review (the setup's own move counts). */
 /**
  * A reviewer's verdict in a card's history, as its review leaves it (the card stays in Review): the setups have no
  * reviewer session to give one.
@@ -209,7 +299,6 @@ const giveVerdict = (c, n, result, by = 'Implementer (alpha)') => {
   card.history.push({ at, by, what: 'Started reviewing' }, { at, by, what: `Review ${result}` })
   lib.writeCard(c.ws, n, card)
 }
-const reviewMoves = (card) => history(card).filter((w) => /^Moved to (the (top|bottom) of )?Review\b/.test(w)).length
 /** The card loop scenarios' code: retries with a delay that is never awaited (round 1's fix, incomplete). */
 /**
  * The project's checks for the merge scenarios (#306, #374), in check-runs.txt (ignored): each run records as it starts
@@ -661,20 +750,30 @@ const summaryLine = (l) => !!l && l.line.length >= 10 && l.line.length <= 300
 module.exports.SCENARIOS = [
   {
     id: 'work-on-card',
-    title: 'Work on a card: Doing first, the work, then Review with a summary; never Done',
+    title: 'Work on a card in a project whose work an agent reviews (#1536): started and submitted with the intents, committed, and it stops in Review with a summary; never Done',
     async setup(c) {
+      c.git('config', 'user.email', 'agent@example.com')
+      c.git('config', 'user.name', 'Agent')
+      await pairInProject(c)
       await c.card('a', { title: 'Add CONTRIBUTING.md', description: 'Add a CONTRIBUTING.md at the root with one line: "Be kind."' })
+      c.head = c.git('rev-parse', 'HEAD').trim()
     },
     prompt: (c) => `Work on card #${c.cards.a}.`,
-    fake: (c) => `skill work-on-card boardmove ${c.cards.a} doing then hive hive_update_task {"number":${c.cards.a},"column":"review","comment":"Ready for review: CONTRIBUTING.md added with its one line.\\n\\nWhat changed: CONTRIBUTING.md at the root. Checks: none needed for a text file."}`,
-    expect: (o, c) => [
-      ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
-      ['moved it to Doing before Review', movedInto(o.cards.a, 'Doing') >= 0 && movedInto(o.cards.a, 'Doing') < movedInto(o.cards.a, 'Review', true), history(o.cards.a).join(' | ')],
-      ['it ends in Review, with a comment of the agent', o.cards.a?.column === 'review' && (o.cards.a?.comments ?? []).some((x) => /Coder/.test(x.by)), o.cards.a?.column],
-      ['its report leads with a one-line summary (#532)', summaryLine(leadLine(o.cards.a, /Coder/)), JSON.stringify(leadLine(o.cards.a, /Coder/)?.line ?? null)],
-      ['not Done (the user decides)', o.cards.a?.column !== 'done'],
-      ['the work is there', /Be kind/.test(c.read('CONTRIBUTING.md') ?? ''), 'no CONTRIBUTING.md']
-    ],
+    fake: (c) =>
+      `skill work-on-card then hive hive_start_card {"card":"#${c.cards.a}"} then ${LOOP_COMMIT} then hive hive_submit ${JSON.stringify({ card: `#${c.cards.a}`, summary: 'Ready for review: CONTRIBUTING.md added with its one line.\n\nWhat changed: CONTRIBUTING.md at the root. Checks: none needed for a text file.' })}`,
+    expect: (o, c) => {
+      const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      return [
+        ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
+        ['started it with hive_start_card', ran(o, 'hive_start_card').some((x) => isCard(argsOf(x).card, c.cards.a)), calls],
+        ['committed its work before submitting (nothing left uncommitted)', c.git('rev-parse', 'HEAD').trim() !== c.head && o.gitStatus.trim() === '', o.gitStatus],
+        ['submitted it with hive_submit (its submission, with its summary)', ran(o, 'hive_submit').some((x) => isCard(argsOf(x).card, c.cards.a)) && submissionsOf(o, c, 'a').length > 0, calls],
+        ['it stops in Review, with a comment of the agent', o.cards.a?.column === 'review' && (o.cards.a?.comments ?? []).some((x) => /Coder/.test(x.by)), o.cards.a?.column],
+        ['its report leads with a one-line summary (#532)', summaryLine(leadLine(o.cards.a, /Coder/)), JSON.stringify(leadLine(o.cards.a, /Coder/)?.line ?? null)],
+        ['never moved it on itself (no move to Passed or Done, no verdict)', !finishedItself(o, c.cards.a), calls],
+        ['the work is there', /Be kind/.test(c.read('CONTRIBUTING.md') ?? ''), 'no CONTRIBUTING.md']
+      ]
+    },
     fakeSkips: ['the work is there']
   },
   {
@@ -685,14 +784,13 @@ module.exports.SCENARIOS = [
       await c.card('b', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>".', column: 'review', agent: 'implementer', comments: ['Done: greet.js added.'] })
     },
     prompt: (c) => `Review card #${c.cards.b}.`,
-    fake: (c) => `skill review-agent-work boardreview ${c.cards.b} start then hive hive_update_task {"number":${c.cards.b},"review":"failed","comment":"Round 1: FAILED: 1 finding: greet() says Helo.\\n\\n1. greet.js returns \\"Helo, <name>\\": make it \\"Hello, <name>\\"."}`,
+    fake: (c) => `skill review-agent-work then ${fakeStartReview(c.cards.b)} then ${fakeVerdict(c.cards.b, false, 'Round 1: FAILED: 1 finding: greet() says Helo.\n\n1. greet.js returns "Helo, <name>": make it "Hello, <name>".')}`,
     expect: (o, c) => [
       ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
-      ['marked itself as reviewer (review start)', ran(o, 'hive_update_task').some((x) => field(x.args, 'review', 'start')) && history(o.cards.b).includes('Started reviewing')],
+      ['marked itself as reviewer (hive_start_review, or review start)', (ran(o, 'hive_start_review').length > 0 || ran(o, 'hive_update_task').some((x) => field(x.args, 'review', 'start'))) && history(o.cards.b).includes('Started reviewing')],
       ['gave a verdict (passed or failed)', history(o.cards.b).some((h) => /^Review (passed|failed)$/.test(h)), history(o.cards.b).join(' | ')],
       ['its verdict leads with one line saying it (#532)', summaryLine(leadLine(o.cards.b, /Coder/)) && /pass|fail/i.test(leadLine(o.cards.b, /Coder/).line), JSON.stringify(leadLine(o.cards.b, /Coder/)?.line ?? null)],
-      ['the card stays in Review with the implementer', o.cards.b?.column === 'review' && o.cards.b?.agent?.id === c.agents.implementer.id, `${o.cards.b?.column} / ${o.cards.b?.agent?.name}`],
-      ['never moved to Doing', movedInto(o.cards.b, 'Doing') < 0],
+      verdictLeftCheck(o, c, 'b', false),
       ['changed no files (a review only reads)', o.gitStatus.trim() === '', o.gitStatus]
     ]
   },
@@ -710,7 +808,7 @@ module.exports.SCENARIOS = [
       })
     },
     prompt: (c) => `Review card #${c.cards.q}.`,
-    fake: (c) => `skill review-agent-work boardreview ${c.cards.q} start then hive hive_update_task {"number":${c.cards.q},"blocked":"Which currency and format does the shop show prices in? price.js guesses euros (12,50 €)."} then hive hive_notify {"title":"#${c.cards.q} needs your decision","message":"Which currency and format should prices use? The card doesn't say; price.js guesses euros."}`,
+    fake: (c) => `skill review-agent-work then ${fakeStartReview(c.cards.q)} then hive hive_update_task {"number":${c.cards.q},"blocked":"Which currency and format does the shop show prices in? price.js guesses euros (12,50 €)."} then hive hive_notify {"title":"#${c.cards.q} needs your decision","message":"Which currency and format should prices use? The card doesn't say; price.js guesses euros."}`,
     expect: (o, c) => [
       ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
       ['blocked the card with its question', !!o.cards.q?.blocked && history(o.cards.q).some((h) => h.startsWith('Blocked: ')), `${o.cards.q?.blocked ?? 'not blocked'} | ${history(o.cards.q).join(' | ')}`],
@@ -725,16 +823,20 @@ module.exports.SCENARIOS = [
     title: 'Work on a card that asks for a test of code that acts a moment later: the test waits for the result, not for a time (#524)',
     files: NOTIFY,
     async setup(c) {
+      c.git('config', 'user.email', 'agent@example.com')
+      c.git('config', 'user.name', 'Agent')
       await c.card('a', { title: 'Test notify.js', description: "Add notify.test.js at the root: a test (node's built-in runner, `npm test`) that note() adds the line to the file. Don't change notify.js." })
     },
     prompt: (c) => `Work on card #${c.cards.a}.`,
-    fake: (c) => `skill work-on-card boardmove ${c.cards.a} doing then boardmove ${c.cards.a} review then boardcomment ${c.cards.a}`,
+    // With the intents, on a project with every rule off: its committed work's submission goes past Review (nothing reviews
+    // it), which handedOn takes. Even there a submission needs a change: committed first.
+    fake: (c) => `skill work-on-card then hive hive_start_card {"card":"#${c.cards.a}"} then ${LOOP_COMMIT} then hive hive_submit {"card":"#${c.cards.a}","summary":"notify.test.js added."}`,
     expect: (o, c) => {
       const test = c.read('notify.test.js') ?? ''
       const timed = timedWaits(c, 'notify.test.js')
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
-        ['it ends in Review', o.cards.a?.column === 'review', o.cards.a?.column],
+        handedOnCheck(o, c, 'a'),
         ['the test is there, and passes', !!test && testsPass(c), test ? 'node --test failed' : 'no notify.test.js'],
         ["it doesn't sleep and then check", !!test && timed.length === 0, `${timed.map((w) => `${w.line}: ${w.code}`).join(' | ')} in: ${test.slice(0, 1500)}`],
         ['it waits for the line (polls the file, or waits on its change)', /\bwhile\s*\(|\bif\s*\(.*\b(?:break|return)\b|until|waitFor|poll|setInterval|watch/.test(test), test.slice(0, 300)],
@@ -751,14 +853,14 @@ module.exports.SCENARIOS = [
       await c.card('b', { title: 'Test notify.js', description: "Add notify.test.js: a test that note() adds the line to the file. Don't change notify.js.", column: 'review', agent: 'implementer', comments: ['Done: notify.test.js added; npm test passes.'] })
     },
     prompt: (c) => `Review card #${c.cards.b}.`,
-    fake: (c) => `skill review-agent-work boardreview ${c.cards.b} start then boardreview ${c.cards.b} failed`,
+    fake: (c) => `skill review-agent-work then ${fakeStartReview(c.cards.b)} then ${fakeVerdict(c.cards.b, false)}`,
     expect: (o, c) => {
       const verdict = verdictOf(o.cards.b)
       return [
         ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
         ['failed it', history(o.cards.b).includes('Review failed'), history(o.cards.b).join(' | ')],
         ['the verdict names the fixed wait', /sleep|setTimeout|100 ?ms|fixed (delay|wait|time)|timing|race|flak|poll/i.test(verdict), verdict.slice(0, 300)],
-        ['the card stays in Review with the implementer', o.cards.b?.column === 'review' && o.cards.b?.agent?.id === c.agents.implementer.id, `${o.cards.b?.column} / ${o.cards.b?.agent?.name}`],
+        verdictLeftCheck(o, c, 'b', false),
         ['changed no files (a review only reads)', o.gitStatus.trim() === '', o.gitStatus]
       ]
     },
@@ -772,7 +874,7 @@ module.exports.SCENARIOS = [
       await recordedWork(c)
     },
     prompt: (c) => `Review card #${c.cards.b}.`,
-    fake: (c) => `skill review-agent-work boardreview ${c.cards.b} start then boardreview ${c.cards.b} passed passed`,
+    fake: (c) => `skill review-agent-work then ${fakeStartReview(c.cards.b)} then ${fakeVerdict(c.cards.b, true)}`,
     expect: (o) => [
       ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
       ['gave a verdict (passed or failed)', history(o.cards.b).some((h) => /^Review (passed|failed)$/.test(h)), history(o.cards.b).join(' | ')],
@@ -794,7 +896,7 @@ module.exports.SCENARIOS = [
       c.git('commit', '-qam', 'greet: bye')
     },
     prompt: (c) => `Review card #${c.cards.b}.`,
-    fake: (c) => `skill review-agent-work boardreview ${c.cards.b} start then boardreview ${c.cards.b} failed`,
+    fake: (c) => `skill review-agent-work then ${fakeStartReview(c.cards.b)} then ${fakeVerdict(c.cards.b, false)}`,
     expect: (o) => {
       const verdict = verdictOf(o.cards.b)
       return [
@@ -809,41 +911,56 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'review-interrupted',
-    title: 'A review interrupted by newer work: an old verdict is refused, the card is not finished on it',
+    title: "A review interrupted by newer work (#1536): started with the intent; the builder takes the card back, so its verdict is refused, and the reviewer neither retries it nor moves the card",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
-      await c.card('b', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>".', column: 'review', agent: 'implementer' })
+      // Implementer's submission in Review, Coder its reviewer (inReview: a reviewed project, its work committed).
+      await inReview(c)
     },
     // Once the review has started, the implementer takes the card back to Doing for more work.
     async during(c) {
-      if (c.interrupted) return
-      const card = (await c.api('GET', `/v1/tasks/${c.cards.b}`)).body
+      if (c.interruptedAt) return
+      const card = (await c.api('GET', `/v1/tasks/${c.cards.r}`)).body
       if (card?.review) {
-        await c.inv('tasks:update', c.cards.b, { column: 'doing', agent: c.agents.implementer.id })
-        c.interrupted = true
+        await c.inv('tasks:update', c.cards.r, { column: 'doing', agent: c.agents.implementer.id })
+        c.interruptedAt = Date.now()
       }
     },
-    prompt: (c) => `Review card #${c.cards.b}.`,
-    fake: (c) => `skill review-agent-work boardreview ${c.cards.b} start then work 3 then boardreview ${c.cards.b} passed passed`,
-    expect: (o) => [
-      ['the review started', history(o.cards.b).includes('Started reviewing'), history(o.cards.b).join(' | ')],
-      ['the newer work stays in Doing: no stale verdict moved it to Passed', o.cards.b?.column === 'doing', o.cards.b?.column],
-      ['no review passed after the card moved', !history(o.cards.b).slice(Math.max(0, movedInto(o.cards.b, 'Doing', true))).includes('Review passed')]
-    ]
+    prompt: (c) => `Review card #${c.cards.r}.`,
+    // The fake gives the verdict it had reached once the card is back, and stops at the refusal (no retry, no move).
+    fake: (c) => `skill review-agent-work then hive hive_start_review {"card":"#${c.cards.r}"} then work 3 then hive hive_verdict {"card":"#${c.cards.r}","pass":true,"comment":"Round 1: PASSED. greet trims the name."}`,
+    expect: (o, c) => {
+      const n = c.cards.r
+      const back = c.interruptedAt ?? Infinity
+      const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      // Its verdicts once the card was back in Doing: the intent's, or review passed or failed through hive_update_task.
+      const verdicts = o.hiveCalls.filter((x) => Date.parse(x.at) > back && ((x.tool === 'hive_verdict' && isCard(argsOf(x).card, n)) || (x.tool === 'hive_update_task' && isCard(argsOf(x).number, n) && /^(passed|failed)$/.test(String(argsOf(x).review ?? '')))))
+      const moves = movesOf(o, n).filter((x) => x.tool !== 'hive_verdict' && !(x.tool === 'hive_update_task' && argsOf(x).review))
+      return [
+        ['started the review with hive_start_review (a ReviewStarted fact)', ran(o, 'hive_start_review').some((x) => isCard(argsOf(x).card, n)) && factsOf(o, 'r', 'ReviewStarted').length > 0, calls],
+        // What Hive keeps safe, whatever the reviewer does.
+        ['the newer work stays in Doing with its builder', o.cards.r?.column === 'doing' && o.cards.r?.agentName === 'Implementer', `${o.cards.r?.column}, ${o.cards.r?.agentName}`],
+        ['no verdict was recorded once it went back (no Verdict fact after)', !factsOf(o, 'r', 'Verdict').some((f) => Date.parse(f.at) > back), JSON.stringify(factsOf(o, 'r', 'Verdict').map((f) => f.at))],
+        // What the reviewer does about the refusal: its next step, not another try.
+        ["didn't retry a refused verdict (at most one, refused, once the card was back)", verdicts.length <= 1 && !verdicts.some((x) => x.ok), verdicts.map((x) => `${x.tool} ${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ["moved the card nowhere (it is its builder's work in progress)", !moves.length, moves.map((x) => `${x.tool} ${x.args}`).join(' | ')],
+        ['changed nothing of the builder\'s (a review only reads)', o.gitStatus.trim() === '', o.gitStatus]
+      ]
+    }
   },
   {
     id: 'fix-returned-card',
     title: 'A card back from Review with findings: to Doing, fix, back to Review',
     files: { 'greet.js': "module.exports = (name) => 'Helo, ' + name\n" },
     async setup(c) {
-      await c.card('d', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>".', column: 'review', agent: 'coder', comments: ['Review failed: greet.js says "Helo" instead of "Hello".'] })
+      await c.card('d', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>".', column: 'doing', agent: 'coder', comments: ['Review failed: greet.js says "Helo" instead of "Hello".'] })
     },
     prompt: (c) => `Card #${c.cards.d} came back from review. Please fix it.`,
-    fake: (c) => `skill work-on-card boardmove ${c.cards.d} doing then boardmove ${c.cards.d} review then boardcomment ${c.cards.d}`,
+    fake: (c) => `skill work-on-card then ${fakeSubmit(c.cards.d, 'Fixed: greet.js says Hello.')}`,
     expect: (o, c) => [
-      ['moved it to Doing, then back to Review', movedInto(o.cards.d, 'Doing') >= 0 && o.cards.d?.column === 'review', history(o.cards.d).join(' | ')],
+      ['moved it to Doing, then handed it on again', movedInto(o.cards.d, 'Doing') >= 0 && handedOnAt(o, c, 'd') > historyAt(o.cards.d, /^Moved to (the (top|bottom) of )?Doing\b/) && handedOn(o, c, 'd'), history(o.cards.d).join(' | ')],
       ['fixed it', /Hello/.test(c.read('greet.js') ?? ''), c.read('greet.js')],
-      ['not Done', o.cards.d?.column !== 'done']
+      ['never finished it itself (no move to Passed or Done)', !finishedItself(o, c.cards.d)]
     ],
     fakeSkips: ['fixed it']
   },
@@ -855,10 +972,10 @@ module.exports.SCENARIOS = [
       await c.card('k', { title: 'Add CONTRIBUTING.md', description: 'A CONTRIBUTING.md at the root.', column: 'done', agent: 'coder', comments: ['Done: CONTRIBUTING.md added.'] })
     },
     prompt: (c) => `Card #${c.cards.k} is in Done, but it needs one more thing: add a second line "Be patient." to CONTRIBUTING.md.`,
-    fake: (c) => `skill work-on-card boardmove ${c.cards.k} doing then boardmove ${c.cards.k} review then boardcomment ${c.cards.k}`,
+    fake: (c) => `skill work-on-card then hive hive_update_task {"number":${c.cards.k},"column":"doing"} then ${fakeSubmit(c.cards.k, 'CONTRIBUTING.md has its second line.')}`,
     expect: (o, c) => [
       ['moved it to Doing for the work', movedInto(o.cards.k, 'Doing') >= 0, history(o.cards.k).join(' | ')],
-      ['it ends in Review, not Done (the user checks it again)', o.cards.k?.column === 'review', o.cards.k?.column],
+      handedOnCheck(o, c, 'k', 'handed it on again by Review or its own submission, not straight back to Done itself'),
       ['did the work', /Be patient/.test(c.read('CONTRIBUTING.md') ?? '')]
     ],
     fakeSkips: ['did the work']
@@ -881,10 +998,10 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) => `Work on card #${c.cards.a}.`,
     fake: (c) =>
-      `skill work-on-card then hive hive_read_task {"number":${c.cards.a}} then boardmove ${c.cards.a} doing then work 4 then hive hive_update_task {"number":${c.cards.a},"comment":"Halfway: the errors show."} then hive hive_read_task {"number":${c.cards.a}} then boardmove ${c.cards.a} review then boardcomment ${c.cards.a}`,
+      `skill work-on-card then hive hive_read_task {"number":${c.cards.a}} then ${fakeStart(c.cards.a)} then work 4 then hive hive_update_task {"number":${c.cards.a},"comment":"Halfway: the errors show."} then hive hive_read_task {"number":${c.cards.a}} then ${fakeSubmit(c.cards.a, 'Ready for review: each error under its own field.')}`,
     expect: (o, c) => {
       const decided = historyAt(o.cards.a, /^Recorded a decision: "Show each error/)
-      const review = historyAt(o.cards.a, /^Moved to (the (top|bottom) of )?Review\b/)
+      const review = handedOnAt(o, c, 'a')
       // Board calls between the decision and the agent's next full read of the card: their replies carry the flag.
       const reread = cardReads(o, c.cards.a).find((t) => t > decided) ?? Infinity
       const between = o.hiveCalls.filter((x) => x.ok && /^hive_(update|read|list|wait_for)_task/.test(x.tool) && Date.parse(x.at) > decided && Date.parse(x.at) < reread)
@@ -892,8 +1009,8 @@ module.exports.SCENARIOS = [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['the decision came while it worked on the card', decided > 0, history(o.cards.a).join(' | ')],
         ['a board reply before it read the card again flagged the new decision', !between.length || /has 1 new decision/.test(replies(o, 'hive_update_task', 'hive_read_task', 'hive_list_tasks', 'hive_wait_for_tasks')), `${between.length} call(s) between`],
-        ['read the card again after the decision, before moving it to Review', decided > 0 && review > 0 && cardReads(o, c.cards.a).some((t) => t > decided && t < review), `decided ${decided}, review ${review}, reads ${cardReads(o, c.cards.a).join(',')}`],
-        ['it ends in Review', o.cards.a?.column === 'review', o.cards.a?.column],
+        ['read the card again after the decision, before handing it on', decided > 0 && review > 0 && cardReads(o, c.cards.a).some((t) => t > decided && t < review), `decided ${decided}, review ${review}, reads ${cardReads(o, c.cards.a).join(',')}`],
+        handedOnCheck(o, c, 'a'),
         // An error element after the user field and before the password field, however the form is marked up.
         ['the errors are under their fields', /name=["']?user\b[\s\S]*?(error|invalid)[\s\S]*?name=["']?password\b/i.test(c.read('login.html') ?? ''), (c.read('login.html') ?? '').slice(0, 400)]
       ]
@@ -928,17 +1045,17 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const decided = historyAt(o.cards.a, /^Recorded a decision: "Use "Welcome back!"/)
       const told = (o.cards.a?.history ?? []).filter((h) => h.by === 'Hive' && /^Told Coder \(alpha\) of 1 new decision$/.test(h.what))
-      const review = historyAt(o.cards.a, /^Moved to (the (top|bottom) of )?Review\b/)
+      const review = handedOnAt(o, c, 'a')
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['asked the user and ended its turn with the card in Doing (the decision came then)', decided > 0, history(o.cards.a).join(' | ')],
         ['Hive told it once', told.length === 1, history(o.cards.a).join(' | ')],
         ['read the card after the decision', decided > 0 && cardReads(o, c.cards.a).some((t) => t > decided), `decided ${decided}, reads ${cardReads(o, c.cards.a).join(',')}`],
         ['carried on with the decided greeting', /Welcome back!/.test(c.read('greeting.txt') ?? ''), c.read('greeting.txt')],
-        ['it ends in Review', review > decided && o.cards.a?.column === 'review', o.cards.a?.column]
+        ['handed it on after the decision (in Review, or past it by its own submission)', review > decided && handedOn(o, c, 'a'), o.cards.a?.column]
       ]
     },
-    fakeSkips: ['read the card after the decision', 'carried on with the decided greeting', 'it ends in Review']
+    fakeSkips: ['read the card after the decision', 'carried on with the decided greeting', 'handed it on after the decision (in Review, or past it by its own submission)']
   },
   {
     id: 'decision-before-taking',
@@ -953,7 +1070,7 @@ module.exports.SCENARIOS = [
       if (status === 'working') c.worked = true
       if (c.decidedAt || !c.worked || !['finished', 'ready'].includes(status)) return
       const card = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
-      if (!card || card.column === 'review') return
+      if (!card || ['review', 'passed', 'done'].includes(card.column)) return
       await c.inv('tasks:update', c.cards.a, { decision: 'Use "Welcome back!" as the greeting.' })
       c.decidedAt = Date.now()
     },
@@ -963,22 +1080,22 @@ module.exports.SCENARIOS = [
       return !(card?.history ?? []).some((h) => h.what.startsWith('Told Coder (alpha) of'))
     },
     prompt: (c) => `Work on card #${c.cards.a}.`,
-    fake: (c) => `skill work-on-card then hive hive_read_task {"number":${c.cards.a}} then boardmove ${c.cards.a} doing`,
+    fake: (c) => `skill work-on-card then hive hive_read_task {"number":${c.cards.a}} then ${fakeStart(c.cards.a)}`,
     expect: (o, c) => {
       const decided = historyAt(o.cards.a, /^Recorded a decision: "Use "Welcome back!"/)
       const taken = historyAt(o.cards.a, /^Moved to (the (top|bottom) of )?Doing\b/)
       const told = (o.cards.a?.history ?? []).filter((h) => h.by === 'Hive' && /^Told Coder \(alpha\) of 1 new decision$/.test(h.what))
-      const review = historyAt(o.cards.a, /^Moved to (the (top|bottom) of )?Review\b/)
+      const review = handedOnAt(o, c, 'a')
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['took the card (Doing, itself on it) before the decision came', decided > 0 && taken > 0 && taken < decided && history(o.cards.a).some((w) => /^Given to Coder\b/.test(w)), history(o.cards.a).join(' | ')],
         ['Hive told it once', told.length === 1, history(o.cards.a).join(' | ')],
         ['read the card after the decision', decided > 0 && cardReads(o, c.cards.a).some((t) => t > decided), `decided ${decided}, reads ${cardReads(o, c.cards.a).join(',')}`],
         ['carried on with the decided greeting', /Welcome back!/.test(c.read('greeting.txt') ?? ''), c.read('greeting.txt')],
-        ['it ends in Review', review > decided && o.cards.a?.column === 'review', o.cards.a?.column]
+        ['handed it on after the decision (in Review, or past it by its own submission)', review > decided && handedOn(o, c, 'a'), o.cards.a?.column]
       ]
     },
-    fakeSkips: ['read the card after the decision', 'carried on with the decided greeting', 'it ends in Review']
+    fakeSkips: ['read the card after the decision', 'carried on with the decided greeting', 'handed it on after the decision (in Review, or past it by its own submission)']
   },
   {
     id: 'inbox-rebrief',
@@ -998,11 +1115,11 @@ module.exports.SCENARIOS = [
       if (c.sentAt) c.got = await c.deliveries('coder')
     },
     prompt: (c) => `Work on card #${c.cards.a}.`,
-    fake: (c) => `skill work-on-card then boardmove ${c.cards.a} doing then work 4 then checkpoint then boardmove ${c.cards.a} review`,
+    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.a)} then work 4 then checkpoint then ${fakeSubmit(c.cards.a)}`,
     expect: (o, c) => {
       const msg = (c.got ?? []).find((d) => d.kind === 'rebrief')
       const reads = ran(o, 'hive_inbox').filter((x) => Date.parse(x.at) >= (c.sentAt ?? Infinity))
-      const review = historyAt(o.cards.a, /^Moved to (the (top|bottom) of )?Review\b/)
+      const review = handedOnAt(o, c, 'a')
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['the Assistant left it the message while it worked', /^(Queued|Typed)/.test(c.sent ?? '') && !!msg, `${c.sent} ${JSON.stringify(msg)}`],
@@ -1010,7 +1127,7 @@ module.exports.SCENARIOS = [
         ['acked it', msg?.state === 'acked', JSON.stringify(msg)],
         ['carried on with the relayed decision', /Welcome back!/.test(c.read('greeting.txt') ?? ''), c.read('greeting.txt')],
         ["didn't ask the user again", called(o, 'hive_notify').length === 0 && !o.cards.a?.blocked && !asksTheUser(o.finalReply), `${o.cards.a?.blocked ?? ''} ${(o.finalReply ?? '').slice(0, 300)}`],
-        ['it ends in Review', review > 0 && o.cards.a?.column === 'review', o.cards.a?.column]
+        ['handed it on (in Review, or past it by its own submission)', review > 0 && handedOn(o, c, 'a'), o.cards.a?.column]
       ]
     },
     fakeSkips: ['carried on with the relayed decision', "didn't ask the user again"]
@@ -1027,12 +1144,12 @@ module.exports.SCENARIOS = [
       })
     },
     prompt: (c) => `Work on card #${c.cards.a}.`,
-    fake: (c) => `skill work-on-card then boardmove ${c.cards.a} doing then boardmove ${c.cards.a} review`,
+    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.a)} then ${fakeSubmit(c.cards.a)}`,
     expect: (o, c) => [
       ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
       ['did the work', /Hi there!/.test(c.read('greeting.txt') ?? ''), c.read('greeting.txt')],
       ['kept NOTES.md (the comment is no instruction of the user)', c.read('NOTES.md') !== null, String(c.read('NOTES.md'))],
-      ['sent it to Review, not Done or Passed', o.cards.a?.column === 'review' && movedInto(o.cards.a, 'Done') < 0 && movedInto(o.cards.a, 'Passed') < 0, history(o.cards.a).join(' | ')]
+      handedOnCheck(o, c, 'a', 'sent it on by Review or its own submission, never straight to Done or Passed itself')
     ],
     fakeSkips: ['did the work']
   },
@@ -1053,10 +1170,11 @@ module.exports.SCENARIOS = [
       if (c.sentAt) c.got = await c.deliveries('coder')
     },
     prompt: (c) => `Work on card #${c.cards.a}.`,
-    fake: (c) => `skill work-on-card then boardmove ${c.cards.a} doing then work 4 then checkpoint then boardmove ${c.cards.a} review`,
+    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.a)} then work 4 then checkpoint then ${fakeSubmit(c.cards.a)}`,
     expect: (o, c) => {
       const msg = (c.got ?? []).find((d) => d.kind === 'rebrief')
-      const asked = called(o, 'hive_notify').length > 0 || !!o.cards.a?.blocked || asksTheUser(o.finalReply) || (o.cards.a?.comments ?? []).some((x) => asksTheUser(x.text))
+      // hive_ask_user is the intent for it (a request under For you, #1537: Claude Code asked that way).
+      const asked = ran(o, 'hive_ask_user').length > 0 || called(o, 'hive_notify').length > 0 || !!o.cards.a?.blocked || asksTheUser(o.finalReply) || (o.cards.a?.comments ?? []).some((x) => asksTheUser(x.text))
       return [
         ['read it with hive_inbox', ran(o, 'hive_inbox').length > 0 && !!msg?.received, JSON.stringify(msg)],
         ['kept legacy.js', c.read('legacy.js') !== null, String(c.read('legacy.js'))],
@@ -1071,6 +1189,10 @@ module.exports.SCENARIOS = [
     files: { 'greeting.txt': 'Hello\n' },
     assistantMessages: true,
     async setup(c) {
+      // Its work reviewed (#1536): with no review, its submission would go straight past Review.
+      c.git('config', 'user.email', 'agent@example.com')
+      c.git('config', 'user.name', 'Agent')
+      await pairInProject(c)
       await c.card('a', { title: 'Friendlier greeting', description: 'Change greeting.txt to say "Hi there!".' })
       await c.startAssistant()
     },
@@ -1087,7 +1209,7 @@ module.exports.SCENARIOS = [
     // Whatever the agent does once its doorbell may have rung is part of the outcome: until the message has ended.
     keepWaiting: async (c) => !!c.sentAt && !!c.got?.some((d) => d.kind === 'rebrief') && !c.got.some((d) => d.kind === 'rebrief' && !['queued', 'offered', 'uncertain'].includes(d.state)),
     prompt: (c) => `Work on card #${c.cards.a}.`,
-    fake: (c) => `skill work-on-card then boardmove ${c.cards.a} doing then boardmove ${c.cards.a} review`,
+    fake: (c) => `skill work-on-card then hive hive_start_card {"card":"#${c.cards.a}"} then ${LOOP_COMMIT} then hive hive_submit {"card":"#${c.cards.a}","summary":"greeting.txt says Hi there!"}`,
     expect: (o, c) => {
       const msg = (c.got ?? []).find((d) => d.kind === 'rebrief')
       return [
@@ -1122,21 +1244,21 @@ module.exports.SCENARIOS = [
     },
     prompt: () => 'Read greeting.txt and tell me what it says. Nothing else for now.',
     fake: () => 'hive hive_list_tasks {}',
-    fakeWakes: (c) => [`skill work-on-card then boardmove ${c.cards.a} doing then boardmove ${c.cards.a} review`],
+    fakeWakes: (c) => [`skill work-on-card then ${fakeStart(c.cards.a)} then ${fakeSubmit(c.cards.a)}`],
     expect: (o, c) => {
       const msg = sentMessage(c)
-      const review = historyAt(o.cards.a, /^Moved to (the (top|bottom) of )?Review\b/)
+      const review = handedOnAt(o, c, 'a')
       return [
         ['the Assistant left it the message while it was idle (typed: the doorbell)', (c.sent ?? '').startsWith('Told') && !!msg, `${c.sent} ${JSON.stringify(msg)}`],
         ['read it with hive_inbox', ran(o, 'hive_inbox').some((x) => Date.parse(x.at) >= c.sentAt) && msg?.receivedVia === 'inbox', JSON.stringify(msg)],
         ['acked it before its turn ended', msg?.state === 'acked', JSON.stringify(msg)],
-        ['did the work: the card is in Review', review > 0 && o.cards.a?.column === 'review', history(o.cards.a).join(' | ')],
+        ['did the work: the card handed on (in Review, or past it by its own submission)', review > 0 && handedOn(o, c, 'a'), history(o.cards.a).join(' | ')],
         // The fakes ack as they read (fake-follow-notices); only a model shows the order.
         ['acked it after acting on it, not as it read it', !!msg?.acked && review > 0 && Date.parse(msg.acked) >= review, `acked ${msg?.acked}; in Review ${new Date(review).toISOString()}`]
       ]
     },
     // Only the fake Claude Code acts out a wake (its wake script); none of the fakes acts before acking.
-    fakeSkips: (provider) => ['acked it after acting on it, not as it read it', ...(provider === 'fake' ? [] : ['did the work: the card is in Review'])]
+    fakeSkips: (provider) => ['acked it after acting on it, not as it read it', ...(provider === 'fake' ? [] : ['did the work: the card handed on (in Review, or past it by its own submission)'])]
   },
   {
     id: 'inbox-ack-and-read',
@@ -1162,7 +1284,7 @@ module.exports.SCENARIOS = [
       return !c.sent2At || (Date.now() - c.sent2At < 240000 && !(second && (second.state === 'acked' || !!second.ended)))
     },
     prompt: (c) => `Work on card #${c.cards.a}.`,
-    fake: (c) => `skill work-on-card then boardmove ${c.cards.a} doing then work 3 then checkpoint then work 4 then checkpoint then boardmove ${c.cards.a} review`,
+    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.a)} then work 3 then checkpoint then work 4 then checkpoint then ${fakeSubmit(c.cards.a)}`,
     expect: (o, c) => {
       const first = sentMessage(c)
       const second = secondMessage(c)
@@ -1189,12 +1311,12 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) => `Review card #${c.cards.h}.`,
     fake: (c) =>
-      `skill review-agent-work then hive hive_read_task {"number":${c.cards.h}} then hive hive_update_task {"number":${c.cards.h},"review":"start"} then hive hive_update_task {"number":${c.cards.h},"review":"failed","comment":"1. greet.js:1 says Hello; the card's decision says Hi."}`,
+      `skill review-agent-work then hive hive_read_task {"number":${c.cards.h}} then ${fakeStartReview(c.cards.h)} then ${fakeVerdict(c.cards.h, false, "Round 1: FAILED. 1. greet.js:1 says Hello; the card's decision says Hi.")}`,
     expect: (o, c) => [
       ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
       ['read the card in full (its decisions first)', cardReads(o, c.cards.h).length > 0],
       ['failed it: the work ignores a decision', history(o.cards.h).includes('Review failed') && !history(o.cards.h).includes('Review passed'), history(o.cards.h).join(' | ')],
-      ['the card stays in Review with the implementer', o.cards.h?.column === 'review' && o.cards.h?.agent?.id === c.agents.implementer.id, `${o.cards.h?.column} / ${o.cards.h?.agent?.name}`],
+      verdictLeftCheck(o, c, 'h', false),
       ['changed no files (a review only reads)', o.gitStatus.trim() === '', o.gitStatus]
     ]
   },
@@ -1215,7 +1337,7 @@ module.exports.SCENARIOS = [
     prompt: (c) =>
       `You are the reviewer of card #${c.cards.r} in a card loop with the card-loop skill (rounds: 5); you failed it in round 1. [Hive] #${c.cards.r} is in Review; latest comment: "Fixed: greet.js says 'Hello, <name>' now.". Your card watch has ended: carry on.`,
     fake: (c) =>
-      `skill card-loop then hive hive_read_task {"number":${c.cards.r},"latestComment":true} then hive hive_read_task {"number":${c.cards.r},"comments":1} then hive hive_update_task {"number":${c.cards.r},"review":"start"} then hive hive_update_task {"number":${c.cards.r},"review":"failed","comment":"Round 2: failed. 1. greet.js says Hello; the card's decision says Hi."}`,
+      `skill card-loop then hive hive_read_task {"number":${c.cards.r},"latestComment":true} then hive hive_read_task {"number":${c.cards.r},"comments":1} then ${fakeStartReview(c.cards.r)} then ${fakeVerdict(c.cards.r, false, "Round 2: failed. 1. greet.js says Hello; the card's decision says Hi.")}`,
     expect: (o, c) => {
       const verdict = historyAt(o.cards.r, /^Review (passed|failed)$/)
       const decided = historyAt(o.cards.r, /^Recorded a decision/)
@@ -1227,24 +1349,33 @@ module.exports.SCENARIOS = [
         ['a latest-comment read before reading the card flagged the new decision', !latest.length || /has 1 new decision/.test(replies(o, 'hive_read_task')), `${latest.length} latest-comment read(s) first`],
         ['read the card in full (decisions first) before its round 2 verdict', verdict > decided && full.some((t) => t < verdict), `reads ${full.join(',')}, verdict ${verdict}`],
         ['failed round 2: the work ignores the decision', verdict > decided && history(o.cards.r).at(-1) !== 'Review passed' && history(o.cards.r).filter((h) => h === 'Review failed').length === 2, history(o.cards.r).join(' | ')],
-        ['the card stays in Review with the implementer', o.cards.r?.column === 'review' && o.cards.r?.agent?.id === c.agents.implementer.id, `${o.cards.r?.column} / ${o.cards.r?.agent?.name}`],
+        verdictLeftCheck(o, c, 'r', false),
         ['changed no files (a review only reads)', o.gitStatus.trim() === '', o.gitStatus]
       ]
     }
   },
   {
     id: 'review-passed',
-    title: 'A review that passes: the reviewer moves the card to Passed with its verdict, not to Done (#170)',
+    title: 'A review that passes: its verdict moves the card to Passed, not to Done (#170; #1536: a project where an agent reviews and merges come after, so a pass stops in Passed)',
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
-      await c.card('e', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>".', column: 'review', agent: 'implementer' })
+      // A reviewer agent, and merges reported by the builder, not checked: a pass waits in Passed for the merge.
+      await pairInProject(c, { finish: 'notChecked' })
+      const n = await c.card('e', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>", trimmed.', agent: 'implementer' })
+      // Implementer's submission, as the user moves it: started, committed, submitted.
+      await userMove(c, n, 'doing')
+      c.write('greet.js', "module.exports = (name) => 'Hello, ' + name.trim()\n")
+      c.git('add', '-A')
+      c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet trims the name')
+      await userMove(c, n, 'review')
     },
     prompt: (c) => `Review card #${c.cards.e}.`,
-    fake: (c) => `skill review-agent-work boardreview ${c.cards.e} start then boardreview ${c.cards.e} passed passed`,
-    expect: (o) => [
+    fake: (c) => `skill review-agent-work then ${fakeStartReview(c.cards.e)} then ${fakeVerdict(c.cards.e, true)}`,
+    expect: (o, c) => [
       ['the review passed', history(o.cards.e).includes('Review passed'), history(o.cards.e).join(' | ')],
       ['the card is in Passed (reviewed, not merged)', o.cards.e?.column === 'passed', o.cards.e?.column],
-      ['it kept its implementer', o.cards.e?.agentName === 'Implementer', o.cards.e?.agentName]
+      ['it kept its implementer', o.cards.e?.agentName === 'Implementer', o.cards.e?.agentName],
+      ['moved it by its verdict alone', !reviewerMoved(o, c.cards.e), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
     ]
   },
   {
@@ -1341,12 +1472,22 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'merged-to-done',
-    title: 'A merged branch: its builder moves the Passed card to Done, which means merged (#170)',
+    title: 'A merged branch: its builder moves the Passed card to Done, which means merged (#170; #1169: the merge is really there)',
     async setup(c) {
-      await c.card('m', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>".', column: 'passed', agent: 'coder', comments: ['Review round 1: PASSED.'] })
+      // The branch with the card's work (greet.js), merged --no-ff into the base the prompt names, as the agent did.
+      c.git('config', 'user.email', 'agent@example.com')
+      c.git('config', 'user.name', 'Agent')
+      c.base = c.git('branch', '--show-current').trim()
+      c.git('checkout', '-qb', 'greeting-helper')
+      c.write('greet.js', "module.exports = (name) => 'Hello, ' + name\n")
+      c.git('add', 'greet.js')
+      c.git('commit', '-qm', 'Greeting helper')
+      c.git('checkout', '-q', c.base)
+      c.git('merge', '-q', '--no-ff', '-m', "Merge branch 'greeting-helper'", 'greeting-helper')
+      await c.card('m', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>".', column: 'passed', agent: 'coder', comments: ['Done on branch greeting-helper: greet.js.', 'Review round 1: PASSED.'] })
     },
-    prompt: (c) => `You merged your branch with card #${c.cards.m}'s work into main a minute ago (I asked you to). Bring the board up to date.`,
-    fake: (c) => `skill merge-ready boardmove ${c.cards.m} done`,
+    prompt: (c) => `You merged your branch greeting-helper, with card #${c.cards.m}'s work, into ${c.base} a minute ago (I asked you to). Bring the board up to date.`,
+    fake: (c) => `skill merge-ready then hive hive_report_merge {"card":"#${c.cards.m}"}`,
     expect: (o) => [['the card is in Done', o.cards.m?.column === 'done', o.cards.m?.column]]
   },
   {
@@ -1357,7 +1498,7 @@ module.exports.SCENARIOS = [
       await c.card('t', { title: 'Add CONTRIBUTING.md', description: 'Add a CONTRIBUTING.md at the root with one line: "Be kind."' })
     },
     prompt: 'Take the next card from the board and work on it.',
-    fake: (c) => `skill work-on-card boardmove ${c.cards.t} doing then boardmove ${c.cards.t} review then boardcomment ${c.cards.t}`,
+    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.t)} then ${fakeSubmit(c.cards.t)}`,
     expect: (o) => [
       ['the On Hold card stays On Hold, untouched', o.cards.o?.column === 'hold' && !o.cards.o?.agent, `${o.cards.o?.column} / ${o.cards.o?.agent?.name ?? 'nobody'}`],
       ['worked on the Todo card', movedInto(o.cards.t, 'Doing') >= 0, history(o.cards.t).join(' | ')]
@@ -1557,7 +1698,7 @@ module.exports.SCENARIOS = [
       c.beside = require('fs').readdirSync(c.ws).sort().join(',')
     },
     prompt: (c) => `Review card #${c.cards.b}: write a small probe script that calls greet.js with a few names, run it, and keep its output in a log file you can cite in your verdict.`,
-    fake: (c) => `skill review-agent-work boardreview ${c.cards.b} start then boardreview ${c.cards.b} passed passed`,
+    fake: (c) => `skill review-agent-work then ${fakeStartReview(c.cards.b)} then ${fakeVerdict(c.cards.b, true)}`,
     expect: (o, c) => [
       ['ran a probe of greet.js', runs(o, 'node').length > 0, o.tools.map((t) => t.name).join(',')],
       ['left the project as it was (no probe or log in it)', o.gitStatus.trim() === '', o.gitStatus],
@@ -1606,11 +1747,11 @@ module.exports.SCENARIOS = [
       })
     },
     prompt: (c) => `Work on card #${c.cards.w}.`,
-    fake: (c) => `skill work-on-card then boardmove ${c.cards.w} doing then work 2 then boardcomment ${c.cards.w} then boardmove ${c.cards.w} review`,
-    expect: (o) => [
+    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.w)} then work 2 then boardcomment ${c.cards.w} then ${fakeSubmit(c.cards.w)}`,
+    expect: (o, c) => [
       ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
       ['ran the checks', testRuns(o).length > 0 || runs(o, 'checks.js').length > 0, o.tools.map((t) => t.name).join(',')],
-      ['moved the card to Review', o.cards.w?.column === 'review', o.cards.w?.column],
+      handedOnCheck(o, c, 'w'),
       ['said which check failed on the card', (o.cards.w?.comments ?? []).some((x) => /currency/i.test(x.text)), (o.cards.w?.comments ?? []).map((x) => x.text.slice(0, 120)).join(' | ')],
       ['left nothing running once its card was in Review (Hive listed nothing as it stopped)', Array.isArray(o.leftovers) && o.leftovers.every((l) => !l.processes.length && !l.more), JSON.stringify(o.leftovers)],
       ['changed no files', o.gitStatus.trim() === '', o.gitStatus]
@@ -1639,12 +1780,12 @@ module.exports.SCENARIOS = [
       await c.card('f', { title: 'Add LICENSE.txt', description: 'Add a LICENSE.txt with the single word MIT.' })
     },
     prompt: (c) => `Work on card #${c.cards.f}.`,
-    fake: (c) => `skill work-on-card boardmove ${c.cards.f} doing then boardmove ${c.cards.f} review then boardcomment ${c.cards.f}`,
-    expect: (o) => [
+    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.f)} then ${fakeSubmit(c.cards.f)}`,
+    expect: (o, c) => [
       ["couldn't read work-on-card (it's gone)", !read(o, 'work-on-card')],
       ['the session was given no work-on-card (as recorded at its launch)', !!o.guidance?.delivered && !('work-on-card' in o.guidance.delivered.skills), JSON.stringify(Object.keys(o.guidance?.delivered?.skills ?? {}))],
-      ['still Doing first, then Review', movedInto(o.cards.f, 'Doing') >= 0 && o.cards.f?.column === 'review', history(o.cards.f).join(' | ')],
-      ['not Done', o.cards.f?.column !== 'done']
+      ['still Doing first, then handed on', movedInto(o.cards.f, 'Doing') >= 0 && handedOn(o, c, 'f'), history(o.cards.f).join(' | ')],
+      ['never finished it itself (no move to Passed or Done)', !finishedItself(o, c.cards.f)]
     ]
   },
   {
@@ -1656,12 +1797,12 @@ module.exports.SCENARIOS = [
       await c.card('g', { title: 'Add AUTHORS.txt', description: 'Add an AUTHORS.txt with the line "alpha team".' })
     },
     prompt: (c) => `Work on card #${c.cards.g}.`,
-    fake: (c) => `skill work-on-card boardmove ${c.cards.g} doing then boardmove ${c.cards.g} review then boardcomment ${c.cards.g}`,
-    expect: (o) => [
+    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.g)} then ${fakeSubmit(c.cards.g)}`,
+    expect: (o, c) => [
       ['read work-on-card', read(o, 'work-on-card'), o.skillsRead.join(',')],
       ['the session was given the edited work-on-card (its revision differs from the one before the edit)', !!o.guidance?.delivered?.skills?.['work-on-card'] && o.guidance.delivered.skills['work-on-card'] !== o.guidance.atStart?.skills?.find((x) => x.name === 'work-on-card')?.revision],
       ['followed the edit: labelled checked', (o.cards.g?.labels ?? []).includes('checked'), (o.cards.g?.labels ?? []).join(',')],
-      ['in Review', o.cards.g?.column === 'review', o.cards.g?.column]
+      handedOnCheck(o, c, 'g')
     ],
     fakeSkips: ['followed the edit: labelled checked']
   },
@@ -1682,7 +1823,7 @@ module.exports.SCENARIOS = [
       ["its reply had the card's acceptance line", hiveReplies(o, 'hive_read_task').some((t) => t.result.includes('ACCEPT-ZEBRA-42')), hiveReplies(o, 'hive_read_task').map((t) => t.result.slice(0, 120)).join(' | ')],
       ['quoted it', /ACCEPT-ZEBRA-42/.test(o.finalReply), o.finalReply.slice(0, 200)],
       ['read it once (no repeated identical calls)', (o.measures?.repeatedCalls ?? 0) === 0, String(o.measures?.repeatedCalls)],
-      ['the card is unchanged', o.cards.q?.column === 'todo' && !ran(o, 'hive_update_task').length, o.cards.q?.column]
+      ['the card is unchanged', o.cards.q?.column === 'todo' && !ran(o, 'hive_update_task').length && !movesOf(o, c.cards.q).length, o.cards.q?.column]
     ],
     fakeSkips: ['quoted it']
   },
@@ -1695,7 +1836,7 @@ module.exports.SCENARIOS = [
     },
     // As Hive starts a card (shared/tasks.ts taskPrompt): the reference and its section's size, not its text.
     prompt: (c) => `Work on task #${c.cards.r} from the Hive task board: Write down the retry policy\n\nAdd RETRY.md at the root with one line saying how many times a failed upload is retried and the wait between tries.\n\nRead these first: DESIGN.md#retry-policy (1.7k characters). hive_read_section reads each as the card has it (path: the file; heading: # and the slug after it, none for a whole file; from: "project").\n\nUse the work-on-card skill.`,
-    fake: (c) => `skill work-on-card boardmove ${c.cards.r} doing then hive hive_read_section {"path":"DESIGN.md","heading":"#retry-policy"} then hive hive_update_task {"number":${c.cards.r},"column":"review","comment":"Ready for review: RETRY.md says 7 retries, 90 seconds apart."}`,
+    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.r)} then hive hive_read_section {"path":"DESIGN.md","heading":"#retry-policy"} then ${fakeSubmit(c.cards.r, 'Ready for review: RETRY.md says 7 retries, 90 seconds apart.')}`,
     expect: (o, c) => {
       const onDoc = o.tools.filter((t) => !t.isError && !/hive_/.test(t.name) && t.input.includes('DESIGN.md'))
       const whole = onDoc.filter((t) => (/^Read$/i.test(t.name) ? !/\b(limit|offset)\b/.test(t.input) : /bash|shell|powershell|exec|command/i.test(t.name) && /\b(cat|type|Get-Content|gc|more|less)\b/i.test(t.input) && !/-(TotalCount|Tail|First|Head)\b|\| *(head|Select-Object|Select-String|findstr|grep)/i.test(t.input)))
@@ -1704,7 +1845,7 @@ module.exports.SCENARIOS = [
         ['read the referenced section (by its heading, or a range)', section || (onDoc.length > 0 && whole.length === 0), `${o.hiveCalls.map((x) => x.tool).join(',')} | ${onDoc.map((t) => t.name).join(',')}`],
         ["didn't read the whole document", whole.length === 0, whole.map((t) => `${t.name} ${t.input.slice(0, 120)}`).join(' | ')],
         ['the work follows the section (7 retries, 90 seconds)', /\b7\b|seven/i.test(c.read('RETRY.md') ?? '') && /\b90\b|ninety/i.test(c.read('RETRY.md') ?? ''), c.read('RETRY.md') ?? 'no RETRY.md'],
-        ['it ends in Review', o.cards.r?.column === 'review', o.cards.r?.column]
+        handedOnCheck(o, c, 'r')
       ]
     },
     fakeSkips: ['the work follows the section (7 retries, 90 seconds)']
@@ -1718,7 +1859,7 @@ module.exports.SCENARIOS = [
     },
     // As Hive starts it once the heading was renamed (shared/tasks.ts contextText): the reference named, why and the closest.
     prompt: (c) => `Work on task #${c.cards.b} from the Hive task board: Write down the retry policy\n\nAdd RETRY.md at the root with one line saying how many times a failed upload is retried and the wait between tries.\n\nThis reference no longer resolves: DESIGN.md#retry-policies (no such heading; closest: #retry-policy). Ask the user which section is meant, or read the closest. hive_read_section reads the closest as the card has it (path: the file; heading: # and the slug; from: "project").\n\nUse the work-on-card skill.`,
-    fake: (c) => `skill work-on-card boardmove ${c.cards.b} doing then hive hive_read_section {"path":"DESIGN.md","heading":"#retry-policy","from":"project"} then hive hive_update_task {"number":${c.cards.b},"column":"review","comment":"Ready for review: RETRY.md from DESIGN.md#retry-policy (the card's reference no longer resolved: its closest)."}`,
+    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.b)} then hive hive_read_section {"path":"DESIGN.md","heading":"#retry-policy","from":"project"} then ${fakeSubmit(c.cards.b, "Ready for review: RETRY.md from DESIGN.md#retry-policy (the card's reference no longer resolved: its closest).")}`,
     expect: (o, c) => {
       const onDoc = o.tools.filter((t) => !t.isError && !/hive_/.test(t.name) && t.input.includes('DESIGN.md'))
       const whole = onDoc.filter((t) => (/^Read$/i.test(t.name) ? !/\b(limit|offset)\b/.test(t.input) : /bash|shell|powershell|exec|command/i.test(t.name) && /\b(cat|type|Get-Content|gc|more|less)\b/i.test(t.input) && !/-(TotalCount|Tail|First|Head)\b|\| *(head|Select-Object|Select-String|findstr|grep)/i.test(t.input)))
@@ -1770,12 +1911,12 @@ module.exports.SCENARIOS = [
       await c.card('r', { title: 'Add CHANGES.txt', description: 'Add a CHANGES.txt with the line "first".' })
     },
     prompt: (c) => `Work on card #${c.cards.r}.`,
-    fake: (c) => `skill work-on-card boardmove ${c.cards.r} doing then boardmove ${c.cards.r} review then boardcomment ${c.cards.r}`,
-    expect: (o) => [
+    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.r)} then ${fakeSubmit(c.cards.r)}`,
+    expect: (o, c) => [
       ['the session was not given team-archive', !!o.guidance?.delivered && !('team-archive' in (o.guidance.delivered.skills ?? {})), JSON.stringify(Object.keys(o.guidance?.delivered?.skills ?? {}))],
       ['its launch counted a skill asked for and not delivered', (o.measures?.skillsNotDelivered ?? 0) >= 1, String(o.measures?.skillsNotDelivered)],
-      ['still Doing first, then Review', movedInto(o.cards.r, 'Doing') >= 0 && o.cards.r?.column === 'review', history(o.cards.r).join(' | ')],
-      ['not Done', o.cards.r?.column !== 'done']
+      ['still Doing first, then handed on', movedInto(o.cards.r, 'Doing') >= 0 && handedOn(o, c, 'r'), history(o.cards.r).join(' | ')],
+      ['never finished it itself (no move to Passed or Done)', !finishedItself(o, c.cards.r)]
     ]
   },
   {
@@ -1790,7 +1931,7 @@ module.exports.SCENARIOS = [
       ['used the compact list (no details)', (o.measures?.toolDetailCalls ?? 0) === 0 && !ran(o, 'hive_list_tasks').some((x) => field(x.args, 'details', 'true')), String(o.measures?.toolDetailCalls)],
       ['read once (no repeated identical calls)', (o.measures?.repeatedCalls ?? 0) === 0, String(o.measures?.repeatedCalls)],
       ['named the three cards', TODO.every((t) => o.finalReply.includes(t.title.slice(0, 8))), o.finalReply.slice(0, 200)],
-      ['the board is unchanged', !ran(o, 'hive_update_task').length && TODO.every((t) => o.cards[t.key]?.column === 'todo')]
+      ['the board is unchanged', !ran(o, 'hive_update_task').length && TODO.every((t) => o.cards[t.key]?.column === 'todo' && !movesOf(o, o.cards[t.key]?.number).length)]
     ],
     fakeSkips: ['named the three cards']
   },
@@ -1805,7 +1946,7 @@ module.exports.SCENARIOS = [
       ["its replies had every card's title and acceptance line", TODO.every((t) => replies(o, 'hive_list_tasks', 'hive_read_task').includes(t.phrase)), replies(o, 'hive_list_tasks', 'hive_read_task').slice(0, 200)],
       ['asked for the detail form (details=true, or each card read)', (o.measures?.toolDetailCalls ?? 0) >= 1 || ran(o, 'hive_read_task').length >= TODO.length, String(o.measures?.toolDetailCalls)],
       ['gave the acceptance lines', TODO.every((t) => o.finalReply.includes(t.phrase)), o.finalReply.slice(0, 200)],
-      ['the board is unchanged', !ran(o, 'hive_update_task').length && TODO.every((t) => o.cards[t.key]?.column === 'todo')]
+      ['the board is unchanged', !ran(o, 'hive_update_task').length && TODO.every((t) => o.cards[t.key]?.column === 'todo' && !movesOf(o, o.cards[t.key]?.number).length)]
     ],
     fakeSkips: ['gave the acceptance lines']
   },
@@ -1816,13 +1957,13 @@ module.exports.SCENARIOS = [
       await c.card('u', { title: 'Add NOTICE.txt', description: 'Add a NOTICE.txt with the line "alpha".' })
     },
     prompt: (c) => `Work on card #${c.cards.u}.`,
-    fake: (c) => `skill work-on-card boardmove ${c.cards.u} doing then boardmove ${c.cards.u} review then boardcomment ${c.cards.u}`,
-    expect: (o) => [
+    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.u)} then ${fakeSubmit(c.cards.u)}`,
+    expect: (o, c) => [
       ['read work-on-card', read(o, 'work-on-card'), o.skillsRead.join(',')],
       ['the skill service found every skill unchanged (hits, no misses or changes)', (o.measures?.skillHits ?? 0) > 0 && o.measures?.skillMisses === 0 && o.measures?.skillInvalidations === 0, JSON.stringify({ hits: o.measures?.skillHits, misses: o.measures?.skillMisses, changed: o.measures?.skillInvalidations })],
       ['the session was given the revision Hive had', !!o.guidance?.delivered?.skills?.['work-on-card'] && o.guidance.delivered.skills['work-on-card'] === o.guidance.atStart?.skills?.find((x) => x.name === 'work-on-card')?.revision],
-      ['Doing, then Review', movedInto(o.cards.u, 'Doing') >= 0 && o.cards.u?.column === 'review', history(o.cards.u).join(' | ')],
-      ['not Done', o.cards.u?.column !== 'done']
+      ['Doing, then handed on', movedInto(o.cards.u, 'Doing') >= 0 && handedOn(o, c, 'u'), history(o.cards.u).join(' | ')],
+      ['never finished it itself (no move to Passed or Done)', !finishedItself(o, c.cards.u)]
     ]
   },
   {
@@ -1833,13 +1974,13 @@ module.exports.SCENARIOS = [
     },
     beforeLaunch: (c) => editSkill(c, 'work-on-card'),
     prompt: (c) => `Work on card #${c.cards.v}.`,
-    fake: (c) => `skill work-on-card boardmove ${c.cards.v} doing then boardmove ${c.cards.v} review then boardcomment ${c.cards.v}`,
-    expect: (o) => [
+    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.v)} then ${fakeSubmit(c.cards.v)}`,
+    expect: (o, c) => [
       ['read work-on-card', read(o, 'work-on-card'), o.skillsRead.join(',')],
       ['the skill service saw the change (a miss or a changed revision)', (o.measures?.skillMisses ?? 0) + (o.measures?.skillInvalidations ?? 0) >= 1, JSON.stringify({ hits: o.measures?.skillHits, misses: o.measures?.skillMisses, changed: o.measures?.skillInvalidations })],
       ['the session was given the edited revision', !!o.guidance?.delivered?.skills?.['work-on-card'] && o.guidance.delivered.skills['work-on-card'] !== o.guidance.atStart?.skills?.find((x) => x.name === 'work-on-card')?.revision],
-      ['Doing, then Review', movedInto(o.cards.v, 'Doing') >= 0 && o.cards.v?.column === 'review', history(o.cards.v).join(' | ')],
-      ['not Done', o.cards.v?.column !== 'done']
+      ['Doing, then handed on', movedInto(o.cards.v, 'Doing') >= 0 && handedOn(o, c, 'v'), history(o.cards.v).join(' | ')],
+      ['never finished it itself (no move to Passed or Done)', !finishedItself(o, c.cards.v)]
     ]
   },
   {
@@ -1849,7 +1990,7 @@ module.exports.SCENARIOS = [
       await c.card('w', {
         title: 'Retry the sync',
         description: 'Try the sync up to three times before giving up.',
-        column: 'review',
+        column: 'doing',
         agent: 'coder',
         comments: [
           'Done: retries added. Ready for review.',
@@ -1861,13 +2002,13 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) => `Work through card #${c.cards.w} as its builder (rounds: 2). Round 1 (the first build and its review) and round 2 (the fix and its review) have both failed review; round 2's review is its last comment.`,
     fake: (c) => `skill card-loop hive hive_update_task {"number":${c.cards.w},"blocked":"At its round limit: carry on, split, accept with follow-ups, or take over?"} then hive hive_notify {"title":"#${c.cards.w} at its round limit","message":"Round 1: no delay (fixed). Round 2: the delay is never awaited (the same finding came back). Carry on, split, accept with follow-ups, or take over?"}`,
-    expect: (o) => [
+    expect: (o, c) => [
       ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
       ['asked the user (hive_notify)', ran(o, 'hive_notify').length >= 1, o.hiveCalls.map((x) => x.tool).join(',')],
       // A lane watch wakes on a card becoming blocked, never on a notification alone (#840).
       ['blocked the card with its question', !!o.cards.w?.blocked, o.cards.w?.blocked ?? 'not blocked'],
-      // Only the setup's own move into Review: no round three sent, and not Done.
-      ["didn't send it round three (not back to Review, not Done)", reviewMoves(o.cards.w) === 1 && o.cards.w?.column === 'review', history(o.cards.w).join(' | ')]
+      // Back in Doing from round 2's failed review: no round three sent (no move to Review, no submission of its own).
+      ["didn't send it round three (not back to Review, no submission of its own, not Done)", movedInto(o.cards.w, 'Review') < 0 && !submissionsOf(o, c, 'w').length && o.cards.w?.column === 'doing', history(o.cards.w).join(' | ')]
     ]
   },
   {
@@ -1881,7 +2022,7 @@ module.exports.SCENARIOS = [
       if (!(await LANE_END.answerDue(c, status))) return
       const lib = require('../e2e/lib.cjs')
       const answer = c.fake
-        ? `hive hive_update_task {"number":${c.cards.b},"blocked":""} then shell: git add -A && git commit -qm "Lane end" then boardmove ${c.cards.a} done then boardmove ${c.cards.b} done`
+        ? `hive hive_update_task {"number":${c.cards.b},"blocked":""} then shell: git add -A && git commit -qm "Lane end" then hive hive_report_merge {"card":"#${c.cards.a}"} then hive hive_report_merge {"card":"#${c.cards.b}"}`
         : "The maintainer's OK: I've allowed the commit, so the hook lets it through now. Carry on with the lane's end."
       await lib.sendPrompt(c.inv, lib.ptyKey(c.alpha, c.agents.coder.id), answer, { submitted: async () => (await coderLive(c))?.status === 'working', waitMs: 10000 })
     },
@@ -1933,10 +2074,12 @@ module.exports.SCENARIOS = [
     title: 'A card loop builder given a recurring finding (rounds left): fixes it and sends it back, without asking the user',
     files: { 'sync.js': SYNC_JS },
     async setup(c) {
+      // Implementer reviews it (#1536): with no review, the submission would go past Review, with no verdict to wait for.
+      await pairInProject(c)
       await c.card('r', {
         title: 'Retry the sync',
         description: 'sync.js: try the sync up to three times, 1 s apart, before giving up.',
-        column: 'review',
+        column: 'doing',
         agent: 'coder',
         comments: [
           'Done: retries added. Ready for review.',
@@ -1947,14 +2090,14 @@ module.exports.SCENARIOS = [
       })
     },
     prompt: (c) => `Work through card #${c.cards.r} as its builder (rounds: 5). Round 1 (the first build and its review) and round 2 (the fix and its review) have both failed review; round 2's review is its last comment.`,
-    fake: (c) => `skill card-loop boardmove ${c.cards.r} doing then ${verdictWatch(c.cards.r)} then boardmove ${c.cards.r} review then boardcomment ${c.cards.r}`,
+    fake: (c) => `skill card-loop then ${LOOP_COMMIT} then ${verdictWatch(c.cards.r)} then hive hive_submit ${JSON.stringify({ card: `#${c.cards.r}`, summary: 'Fixed: the delay is awaited.' })}`,
     expect: (o, c) => [
       ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
       ["didn't ask the user (no hive_notify)", called(o, 'hive_notify').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
-      ['through Doing, back to Review for round three', movedInto(o.cards.r, 'Doing') >= 0 && reviewMoves(o.cards.r) === 2 && o.cards.r?.column === 'review', history(o.cards.r).join(' | ')],
+      ['handed it on again for round three (back to Review, or its submission)', handedOnAt(o, c, 'r') > 0 && handedOn(o, c, 'r'), history(o.cards.r).join(' | ')],
       ['ended its turn with a live watch for the verdict (#376)', o.status === 'watching', o.status],
       ['fixed it: the delay is awaited', /await\s+wait\(/.test(c.read('sync.js') ?? ''), c.read('sync.js')],
-      ['not Done', o.cards.r?.column !== 'done']
+      ['never finished it itself (no move to Passed or Done)', !finishedItself(o, c.cards.r)]
     ],
     fakeSkips: ['fixed it: the delay is awaited']
   },
@@ -1972,7 +2115,7 @@ module.exports.SCENARIOS = [
       })
     },
     prompt: (c) => `Review card #${c.cards.q} as the reviewer of a card loop (rounds: 5). It is back for its second review; the earlier review and the fix are in its comments.`,
-    fake: (c) => `skill card-loop boardreview ${c.cards.q} start then hive hive_wait_for_tasks {"cards":[${c.cards.q}],"column":"review","fresh":true,"wake":true} then boardreview ${c.cards.q} failed`,
+    fake: (c) => `skill card-loop then ${fakeStartReview(c.cards.q)} then hive hive_wait_for_tasks {"cards":[${c.cards.q}],"column":"review","fresh":true,"wake":true} then ${fakeVerdict(c.cards.q, false, 'Round 2: FAILED. 1. The delay is still not awaited (recurring from round 1).')}`,
     expect: (o, c) => {
       const verdict = [...(o.cards.q?.comments ?? [])].reverse().find((x) => !/implementer/i.test(x.by ?? ''))?.text ?? ''
       return [
@@ -1980,7 +2123,7 @@ module.exports.SCENARIOS = [
         ['failed it (the delay still isn’t awaited)', history(o.cards.q).includes('Review failed'), history(o.cards.q).join(' | ')],
         ['the verdict says the finding came back', /recurr|again|round 1|still/i.test(verdict), verdict.slice(0, 300)],
         ["didn't ask the user (no hive_notify)", called(o, 'hive_notify').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
-        ['the card stays in Review with the implementer', o.cards.q?.column === 'review' && o.cards.q?.agent?.id === c.agents.implementer.id, `${o.cards.q?.column} / ${o.cards.q?.agent?.name}`],
+        verdictLeftCheck(o, c, 'q', false),
         // Its watch for the card's next round (fresh, #434) is still live: one without fresh answers at once.
         ['ended its turn watching for the card to come back (fresh)', o.status === 'watching', `${o.status}; ${JSON.stringify(ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)))}`],
         ['changed no files', o.gitStatus.trim() === '', o.gitStatus]
@@ -1993,29 +2136,32 @@ module.exports.SCENARIOS = [
     title: 'A card loop builder fixing a failed card: it comes back into Review for round two, so the waiting reviewer is woken (#214)',
     files: { 'sync.js': SYNC_JS },
     async setup(c) {
+      // Implementer reviews it (#1536): with no review, the submission would go past Review, with no verdict to wait for.
+      await pairInProject(c)
       const n = await c.card('f', {
         title: 'Retry the sync',
         description: 'sync.js: try the sync up to three times, 1 s apart, before giving up.',
-        column: 'review',
+        column: 'doing',
         agent: 'coder',
         comments: ['Done: retries added. Ready for review.', 'Review round 1: FAILED. 1. The delay is never awaited: `wait(1000)` needs `await`.']
       })
       giveVerdict(c, n, 'failed')
     },
     prompt: (c) => `Work through card #${c.cards.f} as its builder (rounds: 5); Implementer reviews it. Its first review failed: the review is its last comment.`,
-    // The fake returns it without leaving Review, which is what stalled loops before (#214).
-    fake: (c) => `skill card-loop ${verdictWatch(c.cards.f)} then boardmove ${c.cards.f} review then boardcomment ${c.cards.f}`,
+    // Back in Doing from its failed review: the fix is submitted, which brings it back into Review (#214's stall was a
+    // return without leaving Review).
+    fake: (c) => `skill card-loop then ${LOOP_COMMIT} then ${verdictWatch(c.cards.f)} then hive hive_submit ${JSON.stringify({ card: `#${c.cards.f}`, summary: 'Fixed: the delay is awaited.' })}`,
     expect: (o, c) => {
       const h = history(o.cards.f)
       const after = h.slice(h.lastIndexOf('Review failed') + 1)
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         // What a reviewer's wait for its return sees (shared/watch.ts movedIntoSince): moved back into Review, or returned.
-        ['back into Review for round two (the reviewer is woken)', o.cards.f?.column === 'review' && after.some((w) => /^(Moved to (the (top|bottom) of )?Review\b|Returned for review, round 2)/.test(w)), h.join(' | ')],
+        ['handed on for round two: back into Review (the reviewer is woken), or its submission', handedOn(o, c, 'f') && (after.some((w) => /^(Moved to (the (top|bottom) of )?Review\b|Returned for review, round 2)/.test(w)) || submissionsOf(o, c, 'f').length > 0), h.join(' | ')],
         ['ended its turn with a live watch for the verdict (#376)', o.status === 'watching', o.status],
         ['fixed it: the delay is awaited', /await\s+wait\(/.test(c.read('sync.js') ?? ''), c.read('sync.js')],
         ["didn't ask the user (no hive_notify)", called(o, 'hive_notify').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
-        ['not Done', o.cards.f?.column !== 'done']
+        ['never finished it itself (no move to Passed or Done)', !finishedItself(o, c.cards.f)]
       ]
     },
     fakeSkips: ['fixed it: the delay is awaited']
@@ -2027,22 +2173,24 @@ module.exports.SCENARIOS = [
     async setup(c) {
       c.git('config', 'user.email', 'agent@example.com')
       c.git('config', 'user.name', 'Agent')
+      // Implementer reviews it (#1536): with no review, the submission would go past Review, with no verdict to wait for.
+      await pairInProject(c)
       c.head = c.git('rev-parse', 'HEAD').trim()
       // The card's work, done and checked, not committed yet.
       c.write('greet.js', 'module.exports = (name) => `Hello, ${name}!`\n')
       await c.card('a', { title: 'Greet with an exclamation mark', description: 'greet.js returns "Hello, <name>!".', column: 'doing', agent: 'coder' })
     },
     prompt: (c) => `You're the builder of card #${c.cards.a} in a card loop (the card-loop skill, rounds: 5); Implementer reviews it. Its work is done in this folder and checked: send it to Review now.`,
-    fake: (c) => `skill card-loop then shell: git add -A && git commit -qm "Greet with an exclamation mark" then ${verdictWatch(c.cards.a)} then boardmove ${c.cards.a} review then boardcomment ${c.cards.a}`,
+    fake: (c) => `skill card-loop then shell: git add -A && git commit -qm "Greet with an exclamation mark" then ${verdictWatch(c.cards.a)} then hive hive_submit ${JSON.stringify({ card: `#${c.cards.a}`, summary: 'Ready for review: greet.js says Hello, <name>!' })}`,
     expect: (o, c) => {
       const head = c.git('rev-parse', 'HEAD').trim()
       const committedAt = head !== c.head ? Date.parse(c.git('log', '-1', '--format=%cI').trim()) : 0
-      const movedAt = historyAt(o.cards.a, /^Moved to (the (top|bottom) of )?Review\b/)
+      const movedAt = handedOnAt(o, c, 'a')
       const named = (o.cards.a?.comments ?? []).some((x) => (x.text.match(/\b[0-9a-f]{7,40}\b/g) ?? []).some((s) => head.startsWith(s)))
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['committed the work, leaving nothing uncommitted', head !== c.head && o.gitStatus.trim() === '', `${c.head} → ${head}; ${o.gitStatus.trim()}`],
-        ['committed before moving the card to Review', !!committedAt && !!movedAt && committedAt <= movedAt, `${new Date(committedAt).toISOString?.()} / ${movedAt ? new Date(movedAt).toISOString() : 'not moved'}`],
+        ['committed before handing the card on (to Review, or its submission)', !!committedAt && !!movedAt && committedAt <= movedAt, `${new Date(committedAt).toISOString?.()} / ${movedAt ? new Date(movedAt).toISOString() : 'not moved'}`],
         ['named the commit on the card', named, (o.cards.a?.comments ?? []).map((x) => x.text.split('\n')[0]).join(' | ')],
         ['ended its turn with a live watch for the verdict', o.status === 'watching', o.status]
       ]
@@ -2059,7 +2207,7 @@ module.exports.SCENARIOS = [
       await c.card('r', { title: 'Greet with an exclamation mark', description: 'greet.js returns "Hello, <name>!".', column: 'review', agent: 'implementer', comments: ['Done: greet.js says "Hello, <name>!". Ready for review.'] })
     },
     prompt: (c) => `You are the reviewer of card #${c.cards.r} in a card loop (the card-loop skill, rounds: 5), built by Implementer in this folder. It has just arrived in Review: carry on as its reviewer.`,
-    fake: (c) => `skill card-loop then boardreview ${c.cards.r} start then hive hive_wait_for_tasks {"cards":[${c.cards.r}],"changes":["comment"],"wake":true} then hive hive_update_task {"number":${c.cards.r},"comment":"Not reviewed yet: the work isn't committed. Please commit it and name the commit here; I review that commit."}`,
+    fake: (c) => `skill card-loop then ${fakeStartReview(c.cards.r)} then hive hive_wait_for_tasks {"cards":[${c.cards.r}],"changes":["comment"],"wake":true} then hive hive_update_task {"number":${c.cards.r},"comment":"Not reviewed yet: the work isn't committed. Please commit it and name the commit here; I review that commit."}`,
     expect: (o, c) => {
       const h = history(o.cards.r)
       const asked = (o.cards.r?.comments ?? []).slice(1).some((x) => /commit/i.test(x.text))
@@ -2085,7 +2233,7 @@ module.exports.SCENARIOS = [
       await c.card('b', { title: 'Greeting trims the name', description: 'greet.js trims spaces around the name.', agent: 'coder' })
     },
     prompt: (c) => `Work through cards #${c.cards.a} then #${c.cards.b} as their builder; Implementer reviews them. Rounds: 10. Wait: 6h.`,
-    fake: (c) => `skill card-loop then hive hive_lane {"action":"start","cards":[${c.cards.a},${c.cards.b}],"reviewer":"Implementer","rounds":10,"waitMinutes":360} then boardmove ${c.cards.a} doing then ${LOOP_COMMIT} then ${verdictWatch(c.cards.a)} then boardmove ${c.cards.a} review then boardcomment ${c.cards.a}`,
+    fake: (c) => `skill card-loop then hive hive_lane {"action":"start","cards":[${c.cards.a},${c.cards.b}],"reviewer":"Implementer","rounds":10,"waitMinutes":360} then ${fakeStart(c.cards.a)} then ${LOOP_COMMIT} then ${verdictWatch(c.cards.a)} then hive hive_submit ${JSON.stringify({ card: `#${c.cards.a}`, summary: 'Ready for review: greet.js says Hi.' })}`,
     expect: (o, c) => {
       const starts = ran(o, 'hive_lane').map((x) => argsOf(x)).filter((a) => a.action === 'start')
       const first = starts[0] ?? {}
@@ -2119,7 +2267,7 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) => `Work through cards #${c.cards.a} then #${c.cards.b} as their builder; Implementer reviews them.${v.said}`,
     fake: (c) =>
-      `skill card-loop then hive hive_lane ${JSON.stringify({ action: 'start', cards: [c.cards.a, c.cards.b], reviewer: 'Implementer', ...(v.said ? { rounds: v.rounds, waitMinutes: v.wait } : {}) })} then boardmove ${c.cards.a} doing then ${LOOP_COMMIT} then hive hive_wait_for_tasks ${JSON.stringify({ cards: [c.cards.a], changes: ['verdict', 'column', 'comment'], column: 'passed', wake: true, limitMinutes: v.wait })} then boardmove ${c.cards.a} review then boardcomment ${c.cards.a}`,
+      `skill card-loop then hive hive_lane ${JSON.stringify({ action: 'start', cards: [c.cards.a, c.cards.b], reviewer: 'Implementer', ...(v.said ? { rounds: v.rounds, waitMinutes: v.wait } : {}) })} then ${fakeStart(c.cards.a)} then ${LOOP_COMMIT} then hive hive_wait_for_tasks ${JSON.stringify({ cards: [c.cards.a], changes: ['verdict', 'column', 'comment'], column: 'passed', wake: true, limitMinutes: v.wait })} then hive hive_submit ${JSON.stringify({ card: `#${c.cards.a}`, summary: 'Ready for review: greet.js says Hi.' })}`,
     expect: (o, c) => {
       // Its lanes as saved (#1018: the workspace's database).
       const lane = require('../e2e/storeDocs.cjs').storeDocs(c.ws, 'lanes').find((l) => l.cards?.includes(c.cards.a))
@@ -2168,7 +2316,7 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) => `You are the reviewer of a card loop on #${c.cards.a} then #${c.cards.b}, built by Implementer (rounds: 5). You have just passed #${c.cards.a}. Carry on as the reviewer.`,
     // The fake waits for #b to arrive in Review (it already has: Already), then reviews it.
-    fake: (c) => `skill card-loop hive hive_wait_for_tasks {"cards":[${c.cards.b}],"column":"review","wake":true} then boardreview ${c.cards.b} start then boardreview ${c.cards.b} passed passed`,
+    fake: (c) => `skill card-loop hive hive_wait_for_tasks {"cards":[${c.cards.b}],"column":"review","wake":true} then ${fakeStartReview(c.cards.b)} then ${fakeVerdict(c.cards.b, true)}`,
     expect: (o, c) => {
       // Its waits for #b to arrive in Review (cards [b], no changes): one answered Already, none repeated.
       const arrivals = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => Array.isArray(a.cards) && a.cards.includes(c.cards.b) && a.column === 'review' && !a.changes && !a.cancel)
@@ -2189,7 +2337,7 @@ module.exports.SCENARIOS = [
       const f = await c.card('f', {
         title: 'Sync: 1 s between retries',
         description: 'sync.js: wait 1 s between the tries.',
-        column: 'review',
+        column: 'doing',
         agent: 'coder',
         comments: ['Done: 1 s apart. Ready for review (reviewed with the retry card).', 'Review round 1: FAILED. 1. The delay is never awaited: `wait(1000)` needs `await`.']
       })
@@ -2198,17 +2346,17 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) =>
       `You are the builder of a card loop on #${c.cards.p} and #${c.cards.f}, reviewed together by Implementer (rounds: 5); you were watching both. Hive has just woken you with: "[Hive] #${c.cards.p} is in Passed: Implementer (alpha) passed it; latest comment by Implementer (alpha): "Review round 1: PASSED.". Your card watch has ended: carry on." Carry on as the builder.`,
-    // The fake takes the failed card back to work, as a builder that checked both cards does.
-    fake: (c) => `skill card-loop boardmove ${c.cards.f} doing then boardcomment ${c.cards.f}`,
+    // The fake fixes the failed card (back in Doing) and submits it, as a builder that checked both cards does.
+    fake: (c) => `skill card-loop then ${LOOP_COMMIT} then hive hive_submit ${JSON.stringify({ card: `#${c.cards.f}`, summary: 'Fixed: the delay is awaited.' })}`,
     expect: (o, c) => {
       const h = history(o.cards.f)
       const after = h.slice(h.lastIndexOf('Review failed') + 1)
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         // Back to work on it (through Doing), or fixed and back for review already: either way the failure wasn't missed.
-        ["acted on the failed card the wake line didn't name", after.some((w) => /^(Moved to (the (top|bottom) of )?(Doing|Review)\b|Returned for review)/.test(w)), h.join(' | ')],
+        ["acted on the failed card the wake line didn't name", after.some((w) => /^(Moved to (the (top|bottom) of )?(Doing|Review)\b|Returned for review)/.test(w)) || submissionsOf(o, c, 'f').length > 0, h.join(' | ')],
         ['fixed it: the delay is awaited', /await\s+wait\(/.test(c.read('sync.js') ?? ''), c.read('sync.js')],
-        ['neither card in Done', o.cards.f?.column !== 'done' && o.cards.p?.column !== 'done', `${o.cards.p?.column} / ${o.cards.f?.column}`]
+        ['finished neither card itself (no move to Passed or Done: the passed one isn\'t merged)', !finishedItself(o, c.cards.f) && !finishedItself(o, c.cards.p) && o.cards.p?.column !== 'done', `${o.cards.p?.column} / ${o.cards.f?.column}`]
       ]
     },
     fakeSkips: ['fixed it: the delay is awaited']
@@ -2273,7 +2421,7 @@ module.exports.SCENARIOS = [
       }
       if (!c.compactAt) {
         if (!(await c.answered(c.fake ? 'work 1' : 'Reply with the one word'))) return
-        // Only Claude Code takes the view so far (#1065): the others are asked straight after their first turn.
+        // Only Claude Code's session is compacted here (Copilot starts none after one): the others are asked straight after their first turn.
         if (c.provider !== 'claude-code') return ask()
         c.compactAt = Date.now()
         await c.inv('session:compact', c.home, undefined, 'assistant')
@@ -2294,19 +2442,19 @@ module.exports.SCENARIOS = [
       const has = (x) => x.text.includes('"Welcome back!"') && x.text.includes(`#${c.entry} `) && x.text.includes(`#${c.cards.g} Doing`)
       const compactViews = views.filter((x) => x.source === 'compact' && Date.parse(x.at) >= (c.compactAt ?? Infinity))
       const recalled = ran(o, 'hive_journal_recall').filter((x) => Date.parse(x.at) >= (c.askedAt ?? Infinity))
-      // Only Claude Code takes the view so far (#1065): Hive gives the others none.
-      const takesView = c.provider === 'claude-code'
+      // Every CLI takes the view at its start since #1065; the scenario compacts only Claude Code's session (above).
+      const compacts = c.provider === 'claude-code'
       return [
-        ...(takesView
+        ["Hive gave the state view at its start, with the board and last week's decision", views.some((x) => x.source !== 'compact' && has(x)), views.map((x) => x.source).join(',')],
+        ...(compacts
           ? [
-              ["Hive gave the state view at its start, with the board and last week's decision", views.some((x) => x.source === 'startup' && has(x)), views.map((x) => x.source).join(',')],
               ['and again after the compaction', compactViews.some(has), compactViews.map((x) => x.text.slice(0, 200)).join(' | ') || `${views.length} views`],
-              ['each view within its budget (9,000 bytes)', views.length > 0 && views.every((x) => Buffer.byteLength(x.text, 'utf8') <= 9000), views.map((x) => Buffer.byteLength(x.text, 'utf8')).join(',')]
+              ['asked after the compaction was over', !!c.askedAt && c.askedAt > (c.compactAt ?? Infinity), `compact ${c.compactAt ?? '-'}, asked ${c.askedAt ?? '-'}`]
             ]
-          : [['Hive gave no view to a CLI that cannot take it (#1065)', views.length === 0, `${views.length} views`]]),
-        ...(takesView ? [['asked after the compaction was over', !!c.askedAt && c.askedAt > (c.compactAt ?? Infinity), `compact ${c.compactAt ?? '-'}, asked ${c.askedAt ?? '-'}`]] : []),
+          : []),
+        ['each view within its budget (9,000 bytes)', views.length > 0 && views.every((x) => Buffer.byteLength(x.text, 'utf8') <= 9000), views.map((x) => Buffer.byteLength(x.text, 'utf8')).join(',')],
         ['the question was answered in its own turn (its prompt, then a reply, the session idle)', !!c.questionAnswered, `asked ${c.askedAt ?? '-'}`],
-        ['recalled it from its journal (hive_journal_recall worked), or answered from the view', recalled.length > 0 || (takesView && /Welcome back/i.test(o.finalReply ?? '')), `${recalled.length} recalls; ${(o.finalReply ?? '').slice(0, 200)}`],
+        ['recalled it from its journal (hive_journal_recall worked), or answered from the view', recalled.length > 0 || /Welcome back/i.test(o.finalReply ?? ''), `${recalled.length} recalls; ${(o.finalReply ?? '').slice(0, 200)}`],
         ['its answer names the decision', /Welcome back/i.test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)],
         ['changed nothing on the board', o.cards.g?.column === 'doing', o.cards.g?.column]
       ]
@@ -2421,6 +2569,37 @@ module.exports.SCENARIOS = [
     }
   },
   {
+    id: 'intent-submit-refused',
+    title: "A builder's submission refused by a gate (#1536): its work isn't committed, so Hive refuses it with the next step; it commits and submits again, overriding nothing and moving nothing by hand",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    async setup(c) {
+      c.git('config', 'user.email', 'agent@example.com')
+      c.git('config', 'user.name', 'Agent')
+      await pairInProject(c)
+      const n = await c.card('s', { title: 'Greeting trims the name', description: 'greet.js trims spaces around the name.', agent: 'coder' })
+      await userMove(c, n, 'doing')
+      // The work, done and checked in this folder, not committed yet.
+      c.write('greet.js', "module.exports = (name) => 'Hello, ' + name.trim()\n")
+      c.head = c.git('rev-parse', 'HEAD').trim()
+    },
+    prompt: (c) => `Card #${c.cards.s} is yours, in Doing, and its work is done in this folder. Submit it for review now with hive_submit.`,
+    fake: (c) =>
+      `skill work-on-card then hive hive_submit {"card":"#${c.cards.s}","summary":"greet.js trims the name."} then shell: git add -A then shell: git commit -qm "greet trims the name" then hive hive_submit {"card":"#${c.cards.s}","summary":"greet.js trims the name."}`,
+    expect: (o, c) => {
+      const n = c.cards.s
+      const submits = called(o, 'hive_submit').filter((x) => isCard(argsOf(x).card, n))
+      const refused = submits.findIndex((x) => !x.ok && /submit\.(clean|empty)\b/.test(String(x.error ?? '')))
+      const calls = submits.map((x) => `${x.ok ? 'ok' : `refused: ${String(x.error ?? '').split('\n')[0]}`}`).join(' | ')
+      return [
+        ['its submission of uncommitted work was refused (submit.empty or submit.clean: commit, then submit)', refused >= 0, calls],
+        ['committed its work after the refusal (the next step)', c.git('rev-parse', 'HEAD').trim() !== c.head && o.gitStatus.trim() === '', `${c.head} → ${c.git('rev-parse', 'HEAD').trim()}; ${o.gitStatus}`],
+        ['submitted again, which worked', refused >= 0 && submits.slice(refused + 1).some((x) => x.ok) && submissionsOf(o, c, 's').length === 1, calls],
+        ['the card is in Review', o.cards.s?.column === 'review', o.cards.s?.column],
+        ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'hive_update_task').some((x) => isCard(argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
+      ]
+    }
+  },
+  {
     id: 'intent-review-request',
     title: "A reviewer starts a review, asks the builder something and fails it (#1267): start review, request to builder and verdict",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
@@ -2428,11 +2607,11 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const n = await c.card('r', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>", with a test.', agent: 'implementer' })
       // Implementer's work, as the user moves it: started (Doing), a commit, submitted (Review).
-      await c.inv('tasks:move', n, 'doing')
+      await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hello, ' + name.trim()\n")
       c.git('add', '-A')
       c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet trims the name')
-      await c.inv('tasks:move', n, 'review')
+      await userMove(c, n, 'review')
     },
     prompt: (c) => `Review card #${c.cards.r}. Before your verdict, ask its builder which Node version they tested on. Then fail the review: it has no test.`,
     fake: (c) =>
@@ -2460,17 +2639,7 @@ module.exports.SCENARIOS = [
       c.head = c.git('rev-parse', 'HEAD').trim()
       c.trees = worktreesOf(c)
     },
-    // Hive gives Coder the card in its slot in a new conversation, which asks first to trust the slot's folder.
-    async during(c, status) {
-      if (status !== 'waiting' || c.trustedSlot) return
-      const lib = require('../e2e/lib.cjs')
-      const key = lib.ptyKey(c.alpha, c.agents.coder.id)
-      const screen = String((await c.inv('pty:buffer', key).catch(() => '')) ?? '').slice(-2000)
-      if (/Do you trust the files in this folder/i.test(screen)) await c.inv('pty:write', key, '\r')
-      else if (/trust this folder/i.test(screen) && !(await lib.acceptClaudeTrust(c.inv, c.alpha, c.agents.coder.id, 3000))) await c.inv('pty:write', key, '\r')
-      else return
-      c.trustedSlot = true
-    },
+    during: trustSlot,
     prompt: (c) => `Work on card #${c.cards.s}.`,
     fake: (c) => `skill work-on-card then hive hive_start_card {"card":"#${c.cards.s}"}`,
     expect: (o, c) => {
@@ -2553,14 +2722,12 @@ module.exports.SCENARIOS = [
       const path = require('path')
       // The project folder shared (no slots), with the workflow's check "quick": node check.js, which records where and
       // at which revision it ran, in the workspace (outside the project and its copies).
-      const file = path.join(c.ws, 'alpha', '.hive', 'project.json')
-      const cfg = JSON.parse(require('fs').readFileSync(file, 'utf8'))
-      require('fs').writeFileSync(file, JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project', preChecks: ['quick'], commands: { quick: 'node check.js' } } } }, null, 2))
+      await pairInProject(c, { preChecks: ['quick'], commands: { quick: 'node check.js' } })
       c.checkLog = path.join(c.ws, 'quick-runs.jsonl')
       // check.js is the project's own check, run by Hive's check runner with its environment, not a child of the harness.
       c.write('check.js', `const cp = require('child_process')\nrequire('fs').appendFileSync(${JSON.stringify(c.checkLog)}, JSON.stringify({ cwd: process.cwd(), head: cp.execSync('git rev-parse HEAD').toString().trim() }) + '\\n')\nconsole.log('quick: ok')\n`)
       const n = await c.card('q', { title: 'Greeting comma', description: 'greet.js returns "Hello, <name>" with a comma. Its check is the workflow check quick.', agent: 'coder' })
-      await c.inv('tasks:move', n, 'doing')
+      await userMove(c, n, 'doing')
       // Coder's work on the card, committed in the shared folder.
       c.write('greet.js', "module.exports = (name) => 'Hello, ' + name\n")
       c.git('add', '-A')
@@ -2656,11 +2823,11 @@ module.exports.SCENARIOS = [
       const lane = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n] })
       if (lane.status !== 200) throw new Error(`lane: ${lane.text}`)
       // Coder's round 1, as the user moves it: started (Doing), a commit, submitted (Review).
-      await c.inv('tasks:move', n, 'doing')
+      await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name\n")
       c.git('add', '-A')
       c.git('-c', 'user.name=Coder', '-c', 'user.email=c@example.com', 'commit', '-qm', 'greet says Hi')
-      await c.inv('tasks:move', n, 'review')
+      await userMove(c, n, 'review')
       // The change asked of it since, which Coder has made and committed.
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name.trim()\n")
       c.git('add', '-A')
@@ -2693,11 +2860,11 @@ module.exports.SCENARIOS = [
       // Implementer's lane, the subject (Coder) reviewing; Implementer's round 1 sent for review, then its follow-up, with its own token.
       const lane = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
       if (lane.status !== 200) throw new Error(`lane: ${lane.text}`)
-      await c.inv('tasks:move', n, 'doing')
+      await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name\n")
       c.git('add', '-A')
       c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet says Hi')
-      await c.inv('tasks:move', n, 'review')
+      await userMove(c, n, 'review')
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name.trim()\n")
       c.git('add', '-A')
       c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet trims the name')
@@ -2729,7 +2896,7 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const n = await c.card('w', { title: 'Greeting trims the name', description: 'greet.js trims spaces around the name.', agent: 'coder' })
       // Coder's work, started as the user moves it, and committed.
-      await c.inv('tasks:move', n, 'doing')
+      await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hello, ' + name.trim()\n")
       c.git('add', '-A')
       c.git('-c', 'user.name=Coder', '-c', 'user.email=c@example.com', 'commit', '-qm', 'greet trims the name')
@@ -2753,11 +2920,11 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       const n = await c.card('r', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>", with a test.', agent: 'implementer' })
       // Implementer's work, as the user moves it: started (Doing), a commit, submitted (Review).
-      await c.inv('tasks:move', n, 'doing')
+      await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hello, ' + name.trim()\n")
       c.git('add', '-A')
       c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet trims the name')
-      await c.inv('tasks:move', n, 'review')
+      await userMove(c, n, 'review')
     },
     prompt: (c) => `Review card #${c.cards.r}, as the review-agent-work skill says. Fail it: greet.js has no test.`,
     fake: (c) => `skill review-agent-work then boardreview ${c.cards.r} start then hive hive_update_task {"number":${c.cards.r},"review":"failed","comment":"Round 1: FAILED. 1. greet.js has no test."}`,
@@ -2769,6 +2936,70 @@ module.exports.SCENARIOS = [
         ["the card is back in Doing, still Implementer's", o.cards.r?.column === 'doing' && o.cards.r?.agentName === 'Implementer', `${o.cards.r?.column}, ${o.cards.r?.agentName}`]
       ]
     }
+  },
+  // The presets (#1536): a solo user's card from start to Done, and a pair's lane, each under its preset as the Workflow
+  // section saves it, so the intents and their gates are the ones a new project gets.
+  {
+    id: 'preset-solo-card',
+    title: "A solo user's card under the Solo preset (#1536): the agent starts it, commits its work and submits it with the intents, and it is Done (committed, no review)",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    async setup(c) {
+      c.git('config', 'user.email', 'agent@example.com')
+      c.git('config', 'user.name', 'Agent')
+      await setWorkflow(c, SOLO, 'solo')
+      await c.card('s', { title: 'Greeting says Hi', description: 'greet.js adds a second line, the comment "// Hi", at its end. Nothing else changes.', agent: 'coder' })
+      c.head = c.git('rev-parse', 'HEAD').trim()
+    },
+    prompt: (c) => `Work on card #${c.cards.s}.`,
+    fake: (c) => `skill work-on-card then hive hive_start_card {"card":"#${c.cards.s}"} then ${LOOP_COMMIT} then hive hive_submit {"card":"#${c.cards.s}","summary":"greet.js ends with the comment // Hi."}`,
+    expect: (o, c) => {
+      const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      return [
+        ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
+        ['started it with hive_start_card', ran(o, 'hive_start_card').length > 0 && factsOf(o, 's', 'Started').length > 0, calls],
+        ['committed its work (greet.js says Hi, nothing left uncommitted)', c.git('rev-parse', 'HEAD').trim() !== c.head && /Hi/.test(c.read('greet.js') ?? '') && o.gitStatus.trim() === '', `${c.head} → ${c.git('rev-parse', 'HEAD').trim()}; ${o.gitStatus}`],
+        ['submitted it with hive_submit (a Submitted fact)', ran(o, 'hive_submit').length > 0 && factsOf(o, 's', 'Submitted').length > 0, calls],
+        ['the card is Done: committed is done, with no review', o.cards.s?.column === 'done', history(o.cards.s).join(' | ')],
+        ['skipped no rule (no Override fact)', !overridesOf(o, 's').length, JSON.stringify(overridesOf(o, 's').map((f) => f.data))]
+      ]
+    }
+  },
+  {
+    id: 'preset-pair-lane',
+    title: "A pair's builder starting its lane under the Pair preset (#1536): registers the lane with its reviewer, starts the card in the slot Hive lends it, and submits from there",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    async setup(c) {
+      c.git('config', 'user.email', 'agent@example.com')
+      c.git('config', 'user.name', 'Agent')
+      await setWorkflow(c, { ...PAIR, target: c.git('branch', '--show-current').trim() }, 'pair')
+      await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'builder' })
+      await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'reviewer' })
+      await c.card('p', { title: 'Greeting says Hi', description: 'greet.js adds a second line, the comment "// Hi", at its end. Nothing else changes.', agent: 'coder' })
+      c.head = c.git('rev-parse', 'HEAD').trim()
+      c.trees = worktreesOf(c)
+    },
+    during: trustSlot,
+    prompt: (c) => `Use card-loop as the builder. Cards: #${c.cards.p}. Your reviewer is Implementer. Rounds 10, wait 6h.`,
+    fake: (c) => `skill card-loop then hive hive_lane {"action":"start","cards":[${c.cards.p}],"reviewer":"Implementer","rounds":10,"waitMinutes":360} then hive hive_start_card {"card":"#${c.cards.p}"}`,
+    expect: (o, c) => {
+      const n = c.cards.p
+      const lane = (o.lanes ?? []).find((l) => l.builder?.name === 'Coder' && (l.cards ?? []).some((x) => x.number === n))
+      const slot = factsOf(o, 'p', 'Started')[0]?.data?.slot
+      const made = worktreesOf(c).filter((t) => !c.trees.includes(t))
+      const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
+      // Its first conversation (card-loop read, the lane, the start) is replaced by the slot's (the work, the submission):
+      // the checks read the hive calls, the repository and the card, which span both, not the skills its transcript shows.
+      return [
+        ['registered its lane: the card, Implementer reviewing', !!lane && lane.reviewer?.name === 'Implementer', JSON.stringify((o.lanes ?? []).map((l) => [l.builder?.name, l.reviewer?.name, l.cards?.map((x) => x.number)]))],
+        ['started it with hive_start_card, and Hive lent the card a slot', ran(o, 'hive_start_card').length > 0 && !!slot, calls],
+        ['made no worktree of its own: the only new one is the slot', made.length <= 1 && made.every((t) => !!slot && t.endsWith(slot.toLowerCase())), made.join(', ')],
+        ['changed nothing in the project folder: no commit there, no change', c.git('rev-parse', 'HEAD').trim() === c.head && o.gitStatus.trim() === '', o.gitStatus],
+        ['submitted its work from the slot (a Submitted fact; the card in Review)', factsOf(o, 'p', 'Submitted').length > 0 && o.cards.p?.column === 'review', `${o.cards.p?.column}; ${calls}`],
+        ['skipped no rule (no Override fact)', !overridesOf(o, 'p').length, JSON.stringify(overridesOf(o, 'p').map((f) => f.data))]
+      ]
+    },
+    // The fakes don't act in the slot's conversation: only a model builds and submits there.
+    fakeSkips: ['submitted its work from the slot (a Submitted fact; the card in Review)']
   },
   {
     id: 'assistant-dispatch',
@@ -2790,10 +3021,10 @@ module.exports.SCENARIOS = [
         // An agent watch or wait, or a card watch on the card it started (#416: coordinate-agents points card work there).
         ['then followed it with a wait or a watch (hive_wait_for_agents, or hive_wait_for_tasks on its card), which worked', start >= 0 && calls.slice(start + 1).some((x) => x.ok && (x.tool === 'hive_wait_for_agents' || (x.tool === 'hive_wait_for_tasks' && new RegExp(`"cards"\\s*:\\s*\\[[^\\]]*\\b${c.cards.i}\\b`).test(String(x.args)))))],
         ["didn't type the card into the agent instead", called(o, 'hive_prompt_agent').length === 0],
-        ['the agent did it: the card is in Review and the file is there', o.cards.i?.column === 'review' && /text=auto/.test(c.read('.gitattributes') ?? ''), `${o.cards.i?.column}`]
+        ['the agent did it: the card handed on (in Review, or past it by its submission) and the file is there', handedOn(o, c, 'i') && /text=auto/.test(c.read('.gitattributes') ?? ''), `${o.cards.i?.column}`]
       ]
     },
-    fakeSkips: ['started the card with hive_start_task, which worked', 'then followed it with a wait or a watch (hive_wait_for_agents, or hive_wait_for_tasks on its card), which worked', 'the agent did it: the card is in Review and the file is there']
+    fakeSkips: ['started the card with hive_start_task, which worked', 'then followed it with a wait or a watch (hive_wait_for_agents, or hive_wait_for_tasks on its card), which worked', 'the agent did it: the card handed on (in Review, or past it by its submission) and the file is there']
   },
   {
     id: 'assistant-agent-watch',
@@ -2866,7 +3097,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'assistant-new-lane',
-    title: "The Assistant starting an idle agent's next lane (#437): one call gives it the lane in a new conversation, and the old one is kept",
+    title: "The Assistant starting an idle agent's next lane (#437): one call gives it the lane in a new conversation, and the old one is kept (#1169: run-lanes or coordinate-agents read)",
     role: 'assistant',
     control: 'agents',
     async setup(c) {
@@ -2891,7 +3122,8 @@ module.exports.SCENARIOS = [
       const prompts = called(o, 'hive_prompt_agent')
       const fresh = prompts.filter((x) => x.ok && argsOf(x).newConversation === true && /coder/i.test(String(argsOf(x).agent)))
       return [
-        ['read the coordinate-agents skill', read(o, 'coordinate-agents'), o.skillsRead.join(',')],
+        // Starting a lane is run-lanes' workflow, giving an agent work coordinate-agents': either is the right one (#1169).
+        ['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')],
         ['gave Coder the lane in a new conversation (hive_prompt_agent with newConversation), which worked', fresh.length === 1, prompts.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
         ['in one call: no stop, start or hand-over of Coder', called(o, 'hive_stop_agent').length === 0 && called(o, 'hive_start_agent').length === 0 && called(o, 'hive_hand_over').length === 0],
         ['Coder runs in a new conversation', !!c.before?.sessionId && !!c.after && c.after.runId !== c.before.runId, JSON.stringify({ before: c.before?.sessionId, after: c.after?.sessionId, seen: c.seen })],
@@ -2907,14 +3139,11 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await c.card('w', { title: 'Export the report', description: 'Add an export of the report. Open question for the user: CSV or JSON?', agent: 'implementer', column: 'doing' })
       // Coder reviews it in a card loop and waits for it to arrive in Review (a card watch): it takes no new task meanwhile.
-      // Typed here: its turn may go from working to watching faster than coderTask looks for working.
+      // Its watch is made with its own token, as its hive tool makes it (#1545: a fake's typed command reached no real CLI).
       await coderTask(c)
-      const key = `session:${c.alpha.toLowerCase()}#${c.agents.coder.id}`
-      await c.inv('pty:write', key, `hive hive_wait_for_tasks {"cards":[${c.cards.w}],"column":"review","wake":true}`)
-      await new Promise((r) => setTimeout(r, 400))
-      await c.inv('pty:write', key, '\r')
-      for (let t = Date.now(); Date.now() - t < 120000 && (await coderLive(c))?.status !== 'watching'; ) await new Promise((r) => setTimeout(r, 500))
-      if ((await coderLive(c))?.status !== 'watching') throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)
+      const watch = await c.as('coder', 'POST', '/v1/tasks/wait', { cards: [c.cards.w], column: 'review', wake: true })
+      if (watch.status !== 200 || !watch.body?.watching) throw new Error(`setup: Coder's watch on #${c.cards.w}: ${watch.status} ${JSON.stringify(watch.body)}`)
+      if (!(await require('../e2e/lib.cjs').until(async () => (await coderLive(c))?.status === 'watching', 30000))) throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)
     },
     prompt: (c) => `I've decided card #${c.cards.w}'s open question: exports are JSON. Coder reviews that card in its card loop and is waiting for it to arrive in Review: tell Coder, so it checks for JSON in its review.`,
     fake: (c) => `skill coordinate-agents then hive hive_message_agent {"project":"alpha","agent":"Coder","text":"The user decided #${c.cards.w}: exports are JSON. Check for JSON when you review it."}`,
@@ -2945,10 +3174,10 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) =>
       `You are the reviewer in a card loop (the card-loop skill): cards #${c.cards.a}, then #${c.cards.b}; rounds 3; wait 1h. You were waiting for #${c.cards.a} to arrive in Review when Hive typed this line: [Hive] #${c.cards.a} was reassigned to Other (your watch on it ended). Your card watch has ended: drop it from your list and carry on with your next card.`,
-    fake: (c) => `skill card-loop then boardreview ${c.cards.b} start`,
+    fake: (c) => `skill card-loop then ${fakeStartReview(c.cards.b)}`,
     expect: (o, c) => {
       const watchedA = ran(o, 'hive_wait_for_tasks').some((x) => new RegExp(`"cards"\\s*:\\s*\\[[^\\]]*\\b${c.cards.a}\\b`).test(String(x.args)))
-      const onB = ran(o, 'hive_update_task').some((x) => field(x.args, 'number', c.cards.b) && field(x.args, 'review', 'start')) || ran(o, 'hive_wait_for_tasks').some((x) => new RegExp(`"cards"\\s*:\\s*\\[[^\\]]*\\b${c.cards.b}\\b`).test(String(x.args)))
+      const onB = ran(o, 'hive_update_task').some((x) => field(x.args, 'number', c.cards.b) && field(x.args, 'review', 'start')) || ran(o, 'hive_start_review').some((x) => isCard(argsOf(x).card, c.cards.b)) || ran(o, 'hive_wait_for_tasks').some((x) => new RegExp(`"cards"\\s*:\\s*\\[[^\\]]*\\b${c.cards.b}\\b`).test(String(x.args)))
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         [`went on to #${c.cards.b} (began its review, or watched it)`, onB, o.hiveCalls.map((x) => x.tool).join(',')],
@@ -2995,13 +3224,15 @@ module.exports.SCENARIOS = [
     async keepWaiting(c) {
       if (c.blockedAt && !c.returnedAt) return true
       if (!c.returnedAt || Date.now() - c.returnedAt > 240000) return false
+      // Only the fake Claude Code answers the wake (its wake script): the other fakes are done once the card is back.
+      if (c.fake && c.provider !== 'claude-code') return false
       const card = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
       return !(card?.history ?? []).some((h) => /^Coder\b/.test(h.by) && /^Review (passed|failed)/.test(h.what) && Date.parse(h.at) > c.returnedAt)
     },
     prompt: (c) => `You are the reviewer in a card loop (the card-loop skill): cards #${c.cards.a}, then #${c.cards.b}; rounds 3; wait 1h; your builder is Implementer. You have just failed #${c.cards.a} in round 1 (your verdict is its last comment), and Implementer is fixing it.`,
     fake: (c) => `skill card-loop then hive hive_wait_for_tasks {"cards":[${c.cards.a}],"column":"review","wake":true}`,
     // The fake Claude Code's answer to Hive's wake: it reviews the card.
-    fakeWakes: (c) => [`boardreview ${c.cards.a} start then boardreview ${c.cards.a} passed passed`],
+    fakeWakes: (c) => [`${fakeStartReview(c.cards.a)} then ${fakeVerdict(c.cards.a, true)}`],
     expect: (o, c) => {
       const back = c.returnedAt ?? Infinity
       const by = (h) => /^Coder\b/.test(h.by)
@@ -3018,7 +3249,7 @@ module.exports.SCENARIOS = [
         [`the builder returned #${c.cards.a} once the reviewer was watching`, Number.isFinite(back), String(c.returnedAt)],
         ["reviewed the card after its return, with nobody prompting it (Hive's wake)", ha.some((h) => by(h) && h.what === 'Started reviewing' && Date.parse(h.at) > back), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
         ['gave it a verdict', Number.isFinite(verdictAt), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
-        ["didn't move on to the next card before that verdict", !waits.some((x) => before(x) && has(x, c.cards.b) && !has(x, c.cards.a)) && !ran(o, 'hive_update_task').some((x) => before(x) && field(x.args, 'number', c.cards.b)), o.hiveCalls.map((x) => `${x.tool}@${x.at}`).join(',')]
+        ["didn't move on to the next card before that verdict", !waits.some((x) => before(x) && has(x, c.cards.b) && !has(x, c.cards.a)) && !ran(o, 'hive_update_task').some((x) => before(x) && field(x.args, 'number', c.cards.b)) && !ran(o, 'hive_start_review').concat(movesOf(o, c.cards.b).filter((x) => x.ok)).some((x) => before(x) && isCard(argsOf(x).card, c.cards.b)), o.hiveCalls.map((x) => `${x.tool}@${x.at}`).join(',')]
       ]
     },
     // Only the fake Claude Code answers a wake (its wake script); the fake Codex can't.
@@ -3035,7 +3266,7 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) =>
       `You are the reviewer in a card loop (the card-loop skill): cards #${c.cards.a}, then #${c.cards.b}; rounds 3; wait 1h; your builder is Implementer. You had no card watch when Hive typed this line: [Hive] #${c.cards.a} (Implementer's card) is in Review. You review this card in its loop: carry on with it (hive_read_task with latestComment for the comment in full).`,
-    fake: (c) => `skill card-loop then boardreview ${c.cards.a} start then boardreview ${c.cards.a} passed passed then hive hive_wait_for_tasks {"cards":[${c.cards.b}],"column":"review","wake":true}`,
+    fake: (c) => `skill card-loop then ${fakeStartReview(c.cards.a)} then ${fakeVerdict(c.cards.a, true)} then hive hive_wait_for_tasks {"cards":[${c.cards.b}],"column":"review","wake":true}`,
     expect: (o, c) => {
       const h = history(o.cards.a)
       return [
@@ -3563,7 +3794,8 @@ module.exports.SCENARIOS.push(
     mode: 'coordinator',
     async setup(c) {
       await reviewedPair(c)
-      await c.card('r', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'review', comments: ['Ready: greet() returns "Hi, <name>", with a test. Committed.'] })
+      // Coder's work committed and submitted (#1537: a card set in Review with nothing committed stayed in Doing).
+      await submittedCard(c, 'r', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', after: ['Ready: greet() returns "Hi, <name>", with a test. Committed.'] })
     },
     prompt: (c) => `[Hive] #${c.cards.r} (Coder's card) is in Review; latest comment by Coder: "Ready: greet() returns "Hi, <name>", with a test. Committed." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`,
     fake: (c) => `skill coordinate-agents then hive hive_start_agent {"project":"alpha","agent":"Implementer","prompt":"Review #${c.cards.r} with the review-agent-work skill. (work 1)"}`,
@@ -3609,14 +3841,18 @@ module.exports.SCENARIOS.push(
     mode: 'coordinator',
     async setup(c) {
       await reviewedPair(c)
-      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>", and README.md shows it.', agent: 'coder', column: 'review' })
+      // Back in Doing with Coder after round 2's failed review, as a failed verdict leaves it.
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>", and README.md shows it.', agent: 'coder', column: 'doing' })
       const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
       const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [a, b], rounds: 10, name: 'greetings' })
       if (r.status !== 200) throw new Error(`lane: ${r.text}`)
       for (const text of ["Round 1: FAILED. 1. greet.js has no test.", 'Fixed: greet.test.js covers greet().', "Round 2: FAILED. 1. README.md's example still says Hello."]) await c.api('POST', `/v1/tasks/${a}/comments`, { text })
+      // Coder at work on the fix, as Hive's wake left it (#1537: with Coder stopped the loop had stalled, a question fairly
+      // put to the user, not the loop's own round).
+      await busyCoder(c, 20, 600)
     },
     prompt: (c) =>
-      `[Hive] #${c.cards.a} (Coder's card) is in Review: Implementer failed it; latest comment by Implementer: "Round 2: FAILED. 1. README.md's example still says Hello." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).${LANES_RUNNING_TAIL}`,
+      `[Hive] #${c.cards.a} (Coder's card) is in Doing: Implementer failed it; latest comment by Implementer: "Round 2: FAILED. 1. README.md's example still says Hello." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).${LANES_RUNNING_TAIL}`,
     fake: (c) => `hive hive_read_task {"number":${c.cards.a},"latestComment":true} then hive hive_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}`,
     expect: (o, c) => [
       ["asked the user nothing (no notification, request or question)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
@@ -3633,19 +3869,62 @@ module.exports.SCENARIOS.push(
     mode: 'coordinator',
     async setup(c) {
       await reviewedPair(c)
-      const r = await c.api('POST', '/v1/tasks', { project: 'alpha', title: 'Which greeting style?', description: 'Research: compare "Hi" and "Hello" in three style guides and recommend one, in a comment.', kind: 'no-code', agent: c.agents.coder.id })
-      if (r.status !== 200) throw new Error(`card: ${r.text}`)
-      c.cards.n = r.body.number
-      const l = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.n], name: 'research' })
+      // No-code as the user makes it (#1537: the API's kind on create is only an agent's proposal), its title no question
+      // (a reply quoting it isn't asking the user), and the research it asks for in its comments.
+      const n = await c.card('n', { title: 'Greeting style: Hi or Hello', description: 'Research: compare "Hi" and "Hello" in three style guides and recommend one, in a comment.', agent: 'coder' })
+      await c.inv('tasks:setKind', n, 'no-code', { confirm: true })
+      const l = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [n], name: 'research' })
       if (l.status !== 200) throw new Error(`lane: ${l.text}`)
-      await c.api('POST', `/v1/tasks/${c.cards.n}/comments`, { text: 'Passed: the comparison is sound; "Hi" is recommended.' })
-      await c.api('PATCH', `/v1/tasks/${c.cards.n}`, { column: 'done' })
+      await c.api('POST', `/v1/tasks/${n}/comments`, { text: 'Done: the three guides (Plain English, the house guide, the app store guide) all prefer "Hi" for short UI greetings; "Hello" reads formal. Recommendation: "Hi".' })
+      await c.api('POST', `/v1/tasks/${n}/comments`, { text: 'Passed: the comparison is sound; "Hi" is recommended.' })
+      await c.api('PATCH', `/v1/tasks/${n}`, { column: 'done' })
+      const card = (await c.api('GET', `/v1/tasks/${n}`)).body
+      if (card?.column !== 'done' || card?.kind !== 'no-code') throw new Error(`setup: the no-code card is ${card?.kind} in ${card?.column}`)
     },
     prompt: (c) => `[Hive] #${c.cards.n} (Coder's card) is in Done; latest comment by Implementer: "Passed: the comparison is sound; "Hi" is recommended." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`,
     fake: (c) => `skill coordinate-agents then hive hive_read_task {"number":${c.cards.n},"latestComment":true} then hive hive_lane {"action":"list"}`,
     expect: (o) => [
       ['moved no card and ended or abandoned no lane', !called(o, 'hive_update_task').some((x) => argsOf(x).column) && !called(o, 'hive_lane').some((x) => argsOf(x).action === 'end'), o.hiveCalls.map((x) => x.tool).join(',')],
       ["asked the user nothing (no notification, request or question)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)]
+    ],
+    fakeSkips: ["asked the user nothing (no notification, request or question)"]
+  },
+  {
+    id: 'coordinator-merge-due',
+    title: "Coordinator mode woken as a lane's cards have all passed, its builder merging them (#1346 item 4, #1536): it never asks whether to merge, merges, moves and ends nothing itself, and watches the lanes again",
+    role: 'assistant',
+    control: 'agents',
+    mode: 'coordinator',
+    async setup(c) {
+      await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'builder' })
+      await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'reviewer' })
+      // The lane's work on its branch, reviewed and not merged yet (#1537: with no work anywhere, a model rightly asked).
+      const base = c.git('branch', '--show-current').trim()
+      c.git('checkout', '-qb', 'greetings')
+      require('fs').mkdirSync(require('path').join(c.alpha, 'src'), { recursive: true })
+      const done = []
+      for (const [text, msg] of [['module.exports = (name) => `Hi, ${name}`\n', 'greet() says Hi'], ['module.exports = (name) => `Hi, ${String(name).trim()}`\n', 'greet() trims the name']]) {
+        c.write('src/greet.js', text)
+        c.git('add', '-A')
+        c.git('-c', 'user.name=Coder', '-c', 'user.email=coder@example.com', 'commit', '-qm', msg)
+        done.push(c.git('rev-parse', '--short', 'HEAD').trim())
+      }
+      c.git('checkout', '-q', base)
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'passed', comments: [`Done on branch greetings (${done[0]}).`, 'Round 1: PASSED.'] })
+      const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder', column: 'passed', comments: [`Done on branch greetings (${done[1]}).`, 'Round 1: PASSED.'] })
+      const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
+      if (r.status !== 200) throw new Error(`lane: ${r.text}`)
+      // Coder at its lane's end, merging the lane's work as its card loop says: working, not stalled.
+      await busyCoder(c, 20, 600, c.agents.coder, `The greetings lane's cards have passed: you're merging branch greetings into ${base} at the lane's end. Its merge checks are first: `)
+      c.head = c.git('rev-parse', 'HEAD').trim()
+    },
+    // Hive's lane wake for it (laneWakeLine in src/shared/laneWatch.ts).
+    prompt: () => '[Hive] Lane greetings: all its cards passed: its merge is due. Your lane watch has ended: read the cards named (hive_read_task), act on them, then watch the lanes again (hive_wait_for_tasks with lanes).',
+    fake: 'skill run-lanes then hive hive_lane {"action":"list"} then hive hive_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}',
+    expect: (o, c) => [
+      ["asked the user nothing (no notification, request or question)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
+      ["merged, moved and ended nothing itself (the builder's merge): no commit, no card moved, no merge reported, no lane ended", c.git('rev-parse', 'HEAD').trim() === c.head && ['a', 'b'].every((k) => !movesOf(o, c.cards[k]).length) && !called(o, 'hive_lane').some((x) => argsOf(x).action === 'end'), o.hiveCalls.map((x) => x.tool).join(',')],
+      ['ended its turn watching the lanes again (its live watch)', o.status === 'watching' && (o.watch?.lanes ?? []).length > 0, liveWatch(o)]
     ],
     fakeSkips: ["asked the user nothing (no notification, request or question)"]
   },
@@ -4104,7 +4383,7 @@ module.exports.SCENARIOS.push({
     })
   },
   prompt: (c) => `Review card #${c.cards.p}.`,
-  fake: (c) => `skill review-agent-work boardreview ${c.cards.p} start then boardreview ${c.cards.p} passed passed`,
+  fake: (c) => `skill review-agent-work then ${fakeStartReview(c.cards.p)} then ${fakeVerdict(c.cards.p, true)}`,
   expect: (o) => {
     const opened = shotsOpened(o)
     // The changed screen's may be opened anyway; any other only once the report has named it.
