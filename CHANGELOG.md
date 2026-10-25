@@ -110,6 +110,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **A long card title in Approved no longer squeezes the board's other columns.** A collapsed card's one-line title set how narrow the Approved and Merging group could get, so it took most of the board and On Hold, Todo, Active and Review shrank to their least width; every column now keeps its share (#1619).
 - **Security: version checks no longer decompress network replies.** Hive's checks for a newer Claude Code, Codex or GitHub Copilot refuse compressed replies, closing CVE-2026-111497's path (a flaw in Node's Brotli decoder) until Electron bundles Node 24.22.1 (#1582).
 - **Editing Hive's settings files by hand no longer loses the edit.** When an editor or a sync tool saved `project.json`, `workspace.json` or `config.json` while Hive read it, Hive could take it for damaged and put its last good copy back. It now waits for a file that is still changing, treats it as damaged only once it has stayed unreadable for 2 seconds, and a change Hive makes to such a file waits too rather than overwrite your edit (#1598, #1600, #1601).
 - **An agent with subagents still working isn't shown as finished:** it shows **Waiting on 2 background tasks** until the last has ended; Codex's spawned subagents count too (#1584).
