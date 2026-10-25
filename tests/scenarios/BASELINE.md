@@ -36,6 +36,36 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## P8's smoke trials (#1537): Codex (Claude Code waits for its test home's sign-in), fixtures v86–v87, 25 October 2026
+
+Darren's scope (24 Oct): each key scenario once on Claude Code and on Codex, with no `--repeat`, Haiku or Copilot. The
+full trials come before the release (#1541). The 40 key scenarios: the intent tools, the inbox, lanes, #1346's five (with
+the other #1346 items 2–4 scenarios), the fresh-workspace set (#1539's model evidence), merge-main-moved and
+merged-to-done.
+- **A clean context**, checked before the run (`hive-test\scratch\1537-trials-20261025-054351\clean-context-before.json`):
+  no memory files in Claude Code's test home and no CLAUDE.md; Codex's has no AGENTS.md and empty memory tables; each
+  scenario runs in a new workspace (no shared notes). Both homes hold skills that aren't Hive's: Claude Code's synced
+  from the account, and Codex's system skills (imagegen, openai-docs, review-agent, skill-creator, skill-installer).
+- **Codex** (CLI 0.164.0, its default model; `2026-10-25T05-45-03-codex`, $2.87): 36 of 40 at v86.
+  - Two failures were the scenarios', fixed in v87:
+    - **coordinator-lanes-to-end**: Codex calls hive tools from its code tool, so the harness didn't find its inbox
+      read after the doorbell; `wakeLines` now takes a `Script` call of `hive_inbox`.
+    - **coordinator-start-reviewer**: its card, set in Review with nothing committed, stayed in Doing under the
+      project's rules, and Codex rightly said so. It now has a real submission. The harness's `card()` now fails setup
+      for a card short of its column; a full fake run found no other.
+    - Rerun at v87 (`2026-10-25T07-00-17-codex`, $0.32): those two and coordinator-ten-rounds (now back in Doing after
+      its failed review) pass.
+  - Two are guidance findings, carded:
+    - **#1607**: a one-card lane's brief named no card-loop. coordinate-agents defines the brief without it; only
+      run-lanes' template has it.
+    - **#1608**: inbox messages acked together at the end, not with the next read. Act, then ack, held.
+  - #1545: assistant-message-watching reached the Assistant with Coder really watching, and passed. #1162:
+    merge-main-moved passed in its one sample.
+- **Claude Code** (CLI 2.1.310): skipped. The test home isn't signed in (`2026-10-25T05-44-19-claude-code`, $0, no login
+  opened).
+- **Fake baselines at v87**, source 5024b034: 138 of 138 on each fake (`2026-10-25T07-04-36-fake`,
+  `2026-10-25T07-44-50-fake-codex`, `2026-10-25T08-25-26-fake-copilot`), saved again as the `p8-scenarios` baselines.
+
 ## P8's scenarios for the intents and gates (#1536): the three fakes, fixtures v86, 24–25 October 2026
 
 The baseline for P8's trials (#1537) and the checks card (#1539), on the guidance that ships (lanes A–D merged, 1.0.0
