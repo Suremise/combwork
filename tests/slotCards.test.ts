@@ -44,6 +44,10 @@ const state = vi.hoisted(() => ({
   lanes: null as null | (() => Promise<unknown[]>),
   /** Lanes waiting for a slot looked up: the pass's step 4. */
   waitingLooks: 0,
+  /** The lanes waiting for a slot, as the pass reads them. */
+  waiting: [] as unknown[],
+  /** The pool's own, over the stand-in's (a lend held, say). */
+  pool: {} as Record<string, unknown>,
   /** The slots' log, as `<level> <line>`. */
   logged: [] as string[]
 }))
@@ -84,12 +88,17 @@ vi.mock('../src/main/slotsApp', async (orig) => ({
   ...(await orig<object>()),
   holder: { self: async () => ({ pid: process.pid, started: 1 }), alive: async () => false, live: new Set() },
   // The project's pool as the pass reads it: no leases open or ended (what it settles first doesn't come from them).
-  poolFor: async () => ({ closed: false, openLeases: () => [], endedSince: () => [], lease: () => null, renames: () => [] })
+  poolFor: async () => ({ closed: false, openLeases: () => [], endedSince: () => [], lease: () => null, renames: () => [], ...state.pool })
 }))
 vi.mock('../src/main/lanes', async (orig) => ({
   ...(await orig<object>()),
   rawLanes: async () => (state.lanes ? state.lanes() : []),
-  lanesWaitingForSlot: async () => (state.waitingLooks++, [])
+  lanesWaitingForSlot: async () => (state.waitingLooks++, state.waiting),
+  setLaneSlotWait: async (_ws: unknown, lane: string) => void state.calls.push(`lane ${lane} waits no more`)
+}))
+vi.mock('../src/main/laneStart', async (orig) => ({
+  ...(await orig<object>()),
+  startWaitingLane: async (_ws: unknown, _p: string, lane: string) => (state.calls.push(`start lane ${lane}`), true)
 }))
 vi.mock('../src/main/logger', async (orig) => {
   const actual = await orig<typeof import('../src/main/logger')>()
@@ -158,7 +167,7 @@ let env: Env | null = null
 afterEach(() => {
   env?.close()
   env = null
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, logged: [] })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [] })
 })
 
 /** A card started in a slot (a worktree on its line, under lease l-1), its change merged into main and reported: Done. */
@@ -434,6 +443,33 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     await pass
     expect(state.logged.filter((l) => l.startsWith('warn'))).toEqual([])
     expect(state.logged.some((l) => l.startsWith('info settling the slots of') && l.includes('cut short by quitting'))).toBe(true)
+  })
+
+  it("a lane waiting for a slot whose lend is under way as Hive quits isn't started: it keeps the slot and its wait for the next start", async () => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
+    let lends = 0
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    state.pool = {
+      leaseOf: () => null,
+      leasesOf: () => [],
+      lend: async () => {
+        lends++
+        await held
+        return { ok: true, lease: { id: 'l-9', slot: 'slot-a' }, slot: { name: 'slot-a' } }
+      }
+    }
+    const ws = { path: e.home, lifetime: { aborted: false }, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
+    const pass = settleSlotCards(ws, e.project)
+    await vi.waitFor(() => expect(lends).toBe(1))
+    const quitting = quitSlotCards(HUNG_MS)
+    release()
+    await quitting
+    await pass
+    expect(state.calls).toEqual([])
+    expect(state.logged.filter((l) => l.startsWith('warn'))).toEqual([])
   })
 
   it('a pass that never ends holds the quit only for its bound', async () => {

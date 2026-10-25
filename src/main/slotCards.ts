@@ -814,24 +814,29 @@ export async function lendLane(ws: WorkspaceService, projectPath: string, lane: 
 async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool: SlotPool): Promise<void> {
   const name = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.name
   const waiting = (await lanesWaitingForSlot(ws)).filter((l) => l.project.toLowerCase() === name?.toLowerCase()).sort((a, b) => a.slotWait!.since.localeCompare(b.slotWait!.since))
+  // The rules off, or Hive quitting (#1628): looked at again after each await, nothing more lent or started.
+  const stopped = (): boolean => !workflowEnforced() || ended(ws)
   for (const lane of waiting) {
-    if (!workflowEnforced() || ended(ws)) return
+    if (stopped()) return
     let lease = pool.leaseOf({ lane: lane.id })
     if (!lease) {
       // The builder's own slot first (#1441), checked against the default branch (the lane's target isn't known here).
       const own = await carriedToHand(ws, projectPath, pool, lane.builder.id, null)
+      if (stopped()) return
       lease = own ? await handOffCarried(ws, projectPath, pool, own, { lane: lane.id, agent: lane.builder.id }, lane.builder.name) : null
     }
+    if (stopped()) return
     if (!lease) {
       const r = await pool.lend({ lane: lane.id, agent: lane.builder.id }, { install: false })
       if (!r.ok) return
       lease = r.lease
       log.info(`Lent ${userText(r.slot.name)} to lane ${lane.id}, which waited for a slot (lease ${r.lease.id})`)
     }
-    if (!workflowEnforced()) return
+    // Hive quitting once a slot is lent (#1628): the lane keeps it and keeps waiting; the next start's pass starts it.
+    if (stopped()) return
     const { startWaitingLane } = await import('./laneStart')
-    const started = await startWaitingLane(ws, projectPath, lane.id, lease.slot).catch((e) => (log.warn(`starting lane ${lane.id} in ${userText(lease!.slot)}`, e), false))
-    if (started) await setLaneSlotWait(ws, lane.id, null)
+    const started = await startWaitingLane(ws, projectPath, lane.id, lease.slot, stopped).catch((e) => (failedStep(`starting lane ${lane.id} in ${userText(lease!.slot)}`, e), false)) // i18n-ignore: a log line (failedStep logs it)
+    if (started && !stopped()) await setLaneSlotWait(ws, lane.id, null)
   }
 }
 
