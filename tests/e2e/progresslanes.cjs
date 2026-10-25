@@ -190,7 +190,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const widths = await row1.locator('.lane-seg').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)))
   check('segments are equal widths', Math.max(...widths) - Math.min(...widths) <= 1, JSON.stringify(widths))
   // Each state its own pattern as well as colour: no two states draw the same.
-  const looks = await row1.locator('.lane-seg').evaluateAll((els) => els.map((e) => { const s = getComputedStyle(e); return `${s.backgroundImage}|${s.backgroundColor}|${s.boxShadow}|${s.animationName}` }))
+  const looks = await row1.locator('.lane-seg').evaluateAll((els) => els.map((e) => { const s = getComputedStyle(e); return `${s.backgroundImage}|${s.backgroundColor}|${s.boxShadow}|${getComputedStyle(e, '::before').animationName}` }))
   const byState = {}
   lane1.forEach((n, i) => (byState[want[n]] = looks[i]))
   check('every state looks different', new Set(Object.values(byState)).size === Object.keys(byState).length, JSON.stringify(byState))
@@ -485,7 +485,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // …but not the abandoned lane's (#512): B6's lane had #5 in Todo when it was given up, and B1's lane works it now.
   const row5 = section.locator(`.progress-lane[data-lane="${l5}"]`)
   const seg5 = (await row5.locator(`.lane-seg[data-card="${n5}"]`).getAttribute('class')) ?? ''
-  check('the abandoned lane keeps the card as it left it, unanimated, while another lane works it', /\btodo\b/.test(seg5) && !/\bdoing\b/.test(seg5) && (await row5.locator(`.lane-seg[data-card="${n5}"]`).evaluate((e) => getComputedStyle(e).animationName)) === 'none', seg5)
+  check('the abandoned lane keeps the card as it left it, unanimated, while another lane works it', /\btodo\b/.test(seg5) && !/\bdoing\b/.test(seg5) && (await row5.locator(`.lane-seg[data-card="${n5}"]`).evaluate((e) => getComputedStyle(e, '::before').animationName)) === 'none', seg5)
   await row5.locator(`.lane-seg[data-card="${n5}"]`).hover()
   check("…and its hover says it's as the lane left it", !!(await until(async () => /when the lane ended/.test((await page.locator('.tip').allInnerTexts()).join(' ')), HUNG_MS)))
   // R1's lane was paused on its blocked card; its builder moves on to the next one: working, not paused, on that card.

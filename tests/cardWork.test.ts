@@ -89,6 +89,44 @@ describe("a card's work from the board (#1223)", () => {
     expect(cardWork(w, archived)!.revisions[0].summary).toBe(marker)
   })
 
+  it('reads again only the cards a change touched, on a board shaped like a long-used one (#1629)', { timeout: 120_000 }, async () => {
+    const w = await workspace()
+    const facts = FactStore.forBoard(w, { project: 'p', key: 'P' })
+    // As Darren's board: 1,277 archived cards from before 1.0, 140 live ones in Todo and Done, and 20 in flight with work.
+    await store.boardWrite(w, async () => {
+      for (let i = 0; i < 1417; i++) facts.createCard({ title: `Card ${i}`, kind: 'code', labels: [], blockedBy: [], preWorkflow: true, stage: i % 2 ? 'done' : 'todo' })
+      store.workspaceDb(w.path!).writer.prepare('UPDATE cards SET archived = 1 WHERE number < (SELECT min(number) + 1277 FROM cards)').run()
+    })
+    const flight: number[] = []
+    for (let i = 0; i < 20; i++) flight.push(await cardWithWork(w, `In flight ${i}`))
+    // Only the cards in flight are read for the merge queues' listing.
+    expect(facts.cardsInFlight().map((c) => c.id)).toEqual(flight)
+
+    const first = workBadges(w)
+    expect(first).toHaveLength(160)
+    // Nothing changed: every badge as it was, none read again.
+    const parse = vi.spyOn(JSON, 'parse')
+    try {
+      const again = workBadges(w)
+      again.forEach((b, i) => expect(b).toBe(first[i]))
+      expect(parse).not.toHaveBeenCalled()
+      // One card's new fact: that card's badge alone is made again, from its own facts (not the 40 others').
+      await store.boardWrite(w, async () => facts.tx((tx) => tx.append(flight[3], { kind: 'Verdict', actor: 'agent:R1', source: 'recorded', data: { reviewer: 'R1', submission: 1, revision: 'rev1111aaaa', pass: true, round: 1, generation: 0, comment: 'ok' } })))
+      parse.mockClear()
+      const after = workBadges(w)
+      expect(parse.mock.calls.length).toBeLessThanOrEqual(3)
+      after.forEach((b, i) => (b.card === flight[3] ? expect(b.verdict).toMatchObject({ pass: true }) : expect(b).toBe(first[i])))
+    } finally {
+      parse.mockRestore()
+    }
+    // An archived card leaves the badges; one moved has its own again.
+    await inWorkspace(w, () => tasks.archiveTask(flight[0], true))
+    await store.boardWrite(w, async () => facts.tx((tx) => tx.setStage(flight[1], 'active')))
+    const later = workBadges(w)
+    expect(later.map((b) => b.card)).not.toContain(flight[0])
+    expect(later.find((b) => b.card === flight[1])?.stage).toBe('active')
+  })
+
   it("gives the Agent API's card its stage: the stage column, else its column's", async () => {
     const w = await workspace()
     const worked = await cardWithWork(w, 'Worked')
