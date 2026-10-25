@@ -72,6 +72,7 @@ import { isDoorbell } from '../shared/doorbell'
 import type { DeliverySender, InboxItem } from '../shared/deliveries'
 import * as tasks from './tasks'
 import { runCardIntent, type CardIntent, type CardRefIn } from './cardIntents'
+import { armIntentWatch } from './intentWatch'
 import { pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
 import type { QueuePublic, QueueView } from '../shared/workflow/queue'
 import * as taskBatch from './taskBatch'
@@ -2778,8 +2779,12 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
   if (actor.kind !== 'assistant') {
     const { done, card } = await runCardIntent(ref, actor, intent)
     const copy = await reviewCopyAfter(actor, card, { start: intent.kind === 'startReview', verdict: intent.kind === 'verdict' })
+    // A lane's handoff arms its agent's watch (#1639): a builder's submission, a reviewer's failed verdict.
+    const self = actor.kind === 'agent' ? actor.self : undefined
+    const watch = self ? await armIntentWatch(requireWorkspace(), self.agentId, card, { submit: intent.kind === 'submit', failed: intent.kind === 'verdict' && !intent.pass }) : null
+    const out = watch ? { ...done, watch } : done
     // The copy first (#1444): a CLI that shortens a long reply (Codex's code tool) still shows where to review.
-    return copy ? { ...done, data: { reviewCopy: copy, ...done.data } } : done
+    return copy ? { ...out, data: { reviewCopy: copy, ...out.data } } : out
   }
   const was = await tasks.getTask(ref.n).catch(() => null)
   const what = INTENT_WORDS[intent.kind]

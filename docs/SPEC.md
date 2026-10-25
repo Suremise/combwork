@@ -2142,6 +2142,18 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
 
 #### 16.8.2 Card loops on intents
 
+- **Hive arms the watch at a lane's handoff** (#1639, built). On 25 Oct two builders submitted their lane's card and
+  ended their turn with no card watch, and their lanes showed as stalled (#376's check) until the Assistant asked each to
+  watch: card-loop's "watch, then submit" was missed. The step is Hive's now (`main/intentWatch.ts`): an agent's
+  `hive_submit` of a card in its running lane (active or paused) where it is the builder, leaving the card in Review,
+  arms its card watch for the review (`changes: verdict, column, comment`, `column: passed`), and its failing
+  `hive_verdict` as the lane's reviewer arms one for the next round (`column: review`, `fresh`), each for the lane's wait
+  (at most a watch's longest). The watch starts from the card as the intent left it (`registerWatch`'s `start`), so a
+  verdict given before it is armed still fires it. An agent with a watch of its own keeps it: one that includes the card
+  is said so, one on other cards (or an agent or lane watch) isn't replaced, since it isn't stalled and the loop wake
+  tells it of the verdict. The intent's reply says what was armed (`watch`: "Hive watches HI-12 for you, for its review
+  …: end your turn, and it wakes you."); card-loop says to end the turn on it, and to start the watch itself only where
+  the reply says none was armed. Not for the pool's reviewers (no lane of theirs) or the Assistant.
 - The builder's watch wakes on a verdict, a `Moved` into Approved or Done, a `ReviewerRequest`, a `Decision`, and the
   user's pane reply when relayed (#922) [#1120 c].
 
