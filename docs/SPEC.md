@@ -2233,11 +2233,16 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   `npm run i18n:extract` after adding them [#1120 c, `locales/glossary-1.0.md` §1].
 - **Read by both** [#1264]: the sentences never name "the user" (the window says *you*, glossary §1 rule 10): a
   `change` says where the rule is set ("This rule is set in Version Control → …"), and `override` who can skip it. A
-  value that is a name in the code (`{stage}`, `{move}`, `{intent}`, `{moves}`, `{rule}`, `{rules}`) reaches agents as
-  it is and the window through its own message (`shared/workflow/texts.ts`: stage, move and rule names, the rules
-  worded as the Version Control options); what a platform couldn't read (`{what}`) is a message of its own, kept as
-  data (`StoredText`) beside its English. `refusal()` builds the agent's English, `refusalLines()` the window's lines.
-  A `move.notFromHere` with nothing possible from the stage says so as its next step, never an empty list.
+  value that is a name in the code (`{move}`, `{intent}`, `{moves}`, `{rule}`, `{rules}`) reaches agents as it is
+  (the intents they call) and the window through its own message (`shared/workflow/texts.ts`: stage, move and rule
+  names, the rules worded as the Version Control options); a stage (`{stage}`, `{stages}`) reaches both by the name the
+  board shows, agents in English ("Active", never the id `active`, #1604); what a platform couldn't read (`{what}`) is
+  a message of its own, kept as data (`StoredText`) beside its English. `refusal()` builds the agent's English,
+  `refusalLines()` the window's lines. A `move.notFromHere` with nothing possible from the stage says so as its next
+  step, never an empty list; one whose stage's intents are the other side's gives the refused agent's own (#1604, its
+  `whose` value): a reviewer's review or verdict on a card no longer in Review hears that its review is over (back for
+  more work: leave it with no verdict and wait for its return to Review; moved on: leave it), and the card's builder
+  refused a move while the card waits in Review hears to wait for the verdict.
 - `next` is the exact next step the agent can take, possible under the card's ruleset (§16.5.4); `override` says who
   can override (never the agent).
 - Every refused intent appends a `Refused` fact (so the lane shows it) [#1120 c]; the window collapses repeats.

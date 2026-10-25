@@ -637,6 +637,10 @@ kept and why, without removing anything; `--days N` sets the age, default 3).
   takes `<suite>-2` (…), at most 32 copies: past that the suite is refused, saying what keeps them, rather than filling
   the disk.
 - Links in what goes (a worktree's `node_modules` junction) are removed as links, never followed.
+- **Something still holds it** (another lane's process working there, a scan, an open handle: EPERM, EBUSY, ENOTEMPTY
+  or EACCES, after a few tries): it is kept and named, never a failure. The runner prints `Kept <run folder>: something
+  still holds it (EPERM)…` and a later run prunes it; its exit code stays its suites' (#1616). The clean-up counts such
+  an item as kept (in use), and a suite folder a pruned run kept is left for the clean-up.
 
 **Probes** (a reviewer's or builder's screenshots, scripts and profiles outside a suite) take **a new folder each run**,
 so nothing needs deleting before a rerun (#304): `require('./tests/e2e/lib.cjs').probeDir('<what>')` makes

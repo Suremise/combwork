@@ -1672,8 +1672,8 @@
     "description": "What a skill that ships with Hive (licence-audit) is for: under its name in the Skills view and a project's Skills tab. Vendored files are other people's files a package carries inside it."
   },
   "assistant.skills.shipped.mergeReady": {
-    "defaultMessage": "Get a branch ready to review and merge in Hive: commit the task's work, run the checks, compare with the base, summarise. Use when asked to finish up or get a branch or worktree ready to merge. Merging and pushing stay separate.",
-    "description": "What a skill that ships with Hive (merge-ready) is for: under its name in the Skills view and a project's Skills tab. Branch, worktree, commit, merge and push are git's terms."
+    "defaultMessage": "Get a branch ready to merge and merge it when asked, through the merge slot: commit, run the checks, compare with the base. Use when asked to finish up, ready a branch, or merge one (\"merge X into Y\", \"merge this lane\").",
+    "description": "What a skill that ships with Hive (merge-ready) is for: under its name in the Skills view and a project's Skills tab. Branch, worktree, commit, merge and push are git's terms. The merge slot is Hive's turn-taking for merges into a branch; the quoted requests are examples of what a user asks."
   },
   "assistant.skills.shipped.pickUp": {
     "defaultMessage": "Continue earlier work from its handover, checking it against the current state. Use when asked to continue, resume or pick up previous work, or to read a handover. Not for every new session.",

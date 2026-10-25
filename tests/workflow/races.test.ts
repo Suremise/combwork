@@ -104,7 +104,7 @@ describe('races between intents', () => {
       }
     }
     const r = refusedBy(await e.wf.start(card.key, B1), 'move.notFromHere')
-    expect(r.message).toContain('is in active')
+    expect(r.message).toContain('is in Active')
     expect(e.kinds(card.id).filter((k) => k === 'Started')).toHaveLength(1)
     expect(e.wf.state(card).started).toMatchObject({ builder: 'B2' })
   })
@@ -124,10 +124,35 @@ describe('races between intents', () => {
         moved(await e.wf.verdict(card.key, R2, { pass: false, comment: 'no' }))
       }
     }
-    refusedBy(await e.wf.verdict(card.key, R1, { pass: true, comment: 'yes' }), 'move.notFromHere')
+    const r = refusedBy(await e.wf.verdict(card.key, R1, { pass: true, comment: 'yes' }), 'move.notFromHere')
+    expect(r.next).toBe('Its review is over: it went back for more work. Leave it where it is, with no verdict, and wait for it to come back to Review.')
     const s = e.wf.state(card)
     expect(s).toMatchObject({ stage: 'active', accepted: null })
     expect(s.verdicts).toHaveLength(1)
+  })
+
+  it("a reviewer refused for a card that left Review gets its own next step, not its builder's; the builder in Review gets its own (#1604)", async () => {
+    const e = (env = setup(pairOpts))
+    const { card } = await startedIn(e, 'Interrupted', 'i.txt')
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    moved(await e.wf.startReview(card.key, R1))
+    // Its builder, waiting in Review, is refused a builder's move with the wait for the verdict, not the reviewer's intents.
+    const waits = refusedBy(await e.wf.putBack(card.key, B1, { why: 'more to do' }), 'move.notFromHere')
+    expect(waits).toMatchObject({ message: "AM-1 is in Review: put back isn't possible from there.", next: "It waits for its reviewer's verdict: wait for that, which brings it back if there is more to do.", values: { whose: 'builder' } })
+    // Taken back to Active during the review: the reviewer's verdict and review are refused with the end of its review.
+    moved(await e.wf.move(card.key, 'active', 'user'))
+    for (const r of [refusedBy(await e.wf.verdict(card.key, R1, { pass: true, comment: 'yes' }), 'move.notFromHere'), refusedBy(await e.wf.startReview(card.key, R1), 'move.notFromHere')]) {
+      expect(r.message).toMatch(/^AM-1 is in Active: (verdict|start review) isn't possible from there\.$/)
+      expect(r.next).toBe('Its review is over: it went back for more work. Leave it where it is, with no verdict, and wait for it to come back to Review.')
+      expect(r.next).not.toMatch(/submit|put back/)
+    }
+    // Its builder calling a verdict there gets the builder's intents, the board's name for the stage.
+    expect(refusedBy(await e.wf.verdict(card.key, B1, { pass: true, comment: 'mine' }), 'move.notFromHere').next).toBe('From Active, use: submit, put back.')
+    // Moved on past Review (passed by another reviewer): its review is over, with nothing to wait for.
+    moved(await e.wf.submit(card.key, B1, { summary: 'again', note: 'unchanged' }))
+    await pass(e, card.key, R2)
+    expect(refusedBy(await e.wf.verdict(card.key, R1, { pass: false, comment: 'late' }), 'move.notFromHere').next).toBe('Its review is over: it has moved on from Review. Leave it where it is, with no verdict.')
+    expect(e.wf.state(card).verdicts.filter((v) => v.reviewer === 'R1')).toHaveLength(0)
   })
 })
 

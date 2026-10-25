@@ -269,9 +269,19 @@ export const REPOSITORY_GONE_NEXT = msg({ id: 'workflow.refused.platform.unknown
 export const NOTHING_FROM_HERE = msg({ id: 'workflow.refused.move.notFromHere.nextNone', defaultMessage: 'Nothing waits to be done there now.', description: "The next step after a refused move when nothing is possible from the card's stage (the request it answered is no longer open)." })
 
 /**
+ * The next step of `move.notFromHere` by the side of the agent refused (#1604, its `whose` value from the runtime), where
+ * the intents of the card's stage are the other side's: a reviewer's review or verdict on a card no longer in Review, or
+ * its builder's move while it waits in Review.
+ */
+export const SIDE_NEXT = {
+  reviewer: msg({ id: 'workflow.refused.move.notFromHere.nextReviewer', defaultMessage: '{back, select, yes {Its review is over: it went back for more work. Leave it where it is, with no verdict, and wait for it to come back to Review.} other {Its review is over: it has moved on from Review. Leave it where it is, with no verdict.}}', description: "The next step after a reviewer's review or verdict was refused because the card is no longer in Review (#1604): its review ended. back (select): yes when the card went back to be worked on (Todo or Active), other when it moved on (approved, merged). Review is a stage name: use it as Hive shows it. Read by agents and shown in the window alike: it names no one. Translate each sentence." }),
+  builder: msg({ id: 'workflow.refused.move.notFromHere.nextBuilder', defaultMessage: "It waits for its reviewer's verdict: wait for that, which brings it back if there is more to do.", description: "The next step after a card's builder was refused a move while the card waits in Review for its reviewer (#1604): the review's verdict comes first. Read by agents and shown in the window alike: it names no one." })
+} satisfies Record<string, Msg>
+
+/**
  * A refusal's values: names and numbers, the same in every language, or a message of its own kept as data (what a
  * platform couldn't read, texts.ts). {stage}, {move}, {intent}, {moves}, {rule} and {rules} hold the code's names, which
- * agents read as they are and the window shows through texts.ts's messages.
+ * agents read as they are (a stage by its board name in English) and the window shows through texts.ts's messages.
  */
 export type RefusalValues = Record<string, string | number | StoredText>
 
@@ -303,25 +313,28 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
   const t = REFUSALS[rule]
   const vals: Record<string, string | number> = {}
   for (const [k, v] of Object.entries(values)) vals[k] = typeof v === 'object' ? (workflowLine(v, f.one) ?? '') : v
+  // A stage by its name (stages.ts), as the board shows it, to agents too (#1604: "Active", never the id "active"): the
+  // project's own, else its message; an id this Hive doesn't know as it is.
+  const stage = (x: string): string => f.stageNames?.[x as keyof StageNames] || (isStageId(x) ? f.one(STAGE_TEXT[x]) : x)
+  if (typeof vals.stage === 'string') vals.stage = stage(vals.stage)
+  // A list of stages (`move.noStage`'s), each by its stage name.
+  if (vals.stages !== undefined) vals.stages = f.list(String(vals.stages).split(', ').filter(Boolean).map(stage))
   if (f.names) {
-    // A stage by its name (stages.ts): the project's own, else its message; an id this Hive doesn't know as it is.
-    const stage = (x: string): string => f.stageNames?.[x as keyof StageNames] || (isStageId(x) ? f.one(STAGE_TEXT[x]) : x)
+    // Intents and rules by their names in the window; agents get them as they are, the names they call them by.
     const name = (x: string): string => {
       const m = MOVE_NAMES[x] ?? RULE_NAMES[x]
       return m ? f.one(m) : stage(x)
     }
     const names = (s: string | number): string => f.list(String(s).split(', ').filter(Boolean).map(name))
-    if (typeof vals.stage === 'string') vals.stage = stage(vals.stage)
     for (const k of ['move', 'intent', 'rule'] as const) if (typeof vals[k] === 'string') vals[k] = name(vals[k] as string)
     for (const k of ['moves', 'rules'] as const) if (vals[k] !== undefined) vals[k] = names(vals[k])
-    // A list of stages (`move.noStage`'s), each by its stage name.
-    if (vals.stages !== undefined) vals.stages = f.list(String(vals.stages).split(', ').filter(Boolean).map(stage))
   }
   // The {why} of a rule with several reasons is the whole sentence of its `cause`.
   if (typeof values.cause === 'string' && Object.hasOwn(WHY, values.cause)) vals.why = f.one(WHY[values.cause as keyof typeof WHY], { n: vals.n ?? 0, q: vals.q ?? 0 })
   const paused = values.queue === 'paused' && typeof values.waits === 'string' && Object.hasOwn(PAUSED_NEXT, values.waits) ? PAUSED_NEXT[values.waits as keyof typeof PAUSED_NEXT] : null
   const queued = rule === 'merge.hiveMerges' && typeof values.queue === 'string' && Object.hasOwn(QUEUE_NEXT, values.queue) ? (paused ?? QUEUE_NEXT[values.queue as keyof typeof QUEUE_NEXT]) : null
-  const next = rule === 'move.notFromHere' && !values.moves ? NOTHING_FROM_HERE : rule === 'platform.unknown' && values.offer === 'repositoryGone' ? REPOSITORY_GONE_NEXT : (queued ?? t.next)
+  const side = rule === 'move.notFromHere' && typeof values.whose === 'string' && Object.hasOwn(SIDE_NEXT, values.whose) ? SIDE_NEXT[values.whose as keyof typeof SIDE_NEXT] : null
+  const next = side ?? (rule === 'move.notFromHere' && !values.moves ? NOTHING_FROM_HERE : rule === 'platform.unknown' && values.offer === 'repositoryGone' ? REPOSITORY_GONE_NEXT : (queued ?? t.next))
   return { message: f.one(t.message, vals), next: f.one(next, vals), change: t.change ? f.one(t.change, vals) : null }
 }
 
