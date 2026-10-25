@@ -36,6 +36,50 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## P8's scenarios for the intents and gates (#1536): the three fakes, fixtures v84, 24–25 October 2026
+
+The baseline for P8's trials (#1537) and the checks card (#1539), on the guidance that ships (lanes A–D merged, 1.0.0
+6e9eeb47), saved as `p8-scenarios` (fake Claude Code), `p8-scenarios-fake-codex` and `p8-scenarios-fake-copilot`.
+- **Before**, v82 (`p8-e-before`, `2026-10-24T17-38-41-fake`): all 134 pass on the fake Claude Code.
+- **After**, v84, source 74cd1802, guidance `3ef4abb443998e00`: **137 of 137 pass on each fake**. Fake Claude Code
+  `2026-10-24T22-08-07-fake` (CLI 2.1.999), fake Codex `2026-10-24T22-49-54-fake-codex` (0.160.0), Copilot offline
+  `2026-10-24T23-31-51-fake-copilot` (1.0.98). Not comparable with v82 (another fixtures version).
+
+What changed (v83–v84):
+- **New**:
+  - **preset-solo-card**: Solo, saved as the Workflow section saves it. Started with `hive_start_card`, committed,
+    `hive_submit`, and Done with no review and no Override.
+  - **preset-pair-lane**: Pair. The builder registers its lane with Implementer and starts its card in the slot Hive
+    lends it, with no worktree of its own. Submitting from the slot is a model's check.
+  - **coordinator-merge-due**: #1346 item 4, a lane's merge due with its builder merging. The Coordinator asks nothing,
+    merges, moves or ends nothing itself, and watches the lanes again.
+- **#1346's five** are now coordinator-fact-before-asking, coordinator-start-reviewer, coordinator-lanes-only-watch,
+  coordinator-merge-due (with coordinator-ten-rounds and coordinator-no-code-done) and coordinator-look-before-asking.
+  #1346 stays open for its Haiku run before the release (#1541).
+- **Checks follow the intents**: where a check counted only `hive_update_task`, it now also takes `hive_start_review`
+  or a moving intent, in review-card, card-detail, list-compact, list-detail, card-loop-released and
+  card-loop-blocked. Scenarios with every rule off keep their old moves; the `old-move-*` scenarios test the
+  translation.
+- **Fixtures**:
+  - merged-to-done: a real `--no-ff` merge of the card's branch into the base its prompt names (#1169).
+  - assistant-new-lane: accepts run-lanes or coordinate-agents (#1169).
+  - assistant-message-watching: Coder's watch made with its own token, `POST /v1/tasks/wait`, so a real CLI gets it
+    too (#1545).
+  - assistant-journal-recall: every CLI gets the start view since #1065, so it no longer expects none on Codex and
+    Copilot.
+  - card-loop-blocked: the fakes that answer no wake end at the card's return, rather than at the fakes' time limit.
+- **Unchanged**:
+  - merge-main-moved keeps "it merged the moved base into the branch first", as #1525 left it (#1162).
+  - **#903**: act, then ack. inbox-act-then-ack and inbox-ack-and-read end `acked` on all three fakes; the order, ack
+    after acting, is a model's check.
+- **Setup flakes**, each fixed with a condition, not a sleep:
+  - #1583: a setup's move as the user moves it (`userMove`) checks the reply, and waits for the card in the column,
+    and in Review for a new submission, else fails as `setup: …`.
+  - #1588: setups save workflow options through `workflow:setOptions` (the project's lock), not by rewriting
+    `project.json` beside Hive. That rewrite is the likely way the agents just added went missing.
+  - Proof: 6 scenarios that move cards in setup, `--repeat 5` with 2 bounded CPU spinner workers, 30 of 30 pass
+    (`2026-10-24T19-08-44-fake`). Neither flake had reproduced alone before the fix.
+
 ## A reviewer's commands in its review copy (#1559): fakes, Claude Code Haiku, fixtures v77–v78, 24 October 2026
 
 review-agent-work now says to run every command with the review copy as its working directory (a reviewer's session and
