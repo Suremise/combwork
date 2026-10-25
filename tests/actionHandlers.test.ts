@@ -649,6 +649,49 @@ describe('notices (#1266, §16.11.4)', () => {
     expect(st.notices).toHaveLength(1)
   })
 
+  it("#1645: a card's events name the running lane that holds it, never an abandoned lane that once listed it", async () => {
+    const agents = [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b4', name: 'B4' }, { id: 'r4', name: 'R4' }]
+    // Each way in a workspace of its own: the wrong lane abandoned before the round (seen by a look in between), or still
+    // running when the right one starts and abandoned in the same look as the failure.
+    for (const between of [true, false]) {
+      const { w, ws, alpha } = await open({ agents })
+      const st = fake(alpha, { b1: 'working', r1: 'working', b4: 'working', r4: 'working' })
+      const db = () => store.workspaceDb(ws).reader
+      await notices.checkLanesNow(w)
+      const since = Date.parse((db().prepare("SELECT value FROM board_meta WHERE key = 'lane_notices_since'").get() as { value: string }).value)
+      await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(since), HANG)
+      const lanesOf = async (c: number) => (await lanes.listLanes(w, { all: true })).filter((l) => l.cards.some((x) => x.number === c))
+      const c = await newCard(w)
+      const wrong = (await lanes.startLane(w, { project: 'alpha', builder: 'b4', reviewer: 'r4', cards: [c], by: 'Assistant', name: 'Narrow card chips' })).lane
+      await notices.checkLanesNow(w)
+      if (between) {
+        await lanes.endLane(w, wrong.id, { abandoned: true })
+        await notices.checkLanesNow(w)
+      }
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)', name: 'WAL checkpoint' })
+      await notices.checkLanesNow(w)
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+      await notices.checkLanesNow(w)
+      if (!between) await lanes.endLane(w, wrong.id, { abandoned: true })
+      const told = st.notices.length
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'failed' }, r1, { comment: 'FAILED' }))
+      await vi.waitFor(async () => {
+        await notices.checkLanesNow(w)
+        await worker.actionsSettled()
+        expect(JSON.stringify(st.notices.slice(told))).toContain('failed review')
+      }, HANG)
+      await settled()
+      const shown = JSON.stringify(st.notices.slice(told))
+      expect(shown, `between: ${between}`).toContain('B1 / R1 (WAL checkpoint)')
+      expect(shown, `between: ${between}`).not.toContain('Narrow card chips')
+      // The card's history names the running lane too.
+      const card = await inWorkspace(w, () => tasks.getTask(c, w))
+      expect(JSON.stringify(card.history.filter((h) => /failed/i.test(JSON.stringify(h))))).not.toContain('Narrow card chips')
+      expect((await lanesOf(c)).map((l) => l.state).sort()).toEqual(['abandoned', 'active'])
+    }
+  })
+
   it('an event before a restart is told after it: what lanes were told is kept with the board, not in memory', async () => {
     const { w, ws, alpha } = await open()
     const st = fake(alpha, { b1: 'working', r1: 'working' })
