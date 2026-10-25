@@ -128,7 +128,7 @@ import type { TipsChange, TipsState } from './tips'
 import type { AdvancedState } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
-import type { GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
+import type { BranchAt, BranchDrops, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -829,6 +829,9 @@ export interface HiveRequests {
   /** The Git view (#607), the project folder's only (agents' worktrees change through the merge flow). The user's: no agent tool reaches these. */
   'git:summary': (projectPath: string) => GitRepoSummary
   'git:info': (projectPath: string) => GitRepoInfo
+  'git:deleteBranches': (projectPath: string, branches: BranchAt[], unmerged?: boolean) => string
+  'git:deleteRemoteBranches': (projectPath: string, remote: string, branches: BranchAt[]) => string
+  'git:branchDrops': (projectPath: string, branch: string) => BranchDrops
   'git:history': (projectPath: string) => GitHistory
   /** Each action replies with what it did, in a sentence. Switching (and creating a branch to switch to) or pulling is refused while an agent works in the folder or its merge slot is held (`folderBusy`). */
   'git:switch': (projectPath: string, branch: string) => string

@@ -5,7 +5,7 @@
 // project folder, never a worktree; a push is never forced; no password or token in a remote URL is shown or logged.
 // Each test makes its own repositories (`fresh`), so any one runs alone or in any order.
 import { execFileSync } from 'child_process'
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { aheadBehindText, folderBusy, gitStatusText, identityProblem, identityWarnings, isNoReplyEmail, parsePushPorcelain, redactRemoteUrl, redactUrlsIn, scrubSecrets, urlSecrets, remoteNameProblem, remoteUrlProblem, type GitRepoSummary } from '../src/shared/gitRepo'
@@ -40,8 +40,13 @@ vi.mock('../src/main/workspace', () => ({
     // The folder contract (#1451) reads no slots here: no Assistant home, no board.
     isAssistantHome: () => false
   },
-  workspaceOf: () => ({ refresh: async () => ({}) })
+  workspaceOf: () => ({ refresh: async () => ({}), path: 'ws', info: () => ({ projects: [{ path: proj, name: 'proj', platform: { id: 'git' } }] }), projectConfig: async () => ({ version: 2, agents }) })
 }))
+/** The project's workflow target (#1642: '' for none, the default branch), and the board's open cards' lines. */
+let workTarget = ''
+let cardLines: { line: string; stage: string }[] = []
+vi.mock('../src/main/workflow/rulesets', () => ({ resolvedOf: () => ({ options: { target: workTarget } }) }))
+vi.mock('../src/main/workflow/cardWork', () => ({ workBadges: () => cardLines.map((b, i) => ({ card: i + 1, line: b.line, stage: b.stage, noCode: false })) }))
 vi.mock('../src/main/sessions', () => ({ sessions: { liveFor: (_p: string, id: string) => (live[id] ? { status: live[id], cwd: agents.find((x) => x.id === id)?.worktree?.path ?? proj } : null), agentNow: (_p: string, id: string) => (live[id] ? { pending: pendingInput.has(id) } : null), lineWaiting: (_p: string, id: string) => typedWaiting.has(id) } }))
 vi.mock('../src/main/mergeSlotHost', () => ({ mergeSlots: { list: () => slots, asUser } }))
 vi.mock('../src/main/branchWatch', () => ({ checkProject: async () => undefined }))
@@ -122,6 +127,8 @@ beforeEach(() => {
   slots = []
   lockDoor = null
   asUser.mockClear()
+  workTarget = ''
+  cardLines = []
 })
 
 describe('the summary', () => {
@@ -584,4 +591,94 @@ describe('what the window says', () => {
     expect(identityProblem('A\nB', '')).not.toBeNull()
     expect(identityProblem('', '')).toBeNull()
   })
+})
+
+describe('branches by state, and cleaning up the merged ones (#1642)', () => {
+  /**
+   * The project's work merges into 1.0.0 (ahead of main): hive/hb1 and hive/hb2 merged into it and unused, hive/slot
+   * merged but checked out in a worktree (a slot's), hive/card merged but an open card's line, spike/x with a commit of
+   * its own. All pushed to origin.
+   */
+  const setUp = (): Record<string, string> => {
+    workTarget = '1.0.0'
+    git(proj, 'checkout', '-q', '-b', '1.0.0')
+    commit(proj, 'release.txt')
+    for (const b of ['hive/hb1', 'hive/hb2', 'hive/slot', 'hive/card']) git(proj, 'branch', b)
+    git(proj, 'checkout', '-q', '-b', 'spike/x')
+    commit(proj, 'spike.txt')
+    git(proj, 'checkout', '-q', 'main')
+    git(proj, 'worktree', 'add', '-q', join(proj, '..', 'slot-a'), 'hive/slot')
+    git(proj, 'push', '-q', 'origin', '1.0.0', 'hive/hb1', 'hive/hb2', 'hive/slot', 'hive/card', 'spike/x')
+    git(proj, 'fetch', '-q', 'origin')
+    cardLines = [{ line: 'hive/card', stage: 'review' }]
+    return Object.fromEntries(['hive/hb1', 'hive/hb2', 'hive/slot', 'hive/card', 'spike/x', 'main', '1.0.0'].map((b) => [b, git(proj, 'rev-parse', b)]))
+  }
+  const branchNames = (cwd: string): string[] => git(cwd, 'for-each-ref', '--format=%(refname:short)', 'refs/heads').split('\n').filter(Boolean).sort()
+
+  it("measures each branch against the project's target and offers only the merged ones nothing uses", async () => {
+    setUp()
+    const info = await repo.repoInfo(proj, workTarget)
+    expect([info.target, info.defaultBranch]).toEqual(['1.0.0', 'main'])
+    const to = Object.fromEntries(info.branches.map((b) => [b.name, b.toTarget]))
+    expect(to).toEqual({ '1.0.0': 0, main: 0, 'hive/hb1': 0, 'hive/hb2': 0, 'hive/slot': 0, 'hive/card': 0, 'spike/x': 1 })
+    expect(info.remoteRows?.find((r) => r.name === 'origin/spike/x')).toMatchObject({ remote: 'origin', branch: 'spike/x', toTarget: 1 })
+    const { busyLines, cleanupOffer, localGroup } = await import('../src/shared/branchCleanup')
+    const busy = busyLines(new Map([['hive/card', [{ stage: 'review' as const }]]]))
+    const groups = Object.fromEntries(info.branches.map((b) => [b.name, localGroup(b, info, busy)]))
+    expect(groups).toEqual({ '1.0.0': 'inUse', main: 'inUse', 'hive/slot': 'inUse', 'hive/card': 'inUse', 'hive/hb1': 'merged', 'hive/hb2': 'merged', 'spike/x': 'unmerged' })
+    const offer = cleanupOffer(info, busy)
+    expect(offer.local.map((b) => b.name)).toEqual(['hive/hb1', 'hive/hb2'])
+    // Never the target, the default branch, a slot's or an open card's branch on the remote either; unmerged never.
+    expect(offer.remote.map((r) => [r.name, r.withLocal])).toEqual([
+      ['origin/hive/hb1', true],
+      ['origin/hive/hb2', true]
+    ])
+    // Without a target asked for (an action reading the branches), nothing is counted.
+    expect((await repo.repoInfo(proj)).branches.every((b) => b.toTarget === undefined)).toBe(true)
+  })
+
+  it('deletes only what it was shown, merged and unused, and says why each other one is kept', async () => {
+    const at = setUp()
+    git(proj, 'config', 'branch.hive/hb1.description', 'gone with it')
+    // hive/hb2 moves on after the dialog showed it.
+    git(proj, 'checkout', '-q', 'hive/hb2')
+    commit(proj, 'later.txt')
+    git(proj, 'checkout', '-q', 'main')
+    const items = ['hive/hb1', 'hive/hb2', 'hive/slot', 'hive/card', 'spike/x', 'main', '1.0.0'].map((name) => ({ name, sha: at[name] }))
+    const said = await repo.deleteBranches(proj, [...items, { name: '--force', sha: at.main }, { name: 'nope', sha: at.main }])
+    expect(branchNames(proj)).toEqual(['1.0.0', 'hive/card', 'hive/hb2', 'hive/slot', 'main', 'spike/x'])
+    expect(readFileSync(join(proj, '.git', 'config'), 'utf8')).not.toContain('hive/hb1')
+    expect(said).toMatch(/Deleted hive\/hb1\./)
+    for (const why of ['hive/hb2 has moved since you were shown it', 'hive/slot is checked out in a worktree or slot', 'An open card works on hive/card', "spike/x has commits that aren't in 1.0.0", 'main is the default branch', '1.0.0 is the branch work merges into', "--force isn't a valid branch name", "There's no branch nope"]) expect(said).toContain(why)
+    // Nothing to delete: refused, saying why.
+    await expect(repo.deleteBranches(proj, [{ name: 'spike/x', sha: at['spike/x'] }])).rejects.toThrow(/spike\/x has commits that aren't in 1\.0\.0/)
+  }, 120_000)
+
+  it('deletes an unmerged branch only alone, at the commit shown, after listing the commits it drops', async () => {
+    const at = setUp()
+    const drops = await repo.branchDrops(proj, 'spike/x')
+    expect(drops).toMatchObject({ target: '1.0.0', total: 1, commits: [{ short: git(proj, 'rev-parse', '--short', 'spike/x'), subject: 'add spike.txt' }] })
+    await expect(repo.deleteBranches(proj, [{ name: 'spike/x', sha: at['spike/x'] }, { name: 'hive/hb1', sha: at['hive/hb1'] }], true)).rejects.toThrow()
+    await expect(repo.deleteBranches(proj, [{ name: 'spike/x', sha: at.main }], true)).rejects.toThrow(/moved since you were shown it/)
+    await expect(repo.deleteBranches(proj, [{ name: 'hive/card', sha: at['hive/card'] }], true)).rejects.toThrow(/An open card works on hive\/card/)
+    expect(await repo.deleteBranches(proj, [{ name: 'spike/x', sha: at['spike/x'] }], true)).toMatch(/Deleted spike\/x/)
+    expect(branchNames(proj)).not.toContain('spike/x')
+  }, 120_000)
+
+  it('deletes merged branches on the remote only at the commit shown, never one in use or unmerged', async () => {
+    const at = setUp()
+    const r = (name: string): { name: string; sha: string } => ({ name: `origin/${name}`, sha: at[name] })
+    const said = await repo.deleteRemoteBranches(proj, 'origin', [r('hive/hb1'), r('hive/slot'), r('hive/card'), r('spike/x'), r('main'), r('1.0.0'), { name: 'origin/hive/hb2', sha: at.main }])
+    expect(branchNames(remote)).toEqual(['1.0.0', 'hive/card', 'hive/hb2', 'hive/slot', 'main', 'spike/x'])
+    expect(said).toMatch(/Deleted hive\/hb1 on origin\./)
+    for (const why of ['origin/hive/slot is checked out in a worktree or slot', 'An open card works on origin/hive/card', "origin/spike/x has commits that aren't in 1.0.0", 'origin/main is the default branch', 'origin/1.0.0 is the branch work merges into', 'origin/hive/hb2 has moved since you were shown it']) expect(said).toContain(why)
+    // The local branch stays: only the remote's went, and its remote-tracking branch with it.
+    expect(branchNames(proj)).toContain('hive/hb1')
+    expect(git(proj, 'for-each-ref', 'refs/remotes/origin/hive/hb1')).toBe('')
+    // Moved on the remote since the last fetch: refused there, never forced.
+    commit(other, 'x.txt')
+    git(other, 'push', '-q', '-f', 'origin', 'HEAD:refs/heads/hive/hb2')
+    await expect(repo.deleteRemoteBranches(proj, 'origin', [r('hive/hb2')])).rejects.toThrow(/origin refused to delete hive\/hb2/)
+    expect(branchNames(remote)).toContain('hive/hb2')
+  }, 120_000)
 })

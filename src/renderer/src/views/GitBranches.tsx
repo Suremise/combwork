@@ -12,9 +12,11 @@ import {
   remoteNameProblem,
   remoteUrlProblem,
   type GitBranchRow,
+  type GitRemoteBranchRow,
   type GitRepoInfo,
   type GitRepoSummary
 } from '@shared/gitRepo'
+import { BRANCH_GROUPS, busyLines, cleanupOffer, localGroup, localUse, remoteGroup, type BranchGroup, type CleanupOffer } from '@shared/branchCleanup'
 import { samePath } from '@shared/movePaths'
 import { call } from '../api'
 import { attempt } from '../actions'
@@ -164,6 +166,33 @@ const M = {
   untrack: msg({ id: 'git.untrack.button', defaultMessage: 'Stop tracking', description: 'The button of the confirmation before a branch stops tracking its remote branch.' })
 }
 
+/** Branches by their state, and cleaning up the merged ones (#1642). */
+const C = {
+  group: msg({ id: 'git.branches.group', defaultMessage: '{group, select, inUse {In use} merged {Merged into {target}} other {Not merged into {target}}}', description: "A heading inside Version Control → Branches & remotes' list of branches: the branches in use (the target, the default branch, the project folder's, a slot's or worktree's, an open card's), those merged into the target branch {target} that nothing uses, and those with commits not in it. Keep the select keys." }),
+  groupTip: msg({ id: 'git.branches.groupTip', defaultMessage: "{group, select, inUse {The branch work merges into, the default branch, the project folder's, and those a slot, a worktree or an open card uses.} merged {Every commit of these is in {target}, and nothing uses them: Clean Up Merged Branches deletes them.} other {These have commits that aren't in {target}. Delete one only after checking the commits it drops.}}", description: 'Tooltip of a group heading in the list of branches (#1642). {target} is the branch the project merges into. Keep the select keys.' }),
+  ahead: msg({ id: 'git.branches.notInTarget', defaultMessage: '{n, plural, one {# commit not in {target}} other {# commits not in {target}}}', description: "On a branch of the Not merged group in Version Control → Branches & remotes: how many of its commits aren't in the target branch {target}." }),
+  cleanUp: msg({ id: 'git.branches.cleanUp', defaultMessage: 'Clean Up Merged Branches…', description: "A button over the list of branches in Version Control → Branches & remotes: lists the branches merged into the target that nothing uses, to delete the ones you tick (it asks first). Keep the …: it opens a dialog." }),
+  cleanUpTip: msg({ id: 'git.branches.cleanUpTip', defaultMessage: "{n, plural, =0 {No branch is merged into {target} and unused.} one {# branch here or on a remote is merged into {target} and unused: pick which to delete.} other {# branches here or on a remote are merged into {target} and unused: pick which to delete.}}", description: 'Tooltip of Clean Up Merged Branches… ({n}: how many it offers, local and remote; {target}: the branch the project merges into).' }),
+  cleanUpTitle: msg({ id: 'git.cleanUp.title', defaultMessage: 'Clean up merged branches', description: 'Title of the Clean Up Merged Branches dialog (Version Control → Branches & remotes).' }),
+  cleanUpMessage: msg({ id: 'git.cleanUp.message', defaultMessage: "Every commit of these is already in {target}, and no slot, worktree or open card uses them. Tick the ones to delete.", description: 'The Clean Up Merged Branches dialog: what it lists. {target} is the branch the project merges into.' }),
+  localHead: msg({ id: 'git.cleanUp.local', defaultMessage: 'In this repository ({n, number})', description: 'A heading in the Clean Up Merged Branches dialog: the local branches it offers ({n}), each with a tick box, ticked to start with.' }),
+  remoteHead: msg({ id: 'git.cleanUp.remote', defaultMessage: 'On {remotes} ({n, number})', description: 'A heading in the Clean Up Merged Branches dialog: the branches it offers on the remote(s) {remotes} (a list of names), {n} of them, none ticked to start with.' }),
+  remoteWarn: msg({ id: 'git.cleanUp.remoteWarn', defaultMessage: "Ticking these deletes them on the remote, for everyone who uses it, and Hive can't undo that. None is ticked for you.", description: "A warning in the Clean Up Merged Branches dialog over the remote branches it offers: deleting them is outward-facing (git push --delete)." }),
+  withLocal: msg({ id: 'git.cleanUp.withLocal', defaultMessage: 'its local branch is ticked above', description: 'Beside a remote branch in the Clean Up Merged Branches dialog: the local branch of the same name is ticked to be deleted, so this one is suggested too (it still needs its own tick).' }),
+  none: msg({ id: 'git.cleanUp.none', defaultMessage: 'None', description: 'In the Clean Up Merged Branches dialog, under a heading with nothing to offer.' }),
+  deleteTicked: msg({ id: 'git.cleanUp.delete', defaultMessage: 'Delete Ticked', description: 'The button of the Clean Up Merged Branches dialog: deletes the branches ticked.' }),
+  deleting: msg({ id: 'git.cleanUp.deleting', defaultMessage: 'Deleting…', description: 'The Clean Up Merged Branches or Delete branch dialog\'s button while branches are being deleted.' }),
+  failed: msg({ id: 'git.cleanUp.failed', defaultMessage: "Couldn't delete the branches", description: "An error notification's title: deleting branches in Version Control → Branches & remotes failed." }),
+  deleteTip: msg({ id: 'git.branch.deleteTip', defaultMessage: 'Delete {branch}…', description: "Tooltip on a branch's Delete button in Version Control → Branches & remotes (it asks first, showing any commits it would drop)." }),
+  deleteMergedTitle: msg({ id: 'git.branch.deleteMergedTitle', defaultMessage: 'Delete {branch}?', description: 'Title of the confirmation before deleting a branch merged into the target.' }),
+  deleteMergedMessage: msg({ id: 'git.branch.deleteMergedMessage', defaultMessage: 'Every commit of it is in {target}: nothing is lost.', description: 'The confirmation before deleting a branch merged into the target branch {target}.' }),
+  deleteUnmergedTitle: msg({ id: 'git.branch.deleteUnmergedTitle', defaultMessage: '{n, plural, one {Delete {branch} and the commit only it has?} other {Delete {branch} and the # commits only it has?}}', description: "Title of the confirmation before deleting a branch with {n} commits that aren't in the target." }),
+  deleteUnmergedMessage: msg({ id: 'git.branch.deleteUnmergedMessage', defaultMessage: "{n, plural, one {This commit isn't in {target}. Deleting {branch} drops it, and Hive can't bring it back:} other {These commits aren't in {target}. Deleting {branch} drops them, and Hive can't bring them back:}}", description: "The confirmation before deleting a branch ({branch}) with {n} commits that aren't in the target {target}; the commits are listed under it." }),
+  deleteMore: msg({ id: 'git.branch.deleteMore', defaultMessage: '…and {n, plural, one {# more} other {# more}}', description: 'The last line of the commits listed before deleting an unmerged branch: how many more there are than shown.' }),
+  deleteButton: msg({ id: 'git.branch.delete', defaultMessage: 'Delete Branch', description: 'The button of the confirmation before deleting a branch.' }),
+  dropsFailed: msg({ id: 'git.branch.dropsFailed', defaultMessage: "Couldn't read the commits {branch} would drop", description: "An error notification's title: reading an unmerged branch's commits before deleting it failed." })
+}
+
 export function BranchesSection({ project }: { project: ProjectInfo }) {
   const read = useGitRead('git:info', project)
   const busyFor = useFolderBusy(project)
@@ -176,6 +205,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
   const tasks = useStore((st) => st.tasks)
   const badges = useWorkBadges()
   const onBranch = useMemo(() => branchCards(project.name, tasks, badges), [project.name, tasks, badges])
+  const busyBranches = useMemo(() => busyLines(onBranch), [onBranch])
   // The project's names for its stages, read once for every row (HR4's #1424 round 1).
   const names = useProjectStages().get(project.path.toLowerCase())?.names
   useNow(60000)
@@ -278,6 +308,68 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
     if (ok) act(`track:${branch}`, tr(M.untrackFailed, { branch, upstream }), () => call('git:setUpstream', project.path, branch, null))
   }
 
+  /** Deletes one branch nothing uses (#1642), after a confirm: a merged one loses nothing; an unmerged one lists the commits it drops. */
+  const deleteOne = async (b: GitBranchRow, target: string): Promise<void> => {
+    if (!b.sha) return
+    const one = { name: b.name, sha: b.sha }
+    const remove = async (unmerged: boolean): Promise<void> => {
+      try {
+        notify('success', await call('git:deleteBranches', project.path, [one], unmerged))
+      } finally {
+        bumpGit(project.path)
+      }
+    }
+    if (b.toTarget === 0) {
+      await confirm({ title: tr(C.deleteMergedTitle, { branch: b.name }), message: tr(C.deleteMergedMessage, { target }), confirmLabel: tr(C.deleteButton), busyLabel: tr(C.deleting), danger: true, run: () => remove(false) })
+      return
+    }
+    const drops = await attempt(tr(C.dropsFailed, { branch: b.name }), () => call('git:branchDrops', project.path, b.name))
+    if (!drops) return
+    const lines = drops.commits.map((c) => `${c.short} ${c.subject}`)
+    if (drops.total > drops.commits.length) lines.push(tr(C.deleteMore, { n: drops.total - drops.commits.length }))
+    await confirm({
+      title: tr(C.deleteUnmergedTitle, { branch: b.name, n: drops.total }),
+      message: tr(C.deleteUnmergedMessage, { branch: b.name, n: drops.total, target: drops.target }),
+      list: lines,
+      listOnly: true,
+      listMono: true,
+      confirmLabel: tr(C.deleteButton),
+      busyLabel: tr(C.deleting),
+      danger: true,
+      run: () => remove(true)
+    })
+  }
+
+  /**
+   * Clean Up Merged Branches (#1642): the offer ticked as the user leaves it, local branches first, then each remote's
+   * (outward-facing, none ticked to start with), each deleted at the commit shown.
+   */
+  const cleanUp = async (offer: CleanupOffer, target: string): Promise<void> => {
+    let picked: CleanupOffer = { local: offer.local, remote: [] }
+    await confirm({
+      title: tr(C.cleanUpTitle),
+      message: tr(C.cleanUpMessage, { target }),
+      content: <CleanupPicker offer={offer} onChange={(p) => (picked = p)} />,
+      wide: true,
+      confirmLabel: tr(C.deleteTicked),
+      busyLabel: tr(C.deleting),
+      danger: true,
+      run: async () => {
+        // Each part said as it is done: a remote's failure (shown in the dialog) never hides the local branches deleted.
+        try {
+          if (picked.local.length) {
+            notify('success', await call('git:deleteBranches', project.path, picked.local.map(({ name, sha }) => ({ name, sha }))))
+            // Done: a retry after a remote's failure doesn't ask for them again.
+            picked = { ...picked, local: [] }
+          }
+          for (const remote of [...new Set(picked.remote.map((r) => r.remote))]) notify('success', await call('git:deleteRemoteBranches', project.path, remote, picked.remote.filter((r) => r.remote === remote).map(({ name, sha }) => ({ name, sha }))))
+        } finally {
+          bumpGit(project.path)
+        }
+      }
+    })
+  }
+
   const editRemote = async (name: string, url: string): Promise<void> => {
     const next = await prompt({ title: tr(M.changeUrlTitle, { remote: name }), initial: url, confirmLabel: tr(M.change), validate: remoteUrlProblem })
     // An https URL shows with its password hidden: unchanged, nothing to save.
@@ -296,7 +388,11 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
         const pullBlocked = ro ? ro : !s.branch ? tr(M.pullDetached) : !s.upstream || s.upstream.gone ? tr(M.pullNoUpstream, { branch: s.branch }) : s.state ? tr(M.pullState, { state: gitStateKey(s.state) }) : busyFor('pull')
         const pushBlocked = ro ? ro : !s.branch ? tr(M.pushDetached) : !s.head ? tr(M.pushNoCommits) : !s.remotes.length ? tr(M.pushNoRemote) : null
         const fetched = at(s.fetchedAt)
-        const remoteOnly = info.remoteBranches.filter((r) => !info.branches.some((b) => b.name === r.slice(r.indexOf('/') + 1)))
+        const remoteRows: GitRemoteBranchRow[] = info.remoteRows ?? info.remoteBranches.map((name) => ({ name, remote: name.slice(0, name.indexOf('/')), branch: name.slice(name.indexOf('/') + 1), sha: '', date: 0, toTarget: null, remoteHead: false }))
+        const remoteOnly = remoteRows.filter((r) => !info.branches.some((b) => b.name === r.name.slice(r.name.indexOf('/') + 1)))
+        // Grouped by state against the project's target (#1642); with none known, the list as it was.
+        const target = info.target ?? null
+        const offer = cleanupOffer(info, busyBranches)
         const warnings = identityWarnings(info.identity, info.remotes)
         // A folder's slot (#1450), and its agent: the slot's lease's, else the agent whose session runs there.
         const slotOf = (path: string | null): SlotView | undefined => (path ? slots.find((x) => samePath(x.folder, path)) : undefined)
@@ -396,14 +492,28 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
               </div>
             </div>
 
-            <h2 className="section">
+            <h2 className="section git-section-head">
               {tr(M.branches)} <span className="badge">{info.branches.length}</span>
+              {target && (
+                <span className="git-section-actions">
+                  <Tooltip content={ro ?? tr(C.cleanUpTip, { n: offer.local.length + offer.remote.length, target })}>
+                    <span>
+                      <button className="btn small" data-action="clean-up-branches" disabled={off || !(offer.local.length + offer.remote.length)} onClick={() => void cleanUp(offer, target)}>
+                        <Icon name="trash" /> {tr(C.cleanUp)}
+                      </button>
+                    </span>
+                  </Tooltip>
+                </span>
+              )}
             </h2>
             <div className="git-rows">
-              {info.branches.map((b) => {
+              {grouped(info.branches, (b) => localGroup(b, info, busyBranches)).map((item) => {
+                if ('group' in item) return <GroupHead key={`group:${item.group}`} group={item.group} n={item.n} target={target ?? ''} />
+                const b = item.row
                 const agent = agentOf(b.worktree)
                 const slot = slotOf(b.worktree)
                 const why = b.current ? null : b.worktree ? tr(M.checkedOutIn, { where: agent ? 'agent' : 'other', agent: agent?.name ?? '' }) : switchBlocked
+                const free = !!target && !localUse(b, info, busyBranches)
                 return (
                   <div key={b.name} className={cx('git-row', 'git-branch', b.current && 'current')} data-branch={b.name}>
                     <Icon name={b.current ? 'check' : b.worktree ? 'repo' : 'git-branch'} />
@@ -424,6 +534,11 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                         {b.upstream} · {aheadBehindText(b)}
                       </span>
                     )}
+                    {free && !!b.toTarget && (
+                      <span className="faint git-track" data-to-target={b.toTarget}>
+                        {tr(C.ahead, { n: b.toTarget, target })}
+                      </span>
+                    )}
                     <span className="git-subject faint">{b.subject}</span>
                     <span className="git-meta faint">{at(b.date)}</span>
                     {info.remotes.length > 0 && (
@@ -433,6 +548,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                       </span>
                     )}
                     {!b.current && <IconButton icon="git-merge" title={tr(M.mergeBranch, { branch: b.name })} action="merge-branch" disabled={!!ro} onClick={() => set({ branchMergeFor: { project: project.path, branch: b.name } })} />}
+                    {free && <IconButton icon="trash" title={tr(C.deleteTip, { branch: b.name })} action="delete-branch" disabled={off} onClick={() => void deleteOne(b, target!)} />}
                     {!b.current && (
                       <Tooltip content={why ?? tr(M.switchTip, { branch: b.name })}>
                         <span>
@@ -451,10 +567,18 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                 </button>
               )}
               {showRemote &&
-                remoteOnly.map((r) => (
+                grouped(remoteOnly, (x) => remoteGroup(x, info)).map((item) => {
+                  if ('group' in item) return <GroupHead key={`remote-group:${item.group}`} group={item.group} n={item.n} target={target ?? ''} remote />
+                  const { name: r, toTarget } = item.row
+                  return (
                   <div key={r} className="git-row git-branch remote" data-remote-branch={r}>
                     <Icon name="cloud" />
                     <span className="git-name">{r}</span>
+                    {!!toTarget && remoteGroup(item.row, info) === 'unmerged' && (
+                      <span className="faint git-track" data-to-target={toTarget}>
+                        {tr(C.ahead, { n: toTarget, target: target ?? '' })}
+                      </span>
+                    )}
                     <Tooltip content={switchBlocked ?? tr(M.trackLocal, { branch: r.slice(r.indexOf('/') + 1), remote: r })}>
                       <span>
                         <button className="btn small subtle" disabled={!!switchBlocked || off} onClick={() => void switchTo(r, s.branch)}>
@@ -463,7 +587,8 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                       </span>
                     </Tooltip>
                   </div>
-                ))}
+                  )
+                })}
             </div>
 
             <h2 className="section git-section-head">
@@ -568,6 +693,88 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
         )
       }}
     </Loading>
+  )
+}
+
+/**
+ * Rows in their groups (#1642): In use, Merged, Not merged, each under its heading with how many, in their order within
+ * it (newest first). With no group (no target known) the rows as they are.
+ */
+function grouped<T>(rows: T[], groupOf: (row: T) => BranchGroup | null): ({ group: BranchGroup; n: number } | { row: T })[] {
+  const groups = rows.map(groupOf)
+  if (groups.every((g) => g === null)) return rows.map((row) => ({ row }))
+  return BRANCH_GROUPS.flatMap((group) => {
+    const mine = rows.filter((_, i) => groups[i] === group)
+    return mine.length ? [{ group, n: mine.length }, ...mine.map((row) => ({ row }))] : []
+  })
+}
+
+function GroupHead({ group, n, target, remote }: { group: BranchGroup; n: number; target: string; remote?: boolean }) {
+  return (
+    <div className="git-row git-group-h" data-branch-group={group} {...(remote ? { 'data-remote-group': '' } : {})}>
+      <Tooltip content={tr(C.groupTip, { group, target })}>
+        <span>
+          {tr(C.group, { group, target })} <span className="badge">{n}</span>
+        </span>
+      </Tooltip>
+    </div>
+  )
+}
+
+/**
+ * Clean Up Merged Branches' choice (#1642): the local branches offered, ticked; the remote ones apart, under a warning
+ * that ticking them deletes them on the remote, none ticked (one whose local branch is ticked is marked suggested).
+ */
+function CleanupPicker({ offer, onChange }: { offer: CleanupOffer; onChange: (picked: CleanupOffer) => void }) {
+  const [local, setLocal] = useState<ReadonlySet<string>>(() => new Set(offer.local.map((b) => b.name)))
+  const [remote, setRemote] = useState<ReadonlySet<string>>(() => new Set())
+  useEffect(() => {
+    onChange({ local: offer.local.filter((b) => local.has(b.name)), remote: offer.remote.filter((r) => remote.has(r.name)) })
+  }, [offer, local, remote, onChange])
+  const flip = (from: ReadonlySet<string>, name: string, on: boolean): Set<string> => {
+    const next = new Set(from)
+    if (on) next.add(name)
+    else next.delete(name)
+    return next
+  }
+  const remotes = [...new Set(offer.remote.map((r) => r.remote))]
+  return (
+    <div className="git-cleanup" data-git-cleanup="">
+      <div className="git-cleanup-h">{tr(C.localHead, { n: offer.local.length })}</div>
+      {offer.local.length ? (
+        <ul className="git-cleanup-list">
+          {offer.local.map((b) => (
+            <li key={b.name}>
+              <label className="dialog-check">
+                <input type="checkbox" className="checkbox" data-cleanup-local={b.name} checked={local.has(b.name)} onChange={(e) => setLocal(flip(local, b.name, e.target.checked))} />
+                <code>{b.name}</code>
+              </label>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="faint">{tr(C.none)}</div>
+      )}
+      {offer.remote.length > 0 && (
+        <>
+          <div className="git-cleanup-h">{tr(C.remoteHead, { remotes: fmt.list(remotes, 'unit'), n: offer.remote.length })}</div>
+          <div className="banner warn" data-git-cleanup-remote-warning="">
+            <Icon name="warning" /> {tr(C.remoteWarn)}
+          </div>
+          <ul className="git-cleanup-list">
+            {offer.remote.map((r) => (
+              <li key={r.name}>
+                <label className="dialog-check">
+                  <input type="checkbox" className="checkbox" data-cleanup-remote={r.name} checked={remote.has(r.name)} onChange={(e) => setRemote(flip(remote, r.name, e.target.checked))} />
+                  <code>{r.name}</code>
+                  {r.withLocal && local.has(r.branch) && <span className="faint">· {tr(C.withLocal)}</span>}
+                </label>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
   )
 }
 

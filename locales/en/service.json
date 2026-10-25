@@ -227,6 +227,14 @@
     "defaultMessage": "{kind, select, tag {{hasName, select, yes {{name} isn't a valid tag name.} other {That isn't a valid tag name.}}} other {{hasName, select, yes {{name} isn't a valid branch name.} other {That isn't a valid branch name.}}}}",
     "description": "An error creating a branch or a tag ({kind}): its name {name} is one git refuses. {hasName} is no when no name was given (then it says That)."
   },
+  "service.gitRepo.branchKept": {
+    "defaultMessage": "{why, select, target {{branch} is the branch work merges into: kept.} default {{branch} is the default branch: kept.} current {{branch} is checked out in the project folder: kept.} worktree {{branch} is checked out in a worktree or slot: kept.} card {An open card works on {branch}: kept.} remoteHead {{branch} is the remote's default branch: kept.} moved {{branch} has moved since you were shown it: kept. Look at it again.} unmerged {{branch} has commits that aren't in {target}: kept.} gone {There's no branch {branch}.} other {{branch} isn't a valid branch name.}}",
+    "description": "Why a branch wasn't deleted (Clean Up Merged Branches, Delete branch…, in Version Control → Branches & remotes). {branch} is its name, {target} the branch the project's work merges into. Keep the select keys."
+  },
+  "service.gitRepo.branchesDeleted": {
+    "defaultMessage": "{n, plural, one {Deleted {branches}.} other {Deleted # branches: {branches}.}}",
+    "description": "After deleting branches in Version Control → Branches & remotes: {branches} lists them ({n})."
+  },
   "service.gitRepo.chooseRemote": {
     "defaultMessage": "Choose the remote to push to.",
     "description": "An error pushing in the Git view: the repository has several remotes and none was chosen."
@@ -246,6 +254,10 @@
   "service.gitRepo.createdSwitched": {
     "defaultMessage": "Created {name} and switched to it.",
     "description": "After creating a branch in the Git view: the project folder is on the new branch {name}."
+  },
+  "service.gitRepo.deleteBranchFailed": {
+    "defaultMessage": "Couldn't delete {branch}: {why}",
+    "description": "An error deleting the branch {branch} in Version Control → Branches & remotes; {why} is git's own words."
   },
   "service.gitRepo.detachedPull": {
     "defaultMessage": "HEAD is detached: switch to a branch to pull.",
@@ -311,6 +323,10 @@
     "defaultMessage": "This repository has no remotes to fetch from: add one first.",
     "description": "An error fetching in the Git view: the repository has no remote."
   },
+  "service.gitRepo.noTarget": {
+    "defaultMessage": "There's no branch {target} here to check the branches against.",
+    "description": "An error deleting branches in Version Control → Branches & remotes: the branch the project's work merges into ({target}; the default branch when none is set) isn't in the repository, so Hive can't tell which branches are merged."
+  },
   "service.gitRepo.noUpstream": {
     "defaultMessage": "{branch} tracks no remote branch: push it first, or switch to one that does.",
     "description": "An error pulling in the Git view: the branch {branch} follows no remote branch."
@@ -366,6 +382,14 @@
   "service.gitRepo.rejected": {
     "defaultMessage": "{to} has commits {branch} hasn't, so the push was refused (Hive never forces a push). Pull first, or merge them in a terminal.",
     "description": "An error pushing the branch {branch} in the Git view: the remote branch {to} has commits it hasn't, so the remote refused."
+  },
+  "service.gitRepo.remoteBranchesDeleted": {
+    "defaultMessage": "{n, plural, one {Deleted {branches} on {remote}.} other {Deleted # branches on {remote}: {branches}.}}",
+    "description": "After deleting branches on the remote {remote} (Clean Up Merged Branches): {branches} lists them ({n})."
+  },
+  "service.gitRepo.remoteDeleteRefused": {
+    "defaultMessage": "{remote} refused to delete {branches}: it has commits there you haven't fetched, or it doesn't allow deleting them.",
+    "description": "After deleting branches on the remote {remote}: it refused those listed in {branches} (Hive deletes a remote branch only at the commit you were shown)."
   },
   "service.gitRepo.remoteRemoved": {
     "defaultMessage": "{n, plural, =0 {Removed {remote}.} one {Removed {remote}: {branches} no longer tracks a remote branch.} other {Removed {remote}: {branches} no longer track a remote branch.}}",

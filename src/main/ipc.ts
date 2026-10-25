@@ -27,7 +27,7 @@ import { presentWindow } from './testQuiet'
 import { insideArchive, insideReal, isFile, samePlace, writeTextAtomic, writeTextUnlessChanged } from './fsutil'
 import { gitDiff, gitStatus } from './git'
 import { initCheck, initRepo } from './gitInit'
-import { addRemote, createBranch, createTag, fetchAll, pull, push, pushToRemote, remoteTracking, removeRemote, renameRemote, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch } from './gitRepo'
+import { addRemote, branchDrops, createBranch, createTag, deleteBranches, deleteRemoteBranches, fetchAll, pull, push, pushToRemote, remoteTracking, removeRemote, renameRemote, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch, workTargetOf } from './gitRepo'
 import { checkGit, gitTool } from './gitTool'
 import { refreshPath, refreshPathBeforeStart } from './freshPath'
 import { openExternalTerminal } from './externalTerminal'
@@ -1366,7 +1366,13 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'git:tool': (recheck) => (recheck ? checkGit() : gitTool()),
     // The Git view (#607): the project folder only, read and changed by the user from the window (never an agent tool).
     'git:summary': (p) => repoSummary(workspace.assertProject(p)),
-    'git:info': (p) => repoInfo(workspace.assertProject(p)),
+    'git:info': async (p) => {
+      p = workspace.assertProject(p)
+      return repoInfo(p, await workTargetOf(p))
+    },
+    'git:deleteBranches': (p, items, unmerged) => deleteBranches(p, Array.isArray(items) ? items : [], !!unmerged),
+    'git:deleteRemoteBranches': (p, remote, items) => deleteRemoteBranches(p, String(remote ?? ''), Array.isArray(items) ? items : []),
+    'git:branchDrops': (p, name) => branchDrops(p, String(name ?? '')),
     'git:history': (p) => repoHistory(workspace.assertProject(p)),
     'git:switch': (p, branch) => switchBranch(p, String(branch ?? '')),
     'git:createBranch': (p, name, stay) => createBranch(p, String(name ?? ''), !!stay),

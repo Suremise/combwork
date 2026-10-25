@@ -1,16 +1,29 @@
 // Generated from locales/en/git.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'git.branch.delete': undefined
+  'git.branch.deleteMergedMessage': { target: string | number }
+  'git.branch.deleteMergedTitle': { branch: string | number }
+  'git.branch.deleteMore': { n: number }
+  'git.branch.deleteTip': { branch: string | number }
+  'git.branch.deleteUnmergedMessage': { n: number; target: string | number; branch: string | number }
+  'git.branch.deleteUnmergedTitle': { n: number; branch: string | number }
+  'git.branch.dropsFailed': { branch: string | number }
   'git.branches.branch': undefined
   'git.branches.cardOpen': { card: string | number; stage: string | number }
   'git.branches.checkedOut': { where: string; agent: string | number }
+  'git.branches.cleanUp': undefined
+  'git.branches.cleanUpTip': { n: number; target: string | number }
   'git.branches.copyRevision': { revision: string | number }
   'git.branches.earlierCards': { n: number }
+  'git.branches.group': { group: string; target: string | number }
+  'git.branches.groupTip': { group: string; target: string | number }
   'git.branches.heading': undefined
   'git.branches.loadTarget': undefined
   'git.branches.merge': { branch: string | number }
   'git.branches.merged': { has: string; revision: string | number }
   'git.branches.noCommits': undefined
+  'git.branches.notInTarget': { n: number; target: string | number }
   'git.branches.reload': undefined
   'git.branches.remote': { count: number }
   'git.branches.revisionCopied': undefined
@@ -24,6 +37,16 @@ interface HiveMessageValues {
   'git.busy.slotWaiting': { agents: string | number; count: number; branch: string | number; action: string }
   'git.busy.yourMerge': { branch: string | number; action: string }
   'git.cancel': undefined
+  'git.cleanUp.delete': undefined
+  'git.cleanUp.deleting': undefined
+  'git.cleanUp.failed': undefined
+  'git.cleanUp.local': { n: number }
+  'git.cleanUp.message': { target: string | number }
+  'git.cleanUp.none': undefined
+  'git.cleanUp.remote': { remotes: string | number; n: number }
+  'git.cleanUp.remoteWarn': undefined
+  'git.cleanUp.title': undefined
+  'git.cleanUp.withLocal': undefined
   'git.fetch.at': { when: string | number }
   'git.fetch.button': undefined
   'git.fetch.failed': undefined

@@ -28,9 +28,16 @@ import {
   type GitRepoInfo,
   type GitRepoState,
   type GitRepoSummary,
-  type GitWorktreeRow
+  type GitWorktreeRow,
+  type BranchAt,
+  type BranchDrops,
+  type GitRemoteBranchRow
 } from '../shared/gitRepo'
+import { localUse, remoteKept } from '../shared/branchCleanup'
 import { samePath } from '../shared/movePaths'
+import * as G from './platform/git'
+import { resolvedOf } from './workflow/rulesets'
+import { workBadges } from './workflow/cardWork'
 import { checkProject } from './branchWatch'
 import { samePlace } from './fsutil'
 import type { AgentDef } from '../shared/types'
@@ -223,34 +230,102 @@ async function identity(root: string): Promise<GitIdentity> {
   return { local: parseIdentity(local), global: parseIdentity(global), effective: parseIdentity(effective) }
 }
 
-/** Branches & remotes: the summary, the branches (local and remote), remotes with their URLs, other worktrees, identity. */
-export async function repoInfo(root: string): Promise<GitRepoInfo> {
+/**
+ * Branches & remotes: the summary, the branches (local and remote), remotes with their URLs, other worktrees, identity.
+ * With `workTarget` (the project's workflow target, null for none: the default branch), each branch's commits not in it
+ * (#1642); left out, none are counted.
+ */
+export async function repoInfo(root: string, workTarget?: string | null): Promise<GitRepoInfo> {
   const summary = await repoSummary(root)
   const none: GitRepoInfo = { summary, branches: [], remoteBranches: [], remotes: [], worktrees: [], identity: { local: {}, global: {}, effective: {} } }
   if (!summary.isRepo) return none
-  const fields = ['%(refname)', '%(refname:short)', '%(upstream:short)', '%(upstream:track,nobracket)', '%(objectname:short)', '%(committerdate:unix)', '%(contents:subject)', '%(upstream:remotename)']
-  const [refs, remotes, wts, id] = await Promise.all([
+  const fields = ['%(refname)', '%(refname:short)', '%(upstream:short)', '%(upstream:track,nobracket)', '%(objectname:short)', '%(committerdate:unix)', '%(contents:subject)', '%(upstream:remotename)', '%(objectname)', '%(symref)']
+  const [refs, remotes, wts, id, targets] = await Promise.all([
     git(root, ['for-each-ref', '--sort=-committerdate', `--format=${fields.join('%00')}`, 'refs/heads', 'refs/remotes']),
     git(root, ['remote', '-v']),
     git(root, ['worktree', 'list', '--porcelain']),
-    identity(root)
+    identity(root),
+    // Only the view's read groups its branches (#1642): an action reading the branches (a switch) skips it.
+    workTarget === undefined ? { target: null, defaultBranch: null } : branchTargets(root, workTarget)
   ])
   if (!refs.ok) throw commandFailed('git for-each-ref', refs) // i18n-ignore: a git command, as it is
   if (!remotes.ok) throw commandFailed('git remote', remotes) // i18n-ignore: a git command, as it is
   const worktrees = wts.ok ? parseWorktrees(wts.out) : []
+  const remoteList = parseRemotes(remotes.out)
+  // A remote branch's remote: the longest remote name it starts with (a remote's name may hold a slash).
+  const remoteOf = (name: string): string | null => remoteList.map((r) => r.name).filter((r) => name.startsWith(`${r}/`)).sort((a, b) => b.length - a.length)[0] ?? null
   const branches: GitBranchRow[] = []
   const remoteBranches: string[] = []
+  const remoteRows: GitRemoteBranchRow[] = []
+  const remoteHeads = new Set<string>()
   for (const line of refs.out.split('\n')) {
     const f = line.split('\0')
-    if (f.length < 8) continue
+    if (f.length < 10) continue
     if (f[0].startsWith('refs/remotes/')) {
-      if (!f[0].endsWith('/HEAD')) remoteBranches.push(f[1])
+      if (f[0].endsWith('/HEAD')) {
+        if (f[9]) remoteHeads.add(f[9].replace(/^refs\/remotes\//, ''))
+        continue
+      }
+      remoteBranches.push(f[1])
+      const remote = remoteOf(f[1])
+      if (remote) remoteRows.push({ name: f[1], remote, branch: f[1].slice(remote.length + 1), sha: f[8], date: Number(f[5]) * 1000, toTarget: null, remoteHead: false })
       continue
     }
     const wt = worktrees.find((w) => w.branch === f[1])
-    branches.push({ name: f[1], current: f[1] === summary.branch, upstream: f[2] || null, ...parseTrack(f[3]), worktree: wt?.path ?? null, commit: f[4], date: Number(f[5]) * 1000, subject: f[6], upstreamRemote: f[7] && f[7] !== '.' ? f[7] : null })
+    branches.push({ name: f[1], current: f[1] === summary.branch, upstream: f[2] || null, ...parseTrack(f[3]), worktree: wt?.path ?? null, commit: f[4], date: Number(f[5]) * 1000, subject: f[6], upstreamRemote: f[7] && f[7] !== '.' ? f[7] : null, sha: f[8] })
   }
-  return { summary, branches: branches.slice(0, BRANCHES_SHOWN), remoteBranches: remoteBranches.slice(0, BRANCHES_SHOWN), remotes: parseRemotes(remotes.out), worktrees, identity: id }
+  for (const r of remoteRows) r.remoteHead = remoteHeads.has(r.name)
+  const shown = branches.slice(0, BRANCHES_SHOWN)
+  const shownRemote = remoteRows.slice(0, BRANCHES_SHOWN)
+  if (targets.target) await measure(root, targets.target, shown, shownRemote)
+  return { summary, branches: shown, remoteBranches: remoteBranches.slice(0, BRANCHES_SHOWN), remotes: remoteList, worktrees, identity: id, target: targets.target, defaultBranch: targets.defaultBranch, remoteRows: shownRemote }
+}
+
+/** The unmerged branches whose commits are counted, at most (a count is a git run each): the rest show as not merged. */
+const COUNTED = 60
+
+/**
+ * Each branch's commits not in the target (#1642): 0 for those merged into it (one `for-each-ref --merged`), a count for
+ * the first COUNTED others, null past them. Measured against the local target branch.
+ */
+async function measure(root: string, target: string, local: GitBranchRow[], remote: GitRemoteBranchRow[]): Promise<void> {
+  const merged = await git(root, ['for-each-ref', `--merged=refs/heads/${target}`, '--format=%(refname)', 'refs/heads', 'refs/remotes'])
+  if (!merged.ok) return
+  const inTarget = new Set(merged.out.split(/\r?\n/).filter(Boolean))
+  const rows = [...local.map((b) => ({ ref: `refs/heads/${b.name}`, row: b as { toTarget?: number | null } })), ...remote.map((r) => ({ ref: `refs/remotes/${r.name}`, row: r as { toTarget?: number | null } }))]
+  let counted = 0
+  for (const { ref, row } of rows) {
+    if (inTarget.has(ref)) row.toTarget = 0
+    else if (counted++ < COUNTED) {
+      const n = await git(root, ['rev-list', '--count', `refs/heads/${target}..${ref}`, '--'])
+      row.toTarget = n.ok ? Number(n.out.trim()) || null : null
+    } else row.toTarget = null
+  }
+}
+
+/**
+ * The branch a project's work merges into, for grouping its branches (#1642): its workflow's target (given), else the
+ * repository's default branch; null when that branch doesn't exist here. And the default branch itself.
+ */
+async function branchTargets(root: string, workTarget?: string | null): Promise<{ target: string | null; defaultBranch: string | null }> {
+  const d = await G.defaultBranch(root).catch(() => null)
+  const defaultBranch = typeof d === 'string' ? d : null
+  const want = workTarget || defaultBranch
+  const found = want ? (await git(root, ['show-ref', '--verify', '-q', `refs/heads/${want}`])).ok : false
+  return { target: found ? want : null, defaultBranch }
+}
+
+/** A project's workflow target as its options in force name it (empty: none named, the default branch). */
+export async function workTargetOf(projectPath: string): Promise<string | null> {
+  const ws = workspaceOf(projectPath)
+  const p = ws.info()?.projects.find((x) => samePath(x.path, projectPath))
+  if (p?.platform?.id !== 'git') return null
+  try {
+    return resolvedOf(ws, p.path, 'git', await ws.projectConfig(p.path)).options.target || null
+  } catch (e) {
+    log.warn(`reading ${userText(projectPath)}'s target for its branches`, e)
+    return null
+  }
 }
 
 /** The project folder's last commits, and its tags, newest first. */
@@ -761,4 +836,182 @@ export async function setIdentity(projectPath: string, name: string, email: stri
       ? tr(msg({ id: 'service.gitRepo.identitySet', defaultMessage: "Set this repository's commit identity.", description: "After setting the repository's own commit name and email in the Git view." }))
       : tr(msg({ id: 'service.gitRepo.identityRemoved', defaultMessage: "Removed this repository's own identity: your global one applies.", description: "After clearing the repository's own commit name and email in the Git view: git uses the user's global ones." }))
   })
+}
+
+// ---------------------------------------------------------------------------
+// Branches cleaned up (#1642)
+// ---------------------------------------------------------------------------
+
+const B = {
+  noTarget: msg({ id: 'service.gitRepo.noTarget', defaultMessage: "There's no branch {target} here to check the branches against.", description: "An error deleting branches in Version Control → Branches & remotes: the branch the project's work merges into ({target}; the default branch when none is set) isn't in the repository, so Hive can't tell which branches are merged." }),
+  kept: msg({ id: 'service.gitRepo.branchKept', defaultMessage: "{why, select, target {{branch} is the branch work merges into: kept.} default {{branch} is the default branch: kept.} current {{branch} is checked out in the project folder: kept.} worktree {{branch} is checked out in a worktree or slot: kept.} card {An open card works on {branch}: kept.} remoteHead {{branch} is the remote's default branch: kept.} moved {{branch} has moved since you were shown it: kept. Look at it again.} unmerged {{branch} has commits that aren't in {target}: kept.} gone {There's no branch {branch}.} other {{branch} isn't a valid branch name.}}", description: "Why a branch wasn't deleted (Clean Up Merged Branches, Delete branch…, in Version Control → Branches & remotes). {branch} is its name, {target} the branch the project's work merges into. Keep the select keys." }),
+  deleteFailed: msg({ id: 'service.gitRepo.deleteBranchFailed', defaultMessage: "Couldn't delete {branch}: {why}", description: "An error deleting the branch {branch} in Version Control → Branches & remotes; {why} is git's own words." }),
+  deleted: msg({ id: 'service.gitRepo.branchesDeleted', defaultMessage: '{n, plural, one {Deleted {branches}.} other {Deleted # branches: {branches}.}}', description: 'After deleting branches in Version Control → Branches & remotes: {branches} lists them ({n}).' }),
+  remoteDeleted: msg({ id: 'service.gitRepo.remoteBranchesDeleted', defaultMessage: '{n, plural, one {Deleted {branches} on {remote}.} other {Deleted # branches on {remote}: {branches}.}}', description: 'After deleting branches on the remote {remote} (Clean Up Merged Branches): {branches} lists them ({n}).' }),
+  remoteRefused: msg({ id: 'service.gitRepo.remoteDeleteRefused', defaultMessage: "{remote} refused to delete {branches}: it has commits there you haven't fetched, or it doesn't allow deleting them.", description: 'After deleting branches on the remote {remote}: it refused those listed in {branches} (Hive deletes a remote branch only at the commit you were shown).' })
+}
+
+/** The branches of open cards (any but Done) on the board, any project's (#1642): never deleted. */
+function cardLines(projectPath: string): Set<string> {
+  const ws = workspaceOf(projectPath)
+  if (!ws.path) return new Set()
+  return new Set(workBadges(ws).filter((b) => b.line && !b.noCode && b.stage !== 'done').map((b) => b.line!))
+}
+
+const kept = (why: string, branch: string, target = ''): Text => withValues(B.kept, { why, branch, target })
+
+const branchNameOk = async (projectPath: string, name: string): Promise<boolean> => !!name && !name.startsWith('-') && (await refFormatOk(projectPath, ['--branch', name]))
+
+/**
+ * Deletes local branches (#1642): each only at the commit the user was shown (`sha`), merged into the project's target
+ * (unless `unmerged`, one branch the user confirmed with the commits it drops), and never one in use (the target, the
+ * default branch, the folder's, a worktree's or slot's, an open card's). Checked again for each under the repository's
+ * lock, where slots are made, so none is deleted as it is checked out; the ref removed at that commit (`update-ref -d`,
+ * not `git branch -d`, which asks about HEAD, not the target), its config section with it. What is kept is said, why.
+ */
+export async function deleteBranches(projectPath: string, items: BranchAt[], unmerged = false): Promise<string> {
+  projectPath = workspace.assertProject(projectPath)
+  if (!Array.isArray(items) || !items.length || (unmerged && items.length !== 1)) throw new HiveError({ lines: ['git:deleteBranches takes branches, and one when unmerged'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  const workTarget = await workTargetOf(projectPath)
+  return oneAtATime(projectPath, () =>
+    withRepoLock(
+      projectPath,
+      async () => {
+        const s = await summaryOf(projectPath)
+        const targets = await branchTargets(projectPath, workTarget)
+        if (!targets.target) throw refusal(B.noTarget, { target: workTarget || targets.defaultBranch || '' })
+        const target = targets.target
+        const wts = await git(projectPath, ['worktree', 'list', '--porcelain'])
+        if (!wts.ok) throw commandFailed('git worktree list', wts) // i18n-ignore: a git command, as it is
+        const worktrees = parseWorktrees(wts.out)
+        const busy = cardLines(projectPath)
+        const deleted: string[] = []
+        const notes: Text[] = []
+        for (const { name, sha } of items) {
+          const branch = String(name ?? '')
+          if (!(await branchNameOk(projectPath, branch))) {
+            notes.push(kept('invalid', branch))
+            continue
+          }
+          const use = localUse({ name: branch, current: branch === s.branch, worktree: worktrees.find((w) => w.branch === branch)?.path ?? null }, targets, busy)
+          if (use) {
+            notes.push(kept(use, branch))
+            continue
+          }
+          const head = await git(projectPath, ['rev-parse', '--verify', '-q', `refs/heads/${branch}^{commit}`])
+          if (!head.ok) {
+            notes.push(kept('gone', branch))
+            continue
+          }
+          if (head.out.trim() !== sha) {
+            notes.push(kept('moved', branch))
+            continue
+          }
+          if (!unmerged && !(await git(projectPath, ['merge-base', '--is-ancestor', sha, `refs/heads/${target}`])).ok) {
+            notes.push(kept('unmerged', branch, target))
+            continue
+          }
+          const r = await git(projectPath, ['update-ref', '-d', `refs/heads/${branch}`, sha])
+          if (!r.ok) {
+            notes.push(withValues(B.deleteFailed, { branch, why: gitSaid(r) }))
+            continue
+          }
+          await git(projectPath, ['config', '--remove-section', `branch.${branch}`])
+          deleted.push(branch)
+        }
+        if (deleted.length) log.info(`Deleted ${deleted.length} branch(es) of ${userText(projectPath)}: ${userText(deleted.join(', '))}${unmerged ? ' (unmerged, confirmed)' : ''}`)
+        if (!deleted.length) throw new HiveError(linesOf(notes))
+        void checkProject(projectPath)
+        return shownText(linesOf([withValues(B.deleted, { n: deleted.length, branches: listOf(deleted, 'unit') }), ...notes]))
+      },
+      { project: projectPath }
+    )
+  )
+}
+
+/**
+ * Deletes branches on a remote (#1642, `git push --delete`, outward-facing: the window asks for each with its own tick):
+ * each named as the window has it (nas/hive/hb1), only merged into the project's target, never the remote's default
+ * branch, the target or the default branch, nor one whose local branch is in use, and only at the commit the user was
+ * shown (`--force-with-lease`: a branch that moved on the remote is refused there).
+ */
+export async function deleteRemoteBranches(projectPath: string, remote: string, items: BranchAt[]): Promise<string> {
+  projectPath = workspace.assertProject(projectPath)
+  if (!Array.isArray(items) || !items.length) throw new HiveError({ lines: ['git:deleteRemoteBranches takes branches'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  const workTarget = await workTargetOf(projectPath)
+  return oneAtATime(projectPath, async () => {
+    const s = await summaryOf(projectPath)
+    if (!s.remotes.includes(remote)) throw refusal(M.noRemote, { remote })
+    const targets = await branchTargets(projectPath, workTarget)
+    if (!targets.target) throw refusal(B.noTarget, { target: workTarget || targets.defaultBranch || '' })
+    const head = await git(projectPath, ['symbolic-ref', '-q', `refs/remotes/${remote}/HEAD`])
+    const remoteHead = head.ok ? head.out.trim().replace(/^refs\/remotes\//, '') : null
+    // A remote branch whose local one is in use (a slot's, a worktree's, an open card's) stays, as in the offer.
+    const wts = await git(projectPath, ['worktree', 'list', '--porcelain'])
+    if (!wts.ok) throw commandFailed('git worktree list', wts) // i18n-ignore: a git command, as it is
+    const worktrees = parseWorktrees(wts.out)
+    const busy = cardLines(projectPath)
+    const notes: Text[] = []
+    const go: { name: string; branch: string; sha: string }[] = []
+    for (const { name, sha } of items) {
+      const full = String(name ?? '')
+      const branch = full.startsWith(`${remote}/`) ? full.slice(remote.length + 1) : ''
+      if (!(await branchNameOk(projectPath, branch))) {
+        notes.push(kept('invalid', full))
+        continue
+      }
+      if (remoteKept({ branch, remoteHead: full === remoteHead }, targets)) {
+        notes.push(kept(full === remoteHead ? 'remoteHead' : branch === targets.target ? 'target' : 'default', full))
+        continue
+      }
+      const localWhy = localUse({ name: branch, current: branch === s.branch, worktree: worktrees.find((w) => w.branch === branch)?.path ?? null }, targets, busy)
+      if (localWhy) {
+        notes.push(kept(localWhy, full))
+        continue
+      }
+      const at = await git(projectPath, ['rev-parse', '--verify', '-q', `refs/remotes/${full}^{commit}`])
+      if (!at.ok) {
+        notes.push(kept('gone', full))
+        continue
+      }
+      if (at.out.trim() !== sha) {
+        notes.push(kept('moved', full))
+        continue
+      }
+      if (!(await git(projectPath, ['merge-base', '--is-ancestor', sha, `refs/heads/${targets.target}`])).ok) {
+        notes.push(kept('unmerged', full, targets.target))
+        continue
+      }
+      go.push({ name: full, branch, sha })
+    }
+    if (!go.length) throw new HiveError(linesOf(notes))
+    const r = await net(projectPath, ['push', '--porcelain', ...go.map((g) => `--force-with-lease=refs/heads/${g.branch}:${g.sha}`), '--', remote, ...go.map((g) => `:refs/heads/${g.branch}`)])
+    const got = parsePushPorcelain(r.out)
+    const done = go.filter((g) => got.some((x) => x.kind === 'branch' && x.name === g.branch && x.result === 'pushed'))
+    const refused = go.filter((g) => !done.includes(g))
+    if (!done.length && !got.length && !r.ok) throw failed(M.pushFailed, { to: remote }, r)
+    if (done.length) log.info(`Deleted ${done.length} branch(es) on ${userText(remote)} of ${userText(projectPath)}: ${userText(done.map((g) => g.branch).join(', '))}`)
+    void checkProject(projectPath)
+    const lines = [...(done.length ? [withValues(B.remoteDeleted, { n: done.length, remote, branches: listOf(done.map((g) => g.branch), 'unit') })] : []), ...(refused.length ? [withValues(B.remoteRefused, { remote, branches: listOf(refused.map((g) => g.branch), 'unit') })] : []), ...notes]
+    if (!done.length) throw new HiveError(linesOf(lines))
+    return shownText(linesOf(lines))
+  })
+}
+
+/** The commits deleting an unmerged local branch drops (#1642): those not in the project's target, the newest 20, and how many. */
+export async function branchDrops(projectPath: string, name: string): Promise<BranchDrops> {
+  projectPath = workspace.assertProject(projectPath)
+  const targets = await branchTargets(projectPath, await workTargetOf(projectPath))
+  if (!targets.target) throw refusal(B.noTarget, { target: targets.defaultBranch ?? '' })
+  if (!(await branchNameOk(projectPath, name)) || !(await git(projectPath, ['show-ref', '--verify', '-q', `refs/heads/${name}`])).ok) throw refusal(M.noBranch, { branch: name })
+  const range = `refs/heads/${targets.target}..refs/heads/${name}`
+  const [count, commitLog] = await Promise.all([git(projectPath, ['rev-list', '--count', range, '--']), git(projectPath, ['log', '-n', '20', '--format=%h%x00%ct%x00%s', range, '--'])])
+  if (!count.ok) throw commandFailed('git rev-list', count) // i18n-ignore: a git command, as it is
+  if (!commitLog.ok) throw commandFailed('git log', commitLog) // i18n-ignore: a git command, as it is
+  const commits = commitLog.out
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((l) => l.split('\0'))
+    .map((f) => ({ short: f[0], date: Number(f[1]) * 1000, subject: f[2] ?? '' }))
+  return { target: targets.target, total: Number(count.out.trim()) || 0, commits }
 }

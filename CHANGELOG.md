@@ -96,6 +96,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Also new
 
+- **Clean up merged branches.** Version Control → Branches & remotes groups the branches as In use, Merged and Not merged against the branch your work merges into, and **Clean Up Merged Branches…** deletes the merged ones nothing uses, with the merged branches on your remotes offered apart, never ticked for you. An unmerged branch's 🗑 lists the commits it would drop first (#1642).
 - **Agent API:** contract version 9 (0.9.3's was 5), with a route for each step of a card (`POST /v1/tasks/{card}/submit`, …); each card ends with its `stage`; `GET /v1/tasks/{n}/facts` lists what happened to its work; `GET /v1/tasks?q=` searches the board through a full-text index; `GET /v1/projects/{name}/slots/releasable` lists slots that can be released.
 - **Keys everywhere.** The board, card dialog, Progress panel, notifications and agents' terminals name cards by key; search for `HI-12` or `HI-`; Project Settings changes a project's key, the old one still finding its cards (#1219, #1221).
 - **The Progress panel has tabs:** Pulse, Merges, Runs and Lanes. Runs keeps every run by day, with search and filters; Recent is gone.

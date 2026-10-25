@@ -93,6 +93,8 @@
   "tips.boardUpgrade.title": "Voltar ao 0.9 depois de atualizar",
   "tips.branchCards.text": "Em Controle de versão → Branches e remotes, um branch em que um cartão trabalha mostra o cartão e a etapa dele, e em Revisão a versão em revisão. Clique no cartão para abri-lo.",
   "tips.branchCards.title": "Veja de qual cartão é um branch",
+  "tips.branchCleanup.text": "Controle de versão → Branches e remotes agrupa os branches em Em uso, Com merge e Sem merge. Limpar branches com merge feito… exclui os com merge que nada usa, e oferece à parte os dos seus remotos, nunca marcados.",
+  "tips.branchCleanup.title": "Limpar branches com merge feito",
   "tips.cardCost.text": "O painel de um cartão diz o que os agentes dele usaram enquanto estavam com ele, “{example}”, com as partes e os tokens do executor e do revisor ao passar o mouse. Desempenho lista o custo de cada cartão, e a dica de uma raia no painel Progresso mostra o custo extra dela.",
   "tips.cardCost.title": "Quanto um cartão custou",
   "tips.cardDecisions.text": "As Decisões de um cartão, acima dos comentários, guardam o que você decidiu: os agentes conferem o trabalho com elas antes da Revisão, e os revisores reprovam o trabalho que ignora alguma. Diga uma decisão ao Assistente e ele a registra ali; um agente que espera a sua resposta é avisado.",

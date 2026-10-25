@@ -93,6 +93,8 @@
   "tips.boardUpgrade.title": "Back to 0.9 after the upgrade",
   "tips.branchCards.text": "In Version Control → Branches & remotes, a branch a card works on shows the card and its stage, and in Review the revision under review. Click the card to open it.",
   "tips.branchCards.title": "See which card a branch is for",
+  "tips.branchCleanup.text": "Version Control → Branches & remotes groups the branches as In use, Merged and Not merged. Clean Up Merged Branches… deletes the merged ones nothing uses, and offers the merged ones on your remotes apart, never ticked for you.",
+  "tips.branchCleanup.title": "Clean up merged branches",
   "tips.cardCost.text": "A card's panel says what its agents used while they held it, \"{example}\", with the builder's and reviewer's parts and tokens on hover. Performance lists every card's cost, and a lane's hover in the Progress panel its overhead.",
   "tips.cardCost.title": "What a card cost",
   "tips.cardDecisions.text": "A card's Decisions, above its comments, hold what you decided: agents check their work against them before Review, and reviewers fail work that ignores one. Tell the Assistant a decision and it records it there; an agent waiting for your answer is told.",

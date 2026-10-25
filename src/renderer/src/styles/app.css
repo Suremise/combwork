@@ -12129,6 +12129,39 @@ button.progress-lane-why:focus-visible,
 .git-row.current {
   background: var(--accent-soft);
 }
+/* A group of the branches (#1642): In use, Merged, Not merged, a small heading row in the list. */
+.git-row.git-group-h {
+  min-height: 24px;
+  padding-block: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+  background: var(--bg-sidebar);
+}
+/* Clean Up Merged Branches' choice: the local branches, then the remote ones under their warning. */
+.git-cleanup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.git-cleanup-h {
+  font-weight: 600;
+  margin-top: 4px;
+}
+.git-cleanup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.git-cleanup-list .dialog-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .git-hash {
   font-family: var(--font-mono, monospace);
   font-size: 12px;

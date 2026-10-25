@@ -58,11 +58,14 @@ interface HiveMessageValues {
   'service.gitRepo.added': { remote: string | number }
   'service.gitRepo.alreadyOn': { branch: string | number }
   'service.gitRepo.badName': { kind: string; hasName: string; name: string | number }
+  'service.gitRepo.branchKept': { why: string; branch: string | number; target: string | number }
+  'service.gitRepo.branchesDeleted': { n: number; branches: string | number }
   'service.gitRepo.chooseRemote': undefined
   'service.gitRepo.command': { command: string | number; why: string | number }
   'service.gitRepo.createFailed': { name: string | number; why: string | number }
   'service.gitRepo.createdAt': { name: string | number; commit: string | number }
   'service.gitRepo.createdSwitched': { name: string | number }
+  'service.gitRepo.deleteBranchFailed': { branch: string | number; why: string | number }
   'service.gitRepo.detachedPull': undefined
   'service.gitRepo.detachedPush': undefined
   'service.gitRepo.diverged': { branch: string | number; upstream: string | number; ahead: number; behind: number }
@@ -79,6 +82,7 @@ interface HiveMessageValues {
   'service.gitRepo.noRemote': { remote: string | number }
   'service.gitRepo.noRemotes': undefined
   'service.gitRepo.noRemotesFetch': undefined
+  'service.gitRepo.noTarget': { target: string | number }
   'service.gitRepo.noUpstream': { branch: string | number }
   'service.gitRepo.notOnRemote': { remote: string | number; branch: string | number }
   'service.gitRepo.notRepo': { folder: string | number }
@@ -93,6 +97,8 @@ interface HiveMessageValues {
   'service.gitRepo.pushed': { branch: string | number; to: string | number }
   'service.gitRepo.pushedAll': { remote: string | number }
   'service.gitRepo.rejected': { to: string | number; branch: string | number }
+  'service.gitRepo.remoteBranchesDeleted': { n: number; branches: string | number; remote: string | number }
+  'service.gitRepo.remoteDeleteRefused': { remote: string | number; branches: string | number }
   'service.gitRepo.remoteRemoved': { n: number; remote: string | number; branches: string | number }
   'service.gitRepo.remoteRenamed': { n: number; from: string | number; to: string | number; branches: string | number }
   'service.gitRepo.remoteSameName': { remote: string | number }

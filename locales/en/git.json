@@ -1,4 +1,36 @@
 {
+  "git.branch.delete": {
+    "defaultMessage": "Delete Branch",
+    "description": "The button of the confirmation before deleting a branch."
+  },
+  "git.branch.deleteMergedMessage": {
+    "defaultMessage": "Every commit of it is in {target}: nothing is lost.",
+    "description": "The confirmation before deleting a branch merged into the target branch {target}."
+  },
+  "git.branch.deleteMergedTitle": {
+    "defaultMessage": "Delete {branch}?",
+    "description": "Title of the confirmation before deleting a branch merged into the target."
+  },
+  "git.branch.deleteMore": {
+    "defaultMessage": "…and {n, plural, one {# more} other {# more}}",
+    "description": "The last line of the commits listed before deleting an unmerged branch: how many more there are than shown."
+  },
+  "git.branch.deleteTip": {
+    "defaultMessage": "Delete {branch}…",
+    "description": "Tooltip on a branch's Delete button in Version Control → Branches & remotes (it asks first, showing any commits it would drop)."
+  },
+  "git.branch.deleteUnmergedMessage": {
+    "defaultMessage": "{n, plural, one {This commit isn't in {target}. Deleting {branch} drops it, and Hive can't bring it back:} other {These commits aren't in {target}. Deleting {branch} drops them, and Hive can't bring them back:}}",
+    "description": "The confirmation before deleting a branch ({branch}) with {n} commits that aren't in the target {target}; the commits are listed under it."
+  },
+  "git.branch.deleteUnmergedTitle": {
+    "defaultMessage": "{n, plural, one {Delete {branch} and the commit only it has?} other {Delete {branch} and the # commits only it has?}}",
+    "description": "Title of the confirmation before deleting a branch with {n} commits that aren't in the target."
+  },
+  "git.branch.dropsFailed": {
+    "defaultMessage": "Couldn't read the commits {branch} would drop",
+    "description": "An error notification's title: reading an unmerged branch's commits before deleting it failed."
+  },
   "git.branches.branch": {
     "defaultMessage": "Branch",
     "description": "Heading in Git → Branches & remotes: the branch checked out in the project folder."
@@ -11,6 +43,14 @@
     "defaultMessage": "{where, select, agent {Checked out in {agent}'s worktree: a branch is in one folder at a time.} other {Checked out in another worktree: a branch is in one folder at a time.}}",
     "description": "Why a branch's Switch is disabled (its tooltip). {agent} is the agent whose worktree has it."
   },
+  "git.branches.cleanUp": {
+    "defaultMessage": "Clean Up Merged Branches…",
+    "description": "A button over the list of branches in Version Control → Branches & remotes: lists the branches merged into the target that nothing uses, to delete the ones you tick (it asks first). Keep the …: it opens a dialog."
+  },
+  "git.branches.cleanUpTip": {
+    "defaultMessage": "{n, plural, =0 {No branch is merged into {target} and unused.} one {# branch here or on a remote is merged into {target} and unused: pick which to delete.} other {# branches here or on a remote are merged into {target} and unused: pick which to delete.}}",
+    "description": "Tooltip of Clean Up Merged Branches… ({n}: how many it offers, local and remote; {target}: the branch the project merges into)."
+  },
   "git.branches.copyRevision": {
     "defaultMessage": "Copy revision {revision}",
     "description": "Tooltip of the button beside a branch's revision under review: copies the whole commit id. {revision} is its short form (a3f2c1d)."
@@ -18,6 +58,14 @@
   "git.branches.earlierCards": {
     "defaultMessage": "{n, plural, one {+# earlier card} other {+# earlier cards}}",
     "description": "Beside a branch's card (Version Control → Branches & remotes): how many earlier cards worked on the same branch ({n}); its tooltip lists them."
+  },
+  "git.branches.group": {
+    "defaultMessage": "{group, select, inUse {In use} merged {Merged into {target}} other {Not merged into {target}}}",
+    "description": "A heading inside Version Control → Branches & remotes' list of branches: the branches in use (the target, the default branch, the project folder's, a slot's or worktree's, an open card's), those merged into the target branch {target} that nothing uses, and those with commits not in it. Keep the select keys."
+  },
+  "git.branches.groupTip": {
+    "defaultMessage": "{group, select, inUse {The branch work merges into, the default branch, the project folder's, and those a slot, a worktree or an open card uses.} merged {Every commit of these is in {target}, and nothing uses them: Clean Up Merged Branches deletes them.} other {These have commits that aren't in {target}. Delete one only after checking the commits it drops.}}",
+    "description": "Tooltip of a group heading in the list of branches (#1642). {target} is the branch the project merges into. Keep the select keys."
   },
   "git.branches.heading": {
     "defaultMessage": "Branches",
@@ -38,6 +86,10 @@
   "git.branches.noCommits": {
     "defaultMessage": "No commits yet, and agents' worktrees need one.",
     "description": "Banner in Git → Branches & remotes of a repository with no commit."
+  },
+  "git.branches.notInTarget": {
+    "defaultMessage": "{n, plural, one {# commit not in {target}} other {# commits not in {target}}}",
+    "description": "On a branch of the Not merged group in Version Control → Branches & remotes: how many of its commits aren't in the target branch {target}."
   },
   "git.branches.reload": {
     "defaultMessage": "Read git again (doesn't fetch)",
@@ -90,6 +142,46 @@
   "git.cancel": {
     "defaultMessage": "Cancel",
     "description": "Button: closes the Git tab's dialog or form without doing anything."
+  },
+  "git.cleanUp.delete": {
+    "defaultMessage": "Delete Ticked",
+    "description": "The button of the Clean Up Merged Branches dialog: deletes the branches ticked."
+  },
+  "git.cleanUp.deleting": {
+    "defaultMessage": "Deleting…",
+    "description": "The Clean Up Merged Branches or Delete branch dialog's button while branches are being deleted."
+  },
+  "git.cleanUp.failed": {
+    "defaultMessage": "Couldn't delete the branches",
+    "description": "An error notification's title: deleting branches in Version Control → Branches & remotes failed."
+  },
+  "git.cleanUp.local": {
+    "defaultMessage": "In this repository ({n, number})",
+    "description": "A heading in the Clean Up Merged Branches dialog: the local branches it offers ({n}), each with a tick box, ticked to start with."
+  },
+  "git.cleanUp.message": {
+    "defaultMessage": "Every commit of these is already in {target}, and no slot, worktree or open card uses them. Tick the ones to delete.",
+    "description": "The Clean Up Merged Branches dialog: what it lists. {target} is the branch the project merges into."
+  },
+  "git.cleanUp.none": {
+    "defaultMessage": "None",
+    "description": "In the Clean Up Merged Branches dialog, under a heading with nothing to offer."
+  },
+  "git.cleanUp.remote": {
+    "defaultMessage": "On {remotes} ({n, number})",
+    "description": "A heading in the Clean Up Merged Branches dialog: the branches it offers on the remote(s) {remotes} (a list of names), {n} of them, none ticked to start with."
+  },
+  "git.cleanUp.remoteWarn": {
+    "defaultMessage": "Ticking these deletes them on the remote, for everyone who uses it, and Hive can't undo that. None is ticked for you.",
+    "description": "A warning in the Clean Up Merged Branches dialog over the remote branches it offers: deleting them is outward-facing (git push --delete)."
+  },
+  "git.cleanUp.title": {
+    "defaultMessage": "Clean up merged branches",
+    "description": "Title of the Clean Up Merged Branches dialog (Version Control → Branches & remotes)."
+  },
+  "git.cleanUp.withLocal": {
+    "defaultMessage": "its local branch is ticked above",
+    "description": "Beside a remote branch in the Clean Up Merged Branches dialog: the local branch of the same name is ticked to be deleted, so this one is suggested too (it still needs its own tick)."
   },
   "git.fetch.at": {
     "defaultMessage": "As of the last fetch, {when}. Hive never fetches by itself.",
