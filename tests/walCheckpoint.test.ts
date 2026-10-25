@@ -2,7 +2,7 @@
 // worker's checkpoint lets the next write start the WAL again, closing stops it, and a file gone is never made again.
 import { existsSync, openSync, readSync, closeSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 
@@ -84,6 +84,155 @@ describe('checkpoints off main (#1633)', () => {
     } finally {
       stop()
       writer.close()
+    }
+  })
+})
+
+/** The writer's auto-checkpoint setting, as SQLite has it. */
+const autoPages = (writer: DatabaseSync): number => (writer.prepare('PRAGMA wal_autocheckpoint').get() as { wal_autocheckpoint: number }).wal_autocheckpoint
+
+/** One round, waited for until each of its checkpoints has answered. */
+async function round(): Promise<void> {
+  wal.checkpointRound()
+  await wal.checkpointsSettled()
+}
+
+/** Whether another connection could have the file to itself now (Restore the 0.9 Board Backup's sole copy needs it). */
+function soleAccess(file: string): boolean {
+  const other = new DatabaseSync(file, { timeout: 0 })
+  try {
+    other.exec('PRAGMA locking_mode = EXCLUSIVE')
+    other.exec('BEGIN EXCLUSIVE')
+    other.exec('COMMIT')
+    return true
+  } catch {
+    return false
+  } finally {
+    other.close()
+  }
+}
+
+describe('falling back to SQLite and back (#1633 round 2)', () => {
+  afterEach(() => {
+    wal.checkpointGate.hold(false)
+    wal.checkpointLimits.hungMs = 60_000
+    wal.checkpointLimits.boundFrames = 8000
+  })
+
+  it('checkpoints failing in a row give SQLite its own back, and the first that succeeds takes it off again', async () => {
+    const file = join(base, `later-${++n}.db`)
+    const writer = new DatabaseSync(':memory:')
+    const stop = wal.checkpointOffThread(file, writer)
+    try {
+      expect(autoPages(writer)).toBe(0)
+      // No file yet: each checkpoint fails (and makes none).
+      for (let i = 1; i < wal.checkpointLimits.failures; i++) {
+        await round()
+        expect(autoPages(writer)).toBe(0)
+      }
+      await round()
+      expect(autoPages(writer)).toBe(1000)
+      expect(wal.checkpointsInCommits(writer)).toBe(true)
+      await round()
+      expect(autoPages(writer)).toBe(1000)
+      // The file there: the next checkpoint succeeds, and the worker has it again.
+      const made = new DatabaseSync(file)
+      made.exec('PRAGMA journal_mode = WAL')
+      made.exec('CREATE TABLE t (x)')
+      made.close()
+      await round()
+      expect(autoPages(writer)).toBe(0)
+    } finally {
+      stop()
+      writer.close()
+    }
+  })
+
+  it('the worker ending gives SQLite its own back; the next round starts it again and takes it off', async () => {
+    const db = open(wal.checkpointOffThread)
+    try {
+      await round()
+      expect(autoPages(db.writer)).toBe(0)
+      await wal.checkpointWorker()!.terminate()
+      await vi.waitFor(() => expect(autoPages(db.writer)).toBe(1000), { timeout: HUNG_MS })
+      await round()
+      expect(autoPages(db.writer)).toBe(0)
+      expect(wal.checkpointWorker()).not.toBeNull()
+    } finally {
+      db.close()
+    }
+  })
+
+  it('a checkpoint that hangs gives SQLite its own back until it answers', async () => {
+    const db = open(wal.checkpointOffThread)
+    try {
+      write(db.writer, 5)
+      wal.checkpointGate.hold(true)
+      wal.checkpointRound()
+      await vi.waitFor(() => expect(wal.checkpointGate.held()).toBe(true), { timeout: HUNG_MS })
+      wal.checkpointLimits.hungMs = 0
+      wal.checkpointRound()
+      expect(autoPages(db.writer)).toBe(1000)
+      wal.checkpointGate.hold(false)
+      await wal.checkpointsSettled()
+      expect(autoPages(db.writer)).toBe(0)
+    } finally {
+      db.close()
+    }
+  })
+
+  it("a WAL a checkpoint can't copy whole past the bound gives SQLite its own back until it can", async () => {
+    const db = open(wal.checkpointOffThread)
+    // A reader on an old snapshot: the checkpoint copies only up to it.
+    const reader = new DatabaseSync(db.file)
+    try {
+      wal.checkpointLimits.boundFrames = 1
+      write(db.writer, 5)
+      reader.exec('BEGIN')
+      reader.prepare('SELECT count(*) FROM t').get()
+      write(db.writer, 5)
+      await round()
+      expect(autoPages(db.writer)).toBe(1000)
+      reader.exec('COMMIT')
+      await round()
+      expect(autoPages(db.writer)).toBe(0)
+    } finally {
+      reader.close()
+      db.close()
+    }
+  })
+
+  it("closing a database during its checkpoint returns once the worker's connection is closed", async () => {
+    const db = open(wal.checkpointOffThread)
+    write(db.writer, 20)
+    wal.checkpointGate.hold(true)
+    wal.checkpointRound()
+    await vi.waitFor(() => expect(wal.checkpointGate.held()).toBe(true), { timeout: HUNG_MS })
+    // The worker holds its connection open between passes now; the close stops it.
+    db.close()
+    expect(soleAccess(db.file)).toBe(true)
+    wal.checkpointGate.hold(false)
+    await wal.checkpointsSettled()
+  })
+
+  it('a checkpoint still queued when its database closes is never made', async () => {
+    const a = open(wal.checkpointOffThread)
+    const b = open(wal.checkpointOffThread)
+    try {
+      write(a.writer, 5)
+      write(b.writer, 5)
+      wal.checkpointGate.hold(true)
+      const skipped = wal.checkpointStats.skipped
+      wal.checkpointRound()
+      // a's checkpoint is held between its passes; b's waits behind it.
+      await vi.waitFor(() => expect(wal.checkpointGate.held()).toBe(true), { timeout: HUNG_MS })
+      b.close()
+      expect(soleAccess(b.file)).toBe(true)
+      wal.checkpointGate.hold(false)
+      await wal.checkpointsSettled()
+      expect(wal.checkpointStats.skipped).toBe(skipped + 1)
+    } finally {
+      a.close()
     }
   })
 })
