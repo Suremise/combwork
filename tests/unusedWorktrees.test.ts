@@ -241,6 +241,64 @@ describe('listing', () => {
     expect(await find(t)).toMatchObject({ kind: 'queue' })
   })
 
+  it("Remove anyway never deletes a queue folder a runner claims while the removal checks it (HR4's #1644 round 1); one claimed for removal loses its record", async () => {
+    const { FactStore } = await import('../src/main/workflow/factStore')
+    const { boardWrite } = await import('../src/main/boardStore')
+    const store = FactStore.forBoard(w, { project: 'proj', key: 'proj' })
+    const lease = `ac${++n}`
+    const t = join(root, `queue-0123456789ab-${lease}`)
+    git(proj, 'worktree', 'add', '-q', '--detach', t)
+    const runner = (token: string): Parameters<typeof store.takeQueueLease>[0] => ({ target: 'main', lease, token, profile: 'Hive-Dev', pid: process.pid, started: 1, takenAt: '2026-10-25T00:00:00.000Z', renewedAt: '2026-10-25T00:00:00.000Z' })
+    const takes = (token: string): void => {
+      store.takeQueueLease(runner(token), null)
+      store.setQueueFolder({ folder: t, target: 'main', lease })
+    }
+    const frees = (token: string): Promise<unknown> => run(() => boardWrite(w, async () => store.dropQueueLease(lease, token) && store.setQueueFolder({ folder: t, target: 'main', lease: null })))
+    const recorded = (): boolean => store.queueFolders().some((f) => placeKey(f.folder) === placeKey(t))
+    await run(() => boardWrite(w, async () => store.setQueueFolder({ folder: t, target: 'main', lease: null })))
+    try {
+      // A runner takes it while the removal asks whether the queue needs it (HR4's repro): kept, its record too.
+      setQueueNeed(async () => false)
+      let preview = await run(() => removalPreview(proj, t))
+      let acquired = false
+      setQueueNeed(async () => {
+        if (!acquired) await boardWrite(w, async () => takes('during-need'))
+        acquired = true
+        return false
+      })
+      expect(await run(() => removeUnusedWorktree(proj, t, { force: preview.token }))).toMatchObject({ deleted: false })
+      expect([acquired, existsSync(t), recorded()]).toEqual([true, true, true])
+      await frees('during-need')
+      // Later still: after every check of the listing, as its contents are read again (the claim alone stops it).
+      setQueueNeed(async () => false)
+      preview = await run(() => removalPreview(proj, t))
+      // The runner's write is asked for there, so it holds the board's lock before the removal's claim asks for it.
+      let late: Promise<unknown> | null = null
+      failing = (args) => {
+        if (!late && args[0] === 'symbolic-ref' && args.includes('--short')) late = run(() => boardWrite(w, async () => takes('during-snapshot')))
+        return false
+      }
+      expect(await run(() => removeUnusedWorktree(proj, t, { force: preview.token }))).toEqual({ deleted: false, reason: 'the merge queue is using it' })
+      failing = null
+      await late
+      expect([!!late, existsSync(t), recorded()]).toEqual([true, true, true])
+      await frees('during-snapshot')
+      // An ended runner's process not seen gone yet (a duty of its lease): it may be in the folder, so it stays.
+      await run(() => boardWrite(w, async () => store.setQueueFolder({ folder: t, target: 'main', lease })))
+      await run(() => boardWrite(w, async () => store.addQueueProc({ lease, target: 'main', pid: 1, startAfter: 0, startBefore: 1, what: 'job' })))
+      expect(await find(t)).toBeUndefined()
+      await run(() => boardWrite(w, async () => store.dropQueueProc(lease, 1)))
+      // Nothing has it: removed, and its record goes with it, so no runner takes the folder after.
+      preview = await run(() => removalPreview(proj, t))
+      expect(await run(() => removeUnusedWorktree(proj, t, { force: preview.token }))).toEqual({ deleted: true })
+      expect([existsSync(t), recorded()]).toEqual([false, false])
+    } finally {
+      failing = null
+      setQueueNeed(null)
+      await run(() => boardWrite(w, async () => store.dropQueueFolder(t)))
+    }
+  })
+
   it("a review copy is never listed; a folder named as the queue names them, with no record, is listed as the queue's (#1644)", async () => {
     const copy = join(root, 'copies', `copy-${++n}`)
     git(proj, 'worktree', 'add', '-q', '--detach', copy)

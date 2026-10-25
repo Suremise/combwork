@@ -2947,7 +2947,10 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   unsettled job or a writer, anything in the project's `copies` folder, or a queue folder its queue uses (#1644: by its record, a living lease, or
   `queueFolderNeeded` on the project's workflow, the folder a released runner keeps warm; not known, used). A recorded
   queue folder its queue no longer needs, and one named as the queue names them with no record, are listed as
-  `queue` ("merge queue's old folder, not needed now"); while the records can't be read, neither is. A slot
+  `queue` ("merge queue's old folder, not needed now"); while the records can't be read, neither is. Right before a
+  queue folder is deleted, removal claims it in one board write, the lock runners take their lease and record their
+  folder under: refused ("the merge queue is using it") while a living runner holds its target's lease or its lease
+  has processes not seen gone, else its record is dropped so no runner takes it after (HR4's round 1). A slot
   row's Remove is `SlotPool.remove` (the archive command first; kept with the guard's reason, worded in the window's
   language), its verdict shown before as `SlotPool.check` (the same guards without the rename probe); never Remove
   anyway (its preview is refused). No row offers Give to an agent any more (#1555). "Remove all merged" takes the same rows. Every removal and

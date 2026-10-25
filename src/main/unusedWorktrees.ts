@@ -18,6 +18,7 @@ import { checkProject } from './branchWatch'
 import { mergeInProject, reserveForRemoval } from './projectAgents'
 import { workspace, workspaceOf, type WorkspaceService } from './workspace'
 import * as wt from './worktrees'
+import { boardWrite } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { isQueueFolder } from './workflow/queueRunner'
 
@@ -64,27 +65,69 @@ export function setQueueNeed(fn: QueueNeed | null): void {
  */
 async function queuePlaces(projectPath: string): Promise<{ used: Set<string>; leftover: Set<string> } | null> {
   const ws = workspaceOf(projectPath)
-  let folders: { folder: string; target: string; held: boolean }[]
   try {
-    const store = FactStore.forBoard(ws, { project: basename(projectPath), key: basename(projectPath) })
-    folders = store.queueFolders().map((f) => {
-      const holder = f.lease ? store.queueLease(f.target) : null
-      return { folder: f.folder, target: f.target, held: !!holder && holder.lease === f.lease && running(holder.pid) }
-    })
+    const store = queueStore(projectPath)
+    // What each target's queue needs first; its records and leases read after, as they are then. Only a hint for the
+    // list: removal claims the folder in the runners' own write (claimQueueFolder, HR4's round 1).
+    const needs = new Map<string, boolean>()
+    for (const f of store.queueFolders()) {
+      if (needs.has(f.target)) continue
+      needs.set(f.target, queueNeed ? await queueNeed(ws, projectPath, f.target).catch((e) => (log.warn(`whether ${userText(basename(projectPath))}'s merge queue needs its folder`, e), true)) : true)
+    }
+    const out = { used: new Set<string>(), leftover: new Set<string>() }
+    for (const f of store.queueFolders()) (queueFolderBusy(store, f) || needs.get(f.target) !== false ? out.used : out.leftover).add(key(f.folder))
+    return out
   } catch (e) {
     // A board still 0.9's (no queue tables, and no queue folders), or one that can't be read now.
     log.warn(`reading ${userText(basename(projectPath))}'s merge queue folders for its unused worktrees`, e)
     return null
   }
-  const out = { used: new Set<string>(), leftover: new Set<string>() }
-  const needs = new Map<string, Promise<boolean>>()
-  for (const f of folders) {
-    let need = needs.get(f.target)
-    if (!need) needs.set(f.target, (need = queueNeed ? queueNeed(ws, projectPath, f.target).catch((e) => (log.warn(`whether ${userText(basename(projectPath))}'s merge queue needs its folder`, e), true)) : Promise.resolve(true)))
-    ;(f.held || (await need) ? out.used : out.leftover).add(key(f.folder))
-  }
-  return out
 }
+
+const queueStore = (projectPath: string): FactStore => FactStore.forBoard(workspaceOf(projectPath), { project: basename(projectPath), key: basename(projectPath) })
+
+/**
+ * Whether a queue folder is a runner's now: a living runner holds its target's lease (it may be taking this folder as
+ * it starts), or the folder's lease still has processes not seen gone (an ended runner's, which may be in it). Read as
+ * the store is: inside a write, as that write sees it.
+ */
+function queueFolderBusy(store: FactStore, f: { target: string; lease: string | null }): boolean {
+  const holder = store.queueLease(f.target)
+  if (holder && running(holder.pid)) return true
+  return !!f.lease && store.queueProcs(f.lease).length > 0
+}
+
+/**
+ * Claims a merge queue folder for removal (#1644, HR4's round 1): in one write under the board's lock, the lock a
+ * runner takes its lease and records its folder under, refused while a runner may have it (queueFolderBusy), else its
+ * record dropped, so no runner takes it from then on. Called right before the folder is deleted; a folder that isn't
+ * the queue's has nothing to claim. Null when claimed; else why not.
+ */
+async function claimQueueFolder(projectPath: string, path: string): Promise<string | null> {
+  const ws = workspaceOf(projectPath)
+  const named = isQueueFolder(join(ws.worktreesRoot, basename(projectPath)), path)
+  try {
+    const store = queueStore(projectPath)
+    return await boardWrite(ws, async () =>
+      store.quiet(() => {
+        const mine = store.queueFolders().filter((f) => key(f.folder) === key(path))
+        if (!mine.length && !named) return null
+        // One named as the queue names them with no record is no runner's: a runner records its folder before its first
+        // test merge makes it.
+        if (mine.some((f) => queueFolderBusy(store, f))) return tr(QUEUE_BUSY)
+        for (const f of mine) store.dropQueueFolder(f.folder)
+        return null
+      })
+    )
+  } catch (e) {
+    // Records that can't be read (a board still 0.9's has none): only a folder named as the queue names them can be one
+    // of its folders, and it is kept.
+    return named ? tr(CANT_CHECK, { detail: (e as Error).message }) : null
+  }
+}
+
+/** Why a merge queue folder isn't removed: a runner has it, or may be taking it (#1644). */
+const QUEUE_BUSY = msg({ id: 'main.unused.why.queueBusy', defaultMessage: 'the merge queue is using it', description: "Why Hive won't remove a folder from Unused worktrees (#1644): it is the merge queue's working folder, and the queue is merging in it or starting to (it may have started since the list was read). A clause. Glossary: merge queue." })
 
 /** Whether a process with this id runs (a quick look: a pid given again keeps a folder hidden, never shows a used one). */
 const running = (pid: number): boolean => {
@@ -647,6 +690,9 @@ export async function removeUnusedWorktree(projectPath: string, path: string, op
           reason: tr(msg({ id: 'main.unused.changed', defaultMessage: 'it changed since you were shown what it holds ({changed})', description: "Why Remove anyway did nothing to one of the Overview's unused worktrees (Remove, Remove anyway, Merge). {changed} lists what changed (main.unused.field.*). A clause; the window then looks again and asks again, saying this." }), { changed: fmt.list(changed.map((k) => tr(SNAPSHOT_FIELD[k]))) })
         }
       const snap = shown.snap
+      // The merge queue's folder, claimed from its runners right before it goes (#1644, HR4's round 1).
+      const queueBusy = await claimQueueFolder(projectPath, listed.path)
+      if (queueBusy) return { deleted: false, reason: queueBusy }
       await wt.removeWorktree(projectPath, { path: listed.path, branch: snap.branch ?? '', base: '' }, false)
       // The branch shown, and only from the commit shown (git refuses otherwise).
       const branch = snap.branch ? await git(projectPath, ['update-ref', '-d', `refs/heads/${snap.branch}`, snap.head]) : null
@@ -656,6 +702,8 @@ export async function removeUnusedWorktree(projectPath: string, path: string, op
       if (!listed.branch) return { deleted: false, reason: tr(msg({ id: 'main.unused.why.detached', defaultMessage: 'it is not on a branch (detached HEAD)', description: "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause. detached HEAD is git's term." })) }
       const tree: wt.WorktreeRef = { path: listed.path, branch: listed.branch, base: '' }
       const check = await wt.worktreeCheck(projectPath, tree)
+      const queueBusy = await claimQueueFolder(projectPath, listed.path)
+      if (queueBusy) return { deleted: false, reason: queueBusy }
       done = await wt.removeCheckedWorktree(projectPath, tree, check, opts.expectInto).catch((e: Error) => ({ deleted: false, reason: e.message.split('\n')[0] }))
     }
     if (done.deleted) {

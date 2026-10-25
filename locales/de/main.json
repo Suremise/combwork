@@ -314,6 +314,7 @@
   "main.unused.why.notUnused": "es ist gerade keiner der ungenutzten Worktrees des Projekts (eine Unterhaltung eines Agenten, eine Review-Kopie oder die Merge-Warteschlange nutzt ihn vielleicht)",
   "main.unused.why.otherProject": "er ist ein anderes Projekt des Arbeitsbereichs",
   "main.unused.why.owned": "ein Agent arbeitet jetzt darin",
+  "main.unused.why.queueBusy": "die Merge-Warteschlange verwendet ihn",
   "main.unused.why.session": "darin läuft eine Sitzung",
   "main.unused.why.slotGuarded": "es ist ein Slot, den Hive nur entfernt, wenn er sauber und seine Arbeit gemergt ist",
   "main.unused.why.slotInUse": "es ist ein Slot in Gebrauch",

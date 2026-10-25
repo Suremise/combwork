@@ -1259,6 +1259,10 @@
     "defaultMessage": "an agent works in it now",
     "description": "Why Hive won't remove or merge one of the Overview's unused worktrees (Remove, Remove anyway, Merge): a clause."
   },
+  "main.unused.why.queueBusy": {
+    "defaultMessage": "the merge queue is using it",
+    "description": "Why Hive won't remove a folder from Unused worktrees (#1644): it is the merge queue's working folder, and the queue is merging in it or starting to (it may have started since the list was read). A clause. Glossary: merge queue."
+  },
   "main.unused.why.session": {
     "defaultMessage": "a session runs in it",
     "description": "Why Hive won't remove a folder from Unused worktrees (#1450): an agent's session runs in it now. A clause."
