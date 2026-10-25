@@ -201,16 +201,15 @@ async function look(ws: WorkspaceService): Promise<boolean> {
         db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING').run(SINCE, since) // i18n-ignore: SQL
         // As the marks are now: what another Hive told since this one read them isn't told again.
         const marks = readMarks(db)
-        const running = new Set<string>()
         for (const now of nows) {
           const lane = lanes.get(now.id)
-          // A lane first seen: one started since Hive began following starts empty (what it came with is told), else from now.
-          const base = marks[now.id] ?? (lane && Date.parse(lane.startedAt) > Date.parse(since) ? newLaneBase(now, since) : null)
+          const running = now.mark.state === 'active' || now.mark.state === 'paused'
+          // A lane first seen: one started since Hive began following starts empty (what it came with is told), else from
+          // now; one first seen already ended or abandoned is only marked (#1631: Hive told its round again on every look).
+          const base = marks[now.id] ?? (running && lane && Date.parse(lane.startedAt) > Date.parse(since) ? newLaneBase(now, since) : null)
           const hit = laneHits(base, now, EVENTS, since)
-          if (now.mark.state === 'active' || now.mark.state === 'paused') {
-            running.add(now.id)
-            writeMark(db, now.id, now.mark)
-          }
+          // Its mark kept once it ends too (#1631): a lane started since with no mark is new to lanesNowIn, and told again.
+          writeMark(db, now.id, now.mark)
           if (!hit || !lane || quiet.has(lane.project.toLowerCase())) continue
           const exists = (n: number): boolean => !!db.prepare('SELECT 1 FROM cards WHERE number = ?').get(n) // i18n-ignore: SQL
           // The lane's current card (its first not yet merged, else its last): where a lane's own event is noted.
@@ -226,8 +225,8 @@ async function look(ws: WorkspaceService): Promise<boolean> {
             if (card !== undefined) notes.push({ card, event: noteEvent(e), lane: hit.label, ...(e.detail ? { why: e.detail } : {}) })
           }
         }
-        // Lanes no longer running (ended, abandoned, gone) are followed no more.
-        for (const id of Object.keys(marks)) if (!running.has(id)) writeMark(db, id, null)
+        // Lanes gone from the board are followed no more; an ended or abandoned one keeps its mark (lanesNowIn leaves it out).
+        for (const id of Object.keys(marks)) if (!lanes.has(id)) writeMark(db, id, null)
         db.prepare("INSERT INTO board_meta (key, value) VALUES (?, '1') ON CONFLICT (key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)").run(SEQ) // i18n-ignore: SQL
         return notes
       })

@@ -615,6 +615,40 @@ describe('notices (#1266, §16.11.4)', () => {
     }, HANG)
   })
 
+  it('#1631: a failed round in a lane started since is told once, also once the lane has ended and after a reload', async () => {
+    const { w, ws, alpha } = await open()
+    const st = fake(alpha, { b1: 'working', r1: 'working' })
+    const db = () => store.workspaceDb(ws).reader
+    const failedNotices = () => (db().prepare("SELECT count(*) AS n FROM card_actions WHERE kind = 'laneNotice' AND payload LIKE '%\"failed\"%'").get() as { n: number }).n
+    // Hive follows the board's lanes from its first look; the lane starts after it (as HI-1626's did on rc.1).
+    await notices.checkLanesNow(w)
+    const since = Date.parse((db().prepare("SELECT value FROM board_meta WHERE key = 'lane_notices_since'").get() as { value: string }).value)
+    await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(since), HANG)
+    const c = await inReview(w)
+    await notices.checkLanesNow(w)
+    await inWorkspace(w, () => tasks.updateTask(c, { review: 'failed' }, r1, { comment: 'FAILED' }))
+    await vi.waitFor(async () => {
+      await notices.checkLanesNow(w)
+      await worker.actionsSettled()
+      expect(toldText(st)).toContain('failed review')
+    }, HANG)
+    const lane = (await lanes.listLanes(w, { all: true })).find((l) => l.cards.some((x) => x.number === c))!
+    await lanes.endLane(w, lane.id, { abandoned: true })
+    // Each look writes nothing more: no notice, no history line (whose change would start the next look).
+    for (let i = 0; i < 3; i++) await notices.checkLanesNow(w)
+    await settled()
+    expect(failedNotices()).toBe(1)
+    expect(st.notices).toHaveLength(1)
+    await disposeWorkspaceService(w)
+    const again = createWorkspaceService()
+    await again.open(ws)
+    opened.push(again)
+    await notices.checkLanesNow(again)
+    await worker.runActions(again)
+    expect(failedNotices()).toBe(1)
+    expect(st.notices).toHaveLength(1)
+  })
+
   it('an event before a restart is told after it: what lanes were told is kept with the board, not in memory', async () => {
     const { w, ws, alpha } = await open()
     const st = fake(alpha, { b1: 'working', r1: 'working' })
