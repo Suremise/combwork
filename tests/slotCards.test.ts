@@ -7,7 +7,9 @@
 // - a builder's placement counts a delivery only while it was given or is on its way: one refused, or a launch that
 //   couldn't start, is made again by the next pass; one uncertain is left to the deliveries' own policy (its agent
 //   started where it is offered, nothing made again);
-// - a card's cycle read from its facts.
+// - a card's cycle read from its facts;
+// - Hive quitting (#1628): a pass running is waited for (bounded) before the boards close, goes on to no next step, and
+//   a failure as they close is no warning; no pass starts after, and the next start's do.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { B1, commit, moved, setup, sh, type Env } from './workflow/harness'
 import { tempDir } from './tempDir'
@@ -16,6 +18,10 @@ import { lineName } from '../src/main/workflow/runtime'
 import type { Fact } from '../src/shared/workflow/facts'
 import { DatabaseSync } from 'node:sqlite'
 import { boardFile } from '../src/main/boardStore'
+import { readFileSync } from 'fs'
+
+/** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
+const HUNG_MS = 30_000
 
 /** What the stand-ins do: the switches, git's and the worktree list's hooks, the agent, its deliveries and launches. */
 const state = vi.hoisted(() => ({
@@ -33,7 +39,13 @@ const state = vi.hoisted(() => ({
   /** The card's runtime, as workflowFor gives it. */
   wf: null as unknown,
   /** Settings → Advanced, Delete a card's branch once it's merged. */
-  deleteOn: true
+  deleteOn: true,
+  /** The pass's read of the lanes (its step after the deletions and renames): null, none. */
+  lanes: null as null | (() => Promise<unknown[]>),
+  /** Lanes waiting for a slot looked up: the pass's step 4. */
+  waitingLooks: 0,
+  /** The slots' log, as `<level> <line>`. */
+  logged: [] as string[]
 }))
 
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => state.enforced, agentRunsGoing: () => [], workflowFor: async () => state.wf }))
@@ -72,9 +84,24 @@ vi.mock('../src/main/slotsApp', async (orig) => ({
   ...(await orig<object>()),
   holder: { self: async () => ({ pid: process.pid, started: 1 }), alive: async () => false, live: new Set() },
   // The project's pool as the pass reads it: no leases open or ended (what it settles first doesn't come from them).
-  poolFor: async () => ({ closed: false, openLeases: () => [], endedSince: () => [], lease: () => null })
+  poolFor: async () => ({ closed: false, openLeases: () => [], endedSince: () => [], lease: () => null, renames: () => [] })
 }))
-vi.mock('../src/main/lanes', async (orig) => ({ ...(await orig<object>()), rawLanes: async () => [], lanesWaitingForSlot: async () => [] }))
+vi.mock('../src/main/lanes', async (orig) => ({
+  ...(await orig<object>()),
+  rawLanes: async () => (state.lanes ? state.lanes() : []),
+  lanesWaitingForSlot: async () => (state.waitingLooks++, [])
+}))
+vi.mock('../src/main/logger', async (orig) => {
+  const actual = await orig<typeof import('../src/main/logger')>()
+  return {
+    ...actual,
+    createLogger: (scope: string) => {
+      const l = actual.createLogger(scope)
+      if (scope !== 'slots') return l
+      return { ...l, info: (m: string, e?: unknown) => (state.logged.push(`info ${m}`), l.info(m, e)), warn: (m: string, e?: unknown) => (state.logged.push(`warn ${m}`), l.warn(m, e)) }
+    }
+  }
+})
 vi.mock('../src/main/advanced', async (orig) => {
   const actual = await orig<typeof import('../src/main/advanced')>()
   const advanced = Object.create(actual.advanced) as typeof actual.advanced
@@ -125,13 +152,13 @@ vi.mock('../src/main/deliveries', async (orig) => {
   }
 })
 
-const { cycleIn, deleteMergedLine, laneSlotIn, place, settleSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
+const { cycleIn, deleteMergedLine, laneSlotIn, place, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
 
 let env: Env | null = null
 afterEach(() => {
   env?.close()
   env = null
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, deliveries: [], next: [], calls: [], wf: null, deleteOn: true })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, logged: [] })
 })
 
 /** A card started in a slot (a worktree on its line, under lease l-1), its change merged into main and reported: Done. */
@@ -350,6 +377,83 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
     expect(state.calls).toEqual(['start'])
     expect(state.deliveries).toHaveLength(1)
     expect(e.store.facts(n).find((f) => f.kind === 'BuilderPlaced')?.data).toMatchObject({ delivery: 'm9', how: 'started' })
+  })
+})
+
+describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
+  // Each test quits: started again after it, as the next Hive's start does, so the other tests' passes run.
+  afterEach(() => {
+    startSlotCards()
+    stopSlotCards()
+  })
+
+  /** A pass of a project's slots held at its read of the lanes, until `go` lets it on (or fails it). */
+  async function heldPass(): Promise<{ pass: Promise<void>; go: (fail?: Error) => void; reads: () => number; ws: never; project: string }> {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    let release!: (fail?: Error) => void
+    const held = new Promise<void>((resolve, reject) => (release = (fail) => (fail ? reject(fail) : resolve())))
+    let reads = 0
+    state.lanes = async () => {
+      reads++
+      await held
+      return []
+    }
+    const ws = { path: e.home, lifetime: { aborted: false }, info: () => ({ projects: [] }), projectConfig: async () => ({ agents: [] }) } as never
+    const pass = settleSlotCards(ws, e.project)
+    await vi.waitFor(() => expect(reads).toBe(1))
+    return { pass, go: release, reads: () => reads, ws, project: e.project }
+  }
+
+  it("waits for a pass running, which goes on to no next step; none starts after, and the next start's do", async () => {
+    const { pass, go, reads, ws, project } = await heldPass()
+    let quit = false
+    const quitting = quitSlotCards(HUNG_MS).then(() => void (quit = true))
+    await new Promise((r) => setImmediate(r))
+    expect(quit).toBe(false)
+    go()
+    await quitting
+    await pass
+    // Past the lanes' read the pass stopped: the lanes waiting for a slot (step 4) never looked up.
+    expect(state.waitingLooks).toBe(0)
+    await settleSlotCards(ws, project)
+    expect(reads()).toBe(1)
+    // The next start: passes run again.
+    startSlotCards()
+    stopSlotCards()
+    await settleSlotCards(ws, project)
+    expect(reads()).toBe(2)
+    expect(state.waitingLooks).toBe(1)
+  })
+
+  it("a pass whose boards close under it as Hive quits says so in the log, not as a warning", async () => {
+    const { pass, go } = await heldPass()
+    const quitting = quitSlotCards(HUNG_MS)
+    go(new Error('No workspace is open'))
+    await quitting
+    await pass
+    expect(state.logged.filter((l) => l.startsWith('warn'))).toEqual([])
+    expect(state.logged.some((l) => l.startsWith('info settling the slots of') && l.includes('cut short by quitting'))).toBe(true)
+  })
+
+  it('a pass that never ends holds the quit only for its bound', async () => {
+    const { go } = await heldPass()
+    await quitSlotCards(10)
+    go()
+  })
+
+  it('quitNow quiets the slots before the sessions stop and waits for them before Hive quits, the boards closing after (index.ts)', () => {
+    const src = readFileSync(join(__dirname, '..', 'src', 'main', 'index.ts'), 'utf8')
+    const body = src.slice(src.indexOf('async function quitNow('), src.indexOf('function relaunch('))
+    const at = (s: string): number => {
+      const i = body.indexOf(s)
+      expect(i, s).toBeGreaterThan(-1)
+      return i
+    }
+    expect(at('= quitSlotCards()')).toBeLessThan(at('sessions.stopAllAndWait('))
+    expect(at('await slotsQuiet')).toBeLessThan(at('app.quit()'))
+    const willQuit = src.slice(src.indexOf("app.on('will-quit'"))
+    expect(willQuit.indexOf('stopSlotCards()')).toBeLessThan(willQuit.indexOf('closeAllBoards()'))
   })
 })
 

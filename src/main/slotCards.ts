@@ -378,9 +378,24 @@ const ensuring = new Set<string>()
 const attempts = new Map<string, number>()
 /** Cycles whose preparation failed here (told once): tried again only by a restart or a new start. */
 const failed = new Set<string>()
+/**
+ * Hive is quitting (`quitSlotCards`, #1628): no pass starts or goes on to its next step, no cycle is prepared or placed,
+ * and what one owed is the next start's pass (its workspace opening), as after a crash.
+ */
+let quitting = false
+
+/** Nothing more is done for `ws` here: Hive is quitting, or the workspace closed or switched. */
+const ended = (ws: WorkspaceService): boolean => quitting || ws.lifetime.aborted
+
+/** A step that failed: a warning, but for one cut short by Hive quitting (its boards closed under it), the next start's. */
+function failedStep(what: string, e: unknown): void {
+  if (quitting) log.info(`${what}: cut short by quitting (the next start does it)`)
+  else log.warn(what, e)
+}
 
 /** Asks for a project's pass (coalesced): resolves when no pass of it runs. Never throws. */
 export function settleSlotCards(ws: WorkspaceService, projectPath: string): Promise<void> {
+  if (quitting) return Promise.resolve()
   const key = `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
   const running = passes.get(key)
   if (running) {
@@ -392,8 +407,8 @@ export function settleSlotCards(ws: WorkspaceService, projectPath: string): Prom
     try {
       do {
         pass.again = false
-        await settleOnce(ws, projectPath).catch((e) => log.warn(`settling the slots of ${userText(projectPath)}`, e))
-      } while (pass.again && !ws.lifetime.aborted)
+        await settleOnce(ws, projectPath).catch((e) => failedStep(`settling the slots of ${userText(projectPath)}`, e)) // i18n-ignore: a log line (failedStep logs it)
+      } while (pass.again && !ended(ws))
     } finally {
       passes.delete(key)
     }
@@ -406,7 +421,7 @@ export function settleSlotCards(ws: WorkspaceService, projectPath: string): Prom
 const waitingForRepair = new Set<string>()
 
 async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<void> {
-  if (!ws.path || ws.lifetime.aborted) return
+  if (!ws.path || ended(ws)) return
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return
   const pool = await poolFor(ws, projectPath)
@@ -422,15 +437,20 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   waitingForRepair.delete(projectPath.toLowerCase())
   // 0. Deletions begun and cut short (a crash between the ref's removal and its settling): settled first, as data safety,
   //    whatever the switches say and wherever the card is now: one may have left a checkout without its branch.
+  // Each step and each lease's turn begins only while Hive isn't quitting (#1628): one cut short is the next start's.
   for (const { card: n, d } of unsettledDeletions(wf.store.factsOfKind([...DELETION_KINDS]))) {
+    if (ended(ws)) return
     const card = cardOf(wf, n)
-    if (card) await withRepoLock(projectPath, () => settleDeletion(projectPath, wf, card, n, d), { quiet: true, project: projectPath }).catch((e) => log.warn(`settling #${n}'s begun deletion of ${userText(d.line)}`, e))
+    if (card) await withRepoLock(projectPath, () => settleDeletion(projectPath, wf, card, n, d), { quiet: true, project: projectPath }).catch((e) => failedStep(`settling #${n}'s begun deletion of ${userText(d.line)}`, e)) // i18n-ignore: a log line (failedStep logs it)
   }
   // 0b. Renames of adopted slots cut short (#1441): their holders gone, finished or given up by the pool.
+  if (ended(ws)) return
   await settleRenames(pool)
+  if (ended(ws)) return
   const lanes = new Map((await rawLanes(ws)).map((l) => [l.id, l]))
   // 1. Releases, rules on or off: a card's lease its current cycle doesn't use, a lane's whose lane has ended.
   for (const l of pool.openLeases()) {
+    if (ended(ws)) return
     if (l.kind === 'card' && l.card !== null) {
       if (uses(wf, l) || (Date.now() - Date.parse(l.from) < START_GRACE_MS && !startedWith(wf, l))) continue
       const stage = cardOf(wf, l.card) ? wf.state(cardOf(wf, l.card)!).stage : null
@@ -458,7 +478,7 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
       if (await pool.release(l.id, 'lane' in kept ? 'laneEnded' : 'cardEnded', over)) log.info(`The adopted ${userText(l.slot)}'s carried lease ${l.id} ended with ${'lane' in kept ? `lane ${kept.lane}` : `#${kept.card}`}`)
     }
   }
-  if (!workflowEnforced()) return
+  if (!workflowEnforced() || ended(ws)) return
   // 2. Each current cycle in a lease: prepared, then its builder placed.
   for (const l of pool.openLeases()) {
     const cards = l.kind === 'card' && l.card !== null ? [l.card] : l.kind === 'lane' && l.lane ? (lanes.get(l.lane)?.cards ?? []) : []
@@ -482,11 +502,16 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
         if (card && c && c.started.lease === l.id && !c.deleted && wf.state(card).stage === 'done') done.add(n)
       }
     }
-    for (const n of done) await deleteMergedLine(ws, projectPath, wf, n).catch((e) => log.warn(`deleting #${n}'s merged line`, e))
+    for (const n of done) {
+      if (ended(ws)) return
+      await deleteMergedLine(ws, projectPath, wf, n).catch((e) => failedStep(`deleting #${n}'s merged line`, e)) // i18n-ignore: a log line (failedStep logs it)
+    }
   }
   // 4. Lanes started from the window waiting for a slot.
+  if (ended(ws)) return
   await startWaitingLanes(ws, projectPath, pool)
   // 5. Adopted slots, once free, renamed to generic names (#1441).
+  if (ended(ws)) return
   await renameAdopted(ws, projectPath, pool)
 }
 
@@ -501,10 +526,10 @@ async function ensure(ws: WorkspaceService, projectPath: string, wf: Workflow, p
     if (!prepared) return
     if (!cycle.placed) await place(ws, projectPath, wf, n, cycle, l)
   } catch (e) {
-    log.warn(`#${n}'s slot ${userText(l.slot)}`, e)
+    failedStep(`#${n}'s slot ${userText(l.slot)}`, e) // i18n-ignore: a log line (failedStep logs it)
     // Its workspace opened again meanwhile (another lifetime's runtime), a write refused, a delivery not given or a launch
     // that failed: another pass once this ends, after a pause that grows with each try (1 s, doubling, at most a minute).
-    retry = !ws.lifetime.aborted && !!ws.path
+    retry = !ended(ws) && !!ws.path
   } finally {
     ensuring.delete(key)
     if (retry) {
@@ -521,7 +546,7 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
   let wf = first
   const st = cycle.started
   const builder = l.agent
-  const gone = (): boolean => !workflowEnforced() || ws.lifetime.aborted || !current(wf, n, cycle.seq, l.id) || !!pool.lease(l.id)?.to
+  const gone = (): boolean => !workflowEnforced() || ended(ws) || !current(wf, n, cycle.seq, l.id) || !!pool.lease(l.id)?.to
   for (;;) {
     if (!(await until(projectPath, builder, () => quiet(projectPath, builder), gone))) return null
     wf = (await workflowFor(ws, projectPath).catch(() => null)) ?? wf
@@ -580,7 +605,7 @@ const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired
 export async function place(ws: WorkspaceService, projectPath: string, first: Workflow, n: number, cycle: Cycle, l: SlotLease): Promise<void> {
   let wf = first
   const agentId = l.agent
-  const gone = (): boolean => !workflowEnforced() || ws.lifetime.aborted || !current(wf, n, cycle.seq, l.id)
+  const gone = (): boolean => !workflowEnforced() || ended(ws) || !current(wf, n, cycle.seq, l.id)
   const offer = offered.get(offerKey(projectPath, n))
   if (offer) await offer.ready
   if (!(await until(projectPath, agentId, () => quiet(projectPath, agentId), gone))) return
@@ -790,7 +815,7 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
   const name = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.name
   const waiting = (await lanesWaitingForSlot(ws)).filter((l) => l.project.toLowerCase() === name?.toLowerCase()).sort((a, b) => a.slotWait!.since.localeCompare(b.slotWait!.since))
   for (const lane of waiting) {
-    if (!workflowEnforced() || ws.lifetime.aborted) return
+    if (!workflowEnforced() || ended(ws)) return
     let lease = pool.leaseOf({ lane: lane.id })
     if (!lease) {
       // The builder's own slot first (#1441), checked against the default branch (the lane's target isn't known here).
@@ -884,6 +909,7 @@ let stop: (() => void) | null = null
 /** Starts cards on slots (index.ts, once): the actions, the passes and what asks for them, the lanes' view of their slot. */
 export function startSlotCards(): void {
   if (stop) return
+  quitting = false
   // A card's slot action asks for its project's pass: the pass, not the action's run, does what is owed.
   const ask = (n: number, ws: WorkspaceService): void => {
     if (crashAt('afterAction')) return
@@ -947,4 +973,20 @@ export function startSlotCards(): void {
 export function stopSlotCards(): void {
   stop?.()
   stop = null
+}
+
+/**
+ * Hive quitting (index.ts quitNow, before its sessions stop, #1628): nothing asks for a pass any more and none starts, a
+ * pass running ends at its next step, and this resolves once each has ended or after `withinMs`, before the boards close
+ * (will-quit). No cycle is prepared or placed (no builder started) as the sessions stop; what a pass didn't get to is the
+ * next start's pass, which settles every workspace as it opens. Never throws.
+ */
+export async function quitSlotCards(withinMs = 5000): Promise<void> {
+  quitting = true
+  stopSlotCards()
+  const running = [...passes.values()].map((p) => p.done)
+  if (!running.length) return
+  let timer: NodeJS.Timeout | undefined
+  await Promise.race([Promise.allSettled(running), new Promise<void>((r) => (timer = setTimeout(r, withinMs)))])
+  clearTimeout(timer)
 }
