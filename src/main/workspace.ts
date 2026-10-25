@@ -406,8 +406,19 @@ export class WorkspaceService {
     // only once it has, so a project's folder can be moved as soon as its window lets it go (#1341: EPERM renaming it). No
     // new one is scheduled from the abort on (scheduleRefresh).
     while (this.scheduledRuns.size) await Promise.allSettled([...this.scheduledRuns])
-    if (closing) closeBoard(closing, place)
-    if (closing) closeJournal(join(closing, HIVE_DIR, ASSISTANT_DIR), place)
+    if (closing) {
+      // Each closed whatever the other did: a checkpoint still holding one (#1633) is logged, and the close goes on.
+      try {
+        closeBoard(closing, place)
+      } catch (e) {
+        log.warn('closing the board', e)
+      }
+      try {
+        closeJournal(join(closing, HIVE_DIR, ASSISTANT_DIR), place)
+      } catch (e) {
+        log.warn("closing the Assistant's journal", e)
+      }
+    }
     await this.watcher?.close()
     this.watcher = null
     this.path = null

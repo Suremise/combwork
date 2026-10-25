@@ -6,7 +6,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 
-const { openDb, transaction } = await import('../src/main/db')
+const { DbInUseError, openDb, transaction } = await import('../src/main/db')
 const wal = await import('../src/main/walCheckpoint')
 
 const base = tempDir('hive-wal-checkpoint-')
@@ -117,6 +117,7 @@ describe('falling back to SQLite and back (#1633 round 2)', () => {
     wal.checkpointGate.hold(false)
     wal.checkpointLimits.hungMs = 60_000
     wal.checkpointLimits.boundFrames = 8000
+    wal.checkpointLimits.stopWaitMs = 10_000
   })
 
   it('checkpoints failing in a row give SQLite its own back, and the first that succeeds takes it off again', async () => {
@@ -167,7 +168,7 @@ describe('falling back to SQLite and back (#1633 round 2)', () => {
     const db = open(wal.checkpointOffThread)
     try {
       write(db.writer, 5)
-      wal.checkpointGate.hold(true)
+      wal.checkpointGate.hold('held')
       wal.checkpointRound()
       await vi.waitFor(() => expect(wal.checkpointGate.held()).toBe(true), { timeout: HUNG_MS })
       wal.checkpointLimits.hungMs = 0
@@ -202,17 +203,70 @@ describe('falling back to SQLite and back (#1633 round 2)', () => {
     }
   })
 
-  it("closing a database during its checkpoint returns once the worker's connection is closed", async () => {
+  it("closing a database during its checkpoint returns once the worker's connection is closed (round 2's gate: after the checkpoint, before its close)", async () => {
     const db = open(wal.checkpointOffThread)
     write(db.writer, 20)
-    wal.checkpointGate.hold(true)
+    const done = wal.checkpointStats.done
+    wal.checkpointGate.hold('held')
     wal.checkpointRound()
     await vi.waitFor(() => expect(wal.checkpointGate.held()).toBe(true), { timeout: HUNG_MS })
-    // The worker holds its connection open between passes now; the close stops it.
+    // Checkpointed, its connection still open: nothing says it ended (no reply), and the file isn't free.
+    await new Promise((res) => setImmediate(res))
+    expect(wal.checkpointStats.done).toBe(done)
+    expect(soleAccess(db.file)).toBe(false)
+    // The close stops it and returns once its connection is closed.
     db.close()
     expect(soleAccess(db.file)).toBe(true)
+    expect(wal.checkpointHolds(db.file)).toBe(false)
     wal.checkpointGate.hold(false)
     await wal.checkpointsSettled()
+    expect(wal.checkpointStats.done).toBe(done + 1)
+  })
+
+  it("a checkpoint that doesn't stop within the wait: the close throws, and the file stays its, across closes and reopenings, until it ends", async () => {
+    const db = open(wal.checkpointOffThread)
+    write(db.writer, 20)
+    wal.checkpointLimits.stopWaitMs = 50
+    wal.checkpointGate.hold('stuck')
+    try {
+      wal.checkpointRound()
+      await vi.waitFor(() => expect(wal.checkpointGate.held()).toBe(true), { timeout: HUNG_MS })
+      expect(() => db.close()).toThrow(DbInUseError)
+      // Its own connections are closed; the worker's isn't.
+      expect(soleAccess(db.file)).toBe(false)
+      // Asked again before a replacement or deletion, with nothing of it open: refused.
+      expect(() => wal.assertDrained(db.file)).toThrow(DbInUseError)
+      // Opened again: its close refuses too, while the old checkpoint holds the file.
+      const again = openDb(db.file, { migrations: MIGRATIONS, hiveVersion: 'test', checkpointer: wal.checkpointOffThread })
+      expect(() => again.close()).toThrow(DbInUseError)
+      wal.checkpointGate.hold(false)
+      await vi.waitFor(() => expect(wal.checkpointHolds(db.file)).toBe(false), { timeout: HUNG_MS })
+      expect(() => wal.assertDrained(db.file)).not.toThrow()
+      expect(soleAccess(db.file)).toBe(true)
+    } finally {
+      wal.checkpointGate.hold(false)
+      await wal.checkpointsSettled()
+    }
+  })
+
+  it("a checkpoint whose close throws is never taken as closed: the file stays its until its worker has exited", async () => {
+    const db = open(wal.checkpointOffThread)
+    try {
+      write(db.writer, 20)
+      const done = wal.checkpointStats.done
+      const w = wal.checkpointWorker()!
+      const exited = new Promise((res) => w.once('exit', res))
+      wal.checkpointGate.hold('closeFails')
+      wal.checkpointRound()
+      await exited
+      wal.checkpointGate.hold(false)
+      expect(wal.checkpointStats.done).toBe(done)
+      expect(wal.checkpointHolds(db.file)).toBe(false)
+      expect(soleAccess(db.file)).toBe(false) // our own connections only: the worker's went with its thread
+    } finally {
+      db.close()
+    }
+    expect(soleAccess(db.file)).toBe(true)
   })
 
   it('a checkpoint still queued when its database closes is never made', async () => {
@@ -221,7 +275,7 @@ describe('falling back to SQLite and back (#1633 round 2)', () => {
     try {
       write(a.writer, 5)
       write(b.writer, 5)
-      wal.checkpointGate.hold(true)
+      wal.checkpointGate.hold('held')
       const skipped = wal.checkpointStats.skipped
       wal.checkpointRound()
       // a's checkpoint is held between its passes; b's waits behind it.

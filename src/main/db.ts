@@ -30,10 +30,13 @@ export interface PendingGroup {
   to: number
 }
 
-/** Another connection (another Hive) has the file open, so a group's exclusive lock couldn't be had: nothing changed. */
+/**
+ * Another connection (another Hive) has the file open, so a group's exclusive lock couldn't be had: nothing changed. Also
+ * thrown by a close whose checkpoint worker still had the file open (#1633): its own connections are closed all the same.
+ */
 export class DbInUseError extends Error {
-  constructor(file: string) {
-    super(`${basename(file)} is open in another process`) // i18n-ignore: the board turns it into its message; this is for the log
+  constructor(file: string, where = 'in another process') {
+    super(`${basename(file)} is open ${where}`) // i18n-ignore: the board turns it into its message; this is for the log
     this.name = 'DbInUseError'
   }
 }
@@ -63,9 +66,10 @@ export interface OpenOptions {
   whileGroupLocked?: () => void
   /**
    * Takes the WAL's checkpoints off the writer's thread (#1633, walCheckpoint.ts): called once the file is open and
-   * writable, with its writer; returns what stops it, called first when the database closes.
+   * writable, with its writer; returns what stops it, called first when the database closes, false when a connection
+   * of its own still has the file (the close then throws DbInUseError once its own connections are closed).
    */
-  checkpointer?: (file: string, writer: DatabaseSync) => () => void
+  checkpointer?: (file: string, writer: DatabaseSync) => () => boolean
 }
 
 /** An open database: a writer and a reader connection to one file. */
@@ -79,6 +83,7 @@ export interface Db {
   newer: number | null
   /** A group of steps this file waits for, not approved (opened read-only), else null. */
   pending: PendingGroup | null
+  /** Closes both connections; throws DbInUseError after that when its checkpointer's connection still has the file. */
   close: () => void
 }
 
@@ -327,7 +332,7 @@ export function openDb(file: string, opts: OpenOptions): Db {
       newer,
       pending,
       close: () => {
-        stopCheckpoints?.()
+        const drained = stopCheckpoints?.() ?? true
         // The reader first (#1324): while it has the file mapped, Windows refuses the checkpoint's truncation of a file
         // that shrank (incremental vacuum), silently, and the close after it has nothing left to copy, so the file kept
         // its biggest size for good.
@@ -342,6 +347,7 @@ export function openDb(file: string, opts: OpenOptions): Db {
           // Closing anyway.
         }
         writer.close()
+        if (!drained) throw new DbInUseError(file, "by its checkpoint, which hasn't stopped") // i18n-ignore: for the log
       }
     }
   } catch (e) {

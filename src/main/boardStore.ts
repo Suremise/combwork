@@ -14,7 +14,7 @@ import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, curre
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
-import { checkpointOffThread, timedCommit } from './walCheckpoint'
+import { assertDrained, checkpointOffThread, timedCommit } from './walCheckpoint'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
 import { placeKey, realPath, withFileLock } from './fsutil'
@@ -864,7 +864,17 @@ export function closeBoard(path: string, place?: string): void {
   const others = [...boards.keys(), ...failures.keys()].some((k) => k !== key)
   const at = others ? (place ?? boards.get(key)?.place ?? placeKey(path)) : ''
   for (const [k, f] of [...failures]) if (k === key || (others && f.place === at)) failures.delete(k)
-  for (const [k, b] of [...boards]) if (k === key || (others && b.place === at)) closeOne(k, b)
+  // Every one closed; then the first that a checkpoint still had open (#1633) is thrown: its file isn't the caller's alone.
+  let held: unknown = null
+  for (const [k, b] of [...boards])
+    if (k === key || (others && b.place === at)) {
+      try {
+        closeOne(k, b)
+      } catch (e) {
+        held ??= e
+      }
+    }
+  if (held) throw held
 }
 
 /** Closes the board under that spelling only (a lease's own, Hive quitting). */
@@ -891,7 +901,13 @@ function closeOne(key: string, b: Board): void {
 
 /** Closes every board (Hive quits). */
 export function closeAllBoards(): void {
-  for (const [k, b] of [...boards]) closeOne(k, b)
+  for (const [k, b] of [...boards]) {
+    try {
+      closeOne(k, b)
+    } catch (e) {
+      log.warn('closing a board as Hive quits', e)
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1593,7 +1609,13 @@ export function leaseDb(workspacePath: string): DbLease {
       if (ended) return
       ended = true
       if (--b.leases > 0) return
-      if (b.detached) b.db.close()
+      if (b.detached) {
+        try {
+          b.db.close()
+        } catch (e) {
+          log.warn("closing a board after its save's lease", e)
+        }
+      }
       // Whether a window has the workspace open is asked now, not when the lease began: one may have opened it since,
       // before or after this board was opened, and uses this connection as its board.
       else if (b.transient && !isAdmitted(b.place)) closeOne(keyOf(b.path), b)
@@ -1734,8 +1756,9 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
     const from09 = pending.from < FIRST_10
     // Opened for keeps: only while a window holds it (#1395), as boardOf above checked, nothing awaited since.
     assertAdmitted(join(path, HIVE_DIR, DB_FILE))
-    closeBoard(path)
     try {
+      // Closed first: a close its checkpoint still had open (#1633) refuses as another Hive's open would.
+      closeBoard(path)
       openBoard(path, true)
     } catch (e) {
       // Opened again as it was (read-only, its upgrade waiting); a failure there is the board's to tell.
@@ -1786,9 +1809,11 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
     // The board put back takes no writes here: an agent running on would go unrecorded. Starts are refused from then on.
     if (agentsRunning() > 0) throw hiveError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
     if (othersPresent(hive, presenceId()).length) throw hiveError(M.inUse, undefined, { kind: 'conflict' })
-    closeBoard(path)
     let saved: string
     try {
+      // Closed first: a close its checkpoint still had open (#1633) refuses as another Hive's open would.
+      closeBoard(path)
+      assertDrained(file)
       saved = soleCopy(file, join(hive, BACKUPS), RESTORE_FAMILY, version)
     } catch (e) {
       failures.delete(keyOf(path))

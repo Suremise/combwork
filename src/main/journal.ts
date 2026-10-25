@@ -8,7 +8,7 @@ import { BROWSE_LIMITS, ENTRY_LIMITS, JOURNAL_KINDS, KEPT_IMPORTANCE, LINK_TYPES
 import { openDb, transaction, type Db, type Migration } from './db'
 import { realPath } from './fsutil'
 import { createLogger, userText } from './logger'
-import { checkpointOffThread } from './walCheckpoint'
+import { assertDrained, checkpointOffThread } from './walCheckpoint'
 import { assertPlaceAdmitted, isAdmitted, ownerOf, refusedOpen } from './openingFence'
 import { trash } from './trash'
 
@@ -184,7 +184,17 @@ export function closeJournal(home: string, place?: string): void {
   const key = keyOf(file)
   const others = [...open.keys()].some((k) => k !== key)
   const at = others ? (place ?? open.get(key)?.owner ?? ownerOf(file)) : null
-  for (const [k, o] of [...open]) if (k === key || (at !== null && o.owner === at)) closeOne(k, o)
+  // Every one closed; then the first that a checkpoint still had open (#1633) is thrown: its file isn't the caller's alone.
+  let held: unknown = null
+  for (const [k, o] of [...open])
+    if (k === key || (at !== null && o.owner === at)) {
+      try {
+        closeOne(k, o)
+      } catch (e) {
+        held ??= e
+      }
+    }
+  if (held) throw held
 }
 
 function closeOne(key: string, o: OpenJournal): void {
@@ -196,7 +206,13 @@ function closeOne(key: string, o: OpenJournal): void {
 export const journalOpen = (home: string): boolean => open.has(keyOf(journalFile(home)))
 
 export function closeAllJournals(): void {
-  for (const o of [...open.values()]) o.db.close()
+  for (const o of [...open.values()]) {
+    try {
+      o.db.close()
+    } catch (e) {
+      log.warn('closing a journal as Hive quits', e)
+    }
+  }
   open.clear()
 }
 
@@ -318,7 +334,12 @@ export function leaveEntry(home: string, settings: JournalSettings, input: Entry
   try {
     return insertEntry(db.writer, e, source)!
   } finally {
-    db.close()
+    try {
+      db.close()
+    } catch (err) {
+      // Written: a checkpoint still holding the file (#1633) is the log's, not the entry's.
+      log.warn('closing a journal after leaving an entry', err)
+    }
   }
 }
 
@@ -653,6 +674,8 @@ export async function deleteJournal(home: string): Promise<void> {
   deleting.add(key)
   try {
     closeJournal(home, at.owner ?? undefined)
+    // A checkpoint an earlier close couldn't see end still holding it (#1633), however it was opened: refused, nothing moved.
+    assertDrained(file)
     for (const f of [file, `${file}-wal`, `${file}-shm`]) if (existsSync(f)) await trash(f)
   } finally {
     deleting.delete(key)

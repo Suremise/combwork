@@ -5,13 +5,17 @@ import { existsSync, readFileSync, statSync } from 'fs'
 import { join, sep } from 'path'
 import { randomBytes } from 'crypto'
 import { DatabaseSync } from 'node:sqlite'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { junction } from './pathAliases'
 import { admitted } from './admitted'
 import { DEFAULT_JOURNAL, isoWeek, journalSettings, weekStart, type JournalSettings } from '../src/shared/journal'
 
 const base = tempDir('hive-journal-')
 const j = await import('../src/main/journal')
+const wal = await import('../src/main/walCheckpoint')
+// The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
+const HUNG_MS = 10_000
 
 let n = 0
 const homes: string[] = []
@@ -333,5 +337,37 @@ describe('deleting the journal', () => {
     expect(existsSync(j.journalFile(h))).toBe(false)
     write(h, { summary: 'After' })
     expect(j.recall(h, {}).map((r) => r.summary)).toEqual(['After'])
+  })
+
+  it("a checkpoint that won't stop keeps it from being deleted, on every retry, reopened or by another spelling, until it ends (#1633 round 3)", async () => {
+    const h = home()
+    const file = j.journalFile(h)
+    const ws = join(h, '..', '..')
+    const alias = junction(ws, join(base, `alias-${n}`))
+    const trashed = (): number => (existsSync(join(trashDir, 'trash.jsonl')) ? readFileSync(join(trashDir, 'trash.jsonl'), 'utf8').split(/\r?\n/).filter(Boolean).length : 0)
+    write(h, { summary: 'Before' })
+    wal.checkpointLimits.stopWaitMs = 50
+    wal.checkpointGate.hold('stuck')
+    try {
+      wal.checkpointRound()
+      await vi.waitFor(() => expect(wal.checkpointGate.held()).toBe(true), { timeout: HUNG_MS })
+      const before = trashed()
+      await expect(j.deleteJournal(h)).rejects.toThrow(/open by its checkpoint/)
+      // Retried with nothing open, reopened by a write, and by another spelling of its folder: refused each time.
+      await expect(j.deleteJournal(h)).rejects.toThrow(/open by its checkpoint/)
+      write(h, { summary: 'Reopened' })
+      await expect(j.deleteJournal(h)).rejects.toThrow(/open by its checkpoint/)
+      await expect(j.deleteJournal(join(alias, '.hive', 'assistant'))).rejects.toThrow(/open by its checkpoint/)
+      expect(existsSync(file)).toBe(true)
+      expect(trashed()).toBe(before)
+      wal.checkpointGate.hold(false)
+      await vi.waitFor(() => expect(wal.checkpointHolds(file)).toBe(false), { timeout: HUNG_MS })
+      await j.deleteJournal(h)
+      expect(existsSync(file)).toBe(false)
+    } finally {
+      wal.checkpointGate.hold(false)
+      wal.checkpointLimits.stopWaitMs = 10_000
+      await wal.checkpointsSettled()
+    }
   })
 })
