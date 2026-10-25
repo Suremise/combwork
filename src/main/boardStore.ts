@@ -14,6 +14,7 @@ import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, curre
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
+import { checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
 import { placeKey, realPath, withFileLock } from './fsutil'
@@ -705,7 +706,8 @@ function openBoard(path: string, upgrade: boolean): Board {
       beforeGroup: () => {
         if (othersPresent(hive, presenceId()).length) throw new OtherHiveError()
       },
-      whileGroupLocked: boardTestHooks.whileUpgrading ?? holdForTest
+      whileGroupLocked: boardTestHooks.whileUpgrading ?? holdForTest,
+      checkpointer: checkpointWhenIdle
     })
     const w = db.writer
     const b: Board = {
@@ -952,7 +954,7 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>, 
       // Undone part way, whatever the change made of the error meanwhile (a batch skips a card that fails): it fails whole.
       if (state.lost) throw state.lost
       if (!db.isTransaction) throw lostChange()
-      db.exec('COMMIT')
+      timedCommit(db, b.db.file)
       committed = true
       return out
     } catch (e) {
