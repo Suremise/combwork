@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 87
+const FIXTURES_VERSION = 88
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -36,10 +36,13 @@ const ran = (o, tool) => called(o, tool).filter((c) => c.ok)
 /**
  * Whether a reply or card puts a decision to the user: a question, or a request without a "?" ("Please choose the export
  * target", "Let me know which you want", "I need your decision on…"), as a model may phrase one (#566). A polite closing
- * ("Please let me know if you need anything else", "Tell me if anything is unclear") puts no decision and doesn't count.
+ * ("Please let me know if you need anything else", "Tell me if anything is unclear") puts no decision and doesn't count,
+ * nor does saying none is needed ("Nothing needs your decision right now", #1537).
  */
 const asksTheUser = (text) =>
-  /\?|\bplease (?:choose|decide|confirm|pick|select)\b|\b(?:let me know|tell me) (?:which|whether|how you(?:'d| would) like)\b|\b(?:need|needs|waiting for|awaiting|awaits?) your (?:decision|choice|call|answer|go-ahead|approval|confirmation)\b/i.test(String(text ?? ''))
+  /\?|\bplease (?:choose|decide|confirm|pick|select)\b|\b(?:let me know|tell me) (?:which|whether|how you(?:'d| would) like)\b|\b(?:need|needs|waiting for|awaiting|awaits?) your (?:decision|choice|call|answer|go-ahead|approval|confirmation)\b/i.test(
+    String(text ?? '').replace(/\b(?:nothing|no one|nobody)\s+(?:needs|is waiting for|awaits)\s+your\s+\w+/gi, '')
+  )
 /**
  * Starts Coder on a long task without a card before the subject's prompt (#416): ready (a trust question answered), then
  * the task typed in, until it is working. The fakes do "work N" (`fakeSecs`: the wake quotes Coder's reply, which the
@@ -1169,7 +1172,8 @@ module.exports.SCENARIOS = [
     fake: (c) => `skill work-on-card then ${fakeStart(c.cards.a)} then work 4 then checkpoint then ${fakeSubmit(c.cards.a)}`,
     expect: (o, c) => {
       const msg = (c.got ?? []).find((d) => d.kind === 'rebrief')
-      const asked = called(o, 'hive_notify').length > 0 || !!o.cards.a?.blocked || asksTheUser(o.finalReply) || (o.cards.a?.comments ?? []).some((x) => asksTheUser(x.text))
+      // hive_ask_user is the intent for it (a request under For you, #1537: Claude Code asked that way).
+      const asked = ran(o, 'hive_ask_user').length > 0 || called(o, 'hive_notify').length > 0 || !!o.cards.a?.blocked || asksTheUser(o.finalReply) || (o.cards.a?.comments ?? []).some((x) => asksTheUser(x.text))
       return [
         ['read it with hive_inbox', ran(o, 'hive_inbox').length > 0 && !!msg?.received, JSON.stringify(msg)],
         ['kept legacy.js', c.read('legacy.js') !== null, String(c.read('legacy.js'))],
@@ -3842,6 +3846,9 @@ module.exports.SCENARIOS.push(
       const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [a, b], rounds: 10, name: 'greetings' })
       if (r.status !== 200) throw new Error(`lane: ${r.text}`)
       for (const text of ["Round 1: FAILED. 1. greet.js has no test.", 'Fixed: greet.test.js covers greet().', "Round 2: FAILED. 1. README.md's example still says Hello."]) await c.api('POST', `/v1/tasks/${a}/comments`, { text })
+      // Coder at work on the fix, as Hive's wake left it (#1537: with Coder stopped the loop had stalled, a question fairly
+      // put to the user, not the loop's own round).
+      await busyCoder(c, 20, 600)
     },
     prompt: (c) =>
       `[Hive] #${c.cards.a} (Coder's card) is in Doing: Implementer failed it; latest comment by Implementer: "Round 2: FAILED. 1. README.md's example still says Hello." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).${LANES_RUNNING_TAIL}`,
@@ -3861,13 +3868,17 @@ module.exports.SCENARIOS.push(
     mode: 'coordinator',
     async setup(c) {
       await reviewedPair(c)
-      const r = await c.api('POST', '/v1/tasks', { project: 'alpha', title: 'Which greeting style?', description: 'Research: compare "Hi" and "Hello" in three style guides and recommend one, in a comment.', kind: 'no-code', agent: c.agents.coder.id })
-      if (r.status !== 200) throw new Error(`card: ${r.text}`)
-      c.cards.n = r.body.number
-      const l = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.n], name: 'research' })
+      // No-code as the user makes it (#1537: the API's kind on create is only an agent's proposal), its title no question
+      // (a reply quoting it isn't asking the user), and the research it asks for in its comments.
+      const n = await c.card('n', { title: 'Greeting style: Hi or Hello', description: 'Research: compare "Hi" and "Hello" in three style guides and recommend one, in a comment.', agent: 'coder' })
+      await c.inv('tasks:setKind', n, 'no-code', { confirm: true })
+      const l = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [n], name: 'research' })
       if (l.status !== 200) throw new Error(`lane: ${l.text}`)
-      await c.api('POST', `/v1/tasks/${c.cards.n}/comments`, { text: 'Passed: the comparison is sound; "Hi" is recommended.' })
-      await c.api('PATCH', `/v1/tasks/${c.cards.n}`, { column: 'done' })
+      await c.api('POST', `/v1/tasks/${n}/comments`, { text: 'Done: the three guides (Plain English, the house guide, the app store guide) all prefer "Hi" for short UI greetings; "Hello" reads formal. Recommendation: "Hi".' })
+      await c.api('POST', `/v1/tasks/${n}/comments`, { text: 'Passed: the comparison is sound; "Hi" is recommended.' })
+      await c.api('PATCH', `/v1/tasks/${n}`, { column: 'done' })
+      const card = (await c.api('GET', `/v1/tasks/${n}`)).body
+      if (card?.column !== 'done' || card?.kind !== 'no-code') throw new Error(`setup: the no-code card is ${card?.kind} in ${card?.column}`)
     },
     prompt: (c) => `[Hive] #${c.cards.n} (Coder's card) is in Done; latest comment by Implementer: "Passed: the comparison is sound; "Hi" is recommended." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`,
     fake: (c) => `skill coordinate-agents then hive hive_read_task {"number":${c.cards.n},"latestComment":true} then hive hive_lane {"action":"list"}`,
