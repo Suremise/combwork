@@ -238,7 +238,9 @@ the turn (`GET /v1/metrics` of the run's own workspace), and the difference is t
 Compare two runs in Hive: **Performance → Compare → Import…** each `benchmark.json` (in the Performance view, with the
 whole workspace selected: a benchmark is its test workspace's, never a project's or the own work's). Each sample keeps
 every check (passed, failed, skipped), the measurement's coverage, and the guidance and skill revisions the session was
-given. Scenarios are judged **correctness first**, check by check:
+given, and its **observations**: what a scenario records without checking it (`observe`, #1611: whether the skill that
+owns a workflow was read, where the behaviour is what's checked), in `results.json` and the sample, never a pass or a
+failure. Scenarios are judged **correctness first**, check by check:
 - *Smaller, still correct*: less Hive context; every check that passed still passes and still runs; no more calls,
   failures (failed calls, tool errors, API failures, cancellations) or retries.
 - *Smaller but failing*: less context but a check passed or ran less often. A cut that breaks a workflow isn't an

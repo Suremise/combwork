@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 89
+const FIXTURES_VERSION = 91
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -126,6 +126,20 @@ async function userMove(c, n, column) {
   if (why) throw new Error(`setup: moving #${n} to ${column}: ${JSON.stringify(why)}`)
   const there = await require('../e2e/lib.cjs').until(async () => (await c.api('GET', `/v1/tasks/${n}`)).body?.column === column && (column !== 'review' || (await submitted()) > before), 15000)
   if (!there) throw new Error(`setup: #${n} isn't in ${column} with its move: ${JSON.stringify(r)}`)
+}
+/**
+ * Before the prompt (#1613): Hive's wake for card `key` that setup left the subject (Coder) has rung its doorbell, been
+ * read, and its turn is over. The doorbell is typed into the idle session as the harness types the prompt: on Copilot
+ * the prompt was sometimes lost to the doorbell's turn.
+ */
+async function wakeRead(c, key) {
+  const wakeIsRead = async () => {
+    const mine = (await c.deliveries('coder')).filter((d) => d.card === c.cards[key])
+    // Read, and none waiting to ring (one replaced by a newer wake is cancelled); its turn over, ending idle or, having
+    // acted on the wake (answered and armed a watch), watching.
+    return mine.some((d) => ['received', 'acked'].includes(d.state)) && !mine.some((d) => ['queued', 'offered', 'uncertain'].includes(d.state)) && ['ready', 'finished', 'watching'].includes(await c.subjectStatus())
+  }
+  if (!(await require('../e2e/lib.cjs').until(wakeIsRead, 120000))) throw new Error(`setup: Coder's wake for #${c.cards[key]} wasn't read: ${JSON.stringify(await c.deliveries('coder'))}, ${await c.subjectStatus()}`)
 }
 /**
  * The fake builder's work on greet.js, committed before its card goes to Review (#1486: a submit needs a change). A step
@@ -2798,6 +2812,7 @@ module.exports.SCENARIOS = [
       if (posted.status !== 200) throw new Error(`design: ${JSON.stringify(posted.body)}`)
       c.design = posted.body.data.design
     },
+    beforePrompt: (c) => wakeRead(c, 'd'),
     prompt: (c) => `You are the reviewer in Implementer's card loop (the card-loop skill). On card #${c.cards.d}, Implementer posted a design for your check before building: check it and answer as your loop says.`,
     fake: (c) =>
       `skill card-loop then hive hive_read_task {"number":${c.cards.d},"latestComment":true} then hive hive_wait_for_tasks {"cards":[${c.cards.d}],"changes":["comment"],"wake":true} then hive hive_loop_step ${JSON.stringify({ card: `#${c.cards.d}`, step: 'gaps', text: '1. Add a test for expiry and for invalidation on write.', design: c.design })}`,
@@ -2873,6 +2888,7 @@ module.exports.SCENARIOS = [
       if (posted.status !== 200) throw new Error(`follow-up: ${JSON.stringify(posted.body)}`)
       c.followUp = posted.body.data.design
     },
+    beforePrompt: (c) => wakeRead(c, 'f'),
     prompt: (c) => `You are the reviewer in Implementer's card loop (the card-loop skill). On card #${c.cards.f}, in Review, the user asked for a change for you to check, and Implementer has posted it as a follow-up: check it and answer as your loop says.`,
     fake: (c) =>
       `skill card-loop then hive hive_read_task {"number":${c.cards.f},"latestComment":true} then hive hive_wait_for_tasks {"cards":[${c.cards.f}],"changes":["comment","column"],"wake":true} then hive hive_loop_step ${JSON.stringify({ card: `#${c.cards.f}`, step: 'gaps', text: '1. Add a test for the trimmed name.', design: c.followUp })}`,
@@ -3152,11 +3168,12 @@ module.exports.SCENARIOS = [
       const s = await coderLive(c)
       if (s) c.coderWatch = s.watch?.cards ?? null
     },
+    // The relay's behaviour is what's checked (#1611): whether it read coordinate-agents, the skill that owns it, is recorded.
+    observe: (o) => [['read the coordinate-agents skill', read(o, 'coordinate-agents'), o.skillsRead.join(',')]],
     expect: (o, c) => {
       const msgs = called(o, 'hive_message_agent')
       const sent = msgs.some((x) => x.ok && /coder/i.test(String(argsOf(x).agent)) && /json/i.test(String(argsOf(x).text ?? '')))
       return [
-        ['read the coordinate-agents skill', read(o, 'coordinate-agents'), o.skillsRead.join(',')],
         ['left Coder a message with the answer (hive_message_agent), which worked', sent, msgs.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
         ["didn't give it a task or stop it", called(o, 'hive_prompt_agent').length === 0 && called(o, 'hive_stop_agent').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
         ["didn't ask the user to paste it into Coder's pane", !/\bpaste\b/i.test(o.finalReply ?? '') && called(o, 'hive_notify').length === 0, (o.finalReply ?? '').slice(0, 300)],

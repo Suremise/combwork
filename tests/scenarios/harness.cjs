@@ -581,6 +581,10 @@ async function runScenario(sc, providerKey, opts = {}) {
     // What the session under test was given at its launch (after setup): Hive's guidance and each skill as delivered.
     const subject = sc.role === 'assistant' ? (await inv('workspace:refresh')).assistant : (await inv('workspace:refresh')).projects.find((x) => x.name === 'alpha')
     result.guidance.delivered = subject?.agents.find((a) => a.id === agentId)?.live?.launched ?? null
+    // What setup left the session under test rings its doorbell once it's idle, as the prompt is typed (#1613: on Copilot
+    // the prompt was lost to the doorbell's turn). A scenario's beforePrompt waits for that turn, so the prompt comes after.
+    ctx.subjectStatus = async () => (await live())?.status ?? 'stopped'
+    if (sc.beforePrompt && !endedAtLaunch) await sc.beforePrompt(ctx)
     const prompt = typeof sc.prompt === 'function' ? sc.prompt(ctx) : sc.prompt
     const fakePrompt = typeof sc.fake === 'function' ? sc.fake(ctx) : sc.fake
     const text = p.fake ? fakePrompt : prompt
@@ -741,6 +745,9 @@ async function runScenario(sc, providerKey, opts = {}) {
     result.checks = (sc.expect?.(observed, ctx) ?? []).map(([name, ok, detail]) =>
       p.fake && (typeof sc.fakeSkips === 'function' ? sc.fakeSkips(providerKey) : (sc.fakeSkips ?? [])).includes(name) ? { name, ok: null, skipped: 'fake provider' } : { name, ok: !!ok, ...(ok ? {} : { detail: String(detail ?? '').slice(0, 300) }) }
     )
+    // What a scenario records without checking it (#1611: whether the skill that owns the workflow was read, when the
+    // behaviour is what's checked): in the results and the benchmark, never a pass or a failure.
+    if (sc.observe) result.observations = sc.observe(observed, ctx).map(([name, value, detail]) => ({ name, value: !!value, ...(detail === undefined ? {} : { detail: String(detail).slice(0, 300) }) }))
     // Kept short in the results (whole tool calls can be large, and must not carry a token).
     const short = (v) => tokens.reduce((x, t) => x.split(t).join('<token>'), String(v)).slice(0, 400)
     result.observed = { ...observed, tools: observed.tools.map((t) => ({ ...t, input: short(t.input), result: short(t.result) })), replies: undefined, settings: undefined, finalReply: short(observed.finalReply) }
