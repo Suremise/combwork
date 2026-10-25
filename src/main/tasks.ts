@@ -1513,8 +1513,9 @@ async function doAskAction(n: number, kind: AskActionKind, reason: string | unde
  * are one transaction, checked there (the request still open, the card where it was asked, its generation current). A
  * decision (a Decide answer) is the card's, added with the answer's write: a new generation, its agents told (#1266). A
  * reply is kept with the answer, added to the card as the user's comment and relayed to the waiting agent. Refused with the rule's text when the request was
- * answered or retired meanwhile. An action the question offered (#1630) is done first, then answers it: refused, the
- * question stays open.
+ * answered or retired meanwhile. An action the question offered (#1630) and the answer are one change of the board
+ * (HR5's round 1): the request still open and the action still allowed, checked under its lock, then the action, then
+ * the answer; any of them refused, none of it is kept and the question stays open.
  */
 export async function answerTask(n: number, request: string, a: ForYouAnswer): Promise<TaskCard> {
   const ws = workspace
@@ -1544,21 +1545,28 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   // its rounds); any other question, a reply or a decision. Checked before anything is written.
   const choice = a.choice as RoundChoice | undefined
   if (!answerFits(req, { outcome: a.outcome, reply: !!reply, decision: !!decision, choice, rounds: a.rounds, ...(action ? { action } : {}) }, LANE_MAX_ROUNDS)) throw bad()
-  if (action) {
-    const card = await getTask(n, ws)
-    if (!askActionAvailable(action, { ...card, kind: rec!.kind })) throw hiveError(ACTION_GONE, { action, n }, { kind: 'conflict' })
-    await doAskAction(n, action, reason)
+  const answerIt = async (): Promise<TaskCard> => {
+    const { reply: r } = await runIntent(
+      wf,
+      n,
+      actor,
+      (w) => w.answer(n, request, a.outcome, { ...(reply ? { note: reply } : reason ? { note: reason } : {}), ...(decision ? { decided: true } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}), ...(action ? { action } : {}) }),
+      // A reply is on the card too, as the user's comment (#1626), so the card shows it and the wake's "in full" is there.
+      (_w, first) => ({ patch: first && decision ? { decision } : {}, ...(first && reply ? { opts: { comment: reply } } : {}) })
+    )
+    if (isRefusal(r)) throw new WorkflowRefusedError(r)
+    return getTask(n, ws)
   }
-  const { reply: r } = await runIntent(
-    wf,
-    n,
-    actor,
-    (w) => w.answer(n, request, a.outcome, { ...(reply ? { note: reply } : reason ? { note: reason } : {}), ...(decision ? { decided: true } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}), ...(action ? { action } : {}) }),
-    // A reply is on the card too, as the user's comment (#1626), so the card shows it and the wake's "in full" is there.
-    (_w, first) => ({ patch: first && decision ? { decision } : {}, ...(first && reply ? { opts: { comment: reply } } : {}) })
-  )
-  if (isRefusal(r)) throw new WorkflowRefusedError(r)
-  return getTask(n, ws)
+  if (!action) return answerIt()
+  return cardBatch(ws, async () => {
+    // Under the board's lock: the request still open (answered or retired from another window meanwhile: refused before
+    // anything is done) and the action still allowed.
+    if (!wf.state(wf.store.card(n)).requests.some((x) => x.request === request)) throw new WorkflowRefusedError(refusalOf('move.notFromHere', { card: `#${n}`, stage: CATEGORY_STAGE[head.column as TaskColumn] ?? 'todo', move: 'answer', moves: '' }))
+    if (!askActionAvailable(action, { ...(await getTask(n, ws)), kind: wf.store.card(n).kind })) throw hiveError(ACTION_GONE, { action, n }, { kind: 'conflict' })
+    await doAskAction(n, action, reason)
+    // A refused answer throws: the action is undone with it.
+    return answerIt()
+  })
 }
 
 /** A new card's reads, made before its number is taken (#1216: recorder.ts' NEW_CARD). */

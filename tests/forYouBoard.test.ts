@@ -7,7 +7,7 @@
 import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -272,6 +272,64 @@ describe('For you on the board (#1269)', () => {
     expect(FactStore.forBoard(w, { project: 'p', key: 'p' }).card(card).kind).toBe('no-code')
     expect(facts(w, card).find((f) => f.kind === 'Override')?.data).toMatchObject({ rules: ['card.kind'], reason: 'a write-up' })
     expect(forYou(w).count).toBe(0)
+  })
+
+  it("an offered action and its answer are one change: another window's answer meanwhile waits and is refused; a refused answer undoes the action (#1630 round 1)", async () => {
+    const { w } = await workspace({ ...allOff('git'), review: 'agent', finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    const kind = () => FactStore.forBoard(w, { project: 'p', key: 'p' }).card(card).kind
+    const of = (k: string) => facts(w, card).filter((f) => f.kind === k)
+    const ask = async (text: string) => {
+      await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text, actions: [{ kind: 'noCode', reason: 'a write-up' }] }))
+      return forYou(w).items.find((i) => i.text === text)!.request
+    }
+    // The runtime's answer, wherever the intent path calls it from.
+    const proto = Object.getPrototypeOf(wf) as typeof wf
+    const real = proto.answer
+    // HR5's probe: the second window's reply starts after the action is written, before its answer is.
+    const first = await ask('A write-up only?')
+    let other: Promise<unknown> | null = null
+    // What another connection (another window's Hive) sees of the card while the answer is being written.
+    let seenOutside: string | null = null
+    const spy = vi.spyOn(proto, 'answer').mockImplementation(function (this: typeof wf, ...args: Parameters<typeof wf.answer>) {
+      if (!other) {
+        const own = FactStore.open(store.boardFile(w.path!), { project: 'p', key: 'p' })
+        try {
+          seenOutside = own.card(card).kind
+        } finally {
+          own.close()
+        }
+      }
+      if (!other) other = answer(w, card, first, { outcome: 'answered', reply: 'Keep it as code; I will finish it' }).then(() => 'answered', (e: unknown) => (e instanceof tasks.WorkflowRefusedError ? 'refused' : String(e)))
+      return real.apply(this, args)
+    })
+    try {
+      await answer(w, card, first, { outcome: 'answered', action: 'noCode', reason: 'a write-up' })
+      expect(await other).toBe('refused')
+      // The action isn't committed before its answer: nobody else sees the card changed and the question still open.
+      expect(seenOutside).toBe('code')
+    } finally {
+      spy.mockRestore()
+    }
+    expect(kind()).toBe('no-code')
+    expect(of('Approval').map((f) => f.data)).toEqual([expect.objectContaining({ request: first, action: 'noCode', note: 'a write-up' })])
+    // Back to code, asked again: its answer refused after the action, the action is undone with it and the question stays.
+    await inWorkspace(w, () => tasks.setKind(card, 'code', user, { confirm: true }))
+    const second = await ask('A write-up after all?')
+    const overrides = of('Override').length
+    const refuse = vi.spyOn(proto, 'answer').mockImplementation(async () => {
+      throw new Error('the answer was refused')
+    })
+    try {
+      await expect(answer(w, card, second, { outcome: 'answered', action: 'noCode', reason: 'a write-up' })).rejects.toThrow(/refused/)
+    } finally {
+      refuse.mockRestore()
+    }
+    expect(kind()).toBe('code')
+    expect(of('Override')).toHaveLength(overrides)
+    expect(forYou(w).items.map((i) => i.request)).toEqual([second])
   })
 
   it("an agent's question: a decision as its answer is recorded on the card (a new generation), the asker told", async () => {
