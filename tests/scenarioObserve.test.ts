@@ -490,15 +490,15 @@ describe('the fixtures fail when nothing was done', () => {
   })
 
   it('assistant-dispatch: names alone, failed calls, or a wait before the start, and a card never finished, all fail', () => {
-    const ctx = { read: () => null, cards: { i: 7 } }
-    const waited = 'then followed it with a wait or a watch (hive_wait_for_agents, or hive_wait_for_tasks on its card), which worked'
+    const ctx = { read: () => null, cards: { i: 7 }, agents: { coder: { id: 'a-coder' } } }
+    const waited ='then followed it with a wait or a watch (hive_wait_for_agents, or hive_wait_for_tasks on its card), which worked'
     const run = (hiveCalls: unknown[], cards = { i: { column: 'todo' } }) => failed(scenario('assistant-dispatch').expect({ ...base, skillsRead: ['coordinate-agents'], hiveMentions: ['hive_start_task', 'hive_wait_for_agents'], hiveCalls, cards }, ctx))
-    expect(run([])).toEqual(expect.arrayContaining(['started the card with hive_start_task, which worked', waited, 'the agent did it: the card is in Review and the file is there']))
+    expect(run([])).toEqual(expect.arrayContaining(['started the card with hive_start_task, which worked', waited, 'the agent did it: the card handed on (in Review, or past it by its submission) and the file is there']))
     expect(run([{ tool: 'hive_start_task', ok: false }, { tool: 'hive_wait_for_agents', ok: true }])).toContain('started the card with hive_start_task, which worked')
     expect(run([{ tool: 'hive_wait_for_agents', ok: true }, { tool: 'hive_start_task', ok: true }])).toContain(waited)
-    expect(run([{ tool: 'hive_start_task', ok: true }, { tool: 'hive_wait_for_agents', ok: true }])).toEqual(['the agent did it: the card is in Review and the file is there'])
+    expect(run([{ tool: 'hive_start_task', ok: true }, { tool: 'hive_wait_for_agents', ok: true }])).toEqual(['the agent did it: the card handed on (in Review, or past it by its submission) and the file is there'])
     // A card watch on the card it started counts (#416); one on another card doesn't.
-    expect(run([{ tool: 'hive_start_task', ok: true }, { tool: 'hive_wait_for_tasks', ok: true, args: '{"cards":[7],"wake":true}' }])).toEqual(['the agent did it: the card is in Review and the file is there'])
+    expect(run([{ tool: 'hive_start_task', ok: true }, { tool: 'hive_wait_for_tasks', ok: true, args: '{"cards":[7],"wake":true}' }])).toEqual(['the agent did it: the card handed on (in Review, or past it by its submission) and the file is there'])
     expect(run([{ tool: 'hive_start_task', ok: true }, { tool: 'hive_wait_for_tasks', ok: true, args: '{"cards":[8],"wake":true}' }])).toContain(waited)
   })
 
