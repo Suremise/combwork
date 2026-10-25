@@ -52,10 +52,10 @@ import { placeOnDisplay } from './windowBounds'
 import { startBranchWatch } from './branchWatch'
 import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
-import { releaseQueueRunners } from './workflow/queueRunner'
+import { queueFolderNeeded, releaseQueueRunners } from './workflow/queueRunner'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { poolFor, startSlots, stopSlots } from './slotsApp'
-import { setSlotPools } from './unusedWorktrees'
+import { setQueueNeed, setSlotPools } from './unusedWorktrees'
 import { quitSlotCards, startSlotCards, stopSlotCards } from './slotCards'
 import { startSlotMigration, stopSlotMigration } from './slotMigration'
 import { startReviewerPool, stopReviewerPool } from './reviewerPool'
@@ -64,7 +64,7 @@ import { startCopies, stopCopies } from './copiesApp'
 import { startReviewCopies, stopReviewCopies } from './reviewCopies'
 import { setAgentBusy, startLineUpdates } from './workflow/lineUpdates'
 import { startLockRecords } from './workflow/lockRecord'
-import { setQueueLive, setRunsGoing } from './workflow/service'
+import { setQueueLive, setRunsGoing, workflowFor } from './workflow/service'
 import { isOpenRun } from '../shared/progress'
 import { createLogger, userText, logsDir } from './logger'
 import { killAll } from './ptyHost'
@@ -1006,6 +1006,11 @@ app.whenReady().then(async () => {
   startSlots()
   // Unused Worktrees reads the slots through those pools (#1450, #1519).
   setSlotPools(poolFor)
+  // …and asks whether a merge queue still needs a folder it kept (#1644): no workflow known, it does.
+  setQueueNeed(async (ws, projectPath, target) => {
+    const wf = await workflowFor(ws, projectPath)
+    return wf ? queueFolderNeeded(wf, target) : true
+  })
   // Cards on slots (#1438): a start lends its builder a slot and makes its line there, Done or put back gives it back.
   startSlotCards()
   // Agents' worktrees adopted as slots at the 1.0 upgrade (#1441): which projects are migrated, and their retired homes.

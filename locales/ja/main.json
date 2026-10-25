@@ -314,6 +314,7 @@
   "main.unused.why.notUnused": "今はプロジェクトの未使用ワークツリーではありません（エージェントの会話、レビュー用コピー、またはマージキューが使っている可能性があります）",
   "main.unused.why.otherProject": "ワークスペースの別のプロジェクトです",
   "main.unused.why.owned": "現在エージェントが作業しています",
+  "main.unused.why.queueBusy": "マージキューが使用中です",
   "main.unused.why.session": "セッションが実行中です",
   "main.unused.why.slotGuarded": "これはスロットで、Hiveはクリーンで作業がマージ済みのときだけ削除します",
   "main.unused.why.slotInUse": "使用中のスロットです",

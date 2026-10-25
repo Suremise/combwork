@@ -314,6 +314,7 @@
   "main.unused.why.notUnused": "它现在不是项目的未使用工作树（智能体的对话、评审副本或合并队列可能正在使用它）",
   "main.unused.why.otherProject": "它是工作区中的另一个项目",
   "main.unused.why.owned": "现在有智能体在其中工作",
+  "main.unused.why.queueBusy": "合并队列正在使用它",
   "main.unused.why.session": "有会话在其中运行",
   "main.unused.why.slotGuarded": "这是一个槽位，Hive 只会在它干净且工作已合并时移除",
   "main.unused.why.slotInUse": "这是正在使用的槽位",

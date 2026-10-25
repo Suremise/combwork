@@ -505,6 +505,7 @@
   "workspace.unused.kind.carried": "worktree antigo de um agente, abandonado",
   "workspace.unused.kind.dirtySlot": "slot com alterações, não emprestado",
   "workspace.unused.kind.home": "pasta antiga, sem conversas",
+  "workspace.unused.kind.queue": "pasta antiga da fila de merge, não é mais necessária",
   "workspace.unused.kind.slot": "slot livre além do grupo",
   "workspace.unused.lostCommits": "{count, plural, one {# commit} other {# commits}} no branch {branch} fora {known, select, yes {de {into}} other {de qualquer outro branch}}",
   "workspace.unused.lostDetached": "{count, plural, one {# commit fora de qualquer branch (só o detached HEAD do worktree o tem)} other {# commits fora de qualquer branch (só o detached HEAD do worktree os tem)}}",
