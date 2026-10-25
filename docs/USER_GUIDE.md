@@ -825,6 +825,12 @@ Turn every rule off at once with **Settings → Advanced → Workflow rules are 
 
 Some cards have no code to write: a decision, a write-up, a trial. Make one with **No code (a decision, a write-up, a trial…)** in the New Card dialog: its tile and its dialog say **No code**, and when its work is done it is submitted with a summary instead of commits, reviewed if your project reviews work, and goes to Done with nothing to merge. An agent that adds a card can only propose it as no code: the card shows **No code?** and its dialog asks you to **Confirm No Code** or **Keep as Code**. To change a card's kind after it was made, use **Make It Code…** or **Make It No Code…** beside its **Kind** in the dialog: as it is an exception to its rules, Hive asks first and records it on the card with your reason. The Hive Assistant changes a kind only with your reason; agents never change it.
 
+### Skipping review <a id="skipping-review"></a>
+
+Some cards need no reviewer even where your project reviews work: building an installer once its fixes have merged, say, or a quick trial. Tick **Skip review** in the New Card dialog (with a note on why, if you like): submitting the card then finishes it with no review. A no-code card goes to Done; a code card goes on to its merge as your project merges work, with its merge checks and any OK before merging you asked for, so nothing unchecked reaches its target. The card shows **Review skipped** (point at it for who set it and why) and its history says so. Until the card is submitted you can change your mind beside **Review** in its dialog (**Skip Review…** or **Review It**); once it is in Review, the way past its review is moving it on, which records an override with your reason. The box only shows where the card's project reviews work.
+
+The Hive Assistant can make a card skip review only with your reason, in your words. An agent can only propose it, with its reason, when it makes the card: the card shows **Skip review?** and its dialog asks you to **Skip Review** or **Keep Review**.
+
 ### For you <a id="for-you"></a>
 
 Some cards wait for you: a review or an OK that is yours to give, a question an agent asked (*"OK to push the release tag?"*), a rule an agent couldn't keep, or a card loop that reached its round limit. Each such card shows a **For you** chip with what it asks (Approve, Decide, Test, Sign in or Other; hover it to read the request), the **Task Board** icon on the activity bar counts them, and the **For you** box in the board's toolbar shows only those cards (with the search box, both apply).

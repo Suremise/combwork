@@ -8788,6 +8788,15 @@ body.pane-resizing-v .monaco-editor {
 .task-kind.proposed {
   border-style: dashed;
 }
+/* Review: Skip (#1625): the New Card dialog's tick box and its note, side by side. */
+.review-skip-new {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.review-skip-new .input {
+  flex: 1;
+  min-width: 160px;
+}
 .kind-field {
   gap: 6px;
 }

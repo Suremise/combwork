@@ -6,7 +6,7 @@ import type { Db } from '../db'
 import { boardRead } from '../boardStore'
 import type { WorkspaceService } from '../workspace'
 import { CATEGORY_STAGE, foldCard, STAGE_CATEGORY, ROUND_LIMIT_GATE, type CardKind, type Category, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
-import { forYouItems, kindProposed, workBadge, workView, type ForYouSummary, type WorkBadge, type WorkCard, type WorkView } from '../../shared/workflow/workView'
+import { forYouItems, kindProposed, reviewSkipOf, workBadge, workView, type ForYouSummary, type WorkBadge, type WorkCard, type WorkView } from '../../shared/workflow/workView'
 import { factOf } from './factStore'
 import { QUERIES } from '../schema/v1_0'
 
@@ -131,6 +131,14 @@ export function cardKind(ws: WorkspaceService, n: number): { kind: CardKind; kin
     if (!r) return null
     const facts = (db.prepare(QUERIES['facts.ofCard'].sql).all(n) as Row[]).map(factOf).filter((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided')
     return { kind: r.kind, kindProposed: kindProposed(facts) }
+  })
+}
+
+/** Whether a card skips review and an open proposal of it (#1625), from its facts; null on a board waiting for its 1.0 upgrade. */
+export function cardReviewSkip(ws: WorkspaceService, n: number): ReturnType<typeof reviewSkipOf> | null {
+  return boardRead(ws, (db) => {
+    if (!hasFacts(db)) return null
+    return reviewSkipOf((db.prepare(QUERIES['facts.ofCard'].sql).all(n) as Row[]).map(factOf).filter((f) => f.kind === 'ReviewSkipSet' || f.kind === 'ReviewSkipProposed'))
   })
 }
 

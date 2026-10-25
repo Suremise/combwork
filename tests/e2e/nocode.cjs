@@ -2,7 +2,10 @@
 // so; S25 (a reviewer agent: submitted with a summary and no revision, passed, Done, no queue, nothing integrated); S38
 // (no review, None and Git: submitted with a summary → Done, no revision, no Integrated); a project agent's no-code is
 // only proposed (the card stays code, its tile marks the proposal) until the user confirms it in the card's dialog; and
-// changing the kind later asks first and records one override. Screenshots of the tile and the dialog in both themes.
+// changing the kind later asks first and records one override. Review: Skip (#1625): offered in the New Card dialog
+// only where the project reviews, a card made with it Done at its submission with no reviewer, its tile's mark; an
+// agent's proposal (with its reason) answered in the dialog, an agent's change refused (403); the dialog's Skip Review…
+// and Review It before submission. Screenshots of the tile and the dialog in both themes.
 // Fake Claude Code agents call the Agent API with their own tokens. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -167,6 +170,64 @@ const check = (name, ok, extra = '') => {
     // An agent can't change it.
     const agentChange = await api('builder', 'PATCH', `/v1/tasks/%23${p}`, { kind: 'no-code' })
     check("an agent can't change a card's kind (403)", agentChange.status === 403 && (await work(p))?.kind === 'code', JSON.stringify(agentChange))
+    await page.keyboard.press('Escape')
+
+    // --- Review: Skip (#1625): the New Card dialog offers it where the project reviews (alpha), not where it doesn't.
+    await page.locator('.board-toolbar button', { hasText: 'New Card' }).first().click()
+    await edit.waitFor({ timeout: HUNG_MS })
+    await edit.locator('.task-title-input').fill('Build the installer')
+    await edit.locator('select:has(option[value="alpha"])').first().selectOption('gamma')
+    const skipBox = edit.locator('.review-skip-new input[type="checkbox"]')
+    check("Skip review isn't offered where the project doesn't review (gamma)", !!(await lib.until(async () => (await edit.locator('.kind-new').count()) === 1, HUNG_MS)) && (await skipBox.count()) === 0)
+    await edit.locator('select:has(option[value="alpha"])').first().selectOption('alpha')
+    check('…and is where it does (alpha)', !!(await lib.until(async () => (await skipBox.count()) === 1, HUNG_MS)))
+    await edit.locator('.kind-new input').check()
+    await skipBox.check()
+    await edit.locator('.review-skip-new input.input').fill('An installer build')
+    await themes('skip-new', edit.locator('.task-form'))
+    await edit.getByRole('button', { name: 'Add Card' }).click()
+    const skipMade = await lib.until(async () => (await inv('tasks:list')).find((c) => c.title === 'Build the installer'), HUNG_MS)
+    const s = skipMade?.number
+    check('the New Card dialog makes a card that skips review, with the note', !!skipMade && JSON.stringify((await work(s))?.reviewSkip) === JSON.stringify({ by: 'user', reason: 'An installer build' }), JSON.stringify(await work(s)))
+    const sMark = tile(s).locator('.task-kind[data-review-skip="skipped"]')
+    check('its tile says Review skipped, who and why in its accessible name', !!(await lib.until(async () => (await sMark.count()) === 1, HUNG_MS)) && (await sMark.getAttribute('aria-label')) === 'Review skipped, set by you: An installer build', await sMark.getAttribute('aria-label'))
+    await themes('skip-tile', tile(s))
+    const sRef = encodeURIComponent(skipMade.key)
+    check('the builder starts it', (await api('builder', 'POST', `/v1/tasks/${sRef}/start`)).status === 200)
+    const sSub = await api('builder', 'POST', `/v1/tasks/${sRef}/submit`, { summary: 'Built.' })
+    const sk = await facts(s)
+    check('submitted: Done at once, with no reviewer', sSub.status === 200 && (await card(s))?.column === 'done' && !sk.includes('ReviewStarted') && !sk.includes('Verdict') && sk.includes('Accepted'), JSON.stringify({ body: sSub.body, facts: sk }))
+
+    // --- A project agent only proposes it, with its reason: the user keeps the review in the dialog; agents never set it.
+    const skipProposed = await api('builder', 'POST', '/v1/tasks', { title: 'Rename the helper', skipReview: 'It only renames a file' })
+    const q = skipProposed.body?.number
+    check('an agent proposes skipping review: the card is reviewed, the proposal on it', skipProposed.status === 200 && !skipProposed.body?.reviewSkipped && skipProposed.body?.reviewSkipProposed === 'It only renames a file', JSON.stringify(skipProposed.body))
+    check('…its tile marks the proposal', !!(await lib.until(async () => (await tile(q).locator('.task-kind[data-review-skip="proposed"]').count()) === 1, HUNG_MS)))
+    const agentSkip = await api('builder', 'PATCH', `/v1/tasks/%23${q}`, { skipReview: 'x' })
+    check("an agent can't make a card skip review (403)", agentSkip.status === 403 && !(await work(q))?.reviewSkip, JSON.stringify(agentSkip))
+    check('skipReview: true is refused (400)', (await api('builder', 'PATCH', `/v1/tasks/%23${q}`, { skipReview: true })).status === 400)
+    await tile(q).click()
+    await dialog.waitFor({ timeout: HUNG_MS })
+    const skipBanner = dialog.locator('[data-section="review-skip-proposal"]')
+    check('its dialog asks: Skip Review or Keep Review, with the agent\'s reason', !!(await lib.until(async () => (await skipBanner.count()) === 1, HUNG_MS)) && (await skipBanner.innerText()).includes('It only renames a file'))
+    await themes('skip-proposal', skipBanner)
+    await skipBanner.getByRole('button', { name: 'Keep Review' }).click()
+    check('Keep Review: the proposal answered, the card reviewed', !!(await lib.until(async () => (await work(q))?.reviewSkipProposed === null, HUNG_MS)) && !(await work(q))?.reviewSkip && (await facts(q)).includes('ReviewSkipSet'), JSON.stringify(await work(q)))
+
+    // --- Changed in the dialog before it is submitted: Skip Review… asks why (optional), Review It sets it back.
+    const skipButton = dialog.getByRole('button', { name: 'Skip Review…' })
+    check('its Review field offers Skip Review…', !!(await lib.until(async () => (await skipButton.count()) === 1, HUNG_MS)))
+    await skipButton.click()
+    const why = page.locator('.dialog', { hasText: 'Skip the review of' }).filter({ has: page.locator('.dialog-field-label') })
+    check('Skip Review… asks first, saying what it means', !!(await lib.until(async () => (await why.count()) === 1 && (await why.innerText()).includes('finish it with no review'), HUNG_MS)), await why.innerText().catch(() => ''))
+    await themes('skip-ask', why)
+    await why.locator('input').fill('A rename after all')
+    await why.getByRole('button', { name: 'Skip Review' }).click()
+    check('…then it skips review, with the note', !!(await lib.until(async () => (await work(q))?.reviewSkip?.reason === 'A rename after all', HUNG_MS)))
+    check('…and its dialog says so, with Review It', !!(await lib.until(async () => (await dialog.locator('[data-review-skip="skipped"]').count()) >= 1 && (await dialog.getByRole('button', { name: 'Review It' }).count()) === 1, HUNG_MS)))
+    await themes('skip-dialog', dialog.locator('.task-form'))
+    await dialog.getByRole('button', { name: 'Review It' }).click()
+    check('Review It: reviewed again', !!(await lib.until(async () => (await work(q))?.reviewSkip === null, HUNG_MS)))
     await page.keyboard.press('Escape')
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))

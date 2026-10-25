@@ -23,10 +23,10 @@ import { FactStore } from './workflow/factStore'
 import { gitStep } from './platform/git'
 import type { CardKind } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
-import { hasStage } from '../shared/workflow/compile'
+import { hasStage, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT } from '../shared/workflow/stages'
 import { answerFits, CATEGORY_STAGE, STAGE_CATEGORY, type RoundChoice, type StageId } from '../shared/workflow/facts'
-import type { ForYouAnswer } from '../shared/workflow/workView'
+import { reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
 import { afterBoardWrite, archiveBatchDocs, boardSavepoint, movedNames, boardRead, boardReadOnly, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
@@ -988,7 +988,7 @@ export async function createTask(...args: Parameters<typeof createTaskLocked>): 
 }
 
 async function createTaskLocked(
-  input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind },
+  input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string },
   actor: TaskActor
 ): Promise<TaskCard> {
   if (!workspace.path) throw hiveError(ERR.noWorkspace, undefined, { kind: 'conflict' })
@@ -1015,6 +1015,12 @@ async function createTaskLocked(
   // Its kind (#1277, §16.7.3): the user's or the Assistant's from the start; a project agent's only proposed (OP-6/OP-7).
   const kind = kindOf(input.kind)
   const proposes = kind === 'no-code' && actor.kind === 'agent'
+  // Review: Skip (#1625): the user's (an optional note) or the Assistant's (the user's reason) from the start; a project
+  // agent's (with its reason) only proposed. Only where the card's rules review.
+  const skipReason = input.skipReview === undefined ? null : reviewSkipArg(input.skipReview)
+  if (skipReason === false) throw hiveError(msg({ id: 'tasks.error.badReviewSkipNew', defaultMessage: "A new card reviews as its rules say: give skipReview the user's reason to skip it, or leave it out.", description: "An error: a card was made with skipReview false. Keep skipReview as it is (a field's name)." }), undefined, { kind: 'invalid' })
+  if (skipReason !== null && actor.kind !== 'user' && !skipReason) throw new TaskConflictError(SKIP.needsReason)
+  if (skipReason !== null && !(await reviewsOf(ws, project, null))?.reviews) throw new TaskConflictError(SKIP.nothingNew)
   const n = await nextNumber(ws)
   const card: TaskCard = {
     number: n,
@@ -1032,7 +1038,11 @@ async function createTaskLocked(
     ...(context.length ? { context } : {}),
     ...(problems.length ? { contextProblems: problems } : {}),
     comments: [],
-    history: [entryOf(now, by, storedText(HISTORY.created, { column })), ...(kind === 'no-code' ? [entryOf(now, by, storedText(HISTORY.kind, { how: proposes ? 'proposed' : 'made', kind }))] : [])],
+    history: [
+      entryOf(now, by, storedText(HISTORY.created, { column })),
+      ...(kind === 'no-code' ? [entryOf(now, by, storedText(HISTORY.kind, { how: proposes ? 'proposed' : 'made', kind }))] : []),
+      ...(skipReason !== null ? [entryOf(now, by, storedText(HISTORY.reviewSkip, { how: actor.kind === 'agent' ? 'proposed' : 'set' }))] : [])
+    ],
     archived: false,
     createdAt: now,
     createdBy: by,
@@ -1041,6 +1051,11 @@ async function createTaskLocked(
   const store = kind === 'no-code' ? FactStore.forBoard(ws, { project: card.project, key: '' }) : null
   await saveCard(ws, n, card, null, store && !proposes ? () => store.updateCard(n, { kind }) : undefined)
   if (store && proposes) store.tx((tx) => tx.append(n, { kind: 'KindProposed', actor: actorOf(actor), source: 'recorded', data: { kind } }))
+  if (skipReason !== null) {
+    const facts = store ?? FactStore.forBoard(ws, { project: card.project, key: '' })
+    const setBy = actor.kind === 'assistant' ? 'assistant' : 'user'
+    facts.tx((tx) => tx.append(n, actor.kind === 'agent' ? { kind: 'ReviewSkipProposed', actor: actorOf(actor), source: 'recorded', data: { reason: skipReason } } : { kind: 'ReviewSkipSet', actor: actorOf(actor), source: 'recorded', data: { skip: true, by: setBy, reason: skipReason } }))
+  }
   log.info(`#${n} created by ${userText(by)}: ${userText(title)}`)
   changed(ws)
   return card
@@ -1476,6 +1491,80 @@ export async function confirmKind(n: number, accept: boolean, actor: TaskActor, 
       await saveCard(ws, n, card, before)
       store.updateCard(n, { kind })
       store.tx((tx) => tx.append(n, { kind: 'KindDecided', actor: actorOf(actor), source: 'recorded', data: { kind, proposed } }))
+      changed(ws)
+      return card
+    })
+  )
+}
+
+const SKIP = {
+  agents: msg({ id: 'tasks.error.reviewSkipNotAgents', defaultMessage: "Agents can't make a card skip review: propose it when you make the card (skipReview, with your reason), and the user or the Assistant decides.", description: "An error: an agent tried to make a card skip its review, or to answer a proposal that it skip review, after the card was made; only the user or the Hive Assistant can. Keep skipReview as it is (a field's name)." }),
+  needsReason: msg({ id: 'tasks.error.reviewSkipNeedsReason', defaultMessage: "A card skips review only with the user's reason: pass skipReview with it, in the user's words.", description: "An error said to the Hive Assistant (or an agent proposing it): it asked for a card to skip its review without a reason. Keep skipReview as it is (a field's name)." }),
+  nothingNew: msg({ id: 'tasks.error.reviewSkipNothingNew', defaultMessage: "This card's rules don't review it: there is no review to skip.", description: "An error making a card: it was to skip its review, but its project's workflow has no review (Solo, or no workflow)." }),
+  nothing: msg({ id: 'tasks.error.reviewSkipNothing', defaultMessage: "#{n}'s rules don't review it: there is no review to skip.", description: "An error: a card was to skip its review, but its project's workflow has no review (Solo, or no workflow). {n} is the card's number." }),
+  inReview: msg({ id: 'tasks.error.reviewSkipInReview', defaultMessage: "#{n} is in Review: whether it skips review is decided before it is submitted. To take it past its review now, the user moves it on (an override, with their reason).", description: "An error: a card's review skip was to change while the card is in Review. The way past its review is the user's override of the move (dragging it on, or the Assistant moving it with the user's reason). {n} is the card's number." }),
+  past: msg({ id: 'tasks.error.reviewSkipPast', defaultMessage: '{stage, select, done {#{n} is Done: it has no review left to skip.} other {#{n} is past its review already: there is nothing left to skip.}}', description: "An error: a card's review skip was to change once the card was past Review (approved, being merged, or Done). {n} is the card's number; {stage} its stage (select: done, or another)." })
+}
+
+/** A card's review skip as a call gives it (#1625): a reason (possibly empty) or `false` (not skipped); else invalid. */
+export function reviewSkipArg(v: unknown): string | false {
+  if (v === false) return false
+  if (typeof v === 'string') return text(v.trim(), 1000, 'blockedReason')
+  throw hiveError(msg({ id: 'tasks.error.badReviewSkip', defaultMessage: "skipReview is the user's reason the card skips review (text), or false to review it after all.", description: "An error: a card's skipReview was given as something else than a reason (text) or false. Keep skipReview and false as they are (a field's name and a value)." }), undefined, { kind: 'invalid' })
+}
+
+/** Whether a card's rules (before its skip) review it: its runtime's, else the project's now; null without a workflow. */
+async function reviewsOf(ws: WorkspaceService, project: string, n: number | null): Promise<{ wf: Workflow; reviews: boolean; stage: StageId } | null> {
+  const { workflowFor } = await import('./workflow/service')
+  if (!ws.path || !project) return null
+  const wf = await workflowFor(ws, join(ws.path, project)).catch(() => null)
+  if (!wf) return null
+  const rec = n === null ? null : (() => {
+    try {
+      return wf.store.card(n)
+    } catch {
+      return null
+    }
+  })()
+  const s = rec ? wf.state(rec) : null
+  const r = rec && s ? wf.reviewedRuleset(rec, s) : wf.currentRuleset(false)
+  return { wf, reviews: r.options.review !== 'none', stage: s?.stage ?? 'todo' }
+}
+
+/**
+ * Makes a card skip review, or review it after all (#1625, SPEC §16.7.3): the user's (`reason` their optional note) or the
+ * Assistant's (`reason` the user's, required to skip); never an agent's (it proposes at creation). An open proposal is
+ * answered by it. Decided before submission: in Review or past it, refused, naming the way on.
+ */
+export async function setReviewSkip(n: number, skip: boolean, actor: TaskActor, o: { reason?: string; commit?: () => void } = {}): Promise<TaskCard> {
+  if (actor.kind === 'agent') throw new TaskPermissionError(SKIP.agents)
+  const ws = workspace
+  const reason = typeof o.reason === 'string' ? text(o.reason.trim(), 1000, 'blockedReason') : ''
+  if (skip && actor.kind === 'assistant' && !reason) throw new TaskConflictError(SKIP.needsReason)
+  return recordingAs(actor, () =>
+    boardLock(ws, async () => {
+      const card = await getTask(n, ws)
+      if (card.archived) throw new TaskPermissionError(withValues(ERR.archived, { n }))
+      const store = FactStore.forBoard(ws, { project: card.project, key: '' })
+      const now = reviewSkipOf(store.facts(n))
+      if (!!now.skip === skip && now.proposed === null) return card
+      const rules = await reviewsOf(ws, card.project, n)
+      if (skip && !rules?.reviews) throw new TaskConflictError(withValues(SKIP.nothing, { n }))
+      const stage = rules?.stage ?? 'todo'
+      if (stage === 'review') throw new TaskConflictError(withValues(SKIP.inReview, { n }))
+      if (stage === 'approved' || stage === 'merging' || stage === 'done') throw new TaskConflictError(withValues(SKIP.past, { n, stage }))
+      o.commit?.()
+      const before = structuredClone(card)
+      const how = now.proposed !== null ? (skip ? 'confirmed' : 'kept') : skip ? 'set' : 'removed'
+      note(card, actorName(actor), storedText(HISTORY.reviewSkip, { how }))
+      await saveCard(ws, n, card, before)
+      const by = actor.kind === 'assistant' ? 'assistant' : 'user'
+      store.tx((tx) => tx.append(n, { kind: 'ReviewSkipSet', actor: actorOf(actor), source: 'recorded', data: { skip, by, reason, ...(now.proposed !== null ? { proposed: now.proposed } : {}) } }))
+      // A started card's stages are its rules with no review from now on: stored, so the board shows them at once.
+      if (skip && rules && stage === 'active') {
+        const rec = rules.wf.store.card(n)
+        rules.wf.store.saveRuleset(skipReviewOf(rules.wf.reviewedRuleset(rec, rules.wf.state(rec))))
+      }
       changed(ws)
       return card
     })

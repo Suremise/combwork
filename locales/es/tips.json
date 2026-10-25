@@ -314,6 +314,8 @@
   "tips.resumeAll.title": "Reanuda todos los agentes a la vez",
   "tips.reviewCopies.text": "Un revisor revisa en una copia de revisión: una carpeta justo en la versión entregada, en la que nada más escribe, así que el autor puede seguir mientras tanto. Sus comprobaciones allí cuentan para esa entrega. Configuración → Avanzado lo desactiva.",
   "tips.reviewCopies.title": "Los revisores prueban justo lo que se entregó",
+  "tips.reviewSkip.text": "¿Compilar un instalador o un ensayo rápido no necesita revisor? Marca Omitir revisión en el diálogo Nueva tarjeta: enviarla la termina, y una tarjeta con código sigue hacia su fusión, con sus comprobaciones de fusión.",
+  "tips.reviewSkip.title": "Tarjetas que no necesitan revisión",
   "tips.reviewerPool.text": "Con la opción del flujo de trabajo Revisores en Un grupo compartido, Iniciar carril ofrece el grupo de revisores: cada tarjeta enviada va al siguiente revisor libre, la más antigua primero, nunca a su propio autor.",
   "tips.reviewerPool.title": "Comparte revisores entre carriles",
   "tips.safeguardStops.text": "Un escudo junto al estado de un agente significa que el clasificador de seguridad de su CLI detuvo una respuesta: pasa el puntero por él para ver cuándo, el modelo y las últimas llamadas a herramientas del agente antes de eso. Naranja significa que su modelo cambió desde entonces, o que te espera.",
