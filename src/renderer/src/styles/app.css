@@ -8365,8 +8365,10 @@ body.pane-resizing-v .monaco-editor {
    ⋯ wrapped). */
 .board-category {
   flex: 1 1 calc((var(--stages, 1) - 1) * 10px + var(--folded, 0) * 34px + (var(--stages, 1) - var(--folded, 0)) * 2px);
-  /* As wide as its columns' least widths: they never spill over the next category. */
-  min-width: min-content;
+  /* As wide as its columns' least widths: they never spill over the next category. Summed from them (the gaps, a
+     folded stage's 34 px, an open one's 120 px), not min-content: a collapsed card's one-line title would set that,
+     squeezing every other column to its least (#1619). */
+  min-width: calc((var(--stages, 1) - 1) * 10px + var(--folded, 0) * 34px + (var(--stages, 1) - var(--folded, 0)) * 120px);
   display: flex;
   flex-direction: column;
   min-height: 0;
