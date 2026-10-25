@@ -105,10 +105,9 @@ export function ReviewSkipProposal({ card, b, readOnly }: { card: TaskCard; b: W
  * Skip review choice and an optional note; for a card made, whether it skips review and the button that changes it, until
  * it is submitted.
  */
-export function ReviewSkipField(props: { card: TaskCard | null; b: WorkBadge | undefined; projectPath: string | null; skip: boolean; setSkip: (v: boolean) => void; note: string; setNote: (v: string) => void; readOnly: boolean }) {
-  const { card, b, projectPath, skip, setSkip, note, setNote, readOnly } = props
+export function ReviewSkipField(props: { card: TaskCard | null; b: WorkBadge | undefined; reviews: boolean | null; skip: boolean; setSkip: (v: boolean) => void; note: string; setNote: (v: string) => void; readOnly: boolean }) {
+  const { card, b, reviews, skip, setSkip, note, setNote, readOnly } = props
   const action = useBusy()
-  const reviews = useProjectReviews(projectPath)
   useLanguage()
   if (!card) {
     if (!reviews) return null

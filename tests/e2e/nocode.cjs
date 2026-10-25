@@ -172,12 +172,28 @@ const check = (name, ok, extra = '') => {
     check("an agent can't change a card's kind (403)", agentChange.status === 403 && (await work(p))?.kind === 'code', JSON.stringify(agentChange))
     await page.keyboard.press('Escape')
 
-    // --- Review: Skip (#1625): the New Card dialog offers it where the project reviews (alpha), not where it doesn't.
+    // --- Review: Skip (#1625): ticked for a project that reviews, then another project (or none) chosen: no hidden skip is
+    // left to block Add Card (HR1's round 1); the card is made there, reviewed as its rules say.
+    const skipBox = edit.locator('.review-skip-new input[type="checkbox"]')
+    for (const [to, title] of [['gamma', 'Switched to gamma'], ['', 'Switched to the workspace']]) {
+      await page.locator('.board-toolbar button', { hasText: 'New Card' }).first().click()
+      await edit.waitFor({ timeout: HUNG_MS })
+      await edit.locator('.task-title-input').fill(title)
+      await edit.locator('select:has(option[value="alpha"])').first().selectOption('alpha')
+      await lib.until(async () => (await skipBox.count()) === 1, HUNG_MS)
+      await skipBox.check()
+      await edit.locator('select:has(option[value="alpha"])').first().selectOption(to)
+      check(`ticked in alpha, then ${to || 'no project'}: the tick box goes`, !!(await lib.until(async () => (await skipBox.count()) === 0, HUNG_MS)))
+      await edit.getByRole('button', { name: 'Add Card' }).click()
+      const switched = await lib.until(async () => (await inv('tasks:list')).find((c) => c.title === title), HUNG_MS)
+      check(`…and Add Card makes it there, with no skip`, !!switched && (switched.project ?? '') === to && !(await work(switched.number))?.reviewSkip, JSON.stringify(switched))
+    }
+
+    // --- The New Card dialog offers it where the project reviews (alpha), not where it doesn't.
     await page.locator('.board-toolbar button', { hasText: 'New Card' }).first().click()
     await edit.waitFor({ timeout: HUNG_MS })
     await edit.locator('.task-title-input').fill('Build the installer')
     await edit.locator('select:has(option[value="alpha"])').first().selectOption('gamma')
-    const skipBox = edit.locator('.review-skip-new input[type="checkbox"]')
     check("Skip review isn't offered where the project doesn't review (gamma)", !!(await lib.until(async () => (await edit.locator('.kind-new').count()) === 1, HUNG_MS)) && (await skipBox.count()) === 0)
     await edit.locator('select:has(option[value="alpha"])').first().selectOption('alpha')
     check('…and is where it does (alpha)', !!(await lib.until(async () => (await skipBox.count()) === 1, HUNG_MS)))
