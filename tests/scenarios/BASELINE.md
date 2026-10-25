@@ -36,6 +36,14 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## A refusal's next step is the task's (#1609): the three fakes, fixtures v90, 25 October 2026
+
+Claude Code's #1537 trial asked the user rather than commit when `hive_submit` was refused ("Commit the work, then
+submit"). work-on-card now says a refusal's next step is part of the task, even one naming only the refused tool, taken
+without asking unless it would discard or overwrite work or needs the user's decision. The scenario is unchanged:
+intent-submit-refused passes on the three fakes (`2026-10-25T16-39-12-fake`, `2026-10-25T16-39-35-fake-codex`,
+`2026-10-25T16-39-58-fake-copilot`). The real rerun is #1539's final step.
+
 ## A wake left by setup rings before the prompt (#1613): the three fakes, fixtures v90, 25 October 2026
 
 card-loop-follow-up-check failed once on fake Copilot (#1537's v89 run): its only turn read the inbox. Setup posts the
