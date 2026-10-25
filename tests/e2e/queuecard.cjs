@@ -138,7 +138,8 @@ const f = q.folderHelpers(fx)
 
     // --- Old rules: the options switch to the agent merging while a card is in its checks.
     q.steer(fx, 'wait')
-    const late = await q.approve(fx, h, reviewer, 'Late', { 'late.txt': 'late\n' })
+    const LATE_TITLE = 'Late, with a title long enough to run past the history’s Title column, so it is cut short and its tooltip has it whole'
+    const late = await q.approve(fx, h, reviewer, LATE_TITLE, { 'late.txt': 'late\n' })
     check('Late is approved', Object.values(late.steps).every((x) => x.status === 200), JSON.stringify(late.steps))
     const lateKey = (await h.card(late.n)).key
     await until(async () => fs.existsSync(fx.started), HUNG_MS)
@@ -151,6 +152,31 @@ const f = q.folderHelpers(fx)
     fs.writeFileSync(fx.go, 'go')
     check('…through to its outcome: merged', !!(await until(async () => (await column(late.n)) === 'done', HUNG_MS)))
     check('…the Git tab\'s history has it merged', !!(await until(async () => (await history.locator('tbody tr', { hasText: lateKey }).locator('[data-outcome="merged"]').count()) === 1, HUNG_MS)), await text(history))
+    const lateTitle = history.locator('tbody tr', { hasText: lateKey }).locator('.git-queue-title')
+    const cut = await lateTitle.evaluate((e) => ({ cut: e.scrollWidth > e.clientWidth, tip: e.getAttribute('title'), rows: e.closest('tr').getClientRects()[0].height }))
+    check('…its long title cut short on one line, whole in its tooltip', cut.cut && cut.tip === LATE_TITLE && cut.rows < 50, JSON.stringify(cut))
+    // A history taller than its box (20 rows a page): the headings and filters stay in view down to the last row. The
+    // box made short here stands in for the rows.
+    const wrap = history.locator('.table-wrap')
+    await wrap.evaluate((w) => {
+      w.style.maxHeight = '120px'
+      w.scrollTop = w.scrollHeight
+    })
+    const sticky = await until(async () => {
+      const r = await wrap.evaluate((w) => {
+        const box = w.getBoundingClientRect()
+        const head = w.querySelector('thead').getBoundingClientRect()
+        const last = [...w.querySelectorAll('tbody tr')].pop().getBoundingClientRect()
+        return { scrolled: w.scrollTop > 0, headTop: head.top - box.top, lastBottom: box.bottom - last.bottom, lastBelowHead: last.top >= head.bottom - 1 }
+      })
+      return r.scrolled && Math.abs(r.headTop) < 2 && r.lastBottom >= -1 && r.lastBelowHead ? r : null
+    }, HUNG_MS)
+    check('…scrolled to its last row, the headings and filters stay at the top', !!sticky, JSON.stringify(sticky))
+    await shoot(section.locator('.git-queue-history'), 'git-history-scrolled')
+    await wrap.evaluate((w) => {
+      w.style.maxHeight = ''
+      w.scrollTop = 0
+    })
     part = await openCard(late.n)
     check('…its Work section: merged (the merge line), no queue part left', !!(await until(async () => /Merged into integration as/.test(await text(dialog.locator('.card-work'))) && (await part.count()) === 0, HUNG_MS)), await text(dialog.locator('.card-work')))
     await closeCard()
