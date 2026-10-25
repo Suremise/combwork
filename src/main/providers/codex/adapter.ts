@@ -1072,17 +1072,35 @@ export class CodexAdapter implements ProviderAdapter {
     return recorded ?? null
   }
 
+  /** The rollouts' sessions (each one's session_meta and stat), read once per rollout list: see rolloutSessions(). */
+  private rolloutSessionList: { list: Promise<string[]>; sessions: Promise<(ExternalSession & { cwd: string })[]> } | null = null
+
+  /**
+   * Every rollout's session, read once per rollout list (#1646): a session list asks for each folder a project's
+   * sessions ran in (its slots and worktrees), and looking at every rollout once per folder took a second on 1,100
+   * rollouts and eight folders.
+   */
+  private rolloutSessions(): Promise<(ExternalSession & { cwd: string })[]> {
+    const list = this.rollouts()
+    if (this.rolloutSessionList?.list === list) return this.rolloutSessionList.sessions
+    const sessions = (async () => {
+      const out: (ExternalSession & { cwd: string })[] = []
+      for (const p of await list) {
+        const m = await this.meta(p)
+        if (!m || !isSessionId(m.id)) continue
+        const s = await stat(p).catch(() => null)
+        if (s && s.size > 0) out.push({ id: m.id, cwd: m.cwd, transcriptPath: p, modified: s.mtime.toISOString(), ...(m.sub ? { sub: m.sub } : {}) })
+      }
+      return out
+    })()
+    this.rolloutSessionList = { list, sessions }
+    return sessions
+  }
+
   async listSessions(folder: string): Promise<ExternalSession[]> {
     // Codex records the cwd as it was given; Hive may spell the folder another way now (a junction, an 8.3 name, #493).
     const here = placeMatcher(folder)
-    const out: ExternalSession[] = []
-    for (const p of await this.rollouts()) {
-      const m = await this.meta(p)
-      if (!m || !isSessionId(m.id) || !here(m.cwd)) continue
-      const s = await stat(p).catch(() => null)
-      if (s && s.size > 0) out.push({ id: m.id, transcriptPath: p, modified: s.mtime.toISOString(), ...(m.sub ? { sub: m.sub } : {}) })
-    }
-    return out
+    return (await this.rolloutSessions()).filter((s) => here(s.cwd)).map(({ cwd: _cwd, ...s }) => s)
   }
 
   async subSessionOf(path: string): Promise<SubSession | null> {

@@ -238,6 +238,7 @@ interface HiveMessageValues {
   'project.overview.byAgent': undefined
   'project.overview.mergeSlot': undefined
   'project.overview.noAgents': undefined
+  'project.overview.noAnswer': { seconds: number }
   'project.overview.period': undefined
   'project.overview.periodHint': undefined
   'project.overview.running': undefined

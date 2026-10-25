@@ -863,6 +863,10 @@
     "defaultMessage": "Loading…",
     "description": "The Workspace Overview while it reads the projects' usage."
   },
+  "workspace.overview.noAnswer": {
+    "defaultMessage": "no answer after {seconds, number} s",
+    "description": "Why the workspace's usage could not be loaded: Hive read it for this long without finishing. Shown as {error} in \"Could not load {what}: {error}\", with Retry."
+  },
   "workspace.overview.noWorkspace": {
     "defaultMessage": "Open a workspace to see its overview.",
     "description": "The Workspace Overview with no workspace open."

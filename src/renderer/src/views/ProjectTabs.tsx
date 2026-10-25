@@ -33,6 +33,7 @@ import { DataTable, useDateColumns, type DataColumn } from '../components/DataTa
 import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Switch, Tooltip } from '../components/ui'
 import { languageFor } from '../monacoLang'
 import { useScopedLoad } from '../scopedLoad'
+import { oneAtATime, withinTime } from '@shared/coalesce'
 import { addSkill, deleteSkill, DeliveredSwitch, editInWorkspace, otherLocal, SKILL_LEVEL_TIP, SkillDetail, SkillRow } from '../components/Skills'
 import { CHANGES_ABOUT, unusedName, unusedPickerLabel } from '@shared/unusedWorktrees'
 import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, openVersionControl, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
@@ -49,6 +50,7 @@ import { agentFolder, awayFromProject, legacyOf, placeText, workFolderOf } from 
 
 const M = {
   loading: msg({ id: 'project.loading', defaultMessage: 'Loading…', description: 'A project tab while its data loads.' }),
+  noAnswer: msg({ id: 'project.overview.noAnswer', defaultMessage: 'no answer after {seconds, number} s', description: 'Why the sessions could not be loaded: Hive listed them for this long without finishing. Shown as {error} in "Could not load the sessions: {error}", with Retry.' }),
   sessionsTarget: msg({ id: 'project.overview.sessionsTarget', defaultMessage: 'the sessions', description: 'What could not be read in the Overview tab: shown in "Could not load {what}: {error}" and "Could not refresh {what}; last updated …".' }),
   tokensPerDay: msg({ id: 'project.chart.label', defaultMessage: 'Tokens per day', description: "Accessible name of the Overview's chart of tokens per day." }),
   dayTip: msg({ id: 'project.chart.dayTip', defaultMessage: '{day}: {tokens} tokens · {cost} · {prompts, plural, one {# prompt} other {# prompts}}', description: 'Tooltip on a day of the chart. {day} is the date, {tokens} a token count such as 1.2M, {cost} a cost.' }),
@@ -324,6 +326,8 @@ export const limitWindow = (l: PlanLimit): string => (l.windowMinutes === 300 ? 
 const LIVE_REFRESH_MS = 15_000
 /** While the usage history is reading sessions a list shows (#1106), the list is read again this soon after it tells. */
 const PENDING_RELOAD_MS = 1_500
+/** A listing with no answer by then shows as failed, with Retry (#1646). */
+const LIST_LIMIT_MS = 60_000
 
 /**
  * The project's sessions with their usage, for the Overview and the Sessions tab. Updates follow
@@ -342,15 +346,29 @@ export function useSessions(project: ProjectInfo) {
   const sessions = useScopedLoad<{ list: SessionListItem[]; kept: SessionListItem[] }>(project.path)
   const last = useRef(0)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // One listing at a time (#1646): with listings slower than the updates asking for them (a busy disk, hundreds of
+  // sessions), each newer one dropped the one under way and none was ever shown.
+  const serial = useRef(oneAtATime())
+  const latest = useRef<() => void>(() => undefined)
   const { load: loadScoped } = sessions
   const load = useCallback(() => {
     if (timer.current) clearTimeout(timer.current)
     timer.current = null
     last.current = Date.now()
     const path = project.path
-    // Deleted sessions' usage only adds to the totals: without it they are a little low, which beats no list.
-    loadScoped(path, () => Promise.all([call('session:list', path), call('session:keptUsage', path).catch(() => [])]).then(([list, kept]) => ({ list, kept })))
+    serial.current.run(
+      path,
+      () => {
+        // Deleted sessions' usage only adds to the totals: without it they are a little low, which beats no list.
+        const list = Promise.all([call('session:list', path), call('session:keptUsage', path).catch(() => [])]).then(([items, kept]) => ({ list: items, kept }))
+        const bounded = withinTime(list, LIST_LIMIT_MS, () => tr(M.noAnswer, { seconds: LIST_LIMIT_MS / 1000 }))
+        loadScoped(path, () => bounded)
+        return bounded
+      },
+      () => latest.current()
+    )
   }, [project.path, loadScoped])
+  latest.current = load
   useEffect(() => {
     load()
     return () => {

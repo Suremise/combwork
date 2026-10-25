@@ -20,6 +20,7 @@ import { assistantTools } from '../shared/assistantTools'
 import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
+import { coalesced } from '../shared/coalesce'
 import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter } from './agentFolders'
 import { slotEnv } from './slots'
 import { copiesDirOf, grantsCopies } from './copies'
@@ -523,6 +524,8 @@ interface UsageSeen {
 const usageSeen = new Map<string, UsageSeen>()
 /** Transcripts main keeps the latest usage of (the worker keeps more: Settings → Sessions → Usage cache size). */
 const MAX_USAGE_SEEN = 200
+/** A session listing this slow is logged with where its time went (#1646). */
+const SLOW_LIST_MS = 1000
 
 /**
  * A transcript's size for the Sessions list (#671): a stat, never a read, taken each time the list is (the window keeps
@@ -5300,11 +5303,26 @@ class SessionManager {
     return title ? { ...usage, title, customTitle: usage.customTitle ?? title } : usage
   }
 
-  async list(projectPath: string): Promise<SessionListItem[]> {
+  /** Listings under way, per host (#1646): see list(). */
+  private listings = coalesced<SessionListItem[]>()
+
+  /**
+   * A host's sessions, for its Overview, its Sessions tab and the Agent API. One listing per host at a time (#1646): a
+   * listing stats each session's files and the CLIs' session folders, and the window asks again as sessions change, so
+   * overlapping ones (61 at once, seen on a 400-session project) shared the disk's threads and each took minutes. Asked
+   * while one runs, callers share one more listing, started once it ends, so each gets a list read after it asked.
+   */
+  list(projectPath: string): Promise<SessionListItem[]> {
     projectPath = workspace.assertSessionHost(projectPath)
+    return this.listings(resolve(projectPath).toLowerCase(), () => this.listNow(projectPath))
+  }
+
+  private async listNow(projectPath: string): Promise<SessionListItem[]> {
+    const started = performance.now()
     const file = await workspace.sessionsFile(projectPath)
     // Read once for the whole list, not once per session.
     const ctx: ListContext = { records: file.sessions, cfg: await workspace.projectConfig(projectPath), stored: await usageHistory.storedUsage(projectPath).catch(() => new Map()) }
+    const read = performance.now()
     const ttl = config.settings.sessions.cacheTtl
     const items: SessionListItem[] = []
     // Deleted sessions stay hidden, though the CLI still has their transcripts.
@@ -5341,6 +5359,7 @@ class SessionManager {
       })
     }
     if (found.size) await this.keepSubs(projectPath, found)
+    const own = performance.now()
     // Each in a slot (#1434): which, and whether it may resume there now, by its agent (gone: no agent may).
     const facts = workspace.isAssistantHome(projectPath) ? null : await folderFacts(projectPath).catch(() => null)
     if (facts?.slots.length) {
@@ -5387,6 +5406,11 @@ class SessionManager {
           })
         }
       }
+    }
+    const ms = performance.now() - started
+    if (ms > SLOW_LIST_MS) {
+      const s = (a: number, b: number): string => `${((b - a) / 1000).toFixed(1)} s`
+      log.info(`listing the sessions of ${userText(projectPath)} took ${s(0, ms)}: the usage history ${s(started, read)}, Hive's ${file.sessions.length} session(s) ${s(read, own)}, the other sessions in ${folders.length} folder(s) ${s(own, started + ms)}`)
     }
     return items.sort((a, b) => (b.lastActivity ?? '').localeCompare(a.lastActivity ?? ''))
   }

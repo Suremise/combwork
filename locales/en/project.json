@@ -947,6 +947,10 @@
     "defaultMessage": "No agents.",
     "description": "The By agent table when there are none."
   },
+  "project.overview.noAnswer": {
+    "defaultMessage": "no answer after {seconds, number} s",
+    "description": "Why the sessions could not be loaded: Hive listed them for this long without finishing. Shown as {error} in \"Could not load the sessions: {error}\", with Retry."
+  },
   "project.overview.period": {
     "defaultMessage": "Period",
     "description": "Accessible name of the Overview's period buttons (Today, 7 days…)."
