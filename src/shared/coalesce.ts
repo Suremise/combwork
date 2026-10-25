@@ -91,27 +91,28 @@ export function withinTime<T>(p: Promise<T>, ms: number, error: () => string): P
 
 /**
  * One load at a time per scope, for a view that asks again as things change (#1646). `run(scope, start, rerun)` calls
- * `start` now, unless a load for that scope is under way: then `rerun` is called once, after it ends, however many
- * times it was asked meanwhile. With numbered loads (useScopedLoad) a newer load drops the one under way, so loads
- * slower than the changes asking for them never showed anything; one at a time, each is shown.
+ * `start` now, unless a load for that scope is under way: then the last `rerun` asked for it is called once, after
+ * that load ends, however many times it was asked meanwhile. Per scope, whatever was asked between (A, then B, then A
+ * again while the first A runs starts no second A), so a scope's loads never overlap and never end out of order. With
+ * numbered loads (useScopedLoad) a newer load drops the one under way, so loads slower than the changes asking for
+ * them never showed anything; one at a time, each is shown. Bounded by the scopes with a load under way.
  */
 export function oneAtATime(): { run: (scope: string, start: () => Promise<unknown>, rerun: () => void) => void } {
-  let running: string | null = null
-  let again = false
+  const running = new Set<string>()
+  const again = new Map<string, () => void>()
   return {
     run(scope, start, rerun) {
-      if (running === scope) {
-        again = true
+      if (running.has(scope)) {
+        again.set(scope, rerun)
         return
       }
-      running = scope
-      again = false
+      running.add(scope)
       const ended = (): void => {
-        if (running === scope) running = null
-        if (!again) return
-        again = false
+        running.delete(scope)
+        const next = again.get(scope)
+        again.delete(scope)
         // After whatever took this load's result.
-        setTimeout(rerun, 0)
+        if (next) setTimeout(next, 0)
       }
       let p: Promise<unknown>
       try {

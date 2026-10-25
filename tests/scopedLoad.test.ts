@@ -1,6 +1,6 @@
 // What a view keeps after a load finishes: results and errors belong to the scope (project, workspace, search) they
 // were loaded for. A failed refresh of the same scope keeps the last results; a failure for a new scope has none.
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { settle, type Scoped } from '../src/shared/scoped'
 import { oneAtATime, withinTime } from '../src/shared/coalesce'
 
@@ -34,10 +34,17 @@ function held() {
   const start = (scope: string) => (): Promise<void> => new Promise<void>((resolve, reject) => loads.push({ scope, resolve, reject }))
   return { loads, start }
 }
-/** Lets the promise callbacks and zero-delay timers queued so far run. */
-const settled = (): Promise<void> => new Promise((r) => setTimeout(r, 0)).then(() => new Promise((r) => setTimeout(r, 0)))
+/** Runs what the loads' endings queued (their callbacks and the zero-delay reruns), on controlled timers. */
+const settled = (): Promise<void> => vi.runAllTimersAsync()
 
 describe('one load at a time (#1646)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('asked again while a load runs, loads once more after it ends, however many times it was asked', async () => {
     const serial = oneAtATime()
     const h = held()
@@ -50,8 +57,8 @@ describe('one load at a time (#1646)', () => {
     ask()
     ask()
     ask()
-    expect(h.loads).toHaveLength(1)
     await settled()
+    expect(h.loads).toHaveLength(1)
     expect(reruns).toBe(0)
     h.loads[0].resolve()
     await settled()
@@ -60,6 +67,7 @@ describe('one load at a time (#1646)', () => {
     h.loads[1].resolve()
     await settled()
     expect(reruns).toBe(1)
+    expect(h.loads).toHaveLength(2)
   })
 
   it('every load ends and is taken when asks come faster than loads finish (they never were with numbered loads)', async () => {
@@ -70,11 +78,33 @@ describe('one load at a time (#1646)', () => {
     for (let round = 0; round < 5; round++) {
       ask()
       ask()
-      const running = h.loads.at(-1)!
-      running.resolve()
+      h.loads.at(-1)!.resolve()
       await settled()
     }
     expect(taken).toEqual([0, 1, 2, 3, 4])
+  })
+
+  it("A, then B, then A again while the first A runs: no second A until it ends, then one, so A's results come in order (HR6's round 1)", async () => {
+    const serial = oneAtATime()
+    const h = held()
+    const results: string[] = []
+    const ask = (scope: string, rerun: () => void): void => serial.run(scope, () => { const n = h.loads.filter((l) => l.scope === scope).length; return h.start(scope)().then(() => { results.push(`${scope}${n}`) }) }, rerun)
+    const askA = (): void => ask('A', askA)
+    askA()
+    ask('B', () => undefined)
+    askA()
+    await settled()
+    expect(h.loads.map((l) => l.scope)).toEqual(['A', 'B'])
+    h.loads[1].resolve()
+    await settled()
+    expect(h.loads.map((l) => l.scope)).toEqual(['A', 'B'])
+    h.loads[0].resolve()
+    await settled()
+    // The first A ended (taken), then the A asked meanwhile started: never two A at once.
+    expect(h.loads.map((l) => l.scope)).toEqual(['A', 'B', 'A'])
+    h.loads[2].resolve()
+    await settled()
+    expect(results).toEqual(['B0', 'A0', 'A1'])
   })
 
   it("another scope's load starts at once; a failed load lets the next one run", async () => {
