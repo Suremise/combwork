@@ -581,6 +581,10 @@ async function runScenario(sc, providerKey, opts = {}) {
     // What the session under test was given at its launch (after setup): Hive's guidance and each skill as delivered.
     const subject = sc.role === 'assistant' ? (await inv('workspace:refresh')).assistant : (await inv('workspace:refresh')).projects.find((x) => x.name === 'alpha')
     result.guidance.delivered = subject?.agents.find((a) => a.id === agentId)?.live?.launched ?? null
+    // What setup left the session under test rings its doorbell once it's idle, as the prompt is typed (#1613: on Copilot
+    // the prompt was lost to the doorbell's turn). A scenario's beforePrompt waits for that turn, so the prompt comes after.
+    ctx.subjectStatus = async () => (await live())?.status ?? 'stopped'
+    if (sc.beforePrompt && !endedAtLaunch) await sc.beforePrompt(ctx)
     const prompt = typeof sc.prompt === 'function' ? sc.prompt(ctx) : sc.prompt
     const fakePrompt = typeof sc.fake === 'function' ? sc.fake(ctx) : sc.fake
     const text = p.fake ? fakePrompt : prompt

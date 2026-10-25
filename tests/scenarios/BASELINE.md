@@ -36,6 +36,16 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## A wake left by setup rings before the prompt (#1613): the three fakes, fixtures v90, 25 October 2026
+
+card-loop-follow-up-check failed once on fake Copilot (#1537's v89 run): its only turn read the inbox. Setup posts the
+builder's follow-up (or design) before the subject starts, so Hive's loop wake rings its doorbell as the session becomes
+idle, just as the harness types the prompt; in every sample the doorbell's turn came first, with the prompt typed into
+the busy session, and once the prompt was lost. Scenarios now have `beforePrompt`: these two wait until the wake is
+read and the session is idle again. Fake Copilot, both ×8 with 2 spinner workers: 16 of 16
+(`results/2026-10-25T16-04-10-fake-copilot`); fake Claude Code and fake Codex once each: all pass
+(`2026-10-25T16-09-43-fake`, `2026-10-25T16-10-36-fake-codex`). Every fake now reads the wake before the prompt.
+
 ## P8's smoke trials (#1537): Claude Code and Codex, fixtures v86–v89, 25 October 2026
 
 Darren's scope (24 Oct): each key scenario once on Claude Code and on Codex, with no `--repeat`, Haiku or Copilot. The
