@@ -578,7 +578,10 @@ function CardTile({
               <span className="task-project" data-stage-note={stageNote}>{c.project}</span>
             </Tooltip>
           ) : (
-            <span className="task-project">{c.project}</span>
+            // Cut with "…" in a narrow column: whole on hover (#1634).
+            <Tooltip content={c.project}>
+              <span className="task-project">{c.project}</span>
+            </Tooltip>
           ))}
           {!c.project && <span className="task-project faint">{tr(WORKSPACE_CARD)}</span>}
         </div>
