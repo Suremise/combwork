@@ -263,11 +263,12 @@ export function folderBytes(dir) {
  * them all until the next runner prunes), and nothing that isn't a run folder (nested/, run-record.md). Nor one
  * spare(path) keeps (#253: a card cites it as evidence, or the board can't be read: evidence.cjs); those don't count
  * towards `keep`. onOverCap(names, bytes), if given, is told of the runs the cap removes and the size before them.
+ * A run folder something still holds (#1616: another process's handle, a scan) is kept for a later prune, not a failure:
+ * onKept(name, code), if given, is told of it. Returns the runs removed.
  */
 export function pruneRunDirs(root, keep = KEEP_RUNS, protect = [], alive = processAlive, spare = () => null, options = {}) {
   const old = runDirsToPrune(root, keep, protect, alive, spare, options)
-  for (const name of old) rmSync(join(root, name), { recursive: true, force: true })
-  return old
+  return old.filter((name) => removeRunDir(root, name, options.onKept))
 }
 
 /**
@@ -276,11 +277,30 @@ export function pruneRunDirs(root, keep = KEEP_RUNS, protect = [], alive = proce
  */
 export async function pruneRunDirsReleasing(root, keep = KEEP_RUNS, protect = [], alive = processAlive, spare = () => null, { release = async () => {}, ...options } = {}) {
   const old = runDirsToPrune(root, keep, protect, alive, spare, options)
+  const removed = []
   for (const name of old) {
     await release(join(root, name))
-    rmSync(join(root, name), { recursive: true, force: true })
+    if (removeRunDir(root, name, options.onKept)) removed.push(name)
   }
-  return old
+  return removed
+}
+
+/** The errors of a folder something still holds open (Windows): such a run folder is kept, never a failed run (#1616). */
+const HELD_CODES = new Set(['EPERM', 'EBUSY', 'ENOTEMPTY', 'EACCES'])
+
+/**
+ * Removes a run folder (a few tries, as a scan lets go): whether it went. One still held is kept, onKept(name, code)
+ * told of it, and the next prune tries again; any other error is thrown.
+ */
+function removeRunDir(root, name, onKept = () => {}) {
+  try {
+    rmSync(join(root, name), { recursive: true, force: true, maxRetries: 3, retryDelay: 200 })
+    return true
+  } catch (e) {
+    if (!HELD_CODES.has(e?.code)) throw e
+    onKept(name, e.code)
+    return false
+  }
 }
 
 /** The run folders pruneRunDirs removes (oldest first), without removing them. */
