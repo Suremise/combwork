@@ -113,6 +113,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **A lane's notice names the right lane:** a card's failed review could be told under a lane that once listed the card and was abandoned (one started on it by mistake), rather than the lane it is in now (#1645).
 - **A lane's notice is shown once:** once a lane ended, Hive told its card's failed review again on every look at the lanes, stacking identical notices and filling the card's history with them (#1631).
 - **Typing no longer lags while agents stream output.** Every frame a terminal drew made Hive measure the window's corner again and restyle the whole window, using a full CPU core with a dozen agents at work; the Progress panel's working lanes now animate without repainting, and the board's work badges are read once for each change (not once for each view showing them), and only the cards that change are worked out again (#1629).
 - **The For you chip's hover is short and readable.** It showed an agent's whole question as raw Markdown, run together in one block; it now says who asks for what (*HB5 asks you to decide*), the question's first sentence or two as plain text, and that a click opens the card to answer. A card's decisions in its hover lose their Markdown marks too (#1635).

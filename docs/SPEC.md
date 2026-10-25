@@ -3668,7 +3668,9 @@ first; `lanes:end`).
   and the marks' writes are as the look read them, under its lock, else it looks again, so
   marks never move back to an older look, a restart tells what it hadn't yet and two Hives tell each event once (the
   toast best effort, as §16.4.5 says; each notice a line in its card's history, the lane's own on its current card); a lane running when
-  Hive first followed the board's lanes starts from then. A card's request for the user (For you) is a notice too, the
+  Hive first followed the board's lanes starts from then. A card a running lane holds is that lane's alone (#1645): an
+  ended or abandoned lane that once listed it tells nothing of it (watches.ts' `lanesIn`, for notices and lane watches
+  alike), so on 25 Oct a lane started on HI-1633 by mistake and abandoned no longer named its failed review. A card's request for the user (For you) is a notice too, the
   runtime's `notify` action. Neither comes for a project whose **Card loops → Wake reviewers and builders** is off
   (`loopWakes`), like its wakes; turning off workflow rules doesn't stop them. A paused lane's reason comes with #1270's
   data.

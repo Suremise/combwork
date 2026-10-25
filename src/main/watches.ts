@@ -1301,8 +1301,13 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
   // (round 2 finding), so its end is told.
   const from = Date.parse(rec.laneSince ?? rec.since ?? '')
   const isNew = (l: { id: string; startedAt: string }): boolean => !rec.laneMarks?.[l.id] && Date.parse(l.startedAt) > from
-  const chosen = cond.ids === 'all' ? inView.filter((l) => l.state === 'active' || l.state === 'paused' || told(l.id) || isNew(l)) : inView.filter((l) => (cond.ids as string[]).includes(l.id))
-  const byNumber = await board.byNumber(chosen.flatMap((l) => l.cards.map((c) => c.number)))
+  const running = (l: { state: string }): boolean => l.state === 'active' || l.state === 'paused'
+  const chosen = cond.ids === 'all' ? inView.filter((l) => running(l) || told(l.id) || isNew(l)) : inView.filter((l) => (cond.ids as string[]).includes(l.id))
+  // #1645: a card a running lane holds is that lane's alone: an ended or abandoned lane that once listed it (one started
+  // on it by mistake, abandoned as its own lane began) tells nothing of it, so its events name the lane holding it now.
+  const held = new Set(inView.filter(running).flatMap((l) => l.cards.map((c) => c.number)))
+  const cardsOf = (l: (typeof inView)[number]) => (running(l) ? l.cards : l.cards.filter((c) => !held.has(c.number)))
+  const byNumber = await board.byNumber(chosen.flatMap((l) => cardsOf(l).map((c) => c.number)))
   const agents = new Map()
   const out: LaneNow[] = []
   for (const l of chosen) {
@@ -1311,7 +1316,7 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
     const changed: { mark: LaneMark['cards'][string]; updatedAt?: string }[] = []
     // A running lane's deadlock (#1410): its reviewer waiting for one of its cards while its builder waits on another.
     const order = l.state === 'active' || l.state === 'paused' ? laneOrderView(l, (n) => byNumber.get(n)) : null
-    for (const lc of l.cards) {
+    for (const lc of cardsOf(l)) {
       const found = byNumber.get(lc.number)
       // A card moved to another project is gone from the lane.
       const card = found && same(found.project, l.project) ? found : null
