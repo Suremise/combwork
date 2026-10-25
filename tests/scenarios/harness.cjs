@@ -375,7 +375,13 @@ async function runScenario(sc, providerKey, opts = {}) {
         const r = await api('POST', '/v1/tasks', { title: c.title, description: c.description ?? '', project: c.project ?? 'alpha', labels: c.labels ?? [], ...(c.context ? { context: c.context } : {}), ...(c.agent ? { agent: ctx.agents[c.agent].id } : {}) })
         if (r.status !== 200) throw new Error(`card ${key}: ${r.text}`)
         for (const text of c.comments ?? []) await api('POST', `/v1/tasks/${r.body.number}/comments`, { text })
-        if (c.column && c.column !== 'todo') await inv('tasks:update', r.body.number, { column: c.column, ...(c.agent ? { agent: ctx.agents[c.agent].id } : {}) })
+        if (c.column && c.column !== 'todo') {
+          await inv('tasks:update', r.body.number, { column: c.column, ...(c.agent ? { agent: ctx.agents[c.agent].id } : {}) })
+          // Under a project's rules a move can stop part way (#1537: a submission with nothing committed stays in Doing):
+          // the scenario never runs on a card that isn't where its setup put it.
+          const now = (await api('GET', `/v1/tasks/${r.body.number}`)).body?.column
+          if (now !== c.column) throw new Error(`setup: card ${key} is in ${now}, not ${c.column}: under the project's rules, move it as the user does (a real submission)`)
+        }
         ctx.cards[key] = r.body.number
         return r.body.number
       },
@@ -673,12 +679,13 @@ async function runScenario(sc, providerKey, opts = {}) {
     // The watch it ended its turn with (#402): the live one, not every watch it started (a new one replaces the last).
     observed.watch = s?.watch ?? null
     // What Hive woke it with (#402), in order: a line it typed in, or (#650: its doorbell) what the session's next
-    // hive_inbox call read, the inbox's own items after the doorbell.
+    // hive_inbox call read, the inbox's own items after the doorbell. Codex calls hive tools from its code tool (Script),
+    // so its read is the script that calls hive_inbox (#1537).
     observed.wakeLines = items.flatMap((x, i) => {
       const line = String(x.kind === 'user' ? (x.text ?? '') : '').trim()
       if (!line.startsWith('[Hive]')) return []
       if (!line.startsWith('[Hive] New in your inbox: ')) return [line.slice(0, 1000)]
-      const read = items.slice(i + 1).find((y) => y.kind === 'tool' && /hive_inbox/.test(y.tool.name))
+      const read = items.slice(i + 1).find((y) => y.kind === 'tool' && (/hive_inbox/.test(y.tool.name) || (y.tool.name === 'Script' && /hive_inbox/.test(String(y.tool.input ?? '')))))
       return [String(read?.tool.result ?? line).trim().slice(0, 1000)]
     })
     observed.guidance = result.guidance
