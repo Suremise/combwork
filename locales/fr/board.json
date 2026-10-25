@@ -637,7 +637,7 @@
   "board.reviewSkip.reason": "Pourquoi (facultatif)",
   "board.reviewSkip.reviewed": "Relue",
   "board.reviewSkip.skipped": "Relecture ignorée",
-  "board.reviewSkip.skippedTip": "{by, select, assistant {Relecture ignorée, décidé par l’Assistant : {reason}} other {{reason, select, none {Relecture ignorée, décidé par toi.} other {Relecture ignorée, décidé par toi : {reason}}}}}",
+  "board.reviewSkip.skippedTip": "{who, select, assistant {Relecture ignorée, décidé par l’Assistant : {reason}} note {Relecture ignorée, décidé par toi : {reason}} other {Relecture ignorée, décidé par toi.}}",
   "board.reviewSkip.working": "Enregistrement…",
   "board.run.agentStopped": "Son agent s’est arrêté avant la fin",
   "board.run.failedAfter": "Échec après {took}",

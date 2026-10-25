@@ -637,7 +637,7 @@
   "board.reviewSkip.reason": "Por quê (opcional)",
   "board.reviewSkip.reviewed": "Revisado",
   "board.reviewSkip.skipped": "Revisão pulada",
-  "board.reviewSkip.skippedTip": "{by, select, assistant {Revisão pulada, definida pelo Assistente: {reason}} other {{reason, select, none {Revisão pulada, definida por você.} other {Revisão pulada, definida por você: {reason}}}}}",
+  "board.reviewSkip.skippedTip": "{who, select, assistant {Revisão pulada, definida pelo Assistente: {reason}} note {Revisão pulada, definida por você: {reason}} other {Revisão pulada, definida por você.}}",
   "board.reviewSkip.working": "Salvando…",
   "board.run.agentStopped": "O agente parou antes de terminar",
   "board.run.failedAfter": "Falhou após {took}",

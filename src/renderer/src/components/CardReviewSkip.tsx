@@ -6,6 +6,7 @@ import { cardLabel } from '@shared/projectKeys'
 import { call, errorMessage } from '../api'
 import { loadTasks, notify, prompt, useLanguage } from '../store'
 import { BusyButton, Icon, Tooltip, useBusy } from './ui'
+import { reviewSkipTip } from './reviewSkipTip'
 
 // Review: Skip in the window (#1625, SPEC §16.7.3): a card that skips review is finished by its submission (a code card
 // goes on to its merge). The user decides it, when the card is made or before it is submitted; a project agent only
@@ -13,7 +14,6 @@ import { BusyButton, Icon, Tooltip, useBusy } from './ui'
 
 const M = {
   skipped: msg({ id: 'board.reviewSkip.skipped', defaultMessage: 'Review skipped', description: "A mark on a card's tile (#1625): the card skips its review; its submission finishes it (a code card still goes on to its merge)." }),
-  skippedTip: msg({ id: 'board.reviewSkip.skippedTip', defaultMessage: '{by, select, assistant {Review skipped, set by the Assistant: {reason}} other {{reason, select, none {Review skipped, set by you.} other {Review skipped, set by you: {reason}}}}}', description: "Tooltip and accessible name of a card's Review skipped mark (#1625): who set it (you, or the Hive Assistant) and why ({reason}: their words; none when the user gave no note). Select keys: keep them." }),
   proposedTip: msg({ id: 'board.reviewSkip.proposedTip', defaultMessage: 'Skip review? Proposed by the agent that made it: open the card to decide.', description: "Tooltip and accessible name of a card's mark when the agent that made it proposed that it skip its review and nobody has answered yet (#1625)." }),
   proposedMark: msg({ id: 'board.reviewSkip.proposedMark', defaultMessage: 'Skip review?', description: "A dashed mark on a card's tile (#1625): the agent that made it proposed that it skip its review, not answered yet." }),
   field: msg({ id: 'board.reviewSkip.field', defaultMessage: 'Review', description: "A field label in the card dialog (#1625): whether the card is reviewed as its project's rules say, or skips its review." }),
@@ -54,7 +54,7 @@ export function ReviewSkipMark({ b }: { b: WorkBadge | undefined }) {
   useLanguage()
   if (!b || (!b.reviewSkip && b.reviewSkipProposed === null)) return null
   const proposed = !b.reviewSkip
-  const text = proposed ? tr(M.proposedTip) : tr(M.skippedTip, { by: b.reviewSkip!.by, reason: b.reviewSkip!.reason || 'none' }) // i18n-ignore: 'none' is a select key of the message, not text
+  const text = proposed ? tr(M.proposedTip) : reviewSkipTip(b.reviewSkip!, tr)
   return (
     <Tooltip content={text}>
       <span className={proposed ? 'task-kind review-skip proposed' : 'task-kind review-skip'} aria-label={text} data-review-skip={proposed ? 'proposed' : 'skipped'}>

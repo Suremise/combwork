@@ -2552,8 +2552,8 @@
     "description": "A mark on a card's tile (#1625): the card skips its review; its submission finishes it (a code card still goes on to its merge)."
   },
   "board.reviewSkip.skippedTip": {
-    "defaultMessage": "{by, select, assistant {Review skipped, set by the Assistant: {reason}} other {{reason, select, none {Review skipped, set by you.} other {Review skipped, set by you: {reason}}}}}",
-    "description": "Tooltip and accessible name of a card's Review skipped mark (#1625): who set it (you, or the Hive Assistant) and why ({reason}: their words; none when the user gave no note). Select keys: keep them."
+    "defaultMessage": "{who, select, assistant {Review skipped, set by the Assistant: {reason}} note {Review skipped, set by you: {reason}} other {Review skipped, set by you.}}",
+    "description": "Tooltip and accessible name of a card's Review skipped mark (#1625): who set it and why. Select keys (keep them): assistant, the Hive Assistant set it, with the user's reason ({reason}: their words); note, the user set it with a note ({reason}); other, the user set it with no note."
   },
   "board.reviewSkip.working": {
     "defaultMessage": "Saving…",
