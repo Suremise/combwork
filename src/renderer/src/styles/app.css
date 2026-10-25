@@ -11322,7 +11322,6 @@ button.progress-run-show:focus-visible {
 }
 .progress-lane.ended .lane-seg,
 .progress-lane.abandoned .lane-seg {
-  animation: none;
   filter: saturate(0.45);
 }
 .progress-lane-top {
@@ -11476,7 +11475,6 @@ button.progress-lane-why:focus-visible,
 .lanes-legend-swatch.lane-seg {
   flex: 0 0 22px;
   cursor: default;
-  animation: none;
 }
 .lanes-legend-name {
   flex-shrink: 0;
@@ -11544,16 +11542,37 @@ button.progress-lane-why:focus-visible,
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-.lane-seg.doing {
-  box-shadow: none;
+.lane-seg.doing,
+.lane-seg.doing::before {
   background: repeating-linear-gradient(-45deg, var(--info) 0 4px, color-mix(in srgb, var(--info) 55%, var(--bg)) 4px 8px);
   background-size: 11.3px 12px;
+}
+.lane-seg.doing {
+  box-shadow: none;
+  overflow: hidden;
+}
+/* The stripes move by a transform of a copy one stripe wider, which the compositor does alone: moving the background
+   itself repainted the panel on every frame while a lane worked (#1629). */
+.lane-seg.doing::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: -11.3px;
+  width: calc(100% + 11.3px);
+  pointer-events: none;
   animation: lane-stripes 1s linear infinite;
 }
 @keyframes lane-stripes {
   to {
-    background-position: 11.3px 0;
+    transform: translateX(11.3px);
   }
+}
+/* Still: a legend's or a branch's swatch, and an ended or abandoned lane (after the animation, which they override). */
+.lanes-legend-swatch.lane-seg::before,
+.git-branch-card-swatch.lane-seg::before,
+.progress-lane.ended .lane-seg::before,
+.progress-lane.abandoned .lane-seg::before {
+  animation: none;
 }
 .lane-seg.review {
   background: color-mix(in srgb, var(--warning) 22%, var(--bg));
@@ -11669,7 +11688,7 @@ button.progress-lane-why:focus-visible,
   color: var(--fg-muted);
 }
 @media (prefers-reduced-motion: reduce) {
-  .lane-seg.doing {
+  .lane-seg.doing::before {
     animation: none;
   }
 }
@@ -12087,7 +12106,6 @@ button.progress-lane-why:focus-visible,
   flex: 0 0 14px;
   width: 14px;
   height: 10px;
-  animation: none;
   cursor: default;
 }
 .git-branch-card-review {

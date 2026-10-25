@@ -128,14 +128,22 @@ export function CornerPlacement() {
       const w = card?.offsetWidth || toasts?.offsetWidth || 320
       const h = card?.offsetHeight || toasts?.offsetHeight || 0
       const { right, lift } = cornerPlacement(window.innerWidth, window.innerHeight, panel ? panel.getBoundingClientRect().left : null, bars, w, h)
-      root.style.setProperty('--corner-right', `${right}px`)
-      root.style.setProperty('--corner-lift', `${lift}px`)
+      // Written only when they change: a property set on the root restyles the whole document, even to the same value (#1629).
+      if (right !== placed.right) root.style.setProperty('--corner-right', `${right}px`)
+      if (lift !== placed.lift) root.style.setProperty('--corner-lift', `${lift}px`)
+      placed = { right, lift }
     }
+    let placed: { right: number | null; lift: number | null } = { right: null, lift: null }
     const soon = (): void => {
       if (!frame) frame = requestAnimationFrame(measure)
     }
+    // A terminal's own DOM (its rows, its input's position) changes with every frame of output: none of it moves the
+    // corner, and measuring for it forced a layout on each frame while agents streamed (#1629).
+    const outsideTerminals = (records: MutationRecord[]): boolean => records.some((r) => !(r.target instanceof Element ? r.target : r.target.parentElement)?.closest('.xterm'))
     measure()
-    const watch = new MutationObserver(soon)
+    const watch = new MutationObserver((records) => {
+      if (outsideTerminals(records)) soon()
+    })
     watch.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] })
     window.addEventListener('resize', soon)
     return () => {

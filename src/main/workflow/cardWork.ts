@@ -42,14 +42,54 @@ export function workBadges(ws: WorkspaceService, rulesetsNow: ReadonlyMap<string
   return boardRead(ws, (db) => {
     if (!hasFacts(db)) return []
     const cards = db.prepare('SELECT number, col, stage, pre_workflow, kind, project FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
-    const facts = new Map<number, Fact[]>()
-    for (const r of db.prepare(QUERIES['facts.live'].sql).all() as Row[]) {
-      const f = factOf(r)
-      facts.set(f.card, [...(facts.get(f.card) ?? []), f])
+    // Each card's newest fact and how many (#1629): with its row and its project's ruleset now, what its badge is made
+    // from. Facts are only ever added, and a stored ruleset never changes, so a card whose key is as it was keeps its
+    // badge; only the cards a change touched are read and folded again.
+    const heads = new Map<number, string>()
+    for (const r of db.prepare('SELECT f.card, max(f.seq) AS seq, count(*) AS n FROM card_facts f JOIN cards c ON c.number = f.card WHERE c.archived = 0 GROUP BY f.card').all() as Row[]) heads.set(r.card as number, `${r.seq}/${r.n}`)
+    const kept = badgeCache(ws)
+    const keyOf = (r: Row): string => [r.col, r.stage, r.pre_workflow, r.kind, heads.get(r.number as number) ?? '', rulesetsNow.get(String(r.project ?? '').toLowerCase()) ?? ''].join('\n')
+    const changed = cards.filter((r) => kept.get(r.number as number)?.key !== keyOf(r))
+    if (changed.length) {
+      const facts = new Map<number, Fact[]>()
+      const add = (r: Row): void => {
+        const f = factOf(r)
+        const list = facts.get(f.card)
+        if (list) list.push(f)
+        else facts.set(f.card, [f])
+      }
+      // Many (the first read, a board changed in bulk): the live cards' facts in one read; else each changed card's.
+      if (changed.length > BADGES_ONE_BY_ONE) for (const r of db.prepare(QUERIES['facts.live'].sql).all() as Row[]) add(r)
+      else {
+        const stmt = db.prepare(QUERIES['facts.ofCard'].sql)
+        for (const r of changed) for (const f of stmt.all(r.number) as Row[]) add(f)
+      }
+      const stages = stagesReader(db)
+      for (const r of changed) kept.set(r.number as number, { key: keyOf(r), badge: workBadge(workView(cardOf(r), facts.get(r.number as number) ?? []), rulesetsNow.get(String(r.project ?? '').toLowerCase()), stages) })
     }
-    const stages = stagesReader(db)
-    return cards.map((r) => workBadge(workView(cardOf(r), facts.get(r.number as number) ?? []), rulesetsNow.get(String(r.project ?? '').toLowerCase()), stages))
+    // Cards archived or gone since let go.
+    if (kept.size > cards.length) {
+      const live = new Set(cards.map((r) => r.number as number))
+      for (const n of kept.keys()) if (!live.has(n)) kept.delete(n)
+    }
+    return cards.map((r) => kept.get(r.number as number)!.badge)
   })
+}
+
+/** Up to how many changed cards workBadges reads one by one; more, and it reads every live card's facts at once. */
+const BADGES_ONE_BY_ONE = 40
+
+/** Each workspace's badges by card, with the key each was made from (workBadges); a workspace opened again starts afresh. */
+const badges = new WeakMap<WorkspaceService, { path: string | null; life: unknown; cards: Map<number, { key: string; badge: WorkBadge }> }>()
+/** Drops a workspace's kept badges: its next workBadges makes every one afresh (tests compare the two). */
+export function forgetBadges(ws: WorkspaceService): void {
+  badges.delete(ws)
+}
+
+function badgeCache(ws: WorkspaceService): Map<number, { key: string; badge: WorkBadge }> {
+  let c = badges.get(ws)
+  if (!c || c.path !== ws.path || c.life !== ws.lifetime) badges.set(ws, (c = { path: ws.path, life: ws.lifetime, cards: new Map() }))
+  return c.cards
 }
 
 /** A stored ruleset's stages by its id, in board order (each read once; null for one not stored or not readable). */

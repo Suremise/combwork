@@ -7,7 +7,7 @@ import type { QueueRecent, QueueStuck, QueueView } from '@shared/workflow/queue'
 import type { WorkView } from '@shared/workflow/workView'
 import type { ProgressRun, TaskCard } from '@shared/types'
 import { attempt } from '../actions'
-import { call } from '../api'
+import { call, callShared } from '../api'
 import { useForYou } from '../forYou'
 import { showQueueRun } from '../queueSource'
 import { confirm, notify, useStore } from '../store'
@@ -94,7 +94,7 @@ export function CardQueue({ card, view: w, projectPath, short, reveal = 0 }: { c
   useEffect(() => {
     if (!projectPath || !target) return
     let live = true
-    void call('queue:list', projectPath, target).then(
+    void callShared('queue:list', projectPath, target).then(
       (v) => live && setQueue(v[0] ?? null),
       () => undefined
     )
