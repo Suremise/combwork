@@ -156,7 +156,7 @@ describe('a lane waiting for a slot, started as Hive quits (#1628)', () => {
     let quitting = false
     let release!: () => void
     state.lanesHeld = new Promise<void>((r) => (release = r))
-    const started = startWaitingLane(ws, 'D:\ws\alpha', 'lane-1', 'slot-a', () => quitting)
+    const started = startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => quitting)
     quitting = true
     release()
     expect(await started).toBe(false)
@@ -167,14 +167,14 @@ describe('a lane waiting for a slot, started as Hive quits (#1628)', () => {
     waiting()
     let quitting = false
     state.onStart = (id) => void (id === 'b1' && (quitting = true))
-    expect(await startWaitingLane(ws, 'D:\ws\alpha', 'lane-1', 'slot-a', () => quitting)).toBe(false)
+    expect(await startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => quitting)).toBe(false)
     expect(state.calls).toEqual(['start b1'])
     expect(state.briefs).toHaveLength(1)
   })
 
   it('not quitting: both are started', async () => {
     waiting()
-    expect(await startWaitingLane(ws, 'D:\ws\alpha', 'lane-1', 'slot-a', () => false)).toBe(true)
+    expect(await startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => false)).toBe(true)
     expect(state.calls).toEqual(['start b1', 'start r1'])
   })
 })
