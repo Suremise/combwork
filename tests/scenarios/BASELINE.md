@@ -36,14 +36,34 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
-## P8's scenarios for the intents and gates (#1536): the three fakes, fixtures v85, 24–25 October 2026
+## P8's scenarios for the intents and gates (#1536): the three fakes, fixtures v86, 24–25 October 2026
 
 The baseline for P8's trials (#1537) and the checks card (#1539), on the guidance that ships (lanes A–D merged, 1.0.0
 6e9eeb47), saved as `p8-scenarios` (fake Claude Code), `p8-scenarios-fake-codex` and `p8-scenarios-fake-copilot`.
 - **Before**, v82 (`p8-e-before`, `2026-10-24T17-38-41-fake`): all 134 pass on the fake Claude Code.
-- **After**, v85, source 1d426b63, guidance `3ef4abb443998e00`: **138 of 138 pass on each fake**. Fake Claude Code
-  `2026-10-25T00-35-32-fake` (CLI 2.1.999), fake Codex `2026-10-25T01-13-50-fake-codex` (0.160.0), Copilot offline
-  `2026-10-25T01-55-23-fake-copilot` (1.0.98). Not comparable with v82 (another fixtures version).
+- **After**, v86, source a450ce5c, guidance `3ef4abb443998e00`: **138 of 138 pass on each fake**. Fake Claude Code
+  `2026-10-25T03-34-16-fake` (CLI 2.1.999), fake Codex `2026-10-25T04-14-20-fake-codex` (0.160.0), Copilot offline
+  `2026-10-25T04-55-02-fake-copilot` (1.0.98). Not comparable with v82 (another fixtures version).
+
+What changed in v86 (review round 3, the root fix):
+- **The fakes act as the shipped guidance does.** Every fake script uses the intents: `fakeStart`, `fakeSubmit` (the
+  work committed, then `hive_submit`), `fakeStartReview`, `fakeVerdict` and `hive_report_merge`. The old moves stay only
+  where they are meant:
+  - `old-move-*`: the translation's tests;
+  - done-card-more-work: work-on-card's own step for a card back from Done;
+  - assistant-override-* and assistant-bulk-move: the Assistant's moves;
+  - prioritise: an order within Todo.
+  The full fake run was then the audit, and its failures were fixed in the fixtures.
+- **Reviewers' checks** take where the verdict leaves the card (`verdictLeft`): a fail back with its builder in Doing (or
+  in Review by the old move), a pass in Passed or past it, moved by nothing else of the reviewer's. This covers
+  review-card, test-waits-review, review-against-decision, review-decision-next-round and card-loop-recurring-review.
+  **review-passed** means "Passed, not Done", so its project has a reviewer agent and unchecked merges, where a pass
+  stops in Passed, with a real submission.
+- **Fixtures for the outcome they mean**:
+  - a card back from a failed review is in Doing: fix-returned-card, card-loop-rounds, card-loop-recurring,
+    card-loop-return, card-loop-two-cards;
+  - a loop with a reviewer has its work reviewed, so the builder's watch has a verdict to wait for:
+    card-loop-recurring, card-loop-return, card-loop-commit.
 
 What changed in v85 (review round 2):
 - **work-on-card** runs in a project whose work an agent reviews, and requires the intents: started with
