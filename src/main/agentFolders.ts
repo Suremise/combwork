@@ -132,40 +132,52 @@ export async function folderFacts(projectPath: string): Promise<FolderFacts> {
 /**
  * Where an agent works, for the Agent API and main's readers (#1451): where it is now (its running session's folder, else
  * where a new conversation would start) and where its next new conversation starts, each named and with why
- * (`agentPlaces`), and `branch`, the line of the slot it is in now: the card last started under that slot's open lease,
- * else a carried slot's or 0.9 worktree's own branch. `facts`: read once for several agents.
+ * (`agentPlaces`), `branch`, the line of the slot it is in now: the card last started under that slot's open lease,
+ * else a carried slot's or 0.9 worktree's own branch, and `target`, the branch that card's line merges into (its
+ * `Started` fact's, #1627), when known. `facts`: read once for several agents.
  */
-export async function agentPlace(projectPath: string, agent: Pick<AgentDef, 'id' | 'name' | 'role' | 'workflowRole'>, running: { cwd: string } | null, facts?: FolderFacts): Promise<{ now: AgentPlace; launch: AgentPlace; branch: string | null }> {
+export async function agentPlace(projectPath: string, agent: Pick<AgentDef, 'id' | 'name' | 'role' | 'workflowRole'>, running: { cwd: string } | null, facts?: FolderFacts): Promise<{ now: AgentPlace; launch: AgentPlace; branch: string | null; target: string | null }> {
   const f = facts ?? (await folderFacts(projectPath))
   const places = agentPlaces(f, folderAgent(agent), running)
   const slot = places.now.slot ? (f.slots.find((s) => s.name === places.now.slot) ?? null) : null
   const legacy = legacyWorktree(agent)
-  let branch: string | null = null
+  let started: LeaseStart | null = null
   if (slot?.open) {
     try {
-      branch = boardRead(workspaceOf(projectPath), (db) => leaseLine(db, slot.open!.id))
+      started = boardRead(workspaceOf(projectPath), (db) => leaseStart(db, slot.open!.id))
     } catch {
       // A board still 0.9's: no lines.
     }
   }
+  let branch = started?.line ?? null
   if (!branch && legacy && (slot?.open?.kind === 'carried' || samePlace(places.now.path, legacy.path))) branch = legacy.branch
-  return { ...places, branch }
+  return { ...places, branch, target: started?.target ?? null }
 }
 
 /**
  * An agent's open lease in a project's slots and its line (#1451: branchWatch's): its dispatch lease (a card's or a
- * lane's), else its carried one, with the slot's folder and target; null: none open.
+ * lane's), else its carried one, with the slot's folder and the line's target: the card's own (its `Started` fact's,
+ * #1627: a lane's slot keeps the target it was lent with), else the slot's; null: none open.
  */
 export function leasedLine(db: DatabaseSync, project: string, agentId: string): { folder: string; target: string | null; line: string | null; carried: boolean } | null {
   const l = db
     .prepare("SELECT l.id, l.kind, s.folder, s.target FROM slot_leases l JOIN slots s ON s.project = l.project AND s.name = l.slot WHERE l.project = ? AND l.agent = ? AND l.ended_at IS NULL ORDER BY l.kind = 'carried' LIMIT 1") // i18n-ignore: SQL
     .get(project, agentId) as { id: string; kind: string; folder: string; target: string | null } | undefined
-  return l ? { folder: l.folder, target: l.target, line: leaseLine(db, l.id), carried: l.kind === 'carried' } : null
+  if (!l) return null
+  const started = leaseStart(db, l.id)
+  return { folder: l.folder, target: started?.target ?? l.target, line: started?.line ?? null, carried: l.kind === 'carried' }
 }
 
-/** The line of the card last started under a lease (its `Started` fact's), or null. */
-export function leaseLine(db: DatabaseSync, lease: string): string | null {
-  return (db.prepare("SELECT json_extract(data, '$.line') AS line FROM card_facts WHERE kind = 'Started' AND json_extract(data, '$.lease') = ? ORDER BY at DESC LIMIT 1").get(lease) as { line: string | null } | undefined)?.line ?? null // i18n-ignore: SQL
+/** The line of the card last started under a lease and the branch it merges into (its `Started` fact's). */
+interface LeaseStart {
+  line: string | null
+  target: string | null
+}
+
+/** The card last started under a lease: its line and target (its `Started` fact's), or null. */
+export function leaseStart(db: DatabaseSync, lease: string): LeaseStart | null {
+  const r = db.prepare("SELECT json_extract(data, '$.line') AS line, json_extract(data, '$.target') AS target FROM card_facts WHERE kind = 'Started' AND json_extract(data, '$.lease') = ? ORDER BY at DESC LIMIT 1").get(lease) as { line: string | null; target: string | null } | undefined // i18n-ignore: SQL
+  return r ? { line: r.line ?? null, target: r.target || null } : null
 }
 
 /** Why a bind or rebind was refused (in English: the log and agents). */

@@ -296,10 +296,14 @@ export interface NamedFolder {
 
 const leafOf = (folder: string): string => folder.split(/[\\/]/).filter(Boolean).pop() ?? folder
 
-/** The window's view of `now` (an `agentPlaces` answer) for the agent, with its line (`branch`, main's `agentPlace`). */
-export function shownPlace(facts: FolderFacts, agent: FolderAgent, now: AgentPlace, branch: string | null): ShownPlace {
+/**
+ * The window's view of `now` (an `agentPlaces` answer) for the agent, with its line (`branch`, main's `agentPlace`) and
+ * the branch that line merges into (`target`, its card's: #1627), else the slot's.
+ */
+export function shownPlace(facts: FolderFacts, agent: FolderAgent, now: AgentPlace, branch: string | null, target: string | null = null): ShownPlace {
   const slot = now.slot ? (facts.slots.find((s) => s.name === now.slot) ?? null) : null
-  if (slot) return { folder: now.path, is: slot.open?.kind === 'carried' && slot.open.agent === agent.id ? 'carried' : 'slot', name: slot.name, branch, ...(slot.target ? { base: slot.target } : {}) }
+  const base = target ?? slot?.target
+  if (slot) return { folder: now.path, is: slot.open?.kind === 'carried' && slot.open.agent === agent.id ? 'carried' : 'slot', name: slot.name, branch, ...(base ? { base } : {}) }
   if (facts.homes.some((h) => samePath(h, now.path))) return { folder: now.path, is: 'home', name: leafOf(now.path), branch: null }
   if (agent.legacy && samePath(agent.legacy.path, now.path)) return { folder: now.path, is: 'legacy', name: leafOf(now.path), branch: agent.legacy.branch }
   return { folder: now.path, is: 'project', name: null, branch: null }

@@ -773,7 +773,8 @@ export async function lendLane(ws: WorkspaceService, projectPath: string, lane: 
   const own = await carriedToHand(ws, projectPath, pool, builder, target)
   const handed = own ? await handOffCarried(ws, projectPath, pool, own, { lane, agent: builder }, name(builder)) : null
   if (handed) return { slot: handed.slot }
-  const r = await pool.lend({ lane, agent: builder }, { install: false })
+  // Lent with the lane's target (#1627), so the slot records where its lines merge.
+  const r = await pool.lend({ lane, agent: builder }, { ...(target ? { target } : {}), install: false })
   if (r.ok) {
     log.info(`Lent ${userText(r.slot.name)} to lane ${lane} (lease ${r.lease.id})`)
     return { slot: r.slot.name }

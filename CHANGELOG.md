@@ -130,6 +130,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 - **Menus near the window's right edge keep their width** (#1329), and **a notice's buttons wrap** rather than run past its edge (#1574).
 - **The Assistant's journal gives back the space its size cap frees.**
 - **No more "Permission mode changed"** when an agent starts a new conversation with its mode unchanged.
+- **A card's unmerged commits are counted against where it merges.** An agent's unmerged work in a slot (its pane's Merge… and its Changes tab) was counted against `main` when its lane's slot was lent before the project's target branch was passed on, so a card heading for another branch (such as `1.0.0`) showed hundreds of commits. It's now counted against the card's target, else the project's default branch, and a card's branch that isn't made yet no longer logs a warning (#1627).
 
 ## 0.9.3 — 2026-10-20
 
