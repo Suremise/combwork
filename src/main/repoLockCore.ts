@@ -69,6 +69,21 @@ export interface TakeOptions {
   onWait?: (holder: RepoLockHolder) => void
   noticeAfterMs?: number
   procs?: LockProcesses
+  /** Told of a step on the lock's file (synchronous, on the caller's thread) that took SLOW_STEP_MS or more (#1633). */
+  onSlow?: (step: string, ms: number) => void
+}
+
+/** A step on the lock's file this slow is told (`onSlow`): its busy wait or its fsyncs held the caller's thread up. */
+export const SLOW_STEP_MS = 100
+
+function timed<T>(step: string, onSlow: TakeOptions['onSlow'], fn: () => T): T {
+  const t = performance.now()
+  try {
+    return fn()
+  } finally {
+    const ms = performance.now() - t
+    if (onSlow && ms >= SLOW_STEP_MS) onSlow(step, ms)
+  }
 }
 
 /** A held lock: release it once (later calls do nothing). */
@@ -138,7 +153,8 @@ async function holderDead(r: Row, own: number, procs: LockProcesses): Promise<bo
 export async function takeRepoLock(commonDir: string, opts: TakeOptions): Promise<TakeResult> {
   const procs = opts.procs ?? SYSTEM_PROCESSES
   const own = await ownStartOf(procs)
-  const db = openLockDb(join(commonDir, REPO_LOCK_FILE), BUSY_MS, SCHEMA)
+  const slow = opts.onSlow
+  const db = timed('open', slow, () => openLockDb(join(commonDir, REPO_LOCK_FILE), BUSY_MS, SCHEMA))
   const started = Date.now()
   let told = false
   // Holders judged live, by token, and when: looked at by pid alone between full checks, and judged again whole (its
@@ -148,7 +164,7 @@ export async function takeRepoLock(commonDir: string, opts: TakeOptions): Promis
   let kept = false
   try {
     for (;;) {
-      const seen = readRow(db)
+      const seen = timed('read', slow, () => readRow(db))
       let dead = false
       if (seen) {
         const at = live.get(seen.token)
@@ -160,7 +176,7 @@ export async function takeRepoLock(commonDir: string, opts: TakeOptions): Promis
       }
       if (!seen || dead) {
         const token = randomUUID()
-        db.exec('BEGIN IMMEDIATE')
+        timed('begin', slow, () => db.exec('BEGIN IMMEDIATE'))
         let took = false
         try {
           const now = readRow(db)
@@ -170,7 +186,7 @@ export async function takeRepoLock(commonDir: string, opts: TakeOptions): Promis
             db.prepare('INSERT OR REPLACE INTO repo_lock (id, token, pid, process_start, profile, taken_at) VALUES (1, ?, ?, ?, ?, ?)').run(token, process.pid, own, opts.profile, new Date().toISOString())
             took = true
           }
-          db.exec('COMMIT')
+          timed('take', slow, () => db.exec('COMMIT'))
         } catch (e) {
           if (db.isTransaction) db.exec('ROLLBACK')
           throw e
@@ -178,7 +194,7 @@ export async function takeRepoLock(commonDir: string, opts: TakeOptions): Promis
         if (took) {
           heldHere.add(token)
           kept = true
-          return { held: heldLock(db, token) }
+          return { held: heldLock(db, token, slow) }
         }
         continue
       }
@@ -196,7 +212,7 @@ export async function takeRepoLock(commonDir: string, opts: TakeOptions): Promis
   }
 }
 
-function heldLock(db: DatabaseSync, token: string): HeldRepoLock {
+function heldLock(db: DatabaseSync, token: string, slow: TakeOptions['onSlow']): HeldRepoLock {
   let done = false
   return {
     token,
@@ -206,9 +222,9 @@ function heldLock(db: DatabaseSync, token: string): HeldRepoLock {
       heldHere.delete(token)
       try {
         // i18n-ignore: SQL, not text
-        db.prepare('DELETE FROM repo_lock WHERE token = ?').run(token)
+        timed('release', slow, () => db.prepare('DELETE FROM repo_lock WHERE token = ?').run(token))
       } finally {
-        db.close()
+        timed('close', slow, () => db.close())
       }
     }
   }

@@ -7,7 +7,7 @@ import { basename, dirname, join } from 'path'
  * and the Assistant's journal in a file of its own, #989) is opened, set up and migrated here, with Node's built-in
  * `node:sqlite` (no native module to rebuild for each Electron). Nothing else imports `node:sqlite`, so another library
  * would be a change to this file only. Its calls are synchronous: at these sizes a query or a commit takes well under a
- * millisecond on main's thread. The usage history (`.hive/usage.db`, #1106) is opened here too, by the usage worker on a
+ * millisecond on main's thread, once the WAL's checkpoints, which fsync the file, are off it (`checkpointer`, #1633). The usage history (`.hive/usage.db`, #1106) is opened here too, by the usage worker on a
  * thread of its own (usageWorker.ts): nothing here is tied to main's thread.
  */
 
@@ -61,6 +61,11 @@ export interface OpenOptions {
   beforeGroup?: (pending: PendingGroup) => void
   /** For tests: runs once a group's steps are committed, its lock still held (another process trying to open the file meanwhile). */
   whileGroupLocked?: () => void
+  /**
+   * Takes the WAL's checkpoints off the writer's thread (#1633, walCheckpoint.ts): called once the file is open and
+   * writable, with its writer; returns what stops it, called first when the database closes.
+   */
+  checkpointer?: (file: string, writer: DatabaseSync) => () => void
 }
 
 /** An open database: a writer and a reader connection to one file. */
@@ -314,6 +319,7 @@ export function openDb(file: string, opts: OpenOptions): Db {
     opts.setup?.(reader, false)
     reader.exec('PRAGMA query_only = ON')
     const r = reader
+    const stopCheckpoints = newer === null && !pending ? opts.checkpointer?.(file, writer) : undefined
     return {
       file,
       writer,
@@ -321,6 +327,7 @@ export function openDb(file: string, opts: OpenOptions): Db {
       newer,
       pending,
       close: () => {
+        stopCheckpoints?.()
         // The reader first (#1324): while it has the file mapped, Windows refuses the checkpoint's truncation of a file
         // that shrank (incremental vacuum), silently, and the close after it has nothing left to copy, so the file kept
         // its biggest size for good.

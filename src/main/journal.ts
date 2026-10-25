@@ -8,6 +8,7 @@ import { BROWSE_LIMITS, ENTRY_LIMITS, JOURNAL_KINDS, KEPT_IMPORTANCE, LINK_TYPES
 import { openDb, transaction, type Db, type Migration } from './db'
 import { realPath } from './fsutil'
 import { createLogger, userText } from './logger'
+import { checkpointOffThread } from './walCheckpoint'
 import { assertPlaceAdmitted, isAdmitted, ownerOf, refusedOpen } from './openingFence'
 import { trash } from './trash'
 
@@ -169,7 +170,7 @@ function journalOf(home: string, at: Located = located(home)): Db {
 }
 
 /** Opens the journal at `file`, where it really is (its backups beside it). */
-const openJournalDb = (file: string): Db => openDb(file, { migrations: JOURNAL_MIGRATIONS, hiveVersion: hiveVersion(), backupDir: join(dirname(file), 'backups'), setup })
+const openJournalDb = (file: string): Db => openDb(file, { migrations: JOURNAL_MIGRATIONS, hiveVersion: hiveVersion(), backupDir: join(dirname(file), 'backups'), setup, checkpointer: checkpointOffThread })
 
 /**
  * Closes a home's journal (its workspace closed, or before it is deleted): every connection to it, however it was spelt

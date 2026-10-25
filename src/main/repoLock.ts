@@ -61,6 +61,7 @@ export async function withRepoLock<T>(folder: string, fn: () => Promise<T>, opts
       profile: profile(),
       waitMs: waitSeconds * 1000,
       noticeAfterMs: NOTICE_AFTER_MS,
+      onSlow: (step, ms) => log.warn(`the repository lock's ${step} took ${Math.round(ms)} ms on main's thread (${userText(folder)})`),
       onWait: (h) => {
         log.info(`Waiting for the repository lock of ${userText(folder)}, held by ${userText(h.profile)} (pid ${h.pid})`)
         if (!opts.quiet) toast('info', tr(msg({ id: 'git.repoLock.waiting', defaultMessage: 'Another Hive is merging into this repository ({profile})', description: "A notification's title: this Hive waits to merge into (or change) a repository because another Hive (its profile folder's name, {profile}, e.g. Hive-Dev) holds the repository's merge lock." }), { profile: h.profile }), tr(msg({ id: 'git.repoLock.waitingFor', defaultMessage: 'Hive waits for it to finish, up to {seconds, number} s.', description: 'The notification\'s text under "Another Hive is merging into this repository": how long this Hive waits for the other one, in seconds.' }), { seconds: waitSeconds }), undefined, opts.project)
