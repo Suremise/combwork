@@ -32,6 +32,18 @@ This document explains how Hive is put together, for anyone changing the code. P
 | `src/main/workflow/lockRecord.ts` | G16's lock records (#1481): each agent's file locks, from its sessions' `session-status` (`lockedFiles`), recorded on its current card as `FilesLocked`, queued in order per project; a submit waits for those queued before it (`locksSettled`) |
 | `src/main/workflow/lineUpdates.ts` | An agent's worktree between a lane's cards (#1271, SPEC §16.19.2): after a squash merge, the builder's branch brought up to date before the next card (idle, no run, clean, nothing lost), recorded as `LineMoved`; else asked under For you; the lane's `lineUpdate` status meanwhile |
 | `src/main/workflow/adoption.ts`, `src/main/workflow/upgrade.ts` | The 1.0 upgrade's adoption (#1218): each project's options as it works today, cards from before 1.0 marked, cards in flight adopted from what their folder shows (`adoptionInputs` outside the board's lock, `writeAdoption` inside); in the background after the upgrade and at each open until it has run once |
+| `src/shared/platform/`, `src/main/platform/` | The platform layer (SPEC §16.3): None and Git behind one `PlatformAdapter` (`adapter.ts`; `gitPlatform.ts` on `git.ts`, `nonePlatform.ts` on `none.ts`; a value or unknown, `types.ts`), each one's capabilities (`descriptors.ts`), detection (`registry.ts`), switching a project's version control (`switching.ts`, `workflow/platformSwitch.ts`, #1419), and the watcher (`observe.ts`, its lifetime in `watching.ts`) |
+| `src/shared/workflow/` | The workflow core, pure and unit-tested: a card's facts and their fold (`facts.ts`) and its work view (`workView.ts`); options, presets and their words (`options.ts`, `optionTexts.ts`, `projectWorkflow.ts`, `presetStep.ts`); the piece library and compiling options into a ruleset (`pieces.ts`, `guards.ts`, `compile.ts`); the board's stages (`stages.ts`); refusals and the next step (`refusals.ts`, `nextStep.ts`, `texts.ts`); card references (`cardRefs.ts`), lane lists (`laneList.ts`), roles (`roles.ts`), the reviewer pool's choice (`reviewerPool.ts`), the queue's model (`queue.ts`) |
+| `src/main/workflow/service.ts`, `runtime.ts`, `rulesets.ts`, `levels.ts`, `writes.ts`, `src/main/tasks.ts`, `src/main/cardIntents.ts` | Gates and intents (SPEC §16.7, §16.8): one runtime per project (`workflowFor`), each move's guards and actions in one `boardWrite`; options resolved Hive → workspace → project (`rulesets.ts`; the levels' defaults `levels.ts`, written one at a time `writes.ts`); the board's one intent path (`tasks.ts` `runIntent`, the user's and the Assistant's moves through `moveThroughRules`) and agents' intents (`cardIntents.ts`); off with Advanced `hive.workflow.enforce` (`workflowEnforced()`) |
+| `src/main/workflow/reconcile.ts`, `reconciler.ts`, `checks.ts`, `runChecks.ts`, `runLink.ts`, `cardWork.ts` | Reconciliation of work done outside Hive (SPEC §16.4.4); runs as checks (§16.13); a card's work read for the window (`tasks:work`, `tasks:workBadges`, `tasks:forYou`) |
+| `src/main/workflowNotices.ts`, `decisionWakes.ts`, `loopWakes.ts`, `src/renderer/src/forYou.ts`, `components/ForYou.tsx`, `CardWork.tsx`, `CardKind.tsx` | For you (SPEC §16.8.5: the user's requests, notices of the work, a chip, the board's filter and the Board icon's count) and the wakes that follow facts; the card dialog's Work section and badges; no-code cards (§16.7.3) |
+| `src/main/workflow/mergeQueue.ts`, `queueHost.ts`, `queueRunner.ts`, `queueJobs.ts`, `launcher.ts`, `queueProcs.ts`, `queueChecks.ts`, `queueChecksApp.ts`, `queueControls.ts`, `queueState.ts`, `src/main/processSupervisor.ts` | The merge queue (SPEC §16.9): the test merge, merge checks and the advance; one runner per target across Hives, its processes in a job on Hive's process supervisor; Pause, Resume, Remove and Retry; where a card stands for agents. In the window: `shared/progressQueue.ts`, `ProgressQueue.tsx`, `ProgressMerge.tsx`, `CardQueue.tsx`, `GitQueueSection.tsx` |
+| `src/main/slots.ts`, `slotsApp.ts`, `slotJobs.ts`, `slotCards.ts`, `slotMigration.ts`, `slotRelease.ts`, `slotSettings.ts`, `projectFolders.ts`, `src/renderer/src/components/SlotsAndCopies.tsx` | Slots (SPEC §16.10): the pool and its leases, warming and guarded clean-up; cards and lanes on slots; agents' 0.9 worktrees carried in at the upgrade; Release Slot; the Slots and copies settings; Repair and project removal on slots |
+| `src/main/copies.ts`, `copiesApp.ts`, `reviewCopies.ts`, `reviewerPool.ts`, `loopReviewer.ts` | Review and check copies (SPEC §16.10.5: a reviewer's copy at the revision it reviews, `hive-progress --isolated` checks), the reviewer pool (G17) and who a card's loop reviewer is |
+| `src/main/lanes.ts`, `laneStart.ts` | Lanes (SPEC §16.11): Hive keeps each lane's card list, one card at a time; Start Lane… from the window |
+| `src/main/assistantChanges.ts`, `assistantUndo.ts`, `src/renderer/src/assistantUndo.ts` | Undo for the Assistant's changes (SPEC §16.14): each change recorded with its old and new values, undone one at a time or by message, what changed since kept |
+| `src/renderer/src/views/VersionControl.tsx`, `VersionControlHeader.tsx`, `GitTab.tsx`, `components/WorkflowOptions.tsx`, `PresetStep.tsx`, `BoardWorkflow.tsx`, `src/main/workflow/presetStep.ts` | The Version Control tab (SPEC §16.6; the Git tab before 1.0, its id still `changes`): None or Git, the Workflow section with Solo, Pair and Team, "How do you work?", Git's sections; the board's link to each project's workflow |
+| `src/shared/advanced.ts`, `src/shared/inboxSwitches.ts`, `cliOwnMode.ts`, `terminalInput.ts` | The switches for Hive's overrides of the CLIs (SPEC §16.15): Advanced rows per CLI and under Hive, how agents hear of their inbox, the CLI's own permission setting, keys and the clipboard |
 | `src/main/windows.ts` | Hive's windows (one workspace each) and where each event and terminal's output goes |
 | `src/main/files.ts` | Files/Images tab back end: project file operations, find, live watch, session images |
 | `src/main/transcripts.ts`, `src/main/providers/conversation.ts` | Sessions tab transcript viewer: per-provider incremental parsers, search, Markdown export |
@@ -226,40 +238,23 @@ Changes emit `tasks-changed` (routed by workspace path), once a board change com
 
 **Tool replies** are lean: every character a tool returns goes into the agent's context and is paid for on each later turn. The Agent API keeps its full replies by default and has opt-in short ones (`?view=short` on task and project lists, `?history=false` on a card, `?days=false` on usage, `reply: "short"` on card changes, comments, reorders and starts); `servers.ts` builds them (`taskChange()` reports what changed in the card's history words, which `updateTask()` hands back through `opts.said`, and where the card is now). `hive-mcp.ts` asks for those and turns them into text with `shared/toolReplies.ts` (a line per card or project, a confirmation per change, notes as their text); everything else goes out as compact JSON. `tests/e2e/replysize.cjs` measures every tool against a busy workspace and holds each reply to a size.
 
-## Workflow layer (1.0)
+## Workflow layer
 
-The design is SPEC §16; this is how it fits the code. It is the plan for P2–P8 on the `1.0.0` branch, and each phase
-moves its part of this section into the code map when it merges. Names are proposals the builders may change,
-keeping the boundaries.
+The design is SPEC §16; this is how it fits the code. It was built in phases P2–P8 on the `1.0.0` branch (SPEC §16.19
+says what each built): the code map above says where each part lives, and this section how the parts work together.
 
-**The core spike (P2, #1118)** built the core in these places, **isolated: nothing in the app imports it** (no IPC, no
-Agent API route, no `boardWrite`): `src/shared/platform/descriptors.ts`; `src/shared/workflow/` (`facts.ts` with the
-fold, `options.ts`, `pieces.ts`, `compile.ts`, `guards.ts`, `refusals.ts` as messages, `cardRefs.ts`, `laneList.ts`);
-`src/main/platform/` (`adapter.ts`, `gitPlatform.ts` and `nonePlatform.ts` behind it, `git.ts` on `git()`, `none.ts`, `registry.ts`, `types.ts`); `src/main/workflow/` (`factStore.ts`,
-then a database file of its own with `card_facts`, `card_actions`, `rulesets` and a stand-in card table, in hive.db
-since #1215; `runtime.ts`;
-`reconcile.ts`; `mergeQueue.ts`; `checks.ts`; `upgrade.ts`). Its tests, `tests/workflow/`, run SPEC §16.18's P2
-scenarios on real temporary repositories. **Darren decided (#1118, 20 Oct)** that it is P3's base in part: `shared/workflow` and
-the platform adapters as they are, the runtime, reconciliation, queue and checks as P4's and P5's starting point, and
-the fact store replaced by hive.db tables;
-where it stands in for later work: the store (P3 puts the tables in hive.db, written inside `boardWrite`), card folders as plain worktrees
-(P7's slots), no repository lock or signing pauses in the queue (P5), refusal text in English only (P4 translates).
+**Where it attaches.** Every card write goes through `boardWrite(ws, fn)` (`boardStore.ts`): file lock,
+`BEGIN IMMEDIATE`, commit, then `tasks-changed` once; `afterBoardWrite` runs callbacks after the commit. `tasks.ts`
+wraps it (`boardLock`, `cardBatch`), and the caller is a `TaskActor` (servers.ts' `taskActor`, from the token). A card's
+facts, its stage and the actions they cause are written in that same change (below), so a card and its facts never
+diverge. Git runs through `git()` (`git.ts`); `mergeWorktree` (`worktrees.ts`) refuses a dirty worktree, takes a
+target and returns the merge commit (#1347). The Git view's actions fence the folder (`folderFence.ts`, `gitRepo.ts`)
+and take the repository lock (`repoLock.ts`).
 
-**Today, where it attaches** (read on 20 Oct, 1.0.0 at edbf9b33):
-- Every card write goes through `boardWrite(ws, fn)` (`src/main/boardStore.ts:536`): file lock, `BEGIN IMMEDIATE`,
-  commit, then `tasks-changed` once; `afterBoardWrite` runs callbacks after the commit. `tasks.ts` wraps it
-  (`boardLock`, `cardBatch`). The caller is a `TaskActor` (`tasks.ts:58`) from the token (`taskActor`,
-  `servers.ts:1737`). The guards today are scattered in `tasks.ts` (project scope, archived, On Hold, Done on create
-  and placement, reviews at `:1151-1169`); there is no transition graph.
-- Verdicts are history lines (`shared/watch.ts:61`), the round count is parsed from them (`returnRound`); the card's
-  `review` holds only the current reviewer.
-- hive.db has `cards` (a JSON document with generated columns, until the cards step of P3, #1209), `store_rows`/`store_meta` (lanes, watches, deliveries,
-  sessions), `board_meta`, `archive_batches`; migrations in `BOARD_MIGRATIONS` (`boardStore.ts:34`), versioned and
-  backed up by `db.ts`.
-- Lanes (`lanes.ts`) are bookkeeping; `mergeCommit` is the agent's text. Merge slots (`mergeSlots.ts`) are in-memory,
-  per process. Git runs through `git()` (`git.ts:47`); `mergeWorktree` (`worktrees.ts`) refuses a dirty worktree,
-  takes a target and returns the merge commit (#1347); squash detection is `alreadyMerged`. The Git view's actions fence
-  the folder (`folderFence.ts`, `gitRepo.ts`) and take the repository lock (`repoLock.ts`, #1347).
+**The core spike (P2, #1118)** built the platform adapters, `shared/workflow`, the runtime, reconciliation, the queue
+and checks in isolation, with `tests/workflow/` running SPEC §16.18's scenarios on real temporary repositories (still
+the workflow's scenario tests); P3 put its fact store in hive.db, written inside `boardWrite`, and later phases
+wired the rest into the app.
 
 **The platform boundary** (P2, after its review): the runtime, reconciliation and check runs ask a `PlatformAdapter`
 (`src/main/platform/adapter.ts`: start, the revision now, a submission's endpoints and guard inputs, finish inputs, a
@@ -282,7 +277,7 @@ its conditions first (`folderBuilders`: `sessions.locksIn` and the folder's runn
 (`answered`): approved, `process(…, ready)` advances that test merge at once. Test copies' seams: `HIVE_TEST_QUEUE_CRASH`
 (any `QueueHook` of the journal) and `HIVE_TEST_QUEUE_RACE`. It releases the runner when the queue is empty or paused; a workspace closing releases its
 runners first, so a check the close ends writes nothing. The action worker's runs and the hosts' run outside any write
-fence (`withoutWriteFence`): a fence is only the queue's own work's. `releaseSlot` is a no-op until P7.
+fence (`withoutWriteFence`): a fence is only the queue's own work's. `releaseSlot` is slotCards.ts's (#1438).
 
 **The queue's controls** (#1353, SPEC §16.9.3): `workflow/queueControls.ts` builds the one model of a target's queue
 (`shared/workflow/queue.ts`: testing, queued, the latest outcomes from the cards' facts, the pause, the lease's
@@ -353,19 +348,6 @@ reconciliation included (`MergeQueue`'s `holds`; a lost lease throws `LeaseLost`
 runner's worktree while an entry, an unfinished advance or an in-flight card's ruleset needs it. Workspace close
 (`WorkspaceService.closingTasks`), quit and project removal release the runners (`releaseQueueRunners`,
 `forgetProjectQueues`).
-
-**Layers and modules (planned):**
-
-| Layer | Shared (pure, unit-tested) | Main |
-|---|---|---|
-| Platform | `src/shared/platform/descriptors.ts` (capabilities, revision display) | `src/main/platform/registry.ts`, `git.ts` (on `git()`), `none.ts` (hashing, manifests), `observe.ts` (watchers, debounce, write logs), `watching.ts` (its lifetime) |
-| Facts | `src/shared/workflow/facts.ts` (kinds, validation, derived state as a pure fold) | `src/main/workflow/factStore.ts` (the `card_facts` table, written inside `boardWrite`) |
-| Options and rulesets | `src/shared/workflow/options.ts` (option defs, presets, contradictions), `pieces.ts` (guard and action ids, params, required capabilities), `compile.ts` (options → ruleset, hashed) | `src/main/workflow/rulesets.ts` (stored rulesets, resolution global → workspace → project) |
-| Runtime | `src/shared/workflow/refusals.ts` (refusal messages: `msg()` ids shared by the Agent API's English and the window) | `src/main/workflow/service.ts` (one runtime per project of an open workspace, #1263), `runtime.ts` (evaluate a move: load facts and ruleset, run guards, then actions, in one `boardWrite`), `reconcile.ts`, `intents.ts` (the Agent API routes' handlers) |
-| Merge queue | — | `src/main/workflow/mergeQueue.ts` (per target; replaces `mergeSlots.ts`' role for cards), `queueRunner.ts` (the target's runner, below), `queueJobs.ts` (its job object and launcher), `queueProcs.ts` (process identity by pid and start time), `repoLock.ts` (cross-process lock in the common git dir, shared with `gitRepo.ts`) |
-| Slots | `src/shared/slots.ts` | `src/main/slots.ts` (the pool: `slots` and `slot_leases` rows, lending, warming, guarded clean-up; #1429), `slotMigration.ts` (agents' worktrees adopted as carried slots at the upgrade; #1441), `projectFolders.ts` (a project's slots, copies and retired homes for Repair and project removal; #1447), `slotsApp.ts` (a pool per open project on the board, warming runs on the process supervisor, the hourly tidy), `slotJobs.ts` (settling a slot command's job: #1360's sealed-journal protocol), `copies.ts` and `copiesApp.ts` (review
-and check copies: leases at a revision, the quiescence barrier, isolated checks' jobs; #1435), `reviewCopies.ts`, `slotSettings.ts` (the Version Control tab's Slots and copies settings, one key at a time under the project's lock; #1445) |
-| Undo | `src/shared/assistantUndo.ts` (grouping) | `src/main/assistantUndo.ts` (replays the Assistant's facts backwards, skips "changed since") |
 
 **The one path.** An intent (Agent API route or hive tool) or a user move (IPC) calls `runtime.move(card, request,
 actor)`. It asks the platform adapter for the facts the guards need first, outside the transaction (keys, files,
@@ -511,7 +493,7 @@ each write that changed the card, in the same transaction (its `locked` joins th
 loop events), inside `recordingByRuntime`, so the recorder writes no `Started`/`Moved`/`Submitted`/`ReviewStarted`/
 `Verdict` for it (one owner per fact) but still its `Blocked`, `Decision`s. The user's and the Assistant's column moves
 take it when `gateOf` says so (the rules enforced, a card from 1.0, a project with a platform, a stage its ruleset has;
-a batch's cards too, in the batch's change): `Workflow.move` with `confirm` for the user (interim until #1290/#1275),
+a batch's cards too, in the batch's change): `Workflow.move` with `confirm` for the user (the window asks first, #1275),
 `override.reason` for the Assistant. A refusal is `WorkflowRefusedError` (its `refusal`), which `apiErrorReply` turns
 into §16.8.3's 409 body; `tasks:move` returns `moved | ask | refused`. For you (#1269): `tasks:answer` is
 `answerTask` (the user's only), `Workflow.answer` on the same path, its checks of what the answer may be (the request's
@@ -521,8 +503,8 @@ runtime's `askAtLimit` (a verdict's fail, the user's decline) and by the recorde
 on the board (until #1268), from the card's lane's rounds (`CardRecord.rounds`); `lanes.ts` reads `roundLimitCards` to
 pause a lane on a card waiting for that answer (`LaneCard.roundLimit`), while the rules are enforced. Runtime writes outside an intent's write (a
 refusal's `Refused`, None's declared paths) go through `locked` too, and `start` stores its ruleset only in its write.
-Before P7 a builder's own worktree is its card's folder (`cfg.agentFolder`, from project.json; `StartPlan.existing`:
-no `prepareSlot`); `cfg.runsOf` is the agent's open Progress runs and background tasks (`setRunsGoing`, from index.ts).
+A lane carried over the upgrade works in its builder's carried slot (`cfg.agentFolder`: the 0.9 worktree until
+#1441 migrates the agent, then `SlotStarts.standIn`; `StartPlan.existing`: no `prepareSlot`), other cards on slots (below); `cfg.runsOf` is the agent's open Progress runs and background tasks (`setRunsGoing`, from index.ts).
 Start and submit are each a gather (`gatherStart`, `gatherSubmit`: the slow reads, outside the lock, nothing written;
 None's paths kept as `setPaths`) and an apply (`applyStart`, `applySubmit`, in the write). `dragForward` gathers every
 step first (a submission on `predicted`, the state the start would leave), decides on the union of the rules they skip
@@ -569,7 +551,7 @@ watch goes as the workspace closes.
 **Rulesets.** Compiled from options, stored once by hash (`rulesets` table); a card's `Started` fact names its
 ruleset. Pieces are looked up by id: an unknown id refuses to compile, and a ruleset from a newer Hive is read-only.
 
-**Merge queue.** One worker per repository, holding `repoLock`. Entries come from `IntegrationRequested` facts (each
+**Merge queue.** One runner per project and target (`queueRunner.ts`, above), taking `repoLock` for the advance. Entries come from `IntegrationRequested` facts (each
 with an entry id; cancelled, failed and integrated entries are skipped); the order is rebuilt from facts at start,
 after reconciling any entry with `IntegrationStarted` and no outcome. The test merge happens in the queue's own
 worktree on `refs/hive/queue/<entry>`; merge checks are progress runs attributed to Hive; the target advances by
@@ -577,8 +559,8 @@ compare-and-swap (`update-ref` with the expected old value), and when the target
 **journaled** read-tree/update-ref protocol of SPEC §16.9.2 inside the folder fence: conditions checked before the
 folder is touched (branch, ref, nothing staged, no unstaged changes in the merged files), each phase written to the
 `IntegrationStarted` fact before it runs, a recovery table on restart, and a terminal "needs you" state that pauses
-the queue (never `merge --ff-only`, which has no expected value). The repository lock (a lock file in the common git
-dir, replacing the in-process `.git/hive-merge` lock of `withFileLock`, `fsutil.ts:512`) is held only for the
+the queue (never `merge --ff-only`, which has no expected value). The repository lock (`repoLock.ts`: `hive-merge.lock` in the common git
+dir, #1347) is held only for the
 advance, never across the test merge (hooks, signing) or the merge checks, and never while an entry is paused. Every
 submitted revision is pinned by `refs/hive/cards/<key>/<n>` until its card is archived; strict updates live only on
 the queue's ref.
@@ -591,7 +573,7 @@ checkout contains the card's revision; nothing written in the tracked tree durin
 **lease** (a `slot_leases` row: slot, card or lane, builder, from, to), one open lease per slot, taken under the slot's
 lock. Sessions record their folder and lease; `sessions.ts` resumes a session only in its folder (as today) and only
 while its lease is open or the slot is free at its last revision, so a reused slot never resumes the wrong work, and
-Resume All skips the rest. `AgentDef` loses `worktree`. Review copies are detached worktrees from a small warm pool,
+Resume All skips the rest. `AgentDef` has no `worktree` (0.9's is `LegacyAgentFields`, `agentFolders.ts`). Review copies are detached worktrees from a small warm pool,
 leased to one reviewer for one submission; reviewers' sessions live in the project folder, and their launch grants
 the review-copy pool's folder through the provider adapter (`extraDirs`: `--add-dir` for each CLI; for Codex it adds
 to the user's own writable roots, where a `-c` override would replace them), never the CLI's config. Built [#1439]:
@@ -710,7 +692,7 @@ real queries, and `tests/schemaV1_0.test.ts` checks that each uses its index (EX
 
 `board_meta` and `archive_batches` (an undo record of a bulk archive, read whole) stay as they are; the stores' few
 values (`imported`, `next`, `invalid`, `observed`…) move from `store_meta` to `board_meta` as `<store>.<key>` (lanes,
-watches and metrics with #1212); `store_rows` and `store_meta` go with the second of #1211/#1212 to merge. `slot_leases` is P7's.
+watches and metrics with #1212); `store_rows` and `store_meta` go with the second of #1211/#1212 to merge. `slot_leases` is P7's (`SLOTS_STEP`).
 
 **What stays JSON, and why:** a fact's `data` (each kind's own fields and the platform's opaque `data.platform`, read
 whole per card into the fold); a ruleset (a compiled document, stored once by its hash); a card's `context_problems`
@@ -767,7 +749,7 @@ list or its queued one, and its reviewer that lane's. The runtime ends a lane as
 writes a changed lane again whole (deleted and inserted), so `lane_runs` and `lane_pending` have no foreign key and go
 when the lane leaves the table (`storeCodec.ts` `onRemove`); and since the runtime writes lane rows too, a lanes save
 compares with the table, never its own last save (`shared`). A target's queue pause is a table of its own per project
-(`workflow_queue_pauses`) until P7 makes it the queue's; scalars (a line's last head seen, a folder's installed manifests) are `board_meta` rows keyed
+(`workflow_queue_pauses`); scalars (a line's last head seen, a folder's installed manifests) are `board_meta` rows keyed
 `workflow:<project>:<key>`. A store reaches the database one of two ways (HR4's #1215 round 1: a connection's open
 transaction is no sign it is the caller's). **On the board** (`FactStore.forBoard(ws)`): its writes go through the
 board's own guard (`boardWriteOp`, writeOp's): only inside the caller's change of that board, in that change's async
@@ -814,7 +796,7 @@ write fails the change whole** (HR4's round 1), a batch's too (`FactWriteError`;
 per-card catches pass on, as SQLite's own errors: part of the card may be written): a card and its facts never
 diverge. `boardWrite` then says the change was undone part way when SQLite undid it, whichever error the change passed
 on. The window reads a card's facts with
-`tasks:facts`. Not yet: None's manifests (P5).
+`tasks:facts`. A None card's `Started` has no line, head or base (the recorder records no manifests).
 
 **The adoption** (`workflow/adoption.ts`, SPEC §16.17): `adoptWorkspace` runs after `board:upgrade` and at each open (`WorkspaceService.onOpened`), one at a time per workspace, until board_meta `adoption` says it has handled every card once. Per project: its options through `mutateProjectConfig` (only when project.json has none) and its compiled ruleset; its cards in flight read with git first, then written in one board change, each in a fact-store transaction (`writeAdoption`, deduplicated `adopted`); the rest marked `pre_workflow` (`markPreWorkflow`). Only cards up to board_meta `adoption_upto` (written by the 1.0 group's last step, and by the import of card files) are its. Under the lock each card is checked again (`adoptionCardNow`, and the agent's folder in project.json): a card started or marked meanwhile is skipped, one changed meanwhile counts as `changed` and is classified again by another run (`adoptWorkspace` makes up to three), and the done mark waits until none is left. Like the actions worker, a run belongs to the workspace as it began (`alive`, passed to `boardWrite`).
 
@@ -825,15 +807,16 @@ pending. Each action runs in one of two ways (#1266), as its handler registered 
 **delivered** (`wake`, loopWakes.ts; `wakeOnDecision`, decisionWakes.ts), checked still pending in a board change of
 its own, then its handler runs, whose delivery carries the action's id (`deliveries.action`, unique: `actionDelivered`
 finds one made, in memory or in hive.db, another Hive's too), then it is marked done (failed when the handler throws;
-never tried again); **repeatable** (`notify` and `laneNotice`, workflowNotices.ts), leased by one claim
+never tried again); **repeatable** (`notify` and `laneNotice`, workflowNotices.ts; `endLaneIfDone`, lanes.ts), leased by one claim
 (`lease_owner`, a token per claim, `<process>/<uuid>`, and `lease_until`, 2 min: `take`, a conditional update; renewed
 while the handler runs; one another claim holds is left and tried again when its lease passes), its handler giving its
 effect to `dispatch(effect)` (`attempts`, counted under the token while the lease holds, then the effect at once: an
 uncertain dispatch), completion fenced by the token, a refused dispatch left pending and taken again after a second
 (`cooling`), done after two uncertain dispatches; the commit listener starts a run only for what this process could
-take, so no run starts runs for nothing; or **claimed** (every kind with
-no handler, marked done as the no-op it is: `prepareReviewCopy`, `releaseSlot`, `enqueue`, `pin`, `prepareSlot`,
-`endLaneIfDone` until P5 and P7). deliveries.ts saves a host's deliveries by compare-and-set (`saveDeliveryChanges`):
+take, so no run starts runs for nothing; or **claimed**, marked done before its
+handler runs (`prepareSlot` and `releaseSlot`, which ask for the slots' pass; `enqueue` and `pin`, the queue's;
+`assignReviewer`, the pool's), as is a kind with no handler, the no-op it is (`prepareReviewCopy`: a review copy is
+leased at start review, #1439). deliveries.ts saves a host's deliveries by compare-and-set (`saveDeliveryChanges`):
 only what the transaction changed, each from its row as the store last read or wrote it (`Store.base`, read with the
 record in one SELECT and one read transaction: `readDeliveriesWithBases`); a row another Hive changed since fails the
 save (`StaleDeliveries`), and the transaction reads the rows again and plans again on them. The recorder
@@ -868,11 +851,6 @@ storeTables' lanes saves, writing nothing; and `lane_notices_seq`) is unchanged 
 #1266),
 the Progress runs (`ProgressRun` gains `card` and
 `revision`).
-
-**Risks the builders own** (SPEC §16 and the note's section 12): `sessions.ts`, `servers.ts` and `tasks.ts` are large;
-follow the service-changes skill; keep adapter calls out of long transactions; slots touch about 45–55 files
-(templates, project agents, sessions, actions, the agent dialogs and panes, project tabs, the Agent API's agent
-replies).
 
 ## Removing projects
 

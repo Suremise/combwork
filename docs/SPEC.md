@@ -4096,6 +4096,8 @@ under Hive in Advanced (no CLI's recording to check it against), defaulting to w
 - **Logical CSS** in every new 1.0 rule (#908) [#1117 c6].
 - **Stable user-guide anchors** (#860) and **builds as facts** (#1062) in P8 [#1124 c].
 - **Every phase ends with an RC** for Darren to install, except P2 (a spike with no UI) [#1112 release plan, #1118].
+  **Changed** [Darren, 21 and 22 Oct]: P3–P7 ended with checks only, and the first install is the 1.0 baseline at P8's
+  end (#1288, §16.19).
 
 ### 16.17 Upgrading to 1.0
 
@@ -4118,9 +4120,10 @@ typed tables (#1211, v6, the last of its stores: `store_rows` goes with it), eve
 deliveries keep their in-memory store (published after each transaction), the table its durable copy [Darren, 20 Oct,
 #1211].
 - **Before it runs, Hive asks** ("Upgrade this workspace's board to 1.0? Hive 1.0 needs to upgrade this workspace's
-  data. A 0.9 Hive can then no longer open it; a backup is kept, and Help → Restore the 0.9 Board Backup… puts it
-  back." [the Assistant for Darren, #1207 20 Oct; reworded on #1209, Darren 20 Oct: the cards step drops the cards'
-  documents, which 0.9 reads]). Until the user agrees, the board opens read-only, as for a newer
+  data. A 0.9 Hive can then no longer open it; a backup of the board is kept, and Help → Restore the 0.9 Board Backup…
+  puts it back. Back up first: there's no going back to 0.9.3 once your agents' worktrees become slots." [the Assistant
+  for Darren, #1207 20 Oct; reworded on #1209, Darren 20 Oct: the cards step drops the cards' documents, which 0.9
+  reads; its last sentence since the upgrade is one-way, Darren 22 Oct on #1123]). Until the user agrees, the board opens read-only, as for a newer
   file (writes refused with "This board is from Hive 0.9: it is read-only until it is upgraded to 1.0"; what would
   change a card is off, saying why in its tooltip: the board's add-card buttons, dragging cards, a card's menu but Open, the
   card dialog's fields, Save, Start…, Archive, Delete, comments and decisions, with the reason as a banner in the dialog
@@ -4160,7 +4163,10 @@ deliveries keep their in-memory store (published after each transaction), the ta
   it closes, and a marker is stale once its heartbeat is 90 s old or its process is gone. The upgrade refuses, as for
   SQLite's lock, while another profile's fresh marker exists.
 - **A way back:** Help → **Restore the 0.9 Board Backup…** puts the pre-migration backup back (after its own backup of
-  the 1.0 file), for a user who returns to 0.9.x; the RC notes say so. Nothing is deleted. [#1207] The 1.0 file is
+  the 1.0 file), for a user who returns to 0.9.x; the RC notes say so. Nothing is deleted. [#1207] It brings back the
+  board's cards and their history only: once slots have moved agents' worktrees, nothing promises that 0.9.3 carries on
+  with worktrees, sessions or lanes (Darren, 22 Oct on #1123: the upgrade is one-way; the release notes say to back up
+  first). The 1.0 file is
   copied first by a connection holding the file's exclusive lock (refused, as the upgrade is, while another Hive has it
   open), kept for good as `hive-before-restore-v<n>-<time>.db`; the board is closed, the 0.9 copy put in its place,
   and the board opened again: read-only in the 1.0 build (its upgrade waiting again), writable for 0.9. The copy put
@@ -4337,19 +4343,21 @@ Each is a test P2's spike passes without UI (`tests/workflow/` or a unit suite),
 | Phase | Card | Builds (sections) | Ends with |
 |---|---|---|---|
 | P2 Core spike | #1118 | Facts (§16.4), the piece library and compilation (§16.5), None and Git adapters (§16.3), reconciliation, durable actions; no UI; S1–S20, S25, S27, S29–S33, S36–S41, S44–S46, S48, S50, S57–S59, S61, S62 at the core (S34, S35, S42, S43, S47, S49, S51–S56, S60 need the queue, slots, the window or a build: P3–P7) | Every scenario passing at the core; Darren decides whether the spike becomes P3's base. No RC [#1118's description, the Assistant's; #1112's release plan says every phase cuts one: OP-39]. **Built** (20 Oct): every scenario of this row passes in `tests/workflow` (ARCHITECTURE "Workflow layer" says where the code is and what it stands in for); the spec fixes it found are marked **[P2]**. **What P3 adopts** [#1118 20 Oct]: `src/shared/workflow` and the platform adapters (`src/main/platform`) as they are; `runtime.ts`, `reconcile.ts`, `mergeQueue.ts` and `checks.ts` as P4's and P5's starting point; the fact store replaced by hive.db tables written inside `boardWrite` (P3). This row's list (43 scenarios) is the source, not the 28 the card's brief named. |
-| P3 Facts | #1119 | Platform layer in main; the one migration with its question, restore and idempotent observations (§16.12, §16.17); facts recorded and observed; the card's Work section; runs as checks (§16.13 P3); files per revision; cost per round data | RC |
-| P4 Gates and intents | #1120 | Gates at `boardWrite`; intents (§16.8); refusals; overrides; For you; no-code; decisions wake; Hive owns lanes; undo (§16.14); override switches A, B, E, #1167, #1174 (§16.15); Progress P4. **Operable without the Assistant and before P6** [HB3's round 1 finding 7]: a plain options form in Project Settings (every option of §16.6 as a row, presets as a choice, no polish) and the options through `hive_update_setting` (built: #1278, §16.6.6); the transition for agents' old column moves and the skill lines its gates change (§16.17); window controls to end or abandon a lane. Its RC moves the hive project to Pair (the agent merges) (§16.19.1). | RC |
-| P5 Hive merges | #1121 | The merge queue (§16.9; in the app for a target checked out nowhere: #1348), the lock, `mergeWorktree`, agent-merges option; Progress P5 | RC |
-| P6 Version Control tab | #1122 | The tab replaces P4's plain form: options worded and laid out, presets documented, detection, switching (§16.6, §16.3.5); stages on the board; Progress P6 | RC |
-| P7 Slots | #1123 | Slots, review copies, sessions, templates v2, names, migration (§16.10); override switches C; Progress P7 | RC |
+| P3 Facts | #1119 | Platform layer in main; the one migration with its question, restore and idempotent observations (§16.12, §16.17); facts recorded and observed; the card's Work section; runs as checks (§16.13 P3); files per revision; cost per round data. **Built** (21 Oct): its cards #1206–#1226, #1228, #1230 and #1253 are in 1.0.0 (0d40afba to a0dac094). **What changed against the plan:** the one migration took in #1025 (cards, sessions, deliveries, lanes, watches and metrics as typed tables; `store_rows` gone), #704's project keys and numbers per project (§16.12) and #1107's comment and history tables; it runs as the 1.0 group, one ask, one backup and one exclusive lock (Darren, #1119 decision 3); SQLite's lock is relied on, so no 0.9.4 marker patch (OP-41) | Checks only (#1227, 554551a8): RCs became Darren's call (21 Oct) |
+| P4 Gates and intents | #1120 | Gates at `boardWrite`; intents (§16.8); refusals; overrides; For you; no-code; decisions wake; Hive owns lanes; undo (§16.14); override switches A, B, E, #1167, #1174 (§16.15); Progress P4. **Operable without the Assistant and before P6** [HB3's round 1 finding 7]: a plain options form in Project Settings (every option of §16.6 as a row, presets as a choice, no polish) and the options through `hive_update_setting` (built: #1278, §16.6.6); the transition for agents' old column moves and the skill lines its gates change (§16.17); window controls to end or abandon a lane. Its RC moves the hive project to Pair (the agent merges) (§16.19.1). **Built** (21 Oct): #1261's cards are in 1.0.0. **What changed against the plan:** no RC (Darren, 21 Oct), so the hive project keeps its options until the 1.0 baseline (#1288); Darren's seven answers on #1120 shaped the switches (`hive.workflow.enforce` kept as the off switch; the CLI's own permission setting and the Assistant's other MCP servers, #1284; no hooks-free mode, with the status line and Hive's guidance as switches, #1285; OSC 52 Allow, Ask or Block and only a card's start raw, #1292; only the user answers For you, whose count is the Board icon's badge) | Checks only (#1337, cb1bef5b: the full e2e set and the Sandbox upgrade from 0.9.3) |
+| P5 Hive merges | #1121 | The merge queue (§16.9; in the app for a target checked out nowhere: #1348), the lock, `mergeWorktree`, agent-merges option; Progress P5. **Built** (22 Oct): #1338's cards (#1347–#1358, #1360–#1362, #1371, #1455) are in 1.0.0. **What changed against the plan:** Team came in P5 rather than P6 (#1361), its merge checks the quick checks and the unit tests with dependencies installed from scratch every time, each card's focused tests left to #1367 (Darren, 21 Oct); a merge check that exits 75 or ends with Node's or npm's network errors counts as transient (#1362); the queue also merges into a target checked out in a folder (#1351), with **Ask each time** in Advanced; pushing after a merge stays On Hold (#1179) | Checks only (#1359, 5172d064: 235/235 e2e suites, the unit tests, the scenarios, the Sandbox upgrade) |
+| P6 Version Control tab | #1122 | The tab replaces P4's plain form: options worded and laid out, presets documented, detection, switching (§16.6, §16.3.5); stages on the board; Progress P6. **Built** (24 Oct): #1416–#1425 are in 1.0.0. **What changed against the plan:** None can be chosen for a Git folder, with a warning (Darren, 22 Oct, #1419); the window says Active and Approved for Doing and Passed, the ids unchanged (OP-1, #1417); Merging is a stage inside Approved that takes no drop (#1420); Hive's and the workspace's workflow defaults got a place in the window (#1422); a project added since 1.0 asks "How do you work?" (#1423) | Checks only (#1426, on 9846ea3a) |
+| P7 Slots | #1123 | Slots, review copies, sessions, templates v2, names, migration (§16.10); override switches C; Progress P7. **Built** (24 Oct): #1429–#1452 and the "P7 fixes" lanes (to c62a118b) are in 1.0.0. **What changed against the plan:** the upgrade is one-way (Darren, 22 Oct): the board backup brings back the cards and their history, with no way back for worktrees, sessions or lanes; agents' worktrees are carried into slots in place and renamed later (#1441); a reviewer pool (G17, #1443); six shipped templates named from the project's key, the 0.9 ones no longer used (#1436, #1440) | Checks only (#1449, round 2 on 50add517: the real tier and the Sandbox upgrade at 6×6 and solo) |
 | Translation review | #1126 | §16.16 | — |
-| P8 Guidance and 1.0.0 | #1124 | Skills describe the rules; AGENTS.md, RELEASING.md; memory rules retired; scenarios and trials; 1.0.0 | 1.0.0 |
+| P8 Guidance and 1.0.0 | #1124 | Skills describe the rules; AGENTS.md, RELEASING.md; memory rules retired; scenarios and trials; 1.0.0. **Built** (25 Oct, but for scenarios and trials): the skills and modes (#1524–#1528), the contract and tool texts (#1529–#1531), AGENTS.md, RELEASING.md and builds as facts (#1532–#1534), the user guide's heading ids (#1535), the translation review (#1126) and #1582's workaround for Electron's CVE are in 1.0.0; the scenarios and trials (#1536, #1537) and P8's checks (#1539) are still to come. **What changed against the plan:** P8 ends with Darren's daily 1.0 baseline (#1288), not 1.0.0, which comes after the On Hold stretch (#1540, #1541) (Darren, 23 Oct); the baseline's trials are a smoke run and it doesn't wait for Electron's fix (#1503) (Darren, 24 Oct); the memory rules are retired after the baseline is installed (#1538) | The 1.0 baseline (#1288) |
 
 #### 16.19.1 What each RC offers
 
 [P1, answering HB3's round 2 finding A and HR2's round 2 finding 8] The options exist before all their pieces do, so
 each RC states which values it offers; a value whose piece hasn't shipped isn't shown, and no RC's preset needs a
-later phase. Lanes keep working, and everything works with the Assistant off, in every RC.
+later phase. Lanes keep working, and everything works with the Assistant off, in every RC. No RC was cut for P3–P7
+(§16.16): each row is what that phase's build offered, and the 1.0 baseline offers every value. The hive project stays
+on its options until Darren installs the baseline (#1288).
 
 | RC | Where cards are built (G11) | Who finishes (G5) | Hive moves to | Scenario |
 |---|---|---|---|---|
