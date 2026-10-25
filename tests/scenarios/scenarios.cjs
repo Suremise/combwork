@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 90
+const FIXTURES_VERSION = 91
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -3168,11 +3168,12 @@ module.exports.SCENARIOS = [
       const s = await coderLive(c)
       if (s) c.coderWatch = s.watch?.cards ?? null
     },
+    // The relay's behaviour is what's checked (#1611): whether it read coordinate-agents, the skill that owns it, is recorded.
+    observe: (o) => [['read the coordinate-agents skill', read(o, 'coordinate-agents'), o.skillsRead.join(',')]],
     expect: (o, c) => {
       const msgs = called(o, 'hive_message_agent')
       const sent = msgs.some((x) => x.ok && /coder/i.test(String(argsOf(x).agent)) && /json/i.test(String(argsOf(x).text ?? '')))
       return [
-        ['read the coordinate-agents skill', read(o, 'coordinate-agents'), o.skillsRead.join(',')],
         ['left Coder a message with the answer (hive_message_agent), which worked', sent, msgs.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
         ["didn't give it a task or stop it", called(o, 'hive_prompt_agent').length === 0 && called(o, 'hive_stop_agent').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
         ["didn't ask the user to paste it into Coder's pane", !/\bpaste\b/i.test(o.finalReply ?? '') && called(o, 'hive_notify').length === 0, (o.finalReply ?? '').slice(0, 300)],

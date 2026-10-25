@@ -422,6 +422,14 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
     expect(benchmarkOf(meta, Array.from({ length: 30 }, (_, i) => result('one', i)), '0.3.1').scenarios[0].samples.length).toBe(LIMITS.samples)
   })
 
+  it('records a scenario’s observations in its sample, never as checks: a false one leaves it passed (#1611)', () => {
+    const observed = result('seven', 1, { observations: [{ name: 'read the coordinate-agents skill', value: false, detail: '' }] })
+    const sample = benchmarkOf(meta, [observed], '0.3.1').scenarios[0].samples[0]
+    expect([sample.ok, sample.passed, sample.failed, sample.observations]).toEqual([true, 2, 0, [{ name: 'read the coordinate-agents skill', value: false }]])
+    expect(art(parseArtifact(JSON.stringify(benchmarkOf(meta, [observed], '0.3.1')), WS)).scenarios![0].samples[0].ok).toBe(true)
+    expect(benchmarkOf(meta, [result('seven', 1)], '0.3.1').scenarios[0].samples[0]).not.toHaveProperty('observations')
+  })
+
   it('keeps the newest runs in folders of their own; never overwrites a baseline, even saved three times in a second', () => {
     const dir = tempDir('hive-results-')
     try {
