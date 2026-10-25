@@ -105,11 +105,32 @@ async function agent(fx, h, name, { worktree = false, project = fx.alpha } = {})
   fs.writeFileSync(trusted, JSON.stringify([...new Set([...was, fx.ws.toLowerCase(), project.toLowerCase(), folder.toLowerCase(), ...slots])]))
   await h.inv('session:start', project, { agentId: a.id })
   const live = async () => (await h.inv('session:live')).find((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === a.id)
-  const sessionId = await lib.until(async () => (await live())?.sessionId, HUNG_MS, 200)
-  const launch = await lib.until(() => launches(fx).find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS, 200)
-  const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-  const token = hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
-  return { id: a.id, name, folder, token }
+  const got = await liveToken(fx, live)
+  return { id: a.id, name, folder, token: got?.token ?? null }
+}
+
+/**
+ * The live session's own launch and its token (#1615): the launch of the run live now (its private folder is named by
+ * the run), read inside the wait. A run Hive ends meanwhile (superseded: a resumed session keeps its id) has its folder
+ * removed with its mcp.json, so a read after the wait failed (ENOENT); here the next poll reads the run live then.
+ * `where` narrows the live session (in a folder): { launch, token }, or null if none came.
+ */
+async function liveToken(fx, live, where = () => true) {
+  const read = (file) => {
+    try {
+      return JSON.parse(fs.readFileSync(file, 'utf8'))
+    } catch {
+      return null
+    }
+  }
+  return lib.until(async () => {
+    const s = await live()
+    if (!s?.runId || !where(s)) return null
+    const launch = launches(fx).find((l) => l.opts['--mcp-config'] && path.basename(path.dirname(l.opts['--mcp-config'])) === s.runId)
+    const hive = launch ? read(launch.opts['--mcp-config'])?.mcpServers?.hive : null
+    const token = hive ? read(hive.env.HIVE_API_TOKEN_FILE)?.token : null
+    return token ? { launch, token } : null
+  }, HUNG_MS, 200)
 }
 
 /**
@@ -119,14 +140,11 @@ async function agent(fx, h, name, { worktree = false, project = fx.alpha } = {})
  */
 async function rejoin(fx, h, a) {
   await releaseHeld(fx, h)
-  // This launch's, never an earlier one's (a resumed session keeps its id).
-  const before = launches(fx).length
   await h.inv('session:start', fx.alpha, { agentId: a.id })
   const live = async () => (await h.inv('session:live')).find((s) => s.projectPath.toLowerCase() === fx.alpha.toLowerCase() && s.agentId === a.id)
-  const sessionId = await lib.until(async () => (await live())?.sessionId, HUNG_MS, 200)
-  const launch = await lib.until(() => launches(fx).slice(before).find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS, 200)
-  const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-  return { ...a, ...(launch ? { folder: launch.cwd } : {}), token: hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null }
+  // This run's launch, never an earlier one's (a resumed session keeps its id).
+  const got = await liveToken(fx, live)
+  return { ...a, ...(got ? { folder: got.launch.cwd } : {}), token: got?.token ?? null }
 }
 
 /**
@@ -156,7 +174,6 @@ const sameDir = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.r
 async function startCard(fx, h, builder, n) {
   const live = async () => (await h.inv('session:live')).find((s) => s.projectPath.toLowerCase() === fx.alpha.toLowerCase() && s.agentId === builder.id)
   const free = async () => (await h.inv('slots:list', fx.alpha)).some((s) => !s.lease && !s.writer)
-  let before = 0
   let start = null
   // No slot free yet (the last card's: its builder's session there just ended with its lease, until its processes are
   // known to have ended): as an agent told "Wait for a slot to be free", started again once one is (a few times at most).
@@ -167,17 +184,14 @@ async function startCard(fx, h, builder, n) {
     // Stopped by Hive meanwhile (its session ended with its slot's lease, as a card's Done or its recovery after a seam
     // ends it): started again, with its new launch's token.
     if (!(await live())) Object.assign(builder, await rejoin(fx, h, builder))
-    before = launches(fx).length
     start = await intent(h, builder, n, 'start')
   }
   const { folder, line } = start.body?.data ?? {}
   if (start.status !== 200 || !folder || folder === 'project') return start
   await lib.until(() => (lib.git(folder, ['branch', '--show-current']).trim() === line ? true : null), HUNG_MS, 200).catch(() => null)
-  const launch = await lib.until(async () => {
-    const s = await live()
-    return s && sameDir(s.cwd, folder) ? launches(fx).slice(before).find((l) => l.sessionId === s.sessionId && l.opts['--mcp-config']) ?? (sameDir(builder.folder, folder) ? 'same' : null) : null
-  }, HUNG_MS, 200)
-  if (launch && launch !== 'same') builder.token = JSON.parse(fs.readFileSync(JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token
+  // The run live in the start's folder: a new launch there, or the one it already worked in (its token unchanged).
+  const got = await liveToken(fx, live, (s) => sameDir(s.cwd, folder))
+  if (got) builder.token = got.token
   builder.folder = folder
   return start
 }
