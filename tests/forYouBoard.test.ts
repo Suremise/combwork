@@ -19,6 +19,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
 const loopWakes = await import('../src/main/loopWakes')
+const deliveries = await import('../src/main/deliveries')
 const worker = await import('../src/main/workflow/actionWorker')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
@@ -79,6 +80,11 @@ async function deliveredTo(w: WS, agent: string): Promise<string[]> {
   await worker.actionsSettled()
   await loopWakes.settled()
   return (store.workspaceDb(w.path!).reader.prepare("SELECT body FROM deliveries WHERE agent_id = ? AND source = 'loop' ORDER BY seq").all(agent) as { body: string }[]).map((r) => r.body)
+}
+/** What an agent reads with hive_inbox (each delivery made again as it is handed out), once the actions have run. */
+async function inboxOf(w: WS, agent: string) {
+  await deliveredTo(w, agent)
+  return (await deliveries.readInbox(join(w.path!, 'p'), agent)).items
 }
 function commitIn(wt: string, file: string): void {
   writeFileSync(join(wt, file), `${file}\n`)
@@ -188,18 +194,39 @@ describe('For you on the board (#1269)', () => {
     await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: question }))
     const req = forYou(w).items[0]
     expect(req).toMatchObject({ kind: 'decide', asker: 'a1' })
-    const after = await answer(w, card, req.request, { outcome: 'answered', reply: 'Option b, and say so in the changelog' })
+    // A long first paragraph, and the line that matters last: past the 500 characters a delivery's meta value keeps.
+    const reply = `Option b. ${'The retries keep their old timing for now, and the setting explains why. '.repeat(8)}\n\nLAST-LINE: say so in the changelog`
+    expect(reply.indexOf('LAST-LINE')).toBeGreaterThan(500)
+    const after = await answer(w, card, req.request, { outcome: 'answered', reply })
     expect(forYou(w).count).toBe(0)
     // On the card as the user's comment; no decision.
-    expect(after.comments.at(-1)).toMatchObject({ by: 'You', text: 'Option b, and say so in the changelog' })
+    expect(after.comments.at(-1)).toMatchObject({ by: 'You', text: reply })
     expect(after.decisions ?? []).toEqual([])
-    // In the asker's inbox: an answer from the user (acked, not a card event), with the reply.
-    await deliveredTo(w, 'a1')
-    const rows = store.workspaceDb(w.path!).reader.prepare("SELECT kind, body FROM deliveries WHERE agent_id = ? AND source = 'loop' ORDER BY seq").all('a1') as { kind: string; body: string }[]
-    expect(rows).toHaveLength(1)
-    expect(rows[0].kind).toBe('answer')
-    expect(rows[0].body).toContain(': Option b, and say so in the changelog')
-    expect(rows[0].body).toContain('The user answered: carry on from where you asked')
+    // What the asker reads (made again from its meta as it is handed out): an answer from the user, not a card event, with
+    // the whole reply.
+    const items = await inboxOf(w, 'a1')
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({ kind: 'answer', from: 'the user', card })
+    expect(items[0].text).toContain('Option b. The retries keep')
+    expect(items[0].text).toContain('LAST-LINE: say so in the changelog')
+    expect(items[0].text).toContain('The user answered: carry on from where you asked')
+  })
+
+  it("Send Reply to a question asked by an agent other than the card's builder reaches that agent, not the builder (#1626)", async () => {
+    const { w } = await workspace({ ...allOff('git'), review: 'agent', finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a2', { kind: 'decide', text: 'Should the review cover the docs too?' }))
+    const req = forYou(w).items[0]
+    expect(req.asker).toBe('a2')
+    await answer(w, card, req.request, { outcome: 'answered', reply: 'Yes, the user guide too' })
+    expect(forYou(w).count).toBe(0)
+    const asker = await inboxOf(w, 'a2')
+    expect(asker).toHaveLength(1)
+    expect(asker[0]).toMatchObject({ kind: 'answer', card })
+    expect(asker[0].text).toContain(': Yes, the user guide too')
+    expect((await inboxOf(w, 'a1')).filter((i) => i.text.includes('Yes, the user guide too'))).toEqual([])
   })
 
   it("an agent's question: a decision as its answer is recorded on the card (a new generation), the asker told", async () => {
