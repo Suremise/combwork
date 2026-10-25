@@ -4,6 +4,7 @@ import type { TaskCard } from '@shared/types'
 import { LANE_MAX_ROUNDS } from '@shared/lanes'
 import { QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type RoundChoice } from '@shared/workflow/facts'
 import { FOR_YOU_KIND, ROUND_CHOICE, workflowLine } from '@shared/workflow/texts'
+import { gist } from '@shared/gist'
 import type { ForYouAnswer, ForYouItem } from '@shared/workflow/workView'
 import { call, errorMessage } from '../api'
 import { loadTasks, notify, prompt, useLanguage, useStore } from '../store'
@@ -17,7 +18,10 @@ import { SHOW_QUEUE_WORK } from './CardQueue'
 
 const M = {
   chip: msg({ id: 'board.forYou.chip', defaultMessage: 'For you', description: "A chip on a board card: something on the card waits for the user (an approval, a decision, a question). Glossary: For you." }),
-  chipTip: msg({ id: 'board.forYou.chipTip', defaultMessage: '{n, plural, one {Waits for you: {requests}} other {# requests wait for you: {requests}}}', description: "Tooltip and accessible name of a card's For you chip: how many requests wait for the user ({n}) and each one, its kind and what it asks ({requests}, separated by · ). Glossary: For you." }),
+  chipTip: msg({ id: 'board.forYou.chipTip', defaultMessage: '{n, plural, one {Waits for you: {requests}} other {# requests wait for you: {requests}}}', description: "Accessible name of a card's For you chip: how many requests wait for the user ({n}) and each one, its kind and the start of what it asks ({requests}, separated by · ). Glossary: For you." }),
+  tipAsks: msg({ id: 'board.forYou.tipAsks', defaultMessage: '{kind, select, approve {{who} asks for your OK} decide {{who} asks you to decide} test {{who} asks you to test} signIn {{who} asks you to sign in} other {{who} asks you}}', description: "The first line of a request in the tooltip of a card's For you chip: who asks ({who}: an agent's name, or Hive) and what for (the request's kind: approve, decide, test, sign in, or anything else). The start of the request follows on the next line. Keep the select keys as they are. Glossary: For you." }),
+  tipMore: msg({ id: 'board.forYou.tipMore', defaultMessage: '{n, plural, one {and # more request} other {and # more requests}}', description: "In the tooltip of a card's For you chip, after the first requests shown: how many more wait for the user ({n})." }),
+  tipOpen: msg({ id: 'board.forYou.tipOpen', defaultMessage: 'Click to open the card and answer under For you.', description: "The last line of the tooltip of a card's For you chip: a click opens the card, whose For you section shows each request in full with its answers. Glossary: For you." }),
   heading: msg({ id: 'board.forYou.heading', defaultMessage: 'For you', description: "A heading in the card dialog, above what on the card waits for the user (approvals, decisions, questions). Glossary: For you." }),
   asked: msg({ id: 'board.forYou.asked', defaultMessage: '{who, select, hive {Hive asks} other {{who} asks}} · {when}', description: "Under a request for the user in the card dialog: who asks (Hive, or an agent: its name {who}) and when ({when}: \"5 min ago\"). Keep the select keys as they are." }),
   approve: msg({ id: 'board.forYou.approve', defaultMessage: 'Approve', description: "A button under a request for the user's approval (For you): approves it. Glossary: approve." }),
@@ -40,12 +44,33 @@ export const requestText = (i: Pick<ForYouItem, 'shown' | 'text'>): string => (i
 /** A request's kind, as the window names it (Approve, Decide, Test, Sign in, Other). */
 const kindText = (i: Pick<ForYouItem, 'kind'>): string => tr(FOR_YOU_KIND, { kind: i.kind })
 
-/** The chip on a card's tile: what waits for the user, by kind; each request in its tooltip and accessible name. */
+/** The requests a chip's tooltip shows; the others are counted. */
+const TIP_REQUESTS = 2
+
+/**
+ * The chip on a card's tile: what waits for the user, by kind. Its tooltip is short (#1635): who asks for what, the
+ * start of each request as plain text (an agent's question can be pages of Markdown) and where to answer it; the whole
+ * is in the card's For you section.
+ */
 export function ForYouChip({ items }: { items: ForYouItem[] | undefined }) {
+  const projects = useStore((s) => s.workspace?.projects)
   if (!items?.length) return null
-  const text = tr(M.chipTip, { n: items.length, requests: items.map((i) => `${kindText(i)}: ${requestText(i)}`).join(' · ') })
+  const who = (i: ForYouItem): string => (i.asker ? (projects?.find((p) => p.name.toLowerCase() === i.project.toLowerCase())?.agents.find((a) => a.id === i.asker)?.name ?? i.asker) : 'Hive') // i18n-ignore: the app's name
+  const text = tr(M.chipTip, { n: items.length, requests: items.map((i) => `${kindText(i)}: ${gist(requestText(i), 100)}`).join(' · ') })
+  const tip = (
+    <div className="for-you-tip">
+      {items.slice(0, TIP_REQUESTS).map((i) => (
+        <div key={i.request} className="for-you-tip-request">
+          <div className="for-you-tip-asks">{tr(M.tipAsks, { kind: i.kind, who: who(i) })}</div>
+          <div>{gist(requestText(i))}</div>
+        </div>
+      ))}
+      {items.length > TIP_REQUESTS && <div className="faint">{tr(M.tipMore, { n: items.length - TIP_REQUESTS })}</div>}
+      <div className="faint">{tr(M.tipOpen)}</div>
+    </div>
+  )
   return (
-    <Tooltip content={text}>
+    <Tooltip content={tip}>
       <span className="task-for-you" aria-label={text} data-for-you={items.map((i) => i.kind).join(' ')}>
         <Icon name="bell-dot" />
         <span className="task-chip-label">

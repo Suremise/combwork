@@ -8880,6 +8880,15 @@ body.pane-resizing-v .monaco-editor {
   font-weight: 600;
   white-space: nowrap;
 }
+/* Its tooltip (#1635): each request's asker in bold over the start of what it asks, then where to answer. */
+.for-you-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.for-you-tip-asks {
+  font-weight: 600;
+}
 .task-card.folded .task-for-you {
   margin-inline-start: 4px;
 }

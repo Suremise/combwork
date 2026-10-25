@@ -314,6 +314,9 @@ interface HiveMessageValues {
   'board.forYou.rounds': undefined
   'board.forYou.send': undefined
   'board.forYou.showStuck': undefined
+  'board.forYou.tipAsks': { kind: string; who: string | number }
+  'board.forYou.tipMore': { n: number }
+  'board.forYou.tipOpen': undefined
   'board.inbox.asks': undefined
   'board.inbox.asksWhat': { message: string | number }
   'board.inbox.assistant': undefined

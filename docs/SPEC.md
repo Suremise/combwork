@@ -2338,8 +2338,11 @@ no loop: it reaches an agent working on its own, with no lane or reviewer (*"…
 asked"*), and the card's history says so (*Told B1 (hive) of your answer*), as long as the project's loop wakes are on. Each request records whom it is for
 (`for: 'user'`). The window lists what waits with `tasks:forYou` (a project's or the workspace's: each request's card,
 kind, gate, English text and Hive's message for it, when it was asked and who asked; a count), read again on
-`tasks-changed`. **In the window (#1276):** a card with requests shows a **For you** chip (a bell, the kind, each
-request in its tooltip and accessible name; the accent colour, pill-shaped) on its tile, folded or not; the Task Board
+`tasks-changed`. **In the window (#1276):** a card with requests shows a **For you** chip (a bell, the kind; the accent colour,
+pill-shaped). Its tooltip is short (#1635): for each of the first two requests who asks for what ("HB5 asks you to
+decide") over its first sentence or two as plain text (Markdown's marks taken out), a count of any more, and where to
+answer (a click opens the card, whose For you section has each in full); its accessible name gives each request's kind
+and start. The chip sits on its tile, folded or not; the Task Board
 icon on the activity bar counts the cards (its accessible name "3 cards wait for you"; Review's count stays in the board
 sidebar's Waiting for review); the board's toolbar has a **For you** filter (remembered per board view, composing with
 the search); the card dialog's **For you** section lists each request (its kind, its text in the window's language or
