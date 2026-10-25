@@ -192,7 +192,7 @@ export const AREAS = [
   { paths: ['src/main/progressReporters/'], suites: ['progressreport', 'progressstates', 'packaged-progress'] },
   { paths: ['src/main/projectAgents.ts'], suites: ['agents', 'agents-ui', 'agents24', 'reorder', 'pages', 'unmerged', 'removeall', 'mergeslot', 'placement', 'swap', 'repolock'] },
   { paths: ['src/main/repoLock.ts', 'src/main/repoLockCore.ts', 'tests/e2e/repolock.cjs'], suites: ['repolock', 'gitview', 'mergeslot'] },
-  { paths: ['src/main/workflow/queueHost.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts', 'src/main/workflow/queueChecksApp.ts', 'src/main/repoLock.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergequeue.cjs'], suites: ['mergequeue', 'queueagents'] },
+  { paths: ['src/main/workflow/queueHost.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts', 'src/main/workflow/queueChecksApp.ts', 'src/main/repoLock.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergequeue.cjs'], suites: ['mergequeue', 'queueagents', 'queueupgrade'] },
   // Agents under Hive merges (#1354): the refusals, the wakes and the card's queue state.
   { paths: ['src/main/workflow/queueState.ts', 'src/shared/workflow/refusals.ts', 'src/main/mergeSlots.ts', 'tests/e2e/queueagents.cjs'], suites: ['queueagents'] },
   // The queue's controls (#1353): its model, Pause/Resume, Remove from queue and Retry merge, hive_queue.
@@ -228,6 +228,7 @@ export const AREAS = [
   { paths: ['tests/e2e/copyquiet.cjs', 'src/main/copies.ts', 'src/main/copiesApp.ts', 'src/main/reviewCopies.ts'], suites: ['copyquiet'] },
   { paths: ['tests/e2e/startfresh.cjs', 'src/main/freshStarts.ts', 'src/shared/freshStarts.ts', 'src/renderer/src/components/NoticeBanners.tsx'], suites: ['startfresh'] },
   { paths: ['tests/e2e/repairslots.cjs', 'tests/e2e/removeprojectslots.cjs', 'src/main/projectFolders.ts', 'src/shared/projectFolders.ts', 'src/main/projectRemoval.ts', 'src/renderer/src/components/MoveRepair.tsx', 'src/renderer/src/components/ProjectRemoval.tsx', 'src/main/agentWorktree.ts'], suites: ['repairslots', 'removeprojectslots', 'wsmove', 'wtrecreate', 'repairbranches'] },
+  { paths: ['tests/e2e/queueupgrade.cjs'], suites: ['queueupgrade'] },
   { paths: ['tests/e2e/slotupgrade.cjs', 'src/main/slotMigration.ts', 'src/main/workspaceMove.ts'], suites: ['slotupgrade', 'wsmove', 'repairbranches'] },
   { paths: ['tests/e2e/slotsessions.cjs', 'src/main/agentFolders.ts', 'src/shared/agentFolders.ts', 'src/shared/sessionResume.ts', 'src/shared/resumeAll.ts', 'src/main/sessions.ts'], suites: ['slotsessions', 'legacyworktree'] },
   { paths: ['tests/e2e/legacyworktree.cjs', 'src/main/agentWorktree.ts'], suites: ['legacyworktree', 'slotupgrade'] },

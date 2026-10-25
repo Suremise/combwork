@@ -213,6 +213,7 @@ export const SUITES = [
   { name: 'queuecard' },
   { name: 'queuecontrols' },
   { name: 'queuelease' },
+  { name: 'queueupgrade' },
   { name: 'quit' },
   { name: 'quitwait' },
   { name: 'rail' },
