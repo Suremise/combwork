@@ -36,7 +36,7 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
-## P8's smoke trials (#1537): Codex (Claude Code waits for its test home's sign-in), fixtures v86–v87, 25 October 2026
+## P8's smoke trials (#1537): Claude Code and Codex, fixtures v86–v89, 25 October 2026
 
 Darren's scope (24 Oct): each key scenario once on Claude Code and on Codex, with no `--repeat`, Haiku or Copilot. The
 full trials come before the release (#1541). The 40 key scenarios: the intent tools, the inbox, lanes, #1346's five (with
@@ -61,10 +61,36 @@ merged-to-done.
     - **#1608**: inbox messages acked together at the end, not with the next read. Act, then ack, held.
   - #1545: assistant-message-watching reached the Assistant with Coder really watching, and passed. #1162:
     merge-main-moved passed in its one sample.
-- **Claude Code** (CLI 2.1.310): skipped. The test home isn't signed in (`2026-10-25T05-44-19-claude-code`, $0, no login
-  opened).
-- **Fake baselines at v87**, source 5024b034: 138 of 138 on each fake (`2026-10-25T07-04-36-fake`,
-  `2026-10-25T07-44-50-fake-codex`, `2026-10-25T08-25-26-fake-copilot`), saved again as the `p8-scenarios` baselines.
+- **Claude Code** (CLI 2.1.310, its default model). The first try skipped every scenario: the test home wasn't signed in
+  (`2026-10-25T05-44-19-claude-code`, $0, no login opened). Darren signed it in by hand. Then
+  `2026-10-25T09-42-15-claude-code` ($8.33): 32 of 40 at v87.
+  - Five failures were the scenarios', fixed in v88–v89:
+    - `asksTheUser` read "Nothing needs your decision" as a question (coordinator-start-reviewer, coordinator-merge-due).
+    - coordinator-no-code-done's card title ended in "?", which the reply quoted. Its card was also never no-code: the
+      API's kind on create is only an agent's proposal, so it is now set as the user sets it (`tasks:setKind`). Its
+      research comment is there too.
+    - inbox-destructive didn't count asking through `hive_ask_user`.
+    - coordinator-ten-rounds' builder was stopped, so the loop had stalled and asking was fair. Its builder now works
+      on the fix.
+    - coordinator-merge-due's passed cards had no work anywhere. Their work is now on the lane's unmerged branch, and
+      Coder's task says it is merging.
+    - Rerun at v88–v89 (`2026-10-25T10-20-18-claude-code`, `10-25-08-claude-code`, $1.11): all five pass. Codex reran
+      the three changed Assistant fixtures (`2026-10-25T10-25-46-codex`, $0.25): pass.
+  - Three are guidance findings, carded:
+    - **#1609**: refused with "commit, then submit", it asked the user rather than committing (intent-submit-refused).
+      Whether the prompt narrowed the task is weighed there.
+    - **#1610**: it merged without merge-ready: no slot, a `--no-commit` merge on the base (merge-main-moved; #1162's
+      pattern).
+    - **#1611**: it relayed the user's answer correctly without reading coordinate-agents (assistant-message-watching:
+      only the skill check failed).
+- **The run was interrupted** at about 11:57 (the connection to Anthropic dropped and Hive's agents stopped). Only the
+  Copilot-offline baseline run was cut off. Its rerun (`2026-10-25T12-07-59-fake-copilot`) had 137 of 138:
+  card-loop-follow-up-check only read its inbox. It passed 5 of 5 alone, so it's carded as a flake (#1613), and the set
+  was run once more for a clean baseline.
+- **Fake baselines at v89**, source ab349143: 138 of 138 on each fake (`2026-10-25T10-29-00-fake`,
+  `2026-10-25T11-09-30-fake-codex`, `2026-10-25T12-54-26-fake-copilot`; the last with only this file's notes uncommitted),
+  saved as the `p8-scenarios` baselines.
+  The v87 baselines (`2026-10-25T07-04-36-fake`, `07-44-50-fake-codex`, `08-25-26-fake-copilot`) are archived beside them.
 
 ## P8's scenarios for the intents and gates (#1536): the three fakes, fixtures v86, 24–25 October 2026
 
