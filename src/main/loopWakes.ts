@@ -3,7 +3,7 @@ import { projectAgents } from '../shared/defaults'
 import { pendingStep } from '../shared/tasks'
 import type { TaskCard, TaskHistoryEntry } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
-import { cardChange, LOOP_WAKE_KINDS, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
+import { ANSWER_MAX, cardChange, LOOP_WAKE_KINDS, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
 import { onHiveEvent } from './events'
 import { onLanesWritten } from './lanes'
 import { loopReviewerOf, poolCard } from './loopReviewer'
@@ -41,6 +41,8 @@ const log = createLogger('loopWakes')
 
 /** Hive's own deliveries come from it. */
 const HIVE = { kind: 'hive', name: 'Hive' } as const
+/** The user's answer comes from them, as a decision does (decisionWakes.ts). */
+const USER = { kind: 'user', name: 'the user' } as const
 
 const keyOf = (projectPath: string, agentId: string, n: number): string => `${projectPath.toLowerCase()}#${agentId}#${n}`
 /** How long a wake waits for its agent to be idle (its session running) before it is dropped. */
@@ -117,12 +119,35 @@ interface Wake {
   agentName: string
   since: TaskHistoryEntry | null
   text?: string
+  /** The user's answer's: the agent waiting on it (the one that asked, else the builder), kept whoever the card's agent is now (#1626). */
+  to?: string
 }
+
+/**
+ * A wake's text in its delivery's meta, which keeps a value of at most 500 characters (deliveries.ts): the user's answer
+ * in pieces (`text`, `text1`…), so its reply survives being made again before it is offered (#1626); the rest, a note's
+ * 600 cut to the one piece.
+ */
+const PIECE = 500
+const textMeta = (kind: LoopWakeKind, text: string | undefined): Record<string, string> => {
+  if (!text) return {}
+  const all = text.slice(0, kind === 'answer' ? ANSWER_MAX + 400 : PIECE)
+  const out: Record<string, string> = {}
+  for (let i = 0; i * PIECE < all.length; i++) out[i ? `text${i}` : 'text'] = all.slice(i * PIECE, (i + 1) * PIECE)
+  return out
+}
+const textOf = (m: Record<string, unknown>): string => {
+  let out = typeof m.text === 'string' ? m.text : ''
+  for (let i = 1; typeof m[`text${i}`] === 'string'; i++) out += m[`text${i}`] as string
+  return out
+}
+
 const wakeOf = (r: DeliveryRecord): Wake | null => {
   const m = r.meta ?? {}
   if (typeof m.n !== 'number' || !LOOP_WAKE_KINDS.includes(m.kind as LoopWakeKind) || typeof m.agentName !== 'string') return null
   const since = typeof m.sinceAt === 'string' && m.sinceAt ? ({ at: m.sinceAt, ...(typeof m.sinceId === 'string' && m.sinceId ? { id: m.sinceId } : {}) } as TaskHistoryEntry) : null
-  return { n: m.n, kind: m.kind as LoopWakeKind, agentName: m.agentName, since, ...(typeof m.text === 'string' && m.text ? { text: m.text } : {}) }
+  const text = textOf(m)
+  return { n: m.n, kind: m.kind as LoopWakeKind, agentName: m.agentName, since, ...(text ? { text } : {}), ...(typeof m.to === 'string' && m.to ? { to: m.to } : {}) }
 }
 
 /**
@@ -148,8 +173,12 @@ async function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard
   await withCardNames(ws, async () => {
     if (!ws.path || !ws.isProjectPath(projectPath)) return
     const kinds = kindsOf(w.kind)
-    const meta = { n: card.number, kind: w.kind, agentName: to.name, sinceAt: w.since?.at ?? '', sinceId: w.since?.id ?? '', ...(w.text ? { text: w.text.slice(0, 600) } : {}) }
-    await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: 'card-event', from: HIVE, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: wakeAbout(card, kinds, to.id) }, w.kind, w.text), expiresMs: KEEP_MS, source: 'loop', ref: `#${card.number}`, replace: true, meta, ...(action ? { action } : {}) })
+    const answer = w.kind === 'answer'
+    const meta = { n: card.number, kind: w.kind, agentName: to.name, sinceAt: w.since?.at ?? '', sinceId: w.since?.id ?? '', ...textMeta(w.kind, w.text), ...(answer ? { to: to.id } : {}) }
+    // The user's answer is an answer from them (#1626: acked, never coalesced into the card's events), each its own (a
+    // later handoff of the card, or another answer, doesn't replace it); the rest, Hive's card events, the latest per card.
+    const ref = answer ? `#${card.number}/answer${action ? `/${action}` : ''}` : `#${card.number}`
+    await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: answer ? 'answer' : 'card-event', from: answer ? USER : HIVE, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: wakeAbout(card, kinds, to.id) }, w.kind, w.text), expiresMs: KEEP_MS, source: 'loop', ref, replace: true, meta, ...(action ? { action } : {}) })
     await offerNow(projectPath, to.id)
   }, scopeOfHost(projectPath))
 }
@@ -267,7 +296,8 @@ registerSource('loop', {
     const told = !!card && !!p.since && watchTold(host, r.agentId, card, p.since, p.kind === 'request' || isStep(p.kind))
     if (!card || !stillDue({ ...p, agentId: r.agentId }, card) || covered(host, r.agentId, card, p.kind) || told || !(await wakesOn(ws, host))) return { cancel: 'no longer due' }
     // Only to whose wake it is now: another reviewer given the lane meanwhile gets it instead (#405 round 1 finding).
-    const to = await targetOf(ws, host, card, p.kind)
+    // The user's answer stays with the agent waiting on it (#1626), while it is one of the project's agents.
+    const to = await targetOf(ws, host, card, p.kind, p.kind === 'answer' ? p.to : undefined)
     if (to?.id !== r.agentId) {
       if (to) inBackground('a loop wake', enqueue(ws, host, card, p, to))
       return { cancel: 'it is another agent\'s wake now' }

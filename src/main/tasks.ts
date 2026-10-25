@@ -1490,7 +1490,7 @@ const BAD_ANSWER = msg({ id: 'tasks.error.badAnswer', defaultMessage: "That answ
  * an agent or the Assistant). On the intent path (`runIntent`), so the answer, what it moves and the card's 0.9 fields
  * are one transaction, checked there (the request still open, the card where it was asked, its generation current). A
  * decision (a Decide answer) is the card's, added with the answer's write: a new generation, its agents told (#1266). A
- * reply is kept with the answer and relayed to the waiting agent. Refused with the rule's text when the request was
+ * reply is kept with the answer, added to the card as the user's comment and relayed to the waiting agent. Refused with the rule's text when the request was
  * answered or retired meanwhile.
  */
 export async function answerTask(n: number, request: string, a: ForYouAnswer): Promise<TaskCard> {
@@ -1522,7 +1522,8 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
     n,
     actor,
     (w) => w.answer(n, request, a.outcome, { ...(reply ? { note: reply } : {}), ...(decision ? { decided: true } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}) }),
-    (_w, first) => ({ patch: first && decision ? { decision } : {} })
+    // A reply is on the card too, as the user's comment (#1626), so the card shows it and the wake's "in full" is there.
+    (_w, first) => ({ patch: first && decision ? { decision } : {}, ...(first && reply ? { opts: { comment: reply } } : {}) })
   )
   if (isRefusal(r)) throw new WorkflowRefusedError(r)
   return getTask(n, ws)

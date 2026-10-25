@@ -202,6 +202,9 @@ const REVIEW_MOVES: ReadonlySet<string> = new Set(['start review', 'verdict']) /
 /** The user's choice at the round limit, as an agent's wake says it (English). */
 const CHOICE_WORDS: Record<RoundChoice, string> = { carryOn: 'carry on', split: 'split it', accept: 'accept it with follow-ups', takeOver: 'the user takes it over' } // i18n-ignore: a wake, agent-facing
 
+/** How much of the question an answer's wake quotes before the user's reply (#1626). */
+const QUESTION_QUOTE_MAX = 200
+
 /** A write inside one transaction, for one card: facts with the ruleset and actor, the stage cache, actions. */
 export class Write {
   readonly written: Fact[] = []
@@ -1328,7 +1331,10 @@ export class Workflow {
       if (!st.requests.some((x) => x.request === request)) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'answer', moves: '' } } as GuardRefusal
       w.fact('Approval', { request, answer, ...(note ? { note } : {}), generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}), ...(choice ? { choice } : {}), ...(rounds ? { rounds } : {}) }) // i18n-ignore: a fact's kind and codes, not text
       const builder = st.started?.builder
-      const said = `${card.key}: the user ${answer === 'approved' ? 'approved' : answer === 'declined' ? 'declined' : 'answered'} "${req.text}"${choice ? `: ${CHOICE_WORDS[choice]}${rounds ? ` (${rounds} more round${rounds === 1 ? '' : 's'})` : ''}` : ''}${note ? `: ${note}` : ''}` // i18n-ignore: a wake, agent-facing
+      // The question quoted short (its asker has it), so the reply after it is never cut off the wake (#1626).
+      const asked = [...req.text.replace(/\s+/g, ' ').trim()]
+      const quoted = asked.length > QUESTION_QUOTE_MAX ? `${asked.slice(0, QUESTION_QUOTE_MAX - 1).join('')}…` : asked.join('')
+      const said = `${card.key}: the user ${answer === 'approved' ? 'approved' : answer === 'declined' ? 'declined' : 'answered'} "${quoted}"${choice ? `: ${CHOICE_WORDS[choice]}${rounds ? ` (${rounds} more round${rounds === 1 ? '' : 's'})` : ''}` : ''}${note ? `: ${note}` : ''}` // i18n-ignore: a wake, agent-facing
       w.answer = said
       if (req.gate === ROUND_LIMIT_GATE) {
         this.wake(w, builder, said, 'answer')
