@@ -8671,6 +8671,18 @@ body.pane-resizing-v .monaco-editor {
 /* A folded card: one line with its number, title (cut short), markers and agent. */
 .task-card.folded {
   padding: 4px 9px;
+  container: folded-card / inline-size;
+}
+.task-card-line .task-number {
+  flex: none;
+  white-space: nowrap;
+}
+/* In a narrow column its For you chip is its bell alone (#1634), so the title keeps what room there is; its words and
+   the requests stay in its tooltip and accessible name. */
+@container folded-card (max-width: 219px) {
+  .task-card-line .task-for-you .task-chip-label {
+    display: none;
+  }
 }
 .task-card-line {
   display: flex;
@@ -8783,6 +8795,29 @@ body.pane-resizing-v .monaco-editor {
   border: 1px solid var(--border);
   color: var(--fg-muted, var(--fg));
   font-size: 11px;
+  white-space: nowrap;
+}
+/* A card's chips never run past its edge in a narrow column (#1634): each shrinks to the card, its label cut with "…"
+   and its icon kept; the whole in its tooltip. */
+.task-for-you-row > .tip-wrap,
+.task-card-line > .tip-wrap:has(> .task-for-you),
+.task-card-top > .tip-wrap:has(> .task-project) {
+  min-width: 0;
+  max-width: 100%;
+}
+.task-kind,
+.task-for-you {
+  min-width: 0;
+  max-width: 100%;
+}
+.task-kind > .codicon,
+.task-for-you > .codicon {
+  flex: none;
+}
+.task-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .task-kind.proposed {
@@ -8912,9 +8947,19 @@ textarea.input.task-blocked-input {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Its status stays on one line beside the name, which gives way first. */
-.task-agent > .faint {
+/* Its status stays on one line beside the name, which gives way first; in a narrow column the status is cut with "…"
+   too (#1634), the whole in the line's tooltip. */
+.task-agent > .dot {
   flex: none;
+}
+.task-agent > .task-agent-name {
+  flex-shrink: 1000;
+  min-width: 2ch;
+}
+.task-agent > .faint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .task-drop {

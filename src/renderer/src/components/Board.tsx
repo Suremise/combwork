@@ -384,7 +384,9 @@ function AgentLine({ c, projects, live }: { c: TaskCard; projects: ProjectInfo[]
   const name = agent?.name ?? c.agentName ?? tr(ITS_AGENT)
   if (!agent) return <span className="task-agent faint">{tr(REMOVED_AGENT, { agent: name })}</span>
   const status = agent.live?.status ?? 'stopped'
-  const text = agent.live ? statusText(agent.live) : tr(NOT_RUNNING)
+  // Its hooks not arriving (#1336): the line says so, and so does its tooltip, where a status cut short is read whole (#1634).
+  const hooksMissing = live && agent.live ? hooksMissingText(agent.live, tr) : null
+  const text = hooksMissing ?? (agent.live ? statusText(agent.live) : tr(NOT_RUNNING))
   return (
     <Tooltip content={tr(msg({ id: 'board.agent.tip', defaultMessage: '{agent}: {status}. Click to show it.', description: "Tooltip on a card's agent line: the agent's name and what it is doing ({status}: \"Working…\", \"Not running\")." }), { agent: name, status: text })}>
       <span
@@ -399,7 +401,7 @@ function AgentLine({ c, projects, live }: { c: TaskCard; projects: ProjectInfo[]
         {live && <span className={cx('dot', agent.live ? status : 'stopped')} />}
         <span className="task-agent-name">{name}</span>
         {/* Its hooks not arriving (#1336): its status word would be a guess. */}
-        {live && <span className="faint">{agent.live ? (hooksMissingText(agent.live, tr) ?? STATUS_TEXT[status]) : tr(NOT_RUNNING)}</span>}
+        {live && <span className="faint">{agent.live ? (hooksMissing ?? STATUS_TEXT[status]) : tr(NOT_RUNNING)}</span>}
       </span>
     </Tooltip>
   )

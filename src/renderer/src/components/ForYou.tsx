@@ -47,7 +47,10 @@ export function ForYouChip({ items }: { items: ForYouItem[] | undefined }) {
   return (
     <Tooltip content={text}>
       <span className="task-for-you" aria-label={text} data-for-you={items.map((i) => i.kind).join(' ')}>
-        <Icon name="bell-dot" /> {tr(M.chip)}: {items.length === 1 ? kindText(items[0]) : items.length}
+        <Icon name="bell-dot" />
+        <span className="task-chip-label">
+          {tr(M.chip)}: {items.length === 1 ? kindText(items[0]) : items.length}
+        </span>
       </span>
     </Tooltip>
   )
