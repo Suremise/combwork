@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 91
+const FIXTURES_VERSION = 92
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -2286,16 +2286,63 @@ module.exports.SCENARIOS = [
       // Its lanes as saved (#1018: the workspace's database).
       const lane = require('../e2e/storeDocs.cjs').storeDocs(c.ws, 'lanes').find((l) => l.cards?.includes(c.cards.a))
       const waits = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => a.cards?.includes(c.cards.a))
+      // Its watch for the verdict, its own or the one Hive arms at its submission (#1639): the lane's wait long.
+      const minutes = o.watch ? Math.round((Date.parse(o.watch.limitAt) - Date.parse(o.watch.since)) / 60000) : null
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         [`its lane has ${v.rounds} rounds and a ${v.wait}-minute wait`, lane?.rounds === v.rounds && lane?.waitMinutes === v.wait, JSON.stringify(lane ? { rounds: lane.rounds, waitMinutes: lane.waitMinutes } : null)],
-        [`it waits for the verdict with that wait (limitMinutes ${v.wait})`, waits.some((a) => a.limitMinutes === v.wait), JSON.stringify(waits)],
+        [`it waits for the verdict with that wait (${v.wait} minutes)`, !!o.watch?.cards?.includes(c.cards.a) && Math.abs(minutes - v.wait) <= 1, JSON.stringify({ watch: o.watch, minutes, waits })],
         // Submitted under the review rules (#1486): a submit refused (nothing committed) leaves it in Doing.
         ['its first card to Review, the second not begun', o.cards.a?.column === 'review' && o.cards.b?.column === 'todo', `${o.cards.a?.column} / ${o.cards.b?.column}`],
         ['ended its turn with a live watch for the verdict', o.status === 'watching', o.status]
       ]
     }
   })),
+  {
+    id: 'card-loop-submit-watch',
+    title: "A card loop builder submits and ends its turn (#1639): Hive watches the card for it, with no watch call of its own, so its lane isn't stalled, and the verdict wakes it",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    async setup(c) {
+      await pairInProject(c)
+      const a = await c.card('a', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>" instead of "Hello, <name>".', agent: 'coder' })
+      const r = await c.api('POST', '/v1/lanes', { project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 })
+      if (r.status !== 200) throw new Error(`lane: ${r.text}`)
+      // Implementer reviews with its own token: started, so it has one.
+      await c.startAgent('implementer')
+    },
+    // Once its turn has ended with the card in Review: the watch it has then, and Implementer's failed verdict (whose
+    // reply says Hive watches the card for its next round); then whether that woke it.
+    async during(c, status) {
+      if (c.verdictAt) {
+        if (status === 'working') c.woke = true
+        return
+      }
+      if (!['finished', 'ready', 'watching'].includes(status)) return
+      if ((await c.api('GET', `/v1/tasks/${c.cards.a}`)).body?.column !== 'review') return
+      c.watchAtEnd = (await coderLive(c))?.watch ?? null
+      c.statusAtEnd = status
+      await c.as('implementer', 'POST', `/v1/tasks/%23${c.cards.a}/start-review`)
+      const failed = await c.as('implementer', 'POST', `/v1/tasks/%23${c.cards.a}/verdict`, { pass: false, failKind: 'content', comment: 'Round 1: FAILED. 1. greet.js still says Hello.' })
+      if (failed.status !== 200) throw new Error(`the verdict: ${JSON.stringify(failed.body)}`)
+      c.reviewerWatch = failed.body?.watch ?? null
+      c.verdictAt = Date.now()
+    },
+    // Its wake comes at once (a watch's settle): at most 40 s, within a fake's minute.
+    keepWaiting: async (c) => !!c.verdictAt && !c.woke && Date.now() - c.verdictAt < 40000,
+    prompt: (c) => `You are the builder of card #${c.cards.a} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Do the card and hand it to your reviewer as your loop says.`,
+    fake: (c) => `skill card-loop then ${fakeStart(c.cards.a)} then ${fakeSubmit(c.cards.a, 'Ready for review: greet.js says Hi.')}`,
+    expect: (o, c) => {
+      const w = c.watchAtEnd
+      return [
+        ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
+        ['submitted its card (Review)', submissionsOf(o, c, 'a').length > 0, history(o.cards.a).join(' | ')],
+        ['its turn ended watching the card for the verdict (Passed, a verdict, a move or a comment)', c.statusAtEnd === 'watching' && !!w?.cards?.includes(c.cards.a) && w.column === 'passed', JSON.stringify({ status: c.statusAtEnd, watch: w })],
+        ["the watch is the lane's wait long (6 h)", !!w && Math.abs(Math.round((Date.parse(w.limitAt) - Date.parse(w.since)) / 60000) - 360) <= 1, JSON.stringify(w)],
+        ['the verdict woke it', !!c.woke || o.wakeLines.some((l) => l.includes(`#${c.cards.a}`)), JSON.stringify(o.wakeLines)],
+        ["the reviewer's failed verdict had Hive watch the card for its next round", /^Hive watches .* for its next round in Review/.test(c.reviewerWatch ?? ''), String(c.reviewerWatch)]
+      ]
+    }
+  },
   {
     id: 'card-loop-lane-join',
     title: "A card loop reviewer joins its builder's lane (#483) by the builder's name, then waits for the first card",

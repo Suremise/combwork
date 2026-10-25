@@ -300,7 +300,9 @@ describe('the bundled skills', () => {
     // In Git only (HR1's #1524 round 1 finding 1): a no-code card submits a summary, a project without version control its files' state.
     expect(line('1. Do its work')).toMatch(/for a code card in Git, commit each round's work and name the commit in its summary; a no-code card has nothing to commit/)
     expect(line('2. Review it')).toMatch(/`hive_start_review` names what to review \(a revision, or a no-code card's summary\)\. For a code card in Git, work that revision doesn't hold \(uncommitted, or no commit named\) isn't a failed round on that alone/)
-    expect(line('- builder: the card')).toMatch(/changes: \["verdict", "column", "comment"\]/)
+    expect(line('- builder, its card in Review: the card')).toMatch(/changes: \["verdict", "column", "comment"\]/)
+    // #1639: after a submission or a failed verdict in a lane, Hive arms the watch and the reply says so.
+    expect(text).toMatch(/After a submission or a failed verdict in your lane, Hive watches the card for you/)
     expect(line('- reviewer, after asking the builder for something')).toMatch(/changes: \["comment"\]/)
     // run-lanes' sample brief leaves the procedure to card-loop and the rules to Hive (a brief saying "commit once it
     // passes" undid it; since #1527 a submission's commit is Hive's to check, so the brief says nothing of it).

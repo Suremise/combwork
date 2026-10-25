@@ -161,7 +161,7 @@ function intentTools(): Tool[] {
     intent(
       'hive_submit',
       'submit',
-      'Submit a card in Doing for review: it moves on (to Review, or past it where its project has no review). Writes summary as a comment. A revision already reviewed needs note (what is different). Replies with warnings (files outside its paths, other agents\' changes in a shared folder).',
+      'Submit a card in Doing for review: it moves on (to Review, or past it where its project has no review). Writes summary as a comment. A revision already reviewed needs note (what is different). As a lane\'s builder, Hive then watches it for you, for its review. Replies with warnings (files outside its paths, other agents\' changes in a shared folder) and the watch.',
       { summary: { type: 'string', description: 'What was done, a line first.' }, revision, note: { type: 'string', description: 'For a revision already reviewed: what this submission adds (an explanation).' }, paths: { type: 'array', items: { type: 'string' }, description: 'The files the work changed, relative to the project, for a project with no version control.' } },
       ['summary'],
       (a) => ({ summary: a.summary, revision: a.revision, note: a.note, paths: a.paths })
@@ -171,7 +171,7 @@ function intentTools(): Tool[] {
     intent(
       'hive_verdict',
       'verdict',
-      "Give your verdict on the card you review: comment is written on it. A pass moves it on (to Passed, or to its merge) once its reviews are in; a fail sends it back to Doing for its builder, a round counted.",
+      "Give your verdict on the card you review: comment is written on it. A pass moves it on (to Passed, or to its merge) once its reviews are in; a fail sends it back to Doing for its builder, a round counted, and as a lane's reviewer Hive then watches it for you, for its next round.",
       { pass: { type: 'boolean' }, comment: { type: 'string', description: 'The verdict, a line first; findings numbered.' }, failKind: { type: 'string', enum: ['content', 'explanation'], description: 'A fail: the work itself (content) or only how it was explained (explanation).' }, submission },
       ['pass', 'comment'],
       (a) => ({ pass: a.pass, comment: a.comment, failKind: a.failKind, submission: a.submission })

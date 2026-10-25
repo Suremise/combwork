@@ -726,6 +726,12 @@ export function watchFor(projectPath: string, agentId: string): TaskWatchInfo | 
   return r ? infoOf(r) : null
 }
 
+/** An agent's watch as watchFor tells it, once its workspace's watches are loaded (#1639: before arming one for it). */
+export async function loadedWatchFor(ws: WorkspaceService, projectPath: string, agentId: string): Promise<TaskWatchInfo | null> {
+  await load(ws)
+  return watchFor(projectPath, agentId)
+}
+
 /**
  * A card as the scope may see it (null: gone, archived cards included as they are, or outside the scope), read from the
  * store's own workspace: a read that a close or switch overlapped is refused.
@@ -766,8 +772,10 @@ export type WatchResult = { watching: TaskWatchInfo } | { already: CardChange }
  * #434, unless it asks for a `fresh` one): the agent's earlier watch ends and the card's state is the answer. The agent sees the board as its token does (a project agent: its
  * project's cards; the Assistant: all), and a card outside that is unknown.
  * The board is checked again once the watch is in place, so a change while it was being set up isn't missed.
+ * `start` (#1639): a card as an intent of the agent's left it, and when: the watch starts from there, so what others
+ * changed since that intent (a verdict given before Hive armed the watch) counts.
  */
-export async function registerWatch(ws: WorkspaceService, projectPath: string, agentId: string, cond: WatchCondition, limitMinutes = WATCH_DEFAULT_LIMIT_MINUTES): Promise<WatchResult> {
+export async function registerWatch(ws: WorkspaceService, projectPath: string, agentId: string, cond: WatchCondition, limitMinutes = WATCH_DEFAULT_LIMIT_MINUTES, start?: { card: TaskCard; at: string }): Promise<WatchResult> {
   const store = await load(ws)
   // A wake whose line its CLI has taken is received first, so this watch starts from what it told (#649).
   await followAgent(projectPath, agentId)
@@ -776,7 +784,7 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
   const self = await boardName(ws, projectPath, agentId)
   const result = await locked(store, async (): Promise<WatchResult> => {
     // Moves into a column are looked for in the history from here: before the cards are read, so none falls between.
-    const since = new Date().toISOString()
+    const since = start?.at ?? new Date().toISOString()
     // After a wake, a card that wake told about starts from what it told (#224): what others changed since counts, so a
     // change that landed between the wake and this watch (a second card's verdict a second later) fires it at once.
     const told = self ? store.woke.get(agentKey(projectPath, agentId)) : undefined
@@ -799,8 +807,9 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
         break
       }
       const was = told?.get(String(n))
-      marks[n] = was ? carriedOver(card, was, self!) : mark
-      seen[n] = was ? was.seen : seenOf(card)
+      const base = start?.card.number === n ? start.card : card
+      marks[n] = was ? carriedOver(card, was, self!) : markOf(base)
+      seen[n] = was ? was.seen : seenOf(base)
       now[n] = mark
     }
     const from = { seen, ...(told && cond.cards.some((n) => told.has(String(n))) ? { self: self! } : {}) }
