@@ -161,6 +161,23 @@ export function loadRuleset(data: unknown): LoadResult {
 
 export const hasStage = (r: Ruleset, id: StageId): boolean => r.stages.some((s) => s.id === id)
 
+/** What marks a ruleset as its base's with no review (#1625): its id is the base's with this after it. */
+export const REVIEW_SKIPPED = '~skipReview'
+
+/** The ruleset a ruleset's id was made from: itself, unless it is one with review skipped (#1625). */
+export const baseRulesetId = (id: string): string => (id.endsWith(REVIEW_SKIPPED) ? id.slice(0, -REVIEW_SKIPPED.length) : id)
+
+/**
+ * The rules a card that skips review runs under (#1625, SPEC §16.7.3): its base's with no review, so its submission
+ * finishes it (a no-code card is Done; a code card goes on as its finish says, the merge checks and the OK before merging
+ * kept). Its id is the base's marked, so the base is found again (`baseRulesetId`). Rules that don't review are their own.
+ */
+export function skipReviewOf(r: Ruleset): Ruleset {
+  if (r.options.review === 'none' || r.id.endsWith(REVIEW_SKIPPED)) return r
+  const c = mustCompile({ ...r.options, review: 'none', reviewers: 1, reviewerMode: 'lane' })
+  return { ...c, id: r.id + REVIEW_SKIPPED }
+}
+
 /**
  * A card the agent merges under rules with no Approved stage (no review and no OK before merging, §16.5.2 as decided on
  * #1417): once submitted it waits in Active for the agent's merge, as an approved card waits in Approved.

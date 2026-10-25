@@ -693,11 +693,12 @@ const tools: Tool[] = [
         blockedBy: cardsArg('Cards that have to be done first.'),
         links: cardsArg('Related cards.'),
         context: contextArg,
-        kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? 'no-code: work with no commits (a decision, a write-up, a trial), submitted with a summary. Default code.' : 'no-code proposes work with no commits (a decision, a write-up, a trial); the user confirms it. Default code.' }
+        kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? 'no-code: work with no commits (a decision, a write-up, a trial), submitted with a summary. Default code.' : 'no-code proposes work with no commits (a decision, a write-up, a trial); the user confirms it. Default code.' },
+        skipReview: { type: 'string', description: ASSISTANT ? "The user's reason it skips review, in their words: submitting it then finishes it (a code card goes on to its merge, merge checks kept). Only where its rules review." : 'Proposes it skip review, with your reason; the user confirms it. Only where its rules review.' }
       },
       required: ['title']
     },
-    run: async (a) => createdText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), reply: 'short' })) as TaskChange)
+    run: async (a) => createdText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), reply: 'short' })) as TaskChange)
   },
   {
     name: 'hive_update_task',
@@ -728,7 +729,8 @@ const tools: Tool[] = [
           ? {
               override: overrideArg,
               kind: { type: 'string', enum: ['code', 'no-code'], description: "Changes its kind after it was made: an exception to its rules, only with override (the user's reason)." },
-              confirmKind: { type: 'boolean', description: 'Answers an agent proposing no-code (kindProposed): true makes it no-code, false keeps it code. Only as the user says.' }
+              confirmKind: { type: 'boolean', description: 'Answers an agent proposing no-code (kindProposed): true makes it no-code, false keeps it code. Only as the user says.' },
+              skipReview: { type: ['string', 'boolean'], description: "The user's reason it skips review, in their words (answers an agent's reviewSkipProposed too), or false to review it after all. Only before it is submitted." }
             }
           : { review: { type: 'string', enum: ['start', 'passed', 'failed'] } })
       },
@@ -736,7 +738,7 @@ const tools: Tool[] = [
     },
     run: async (a) => {
       const body: Record<string, unknown> = { reply: 'short' }
-      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind']) if (a[k] !== undefined) body[k] = a[k]
+      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview']) if (a[k] !== undefined) body[k] = a[k]
       const text = changedText((await api('PATCH', `/v1/tasks/${enc(String(a.number))}`, body)) as TaskChange)
       // #1346 item 8: an Assistant with its journal on recorded six decisions and wrote none of them down.
       return ASSISTANT && JOURNAL && typeof a.decision === 'string' && a.decision.trim() ? `${text}\nNote it in your journal (hive_journal_write).` : text

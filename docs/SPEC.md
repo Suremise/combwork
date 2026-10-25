@@ -2064,6 +2064,23 @@ needs `override.reason`; either records one `Override` (`card.kind`); agents nev
 card shows **No code** on its tile and in its dialog's **Kind** (with **Make It Code…** / **Make It No Code…**); the
 Agent API's card adds `kind` and, while one is open, `kindProposed` after its document's fields, just before `stage`.
 
+**Review: Skip (#1625; Darren, 25 Oct).** Any card, code or no code, can skip its review, decided when it is made or
+before it is submitted: not a project option, and Pair and Team still review everything else. Set, the card runs under
+its rules with no review (`skipReviewOf`: its ruleset compiled with `review: none`, its id the base's with
+`~skipReview`, so the base is found again and *old rules* compares the base), whenever the skip was set: its submission
+finishes it. A no-code card is Done; a code card goes on as its finish says (Hive merges: straight to the merge queue,
+whose merge checks and `done.contained` still hold; G10's OK before merging still applies, as it isn't a review). Who:
+the user (the New Card dialog's **Skip review**, with an optional note; the card dialog's **Review**: **Skip Review…** /
+**Review It**), and the Assistant only with the user's reason (`skipReview` on `POST /v1/tasks`, `PATCH /v1/tasks/{n}`,
+`hive_create_task` and `hive_update_task`; `false` sets it back). A project agent's (or the workspace token's)
+`skipReview` at creation is only **proposed** (a `ReviewSkipProposed` fact with its reason; the tile shows *Skip
+review?*, the dialog **Skip Review** / **Keep Review**), answered by the user or the Assistant, the Assistant with the
+user's reason, never the agent's (kept in the fact as `proposed`, for history); agents never set or answer it (`403`).
+Each decision is a `ReviewSkipSet` fact (`skip`, `by`, `reason`). Refused where the card's rules have no review
+(nothing to skip), and once a submission waits for review or later (in Review: the way past it is the user's override
+of the move; approved, merging or Done: nothing left to skip). The tile and the dialog show **Review skipped** with who
+set it and why; the Agent API's card adds `reviewSkipped: { by, reason }` and `reviewSkipProposed` when there is one.
+
 #### 16.7.4 Other moves
 
 [P1, answering HB3's round 1 finding 15]

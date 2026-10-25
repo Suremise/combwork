@@ -316,6 +316,8 @@ interface HiveMessageValues {
   'tips.resumeAll.title': undefined
   'tips.reviewCopies.text': undefined
   'tips.reviewCopies.title': undefined
+  'tips.reviewSkip.text': undefined
+  'tips.reviewSkip.title': undefined
   'tips.reviewerPool.text': undefined
   'tips.reviewerPool.title': undefined
   'tips.safeguardStops.text': undefined

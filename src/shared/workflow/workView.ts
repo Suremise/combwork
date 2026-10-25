@@ -7,6 +7,7 @@
 
 import { foldCard, type Actor, type CardKind, type CardState, type CheckRanData, type Fact, type FactData, type FileChange, type ForYouKind, type QueueEntry, type RoundChoice, type StageId } from './facts'
 import type { StoredText } from '../types'
+import { baseRulesetId, REVIEW_SKIPPED } from './compile'
 
 /** An Override's move when the user applied changed options to a card in flight (§16.11.4, OP-38). */
 export const APPLY_OPTIONS = 'applyOptions'
@@ -219,6 +220,10 @@ export interface WorkView {
   kind: CardKind | null
   /** A kind a project agent proposed when it made the card, not answered yet (OP-6/OP-7, #1277). */
   kindProposed: CardKind | null
+  /** It skips review (#1625): who set it and their reason; null when it doesn't. */
+  reviewSkip: ReviewSkip | null
+  /** A project agent's proposal that it skip review, its reason, not answered yet (#1625). */
+  reviewSkipProposed: string | null
   /** Where the card works: `project`, or the slot's folder. */
   folder: string | null
   /** The line it works on (Git: its branch); null for None. */
@@ -291,6 +296,29 @@ export function kindProposed(facts: readonly Fact[]): CardKind | null {
   return facts.some((f) => f.kind === 'KindDecided' && f.seq > p.seq) ? null : (p.data as FactData['KindProposed']).kind
 }
 
+/** A card's review skip and an open proposal of one, as its work view has them (#1625). */
+const reviewSkipView = (facts: readonly Fact[]): Pick<WorkView, 'reviewSkip' | 'reviewSkipProposed'> => {
+  const r = reviewSkipOf(facts)
+  return { reviewSkip: r.skip, reviewSkipProposed: r.proposed }
+}
+
+/** A card's review skip (#1625): who set it and their reason, as the badge and the Agent API show it. */
+export interface ReviewSkip {
+  by: 'user' | 'assistant'
+  reason: string
+}
+
+/**
+ * Whether a card skips review (#1625), from its facts: its latest `ReviewSkipSet` (null: it doesn't), and the reason of a
+ * project agent's proposal nobody has answered yet (a `ReviewSkipProposed` with no `ReviewSkipSet` after it).
+ */
+export function reviewSkipOf(facts: readonly Fact[]): { skip: ReviewSkip | null; proposed: string | null } {
+  const set = facts.findLast((f) => f.kind === 'ReviewSkipSet')
+  const p = facts.findLast((f) => f.kind === 'ReviewSkipProposed')
+  const d = set ? (set.data as FactData['ReviewSkipSet']) : null
+  return { skip: d?.skip ? { by: d.by, reason: d.reason } : null, proposed: p && (!set || set.seq < p.seq) ? (p.data as FactData['ReviewSkipProposed']).reason : null }
+}
+
 /** A fact's `platform.unknown`: each field that couldn't be read, and why (text only). */
 function unknownOf(platform: Record<string, unknown> | undefined): Record<string, string> {
   const u = platform?.unknown
@@ -353,6 +381,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     // The card's kind now, not the one its cycle started with: a change after its start shows at once (HR3's #1277 round 1).
     kind: c.kind ?? started?.cardKind ?? null,
     kindProposed: kindProposed(facts),
+    ...reviewSkipView(facts),
     folder: started?.folder ?? null,
     line: started?.line ?? null,
     base: started?.base ?? null,
@@ -434,6 +463,9 @@ export interface WorkBadge {
   /** Its kind (no code: no commits, §16.7.3) and a kind an agent proposed, not answered yet (#1277). */
   kind: CardKind | null
   kindProposed: CardKind | null
+  /** It skips review (#1625): who set it and their reason (the Review skipped mark); and an agent's proposal, its reason. */
+  reviewSkip: ReviewSkip | null
+  reviewSkipProposed: string | null
   /** A decision was recorded since the latest submission was made. */
   decisionSince: boolean
   /**
@@ -459,7 +491,17 @@ export interface WorkBadge {
 }
 
 /** Whether a card is in flight under rules that aren't `current` (its project's ruleset now; null: not known, no mark). */
-export const onOldRules = (v: Pick<WorkView, 'stage' | 'ruleset'>, current: string | null | undefined): boolean => !!current && !!v.ruleset && v.stage !== 'todo' && v.stage !== 'done' && v.ruleset !== current
+export const onOldRules = (v: Pick<WorkView, 'stage' | 'ruleset'>, current: string | null | undefined): boolean => !!current && !!v.ruleset && v.stage !== 'todo' && v.stage !== 'done' && baseRulesetId(v.ruleset) !== current
+
+/**
+ * The stages a card in flight keeps (#1421), its review skip applied (#1625): its rules with no review while it skips
+ * review (stored once the skip is set on a started card), else its base rules.
+ */
+function keptStages(v: WorkView, stagesOf: (ruleset: string) => StageId[] | null): StageId[] | null {
+  if (!v.ruleset || v.stage === 'done') return null
+  const base = baseRulesetId(v.ruleset)
+  return (v.reviewSkip ? stagesOf(base + REVIEW_SKIPPED) : null) ?? stagesOf(base)
+}
 
 /**
  * `current`: the card's project's ruleset now, for its old rules mark (main's; none: no mark); `stagesOf`: a stored
@@ -498,9 +540,11 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     forYou: v.forYou,
     kind: v.kind,
     kindProposed: v.kindProposed,
+    reviewSkip: v.reviewSkip,
+    reviewSkipProposed: v.reviewSkipProposed,
     decisionSince: !!latest && v.decisions.generation > latest.generation,
     oldRules: onOldRules(v, current),
-    stages: v.ruleset && v.stage !== 'done' ? (stagesOf?.(v.ruleset) ?? null) : null,
+    stages: stagesOf ? keptStages(v, stagesOf) : null,
     line: v.line,
     underReview: v.stage === 'review' && v.kind !== 'no-code' ? (latest?.revision ?? null) : null,
     startedAt: v.startedAt,

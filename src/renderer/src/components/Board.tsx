@@ -15,6 +15,7 @@ import { MARKDOWN_CARDS } from '../cardLinks'
 import { CardWork, WorkBadges } from './CardWork'
 import { ForYouChip, ForYouSection } from './ForYou'
 import { KindField, KindMark, KindProposal } from './CardKind'
+import { ReviewSkipField, ReviewSkipMark, ReviewSkipProposal, useProjectReviews } from './CardReviewSkip'
 import { useForYou } from '../forYou'
 import type { ForYouItem } from '@shared/workflow/workView'
 import { useWorkBadges } from '../cardWork'
@@ -610,10 +611,11 @@ function CardTile({
           </Tooltip>
         )}
         <ReviewLine c={c} projects={projects} />
-        {(!!forYou?.length || work?.kind === 'no-code' || work?.kindProposed === 'no-code') && (
+        {(!!forYou?.length || work?.kind === 'no-code' || work?.kindProposed === 'no-code' || !!work?.reviewSkip || (work?.reviewSkipProposed ?? null) !== null) && (
           <div className="task-for-you-row">
             <ForYouChip items={forYou} />
             <KindMark b={work} />
+            <ReviewSkipMark b={work} />
           </div>
         )}
         <WorkBadges b={work} card={c} />
@@ -1669,6 +1671,9 @@ export function TaskDialog() {
   const badge = useWorkBadges().get(card?.number ?? -1)
   // A new card's kind (#1277): no code, or code (the default).
   const [noCode, setNoCode] = useState(false)
+  // A new card's Review: Skip (#1625), and the user's optional note on why.
+  const [skipReview, setSkipReview] = useState(false)
+  const [skipNote, setSkipNote] = useState('')
   // Why the board takes no changes (#1230): its 1.0 upgrade waits, or a newer Hive saved it. The card can be read, not changed.
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const ro = !!readOnly
@@ -1727,6 +1732,8 @@ export function TaskDialog() {
     setActionError(null)
     setAnswerDrafts({})
     setNoCode(false)
+    setSkipReview(false)
+    setSkipNote('')
     const c = typeof open === 'number' ? get().tasks.find((x) => x.number === open) : null
     setTitle(c?.title ?? '')
     setDescription(c?.description ?? '')
@@ -1765,6 +1772,8 @@ export function TaskDialog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, ready])
 
+  // Whether the chosen project's rules review (#1625): Skip review is offered, and sent, only where they do.
+  const projectReviews = useProjectReviews(projects.find((p) => p.name === project)?.path ?? null)
   if (open === null || (!isNew && (!card || !ready))) return null
   const close = (): void => set({ taskOpen: null })
   const proj = projects.find((p) => p.name === project) ?? null
@@ -1815,7 +1824,7 @@ export function TaskDialog() {
   const persist = async (hold = false): Promise<void> => {
     if (!title.trim()) throw new Error(tr(NEEDS_TITLE))
     if (isNew) {
-      const c = await call('tasks:create', { title, description, project, agent: agent || null, column, labels: labelList, ...(splitDocRefs(context).length ? { context: splitDocRefs(context) } : {}), ...(noCode ? { kind: 'no-code' as const } : {}) })
+      const c = await call('tasks:create', { title, description, project, agent: agent || null, column, labels: labelList, ...(splitDocRefs(context).length ? { context: splitDocRefs(context) } : {}), ...(noCode ? { kind: 'no-code' as const } : {}), ...(skipReview && projectReviews === true ? { skipReview: skipNote.trim() } : {}) })
       const extra: TaskPatch = {}
       if (blocked.trim()) extra.blocked = blocked
       if (refs(blockedBy).length) extra.blockedBy = refs(blockedBy)
@@ -2033,6 +2042,7 @@ export function TaskDialog() {
           </div>
         )}
         {card && !card.archived && <KindProposal card={card} b={badge} readOnly={ro} />}
+        {card && !card.archived && <ReviewSkipProposal card={card} b={badge} readOnly={ro} />}
         {card && !card.archived && <ForYouSection card={card} items={forYouItems} drafts={answerDrafts} setDraft={(request, text) => setAnswerDrafts((d) => ({ ...d, [request]: text }))} setAnswering={setAnswering} />}
         <input ref={titleRef} className="input task-title-input" placeholder={tr(msg({ id: 'board.dialog.titlePlaceholder', defaultMessage: 'Title', description: "Placeholder of the card dialog's title box." }))} value={title} maxLength={200} readOnly={ro} onChange={(e) => setTitle(e.target.value)} />
         <div className="agent-form task-form">
@@ -2044,6 +2054,9 @@ export function TaskDialog() {
             onChange={(e) => {
               setProject(e.target.value)
               setAgent('')
+              // A skip ticked for another project isn't this one's choice (HR1's #1625 round 1): ticked again if wanted.
+              setSkipReview(false)
+              setSkipNote('')
             }}
           >
             <option value="">{tr(msg({ id: 'board.dialog.noProject', defaultMessage: 'None (about the workspace)', description: "The card dialog's project choice for a card of no project: it is about the whole workspace." }))}</option>
@@ -2073,6 +2086,7 @@ export function TaskDialog() {
             ))}
           </select>
           <KindField card={card} b={badge} noCode={noCode} setNoCode={setNoCode} readOnly={ro} />
+          <ReviewSkipField card={card} b={badge} reviews={projectReviews} skip={skipReview} setSkip={setSkipReview} note={skipNote} setNote={setSkipNote} readOnly={ro} />
           <label>{tr(msg({ id: 'board.dialog.labels', defaultMessage: 'Labels', description: "A field label in the card dialog: the card's labels." }))}</label>
           <input className="input" placeholder={tr(msg({ id: 'board.dialog.labelsPlaceholder', defaultMessage: 'Comma separated, e.g. bug, ui', description: "Placeholder of the card dialog's labels box: labels separated by commas (bug and ui are examples)." }))} value={labels} readOnly={ro} onChange={(e) => setLabels(e.target.value)} />
           <label>{tr(BLOCKED_FIELD)}</label>

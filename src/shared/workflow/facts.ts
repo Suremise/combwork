@@ -232,6 +232,13 @@ export interface FactData {
   KindProposed: { kind: CardKind }
   /** The user or the Assistant answered a proposed kind (#1277): `kind` is the card's kind from now on. */
   KindDecided: { kind: CardKind; proposed: CardKind }
+  /** A project agent proposed, when it made the card, that it skip review (#1625), with its reason: until answered. */
+  ReviewSkipProposed: { reason: string }
+  /**
+   * The card skips review, or no longer does (#1625): the user's (`reason` their optional note) or the Assistant's (the
+   * user's reason, required). `proposed`: the agent's reason it answers, kept for history only.
+   */
+  ReviewSkipSet: { skip: boolean; by: 'user' | 'assistant'; reason: string; proposed?: string }
   Blocked: { reason: string }
   Unblocked: Record<string, never>
   /** A decision added, its words changed, or removed (`removed`, its last words): each a new generation (#1216). */
