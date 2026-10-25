@@ -4139,7 +4139,11 @@ deliveries keep their in-memory store (published after each transaction), the ta
   refused before anything runs ("This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents"), and
   reading the workspace's stores moves no old file in (a host's `sessions.json` waits for the upgrade). The workspace
   stays open for reading; the banner says the board is read-only and agents can't start, and New Session and Resume in
-  the session view and the agent's menus are off with that as their tooltip [#1230]. **When the file is replaced
+  the session view and the agent's menus are off with that as their tooltip [#1230]. The opening's steps that write the
+  board (the merge queues, the cards', lanes' and watches' project ids, the projects' keys, archiving old Done cards,
+  ending the reviews of sessions that ended, sweeping idle skill copies, the adoption) skip it quietly, logging nothing,
+  and **run once the upgrade completes**, in the same session (`onBoardUpgraded`) [#1621: the merge queues had failed
+  with "no such table: card_facts" and started only after a restart]. **When the file is replaced
   under the services** (the upgrade, Restore) [HR1's round 2 finding]: what they keep from it in memory (deliveries,
   card watches, metrics, lanes' and sessions' "moved in" marks) was read before, and a 0.9 Hive may have written since
   (while the upgrade waited), so each reads it again from the file as it is then; the workspace database's

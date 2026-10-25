@@ -19,6 +19,7 @@ const { sessions } = await import('../src/main/sessions')
 const storeRows = await import('../src/main/storeRows')
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
+const { keyProjects } = await import('../src/main/projectKeys')
 const { BACKUPS_KEPT, DbInUseError, fileSchemaVersion, openDb, schemaVersion } = await import('../src/main/db')
 const { PRESENCE_DIR, STALE_MS } = await import('../src/main/presence')
 
@@ -402,6 +403,39 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     await inWorkspace(w, () => store.upgradeBoard(w))
     expect((await inWorkspace(w, () => workspace.sessionsFile(p))).sessions.map((x) => x.id)).toEqual(['s1'])
     expect(existsSync(join(p, '.hive', 'sessions.json'))).toBe(false)
+    await close(w)
+  })
+
+  it("the opening's steps that write skip the waiting board quietly; the upgrade tells its listeners once, so they run then (#1621)", async () => {
+    const ws = await board09()
+    const w = await open(ws)
+    const told: string[] = []
+    const off = store.onBoardUpgraded((x) => told.push(x.path!))
+    try {
+      // Nothing written, nothing thrown ("This board is from Hive 0.9…" was logged for each).
+      expect(await inWorkspace(w, () => tasks.stampCardProjects(w))).toBe(0)
+      expect(await inWorkspace(w, () => keyProjects(w))).toEqual([])
+      expect(await inWorkspace(w, () => tasks.archiveOldDone(w))).toEqual([])
+      expect(await inWorkspace(w, () => tasks.endReviewsWithoutSession(w, () => false))).toEqual([])
+      // Refused (another Hive has the file open): not upgraded, nobody told.
+      const other = new DatabaseSync(store.boardFile(ws))
+      other.prepare('SELECT count(*) FROM cards').get()
+      await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow('close it first')
+      other.close()
+      expect(told).toEqual([])
+      await inWorkspace(w, () => store.upgradeBoard(w))
+      expect(told).toEqual([ws])
+      // Upgrading again changes nothing, and tells nobody again.
+      await inWorkspace(w, () => store.upgradeBoard(w))
+      expect(told).toEqual([ws])
+      // The board takes writes now: the same steps run through it (the upgrade gave the project its key already).
+      expect(await inWorkspace(w, () => tasks.stampCardProjects(w))).toBe(0)
+      expect(await inWorkspace(w, () => keyProjects(w))).toEqual([])
+      expect(store.projectKeys(w).filter((k) => k.current)).toHaveLength(1)
+      expect(await inWorkspace(w, () => tasks.endReviewsWithoutSession(w, () => false))).toEqual([])
+    } finally {
+      off()
+    }
     await close(w)
   })
 

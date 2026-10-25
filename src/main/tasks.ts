@@ -29,7 +29,7 @@ import { answerFits, CATEGORY_STAGE, STAGE_CATEGORY, type RoundChoice, type Stag
 import type { ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
-import { afterBoardWrite, archiveBatchDocs, boardSavepoint, movedNames, boardRead, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { afterBoardWrite, archiveBatchDocs, boardSavepoint, movedNames, boardRead, boardReadOnly, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
@@ -425,10 +425,11 @@ function withProject(raw: Record<string, unknown>, project: string, projectId: s
  * since gets its name now. A card with an id no project has (its project removed or gone) is left as it is, and so is one
  * saved before ids under a name no project has (Repair can give those to their project). In one board change, every
  * field kept (the cards' files as they were before 0.9 are kept in `.hive/tasks.imported-<time>`, #1017). Run each time
- * the workspace opens; it changes nothing the second time.
+ * the workspace opens, and again once its board is upgraded to 1.0 (#1621: until then it takes no writes, and is skipped);
+ * it changes nothing the second time.
  */
 export function stampCardProjects(ws: WorkspaceService): Promise<number> {
-  if (!ws.path) return Promise.resolve(0)
+  if (!ws.path || boardReadOnly(ws)) return Promise.resolve(0)
   return boardLock(ws, async () => {
     if (!ws.path) return 0
     const ids = await ws.projectIds()
@@ -1945,7 +1946,8 @@ export const setAmidRepairForTests = (fn: (() => Promise<void> | void) | null): 
 export async function endReviewsWithoutSession(ws: WorkspaceService, live: (project: string, agentId: string) => boolean): Promise<number[]> {
   const path = ws.path
   const life = ws.lifetime
-  if (!path) return []
+  // A board waiting for its upgrade to 1.0 takes no writes: repaired once it is upgraded (#1621).
+  if (!path || boardReadOnly(ws)) return []
   const alive = (): boolean => !life.aborted && ws.path === path
   return boardWrite(ws, async () => {
     const gone = (await allTasks(ws, { archived: false })).filter((c) => c.review && c.review.agent !== ASSISTANT_AGENT_ID && !live(c.project, c.review.agent))
@@ -2337,6 +2339,8 @@ export function doneSince(card: TaskCard): number {
 
 /** Archives the cards that have been in Done for Settings → Board's days (none when that is 0). */
 export function archiveOldDone(ws: WorkspaceService, now = Date.now()): Promise<number[]> {
+  // A board waiting for its upgrade to 1.0 takes no writes: archived once it is upgraded (#1621).
+  if (ws.path && boardReadOnly(ws)) return Promise.resolve([])
   return cardBatch(ws, () => archiveOldDoneUnbatched(ws, now))
 }
 
