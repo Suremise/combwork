@@ -137,7 +137,7 @@ describe('races between intents', () => {
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
     moved(await e.wf.startReview(card.key, R1))
     // Its builder, waiting in Review, is refused a builder's move with the wait for the verdict, not the reviewer's intents.
-    const waits = refusedBy(await e.wf.putBack(card.key, B1, 'more to do'), 'move.notFromHere')
+    const waits = refusedBy(await e.wf.putBack(card.key, B1, { why: 'more to do' }), 'move.notFromHere')
     expect(waits).toMatchObject({ message: "AM-1 is in Review: put back isn't possible from there.", next: "It waits for its reviewer's verdict: wait for that, which brings it back if there is more to do.", values: { whose: 'builder' } })
     // Taken back to Active during the review: the reviewer's verdict and review are refused with the end of its review.
     moved(await e.wf.move(card.key, 'active', 'user'))
