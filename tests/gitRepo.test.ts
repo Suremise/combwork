@@ -67,6 +67,8 @@ vi.mock('../src/main/fsutil', async (importOriginal) => {
 
 /** While set, a `git checkout` or `git merge` (a switch, a create, a pull) stops before git starts: `entered`, then `open` (#646). */
 let gitDoor: { entered: () => void; open: Promise<void> } | null = null
+/** While set, the next `git update-ref` (a branch deleted, #1642) stops before git starts, likewise. */
+let refDoor: { entered: () => void; open: Promise<void> } | null = null
 vi.mock('../src/main/git', async (importOriginal) => {
   const real = await importOriginal<typeof import('../src/main/git')>()
   return {
@@ -77,6 +79,12 @@ vi.mock('../src/main/git', async (importOriginal) => {
         gitDoor = null
         door.entered()
         await door.open
+      }
+      const atRef = refDoor
+      if (atRef && args[1][0] === 'update-ref') {
+        refDoor = null
+        atRef.entered()
+        await atRef.open
       }
       return real.git(...args)
     }
@@ -126,6 +134,7 @@ beforeEach(() => {
   live = {}
   slots = []
   lockDoor = null
+  refDoor = null
   asUser.mockClear()
   workTarget = ''
   cardLines = []
@@ -652,6 +661,56 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     for (const why of ['hive/hb2 has moved since you were shown it', 'hive/slot is checked out in a worktree or slot', 'An open card works on hive/card', "spike/x has commits that aren't in 1.0.0", 'main is the default branch', '1.0.0 is the branch work merges into', "--force isn't a valid branch name", "There's no branch nope"]) expect(said).toContain(why)
     // Nothing to delete: refused, saying why.
     await expect(repo.deleteBranches(proj, [{ name: 'spike/x', sha: at['spike/x'] }])).rejects.toThrow(/spike\/x has commits that aren't in 1\.0\.0/)
+  }, 120_000)
+
+  /** A door that stops an action where `set` puts it, and the promises to wait at it and let it through. */
+  const door = (): { at: Promise<void>; door: { entered: () => void; open: Promise<void> }; open: () => void } => {
+    let entered!: () => void
+    let open!: () => void
+    const at = new Promise<void>((r) => (entered = r))
+    return { at, door: { entered, open: new Promise<void>((r) => (open = r)) }, open }
+  }
+
+  it('reads what a branch is to the project when it deletes it, not when the request was queued (round 2)', async () => {
+    const at = setUp()
+    // The target becomes hive/hb1 while the deletion waits for the repository's lock.
+    const d = door()
+    lockDoor = d.door
+    const queued = repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }])
+    await d.at
+    workTarget = 'hive/hb1'
+    d.open()
+    await expect(queued).rejects.toThrow(/hive\/hb1 is the branch work merges into/)
+    lockDoor = null
+    expect(branchNames(proj)).toContain('hive/hb1')
+    // An open card takes a later branch of the batch while an earlier one is being deleted.
+    workTarget = '1.0.0'
+    const r = door()
+    refDoor = r.door
+    const batch = repo.deleteBranches(proj, [
+      { name: 'hive/hb1', sha: at['hive/hb1'] },
+      { name: 'hive/hb2', sha: at['hive/hb2'] }
+    ])
+    await r.at
+    cardLines = [...cardLines, { line: 'hive/hb2', stage: 'doing' }]
+    r.open()
+    const said = await batch
+    expect(said).toContain('An open card works on hive/hb2')
+    expect(branchNames(proj)).toEqual(expect.arrayContaining(['hive/hb2']))
+    expect(branchNames(proj)).not.toContain('hive/hb1')
+  }, 120_000)
+
+  it('checks a remote branch under the repository lock with its use read then (round 2)', async () => {
+    const at = setUp()
+    const d = door()
+    lockDoor = d.door
+    const queued = repo.deleteRemoteBranches(proj, 'origin', [{ name: 'origin/hive/hb1', sha: at['hive/hb1'] }])
+    await d.at
+    cardLines = [{ line: 'hive/hb1', stage: 'doing' }]
+    d.open()
+    await expect(queued).rejects.toThrow(/An open card works on origin\/hive\/hb1/)
+    lockDoor = null
+    expect(branchNames(remote)).toContain('hive/hb1')
   }, 120_000)
 
   it('deletes an unmerged branch only alone, at the commit shown, after listing the commits it drops', async () => {

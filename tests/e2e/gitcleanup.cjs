@@ -4,7 +4,9 @@
 // has. The list stays a list (Darren's decision) under three headings: In use, Merged into main, Not merged into main,
 // the last saying how many commits; the remote branches grouped the same way. Clean Up offers exactly the merged unused
 // ones, ticked, never main or the slot's branch, and nas's apart under a warning, none ticked; untick one, tick one on
-// nas, Delete Ticked: those go, the rest stay. The unmerged branch's 🗑 lists its two commits first, then deletes it.
+// nas, Delete Ticked: those go, the rest stay. Round 2: a third remote, other, unreachable by then, fails after the local
+// branches and nas's went; a tick changed, Try Again deletes only other's (nothing done is asked again). The unmerged
+// branch's 🗑 lists its two commits first, then deletes it.
 // Remotes are local bare repositories in the suite's folder (never a real remote), git's global config the suite's own.
 // Screenshots of the list and the dialog in both themes. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
@@ -17,6 +19,8 @@ const HUNG_MS = 15000
 const userData = path.join(lib.WORK, 'gitcleanup-profile')
 const ws = path.join(lib.WORK, 'gitcleanup-ws')
 const nas = path.join(lib.WORK, 'gitcleanup-nas.git')
+const otherRepo = path.join(lib.WORK, 'gitcleanup-other.git')
+const missing = path.join(lib.WORK, 'gitcleanup-missing.git')
 const slot = path.join(lib.WORK, 'gitcleanup-slot-a')
 const claudeHome = path.join(lib.WORK, 'gitcleanup-claude-home')
 const globalConfig = path.join(lib.WORK, 'gitcleanup-gitconfig')
@@ -29,7 +33,7 @@ const check = (name, ok, extra = '') => {
 const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitcleanup-${name}.png`) })
 
 ;(async () => {
-  for (const d of [userData, ws, nas, slot, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [userData, ws, nas, otherRepo, missing, slot, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.writeFileSync(globalConfig, '[user]\n\tname = Test User\n\temail = 1+test@users.noreply.github.com\n[init]\n\tdefaultBranch = main\n[core]\n\tautocrlf = false\n')
   const gitEnv = lib.gitEnv({ GIT_CONFIG_GLOBAL: globalConfig })
   const g = (cwd, ...a) => execFileSync('git', a, { cwd, env: gitEnv, encoding: 'utf8' }).trim()
@@ -40,7 +44,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitcle
   }
   const heads = (repo) => g(repo, 'for-each-ref', '--format=%(refname:short)', 'refs/heads').split('\n').filter(Boolean).sort()
   fs.mkdirSync(alpha, { recursive: true })
-  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', nas], { env: gitEnv })
+  for (const r of [nas, otherRepo]) execFileSync('git', ['init', '-q', '--bare', '-b', 'main', r], { env: gitEnv })
   g(ws, 'init', '-q', '-b', 'main', alpha)
   commit('a.txt')
   for (const b of ['hive/hb1', 'hive/hb2', 'backup/hb5', 'hive/slot-line']) g(alpha, 'branch', b)
@@ -53,6 +57,9 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitcle
   g(alpha, 'remote', 'add', 'nas', nas)
   g(alpha, 'push', '-q', 'nas', 'main', 'hive/hb1', 'hive/hb2', 'backup/hb5', 'spike/i18n', 'hive/slot-line', 'main:refs/heads/old/only-on-nas')
   g(alpha, 'fetch', '-q', 'nas')
+  g(alpha, 'remote', 'add', 'other', otherRepo)
+  g(alpha, 'push', '-q', 'other', 'main', 'hive/hb2')
+  g(alpha, 'fetch', '-q', 'other')
   const claude = lib.fakeClaude(userData, claudeHome, [alpha])
   const env = { ...claude, HIVE_API_PORT: lib.port(47798), GIT_CONFIG_GLOBAL: globalConfig }
 
@@ -108,7 +115,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitcle
     await lib.until(async () => (await dialog.locator('[data-git-cleanup]').count()) === 1, HUNG_MS)
     const ticks = (kind) => dialog.locator(`[data-cleanup-${kind}]`).evaluateAll((els, k) => els.map((e) => `${e.getAttribute(`data-cleanup-${k}`)}${e.checked ? ':on' : ''}`), kind)
     check('local: the three merged unused branches, ticked', JSON.stringify(await ticks('local')) === JSON.stringify(['backup/hb5:on', 'hive/hb1:on', 'hive/hb2:on']), JSON.stringify(await ticks('local')))
-    check('nas: its merged branches but main and the slot’s, none ticked', JSON.stringify(await ticks('remote')) === JSON.stringify(['nas/backup/hb5', 'nas/hive/hb1', 'nas/hive/hb2', 'nas/old/only-on-nas']), JSON.stringify(await ticks('remote')))
+    check('nas and other: their merged branches but main and the slot’s, none ticked', JSON.stringify(await ticks('remote')) === JSON.stringify(['nas/backup/hb5', 'nas/hive/hb1', 'nas/hive/hb2', 'nas/old/only-on-nas', 'other/hive/hb2']), JSON.stringify(await ticks('remote')))
     check('…under a warning that it deletes on the remote', /deletes them on the remote, for everyone/.test(await text(dialog.locator('[data-git-cleanup-remote-warning]'))))
     check('…each whose local branch is ticked says so', (await dialog.locator('li', { hasText: 'nas/hive/hb1' }).innerText()).includes('its local branch is ticked above') && !(await dialog.locator('li', { hasText: 'nas/old/only-on-nas' }).innerText()).includes('ticked above'))
     await dialog.locator('[data-cleanup-local="backup/hb5"]').uncheck()
@@ -119,9 +126,19 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitcle
       await dialog.screenshot({ path: path.join(lib.WORK, `gitcleanup-2-dialog-${t}.png`) })
     }
     await theme('dark')
+    // other can't be reached by the time it is asked (round 2): the local branches and nas's go first, then it fails.
+    await dialog.locator('[data-cleanup-remote="other/hive/hb2"]').check()
+    g(alpha, 'remote', 'set-url', 'other', missing)
     await dialog.getByRole('button', { name: 'Delete Ticked', exact: true }).click()
-    const deleted = await lib.until(async () => ((await dialog.count()) === 0 && !heads(alpha).includes('hive/hb1') && !heads(nas).includes('hive/hb1') ? true : null), HUNG_MS)
-    check('Delete Ticked: the ticked go, here and on nas; the unticked stay', !!deleted && JSON.stringify(heads(alpha)) === JSON.stringify(['backup/hb5', 'hive/slot-line', 'main', 'spike/i18n']) && JSON.stringify(heads(nas)) === JSON.stringify(['backup/hb5', 'hive/hb2', 'hive/slot-line', 'main', 'old/only-on-nas', 'spike/i18n']), JSON.stringify({ alpha: heads(alpha), nas: heads(nas) }))
+    const partly = await lib.until(async () => ((await dialog.locator('.dialog-error').count()) === 1 && !heads(alpha).includes('hive/hb1') && !heads(nas).includes('hive/hb1') ? true : null), HUNG_MS)
+    check('Delete Ticked: the local branches and nas’s go, other’s fails in the dialog', !!partly && JSON.stringify(heads(alpha)) === JSON.stringify(['backup/hb5', 'hive/slot-line', 'main', 'spike/i18n']) && JSON.stringify(heads(nas)) === JSON.stringify(['backup/hb5', 'hive/hb2', 'hive/slot-line', 'main', 'old/only-on-nas', 'spike/i18n']) && heads(otherRepo).includes('hive/hb2'), JSON.stringify({ alpha: heads(alpha), nas: heads(nas), error: await text(dialog.locator('.dialog-error')) }))
+    // A tick changed after the failure, other reachable again: Try Again asks only for other's (nothing deleted already).
+    g(alpha, 'remote', 'set-url', 'other', otherRepo)
+    await dialog.locator('[data-cleanup-local="backup/hb5"]').check()
+    await dialog.locator('[data-cleanup-local="backup/hb5"]').uncheck()
+    await dialog.getByRole('button', { name: 'Try Again', exact: true }).click()
+    const retried = await lib.until(async () => ((await dialog.count()) === 0 && !heads(otherRepo).includes('hive/hb2') ? true : null), HUNG_MS)
+    check('Try Again: only other’s goes, nothing done is asked again', !!retried && JSON.stringify(heads(otherRepo)) === JSON.stringify(['main']) && heads(alpha).includes('backup/hb5'), JSON.stringify({ other: heads(otherRepo), alpha: heads(alpha), error: await text(dialog.locator('.dialog-error')) }))
     check('…and the list follows', !!(await lib.until(async () => (await branches.locator('[data-branch="hive/hb1"]').count()) === 0 && (await branches.locator('[data-branch="backup/hb5"]').count()) === 1, HUNG_MS)))
 
     // --- An unmerged branch alone: its commits listed first, then deleted.

@@ -2978,7 +2978,11 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   the window was shown (`update-ref -d <ref> <sha>`, and the branch's config section; not `git branch -d`, which
   measures against HEAD, not the target), merged unless it is one unmerged branch the user confirmed with the commits
   it drops (`git:branchDrops`); `git:deleteRemoteBranches` with `push --force-with-lease=<ref>:<sha> :<ref>`, so one
-  that moved on the remote is refused there. Each one kept is said, why. A card's own line is deleted by
+  that moved on the remote is refused there. Each one kept is said, why. What a branch is to the project (the target,
+  read from its options again; the folder's branch, the worktrees and slots, the board's open cards) is read for each
+  branch right before it goes, under the lock, never from the batch's first look or from before the lock (HR1's round
+  1); a remote's checks too, its push after the lock. The dialog keeps what it deleted, so Try Again after a remote's
+  failure, or a tick changed after one, asks only for what is left. A card's own line is deleted by
   `deleteMergedLine` (#1438) once the card is Done and no worktree has it checked out: in a lane that is when its slot
   moves to the next card's line, so until then it shows In use.
 

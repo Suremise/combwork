@@ -11,6 +11,7 @@ import {
   parentRepoText,
   remoteNameProblem,
   remoteUrlProblem,
+  type BranchAt,
   type GitBranchRow,
   type GitRemoteBranchRow,
   type GitRepoInfo,
@@ -346,6 +347,9 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
    */
   const cleanUp = async (offer: CleanupOffer, target: string): Promise<void> => {
     let picked: CleanupOffer = { local: offer.local, remote: [] }
+    // What is deleted already (#1642 round 2): a retry after a failure, or a tick changed after one, never asks for it
+    // again, so a remote that failed is tried again on its own.
+    const done = new Set<string>()
     await confirm({
       title: tr(C.cleanUpTitle),
       message: tr(C.cleanUpMessage, { target }),
@@ -356,13 +360,19 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
       danger: true,
       run: async () => {
         // Each part said as it is done: a remote's failure (shown in the dialog) never hides the local branches deleted.
+        const asked = ({ name, sha }: BranchAt): BranchAt => ({ name, sha })
+        const local = picked.local.filter((b) => !done.has(`local:${b.name}`))
+        const remote = picked.remote.filter((r) => !done.has(`remote:${r.name}`))
         try {
-          if (picked.local.length) {
-            notify('success', await call('git:deleteBranches', project.path, picked.local.map(({ name, sha }) => ({ name, sha }))))
-            // Done: a retry after a remote's failure doesn't ask for them again.
-            picked = { ...picked, local: [] }
+          if (local.length) {
+            notify('success', await call('git:deleteBranches', project.path, local.map(asked)))
+            for (const b of local) done.add(`local:${b.name}`)
           }
-          for (const remote of [...new Set(picked.remote.map((r) => r.remote))]) notify('success', await call('git:deleteRemoteBranches', project.path, remote, picked.remote.filter((r) => r.remote === remote).map(({ name, sha }) => ({ name, sha }))))
+          for (const name of [...new Set(remote.map((r) => r.remote))]) {
+            const mine = remote.filter((r) => r.remote === name)
+            notify('success', await call('git:deleteRemoteBranches', project.path, name, mine.map(asked)))
+            for (const r of mine) done.add(`remote:${r.name}`)
+          }
         } finally {
           bumpGit(project.path)
         }

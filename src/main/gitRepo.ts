@@ -872,30 +872,18 @@ const branchNameOk = async (projectPath: string, name: string): Promise<boolean>
 export async function deleteBranches(projectPath: string, items: BranchAt[], unmerged = false): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
   if (!Array.isArray(items) || !items.length || (unmerged && items.length !== 1)) throw new HiveError({ lines: ['git:deleteBranches takes branches, and one when unmerged'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
-  const workTarget = await workTargetOf(projectPath)
   return oneAtATime(projectPath, () =>
     withRepoLock(
       projectPath,
       async () => {
-        const s = await summaryOf(projectPath)
-        const targets = await branchTargets(projectPath, workTarget)
-        if (!targets.target) throw refusal(B.noTarget, { target: workTarget || targets.defaultBranch || '' })
-        const target = targets.target
-        const wts = await git(projectPath, ['worktree', 'list', '--porcelain'])
-        if (!wts.ok) throw commandFailed('git worktree list', wts) // i18n-ignore: a git command, as it is
-        const worktrees = parseWorktrees(wts.out)
-        const busy = cardLines(projectPath)
+        await summaryOf(projectPath)
+        await targetOrRefuse(projectPath)
         const deleted: string[] = []
         const notes: Text[] = []
         for (const { name, sha } of items) {
           const branch = String(name ?? '')
           if (!(await branchNameOk(projectPath, branch))) {
             notes.push(kept('invalid', branch))
-            continue
-          }
-          const use = localUse({ name: branch, current: branch === s.branch, worktree: worktrees.find((w) => w.branch === branch)?.path ?? null }, targets, busy)
-          if (use) {
-            notes.push(kept(use, branch))
             continue
           }
           const head = await git(projectPath, ['rev-parse', '--verify', '-q', `refs/heads/${branch}^{commit}`])
@@ -907,8 +895,19 @@ export async function deleteBranches(projectPath: string, items: BranchAt[], unm
             notes.push(kept('moved', branch))
             continue
           }
-          if (!unmerged && !(await git(projectPath, ['merge-base', '--is-ancestor', sha, `refs/heads/${target}`])).ok) {
-            notes.push(kept('unmerged', branch, target))
+          // Its use read now, right before it goes (#1642 round 2): never the batch's first look, nor one from before
+          // the lock (the target changed while it waited, an open card took an earlier item's neighbour meanwhile).
+          const now = await branchUseNow(projectPath, branch)
+          if (now.why) {
+            notes.push(kept(now.why, branch))
+            continue
+          }
+          if (!now.target) {
+            notes.push(withValues(B.noTarget, { target: now.defaultBranch ?? '' }))
+            continue
+          }
+          if (!unmerged && !(await git(projectPath, ['merge-base', '--is-ancestor', sha, `refs/heads/${now.target}`])).ok) {
+            notes.push(kept('unmerged', branch, now.target))
             continue
           }
           const r = await git(projectPath, ['update-ref', '-d', `refs/heads/${branch}`, sha])
@@ -933,57 +932,64 @@ export async function deleteBranches(projectPath: string, items: BranchAt[], unm
  * Deletes branches on a remote (#1642, `git push --delete`, outward-facing: the window asks for each with its own tick):
  * each named as the window has it (nas/hive/hb1), only merged into the project's target, never the remote's default
  * branch, the target or the default branch, nor one whose local branch is in use, and only at the commit the user was
- * shown (`--force-with-lease`: a branch that moved on the remote is refused there).
+ * shown (`--force-with-lease`: a branch that moved on the remote is refused there). Each is checked under the
+ * repository's lock, its use read then (round 2); the push itself runs after it, as every push does: it may wait minutes
+ * on the remote or a sign-in, and slots are made under that lock.
  */
 export async function deleteRemoteBranches(projectPath: string, remote: string, items: BranchAt[]): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
   if (!Array.isArray(items) || !items.length) throw new HiveError({ lines: ['git:deleteRemoteBranches takes branches'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
-  const workTarget = await workTargetOf(projectPath)
   return oneAtATime(projectPath, async () => {
-    const s = await summaryOf(projectPath)
-    if (!s.remotes.includes(remote)) throw refusal(M.noRemote, { remote })
-    const targets = await branchTargets(projectPath, workTarget)
-    if (!targets.target) throw refusal(B.noTarget, { target: workTarget || targets.defaultBranch || '' })
-    const head = await git(projectPath, ['symbolic-ref', '-q', `refs/remotes/${remote}/HEAD`])
-    const remoteHead = head.ok ? head.out.trim().replace(/^refs\/remotes\//, '') : null
-    // A remote branch whose local one is in use (a slot's, a worktree's, an open card's) stays, as in the offer.
-    const wts = await git(projectPath, ['worktree', 'list', '--porcelain'])
-    if (!wts.ok) throw commandFailed('git worktree list', wts) // i18n-ignore: a git command, as it is
-    const worktrees = parseWorktrees(wts.out)
-    const busy = cardLines(projectPath)
-    const notes: Text[] = []
-    const go: { name: string; branch: string; sha: string }[] = []
-    for (const { name, sha } of items) {
-      const full = String(name ?? '')
-      const branch = full.startsWith(`${remote}/`) ? full.slice(remote.length + 1) : ''
-      if (!(await branchNameOk(projectPath, branch))) {
-        notes.push(kept('invalid', full))
-        continue
-      }
-      if (remoteKept({ branch, remoteHead: full === remoteHead }, targets)) {
-        notes.push(kept(full === remoteHead ? 'remoteHead' : branch === targets.target ? 'target' : 'default', full))
-        continue
-      }
-      const localWhy = localUse({ name: branch, current: branch === s.branch, worktree: worktrees.find((w) => w.branch === branch)?.path ?? null }, targets, busy)
-      if (localWhy) {
-        notes.push(kept(localWhy, full))
-        continue
-      }
-      const at = await git(projectPath, ['rev-parse', '--verify', '-q', `refs/remotes/${full}^{commit}`])
-      if (!at.ok) {
-        notes.push(kept('gone', full))
-        continue
-      }
-      if (at.out.trim() !== sha) {
-        notes.push(kept('moved', full))
-        continue
-      }
-      if (!(await git(projectPath, ['merge-base', '--is-ancestor', sha, `refs/heads/${targets.target}`])).ok) {
-        notes.push(kept('unmerged', full, targets.target))
-        continue
-      }
-      go.push({ name: full, branch, sha })
-    }
+    const { go, notes } = await withRepoLock(
+      projectPath,
+      async () => {
+        const s = await summaryOf(projectPath)
+        if (!s.remotes.includes(remote)) throw refusal(M.noRemote, { remote })
+        await targetOrRefuse(projectPath)
+        const head = await git(projectPath, ['symbolic-ref', '-q', `refs/remotes/${remote}/HEAD`])
+        const remoteHead = head.ok ? head.out.trim().replace(/^refs\/remotes\//, '') : null
+        const said: Text[] = []
+        const ready: { name: string; branch: string; sha: string }[] = []
+        for (const { name, sha } of items) {
+          const full = String(name ?? '')
+          const branch = full.startsWith(`${remote}/`) ? full.slice(remote.length + 1) : ''
+          if (!(await branchNameOk(projectPath, branch))) {
+            said.push(kept('invalid', full))
+            continue
+          }
+          const at = await git(projectPath, ['rev-parse', '--verify', '-q', `refs/remotes/${full}^{commit}`])
+          if (!at.ok) {
+            said.push(kept('gone', full))
+            continue
+          }
+          if (at.out.trim() !== sha) {
+            said.push(kept('moved', full))
+            continue
+          }
+          // As a local branch's: its use read now, for each (a remote branch whose local one is in use stays too).
+          const now = await branchUseNow(projectPath, branch)
+          if (remoteKept({ branch, remoteHead: full === remoteHead }, now)) {
+            said.push(kept(full === remoteHead ? 'remoteHead' : branch === now.target ? 'target' : 'default', full))
+            continue
+          }
+          if (now.why) {
+            said.push(kept(now.why, full))
+            continue
+          }
+          if (!now.target) {
+            said.push(withValues(B.noTarget, { target: now.defaultBranch ?? '' }))
+            continue
+          }
+          if (!(await git(projectPath, ['merge-base', '--is-ancestor', sha, `refs/heads/${now.target}`])).ok) {
+            said.push(kept('unmerged', full, now.target))
+            continue
+          }
+          ready.push({ name: full, branch, sha })
+        }
+        return { go: ready, notes: said }
+      },
+      { project: projectPath }
+    )
     if (!go.length) throw new HiveError(linesOf(notes))
     const r = await net(projectPath, ['push', '--porcelain', ...go.map((g) => `--force-with-lease=refs/heads/${g.branch}:${g.sha}`), '--', remote, ...go.map((g) => `:refs/heads/${g.branch}`)])
     const got = parsePushPorcelain(r.out)
@@ -996,6 +1002,29 @@ export async function deleteRemoteBranches(projectPath: string, remote: string, 
     if (!done.length) throw new HiveError(linesOf(lines))
     return shownText(linesOf(lines))
   })
+}
+
+/** The project's target read now, refusing when that branch isn't here (nothing can be measured against it). */
+async function targetOrRefuse(projectPath: string): Promise<string> {
+  const workTarget = await workTargetOf(projectPath)
+  const targets = await branchTargets(projectPath, workTarget)
+  if (!targets.target) throw refusal(B.noTarget, { target: workTarget || targets.defaultBranch || '' })
+  return targets.target
+}
+
+/**
+ * A local branch's use as it is now (#1642 round 2), read for each branch right before it is deleted: the project's
+ * target (its options read again) and default branch, the folder's branch, the worktrees and slots, the board's open
+ * cards. Under the repository's lock worktrees and slots can't change meanwhile; cards and options can only race the
+ * few git calls left before the deletion.
+ */
+async function branchUseNow(projectPath: string, branch: string): Promise<{ why: ReturnType<typeof localUse>; target: string | null; defaultBranch: string | null }> {
+  const targets = await branchTargets(projectPath, await workTargetOf(projectPath))
+  const [head, wts] = await Promise.all([git(projectPath, ['symbolic-ref', '-q', '--short', 'HEAD']), git(projectPath, ['worktree', 'list', '--porcelain'])])
+  if (!wts.ok) throw commandFailed('git worktree list', wts) // i18n-ignore: a git command, as it is
+  const worktree = parseWorktrees(wts.out).find((w) => w.branch === branch)?.path ?? null
+  const why = localUse({ name: branch, current: head.ok && head.out.trim() === branch, worktree }, targets, cardLines(projectPath))
+  return { why, ...targets }
 }
 
 /** The commits deleting an unmerged local branch drops (#1642): those not in the project's target, the newest 20, and how many. */
