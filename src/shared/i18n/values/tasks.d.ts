@@ -4,6 +4,7 @@ interface HiveMessageValues {
   'tasks.by.assistant': undefined
   'tasks.by.repair': undefined
   'tasks.by.you': undefined
+  'tasks.error.actionGone': { action: string; n: string | number }
   'tasks.error.addOwnOnly': { project: string | number }
   'tasks.error.archiveNone': undefined
   'tasks.error.archiveNumbers': undefined

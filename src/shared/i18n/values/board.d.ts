@@ -300,6 +300,7 @@ interface HiveMessageValues {
   'board.forYou.answering': undefined
   'board.forYou.approve': undefined
   'board.forYou.asDecision': undefined
+  'board.forYou.asDecisionTip': undefined
   'board.forYou.asked': { who: string; when: string | number }
   'board.forYou.checklist': undefined
   'board.forYou.chip': undefined
@@ -310,9 +311,13 @@ interface HiveMessageValues {
   'board.forYou.declineWhy': undefined
   'board.forYou.failed': undefined
   'board.forYou.heading': undefined
+  'board.forYou.offer': { action: string }
+  'board.forYou.offerReason': undefined
+  'board.forYou.offerTip': { action: string }
   'board.forYou.reply': undefined
   'board.forYou.rounds': undefined
   'board.forYou.send': undefined
+  'board.forYou.sendTip': undefined
   'board.forYou.showStuck': undefined
   'board.inbox.asks': undefined
   'board.inbox.asksWhat': { message: string | number }

@@ -87,7 +87,7 @@ import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRe
 import { workflowSummary } from './workflow/optionsForm'
 import { detect, projectPlatform } from './platform/registry'
 import { revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
-import { CATEGORY_STAGE, LOOP_STEPS, type ForYouKind } from '../shared/workflow/facts'
+import { ASK_ACTIONS, ASK_ACTIONS_MAX, CATEGORY_STAGE, LOOP_STEPS, type AskAction, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
 import { actorOf, recordDecisionsReceived } from './workflow/recorder'
 import { workflowFor } from './workflow/service'
@@ -2853,6 +2853,25 @@ function checklistField(body: any): { checklist?: string[] } {
   return { checklist: v.map((x: string) => x.trim()) }
 }
 
+/** The longest an offered action's reason is (#1630), as an override's. */
+const ASK_REASON_MAX = 1000
+
+/** The actions an ask offers the user on its card (#1630): known kinds, each once, with an optional reason. */
+function actionsField(body: any): { actions?: AskAction[] } {
+  const v = body?.actions
+  if (v === undefined || v === null) return {}
+  const bad = (): HttpError => new HttpError(400, `actions is a list of 1 to ${ASK_ACTIONS_MAX} actions, each {kind: ${ASK_ACTIONS.join(', ')}; reason?: text of at most ${ASK_REASON_MAX} characters}, each kind once.`)
+  if (!Array.isArray(v) || !v.length || v.length > ASK_ACTIONS_MAX) throw bad()
+  const out: AskAction[] = []
+  for (const x of v) {
+    if (!x || typeof x !== 'object' || !ASK_ACTIONS.includes(x.kind) || out.some((o) => o.kind === x.kind)) throw bad()
+    if (x.reason !== undefined && x.reason !== null && (typeof x.reason !== 'string' || x.reason.length > ASK_REASON_MAX)) throw bad()
+    const reason = typeof x.reason === 'string' ? x.reason.trim() : ''
+    out.push({ kind: x.kind, ...(reason ? { reason } : {}) })
+  }
+  return { actions: out }
+}
+
 const ASK_KINDS: readonly ForYouKind[] = ['approve', 'decide', 'test', 'signIn', 'other']
 
 /** Each intent's route (POST /v1/tasks/:n/<route>) and its arguments from the body; start is /start's (below). */
@@ -2873,7 +2892,7 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
     if (!ASK_KINDS.includes(askKind)) throw new HttpError(400, `Unknown kind "${String(askKind)}": ${ASK_KINDS.join(', ')}.`)
     const revision = textField(body, 'revision')
     if (revision !== undefined && (revision.length > 200 || /\s/.test(revision))) throw new HttpError(400, 'revision is one revision (a commit id), with no spaces.')
-    return { kind: 'ask', askKind, text: textField(body, 'text', true), ...(revision ? { revision } : {}), ...checklistField(body) }
+    return { kind: 'ask', askKind, text: textField(body, 'text', true), ...(revision ? { revision } : {}), ...checklistField(body), ...actionsField(body) }
   },
   cannot: (body) => ({ kind: 'cannot', rule: textField(body, 'rule', true), why: textField(body, 'why', true) }),
   request: (body) => ({ kind: 'request', text: textField(body, 'text', true) }),

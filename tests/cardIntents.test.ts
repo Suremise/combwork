@@ -652,6 +652,9 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(parse('ask', { kind: 'test', text: 'Verify this revision', revision: 'abc123', checklist: ['Install', ' Open app '] })).toEqual({ kind: 'ask', askKind: 'test', text: 'Verify this revision', revision: 'abc123', checklist: ['Install', 'Open app'] })
     expect(parse('ask', { text: 'x', revision: 'abc 123' })).toBe(400)
     for (const checklist of [[], [''], 'Install', [7], Array.from({ length: 21 }, () => 'step'), ['x'.repeat(501)]]) expect(parse('ask', { text: 'x', checklist })).toBe(400)
+    // #1630: the actions it offers, known kinds each once, their reasons trimmed (an empty one left out).
+    expect(parse('ask', { text: 'How do I close it?', actions: [{ kind: 'done', reason: ' already done by #1277 ' }, { kind: 'noCode', reason: ' ' }] })).toEqual({ kind: 'ask', askKind: 'other', text: 'How do I close it?', actions: [{ kind: 'done', reason: 'already done by #1277' }, { kind: 'noCode' }] })
+    for (const actions of [[], 'done', [{ kind: 'skipReview' }], [{ kind: 'done' }, { kind: 'done' }], [{ kind: 'done', reason: 7 }], [{ kind: 'done', reason: 'x'.repeat(1001) }], [{ kind: 'done' }, { kind: 'noCode' }, { kind: 'unblock' }, { kind: 'done' }]]) expect(parse('ask', { text: 'x', actions })).toBe(400)
     expect(parse('cannot', { rule: 'review.notAuthor' })).toBe(400)
     expect(parse('request', { text: 7 })).toBe(400)
   })

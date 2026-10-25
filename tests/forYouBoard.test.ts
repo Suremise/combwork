@@ -229,6 +229,51 @@ describe('For you on the board (#1269)', () => {
     expect((await inboxOf(w, 'a1')).filter((i) => i.text.includes('Yes, the user guide too'))).toEqual([])
   })
 
+  it("an agent's question offering Move to Done: one click moves its code card with no change to Done, the override and reason recorded, the asker told (#1630)", async () => {
+    // Done needs a review and a merge: a move past them is an override.
+    const { w } = await workspace({ ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    // HB1's HI-1624: already done by another card, so nothing to submit.
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'This was already done by #1277: how do I close it?', actions: [{ kind: 'done', reason: 'already done by #1277' }, { kind: 'noCode' }] }))
+    const req = forYou(w).items[0]
+    expect(req.actions).toEqual([{ kind: 'done', reason: 'already done by #1277' }, { kind: 'noCode' }])
+    // Only an action it offers, and never with a reply.
+    await expect(answer(w, card, req.request, { outcome: 'answered', action: 'unblock' })).rejects.toThrow(/doesn't fit the request/)
+    await expect(answer(w, card, req.request, { outcome: 'answered', action: 'done', reply: 'Done it' })).rejects.toThrow(/doesn't fit the request/)
+    const after = await answer(w, card, req.request, { outcome: 'answered', action: 'done', reason: 'already done by #1277' })
+    expect(after.column).toBe('done')
+    expect(facts(w, card).find((f) => f.kind === 'Override')?.data).toMatchObject({ by: 'user', reason: 'already done by #1277', move: expect.stringContaining('done') })
+    expect(facts(w, card).find((f) => f.kind === 'Approval')?.data).toMatchObject({ request: req.request, answer: 'answered', action: 'done', note: 'already done by #1277' })
+    expect(forYou(w).count).toBe(0)
+    const items = await inboxOf(w, 'a1')
+    expect(items.filter((i) => i.kind === 'answer')).toHaveLength(1)
+    expect(items.find((i) => i.kind === 'answer')?.text).toContain('moved it to Done (already done by #1277)')
+  })
+
+  it("an offered action the card no longer allows is refused and the question stays open; Make It No Code and Unblock do what the board does (#1630)", async () => {
+    const { w } = await workspace({ ...allOff('git'), review: 'agent', finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Unblock it?', actions: [{ kind: 'unblock' }] }))
+    const unblock = forYou(w).items[0]
+    // Not blocked: nothing to unblock, and the question is still there.
+    await expect(answer(w, card, unblock.request, { outcome: 'answered', action: 'unblock' })).rejects.toThrow(/isn't blocked/)
+    expect(forYou(w).items.map((i) => i.request)).toEqual([unblock.request])
+    await update(w, card, { blocked: 'Waiting for the key' }, b1)
+    const unblocked = await answer(w, card, unblock.request, { outcome: 'answered', action: 'unblock', reason: 'The key is in the vault' })
+    expect(unblocked.blocked).toBeNull()
+    expect(unblocked.comments.at(-1)).toMatchObject({ by: 'You', text: 'The key is in the vault' })
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'A write-up only?', actions: [{ kind: 'noCode', reason: 'a write-up' }] }))
+    const noCode = forYou(w).items[0]
+    await answer(w, card, noCode.request, { outcome: 'answered', action: 'noCode', reason: 'a write-up' })
+    expect(FactStore.forBoard(w, { project: 'p', key: 'p' }).card(card).kind).toBe('no-code')
+    expect(facts(w, card).find((f) => f.kind === 'Override')?.data).toMatchObject({ rules: ['card.kind'], reason: 'a write-up' })
+    expect(forYou(w).count).toBe(0)
+  })
+
   it("an agent's question: a decision as its answer is recorded on the card (a new generation), the asker told", async () => {
     const { w } = await workspace({ ...allOff('git'), review: 'agent', finish: 'agentMerges', folder: 'slots' })
     const card = await create(w)

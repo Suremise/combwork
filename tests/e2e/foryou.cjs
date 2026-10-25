@@ -7,7 +7,8 @@
 // you chip, the Task Board icon's count and the board's For you filter show it; Approve in the card dialog records the
 // Approval and wakes the builder; Decline (with a reason) returns the card to Active as a round; a reply to a Decide
 // question reaches the builder; S14's P4 form (with no review and the OK before merging on `ui` cards, a `ui` card
-// approved waits for your OK, then its builder is told to merge). Screenshots in both themes and in Polish. Dev build, throwaway profile, workspace and
+// approved waits for your OK, then its builder is told to merge); a question offering Move to Done (#1630) answered with
+// one click, the card in Done and the builder told. Screenshots in both themes and in Polish. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 // Dev build only (#1578): it starts this checkout's Electron itself, and Maker is a 0.9 worktree agent
 // (agents:testLegacy).
@@ -265,6 +266,30 @@ const check = (name, ok, extra = '') => {
     const toldR = () => wakes('Maker').some((w) => w.startsWith(`[Hive] ${rKey} (#${r})`) && w.includes('merge it and report the merge'))
     check('the OK given: the builder is told to merge it', !!(await lib.until(async () => toldR() && (await rSection.count()) === 0, HUNG_MS)), JSON.stringify(wakes('Maker')))
     check('nothing waits for you now', (await inv('tasks:forYou')).count === 0 && (await badge.count()) === 0)
+    await page.keyboard.press('Escape')
+
+    // #1630 (HB1's HI-1624): a card already done elsewhere; its builder offers Move to Done with a reason, one click.
+    const s = (await inv('tasks:create', { title: 'Done elsewhere', project: 'beta' })).number
+    await inv('tasks:move', s, 'doing', { agent: maker.id })
+    const sKey = (await card(s)).key
+    await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${s}`, kind: 'decide', text: 'Already done by #1277: how do I close it?', actions: [{ kind: 'done', reason: 'already done by #1277' }, { kind: 'unblock' }] })}`)
+    await openByTitle(page, s)
+    const sDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
+    await sDialog.waitFor({ timeout: HUNG_MS })
+    const sSection = sDialog.locator('[data-section="for-you"]')
+    const offer = sSection.locator('[data-offer="done"]')
+    check('an offered action shows as a button with its reason', !!(await lib.until(async () => (await offer.count()) === 1 && (await offer.locator('input').inputValue()) === 'already done by #1277', HUNG_MS)), await sSection.innerText().catch(() => ''))
+    check('…only what the card allows now (it is not blocked: no Unblock)', (await sSection.locator('[data-offer="unblock"]').count()) === 0)
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await sSection.screenshot({ path: path.join(lib.WORK, `foryou-actions-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await offer.getByRole('button', { name: 'Move to Done' }).click()
+    check('one click moves it to Done and answers the question', !!(await lib.until(async () => (await card(s))?.column === 'done' && (await inv('tasks:forYou')).count === 0, HUNG_MS)), JSON.stringify({ column: (await card(s))?.column }))
+    const chose = (await inv('tasks:facts', s)).find((f) => f.kind === 'Approval')
+    check('…recording the action and its reason', chose?.data.action === 'done' && chose?.data.note === 'already done by #1277', JSON.stringify(chose))
+    check('…and the builder hears what was chosen', !!(await lib.until(async () => wakes('Maker').some((w) => w.startsWith(`[Hive] ${sKey} (#${s})`) && w.includes('moved it to Done (already done by #1277)')), HUNG_MS)), JSON.stringify(wakes('Maker')))
   } finally {
     await app.close()
   }

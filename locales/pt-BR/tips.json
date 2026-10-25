@@ -156,6 +156,8 @@
   "tips.followUpCheck.title": "Peça a verificação de um acompanhamento sem nova rodada",
   "tips.forYou.text": "Um cartão com o selo Para você aguarda você: uma aprovação, uma decisão ou uma pergunta. O ícone do Quadro de tarefas conta esses cartões, e Para você no quadro mostra só eles. Abra o cartão para aprovar, recusar ou responder: o agente que aguarda fica sabendo na hora.",
   "tips.forYou.title": "Responda ao que aguarda você",
+  "tips.forYouActions.text": "Quando a pergunta de um agente é sobre algo que só você pode fazer no cartão dele, ele pode oferecer isso como um botão sob a pergunta: Mover para Concluído, Tornar sem código ou Desbloquear, com o motivo sugerido, que você pode mudar. Um clique faz isso e responde o agente.",
+  "tips.forYouActions.title": "Responda com um clique",
   "tips.gitCheck.text": "Ajuda → Configuração de agentes… mostra o git que o Hive encontrou e a versão dele. Agentes em worktree, o merge e as seções Git da aba Controle de versão precisam do Git for Windows 2.38 ou posterior.",
   "tips.gitCheck.title": "O git está pronto para worktrees?",
   "tips.gitInit.text": "Um projeto sem git? Inicializar repositório…, na aba Controle de versão dele, transforma o projeto em um repositório na main, mantém o .hive de fora, adiciona um .gitignore inicial se você quiser e faz o primeiro commit, para que os agentes possam trabalhar em worktrees na hora.",

@@ -1,7 +1,7 @@
 import { join } from 'path'
 import type { StoredText, TaskCard, TaskPatch } from '../shared/types'
 import type { IntentDone } from '../shared/toolReplies'
-import type { ForYouKind, LoopStepId } from '../shared/workflow/facts'
+import type { AskAction, ForYouKind, LoopStepId } from '../shared/workflow/facts'
 import { boardLock, getTask, loopStepNote, readTask, requestNote, runIntent, WorkflowRefusedError, type TaskActor } from './tasks'
 import { actorOf } from './workflow/recorder'
 import { isRefusal, type Moved, type Reply, type Workflow } from './workflow/runtime'
@@ -32,7 +32,7 @@ export type CardIntent =
   | { kind: 'startReview'; submission?: number }
   | { kind: 'verdict'; submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string }
   | { kind: 'reportMerge'; result?: string }
-  | { kind: 'ask'; askKind: ForYouKind; text: string; revision?: string; checklist?: string[] }
+  | { kind: 'ask'; askKind: ForYouKind; text: string; revision?: string; checklist?: string[]; actions?: AskAction[] }
   | { kind: 'cannot'; rule: string; why: string }
   | { kind: 'request'; text: string }
   /** A card loop's step (#1382, #1467): a design or a follow-up for the reviewer's check, its answer, or going ahead unchecked. */
@@ -101,7 +101,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'reportMerge':
         return w.reportMerge(named, who, { ...(intent.result ? { result: intent.result } : {}) })
       case 'ask':
-        return w.askTheUser(named, who, { kind: intent.askKind, text: intent.text, ...(intent.revision ? { revision: intent.revision } : {}), ...(intent.checklist?.length ? { checklist: intent.checklist } : {}) })
+        return w.askTheUser(named, who, { kind: intent.askKind, text: intent.text, ...(intent.revision ? { revision: intent.revision } : {}), ...(intent.checklist?.length ? { checklist: intent.checklist } : {}), ...(intent.actions?.length ? { actions: intent.actions } : {}) })
       case 'cannot':
         return w.cannotWithinRules(named, who, { rule: intent.rule, why: intent.why })
       case 'request':

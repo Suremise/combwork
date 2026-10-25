@@ -2,6 +2,7 @@
   "tasks.by.assistant": "Assistant",
   "tasks.by.repair": "Repair",
   "tasks.by.you": "You",
+  "tasks.error.actionGone": "{action, select, done {#{n} is already in Done.} noCode {#{n} is already no code.} other {#{n} isn't blocked.}} Answer the question with a reply instead.",
   "tasks.error.addOwnOnly": "You can add cards only to your project ({project}).",
   "tasks.error.archiveNone": "cards: list the cards to archive.",
   "tasks.error.archiveNumbers": "cards: card numbers only.",

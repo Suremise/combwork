@@ -8865,6 +8865,23 @@ body.pane-resizing-v .monaco-editor {
   align-items: center;
   gap: 6px;
 }
+.for-you-offers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-block-end: 8px;
+}
+/* An action an agent's question offers (#1630): its button, then the reason it is done with. */
+.for-you-offer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-inline-size: 0;
+}
+.for-you-offer .input {
+  flex: 1;
+  min-inline-size: 0;
+}
 .for-you-rounds input {
   inline-size: 64px;
   margin-inline-start: 6px;
