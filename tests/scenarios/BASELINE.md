@@ -36,6 +36,13 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## Ack with the next read (#1608): the three fakes, fixtures v90, 25 October 2026
+
+Codex's #1537 trial acked two messages in a call of their own. `hive_inbox`'s description now says to ack the ids you've
+acted on in your next hive_inbox call, not in a call of their own (the tool owns it; work-on-card doesn't repeat it).
+The check is unchanged: inbox-ack-and-read passes on the three fakes (`2026-10-25T16-44-54-fake`,
+`2026-10-25T16-45-34-fake-codex`, `2026-10-25T16-46-10-fake-copilot`). The real rerun is #1539's final step.
+
 ## A refusal's next step is the task's (#1609): the three fakes, fixtures v90, 25 October 2026
 
 Claude Code's #1537 trial asked the user rather than commit when `hive_submit` was refused ("Commit the work, then
