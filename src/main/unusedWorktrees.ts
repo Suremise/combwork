@@ -19,6 +19,7 @@ import { mergeInProject, reserveForRemoval } from './projectAgents'
 import { workspace, workspaceOf, type WorkspaceService } from './workspace'
 import * as wt from './worktrees'
 import { FactStore } from './workflow/factStore'
+import { isQueueFolder } from './workflow/queueRunner'
 
 const log = createLogger('worktrees')
 
@@ -45,22 +46,44 @@ async function unsafe(projectPath: string, path: string): Promise<string | null>
 }
 
 /**
- * The merge queue's folders a running runner holds now (#1360): never offered, whoever's Hive runs it. A folder of a
- * runner whose process has gone (it crashed), or kept for the next one, is an unused worktree like any other.
+ * Whether a target's merge queue still needs its folder (#1644: queueRunner's `queueFolderNeeded` on the project's
+ * workflow). The app gives its own (index.ts), so this module never loads the workflow's wiring; unset (unit tests), or
+ * when it can't say, the queue needs it: its folders are never offered then.
  */
-function queueFoldersInUse(projectPath: string): Set<string> {
+type QueueNeed = (ws: WorkspaceService, projectPath: string, target: string) => Promise<boolean>
+let queueNeed: QueueNeed | null = null
+export function setQueueNeed(fn: QueueNeed | null): void {
+  queueNeed = fn
+}
+
+/**
+ * The merge queue's folders (#1360, #1644), by the queue's records: `used`, those its queue uses (a running runner holds
+ * it, whoever's Hive runs it, or the queue still needs it: a released runner keeps it warm for the next merge), never
+ * listed; `leftover`, recorded ones it no longer needs, listed as the queue's. Null when the records can't be read: then
+ * no folder named as the queue names them is listed.
+ */
+async function queuePlaces(projectPath: string): Promise<{ used: Set<string>; leftover: Set<string> } | null> {
+  const ws = workspaceOf(projectPath)
+  let folders: { folder: string; target: string; held: boolean }[]
   try {
-    const store = FactStore.forBoard(workspaceOf(projectPath), { project: basename(projectPath), key: basename(projectPath) })
-    const out = new Set<string>()
-    for (const f of store.queueFolders()) {
+    const store = FactStore.forBoard(ws, { project: basename(projectPath), key: basename(projectPath) })
+    folders = store.queueFolders().map((f) => {
       const holder = f.lease ? store.queueLease(f.target) : null
-      if (holder && holder.lease === f.lease && running(holder.pid)) out.add(key(f.folder))
-    }
-    return out
-  } catch {
-    // A board still 0.9's (no queue tables), or none open: no queue runs.
-    return new Set()
+      return { folder: f.folder, target: f.target, held: !!holder && holder.lease === f.lease && running(holder.pid) }
+    })
+  } catch (e) {
+    // A board still 0.9's (no queue tables, and no queue folders), or one that can't be read now.
+    log.warn(`reading ${userText(basename(projectPath))}'s merge queue folders for its unused worktrees`, e)
+    return null
   }
+  const out = { used: new Set<string>(), leftover: new Set<string>() }
+  const needs = new Map<string, Promise<boolean>>()
+  for (const f of folders) {
+    let need = needs.get(f.target)
+    if (!need) needs.set(f.target, (need = queueNeed ? queueNeed(ws, projectPath, f.target).catch((e) => (log.warn(`whether ${userText(basename(projectPath))}'s merge queue needs its folder`, e), true)) : Promise.resolve(true)))
+    ;(f.held || (await need) ? out.used : out.leftover).add(key(f.folder))
+  }
+  return out
 }
 
 /** Whether a process with this id runs (a quick look: a pid given again keeps a folder hidden, never shows a used one). */
@@ -153,11 +176,18 @@ async function candidates(projectPath: string, reads?: wt.RepoReads): Promise<{ 
     const w = legacyWorktree(a)
     return w ? [key(w.path)] : []
   })
-  const used = new Set([...legacy, ...queueFoldersInUse(projectPath)])
+  const queue = await queuePlaces(projectPath)
+  const queueRoot = join(workspaceOf(projectPath).worktreesRoot, basename(projectPath))
+  const used = new Set([...legacy, ...(queue?.used ?? [])])
   const listed: Candidate[] = []
   for (const w of all) {
     if (key(w.path) === key(projectPath) || used.has(key(w.path)) || !existsSync(w.path)) continue
     if (await unsafe(projectPath, w.path)) continue
+    // The queue's left over, or one named as it names them that it has no record of (#1644): listed as the queue's.
+    if (queue?.leftover.has(key(w.path)) || isQueueFolder(queueRoot, w.path)) {
+      if (queue) listed.push({ ...w, kind: 'queue' })
+      continue
+    }
     const slot = places.slots.get(key(w.path))
     if (slot) {
       if (slot.kind) listed.push({ ...w, kind: slot.kind, slot: slot.name })

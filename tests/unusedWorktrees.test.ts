@@ -30,7 +30,7 @@ vi.mock('../src/main/git', async (importOriginal) => {
   return { ...real, git: ((cwd, args, ...rest) => (failing?.(args) ? failed() : real.git(cwd, args, ...rest))) as typeof real.git }
 })
 
-const { PREVIEW_MS, mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchStatus, unusedWorktreeCounts, unusedWorktrees } = await import('../src/main/unusedWorktrees')
+const { PREVIEW_MS, mergeUnused, removalPreview, removeUnusedWorktree, setQueueNeed, unusedBranchStatus, unusedWorktreeCounts, unusedWorktrees } = await import('../src/main/unusedWorktrees')
 const { createWorktree } = await import('../src/main/worktrees')
 const { addAgent, reserveForRemoval, worktreeChecks } = await import('../src/main/projectAgents')
 const { gitTestHooks } = await import('../src/main/git')
@@ -192,21 +192,62 @@ describe('listing', () => {
     expect(existsSync(t.path)).toBe(true)
   })
 
-  it("the merge queue's folder isn't listed while a running runner holds it (#1360); once that runner's process has gone, it is", async () => {
+  it("the merge queue's folder is never listed while its queue uses it: a running runner holds it (#1360), or the queue still needs it (#1644)", async () => {
     const { FactStore } = await import('../src/main/workflow/factStore')
     const { boardWrite } = await import('../src/main/boardStore')
     const store = FactStore.forBoard(w, { project: 'proj', key: 'proj' })
     const lease = `ab${++n}`
     const t = join(root, `queue-0123456789ab-${lease}`)
     git(proj, 'worktree', 'add', '-q', '--detach', t)
-    const held = { target: 'main', lease, token: 't1', profile: 'Hive-Dev', pid: process.pid, started: 1, takenAt: '2026-10-21T00:00:00.000Z', renewedAt: '2026-10-21T00:00:00.000Z' }
-    await run(() => boardWrite(w, async () => store.takeQueueLease(held, null) && store.setQueueFolder({ folder: t, target: 'main', lease })))
-    expect(await find(t)).toBeUndefined()
-    // Its Hive crashed: the lease names a process that has ended.
-    const ended = execFileSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))'], { encoding: 'utf8', env: { SystemRoot: process.env.SystemRoot ?? '' } })
-    await run(() => boardWrite(w, async () => store.takeQueueLease({ ...held, token: 't2', pid: Number(ended) }, 't1')))
-    expect(await find(t)).toMatchObject({ branch: null })
-    await run(() => boardWrite(w, async () => store.dropQueueLease(lease, 't2')))
+    const needs: string[] = []
+    let need: boolean | Error = false
+    setQueueNeed(async (_ws, p, target) => {
+      needs.push(`${placeKey(p) === placeKey(proj) ? 'proj' : p}:${target}`)
+      if (need instanceof Error) throw need
+      return need
+    })
+    try {
+      const held = { target: 'main', lease, token: 't1', profile: 'Hive-Dev', pid: process.pid, started: 1, takenAt: '2026-10-21T00:00:00.000Z', renewedAt: '2026-10-21T00:00:00.000Z' }
+      await run(() => boardWrite(w, async () => store.takeQueueLease(held, null) && store.setQueueFolder({ folder: t, target: 'main', lease })))
+      // Its runner merging in it: not listed, not removable, even though nothing else needs it.
+      expect(await find(t)).toBeUndefined()
+      await expect(run(() => removalPreview(proj, t))).rejects.toThrow(/Hive doesn't remove it/)
+      expect(existsSync(t)).toBe(true)
+      // Its Hive crashed (the lease names a process that has ended): the queue's, while the queue needs it.
+      const ended = execFileSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))'], { encoding: 'utf8', env: { SystemRoot: process.env.SystemRoot ?? '' } })
+      await run(() => boardWrite(w, async () => store.takeQueueLease({ ...held, token: 't2', pid: Number(ended) }, 't1')))
+      need = true
+      expect(await find(t)).toBeUndefined()
+      // Released cleanly and kept warm for the next merge (Darren's case): still the queue's while it needs it.
+      await run(() => boardWrite(w, async () => store.dropQueueLease(lease, 't2') && store.setQueueFolder({ folder: t, target: 'main', lease: null })))
+      expect(await find(t)).toBeUndefined()
+      await expect(run(() => removalPreview(proj, t))).rejects.toThrow(/Hive doesn't remove it/)
+      // Whether it does can't be said: kept, never offered.
+      need = new Error('no workflow')
+      expect(await find(t)).toBeUndefined()
+      // Nothing waits to merge into main any more: left over, listed as the queue's.
+      need = false
+      expect(await find(t)).toMatchObject({ branch: null, kind: 'queue' })
+      expect((await run(() => removalPreview(proj, t))).path).toBeTruthy()
+      expect(needs).toContain('proj:main')
+      // No way of asking (the app not wired): the queue needs it.
+      setQueueNeed(null)
+      expect(await find(t)).toBeUndefined()
+    } finally {
+      setQueueNeed(null)
+      await run(() => boardWrite(w, async () => store.dropQueueFolder(t)))
+    }
+    // A folder named as the queue names them, with no record of it: listed as the queue's, never as a plain worktree.
+    expect(await find(t)).toMatchObject({ kind: 'queue' })
+  })
+
+  it("a review copy is never listed; a folder named as the queue names them, with no record, is listed as the queue's (#1644)", async () => {
+    const copy = join(root, 'copies', `copy-${++n}`)
+    git(proj, 'worktree', 'add', '-q', '--detach', copy)
+    const q = join(root, `queue-0123456789ab-cd${n}`)
+    git(proj, 'worktree', 'add', '-q', '--detach', q)
+    expect(await find(copy)).toBeUndefined()
+    expect(await find(q)).toMatchObject({ kind: 'queue' })
   })
 
   // Read-only check loops share one operation's reads (#733): the project's worktree list, its main branch (its branches

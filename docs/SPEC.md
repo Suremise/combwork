@@ -2944,7 +2944,10 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   (with Open: the Changes tab shows a detached slot's changes too); free `ready` slots beyond the pool's size, least
   recently used first; a slot whose newest lease is an ended `carried` one; a retired home once no session record of an
   agent the project still has is in it. Never a lent slot, one with an open carried lease, one with an operation, an
-  unsettled job or a writer, anything in the project's `copies` folder, or a queue folder with a living lease. A slot
+  unsettled job or a writer, anything in the project's `copies` folder, or a queue folder its queue uses (#1644: by its record, a living lease, or
+  `queueFolderNeeded` on the project's workflow, the folder a released runner keeps warm; not known, used). A recorded
+  queue folder its queue no longer needs, and one named as the queue names them with no record, are listed as
+  `queue` ("merge queue's old folder, not needed now"); while the records can't be read, neither is. A slot
   row's Remove is `SlotPool.remove` (the archive command first; kept with the guard's reason, worded in the window's
   language), its verdict shown before as `SlotPool.check` (the same guards without the rename probe); never Remove
   anyway (its preview is refused). No row offers Give to an agent any more (#1555). "Remove all merged" takes the same rows. Every removal and

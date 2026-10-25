@@ -505,6 +505,7 @@
   "workspace.unused.kind.carried": "ancien worktree d’un agent, abandonné",
   "workspace.unused.kind.dirtySlot": "emplacement avec modifications, non prêté",
   "workspace.unused.kind.home": "ancien dossier, plus aucune conversation",
+  "workspace.unused.kind.queue": "ancien dossier de la file de fusion, plus nécessaire",
   "workspace.unused.kind.slot": "emplacement libre en surnombre",
   "workspace.unused.lostCommits": "{count, plural, one {# commit sur {branch} absent} many {# commits sur {branch} absents} other {# commits sur {branch} absents}} {known, select, yes {de la branche {into}} other {de toute autre branche}}",
   "workspace.unused.lostDetached": "{count, plural, one {# commit sur aucune branche (seule sa HEAD détachée l’a)} many {# commits sur aucune branche (seule sa HEAD détachée les a)} other {# commits sur aucune branche (seule sa HEAD détachée les a)}}",

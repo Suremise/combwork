@@ -41,6 +41,7 @@ const M = {
   kindDirtySlot: msg({ id: 'workspace.unused.kind.dirtySlot', defaultMessage: 'slot with changes, not lent', description: "What an unused worktree is (#1450): one of Hive's slots, left with uncommitted or untracked files and lent to no card. Lower case: a badge after its name." }),
   kindCarried: msg({ id: 'workspace.unused.kind.carried', defaultMessage: "agent's old worktree, given up", description: "What an unused worktree is (#1450): an agent's 0.9 worktree Hive carried into the slots (a carried lease), whose lease has ended. Lower case: a badge after its name." }),
   kindHome: msg({ id: 'workspace.unused.kind.home', defaultMessage: 'retired home, no conversation left', description: "What an unused worktree is (#1450): an agent's old folder kept so its conversations could resume (a reviewer's old worktree, say), none of which can now. Lower case: a badge after its name." }),
+  kindQueue: msg({ id: 'workspace.unused.kind.queue', defaultMessage: "merge queue's old folder, not needed now", description: "What an unused worktree is (#1644): a folder the merge queue tested merges in, kept after its last merge, which no merge waiting or card in progress needs now (the queue makes a new one when it does). Lower case: a badge after its name. Glossary: merge queue." }),
   workNotice: msg({ id: 'workspace.unused.workNotice', defaultMessage: "{count, plural, one {# unused worktree has} other {# unused worktrees have}} work that isn't on {known, select, yes {{into}} other {the main branch}}", description: "The Changes tab's notice on unused worktrees holding work." }),
 }
 
@@ -83,6 +84,8 @@ export function kindLabel(w: Pick<UnusedWorktree, 'kind'>): string {
       return tr(M.kindCarried)
     case 'home':
       return tr(M.kindHome)
+    case 'queue':
+      return tr(M.kindQueue)
     default:
       return ''
   }

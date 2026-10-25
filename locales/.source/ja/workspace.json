@@ -505,6 +505,7 @@
   "workspace.unused.kind.carried": "agent's old worktree, given up",
   "workspace.unused.kind.dirtySlot": "slot with changes, not lent",
   "workspace.unused.kind.home": "retired home, no conversation left",
+  "workspace.unused.kind.queue": "merge queue's old folder, not needed now",
   "workspace.unused.kind.slot": "free slot beyond the pool",
   "workspace.unused.lostCommits": "{count, plural, one {# commit} other {# commits}} on {branch} not on {known, select, yes {{into}} other {any other branch}}",
   "workspace.unused.lostDetached": "{count, plural, one {# commit on no branch (only its detached HEAD has it)} other {# commits on no branch (only its detached HEAD has them)}}",

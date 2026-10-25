@@ -645,7 +645,8 @@ async function gone(probe: ProcessProbe, targets: Listed[]): Promise<Listed[] | 
  */
 export function queueFolderNeeded(wf: Workflow, target: string, busy?: () => boolean): boolean {
   if (busy?.()) return true
-  for (const card of wf.store.cards()) {
+  // Only the cards past Todo and not Done (#1629): Unused worktrees asks too (#1644), and a board keeps every card it had.
+  for (const card of wf.store.cardsInFlight()) {
     const s = wf.state(card)
     if (s.entries.some((e) => e.target === target && (e.state === 'open' || e.state === 'started'))) return true
     if (s.started && s.stage !== 'done' && s.stage !== 'todo' && s.started.target === target && wf.rulesetOf(card, s).options.finish === 'hiveMerges') return true
