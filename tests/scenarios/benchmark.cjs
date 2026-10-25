@@ -119,6 +119,8 @@ function sampleOf(r) {
     skipped: checks.filter((c) => c.ok === null).length,
     checks: checks.slice(0, LIMITS.checks).map((c) => ({ name: clean(c.name), ok: c.ok === true ? true : c.ok === false ? false : null })),
     failedChecks: failed.slice(0, LIMITS.failedChecks).map((c) => clean(c.name)),
+    // Recorded, not checked (#1611): they never change ok, passed or failed.
+    ...(r.observations?.length ? { observations: r.observations.slice(0, LIMITS.checks).map((x) => ({ name: clean(x.name), value: x.value === true })) } : {}),
     coverage: r.coverage ?? { recording: null, dropped: 0, partial: ['not recorded by this harness'] },
     guidance: typeof r.guidance?.delivered?.guidance === 'string' ? clean(r.guidance.delivered.guidance) : null,
     skills: r.guidance?.delivered ? skills : null,
