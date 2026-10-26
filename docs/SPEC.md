@@ -2479,7 +2479,8 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    - the repository's hooks run (no `--no-verify`, AGENTS.md); a hook that fails returns the card with the hook's
      output (`IntegrationFailed`, reason `hook`);
    - **a conflict's hunks** (HI-1181, rc.4; design HI-1181/s8 and s10 checked by HR4): before the test merge, strict's
-     update or the rebase is aborted, `main/workflow/conflictRead.ts` reads each conflicted file in the queue's own
+     update or the rebase is aborted, `main/workflow/conflictRead.ts` reads each conflicted file (named as git lists them with
+     `diff --name-only -z`, never C-quoted: HR4's round 1) in the queue's own
      folder, bounded before anything is read (20 files, 256 KB a file, 1 MB in all, each read into a buffer of that size,
      never whole) and confined to it (a path that is absolute or climbs out, a link anywhere on the way, a parent whose
      real place is outside, missing, binary or not UTF-8 text: recorded with why, never read; a character cut at the
@@ -2488,7 +2489,8 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
      rest counted), lines cut at 400 characters (counted) and 16,000 characters in all, and says what stopped it
      (`partial`: read in part, the hunks, the room; an exact `more` only when the file was scanned whole). Kept on
      `IntegrationFailed` as `conflicts`, with which side git wrote first (`oursIs`: the target in a test merge and a
-     rebase, the card in strict's merge). The card's Work section unfolds each file's hunks, read-only, its sides named
+     rebase, the card in strict's merge). The card's Work section unfolds each file's hunks whenever they were captured
+     (strict's not-up-to-date return too), read-only, its sides named
      (the target, the card's key, the common ancestor); "no text conflict" only for a file read whole with no markers,
      else why or "may have more". The builder's wake names where each file's conflicts are ("a.ts (2 conflicts, lines
      10 and 40)", "b.png (not read: binary)"), within its note's room. The queue's folder is reset straight after, so
