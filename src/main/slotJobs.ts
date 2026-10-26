@@ -7,7 +7,8 @@
 //    longer be written down after the read (it ends what it can't write down instead);
 // 3. one read of it (unreadable or damaged: unknown, never empty), then every process it names that still runs (by pid
 //    and start) ended with what it started, and seen gone;
-// 4. only then its journal cleared (the seal stays), and the caller clears the slot's `job`.
+// 4. only then its journal cleared (the seal stays until its job is gone: the caller retires it, HI-1723), and the
+//    caller clears the slot's `job`.
 
 import { clearJournal, journalOf, sealJournal } from './workflow/queueJobs'
 import { treeOf, type Listed, type ProcessProbe } from './workflow/queueProcs'

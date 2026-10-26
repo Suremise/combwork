@@ -21,7 +21,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { mkdir, readdir, readFile, rename, rm, stat } from 'original-fs/promises'
+import { mkdir, readdir, readFile, rename, rm, rmdir, stat } from 'original-fs/promises'
 import { JobHost } from '../processSupervisor'
 import { createLogger } from '../logger'
 
@@ -120,6 +120,15 @@ export async function endLeaseJob(host: JobHost, lease: string): Promise<boolean
   return r === 'ended' || r === 'nojob'
 }
 
+/**
+ * Whether a lease's job is gone: no process holds it (no supervisor, this Hive's or one that outlived its Hive), so
+ * nothing can write its journal again (HI-1723). Asked as endLeaseJob does: a job still there is ended, which for a
+ * settled lease (the only kind asked) changes nothing. False when it is still held, or that can't be told.
+ */
+export async function leaseJobGone(host: JobHost, lease: string): Promise<boolean> {
+  return (await host.request('endnamed', lease)) === 'nojob'
+}
+
 /** A FILETIME (the supervisor's start times) in Unix ms. */
 export const fileTimeMs = (created: string): number => Number((BigInt(created) - 116444736000000000n) / 10000n)
 
@@ -131,7 +140,8 @@ export const fileTimeMs = (created: string): number => Number((BigInt(created) -
  * Sealing it (sealJournal) closes it to writers for good: what it held is moved aside (`<lease>.sealed-<n>`), and a
  * folder takes its name, so a supervisor that outlived its Hive and finds something more to follow can't write it down,
  * and so ends it itself instead (its fail-closed rule): no entry can arrive after the last read (HR4's design review of
- * round 5). What is moved aside stays until a settle has ended what it names; the seal stays.
+ * round 5). What is moved aside stays until a settle has ended what it names; the seal stays until the lease's job is
+ * gone, nothing holding it to write there (retireSeal, HI-1723).
  */
 export async function journalPath(root: string, lease: string, dir?: string): Promise<string> {
   const folder = dir ?? join(root, JOURNALS)
@@ -246,7 +256,8 @@ export async function sealJournal(root: string, lease: string, dir?: string): Pr
 
 /**
  * Removes a lease's journal, once what it names is seen gone: its moved-aside parts, and the journal itself unless it
- * is sealed (the seal stays: a supervisor that outlived its Hive may still try to write there).
+ * is sealed (the seal stays: a supervisor that outlived its Hive may still try to write there, until retireSeal finds
+ * its job gone).
  */
 export async function clearJournal(root: string, lease: string, dir?: string): Promise<void> {
   const folder = journalsOf(root, dir)
@@ -255,6 +266,43 @@ export async function clearJournal(root: string, lease: string, dir?: string): P
   const main = join(folder, `${lease}.followed`)
   const isFile = await stat(main).then((st) => st.isFile(), () => false)
   if (isFile) await rm(main, { force: true }).catch(() => undefined)
+}
+
+/**
+ * Removes a lease's seal once nothing can write its journal again (HI-1723: one empty folder per job, never removed,
+ * piled up): only a sealed journal already cleared (a folder, no moved-aside part left: a settle's evidence), and only
+ * when `gone` says its job is (leaseJobGone). An error, a part, anything in the folder or a job that may still be held
+ * keeps it (fail-closed). Whether it was removed.
+ */
+export async function retireSeal(root: string, lease: string, dir: string | undefined, gone: (lease: string) => Promise<boolean>): Promise<boolean> {
+  const folder = journalsOf(root, dir)
+  const names = await readdir(folder).catch(() => null)
+  return names ? retireIn(folder, names, lease, gone) : false
+}
+
+/**
+ * Removes every seal in a journals folder whose job is gone (retireSeal), one lease after another: one listing, then
+ * each its own awaited checks (async file calls and the supervisor's requests: main's thread is never held). How many.
+ */
+export async function sweepSeals(root: string, dir: string | undefined, gone: (lease: string) => Promise<boolean>): Promise<number> {
+  const folder = journalsOf(root, dir)
+  const names = await readdir(folder).catch(() => null)
+  if (!names) return 0
+  let removed = 0
+  for (const n of names) {
+    if (!n.endsWith('.followed')) continue
+    if (await retireIn(folder, names, n.slice(0, -'.followed'.length), gone)) removed++
+  }
+  return removed
+}
+
+async function retireIn(folder: string, names: string[], lease: string, gone: (lease: string) => Promise<boolean>): Promise<boolean> {
+  if (!names.includes(`${lease}.followed`) || names.some((n) => n.startsWith(`${lease}.sealed-`))) return false
+  const main = join(folder, `${lease}.followed`)
+  if (!(await stat(main).then((st) => st.isDirectory(), () => false))) return false
+  if (!(await gone(lease).catch(() => false))) return false
+  // Not recursive: a folder with anything in it isn't a seal as sealJournal makes it, and stays.
+  return rmdir(main).then(() => true, () => false)
 }
 
 // The launcher (run by Node, waiting for its go-ahead) is launcher.ts's, shared with hive-progress's isolated checks (#1435).

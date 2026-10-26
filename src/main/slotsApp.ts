@@ -34,7 +34,7 @@ import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
 import { setRetiredHomes, setWriterHost, writerHeld, writerOver } from './agentFolders'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
-import { endLeaseJob, journalPath, LeaseJob, startLauncher } from './workflow/queueJobs'
+import { endLeaseJob, journalPath, LeaseJob, leaseJobGone, retireSeal, startLauncher, sweepSeals } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
 import { workflowFor } from './workflow/service'
 import { projectAgents } from '../shared/defaults'
@@ -95,6 +95,38 @@ const probe = defaultProbe()
 /** Where a project's slot jobs keep their journals (what their supervisor follows outside them). */
 export const journalsOf = (root: string): string => join(root, '.slot-journals')
 
+/** Whether a settled lease's job is gone (HI-1723), asked of this Hive's supervisor; false with none to ask. */
+async function sealGone(lease: string): Promise<boolean> {
+  const host = processSupervisor()
+  return host.usable && (await host.ensure()) && (await leaseJobGone(host, lease))
+}
+
+/** A settled job's seal removed once its job is gone (HI-1723), after this Hive let its own handle go. */
+export function retireSealOf(root: string, job: string): void {
+  void retireSeal(root, job, journalsOf(root), sealGone).catch(() => false)
+}
+
+/** The journals folders being swept now, and the ones swept since this Hive started. */
+const sweeping = new Set<string>()
+const swept = new Set<string>()
+
+/**
+ * Removes the seals in a project's journals folder whose jobs are gone (HI-1723: an empty folder per slot or copy job
+ * piled up). One sweep a folder at a time (a call while one runs does nothing); `once`: only the first since this
+ * Hive started (a pool made).
+ */
+export function sweepSealsOf(root: string, o: { once?: boolean } = {}): void {
+  const dir = journalsOf(root)
+  const key = dir.toLowerCase()
+  if (sweeping.has(key) || (o.once && swept.has(key))) return
+  sweeping.add(key)
+  swept.add(key)
+  void sweepSeals(root, dir, sealGone)
+    .then((n) => n && log.info(`removed ${n} sealed journal(s) whose jobs are gone in ${userText(dir)}`))
+    .catch((e) => log.warn(`sweeping the sealed journals of ${userText(dir)}`, e))
+    .finally(() => sweeping.delete(key))
+}
+
 /**
  * A project's slot runs: each a run of "Hive (slot <name>)" in the Progress panel, in the job the pool recorded for it.
  * Fails closed: with no process supervisor, or its job not made, nothing runs. Its job is ended when the command
@@ -141,6 +173,7 @@ export function appRunner(ws: WorkspaceService, projectPath: string, root: strin
       // Settled as a dead holder's job would be (slotJobs.ts): ended, its journal sealed, read and what it names ended.
       const settled = await settleSlotJob({ endJob: () => job.end().catch(() => false), probe, root, dir: journalsOf(root) }, r.job).catch(() => false)
       await job.close().catch(() => undefined)
+      if (settled) retireSealOf(root, r.job)
       end = { ...end, settled, logPath: out.usable ? logPath : null }
       if (id) {
         try {
@@ -218,7 +251,11 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       builders: () => builderCountOf(projectPath, async () => projectAgents(await ws.projectConfig(projectPath)).length),
       cap: () => agentLimit(projectPath),
       runner: appRunner(ws, projectPath, root),
-      settle: appSettle(root),
+      settle: async (job) => {
+        const ok = await appSettle(root)(job)
+        if (ok) retireSealOf(root, job)
+        return ok
+      },
       holder,
       sessionIn,
       inFlight: async (card) => {
@@ -239,6 +276,8 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }), // i18n-ignore: the log's reason (English)
       renamer: renamerFor(ws, projectPath)
     })
+    // The seals of jobs settled before this Hive started (HI-1723).
+    sweepSealsOf(root, { once: true })
     return made
   })()
   pools.set(key, { life: ws.lifetime, pool })
@@ -576,6 +615,7 @@ export async function tidyOpenPools(): Promise<void> {
       await poolFor(ws, path)
         .then((p) => p.tidy())
         .catch((e) => log.warn(`tidying the slots of ${userText(path)}`, e))
+      sweepSealsOf(join(ws.worktreesRoot, basename(path)))
     }
   }
 }
