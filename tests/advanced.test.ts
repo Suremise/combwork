@@ -167,11 +167,11 @@ describe('an override', () => {
   it('is used when it checks out; else the default, saying why; a workspace\'s own comes first where one is taken', () => {
     const lanes = def('hive.progress.lanesShown')
     const state = (values: Record<string, unknown>, workspace: Record<string, unknown> | null = null) => ({ values, madeFor: {}, workspace, cli: {} })
-    expect(advancedRow(lanes, null).value).toBe(4)
+    expect(advancedRow(lanes, null).value).toBe(6)
     expect(advancedRow(lanes, state({ 'hive.progress.lanesShown': 6 })).value).toBe(6)
     expect(advancedRow(lanes, state({ 'hive.progress.lanesShown': 6 }, { 'hive.progress.lanesShown': 2 })).value).toBe(2)
     const bad = advancedRow(lanes, state({ 'hive.progress.lanesShown': 'six' }))
-    expect(bad.value).toBe(4)
+    expect(bad.value).toBe(6)
     expect(bad.problem).toMatch(/whole number/)
     const badOwn = advancedRow(lanes, state({ 'hive.progress.lanesShown': 6 }, { 'hive.progress.lanesShown': 99 }))
     expect(badOwn.value).toBe(6)

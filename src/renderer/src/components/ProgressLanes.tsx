@@ -240,26 +240,23 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
   }
   useLayoutEffect(() => {
     const el = list.current
-    const panel = el?.closest<HTMLElement>('.progress-panel')
-    const body = panel?.querySelector<HTMLElement>('.progress-body')
-    const section = el?.closest<HTMLElement>('.progress-lanes')
-    if (full || !open || !el || !body || !panel || !section) return
+    const body = el?.closest('.progress-panel')?.querySelector<HTMLElement>('.progress-body')
+    if (full || !open || !el || !body) return
     const row = el.querySelector<HTMLElement>('.progress-lane')
+    // The lanes sit at the bottom of the panel (#484, HI-1673): the room they could have is the list's height and what
+    // the runs above can give up, keeping RUNS_KEEP_PX. That sum doesn't change as the lanes shown do, so it settles at once.
     const measure = (): void => {
       if (row) {
         const h = row.getBoundingClientRect().height + parseFloat(getComputedStyle(row).marginBottom || '0')
         if (h > 0) setPitch((was) => (Math.abs(was - h) < 0.1 ? was : h))
       }
-      // The lanes follow the runs (#1309: not pinned to the bottom), so the room left below them is theirs too.
-      const below = Math.max(0, panel.getBoundingClientRect().bottom - section.getBoundingClientRect().bottom)
-      const r = el.clientHeight + body.getBoundingClientRect().height + below - RUNS_KEEP_PX
+      const r = el.clientHeight + body.getBoundingClientRect().height - RUNS_KEEP_PX
       setRoom((was) => (was !== null && Math.abs(was - r) < 1 ? was : r))
     }
     measure()
     const watch = new ResizeObserver(measure)
     watch.observe(el)
     watch.observe(body)
-    watch.observe(panel)
     if (row) watch.observe(row)
     return () => watch.disconnect()
   }, [open, lanes, width, full])

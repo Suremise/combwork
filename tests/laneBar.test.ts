@@ -311,10 +311,10 @@ describe("the user's order of lanes (#568)", () => {
 })
 
 describe("the lanes section's height (#569)", () => {
-  it('shows up to four lanes by default, and only as many as there are', () => {
-    expect(DEFAULT_LANE_ROWS).toBe(4)
-    expect([1, 2, 3, 4, 5, 9].map((n) => lanesShown(undefined, n))).toEqual([1, 2, 3, 4, 4, 4])
-    expect(lanesShown(null, 7)).toBe(4)
+  it('shows up to six lanes by default (HI-1673), and only as many as there are', () => {
+    expect(DEFAULT_LANE_ROWS).toBe(6)
+    expect([1, 2, 3, 6, 7, 9].map((n) => lanesShown(undefined, n))).toEqual([1, 2, 3, 6, 6, 6])
+    expect(lanesShown(null, 7)).toBe(6)
   })
 
   it('a kept choice wins, as whole lanes, at least one, never more than there are', () => {
@@ -325,8 +325,8 @@ describe("the lanes section's height (#569)", () => {
     expect(chosenLaneRows(0)).toBe(1)
     expect(chosenLaneRows(-4)).toBe(1)
     // A damaged value is no choice.
-    expect(chosenLaneRows(Number.NaN)).toBe(4)
-    expect(chosenLaneRows(Infinity)).toBe(4)
+    expect(chosenLaneRows(Number.NaN)).toBe(6)
+    expect(chosenLaneRows(Infinity)).toBe(6)
   })
 
   it('the most it can show: no more lanes than there are, nor than the room holds', () => {
@@ -356,7 +356,7 @@ describe("the lanes section's height (#569)", () => {
     // Room again: the choice shows.
     expect(laneRowsNow(7, 7, 1000, 61)).toEqual({ chosen: 7, shown: 7, max: 7 })
     // Not measured yet: the choice, up to the lanes there are.
-    expect(laneRowsNow(undefined, 9, null, 61)).toEqual({ chosen: 4, shown: 4, max: 9 })
+    expect(laneRowsNow(undefined, 9, null, 61)).toEqual({ chosen: 6, shown: 6, max: 9 })
     // However short, one lane.
     expect(laneRowsNow(5, 6, -40, 61)).toEqual({ chosen: 5, shown: 1, max: 1 })
   })

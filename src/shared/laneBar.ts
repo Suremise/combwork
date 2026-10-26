@@ -505,12 +505,12 @@ export function laneSummary(cards: CardSegment[]): { finished: number; total: nu
 }
 
 /**
- * How many lanes the Progress panel's lanes section shows before it scrolls (#569): up to four by default (Settings →
+ * How many lanes the Progress panel's lanes section shows before it scrolls (#569): up to six by default (Settings →
  * Advanced → Progress panel: lanes shown, and a workspace's own: #367, the `fallback` below); the user drags
  * the section's top edge (or presses Up and Down on it) for more or fewer, in whole lanes, kept per workspace. With fewer
  * lanes than that, the section is only as tall as they are.
  */
-export const DEFAULT_LANE_ROWS = 4
+export const DEFAULT_LANE_ROWS = 6
 
 /** The height the runs above keep (px) when the lanes are dragged up: about a run and a half. */
 export const RUNS_KEEP_PX = 120

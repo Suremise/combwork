@@ -116,7 +116,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     check('…and not in advanced.json', !('hive.progress.lanesShown' in readFile().values))
     const state = await inv('advanced:state')
     check('the window uses it', state.workspace?.['hive.progress.lanesShown'] === 2, JSON.stringify(state.workspace))
-    check("Settings' own value stays beside it", (await lanes.getByLabel('Hive: Progress panel: lanes shown', { exact: true }).inputValue()) === '4')
+    check("Settings' own value stays beside it", (await lanes.getByLabel('Hive: Progress panel: lanes shown', { exact: true }).inputValue()) === '6')
 
     // --- Agents per project (#562): above 12, a note on what more agents cost, in this computer's figures.
     const agentsRow = row('hive.agents.perProject')

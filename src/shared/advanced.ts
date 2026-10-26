@@ -491,7 +491,8 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.hive.progress.lanesShown.title', defaultMessage: 'Progress panel: lanes shown', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
     desc: msg({ id: 'settings.advanced.hive.progress.lanesShown.desc', defaultMessage: "How many card-loop lanes the Progress panel shows before its lanes scroll, until you drag the section's top edge (the drag is kept per workspace). A workspace that runs many lanes at once can set its own.", description: 'What the advanced setting "Progress panel: lanes shown" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
     kind: 'number',
-    default: 4,
+    // About six before they scroll (HI-1673, Darren: as on main, the lanes at the bottom growing upwards).
+    default: 6,
     min: 1,
     max: 24,
     unit: 'lanes',
