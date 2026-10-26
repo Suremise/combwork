@@ -6,6 +6,10 @@ import { cardChange, loopWakeLine, readCondition, wakeAbout, type WatchCondition
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
 
+/** The merge queue's returns as queueReturnOf finds them (HI-1721), by card: none unless a test sets one. */
+const { returns } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>() }))
+vi.mock('../src/main/queueReturn', () => ({ queueReturnOf: async (_ws: unknown, _p: string, n: number) => returns.get(n) ?? null, returnIn: () => null }))
+
 describe('loop wake lines (#405)', () => {
   const card = { number: 12, title: 'T', description: '', project: 'alpha', agent: 'b1', agentName: 'B1', column: 'review' as const, order: 1, labels: [], blocked: null, blockedBy: [], links: [], comments: [{ at: '2026-10-10T00:00:00.000Z', by: 'R1 (alpha)', text: 'Round 1: FAILED. 1. No delay.' }], history: [{ at: '2026-10-10T00:00:00.000Z', by: 'R1 (alpha)', what: 'Review failed' }], archived: false, createdAt: '2026-10-10T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-10T00:00:00.000Z' }
   it("words a reviewer's and a builder's wake as a watch's line, with what to do", () => {
@@ -693,6 +697,91 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
   // found the board changed (any card's change) by its hand-out, and kept it unread. Now a notice names only what a read
   // would give (deliveries.countable, which makes nothing again), and a read's hand-out asks only whether this wake's own
   // card, lanes and project changed: another card's change doesn't keep it from being read, a change of its own does.
+  describe('a card the merge queue returned (HI-1721)', async () => {
+    const deliveries = await import('../src/main/deliveries')
+    /** A wake as wakeFromAction makes the queue's return: a note, anchored at the card's latest entry (the return writes none). */
+    const queueReturnWake = async (w: Awaited<ReturnType<typeof open>>['w'], alpha: string, c: number, text: string) => {
+      const card = await inWorkspace(w, () => tasks.getTask(c, w))
+      const since = card.history.at(-1)!
+      await deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1 (alpha)', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, card: c, body: `[Hive] #${c}: ${text}`, source: 'loop', ref: `#${c}`, replace: true, meta: { n: c, kind: 'note', agentName: 'B1 (alpha)', sinceAt: since.at, sinceId: since.id ?? '', text } })
+    }
+
+    it("HI-1694's sequence: the builder's watch told it the pass; the return comes, and a watch for Done begins before it reads it: the return is still given, and the builder told of the conflict", async () => {
+      await loopWakes.clearLoopWakes()
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const c = await newCard(w)
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      await typedUntil(st, 1)
+      // B1 watches for its verdict; R1 passes it: the watch's line tells B1 the card is in Passed (its told boundary).
+      st.status.set('b1', 'watching')
+      await watches.registerWatch(w, alpha, 'b1', { cards: [c], changes: ['verdict', 'column', 'comment'], column: 'passed' })
+      st.status.set('r1', 'working')
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 1: PASSED.' }))
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.typed.filter((t) => t.agent === 'b1').map((t) => t.text).join('\n')).toMatch(/is in Passed/), HANG)
+      await settled()
+      const before = st.typed.length
+      // The queue returns it with a conflict (a wake anchored at the entry B1's watch has read), and B1, still acting on
+      // the pass, starts a watch for Done before it reads that.
+      const conflict = `#${c} came back from the merge queue: a conflict with main in src/a.ts. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).`
+      st.status.set('b1', 'watching')
+      await queueReturnWake(w, alpha, c, conflict)
+      await watches.registerWatch(w, alpha, 'b1', { cards: [c], changes: ['column'], column: 'done' })
+      await typedUntil(st, before + 1)
+      expect(st.typed.at(-1)).toMatchObject({ agent: 'b1', text: expect.stringContaining('came back from the merge queue: a conflict with main in src/a.ts') })
+      await disposeWorkspaceService(w)
+    })
+
+    it('a watch begun on its own returned card for another column tells the builder of the return at once, from the card as it is; not one for Doing, nor another agent\'s card', async () => {
+      await loopWakes.clearLoopWakes()
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const c = await newCard(w)
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+      const text = `#${c} came back from the merge queue: a conflict with main in src/b.ts. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).`
+      returns.set(c, { at: new Date().toISOString(), text, builder: 'b1' })
+      try {
+        // For Doing (where it already waits): nothing more; R1 watching it: not R1's card to fix.
+        st.status.set('r1', 'watching')
+        await watches.registerWatch(w, alpha, 'r1', { cards: [c], changes: ['column'], column: 'done' })
+        st.status.set('b1', 'watching')
+        await watches.registerWatch(w, alpha, 'b1', { cards: [c], changes: ['column'], column: 'doing' })
+        await settled()
+        expect(st.typed).toEqual([])
+        // For Done: told of the return now.
+        await watches.registerWatch(w, alpha, 'b1', { cards: [c], changes: ['column'], column: 'done' })
+        await typedUntil(st, 1)
+        expect(st.typed[0]).toMatchObject({ agent: 'b1', text: expect.stringContaining('came back from the merge queue: a conflict with main in src/b.ts') })
+      } finally {
+        returns.delete(c)
+      }
+      await disposeWorkspaceService(w)
+    })
+
+    it("the user's answer stays due until the agent reads it, though it acted on the card meanwhile (HI-1694's m4917)", async () => {
+      await loopWakes.clearLoopWakes()
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const c = await newCard(w)
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+      const card = await inWorkspace(w, () => tasks.getTask(c, w))
+      const since = card.history.at(-1)!
+      st.status.set('b1', 'working')
+      await deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1 (alpha)', kind: 'answer', from: { kind: 'user', name: 'the user' }, card: c, body: 'Defender excludes Tools.', source: 'loop', ref: `#${c}/answer`, meta: { n: c, kind: 'answer', agentName: 'B1 (alpha)', sinceAt: since.at, sinceId: since.id ?? '', text: 'Defender excludes Tools.', to: 'b1' } })
+      // B1 submits its next round before it reads the answer.
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      st.status.set('b1', 'ready')
+      await vi.waitFor(async () => {
+        await loopWakes.tryLoopWakes()
+        expect(st.typed.filter((t) => t.agent === 'b1').map((t) => t.text).join('\n')).toContain('Defender excludes Tools.')
+      }, HANG)
+      await disposeWorkspaceService(w)
+    })
+  })
+
   describe('what the notices name, hive_inbox gives (HI-1687)', async () => {
     const deliveries = await import('../src/main/deliveries')
     const { noticeFor } = await import('../src/main/inboxNotices')

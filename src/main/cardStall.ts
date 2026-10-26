@@ -4,6 +4,7 @@ import { agentRuntime } from '../shared/runtime'
 import { columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, type LaneOrderView } from '../shared/tasks'
 import type { TaskCard } from '../shared/types'
 import { loopStepWaitMinutes } from '../shared/lanes'
+import { queueReturnOf } from './queueReturn'
 import { isResuming } from './restartResume'
 import { sessions } from './sessions'
 import { workspaceOf, type WorkspaceService } from './workspace'
@@ -14,8 +15,30 @@ import { workspaceOf, type WorkspaceService } from './workspace'
  * a reviewer that watches it but hasn't started (#521), or on one that started and only watches it, with no verdict (#843),
  * or one whose lane is deadlocked, its reviewer waiting for another of its cards while its builder waits on it (#1410),
  * or a card whose builder waits on a check nobody gives: of its design in Doing (#1382), or of its follow-up in Review or
- * Passed (#1467). Null when it isn't.
+ * Passed (#1467), or a card the merge queue returned that its builder, idle or only watching, hasn't taken up (HI-1721).
+ * Null when it isn't.
  */
+
+/** How long a card the merge queue returned waits in Doing, its builder idle or watching, before it is stalled (HI-1721). */
+export const RETURN_STALL_MS = 15 * 60_000
+
+/**
+ * Why a card the merge queue returned to its builder is stalled (HI-1721), or null: in Doing, not blocked, unchanged for
+ * RETURN_STALL_MS since it came back, and its builder not at work on anything (idle, or only watching: HB2 watched
+ * HI-1694 for Done for three hours while it waited for HB2). A builder not running is stalledReason's. Agent-facing.
+ */
+export function returnedWaitReason(c: Pick<TaskCard, 'number' | 'key' | 'column' | 'archived' | 'blocked' | 'updatedAt'>, returned: { at: string } | null | undefined, builder: { name: string; status: string; watching: boolean } | null, now = Date.now()): string | null {
+  if (!returned || !builder || c.archived || c.blocked || c.column !== 'doing') return null
+  if (!IDLE.includes(builder.status) && !builder.watching) return null
+  const since = Math.max(Date.parse(returned.at) || 0, Date.parse(c.updatedAt) || 0)
+  if (!since || now - since < RETURN_STALL_MS) return null
+  const min = Math.round((now - since) / 60_000)
+  const name = c.key ?? `#${c.number}`
+  return `${name} came back from the merge queue ${min} min ago; ${builder.name} is ${builder.watching ? 'only watching it' : 'idle'}, not fixing it.` // i18n-ignore: agent-facing (the Agent API's stalled)
+}
+
+/** A builder's statuses with no turn going (watching counts too: returnedWaitReason). */
+const IDLE = ['ready', 'finished', 'watching']
 
 /** A workspace's live agents (by its folder): their names, projects, cards left with no watch, card watches (and since when), and how each is now. */
 function liveOf(wsPath: string): { name: string; project: string; agentId: string; notWatching?: number[]; untaken: boolean; cards: number[]; watchSince?: string; status: string; silentMinutes?: number }[] {
@@ -31,10 +54,12 @@ function liveOf(wsPath: string): { name: string; project: string; agentId: strin
  * folder, its running lane (none: no lane's deadlock is looked for), and how long a design waits for its check
  * (stepWaitMs: its project's Card loops → Design check wait).
  */
-export function cardStall(c: TaskCard, agentNow: { name: string; running: boolean } | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = loopStepWaitMinutes() * 60_000): string | null {
+export function cardStall(c: TaskCard, agentNow: { name: string; running: boolean } | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = loopStepWaitMinutes() * 60_000, returned?: { at: string } | null): string | null {
   const live = wsPath ? liveOf(wsPath) : []
   const watchers = live.filter((a) => a.cards.length)
-  return stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? reviewWaitReason(c, watchers) ?? reviewVerdictWaitReason(c, watchers) ?? laneOrderWaitReason(c, lane, watchers) ?? loopStepWaitReason(c, watchers, stepWaitMs)
+  const builder = returned && c.agent && c.project ? live.find((a) => a.agentId === c.agent && a.project.toLowerCase() === c.project!.toLowerCase()) : undefined
+  const back = builder ? returnedWaitReason(c, returned, { name: builder.name, status: builder.status, watching: builder.cards.length > 0 }) : null
+  return stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? reviewWaitReason(c, watchers) ?? reviewVerdictWaitReason(c, watchers) ?? laneOrderWaitReason(c, lane, watchers) ?? loopStepWaitReason(c, watchers, stepWaitMs)
 }
 
 /** A running lane as the stall check reads it (#1410), its cards' keys and last moves from the board's cards (`card`). */
@@ -67,5 +92,7 @@ export async function cardStallIn(ws: WorkspaceService, c: TaskCard, agents = ne
     // An agent queued to resume after a restart (HI-1707) isn't stalled meanwhile.
     now = def ? { name: def.name, running: !!sessions.liveFor(p, c.agent) || isResuming(p, c.agent) } : null
   }
-  return cardStall(c, now, ws.path, lane, await stepWaitOf(ws, c))
+  // A card in Doing with its agent: has the merge queue returned it (HI-1721)?
+  const returned = c.column === 'doing' && c.agent && c.project && ws.path ? await queueReturnOf(ws, join(ws.path, c.project), c.number) : null
+  return cardStall(c, now, ws.path, lane, await stepWaitOf(ws, c), returned)
 }

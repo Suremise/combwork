@@ -8,6 +8,8 @@ import { preset } from '../../src/shared/workflow/options'
 import { leftWake, NOT_RUN_HERE, pauseWait, queueLine, type PauseWait, queueOrder, queueStateOf, returnedText, WAKE_NOTE_MAX, type QueueLive } from '../../src/main/workflow/queueState'
 import { keptLog, KEPT_LOG, type PauseReason } from '../../src/main/workflow/mergeQueue'
 import { refusalLines } from '../../src/shared/workflow/refusals'
+import { returnIn } from '../../src/main/queueReturn'
+import { agentOf } from '../../src/shared/workflow/facts'
 import { laneNextText } from '../../src/shared/lanes'
 import { cardChange, loopWakeLine } from '../../src/shared/watch'
 import type { FactData } from '../../src/shared/workflow/facts'
@@ -164,6 +166,21 @@ describe('with workflow rules off (Settings → Advanced)', () => {
 })
 
 describe('wakes at each queue outcome (what came back and what to do)', () => {
+  it("a card the queue returned waits for its builder, as its facts say (HI-1721's returnIn): when, its wake, its builder; none once it is submitted again, queued or merged", async () => {
+    const e = team()
+    const { card, folder } = await queued(e, 'Back')
+    expect(returnIn(e.wf, card.id)).toBeNull()
+    await e.queue({ runCheck: async () => ({ ok: false, output: '1 failing' }) }).drain('main')
+    const back = returnIn(e.wf, card.id)
+    expect(back).toMatchObject({ builder: agentOf(B1), text: e.wakes.find((w) => w.card === card.key && w.why.includes('merge queue'))!.why })
+    expect(Date.parse(back!.at)).toBeGreaterThan(0)
+    // Fixed and submitted again: not waiting for its builder any more.
+    commit(folder, { 'src/fix.txt': 'fix\n' }, `${card.key}: fix`)
+    moved(await e.wf.submit(card.key, B1, { summary: 'fixed' }))
+    expect(returnIn(e.wf, card.id)).toBeNull()
+    expect(returnIn(e.wf, 99999)).toBeNull()
+  })
+
   it('red checks: the check, its log, its last lines and the next step; within the wake line', async () => {
     const e = team()
     const { card } = await queued(e)

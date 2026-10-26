@@ -128,6 +128,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **A card the merge queue sends back reaches its builder.** A builder that started watching its card before reading that the queue had returned it (a conflict) was never told, and waited for Done while the card waited for it. The return is now always given, a builder that starts watching its own returned card is told of it at once, and a lane whose returned card sits for 15 minutes with its builder idle or only watching counts as stalled. Your answer to an agent is no longer dropped when the agent moves its card on before reading it (HI-1721).
 - **Retry merge is offered only when it can run.** A card waiting for its reviewer to check a follow-up no longer shows a Retry merge that is then refused, and a card already retried for its revision says a new revision is the way back. The confirmation only mentions "once per revision" after a return, where that limit applies (HI-1667).
 - **Hive's log names what held it up.** A pause's line in hive.log now names a database step or log write that waited for the disk, and a pause of all of Hive (the PC or the process paused) is no longer counted as busy (HI-1692).
 - **Saving the board's database no longer holds Hive up.** Copying its log into the file (a checkpoint) now runs in a thread of its own; on a busy disk it held typing and replies for up to most of a second (HI-1691).
