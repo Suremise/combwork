@@ -21,11 +21,16 @@
   "activity.endedNode": "Beendet · beim nächsten Aktualisieren weg",
   "activity.expand": "Ausklappen",
   "activity.expandAll": "Alle ausklappen",
+  "activity.fit": "An Fenster anpassen (F)",
   "activity.heading": "Aktivität",
   "activity.hideFinished": "Beendete ausblenden",
   "activity.input": "Eingabe",
+  "activity.jump": "Zur Auswahl springen (J)",
   "activity.lastAction": "Letzte Aktion",
   "activity.lastActive": "Zuletzt aktiv",
+  "activity.levelCollapse": "{level, select, agent {Alle Agenten einklappen} session {Alle Sitzungen einklappen} subagent {Alle Subagenten einklappen} turn {Alle Durchgänge einklappen} tool {Alle Tool-Aufrufe einklappen} other {Alle Prozesse einklappen}}",
+  "activity.levelExpand": "{level, select, agent {Alle Agenten ausklappen} session {Alle Sitzungen ausklappen} subagent {Alle Subagenten ausklappen} turn {Alle Durchgänge ausklappen} tool {Alle Tool-Aufrufe ausklappen} other {Alle Prozesse ausklappen}}",
+  "activity.levels": "Ebenen",
   "activity.live": "Live",
   "activity.liveTip": "Updates wieder sofort anzeigen.",
   "activity.loadFailed": "Aktivität konnte nicht geladen werden: {error}",
@@ -53,5 +58,9 @@
   "activity.statusLabel": "Status",
   "activity.task": "{type, select, subagent {Subagent im Hintergrund} command {Befehl im Hintergrund} monitor {Monitor} workflow {Workflow} other {Hintergrundaufgabe}}",
   "activity.tools": "{n, plural, =0 {Keine Tool-Aufrufe} one {# Tool-Aufruf} other {# Tool-Aufrufe}}",
-  "activity.turns": "{n, plural, one {# Durchgang} other {# Durchgänge}}"
+  "activity.turns": "{n, plural, one {# Durchgang} other {# Durchgänge}}",
+  "activity.zoomIn": "Vergrößern (+)",
+  "activity.zoomLabel": "Zoom",
+  "activity.zoomOut": "Verkleinern (−)",
+  "activity.zoomReset": "Originalgröße (0)"
 }

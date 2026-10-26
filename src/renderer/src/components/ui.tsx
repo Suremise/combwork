@@ -15,6 +15,7 @@ import { safeguardText } from '@shared/safeguards'
 import { placeTip, type Box } from '@shared/tipPlacement'
 import { placeMenu } from '@shared/menuPlacement'
 import { msg, tr, tRich, type Msg } from '@shared/i18n'
+import { watchStatus } from './watchLine'
 import { headingId, slugOf } from '@shared/docSections'
 
 export function Icon({ name, className, title, spin }: { name: string; className?: string; title?: string; spin?: boolean }) {
@@ -532,8 +533,9 @@ export function statusText(live: Pick<LiveSessionState, 'status' | 'statusMessag
   const text = ((): string => {
     const projected = live.runtime ? runtimeLabel(live) : unknownStateText(live)
     if (projected) return projected
-    // Waiting on cards: what for ("Waiting for #12 → Review").
-    if (live.status === 'watching' && live.watch) return live.watch.label
+    // Waiting on cards: what for, in the window's words and its card names ("Waiting for HI-12 → Review", HI-1679: never
+    // the watch's `label`, the English agents read).
+    if (live.status === 'watching' && live.watch) return watchStatus(live.watch)
     // Hive's own words in the window's language (#847), or the CLI's as they came.
     if (live.statusMessage) return shownStatusMessage(live)!
     // At the merge slot (#350): waiting for it, or merging.
@@ -975,11 +977,22 @@ function linkCards(html: string, cards: MarkdownCards): string {
  * Markdown, sanitized. `cards`: card references (AM-12, #1061) link to their cards, as in a card's description and comments.
  * `breaks`: a single line break is kept (#1637: an agent's question written line by line), not run into its paragraph.
  */
-export function Markdown({ source, className, onLink, cards, breaks }: { source: string; className?: string; onLink?: (href: string) => boolean; cards?: MarkdownCards; breaks?: boolean }) {
+export function Markdown({ source, className, onLink, cards, breaks, images }: { source: string; className?: string; onLink?: (href: string) => boolean; cards?: MarkdownCards; breaks?: boolean; images?: (src: string) => string | null }) {
   const clean = DOMPurify.sanitize(marked.parse(source, { async: false, ...(breaks ? { breaks: true } : {}) }) as string)
   const html = cards ? linkCards(clean, cards) : clean
+  // Images the caller gives a source of its own once shown (HI-1700: a card's attachments, by a relative placeholder the
+  // sanitiser keeps; their hive-img: and blob: URLs it wouldn't).
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (!images || !ref.current) return
+    for (const img of ref.current.querySelectorAll('img')) {
+      const to = images(img.getAttribute('src') ?? '')
+      if (to) img.setAttribute('src', to)
+    }
+  }, [html, images])
   return (
     <div
+      ref={ref}
       className={cx('markdown', className)}
       onClick={(e) => {
         const a = (e.target as HTMLElement).closest('a')

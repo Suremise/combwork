@@ -43,6 +43,8 @@ export interface RunGroup {
   failed: number
   /** The newest of them. */
   last: ProgressRun
+  /** The merge queue's checks of a card folded into one (HI-1701). */
+  queue?: true
 }
 
 /** A day of finished runs: its groups, the newest first. `day` is how many days ago (0: today). */
@@ -90,8 +92,8 @@ export function runDayLabel(d: RunDay, now: number, tr: Tr): string {
  * A group of retries in a line (#1309): "AL-12 cardwork ×4 · 2 failed, then passed". `name`: its card as the window
  * names it, or null.
  */
-export function runGroupLabel(g: RunGroup, name: string | null, tr: Tr): string {
-  const what = name ? tr(msg({ id: 'board.runs.cardRun', defaultMessage: '{card} {run}', description: "A run named with its card in the Progress panel's Runs tab: the card's name ({card}: its key, such as AL-12) and the run's title ({run})." }), { card: name, run: g.last.title }) : g.last.title
+export function runGroupLabel(g: RunGroup, name: string | null, tr: Tr, title: string = g.last.title): string {
+  const what = name ? tr(msg({ id: 'board.runs.cardRun', defaultMessage: '{card} {run}', description: "A run named with its card in the Progress panel's Runs tab: the card's name ({card}: its key, such as AL-12) and the run's title ({run})." }), { card: name, run: title }) : title
   const outcome = g.last.state === 'passed' ? 'passed' : g.last.state === 'failed' ? 'failed' : 'other'
   return tr(
     msg({
@@ -101,6 +103,113 @@ export function runGroupLabel(g: RunGroup, name: string | null, tr: Tr): string 
     }),
     { what, n: g.runs.length, failed: g.failed, outcome } // i18n-ignore: select keys, never shown
   )
+}
+
+/** A run of Hive's merge queue (a merge check or install on a card's merged result), not a slot's or a copy's setup. */
+const isQueueRun = (r: ProgressRun): boolean => r.source === 'hive' && runAgentKey(r) === HIVE_RUNS
+
+/**
+ * A card's runs on a day (HI-1701): its runs and their retries folded as before, the merge queue's checks folded into
+ * one more (`queue`), newest first. `card` null: the runs for no card (Hive's own, scripts), the day's Other.
+ */
+export interface CardRuns {
+  key: string
+  card: number | null
+  items: RunGroup[]
+  runs: number
+  failed: number
+  /** The newest of its runs. */
+  last: ProgressRun
+}
+
+/** How a group of runs went, for its icon (HI-1701): its last failed; one failed before it passed; or its last's state. */
+export type RunsLook = 'failed' | 'retried' | 'passed' | 'stale' | 'stopped'
+
+export function groupLook(g: RunGroup): RunsLook {
+  if (g.last.state === 'failed') return 'failed'
+  if (g.failed > 0) return 'retried'
+  return g.last.state === 'passed' ? 'passed' : g.last.state === 'stale' ? 'stale' : 'stopped'
+}
+
+/** A card's look: failed when any of its runs' last failed, else retried when any failed, else passed when all did. */
+export function cardLook(c: CardRuns): RunsLook {
+  const looks = c.items.map(groupLook)
+  for (const l of ['failed', 'retried', 'stale', 'stopped'] as const) if (looks.includes(l)) return l
+  return 'passed'
+}
+
+/**
+ * A day's runs by card (HI-1701), the card with the newest run first and Other (no card) last; in each, its runs folded
+ * as `runDays` folds them, the merge queue's checks into one, newest first.
+ */
+export function runsByCard(d: RunDay): CardRuns[] {
+  const endOf = (r: ProgressRun): number => r.finishedAt ?? r.updatedAt
+  const cards = new Map<number | null, RunGroup[]>()
+  for (const g of d.groups) {
+    const card = g.last.card ?? null
+    cards.set(card, [...(cards.get(card) ?? []), g])
+  }
+  const group = (key: string, runs: ProgressRun[], queue?: boolean): RunGroup => ({ key, runs, failed: runs.filter((r) => r.state === 'failed').length, last: runs.at(-1)!, ...(queue ? { queue: true } : {}) })
+  const out = [...cards.entries()].map(([card, groups]): CardRuns => {
+    // The queue's runs out of every group: a card's check is the same thing whoever runs it, but the agent's and the
+    // queue's are lines of their own.
+    const queued = card === null ? [] : groups.flatMap((g) => g.runs.filter(isQueueRun))
+    const items = groups.flatMap((g) => {
+      const own = g.runs.filter((r) => !queued.includes(r))
+      return !own.length ? [] : own.length === g.runs.length ? [g] : [group(g.key, own)]
+    })
+    if (queued.length) items.push(group(`${d.day}\n${card}\nqueue`, [...queued].sort((a, b) => a.startedAt - b.startedAt), true))
+    items.sort((a, b) => endOf(b.last) - endOf(a.last))
+    return { key: `${d.day}\n${card ?? ''}`, card, items, runs: items.reduce((n, g) => n + g.runs.length, 0), failed: items.reduce((n, g) => n + g.failed, 0), last: items[0].last }
+  })
+  return out.sort((a, b) => (a.card === null ? 1 : b.card === null ? -1 : endOf(b.last) - endOf(a.last)))
+}
+
+/**
+ * A run's title under its card's heading (HI-1701): without the card's key, which the heading shows ("HI-12 final
+ * typecheck" → "final typecheck"); the title as it is when that would leave nothing.
+ */
+export function withoutCardKey(title: string, key: string | null): string {
+  return withoutWords(title, key ? [key] : [])
+}
+
+/** A title without these words (each whole, with a separator after it), its separators tidied; as it is when that leaves nothing. */
+function withoutWords(title: string, words: readonly string[]): string {
+  let left = title
+  for (const w of words) left = left.replace(new RegExp(`(^|[^\\w-])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])\\s*[:·\\-–—,@]?`, 'gi'), '$1')
+  left = left.replace(/\s{2,}/g, ' ').replace(/^[\s:·\-–—,@]+|[\s:·\-–—,@]+$/g, '')
+  return left || title
+}
+
+/**
+ * A run's title as a line under its card's heading shows it (HI-1701, HR6's round 1): without the card's key, which the
+ * heading shows, nor the run's own revision, which its hover and details have ("HI-12 · lint · a4f5998", as the merge
+ * queue names its checks, is "lint").
+ */
+export function runTitleIn(r: Pick<ProgressRun, 'title' | 'revision'>, key: string | null): string {
+  return withoutWords(r.title, [...(key ? [key] : []), ...(r.revision ? [r.revision.slice(0, 7)] : [])])
+}
+
+/** A card's heading's summary (HI-1701): "7 runs · 1 failed", "9 runs · all passed", and " · running" while one runs. */
+export function cardRunsSummary(c: CardRuns, running: boolean, tr: Tr): string {
+  const notPassed = c.items.reduce((n, g) => n + g.runs.filter((r) => r.state !== 'passed' && r.state !== 'failed').length, 0)
+  return tr(
+    msg({
+      id: 'board.runs.cardSummary',
+      defaultMessage: '{n, plural, one {# run} other {# runs}} · {failed, plural, =0 {{stopped, plural, =0 {all passed} other {# stopped}}} other {# failed}}{running, select, yes { · running} other {}}',
+      description: "The summary on a card's heading in the Progress panel's Runs tab, where runs are grouped by card: how many runs it had that day ({n}), how many failed ({failed}), else how many stopped without passing or failing ({stopped}), else all passed; then \" · running\" while one of its runs is still going. Keep the select keys."
+    }),
+    { n: c.runs, failed: c.failed, stopped: notPassed, running: running ? 'yes' : 'no' } // i18n-ignore: a select's key, never shown
+  )
+}
+
+/**
+ * The merge queue's checks of a card folded in a line (HI-1701): "lint, typecheck", then how many failed. `label`: a run's
+ * check as the line names it (`runTitleIn`: the queue's titles carry the card and revision), each named once.
+ */
+export function queueChecksLabel(g: RunGroup, list: (items: string[]) => string, tr: Tr, label: (r: ProgressRun) => string = (r) => r.title): string {
+  const checks = [...new Set(g.runs.map(label))]
+  return tr(msg({ id: 'board.runs.queueChecks', defaultMessage: '{checks}{failed, plural, =0 {} one { · # failed} other { · # failed}}', description: "A line in the Progress panel's Runs tab folding the merge queue's checks for one card: the checks it ran ({checks}: their names, a list such as \"lint, typecheck\") and how many of its runs failed ({failed}, nothing when none)." }), { checks: list(checks), failed: g.failed })
 }
 
 /**

@@ -87,6 +87,10 @@
     "defaultMessage": "Expand All",
     "description": "Tooltip of the Activity tab's button that opens every node."
   },
+  "activity.fit": {
+    "defaultMessage": "Zoom to Fit (F)",
+    "description": "Tooltip of the Activity tab's button that scales the tree to fit the tab. F is its key; keep it."
+  },
   "activity.heading": {
     "defaultMessage": "Activity",
     "description": "The Activity tab's heading: the project's live work as a tree."
@@ -99,6 +103,10 @@
     "defaultMessage": "Input",
     "description": "A heading in the Activity tab's details: the node's input exactly (a prompt, a tool call's input, a command line), with secrets masked."
   },
+  "activity.jump": {
+    "defaultMessage": "Jump to Selected (J)",
+    "description": "Tooltip of the Activity tab's button that scrolls the selected node (or the agent or card it was opened for) into view. J is its key; keep it."
+  },
   "activity.lastAction": {
     "defaultMessage": "Last action",
     "description": "A heading in the Activity tab's details: what the node did last (a reply, a tool call's result, an agent's status)."
@@ -106,6 +114,18 @@
   "activity.lastActive": {
     "defaultMessage": "Last active",
     "description": "A label in the Activity tab's details: when a session was last active."
+  },
+  "activity.levelCollapse": {
+    "defaultMessage": "{level, select, agent {Collapse all agents} session {Collapse all sessions} subagent {Collapse all subagents} turn {Collapse all turns} tool {Collapse all tool calls} other {Collapse all processes}}",
+    "description": "An entry of the Activity tab's Levels menu: closes every node at that level."
+  },
+  "activity.levelExpand": {
+    "defaultMessage": "{level, select, agent {Expand all agents} session {Expand all sessions} subagent {Expand all subagents} turn {Expand all turns} tool {Expand all tool calls} other {Expand all processes}}",
+    "description": "An entry of the Activity tab's Levels menu: opens every node at that level again."
+  },
+  "activity.levels": {
+    "defaultMessage": "Levels",
+    "description": "A menu button above the Activity tree: collapses or expands every node at one level at once (all turns, all tool calls…)."
   },
   "activity.live": {
     "defaultMessage": "Live",
@@ -218,5 +238,21 @@
   "activity.turns": {
     "defaultMessage": "{n, plural, one {# turn} other {# turns}}",
     "description": "A session node's second line in the Activity tree: how many turns (a prompt and what followed) it has."
+  },
+  "activity.zoomIn": {
+    "defaultMessage": "Zoom In (+)",
+    "description": "Tooltip of the Activity tab's zoom in button. + is its key; keep it."
+  },
+  "activity.zoomLabel": {
+    "defaultMessage": "Zoom",
+    "description": "The Activity tab's zoom buttons, for screen readers."
+  },
+  "activity.zoomOut": {
+    "defaultMessage": "Zoom Out (−)",
+    "description": "Tooltip of the Activity tab's zoom out button. − is its key; keep it."
+  },
+  "activity.zoomReset": {
+    "defaultMessage": "Actual Size (0)",
+    "description": "Tooltip of the Activity tab's zoom level (a percentage): clicking it goes back to 100%. 0 is its key; keep it."
   }
 }

@@ -88,9 +88,19 @@ const check = (name, ok, extra = '') => {
     const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const make = async (title, column, agent) => (await inv('tasks:create', { title, project: 'alpha', column, agent })).number
     const lanes = async () => inv('lanes:list')
+    /**
+     * Crosses the limit while idle (HI-1670): the transcript grows during the fake's turn, and Hive's 5-second look could
+     * make the notice then (working: no button). So the limit is off (Never) while it pads, and back at 1 MB once its turn
+     * is over: the next look makes the notice, the agent idle.
+     */
     const pad = async (a) => {
-      await say(a, 'pad 1200')
-      return lib.until(async () => (await live(a.id))?.status === 'finished', HUNG_MS, 300)
+      await inv('settings:update', { sessions: { transcriptWarnMB: 0 } })
+      try {
+        await say(a, 'pad 1200')
+        return await lib.until(async () => (await live(a.id))?.status === 'finished', HUNG_MS, 300)
+      } finally {
+        await inv('settings:update', { sessions: { transcriptWarnMB: 1 } })
+      }
     }
     // The handover the agent is asked for, written as hive_create_handover would (its session in the header).
     let written = 0

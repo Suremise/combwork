@@ -4,6 +4,7 @@ import { pendingStep } from '../shared/tasks'
 import type { TaskCard, TaskHistoryEntry } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
 import { ANSWER_MAX, cardChange, LOOP_WAKE_KINDS, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
+import { boardRead } from './boardStore'
 import { onHiveEvent } from './events'
 import { onLanesWritten } from './lanes'
 import { loopReviewerOf, poolCard } from './loopReviewer'
@@ -248,9 +249,11 @@ function historySince(card: TaskCard, since: TaskHistoryEntry | null): TaskHisto
  * a reviewer's while the card is in Review and nobody has reviewed that round (no review started nor verdict given
  * since: a round reviewed and failed meanwhile is the builder's now, #405 round 2 finding); a builder's (a verdict, a
  * move into Passed or Done, a request, a note) while the card is still its own and, since the handoff, neither it acted
- * on the card nor another round started. A later arrival queues a wake of its own.
+ * on the card nor another round started; one of a card that is Done, only while a lane running holds it (`inLane`: the
+ * next card follows; with its lane over, the lane's end tells the builder, and nothing is left to carry on with, HI-1687).
+ * A later arrival queues a wake of its own.
  */
-function stillDue(p: Wake & { agentId: string }, card: TaskCard | null): boolean {
+function stillDue(p: Wake & { agentId: string }, card: TaskCard | null, inLane: boolean): boolean {
   if (!card || card.archived) return false
   const since = historySince(card, p.since)
   if (p.kind === 'review') return card.column === 'review' && !card.review && !since.some((h) => /^(Started reviewing|Review (passed|failed))$/.test(h.what))
@@ -259,7 +262,7 @@ function stillDue(p: Wake & { agentId: string }, card: TaskCard | null): boolean
   // A builder's loop step (#1382, #1467), to its reviewer: due until the reviewer acts on the card; a design or a
   // follow-up to check, only while one still waits (answered by someone else, or the card moved on: nothing left to check).
   if (toReviewer(p.kind)) return !since.some((h) => same(h.by, p.agentName)) && (p.kind !== 'step' || !!pendingStep(card))
-  if (card.agent !== p.agentId) return false
+  if (card.agent !== p.agentId || (card.column === 'done' && !inLane)) return false
   return !since.some((h) => same(h.by, p.agentName) || /^(Moved to (the (top|bottom) of )?Review\b|Returned for review|Started reviewing)/.test(h.what))
 }
 
@@ -267,13 +270,55 @@ function stillDue(p: Wake & { agentId: string }, card: TaskCard | null): boolean
 let rolesSeq = 0
 
 /**
+ * What a wake of card n is decided from, as the board has it now (HI-1687), read without waiting: the card's row (its
+ * place, builder, reviewer and when it last changed), its newest history entry and fact (a review started, a verdict,
+ * the pool's reviewer, someone acting on it), the lanes holding it (their builder, reviewer and state) and Hive's last
+ * write of its project's settings (its agents, its loop wakes). Another card's change leaves it as it is. Null when it
+ * can't be read (a board from before 1.0): the strict count of every change stands in.
+ */
+function wakeKey(ws: WorkspaceService, projectPath: string, n: number): string | null {
+  try {
+    return boardRead(ws, (db) => {
+      // i18n-ignore: SQL, not text
+      const card = db.prepare('SELECT col, stage, agent, review_agent, archived, updated_at FROM cards WHERE number = ?').get(n)
+      // i18n-ignore: SQL, not text
+      const history = db.prepare('SELECT max(ord) AS last, count(*) AS n FROM card_history WHERE card = ?').get(n)
+      // i18n-ignore: SQL, not text
+      const facts = db.prepare('SELECT max(seq) AS last, count(*) AS n FROM card_facts WHERE card = ?').get(n)
+      // i18n-ignore: SQL, not text
+      const lanes = db.prepare('SELECT l.id, l.builder_id, l.reviewer_id, l.state FROM lane_cards c JOIN lanes l ON l.id = c.lane WHERE c.card = ? ORDER BY l.id').all(n)
+      return JSON.stringify([card ?? null, history, facts, lanes, ws.projectConfigWrites(projectPath)])
+    })
+  } catch {
+    return null
+  }
+}
+
+/** For tests: awaited as a wake is made again, once what it is decided from is read (a change while it is made). */
+export const loopWakeTestHooks: { afterKey: (() => Promise<void> | void) | null } = { afterKey: null }
+
+/** Whether a running lane holds card n (yes when the board can't say). */
+function inRunningLane(ws: WorkspaceService, n: number): boolean {
+  try {
+    // i18n-ignore: SQL, not text
+    return boardRead(ws, (db) => !!db.prepare("SELECT 1 FROM lane_cards c JOIN lanes l ON l.id = c.lane WHERE c.card = ? AND l.state = 'active' LIMIT 1").get(n))
+  } catch {
+    return true
+  }
+}
+
+/**
  * A version of a wake here: its host, delivery id and version (ids are a host's own; a wake is made again before each
  * offer or hand-out, and an offered one keeps the version it was offered as).
  */
 const madeKey = (host: string, id: string, v: unknown): string => `${host.toLowerCase()}#${id}#${String(v)}`
 let versions = 0
-/** What each wake was made again from just before it was offered (by host and delivery id): the roles' count, the card's column. */
-const madeFrom = new Map<string, { seq: number; column: TaskCard['column'] }>()
+/**
+ * What each wake was made again from just before it was offered or read (by host and delivery id): the roles' count, the
+ * card's column, and what it was decided from (`wakeKey`, read before anything was awaited, so a change while it was
+ * made counts as one).
+ */
+const madeFrom = new Map<string, { seq: number; column: TaskCard['column']; key: string | null }>()
 
 /**
  * The loop wakes' part in their deliveries (#649): made again just before each offer (the line from the card as it is
@@ -289,12 +334,15 @@ registerSource('loop', {
     // Its workspace closed, or switched to another folder: dropped.
     if (!ws?.path || !ws.isProjectPath(host)) return { cancel: 'its project is no longer open' }
     // Roles can change while it is checked or typed (the lane's reviewer, the card's agent): then it is worked out again.
+    // What it is decided from is read first, before anything is awaited (HI-1687).
     const seq = rolesSeq
+    const key = wakeKey(ws, host, p.n)
+    await loopWakeTestHooks.afterKey?.()
     const card = await getTask(p.n, ws).catch(() => null)
     // Its own watch told it already (#578): a watch whose line had read this handoff's own history entry, even one that
     // has ended since (a handoff slower than the watch's settle and typing found no watch to leave it to).
     const told = !!card && !!p.since && watchTold(host, r.agentId, card, p.since, p.kind === 'request' || isStep(p.kind))
-    if (!card || !stillDue({ ...p, agentId: r.agentId }, card) || covered(host, r.agentId, card, p.kind) || told || !(await wakesOn(ws, host))) return { cancel: 'no longer due' }
+    if (!card || !stillDue({ ...p, agentId: r.agentId }, card, inRunningLane(ws, p.n)) || covered(host, r.agentId, card, p.kind) || told || !(await wakesOn(ws, host))) return { cancel: 'no longer due' }
     // Only to whose wake it is now: another reviewer given the lane meanwhile gets it instead (#405 round 1 finding).
     // The user's answer stays with the agent waiting on it (#1626), while it is one of the project's agents.
     const to = await targetOf(ws, host, card, p.kind, p.kind === 'answer' ? p.to : undefined)
@@ -303,15 +351,22 @@ registerSource('loop', {
       return { cancel: 'it is another agent\'s wake now' }
     }
     const v = ++versions
-    madeFrom.set(madeKey(host, r.id, v), { seq, column: card.column })
+    madeFrom.set(madeKey(host, r.id, v), { seq, column: card.column, key })
     if (madeFrom.size > 1000) madeFrom.delete(madeFrom.keys().next().value!)
     const kinds = kindsOf(p.kind)
     return { body: loopWakeLine({ ...cardChange(p.n, card, kinds), about: wakeAbout(card, kinds, r.agentId) }, p.kind, p.text), meta: { ...r.meta, v } }
   },
-  holds: (r, host) => {
+  // Its version made, its watch not telling it, and what it was decided from as it was: for a line being typed, also
+  // nothing on the board or lanes changed (#578 round 2: it stops at once); for a hand-out (hive_inbox, and the notices
+  // naming what it would give), only a change to its own card, lanes or project settings, so another lane's traffic
+  // doesn't keep it from being read (HI-1687). Asked at the locked boundary, with nothing awaited.
+  holds: (r, host, by) => {
     const p = wakeOf(r)
     const m = madeFrom.get(madeKey(host, r.id, r.meta?.v))
-    return !!p && !!m && m.seq === rolesSeq && !covered(host, r.agentId, { number: p.n, column: m.column } as TaskCard, p.kind)
+    if (!p || !m || covered(host, r.agentId, { number: p.n, column: m.column } as TaskCard, p.kind)) return false
+    const ws = workspaceFor(host)
+    const unchanged = m.key !== null && !!ws && wakeKey(ws, host, p.n) === m.key
+    return by === 'read' ? unchanged || (m.key === null && m.seq === rolesSeq) : m.seq === rolesSeq && (m.key === null || unchanged)
   },
   received: (r, host) => {
     madeFrom.delete(madeKey(host, r.id, r.meta?.v))

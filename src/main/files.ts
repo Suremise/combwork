@@ -3,7 +3,7 @@ import { cp, lstat, mkdir, readdir, readFile, rename, rmdir, stat, writeFile } f
 import { basename, dirname, extname, join, relative, resolve, sep } from 'path'
 import { HIVE_DIR, assertSessionId } from '../shared/defaults'
 import type { AttachmentContent, FileContent, FileEntry, SessionAttachment, SessionAttachmentGroup } from '../shared/types'
-import { attachmentKind } from '../shared/attachments'
+import { attachmentKind, isSessionFolder } from '../shared/attachments'
 import { attachmentsDir, movedAttachment } from './attachmentsFolder'
 import { emit } from './events'
 import { heldOpen, insideReal, isInUse, trashAllOrNothing, withFileLock } from './fsutil'
@@ -475,7 +475,7 @@ async function attachmentAt(projectPath: string, path: string): Promise<{ root: 
   const root = await attachmentsRoot(projectPath)
   const abs = resolve(path)
   const parts = root ? relative(root, abs).split(sep) : []
-  if (!root || parts.length !== 2 || parts[0] === '..') throw hiveError(msg({ id: 'service.files.notAttachment', defaultMessage: 'Not a session attachment', description: "An error opening or deleting a session's attachment: the path isn't a file in a session's attachments folder." }))
+  if (!root || parts.length !== 2 || parts[0] === '..' || !isSessionFolder(parts[0])) throw hiveError(msg({ id: 'service.files.notAttachment', defaultMessage: 'Not a session attachment', description: "An error opening or deleting a session's attachment: the path isn't a file in a session's attachments folder." }))
   return { root, sessionId: assertSessionId(parts[0]), abs }
 }
 
@@ -487,7 +487,8 @@ export async function listAttachments(projectPath: string): Promise<SessionAttac
   const records = new Map((await workspace.sessionsFile(projectPath)).sessions.map((s) => [s.id, s]))
   const groups: SessionAttachmentGroup[] = []
   for (const d of await readdir(root, { withFileTypes: true }).catch(() => [])) {
-    if (!d.isDirectory()) continue
+    // The cards' folder (HI-1700) is listed with the cards, never as a session.
+    if (!d.isDirectory() || !isSessionFolder(d.name)) continue
     const attachments: SessionAttachment[] = []
     for (const f of await readdir(join(root, d.name), { withFileTypes: true }).catch(() => [])) {
       if (!f.isFile()) continue
@@ -542,6 +543,7 @@ export async function trashAttachment(projectPath: string, path: string): Promis
 export async function trashAttachmentGroup(projectPath: string, sessionId: string): Promise<number> {
   projectPath = workspace.assertSessionHost(projectPath)
   assertSessionId(sessionId)
+  if (!isSessionFolder(sessionId)) throw hiveError(M.notKept)
   const root = await attachmentsRoot(projectPath)
   if (!root) throw hiveError(M.notKept)
   const dir = join(root, sessionId)

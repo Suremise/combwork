@@ -21,11 +21,16 @@
   "activity.endedNode": "Zakończone · zniknie po odświeżeniu",
   "activity.expand": "Rozwiń",
   "activity.expandAll": "Rozwiń wszystko",
+  "activity.fit": "Dopasuj do okna (F)",
   "activity.heading": "Aktywność",
   "activity.hideFinished": "Ukryj zakończone",
   "activity.input": "Wejście",
+  "activity.jump": "Przejdź do zaznaczenia (J)",
   "activity.lastAction": "Ostatnia czynność",
   "activity.lastActive": "Ostatnia aktywność",
+  "activity.levelCollapse": "{level, select, agent {Zwiń wszystkich agentów} session {Zwiń wszystkie sesje} subagent {Zwiń wszystkie podagenty} turn {Zwiń wszystkie tury} tool {Zwiń wszystkie wywołania narzędzi} other {Zwiń wszystkie procesy}}",
+  "activity.levelExpand": "{level, select, agent {Rozwiń wszystkich agentów} session {Rozwiń wszystkie sesje} subagent {Rozwiń wszystkie podagenty} turn {Rozwiń wszystkie tury} tool {Rozwiń wszystkie wywołania narzędzi} other {Rozwiń wszystkie procesy}}",
+  "activity.levels": "Poziomy",
   "activity.live": "Na żywo",
   "activity.liveTip": "Znów pokazuj aktualizacje na bieżąco.",
   "activity.loadFailed": "Nie udało się wczytać aktywności: {error}",
@@ -53,5 +58,9 @@
   "activity.statusLabel": "Stan",
   "activity.task": "{type, select, subagent {Podagent w tle} command {Polecenie w tle} monitor {Monitor} workflow {Przepływ pracy} other {Zadanie w tle}}",
   "activity.tools": "{n, plural, =0 {Brak wywołań narzędzi} one {# wywołanie narzędzia} few {# wywołania narzędzi} many {# wywołań narzędzi} other {# wywołania narzędzi}}",
-  "activity.turns": "{n, plural, one {# tura} few {# tury} many {# tur} other {# tury}}"
+  "activity.turns": "{n, plural, one {# tura} few {# tury} many {# tur} other {# tury}}",
+  "activity.zoomIn": "Powiększ (+)",
+  "activity.zoomLabel": "Powiększenie",
+  "activity.zoomOut": "Pomniejsz (−)",
+  "activity.zoomReset": "Rzeczywisty rozmiar (0)"
 }

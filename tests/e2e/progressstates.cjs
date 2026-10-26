@@ -169,6 +169,8 @@ const t = setInterval(() => {
   // In the Runs tab (#1309), the stopped one is marked stopped (muted), not with a warning; a group of retries opened.
   await panel.locator('.progress-tab[data-tab="runs"]').click()
   await until(async () => (await panel.locator('.progress-tab-runs').count()) === 1, 5000)
+  // Its card's runs (HI-1701) opened, then its group of retries.
+  for (const head of await panel.locator('.progress-card-toggle[aria-expanded="false"]').all()) await head.click()
   for (const head of await panel.locator('.progress-group-head[aria-expanded="false"]').all()) await head.click()
   const recentIcon = await until(async () => (await panel.locator(`.progress-recent-item[data-run="${stopped?.id}"] .progress-recent .codicon`).first().getAttribute('class', { timeout: 500 }).catch(() => '')) || '', 5000)
   check('in the Runs tab, the interrupted run is marked stopped, not with a warning', /codicon-circle-slash/.test(recentIcon ?? ''), recentIcon)

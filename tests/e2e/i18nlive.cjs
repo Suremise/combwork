@@ -165,8 +165,13 @@ const check = (name, ok, extra = '') => {
     await call('POST', `/v1/progress/${done.id}/finish`, { ok: true })
     if (!(await page.locator('.progress-panel').count())) await page.locator('.progress-rail').click()
     await page.locator('.progress-panel .progress-tab[data-tab="runs"]').click()
-    const recentRow = page.locator(`.progress-panel .progress-recent-item[data-run="${done.id}"] .progress-recent-text`)
-    check('the ended run is in the Runs tab, by a script', !!(await lib.until(async () => (await recentRow.innerText().catch(() => '')).startsWith('Script'), 30000)), await recentRow.innerText().catch(() => ''))
+    // Who ran it, the first part of its line (HI-1701), in Other (a run for no card), opened: closed once its runs passed.
+    const recentRow = page.locator(`.progress-panel .progress-recent-item[data-run="${done.id}"] .progress-recent-who`)
+    const openOther = page.locator('.progress-panel .progress-card-runs[data-card-runs="other"] .progress-card-toggle[aria-expanded="false"]')
+    check('the ended run is in the Runs tab, by a script', !!(await lib.until(async () => {
+      if (await openOther.count()) await openOther.click().catch(() => undefined)
+      return (await recentRow.innerText().catch(() => '')).startsWith('Script')
+    }, 30000)), await recentRow.innerText().catch(() => ''))
     await speak('de', { 'board.progress.script': 'Skript' })
     check('…its closed row follows a change of language', !!(await lib.until(async () => (await recentRow.innerText().catch(() => '')).startsWith('Skript'), HUNG_MS)), await recentRow.innerText().catch(() => ''))
     await speak('en', {})

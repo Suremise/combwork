@@ -2,7 +2,7 @@
 // process under the one tool call open when it started, else under its session; and the tree, card → agent → session →
 // turn → tool call, with subagents and processes, filtered to an agent or a card, recent sessions only.
 import { describe, expect, it } from 'vitest'
-import { activityTurns, buildActivityTree, filetimeMs, keepGone, newOrder, placeProcesses, stableRows, ACTIVITY_SESSIONS, type ActivityFilter, type ActivityInput, type ActivityNode, type ActivityOrder, type ActivityTurns } from '../src/shared/activity'
+import { ACTIVITY_LEVELS, activityLevel, activityTurns, buildActivityTree, keysAtLevel, filetimeMs, keepGone, newOrder, placeProcesses, stableRows, ACTIVITY_SESSIONS, type ActivityFilter, type ActivityInput, type ActivityNode, type ActivityOrder, type ActivityTurns } from '../src/shared/activity'
 import type { AgentProcess } from '../src/shared/agentProcesses'
 import type { SessionListItem, TranscriptItem } from '../src/shared/types'
 
@@ -101,6 +101,19 @@ describe('the tree', () => {
     expect((turn.children[0] as Extract<ActivityNode, { kind: 'tool' }>).state).toBe('working')
     const cli = s1.children.filter((n) => n.kind === 'process' && n.cli).map((n) => n.key)
     expect(cli).toEqual(['p:10:' + ft(-100), 'p:11:' + ft(-99)])
+  })
+
+  it('each node has a level for Levels ▾ (HI-1678): sub-sessions and background tasks are subagents; cards fold on their own', () => {
+    const input = base()
+    input.turns = new Map([['s1', { sessionId: 's1', version: 'v', ...activityTurns([user(1, 0, 'go'), tool(2, 10, 'Bash', { result: null })]) }]])
+    const tree = buildActivityTree(input)
+    const levels: Record<string, string | null> = {}
+    const walk = (ns: ActivityNode[]): void => ns.forEach((n) => ((levels[n.key] = activityLevel(n)), walk(n.children)))
+    walk(tree)
+    expect(levels).toMatchObject({ 'c:7': null, 'c:7:a:hb1': 'agent', 's:s1': 'session', 's:sub1': 'subagent', 'task:s1:bg1': 'subagent', 'turn:s1:1': 'turn', 'tool:s1:2': 'tool', ['p:20:' + ft(15)]: 'process', 'a:hr1': 'agent', 's:loose': 'session' })
+    expect([...keysAtLevel(tree, 'subagent')].sort()).toEqual(['s:sub1', 'task:s1:bg1'])
+    expect([...keysAtLevel(tree, 'tool')]).toEqual(['tool:s1:2'])
+    expect(ACTIVITY_LEVELS).toEqual(['agent', 'session', 'subagent', 'turn', 'tool', 'process'])
   })
 
   it("draws a running agent's session the list doesn't have yet, with its processes, in the tree's own order (no re-sorting by what runs, HI-1677)", () => {

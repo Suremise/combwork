@@ -1,3 +1,4 @@
+import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { ActivityDetail, ActivityNow, ActivityTurns, EndProcessResult } from './activity'
 import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
@@ -308,6 +309,11 @@ export interface HiveRequests {
    * null for a project whose version control isn't recorded yet. A `workflow-changed` event says when to read it again.
    */
   'workflow:stages': (projectPath: string) => ProjectStages | null
+  /**
+   * Every project's stages (`workflow:stages`) by its path in lower case: read with the board's cards, so its columns
+   * are right in its first paint, never added after it (HI-1682).
+   */
+  'board:stages': () => Record<string, ProjectStages | null>
   /** What switching the project's version control would do (#1419, §16.6.5's warning): why it can't now, what keeps old rules. */
   'workflow:checkPlatform': (projectPath: string, to: PlatformId) => PlatformSwitchCheck
   /**
@@ -412,7 +418,7 @@ export interface HiveRequests {
   'tasks:setAside': () => SetAsideCard[]
   'tasks:addSetAside': (file: string) => TaskCard
   'tasks:discardSetAside': (file: string) => void
-  'tasks:create': (input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; context?: string[]; kind?: 'code' | 'no-code'; skipReview?: string }) => TaskCard
+  'tasks:create': (input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; context?: string[]; kind?: 'code' | 'no-code'; skipReview?: string }, drafts?: CardDrafts) => TaskCard
   /** Changes a card's kind after it was made (#1277): an override, asked first (`ask`) unless `confirm`, with its reason. */
   'tasks:setKind': (n: number, kind: 'code' | 'no-code', opts?: { confirm?: boolean; reason?: string }) => { ask: true } | TaskCard
   /** Answers an agent's proposed kind (#1277): `accept` makes it the card's kind, else the card stays code. */
@@ -421,7 +427,8 @@ export interface HiveRequests {
   'tasks:setReviewSkip': (n: number, skip: boolean, opts?: { reason?: string }) => TaskCard
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }
-  'tasks:update': (n: number, patch: TaskPatch) => TaskCard
+  /** A change; with `more`, its comment and the dialog's drafts (HI-1700) in the same change. */
+  'tasks:update': (n: number, patch: TaskPatch, more?: { comment?: string; drafts?: CardDrafts }) => TaskCard
   /**
    * The user's move of a card to a column through its workflow rules (#1265, SPEC §16.8.4): a move that skips a rule
    * asks first (`ask`, nothing written) unless `confirm`, then records an Override (with `reason`, optional).
@@ -435,7 +442,14 @@ export interface HiveRequests {
   'tasks:forYou': (project?: string | null) => ForYouSummary
   /** The user answers a card's request (For you): only the user. Refused when it was answered or retired meanwhile. */
   'tasks:answer': (n: number, request: string, answer: ForYouAnswer) => TaskCard
-  'tasks:comment': (n: number, text: string) => TaskCard
+  'tasks:comment': (n: number, text: string, drafts?: CardDrafts) => TaskCard
+  /** A card's attachments (HI-1700), newest first. */
+  'cards:attachments': (n: number) => CardAttachment[]
+  /** A project's cards' attachments, by card (its Attachments tab). */
+  'cards:projectAttachments': (projectPath: string) => CardAttachmentGroup[]
+  'cards:removeAttachment': (n: number, id: string) => void
+  /** A session attachment of `host` (a pane's) copied to a card. */
+  'cards:attachFromPane': (n: number, host: string, path: string) => CardAttachment
   /** Changes the words of one of a card's decisions, or removes it (text null): the user's (#357). */
   'tasks:editDecision': (n: number, id: string, text: string | null) => TaskCard
   'tasks:archive': (n: number, archived: boolean) => TaskCard

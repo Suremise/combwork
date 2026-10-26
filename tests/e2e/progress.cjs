@@ -113,8 +113,9 @@ const near = (a, b) => Math.abs(a - b) < 0.001
     if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click()
     return !!(await until(async () => (await panel.locator(`.progress-tab-${name}`).count()) === 1, HUNG_MS))
   }
-  /** Opens every folded group of retries in the Runs tab, so each run's own line shows. */
+  /** Opens every closed card's runs (HI-1701) and folded group of retries in the Runs tab, so each run's own line shows. */
   const openGroups = async () => {
+    for (const head of await panel.locator('.progress-card-toggle[aria-expanded="false"]').all()) await head.click()
     for (const head of await panel.locator('.progress-group-head[aria-expanded="false"]').all()) await head.click()
   }
   check('the Progress strip shows, folded, with no runs', (await rail.count()) === 1 && (await panel.count()) === 0 && (await rail.locator('.progress-mini').count()) === 0)
@@ -245,7 +246,11 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check('a finished run takes no more updates (409)', (await call(alfieToken, 'PATCH', `/v1/progress/${run1}`, { step: 2 })).status === 409)
   check('after a few seconds it leaves Pulse', !!(await until(async () => (await row.count()) === 0, 15000)))
   await showTab('runs')
-  check('…and is in the Runs tab, passed, under Today', !!(await until(async () => (await panel.locator('.progress-recent.passed').count()) === 1, HUNG_MS)) && (await panel.locator('.progress-runs-day .progress-section').first().textContent()) === 'Today')
+  // A run for no card is in Other (HI-1701), closed while all its runs passed; opened, it stays open.
+  const other = panel.locator('.progress-card-runs[data-card-runs="other"]')
+  check('…and is in the Runs tab under Today, in Other, closed: 1 run, all passed', !!(await until(async () => ((await other.locator('.progress-card-summary').textContent().catch(() => '')) ?? '') === '1 run · all passed', HUNG_MS)) && (await panel.locator('.progress-runs-day .progress-section').first().textContent()) === 'Today' && (await other.locator('.progress-card-toggle').getAttribute('aria-expanded')) === 'false' && (await other.locator('.progress-recent').count()) === 0)
+  await openGroups()
+  check('…opened, the run passed', !!(await until(async () => (await panel.locator('.progress-recent.passed').count()) === 1, HUNG_MS)))
   await showTab('pulse')
 
   // --- Failed, with the panel folded: the taskbar goes red until the panel is looked at; the run stays until dismissed.
@@ -395,7 +400,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   // and the Runs tab's alike, is remembered for the workspace, and the folded strip follows it.
   const projectFilter = panel.locator('.progress-filter select[aria-label="Show the runs of"]')
   check('with runs from two projects, the panel offers a project filter', (await projectFilter.count()) === 1 && JSON.stringify(await projectFilter.locator('option').allTextContents()) === JSON.stringify(['All projects', 'alpha', 'beta']), JSON.stringify(await projectFilter.locator('option').allTextContents().catch(() => [])))
-  const agentsShown = async () => [...new Set((await panel.locator('.progress-recent-text, .progress-agent').allTextContents()).map((t) => t.split(' · ')[0].trim()))].sort()
+  const agentsShown = async () => [...new Set((await panel.locator('.progress-recent-who, .progress-agent').allTextContents()).map((t) => t.trim()))].sort()
   check('…showing every run to start with', JSON.stringify(await agentsShown()) === JSON.stringify(['Alfie', 'Betty']), JSON.stringify(await agentsShown()))
   await projectFilter.selectOption({ label: 'beta' })
   check("choosing beta shows only beta's runs, every one in the Runs tab included", !!(await until(async () => JSON.stringify(await agentsShown()) === JSON.stringify(['Betty']), HUNG_MS)), JSON.stringify(await agentsShown()))
@@ -640,13 +645,16 @@ const near = (a, b) => Math.abs(a - b) < 0.001
     await call(workspaceToken, 'POST', `/v1/progress/${h.body?.id}/finish`, { ok })
   }
   await showTab('runs')
-  const lines = async () => panel.locator('.progress-runs-day').first().locator(':scope > .progress-recent-item .progress-recent-text, :scope > .progress-run-group .progress-group-head .progress-recent-text').allTextContents()
+  // Each line as "who · what" (HI-1701: two parts of one line), its card's and its retries' groups' lines.
+  const lines = async () => panel.locator('.progress-runs-day').first().locator('.progress-card-items > .progress-recent-item > .progress-recent, .progress-card-items > .progress-run-group > .progress-group-head').evaluateAll((els) => els.map((el) => `${el.querySelector('.progress-recent-who')?.textContent} · ${el.querySelector('.progress-recent-text')?.textContent}`))
   check('every ended run is in the Runs tab under Today, newest first', !!(await until(async () => {
     const l = await lines()
     return Array.from({ length: 12 }, (_, i) => `Script · history ${i}`).every((x) => l.includes(x)) && l.indexOf('Script · history 11') < l.indexOf('Script · history 0')
   }, 20000)), JSON.stringify(await lines()))
   const retried = panel.locator('.progress-run-group').filter({ hasText: 'retried check' })
-  check('a run tried three times is one line: ×3 · 2 failed, then passed', (await retried.locator('.progress-group-head').textContent())?.trim() === 'Script · retried check ×3 · 2 failed, then passed', await retried.locator('.progress-group-head').textContent().catch(() => ''))
+  const retriedLine = async () => (await retried.locator('.progress-group-head').evaluate((el) => `${el.querySelector('.progress-recent-who')?.textContent} · ${el.querySelector('.progress-recent-text')?.textContent}`).catch(() => ''))
+  check('a run tried three times is one line: ×3 · 2 failed, then passed', (await retriedLine()) === 'Script · retried check ×3 · 2 failed, then passed', await retriedLine())
+  check('…its icon a warning: it failed before it passed', (await retried.locator('.progress-group-head .codicon-warning').count()) === 1)
   check('…and resolves its failures: they are not in the badge', !(await panel.locator('.progress-tab[data-tab="runs"]').getAttribute('aria-label'))?.includes('3 failures'))
   await retried.locator('.progress-group-head').click()
   check('…opened, each of its runs, the newest first', !!(await until(async () => (await retried.locator('.progress-recent-item').count()) === 3, HUNG_MS)) && (await retried.locator('.progress-recent-item').first().locator('.progress-recent.passed').count()) === 1)
@@ -660,7 +668,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   await panel.locator('.progress-runs-clear').click()
   const nScripts = (await inv('progress:list')).filter((x) => x.finishedAt !== null && x.source !== 'agent').length
   await panel.locator('.progress-filter select[aria-label="Show the runs of"]').selectOption({ label: 'Assistant and scripts' })
-  check(`filtered to scripts: only their runs (${nScripts})`, !!(await until(async () => (await panel.locator('.progress-recent-text').allTextContents()).every((t) => t.startsWith('Script')), HUNG_MS)))
+  check(`filtered to scripts: only their runs (${nScripts})`, !!(await until(async () => (await panel.locator('.progress-recent-who').allTextContents()).every((t) => t.startsWith('Script')), HUNG_MS)))
   await panel.locator('.progress-filter select[aria-label="Show the runs of"]').selectOption({ label: 'All projects' })
   for (const theme of ['light', 'dark']) {
     await inv('settings:update', { appearance: { theme } })

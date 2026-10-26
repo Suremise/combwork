@@ -7059,6 +7059,20 @@ button.agent-place:hover {
 }
 .activity-canvas {
   position: relative;
+  transform-origin: 0 0;
+}
+/* The tree's box at its zoom (HI-1678): the canvas is scaled inside it, so the scrollbars follow the zoom. */
+.activity-scaled {
+  position: relative;
+}
+.activity-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.activity-zoom-value {
+  min-width: 46px;
+  font-variant-numeric: tabular-nums;
 }
 .activity-lines {
   position: absolute;
@@ -7369,6 +7383,104 @@ button.agent-place:hover {
 }
 .running-row .small {
   font-size: 12px;
+}
+/* A running agent's first line (HI-1679): its name, its status and its card's chip on one line at any width. As the
+   row narrows, the chip's title gives way first (down to the key), then the status (with "…"), then the project before
+   the agent's name; the agent's name and the card's key stay whole. In a narrow Overview the context column narrows with
+   the line, so the line keeps room for them. */
+.running-row > .grow {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.running-row > .tip-wrap:has(> .running-ctx) {
+  flex: 0 1 180px;
+  min-width: 0;
+}
+.running-row .running-ctx {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+.running-row .running-ctx > .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Shrink factors far apart give each part its turn: what a part with a far smaller factor would give up meanwhile
+   rounds to nothing, so it shows no "…" until the parts before it are as small as they go. */
+.running-line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+/* Spaced by margins, not a gap: the project and the agent's name are two items that read as one. */
+.running-line > .tip-wrap {
+  margin-left: 6px;
+}
+/* The name's parts are the line's own: its project shrinks to nothing first, its agent's name (no box of its own) never. */
+.running-line > strong {
+  display: contents;
+  white-space: nowrap;
+}
+.running-project {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: pre;
+}
+.running-line > .tip-wrap:has(> .running-status) {
+  flex: 0 100000 auto;
+  min-width: 0;
+}
+.running-status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.running-line > .tip-wrap:has(> .card-chip) {
+  flex: 0 10000000000 auto;
+}
+/* Several cards (WatchedCardChips): a chip each, keys only, giving way as one chip does; when they don't fit, how many
+   ("2 cards"), whole. The unseen copy measures what the chips need. */
+.running-line > .running-cards {
+  position: relative;
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 10000000000 auto;
+  min-width: 0;
+  margin-left: 6px;
+  overflow: hidden;
+}
+.running-line > .running-cards.counted {
+  min-width: max-content;
+}
+.running-cards-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  gap: 4px;
+  visibility: hidden;
+  white-space: nowrap;
+}
+.running-cards-count {
+  cursor: default;
+  white-space: nowrap;
+}
+/* The chip as a grid here: the title's column (the third) is as wide as the title when there is room and nothing at
+   the least, so the chip shrinks down to its icon and key, never past them. */
+.running-line .card-chip {
+  flex: 0 1 auto;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: auto auto minmax(0, max-content) auto;
+  min-width: auto;
+  max-width: 100%;
+}
+.running-line .card-chip .codicon,
+.running-line .card-chip-number {
+  white-space: nowrap;
 }
 .running-ctx {
   width: 180px;
@@ -8575,6 +8687,9 @@ body.pane-resizing-v .monaco-editor {
   display: flex;
   gap: 10px;
   overflow-x: auto;
+  /* The view's 10 px gap above it is inside it, so a group's heading on its line there (below) is in its scroll box. */
+  margin-top: -10px;
+  padding-top: 10px;
 }
 .board-column {
   flex: 1 1 0;
@@ -8595,8 +8710,7 @@ body.pane-resizing-v .monaco-editor {
   min-width: 34px;
 }
 /* A category with several stages (#1420: Approved with Merging): one heading over its stages' columns, which share its
-   width as the board's columns do; its flex-grow is how many of them are open (inline). The other columns start lower
-   by the heading's height, so every column's header lines up. Its basis is the room inside it that isn't its open
+   width as the board's columns do; its flex-grow is how many of them are open (inline). Its basis is the room inside it that isn't its open
    columns' shares: the gaps between its stages (10 px each), a folded stage's 34 px strip, and each open column's
    borders (2 px: a column's least size, which every column outside a category has as its own basis). So each open
    column gets the same share of the board as the others (#1490: Approved and Merging were 5 px narrower, and Approved's
@@ -8610,14 +8724,44 @@ body.pane-resizing-v .monaco-editor {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  position: relative;
 }
 .board-category.collapsed {
   flex: 0 0 auto;
 }
+/* Its heading is a line over its columns in the 10 px gap above them, its name on the line as a fieldset's legend
+   (HI-1682, Darren's decision): it takes no row of its own, so every column's top is the same with a group or without
+   one. The name, on the view's background, may reach a pixel into the columns' tops. */
 .board-category-head {
-  height: 18px;
-  padding: 0 6px;
-  font-size: 11px;
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  height: 10px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  pointer-events: none;
+}
+/* Folded to its strips, its name has their width only. */
+.board-category.collapsed .board-category-head {
+  padding: 0 2px;
+}
+.board-category-head::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 0;
+  border-top: 2px solid var(--border-subtle);
+}
+.board-category-head > span {
+  position: relative;
+  min-width: 0;
+  padding: 0 4px;
+  background: var(--bg);
+  font-size: 10px;
+  line-height: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -8625,12 +8769,12 @@ body.pane-resizing-v .monaco-editor {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border-bottom: 2px solid var(--border-subtle);
-  margin-bottom: 4px;
 }
-.board.colored .board-category-head {
+.board.colored .board-category-head > span {
   color: color-mix(in srgb, var(--col) var(--board-label), var(--fg-strong));
-  border-bottom-color: var(--col);
+}
+.board.colored .board-category-head::before {
+  border-top-color: var(--col);
 }
 .board-category-columns {
   flex: 1;
@@ -8642,10 +8786,8 @@ body.pane-resizing-v .monaco-editor {
 .board-category-columns > .board-column:not(.collapsed) {
   min-width: 120px;
 }
-/* The heading's height (its 2 px edge inside it) and margin: 22 px, so the headers line up (#1490: 24 was 2 px low). */
+/* Seven columns where six were: each a little narrower at least, so they still fit where six did. */
 .board.grouped > .board-column {
-  margin-top: 22px;
-  /* Seven columns where six were: each a little narrower at least, so they still fit where six did. */
   min-width: 140px;
 }
 .board-column-strip {
@@ -9186,22 +9328,47 @@ body.pane-resizing-v .monaco-editor {
   align-items: center;
   gap: 6px;
 }
-.for-you-offers {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* The actions an agent's question offers (#1630), as one grid (HI-1689): the buttons share a column as wide as the
+   widest label, so every reason box starts and ends at the same place. Narrow, each button is over its box. */
+.for-you-offers-box {
+  container-type: inline-size;
   margin-block-end: 8px;
 }
-/* An action an agent's question offers (#1630): its button, then the reason it is done with. */
-.for-you-offer {
-  display: flex;
-  align-items: center;
+.for-you-offers {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   gap: 6px;
+}
+/* An action: its button, then the reason it is done with, a row of the grid (a subgrid, so it keeps a box). */
+.for-you-offer {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
   min-inline-size: 0;
 }
-.for-you-offer .input {
+.for-you-offer > .tip-wrap {
+  display: flex;
+  align-self: stretch;
+}
+.for-you-offer > .tip-wrap > .btn {
   flex: 1;
+  justify-content: center;
+}
+.for-you-offer .input {
+  align-self: stretch;
   min-inline-size: 0;
+}
+/* Narrower than the widest label (German's, 179 px) and a reason box of about 155 px: a button over its box, the actions
+   further apart than a button and its box. */
+@container (max-width: 340px) {
+  .for-you-offers {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 10px;
+  }
+  .for-you-offer {
+    row-gap: 4px;
+  }
 }
 .for-you-rounds input {
   inline-size: 64px;
@@ -9841,6 +10008,101 @@ textarea.input.task-blocked-input {
   width: 100%;
   min-height: 56px;
   resize: vertical;
+}
+/* Card attachments (HI-1700): an image in a card's text shown as a thumbnail under the text it follows (a click opens it);
+   a link to one removed. */
+.task-description .markdown img,
+.task-comment .markdown img {
+  display: block;
+  max-width: min(240px, 100%);
+  max-height: 240px;
+  margin: 4px 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.attachment-gone {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 9px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  background: var(--bg-active);
+}
+/* Files pasted or dropped into a box, not saved yet: a chip each, under the box. */
+.attach-drafts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  align-self: stretch;
+  margin-top: 4px;
+}
+.attach-draft {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  padding: 2px 2px 2px 4px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.attach-draft img {
+  width: 24px;
+  height: 24px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+.attach-draft-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The card's attachments: a row each, its thumbnail or icon, its name and size, and its actions. */
+.card-attachments {
+  margin-top: 8px;
+}
+.card-attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-attachment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+.card-attachment.missing {
+  border-style: dashed;
+}
+.card-attachment-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex: none;
+}
+.card-attachment-icon {
+  width: 40px;
+  text-align: center;
+  font-size: 20px;
+  flex: none;
+}
+.card-attachment-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.card-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* A card's decisions (#357), pinned above its comments: compact, an accent rule like a quote, "new since start" marked. */
 .task-decisions {
@@ -10771,11 +11033,6 @@ button.progress-run-show:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Under a finished run in a copy (#1446): lined up with its title, after its icon. */
-.progress-recent-item > .progress-run-for {
-  margin-top: 0;
-  padding: 0 12px 3px 32px;
-}
 /* A failed check that blocks its card's Review (#1279). */
 .progress-run-blocks {
   margin-top: 2px;
@@ -11043,7 +11300,67 @@ button.progress-run-show:focus-visible {
 .progress-runs-failed .codicon {
   color: var(--error);
 }
-/* A run and its retries the same day, one line (#1309): it opens to each run. */
+/* A day's runs by card (HI-1701): a heading per card (Other last), its runs under it, a line each. */
+.progress-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 8px 2px 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.progress-card-head:hover {
+  background: var(--bg-hover);
+}
+.progress-card-head > .codicon,
+.progress-card-key,
+.progress-card-summary,
+.progress-card-when {
+  flex-shrink: 0;
+}
+.progress-card-key {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+}
+button.progress-card-key {
+  cursor: pointer;
+}
+button.progress-card-key:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+/* The title gives way first, then the summary keeps its words. */
+.progress-card-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-card-runs.passed > .progress-card-head > .progress-card-icon {
+  color: var(--success);
+}
+.progress-card-runs.failed > .progress-card-head > .progress-card-icon,
+.progress-card-runs.failed .progress-card-summary {
+  color: var(--error);
+}
+.progress-card-runs.retried > .progress-card-head > .progress-card-icon,
+.progress-card-runs.stale > .progress-card-head > .progress-card-icon {
+  color: var(--warning);
+}
+.progress-card-runs.stopped > .progress-card-head > .progress-card-icon {
+  color: var(--fg-muted);
+}
+.progress-card-items {
+  margin-inline-start: 18px;
+  border-inline-start: 1px solid var(--border-subtle);
+}
+/* A run and its retries the same day, or the merge queue's checks of a card, one line (#1309, HI-1701): it opens to each run. */
 .progress-group-head {
   width: 100%;
   border: 0;
@@ -11051,6 +11368,15 @@ button.progress-run-show:focus-visible {
   font: inherit;
   text-align: start;
   cursor: pointer;
+}
+/* As wide and tall as a run's chevron button, so every line is the same height. */
+.progress-group-chevron {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
 }
 .progress-group-runs {
   margin-inline-start: var(--space-4);
@@ -11075,7 +11401,9 @@ button.progress-run-show:focus-visible {
   padding-right: 4px;
 }
 /* The line (its tooltip's), then the chevron after the time (#251): the title gives way first. */
-.progress-recent > .tip-wrap:first-child {
+.progress-recent > .tip-wrap:first-child,
+.progress-recent-line {
+  display: flex;
   flex: 1;
   min-width: 0;
   align-items: center;
@@ -11173,16 +11501,30 @@ button.progress-run-show:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.progress-recent.passed > .tip-wrap > .codicon {
+/* Who ran it, then what (HI-1701): its name keeps its width. */
+.progress-recent-who {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+}
+.progress-recent.passed > .tip-wrap > .codicon,
+.progress-recent.passed > .progress-recent-line > .codicon {
   color: var(--success);
 }
-.progress-recent.failed > .tip-wrap > .codicon {
+.progress-recent.failed > .tip-wrap > .codicon,
+.progress-recent.failed > .progress-recent-line > .codicon {
   color: var(--error);
 }
-.progress-recent.stale > .tip-wrap > .codicon {
+.progress-recent.stale > .tip-wrap > .codicon,
+.progress-recent.stale > .progress-recent-line > .codicon,
+.progress-recent.retried > .progress-recent-line > .codicon {
   color: var(--warning);
 }
-.progress-recent.stopped > .tip-wrap > .codicon {
+.progress-recent.stopped > .tip-wrap > .codicon,
+.progress-recent.stopped > .progress-recent-line > .codicon {
   color: var(--fg-muted);
 }
 .progress-rail {

@@ -210,18 +210,21 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
           </ul>
         </div>
       )}
+      {/* One grid (HI-1689): the buttons share a column as wide as the widest, so the reason boxes line up. */}
       {!!offered.length && (
-        <div className="for-you-offers">
-          {offered.map((x) => (
-            <div key={x.kind} className="for-you-offer" data-offer={x.kind}>
-              <Tooltip content={tr(M.offerTip, { action: x.kind })}>
-                <BusyButton className="primary" busy={busy(x.kind)} busyLabel={tr(M.answering)} disabled={!!action.busy} onClick={() => void answer(x.kind, { outcome: 'answered', action: x.kind, ...(reasonOf(x).trim() ? { reason: reasonOf(x).trim() } : {}) })}>
-                  {tr(M.offer, { action: x.kind })}
-                </BusyButton>
-              </Tooltip>
-              <input className="input" aria-label={tr(M.offerReason)} placeholder={tr(M.offerReason)} value={reasonOf(x)} onChange={(e) => setReasons((r) => ({ ...r, [x.kind]: e.target.value }))} />
-            </div>
-          ))}
+        <div className="for-you-offers-box">
+          <div className="for-you-offers">
+            {offered.map((x) => (
+              <div key={x.kind} className="for-you-offer" data-offer={x.kind}>
+                <Tooltip content={tr(M.offerTip, { action: x.kind })}>
+                  <BusyButton className="primary" busy={busy(x.kind)} busyLabel={tr(M.answering)} disabled={!!action.busy} onClick={() => void answer(x.kind, { outcome: 'answered', action: x.kind, ...(reasonOf(x).trim() ? { reason: reasonOf(x).trim() } : {}) })}>
+                    {tr(M.offer, { action: x.kind })}
+                  </BusyButton>
+                </Tooltip>
+                <input className="input" aria-label={tr(M.offerReason)} placeholder={tr(M.offerReason)} value={reasonOf(x)} onChange={(e) => setReasons((r) => ({ ...r, [x.kind]: e.target.value }))} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
       {limit ? (

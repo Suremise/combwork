@@ -68,7 +68,7 @@ import { syncBundled } from './bundled'
 import { checkMoved, finishPending, movePlan, repairMove } from './workspaceMove'
 import { missingWorktree, recreateWorktree, unlinkMissingWorktree } from './agentWorktree'
 import { projectAgents as agentsOf } from '../shared/defaults'
-import type { MoveOptions } from '../shared/types'
+import type { MoveOptions, TaskCard } from '../shared/types'
 import { killPty, ptyBuffer, ptySize, resizePty, writePty } from './ptyHost'
 import { apiInfo, createViewer, regenerateToken, revokeViewer } from './servers'
 import * as projectAgents from './projectAgents'
@@ -107,6 +107,7 @@ import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
 import { adoptWorkspace } from './workflow/adoption'
 import { repairStages } from './workflow/stageRepair'
+import { attachableSource, attachToCard, cardAttachmentGroups, cardAttachments, recoverCardAttachments, removeCardAttachment, stageDrafts } from './cardAttachments'
 import { settleSlotsUpToDate } from './workflow/slotsUpToDateStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
 import { heldWriter, releaseHeldWriter } from './agentFolders'
@@ -367,6 +368,8 @@ function boardSteps(ws: WorkspaceService, upgraded = false): void {
     .then(() => step('slots'))
     .then(() => migrateSlots(ws))
     .then(() => repairStages(ws))
+    // What an interrupted card attachment operation left (HI-1700), settled from its records against the board.
+    .then(() => recoverCardAttachments(ws))
     .finally(() => {
       releaseWindow(ws, claim)
       return reconcileWorkspace(ws)
@@ -747,12 +750,19 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const dir = join(r.filePaths[0], `hive-board-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`)
       return { dir, cards: await exportBoard(ws, dir) }
     },
-    'tasks:create': (input) => tasks.createTask(input, { kind: 'user' }),
+    'tasks:create': async (input, drafts) => tasks.changeWithAttachments({ kind: 'user' }, await stageDrafts(currentWorkspace(), drafts, input.project ?? null), 'description', () => tasks.createTask(input, { kind: 'user' })),
     'tasks:setKind': (n, kind, opts) => tasks.setKind(n, kind, { kind: 'user' }, opts ?? {}),
     'tasks:confirmKind': (n, accept) => tasks.confirmKind(n, accept === true, { kind: 'user' }),
     'tasks:setReviewSkip': (n, skip, opts) => tasks.setReviewSkip(n, skip === true, { kind: 'user' }, { reason: opts?.reason }),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
-    'tasks:update': (n, patch) => tasks.updateTask(n, patch, { kind: 'user' }, { ask: true }),
+    'tasks:update': async (n, patch, more) => {
+      const user = { kind: 'user' } as const
+      const comment = typeof more?.comment === 'string' && more.comment.trim() ? more.comment : undefined
+      // The dialog's Save (HI-1700): its change, its comment and the drafts of both boxes, in one change.
+      const drafts = more?.drafts?.files?.length ? await stageDrafts(currentWorkspace(), more.drafts, (await tasks.getTask(n)).project ?? null) : null
+      const run = (): Promise<TaskCard> => (Object.keys(patch).length ? tasks.updateTask(n, patch, user, { ask: true, ...(comment ? { comment } : {}) }) : comment ? tasks.commentTask(n, comment, user) : tasks.getTask(n))
+      return tasks.changeWithAttachments(user, drafts, comment ? 'comment' : 'description', run)
+    },
     'tasks:move': (n, column, opts) => tasks.moveTask(n, column, opts ?? {}),
     'tasks:columns': (n) => tasks.moveColumns(n),
     'tasks:facts': (n) => cardFacts(currentWorkspace(), n),
@@ -762,7 +772,15 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'tasks:answer': (n, request, answer) => tasks.answerTask(n, request, answer),
     'docs:section': (p, ref) => checkDocRef(p ? workspace.assertProject(p) : null, workspace.sharedDir, String(ref ?? '')),
-    'tasks:comment': (n, text) => tasks.commentTask(n, text, { kind: 'user' }),
+    'tasks:comment': async (n, text, drafts) => tasks.changeWithAttachments({ kind: 'user' }, await stageDrafts(currentWorkspace(), drafts, (await tasks.getTask(n)).project ?? null), 'comment', () => tasks.commentTask(n, text, { kind: 'user' })),
+    'cards:attachments': (n) => cardAttachments(currentWorkspace(), n),
+    'cards:projectAttachments': (p) => cardAttachmentGroups(currentWorkspace(), workspace.assertProject(p)),
+    'cards:removeAttachment': (n, id) => removeCardAttachment(currentWorkspace(), n, String(id)),
+    'cards:attachFromPane': async (n, host, path) => {
+      const ws = currentWorkspace()
+      const from = await attachableSource(ws, { kind: 'pane', host: workspace.assertSessionHost(host) }, String(path))
+      return (await attachToCard(ws, n, [{ path: from }], 'You', 'pane')).attachments[0] // i18n-ignore: stored with the row in English, as agents read it
+    },
     'tasks:archive': (n, archived) => tasks.archiveTask(n, archived),
     'tasks:editDecision': (n, id, text) => tasks.editDecision(n, id, text, { kind: 'user' }),
     'tasks:archiveBatch': (numbers, req) => {
@@ -848,6 +866,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workflow:check': (p, change) => checkWorkflowChange(workspace, workspace.assertProject(p), change),
     'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [] }),
     'workflow:stages': (p) => projectStages(workspace, workspace.assertProject(p)),
+    'board:stages': async () => Object.fromEntries(await Promise.all((workspace.info()?.projects ?? []).map(async (p) => [p.path.toLowerCase(), await projectStages(workspace, p.path).catch(() => null)] as const))),
     'workflow:checkPlatform': (p, to) => checkPlatformSwitch(workspace, workspace.assertProject(p), to),
     'workflow:setPlatform': (p, to, opts) => setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected }),
     'workflow:presetNotNow': (p, platform) => presetNotNow(workspace, workspace.assertProject(p), platform),

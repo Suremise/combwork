@@ -1,15 +1,22 @@
 // What an agent's line hasn't merged, as branchWatch counts it (#1627): a slot's line against its target, else the
 // project's default branch, never the branch the project folder has checked out; a line whose branch isn't made yet is
-// nothing to count, quietly. Real repositories.
+// nothing to count, quietly. HI-1698: a branch that isn't there (an agent's 0.9 branch gone with its worktree, a card's
+// line deleted after its merge) is nothing to count either, and a migrated agent's 0.9 worktree isn't its line; a line
+// with no card target counts against the project's target before its default branch. Real repositories.
 import { execFileSync } from 'child_process'
 import { rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import type { ProjectInfo } from '../src/shared/types'
 
+// The project's workflow target (its options in force), as the test sets it.
+const projectTarget = vi.hoisted(() => ({ value: null as string | null }))
+vi.mock('../src/main/gitRepo', () => ({ workTargetOf: async () => projectTarget.value }))
+
 const { lineStatus } = await import('../src/main/branchWatch')
 const { createWorktree } = await import('../src/main/worktrees')
+const { setSlotsMigrated } = await import('../src/main/agentFolders')
 
 const run = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' })
 let root = ''
@@ -17,6 +24,8 @@ let root = ''
 afterEach(() => {
   if (root) rmSync(root, { recursive: true, force: true })
   root = ''
+  projectTarget.value = null
+  setSlotsMigrated(null)
 })
 
 const commit = (cwd: string, file: string): void => {
@@ -69,5 +78,35 @@ describe("an agent's line, counted against where it merges (#1627)", () => {
     const { project: pr, slot } = await project()
     const st = await lineStatus({ project: pr, worktree: { path: slot, branch: 'hive/P/P-1-fix', base: '1.0.0' } })
     expect(st).toMatchObject({ into: 'main', ahead: 3 })
+  })
+})
+
+describe('branches that are gone, and agents that moved to slots (HI-1698)', () => {
+  it("an agent's 0.9 branch deleted with its worktree: nothing to count, no error", async () => {
+    const { project: pr, slot } = await project()
+    await expect(lineStatus({ project: pr, agentId: 'hb1', worktree: { path: join(root, 'gone'), branch: 'hive/hb1', base: 'main' } })).resolves.toBeNull()
+    // A slot's line the same.
+    await expect(lineStatus({ project: pr, agentId: 'hb1', worktree: { path: slot, branch: 'hive/hb1', base: '' }, slot: true })).resolves.toBeNull()
+  })
+
+  it("a card's line deleted after its merge: nothing to count, no error", async () => {
+    const { project: pr, slot } = await project()
+    run(slot, 'checkout', '-q', '--detach')
+    run(pr.path, 'branch', '-D', 'hive/P/P-1-fix')
+    await expect(lineStatus({ project: pr, agentId: 'hb2', worktree: { path: slot, branch: 'hive/P/P-1-fix', base: '1.0.0' }, slot: true, target: '1.0.0' })).resolves.toBeNull()
+  })
+
+  it("a migrated agent's 0.9 worktree, its branch still there, isn't its line any more", async () => {
+    const { project: pr, slot } = await project()
+    setSlotsMigrated(() => ['hb3'])
+    await expect(lineStatus({ project: pr, agentId: 'hb3', worktree: { path: slot, branch: 'hive/P/P-1-fix', base: 'main' } })).resolves.toBeNull()
+    // One not migrated still counts it, as before.
+    expect(await lineStatus({ project: pr, agentId: 'hb9', worktree: { path: slot, branch: 'hive/P/P-1-fix', base: '1.0.0' } })).toMatchObject({ ahead: 3 })
+  })
+
+  it("a slot's line with no card target counts against the project's target (1.0.0), not main", async () => {
+    const { project: pr, slot } = await project()
+    projectTarget.value = '1.0.0'
+    expect(await lineStatus({ project: pr, worktree: { path: slot, branch: 'hive/P/P-1-fix', base: '' }, slot: true })).toMatchObject({ into: '1.0.0', ahead: 1 })
   })
 })

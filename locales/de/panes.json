@@ -134,6 +134,8 @@
   "panes.resume.recache": "Cache abgelaufen, ~{tokens} zum erneuten Cachen",
   "panes.resume.sessionsTab": "Tab „Sitzungen“…",
   "panes.resume.tip": "„{session}“ fortsetzen, zuletzt aktiv {when}",
+  "panes.running.cards": "{n, plural, one {# Karte} other {# Karten}}",
+  "panes.running.waitingFor": "Wartet auf",
   "panes.runtime.hooksMissing": "Status unbekannt: keine Hooks von {provider}",
   "panes.runtime.hooksMissingNote": "Hive empfängt keine Hooks von {provider}, daher kann der Status des Agenten falsch sein. {why, select, refused {Hive hat seine Hooks abgelehnt: Sie trugen nicht das Token dieser Sitzung.} off {{where} schaltet Hooks aus (disableAllHooks).} newer {Dieses {provider} ist neuer als die Version, mit der Hive getestet wurde, und ein Update hat womöglich seine Hooks geändert.} other {{after, select, start {Seit dem Start kam keiner.} other {Nach einem Prompt, an dem es zu arbeiten begann, kam keiner.}}}} Bis Hooks ankommen, tippt Hive nichts in den Agenten. Starte die Sitzung neu; passiert das wieder, aktualisiere Hive oder prüfe, ob die Einstellungen von {provider} Hooks ausschalten.",
   "panes.runtime.needsInput": "Braucht deine Eingabe",

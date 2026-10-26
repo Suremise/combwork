@@ -689,6 +689,168 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  // HI-1687: the Stop hook named a loop wake (m4790) that hive_inbox wouldn't give, nor ack: the read made it again, then
+  // found the board changed (any card's change) by its hand-out, and kept it unread. Now a notice names only what a read
+  // would give (deliveries.countable, which makes nothing again), and a read's hand-out asks only whether this wake's own
+  // card, lanes and project changed: another card's change doesn't keep it from being read, a change of its own does.
+  describe('what the notices name, hive_inbox gives (HI-1687)', async () => {
+    const deliveries = await import('../src/main/deliveries')
+    const { noticeFor } = await import('../src/main/inboxNotices')
+    const liveOf = (alpha: string, agentId: string) => ({ projectPath: alpha, agentId, sessionId: null }) as never
+    const idsIn = (text: string | null): string[] => [...(text ?? '').matchAll(/\bm\d+\b/g)].map((m) => m[0])
+    const given = (read: { items: { ids: string[] }[] }): string[] => read.items.flatMap((i) => i.ids)
+    const loopOf = async (alpha: string, agentId: string) => (await deliveries.deliveriesOf(alpha, agentId)).filter((r) => r.source === 'loop')
+    /** The builder working while its card passes: its verdict's wake waits in its inbox, made once by a read that gave it nothing. */
+    const passedWhileWorking = async () => {
+      await loopWakes.clearLoopWakes()
+      await rulesOff()
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const c = await newCard(w)
+      const later = await newCard(w)
+      const unrelated = await newCard(w)
+      const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c, later], by: 'B1 (alpha)' })).lane
+      st.status.set('b1', 'working')
+      st.status.set('r1', 'working')
+      st.status.set('o1', 'working')
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 1: PASSED.' }))
+      await vi.waitFor(async () => expect((await loopOf(alpha, 'b1')).filter((r) => r.state === 'queued')).toHaveLength(1), HANG)
+      const [wake] = await loopOf(alpha, 'b1')
+      return { w, alpha, st, c, later, unrelated, lane, wake }
+    }
+    afterEach(() => {
+      deliveries.setBeforePlanForTests(null)
+      loopWakes.loopWakeTestHooks.afterKey = null
+    })
+
+    it('another card changes while hive_inbox reads it: it is given and acked, and the Stop hook named nothing a read would not give', async () => {
+      const { w, alpha, unrelated, wake } = await passedWhileWorking()
+      const named = idsIn(await noticeFor(liveOf(alpha, 'b1'), 'drain'))
+      let changed = false
+      deliveries.setBeforePlanForTests(async () => {
+        if (changed) return
+        changed = true
+        await inWorkspace(w, () => tasks.updateTask(unrelated, {}, user, { comment: 'Another lane at work.' }))
+      })
+      const read = await deliveries.readInbox(alpha, 'b1')
+      expect(changed).toBe(true)
+      expect(given(read)).toEqual([wake.id])
+      expect(named.every((id) => given(read).includes(id))).toBe(true)
+      expect((await deliveries.ackDeliveries(alpha, 'b1', [wake.id])).acked).toEqual([wake.id])
+      await settled()
+      await disposeWorkspaceService(w)
+    })
+
+    it('once made, the Stop hook names it, and a read made again after its own card changed gives it', async () => {
+      const { w, alpha, c, wake } = await passedWhileWorking()
+      // Made by a read held back once (the card itself changed between its making and its hand-out): named now.
+      let changed = false
+      deliveries.setBeforePlanForTests(async () => {
+        if (changed) return
+        changed = true
+        await inWorkspace(w, () => tasks.updateTask(c, {}, user, { comment: 'A note on the card itself.' }))
+      })
+      const read = await deliveries.readInbox(alpha, 'b1')
+      expect(changed).toBe(true)
+      // Its own card changed: made again (the next attempt), then given.
+      expect(given(read)).toEqual([wake.id])
+      await settled()
+      await disposeWorkspaceService(w)
+    })
+
+    it("the lane's reviewer changes after a reviewer's wake is made and before its hand-out: the old reviewer gets nothing", async () => {
+      await loopWakes.clearLoopWakes()
+      await rulesOff()
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const c = await newCard(w)
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+      st.status.set('r1', 'working')
+      st.status.set('o1', 'working')
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      await vi.waitFor(async () => expect((await loopOf(alpha, 'r1')).filter((r) => r.state === 'queued')).toHaveLength(1), HANG)
+      let changed = false
+      deliveries.setBeforePlanForTests(async () => {
+        if (changed) return
+        changed = true
+        await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'o1', cards: [c], by: 'B1 (alpha)' })
+      })
+      expect(given(await deliveries.readInbox(alpha, 'r1'))).toEqual([])
+      expect(changed).toBe(true)
+      expect((await loopOf(alpha, 'r1')).map((r) => `${r.state}: ${r.detail}`)).toEqual(["cancelled: it is another agent's wake now"])
+      expect(idsIn(await noticeFor(liveOf(alpha, 'r1'), 'drain'))).toEqual([])
+      await settled()
+      await disposeWorkspaceService(w)
+    })
+
+    it('the card changes while its wake is made again (before the read reaches the hand-out): that version is not given; the next one is', async () => {
+      const { w, alpha, c, wake } = await passedWhileWorking()
+      let changed = false
+      loopWakes.loopWakeTestHooks.afterKey = async () => {
+        if (changed) return
+        changed = true
+        await inWorkspace(w, () => tasks.updateTask(c, {}, user, { comment: 'Changed while it was made.' }))
+      }
+      const read = await deliveries.readInbox(alpha, 'b1')
+      expect(changed).toBe(true)
+      expect(given(read)).toEqual([wake.id])
+      // The version given is the one made after the change, not the one made across it.
+      expect((await deliveries.deliveriesOf(alpha, 'b1')).find((r) => r.id === wake.id)?.meta?.v).not.toBe(undefined)
+      await settled()
+      await disposeWorkspaceService(w)
+    })
+
+    it("a Done card's step whose lane ends before its hand-out is dropped as no longer due, and never named", async () => {
+      await loopWakes.clearLoopWakes()
+      await rulesOff()
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const c = await newCard(w)
+      const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })).lane
+      st.status.set('b1', 'working')
+      st.status.set('r1', 'working')
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'done' }, r1, { comment: 'Round 1: PASSED.' }))
+      await vi.waitFor(async () => expect((await loopOf(alpha, 'b1')).filter((r) => r.state === 'queued')).toHaveLength(1), HANG)
+      let ended = false
+      deliveries.setBeforePlanForTests(async () => {
+        if (ended) return
+        ended = true
+        await lanes.endLane(w, lane.id, {})
+      })
+      expect(given(await deliveries.readInbox(alpha, 'b1'))).toEqual([])
+      expect(ended).toBe(true)
+      expect((await loopOf(alpha, 'b1')).map((r) => `${r.state}: ${r.detail}`)).toEqual(['cancelled: no longer due'])
+      expect(idsIn(await noticeFor(liveOf(alpha, 'b1'), 'drain'))).toEqual([])
+      await settled()
+      await disposeWorkspaceService(w)
+    })
+
+    it('counting changes nothing: no version made, no wake for the new recipient, and a read in progress still gives it', async () => {
+      const { w, alpha, c, later, wake } = await passedWhileWorking()
+      // The lane's reviewer changes (a builder's wake stays the builder's), and the notices count, again and again.
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'o1', cards: [c, later], by: 'B1 (alpha)' })
+      const snapshot = async () => JSON.stringify(await Promise.all(['b1', 'r1', 'o1'].map(async (a) => (await deliveries.deliveriesOf(alpha, a)).map((r) => [r.id, r.state, r.meta?.v ?? null]))))
+      const before = await snapshot()
+      let counted = 0
+      deliveries.setBeforePlanForTests(async () => {
+        // While the read waits at its hand-out: the notices count for both agents.
+        for (let i = 0; i < 3; i++) for (const a of ['b1', 'o1']) await noticeFor(liveOf(alpha, a), i % 2 ? 'checkpoint' : 'drain')
+        counted++
+      })
+      for (let i = 0; i < 3; i++) for (const a of ['b1', 'o1']) await noticeFor(liveOf(alpha, a), 'drain')
+      expect(await snapshot()).toBe(before)
+      const read = await deliveries.readInbox(alpha, 'b1')
+      expect(counted).toBeGreaterThan(0)
+      expect(given(read)).toEqual([wake.id])
+      await settled()
+      await disposeWorkspaceService(w)
+    })
+  })
+
   it("a lane reviewer's comment is only a comment while the project's loop wakes are off (#1410)", async () => {
     await loopWakes.clearLoopWakes()
     const { w, alpha } = await open({ loopWakes: false })

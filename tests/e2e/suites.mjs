@@ -60,6 +60,7 @@ export const SUITES = [
   { name: 'buildfacts' },
   { name: 'bursts' },
   { name: 'busy' },
+  { name: 'cardattach' },
   { name: 'cardchip' },
   { name: 'cardcontext' },
   { name: 'cardcost' },

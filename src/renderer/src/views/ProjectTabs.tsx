@@ -1,6 +1,7 @@
 import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AssistantMark } from '../components/AssistantMark'
-import { CardChip } from '../components/CardChip'
+import { CardChip, WatchedCardChip, WatchedCardChips } from '../components/CardChip'
+import { cardsWait } from '../components/watchLine'
 import { KeybindingsEditor } from '../components/Keybindings'
 import type { CompactionEvent, GitDiff, GitStatus, McpServerInfo, MemorySource, PlanLimit, ProjectConfig, ProjectInfo, ProviderId, SessionListItem, SessionUsage, SkillInfo, UnusedWorktree } from '@shared/types'
 import { unpricedModel, unpricedText, usesOwnPrices } from '@shared/prices'
@@ -620,7 +621,7 @@ function AgentsByUsage({ rows }: { rows: AgentRow[] }) {
 }
 
 /** One running agent: provider, model, mode, status, context used and cost so far. `onOpen` makes it a link. */
-export function RunningAgent({ project, a, label, onOpen, assistant }: { project: ProjectInfo; a: ProjectInfo['agents'][number]; label?: string; onOpen?: () => void; assistant?: boolean }) {
+export function RunningAgent({ project, a, label, onOpen, assistant }: { project: ProjectInfo; a: ProjectInfo['agents'][number]; label?: React.ReactNode; onOpen?: () => void; assistant?: boolean }) {
   const live = a.live!
   const usage = useLiveUsage(project, a.id)
   const settings = useStore((s) => s.settings)
@@ -629,11 +630,14 @@ export function RunningAgent({ project, a, label, onOpen, assistant }: { project
   const pct = contextPercent(ctx, window)
   const cost = live.costUsd ?? usage?.costUsd ?? null
   const estimated = live.costUsd !== undefined ? !!live.costEstimated : !!usage?.costEstimated
+  const status = statusText(live)
+  // Waiting on cards (HI-1679): their chips, as a working agent's card, and the status says what for; its hover the whole.
+  const wait = cardsWait(live, status)
   return (
     <div className={cx('running-row', onOpen && 'clickable')} onClick={onOpen} role={onOpen ? 'button' : undefined}>
       {/* The Assistant's own status icon (#399), its status in the tooltip as a dot's is. */}
       {assistant ? (
-        <Tooltip content={statusText(live)}>
+        <Tooltip content={status}>
           <AssistantMark status={live.status} unseen={live.unseen} />
         </Tooltip>
       ) : (
@@ -641,8 +645,13 @@ export function RunningAgent({ project, a, label, onOpen, assistant }: { project
       )}
       <ProviderIcon provider={live.provider} />
       <div className="grow">
-        <div>
-          <strong>{label ?? a.name}</strong> <span className="faint">{statusText(live)}</span> <CardChip project={project} a={a} />
+        {/* One line (HI-1679): the status gives way with "…", the chip after it never wraps and keeps its key whole. */}
+        <div className="running-line">
+          <strong>{label ?? a.name}</strong>
+          <Tooltip content={status}>
+            <span className="faint running-status">{wait ? wait.line : status}</span>
+          </Tooltip>
+          {!wait ? <CardChip project={project} a={a} /> : wait.cards.length === 1 ? <WatchedCardChip number={wait.cards[0]} /> : <WatchedCardChips cards={wait.cards} status={status} />}
         </div>
         <div className="faint small">
           {[live.modelName ?? usage?.model ?? null, live.permissionMode ? permissionLabel(live.provider, live.permissionMode, tr) : null, live.planMode ? tr(M.plan) : null].filter(Boolean).join(' · ')}

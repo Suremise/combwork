@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { msg, tr } from '@shared/i18n'
 import type { AgentInfo, ProjectInfo, TaskCard, TaskColumn } from '@shared/types'
 import { agentDoingCards, agentReviewCards, agentRowCards, columnColor, columnName } from '@shared/tasks'
@@ -70,6 +70,11 @@ export function TaskChip({ number, column, title, short, more = 0, label, blocke
   )
 }
 
+const CARD_LINE = msg({ id: 'board.chip.card', defaultMessage: '{card} {title}{decisions, plural, =0 {} one { (decisions: #)} other { (decisions: #)}}', description: "A card in the hover of an agent's card chip: its name (its key, such as AM-12, or #12 for a card with none), title (the user's own words) and how many decisions the user made about it (none: leave that branch empty)." })
+const CLICK_TO_OPEN = msg({ id: 'board.chip.clickToOpen', defaultMessage: 'Click to open {card}.', description: "The last line of the hover of an agent's card chip. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none." })
+/** A card in a chip's hover: its name, title and how many decisions it has (#357: what the user decided about it). */
+const cardLine = (c: TaskCard): string => tr(CARD_LINE, { card: cardLabel(c), title: c.title, decisions: c.decisions?.length ?? 0 })
+
 /**
  * The card an agent is working on (its first in Doing): `#4 title`, or only `#4` when `short`. Tinted with the Doing
  * column's colour (Settings → Board); clicking opens the card. With none in Doing, the card it is reviewing, with an
@@ -84,14 +89,66 @@ export function CardChip({ project, a, short, tip = true }: { project: ProjectIn
   const review = !doing.length
   const chip = <TaskChip number={first.number} column={review ? 'review' : 'doing'} title={first.title} short={short} more={more.length} />
   if (!tip) return chip
-  // Each card's decisions counted (#357): what the user decided about it, read in the card.
-  const line = (c: TaskCard): string => tr(msg({ id: 'board.chip.card', defaultMessage: '{card} {title}{decisions, plural, =0 {} one { (decisions: #)} other { (decisions: #)}}', description: "A card in the hover of an agent's card chip: its name (its key, such as AM-12, or #12 for a card with none), title (the user's own words) and how many decisions the user made about it (none: leave that branch empty)." }), { card: cardLabel(c), title: c.title, decisions: c.decisions?.length ?? 0 })
   const lines = [
-    ...(doing.length ? [tr(msg({ id: 'board.chip.doing', defaultMessage: 'Working on (Active):', description: "Heading in the hover of an agent's card chip, above the cards it works on. Active is the board column." })), ...doing.map(line)] : []),
-    ...(reviewing.length ? [tr(msg({ id: 'board.chip.reviewing', defaultMessage: 'Reviewing:', description: "Heading in the hover of an agent's card chip, above the cards it reviews." })), ...reviewing.map(line)] : []),
-    tr(msg({ id: 'board.chip.clickToOpen', defaultMessage: 'Click to open {card}.', description: "The last line of the hover of an agent's card chip. {card} is the card’s name: its key, such as AM-12, or #12 for a card with none." }), { card: cardLabel(first) })
+    ...(doing.length ? [tr(msg({ id: 'board.chip.doing', defaultMessage: 'Working on (Active):', description: "Heading in the hover of an agent's card chip, above the cards it works on. Active is the board column." })), ...doing.map(cardLine)] : []),
+    ...(reviewing.length ? [tr(msg({ id: 'board.chip.reviewing', defaultMessage: 'Reviewing:', description: "Heading in the hover of an agent's card chip, above the cards it reviews." })), ...reviewing.map(cardLine)] : []),
+    tr(CLICK_TO_OPEN, { card: cardLabel(first) })
   ]
   return <Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{lines.join('\n')}</span>}>{chip}</Tooltip>
+}
+
+/**
+ * The one card a watching agent waits on (HI-1679), as the chip a working agent's card has: tinted with the column it is
+ * in, its title, a click opening it. A card the board doesn't have is its name alone.
+ */
+export function WatchedCardChip({ number, short }: { number: number; short?: boolean }) {
+  const card = useStore((s) => s.tasks.find((t) => t.number === number))
+  const chip = <TaskChip number={number} column={card?.column ?? null} title={card?.title} blocked={!!card?.blocked} short={short} />
+  if (!card) return chip
+  return <Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{[cardLine(card), tr(CLICK_TO_OPEN, { card: cardLabel(card) })].join('\n')}</span>}>{chip}</Tooltip>
+}
+
+const N_CARDS = msg({ id: 'panes.running.cards', defaultMessage: '{n, plural, one {# card} other {# cards}}', description: "Instead of their chips, when they don't fit: how many cards a running agent waits for, in the Overview's Running now (its hover names them)." })
+
+/**
+ * The cards a watching agent waits on (HI-1679), a chip each with its key, as many as fit; when they don't all fit, how
+ * many there are ("2 cards"), its hover the whole status. Whether they fit is measured against an unseen copy of the
+ * chips, whose width the box keeps asking for, so what it shows never decides it.
+ */
+export function WatchedCardChips({ cards, status }: { cards: number[]; status: string }) {
+  const box = useRef<HTMLSpanElement>(null)
+  const measure = useRef<HTMLSpanElement>(null)
+  const [room, setRoom] = useState<{ need: number; have: number } | null>(null)
+  const ids = cards.join(',')
+  useLayoutEffect(() => {
+    const b = box.current
+    const m = measure.current
+    if (!b || !m) return
+    const read = (): void => setRoom((r) => (r && r.need === m.scrollWidth && r.have === b.clientWidth ? r : { need: m.scrollWidth, have: b.clientWidth }))
+    read()
+    const seen = new ResizeObserver(read)
+    seen.observe(b)
+    seen.observe(m)
+    return () => seen.disconnect()
+  }, [ids])
+  const fits = !room || room.have >= room.need - 1
+  const chips = cards.map((n) => <WatchedCardChip key={n} number={n} short />)
+  return (
+    <span ref={box} className={cx('running-cards', !fits && 'counted')} style={room ? { flexBasis: room.need } : undefined}>
+      <span ref={measure} className="running-cards-measure" aria-hidden="true" inert>
+        {cards.map((n) => (
+          <TaskChip key={n} number={n} column={null} short />
+        ))}
+      </span>
+      {fits ? (
+        chips
+      ) : (
+        <Tooltip content={status}>
+          <span className="card-chip running-cards-count">{tr(N_CARDS, { n: cards.length })}</span>
+        </Tooltip>
+      )}
+    </span>
+  )
 }
 
 /** The cards an agent's row in the focus view's strip names (agentRowCards), kept up to date with the board. */

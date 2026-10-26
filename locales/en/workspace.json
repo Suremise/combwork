@@ -812,8 +812,8 @@
     "description": "Under the steps of opening a workspace: why the window takes no other workspace meanwhile."
   },
   "workspace.overview.agentLabel": {
-    "defaultMessage": "{project} · {agent}",
-    "description": "A running agent in the Workspace Overview: its project and name."
+    "defaultMessage": "<in>{project} · </in>{agent}",
+    "description": "A running agent in the Workspace Overview: its project and name. <in>…</in> holds the project part (keep the tags around it, with its separator): in a narrow row it is dropped first, so the agent’s name stays whole."
   },
   "workspace.overview.apiCost": {
     "defaultMessage": "API-equivalent cost",
@@ -1826,6 +1826,10 @@
   "workspace.storage.cancel": {
     "defaultMessage": "Cancel",
     "description": "The Clean Up dialog's button that closes it."
+  },
+  "workspace.storage.cardAttachments": {
+    "defaultMessage": "Card attachments",
+    "description": "Storage (HI-1700): files kept with cards (.hive/attachments/cards). Clean Up and Purge never remove them."
   },
   "workspace.storage.cleanUp": {
     "defaultMessage": "Clean Up…",

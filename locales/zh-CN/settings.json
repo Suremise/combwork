@@ -166,6 +166,8 @@
   "settings.advanced.hive.assistant.otherMcpServers.title": "助手使用工作区的其他 MCP 服务器",
   "settings.advanced.hive.assistant.startView.desc": "Hive Assistant 的日志开启时，Hive 会在它启动时以及每次压缩后，向它提供工作区的简短视图：正在进行和等待中的事项，以及日志的最近条目。关闭后，从下次启动或压缩起它就不再获得这一视图（正在运行的助手也是如此），会用自己的工具读取所需内容。",
   "settings.advanced.hive.assistant.startView.title": "助手启动时使用 Hive 的启动视图",
+  "settings.advanced.hive.cards.attachmentMax.desc": "Hive 随卡片保留的最大文件（字节）：粘贴或拖放到卡片中的、从代理窗格附加的，或由代理或助手提供的文件。更大的文件会被拒绝并给出提示。已保留的文件不受影响。",
+  "settings.advanced.hive.cards.attachmentMax.title": "卡片附件：最大文件",
   "settings.advanced.hive.console.showText.desc": "在开发者控制台中显示文本：提示词、回复、命令和工具参数，上方有横幅说明内容未脱敏，并且每次录制开始时默认勾选其文本框。无论此设置如何，Token、API 密钥和登录信息始终遮盖；智能体的 hive_console 仍会脱敏，含文本的录制永远不会附加到“复制诊断信息”中。",
   "settings.advanced.hive.console.showText.title": "开发者控制台：显示提示词、回复和命令文本",
   "settings.advanced.hive.copies.quietWaitMinutes.desc": "归还的评审副本或检查副本，只有在其中不再有任何东西运行时才会再次使用：没有运行，没有其检查启动的进程，且其评审者处于空闲状态。超过这么多分钟后，等待副本的检查会说明哪个副本仍在被什么占用。Hive 绝不会重置仍有东西在运行的副本。",

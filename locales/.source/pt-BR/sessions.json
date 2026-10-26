@@ -34,6 +34,7 @@
   "sessions.cards.workedOn": "Worked on",
   "sessions.chips.dismiss": "Dismiss {file}",
   "sessions.chips.label": "Attached to this prompt",
+  "sessions.chips.toCard": "Attach {file} to a card",
   "sessions.cleanup.age": "{age, select, day {24 hours ago} week {7 days ago} other {30 days ago}}",
   "sessions.cleanup.archive": "Archive",
   "sessions.cleanup.archiveSummary": "Hive's own sessions are hidden from the list and their transcripts kept in .hive/archive: tick Archived to see them, and unarchive any at any time.",

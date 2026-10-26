@@ -147,6 +147,8 @@
   "panes.resume.recache": "cache expired, ~{tokens} to re-cache",
   "panes.resume.sessionsTab": "Sessions Tab…",
   "panes.resume.tip": "Resume \"{session}\", last active {when}",
+  "panes.running.cards": "{n, plural, one {# card} other {# cards}}",
+  "panes.running.waitingFor": "Waiting for",
   "panes.runtime.hooksMissing": "Status unknown: no hooks from {provider}",
   "panes.runtime.hooksMissingNote": "Hive isn't hearing from {provider}'s hooks, so its status may be wrong. {why, select, refused {Hive refused its hooks: they didn't carry this session's token.} off {{where} turns hooks off (disableAllHooks).} newer {This {provider} is newer than the version Hive was tested with, and an update may have changed its hooks.} other {{after, select, start {None came after it started.} other {None came after a prompt it went to work on.}}}} Until its hooks arrive, Hive types nothing into it. Restart the session; if this happens again, update Hive, or check {provider}'s settings for hooks turned off.",
   "panes.runtime.needsInput": "Needs your input",

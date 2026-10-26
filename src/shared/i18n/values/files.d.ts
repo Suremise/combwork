@@ -1,6 +1,11 @@
 // Generated from locales/en/files.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'files.attach.cardArchived': undefined
+  'files.attach.cardsHeading': { n: number }
+  'files.attach.cardsKept': undefined
+  'files.attach.openCard': { card: string | number }
+  'files.attach.toCard': undefined
   'files.attachments.all': undefined
   'files.attachments.archived': { host: string }
   'files.attachments.archivedBadge': undefined
@@ -34,8 +39,11 @@ interface HiveMessageValues {
   'files.attachments.refreshTarget': undefined
   'files.attachments.running': { host: string }
   'files.attachments.runningBadge': undefined
+  'files.attachments.sessionsHeading': { n: number }
+  'files.attachments.sessionsKept': undefined
   'files.attachments.title': undefined
   'files.attachments.total': { host: string; total: number; groups: number }
+  'files.attachments.totalWithCards': { total: number; cards: number; sessions: number; groups: number }
   'files.attachments.unnamed': { host: string; id: string | number }
   'files.attachments.view': undefined
   'files.collapseAll': undefined

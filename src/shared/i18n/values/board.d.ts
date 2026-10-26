@@ -50,6 +50,27 @@ interface HiveMessageValues {
   'board.archived.unarchiveSelected': undefined
   'board.archived.unarchiveSelectedN': { n: number }
   'board.archived.unarchiveTip': { card: string | number; column: string | number }
+  'board.attach.already': { card: string | number; file: string | number }
+  'board.attach.attached': { file: string | number; card: string | number }
+  'board.attach.drafts': { box: string }
+  'board.attach.failed': { file: string | number }
+  'board.attach.heading': { n: number }
+  'board.attach.hint': undefined
+  'board.attach.meta': { size: string | number; by: string | number; when: string | number }
+  'board.attach.missing': undefined
+  'board.attach.open': undefined
+  'board.attach.otherCards': undefined
+  'board.attach.paneHeader': { file: string | number }
+  'board.attach.remove': undefined
+  'board.attach.removeDraft': { name: string | number }
+  'board.attach.removeMessage': { used: string }
+  'board.attach.removeTitle': { name: string | number; card: string | number }
+  'board.attach.removed': { name: string | number }
+  'board.attach.show': undefined
+  'board.attach.toCard': { card: string | number }
+  'board.attach.tooLarge': { name: string | number; max: string | number }
+  'board.attach.tooMuch': { files: number; total: string | number }
+  'board.attach.where': { description: string; both: string; comments: number }
   'board.batch.andMore': { cards: string | number; n: number }
   'board.batch.archived': { n: number }
   'board.batch.backFailed': undefined
@@ -691,14 +712,18 @@ interface HiveMessageValues {
   'board.runs.anyAgent': undefined
   'board.runs.anyLane': undefined
   'board.runs.cardRun': { card: string | number; run: string | number }
+  'board.runs.cardSummary': { n: number; failed: number; stopped: number; running: string }
   'board.runs.clear': undefined
   'board.runs.failedOnly': undefined
   'board.runs.group': { what: string | number; n: number; outcome: string; failed: number }
   'board.runs.lane': undefined
   'board.runs.none': undefined
   'board.runs.noneMatch': undefined
+  'board.runs.other': undefined
+  'board.runs.queueChecks': { checks: string | number; failed: number }
   'board.runs.search': undefined
   'board.runs.today': undefined
+  'board.runs.toggleCard': { open: string; card: string | number }
   'board.runs.yesterday': undefined
   'board.setAside.add': undefined
   'board.setAside.added': { n: string | number }

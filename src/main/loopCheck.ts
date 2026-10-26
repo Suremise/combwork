@@ -6,7 +6,7 @@ import { onHiveEvent } from './events'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
-import { allTasks } from './tasks'
+import { liveCardHeads } from './tasks'
 import { workspaceOf } from './workspace'
 
 const log = createLogger('loops')
@@ -105,7 +105,7 @@ export function cardsInPlay(cards: readonly TaskCard[], project: string, agentId
 async function recheck(loop: Loop): Promise<void> {
   const st = sessions.liveFor(loop.projectPath, loop.agentId)
   if (!st?.notWatching || loops.get(keyOf(loop.projectPath, loop.agentId)) !== loop) return
-  const inPlay = cardsInPlay(await allTasks(workspaceOf(loop.projectPath), { archived: false }), basename(loop.projectPath), loop.agentId, loop.cards)
+  const inPlay = cardsInPlay(await liveCardHeads(workspaceOf(loop.projectPath)), basename(loop.projectPath), loop.agentId, loop.cards)
   const now = sessions.liveFor(loop.projectPath, loop.agentId)
   if (!now?.notWatching || loops.get(keyOf(loop.projectPath, loop.agentId)) !== loop) return
   sessions.setNotWatching(loop.projectPath, loop.agentId, inPlay.length ? inPlay : null)
@@ -115,7 +115,7 @@ async function check(loop: Loop): Promise<void> {
   const st = sessions.liveFor(loop.projectPath, loop.agentId)
   if (!unwatched(st) || loops.get(keyOf(loop.projectPath, loop.agentId)) !== loop) return
   const ws = workspaceOf(loop.projectPath)
-  const inPlay = cardsInPlay(await allTasks(ws, { archived: false }), basename(loop.projectPath), loop.agentId, loop.cards)
+  const inPlay = cardsInPlay(await liveCardHeads(ws), basename(loop.projectPath), loop.agentId, loop.cards)
   // Read again after the wait: it may have started working or watching meanwhile.
   const now = sessions.liveFor(loop.projectPath, loop.agentId)
   if (!unwatched(now) || loops.get(keyOf(loop.projectPath, loop.agentId)) !== loop) return

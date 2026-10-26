@@ -235,7 +235,15 @@ export class WorkspaceService {
   lastSeenCount(): number {
     return this.lastAt.size
   }
-  private idsRead: { key: string; run: Promise<ProjectIdIndex> } | null = null
+  private idsRead: { key: string; run: Promise<ProjectIdIndex>; ticket: { listing: number } } | null = null
+  /**
+   * The folders' listings in the order they were made, and the latest whose read has settled (HI-1668): a read that
+   * listed them before another settles after it (the root watcher's, 250 ms after a change, beside a caller's) leaves
+   * the later listing standing, never its own older one. A listing that finds what is read already (the standing ids'
+   * key) settles at once; one that finds a read under way of the same folders makes that read its own (its ticket).
+   */
+  private idsListed = 0
+  private idsSettled = 0
 
   setLiveProvider(p: LiveProvider): void {
     WorkspaceService.liveProvider = p
@@ -723,6 +731,7 @@ export class WorkspaceService {
     // Listed again at most once a second (a board read checks many cards, each by its project's id), or now with
     // `fresh`: what is read in the second after that sees the same projects.
     if (this.ids && !opts.fresh && Date.now() - this.ids.at < 1000) return this.ids
+    const listing = ++this.idsListed
     const paths = [...(await this.listProjectPaths()), ...(await this.listProjectPaths({ hidden: true }))]
     // Each folder with its project.json's identity and time: a folder replaced by another of the same name, or two
     // projects that swapped names, read again too.
@@ -738,13 +747,18 @@ export class WorkspaceService {
       .join('|')
     if (this.ids?.key === key) {
       this.ids.at = Date.now()
+      this.idsSettled = Math.max(this.idsSettled, listing)
       return this.ids
     }
-    if (this.idsRead?.key === key) return this.idsRead.run
-    const run = this.readProjectIds(paths, key).finally(() => {
+    if (this.idsRead?.key === key) {
+      this.idsRead.ticket.listing = Math.max(this.idsRead.ticket.listing, listing)
+      return this.idsRead.run
+    }
+    const ticket = { listing }
+    const run = this.readProjectIds(paths, key, ticket).finally(() => {
       if (this.idsRead?.run === run) this.idsRead = null
     })
-    this.idsRead = { key, run }
+    this.idsRead = { key, run, ticket }
     return run
   }
 
@@ -753,7 +767,7 @@ export class WorkspaceService {
     return this.ids ?? NO_PROJECT_IDS
   }
 
-  private async readProjectIds(paths: string[], key: string): Promise<ProjectIdIndex> {
+  private async readProjectIds(paths: string[], key: string, ticket: { listing: number }): Promise<ProjectIdIndex> {
     const gen = this.generation
     const entries: ProjectIdEntry[] = []
     const cfgs = new Map<string, ProjectConfig>()
@@ -785,6 +799,9 @@ export class WorkspaceService {
     }
     const index = { key, byPath, byId, at: Date.now() }
     if (gen !== this.generation) return index
+    // A later listing's read settled first: it stands, and its caller gets it.
+    if (ticket.listing < this.idsSettled) return this.ids ?? index
+    this.idsSettled = ticket.listing
     this.ids = index
     // Each project by its id, as this read saw it (#514): the record of their names, and what follows a rename, go from it.
     const copies = new Set(fresh.map((p) => p.toLowerCase()))
