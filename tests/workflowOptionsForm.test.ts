@@ -504,6 +504,70 @@ describe("the upgrade's merge question (HI-1697)", () => {
     expect(card.number).toBeGreaterThan(0)
   })
 
+  /** A seam held until released: `reached` once the save gets there. */
+  function held(seam: 'beforeBoard' | 'written') {
+    let reach!: () => void
+    let go!: () => void
+    const reached = new Promise<void>((r) => (reach = r))
+    const released = new Promise<void>((r) => (go = r))
+    form.saveSeams[seam] = async () => {
+      form.saveSeams[seam] = undefined
+      reach()
+      await released
+    }
+    return { reached, release: () => go() }
+  }
+  afterEach(() => {
+    form.saveSeams.beforeBoard = undefined
+    form.saveSeams.written = undefined
+  })
+
+  it('the question answered elsewhere while the choice waits for the board: refused, with options, mark and card rules unchanged', async () => {
+    const { w, repo, card, ask, choose, state, options, wf } = await asked()
+    const request = await ask(MERGE_CHOICE_GATE, 'e1')
+    const before = { options: await options(), style: wf.rulesetOf(wf.store.card(card.number)).options.style }
+    const seam = held('beforeBoard')
+    const choice = choose(request, 'squash', 'branch')
+    await seam.reached
+    // Meanwhile, the request answered in words through For you's own path.
+    await inWorkspace(w, () => tasks.answerTask(card.number, request, { outcome: 'answered', reply: 'merge as before' }))
+    seam.release()
+    await expect(choice).rejects.toThrow()
+    expect(await options()).toEqual(before.options)
+    expect(await asks(w, repo)).toBe(true)
+    expect(wf.rulesetOf(wf.store.card(card.number)).options.style).toBe(before.style)
+    expect((await state()).approvals).toEqual([expect.objectContaining({ request, note: 'merge as before' })])
+  })
+
+  it('the question retired while the choice waits for the board: refused, nothing changed', async () => {
+    const { w, repo, card, ask, choose, options, wf } = await asked()
+    const request = await ask(MERGE_CHOICE_GATE, 'e1')
+    const before = await options()
+    const seam = held('beforeBoard')
+    const choice = choose(request, 'rebase', 'branch')
+    await seam.reached
+    const rec = wf.store.card(card.number)
+    await store.boardWrite(w, async () => wf.write(rec, wf.rulesetOf(rec), 'hive', (x) => x.fact('RequestClosed', { request, why: 'done' })))
+    seam.release()
+    await expect(choice).rejects.toThrow()
+    expect(await options()).toEqual(before)
+    expect(await asks(w, repo)).toBe(true)
+  })
+
+  it('a failure after project.json is written undoes the board change and puts project.json back', async () => {
+    const { w, repo, card, ask, choose, state, options, wf } = await asked()
+    const request = await ask(MERGE_CHOICE_GATE, 'e1')
+    const before = await options()
+    form.saveSeams.written = async () => {
+      throw new Error('a failure part way')
+    }
+    await expect(choose(request, 'squash', 'branch')).rejects.toThrow(/part way/)
+    expect(await options()).toEqual(before)
+    expect(await asks(w, repo)).toBe(true)
+    expect((await state()).requests.map((r) => r.request)).toContain(request)
+    expect(wf.store.facts(card.number).filter((f) => f.kind === 'Override')).toEqual([])
+  })
+
   it('two answers at once (two windows): one is recorded and saved, the other refused, never written over it', async () => {
     const { w, repo, ask, choose, state, options } = await asked()
     const request = await ask(MERGE_CHOICE_GATE, 'e1')

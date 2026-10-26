@@ -239,16 +239,104 @@ export class WorkflowRefused extends HiveError {
  * recorded with an Override naming what changed (OP-38: the user only, per change, the cards listed first). Returns the
  * form as it is now.
  */
-export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answering?: boolean } = {}): Promise<WorkflowForm> {
+export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[] } = {}): Promise<WorkflowForm> {
   // Checked against the levels as they are now and written in the same turn of workflow writes (#1422), holding the
   // project's repository lock first (#1642 round 5): its target can't move while a clean-up checks a branch against it,
   // from this Hive or another.
   return withRepoLocks([projectPath], () => workflowWrite(() => saveWorkflowOptions(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
 }
 
-async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answering?: boolean }): Promise<WorkflowForm> {
+/** HI-1697: the user's answer to the merge queue's question before an upgraded project's first merge. */
+interface MergeAnswer {
+  card: number
+  request: string
+  style: WorkflowOptions['style']
+  commitMessage: CommitMessage
+}
+
+/**
+ * The user's answer to the merge queue's question before an upgraded project's first merge (HI-1697, For you): saved as
+ * a Workflow save is, through the same function, as one change (`saveWorkflowOptions`).
+ */
+export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw: unknown): Promise<void> {
   const project = projectOf(ws, projectPath)
-  const change = shapeOf(raw)
+  const a = raw as { card?: unknown; request?: unknown; style?: unknown; commitMessage?: unknown } | null
+  if (!a || !Number.isInteger(a.card) || typeof a.request !== 'string' || !takesOption('style', a.style) || !takesOption('commitMessage', a.commitMessage)) throw new HiveError({ lines: ['A merge choice is { card, request, style, commitMessage }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  const answer: MergeAnswer = { card: a.card as number, request: a.request, style: a.style as WorkflowOptions['style'], commitMessage: a.commitMessage as CommitMessage }
+  await withRepoLocks([project.path], () => workflowWrite(() => saveWorkflowOptions(ws, project.path, null, { answer })), { quiet: true, project: project.path })
+}
+
+/**
+ * A save, under the repository's lock and in its turn of workflow writes. HI-1697: a project whose merge question is
+ * still open (the upgrade's mark), or a save that answers it, saves as one change of the board (its lock and
+ * transaction, which every answer, move and retirement of a request takes, in this Hive or another): the answer's
+ * request checked there, still open, of its gate, bound to the card's open entry (else refused, nothing written); the
+ * options written as they are now, checked as any save is (an answer's choice set over them), the mark cleared with
+ * them; the cards' rules (the waiting card's too: its ruleset has the style it was approved under); then the request
+ * answered as the user, or, a save choosing them, the question closed. Any of it refused or failing, the transaction is
+ * undone and project.json put back as it was: either all of it, or nothing.
+ */
+async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answer?: MergeAnswer }): Promise<WorkflowForm> {
+  const project = projectOf(ws, projectPath)
+  const asked = !!o.answer || !!(await ws.projectConfig(project.path)).workflow?.mergeAsk
+  let saved: Saved
+  if (!asked) {
+    saved = await writeOptions(ws, project, shapeOf(raw), false)
+    if (!namesOnly(saved.changed) && o.applyTo?.length && saved.changed.length) await applyToInFlight(ws, project, [...new Set(o.applyTo)], saved.changed)
+  } else {
+    let before: { workflow?: ProjectWorkflow } | null = null
+    await saveSeams.beforeBoard?.()
+    try {
+      saved = await boardWrite(ws, async () => {
+        const target = o.answer ? await stillAsked(ws, project, o.answer) : null
+        const cfg = await ws.projectConfig(project.path)
+        before = { workflow: cfg.workflow }
+        const change: WorkflowChange = o.answer ? answerChange(cfg, project.platform, o.answer) : shapeOf(raw)
+        const s = await writeOptions(ws, project, change, !!o.answer)
+        await saveSeams.written?.()
+        // The answer's choice is how Hive merges the project's cards: all those in flight; a save's, those ticked, and
+        // the card waiting with the question once it chooses.
+        const cards = o.answer ? (await cardsInFlight(ws, project)).map((c) => c.number) : [...(o.applyTo ?? []), ...(s.chosen ? await askedCards(ws, project.path) : [])]
+        if (!namesOnly(s.changed) && cards.length && s.changed.length) await applyToInFlight(ws, project, [...new Set(cards)], s.changed)
+        if (o.answer) await answerIt(o.answer)
+        else if (s.chosen) await closeAsked(ws, project.path)
+        return { ...s, target: target ?? s.target }
+      })
+    } catch (e) {
+      if (before) await putBack(ws, project.path, before)
+      throw e
+    }
+  }
+  log.info(`the workflow options of ${userText(project.name)} changed: ${saved.changed.join(', ') || 'none'}${saved.chosen ? ' (the merge question answered)' : ''}`)
+  workflowChanged(ws, project.path)
+  // Names alone change no card's rules (#1417): nothing to apply to cards in flight, nor any queue to read again.
+  if (namesOnly(saved.changed) && !saved.chosen) return workflowForm(ws, project.path)
+  // Whether Hive merges, and into what, may have changed: the windows read the project's queues again (#1356: which
+  // show follows the options too), whoever changed them (the window, the Assistant). A queue waiting for the merge
+  // question (paused `mergeChoice`) carries on.
+  const t = saved.target || (await G.defaultBranch(project.path).catch(() => null))
+  if (t && !isUnknown(t)) {
+    queueChanged(ws, project.path, t)
+    if (saved.chosen) void kickQueue(ws, project.path, t)
+  }
+  return workflowForm(ws, project.path)
+}
+
+/**
+ * Tests only (HI-1697's races): seams in a save made with the merge question open, just before it takes the board's lock,
+ * and once project.json is written, inside the board's change.
+ */
+export const saveSeams: { beforeBoard?: () => Promise<void>; written?: () => Promise<void> } = {}
+
+/** What a save wrote: the options it changed, whether it chose the merge question's (HI-1697), its target if named. */
+interface Saved {
+  changed: (keyof WorkflowOptions)[]
+  chosen: boolean
+  target: string
+}
+
+/** Writes a change to the project's options as they are now (`answering`: the merge question's answer clears its mark). */
+async function writeOptions(ws: WorkspaceService, project: { path: string; name: string; platform: PlatformId }, change: WorkflowChange, answering: boolean): Promise<Saved> {
   let changed: (keyof WorkflowOptions)[] = []
   let chosen = false
   await ws.mutateProjectConfig(project.path, (cfg) => {
@@ -263,81 +351,69 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
     const options = Object.fromEntries(Object.entries(change.options).filter(([k, v]) => k !== 'platform' && v !== undefined))
     // Saved from the Workflow section: the answer to "How do you work?" for this platform is given (#1423).
     const workflow = setPresetAsked(writeWorkflow(cfg.workflow, { platform: project.platform, preset: change.preset, options }), project.platform, 'chosen')
-    // HI-1697: a change to the merge style or the commit message chooses them: the upgrade's question is answered.
-    // As they resolve (an option left out inherits), before and after.
-    if (workflow.mergeAsk && o.answering) chosen = true
+    // HI-1697: a change to the merge style or the commit message, as they resolve (one left out inherits), chooses
+    // them; so does the answer, whatever it chose.
+    if (workflow.mergeAsk && answering) chosen = true
     else if (workflow.mergeAsk) {
       const was = resolvedOf(ws, project.path, project.platform, cfg).options
-      const saved = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow }).options
-      chosen = was.style !== saved.style || was.commitMessage !== saved.commitMessage
+      const next = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow }).options
+      chosen = was.style !== next.style || was.commitMessage !== next.commitMessage
     }
     return { workflow: chosen ? withoutMergeAsk(workflow) : workflow }
   })
-  log.info(`the workflow options of ${userText(project.name)} changed: ${changed.join(', ') || 'none'}`)
-  workflowChanged(ws, project.path)
-  // Names alone change no card's rules (#1417): nothing to apply to cards in flight, nor any queue to read again.
-  if (namesOnly(changed)) return workflowForm(ws, project.path)
-  // A save that answers the upgrade's question (HI-1697) carries its choice to the card waiting in the queue too, whose
-  // ruleset still has the merge style it was approved under.
-  const applyTo = [...new Set([...(o.applyTo ?? []), ...(chosen ? await askedCards(ws, project.path) : [])])]
-  if (applyTo.length && changed.length) await applyToInFlight(ws, project, applyTo, changed)
-  // Whether Hive merges, and into what, may have changed: the windows read the project's queues again (#1356: which
-  // show follows the options too), whoever changed them (the window, the Assistant).
-  if (changed.length) {
-    const t = change.options.target || (await G.defaultBranch(project.path).catch(() => null))
-    queueChanged(ws, project.path, t && !isUnknown(t) ? t : '')
-    // The queue waiting for them (paused `mergeChoice`) carries on; with its question's answer, once that is recorded.
-    if (chosen && !o.answering && t && !isUnknown(t)) void kickQueue(ws, project.path, t)
+  return { changed, chosen, target: change.options.target ?? '' }
+}
+
+/** The answer's change: the project's own options and preset as they are now, its merge style and commit message set. */
+function answerChange(cfg: { workflow?: ProjectWorkflow }, platform: PlatformId, a: MergeAnswer): WorkflowChange {
+  const preset = cfg.workflow?.platform === platform ? cfg.workflow.preset : null
+  return { preset, options: { ...ownOf(cfg, platform), style: a.style, commitMessage: a.commitMessage } }
+}
+
+/**
+ * The answer's request still asks, checked under the board's lock: the card this project's, the request open, the merge
+ * question, bound to the card's open queue entry; its target. Else refused (a stale dialog's answer, or one answered or
+ * retired meanwhile), as `tasks:answer` refuses one.
+ */
+async function stillAsked(ws: WorkspaceService, project: { path: string }, a: MergeAnswer): Promise<string> {
+  const { WorkflowRefusedError } = await import('../tasks')
+  const wf = await workflowFor(ws, project.path)
+  const rec = wf?.store.cards().find((c) => c.id === a.card)
+  const s = wf && rec ? wf.state(rec) : null
+  const req = s?.requests.find((r) => r.request === a.request)
+  const entry = s ? openEntry(s) : undefined
+  if (!s || !req || req.gate !== MERGE_CHOICE_GATE || !entry || req.entry !== entry.id) throw new WorkflowRefusedError(refusal('move.notFromHere', { card: rec ? cardLabel({ number: a.card, key: rec.key }) : `#${a.card}`, stage: s?.stage ?? 'todo', move: 'answer', moves: '' }))
+  return entry.target
+}
+
+/** The request answered as the user (For you's path: its refusal propagated), its words kept on the card. */
+async function answerIt(a: MergeAnswer): Promise<void> {
+  const { answerTask } = await import('../tasks')
+  const style = a.style === 'merge' ? 'merge commit' : a.style === 'squash' ? 'squash' : 'rebase and fast-forward'
+  const message = a.commitMessage === 'branch' ? "the branch's own" : "Hive's"
+  await answerTask(a.card, a.request, { outcome: 'answered', reply: `Merge style: ${style}; commit message: ${message}.` }) // i18n-ignore: the answer's words, kept on the card as the user's comment and read by agents (English)
+}
+
+/** A save chose them: each open merge question of the project closed, with the save. */
+async function closeAsked(ws: WorkspaceService, projectPath: string): Promise<void> {
+  const wf = await workflowFor(ws, projectPath)
+  if (!wf) return
+  for (const id of await askedCards(ws, projectPath)) {
+    const rec = wf.store.card(id)
+    await wf.write(rec, wf.rulesetOf(rec), 'hive', (w) => {
+      for (const r of w.state().requests.filter((x) => x.gate === MERGE_CHOICE_GATE)) w.fact('RequestClosed', { request: r.request, why: 'done' }) // i18n-ignore: a fact's kind and codes, not text
+    })
   }
-  return workflowForm(ws, project.path)
+}
+
+/** project.json's workflow put back as it was, after a save whose board change was undone. */
+async function putBack(ws: WorkspaceService, projectPath: string, before: { workflow?: ProjectWorkflow }): Promise<void> {
+  await ws.mutateProjectConfig(projectPath, () => ({ workflow: before.workflow })).catch((e: unknown) => log.warn(`putting back the workflow options of ${userText(projectPath)}`, e))
 }
 
 const withoutMergeAsk = (w: ProjectWorkflow): ProjectWorkflow => {
   const { mergeAsk: _asked, ...rest } = w
   return rest
-}
-
-/**
- * The user's answer to the merge queue's question before an upgraded project's first merge (HI-1697, For you). Checked
- * first, before anything changes: the card this project's, the request open, the queue's question and bound to the
- * card's open entry (a stale dialog's answer is refused, as `tasks:answer` refuses one). Then the merge style and commit
- * message saved as the project's own options, over the options read here (`base`: a change made meanwhile, from another
- * window or the Assistant, refuses it, never written over), the mark cleared in the same write, and applied to the
- * project's cards in flight (the waiting one's ruleset has the style it was approved under). Then the request answered
- * as the user (its refusal propagated), which wakes the queue. Answers take turns (`chooseTurn`): a second answer to the
- * same question, from another window, is checked once the first is recorded, and refused.
- */
-export function chooseMerge(ws: WorkspaceService, projectPath: string, raw: unknown): Promise<void> {
-  const run = chooseTurn.then(() => choose(ws, projectPath, raw))
-  chooseTurn = run.catch(() => undefined)
-  return run
-}
-
-let chooseTurn: Promise<unknown> = Promise.resolve()
-
-async function choose(ws: WorkspaceService, projectPath: string, raw: unknown): Promise<void> {
-  const project = projectOf(ws, projectPath)
-  const a = raw as { card?: unknown; request?: unknown; style?: unknown; commitMessage?: unknown } | null
-  if (!a || !Number.isInteger(a.card) || typeof a.request !== 'string' || !takesOption('style', a.style) || !takesOption('commitMessage', a.commitMessage)) throw new HiveError({ lines: ['A merge choice is { card, request, style, commitMessage }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
-  const n = a.card as number
-  const request = a.request
-  const style = a.style as WorkflowOptions['style']
-  const message = a.commitMessage as CommitMessage
-  const { answerTask, WorkflowRefusedError } = await import('../tasks')
-  const wf = await workflowFor(ws, project.path)
-  const rec = wf?.store.cards().find((c) => c.id === n)
-  const s = wf && rec ? wf.state(rec) : null
-  const req = s?.requests.find((r) => r.request === request)
-  const entry = s ? openEntry(s) : undefined
-  if (!s || !req || req.gate !== MERGE_CHOICE_GATE || !entry || req.entry !== entry.id) throw new WorkflowRefusedError(refusal('move.notFromHere', { card: rec ? cardLabel({ number: n, key: rec.key }) : `#${n}`, stage: s?.stage ?? 'todo', move: 'answer', moves: '' }))
-  const cfg = await ws.projectConfig(project.path)
-  const own = ownOf(cfg, project.platform)
-  const presetNow = cfg.workflow?.platform === project.platform ? cfg.workflow.preset : null
-  const inFlight = (await cardsInFlight(ws, project)).map((c) => c.number)
-  await setWorkflowOptions(ws, project.path, { preset: presetNow, options: { ...own, style, commitMessage: message }, base: { preset: presetNow, options: own } }, { applyTo: inFlight, answering: true })
-  log.info(`${userText(project.name)}'s merge style and commit message chosen: ${style}, ${message}`)
-  // i18n-ignore: the answer's words, kept on the card as the user's comment and read by agents (English)
-  await answerTask(n, request, { outcome: 'answered', reply: `Merge style: ${style === 'merge' ? 'merge commit' : style === 'squash' ? 'squash' : 'rebase and fast-forward'}; commit message: ${message === 'branch' ? "the branch's own" : "Hive's"}.` })
 }
 
 /** The project's cards whose merge waits for the upgrade's question (HI-1697): a request of its gate open. */

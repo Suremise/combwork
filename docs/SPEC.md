@@ -4477,14 +4477,17 @@ when a role or name says *review*.
   has Hive merge it, a preset or a save later) pauses the queue (`mergeChoice`) with a Decide on the card in For you:
   "How should Hive merge <project>'s cards into <target>?", with G6 (Merge commit, as until now; Squash; Rebase and
   fast-forward) and G19 (Hive's, as until now; the branch's own; not shown with Rebase) and **Save and Carry On
-  Merging** (`workflow:chooseMerge`, answers taking turns). Checked first, changing nothing when refused: the card the
-  project's, the request open, of the gate, bound to the card's open queue entry (a stale dialog's answer is refused as
-  `tasks:answer` refuses one). Then both are saved as the project's own options over the options read for it (a change
-  made meanwhile refuses it, never written over), checked as the Workflow section's save is, the mark cleared in the
-  same write, applied to its cards in flight (the waiting one's ruleset has the style it was approved under); then the
-  request is answered as the user, and the queue goes on. A save in Version Control → Workflow that changes G6 or G19
-  as they resolve clears the mark too, and carries them to the card waiting with the question: the queue then lifts its
-  pause, closes the question and merges it as chosen. Answered in words with the mark still set, the queue asks again.
+  Merging** (`workflow:chooseMerge`). The answer and a Workflow save are one function (`saveWorkflowOptions`), and
+  while the mark is set (or for an answer) a save is one change of the board, under the repository's lock, in its turn
+  of workflow writes, then in the board's lock and transaction, which every answer, move and retirement of a request
+  takes, from this Hive or another. In it: an answer's request checked still open, of the gate and bound to the card's
+  open queue entry (else refused, nothing written: a stale dialog, or one answered or retired while the save waited);
+  the options written as they are now, checked as any save is (an answer sets G6 and G19 over them), the mark cleared
+  in the same write; the cards' rules (an answer's: the project's cards in flight; a save's: those ticked and the card
+  waiting with the question, whose ruleset has the style it was approved under); then the request answered as the
+  user, or, a save that changes G6 or G19 as they resolve, the question closed. Any of it refused or failing, the
+  transaction is undone and project.json put back: all of it, or nothing. The queue then lifts its pause and merges
+  the card as chosen. Answered in words with the mark still set, the queue asks again.
   A project marked with no card in the queue is never interrupted. Projects upgraded before HI-1697 have no mark.
 
 **Agents' old moves, for one transition** [HB3's finding 7]: from P4 until P8 rewrites the skills, an agent's
