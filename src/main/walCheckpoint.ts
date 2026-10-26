@@ -3,7 +3,7 @@ import { basename, join } from 'path'
 import { Worker } from 'worker_threads'
 import type { DatabaseSync } from 'node:sqlite'
 import { createLogger } from './logger'
-import { BUSY, CLOSING, runCheckpoint, type CheckpointDone, type CheckpointReply, type CheckpointRequest } from './walCheckpointWorker'
+import { CLOSING, runCheckpoint, type CheckpointDone, type CheckpointReply, type CheckpointRequest } from './walCheckpointWorker'
 
 /**
  * The WAL's checkpoints out of the commits (#1633). SQLite checkpoints a WAL database itself inside whichever COMMIT
@@ -25,8 +25,10 @@ import { BUSY, CLOSING, runCheckpoint, type CheckpointDone, type CheckpointReply
  *
  * Off main's thread (HI-1691): the field's logs had idle checkpoints of 100-893 ms on main, so the checkpoint itself runs
  * in a worker, on a connection of its own (walCheckpointWorker.ts); the triggers (a stat a second) and the fallback (a
- * pragma on the writer) stay here. One checkpoint of a database at a time; a database closing waits for its worker to
- * let go of the file. Without the worker's script (unit tests) the checkpoint runs here, on a connection of its own too.
+ * pragma on the writer) stay here. One checkpoint of a database at a time. Closing a database never waits for the worker
+ * (the Assistant's design call, HR6's rounds 1 and 2: a wait on main for another thread either went on with the file held
+ * or, the worker dead, never ended): only what needs the file free (a restore, the upgrade, deleting the journal) awaits
+ * `checkpointsReleased`. Without the worker's script (unit tests) the checkpoint runs here, on a connection of its own.
  */
 
 const log = createLogger('db')
@@ -176,8 +178,8 @@ export function checkpointWhenIdle(file: string, writer: DatabaseSync): () => vo
   }
   return () => {
     dbs.delete(writer)
-    // Its worker lets go of the file first: the database closes (and may be replaced) next.
-    if (r.inFlight) thread.closing()
+    // A checkpoint asked for before now is skipped; one under way finishes on its own connection (checkpointsReleased).
+    thread.closing()
     if (!dbs.size && timer) {
       clearInterval(timer)
       timer = null
@@ -190,14 +192,18 @@ type Answer = (res: CheckpointDone | { error: string } | null, where: string) =>
 
 /**
  * The checkpoints' worker (HI-1691), started with the first checkpoint, as the repository lock's is (HI-1680). Without its
- * script (unit tests), each checkpoint runs at once, here.
+ * script (unit tests), each checkpoint runs at once, here. It answers each checkpoint once its connection is closed, so a
+ * file's checkpoints in flight say whether the worker still holds it.
  */
 class CheckpointThread {
   private worker: Worker | null = null
-  /** BUSY and CLOSING, shared with the worker (walCheckpointWorker.ts). */
-  private state = new Int32Array(new SharedArrayBuffer(8))
-  private calls = new Map<number, Answer>()
+  /** CLOSING, shared with the worker (walCheckpointWorker.ts). */
+  private state = new Int32Array(new SharedArrayBuffer(4))
+  private calls = new Map<number, { key: string; answer: Answer }>()
   private next = 0
+  /** Checkpoints in flight, and what waits for them to end, by file (lower case). */
+  private flying = new Map<string, number>()
+  private waiting = new Map<string, (() => void)[]>()
 
   run(file: string, answer: Answer): void {
     const w = this.worker ?? this.start()
@@ -211,24 +217,43 @@ class CheckpointThread {
       return answer(res, '')
     }
     const id = ++this.next
-    this.calls.set(id, answer)
+    const key = file.toLowerCase()
+    this.calls.set(id, { key, answer })
+    this.flying.set(key, (this.flying.get(key) ?? 0) + 1)
     const m: CheckpointRequest = { id, file, closing: Atomics.load(this.state, CLOSING) }
     w.postMessage(m)
   }
 
-  /**
-   * A database is closing: checkpoints asked for before now are skipped, and one with a file open is waited for until it
-   * lets go, blocking, however long that takes (HR6's round 1): the file mustn't be held as it is closed, replaced or
-   * restored, and the database isn't admitted after (#1395). No worse than before HI-1691, when the close's own checkpoint
-   * ran on main: a checkpoint never waits for a lock (PASSIVE), so only the disk holds it. Logged while it waits.
-   */
+  /** A database is closing: checkpoints asked for before now are skipped (never waited for). */
   closing(): void {
-    if (!this.worker) return
     Atomics.add(this.state, CLOSING, 1)
-    const from = performance.now()
-    while (Atomics.load(this.state, BUSY) === 1) {
-      if (Atomics.wait(this.state, BUSY, 1, closeLimits.warnMs) === 'timed-out' && Atomics.load(this.state, BUSY) === 1) log.warn(`a database closing waits for its WAL's checkpoint in the worker to let go of the file (${Math.round(performance.now() - from)} ms so far)`)
-    }
+  }
+
+  /** Resolves once no checkpoint of `file` is in flight: the worker has let go of it, or ended. */
+  released(file: string): Promise<void> {
+    const key = file.toLowerCase()
+    if (!this.flying.get(key)) return Promise.resolve()
+    return new Promise<void>((resolve) => {
+      const from = performance.now()
+      const say = setInterval(() => log.warn(`waiting for the WAL's checkpoint of ${basename(file)} in its worker to let go of the file (${Math.round(performance.now() - from)} ms so far)`), closeLimits.warnMs)
+      say.unref?.()
+      this.waiting.set(key, [
+        ...(this.waiting.get(key) ?? []),
+        () => {
+          clearInterval(say)
+          resolve()
+        }
+      ])
+    })
+  }
+
+  /** One of `key`'s checkpoints ended: what waited for the last of them goes on. */
+  private landed(key: string): void {
+    const left = (this.flying.get(key) ?? 1) - 1
+    if (left > 0) return void this.flying.set(key, left)
+    this.flying.delete(key)
+    for (const go of this.waiting.get(key) ?? []) go()
+    this.waiting.delete(key)
   }
 
   private start(): Worker | null {
@@ -236,17 +261,21 @@ class CheckpointThread {
     const w = new Worker(workerScript(), { workerData: this.state.buffer })
     this.worker = w
     w.on('message', (m: CheckpointReply) => {
-      const answer = this.calls.get(m.id)
+      const call = this.calls.get(m.id)
+      if (!call) return
       this.calls.delete(m.id)
-      answer?.(m.ok ? m.value : { error: m.error }, ' in its worker')
+      this.landed(call.key)
+      call.answer(m.ok ? m.value : { error: m.error }, ' in its worker')
     })
     const gone = (why: string): void => {
       if (this.worker !== w) return
       this.worker = null
       log.warn(`the WAL checkpoints' worker ended (${why}); it starts again with the next checkpoint`)
-      Atomics.store(this.state, BUSY, 0)
-      for (const answer of this.calls.values()) answer({ error: `its worker ended (${why})` }, ' in its worker') // i18n-ignore: for the log
+      const calls = [...this.calls.values()]
       this.calls.clear()
+      // Ended, it holds nothing (a handle it leaked is the process's: a rename then says why it failed).
+      for (const c of calls) this.landed(c.key)
+      for (const c of calls) c.answer({ error: `its worker ended (${why})` }, ' in its worker') // i18n-ignore: for the log
     }
     w.on('error', (e: Error) => gone(e.message))
     w.on('exit', (code) => gone(`exit code ${code}`)) // i18n-ignore: for the log
@@ -255,8 +284,14 @@ class CheckpointThread {
   }
 }
 
-/** How often a database's close, waiting for its worker's checkpoint to let go of the file, says so in the log (tests change it). */
+/** How often something waiting for a database's file to be let go of by the worker says so in the log (tests change it). */
 export const closeLimits = { warnMs: 10_000 }
+
+/**
+ * Resolves once the checkpoints' worker has let go of `file` (HI-1691): awaited after a database is closed by what renames,
+ * replaces or deletes its file. At once when no checkpoint of it is in flight.
+ */
+export const checkpointsReleased = (file: string): Promise<void> => thread.released(file)
 
 /** The worker's script, beside main's (as the repository lock's); a test's build of it (`useCheckpointWorker`). */
 let scriptForTests: string | null = null
