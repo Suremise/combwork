@@ -101,6 +101,15 @@ describe("a board's fold, saved as a change (#170)", () => {
     expect(Object.keys(saved)).toEqual(['c:\\ws\\a'])
   })
 
+  it('keeps Merging collapsed, in board order after Approved, and expands it again (#1662)', () => {
+    let saved = applyBoardFold({}, 'ws', { columns: { ids: ['merging'], collapsed: true } })
+    expect(saved.ws).toEqual({ columns: ['merging'] })
+    saved = applyBoardFold(saved, 'ws', { columns: { ids: ['done', 'passed', 'hold'], collapsed: true } })
+    expect(saved.ws.columns).toEqual(['hold', 'passed', 'merging', 'done'])
+    saved = applyBoardFold(saved, 'ws', { columns: { ids: ['merging'], collapsed: false } })
+    expect(saved.ws.columns).toEqual(['hold', 'passed', 'done'])
+  })
+
   it('drops folds of cards no longer on the board, ignores what is not a column or card, and keeps the newest workspaces', () => {
     const saved = applyBoardFold({ ws: { columns: ['hold'], cards: [1, 2, 3] } }, 'ws', { cards: { numbers: [4, -1, 2.5, 'x' as never], folded: true }, columns: { ids: ['merged' as never, 'passed'], collapsed: true }, known: [2, 4] })
     expect(saved.ws).toEqual({ columns: ['hold', 'passed'], cards: [2, 4] })
