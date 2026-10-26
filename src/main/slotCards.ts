@@ -201,8 +201,6 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
     if (at) return at
   }
   if (held) return { wait: refusalText({ why: 'inUse', slot: held.slot, agent: held.agent, card: held.card, lane: held.lane }, name) } // i18n-ignore: a refusal's code, agent-facing English (refusalText)
-  // Its carried lease kept for a card it has left ends here (HI-1731), so that folder retires once nothing writes there.
-  if (!o.dry) await endLeftCarried(ws, projectPath, pool, builder, { card: card.id })
   // The builder's own slot (#1441: its carried lease, kept for nothing now) taken over when it can be; else the card gets
   // another slot, and the carried one stays protected.
   const own = await carriedToHand(ws, projectPath, pool, builder, o.target)
@@ -215,32 +213,42 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
   const r = await pool.lend(lane ? { lane, agent: builder } : { card: card.id, agent: builder }, { ...(o.target ? { target: o.target } : {}), install: false })
   if (!r.ok) return { wait: refusalText(r.refusal, name) }
   log.info(`Lent ${userText(r.slot.name)} to ${userText(name(builder))} for ${lane ? `lane ${lane}` : `#${card.id}`} (lease ${r.lease.id})`)
+  // Its carried lease kept for a card it has left ends now that this start holds its own (HI-1731).
+  await endLeftCarried(ws, projectPath, pool, builder, lane ? { lane } : { card: card.id }, r.lease.id)
   return leaseAt(pool, r.lease)
 }
 
 /**
  * A builder's carried lease kept for another card it has left (HI-1731: HB3's, kept for a card stuck in Approved, held its
- * old folder while it worked other lanes), ended (`superseded`) as it starts this one: that card no longer Active, and
- * the folder with no changes not committed (unknown or dirty keeps it). The card's work is on its line, which stays; back
- * in Active, its start lends it a slot on that line as for any card. The builder's run there isn't stopped (it now holds
- * this start's lease: stopLeaseSession); the slot drains once it has moved, then retires as any free slot does.
+ * old folder while it worked other lanes), ended (`superseded`) once a start of its holds a lease of its own (`holding`,
+ * just lent): never before, so a start refused or failed ends nothing, and the builder's run in the old folder is never
+ * left without a lease (stopLeaseSession: it now holds that one). That card no longer Active, the folder with no changes
+ * not committed (unknown or dirty keeps it); then, in the pool's write, all of it again: the carried lease still open
+ * and still kept for that card, the card still not Active, the slot still at the folder found clean, and `holding` still
+ * open. The card's work is on its line, which stays; back in Active, its start lends it a slot on that line as for any
+ * card. The slot isn't reused or removed while the builder's run still writes there (a slot with a writer isn't free);
+ * it drains once that run has moved, then retires as any free slot does.
  */
-async function endLeftCarried(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, starting: { card: number } | { lane: string }): Promise<void> {
+async function endLeftCarried(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, starting: { card: number } | { lane: string }, holding: string): Promise<void> {
   const carried = pool.leasesOf(builder).find((l) => l.kind === 'carried')
   const kept = carried ? keptFor(ws, carried.id) : null
   if (!carried || !kept || !('card' in kept) || ('card' in starting && kept.card === starting.card)) return
   const wf = await workflowFor(ws, projectPath).catch(() => null)
-  if (!wf) return
+  const slot = pool.slotOf(carried)
+  if (!wf || !slot) return
   const left = (): boolean => {
     const c = cardOf(wf, kept.card)
     return !c || wf.state(c).stage !== 'active'
   }
   if (!left()) return
-  const slot = pool.slotOf(carried)
-  if (!slot) return
   const d = await G.dirty(slot.folder)
   if (isUnknown(d) || d.length) return
-  if (await pool.release(carried.id, 'superseded', left)) log.info(`The adopted ${userText(slot.name)}'s carried lease ${carried.id} ended: its builder left #${kept.card} for ${'card' in starting ? `#${starting.card}` : `lane ${starting.lane}`}`)
+  const still = (): boolean => {
+    const k = keptFor(ws, carried.id)
+    const now = pool.slotOf(carried)
+    return !!k && 'card' in k && k.card === kept.card && left() && !!now && samePlace(now.folder, slot.folder) && pool.leasesOf(builder).some((l) => l.id === holding)
+  }
+  if (await pool.release(carried.id, 'superseded', still)) log.info(`The adopted ${userText(slot.name)}'s carried lease ${carried.id} ended: its builder left #${kept.card} for ${'card' in starting ? `#${starting.card}` : `lane ${starting.lane}`} (lease ${holding})`)
 }
 
 /**
@@ -827,9 +835,7 @@ export async function lendLane(ws: WorkspaceService, projectPath: string, lane: 
   const pool = await poolFor(ws, projectPath)
   const agents = projectAgents(await ws.projectConfig(projectPath))
   const name = (id: string): string => agents.find((a) => a.id === id)?.name ?? id
-  // Its carried lease kept for a card it has left ends (HI-1731), and its own slot is taken over by the lane when it can
-  // be (#1441), as a card's start does.
-  await endLeftCarried(ws, projectPath, pool, builder, { lane })
+  // The builder's own slot, taken over by the lane when it can be (#1441), as a card's start does.
   const own = await carriedToHand(ws, projectPath, pool, builder, target)
   const handed = own ? await handOffCarried(ws, projectPath, pool, own, { lane, agent: builder }, name(builder)) : null
   if (handed) return { slot: handed.slot }
@@ -837,6 +843,8 @@ export async function lendLane(ws: WorkspaceService, projectPath: string, lane: 
   const r = await pool.lend({ lane, agent: builder }, { ...(target ? { target } : {}), install: false })
   if (r.ok) {
     log.info(`Lent ${userText(r.slot.name)} to lane ${lane} (lease ${r.lease.id})`)
+    // Its carried lease kept for a card it has left ends now that the lane holds its own (HI-1731).
+    await endLeftCarried(ws, projectPath, pool, builder, { lane }, r.lease.id)
     return { slot: r.slot.name }
   }
   return { waiting: refusalText(r.refusal, name) }
@@ -856,10 +864,7 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
     if (stopped()) return
     let lease = pool.leaseOf({ lane: lane.id })
     if (!lease) {
-      // The builder's own slot first (#1441), checked against the default branch (the lane's target isn't known here),
-      // its carried lease kept for a card it has left ended first (HI-1731).
-      await endLeftCarried(ws, projectPath, pool, lane.builder.id, { lane: lane.id })
-      if (stopped()) return
+      // The builder's own slot first (#1441), checked against the default branch (the lane's target isn't known here).
       const own = await carriedToHand(ws, projectPath, pool, lane.builder.id, null)
       if (stopped()) return
       lease = own ? await handOffCarried(ws, projectPath, pool, own, { lane: lane.id, agent: lane.builder.id }, lane.builder.name) : null
@@ -870,6 +875,8 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
       if (!r.ok) return
       lease = r.lease
       log.info(`Lent ${userText(r.slot.name)} to lane ${lane.id}, which waited for a slot (lease ${r.lease.id})`)
+      // Its carried lease kept for a card it has left ends now that the lane holds its own (HI-1731).
+      await endLeftCarried(ws, projectPath, pool, lane.builder.id, { lane: lane.id }, r.lease.id)
     }
     // Hive quitting once a slot is lent (#1628): the lane keeps it and keeps waiting; the next start's pass starts it.
     if (stopped()) return

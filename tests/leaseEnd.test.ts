@@ -23,10 +23,23 @@ vi.mock('../src/main/sessions', () => ({
 }))
 
 /** The project's lanes as kept, and each agent's watch, as lanes.ts and watches.ts give them. */
-let lanesNow: { id: string; project: string; state: string; builder: { id: string } }[] = []
-const watching = new Map<string, { label: string }>()
+let lanesNow: { id: string; project: string; state: string; builder: { id: string }; reviewer?: { id: string } | null }[] = []
+const watching = new Map<string, { label: string } | 'unknown'>()
 vi.mock('../src/main/lanes', async (orig) => ({ ...(await orig<object>()), rawLanes: async () => lanesNow }))
-vi.mock('../src/main/watches', async (orig) => ({ ...(await orig<object>()), watchFor: (_p: string, agent: string) => watching.get(agent) ?? null }))
+vi.mock('../src/main/watches', async (orig) => ({ ...(await orig<object>()), watchKnown: (_p: string, agent: string) => watching.get(agent) ?? null }))
+/** The project's cards in flight its agent builds or reviews, as the board's query finds them (none: undefined). */
+let inFlight: { number: number } | undefined
+let boardFails = false
+let reads = 0
+const asked = (): number => reads
+vi.mock('../src/main/boardStore', async (orig) => ({
+  ...(await orig<object>()),
+  boardRead: (_ws: unknown, fn: (db: unknown) => unknown) => {
+    if (boardFails) throw new Error('the board is closing')
+    reads++
+    return fn({ prepare: () => ({ get: () => inFlight }) })
+  }
+}))
 
 const { tellListeners } = await import('../src/main/events')
 const { setAgentBusy } = await import('../src/main/workflow/lineUpdates')
@@ -46,6 +59,9 @@ const AT = { ws: { lifetime: new AbortController().signal }, pool: { slots: () =
 const status = (): void => tellListeners({ type: 'session-status', state: { agentId: 'b1', projectPath: P } as LiveSessionState })
 
 afterEach(() => {
+  inFlight = undefined
+  boardFails = false
+  reads = 0
   lanesNow = []
   watching.clear()
   runs.clear()
@@ -166,6 +182,42 @@ describe("a carried lease's end never stops an agent with work elsewhere (HI-173
     expect(stopped).toEqual([])
   })
 
+  it("reviewing a running lane, a card in flight it builds or reviews (no lease yet), or watches not loaded: goes on", async () => {
+    runs.set('b1', { run: 'run-1', starting: false })
+    lanesNow = [{ id: 'lane-r', project: 'project', state: 'active', builder: { id: 'b9' }, reviewer: { id: 'b1' } }]
+    await stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), at())
+    lanesNow = []
+    inFlight = { number: 12 }
+    await stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), at())
+    inFlight = undefined
+    watching.set('b1', 'unknown')
+    await stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), at())
+    status()
+    expect(stopped).toEqual([])
+  })
+
+  it("what can't be told counts as work: a board read that fails keeps it running", async () => {
+    runs.set('b1', { run: 'run-1', starting: false })
+    boardFails = true
+    await stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), at())
+    status()
+    expect(stopped).toEqual([])
+  })
+
+  it('work arriving while it waits for its turn to end is seen just before the stop: it goes on', async () => {
+    runs.set('b1', { run: 'run-1', starting: false })
+    let busy = true
+    setAgentBusy(() => busy)
+    await stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), at())
+    // Its turn starts a card meanwhile (no lease yet, so the first look found nothing).
+    inFlight = { number: 13 }
+    busy = false
+    status()
+    await vi.waitFor(() => expect(asked()).toBeGreaterThan(1))
+    status()
+    expect(stopped).toEqual([])
+  })
+
   it("a lane of another project, or one it doesn't build, or one ended, isn't work of its: stopped once idle, as before", async () => {
     runs.set('b1', { run: 'run-1', starting: false })
     lanesNow = [
@@ -180,6 +232,7 @@ describe("a carried lease's end never stops an agent with work elsewhere (HI-173
     expect(stopped).toEqual([])
     busy = false
     status()
-    expect(stopped).toEqual(['b1:run-1'])
+    // Asked again just before (an await), then stopped.
+    await vi.waitFor(() => expect(stopped).toEqual(['b1:run-1']))
   })
 })

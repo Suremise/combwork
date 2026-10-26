@@ -3723,11 +3723,14 @@ decided again in it):
 - **A carried lease's life.** Kept for a lane or card: those finish where they started, its cards' folder the adopted
   worktree on the agent's own branch (the stand-in, §16.19.1), and the pass ends the lease once the lane ends or the card
   is Done or put back. Kept for a card its agent has **left** (no longer Active: in Review, Approved, On Hold…), it ends
-  (`superseded`) at that agent's next card or lane start, when its folder has no changes not committed: the card's work
-  is on its line, which stays, and the folder retires as any free slot does (HI-1731: HB3's old folder stayed held for
-  a checks-only card in Approved). A carried lease's end never stops an agent with work elsewhere (another open lease, a
-  running lane it builds, or a watch of its own): its run goes on, and the slot drains once it leaves the folder; with
-  nothing else, it is stopped once its turn is over. Kept for nothing: the agent keeps starting and resuming there until its next card or lane under
+  (`superseded`) once that agent's next card or lane start holds its own lease (never before: a start refused ends
+  nothing), when its folder has no changes not committed, all of it decided again in the pool's write: the card's work
+  is on its line, which stays, and the folder retires as any free slot does once nothing writes there (HI-1731: HB3's
+  old folder stayed held for a checks-only card in Approved). A carried lease's end never stops an agent with work
+  elsewhere: another open lease, a running lane it builds or reviews, a card in flight it builds or reviews, or a
+  watch of its own; what can't be told (its watches not loaded yet, a read that fails) counts as work. Its run goes on,
+  and the slot drains once it leaves the folder; with nothing else, it is stopped once its turn is over, its work asked
+  again just before. Kept for nothing: the agent keeps starting and resuming there until its next card or lane under
   slots, which **takes the slot over** when it is clean and its head is in the target: in one write the carried lease
   ends (`handedOff`), the card's or lane's lease begins on the same slot and its conversations are rebound to it, so the
   conversation goes on there and resumes there after a restart. Otherwise the card gets another slot and the carried one

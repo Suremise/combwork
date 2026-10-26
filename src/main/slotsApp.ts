@@ -298,20 +298,26 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
  *
  * A carried lease's end (#1441: an adopted worktree, kept for a card or lane from the upgrade) never stops an agent
  * that has work elsewhere (HI-1731: HB3 was stopped mid-lane when the card its old folder was kept for went to Done):
- * another open lease, a running lane it builds, or a watch of its own. Its run goes on, and the slot drains once it
- * leaves the folder (its next start elsewhere moves it). With nothing else, it is stopped once its turn is over. That
- * look is the one await: the promise returned (a carried lease's only) settles once it is made.
+ * currentWork, conservative (what can't be told counts as work). Its run goes on, and the slot drains once it leaves
+ * the folder (its next start elsewhere moves it); nothing reuses or removes a slot while it has a writer. With nothing
+ * else, it is stopped once its turn is over, currentWork asked again just before, and after that await the same run
+ * still idle and still the slot's writer under this lease (HR4's design review). The promise returned (a carried
+ * lease's only) settles once the first look is made.
  */
 export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Slot, at?: { ws: WorkspaceService; pool: SlotPool }): Promise<void> | void {
   const w = slot.writer
   if (!w || w.lease !== lease.id) return
   if (lease.kind === 'carried' && at) {
-    return workElsewhere(projectPath, w.agent, lease, at)
-      .catch(() => null)
-      .then((work) => {
-        if (work) log.info(`Keeps ${userText(w.agent)}'s session in ${userText(slot.name)} running: its carried lease ${lease.id} ended (${lease.why ?? 'released'}), but it ${work}`)
-        else stopWhenIdle(projectPath, lease, slot, w)
-      })
+    const keep = (work: string): void => log.info(`Keeps ${userText(w.agent)}'s session in ${userText(slot.name)} running: its carried lease ${lease.id} ended (${lease.why ?? 'released'}), but it ${work}`)
+    const again = async (): Promise<boolean> => {
+      const work = await currentWork(projectPath, w.agent, lease, at)
+      if (work) keep(work)
+      return !work
+    }
+    const writerNow = (): SlotWriter | null => at.pool.slots().find((s) => s.name === slot.name)?.writer ?? null
+    return again().then((go) => {
+      if (go) stopWhenIdle(projectPath, lease, slot, w, { again, writerNow })
+    })
   }
   // This Hive's run of it, still (another Hive's run, or one already over, isn't this Hive's to stop).
   const mine = (): { run: string; starting: boolean } | null => {
@@ -326,40 +332,75 @@ export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Sl
 }
 
 /**
- * What an agent works on besides a lease that ended (HI-1731), in words for the log, or null: another open lease of its
- * in the pool, a running lane of the project it builds, or a watch of its own (a card's or a lane's).
+ * What an agent works on besides a lease that ended (HI-1731), in words for the log, or null when nothing: another open
+ * lease of its in the pool; a running lane of the project it builds or reviews; a card of the project in flight (past
+ * Todo, not Done) it builds or reviews, with or without a lease yet; a watch of its own. Conservative: watches not
+ * loaded yet, or anything that can't be read, count as work (never taken for none).
  */
-export async function workElsewhere(projectPath: string, agent: string, lease: SlotLease, at: { ws: WorkspaceService; pool: SlotPool }): Promise<string | null> {
-  const other = at.pool.leasesOf(agent).find((l) => l.id !== lease.id && !l.to)
-  if (other) return `holds lease ${other.id} (${other.lane ? `lane ${other.lane}` : other.card !== null ? `#${other.card}` : other.kind})`
-  const project = basename(projectPath).toLowerCase()
-  const lane = (await rawLanes(at.ws)).find((l) => l.state === 'active' && l.builder.id === agent && l.project.toLowerCase() === project)
-  if (lane) return `builds lane ${lane.id}`
-  // Imported here: watches.ts registers its delivery sources as it loads, which slots' own users needn't.
-  const { watchFor } = await import('./watches')
-  const watch = watchFor(projectPath, agent)
-  if (watch) return `watches (${userText(watch.label)})`
-  return null
+export async function currentWork(projectPath: string, agent: string, lease: SlotLease, at: { ws: WorkspaceService; pool: SlotPool }): Promise<string | null> {
+  try {
+    const other = at.pool.leasesOf(agent).find((l) => l.id !== lease.id && !l.to)
+    if (other) return `holds lease ${other.id} (${other.lane ? `lane ${other.lane}` : other.card !== null ? `#${other.card}` : other.kind})`
+    const project = basename(projectPath).toLowerCase()
+    const lane = (await rawLanes(at.ws)).find((l) => l.state === 'active' && l.project.toLowerCase() === project && (l.builder.id === agent || l.reviewer?.id === agent))
+    if (lane) return `${lane.builder.id === agent ? 'builds' : 'reviews'} lane ${lane.id}`
+    const card = boardRead(at.ws, (db) => db.prepare("SELECT number FROM cards WHERE archived = 0 AND project = ? COLLATE NOCASE AND (agent = ? OR review_agent = ?) AND coalesce(stage, CASE col WHEN 'todo' THEN 'todo' WHEN 'done' THEN 'done' END, '') NOT IN ('todo', 'done') ORDER BY number LIMIT 1").get(basename(projectPath), agent, agent) as { number: number } | undefined) // i18n-ignore: SQL
+    if (card) return `has #${card.number} in flight`
+    // Imported here: watches.ts registers its delivery sources as it loads, which slots' own users needn't.
+    const { watchKnown } = await import('./watches')
+    const watch = watchKnown(projectPath, agent)
+    if (watch === 'unknown') return "may watch something (its watches aren't loaded yet)"
+    if (watch) return `watches (${userText(watch.label)})`
+    return null
+  } catch (e) {
+    return `may work elsewhere (that couldn't be told: ${e instanceof Error ? e.message : String(e)})`
+  }
 }
 
-/** The lease's run stopped once its turn and its runs have finished; a start still being prepared at once (#1434). */
-function stopWhenIdle(projectPath: string, lease: SlotLease, slot: Slot, w: SlotWriter): void {
+/**
+ * The lease's run stopped once its turn and its runs have finished; a start still being prepared at once (#1434).
+ * `check` (a carried lease's, HI-1731): `again` asked just before a stop, false keeping it running; after its await,
+ * the stop only while the run is the same, still idle, and (`writerNow`) still the slot's writer under this lease.
+ */
+function stopWhenIdle(projectPath: string, lease: SlotLease, slot: Slot, w: SlotWriter, check?: { again: () => Promise<boolean>; writerNow: () => SlotWriter | null }): void {
   const mine = (): { run: string; starting: boolean } | null => {
     const r = sessions.runNow(projectPath, w.agent)
     return r && r.run === w.run ? r : null
   }
   let off: (() => void) | null = null
+  let asking = false
   const done = (): void => {
     off?.()
     off = null
   }
-  const look = (): void => {
-    const r = mine()
-    if (!r) return done()
-    if (!r.starting && (agentBusy(projectPath, w.agent) || agentRunsGoing(projectPath, w.agent).length)) return
+  const idle = (r: { starting: boolean }): boolean => r.starting || (!agentBusy(projectPath, w.agent) && !agentRunsGoing(projectPath, w.agent).length)
+  const stop = (r: { starting: boolean }): void => {
     done()
     log.info(`Stopping ${userText(w.agent)}'s ${r.starting ? 'start' : 'session'} in ${userText(slot.name)}: its lease ${lease.id} ended (${lease.why ?? 'released'})`)
     sessions.stop(projectPath, w.agent)
+  }
+  const look = (): void => {
+    if (asking) return
+    const r = mine()
+    if (!r) return done()
+    if (!idle(r)) return
+    if (!check) return stop(r)
+    asking = true
+    void check.again().then(
+      (go) => {
+        asking = false
+        if (!go) return done()
+        const now = mine()
+        const writer = check.writerNow()
+        if (!now || !writer || writer.run !== w.run || writer.lease !== lease.id) return done()
+        // Busy again meanwhile: the next event looks again.
+        if (idle(now)) stop(now)
+      },
+      () => {
+        asking = false
+        done()
+      }
+    )
   }
   off = onHiveEvent((e) => {
     if ((e.type === 'session-status' && e.state.agentId === w.agent && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
