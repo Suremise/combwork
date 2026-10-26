@@ -86,6 +86,94 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     await shoot(notice(), 'notice-fr')
     await speak(base)
     await lib.until(async () => (await text(notice())).startsWith('alpha was added'), HUNG_MS)
+    // --- In a narrow pane (HI-1717: at 900 px and 150% Not Now was cut at the edge, the text a word a line): the buttons
+    // go under the text, together, and stack where even the pair doesn't fit; each stays whole and clickable, and the
+    // text takes the whole row the buttons left. Wide, one row. Under zoom the window is captured by Electron (an
+    // element's screenshot is wrong there, HI-1696).
+    const layout = () => page.evaluate(() => {
+      const n = document.querySelector('[data-step-notice]')
+      const cs = getComputedStyle(n)
+      const outer = n.getBoundingClientRect()
+      // The banner's content box: what its icon, text and buttons have.
+      const box = { left: outer.left + parseFloat(cs.paddingLeft), right: outer.right - parseFloat(cs.paddingRight), top: outer.top + parseFloat(cs.paddingTop), bottom: outer.bottom - parseFloat(cs.paddingBottom) }
+      const rect = (e) => {
+        const r = e.getBoundingClientRect()
+        return { left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), width: Math.round(r.width) }
+      }
+      const parts = { icon: rect(n.querySelector('.codicon')), text: rect(n.querySelector('.grow')), actions: rect(n.querySelector('.step-notice-actions')) }
+      // The hit test with the button in view (a narrow banner can reach below the window), its bounds read before that.
+      const bounds = [...n.querySelectorAll('.step-notice-actions button')].map((b) => [b, rect(b)])
+      const buttons = bounds.map(([b, at]) => {
+        b.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+        const r = b.getBoundingClientRect()
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+        return { ...at, cut: b.scrollWidth > b.clientWidth + 1 || b.scrollHeight > b.clientHeight + 1, hit: !!hit && b.contains(hit) }
+      })
+      return { inner: window.innerWidth, box: { left: Math.round(box.left), right: Math.round(box.right), top: Math.round(box.top), bottom: Math.round(box.bottom), width: Math.round(box.right - box.left) }, gap: parseFloat(cs.columnGap) || 0, ...parts, buttons }
+    })
+    const inside = (r, b) => r.left >= b.left - 1 && r.right <= b.right + 1 && r.top >= b.top - 1 && r.bottom <= b.bottom + 1
+    const apart = (a, b) => a.right <= b.left + 1 || b.right <= a.left + 1 || a.bottom <= b.top + 1 || b.bottom <= a.top + 1
+    // Every part inside the banner's content box and the window, none over another, each button whole and the one hit
+    // at its middle; the actions under the text when they don't share its row, and then the text has its whole row.
+    const whole = (l) => {
+      const parts = [l.icon, l.text, l.actions]
+      if (l.buttons.length !== 2 || !parts.concat(l.buttons).every((r) => inside(r, l.box) && r.right <= l.inner)) return false
+      if (!parts.every((a, i) => parts.slice(i + 1).every((b) => apart(a, b))) || !apart(l.buttons[0], l.buttons[1])) return false
+      if (!l.buttons.every((b) => !b.cut && b.hit && inside(b, l.actions))) return false
+      const besideText = l.actions.top < l.text.bottom - 1
+      return besideText || l.text.width >= l.box.right - l.text.left - 2
+    }
+    const below = (l) => l.actions.top >= l.text.bottom - 1
+    const capture = async (name) => {
+      await page.mouse.move(5, 5)
+      for (const theme of ['dark', 'light']) {
+        await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+        const png = await app.evaluate(async ({ BrowserWindow }) => (await BrowserWindow.getAllWindows()[0].webContents.capturePage()).toPNG().toString('base64'))
+        fs.writeFileSync(path.join(shots, `presetstep-${name}-${theme}.png`), Buffer.from(png, 'base64'))
+      }
+      await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    }
+    const zoomTo = async (z, width) => {
+      await app.evaluate(({ BrowserWindow }, f) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(f), z)
+      await lib.until(async () => Math.abs((await page.evaluate(() => window.innerWidth)) - width / z) <= 2, HUNG_MS)
+    }
+    const fits = (also = () => true) => lib.until(async () => {
+      const l = await layout()
+      return whole(l) && also(l)
+    }, HUNG_MS)
+    await lib.fitWindow(app, page, { width: 900, height: 850 })
+    await zoomTo(1.5, 900)
+    check('900 px at 150%: the buttons under the text, whole, inside the banner and apart; the text has its row (HI-1717)', !!(await fits(below)), JSON.stringify(await layout()))
+    await capture('notice-narrow-150')
+    // French's longer labels (Choisir… / Pas maintenant).
+    await speak({ ...base, code: 'fr', locale: 'fr', messages: french })
+    await lib.until(async () => !(await text(notice())).startsWith('alpha was added'), HUNG_MS)
+    check('…and in French', !!(await fits(below)), JSON.stringify(await layout()))
+    await capture('notice-narrow-150-fr')
+    // Narrower than the pair: the buttons stack; narrower than a button's label: it wraps inside the button, still whole.
+    // At 100%, so even the tallest of these fits the window's height.
+    await zoomTo(1, 900)
+    for (const [width, what] of [[150, 'narrower than the pair: the buttons stack'], [70, 'narrower than a label: it wraps in its button']]) {
+      await notice().evaluate((n, w) => (n.style.width = `${w}px`), width)
+      check(`French, a banner ${width} px wide, ${what}, each whole`, !!(await fits((l) => l.buttons[1].top >= l.buttons[0].bottom - 1)), JSON.stringify(await layout()))
+    }
+    await notice().evaluate((n) => (n.style.width = ''))
+    // Beside the Assistant's panel, at 100% (at 150% the panel and the sidebar leave the main pane no width at all, HI-1737).
+    await page.locator('.assistant-rail').click()
+    await lib.until(async () => (await page.locator('.assistant-panel').count()) === 1, HUNG_MS)
+    check("French, 900 px beside the Assistant's panel: whole, inside the banner and apart", !!(await fits()), JSON.stringify(await layout()))
+    await capture('notice-narrow-assistant-fr')
+    await speak(base)
+    await lib.until(async () => (await text(notice())).startsWith('alpha was added'), HUNG_MS)
+    check("…and in English", !!(await fits()), JSON.stringify(await layout()))
+    await capture('notice-narrow-assistant')
+    await page.keyboard.press('Control+Alt+I')
+    await lib.until(async () => (await page.locator('.assistant-rail').count()) === 1, HUNG_MS)
+    await lib.fitWindow(app, page, { width: 1500, height: 900 })
+    check('wide: the notice is one row, its buttons beside the text', !!(await fits((l) => !below(l) && l.buttons[0].top === l.buttons[1].top)), JSON.stringify(await layout()))
+    await capture('notice-wide')
+    await lib.fitWindow(app, page, { width: 1400, height: 900 })
+
     await notice().getByRole('button', { name: 'Choose…' }).click()
     check('Choose… opens its Version Control tab at the step: Git in the header', !!(await lib.until(async () => (await stepEl().getAttribute('data-preset-step').catch(() => null)) === 'git' && (await head().locator('[data-platform="git"][aria-checked="true"]').count()) === 1, HUNG_MS)))
     check('…and the notice goes', !!(await lib.until(async () => (await notice().count()) === 0, HUNG_MS)))

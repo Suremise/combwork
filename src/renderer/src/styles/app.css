@@ -1771,6 +1771,41 @@ textarea.input {
 .banner .btn {
   margin-left: auto;
 }
+/* The presets notice (HI-1717): its buttons go under the text, together, once the text would have less than 240 px beside
+   them; where even the pair doesn't fit the banner they stack, and a label wider than the banner wraps inside its button,
+   so each stays whole and clickable at any width. */
+.banner.step-notice {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+.step-notice-text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 266px;
+  min-width: 0;
+}
+.step-notice-text > .grow {
+  min-width: 0;
+}
+.step-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px 8px;
+  min-width: 0;
+  max-width: 100%;
+  margin-left: auto;
+}
+.step-notice-actions .btn {
+  margin-left: 0;
+  max-width: 100%;
+  height: auto;
+  min-height: 24px;
+  padding-block: 3px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .moved-banner .grow {
   min-width: 0;
 }

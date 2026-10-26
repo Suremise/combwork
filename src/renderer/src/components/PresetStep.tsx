@@ -161,14 +161,20 @@ export function NewProjectsNotice() {
   }
   return (
     <div className="banner info step-notice" role="status" data-step-notice="">
-      <Icon name="info" />
-      <span className="grow">{tr(N.text, { projects: fmt.list(projects.map((p) => p.name)), n: projects.length })}</span>
-      <button className="btn small primary" data-action="step-notice-choose" onClick={choose}>
-        {tr(N.choose)}
-      </button>
-      <button className="btn small subtle" data-action="step-notice-notnow" onClick={notNow}>
-        {tr(N.notNow)}
-      </button>
+      {/* The icon with its text, so they wrap as one (HI-1717). */}
+      <span className="step-notice-text">
+        <Icon name="info" />
+        <span className="grow">{tr(N.text, { projects: fmt.list(projects.map((p) => p.name)), n: projects.length })}</span>
+      </span>
+      {/* Together, so in a narrow pane they wrap under the text as one (HI-1717). */}
+      <span className="step-notice-actions">
+        <button className="btn small primary" data-action="step-notice-choose" onClick={choose}>
+          {tr(N.choose)}
+        </button>
+        <button className="btn small subtle" data-action="step-notice-notnow" onClick={notNow}>
+          {tr(N.notNow)}
+        </button>
+      </span>
     </div>
   )
 }
