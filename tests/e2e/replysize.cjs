@@ -391,6 +391,10 @@ const prose = (seed, n) => {
   check('turned off meanwhile, a call is refused, saying the entries are kept', whileOff.isError && /journal is off .*entries are kept/.test(whileOff.text), whileOff.text)
   await inv('journal:set', { enabled: true })
   check('on again, every entry is there', tool('hive_journal_recall', { limit: 50 }, 'assistant').text.split('\n').length >= 31)
+  // A card link by key (HI-1661: as the tool asks) is kept as its card: recall by its key or its old number finds it.
+  const keyLinked = tool('hive_journal_write', { kind: 'plan', summary: 'Linked to its card by key', links: [{ type: 'card', ref: K(target) }] }, 'assistant')
+  const linkedIds = (ref) => tool('hive_journal_recall', { link: { type: 'card', ref } }, 'assistant').text.split('\n').filter((l) => l.includes('Linked to its card by key')).length
+  check('a card link by key is found by the key and by the old number', !keyLinked.isError && linkedIds(K(target)) === 1 && linkedIds(`#${target}`) === 1 && linkedIds(String(target)) === 1, keyLinked.text)
   // A long last turn in Coder's transcript (as Claude Code writes one): a 5,000-character task, 12 tool calls with long
   // summaries and a 7,000-character reply, longer than either form of the reply gives.
   const coderSession = (await live(alpha, coder.id)).sessionId

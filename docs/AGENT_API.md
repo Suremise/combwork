@@ -279,7 +279,7 @@ The changes below are the Assistant's only: other callers get `403`.
 
 | Call | What it does |
 |---|---|
-| `POST /v1/journal` `{ "kind", "summary", "detail"?, "why"?, "project"?, "importance"?, "links"?, "tags"?, "digestOf"? }` | Writes an entry; `{ "id" }`. A kind outside the user's scope is `400`, saying which are allowed |
+| `POST /v1/journal` `{ "kind", "summary", "detail"?, "why"?, "project"?, "importance"?, "links"?, "tags"?, "digestOf"? }` | Writes an entry; `{ "id" }`. A kind outside the user's scope is `400`, saying which are allowed. A `card` link takes the card's key (`HI-12`, an old key or `#12`) and is kept as its card, so recall by any of its names finds it (HI-1661); a ref no card has is kept as given |
 | `POST /v1/journal/recall` `{ "query"?, "since"?, "until"?, "kinds"?, "project"?, "link"?, "tag"?, "superseded"?, "limit"? }` | `{ "entries": [{ id, at, kind, project, summary, importance, source, supersededBy, hasDetail }] }`, newest or best first, 10 by default (50 at most) |
 | `GET /v1/journal/{id}` | The entry in full: also `detail`, `why`, `digestOf`, `updatedAt`, `links`, `tags`, `supersedes` |
 | `PATCH /v1/journal/{id}` `{ "summary"?, "detail"?, "why"?, "importance"?, "supersededBy"?, "addLinks"?, "addTags"? }` | Changes it; `404` when there is none |

@@ -5,6 +5,7 @@ import { msg, tr } from '@shared/i18n'
 import { formatSize } from '@shared/units'
 import { call, errorMessage } from '../api'
 import { confirm, notify, set, setActivity, useDateStyle, useLanguage, useStore } from '../store'
+import { cardNumberOf } from '../projectKeys'
 import { cx } from '../util'
 import { AssistantMark } from './AssistantMark'
 import { TaskChip } from './CardChip'
@@ -450,11 +451,15 @@ function SourceMark({ source }: { source: JournalSource }) {
   )
 }
 
-/** A card a link names, as the board's chip (its column's colour, opens it); one not on the board, as its number. */
+/**
+ * A card a link names, as the board's chip (its column's colour, opens it); one not on the board, as its number. The link
+ * names it by its key (HI-1661: `HI-12`, an old key or a moved card's old name) or, written before, by its number.
+ */
 function CardLink({ refText, short }: { refText: string; short?: boolean }) {
-  const n = Number(refText)
-  const card = useStore((s) => (Number.isInteger(n) ? s.tasks.find((c) => c.number === n) : undefined))
-  if (!Number.isInteger(n)) return <span className="badge">{refText}</span>
+  // Read in the selector, so a card the board gets later (or a key changed) is found then.
+  const n = useStore(() => cardNumberOf(refText))
+  const card = useStore((s) => (n !== null ? s.tasks.find((c) => c.number === n) : undefined))
+  if (n === null) return <span className="badge">{refText}</span>
   return <TaskChip number={n} column={card?.column ?? null} title={card?.title} short={short} blocked={!!card?.blocked} />
 }
 

@@ -14,6 +14,7 @@ import { cardChange, limitLine, releasedLine, wakeLine } from '../src/shared/wat
 import { inboxText } from '../src/shared/deliveries'
 import { taskPrompt } from '../src/shared/tasks'
 import { taskRow, taskRowText } from '../src/shared/toolReplies'
+import { unexpectedCloseText } from '../src/shared/unexpectedClose'
 
 const base = tempDir('hive-keys-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -357,6 +358,33 @@ describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', 
     expect(taskRowText(row)).toContain(`after ${name}`)
     expect(taskRowText({ ...row, names: undefined })).toContain(`after #${c.number}`)
     await close(w)
+  })
+
+  it("a slot kept for a card in flight names it by key, its digits not the workspace number's (HI-1661 round 1, finding 2)", async () => {
+    const ws = workspace()
+    const w = await open(ws)
+    await keys.keyProjects(w)
+    // amberlight's card takes #1, so hive's first card is HI-1 with the workspace number 2.
+    const [, h] = await inWorkspace(w, async () => [await tasks.createTask({ title: 'A', project: 'amberlight' }, user), await tasks.createTask({ title: 'H', project: 'hive' }, user)])
+    expect([h.key, h.number]).toEqual(['HI-1', 2])
+    const { keptText } = await import('../src/main/unusedWorktrees')
+    // Outside any workspace's work, as Unused worktrees asks.
+    expect(await keptText(join(ws, 'hive'), { why: 'inFlight', card: h.number } as never)).toBe('card HI-1, which it held, is still being merged')
+    await close(w)
+  })
+
+  it("a crash notice's merges name their cards as each one's workspace does (HI-1661 round 1, finding 4)", async () => {
+    // Two workspaces, each with its card #1, under different keys: one notice, told outside both.
+    const [w1, w2] = [await open(workspace(['hive'])), await open(workspace(['amberlight']))]
+    for (const w of [w1, w2]) await keys.keyProjects(w)
+    const [c1, c2] = [await inWorkspace(w1, () => tasks.createTask({ title: 'H', project: 'hive' }, user)), await inWorkspace(w2, () => tasks.createTask({ title: 'A', project: 'amberlight' }, user))]
+    expect([c1.number, c2.number]).toEqual([1, 1])
+    const merge = (w: WS, name: string) => ({ agentName: name, branch: 'main', cards: [1], cardNames: [1].map(keys.cardNamesOf(w)), folder: w.path! })
+    const text = unexpectedCloseText({ lastSeen: new Date().toISOString(), agents: [], dump: false, merges: [merge(w1, 'B1'), merge(w2, 'B2')] }, null)
+    expect(text).toContain('B1 was merging main (HI-1)')
+    expect(text).toContain('B2 was merging main (AM-1)')
+    expect(text).not.toContain('#1')
+    for (const w of [w1, w2]) await close(w)
   })
 
   it("every card argument of the hive tools takes a key as well as a number (Darren, 20 Oct: tools take a key string)", () => {

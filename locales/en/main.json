@@ -1209,7 +1209,7 @@
   },
   "main.unused.slot.inFlight": {
     "defaultMessage": "card {card}, which it held, is still being merged",
-    "description": "Why Hive won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its number) that worked in it. A clause."
+    "description": "Why Hive won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its key, such as HI-12) that worked in it. A clause."
   },
   "main.unused.slot.leased": {
     "defaultMessage": "it is lent to {agent}",

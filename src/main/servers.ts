@@ -1318,13 +1318,33 @@ const entryId = (raw: string): number => {
   if (!Number.isInteger(n) || n < 1) throw new HttpError(400, 'An entry id is a whole number.')
   return n
 }
+/**
+ * A card link's ref as the journal keeps it (HI-1661): the card's number, as Hive's own facts link it, so an entry the
+ * Assistant links by key (`HI-12`, an old key, `#12`) is found by the same card's recall and shows its chip. A ref no card
+ * has is kept as it was given.
+ */
+function cardLinksByNumber(ws: WorkspaceService, links: unknown): unknown {
+  if (!Array.isArray(links)) return links
+  return links.map((l) => {
+    if (!l || typeof l !== 'object' || (l as { type?: unknown }).type !== 'card' || typeof (l as { ref?: unknown }).ref !== 'string') return l
+    const n = cardOfRef(ws, (l as { ref: string }).ref)
+    return n === null ? l : { ...l, ref: String(n) }
+  })
+}
+function withCardLinks<T>(ws: WorkspaceService, body: T, fields: string[]): T {
+  const b = { ...((body ?? {}) as Record<string, unknown>) }
+  for (const f of fields) if (f in b) b[f] = f === 'link' ? (cardLinksByNumber(ws, [b[f]]) as unknown[])[0] : cardLinksByNumber(ws, b[f])
+  return b as T
+}
 route('POST', '/v1/journal', async ({ body }) => {
   const { home, settings } = journalHome()
-  return { id: journalCall(() => writeEntry(home, settings, body ?? {}, 'assistant')) }
+  const input = withCardLinks(requireWorkspace(), body, ['links'])
+  return { id: journalCall(() => writeEntry(home, settings, input, 'assistant')) }
 })
 route('POST', '/v1/journal/recall', async ({ body }) => {
   const { home } = journalHome()
-  return { entries: journalCall(() => recall(home, body ?? {})) }
+  const query = withCardLinks(requireWorkspace(), body, ['link'])
+  return { entries: journalCall(() => recall(home, query)) }
 })
 route('GET', '/v1/journal/:id', async ({ params }) => {
   const { home } = journalHome()
@@ -1335,7 +1355,8 @@ route('GET', '/v1/journal/:id', async ({ params }) => {
 route('PATCH', '/v1/journal/:id', async ({ params, body }) => {
   const { home, settings } = journalHome()
   const id = entryId(params[0])
-  if (!journalCall(() => updateEntry(home, settings, id, body ?? {}))) throw new HttpError(404, `There is no entry ${id}.`)
+  const patch = withCardLinks(requireWorkspace(), body, ['addLinks'])
+  if (!journalCall(() => updateEntry(home, settings, id, patch))) throw new HttpError(404, `There is no entry ${id}.`)
   return { id, updated: true }
 })
 route('DELETE', '/v1/journal/:id', async ({ params }) => {
