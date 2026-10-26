@@ -155,10 +155,17 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     await page.keyboard.press('Alt+7')
     const tile = page.locator('.images-page .image-group .thumb').filter({ has: page.locator('img[alt$="session-shot.png"]') })
     check('the Attachments tab shows the session file', !!(await until(async () => (await tile.count()) === 1)))
-    await tile.click({ button: 'right' })
-    await page.locator('.menu-item', { hasText: 'Attach to a card' }).click()
+    // The menu lists the cards the window has: opened again until it has the one just made.
     const otherLabel = await lib.cardLabel(inv, other.number)
-    await page.locator('.menu-item', { hasText: otherLabel }).first().click()
+    const entry = page.locator('.menu-item', { hasText: otherLabel }).first()
+    const listed = await until(async () => {
+      await page.keyboard.press('Escape')
+      await tile.click({ button: 'right' })
+      await page.locator('.menu-item', { hasText: 'Attach to a card' }).click()
+      return (await entry.count()) === 1
+    })
+    check(`the menu lists ${otherLabel}`, !!listed)
+    await entry.click()
     const copied = await until(async () => {
       const l = await inv('cards:attachments', other.number)
       return l.length === 1 && l
