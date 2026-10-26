@@ -526,6 +526,22 @@ const usageSeen = new Map<string, UsageSeen>()
 const MAX_USAGE_SEEN = 200
 /** A session listing this slow is logged with where its time went (#1646). */
 const SLOW_LIST_MS = 1000
+/** How many of Hive's sessions a listing looks at at once (#1649): enough to overlap their file checks, not to flood the disk's threads. */
+const LIST_AT_ONCE = 8
+
+/** `fn` on each of `items`, at most `n` at once; the results in the items' order. */
+async function atMost<T, R>(n: number, items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = Array.from({ length: items.length })
+  let next = 0
+  const worker = async (): Promise<void> => {
+    while (next < items.length) {
+      const i = next++
+      out[i] = await fn(items[i])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker))
+  return out
+}
 
 /**
  * A transcript's size for the Sessions list (#671): a stat, never a read, taken each time the list is (the window keeps
@@ -1310,7 +1326,11 @@ class SessionManager {
   }
 
   private backupPath(projectPath: string, sessionId: string, archived = false): string {
-    return join(projectPath, HIVE_DIR, archived ? 'archive' : 'sessions', `${assertSessionId(sessionId)}.jsonl`)
+    return join(this.backupDir(projectPath, archived), `${assertSessionId(sessionId)}.jsonl`)
+  }
+
+  private backupDir(projectPath: string, archived = false): string {
+    return join(projectPath, HIVE_DIR, archived ? 'archive' : 'sessions')
   }
 
   /** Works out usage again (e.g. after price changes, so estimates are recomputed); what was read is kept. */
@@ -5329,7 +5349,10 @@ class SessionManager {
     const known = new Set([...file.sessions.map((s) => s.id), ...(file.deleted ?? [])])
     // Records from before sub-sessions were told apart (a guardian review adopted then): found now, and kept on them.
     const found = new Map<string, SubSession>()
-    for (const rec of file.sessions) {
+    // Hive's backups, from its two folders' names (#1649): not four checks per session on main's thread.
+    const backups = await this.backupNames(projectPath)
+    // A few sessions at a time (#1649): each waits on its files, and one after another 400 took a second.
+    const listed = await atMost(LIST_AT_ONCE, file.sessions, async (rec): Promise<SessionListItem> => {
       const provider = recordProvider(rec)
       let transcript: string | null = null
       try {
@@ -5338,12 +5361,12 @@ class SessionManager {
         // A provider this version doesn't know.
       }
       const hasTranscript = !!transcript
-      const hasBackup = this.backupFiles(projectPath, rec.id).length > 0
+      const hasBackup = backups.has(`${rec.id}.jsonl`.toLowerCase()) || backups.has(`${rec.id}.jsonl${GZ}`.toLowerCase())
       const usage = await this.usage(projectPath, rec.id, ctx)
       const { keptUsage: _kept, ...fields } = rec
-      const sub = rec.sub ?? (await this.recordSub(projectPath, rec))
+      const sub = rec.sub ?? (await this.recordSub(projectPath, rec, transcript))
       if (sub && !rec.sub) found.set(rec.id, sub)
-      items.push({
+      return {
         ...fields,
         ...(sub ? { sub } : {}),
         provider,
@@ -5356,8 +5379,9 @@ class SessionManager {
         ...(!ctx.stored?.has(rec.id) && (hasTranscript || hasBackup) ? { pending: true } : {}),
         usage,
         recache: usage && providerDescriptor(provider).capabilities.promptCacheTtl ? recacheEstimate(usage, ttl) : null
-      })
-    }
+      }
+    })
+    items.push(...listed)
     if (found.size) await this.keepSubs(projectPath, found)
     const own = performance.now()
     // Each in a slot (#1434): which, and whether it may resume there now, by its agent (gone: no agent may).
@@ -5430,12 +5454,16 @@ class SessionManager {
     return [...out.values()]
   }
 
-  /** Whether one of Hive's records is a sub-session, from its transcript's first line (the CLI's, else Hive's copy). */
-  private async recordSub(projectPath: string, rec: SessionRecord): Promise<SubSession | null> {
+  /**
+   * Whether one of Hive's records is a sub-session, from its transcript's first line (the CLI's, else Hive's copy).
+   * `transcript`: the CLI's, when the caller has looked it up already (null: it has none).
+   */
+  private async recordSub(projectPath: string, rec: SessionRecord, transcript?: string | null): Promise<SubSession | null> {
     if (rec.sub) return rec.sub
     try {
       const adapter = providerAdapter(recordProvider(rec))
-      const path = (await adapter.transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath).catch(() => null)) ?? this.backupCopy(projectPath, rec.id) ?? this.backupCopy(projectPath, rec.id, true)
+      const cli = transcript !== undefined ? transcript : await adapter.transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath).catch(() => null)
+      const path = cli ?? this.backupCopy(projectPath, rec.id) ?? this.backupCopy(projectPath, rec.id, true)
       return path ? await adapter.subSessionOf(path, rec.id) : null
     } catch {
       return null
@@ -5703,6 +5731,12 @@ class SessionManager {
   /** Hive's copies of a session's transcript that exist (the active backup, the archived one). */
   backupFiles(projectPath: string, sessionId: string): string[] {
     return [false, true].flatMap((archived) => [this.backupPath(projectPath, sessionId, archived), this.backupPath(projectPath, sessionId, archived) + GZ]).filter((b) => existsSync(b))
+  }
+
+  /** The names of Hive's copies of a host's transcripts (active and archived), lower-cased: a listing's backupFiles. */
+  private async backupNames(projectPath: string): Promise<Set<string>> {
+    const names = await Promise.all([false, true].map((archived) => readdir(this.backupDir(projectPath, archived)).catch(() => [] as string[])))
+    return new Set(names.flat().map((n) => n.toLowerCase()))
   }
 
   /**
