@@ -107,7 +107,7 @@ export interface LoopReach {
 /**
  * Of an agent's cards in play, those it owes the next move on, or that nothing would wake it for (HI-1693): flagged when
  * it sits idle with no watch. A loop wake brings it the other side's move, so these aren't, while one can reach it:
- * - its own card (the builder's) in Review: the reviewer's verdict;
+ * - its own card (the builder's) in Review, with no request of its reviewer's left to answer: the reviewer's verdict;
  * - its own card in Doing with a design or follow-up posted (`pendingStep`): the reviewer's answer;
  * - a card it reviews in the loop, in Doing with no step waiting for it: the builder's submission.
  * The rest is its own move (a builder's card in Doing, a step its reviewer must answer, a card in Review its reviewer
@@ -121,7 +121,7 @@ export function owedCards(cards: readonly TaskCard[], project: string, agentId: 
     const reviewer = reach.reviewerOf(n)
     if (!reviewer) return true
     const step = !!pendingStep(c)
-    if (c.agent === agentId) return !((c.column === 'review' && !failedSinceArrival(c)) || (c.column === 'doing' && step))
+    if (c.agent === agentId) return !((c.column === 'review' && !failedSinceArrival(c) && !requestOpen(c)) || (c.column === 'doing' && step))
     if (reviewer === agentId) return !(c.column === 'doing' && !step)
     return true
   })
@@ -131,6 +131,22 @@ export function owedCards(cards: readonly TaskCard[], project: string, agentId: 
 function failedSinceArrival(card: Pick<TaskCard, 'history'>): boolean {
   const i = card.history.findLastIndex((h) => /^(Moved to (the (top|bottom) of )?Review\b|Created in Review\b|Returned for review\b)/.test(h.what))
   return card.history.slice(i + 1).some((h) => /^Review failed\b/.test(h.what))
+}
+
+/**
+ * A request of its reviewer's to its builder (`hive_request_builder`: "Asked the builder…") on a card in Review, since it
+ * came in, that the builder hasn't answered (nothing of the builder's on the card after it): the builder's move.
+ */
+function requestOpen(card: Pick<TaskCard, 'history' | 'comments' | 'agentName' | 'project'>): boolean {
+  const arrived = card.history.findLastIndex((h) => /^(Moved to (the (top|bottom) of )?Review\b|Created in Review\b|Returned for review\b)/.test(h.what))
+  const asked = card.history.findLastIndex((h) => /^Asked the builder\b/.test(h.what))
+  if (asked < 0 || asked < arrived) return false
+  // Its board name, as its lines and comments are signed ("B1 (alpha)"), whether the card keeps it with its project or not.
+  const name = card.agentName?.toLowerCase()
+  const names = name ? new Set([name, `${name} (${card.project.toLowerCase()})`]) : new Set<string>()
+  const at = card.history[asked].at
+  // Answered: a line of the builder's after it (a step, a move), or a comment of its own since (comments aren't lines).
+  return !card.history.slice(asked + 1).some((h) => names.has(h.by.toLowerCase())) && !(card.comments ?? []).some((m) => m.at >= at && names.has(m.by.toLowerCase()))
 }
 
 /** The cards an agent in a loop owes now (owedCards), read from the board, its project's settings and its reviewers. */
@@ -158,8 +174,13 @@ function schedule(loop: Loop): void {
   loop.timer.unref?.()
 }
 
-/** For tests: how many checks and rechecks have finished (a check's outcome is read once it has run). */
-export const loopCheckRuns = { done: 0 }
+/**
+ * For tests: how many checks and rechecks have finished (`done`), and each agent's grace checks finished (`checks`, by
+ * project and agent: what decides its flag), so a test reads its own agent's outcome once that check has run.
+ */
+export const loopCheckRuns = { done: 0, checks: new Map<string, number>() }
+/** For tests: how many grace checks of this agent have finished. */
+export const loopChecksOf = (projectPath: string, agentId: string): number => loopCheckRuns.checks.get(keyOf(projectPath, agentId)) ?? 0
 
 /**
  * The board, the lanes, the settings or the project changed: what the agent owes is worked out again (HI-1693). A mark
@@ -188,6 +209,8 @@ async function check(loop: Loop): Promise<void> {
     await checkNow(loop)
   } finally {
     loopCheckRuns.done++
+    const k = keyOf(loop.projectPath, loop.agentId)
+    loopCheckRuns.checks.set(k, (loopCheckRuns.checks.get(k) ?? 0) + 1)
   }
 }
 

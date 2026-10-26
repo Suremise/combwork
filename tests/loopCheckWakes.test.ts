@@ -80,11 +80,11 @@ describe('loop agents with no watch, and the loop wakes that reach them (HI-1693
   /** A step of the card's by intent (as the agents' tools take it): a no-code card is submitted with its summary. */
   const act = (w: Awaited<ReturnType<typeof open>>['w'], c: number, who: typeof b1 | typeof r1, intent: Parameters<typeof runCardIntent>[2]) => inWorkspace(w, () => runCardIntent({ n: c, plain: false }, who, intent))
   const submit = (w: Awaited<ReturnType<typeof open>>['w'], c: number) => act(w, c, b1, { kind: 'submit', summary: 'Round 1 ready' })
-  /** Runs `step`, then waits until a check or recheck begun after it has finished (its outcome, not a moment, is read). */
-  const checked = async (step: () => unknown) => {
-    const from = loopCheck.loopCheckRuns.done
+  /** Runs `step`, then waits until this agent's own grace check begun after it has finished: its outcome, not a moment, is read. */
+  const checked = async (alpha: string, agentId: string, step: () => unknown) => {
+    const from = loopCheck.loopChecksOf(alpha, agentId)
     await step()
-    await vi.waitFor(() => expect(loopCheck.loopCheckRuns.done).toBeGreaterThan(from), HANG)
+    await vi.waitFor(() => expect(loopCheck.loopChecksOf(alpha, agentId)).toBeGreaterThan(from), HANG)
   }
 
   it('a builder waiting for its verdict is not flagged; once the verdict sends the move back and it stays idle, it is', async () => {
@@ -93,7 +93,7 @@ describe('loop agents with no watch, and the loop wakes that reach them (HI-1693
     const c = await inLane(w, alpha)
     await submit(w, c)
     // A notice ended its watch, and its turn ended without a new one: the reviewer's verdict will wake it.
-    await checked(() => s.idle('b1'))
+    await checked(alpha, 'b1', () => s.idle('b1'))
     expect(s.flagged('b1')).toBeNull()
     expect(s.told).toEqual([])
     // Failed: its move now. Still idle with no watch (no new session-status): flagged after the grace, and told.
@@ -104,12 +104,29 @@ describe('loop agents with no watch, and the loop wakes that reach them (HI-1693
     await disposeWorkspaceService(w)
   })
 
+  it("a reviewer's request leaves the move to the builder: flagged while it sits idle unanswered, and not once it has answered", async () => {
+    const { w, alpha } = await open()
+    const s = fake(alpha)
+    const c = await inLane(w, alpha)
+    await submit(w, c)
+    await checked(alpha, 'b1', () => s.idle('b1'))
+    expect(s.flagged('b1')).toBeNull()
+    // Mid-review, the reviewer asks the builder something: its answer is owed, the card still in Review.
+    await act(w, c, r1, { kind: 'startReview' })
+    await act(w, c, r1, { kind: 'request', text: 'Which commit should I review?' })
+    await vi.waitFor(() => expect(s.flagged('b1')).toEqual([c]), HANG)
+    // Answered on the card: the verdict is the reviewer's again, and the mark goes.
+    await inWorkspace(w, () => tasks.updateTask(c, {}, b1, { comment: 'The latest: 1a2b3c4.' }))
+    await vi.waitFor(() => expect(s.flagged('b1')).toBeNull(), HANG)
+    await disposeWorkspaceService(w)
+  })
+
   it('a builder whose design waits for the answer is not flagged; once the reviewer answers with gaps, it is', async () => {
     const { w, alpha } = await open()
     const s = fake(alpha)
     const c = await inLane(w, alpha)
     const id = String((await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Plan' }))).done.data?.design)
-    await checked(() => s.idle('b1'))
+    await checked(alpha, 'b1', () => s.idle('b1'))
     expect(s.flagged('b1')).toBeNull()
     await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step: 'gaps', text: '1. Say how.', design: id }))
     await vi.waitFor(() => expect(s.flagged('b1')).toEqual([c]), HANG)
@@ -120,7 +137,7 @@ describe('loop agents with no watch, and the loop wakes that reach them (HI-1693
     const { w, alpha } = await open()
     const s = fake(alpha)
     const c = await inLane(w, alpha)
-    await checked(() => s.idle('r1'))
+    await checked(alpha, 'r1', () => s.idle('r1'))
     expect(s.flagged('r1')).toBeNull()
     // The builder posts a design: the reviewer's to answer. Idle with no watch, it is flagged after the grace.
     await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, b1, { kind: 'loopStep', step: 'design', text: 'Plan' }))
@@ -133,7 +150,7 @@ describe('loop agents with no watch, and the loop wakes that reach them (HI-1693
     const s = fake(alpha)
     const c = await inLane(w, alpha)
     await submit(w, c)
-    await checked(() => s.idle('r1'))
+    await checked(alpha, 'r1', () => s.idle('r1'))
     await vi.waitFor(() => expect(s.flagged('r1')).toEqual([c]), HANG)
     await disposeWorkspaceService(w)
   })
@@ -144,7 +161,7 @@ describe('loop agents with no watch, and the loop wakes that reach them (HI-1693
     const c = await inLane(w, alpha)
     await submit(w, c)
     deliveries.setReadsInboxForTests(() => false)
-    await checked(() => s.idle('b1'))
+    await checked(alpha, 'b1', () => s.idle('b1'))
     await vi.waitFor(() => expect(s.flagged('b1')).toEqual([c]), HANG)
     // Its hive tools back (Settings changed): a loop wake reaches it again, and the mark goes.
     deliveries.setReadsInboxForTests(() => true)
@@ -158,7 +175,7 @@ describe('loop agents with no watch, and the loop wakes that reach them (HI-1693
     const s = fake(alpha)
     const c = await inLane(w, alpha)
     await submit(w, c)
-    await checked(() => s.idle('b1'))
+    await checked(alpha, 'b1', () => s.idle('b1'))
     await vi.waitFor(() => expect(s.flagged('b1')).toEqual([c]), HANG)
     await disposeWorkspaceService(w)
   })

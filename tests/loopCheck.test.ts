@@ -74,6 +74,14 @@ describe("what a loop agent with no watch owes, while Hive's loop wakes reach it
     expect(owedCards([own({ column: 'doing', history: [h('Moved to Doing'), h('Posted a design for the reviewer to check: "Plan"')] })], 'alpha', 'r1', [1], reach)).toEqual([1])
     expect(owedCards([own({ column: 'review', history: [h('Moved to Review')] })], 'alpha', 'r1', [1], reach)).toEqual([1])
   })
+  it("a builder asked something mid-review owes the answer until it has given one (a line or a comment of its own since)", () => {
+    const asked = [h('Moved to Review'), { ...h('Asked the builder: "Which commit should I review?"'), by: 'R1 (alpha)' }]
+    expect(owedCards([own({ column: 'review', agentName: 'B1', history: asked })], 'alpha', 'b1', [1], reach)).toEqual([1])
+    const answered = { at: '2026-10-26T11:00:01.000Z', by: 'B1 (alpha)', text: 'The latest: 1a2b3c4.' }
+    expect(owedCards([own({ column: 'review', agentName: 'B1', history: asked, comments: [answered] as never })], 'alpha', 'b1', [1], reach)).toEqual([])
+    // A request from before the card came back for review is that round's: answered or not, the verdict waits now.
+    expect(owedCards([own({ column: 'review', agentName: 'B1', history: [...asked, h('Returned for review, round 2')] })], 'alpha', 'b1', [1], reach)).toEqual([])
+  })
   it('everything is owed where no loop wake reaches it: none can (loop wakes off, no inbox), or the card has no reviewer', () => {
     const inReview = [own({ column: 'review', history: [h('Moved to Review')] })]
     expect(owedCards(inReview, 'alpha', 'b1', [1], { ...reach, wakes: false })).toEqual([1])
