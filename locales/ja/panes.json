@@ -134,6 +134,8 @@
   "panes.resume.recache": "キャッシュ期限切れ、再キャッシュに約{tokens}トークン",
   "panes.resume.sessionsTab": "セッション履歴タブ…",
   "panes.resume.tip": "「{session}」を再開（最終アクティブ：{when}）",
+  "panes.running.cards": "{n, plural, other {# 枚のカード}}",
+  "panes.running.waitingFor": "待機中",
   "panes.runtime.hooksMissing": "状態不明：{provider}からフックが届いていません",
   "panes.runtime.hooksMissingNote": "Hiveに{provider}のフックが届いていないため、状態が正しくない可能性があります。{why, select, refused {Hiveがフックを拒否しました：このセッションのトークンが含まれていませんでした。} off {{where}がフックを無効にしています（disableAllHooks）。} newer {この{provider}はHiveがテストしたバージョンより新しく、更新でフックが変わった可能性があります。} other {{after, select, start {起動後にフックが1つも届いていません。} other {作業を始めたプロンプトの後にフックが1つも届いていません。}}}}フックが届くまで、Hiveはこのエージェントに何も入力しません。セッションを再起動してください。再び起きる場合は、Hiveを更新するか、{provider}の設定でフックが無効になっていないか確認してください。",
   "panes.runtime.needsInput": "入力待ち",

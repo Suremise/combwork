@@ -539,6 +539,14 @@
     "defaultMessage": "Resume \"{session}\", last active {when}",
     "description": "Tooltip of an agent's Resume button: the session it resumes ({session}: its name) and when it was last active ({when}: \"5 min ago\")."
   },
+  "panes.running.cards": {
+    "defaultMessage": "{n, plural, one {# card} other {# cards}}",
+    "description": "Instead of their chips, when they don't fit: how many cards a running agent waits for, in the Overview's Running now (its hover names them)."
+  },
+  "panes.running.waitingFor": {
+    "defaultMessage": "Waiting for",
+    "description": "A running agent's status in the Overview's Running now while it waits for several cards to change: the cards' chips follow it (or how many there are, when they don't fit)."
+  },
   "panes.runtime.hooksMissing": {
     "defaultMessage": "Status unknown: no hooks from {provider}",
     "description": "An agent's status (its pane, the agents table): its coding agent ({provider}, a product name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing), so Hive can't tell what it is doing. Keep it short."

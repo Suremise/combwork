@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import type { AgentState } from '@shared/agentState'
-import { agentDoingCards, agentReviewCards, columnName } from '@shared/tasks'
+import { agentDoingCards, agentReviewCards } from '@shared/tasks'
 import { cardsText } from '@shared/agentTable'
 import { compactThreshold, pageEndIndex, transcriptWarnLimit } from '@shared/defaults'
 import { droppedLaneOrder } from '@shared/laneBar'
@@ -21,6 +21,7 @@ import { RowCardChip, useRowCards } from './CardChip'
 import { PaneResizer, usePaneSize } from './Resizer'
 import { StateMark } from './StateMark'
 import { Icon, statusText, Tooltip, useClipped, useContextMenu } from './ui'
+import { cardsWait } from './watchLine'
 
 /**
  * The Session tab's Tiles view (#976; #975's toggle switches to it): a tile per agent, 12 to a page, in the order Settings
@@ -574,10 +575,9 @@ function StripItem({ project, a, state, active, drag }: { project: ProjectInfo; 
   const cards = useRowCards(project, a.id)
   const [nameRef, clipped] = useClipped<HTMLSpanElement>()
   const shown = cards[0]?.card.number
-  const watch = a.live?.status === 'watching' ? a.live.watch : undefined
-  // Waiting on its own card only (#1021): the chip says which, so the status doesn't repeat its number.
-  const short = watch && status === watch.label && shown !== undefined && !watch.agents?.length && !watch.lanes?.length && watch.cards.length === 1 && watch.cards[0] === shown
-  const line = short ? (watch.column ? tr(msg({ id: 'panes.tiles.waitingInto', defaultMessage: 'Waiting → {column}', description: "An agent's status in the focus view's strip while it waits for its card (named by the chip beside it) to move into a board column ({column})." }), { column: columnName(watch.column, tr) }) : tr(msg({ id: 'panes.tiles.waitingCard', defaultMessage: 'Waiting for its card', description: "An agent's status in the focus view's strip while it waits for its card (named by the chip beside it) to change." }))) : status
+  // Waiting on its own card only (#1021): the chip says which, so the status doesn't repeat its name.
+  const wait = a.live ? cardsWait(a.live, status) : null
+  const line = wait && wait.cards.length === 1 && wait.cards[0] === shown ? wait.line : status
   return (
     <div className={cx('tile-strip-row', drag && 'movable', drag?.dragging && 'dragging', drag?.dropBefore && 'drop-before', drag?.dropAfter && 'drop-after')} data-agent={a.id}>
       <button

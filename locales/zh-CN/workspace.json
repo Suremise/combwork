@@ -193,7 +193,7 @@
   "workspace.notes.workspaceNotes.off": "提供已关闭（“设置”→“高级”→“向智能体提供 Workspace notes”）：智能体不会获得它。",
   "workspace.notes.workspaceNotes.template": "# Workspace notes\n\n每个智能体都应了解的关于这台机器的笔记：某个命令需要的完整路径、本地工具的版本。适用于项目所有参与者的规则请写进该项目的 AGENTS.md。\n",
   "workspace.notes.workspaceNotes.title": "Workspace notes",
-  "workspace.overview.agentLabel": "{project} · {agent}",
+  "workspace.overview.agentLabel": "<in>{project} · </in>{agent}",
   "workspace.overview.apiCost": "按 API 价格计的费用",
   "workspace.overview.asReported": "提供方报告",
   "workspace.overview.assistant": "助手",

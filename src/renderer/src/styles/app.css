@@ -7377,6 +7377,104 @@ button.agent-place:hover {
 .running-row .small {
   font-size: 12px;
 }
+/* A running agent's first line (HI-1679): its name, its status and its card's chip on one line at any width. As the
+   row narrows, the chip's title gives way first (down to the key), then the status (with "…"), then the project before
+   the agent's name; the agent's name and the card's key stay whole. In a narrow Overview the context column narrows with
+   the line, so the line keeps room for them. */
+.running-row > .grow {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.running-row > .tip-wrap:has(> .running-ctx) {
+  flex: 0 1 180px;
+  min-width: 0;
+}
+.running-row .running-ctx {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+.running-row .running-ctx > .small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Shrink factors far apart give each part its turn: what a part with a far smaller factor would give up meanwhile
+   rounds to nothing, so it shows no "…" until the parts before it are as small as they go. */
+.running-line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+/* Spaced by margins, not a gap: the project and the agent's name are two items that read as one. */
+.running-line > .tip-wrap {
+  margin-left: 6px;
+}
+/* The name's parts are the line's own: its project shrinks to nothing first, its agent's name (no box of its own) never. */
+.running-line > strong {
+  display: contents;
+  white-space: nowrap;
+}
+.running-project {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: pre;
+}
+.running-line > .tip-wrap:has(> .running-status) {
+  flex: 0 100000 auto;
+  min-width: 0;
+}
+.running-status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.running-line > .tip-wrap:has(> .card-chip) {
+  flex: 0 10000000000 auto;
+}
+/* Several cards (WatchedCardChips): a chip each, keys only, giving way as one chip does; when they don't fit, how many
+   ("2 cards"), whole. The unseen copy measures what the chips need. */
+.running-line > .running-cards {
+  position: relative;
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 10000000000 auto;
+  min-width: 0;
+  margin-left: 6px;
+  overflow: hidden;
+}
+.running-line > .running-cards.counted {
+  min-width: max-content;
+}
+.running-cards-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  gap: 4px;
+  visibility: hidden;
+  white-space: nowrap;
+}
+.running-cards-count {
+  cursor: default;
+  white-space: nowrap;
+}
+/* The chip as a grid here: the title's column (the third) is as wide as the title when there is room and nothing at
+   the least, so the chip shrinks down to its icon and key, never past them. */
+.running-line .card-chip {
+  flex: 0 1 auto;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: auto auto minmax(0, max-content) auto;
+  min-width: auto;
+  max-width: 100%;
+}
+.running-line .card-chip .codicon,
+.running-line .card-chip-number {
+  white-space: nowrap;
+}
 .running-ctx {
   width: 180px;
   display: flex;

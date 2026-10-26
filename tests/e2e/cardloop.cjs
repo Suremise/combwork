@@ -86,7 +86,8 @@ const check = (name, ok, extra = '') => {
   await page.getByText('alpha', { exact: true }).first().click()
   const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
   const reviewer = await lib.addAgent(inv, alpha, { name: 'Reviewer' })
-  const c1 = (await inv('tasks:create', { title: 'First card', project: 'alpha', agent: builder.id })).number
+  const first = await inv('tasks:create', { title: 'First card', project: 'alpha', agent: builder.id })
+  const c1 = first.number
   const c2 = (await inv('tasks:create', { title: 'Second card', project: 'alpha', agent: builder.id })).number
   const built = (n) => `boardmove ${n} doing then ${wait(n, { changes: ['verdict', 'column'], column: 'passed' })} then boardmove ${n} review then boardcomment ${n}`
   // What each does when woken, in order: c1 passes first time; c2 fails once, then passes. A lane's next card starts once
@@ -107,7 +108,8 @@ const check = (name, ok, extra = '') => {
   const watching = await until(async () => (await live(reviewer.id))?.status === 'watching', HUNG_MS)
   const st = await live(reviewer.id)
   check('the reviewer is watching: status watching, with what for', !!watching && st?.watch?.label === `Waiting for #${c1} → Review`, JSON.stringify({ status: st?.status, watch: st?.watch }))
-  check('its header says so', !!(await until(async () => (await page.locator('.pane-status.watching', { hasText: `Waiting for #${c1} → Review` }).count()) >= 1, 5000)))
+  // The window words the watch itself (HI-1679): the card by its key, where the Agent API's label above has its number.
+  check('its header says so', !!(await until(async () => (await page.locator('.pane-status.watching', { hasText: `Waiting for ${first.key ?? `#${c1}`} → Review` }).count()) >= 1, 5000)))
   await page.screenshot({ path: path.join(lib.WORK, 'cardloop-watching.png') })
   /** Whether the watching header's ⋯ (Cancel Card Watch is in its menu, #977) is on screen where a click lands on it (not clipped or covered). */
   const cancelHit = (agentName) =>
