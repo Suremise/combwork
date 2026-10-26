@@ -17,6 +17,9 @@ import { LANE_NEXT_STALL_MS, laneNextWaitReason, RETURN_STALL_MS, returnedWaitRe
 /** The merge queue's returns as queueReturnOf finds them (HI-1721), by card: none unless a test sets one. */
 const { returns } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>() }))
 vi.mock('../src/main/queueReturn', () => ({ queueReturnOf: async (_ws: unknown, _p: string, n: number) => returns.get(n) ?? null, returnIn: () => null }))
+/** Agents queued to resume after a restart (HI-1707's isResuming), by id: none unless a test sets one. */
+const { resuming } = vi.hoisted(() => ({ resuming: new Set<string>() }))
+vi.mock('../src/main/restartResume', async (orig) => ({ ...(await orig<object>()), isResuming: (_p: string, id: string) => resuming.has(id) }))
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
 
@@ -738,10 +741,13 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await disposeWorkspaceService(w)
   })
 
-  it("a lane's next card its builder, idle, hasn't started is stalled once the card before it has been Done 15 min; started, it isn't (HI-1741)", async () => {
+  it("a lane's next card its builder, idle, hasn't started is stalled once the card before it has been Done 15 min, told once by key; not while the lane is paused or its builder works or is about to resume; started, it isn't (HI-1741)", async () => {
     const { w, alpha, home } = await open()
     const st = fake(alpha, home)
     await rulesOff()
+    const { changeProjectKey } = await import('../src/main/projectKeys')
+    await changeProjectKey(w, alpha, 'AL')
+    const { noteHooksMissing } = await import('../src/main/hooksHealth')
     const [a] = await newCards(w, 'b1', 1)
     const b = (await inWorkspace(w, () => tasks.createTask({ title: 'Next', project: 'alpha', agent: 'b1' }, user))).number
     await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a, b], by: 'B1 (alpha)' })
@@ -757,15 +763,37 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
       vi.setSystemTime(done + LANE_NEXT_STALL_MS + 60_000)
+      const quiet = async (): Promise<void> => {
+        await watches.evaluateWatches(w)
+        await watches.settled()
+        expect(st.typed).toEqual([])
+      }
       // At work then (its turn not over): no stall.
       b1Status = 'working'
-      await watches.evaluateWatches(w)
-      await watches.settled()
-      expect(st.typed).toEqual([])
+      await quiet()
+      // Idle, but its lane paused (its hooks aren't arriving: nothing is typed into it): no stall.
       b1Status = 'finished'
+      noteHooksMissing(alpha, 'b1', true)
+      try {
+        await quiet()
+      } finally {
+        noteHooksMissing(alpha, 'b1', false)
+      }
+      // Not running, but queued to resume after a restart: no stall.
+      const liveFor = sessions.liveFor.bind(sessions)
+      const liveStates = sessions.liveStates.bind(sessions)
+      Object.assign(sessions, { liveFor: (p: string, id: string) => (id === 'b1' ? null : liveFor(p, id)), liveStates: () => [] })
+      resuming.add('b1')
+      try {
+        await quiet()
+      } finally {
+        resuming.delete('b1')
+        Object.assign(sessions, { liveFor, liveStates })
+      }
+      // Idle, the lane running: stalled, by the cards' keys.
       await watches.evaluateWatches(w)
       await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
-      expect(st.told[0]).toMatch(new RegExp(`#${b} is stalled: "#${b} is the lane's next card: #${a} went Done 16 min ago, and B1 is idle without starting it\\."`))
+      expect(st.told[0]).toContain(`is stalled: "AL-2 is the lane's next card: AL-1 went Done 16 min ago, and B1 is idle without starting it."`)
       // Told once: looked at again, nothing new.
       await watchAll(w, home, st)
       await watches.evaluateWatches(w)

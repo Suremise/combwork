@@ -21,7 +21,7 @@ const base = tempDir('resumedcarry-')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { boardFile, boardRead } = await import('../src/main/boardStore')
 const { SlotStore, fileSlotConn } = await import('../src/main/slots')
-const { leaseForStart, lendLane, settleSlotCards } = await import('../src/main/slotCards')
+const { leaseForStart, lendLane, retireWaitOf, settleSlotCards } = await import('../src/main/slotCards')
 const { holder, poolFor } = await import('../src/main/slotsApp')
 const { sessions } = await import('../src/main/sessions')
 const { loadedWatchFor } = await import('../src/main/watches')
@@ -62,9 +62,9 @@ async function setup(name: string) {
   const lane = () => run(() => lendLane(ws, project, 'lane-b1', 'b1', 'main'))
   const leases = (agent: string) => store.openLeases().filter((l) => l.agent === agent)
   const leaseRow = (id: string) => boardRead(ws, (db) => db.prepare('SELECT why, ended_at FROM slot_leases WHERE id = ?').get(id) as { why: string | null; ended_at: string | null })
-  const setWriter = async (slot: string, run: string, lease: string): Promise<void> => {
+  const setWriter = async (slot: string, writerRun: string, lease: string): Promise<void> => {
     const me = await holder.self()
-    await store.conn.write((db) => db.prepare('UPDATE slots SET writer_run = ?, writer_lease = ?, writer_agent = ?, writer_pid = ?, writer_started = ? WHERE project = ? AND name = ?').run(run, lease, 'b1', me.pid, me.started, projectId, slot))
+    await store.conn.write((db) => db.prepare('UPDATE slots SET writer_run = ?, writer_lease = ?, writer_agent = ?, writer_pid = ?, writer_started = ? WHERE project = ? AND name = ?').run(writerRun, lease, 'b1', me.pid, me.started, projectId, slot))
   }
 
   /**
@@ -184,9 +184,11 @@ describe("a slot B1's Resume took, then B1's lane starts (HB3's sequence)", () =
     await vi.waitFor(() => expect(t.pool.slots().find((s) => s.name === b1.slot)?.op).toBeTruthy(), { timeout: HUNG_MS })
     const got = await t.lane()
     expect('slot' in got && got.slot).not.toBe(b1.slot)
-    // Held while the operation runs, a pass later too.
+    // Held while the operation runs, a pass later too: one retry waits, never a second beside it.
+    expect(retireWaitOf(t.wsPath, t.project)).toEqual({ tries: 1, waiting: true })
     await t.run(() => settleSlotCards(t.ws, t.project))
     expect(t.leaseRow(b1.carried)).toMatchObject({ why: null, ended_at: null })
+    expect(retireWaitOf(t.wsPath, t.project)).toEqual({ tries: 1, waiting: true })
     // The operation ends, changing nothing (not now): the retry (the pass asked for again after its pause) ends the
     // carried lease, nothing else asked.
     open('the test: not now')
@@ -203,6 +205,29 @@ describe("a slot B1's Resume took, then B1's lane starts (HB3's sequence)", () =
     const r = await t.start(await t.card('B2s', 'b2'), 'b2')
     expect(r && 'lease' in r ? r.slot : r).toBe(b1.slot)
     expect(stops).toEqual([])
+  })
+})
+
+describe("the retirement's retry goes with its workspace", () => {
+  it('the workspace closing while a retry waits drops it; nothing of it runs after', async () => {
+    const t = await setup('closing')
+    const b1 = await t.resumedB1()
+    let open!: (why: string) => void
+    const gate = new Promise<string>((res) => (open = res))
+    const prep = t.pool.prepare(b1.carried, { line: 'hive/elsewhere', base: 'main', install: false, ready: () => gate })
+    await vi.waitFor(() => expect(t.pool.slots().find((s) => s.name === b1.slot)?.op).toBeTruthy(), { timeout: HUNG_MS })
+    await t.lane()
+    expect(retireWaitOf(t.wsPath, t.project)).toEqual({ tries: 1, waiting: true })
+    // The workspace closes: its pools wait for the operation, which then ends; its lifetime ends, and the retry with it.
+    const life = t.ws.lifetime
+    const closing = disposeWorkspaceService(t.ws)
+    open('the test: closing')
+    await prep
+    await closing
+    expect(life.aborted).toBe(true)
+    expect(retireWaitOf(t.wsPath, t.project)).toBeNull()
+    // Its carried lease as it was (read from the board's file): nothing ran for it after.
+    expect(t.store.lease(b1.carried)).toMatchObject({ to: null, why: null })
   })
 })
 

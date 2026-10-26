@@ -3744,8 +3744,9 @@ decided again in it):
   in the handover's write: changed, nothing is written. A handover not possible just then ends the lease (`superseded`)
   once the start holds its own, decided again in the pool's write as above; the slot pass does the same for such a lease
   whose agent holds a card's or lane's lease elsewhere (a later start reusing its lane's lease), and while an operation
-  or job holds the slot it asks for itself again after a pause (1 s, doubling, at most a minute) until it can, a
-  workspace's opening looking again too. **Release Slot…** in the agent's ⋯ menu (asks first) ends a carried lease; Hive never deletes
+  or job holds the slot it asks for itself again after a pause (1 s, doubling, at most a minute) until it can: one
+  waiting at a time per project, dropped when its workspace closes (its opening's pass looks again), never for what
+  doesn't pass by itself (changes not committed, a head no branch holds). **Release Slot…** in the agent's ⋯ menu (asks first) ends a carried lease; Hive never deletes
   the agent's branch.
 - **The rename.** A free adopted slot (no lease, operation, job or writer, ready, no session running there, nothing
   holding the folder: the rename probe) is renamed to the next generic name (`slot-c`) in the pool's folder, so a slot

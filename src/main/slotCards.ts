@@ -280,16 +280,62 @@ async function endLeftCarried(ws: WorkspaceService, projectPath: string, pool: S
 /**
  * Carried leases whose retirement waits for an operation or job on their slot to settle (HI-1741), by project: the pass
  * looked at again after a pause that grows with each try (1 s, doubling, at most a minute), as `ensure` retries, until
- * it isn't busy any more. A restart's pass looks again too.
+ * it isn't busy any more. One pass waits at a time per project; it goes with the workspace's lifetime (closed or opened
+ * again: dropped, and the opening's own pass looks again).
  */
-const retiring = new Map<string, number>()
+interface Retry {
+  tries: number
+  timer: ReturnType<typeof setTimeout> | null
+  /** Its workspace's lifetime, and what drops the retry when it ends. */
+  life: AbortSignal
+  drop: () => void
+}
+const retiring = new Map<string, Retry>()
+const retireKey = (ws: WorkspaceService, projectPath: string): string => `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
 
-/** A retirement found busy: another pass asked for after its pause. */
+/** A retirement found busy: another pass asked for after its pause, unless one already waits. */
 function retireLater(ws: WorkspaceService, projectPath: string): void {
-  const key = `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
-  const tries = (retiring.get(key) ?? 0) + 1
-  retiring.set(key, tries)
-  setTimeout(() => void settleSlotCards(ws, projectPath), Math.min(60_000, 1000 * 2 ** (tries - 1))).unref?.()
+  if (ended(ws)) return
+  const key = retireKey(ws, projectPath)
+  let r = retiring.get(key)
+  if (r && r.life !== ws.lifetime) forget(key, r)
+  r = retiring.get(key)
+  if (!r) {
+    const made: Retry = { tries: 0, timer: null, life: ws.lifetime, drop: () => forget(key, made) }
+    made.life.addEventListener('abort', made.drop, { once: true })
+    retiring.set(key, made)
+    r = made
+  }
+  if (r.timer) return
+  const life = r.life
+  r.tries++
+  const at = r
+  r.timer = setTimeout(() => {
+    at.timer = null
+    if (!life.aborted) void settleSlotCards(ws, projectPath)
+  }, Math.min(60_000, 1000 * 2 ** (r.tries - 1)))
+  r.timer.unref?.()
+}
+
+/** A retry forgotten: its pass no longer waits, nor its lifetime's listener. */
+function forget(key: string, r: Retry): void {
+  if (r.timer) clearTimeout(r.timer)
+  r.timer = null
+  r.life.removeEventListener('abort', r.drop)
+  if (retiring.get(key) === r) retiring.delete(key)
+}
+
+/** A project's retirement retry as it stands (tests), by its workspace's folder: its tries and whether a pass waits; null: none. */
+export function retireWaitOf(wsPath: string, projectPath: string): { tries: number; waiting: boolean } | null {
+  const r = retiring.get(`${wsPath.toLowerCase()}\n${projectPath.toLowerCase()}`)
+  return r ? { tries: r.tries, waiting: !!r.timer } : null
+}
+
+/** No retirement busy any more (the pass found none): its tries forgotten, a pass still waiting left to run. */
+function retiredNow(ws: WorkspaceService, projectPath: string): void {
+  const key = retireKey(ws, projectPath)
+  const r = retiring.get(key)
+  if (r && !r.timer) forget(key, r)
 }
 
 /** A start's end of its builder's left carried lease (endLeftCarried), its retry asked for when the slot was busy. */
@@ -613,8 +659,8 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
     }
   }
   // A retirement waiting for its slot's operation or job: looked at again later; none: its tries forgotten.
-  if (busy && !ended(ws)) retireLater(ws, projectPath)
-  else retiring.delete(`${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`)
+  if (busy) retireLater(ws, projectPath)
+  else retiredNow(ws, projectPath)
   if (!workflowEnforced() || ended(ws)) return
   // 2. Each current cycle in a lease: prepared, then its builder placed.
   for (const l of pool.openLeases()) {
