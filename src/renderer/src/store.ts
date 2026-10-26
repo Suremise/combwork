@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import { useMemo, type ReactNode } from 'react'
 import type { Period } from '@shared/usageTotals'
 import type { StartFailure } from '@shared/startFailure'
-import { cardLabel } from '@shared/projectKeys'
+import { cardLabel, setCardNaming } from '@shared/projectKeys'
 import type { AdvancedState } from '@shared/advanced'
 import type { StageId } from '@shared/workflow/facts'
 import type { AgentLeftovers } from '@shared/agentProcesses'
@@ -225,6 +225,8 @@ interface State {
   /** Set to select a session in its project's Sessions tab. */
   /** Open the Sessions tab on a session, and in it at its nth compaction (from 0, oldest first) when given. */
   sessionsJump: { project: string; id: string; nonce: number; compaction?: number } | null
+  /** The Activity tab's filter per project (#1254): one agent's work, or one card's; none: everything. */
+  activityFilters: Record<string, { agentId?: string; card?: number }>
   /** A file to show in a project's Files tab (a terminal's file link): whose folder (`root`, a worktree agent's id or ''), the file and the line. */
   filesJump: { project: string; root: string; rel: string; line?: number; col?: number; nonce: number } | null
   /** Resizable pane sizes, saved with the window layout. */
@@ -488,6 +490,7 @@ export const useStore = create<State>(() => ({
   sidebarWidth: 280,
   sidebarCompact: false,
   sessionsJump: null,
+  activityFilters: {},
   filesJump: null,
   panes: {},
   skillsProvider: {},
@@ -972,6 +975,16 @@ export function openInSessionsTab(path: string, id: string, compaction?: number)
   setProjectTab(path, 'sessions')
 }
 
+/** Opens a project's Activity tab (#1254), filtered to an agent's work or a card's (null: everything). */
+export function openActivity(path: string, filter: { agentId?: string; card?: number } | null): void {
+  set((s) => {
+    const { [path]: _was, ...rest } = s.activityFilters
+    return { activityFilters: filter ? { ...rest, [path]: filter } : rest, selectedProject: path }
+  })
+  showView('projects')
+  setProjectTab(path, 'activity')
+}
+
 /** Shows an agent's pane on the Session tab and focuses it. */
 export function revealAgent(p: ProjectInfo, agentId: string): void {
   showAgent(p, agentId)
@@ -1296,6 +1309,9 @@ export const cardLabelOf = (s: Pick<State, 'tasks'>, n: number): string => {
   const c = s.tasks.find((t) => t.number === n)
   return c ? cardLabel(c) : `#${n}`
 }
+
+// Shared code the window runs names a card by its number with cardRef: by the board's key here too (HI-1661 round 1).
+setCardNaming(() => (n) => cardLabelOf(get(), n))
 
 /** Stable empty list for selectors — a fresh [] on every call makes zustand re-render forever. */
 export const NO_PROJECTS: ProjectInfo[] = []

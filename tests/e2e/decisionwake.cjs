@@ -69,8 +69,8 @@ const check = (name, ok, extra = '') => {
   const agent = await lib.addAgent(inv, alpha, { name: 'Asker' })
   const n = (await inv('tasks:create', { title: 'Pick the shots', project: 'alpha', agent: agent.id })).number
   // Wakes name the card by its key with the number the tools take (#1219): its own key, from the board.
-  const named = `${(await card(n)).key} (#${n})`
-  check('the card has a key of its project', /^[A-Z]{2,4}-\d+ \(#\d+\)$/.test(named), named)
+  const named = `${(await card(n)).key}`
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(named), named)
   await inv('tasks:update', n, { column: 'doing', agent: agent.id })
   // What it does when Hive's line comes: reads the card's decisions, as work-on-card says.
   fs.writeFileSync(path.join(claudeHome, 'fake-wakes-Asker.txt'), `hive hive_read_task {"number":${n}}\nhive hive_read_task {"number":${n}}\nhive hive_read_task {"number":${n}}\n`)

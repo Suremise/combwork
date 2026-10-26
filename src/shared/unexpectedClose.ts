@@ -11,6 +11,7 @@ import type { ProviderId } from './types'
 import type { ResumeHold } from './agentFolders'
 import { shownText } from './advanced'
 import { holdShort } from './sessionResume'
+import { cardRef } from './projectKeys'
 
 /** An agent running when the marker was last written. */
 export interface RunningAgent {
@@ -120,6 +121,11 @@ export interface LeftMerge {
   agentName: string
   branch: string
   cards: number[]
+  /**
+   * Those cards as its own workspace names them (HI-1661: by key), made where the merge is recovered: the notice can hold
+   * several workspaces' merges, and is told outside any of them. Absent: by number.
+   */
+  cardNames?: string[]
   /** The folder the merge was in: the agent's worktree, or the project's main checkout. */
   folder: string
 }
@@ -253,7 +259,7 @@ export function unexpectedCloseText(c: { lastSeen: string; agents: readonly Runn
   if (c.stillRunning?.length) lines.push(stillRunningLine(c.stillRunning, c.kept))
   if (c.dump) lines.push(tr(msg({ id: 'main.unexpectedClose.dump', defaultMessage: 'Hive kept a crash dump of it: Help → Copy Diagnostics names it.', description: 'The notice that Hive closed unexpectedly: a crash dump of that run was saved on this PC.' })))
   for (const m of c.merges) {
-    const cards = fmt.list(m.cards.map((n) => `#${n}`))
+    const cards = fmt.list(m.cardNames ?? m.cards.map(cardRef))
     lines.push(
       m.cards.length
         ? tr(msg({ id: 'main.unexpectedClose.mergeCards', defaultMessage: '{agent} was merging {branch} ({cards}): check {folder} for a merge left half done (git status there) before the next merge.', description: 'The notice that Hive closed unexpectedly: an agent ({agent}) held the merge slot for a branch ({branch}) for cards ({cards}); {folder} is where the merge was (its worktree or the main checkout).' }), { agent: m.agentName, branch: m.branch, cards, folder: m.folder })

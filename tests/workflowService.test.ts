@@ -246,7 +246,7 @@ describe("a project's options, resolved (#1263, SPEC §16.6.6)", () => {
     }
     off(resolveOptions('git', { project: { finish: 'typo' } as never }), /project options: finish/)
     off(resolveOptions('git', { workspace: { git: { review: 'everyone' } } as never }), /workspace options: review/)
-    off(resolveOptions('git', { global: { git: { style: 'rebase' } } as never }), /global options: style/)
+    off(resolveOptions('git', { global: { git: { style: 'octopus' } } as never }), /global options: style/)
     off(resolveOptions('git', { project: { sameness: 'close' } as never }), /project options: sameness/)
     off(resolveOptions('git', { project: { folder: 'tmp' } as never }), /project options: folder/)
     off(resolveOptions('git', { project: { okBefore: { mode: 'sometimes', labels: [] } } as never }), /project options: okBefore/)

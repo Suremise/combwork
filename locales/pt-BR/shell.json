@@ -81,6 +81,7 @@
   "shell.command.project.previous": "Projeto anterior",
   "shell.command.project.remove": "Remover projeto…",
   "shell.command.project.storage": "Armazenamento e limpeza do projeto…",
+  "shell.command.project.tab.activity": "Ir para Atividade",
   "shell.command.project.tab.changes": "Ir para Controle de versão",
   "shell.command.project.tab.files": "Ir para Arquivos",
   "shell.command.project.tab.images": "Ir para Anexos",

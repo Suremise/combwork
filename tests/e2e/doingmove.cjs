@@ -57,7 +57,7 @@ const until = async (fn, ms = 10000) => {
 
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
   // Prompts name a card by its key with the number the tools take (#1219): its own key, from the board.
-  const named = async (n) => `${(await card(n)).key} (#${n})`
+  const named = async (n) => `${(await card(n)).key}`
   // The window names a card by key (#1221).
   const keyOf = new Map()
   const make = async (title, extra = {}) => {
@@ -139,7 +139,7 @@ const until = async (fn, ms = 10000) => {
   }, 5000)))
   await lib.sleep(1000) // A fixed wait on purpose: this checks that nothing starts.
   const cName = await named(c)
-  check('the card has a key of its project', /^[A-Z]{2,4}-\d+ \(#\d+\)$/.test(cName), cName)
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(cName), cName)
   check('and starts nothing', !transcripts().includes(`task ${cName} `) && (await live(busy))?.status === 'working' && !(await live(sleepy)))
 
   // --- Within Active: reordering doesn't ask.
@@ -160,7 +160,7 @@ const until = async (fn, ms = 10000) => {
 
   // --- The card dialog: Column → Active and a new title; Cancel keeps the dialog and saves nothing.
   await tile(d).click()
-  const edit = page.locator('.dialog', { hasText: `#${d}` }).filter({ has: page.locator('.task-title-input') })
+  const edit = lib.cardDialog(page, await lib.cardLabel(inv, d)).filter({ has: page.locator('.task-title-input') })
   await edit.waitFor({ timeout: 5000 })
   await edit.locator('.task-title-input').fill('Card D, renamed')
   await edit.locator('select').nth(2).selectOption('doing')

@@ -1,4 +1,4 @@
-import type { AgentInstallInfo, AutoCompactSetting, CatalogModel, EffortLevel, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
+import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, CatalogModel, EffortLevel, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
 import type { ProviderDescriptor } from '../../shared/providers'
 import type { StartHint } from '../../shared/startFailure'
 import type { SafeguardEvent } from '../../shared/safeguards'
@@ -253,6 +253,15 @@ export interface LiveDetails {
   /** When the CLI recorded that turn's end (ISO), when it says: one from before this launch (a resumed log) is history. */
   signInAt?: string
   /**
+   * A turn ended on an error that isn't a refused sign-in, as the CLI recorded it (#1632, Codex's rollout: its Stop hook
+   * says nothing of it): the CLI's message ('' for none), and when (ISO). A turn after it clears it; one from before
+   * this launch is history.
+   */
+  turnFailed?: string
+  turnFailedAt?: string
+  /** The turn it names (its id as the CLI's hooks name turns), when the record names one. */
+  turnFailedTurn?: string
+  /**
    * When a turn last ended on an interrupt the CLI sends no hook for (Copilot's `abort`, also when a person cancels its
    * permission dialog), as recorded (ISO): handled as an interrupt hook. One from before this launch is history.
    */
@@ -275,8 +284,7 @@ export interface LiveDetails {
   stopsAnswered?: string[]
 }
 
-/** What a background task is (#1584): a command left running, a Monitor, a subagent run in the background, a workflow. */
-export type BackgroundTaskType = 'command' | 'monitor' | 'subagent' | 'workflow'
+export type { BackgroundTaskType } from '../../shared/types'
 
 /**
  * A background task an agent started (a command left running, a Monitor, a subagent) or that ended, from its transcript.

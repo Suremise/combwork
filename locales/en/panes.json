@@ -339,6 +339,10 @@
     "defaultMessage": "Files it is editing this turn. Other agents in this folder wait until it finishes with them:",
     "description": "Above the files an agent is editing (an agent sharing the project's folder), in its pane's ⋯ menu."
   },
+  "panes.menu.activity": {
+    "defaultMessage": "Activity",
+    "description": "Menu item (an agent's menu): opens the project's Activity tab showing this agent's work: its sessions, turns, tool calls and processes."
+  },
   "panes.menu.archiveStartNew": {
     "defaultMessage": "Archive and Start New…",
     "description": "Menu item (an agent's menu): archives the agent's conversation and starts a new one."

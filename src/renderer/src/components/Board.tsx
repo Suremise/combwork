@@ -8,8 +8,8 @@ import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBa
 import { enabledProviders, isProviderEnabled, projectDefaultProvider, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { NO_PROJECTS, agentProviderOf, cardLabelOf, choose, confirm, get, loadTasks, notify, prompt, revealAgent, set, setProjectTab, showView, useDateStyle, useLanguage, useStore, wantFullArchive, type ArchiveAllRequest, type DoingRequest } from '../store'
-import { cardLabel, nameWithKey } from '@shared/projectKeys'
+import { NO_PROJECTS, agentProviderOf, cardLabelOf, choose, confirm, get, loadTasks, notify, openActivity, prompt, revealAgent, set, setProjectTab, showView, useDateStyle, useLanguage, useStore, wantFullArchive, type ArchiveAllRequest, type DoingRequest } from '../store'
+import { cardLabel } from '@shared/projectKeys'
 import { cardNumberOf } from '../projectKeys'
 import { MARKDOWN_CARDS } from '../cardLinks'
 import { CardWork, WorkBadges } from './CardWork'
@@ -1006,7 +1006,7 @@ const lastAgent = (c: TaskCard): string => (c.agent ? (c.agentName ?? c.agent) :
 
 /** The archived cards' table columns, in the window's language (made again when it changes). */
 const archivedColumns = (): DataColumn<TaskCard>[] => [
-  { key: 'number', header: '#', num: true, descFirst: true, cell: (c) => <span className="task-number" data-task={c.number}>{cardLabel(c)}</span>, sortValue: (c) => c.number, filter: { kind: 'text', value: (c) => `${cardLabel(c)} #${c.number}` } },
+  { key: 'number', header: '#', num: true, descFirst: true, cell: (c) => <span className="task-number" data-task={c.number}>{cardLabel(c)}</span>, sortValue: (c) => c.number, filter: { kind: 'text', value: (c) => cardLabel(c) } },
   { key: 'title', header: tr(msg({ id: 'board.archived.title', defaultMessage: 'Title', description: "A column header of the archived cards' table: the card's title." })), cell: (c) => <span className="archive-title">{c.title}</span>, sortValue: (c) => c.title, filter: { kind: 'text', value: (c) => c.title } },
   { key: 'project', header: tr(msg({ id: 'board.archived.project', defaultMessage: 'Project', description: "A column header of the archived cards' table: the card's project." })), cell: (c) => (c.project ? <span className="task-project">{c.project}</span> : <span className="faint">{tr(WORKSPACE_CARD)}</span>), sortValue: (c) => c.project || null, filter: { kind: 'choice', value: (c) => c.project || tr(WORKSPACE_CARD) } },
   {
@@ -1983,8 +1983,8 @@ export function TaskDialog() {
   return (
     <>
       <Modal
-        // Its key, and its old number beside it: what agents name it by until P8 ("HI-12 (#40)", #1221).
-        title={isNew ? tr(NEW_CARD) : nameWithKey(card!.number, card!.key)}
+        // Its key alone (#1221, HI-1661), as agents name it too.
+        title={isNew ? tr(NEW_CARD) : cardLabel(card!)}
         icon="checklist"
         wide
         onClose={() => void tryClose()}
@@ -2020,6 +2020,19 @@ export function TaskDialog() {
                     <BusyButton className={cx('subtle', ro && 'ro-off') /* i18n-ignore: class names */} busy={action.busy === 'start'} busyLabel={tr(SAVING)} disabled={!card.project || !title.trim() || ro} onClick={() => void start()}>
                       <Icon name="play" /> {edited.length ? tr(msg({ id: 'board.dialog.saveAndStart', defaultMessage: 'Save and Start…', description: 'Button in the card dialog with unsaved changes: saves them, then asks which agent starts the card.' })) : tr(msg({ id: 'board.dialog.start', defaultMessage: 'Start…', description: 'Button in the card dialog: asks which agent starts the card.' }))}
                     </BusyButton>
+                  </Tooltip>
+                )}
+                {!!card.project && (
+                  <Tooltip content={tr(msg({ id: 'board.dialog.activityTip', defaultMessage: "Show this card's agents, sessions, turns and processes in its project's Activity tab.", description: "Tooltip on the card dialog's Activity button." }))}>
+                    <button
+                      className="btn subtle"
+                      onClick={() => {
+                        const p = get().workspace?.projects.find((x) => x.name.toLowerCase() === card.project.toLowerCase())
+                        if (p) void tryClose().then((closed) => closed && openActivity(p.path, { card: card.number }))
+                      }}
+                    >
+                      <Icon name="type-hierarchy" /> {tr(msg({ id: 'board.dialog.activity', defaultMessage: 'Activity', description: "Button in the card dialog: opens its project's Activity tab showing this card's work." }))}
+                    </button>
                   </Tooltip>
                 )}
               </>

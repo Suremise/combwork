@@ -7014,6 +7014,198 @@ button.agent-place:hover {
   justify-content: space-between;
   gap: 8px 12px;
 }
+/* The Activity tab (#1254): the project's live work as a tree running left to right, its details beside it. */
+.activity-tab {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+.activity-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.activity-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+.activity-head .actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+.activity-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.activity-tree {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px;
+}
+.activity-canvas {
+  position: relative;
+}
+.activity-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.activity-lines path {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.activity-node {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 2px;
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  cursor: pointer;
+  overflow: hidden;
+}
+.activity-node:hover {
+  background: var(--bg-hover);
+}
+.activity-node.selected,
+.activity-node:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.activity-node.act-working {
+  border-left-color: var(--accent);
+}
+.activity-node.act-waiting {
+  border-left-color: var(--state-waiting, var(--warning));
+}
+.activity-node.act-failed {
+  border-left-color: var(--error);
+}
+.activity-node.act-done {
+  border-left-color: var(--success);
+}
+.activity-node.act-more {
+  border-style: dashed;
+  background: transparent;
+  color: var(--fg-muted);
+}
+.activity-node.act-card {
+  border-left-color: var(--info);
+}
+.activity-twisty {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.activity-node-text {
+  min-width: 0;
+  flex: 1;
+  line-height: 1.2;
+}
+.activity-node-title {
+  font-size: 12px;
+  color: var(--fg-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.activity-node-sub {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.activity-spin {
+  flex: none;
+  color: var(--accent);
+}
+.activity-details {
+  flex: none;
+  width: 360px;
+  max-width: 45%;
+  border-left: 1px solid var(--border-subtle);
+  background: var(--bg-sidebar);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.activity-details-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 8px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.activity-details-head .actions {
+  margin-left: auto;
+}
+.activity-details-title {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.activity-details-body {
+  padding: 10px 14px;
+  overflow: auto;
+}
+.activity-facts {
+  margin: 0 0 8px;
+  display: grid;
+  gap: 4px;
+}
+.activity-facts > div {
+  display: flex;
+  gap: 8px;
+}
+.activity-facts dt {
+  color: var(--fg-muted);
+  min-width: 110px;
+}
+.activity-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.activity-pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  max-height: 260px;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin: 4px 0 10px;
+}
+.activity-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 /* The usage history's import under way (#1106), a bulk action on sessions (#1659): a spinner beside its note. */
 .sessions-bulk-progress {
   display: flex;
@@ -9396,6 +9588,33 @@ textarea.input.task-blocked-input {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+/* A returned card's conflicts (HI-1181): each file unfolds its hunks, read-only; context lines muted, each side under its
+   name (the target, the card, a diff3 base), lines left out said apart from the text. */
+.card-work-conflicts > li > .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.card-work-hunk {
+  margin-block: 4px;
+}
+.card-work-hunk-text .hunk-context {
+  color: var(--fg-faint);
+}
+.card-work-hunk-text .hunk-side {
+  display: block;
+  border-inline-start: 2px solid var(--merge);
+  padding-inline-start: 6px;
+  margin-block: 2px;
+}
+.card-work-hunk-text .hunk-side-name {
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.card-work-hunk-text .hunk-cut {
+  font-style: italic;
+  color: var(--fg-faint);
 }
 .card-work-queue-why {
   white-space: pre-line;

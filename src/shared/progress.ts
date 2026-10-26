@@ -1,6 +1,7 @@
 import type { MergeSlotInfo, ProgressRun, ProgressSnapshot, ProgressTelling } from './types'
 import { formatDateTime } from './dates'
 import { msg } from './i18n/msg'
+import { cardRef } from './projectKeys'
 import { providerName } from './providers'
 import { durationText, type Tr } from './tasks'
 
@@ -32,8 +33,8 @@ export const MAX_LOG_PATH = 400
 export const MAX_TOTAL = 100_000
 export const MAX_ESTIMATE_MS = 7 * 24 * 3_600_000
 
-/** A run's card as runs name it (#1220): `#1061`, the old global number, until project keys arrive (#1219). */
-export const cardRefText = (n: number): string => `#${n}`
+/** A run's card as runs name it (#1220): its key, as cardRef names it (HI-1661), `#1061` where no key is known. */
+export const cardRefText = (n: number): string => cardRef(n)
 
 /** The short form of a commit id, as the panel and replies show it. */
 export const shortRevision = (id: string): string => id.slice(0, 7)

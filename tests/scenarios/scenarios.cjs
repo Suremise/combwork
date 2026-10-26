@@ -1227,8 +1227,8 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const msg = (c.got ?? []).find((d) => d.kind === 'rebrief')
       return [
-        ['the message was left, tied to its round', new RegExp(`for ([A-Z]{2,4}-\\d+ \\(#${c.cards.a}\\)|#${c.cards.a}) round 1`).test(c.sent ?? ''), c.sent],
-        ['stale once the card passed, never given', msg?.state === 'stale' && new RegExp(`^([A-Z]{2,4}-\\d+ \\(#${c.cards.a}\\)|#${c.cards.a}) passed review$`).test(msg.detail ?? '') && !msg.received, JSON.stringify(msg)],
+        ['the message was left, tied to its round', new RegExp(`for ([A-Z]{2,4}-\\d+|#${c.cards.a}) round 1`).test(c.sent ?? ''), c.sent],
+        ['stale once the card passed, never given', msg?.state === 'stale' && new RegExp(`^([A-Z]{2,4}-\\d+|#${c.cards.a}) passed review$`).test(msg.detail ?? '') && !msg.received, JSON.stringify(msg)],
         ['the greeting is the card\'s, not the stale one', !/Stale!/.test(c.read('greeting.txt') ?? ''), c.read('greeting.txt')],
         ["didn't reopen the passed card", o.cards.a?.column === 'passed', history(o.cards.a).join(' | ')]
       ]

@@ -219,10 +219,11 @@ export class ProgressRun {
   /**
    * Ends the run: ok or not, with an optional summary ("11 passed, 1 failed"), and what else is known: the exit code, a
    * log or record file. Inside hive-progress the log goes to the wrapper as a line (it reports the finish). Never rejects.
+   * Resolves with Hive's answer (a check run's says how it counted, #1654), or null when there is none in time.
    */
-  async finish(ok: boolean, summary?: string, finishWaitMs = 3000, more: ProgressFinishMore = {}): Promise<void> {
+  async finish(ok: boolean, summary?: string, finishWaitMs = 3000, more: ProgressFinishMore = {}): Promise<unknown> {
     if (this.lines && more.logPath && !this.finished) this.lines(`##hive-progress log=${clip(more.logPath, MAX_LOG_PATH)}`)
-    if (!this.target || this.finished) return
+    if (!this.target || this.finished) return null
     this.finished = true
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
@@ -235,8 +236,9 @@ export class ProgressRun {
       .then(() => this.id)
       .then((id) => (id ? this.send('POST', `/v1/progress/${encodeURIComponent(id)}/finish`, { ok, ...(more.stopped ? { stopped: true } : {}), ...(summary ? { summary: clip(summary, MAX_SUMMARY) } : {}), ...(Number.isSafeInteger(more.exitCode) ? { exitCode: more.exitCode } : {}), ...(more.logPath ? { logPath: clip(more.logPath, MAX_LOG_PATH) } : {}) }, finishWaitMs) : null))
     let timer: ReturnType<typeof setTimeout> | undefined
-    await Promise.race([done, new Promise((r) => (timer = setTimeout(r, finishWaitMs + 250)))])
+    const answer = await Promise.race([done, new Promise((r) => (timer = setTimeout(() => r(null), finishWaitMs + 250)))])
     clearTimeout(timer)
+    return answer ?? null
   }
 
   private async send(method: string, path: string, body: unknown, timeoutMs: number): Promise<unknown> {

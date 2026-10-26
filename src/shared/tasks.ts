@@ -510,14 +510,16 @@ export function newSinceStart(card: Pick<TaskCard, 'history'>, d: { at: string }
 
 /**
  * A card matches the board's search: its key (#1221: `AM-12` or `am-12`; `AM-` for all of that project's; a project's old
- * key too), its number (#12 or 12), title, description, labels, project or agent. A key form no project has (`re-`) is
- * searched as words. `keys`: the projects' keys and old keys (without them, only a card's own key is matched); `moved`:
- * the names moved cards keep in the projects they left (`HI-1` → card), which find them too.
+ * key too), its key's digits (HI-1661: `12` finds AM-12 and HI-12, never the workspace number nothing shows; a card with
+ * no key, `#12`, by its number), the old number as `#12`, title, description, labels, project or agent. A key form no
+ * project has (`re-`) is searched as words. `keys`: the projects' keys and old keys (without them, only a card's own key
+ * is matched); `moved`: the names moved cards keep in the projects they left (`HI-1` → card), which find them too.
  */
 export function cardMatches(c: Pick<TaskCard, 'number' | 'key' | 'title' | 'description' | 'project' | 'agentName' | 'labels'>, q: string, keys: readonly { key: string; aliases: readonly string[] }[] = [], moved: Readonly<Record<string, number>> = {}): boolean {
   const s = q.trim().toLowerCase()
   if (!s) return true
-  if (/^#?\d+$/.test(s)) return c.number === Number(s.replace('#', ''))
+  if (/^#\d+$/.test(s)) return c.number === Number(s.slice(1))
+  if (/^\d+$/.test(s)) return c.key ? c.key.slice(c.key.lastIndexOf('-') + 1) === String(Number(s)) : c.number === Number(s)
   const k = /^([a-z]{2,4})-(\d{0,9})$/.exec(s)
   const typed = k?.[1].toUpperCase()
   const project = typed ? keys.find((x) => x.key === typed || x.aliases.includes(typed)) : undefined

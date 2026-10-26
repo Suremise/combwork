@@ -84,6 +84,7 @@
   "panes.locks.item": "{n, plural, other {#個のファイルを編集中}}",
   "panes.locks.title": "このターンで編集中のファイル：",
   "panes.locks.titleShared": "このターンで編集中のファイル。このフォルダーのほかのエージェントは、編集が終わるまで待ちます：",
+  "panes.menu.activity": "アクティビティ",
   "panes.menu.archiveStartNew": "アーカイブして新規開始…",
   "panes.menu.cancelWatch": "カードの監視をキャンセル",
   "panes.menu.compact": "コンパクト化…",

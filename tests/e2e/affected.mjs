@@ -134,7 +134,7 @@ export const AREAS = [
   // Git missing or too old (#346): Agent Setup's Git row, the status bar and every git-dependent screen.
   { paths: ['src/main/gitTool.ts', 'src/shared/gitTool.ts'], suites: ['gitmissing', 'providers'] },
   // The Git view (#607): the Git tab's sections and the status bar's item.
-  { paths: ['src/main/gitRepo.ts', 'src/shared/gitRepo.ts', 'src/shared/branchCleanup.ts', 'src/renderer/src/views/GitTab.tsx', 'src/renderer/src/views/GitBranches.tsx', 'src/renderer/src/gitReads.ts'], suites: ['gitbranchcards', 'gitcleanup', 'gitview', 'gitremotes', 'changes', 'changespicker', 'gitmissing', 'unusedwt', 'inbox', 'gitinit', 'versioncontrol', 'mergedialogslots'] },
+  { paths: ['src/main/gitRepo.ts', 'src/shared/gitRepo.ts', 'src/shared/branchCleanup.ts', 'src/renderer/src/views/GitTab.tsx', 'src/renderer/src/views/GitBranches.tsx', 'src/renderer/src/gitReads.ts'], suites: ['gitbranchcards', 'gitcleanup', 'gitupdate', 'gitview', 'gitremotes', 'changes', 'changespicker', 'gitmissing', 'unusedwt', 'inbox', 'gitinit', 'versioncontrol', 'mergedialogslots'] },
   { paths: ['src/renderer/src/views/VersionControl.tsx', 'src/renderer/src/views/VersionControlHeader.tsx'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'gitinit', 'changes', 'queuecard', 'workflowoptions'] },
   // "How do you work?" (#1423): the step, its notice, the answer and the adoption on a board made by 1.0.
   { paths: ['src/renderer/src/components/PresetStep.tsx', 'src/shared/workflow/presetStep.ts', 'src/main/workflow/presetStep.ts', 'src/main/workflow/adoption.ts'], suites: ['presetstep', 'vcswitch', 'workflowoptions'] },
@@ -156,6 +156,7 @@ export const AREAS = [
   { paths: ['src/main/skillCopies.ts', 'src/shared/skillDelivery.ts', 'src/main/providers/common.ts'], suites: ['skilldelivery', 'skills'] },
   { paths: ['src/main/workspaceNotes.ts', 'src/shared/workspaceNotes.ts', 'src/renderer/src/components/WorkspaceNotes.tsx', 'src/main/providers/claude/adapter.ts', 'src/main/providers/codex/adapter.ts', 'src/main/providers/copilot/adapter.ts'], suites: ['workspacenotes'] },
   { paths: ['src/main/cardSessions.ts', 'src/renderer/src/components/CardChip.tsx'], suites: ['cardchip', 'sessionorigin'] },
+  { paths: ['src/shared/activity.ts', 'src/renderer/src/views/ActivityTab.tsx', 'src/main/agentProcesses.ts'], suites: ['activitytab'] },
   { paths: ['src/main/compaction.ts'], suites: ['compact', 'overview', 'paneheader', 'idlestatus'] },
   { paths: ['src/shared/safeguards.ts', 'src/main/providers/claude/safeguards.ts', 'src/main/providers/codex/safeguards.ts', 'src/main/cardSessions.ts'], suites: ['safeguards'] },
   { paths: ['src/main/diagnostics.ts', 'src/shared/redact.ts'], suites: ['about', 'testedclis'] },

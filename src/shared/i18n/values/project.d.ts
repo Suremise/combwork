@@ -317,6 +317,7 @@ interface HiveMessageValues {
   'project.skills.target': undefined
   'project.skills.turnOn': undefined
   'project.skills.user': undefined
+  'project.tab.activity': undefined
   'project.tab.attachments': undefined
   'project.tab.files': undefined
   'project.tab.mcp': undefined

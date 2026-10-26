@@ -115,10 +115,10 @@ const projectArg = {
   type: 'string',
   description: `Project name. Defaults to the current project${PROJECT ? ` ("${PROJECT}")` : ''}.`
 }
-/** A card (#1219: tools take a key string too, Darren 20 Oct): its number, or its key. */
+/** A card (#1219; HI-1661: named by its key, an old number still taken). */
 /** A reply worded with the card names the API sent with it (#1219: its `names`). */
 const named = <T>(r: T, text: (r: T) => string): string => namedBy(namesFrom((r as { names?: Record<string, string> } | null)?.names), () => text(r))
-const cardArg = { type: ['number', 'string'], description: 'The card: its number (#12 is 12) or its key ("HI-12").' }
+const cardArg = { type: ['number', 'string'], description: 'The card: its key ("HI-12").' }
 const agentArg = { type: 'string', description: "The agent's name (e.g. \"Agent 2\") or id. Optional when the project has one agent." }
 const settingsArgs = {
   provider: { type: 'string', description: 'Provider id (hive_list_providers). Default: the project\'s default provider.' },
@@ -134,12 +134,12 @@ const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/a
 const columnArg = { type: 'string', enum: [...COLUMN_IDS] }
 /** The Assistant's override of a card's workflow rules for a move (#1265, SPEC §16.8.4): why, recorded on the card. */
 const overrideArg = { type: 'object', properties: { reason: { type: 'string' } }, required: ['reason'], description: "Moves the card across the workflow rules the move skips: reason is the user's own why (recorded on the card with the rules), given with the request or after you told them what it skips; never made up." }
-const cardsArg = (what: string) => ({ type: 'array', items: { type: ['number', 'string'] }, description: `${what} Each its number (#12 is 12) or key ("HI-12").` })
+const cardsArg = (what: string) => ({ type: 'array', items: { type: ['number', 'string'] }, description: `${what} Each its key ("HI-12").` })
 /** Numbers that aren't cards (a console's events). */
 const numbersArg = (what: string) => ({ type: 'array', items: { type: 'number' }, description: what })
 
-/** The card of an intent (#1267, S48): its key or #number; a plain number is refused. */
-const intentCardArg = { type: 'string', description: 'The card: its key ("HI-12") or "#12" (a plain number is refused).' }
+/** The card of an intent (#1267, S48): its key (an old #number is still taken; a plain number is refused). */
+const intentCardArg = { type: 'string', description: 'The card: its key ("HI-12").' }
 
 /**
  * A card's intents (#1267, SPEC §16.8.1), a tool each: the caller says what it did or wants, and Hive moves the card by
@@ -484,7 +484,7 @@ const tools: Tool[] = [
       const r = (await api('POST', `${agentPath(a)}/message`, a.cancel === true ? { cancel: true } : { text: a.text, ...(a.card !== undefined ? { card: a.card } : {}) })) as { id?: string; typed?: boolean; queued?: number; status?: string; tells?: InboxSwitch[]; cancelled?: number; round?: number; card?: number; names?: Record<string, string> }
       const who = String(a.agent || 'the agent')
       if (a.cancel === true) return r.cancelled ? `Cancelled ${r.cancelled === 1 ? 'the message' : `${r.cancelled} messages`} waiting for ${who}.` : `No message was waiting for ${who}.`
-      // The card as Hive names it (#1219): its key and number ("HI-12 (#40)"), whichever way the agent gave it.
+      // The card as Hive names it (#1219): its key ("HI-12"), whichever way the agent gave it.
       const tied = r.round && r.card ? `, for ${named(r, () => cardRef(r.card!))} round ${r.round}` : ''
       if (r.typed) return `Told ${who} now (${r.id}${tied}): it reads it with hive_inbox${r.status === 'watching' ? '; its watch carries on' : ''}.`
       // Only the ways the carrying-on switches leave on for it (#1497); an older Hive's reply has no tells: all three.
@@ -576,7 +576,7 @@ const tools: Tool[] = [
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['start', 'join', 'next', 'end', 'list'] },
-        cards: cardsArg('Card numbers, in the order they are done.'),
+        cards: cardsArg('Cards, in the order they are done.'),
         ...(ASSISTANT ? { project: { type: 'string' }, builder: { type: 'string', description: 'Agent name or id.' } } : { builder: { type: 'string', description: "join: the builder's name." } }),
         reviewer: { type: 'string', description: 'Agent name or id.' },
         rounds: { type: 'number' },
@@ -684,7 +684,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_create_task',
-    description: `Add a card, in todo unless column says otherwise (never done${ASSISTANT ? '' : ' or hold'}). ${ASSISTANT ? "Give it a project: without one it is about the workspace and can't be started on an agent." : "It is your project's: you can't add cards for other projects or the whole workspace (tell the user)."}${ASSISTANT ? '' : ' Created in doing without agent, it is given to you.'} Replies with its number and place.`,
+    description: `Add a card, in todo unless column says otherwise (never done${ASSISTANT ? '' : ' or hold'}). ${ASSISTANT ? "Give it a project: without one it is about the workspace and can't be started on an agent." : "It is your project's: you can't add cards for other projects or the whole workspace (tell the user)."}${ASSISTANT ? '' : ' Created in doing without agent, it is given to you.'} Replies with its key and place.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -717,7 +717,7 @@ const tools: Tool[] = [
         comment: { type: 'string', description: 'Added to its comments.' },
         column: columnArg,
         position: { type: 'string', enum: ['top', 'bottom'], description: ASSISTANT ? 'The top (highest priority) or bottom of its column.' : "The top (highest priority) or bottom of your project's cards in its column." },
-        before: { type: ['number', 'string'], description: 'Just above this card (its number or key), which must be in the column the card ends up in.' },
+        before: { type: ['number', 'string'], description: 'Just above this card (its key), which must be in the column the card ends up in.' },
         blocked: { type: 'string' },
         title: { type: 'string' },
         description: { type: 'string' },
@@ -757,7 +757,7 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        numbers: cardsArg('The card numbers to change, up to 100.'),
+        numbers: cardsArg('The cards to change, up to 100.'),
         column: columnArg,
         position: { type: 'string', enum: ['top', 'bottom'], description: "The top or bottom of each card's column, in turn." },
         blocked: { type: 'string', description: 'Why they are blocked, for each card (empty clears it).' },
@@ -782,7 +782,7 @@ const tools: Tool[] = [
       type: 'object',
       properties: {
         column: { type: 'string', enum: COLUMN_IDS.filter((c) => c !== 'done') },
-        cards: cardsArg('Card numbers, highest priority first.')
+        cards: cardsArg('Cards, highest priority first.')
       },
       required: ['column', 'cards']
     },
@@ -881,7 +881,7 @@ const tools: Tool[] = [
         why: { type: 'string', description: 'Why it mattered.' },
         project: { type: 'string', description: 'The project it is about; left out: the workspace.' },
         importance: { type: 'number', enum: [0, 1, 2, 3] },
-        links: { type: 'array', items: { type: 'object', properties: { type: { type: 'string', enum: [...LINK_TYPES] }, ref: { type: 'string', description: 'A card number, commit, note path, entry id…' } }, required: ['type', 'ref'] } },
+        links: { type: 'array', items: { type: 'object', properties: { type: { type: 'string', enum: [...LINK_TYPES] }, ref: { type: 'string', description: 'A card key, commit, note path, entry id…' } }, required: ['type', 'ref'] } },
         tags: { type: 'array', items: { type: 'string' } },
         digestOf: { type: 'string' }
       },

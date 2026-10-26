@@ -84,7 +84,7 @@ import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
 import { cardFacts, cardKind, cardReviewSkip, factRow } from './workflow/cardWork'
-import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket } from './workflow/runChecks'
+import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
 import { detect, projectPlatform } from './platform/registry'
 import { revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
@@ -1318,13 +1318,33 @@ const entryId = (raw: string): number => {
   if (!Number.isInteger(n) || n < 1) throw new HttpError(400, 'An entry id is a whole number.')
   return n
 }
+/**
+ * A card link's ref as the journal keeps it (HI-1661): the card's number, as Hive's own facts link it, so an entry the
+ * Assistant links by key (`HI-12`, an old key, `#12`) is found by the same card's recall and shows its chip. A ref no card
+ * has is kept as it was given.
+ */
+function cardLinksByNumber(ws: WorkspaceService, links: unknown): unknown {
+  if (!Array.isArray(links)) return links
+  return links.map((l) => {
+    if (!l || typeof l !== 'object' || (l as { type?: unknown }).type !== 'card' || typeof (l as { ref?: unknown }).ref !== 'string') return l
+    const n = cardOfRef(ws, (l as { ref: string }).ref)
+    return n === null ? l : { ...l, ref: String(n) }
+  })
+}
+function withCardLinks<T>(ws: WorkspaceService, body: T, fields: string[]): T {
+  const b = { ...((body ?? {}) as Record<string, unknown>) }
+  for (const f of fields) if (f in b) b[f] = f === 'link' ? (cardLinksByNumber(ws, [b[f]]) as unknown[])[0] : cardLinksByNumber(ws, b[f])
+  return b as T
+}
 route('POST', '/v1/journal', async ({ body }) => {
   const { home, settings } = journalHome()
-  return { id: journalCall(() => writeEntry(home, settings, body ?? {}, 'assistant')) }
+  const input = withCardLinks(requireWorkspace(), body, ['links'])
+  return { id: journalCall(() => writeEntry(home, settings, input, 'assistant')) }
 })
 route('POST', '/v1/journal/recall', async ({ body }) => {
   const { home } = journalHome()
-  return { entries: journalCall(() => recall(home, body ?? {})) }
+  const query = withCardLinks(requireWorkspace(), body, ['link'])
+  return { entries: journalCall(() => recall(home, query)) }
 })
 route('GET', '/v1/journal/:id', async ({ params }) => {
   const { home } = journalHome()
@@ -1335,7 +1355,8 @@ route('GET', '/v1/journal/:id', async ({ params }) => {
 route('PATCH', '/v1/journal/:id', async ({ params, body }) => {
   const { home, settings } = journalHome()
   const id = entryId(params[0])
-  if (!journalCall(() => updateEntry(home, settings, id, body ?? {}))) throw new HttpError(404, `There is no entry ${id}.`)
+  const patch = withCardLinks(requireWorkspace(), body, ['addLinks'])
+  if (!journalCall(() => updateEntry(home, settings, id, patch))) throw new HttpError(404, `There is no entry ${id}.`)
   return { id, updated: true }
 })
 route('DELETE', '/v1/journal/:id', async ({ params }) => {
@@ -2407,11 +2428,11 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   }
   const was = await tasks.getTask(n).catch(() => null)
   const given = typeof patch.agent === 'string' ? await knownAgent(was?.project, patch.agent) : was ? await cardAgent(was) : undefined
-  return assistantChange('agents', `change #${n} on the board`, { kind: 'update-task', card: n, ...(patch.column ? { column: patch.column } : {}), ...(was?.project ? { project: was.project } : {}), ...(given ? { agent: given } : {}) }, async (commit) => {
+  return assistantChange('agents', `change ${cardRef(n)} on the board`, { kind: 'update-task', card: n, ...(patch.column ? { column: patch.column } : {}), ...(was?.project ? { project: was.project } : {}), ...(given ? { agent: given } : {}) }, async (commit) => {
     const before = await tasks.getTask(n)
     const placed = (patch.before !== undefined && patch.before !== null) || patch.position !== undefined
     const c = await apply(commit)
-    const at = patch.position ? `at the ${patch.position}` : placed ? `before #${patch.before}` : ''
+    const at = patch.position ? `at the ${patch.position}` : placed ? `before ${typeof patch.before === 'number' ? cardRef(patch.before) : patch.before}` : ''
     const what = [
       patch.column && patch.column !== before.column
         ? `moved it to ${columnLabel(patch.column)}${at ? `, ${at}` : ''}`
@@ -2549,7 +2570,7 @@ route('POST', '/v1/tasks/:n/comments', async ({ params, body }) => {
   const actor = await taskActor()
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, ['Commented']) : taskView(c))
   if (actor.kind !== 'assistant') return reply(await tasks.commentTask(n, text, actor))
-  return assistantChange('agents', `comment on #${n}`, { kind: 'comment-task', card: n }, async () => ({ done: `Commented on ${cardRef(n)}`, result: await reply(await tasks.commentTask(n, text, actor)) }))
+  return assistantChange('agents', `comment on ${cardRef(n)}`, { kind: 'comment-task', card: n }, async () => ({ done: `Commented on ${cardRef(n)}`, result: await reply(await tasks.commentTask(n, text, actor)) }))
 })
 
 /** Bounded waits running now, per caller (an agent, the Assistant, a script): at most WAITS_PER_CALLER at a time. */
@@ -2934,7 +2955,7 @@ route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
     : { kind: 'new-agent', name: body?.name ? String(body.name) : undefined, provider: body?.provider && isKnownProvider(String(body.provider)) ? (String(body.provider) as ProviderId) : undefined }
   // The agent it is started on, when it exists (a new one is named once added).
   const named = target.kind === 'agent' ? await knownAgent(card.project, target.agentId) : undefined
-  return assistantChange('agents', `start #${n} ${target.kind === 'agent' ? `on ${named?.name ?? 'an agent'}` : 'on a new agent'}${card.project ? ` in ${card.project}` : ''}`, { kind: 'start-task', card: n, ...(card.project ? { project: card.project } : {}), ...(named ? { agent: named } : {}) }, async () => {
+  return assistantChange('agents', `start ${cardRef(n)} ${target.kind === 'agent' ? `on ${named?.name ?? 'an agent'}` : 'on a new agent'}${card.project ? ` in ${card.project}` : ''}`, { kind: 'start-task', card: n, ...(card.project ? { project: card.project } : {}), ...(named ? { agent: named } : {}) }, async () => {
     if (target.kind === 'new-agent' && body?.provider && !isKnownProvider(String(body.provider))) throw new HttpError(400, `Unknown provider "${body.provider}". hive_list_providers lists them.`)
     const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined)
     return {
@@ -3380,16 +3401,35 @@ route('PATCH', '/v1/progress/:id', async ({ params, body }) =>
   })
 )
 
-route('POST', '/v1/progress/:id/finish', async ({ params, body }) =>
-  progressCall<{ ok: true; ignored?: true }>({ ok: true, ignored: true }, (caller) => {
+/** How long a finish waits for its run's record as a check, to say how it counted (#1654): hive-progress waits a little longer. */
+const CHECK_REPLY_MS = 8000
+
+route('POST', '/v1/progress/:id/finish', async ({ params, body }) => {
+  const recording: { check?: Promise<Recorded | null> } = {}
+  const r = await progressCall<{ ok: true; ignored?: true }>({ ok: true, ignored: true }, (caller) => {
     const id = decodeURIComponent(params[0])
     // Ended by Stop in the Progress panel (#1435): stopped, whatever its command's exit says.
     const run = progress.finish(caller, id, takeStopped(id) ? { ...bodyObject(body), ok: false, stopped: true } : bodyObject(body))
     // Recorded as a check first (its copy still at the revision), then its isolated check's copy returned (#1435).
-    void recordCheck(run).then(() => isolatedRunEnded(requireWorkspace(), run.id)).catch((e) => log.warn('returning a check copy', e))
+    recording.check = recordCheck(run)
+    void recording.check.then(() => isolatedRunEnded(requireWorkspace(), run.id)).catch((e) => log.warn('returning a check copy', e))
     return { ok: true }
   })
-)
+  // How it counted as a check, once recorded (within CHECK_REPLY_MS): hive-progress says why one didn't (#1654).
+  const c = recording.check ? await within(recording.check, CHECK_REPLY_MS) : null
+  return c ? { ...r, check: { name: c.name, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), ...(c.changes ? { changes: c.changes } : {}), platform: c.platform } } : r
+})
+
+/** A promise's value, or null once `ms` has passed first. */
+async function within<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const late = new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), ms)))
+  try {
+    return await Promise.race([p, late])
+  } finally {
+    clearTimeout(timer)
+  }
+}
 
 /** An isolated check's lease, held by the link resolve gave out, taken by the run that started with it. */
 async function retakeIsolated(ws: WorkspaceService, projectPath: string, linkId: string, runId: string): Promise<void> {
@@ -3399,12 +3439,14 @@ async function retakeIsolated(ws: WorkspaceService, projectPath: string, linkId:
 }
 
 /** A finished run for a card: its `CheckRan` in the card's facts (#1222), and how it counted on the run's row. */
-async function recordCheck(run: ProgressRun): Promise<void> {
+async function recordCheck(run: ProgressRun): Promise<Recorded | null> {
   try {
     const c = await bracketFinished(run)
     if (c) progress.noteCheck(run.workspacePath, run.id, { name: c.name, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), ...(c.blocks ? { blocks: c.blocks } : {}) })
+    return c
   } catch (e) {
     log.warn(`could not record run ${run.id} as a check of #${run.card}`, e)
+    return null
   }
 }
 

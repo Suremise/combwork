@@ -343,7 +343,7 @@ describe('choosing the skills delivered (#1431)', () => {
     }
     expect(hiveInstructions('p', 'agent', true, new Set(['handover']))).not.toMatch(/\bhandovers,/)
     expect(boardSkillsLine(new Set(['work-on-card']))).toMatch(/Asked to review or check a card, use review-agent-work/)
-    expect(boardSkillsLine(new Set(['work-on-card', 'review-agent-work', 'card-loop', 'handover', 'pick-up', 'workspace-note', 'merge-ready', 'split-work', 'use-hive-api']))).toBe("The board shows your project's cards.")
+    expect(boardSkillsLine(new Set(['work-on-card', 'review-agent-work', 'card-loop', 'handover', 'pick-up', 'workspace-note', 'merge-ready', 'split-work', 'use-hive-api']))).toBe("The board shows your project's cards, each named by its key (AM-12).")
     // The Assistant's own skills aren't chosen here.
     expect(hiveInstructions('', 'assistant', true, new Set(['handover']))).toBe(hiveInstructions('', 'assistant'))
   })

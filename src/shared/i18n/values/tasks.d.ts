@@ -4,37 +4,37 @@ interface HiveMessageValues {
   'tasks.by.assistant': undefined
   'tasks.by.repair': undefined
   'tasks.by.you': undefined
-  'tasks.error.actionGone': { action: string; n: string | number }
+  'tasks.error.actionGone': { action: string; card: string | number }
   'tasks.error.addOwnOnly': { project: string | number }
   'tasks.error.archiveNone': undefined
   'tasks.error.archiveNumbers': undefined
-  'tasks.error.archived': { n: string | number }
+  'tasks.error.archived': { card: string | number }
   'tasks.error.badAnswer': { max: string | number }
   'tasks.error.badKind': { kind: string | number }
   'tasks.error.badReviewSkip': undefined
   'tasks.error.badReviewSkipNew': undefined
   'tasks.error.batchGone': undefined
-  'tasks.error.beforeArchived': { before: string | number; column: string; n: string | number }
-  'tasks.error.beforeElsewhere': { before: string | number; other: string; column: string; n: string | number }
+  'tasks.error.beforeArchived': { before: string | number; column: string; card: string | number }
+  'tasks.error.beforeElsewhere': { before: string | number; other: string; column: string; card: string | number }
   'tasks.error.beforeItself': undefined
   'tasks.error.beforeOrPosition': undefined
   'tasks.error.cardsNotNumber': { value: string | number }
   'tasks.error.cardsTooMany': { max: number }
-  'tasks.error.cardsTwice': { n: string | number }
+  'tasks.error.cardsTwice': { card: string | number }
   'tasks.error.changeNone': undefined
   'tasks.error.chooseProject': undefined
   'tasks.error.contextList': undefined
   'tasks.error.contextRef': { ref: string | number }
   'tasks.error.decisionEmptied': undefined
-  'tasks.error.decisionGone': { n: string | number }
+  'tasks.error.decisionGone': { card: string | number }
   'tasks.error.decisionsUsers': undefined
   'tasks.error.emptyComment': undefined
   'tasks.error.emptyDecision': undefined
-  'tasks.error.failedStays': { n: string | number }
-  'tasks.error.holdCard': { n: string | number }
+  'tasks.error.failedStays': { card: string | number }
+  'tasks.error.holdCard': { card: string | number }
   'tasks.error.holdNew': undefined
-  'tasks.error.inDoingWith': { n: string | number; agent: string | number; column: string }
-  'tasks.error.inDoingWithAnother': { n: string | number; column: string }
+  'tasks.error.inDoingWith': { card: string | number; agent: string | number; column: string }
+  'tasks.error.inDoingWithAnother': { card: string | number; column: string }
   'tasks.error.kindNeedsReason': undefined
   'tasks.error.kindNotAgents': undefined
   'tasks.error.labelFieldList': { field: string | number }
@@ -42,37 +42,37 @@ interface HiveMessageValues {
   'tasks.error.labelsList': undefined
   'tasks.error.labelsMixed': undefined
   'tasks.error.needsTitle': undefined
-  'tasks.error.noCard': { n: string | number }
-  'tasks.error.noKindProposal': { n: string | number; kind: string | number }
+  'tasks.error.noCard': { card: string | number }
+  'tasks.error.noKindProposal': { card: string | number; kind: string | number }
   'tasks.error.noWorkspace': undefined
-  'tasks.error.notReviewing': { n: string | number }
+  'tasks.error.notReviewing': { card: string | number }
   'tasks.error.onlyUserArchives': undefined
   'tasks.error.onlyUserDone': undefined
   'tasks.error.onlyUserOrdersDone': undefined
   'tasks.error.onlyUserUnarchives': undefined
-  'tasks.error.orderArchived': { n: string | number; column: string }
-  'tasks.error.orderChanged': { n: string | number }
-  'tasks.error.orderElsewhere': { n: string | number; other: string; column: string }
+  'tasks.error.orderArchived': { card: string | number; column: string }
+  'tasks.error.orderChanged': { card: string | number }
+  'tasks.error.orderElsewhere': { card: string | number; other: string; column: string }
   'tasks.error.orderNone': undefined
   'tasks.error.overrideNotAgents': undefined
   'tasks.error.overrideShape': undefined
   'tasks.error.ownCardsOnly': { project: string | number }
   'tasks.error.projectThenAgent': undefined
   'tasks.error.refsList': { field: string | number }
-  'tasks.error.refsNoCard': { field: string | number; n: string | number }
+  'tasks.error.refsNoCard': { field: string | number; card: string | number }
   'tasks.error.refsNotNumber': { field: string | number; value: string | number }
   'tasks.error.refsSelf': { field: string | number }
   'tasks.error.repairNoProject': { project: string | number }
   'tasks.error.reviewAgentsOnly': undefined
-  'tasks.error.reviewNotInReview': { n: string | number; column: string }
+  'tasks.error.reviewNotInReview': { card: string | number; column: string }
   'tasks.error.reviewOnItsOwn': undefined
-  'tasks.error.reviewSkipInReview': { n: string | number }
+  'tasks.error.reviewSkipInReview': { card: string | number }
   'tasks.error.reviewSkipNeedsReason': undefined
   'tasks.error.reviewSkipNotAgents': undefined
-  'tasks.error.reviewSkipNothing': { n: string | number }
+  'tasks.error.reviewSkipNothing': { card: string | number }
   'tasks.error.reviewSkipNothingNew': undefined
-  'tasks.error.reviewSkipPast': { stage: string; n: string | number }
-  'tasks.error.reviewTaken': { agent: string | number; n: string | number; since: string | number }
+  'tasks.error.reviewSkipPast': { stage: string; card: string | number }
+  'tasks.error.reviewTaken': { agent: string | number; card: string | number; since: string | number }
   'tasks.error.setAsideGone': undefined
   'tasks.error.staysInProject': { project: string | number }
   'tasks.error.tooLong': { what: string; max: number }
@@ -84,8 +84,8 @@ interface HiveMessageValues {
   'tasks.error.unknownPosition': { position: string | number }
   'tasks.error.unknownProject': { project: string | number }
   'tasks.error.unknownReview': { review: string | number }
-  'tasks.error.unknownTask': { n: string | number }
-  'tasks.error.verdictNotYours': { agent: string | number; n: string | number }
+  'tasks.error.unknownTask': { card: string | number }
+  'tasks.error.verdictNotYours': { agent: string | number; card: string | number }
   'tasks.history.answerTold': { agent: string | number }
   'tasks.history.archived': undefined
   'tasks.history.archivedDone': { days: number }
@@ -126,6 +126,7 @@ interface HiveMessageValues {
   'tasks.history.placed': { place: number; column: string }
   'tasks.history.renamed': { title: string | number }
   'tasks.history.repaired': { from: string | number; to: string | number }
+  'tasks.history.requestClosed': { why: string }
   'tasks.history.restored': { project: string | number }
   'tasks.history.returned': { round: string | number }
   'tasks.history.reviewCopyLeased': { agent: string | number; copy: string | number; revision: string | number }
@@ -154,17 +155,17 @@ interface HiveMessageValues {
   'tasks.skipped.unreadable': undefined
   'tasks.skipped.unsaved': undefined
   'tasks.start.agentBusy': { agent: string | number; status: string }
-  'tasks.start.alreadyStarting': { n: string | number }
-  'tasks.start.archived': { n: string | number }
+  'tasks.start.alreadyStarting': { card: string | number }
+  'tasks.start.archived': { card: string | number }
   'tasks.start.beingGiven': { agent: string | number }
-  'tasks.start.changed': { n: string | number }
-  'tasks.start.movedColumn': { n: string | number; column: string }
-  'tasks.start.movedDone': { n: string | number }
-  'tasks.start.movedProject': { n: string | number; project: string | number }
-  'tasks.start.movedWorkspace': { n: string | number }
-  'tasks.start.noProject': { n: string | number }
-  'tasks.start.notGiven': { agent: string | number; n: string | number; why: string | number }
+  'tasks.start.changed': { card: string | number }
+  'tasks.start.movedColumn': { card: string | number; column: string }
+  'tasks.start.movedDone': { card: string | number }
+  'tasks.start.movedProject': { card: string | number; project: string | number }
+  'tasks.start.movedWorkspace': { card: string | number }
+  'tasks.start.noProject': { card: string | number }
+  'tasks.start.notGiven': { agent: string | number; card: string | number; why: string | number }
   'tasks.start.noteTooLong': { max: number }
-  'tasks.start.reassigned': { n: string | number; who: string }
+  'tasks.start.reassigned': { card: string | number; who: string }
   'tasks.start.userTyping': { agent: string | number }
 }

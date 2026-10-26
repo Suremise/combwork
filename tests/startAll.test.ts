@@ -12,10 +12,10 @@ import { agentRowsText } from '../src/shared/agentTable'
 const src = (p: string): string => readFileSync(join(__dirname, '..', p), 'utf8')
 
 describe('the Project menu is the tab strip', () => {
-  it('lists all 13 tabs in the strip order, each with a command, from the list the strip uses', () => {
+  it('lists all 14 tabs in the strip order, each with a command, from the list the strip uses', () => {
     const tabs = PROJECT_MENU.filter((x) => x.startsWith('project.tab.'))
     expect(tabs).toEqual(PROJECT_TABS.map((t) => tabCommand(t.id)))
-    expect(tabs).toHaveLength(13)
+    expect(tabs).toHaveLength(14)
     expect(tabs).toContain('project.tab.performance')
     const commands = src('src/renderer/src/commands.ts')
     for (const id of tabs) expect(commands, id).toContain(`id: '${id}'`)
@@ -29,8 +29,8 @@ describe('the Project menu is the tab strip', () => {
     expect(PROJECT_MENU).toEqual(expect.arrayContaining(['project.openExplorer', 'project.openTerminal']))
   })
 
-  it("groups the main tabs, then More ▾'s, then Project Settings, and numbers the main tabs Alt+1…8 in that order (#1043)", () => {
-    expect(MAIN_TABS.map((t) => t.id)).toEqual(['session', 'overview', 'performance', 'tasks', 'sessions', 'files', 'images', 'changes'])
+  it("groups the main tabs, then More ▾'s, then Project Settings, and numbers the main tabs Alt+1…9 in that order (#1043, Activity #1254)", () => {
+    expect(MAIN_TABS.map((t) => t.id)).toEqual(['session', 'overview', 'performance', 'tasks', 'sessions', 'files', 'images', 'changes', 'activity'])
     expect(MORE_TABS.map((t) => t.id)).toEqual(['memory', 'skills', 'templates', 'mcp'])
     const group = (ids: string[]): number => PROJECT_MENU.indexOf(ids[0])
     const main = MAIN_TABS.map((t) => tabCommand(t.id))
@@ -41,7 +41,7 @@ describe('the Project menu is the tab strip', () => {
     const commands = src('src/renderer/src/commands.ts')
     const lines = commands.split(/\r?\n/)
     const key = (id: string): string | null => lines.find((l) => l.includes(`{ id: '${id}',`))?.match(/keybinding: '([^']+)'/)?.[1] ?? null
-    expect(main.map(key)).toEqual(['Alt+1', 'Alt+2', 'Alt+3', 'Alt+4', 'Alt+5', 'Alt+6', 'Alt+7', 'Alt+8'])
+    expect(main.map(key)).toEqual(['Alt+1', 'Alt+2', 'Alt+3', 'Alt+4', 'Alt+5', 'Alt+6', 'Alt+7', 'Alt+8', 'Alt+9'])
     expect(more.map(key)).toEqual([null, null, null, null])
     expect(key('project.tab.settings')).toBe('Alt+0')
     // No other command takes Alt and a digit.

@@ -72,6 +72,31 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const [f2] = await firstFailure(two.n)
     check('a conflict returns it: IntegrationFailed (conflict) naming a.txt, back in Doing', f2?.data?.reason === 'conflict' && JSON.stringify(f2.data.files) === '["a.txt"]' && (await column(two.n)) === 'doing', JSON.stringify(f2))
     check('…the target unmoved', q.head(fx) === before)
+    // HI-1181: its hunk recorded (the target's side first, the card's second), unfolded read-only in the Work section.
+    const hunk = f2?.data?.conflicts?.files?.[0]?.hunks?.[0]
+    check("…its hunk recorded: integration's side first, the builder's second", f2?.data?.conflicts?.oursIs === 'target' && JSON.stringify(hunk?.ours) === '["TWO by someone"]' && JSON.stringify(hunk?.theirs) === '["two by the builder"]' && hunk?.line === 2, JSON.stringify(f2?.data?.conflicts))
+    await q.showBoard(h.page)
+    await q.openByTitle(h.page, two.n)
+    const twoDialog = h.page.locator('.dialog').filter({ has: h.page.locator('.task-title-input') })
+    await twoDialog.waitFor({ timeout: HUNG_MS })
+    const fileRow = twoDialog.locator('[data-conflict-file="a.txt"]')
+    check('…the Work section lists a.txt with its one conflict', !!(await until(async () => /a\.txt\s+1 conflict/.test(await fileRow.innerText().catch(() => '')), HUNG_MS)), await fileRow.innerText().catch(() => ''))
+    await fileRow.locator('button').click()
+    const hunkText = fileRow.locator('.card-work-hunk-text')
+    const twoKey = (await h.card(two.n)).key
+    const inOrder = (t) => {
+      const at = ['integration', 'TWO by someone', twoKey, 'two by the builder'].map((x) => t.indexOf(x))
+      return at.every((x, i) => x >= 0 && (i === 0 || x > at[i - 1]))
+    }
+    check('…unfolded: its sides under their names, integration then the card, from line 2', !!(await until(async () => inOrder(await hunkText.innerText().catch(() => '')), HUNG_MS)) && /From line 2/.test(await fileRow.innerText()), await fileRow.innerText().catch(() => ''))
+    const returnedPart = fileRow.locator('xpath=ancestor::*[contains(@class,"card-work-queue-returned")][1]')
+    for (const theme of ['dark', 'light']) {
+      await h.page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await h.page.mouse.move(5, 5)
+      await returnedPart.screenshot({ path: require('path').join(lib.WORK, `mergequeue-conflict-hunks-${theme}.png`) })
+    }
+    await h.page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await h.page.keyboard.press('Escape')
     // The run prunes once its queue is drained, after the outcome above is recorded.
     const pinGone = await until(() => !refs().some((r) => r.startsWith(`refs/hive/cards/${key1.toLowerCase()}/`)), HUNG_MS)
     const key2 = (await h.card(two.n)).key.toLowerCase()

@@ -451,6 +451,50 @@
     "defaultMessage": "Start Lane with These Cards…",
     "description": "Menu item in the Todo column's menu: opens Start Lane with the column's cards, in its order (a lane: a builder and a reviewer working through cards in turn). Glossary: lane."
   },
+  "board.conflicts.base": {
+    "defaultMessage": "Common ancestor",
+    "description": "A label inside a conflict's text in the card dialog's Work section (HI-1181): the lines both sides started from (git's diff3 base) follow."
+  },
+  "board.conflicts.clipped": {
+    "defaultMessage": "{n, plural, one {# long line shortened} other {# long lines shortened}}",
+    "description": "Under a conflict's text in the card dialog's Work section (HI-1181): {n} of its lines were longer than Hive keeps, so only their start is shown."
+  },
+  "board.conflicts.count": {
+    "defaultMessage": "{n, plural, one {# conflict} other {# conflicts}}",
+    "description": "Beside a file in conflict in the card dialog's Work section (HI-1181): how many conflict regions git left in it."
+  },
+  "board.conflicts.cut": {
+    "defaultMessage": "{n, plural, one {# line left out} other {# lines left out}}",
+    "description": "Inside a conflict's text in the card dialog's Work section (HI-1181): this side has {n} more lines than are shown."
+  },
+  "board.conflicts.filesLeft": {
+    "defaultMessage": "{n, plural, one {# more file in conflict, not read} other {# more files in conflict, not read}}",
+    "description": "Under the files in conflict in the card dialog's Work section (HI-1181): git named {n} more conflicting files than Hive reads for one return."
+  },
+  "board.conflicts.line": {
+    "defaultMessage": "From line {line, number}",
+    "description": "Above a conflict's text in the card dialog's Work section (HI-1181): the line of the file where the conflict starts."
+  },
+  "board.conflicts.mayHaveMore": {
+    "defaultMessage": "it may have more, not shown",
+    "description": "Beside a file in conflict in the card dialog's Work section (HI-1181): Hive stopped recording its conflicts (it had shown enough), so there may be more than shown."
+  },
+  "board.conflicts.more": {
+    "defaultMessage": "{n, plural, one {# more not shown} other {# more not shown}}",
+    "description": "Beside a file in conflict in the card dialog's Work section (HI-1181): it has {n} more conflict regions than are shown (an exact count)."
+  },
+  "board.conflicts.noText": {
+    "defaultMessage": "no text conflict",
+    "description": "Beside a file in conflict in the card dialog's Work section (HI-1181): Hive read the whole file and git left no conflict markers in it (a conflict over the file itself: deleted, renamed, its mode)."
+  },
+  "board.conflicts.notRead": {
+    "defaultMessage": "{why, select, link {not read: it is a link} outside {not read: outside the queue's folder} missing {not read: not a file there} binary {not read: not text (binary)} notText {not read: not UTF-8 text} budget {not read: past how much Hive reads} other {not read: it couldn't be read}}",
+    "description": "Beside a file in conflict in the card dialog's Work section (HI-1181): Hive didn't read its text, and why (select: translate each): a link it never follows, a path outside the merge queue's folder, not a file there (deleted on one side), binary, not UTF-8 text, past the amount Hive reads for one return, or an error."
+  },
+  "board.conflicts.readInPart": {
+    "defaultMessage": "read in part: it may have more",
+    "description": "Beside a file in conflict in the card dialog's Work section (HI-1181): it is large, so Hive read only its start; there may be more conflicts than shown."
+  },
   "board.context.close": {
     "defaultMessage": "Close",
     "description": "Button: closes the doc section viewer."
@@ -766,6 +810,14 @@
   "board.details.waitingSince": {
     "defaultMessage": "Waiting since {since}: {waiting}",
     "description": "A run's state in its details (Progress panel): waiting since a date and time ({since}) for what its reporter says ({waiting}, in its own words: \"a test slot\")."
+  },
+  "board.dialog.activity": {
+    "defaultMessage": "Activity",
+    "description": "Button in the card dialog: opens its project's Activity tab showing this card's work."
+  },
+  "board.dialog.activityTip": {
+    "defaultMessage": "Show this card's agents, sessions, turns and processes in its project's Activity tab.",
+    "description": "Tooltip on the card dialog's Activity button."
   },
   "board.dialog.addCard": {
     "defaultMessage": "Add Card",
@@ -2334,6 +2386,22 @@
   "board.queue.pause.other": {
     "defaultMessage": "Paused ({reason}).",
     "description": "Why a merge queue is paused, on its card in the Progress panel, for a reason this window has no words for ({reason}: Hive's code for it)."
+  },
+  "board.queue.pause.pushFailed": {
+    "defaultMessage": "{card} is merged, but pushing {target} failed (git’s message follows). Fix it, then resume; or turn off “Push the target branch after merging” and resume to keep merging locally.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), pushing the target ({target}: a branch) failed, for a sign-in, the network or a time limit; git's own message follows. “Push the target branch after merging” is a workflow option's name: use its words."
+  },
+  "board.queue.pause.pushNoRemote": {
+    "defaultMessage": "{card} is merged, but {target} has no remote to push to: it tracks none, and the repository has no origin or only remote. Add one or set what {target} tracks, then resume; or turn off “Push the target branch after merging” and resume.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), the target ({target}: a branch) had nowhere to be pushed. Origin is git's usual name for a remote: keep it. “Push the target branch after merging” is a workflow option's name: use its words."
+  },
+  "board.queue.pause.pushRejected": {
+    "defaultMessage": "{card} is merged, but its remote refused the push of {target}: it has commits {target} hasn’t (Hive never forces a push). Pull them into {target}, then resume; or turn off “Push the target branch after merging” and resume to keep merging locally.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), pushing the target ({target}: a branch) was refused because the remote has newer commits. “Push the target branch after merging” is a workflow option's name: use its words."
+  },
+  "board.queue.pause.pushUnreadable": {
+    "defaultMessage": "{card} is merged, and {target} still has to be pushed, but Hive couldn’t read {target} to do it. Resume to try again; or turn off “Push the target branch after merging” and resume to keep merging locally.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), Hive couldn't read the target ({target}: a branch) to push it (git didn't answer), so the push still waits. “Push the target branch after merging” is a workflow option's name: use its words."
   },
   "board.queue.pause.rulesOff": {
     "defaultMessage": "The workflow's rules are off (Settings → Advanced), so the queue doesn't merge.",

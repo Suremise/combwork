@@ -8,7 +8,7 @@ import { keyProblem, KEY_FORM, nameWithKey, normalKey, setCardNaming, suggestKey
 import type { WorkspaceInfo } from '../shared/types'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
-import { workspaceFor, type WorkspaceService } from './workspace'
+import { contextWorkspace, workspaceFor, type WorkspaceService } from './workspace'
 
 const log = createLogger('keys')
 
@@ -29,12 +29,19 @@ const inScope = (ws: WorkspaceService, of: { project: string; projectId: string 
   scope === null || projectNow(ws.projectIdsNow(), of.project, of.projectId).toLowerCase() === scope.toLowerCase()
 
 // ---------------------------------------------------------------------------
-// Card names in what agents read (#1219; Darren, 20 Oct: "HI-1230 (#1240)" until P8).
+// Card names in what agents read (#1219; HI-1661, Darren 26 Oct: by key only, "HI-1230").
 // ---------------------------------------------------------------------------
 
 /** The names in force for the work running now: an Agent API request's, a wake's or a delivery's (withCardNames). */
 const naming = new AsyncLocalStorage<CardNames>()
-setCardNaming(() => naming.getStore() ?? null)
+// Outside them, the work's own workspace (the window's IPC calls, background work run in it) names its cards by key too
+// (HI-1661): every card in it, as the window sees them.
+setCardNaming(() => {
+  const named = naming.getStore()
+  if (named) return named
+  const ws = contextWorkspace()
+  return ws?.path ? cardNamesOf(ws) : null
+})
 
 /**
  * A workspace's card names, looked up as they are asked for (a key found is kept; one not found yet is looked up again,

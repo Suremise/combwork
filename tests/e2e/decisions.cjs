@@ -72,7 +72,7 @@ const check = (name, ok, extra = '') => {
 
   // The user records one in the dialog.
   await tile.click()
-  const dialog = page.locator('.dialog', { hasText: `#${n}` })
+  const dialog = lib.cardDialog(page, await lib.cardLabel(inv, n))
   await until(async () => (await dialog.count()) === 1, 5000)
   const section = dialog.locator('.task-decisions')
   const above = await page.evaluate(() => {
@@ -168,7 +168,7 @@ const check = (name, ok, extra = '') => {
   // --- Save keeps everything typed in the dialog (#432), on a card of its own.
   const m = (await inv('tasks:create', { title: 'Password reset', project: 'alpha' })).number
   const mTile = page.locator(`.task-card[data-task="${m}"]`)
-  const mDialog = page.locator('.dialog', { hasText: `#${m}` })
+  const mDialog = lib.cardDialog(page, await lib.cardLabel(inv, m))
   const open = async () => {
     await until(async () => (await mTile.count()) === 1, 5000)
     await mTile.click()
@@ -295,8 +295,8 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(20)
   await inv('tasks:update', n, { decision: 'Errors stay on screen until fixed.' })
   // Notices name the card by its key with the number the tools take (#1219): its own key, from the board.
-  const named = `${(await card(n)).key} (#${n})`
-  check('the card has a key of its project', /^[A-Z]{2,4}-\d+ \(#\d+\)$/.test(named), named)
+  const named = `${(await card(n)).key}`
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(named), named)
   const status = await asCoder('/v1/projects/alpha')
   check('a decision recorded since: its next reply, from a tool that is not the board, flags it', status.status === 200 && status.notice === `[Hive] ${named} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`, JSON.stringify(status))
   // Through the real hive MCP server, as the agent's tools see it: the reply ends with the line.

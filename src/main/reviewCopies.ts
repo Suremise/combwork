@@ -26,6 +26,7 @@ import { copiesDirOf, copyRefusalText, FIRST_WAIT_MS, type CopyLease, type CopyP
 import { samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
+import { cardNamesOf, scopeOfHost } from './projectKeys'
 import { openWorkspaces, type WorkspaceService } from './workspace'
 import { COPIES_REVIEW, WORKFLOW_ENFORCE } from '../shared/advanced'
 import { HISTORY, storedText } from '../shared/taskHistory'
@@ -58,6 +59,8 @@ export interface ReviewCopyDeps {
   review: (card: number, agent: string) => Promise<ReviewNow>
   /** Tells a reviewer that waited its copy is ready (its inbox). */
   tell: (agent: Reviewer, card: number, text: string) => Promise<void>
+  /** How the reviewer's texts name a card (HI-1661: its key); `#N` by default. */
+  cardName?: (card: number) => string
   /** A line of the card's history, for the window. */
   note: (card: number, text: StoredText) => Promise<void>
   /** How long a start waits for a copy before replying that it waits (a first copy's setup takes minutes). */
@@ -81,8 +84,8 @@ interface Waiting {
 const key = (card: number, agent: string): string => `${card}|${agent}`
 
 /** The line an agent's start review reply, or its later message, gives for a copy. */
-export function reviewCopyText(a: ReviewCopyAnswer, card?: number): string {
-  if (a.is === 'ready') return `${card !== undefined ? `#${card}'s review copy is ready. ` : ''}Review in ${a.folder} at ${a.revision.slice(0, 12)}: read and run commands there, with it as their working directory; your session stays where it is.` // i18n-ignore: agent-facing
+export function reviewCopyText(a: ReviewCopyAnswer, card?: string): string {
+  if (a.is === 'ready') return `${card !== undefined ? `${card}'s review copy is ready. ` : ''}Review in ${a.folder} at ${a.revision.slice(0, 12)}: read and run commands there, with it as their working directory; your session stays where it is.` // i18n-ignore: agent-facing
   if (a.is === 'waiting') return `Waiting for a review copy (${a.why}): Hive tells you when one is ready, with its folder. Meanwhile git can show the submission from where you are.` // i18n-ignore: agent-facing
   return `No review copy (${a.why}): review the builder's work read-only from where you are.` // i18n-ignore: agent-facing
 }
@@ -92,6 +95,10 @@ export class ReviewCopies {
   private readonly waiting = new Map<string, Waiting>()
 
   constructor(private readonly deps: ReviewCopyDeps) {}
+
+  private named(card: number): string {
+    return this.deps.cardName?.(card) ?? `#${card}`
+  }
 
   /** The reviews waiting for a copy now (cards and reviewers). */
   waits(): { card: number; agent: string }[] {
@@ -159,7 +166,7 @@ export class ReviewCopies {
         }
         if (this.waiting.get(k) === w) this.waiting.delete(k)
         const none: ReviewCopyAnswer = { is: 'none', why: copyRefusalText(r.refusal) }
-        if (w.told) await this.deps.tell(w.agent, w.card, `#${w.card}: ${reviewCopyText(none)}`).catch(() => undefined)
+        if (w.told) await this.deps.tell(w.agent, w.card, `${this.named(w.card)}: ${reviewCopyText(none)}`).catch(() => undefined)
         return none
       }
       // Its review may have ended while the copy was set up, or review copies been turned off: returned, never handed over.
@@ -169,13 +176,13 @@ export class ReviewCopies {
         await pool.returnCopy(r.lease.id, off ? 'off' : 'abandoned')
         if (this.waiting.get(k) === w) this.waiting.delete(k)
         const none: ReviewCopyAnswer = { is: 'none', why: off ?? 'the review ended' } // i18n-ignore: agent-facing
-        if (off && w.told) await this.deps.tell(w.agent, w.card, `#${w.card}: ${reviewCopyText(none)}`).catch(() => undefined)
+        if (off && w.told) await this.deps.tell(w.agent, w.card, `${this.named(w.card)}: ${reviewCopyText(none)}`).catch(() => undefined)
         return none
       }
       this.waiting.delete(k)
       const got: ReviewCopyAnswer = { is: 'ready', copy: r.copy.name, folder: r.copy.folder, revision: w.revision }
       await this.deps.note(w.card, storedText(HISTORY.reviewCopyLeased, { agent: w.agent.name, copy: r.copy.name, revision: w.revision.slice(0, 12) })).catch(() => undefined)
-      if (w.told) await this.deps.tell(w.agent, w.card, reviewCopyText(got, w.card)).catch((e) => log.warn(`Could not tell ${userText(w.agent.name)} its review copy is ready`, e))
+      if (w.told) await this.deps.tell(w.agent, w.card, reviewCopyText(got, this.named(w.card))).catch((e) => log.warn(`Could not tell ${userText(w.agent.name)} its review copy is ready`, e))
       return got
     }
     const p = run().finally(() => {
@@ -193,7 +200,7 @@ export class ReviewCopies {
       // Turned off while it waited: dropped, and told (a lease under way is handled where it ends).
       if (off) {
         this.waiting.delete(k)
-        if (w.told) await this.deps.tell(w.agent, w.card, `#${w.card}: ${reviewCopyText({ is: 'none', why: off })}`).catch(() => undefined)
+        if (w.told) await this.deps.tell(w.agent, w.card, `${this.named(w.card)}: ${reviewCopyText({ is: 'none', why: off })}`).catch(() => undefined)
         continue
       }
       const now = await this.deps.review(w.card, w.agent.id).catch(() => null)
@@ -260,6 +267,7 @@ export function reviewCopiesFor(ws: WorkspaceService, projectPath: string): Revi
     pool: () => copiesFor(ws, projectPath),
     review: (card, agent) => reviewOf(ws, projectPath, card, agent),
     tell: async (agent, card, text) => void (await leaveMessage(projectPath, agent.id, agent.name, { kind: 'hive', name: 'Hive' }, text, card)), // i18n-ignore: the sender's name agents read
+    cardName: (card) => cardNamesOf(ws, scopeOfHost(projectPath))(card),
     note: async (card, text) => {
       const { noteOnCard } = await import('./tasks')
       await noteOnCard(card, text, ws)

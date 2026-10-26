@@ -81,6 +81,7 @@
   "shell.command.project.previous": "前のプロジェクト",
   "shell.command.project.remove": "プロジェクトを削除…",
   "shell.command.project.storage": "プロジェクトのストレージとクリーンアップ…",
+  "shell.command.project.tab.activity": "アクティビティタブに移動",
   "shell.command.project.tab.changes": "バージョン管理タブに移動",
   "shell.command.project.tab.files": "ファイルタブに移動",
   "shell.command.project.tab.images": "添付ファイルタブに移動",

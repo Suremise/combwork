@@ -404,7 +404,7 @@ const check = (name, ok, extra = '') => {
     check('…the long name ends in an ellipsis before its chip; the chips line up', (await longCut()) && fits(await layout()), JSON.stringify(await layout()))
     await page.screenshot({ path: path.join(lib.WORK, 'tilesview-chips.png') })
     await chipOf('C').click()
-    const dialog = page.locator('.dialog', { hasText: `#${passedCard}` })
+    const dialog = lib.cardDialog(page, await lib.cardLabel(inv, passedCard))
     check("a click on C's chip opens its card, the focus view staying on A", !!(await lib.until(async () => (await dialog.count()) === 1, HUNG_MS)) && (await inFocus('A')))
     await page.keyboard.press('Escape')
     await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)

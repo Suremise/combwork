@@ -627,6 +627,14 @@
     "defaultMessage": "Checks pass before review",
     "description": "A workflow option (glossary 2.6, G3 and N3): named commands that must pass before a card goes to review."
   },
+  "workflow.option.pushTarget.desc": {
+    "defaultMessage": "After each merge, the merge queue pushes the target branch to the remote it tracks (or the only remote, or origin), never forced, and pauses, saying why, when the push is refused or fails.",
+    "description": "What the workflow option “Push the target branch after merging” does (glossary 2.1: merge queue). Origin is git’s usual name for a remote: keep it."
+  },
+  "workflow.option.pushTarget.title": {
+    "defaultMessage": "Push the target branch after merging",
+    "description": "A workflow option (glossary 2.6, G18): after Hive’s merge queue merges a card, it pushes the target branch to its remote."
+  },
   "workflow.option.review.desc": {
     "defaultMessage": "A card goes to Review when its builder submits it and moves on only once it passes, waiting for your OK after the reviewer when you check too.",
     "description": "What the workflow option “Work is reviewed before it’s merged” does."
@@ -776,8 +784,8 @@
     "description": "A refused intent: the card was named by a bare number."
   },
   "workflow.refused.card.plainNumber.next": {
-    "defaultMessage": "Name the card as {key} or {alias}.",
-    "description": "The forms a card reference takes: {key} like AM-12, {alias} like #1061."
+    "defaultMessage": "Name the card by its key: {key}.",
+    "description": "How to name a card instead of a bare number: by its key, {key} (such as AM-12)."
   },
   "workflow.refused.check.revisionMismatch.message": {
     "defaultMessage": "{revision} isn't what's checked out here.",
@@ -1148,12 +1156,12 @@
     "description": "Where the rule that refused a submit for a missing check is changed."
   },
   "workflow.refused.submit.checksPassed.message": {
-    "defaultMessage": "Review refused: {check} hasn't passed on {revision}.",
-    "description": "A refused submit: a configured check has no passing counted run on the revision. {check} is the check name, {revision} a short revision id."
+    "defaultMessage": "Review refused: {check} hasn't passed on {revision}.{why, select, notCheck { Its last run passed but didn't count: it wasn't the check's configured command.} notContained { Its last run passed but didn't count: what it ran on doesn't contain the revision.} dirty { Its last run passed but didn't count: the folder had uncommitted changes{files, select, none {} other { ({files})}}.} moved { Its last run passed but didn't count: something else was checked out by its end.} changed { Its last run passed but didn't count: files changed in the folder while it ran{files, select, none {} other { ({files})}}.} revisionChanged { Its last run passed but didn't count: the card's files changed while it ran.} other {}}",
+    "description": "A refused submit: a configured check has no passing counted run on the revision. {check} is the check name, {revision} a short revision id. {why} picks why its last run there didn't count (#1654; keep each branch's key as it is; 'other': it didn't run there, or failed, and nothing is added); {files} lists the paths that changed, or is 'none' (keep the key)."
   },
   "workflow.refused.submit.checksPassed.next": {
-    "defaultMessage": "Run {command}, then submit again.",
-    "description": "The next step after a refused submit for a missing check: {command} is the command to run."
+    "defaultMessage": "{why, select, dirty {Commit or remove the uncommitted changes, run {command} again, then submit again.} changed {{copy, select, yes {Run {command} again with nothing else writing in the folder, or add --isolated to run it in a check copy of its own, then submit again.} other {Run {command} again with nothing else writing in the folder, then submit again.}}} notContained {Run {command} in the card's own folder, at its revision, then submit again.} other {Run {command}, then submit again.}}",
+    "description": "The next step after a refused submit for a missing check: {command} is the command to run. {why} picks the remedy for why its last run didn't count (#1654; keep each branch's key as it is); {copy} is 'yes' where a check copy (--isolated, kept as typed) can be used."
   },
   "workflow.refused.submit.clean.change": {
     "defaultMessage": "This rule comes with review and merging in Version Control.",
@@ -1811,6 +1819,10 @@
     "defaultMessage": "Merge commit",
     "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
   },
+  "workflow.value.style.rebase": {
+    "defaultMessage": "Rebase and fast-forward",
+    "description": "A value of the workflow option “Merge style” (glossary 2.6, G6; #1184): Hive’s merge queue rebases the card’s commits onto the target branch and moves the branch forward to them, so the history stays linear, with no merge commit."
+  },
   "workflow.value.style.squash": {
     "defaultMessage": "Squash",
     "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
@@ -1854,6 +1866,10 @@
   "workflow.why.preChecks": {
     "defaultMessage": "Cheap checks before review catch most of the rounds that would be lost, and a team adds its tests.",
     "description": "Why the presets set “Checks pass before review” as they do (Pair: the quick checks; Team: the tests too)."
+  },
+  "workflow.why.pushTarget": {
+    "defaultMessage": "Pushing reaches your remote and its sign-in, so it stays yours unless you turn it on.",
+    "description": "Why the presets leave “Push the target branch after merging” off."
   },
   "workflow.why.review": {
     "defaultMessage": "A pair exists to review: a second agent catches what the builder missed, while working solo you read the card’s work yourself.",

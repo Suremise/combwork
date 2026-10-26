@@ -84,6 +84,7 @@
   "panes.locks.item": "{n, plural, one {Edytuje # plik} few {Edytuje # pliki} many {Edytuje # plików} other {Edytuje # pliku}}",
   "panes.locks.title": "Pliki, które edytuje w tej turze:",
   "panes.locks.titleShared": "Pliki, które edytuje w tej turze. Inni agenci w tym folderze czekają, aż z nimi skończy:",
+  "panes.menu.activity": "Aktywność",
   "panes.menu.archiveStartNew": "Zarchiwizuj i zacznij nową…",
   "panes.menu.cancelWatch": "Anuluj obserwowanie kart",
   "panes.menu.compact": "Kompaktuj…",

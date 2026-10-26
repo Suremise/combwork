@@ -26,6 +26,7 @@ import { VersionControl } from './VersionControl'
 import { MemoryTab, OverviewTab, ProjectMcpTab, ProjectSettingsTab, ProjectSkillsTab } from './ProjectTabs'
 import { ProjectTemplatesTab } from '../components/Templates'
 import { PerformanceTab } from './Performance'
+import { ActivityTab } from './ActivityTab'
 import { SessionsTab } from './SessionsTab'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { ProjectTasksTab } from '../components/Board'
@@ -622,6 +623,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
           {tab === 'files' && <FilesTab project={project} />}
           {tab === 'images' && <AttachmentsTab project={project} />}
           {tab === 'changes' && <VersionControl project={project} />}
+          {tab === 'activity' && <ActivityTab key={project.path} project={project} />}
           {tab === 'memory' && <MemoryTab project={project} />}
           {tab === 'skills' && <ProjectSkillsTab project={project} />}
           {tab === 'templates' && <ProjectTemplatesTab project={project} />}

@@ -1,3 +1,4 @@
+import type { ActivityDetail, ActivityNow, ActivityTurns, EndProcessResult } from './activity'
 import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
@@ -128,7 +129,7 @@ import type { TipsChange, TipsState } from './tips'
 import type { AdvancedState } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
-import type { BranchAt, BranchDrops, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
+import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -619,6 +620,16 @@ export interface HiveRequests {
   /** The conversation for the transcript viewer; null when the file has not changed since knownVersion (a Transcript's `version`). Long tool input/output is shortened. */
   /** The conversation from item `from` on (default: the last TRANSCRIPT_WINDOW items); null when the file hasn't changed since knownVersion and `from` is unchanged. */
   'transcript:read': (projectPath: string, sessionId: string, opts?: { knownVersion?: string; from?: number }) => Transcript | null
+  /** The Activity tab (#1254): what runs in a project's agents' launches now (their processes, by Stop's tracking, and background tasks). */
+  'activity:now': (projectPath: string) => ActivityNow
+  /** The project's sessions running or active within `hours`, from their records alone (no transcript looked for). */
+  'activity:sessions': (projectPath: string, hours: number) => SessionListItem[]
+  /** An item's whole input (a prompt, a tool call's input and result) as written, masked like the log; null for another kind. */
+  'activity:detail': (projectPath: string, sessionId: string, itemId: number) => ActivityDetail | null
+  /** A session's latest turns and their tool calls, from its transcript; null when unchanged since knownVersion. */
+  'activity:turns': (projectPath: string, sessionId: string, knownVersion?: string) => ActivityTurns | null
+  /** Ends one of an agent's own processes (pid and start time, as listed), never its CLI. */
+  'activity:endProcess': (projectPath: string, agentId: string, pid: number, created: string) => EndProcessResult
   /** One tool call with its full input and output. */
   'transcript:tool': (projectPath: string, sessionId: string, itemId: number) => TranscriptTool
   /** An image stored in the transcript, as a data URL. */
@@ -835,6 +846,9 @@ export interface HiveRequests {
   'git:history': (projectPath: string, ref?: string | null, page?: number) => GitHistory
   /** Each action replies with what it did, in a sentence. Switching (and creating a branch to switch to) or pulling is refused while an agent works in the folder or its merge slot is held (`folderBusy`). */
   'git:switch': (projectPath: string, branch: string) => string
+  /** Update from <target> (HI-1180): what it would do to a branch (its dialog), and the update, merge or rebase, saying what it did. */
+  'git:updatePlan': (projectPath: string, branch: string) => BranchUpdatePlan
+  'git:updateBranch': (projectPath: string, branch: string, how: BranchUpdateHow) => string
   'git:createBranch': (projectPath: string, name: string, stay?: boolean) => string
   'git:addRemote': (projectPath: string, name: string, url: string) => string
   'git:setRemoteUrl': (projectPath: string, name: string, url: string) => string

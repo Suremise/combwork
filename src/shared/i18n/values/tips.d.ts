@@ -1,6 +1,8 @@
 // Generated from locales/en/tips.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'tips.activityTab.text': undefined
+  'tips.activityTab.title': undefined
   'tips.advancedSettings.text': undefined
   'tips.advancedSettings.title': undefined
   'tips.agentConsole.text': undefined
@@ -128,6 +130,8 @@ interface HiveMessageValues {
   'tips.compactSidebar.title': undefined
   'tips.compactionHistory.text': undefined
   'tips.compactionHistory.title': undefined
+  'tips.conflictHunks.text': undefined
+  'tips.conflictHunks.title': undefined
   'tips.consoleRecording.text': undefined
   'tips.consoleRecording.title': undefined
   'tips.consoleText.text': undefined
@@ -240,10 +244,14 @@ interface HiveMessageValues {
   'tips.memorySnapshot.title': undefined
   'tips.mergeBranch.text': undefined
   'tips.mergeBranch.title': undefined
+  'tips.mergePush.text': undefined
+  'tips.mergePush.title': undefined
   'tips.mergeQueueFolder.text': undefined
   'tips.mergeQueueFolder.title': undefined
   'tips.mergeQueuePanel.text': undefined
   'tips.mergeQueuePanel.title': undefined
+  'tips.mergeRebase.text': undefined
+  'tips.mergeRebase.title': undefined
   'tips.mergeSlot.text': undefined
   'tips.mergeSlot.title': undefined
   'tips.mergeStrict.text': undefined
@@ -411,6 +419,8 @@ interface HiveMessageValues {
   'tips.unmerged.title': undefined
   'tips.unusedWorktrees.text': undefined
   'tips.unusedWorktrees.title': undefined
+  'tips.updateFromTarget.text': undefined
+  'tips.updateFromTarget.title': undefined
   'tips.versionControlSwitch.text': undefined
   'tips.versionControlSwitch.title': undefined
   'tips.versionControlTab.text': undefined

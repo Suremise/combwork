@@ -95,6 +95,7 @@
   "panes.locks.item": "{n, plural, one {Editing # file} other {Editing # files}}",
   "panes.locks.title": "Files it is editing this turn:",
   "panes.locks.titleShared": "Files it is editing this turn. Other agents in this folder wait until it finishes with them:",
+  "panes.menu.activity": "Activity",
   "panes.menu.archiveStartNew": "Archive and Start New…",
   "panes.menu.cancelWatch": "Cancel Card Watch",
   "panes.menu.compact": "Compact…",
