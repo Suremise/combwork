@@ -137,18 +137,24 @@ export interface StoreTable<T> {
  * written), the file then kept as a backup; a file found after that kept so, unread. Nothing while the workspace's
  * upgrade to 1.0 waits. The caller reads the table after. `db`: the connection to use throughout, a save's lease's
  * (#1381), so a workspace closed while the file is read doesn't take it away (else the workspace's, as it is then).
+ * `refuse`: the file must stay where it is now (a removed project's, #1161): asked under the board's lock, after the file
+ * is read and before anything is written or renamed. Returns false when it refused (nothing moved, nothing renamed).
  */
-export async function openTable<T>(workspacePath: string, store: StoreName, scope: string, file: string, readFile: () => Promise<T | null>, table: StoreTable<T>, opts: { whenEmpty?: boolean; db?: Db } = {}): Promise<void> {
+export async function openTable<T>(workspacePath: string, store: StoreName, scope: string, file: string, readFile: () => Promise<T | null>, table: StoreTable<T>, opts: { whenEmpty?: boolean; db?: Db; refuse?: () => boolean } = {}): Promise<boolean> {
   const path = resolve(workspacePath)
   const conn = (): Db => opts.db ?? workspaceDb(path)
-  if (opts.db ? !!opts.db.pending : upgradeWaiting(path)) return
+  if (opts.db ? !!opts.db.pending : upgradeWaiting(path)) return true
+  if (opts.refuse?.()) return false
   const toMove = (db: Writer): boolean => storeValue(db, store, scope, 'imported') === null || (!!opts.whenEmpty && table.count(db, scope) === 0 && existsSync(file))
   const first = toMove(conn().writer)
-  if (first) {
-    const got = await readFile()
-    await withFileLock(boardLock(path), async () => {
-      const db = conn().writer
-      if (!toMove(db)) return
+  if (!first && !existsSync(file)) return true
+  const got = first ? await readFile() : null
+  // The move and the file's rename under one hold of the lock, the refusal asked last before them: nothing that would
+  // refuse it (a removal's export, under the same lock) lands between.
+  return withFileLock(boardLock(path), async () => {
+    if (opts.refuse?.()) return false
+    const db = conn().writer
+    if (first && toMove(db)) {
       let written = 0
       transaction(db, () => {
         written = got ? table.put(db, scope, got) : 0
@@ -157,12 +163,13 @@ export async function openTable<T>(workspacePath: string, store: StoreName, scop
         setMeta(db, store, scope, 'imported', JSON.stringify({ at: new Date().toISOString(), rows: written, file: got ? file : null }))
       })
       if (got) log.info(`moved ${written} ${store} entr${written === 1 ? 'y' : 'ies'} from ${userText(file)} into the workspace database`)
-    })
-  }
-  if (existsSync(file)) {
-    if (!first) log.warn(`${userText(file)} was found after the ${store} moved into the workspace database (an older Hive's, or a rename refused before): kept as a backup, not read`)
-    keepAsBackup(file)
-  }
+    }
+    if (existsSync(file)) {
+      if (!first) log.warn(`${userText(file)} was found after the ${store} moved into the workspace database (an older Hive's, or a rename refused before): kept as a backup, not read`)
+      keepAsBackup(file)
+    }
+    return true
+  })
 }
 
 function setMeta(db: ReturnType<typeof workspaceDb>['writer'], store: StoreName, scope: string, key: string, value: string | null): void {

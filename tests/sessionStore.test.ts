@@ -17,6 +17,22 @@ process.env.CODEX_HOME = join(base, 'codex-home')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // Kept files written as Hive writes them; `afterWrite`, when set, runs once a file is written (the export's, to race it).
 const fileHooks = vi.hoisted(() => ({ afterWrite: null as ((path: string) => void) | null }))
+// A file's read held (#1161): the next read of `held.path` says it has started, then waits for `held.gate`.
+const held = vi.hoisted(() => ({ path: '', started: null as (() => void) | null, gate: null as Promise<void> | null }))
+vi.mock('fs/promises', async (orig) => {
+  const m = await orig<typeof import('fs/promises')>()
+  return {
+    ...m,
+    readFile: async (...a: Parameters<typeof m.readFile>) => {
+      if (held.path && String(a[0]) === held.path) {
+        held.path = ''
+        held.started?.()
+        await held.gate
+      }
+      return m.readFile(...a)
+    }
+  }
+})
 vi.mock('../src/main/fsutil', async (orig) => {
   const m = await orig<typeof import('../src/main/fsutil')>()
   return { ...m, writeKeptJson: async (...a: Parameters<typeof m.writeKeptJson>) => (await m.writeKeptJson(...a), fileHooks.afterWrite?.(a[0])) }
@@ -366,6 +382,49 @@ describe('following the project', () => {
     } finally {
       renameSync(`${cfg}.aside`, cfg)
     }
+  })
+
+  it("a move in whose file read spans the project's removal leaves the file in the folder (#1161)", async () => {
+    const p = project('held-read')
+    await run(() => workspace.ensureProject(p))
+    await run(() => workspace.projectIds({ fresh: true }))
+    await run(() => workspace.upsertSession(p, { id: 'stay-out' }))
+    // A place under its folder's scope (its id unreadable for a moment), where no export is marked.
+    const cfg = join(p, '.hive', 'project.json')
+    let place: SessionsPlace
+    renameSync(cfg, `${cfg}.aside`)
+    try {
+      await run(() => workspace.projectIds({ fresh: true }))
+      place = await run(() => (w as unknown as { sessionsPlace: (pp: string) => Promise<SessionsPlace> }).sessionsPlace(p))
+    } finally {
+      renameSync(`${cfg}.aside`, cfg)
+      await run(() => workspace.projectIds({ fresh: true }))
+    }
+    expect(place.scope).toBe('folder:held-read')
+    expect(place.removed!()).toBe(false)
+    // Its file's read is held; the project is removed meanwhile, writing its records into that file.
+    const file = join(p, '.hive', 'sessions.json')
+    let release!: () => void
+    const started = new Promise<void>((r) => (held.started = r))
+    held.gate = new Promise<void>((r) => (release = r))
+    held.path = file
+    let ids: string[] | null = null
+    const change = changeSessions(place, (f) => {
+      ids = f.sessions.map((x) => x.id)
+    })
+    try {
+      await started
+      await run(() => removal.removeProject(p, 'remove'))
+      expect(place.removed!()).toBe(true)
+    } finally {
+      release()
+      await change
+      held.path = ''
+    }
+    expect(ids).toEqual([])
+    expect(existsSync(file)).toBe(true)
+    await run(() => removal.restoreProject('held-read'))
+    expect((await run(() => workspace.sessionsFile(p))).sessions.map((x) => x.id)).toEqual(['stay-out'])
   })
 
   it('a late change while its workspace is open and the project present still lands, moving the folder file back in (#1161)', async () => {

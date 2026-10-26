@@ -188,7 +188,7 @@ async function opening(place: SessionsPlace, db?: Db): Promise<void> {
   if (opened.has(k) || (db ? !!db.pending : upgradeWaiting(place.workspace))) return
   // A removed host's folder keeps its file, whatever scope it is read under (#1161: its id unreadable for a moment gives
   // its folder's, which has no `exported` mark). Not marked opened: asked again at each read until the project is back.
-  if (removing.has(k) || place.removed?.()) return
+  if (refused(place)) return
   const exported = storeValue((db ?? workspaceDb(resolve(place.workspace))).writer, 'sessions', place.scope, 'exported') !== null
   // Its workspace's place resolved as it enters, before anything is awaited (#1456).
   const at = placeKey(place.workspace)
@@ -196,8 +196,8 @@ async function opening(place: SessionsPlace, db?: Db): Promise<void> {
     if (await moveBack(place)) opened.set(k, at)
     return
   }
-  await openTable(place.workspace, 'sessions', place.scope, place.file, () => readOldFile(place.file), TABLE, { whenEmpty: true, db })
-  opened.set(k, at)
+  // Asked again where the file would be moved or renamed (#1161): a removal may end while the file is read.
+  if (await openTable(place.workspace, 'sessions', place.scope, place.file, () => readOldFile(place.file), TABLE, { whenEmpty: true, db, refuse: () => refused(place) })) opened.set(k, at)
 }
 
 /**
@@ -301,20 +301,27 @@ export function releaseSessions(place: SessionsPlace): void {
  * backup. Gone (taken in by another workspace meanwhile), the mark just ends.
  */
 async function moveBack(place: SessionsPlace): Promise<boolean> {
-  const moved = await withStoreLock(place.workspace, 'sessions', place.scope, async (db) => {
-    // Removed again while this waited for the lock (#1161): the file stays.
-    if (removing.has(openedKey(place)) || place.removed?.()) return false
+  return withStoreLock(place.workspace, 'sessions', place.scope, async (db) => {
+    // Removed while this waited for the lock (#1161): the file stays.
+    if (refused(place)) return false
     if (storeValue(db, 'sessions', place.scope, 'exported') === null) return true
     const f = await readOldFile(place.file)
+    // Or removed while the file was read: asked again right before the move.
+    if (refused(place)) return false
     transaction(db, () => {
       if (f) addSessionRecords(db, place.scope, f)
       db.prepare("DELETE FROM store_meta WHERE store = 'sessions' AND scope = ? AND key = 'exported'").run(place.scope) // i18n-ignore: SQL
     })
     if (f) log.info(`moved ${f.sessions.length} session record(s) back in from ${userText(place.file)}`)
+    // Kept as a backup under the same lock: a removal's export, which takes it too, can't write a new file before this rename.
+    if (existsSync(place.file)) keepAsBackup(place.file)
     return true
   })
-  if (moved && existsSync(place.file)) keepAsBackup(place.file)
-  return moved
+}
+
+/** A host's file must stay in its folder (#1161): it is being removed, or removed, or that can't be known now. */
+function refused(place: SessionsPlace): boolean {
+  return removing.has(openedKey(place)) || !!place.removed?.()
 }
 
 /** For tests: forgets which hosts were moved in this run (a database replaced under a test). */
