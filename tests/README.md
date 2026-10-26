@@ -3,7 +3,9 @@
 Unit tests (Vitest) are the `*.test.ts` files here: `npm test`, or `npx vitest run <file>` for one. The end-to-end
 suites are in [e2e](e2e/README.md) and the agent-behaviour scenarios in [scenarios](scenarios/README.md). Helpers:
 `tempDir()` (`tempDir.ts`) for a test's folders, `pathAliases.ts` for another name for one, `noGlobalGit.ts` (unit
-tests run git with no global config, as CI does), and `electron-stub.ts` standing in for `electron`.
+tests run git with no global config, as CI does), `cliHomes.ts` (each test file gets empty Claude Code, Codex and
+Copilot homes, never the user's, whatever the shell sets: HI-1703), `loggerListeners.ts` (takes off the process
+listeners a test's fresh load of the logger added: HI-1728), and `electron-stub.ts` standing in for `electron`.
 
 Unit tests' temp folders are in the test area, `%LOCALAPPDATA%\hive-test\tmp` (#992), not `%TEMP%`: Hive's Antivirus
 scanning setting covers the test area, and thousands of folders made and removed in `%TEMP%` kept Defender busy.
