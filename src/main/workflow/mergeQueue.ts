@@ -228,6 +228,15 @@ export function pushOwedOf(value: string | null): PushOwed | null {
   }
 }
 
+/**
+ * How an entry of a merge style lands, as its `Integrated` says (an advance, or recovery after a restart): Rebase and
+ * fast-forward moves the target forward (#1184); a squash into the card's own target is a squash; else a merge commit.
+ */
+function methodOf(style: FactData['IntegrationRequested']['style'], cardTarget: string | null | undefined, target: string): 'merge' | 'squash' | 'fastForward' {
+  if (style === 'rebase') return 'fastForward'
+  return cardTarget === target && style === 'squash' ? 'squash' : 'merge'
+}
+
 /** A push reaches the remote and can wait on a sign-in window: as the Git view's, long but never forever. */
 const PUSH_MS = 5 * 60_000
 
@@ -845,8 +854,7 @@ export class MergeQueue {
       // Ask each time (OP-40): the user approves updating the folder, bound to this entry and its test merge. An early-out
       // only: decided again in IntegrationStarted's write, in the lock.
       if (folder && this.cfg.checkedOutTarget?.() === 'ask' && !advanceApprovedIn(this.wf.state(card), entry.id, expected, result)) return this.askAdvance(card, entry, target, expected, result, folder)
-      const style = this.wf.rulesetOf(card, s).options.style
-      const method = style === 'rebase' ? 'fastForward' : s.started?.target === target && style === 'squash' ? 'squash' : 'merge'
+      const method = methodOf(this.wf.rulesetOf(card, s).options.style, s.started?.target, target)
       const integrate = (): Promise<void> => this.integrated(card, entry, revision, target, result, method, 'hive')
       const adv = folder ? await this.advanceCheckedOut(card, entry, target, expected, result, folder, integrate) : await this.advanceRef(card, entry, target, expected, result)
       // Settled in the lock: a pause, the terminal state, the ask.
@@ -1061,10 +1069,12 @@ export class MergeQueue {
     const linear = !merges.out.trim()
     const onTop = await this.git(this.project, ['merge-base', '--is-ancestor', expected, revision])
     if (onTop.code !== 0 && onTop.code !== 1) return { pause: 'needsYou', message: onTop.err }
+    // The queue's worktree at the reviewed revision whatever follows (HR2's #1184 round 1): a linear card already on top
+    // lands as it is, and its merge checks still run there, on exactly that revision.
+    const at = await this.folderAt(revision)
+    if (at) return at
     let result = revision
     if (!linear || onTop.code !== 0) {
-      const at = await this.folderAt(revision)
-      if (at) return at
       const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
       const signs = await this.signs(reads, f)
       const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
@@ -1446,7 +1456,10 @@ export class MergeQueue {
       const { expected, result, checkedOut } = e.started
       const done = async () => {
         await this.write(card, (w) => {
-          const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { entry: e.id, revision: e.revision, target: e.target, result, method: 'merge', by: 'hive' } }) // i18n-ignore: a fact's kind and codes, not text
+          // How it landed, as an advance records it, by the style its entry was queued with (HR2's #1184 round 1).
+          const requested = this.wf.store.facts(card.id).find((x) => x.kind === 'IntegrationRequested' && (x.data as FactData['IntegrationRequested']).entry === e.id)?.data as FactData['IntegrationRequested'] | undefined
+          const method = methodOf(requested?.style ?? this.wf.rulesetOf(card, s).options.style, s.started?.target, e.target)
+          const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { entry: e.id, revision: e.revision, target: e.target, result, method, by: 'hive' } }) // i18n-ignore: a fact's kind and codes, not text
           if (!f) return
           w.move('done', 'derived')
           w.action('releaseSlot', {})

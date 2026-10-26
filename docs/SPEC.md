@@ -2459,7 +2459,9 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    failing one, the card is returned (`notUpToDate`, its log saying which: a merge resolution that changed the work
    can't survive flattening); a conflict returns it with its files; a read git couldn't answer pauses (never taken for a
    pass or a mismatch). The checks then run on exactly that result, and the advance (§16.9.2, unchanged) moves the
-   target from `expected` to it: a fast-forward, recorded as `Integrated` with method `fastForward`. G8 (strict) needs
+   target from `expected` to it: a fast-forward, recorded as `Integrated` with method `fastForward` (by recovery after
+   a restart too, from the style the entry was queued with, as for the other styles). The queue's worktree is set at the
+   reviewed revision first even when nothing is rewritten, so the merge checks always run on exactly the result. G8 (strict) needs
    no separate update with it. The rebased commits keep their own messages, authors and dates, with Hive as committer:
    there is no merge commit, so no `Hive-Card`, `Hive-Revision` or `Hive-Reviewed-By` trailers, the price of a linear
    history; the reviewed revision stays pinned (§16.9.3), and containment finds the change spread over several commits.

@@ -2,6 +2,8 @@
 // target forward to exactly the tested result, under the "linear landing" policy: every commit the advance adds to the
 // target has exactly one parent, and the target's head before is an ancestor of the result. On real repositories.
 import { afterEach, describe, expect, it } from 'vitest'
+import { existsSync } from 'fs'
+import { join } from 'path'
 import { B1, commit, moved, put, R1, setup, sh, type Env } from './harness'
 import { preset, takesOption } from '../../src/shared/workflow/options'
 import { compile } from '../../src/shared/workflow/compile'
@@ -87,6 +89,39 @@ describe("G6's Rebase and fast-forward (#1184)", () => {
     await e.queue().drain('main')
     linear(e, before)
     expect(sh(e.project, 'rev-parse', 'main')).toBe(e.wf.state(card).latest!.revision)
+  })
+
+  for (const reused of [false, true]) {
+    it(`a linear card already on top, with merge checks, in a ${reused ? 'reused' : 'fresh'} queue folder: the checks run on exactly its revision, and it lands (HR2 r1 f1)`, async () => {
+      const e = rebasing({ mergeChecks: ['verify'], commands: { verify: 'npm run verify' } })
+      const card = await queued(e, 'On top', (f) => void commit(f, { 'top.txt': 'top\n' }, 'AM-1: on top'))
+      const revision = e.wf.state(card).latest!.revision!
+      // A queue folder left at the target's head by an earlier merge.
+      if (reused) sh(e.project, 'worktree', 'add', '-q', '--detach', `${e.home}/queue`, 'main')
+      let tested: { head: string; file: boolean } | null = null
+      const [o] = await e
+        .queue({
+          runCheck: async (_name, _command, folder) => {
+            tested = { head: sh(folder, 'rev-parse', 'HEAD'), file: existsSync(join(folder, 'top.txt')) }
+            return { ok: true, output: '' }
+          }
+        })
+        .drain('main')
+      expect(tested).toEqual({ head: revision, file: true })
+      expect(o).toMatchObject({ outcome: 'integrated' })
+      expect(sh(e.project, 'rev-parse', 'main')).toBe(revision)
+    })
+  }
+
+  it('a restart between the advance and its Integrated: recovery records the landing as the advance would, fastForward (HR2 r1 f2)', async () => {
+    const e = rebasing()
+    const card = await queued(e, 'Recovered', (f) => void commit(f, { 'r.txt': 'r\n' }, 'AM-1: recovered'))
+    onTarget(e, { 'other.txt': 'moved\n' }, 'the target moves')
+    const before = sh(e.project, 'rev-parse', 'main')
+    await expect(e.queue({ hooks: { afterAdvance: () => Promise.reject(new Error('crash')) } }).drain('main')).rejects.toThrow('crash')
+    expect((await e.queue().recover('main')).map((x) => x.outcome)).toEqual(['integrated'])
+    expect(integrated(e, card.id)).toMatchObject({ method: 'fastForward', by: 'hive' })
+    linear(e, before)
   })
 
   it('a conflict with the target: returned with its files, the target unmoved', async () => {
