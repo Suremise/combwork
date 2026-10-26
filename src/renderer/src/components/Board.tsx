@@ -29,7 +29,7 @@ import { formatDateTime } from '@shared/dates'
 import { returnRound } from '@shared/watch'
 import { BusyButton, Icon, IconButton, InfoTip, Markdown, Modal, SearchInput, STATUS_TEXT, statusText, Tooltip, useBusy, useContextMenu, type MenuEntry } from './ui'
 import { attachmentLookup, CardAttachmentList, DraftChips, openAttachmentLink, useAttachDrafts, useCardAttachments } from './CardAttachments'
-import { withAttachmentUrls } from '../cardAttachLinks'
+import { attachmentImage, withAttachmentUrls } from '../cardAttachLinks'
 import { DataTable, type DataColumn } from './DataTable'
 import { DialogList } from './Overlays'
 import { openLaneStart } from './LaneStartDialog'
@@ -1723,6 +1723,7 @@ export function TaskDialog() {
   const attach = useAttachDrafts((text) => action.setError(text))
   const lookup = attachmentLookup(files.list, attach.drafts)
   const onAttachmentLink = (href: string): boolean => openAttachmentLink(href, files.list)
+  const attachmentImages = attachmentImage(lookup)
   // Answers to its For you requests being written, by request (#1276 round 1): kept here, so closing asks first, as for a
   // comment; and whether one is being sent (the dialog doesn't close meanwhile).
   const [answerDrafts, setAnswerDrafts] = useState<Record<string, string>>({})
@@ -2194,7 +2195,7 @@ export function TaskDialog() {
         </div>
         {preview ? (
           <div className="task-description" onDoubleClick={() => !ro && setPreview(false)}>
-            {description.trim() ? <Markdown source={withAttachmentUrls(description, lookup)} cards={MARKDOWN_CARDS} onLink={onAttachmentLink} /> : <span className="faint">{tr(msg({ id: 'board.dialog.noDescription', defaultMessage: 'No description. Double-click to write one.', description: "The card dialog's description preview when there is none." }))}</span>}
+            {description.trim() ? <Markdown source={withAttachmentUrls(description, lookup)} cards={MARKDOWN_CARDS} onLink={onAttachmentLink} images={attachmentImages} /> : <span className="faint">{tr(msg({ id: 'board.dialog.noDescription', defaultMessage: 'No description. Double-click to write one.', description: "The card dialog's description preview when there is none." }))}</span>}
           </div>
         ) : (
           <textarea className="input task-description-input" placeholder={tr(msg({ id: 'board.dialog.descriptionPlaceholder', defaultMessage: "What to do, and how to tell it's done (Markdown). Whoever starts the card reads only this.", description: "Placeholder of the card dialog's description box." }))} value={description} readOnly={ro} title={readOnly ?? undefined} onChange={(e) => setDescription(e.target.value)} {...(ro ? {} : attach.boxProps('description', description, setDescription))} />
@@ -2211,7 +2212,7 @@ export function TaskDialog() {
                 <div className="task-comment-by">
                   <strong>{byText(c.by)}</strong> <span className="faint">{timeAgo(c.at)}</span>
                 </div>
-                <Markdown source={withAttachmentUrls(storedLine(c.text, c.hiveText), lookup)} cards={MARKDOWN_CARDS} onLink={onAttachmentLink} />
+                <Markdown source={withAttachmentUrls(storedLine(c.text, c.hiveText), lookup)} cards={MARKDOWN_CARDS} onLink={onAttachmentLink} images={attachmentImages} />
               </div>
             ))}
             {!card.archived && (

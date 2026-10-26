@@ -10,6 +10,11 @@ export type AttachmentLookup = (id: string) => { name: string; kind: AttachmentK
 
 /** A file link's anchor (the dialog's onLink opens it). */
 export const ATTACHMENT_ANCHOR = '#card-attachment-'
+/** An image's source until it is shown (attachmentImage gives its URL). */
+export const ATTACHMENT_IMAGE = 'card-attachment/'
+
+/** An attachment image's URL for Markdown's `images`, from its placeholder source; null for any other image. */
+export const attachmentImage = (lookup: AttachmentLookup) => (src: string): string | null => (src.startsWith(ATTACHMENT_IMAGE) ? (lookup(src.slice(ATTACHMENT_IMAGE.length))?.url ?? null) : null)
 
 const REMOVED = msg({ id: 'board.attach.removed', defaultMessage: '{name} (removed)', description: "In a card's description or comment (HI-1700): a link to an attachment that was removed from the card since; {name} is the file's name as the text gave it." })
 
@@ -22,7 +27,9 @@ export function withAttachmentUrls(text: string, lookup: AttachmentLookup): stri
   return text.replace(LINK, (_all, _bang: string, label: string, id: string) => {
     const a = lookup(id)
     if (!a) return `<span class="attachment-gone">${escapeHtml(tr(REMOVED, { name: label.replace(/\\(.)/g, '$1') }))}</span>` // i18n-ignore: markup around a message
-    if (a.kind === 'image' && a.url) return `![${label}](${a.url})`
+    // A relative source (the sanitiser keeps it), given its URL once shown (Markdown's `images`): hive-img: and blob:
+    // aren't sources the sanitiser lets through.
+    if (a.kind === 'image' && a.url) return `![${label}](${ATTACHMENT_IMAGE}${id})`
     return `[${label}](${ATTACHMENT_ANCHOR}${id})`
   })
 }
