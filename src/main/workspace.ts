@@ -355,15 +355,15 @@ export class WorkspaceService {
     })
     // Every window's recent list: this one first, and open here (#144).
     emit({ type: 'recent-changed' })
-    done('its .hive folder and settings')
+    done('its .hive folder and settings') // i18n-ignore: a part of a log line's timing
     for (const p of await this.listProjectPaths()) await this.ensureProject(p).catch((e) => log.warn(`ensureProject ${userText(p)}`, e))
-    done('its projects')
+    done('its projects') // i18n-ignore: a part of a log line's timing
     // Every project has its id (#508) before the board, lanes and watches are read by it.
     await this.projectIds().catch((e) => log.warn('reading the project ids', e))
-    done('their ids')
+    done('their ids') // i18n-ignore: a part of a log line's timing
     // Before any session starts with them: MCP settings from before #1093 move to its model.
     await this.migrateMcpModel().catch((e) => log.warn('moving the MCP settings to the workspace and project switches', e))
-    done('MCP settings')
+    done('MCP settings') // i18n-ignore: a part of a log line's timing
     try {
       await this.ensureProject(this.assistantHome)
       // The Assistant's conversations and backups are this machine's: kept out of git if the workspace is a repository.
@@ -372,9 +372,9 @@ export class WorkspaceService {
     } catch (e) {
       log.warn('setting up the Assistant', e)
     }
-    done('the Assistant')
+    done('the Assistant') // i18n-ignore: a part of a log line's timing
     await inWorkspace(this, async () => WorkspaceService.onOpened?.(fresh)).catch((e) => log.warn('opening the workspace', e))
-    done('its skills and modes, and what opening starts')
+    done('its skills and modes, and what opening starts') // i18n-ignore: a part of a log line's timing
     for (const l of WorkspaceService.openedListeners) {
       try {
         l(this)
@@ -383,7 +383,7 @@ export class WorkspaceService {
       }
     }
     this.startWatching()
-    done('its watchers')
+    done('its watchers') // i18n-ignore: a part of a log line's timing
     log.info(`Opened workspace ${userText(abs)} in ${Math.round(performance.now() - started)} ms: ${parts.join(', ')}`)
     const read = performance.now()
     const info = await this.refresh()
@@ -1210,9 +1210,9 @@ export class WorkspaceService {
     // A folder found since the workspace opened is made a project as opening makes one (#1423): its platform recorded
     // with its project.json, so it counts as made by 1.0 (it asks "How do you work?"), not as one from before.
     if (!this.isAssistantHome(projectPath) && !existsSync(join(projectPath, HIVE_DIR, 'project.json'))) await this.ensureProject(projectPath).catch((e) => log.warn(`ensureProject ${userText(projectPath)}`, e))
-    const cfg = await took('its settings', this.projectConfig(projectPath))
+    const cfg = await took('its settings', this.projectConfig(projectPath)) // i18n-ignore: a part of a log line's timing
     this.registerRoots(projectPath, cfg, gen, ticket)
-    const { live, restartNeeded, agents, folders } = await took("its agents' sessions and folders", WorkspaceService.liveProvider(projectPath, cfg, scope))
+    const { live, restartNeeded, agents, folders } = await took("its agents' sessions and folders", WorkspaceService.liveProvider(projectPath, cfg, scope)) // i18n-ignore: a part of a log line's timing
     // Its slots and homes are roots from this read on (#1442), fenced as its worktrees are (registerRoots' ticket).
     if (!this.isAssistantHome(projectPath)) this.registerRoots(projectPath, cfg, gen, ticket, (folders ?? []).map((f) => f.path))
     const info: ProjectInfo = {
@@ -1220,16 +1220,16 @@ export class WorkspaceService {
       path: projectPath,
       active: active.has(basename(projectPath)),
       isGitRepo: existsSync(join(projectPath, '.git')),
-      branch: await took('its branch', this.branch(projectPath)),
+      branch: await took('its branch', this.branch(projectPath)), // i18n-ignore: a part of a log line's timing
       config: cfg,
       live,
       restartNeeded,
       agents,
       ...(folders?.length ? { folders } : {}),
-      unmanagedMcp: await took('its MCP servers', this.unmanagedMcp(projectPath)),
-      removedData: await took('removed data', removedData(projectPath)),
+      unmanagedMcp: await took('its MCP servers', this.unmanagedMcp(projectPath)), // i18n-ignore: a part of a log line's timing
+      removedData: await took('removed data', removedData(projectPath)), // i18n-ignore: a part of a log line's timing
       // Ensured at each refresh, so a repository made later (git init) gets it too (#345).
-      ...(this.isAssistantHome(projectPath) ? {} : { hiveVcs: await took('.hive in git', hiveVcs(projectPath).catch(() => undefined)), platform: projectPlatform(projectPath, cfg.platform, cfg.platformFound) })
+      ...(this.isAssistantHome(projectPath) ? {} : { hiveVcs: await took('.hive in git', hiveVcs(projectPath).catch(() => undefined)), platform: projectPlatform(projectPath, cfg.platform, cfg.platformFound) }) // i18n-ignore: a part of a log line's timing
     }
     const ms = performance.now() - started
     if (ms > SLOW_PROJECT_READ_MS) log.info(`reading ${userText(basename(projectPath))} for the window took ${Math.round(ms)} ms: ${parts.map(([w, t]) => `${w} ${Math.round(t)} ms`).join(', ')}`)
