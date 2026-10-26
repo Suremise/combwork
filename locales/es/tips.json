@@ -413,6 +413,8 @@
   "tips.unmerged.title": "Mira lo que un agente con worktree tiene por fusionar",
   "tips.unusedWorktrees.text": "¿Quitaste un agente pero conservaste su worktree? Control de versiones → Cambios se abre con los worktrees que no usa ningún agente, diciendo quién hizo cada uno: abre uno para ver su trabajo y fusionarlo, o quita los fusionados con sus ramas.",
   "tips.unusedWorktrees.title": "Ordena los worktrees conservados",
+  "tips.updateFromTarget.text": "Control de versiones → Ramas y remotos: una rama por detrás del destino tiene Actualizar. Fusiona el destino o haz rebase sobre él, donde está la rama; un conflicto se deshace al momento, nombrando sus archivos.",
+  "tips.updateFromTarget.title": "Poner una rama al día con su destino",
   "tips.versionControlSwitch.text": "Haz clic en Ninguno o Git arriba en la pestaña Control de versiones de un proyecto para cambiarlo desde la próxima tarjeta; las ya en marcha siguen con las reglas anteriores. Cada uno guarda sus opciones del flujo de trabajo y, si la carpeta cambia (git init), Hive ofrece cambiar ahí.",
   "tips.versionControlSwitch.title": "Cambia entre Ninguno y Git",
   "tips.versionControlTab.text": "La pestaña Control de versiones de un proyecto dice qué encontró Hive en su carpeta y empieza por Flujo de trabajo: quién revisa, qué comprobaciones pasan antes y quién fusiona. Su encabezado indica el ajuste predefinido, y un clic en él abre las opciones.",

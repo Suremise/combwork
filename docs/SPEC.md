@@ -3047,6 +3047,33 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
 - **Branches & remotes** reads `slots:list`: a slot's row names its lease (card or lane, its agent; carried for whom; not
   lent), a branch checked out in a slot shows the slot's name, and a folder's agent is its slot lease's, else the agent
   whose session runs there (#1424's worktree badge becomes the slot's).
+- **Update from <target>** (HI-1180, rc.4; the design checked by HR4, the conflict rule from Darren's OK via the
+  Assistant): a local branch that lacks some of the target's commits (`git:info` counts both ways, `rev-list
+  --left-right --count`, as `toTarget` and `fromTarget`; for a branch merged into the target, what it lacks on a
+  count of its own) shows how many it lacks and an **Update** action when it has commits of its own, or none but is in
+  use (a card's line, a slot's or a worktree's: HR4's round 1). A merged branch nothing uses is Clean Up's, not offered.
+  `git:updatePlan` says what it would do: the counts; where it runs (the project folder, the slot or worktree it is
+  checked out in, or a temporary detached worktree in the project's worktrees folder, `update-<id>`, when it is checked
+  out nowhere); the card whose line it is; the agents working there; for a Passed card whether its pass carries over
+  (the project's `sameness`); and why it can't run now. It can't run while an agent there is in a turn, the folder has
+  uncommitted changes to tracked files, git is mid-operation there, or the card is in the merge queue (which brings it
+  up to date itself, G8). The dialog (`GitForm`) offers **Merge <target> in** (the default: `merge --no-ff`, "Merge
+  <target> into <branch>", with `Hive-Card: <key>` for a card's line) or **Rebase onto <target>** (`--no-update-refs
+  --no-autostash`, `rebase.updateRefs=false`; it says the commits are rewritten, and that a pushed copy then differs);
+  for a branch with no commits of its own, only **Fast-forward to <target>** (`merge --ff-only`, whichever main is
+  given). Git is given the target branch's commit, `refs/heads/<target>` read under the locks, never its name (a tag
+  of that name would win), and the branch is checked to contain it afterwards.
+  `git:updateBranch` runs it as switch and pull do: one action at a time, the branch's merge slot held as the user's, the
+  repository locked, the folder fenced (#646), the plan checked again under them. It commits as the repository's own
+  identity, hooks and signing. A conflict, or any failure, is aborted at once (`merge --abort` / `rebase --abort`) and
+  then checked: no operation left, HEAD where it was, no tracked change. Only then does the error say the branch is as
+  it was (naming the conflicting files, or git's words). An abort that fails (HR4's round 1: a hook that left
+  `index.lock`) is said as it is: the folder named, still mid-merge or mid-rebase or left changed, with how to finish it
+  there; never "as it was". In a temporary worktree the branch is moved only from the commit it was updated from
+  (`update-ref <ref> <new> <old>`); the worktree is removed after, except when its abort failed (kept as git left it,
+  the branch not moved, the error naming its path to look at and remove in Unused worktrees), and one that can't be
+  removed is said (the reply's second line, or after the error). A card's pass then follows §16.4.4's reconcile (carried over or stale). A user
+  action only: no Agent API route or hive tool.
 - **Branches by state, and Clean Up Merged Branches** (#1642; Darren's decision: the list stays a list, its rows as they
   were). `git:info` measures each branch against the project's target (its options' `target`, else the default branch;
   none counted when that branch doesn't exist): merged into it (`for-each-ref --merged`), else how many commits it has
@@ -4655,7 +4682,7 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 | `mergeWorktree` returns the merge commit, takes a target, no auto-commit; cross-process merge lock | P5 (in scope) |
 | Branches shown next to their cards and revisions | P6 (in scope). **Built [#1424]:** Branches & remotes shows, on each branch a card's current cycle works on (`WorkBadge.line`), that card (the one in flight, else the latest; how many earlier), its stage (its project's name, its category's colour), in Review the revision under review (`WorkBadge.underReview`, copyable) and, Done, merged with `Integrated`'s result; the cards of a reused branch by when each one's current cycle started (never by a later fact). Worktrees name their agent's card (Doing, else Review, else Passed) the same way, whatever they have checked out |
 | Push the target after Hive merges (an option) | **Built [#1179]:** G18 (§16.6.1, §16.9.1's push after the merge) |
-| Update a branch from its target (merge or rebase) as a user action in the Version Control tab | On Hold, git-support: #1180 |
+| Update a branch from its target (merge or rebase) as a user action in the Version Control tab | **Built [HI-1180]** (rc.4): Branches & remotes' Update from <target> (§8) |
 | Conflict help on a returned card (the conflicting files and hunks from the test merge) | On Hold, git-support: #1181 |
 | Submodules and Git LFS in slots and review copies | On Hold, git-support: #1182 |
 | Remote targets: fetch before testing, push after (Team with a shared remote) | On Hold, git-support: #1183 |

@@ -413,6 +413,8 @@
   "tips.unmerged.title": "Voir ce qu’un agent en worktree a à fusionner",
   "tips.unusedWorktrees.text": "Tu as retiré un agent mais gardé son worktree ? Gestion de versions → Modifications s’ouvre sur les worktrees qu’aucun agent n’utilise, en indiquant qui a créé chacun : ouvres-en un pour voir son travail et le fusionner, ou retire ceux qui sont fusionnés avec leurs branches.",
   "tips.unusedWorktrees.title": "Faire le tri dans les worktrees conservés",
+  "tips.updateFromTarget.text": "Gestion de versions → Branches et dépôts distants : une branche en retard sur la cible a Mettre à jour. Fusionne la cible ou rebase dessus, là où la branche est extraite ; un conflit est annulé aussitôt, en nommant ses fichiers.",
+  "tips.updateFromTarget.title": "Mettre une branche à jour avec sa cible",
   "tips.versionControlSwitch.text": "Clique sur Aucune ou Git en haut de l’onglet Gestion de versions pour changer dès la prochaine carte ; les cartes lancées gardent les anciennes règles. Chacune a ses options du flux de travail, et si le dossier change (git init), Hive y propose de changer.",
   "tips.versionControlSwitch.title": "Basculer entre Aucune et Git",
   "tips.versionControlTab.text": "L’onglet Gestion de versions d’un projet indique ce que Hive a trouvé dans son dossier et commence par Flux de travail : qui relit, quelles vérifications passent d’abord et qui fusionne. Son en-tête nomme le préréglage ; un clic dessus ouvre les options.",

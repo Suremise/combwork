@@ -70,7 +70,38 @@ export interface GitBranchRow {
   sha?: string
   /** Its commits not in the project's target (#1642): 0 merged into it, null not counted (no target, or too many to count). */
   toTarget?: number | null
+  /** The target's commits it hasn't (HI-1180: Update from <target> while it has its own work too); null not counted. */
+  fromTarget?: number | null
 }
+
+/**
+ * What Update from <target> would do to a branch (HI-1180), as its dialog says it: where it runs, whose card's line it is,
+ * who works there, whether a pass carries over, and why it can't run now.
+ */
+export interface BranchUpdatePlan {
+  branch: string
+  target: string
+  /** The target's commits the branch hasn't, and its own commits the target hasn't. */
+  behind: number
+  ahead: number
+  /** Where it runs: the folder the branch is checked out in; a temporary one Hive makes when it is checked out nowhere. */
+  where: 'project' | 'slot' | 'worktree' | 'temporary'
+  folder: string | null
+  slot: string | null
+  /** The card whose line it is, while that card isn't Done. */
+  card: { key: string; stage: string } | null
+  /** Agents working in that folder, none of them in a turn (one in a turn blocks it), each with its status. */
+  agents: { name: string; status: string | null }[]
+  /** A passed card's pass: kept when the update is the same change ("A pass survives a clean rebase"), else reviewed again. */
+  approval: 'carries' | 'reviewAgain' | null
+  /** It tracks a remote branch: a rebase rewrites commits pushed there. */
+  pushed: boolean
+  /** Why it can't run now, in the window's language; null when it can. */
+  blocked: string | null
+}
+
+/** How Update from <target> brings a branch up to date (HI-1180). */
+export type BranchUpdateHow = 'merge' | 'rebase'
 
 /** A remote branch as Branches & remotes groups it (#1642). */
 export interface GitRemoteBranchRow {
