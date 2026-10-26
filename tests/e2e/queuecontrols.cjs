@@ -171,11 +171,11 @@ const TARGET = 'integration'
     const resumedPush = await h.inv('queue:resume', fx.alpha, TARGET)
     check('…turned off and resumed: resumed, not paused', resumedPush?.resumed === true && resumedPush.view.paused === null, JSON.stringify(resumedPush))
     // The queue's run after the Resume drops the owed push (the option is off) and pauses for nothing.
-    const settled = await until(async () => {
+    const unpaused = await until(async () => {
       const v = await view()
       return idle(v) ? v : null
     }, HUNG_MS)
-    check('…and its run after it leaves the queue unpaused', !!settled && settled.paused === null, JSON.stringify(settled))
+    check('…and its run after it leaves the queue unpaused', !!unpaused && unpaused.paused === null, JSON.stringify(unpaused))
     headAtClose = q.head(fx)
   } catch (e) {
     check('no exception', false, e.stack)
