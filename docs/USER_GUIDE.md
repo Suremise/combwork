@@ -332,11 +332,15 @@ Hive only ever ends processes the agent's session started: never one you started
 
 ### The Activity tab <a id="the-activity-tab"></a>
 
-**Activity** (Alt+9) shows the project's work as a tree, from left to right: each card, the agents working on it, their sessions, each session's turns (a prompt and what followed) and the tool calls they made, with background subagents and the processes an agent's session runs. It covers what runs now and the last 24 hours; older sessions are in the **Sessions** tab. What runs now comes first and follows the agents live.
+**Activity** (Alt+9) shows the project's work as a tree, from left to right: each card, the agents working on it, their sessions, each session's turns (a prompt and what followed) and the tool calls they made, with background subagents and the processes an agent's session runs. It covers what runs now and the last 24 hours; older sessions are in the **Sessions** tab. It follows the agents live without jumping around: what's drawn keeps its place, new work is added at the end, finished work dims where it is, and what ended stays dimmed until you refresh.
+
+- **Pause**: the tree holds still while your pointer is over it, while you scroll it or while a node is selected, and goes live again a moment after. **Pause** in the toolbar holds it until you click **Live**. While it's held, a pill counts what's waiting (*12 updates · Refresh*): click it to see them all at once.
+- **Time range**: **Live** (only what runs now), **15 min**, **1 h**, **6 h** or **24 h**.
+- **Filters**: **Agents ▾** and **Cards ▾** (tick several, or **All**), and **Hide finished** to see only running work. The tab remembers your range and filters for each project.
 
 - Open a node with its arrow. A finished session's turns are read when you open it.
 - Click a node to see its details: its status, its input exactly (a prompt, a tool call's input, a command line, with secrets hidden as in Hive's log) and what it did last.
-- **Activity** in an agent's **⋯** menu shows only that agent's work; **Activity** in a card shows only that card's. Click the chip above the tree to see everything again.
+- **Activity** in an agent's **⋯** menu shows only that agent's work; **Activity** in a card shows only that card's. Choose **All** in **Agents ▾** or **Cards ▾** to see everything again.
 - A process an agent's session started has **End Process…** in its details. It ends only that process, after you confirm, and only while it is still the one listed. The agent's own CLI isn't ended here: use **Stop**.
 
 ### Reading past sessions <a id="reading-past-sessions"></a>
