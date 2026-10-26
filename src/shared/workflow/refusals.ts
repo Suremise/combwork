@@ -308,10 +308,19 @@ export interface RefusalFormat {
 
 const IN_ENGLISH: RefusalFormat = { one: (m, values) => englishText(values ? { m, values } : m), list: (items) => items.join(', '), names: false }
 
+/**
+ * Values a rule's text takes that refusals recorded earlier don't have (their facts keep the values of their time), and
+ * what each was then: `submit.checksPassed`'s last run's reason (#1654), none before.
+ */
+const VALUES_BEFORE: Partial<Record<RuleId, Record<string, string>>> = {
+  'submit.checksPassed': { why: 'none', files: 'none', copy: 'no' } // i18n-ignore: select keys, never shown
+}
+
 /** The three sentences of a refusal, formatted by `f`: `change` null when the rule has none. */
 export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalFormat): { message: string; next: string; change: string | null } {
   const t = REFUSALS[rule]
-  const vals: Record<string, string | number> = {}
+  // A refusal recorded before its rule's text took a value has none of it: the value its text had before (#1654).
+  const vals: Record<string, string | number> = { ...VALUES_BEFORE[rule] }
   for (const [k, v] of Object.entries(values)) vals[k] = typeof v === 'object' ? (workflowLine(v, f.one) ?? '') : v
   // A stage by its name (stages.ts), as the board shows it, to agents too (#1604: "Active", never the id "active"): the
   // project's own, else its message; an id this Hive doesn't know as it is.
