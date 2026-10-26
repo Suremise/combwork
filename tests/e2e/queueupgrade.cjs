@@ -138,6 +138,21 @@ const log = () => {
     check("…saved as the project's options, the question cleared", wfNow?.options?.style === 'squash' && wfNow.options.commitMessage === 'branch' && wfNow.mergeAsk === undefined, JSON.stringify(wfNow))
     const request = (await asked())?.data?.request
     check('…and the question answered as the user', (await h.facts(one.n)).some((f) => f.kind === 'Approval' && f.data?.request === request && f.actor === 'user'), JSON.stringify(await h.kinds(one.n)))
+    // The other way to answer (decision 3, HR5's round 1): a save in Version Control → Workflow. Back to a merge commit,
+    // the project marked again as the upgrade leaves it; the next card waits, and Squash with the branch's own saved there
+    // lands it as one squashed commit (its ruleset had a merge commit when it was approved).
+    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
+    const remarked = projectJson()
+    remarked.workflow.mergeAsk = true
+    fs.writeFileSync(path.join(fx.alpha, '.hive', 'project.json'), JSON.stringify(remarked, null, 2))
+    const three = await q.approve(fx, h, reviewer, 'Chosen in Workflow', { 'three.txt': 'three\n' })
+    check('marked again: a card is approved', Object.values(three.steps).every((s) => s.status === 200), JSON.stringify(three.steps))
+    const askedOf = async (n) => (await h.facts(n)).find((f) => f.kind === 'ApprovalRequested' && f.data?.gate === 'mergeChoice')
+    check('…the queue asks again', !!(await until(async () => !!(await askedOf(three.n)), HUNG_MS)), JSON.stringify(await h.kinds(three.n)))
+    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { style: 'squash', commitMessage: 'branch' }) })
+    check('answered by the save: Done', !!(await until(async () => (await h.card(three.n))?.column === 'done', HUNG_MS)), JSON.stringify(await h.kinds(three.n)))
+    const closed = (await askedOf(three.n))?.data?.request
+    check("…one squashed commit with the branch's own message, the mark cleared and the question closed", parents() === 1 && msgOf() === 'Chosen in Workflow' && projectJson().workflow?.mergeAsk === undefined && (await h.facts(three.n)).some((f) => f.kind === 'RequestClosed' && f.data?.request === closed), `${parents()} parent(s) / ${msgOf()} / ${JSON.stringify(await h.kinds(three.n))}`)
     // Hive's message again (the other option), still squashing: the next card lands as "KEY: title" with its trailers.
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { style: 'squash', commitMessage: 'hive' }) })
     const two = await q.approve(fx, h, reviewer, 'With the key', { 'two.txt': 'two\n' })

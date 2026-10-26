@@ -4477,10 +4477,14 @@ when a role or name says *review*.
   has Hive merge it, a preset or a save later) pauses the queue (`mergeChoice`) with a Decide on the card in For you:
   "How should Hive merge <project>'s cards into <target>?", with G6 (Merge commit, as until now; Squash; Rebase and
   fast-forward) and G19 (Hive's, as until now; the branch's own; not shown with Rebase) and **Save and Carry On
-  Merging** (`workflow:chooseMerge`): both saved as the project's own options (checked and saved as the Workflow
-  section saves them, and applied to its cards in flight, the waiting one included), the mark cleared, the request
-  answered, and the queue goes on. A save in Version Control → Workflow that changes G6 or G19 clears the mark too: the
-  queue then lifts its pause and closes the question. Answered in words with the mark still set, the queue asks again.
+  Merging** (`workflow:chooseMerge`, answers taking turns). Checked first, changing nothing when refused: the card the
+  project's, the request open, of the gate, bound to the card's open queue entry (a stale dialog's answer is refused as
+  `tasks:answer` refuses one). Then both are saved as the project's own options over the options read for it (a change
+  made meanwhile refuses it, never written over), checked as the Workflow section's save is, the mark cleared in the
+  same write, applied to its cards in flight (the waiting one's ruleset has the style it was approved under); then the
+  request is answered as the user, and the queue goes on. A save in Version Control → Workflow that changes G6 or G19
+  as they resolve clears the mark too, and carries them to the card waiting with the question: the queue then lifts its
+  pause, closes the question and merges it as chosen. Answered in words with the mark still set, the queue asks again.
   A project marked with no card in the queue is never interrupted. Projects upgraded before HI-1697 have no mark.
 
 **Agents' old moves, for one transition** [HB3's finding 7]: from P4 until P8 rewrites the skills, an agent's

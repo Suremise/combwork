@@ -446,7 +446,8 @@ describe("the upgrade's merge question (HI-1697)", () => {
     expect(await asks(w, repo)).toBeUndefined()
   })
 
-  it("the answer saves the project's merge style and commit message, applies them to its cards in flight and answers the request", async () => {
+  /** A marked Pair project with a started card, queued (an open entry) and asked the question, as the queue asks it. */
+  async function asked() {
     const { platform: _p, ...pair } = preset('git', 'pair')
     const { w, repo } = await workspace({ project: pair, preset: 'pair' })
     await marked(w, repo)
@@ -454,17 +455,74 @@ describe("the upgrade's merge question (HI-1697)", () => {
     const wf = (await workflowFor(w, repo))!
     expect(await store.boardWrite(w, async () => wf.start(`#${card.number}`, agentActor('b1')))).toMatchObject({ ok: true })
     const rec = wf.store.card(card.number)
-    const request = await store.boardWrite(w, async () => wf.write(rec, wf.rulesetOf(rec), 'hive', (x) => wf.askUser(x, 'decide', MERGE_CHOICE_GATE, 'How should Hive merge?', { unbound: true })))
-    await form.chooseMerge(w, repo, { card: card.number, request, style: 'squash', commitMessage: 'branch' })
+    const ask = (gate: string, entry?: string): Promise<string> =>
+      store.boardWrite(w, async () =>
+        wf.write(rec, wf.rulesetOf(rec), 'hive', (x) => {
+          if (entry && !x.state().entries.some((e) => e.id === entry)) x.fact('IntegrationRequested', { entry, revision: git(repo, 'rev-parse', 'HEAD'), key: null, target: 'main', style: 'merge' })
+          return wf.askUser(x, 'decide', gate, 'How should Hive merge?', { unbound: true, ...(entry ? { entry } : {}) })
+        })
+      )
+    const choose = (request: string, style: string, commitMessage: string, n = card.number) => inWorkspace(w, () => form.chooseMerge(w, repo, { card: n, request, style, commitMessage }))
+    const state = async () => {
+      const wf2 = (await workflowFor(w, repo))!
+      return wf2.state(wf2.store.card(card.number))
+    }
+    const options = async () => (await w.projectConfig(repo)).workflow?.options
+    return { w, repo, card, ask, choose, state, options, wf }
+  }
+
+  it("the answer saves the project's merge style and commit message, applies them to its cards in flight and answers the request", async () => {
+    const { w, repo, card, ask, choose, state, options, wf } = await asked()
+    const request = await ask(MERGE_CHOICE_GATE, 'e1')
+    await choose(request, 'squash', 'branch')
     expect((await w.projectConfig(repo)).workflow).toMatchObject({ preset: 'pair', options: { style: 'squash', commitMessage: 'branch' } })
     expect(await asks(w, repo)).toBeUndefined()
-    const wf2 = (await workflowFor(w, repo))!
-    const s = wf2.state(wf2.store.card(card.number))
+    const s = await state()
     expect(s.requests).toEqual([])
-    expect(s.approvals).toEqual([expect.objectContaining({ request, answer: 'answered', note: "squash, the branch's own message" })])
+    expect(s.approvals).toEqual([expect.objectContaining({ request, answer: 'answered', note: "Merge style: squash; commit message: the branch's own." })])
     // The card waiting works under them from now (its ruleset has the merge style it was approved under).
-    expect(wf2.rulesetOf(wf2.store.card(card.number)).options.style).toBe('squash')
-    await expect(form.chooseMerge(w, repo, { card: card.number, request, style: 'sideways', commitMessage: 'branch' })).rejects.toThrow(/card, request, style, commitMessage/)
+    expect(wf.rulesetOf(wf.store.card(card.number)).options.style).toBe('squash')
+    expect(await options()).toMatchObject({ style: 'squash' })
+    // Answered: the same request again (a stale dialog) is refused, and changes nothing.
+    await expect(choose(request, 'rebase', 'hive')).rejects.toThrow()
+    expect(await options()).toMatchObject({ style: 'squash', commitMessage: 'branch' })
+    await expect(choose(request, 'sideways', 'branch')).rejects.toThrow(/card, request, style, commitMessage/)
+  })
+
+  it('refuses an answer that is not to an open question of this card, its queue entry open, before changing anything', async () => {
+    const { w, repo, card, ask, choose, options } = await asked()
+    const before = await options()
+    // An unknown card, an unknown request, another gate's request, and the question with no open queue entry.
+    const other = await ask('lineUpdate')
+    const unbound = await ask(MERGE_CHOICE_GATE)
+    await expect(choose('no-such-request', 'squash', 'branch', 999999)).rejects.toThrow()
+    await expect(choose('no-such-request', 'squash', 'branch')).rejects.toThrow()
+    await expect(choose(other, 'squash', 'branch')).rejects.toThrow()
+    await expect(choose(unbound, 'squash', 'branch')).rejects.toThrow()
+    expect(await options()).toEqual(before)
+    expect(await asks(w, repo)).toBe(true)
+    expect(card.number).toBeGreaterThan(0)
+  })
+
+  it('two answers at once (two windows): one is recorded and saved, the other refused, never written over it', async () => {
+    const { w, repo, ask, choose, state, options } = await asked()
+    const request = await ask(MERGE_CHOICE_GATE, 'e1')
+    const [a, b] = await Promise.allSettled([choose(request, 'squash', 'branch'), choose(request, 'rebase', 'hive')])
+    const won = a.status === 'fulfilled' ? { style: 'squash', commitMessage: 'branch' } : { style: 'rebase', commitMessage: 'hive' }
+    expect([a.status, b.status].sort()).toEqual(['fulfilled', 'rejected'])
+    expect(await options()).toMatchObject(won)
+    expect((await state()).approvals).toHaveLength(1)
+    expect(await asks(w, repo)).toBeUndefined()
+  })
+
+  it('a Workflow save that answers it carries the choice to the card waiting in the queue', async () => {
+    const { w, repo, card, ask, wf } = await asked()
+    await ask(MERGE_CHOICE_GATE, 'e1')
+    const { platform: _p, ...pair } = preset('git', 'pair')
+    // No card ticked to apply to: the waiting one gets the new options anyway.
+    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, style: 'squash', commitMessage: 'branch' } })
+    expect(await asks(w, repo)).toBeUndefined()
+    expect(wf.rulesetOf(wf.store.card(card.number)).options.style).toBe('squash')
   })
 })
 

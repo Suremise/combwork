@@ -10,6 +10,8 @@ import { readFile } from 'original-fs/promises'
 import { join } from 'path'
 import { ADOPTION_UPTO, boardState, boardValue, boardWrite, cardKeys, setBoardValue } from '../boardStore'
 import { cardLabel } from '../../shared/projectKeys'
+import { MERGE_CHOICE_GATE, openEntry } from '../../shared/workflow/facts'
+import { refusal } from '../../shared/workflow/refusals'
 import { config } from '../config'
 import { HiveError, hiveError } from '../hiveError'
 import { projectPlatform } from '../platform/registry'
@@ -263,7 +265,8 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
     const workflow = setPresetAsked(writeWorkflow(cfg.workflow, { platform: project.platform, preset: change.preset, options }), project.platform, 'chosen')
     // HI-1697: a change to the merge style or the commit message chooses them: the upgrade's question is answered.
     // As they resolve (an option left out inherits), before and after.
-    if (workflow.mergeAsk) {
+    if (workflow.mergeAsk && o.answering) chosen = true
+    else if (workflow.mergeAsk) {
       const was = resolvedOf(ws, project.path, project.platform, cfg).options
       const saved = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow }).options
       chosen = was.style !== saved.style || was.commitMessage !== saved.commitMessage
@@ -274,7 +277,9 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
   workflowChanged(ws, project.path)
   // Names alone change no card's rules (#1417): nothing to apply to cards in flight, nor any queue to read again.
   if (namesOnly(changed)) return workflowForm(ws, project.path)
-  const applyTo = [...new Set(o.applyTo ?? [])]
+  // A save that answers the upgrade's question (HI-1697) carries its choice to the card waiting in the queue too, whose
+  // ruleset still has the merge style it was approved under.
+  const applyTo = [...new Set([...(o.applyTo ?? []), ...(chosen ? await askedCards(ws, project.path) : [])])]
   if (applyTo.length && changed.length) await applyToInFlight(ws, project, applyTo, changed)
   // Whether Hive merges, and into what, may have changed: the windows read the project's queues again (#1356: which
   // show follows the options too), whoever changed them (the window, the Assistant).
@@ -293,26 +298,52 @@ const withoutMergeAsk = (w: ProjectWorkflow): ProjectWorkflow => {
 }
 
 /**
- * The user's answer to the merge queue's question before an upgraded project's first merge (HI-1697, For you): the
- * merge style and commit message saved as the project's own options (checked and saved as the Workflow section saves
- * them), the question cleared, and the request answered, which wakes the queue.
+ * The user's answer to the merge queue's question before an upgraded project's first merge (HI-1697, For you). Checked
+ * first, before anything changes: the card this project's, the request open, the queue's question and bound to the
+ * card's open entry (a stale dialog's answer is refused, as `tasks:answer` refuses one). Then the merge style and commit
+ * message saved as the project's own options, over the options read here (`base`: a change made meanwhile, from another
+ * window or the Assistant, refuses it, never written over), the mark cleared in the same write, and applied to the
+ * project's cards in flight (the waiting one's ruleset has the style it was approved under). Then the request answered
+ * as the user (its refusal propagated), which wakes the queue. Answers take turns (`chooseTurn`): a second answer to the
+ * same question, from another window, is checked once the first is recorded, and refused.
  */
-export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw: unknown): Promise<void> {
+export function chooseMerge(ws: WorkspaceService, projectPath: string, raw: unknown): Promise<void> {
+  const run = chooseTurn.then(() => choose(ws, projectPath, raw))
+  chooseTurn = run.catch(() => undefined)
+  return run
+}
+
+let chooseTurn: Promise<unknown> = Promise.resolve()
+
+async function choose(ws: WorkspaceService, projectPath: string, raw: unknown): Promise<void> {
   const project = projectOf(ws, projectPath)
   const a = raw as { card?: unknown; request?: unknown; style?: unknown; commitMessage?: unknown } | null
   if (!a || !Number.isInteger(a.card) || typeof a.request !== 'string' || !takesOption('style', a.style) || !takesOption('commitMessage', a.commitMessage)) throw new HiveError({ lines: ['A merge choice is { card, request, style, commitMessage }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  const n = a.card as number
+  const request = a.request
   const style = a.style as WorkflowOptions['style']
   const message = a.commitMessage as CommitMessage
-  const cfg = await ws.projectConfig(project.path)
-  // The answer is how Hive merges the project's cards: those in flight work under it from now (the card waiting in the
-  // queue too, whose ruleset has the merge style it was approved under), as the Workflow section's "apply" does.
-  const inFlight = (await cardsInFlight(ws, project)).map((c) => c.number)
-  await setWorkflowOptions(ws, project.path, { preset: cfg.workflow?.platform === project.platform ? cfg.workflow.preset : null, options: { ...ownOf(cfg, project.platform), style, commitMessage: message } }, { applyTo: inFlight, answering: true })
-  await ws.mutateProjectConfig(project.path, (c) => (c.workflow?.mergeAsk ? { workflow: withoutMergeAsk(c.workflow) } : {}))
-  log.info(`${userText(project.name)}'s merge style and commit message chosen: ${style}, ${message}`)
+  const { answerTask, WorkflowRefusedError } = await import('../tasks')
   const wf = await workflowFor(ws, project.path)
-  // i18n-ignore: the answer's words, for agents (English)
-  if (wf) await wf.answer(a.card, a.request, 'answered', { note: `${style === 'merge' ? 'merge commit' : style === 'squash' ? 'squash' : 'rebase and fast-forward'}, ${message === 'branch' ? "the branch's own message" : "Hive's message"}` })
+  const rec = wf?.store.cards().find((c) => c.id === n)
+  const s = wf && rec ? wf.state(rec) : null
+  const req = s?.requests.find((r) => r.request === request)
+  const entry = s ? openEntry(s) : undefined
+  if (!s || !req || req.gate !== MERGE_CHOICE_GATE || !entry || req.entry !== entry.id) throw new WorkflowRefusedError(refusal('move.notFromHere', { card: rec ? cardLabel({ number: n, key: rec.key }) : `#${n}`, stage: s?.stage ?? 'todo', move: 'answer', moves: '' }))
+  const cfg = await ws.projectConfig(project.path)
+  const own = ownOf(cfg, project.platform)
+  const preset = cfg.workflow?.platform === project.platform ? cfg.workflow.preset : null
+  const inFlight = (await cardsInFlight(ws, project)).map((c) => c.number)
+  await setWorkflowOptions(ws, project.path, { preset, options: { ...own, style, commitMessage: message }, base: { preset, options: own } }, { applyTo: inFlight, answering: true })
+  log.info(`${userText(project.name)}'s merge style and commit message chosen: ${style}, ${message}`)
+  // i18n-ignore: the answer's words, kept on the card as the user's comment and read by agents (English)
+  await answerTask(n, request, { outcome: 'answered', reply: `Merge style: ${style === 'merge' ? 'merge commit' : style === 'squash' ? 'squash' : 'rebase and fast-forward'}; commit message: ${message === 'branch' ? "the branch's own" : "Hive's"}.` })
+}
+
+/** The project's cards whose merge waits for the upgrade's question (HI-1697): a request of its gate open. */
+async function askedCards(ws: WorkspaceService, projectPath: string): Promise<number[]> {
+  const wf = await workflowFor(ws, projectPath)
+  return wf ? wf.store.cards().filter((c) => wf.state(c).requests.some((r) => r.gate === MERGE_CHOICE_GATE)).map((c) => c.id) : []
 }
 
 /** The user applies the options now in force to cards in flight: an Override on each that is still in flight. */
