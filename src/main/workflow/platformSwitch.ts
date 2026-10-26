@@ -24,6 +24,7 @@ import { queueChanged } from './queueHost'
 import { workflowChanged } from './rulesets'
 import { workflowWrite } from './writes'
 import { withRepoLocks } from '../repoLock'
+import { cardRef } from '../../shared/projectKeys'
 
 const log = createLogger('workflow')
 
@@ -41,7 +42,7 @@ function platformArg(to: unknown): PlatformId {
 
 /** The running lanes and cards in flight a switch leaves on their rules, in a line for the Assistant (English), or null. */
 export function oldRulesLine(c: PlatformSwitchCheck): string | null {
-  const parts = [...c.lanes.map((l) => `lane ${l.name ? `"${l.name}" ` : ''}(${l.builder})`), ...c.inFlight.map((x) => `#${x.number} ${x.title}`)] // i18n-ignore: the Assistant's tools (English)
+  const parts = [...c.lanes.map((l) => `lane ${l.name ? `"${l.name}" ` : ''}(${l.builder})`), ...c.inFlight.map((x) => `${cardRef(x.number)} ${x.title}`)] // i18n-ignore: the Assistant's tools (English)
   return parts.length ? `These keep ${c.from}'s rules until they finish: ${parts.join('; ')}.` : null // i18n-ignore: the Assistant's tools (English)
 }
 

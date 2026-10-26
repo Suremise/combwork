@@ -301,7 +301,7 @@
   "main.unused.slot.dirty": "コミットされていないファイルが{files, plural, other {#件}}あります",
   "main.unused.slot.editedSkillCopy": "{copies, plural, other {スキルフォルダー{names}が、Hiveからのコピーのままではありません}}",
   "main.unused.slot.gitRefused": "gitが削除しませんでした（{detail}）",
-  "main.unused.slot.inFlight": "そこにあったカード#{card}はまだマージ中です",
+  "main.unused.slot.inFlight": "そこにあったカード{card}はまだマージ中です",
   "main.unused.slot.leased": "{agent}に貸し出されています",
   "main.unused.slot.process": "まだプロセスが使用しています",
   "main.unused.slot.session": "セッションが実行中です（{detail}）",

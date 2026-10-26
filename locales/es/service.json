@@ -124,7 +124,7 @@
   "service.hiveVcs.exitCode": "código de salida {code}",
   "service.hiveVcs.noRepo": "Este proyecto no está en ningún repositorio git.",
   "service.hiveVcs.rmFailed": "Falló git rm --cached: {why}",
-  "service.intent.noWorkflow": "#{n} no tiene flujo de trabajo: es una tarjeta del espacio de trabajo, o su proyecto aún no tiene elegido un control de versiones. Muévela en el tablero.",
+  "service.intent.noWorkflow": "{card} no tiene flujo de trabajo: es una tarjeta del espacio de trabajo, o su proyecto aún no tiene elegido un control de versiones. Muévela en el tablero.",
   "service.intent.queueNotAgents": "Solo tú o el Hive Assistant (dentro de Configuración → Asistente → Control) pueden quitar una tarjeta de la cola de fusión o reintentar su fusión.",
   "service.keys.closed": "El espacio de trabajo se cerró, o la ventana abrió otro, antes de cambiar la clave: no se cambió nada.",
   "service.keys.form": "Una clave del proyecto tiene de 2 a 4 letras, de la A a la Z.",

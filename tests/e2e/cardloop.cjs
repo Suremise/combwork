@@ -188,7 +188,7 @@ const check = (name, ok, extra = '') => {
   check("the reviewer was woken once per arrival: c1, c2, c2 again, each naming the builder's card", rw.length === 3 && rw[0].includes(`#${c1} (Builder's card) is in Review`) && rw[1].includes(`#${c2} (Builder's card) is in Review`) && rw[2].includes(`#${c2} (Builder's card) is in Review`), JSON.stringify(rw))
   // The builder's own cards: no owner, the reviewer and its verdict named (#143); Passed isn't called unmerged on its own card.
   check("the builder's wakes name the reviewer's verdict: passed, failed, passed", bw.length === 3 && bw[0].includes(`#${c1} is in Passed: Reviewer (alpha) passed it;`) && bw[1].includes(`#${c2} is in Review: Reviewer (alpha) failed it;`) && bw[2].includes(`#${c2} is in Passed: Reviewer (alpha) passed it;`), JSON.stringify(bw))
-  check('…naming the card by key, with the number the tools take (#1219)', wakes().some((w) => lib.KEYED.test(w.raw ?? '')), JSON.stringify(wakes().slice(-2).map((w) => w.raw)))
+  check('…naming the card by key alone (#1219, HI-1661)', wakes().some((w) => lib.KEYED.test(w.raw ?? '')), JSON.stringify(wakes().slice(-2).map((w) => w.raw)))
   // A pass is one call (verdict, move to Passed and comment): the wake names that comment, not the builder's before it (#138).
   const passed = 'latest comment by Reviewer (alpha): "Fake review: passed."'
   check("the builder's wakes on a pass name the reviewer's comment from the same call", bw.length === 3 && bw[0].includes(passed) && bw[2].includes(passed), JSON.stringify(bw))

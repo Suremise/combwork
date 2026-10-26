@@ -113,7 +113,7 @@ const check = (name, ok, extra = '') => {
     await inv('tasks:answer', n, item.request, { outcome: 'answered', choice: 'carryOn', rounds: 1 })
     check('answered: nothing waits for the user', (await inv('tasks:forYou')).count === 0)
     check('the lane runs again', !!(await lib.until(async () => (await lane())?.state === 'active', HUNG_MS)), JSON.stringify(await lane()))
-    const answerWake = (w) => w.startsWith(`[Hive] ${key} (#${n})`) && w.includes('carry on (1 more round)')
+    const answerWake = (w) => w.startsWith(`[Hive] ${key}`) && w.includes('carry on (1 more round)')
     check('the builder is woken with the answer', !!(await lib.until(async () => wakes('Builder').some(answerWake), HUNG_MS)), JSON.stringify(wakes('Builder')))
     const again = await inv('tasks:answer', n, item.request, { outcome: 'answered', choice: 'carryOn', rounds: 1 }).then(() => null, (e) => String(e.message ?? e))
     check('an answer to it again is refused', !!again, String(again))
@@ -124,7 +124,7 @@ const check = (name, ok, extra = '') => {
     check("the card's history says whom Hive told of the answer", !!(await lib.until(async () => (await card(n))?.history.some((h) => h.by === 'Hive' && h.what === toldLine), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
     await showBoard(page)
     await openByTitle(page, n)
-    const dialog = page.locator('.dialog', { hasText: `(#${n})` })
+    const dialog = lib.cardDialog(page, await lib.cardLabel(inv, n))
     await dialog.waitFor({ timeout: HUNG_MS })
     await dialog.locator('[data-section="history"]').click()
     const history = dialog.locator('.task-history')
@@ -151,7 +151,7 @@ const check = (name, ok, extra = '') => {
     const moved = await inv('tasks:move', q, 'doing', { agent: maker.id })
     check('the ui card starts in its builder’s worktree', !!moved.moved && (await card(q))?.column === 'doing', JSON.stringify(moved))
     const qKey = (await card(q)).key
-    const wakeAbout = (text) => wakes('Maker').some((w) => w.startsWith(`[Hive] ${qKey} (#${q})`) && w.includes(text))
+    const wakeAbout = (text) => wakes('Maker').some((w) => w.startsWith(`[Hive] ${qKey}`) && w.includes(text))
 
     // #922's case: its builder asks for a push OK.
     await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${q}`, kind: 'approve', text: 'OK to push the release tag?' })}`)
@@ -276,7 +276,7 @@ const check = (name, ok, extra = '') => {
     await speak(base)
     await lib.until(async () => (await rSection.innerText().catch(() => '')).includes('Approve'), HUNG_MS)
     await rSection.getByRole('button', { name: 'Approve' }).click()
-    const toldR = () => wakes('Maker').some((w) => w.startsWith(`[Hive] ${rKey} (#${r})`) && w.includes('merge it and report the merge'))
+    const toldR = () => wakes('Maker').some((w) => w.startsWith(`[Hive] ${rKey}`) && w.includes('merge it and report the merge'))
     check('the OK given: the builder is told to merge it', !!(await lib.until(async () => toldR() && (await rSection.count()) === 0, HUNG_MS)), JSON.stringify(wakes('Maker')))
     check('nothing waits for you now', (await inv('tasks:forYou')).count === 0 && (await badge.count()) === 0)
     await page.keyboard.press('Escape')
@@ -302,7 +302,7 @@ const check = (name, ok, extra = '') => {
     check('one click moves it to Done and answers the question', !!(await lib.until(async () => (await card(s))?.column === 'done' && (await inv('tasks:forYou')).count === 0, HUNG_MS)), JSON.stringify({ column: (await card(s))?.column }))
     const chose = (await inv('tasks:facts', s)).find((f) => f.kind === 'Approval')
     check('…recording the action and its reason', chose?.data.action === 'done' && chose?.data.note === 'already done by #1277', JSON.stringify(chose))
-    check('…and the builder hears what was chosen', !!(await lib.until(async () => wakes('Maker').some((w) => w.startsWith(`[Hive] ${sKey} (#${s})`) && w.includes('moved it to Done (already done by #1277)')), HUNG_MS)), JSON.stringify(wakes('Maker')))
+    check('…and the builder hears what was chosen', !!(await lib.until(async () => wakes('Maker').some((w) => w.startsWith(`[Hive] ${sKey}`) && w.includes('moved it to Done (already done by #1277)')), HUNG_MS)), JSON.stringify(wakes('Maker')))
     await page.keyboard.press('Escape')
 
     // #1637: an agent's question is Markdown (HB5's HI-1630 design question): rendered as card comments are, never the

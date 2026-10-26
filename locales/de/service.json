@@ -124,7 +124,7 @@
   "service.hiveVcs.exitCode": "Exitcode {code}",
   "service.hiveVcs.noRepo": "Kein Git-Repository enthält dieses Projekt.",
   "service.hiveVcs.rmFailed": "git rm --cached fehlgeschlagen: {why}",
-  "service.intent.noWorkflow": "#{n} hat keinen Workflow: Es ist eine Karte zum Arbeitsbereich, oder für ihr Projekt ist noch keine Versionsverwaltung gewählt. Verschiebe sie stattdessen auf dem Board.",
+  "service.intent.noWorkflow": "{card} hat keinen Workflow: Es ist eine Karte zum Arbeitsbereich, oder für ihr Projekt ist noch keine Versionsverwaltung gewählt. Verschiebe sie stattdessen auf dem Board.",
   "service.intent.queueNotAgents": "Nur du oder der Hive Assistant (im Rahmen von Einstellungen → Assistent → Steuerung) dürfen eine Karte aus der Merge-Warteschlange nehmen oder ihren Merge wiederholen.",
   "service.keys.closed": "Der Arbeitsbereich wurde geschlossen oder das Fenster hat einen anderen geöffnet, bevor der Schlüssel geändert wurde: Nichts wurde geändert.",
   "service.keys.form": "Ein Projektschlüssel besteht aus 2 bis 4 Buchstaben, A bis Z.",

@@ -301,7 +301,7 @@
   "main.unused.slot.dirty": "{files, plural, one {# plik w nim jest bez commita} few {# pliki w nim są bez commita} many {# plików w nim jest bez commita} other {# pliku w nim jest bez commita}}",
   "main.unused.slot.editedSkillCopy": "{copies, plural, one {jego folder umiejętności {names} nie jest niezmienioną kopią Hive} few {jego foldery umiejętności {names} nie są niezmienionymi kopiami Hive} many {jego foldery umiejętności {names} nie są niezmienionymi kopiami Hive} other {jego foldery umiejętności {names} nie są niezmienionymi kopiami Hive}}",
   "main.unused.slot.gitRefused": "git go nie usunął ({detail})",
-  "main.unused.slot.inFlight": "karta #{card}, która w nim była, jest wciąż scalana",
+  "main.unused.slot.inFlight": "karta {card}, która w nim była, jest wciąż scalana",
   "main.unused.slot.leased": "jest wypożyczony agentowi {agent}",
   "main.unused.slot.process": "proces nadal go używa",
   "main.unused.slot.session": "działa w nim sesja ({detail})",

@@ -84,9 +84,9 @@ const check = (name, ok, extra = '') => {
   const c5 = await newCard('Fifth')
   const c6 = await newCard('Sixth')
   // Wakes name a card by its key with the number the tools take (#1219): its own key, from the board.
-  const named = async (n) => `${(await card(n)).key} (#${n})`
+  const named = async (n) => `${(await card(n)).key}`
   const [n1, n5, n6] = [await named(c1), await named(c5), await named(c6)]
-  check('the card has a key of its project', /^[A-Z]{2,4}-\d+ \(#\d+\)$/.test(n1), n1)
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(n1), n1)
   // The builder registers its lane (card-loop does): Reviewer reviews its cards. Card 4 is in no lane.
   const lane = (who) => `hive hive_lane ${JSON.stringify({ action: 'start', cards: [c1, c2, c3, c5, c6], reviewer: who })}`
   await say(builder.id, lane('Reviewer'))

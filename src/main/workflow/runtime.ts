@@ -364,9 +364,9 @@ export class Workflow {
   resolve(ref: unknown, actor: Actor = 'user'): CardRecord | Refusal {
     if (typeof ref === 'number' && !agentOf(actor)) return this.store.card(ref)
     const p = parseCardRef(ref)
-    if (!p.ok) return refusal('card.plainNumber', { key: `${this.cfg.projectKey}-12`, alias: '#1061' }, null)
+    if (!p.ok) return refusal('card.plainNumber', { key: `${this.cfg.projectKey}-12` }, null)
     const c = 'key' in p.ref ? this.store.cardByKey(p.ref.key) : this.store.cards().find((x) => x.id === (p.ref as { alias: number }).alias)
-    return c ?? refusal('card.plainNumber', { key: `${this.cfg.projectKey}-12`, alias: '#1061' }, null)
+    return c ?? refusal('card.plainNumber', { key: `${this.cfg.projectKey}-12` }, null)
   }
 
   /**
