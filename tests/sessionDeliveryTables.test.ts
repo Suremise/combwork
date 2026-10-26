@@ -12,7 +12,7 @@ import { BOARD_MIGRATIONS } from '../src/main/boardStore'
 import { openDb, schemaVersion } from '../src/main/db'
 import { readDelivery } from '../src/shared/deliveries'
 import { deliveryFromRow, deliveryToRow, keptUsageFromRow, keptUsageToRow, sessionFromRows, sessionToRows } from '../src/main/schema/sessionDeliveryCodec'
-import { addDeliveries, moveStoreRows, readDeleted, readDeletedUsage, readDeliveries, readSessionRecord, readSessionRecords, writeDeliveries, writeSessionRecords } from '../src/main/schema/sessionDeliveryTables'
+import { addDeliveries, addSessionRecords, moveStoreRows, readDeleted, readDeletedUsage, readDeliveries, readSessionRecord, readSessionRecords, writeDeliveries, writeSessionRecords } from '../src/main/schema/sessionDeliveryTables'
 import { V1_0_STEPS } from '../src/main/schema/v1_0'
 
 const base = tempDir('hive-store-tables-')
@@ -175,6 +175,20 @@ describe("a host's records in the tables (storeTables.ts)", () => {
     expect(written().sort()).toEqual(['session_cards DELETE', 'session_cards DELETE', 'session_cards INSERT', 'session_cards INSERT', 'sessions DELETE', 'sessions INSERT', 'sessions UPDATE'])
     expect(readSessionRecords(db, 'p1').map((r) => r.id)).toEqual(['a', 'b', 'd'])
     expect(readDeleted(db, 'p1')).toEqual(['g1', 'g2'])
+  })
+
+  it("a file's records moved in beside the host's: one it has wins, and one its deleted list holds is never written back (HI-1736)", () => {
+    const db = tables()
+    db.exec('BEGIN')
+    writeSessionRecords(db, 'p1', { sessions: [fullSession('a', { name: 'kept' })], deleted: ['gone'] })
+    const added = addSessionRecords(db, 'p1', { sessions: [fullSession('a', { name: 'older' }), fullSession('gone'), fullSession('new')], deleted: ['also'] })
+    db.exec('COMMIT')
+    expect(added).toBe(1)
+    expect(readSessionRecords(db, 'p1').map((r) => [r.id, r.name])).toEqual([
+      ['a', 'kept'],
+      ['new', fullSession('new').name]
+    ])
+    expect(readDeleted(db, 'p1')).toEqual(['gone', 'also'])
   })
 
   it('a record without the fields Hive keeps, or two with one id, throw: nothing written', () => {

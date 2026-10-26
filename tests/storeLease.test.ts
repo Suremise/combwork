@@ -262,6 +262,28 @@ describe("a store's save holds its own connection (#1383)", () => {
     await w.open(elsewhere)
   })
 
+  it("a session deleted while its workspace is closed stays deleted when its host's old file moves in at the next open (HI-1736)", async () => {
+    const ws = workspace()
+    const proj = join(ws, 'proj')
+    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, id: 'p-deleted', agents: [] }))
+    // Its old file, not moved in yet: s-old (deleted below) and s-keep.
+    const rec = (id: string) => ({ id, agent: 'claude-code', name: id, createdAt: at, lastActiveAt: at, archived: false })
+    writeFileSync(join(proj, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: [rec('s-old'), rec('s-keep')] }))
+    await w.open(ws)
+    await w.open(elsewhere)
+    expect(board.boardOpen(ws)).toBe(false)
+    // Deleted while its workspace is closed (#1381's save, written without the move in): its id in the host's deleted list.
+    await w.mutateSessions(proj, (f) => {
+      f.sessions = f.sessions.filter((s) => s.id !== 's-old')
+      f.deleted = [...(f.deleted ?? []), 's-old']
+    })
+    await w.open(ws)
+    const f = await w.sessionsFile(proj)
+    expect(f.sessions.map((s) => s.id)).toEqual(['s-keep'])
+    expect(f.deleted).toEqual(['s-old'])
+    await w.open(elsewhere)
+  })
+
   it("a background read held across its workspace's close is refused however many workspaces open and close after it, with nothing of them kept (#1381, #1395)", async () => {
     const ws = workspace()
     await w.open(ws)
