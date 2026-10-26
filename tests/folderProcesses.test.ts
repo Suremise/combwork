@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'child_process'
 import { createRequire } from 'module'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
@@ -280,6 +280,54 @@ describe("a scenario's leftover processes (#542, #402)", () => {
       if (!exited()) parent.kill()
     }
   }, 60000)
+})
+
+// HI-1453: a test copy of Hive that outlived its suite (12 h, its runner gone). Each copy is recorded as it starts, and
+// the runner ends those still running: recorded (pid, started within its launch's window) or with their profile in the
+// folder, never by name. The real processes: the harnessleftovers e2e.
+describe("a suite's test copies of Hive (HI-1453)", () => {
+  const { COPIES_FILE, recordCopy, recordedCopies, copiesIn, hiveCopyIn } = req('./e2e/folderProcesses.cjs') as {
+    COPIES_FILE: string
+    recordCopy: (dir: string, copy: { pid: number; from: number; to: number; profile?: string | null }) => void
+    recordedCopies: (dir: string, depth?: number) => { pid: number; from: number; to: number }[]
+    copiesIn: (list: Proc[], copies: { pid: number; from: number; to: number }[]) => Proc[]
+    hiveCopyIn: (cmd: string, folder: string) => boolean
+  }
+
+  it('are read back from the folder and its own (a nested runner), a line cut short skipped', () => {
+    const dir = tempDir('hive-copies-')
+    recordCopy(dir, { pid: 10, from: 1000, to: 2000, profile: join(dir, 'p') })
+    mkdirSync(join(dir, 'suite', 'nested', 'inner'), { recursive: true })
+    recordCopy(join(dir, 'suite', 'nested', 'inner'), { pid: 11, from: 3000, to: 4000 })
+    writeFileSync(join(dir, 'suite', COPIES_FILE), '{"pid": 12, "from": 5\n')
+    expect(recordedCopies(dir).map((c) => c.pid).sort()).toEqual([10, 11])
+    expect(recordedCopies(dir, 1).map((c) => c.pid)).toEqual([10])
+  })
+
+  it('are the processes with their pid that started within their launch, never a later process given the pid', () => {
+    const list: Proc[] = [
+      { pid: 10, commandLine: 'electron.exe .', started: 1500 },
+      { pid: 11, commandLine: 'node other.js', started: 90_000 },
+      { pid: 12, commandLine: 'electron.exe .', started: 2600 }
+    ]
+    const copies = [
+      { pid: 10, from: 1000, to: 2000 },
+      { pid: 11, from: 1000, to: 2000 },
+      { pid: 12, from: 3000, to: 4000 }
+    ]
+    // 12 started 400 ms before its window: within the clocks' slack (1 s). 11 is another process by now.
+    expect(copiesIn(list, copies).map((p) => p.pid)).toEqual([10, 12])
+  })
+
+  it("are found by the profile on their command line, in that folder only, never by a program's name", () => {
+    const lane = 'C:\\t\\hive-test\\e2e\\lanes\\1'
+    expect(hiveCopyIn(`"C:\\wt\\node_modules\\electron\\dist\\electron.exe" C:\\wt --hive-test-profile=${lane}\\leftovers\\leftovers\\profile`, lane)).toBe(true)
+    expect(hiveCopyIn(`"C:\\wt\\electron.exe" --type=renderer --user-data-dir="${lane}\\x\\profile" --lang=en`, lane)).toBe(true)
+    expect(hiveCopyIn(`electron.exe --hive-test-profile=${lane}0\\x\\profile`, lane)).toBe(false)
+    expect(hiveCopyIn(`"C:\\Users\\u\\AppData\\Local\\Programs\\Hive\\Hive.exe" --user-data-dir=C:\\Users\\u\\AppData\\Roaming\\Hive`, lane)).toBe(false)
+    // A program that only names the folder (a viewer opening a screenshot) isn't a copy.
+    expect(hiveCopyIn(`photos.exe ${lane}\\x\\shot.png`, lane)).toBe(false)
+  })
 })
 
 // #603: a remembered pid ended after its process had gone can be another's by then (a concurrent run's Vitest worker,

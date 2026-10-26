@@ -595,6 +595,7 @@ _electron.launch = async (...args) => {
     noUpdateChecks(env.HIVE_USER_DATA)
     if (env.HIVE_USER_DATA) packagedLaunches.push({ profile: env.HIVE_USER_DATA, since: new Date().toISOString() })
   }
+  const from = Date.now()
   const app = await launchElectron(...args)
   // An app.evaluate reaches main through Node's inspector, which runs it at once even while main's JS is running: in a
   // V8 interrupt, in the middle of whatever main was doing. A function that calls into Hive (a window event, a setting)
@@ -621,6 +622,13 @@ _electron.launch = async (...args) => {
       throw new Error(`A packaged test Hive (${args[0].executablePath}) couldn't be kept off the screen (#1253): ${Array.isArray(shown) ? `its windows were shown before it was reached (${shown.join(', ')})` : shown.error}`)
     }
   }
+  // Recorded by its pid and when it started (HI-1453), in the folder its runner gave the suite: whatever ends the run, the
+  // runner ends each copy still running once the suite has ended, and the next run's start those an earlier run left.
+  // Its main process's own pid: Playwright starts Electron through `cmd.exe /c` on Windows, so app.process() is that
+  // shell, which ends with a killed suite while Hive runs on outside the suite's job (how one ran 12 h). Looked up in
+  // the background, so the launch returns as it did: only a record, which never fails or holds up the suite (one not
+  // made in time is found by its profile).
+  if (process.env.HIVE_E2E_DIR) recordMainProcess(WORK, app.process()?.pid, from, env.HIVE_USER_DATA ?? null).catch(() => undefined)
   return app
 }
 
@@ -1237,7 +1245,7 @@ function codexHook(runId) {
 
 // What still runs from a test's own folder after its Hive closed (#542): folderProcesses.cjs.
 // A process by its identity (pid and start time), never by a remembered pid alone (#603).
-const { processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree } = require('./folderProcesses.cjs')
+const { processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, recordMainProcess } = require('./folderProcesses.cjs')
 
 /**
  * Whether process `pid` still runs: false only when Windows says there is no such process (ESRCH). Any other error

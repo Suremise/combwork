@@ -3,8 +3,9 @@
 // what is the test's own, never by name: what its Hive started (its process tree, taken before it closes, each by pid
 // and start time, so a reused pid is never taken), and what names its folder on the command line (a path boundary, so
 // `scenario` never takes `scenario-2`'s) and started after the test did.
+const fs = require('fs')
 const path = require('path')
-const { execFileSync } = require('child_process')
+const { execFile, execFileSync } = require('child_process')
 const { baseEnv } = require('./runContext.cjs')
 
 /** A folder or command line in one spelling: lower case, backslashes, no trailing separator. */
@@ -50,8 +51,11 @@ const ownedBy = (list, folder, since = 0, self = process.pid) =>
  * PowerShell 5.1's ConvertTo-Json leaves some control characters in a command line unescaped (a prompt's, say).
  */
 function processes() {
-  const ps = "Get-CimInstance Win32_Process | ForEach-Object { '{0} {1} {2} {3}' -f $_.ProcessId, $_.ParentProcessId, ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds(), [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$_.CommandLine)) }"
-  const out = execFileSync('powershell.exe', ['-NoProfile', '-Command', ps], { encoding: 'utf8', env: baseEnv(), maxBuffer: 64 * 1024 * 1024 })
+  return parseProcesses(execFileSync('powershell.exe', ['-NoProfile', '-Command', PROCESS_LIST], { encoding: 'utf8', env: baseEnv(), maxBuffer: 64 * 1024 * 1024 }))
+}
+const PROCESS_LIST = "Get-CimInstance Win32_Process | ForEach-Object { '{0} {1} {2} {3}' -f $_.ProcessId, $_.ParentProcessId, ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds(), [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$_.CommandLine)) }"
+/** PROCESS_LIST's output, as processes() returns it. */
+function parseProcesses(out) {
   return out
     .split(/\r?\n/)
     .map((l) => l.trim().split(' '))
@@ -264,4 +268,100 @@ function endChildTree(child) {
   return now ? endTreeExactly({ pid: now.pid, started: now.started }, list) : 0
 }
 
-module.exports = { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, processTree, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree }
+// --- Test copies of Hive that outlive their suite (HI-1453: one ran 12 h after its run, its parent gone).
+
+/** Where a suite's test copies of Hive are recorded as they start: a line each in its work folder (lib.cjs). */
+const COPIES_FILE = '.hive-copies.jsonl'
+/** How far a copy's start may be from the window it was launched in (ms): Windows' and Node's clocks round apart. */
+const COPY_SLACK_MS = 1000
+
+/** Records a copy started in `dir`: { pid, from, to } (ms: its launch began and returned), and its profile. */
+function recordCopy(dir, copy) {
+  fs.appendFileSync(path.join(dir, COPIES_FILE), `${JSON.stringify(copy)}\n`)
+}
+
+/**
+ * Records the copy of Hive that `launcher` (the pid Playwright started, `from`: ms before it did) is: its child that
+ * started since, when Playwright started Electron through `cmd.exe /c` (Windows), else `launcher` itself. Lists the
+ * processes without blocking (the launch has returned meanwhile). Off Windows, nothing.
+ */
+async function recordMainProcess(dir, launcher, from, profile = null) {
+  if (process.platform !== 'win32' || !launcher) return
+  const out = await new Promise((resolve, reject) => execFile('powershell.exe', ['-NoProfile', '-Command', PROCESS_LIST], { encoding: 'utf8', env: baseEnv(), maxBuffer: 64 * 1024 * 1024, windowsHide: true }, (e, stdout) => (e ? reject(e) : resolve(stdout))))
+  const list = parseProcesses(out)
+  const main = list.find((p) => p.parent === launcher && p.started >= from - COPY_SLACK_MS) ?? list.find((p) => p.pid === launcher && p.started >= from - COPY_SLACK_MS)
+  if (main) recordCopy(dir, { pid: main.pid, from, to: Date.now(), profile })
+}
+
+/** The copies recorded in `dir` and its folders `depth` deep (a runner inside a suite has its suites in nested/). */
+function recordedCopies(dir, depth = 3) {
+  const out = []
+  const walk = (d, left) => {
+    let entries
+    try {
+      entries = fs.readdirSync(d, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const e of entries) {
+      if (e.isFile() && e.name === COPIES_FILE) {
+        let text = ''
+        try {
+          text = fs.readFileSync(path.join(d, e.name), 'utf8')
+        } catch {
+          continue
+        }
+        for (const line of text.split(/\r?\n/)) {
+          try {
+            const c = JSON.parse(line)
+            if (Number(c.pid) > 0 && Number.isFinite(c.from) && Number.isFinite(c.to)) out.push(c)
+          } catch {
+            // A line cut short (its writer killed): no copy.
+          }
+        }
+      } else if (e.isDirectory() && left > 0 && !e.isSymbolicLink()) walk(path.join(d, e.name), left - 1)
+    }
+  }
+  walk(dir, depth)
+  return out
+}
+
+/** Of `list` (processes()), the processes the recorded `copies` are: their pid, started within their launch's window. */
+const copiesIn = (list, copies) =>
+  list.filter((p) => copies.some((c) => c.pid === p.pid && p.started >= c.from - COPY_SLACK_MS && p.started <= c.to + COPY_SLACK_MS))
+
+/**
+ * Whether `commandLine` is a test copy of Hive's with its profile in `folder`: Hive's own main process names it
+ * (--hive-test-profile, lib.cjs), Chromium's processes their user data (--user-data-dir). Never by a program's name:
+ * the installed Hive is Hive.exe too, and electron.exe runs other apps.
+ */
+const hiveCopyIn = (commandLine, folder) => /--(hive-test-profile|user-data-dir)=/i.test(String(commandLine ?? '')) && namesFolder(commandLine, folder)
+
+/**
+ * Ends the test copies of Hive in `folders` that are still running, each with what it started: those recorded there
+ * (recordCopy, by pid and start) and those whose profile is there (hiveCopyIn). `before` (ms): only copies started
+ * before it (a sweep's, so a copy a runner that has just claimed the folder starts is never taken). Each is ended as the
+ * process it is in `list` (endExactly), children first. Returns how many processes were ended.
+ */
+function endCopies(folders, { before = Infinity, list } = {}) {
+  if (process.platform !== 'win32' || !folders.length) return 0
+  try {
+    list ??= processes()
+  } catch {
+    return 0
+  }
+  const roots = new Map()
+  for (const f of folders) {
+    for (const p of copiesIn(list, recordedCopies(f))) roots.set(p.pid, p)
+    for (const p of list) if (hiveCopyIn(p.commandLine, f)) roots.set(p.pid, p)
+  }
+  const pick = new Map()
+  for (const p of roots.values()) {
+    if (p.pid === process.pid || p.started >= before) continue
+    pick.set(p.pid, p.started)
+    for (const d of descendantsIn(list, p.pid)) pick.set(d.pid, d.started)
+  }
+  return pick.size ? endExactly(childrenFirst(list, [...pick].map(([pid, started]) => ({ pid, started })))) : 0
+}
+
+module.exports = { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, processTree, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree, COPIES_FILE, recordCopy, recordMainProcess, recordedCopies, copiesIn, hiveCopyIn, endCopies }

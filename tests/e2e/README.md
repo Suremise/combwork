@@ -590,6 +590,17 @@ startup failure shows no dialog.
 
 ## Housekeeping
 
+**Test copies of Hive never outlive their run** (HI-1453: one ran on 12 hours after its suite, its runner gone, and held
+its lane's port, so no later runner took that lane). Playwright starts Electron through `cmd.exe /c`, so the pid it
+gives is that shell's: a killed suite takes the shell with it, while Hive's main process, the shell's child, runs on.
+`lib.cjs` records each copy's main process as it starts, by pid and when it started, in the suite's folder
+(`.hive-copies.jsonl`, looked up in the background, so a launch returns as before); once a suite has ended, however it ended (passed, failed, timed out,
+killed), the runner ends what is left of its copies, recorded or with their profile in its folder
+(`folderProcesses.cjs` `endCopies`); and each run's start, before it takes a lane, ends the copies an earlier run left
+in the lanes no running runner holds, started before it looked (`leftCopies.mjs`). Each is ended as the process it was
+listed as (pid and start time), never by name: the installed Hive is `Hive.exe` too. `harnessleftovers` checks both
+with real copies.
+
 What the tests leave in `%LOCALAPPDATA%\hive-test` is removed once it is no longer needed (`clean.mjs`, #253). The e2e
 runner and the scenario runner do it when they finish (at most a minute; what is left goes next time), and
 **`npm run test:clean`** does it on demand and prints each area's size (`--dry-run` lists what would go, and what is
