@@ -57,7 +57,7 @@ const check = (name, ok, extra = '') => {
   await lib.openWorkspace(inv, page, ws)
   await lib.waitForProvider(inv)
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
-  const projectCfg = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
+  const projectCfg = (p) => lib.projectConfig(userData, p) // with this user's view over it (HI-1749)
   const strip = page.locator('.session-toolbar')
   const dialog = page.locator('.dialog').last()
   const menuItems = async () => (await page.locator('.menu .menu-item').allInnerTexts()).map((t) => t.split('\n')[0].trim())
@@ -216,7 +216,8 @@ const check = (name, ok, extra = '') => {
   await firstName.fill('Builder')
   check('…put back, Load template can be clicked again', !!(await lib.until(async () => (await warn.locator('.template-plan-table .field-error').count()) === 0 && (await warnLoad.isEnabled()), HUNG_MS)))
   await warnLoad.click()
-  const loaded = await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer"]', 15000)
+  // The layout with them: this user's view, saved a moment after the agents (HI-1749).
+  const loaded = await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer"]' && projectCfg(beta).layout === 'columns3', 15000)
   check('loading replaces the agents', !!loaded, JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
   const b = projectCfg(beta)
   check('…recreating them exactly: role in the workflow, note, model, the layout; in the project folder', b.agents[0].workflowRole === 'builder' && b.agents[0].role === 'builder' && b.agents[1].workflowRole === 'reviewer' && b.agents[0].model === 'opus' && b.layout === 'columns3' && b.agents.every((a) => !a.worktree), JSON.stringify(b))

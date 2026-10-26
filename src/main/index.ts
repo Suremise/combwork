@@ -73,7 +73,7 @@ import { killAll } from './ptyHost'
 import { allLeftovers, closeProcessTracking, leftoversSaved, leftoversSettled, restoreLeftovers, settleAllLeftovers, settleLeftovers, warmProcessTracking } from './agentProcesses'
 import { leftoversSummary } from '../shared/agentProcesses'
 import { installShims } from './progressReporters/shims'
-import { insideArchive, onCorruptFile } from './fsutil'
+import { insideArchive, onCorruptFile, renameDiagnostics } from './fsutil'
 import { apiEnv, assistantApiUrl, startApiServer, startHookServer } from './servers'
 import { clearDiscovery, clearDiscoveryNow } from './apiDiscovery'
 import { clearHookAuth } from './hookTokens'
@@ -88,6 +88,7 @@ import { closedNotice, focusedHive, routeAppNotice, setFocusedHive, startNoticeR
 import { initUpdater, installNow, installsOnQuit } from './updater'
 import { flushMetrics } from './metrics'
 import { watchMainStalls } from './mainStalls'
+import { fileHolders } from './fileHolders'
 import { createWorkspaceService, disposeWorkspaceService, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
 import { journalSettingsOf } from './journalService'
 import { assistantStartView } from './startView'
@@ -866,6 +867,8 @@ app.whenReady().then(async () => {
   startMemoryLog()
   startHeapSnapshots(app.getPath('userData'), heapSnapshots)
   watchMainStalls()
+  // A replace that gave up because the file was held says which processes had it open (HI-1749).
+  renameDiagnostics.holders = fileHolders
   setInterval(archiveOldDoneEverywhere, 3_600_000).unref()
 
   workspace.setLiveProvider((p, cfg, scope) => sessions.liveInfo(p, cfg, scope))

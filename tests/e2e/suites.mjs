@@ -215,6 +215,7 @@ export const SUITES = [
   { name: 'progresstabs' },
   { name: 'projectkeys' },
   { name: 'projectrename' },
+  { name: 'projectview' },
   { name: 'providerdetect' },
   { name: 'providers' },
   { name: 'purge' },

@@ -38,7 +38,7 @@ const check = (name, ok, extra = '') => {
     await lib.openWorkspace(inv, page, ws)
     await lib.waitForProvider(inv)
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-    const projectCfg = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
+    const projectCfg = (p) => lib.projectConfig(userData, p) // with this user's view over it (HI-1749)
     const select = async (name) => {
       await page.locator('.project-row', { hasText: name }).first().click()
       await lib.until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')) === name, HUNG_MS)
