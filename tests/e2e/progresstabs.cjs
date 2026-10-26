@@ -292,17 +292,19 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     agentName: o.agentName ?? 'B1',
     ...(o.source === 'api' ? {} : { projectPath: alpha }),
     ...(o.source === 'hive' ? { defaultName: 'mergeQueue' } : o.source === 'api' ? {} : { agentId: o.agentId ?? builder.id, provider: 'claude-code' }),
-    ...(o.card ? { card: o.card, revision: REV } : {}),
+    ...(o.card ? { card: o.card, revision: o.revision ?? REV } : {}),
     ...(o.check ? { check: o.check } : {}),
     ...(o.copy ? { copy: o.copy } : {})
   })
   const R1 = { agentName: 'R1', agentId: reviewer.id }
-  const QUEUE = { source: 'hive', agentName: 'Hive (merge queue)' }
+  const REV2 = '0123e4979f1c2b3a4d5e6f708192a3b4c5d6e7f8'
+  // The merge queue's runs as queueChecks.ts names them, "<key> · <check> · <revision>", with no check name of their own.
+  const queued = (card, label, revision = REV) => ({ card: card.number, title: `${card.key} · ${label} · ${revision.slice(0, 7)}`, command: `npm run ${label}`, revision, source: 'hive', agentName: 'Hive (merge queue)' })
   const busy = [
     ran('b-unit', 1, 40, { card: b.number, title: 'unit', command: 'npm test' }),
     ran('b-review', 3, 20, { card: b.number, title: 'Review lint', command: 'npm run lint', copy: 'copy-7', ...R1 }),
-    ran('b-q-install', 6, 30, { card: b.number, title: 'install', check: 'install', ...QUEUE }),
-    ran('b-q-lint', 7, 9, { card: b.number, title: 'lint', check: 'lint', ...QUEUE }),
+    ran('b-q-install', 6, 30, { ...queued(b, 'npm ci'), command: 'npm ci' }),
+    ran('b-q-lint', 7, 9, queued(b, 'lint')),
     ran('a-unit-1', 2, 50, { card: a.number, title: 'unit: 6 files', command: 'npm test -- tests/a', state: 'failed' }),
     ran('a-unit-2', 5, 50, { card: a.number, title: 'unit: 6 files', command: 'npm test -- tests/a', state: 'failed' }),
     ran('a-unit-3', 8, 50, { card: a.number, title: 'unit: 6 files', command: 'npm test -- tests/a' }),
@@ -312,8 +314,10 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     ran('a-cardloop', 20, 180, { card: a.number, title: 'cardloop on base c0ffee1', command: 'npm run e2e -- cardloop', state: 'failed' }),
     ran('a-final-1', 22, 30, { card: a.number, title: `${a.key} final typecheck`, check: 'typecheck' }),
     ran('a-final-2', 24, 30, { card: a.number, title: `${a.key} final typecheck`, check: 'typecheck' }),
-    ran('a-q-lint', 30, 6, { card: a.number, title: 'lint', check: 'lint', ...QUEUE }),
-    ran('a-q-typecheck', 31, 7, { card: a.number, title: 'typecheck', check: 'typecheck', ...QUEUE }),
+    // The same check on an earlier revision (a resubmission): named once in the queue's line.
+    ran('a-q-lint-old', 26, 6, queued(a, 'lint', REV2)),
+    ran('a-q-lint', 30, 6, queued(a, 'lint')),
+    ran('a-q-typecheck', 31, 7, queued(a, 'typecheck')),
     ran('c-e2e', 35, 95, { card: c.number, title: 'e2e: changes', command: 'npm run e2e -- changes' })
   ]
   fs.writeFileSync(path.join(historyDir, `${createHash('sha256').update(path.resolve(ws).toLowerCase()).digest('hex').slice(0, 16)}.json`), JSON.stringify({ version: 1, runs: busy }))
@@ -351,12 +355,19 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     check('Today by card: the card with the newest run first, Other last; open while a run failed, closed once all passed', !!(await until(async () => JSON.stringify(await heads()) === JSON.stringify(want), HUNG_MS)), JSON.stringify(await heads()))
     const head = (card) => group(card).locator('.progress-card-head')
     const headText = async (card) => (await head(card).evaluate((el) => [...el.querySelectorAll('.progress-card-key, .progress-card-title, .progress-card-summary')].map((x) => x.textContent).join(' | ')).catch(() => ''))
-    check(`${a.key}'s heading: its key, title and 9 runs · 3 failed, with a failure's icon`, (await headText(a.number)) === `${a.key} | Lane data | 9 runs · 3 failed` && (await head(a.number).locator('.progress-card-icon.codicon-error').count()) === 1, await headText(a.number))
+    check(`${a.key}'s heading: its key, title and 10 runs · 3 failed, with a failure's icon`, (await headText(a.number)) === `${a.key} | Lane data | 10 runs · 3 failed` && (await head(a.number).locator('.progress-card-icon.codicon-error').count()) === 1, await headText(a.number))
     check(`${b.key}'s: 4 runs · all passed, with a pass's icon`, (await headText(b.number)) === `${b.key} | Lane hover | 4 runs · all passed` && (await head(b.number).locator('.progress-card-icon.codicon-pass').count()) === 1, await headText(b.number))
     const rows = (card) => group(card).locator('.progress-card-items > .progress-recent-item > .progress-recent, .progress-card-items > .progress-run-group > .progress-group-head')
     const lines = async (card) => Promise.all((await rows(card).all()).map((h) => lineOf(h)))
     const aLines = ['Hive (merge queue) · lint, typecheck', 'B1 · final typecheck ×2 · all passed', 'B1 · cardloop on base c0ffee1', 'R1 · Review delivery typecheck', 'B1 · unit: 6 files ×3 · 2 failed, then passed']
     check(`${a.key}'s runs, a line each, newest first: the merge queue's checks in one, its key left out of a title`, JSON.stringify(await lines(a.number)) === JSON.stringify(aLines), JSON.stringify(await lines(a.number)))
+    // The queue's titles carry the key and revision (HR6's round 1): opened, its runs name only their check.
+    await group(a.number).locator('.progress-run-group').filter({ hasText: 'Hive (merge queue)' }).locator('.progress-group-head').click()
+    const queueRuns = () => group(a.number).locator('.progress-group-runs .progress-recent-text').allTextContents()
+    check("…opened, the queue's runs, newest first, each its check alone", !!(await until(async () => JSON.stringify(await queueRuns()) === JSON.stringify(['typecheck', 'lint', 'lint']), HUNG_MS)), JSON.stringify(await queueRuns()))
+    const itemsText = await group(a.number).locator('.progress-card-items').innerText()
+    check(`…no key nor revision in ${a.key}'s lines`, !itemsText.includes(a.key) && !itemsText.includes(REV.slice(0, 7)) && !itemsText.includes(REV2.slice(0, 7)), itemsText)
+    await group(a.number).locator('.progress-run-group').filter({ hasText: 'Hive (merge queue)' }).locator('.progress-group-head').click()
     check('…one row shape: no line under a run, no copy name shown', (await group(a.number).locator('.progress-run-for').count()) === 0 && !/copy-5/.test(await group(a.number).innerText()))
     check('…the retries a warning (failed, then passed), the failed run a failure', (await group(a.number).locator('.progress-run-group').filter({ hasText: 'unit: 6 files' }).locator('.progress-group-head .codicon-warning').count()) === 1 && (await group(a.number).locator('.progress-recent-item[data-run="a-cardloop"] .progress-recent .codicon-error').count()) === 1)
     const reviewRow = group(a.number).locator('.progress-recent-item[data-run="a-review"] .progress-recent > .tip-wrap').first()

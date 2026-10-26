@@ -170,13 +170,24 @@ export function runsByCard(d: RunDay): CardRuns[] {
  * typecheck" → "final typecheck"); the title as it is when that would leave nothing.
  */
 export function withoutCardKey(title: string, key: string | null): string {
-  if (!key) return title
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const left = title
-    .replace(new RegExp(`(^|[^\\w-])${escaped}(?![\\w-])\\s*[:·\\-–—,]?`, 'gi'), '$1')
-    .replace(/\s{2,}/g, ' ')
-    .replace(/^[\s:·\-–—,]+|[\s:·\-–—,]+$/g, '')
+  return withoutWords(title, key ? [key] : [])
+}
+
+/** A title without these words (each whole, with a separator after it), its separators tidied; as it is when that leaves nothing. */
+function withoutWords(title: string, words: readonly string[]): string {
+  let left = title
+  for (const w of words) left = left.replace(new RegExp(`(^|[^\\w-])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])\\s*[:·\\-–—,@]?`, 'gi'), '$1')
+  left = left.replace(/\s{2,}/g, ' ').replace(/^[\s:·\-–—,@]+|[\s:·\-–—,@]+$/g, '')
   return left || title
+}
+
+/**
+ * A run's title as a line under its card's heading shows it (HI-1701, HR6's round 1): without the card's key, which the
+ * heading shows, nor the run's own revision, which its hover and details have ("HI-12 · lint · a4f5998", as the merge
+ * queue names its checks, is "lint").
+ */
+export function runTitleIn(r: Pick<ProgressRun, 'title' | 'revision'>, key: string | null): string {
+  return withoutWords(r.title, [...(key ? [key] : []), ...(r.revision ? [r.revision.slice(0, 7)] : [])])
 }
 
 /** A card's heading's summary (HI-1701): "7 runs · 1 failed", "9 runs · all passed", and " · running" while one runs. */
@@ -192,9 +203,12 @@ export function cardRunsSummary(c: CardRuns, running: boolean, tr: Tr): string {
   )
 }
 
-/** The merge queue's checks of a card folded in a line (HI-1701): "lint, typecheck", then how many failed. */
-export function queueChecksLabel(g: RunGroup, list: (items: string[]) => string, tr: Tr): string {
-  const checks = [...new Set(g.runs.map((r) => r.title))]
+/**
+ * The merge queue's checks of a card folded in a line (HI-1701): "lint, typecheck", then how many failed. `label`: a run's
+ * check as the line names it (`runTitleIn`: the queue's titles carry the card and revision), each named once.
+ */
+export function queueChecksLabel(g: RunGroup, list: (items: string[]) => string, tr: Tr, label: (r: ProgressRun) => string = (r) => r.title): string {
+  const checks = [...new Set(g.runs.map(label))]
   return tr(msg({ id: 'board.runs.queueChecks', defaultMessage: '{checks}{failed, plural, =0 {} one { · # failed} other { · # failed}}', description: "A line in the Progress panel's Runs tab folding the merge queue's checks for one card: the checks it ran ({checks}: their names, a list such as \"lint, typecheck\") and how many of its runs failed ({failed}, nothing when none)." }), { checks: list(checks), failed: g.failed })
 }
 

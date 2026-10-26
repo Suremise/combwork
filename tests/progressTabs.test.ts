@@ -2,7 +2,7 @@
 // day with retries folded, a group's line, the Runs tab's filters, the badges and a card's latest run.
 import { describe, expect, it } from 'vitest'
 import { tr } from '../src/shared/i18n'
-import { cardLook, cardRunsSummary, groupLook, latestRunOf, NO_RUNS_FILTER, queueChecksLabel, runDayLabel, runDays, runGroupLabel, runMatches, runsByCard, runThing, tabAt, tabBadges, unresolvedFailures, withoutCardKey } from '../src/shared/progressTabs'
+import { cardLook, cardRunsSummary, groupLook, latestRunOf, NO_RUNS_FILTER, queueChecksLabel, runDayLabel, runDays, runGroupLabel, runMatches, runsByCard, runThing, runTitleIn, tabAt, tabBadges, unresolvedFailures, withoutCardKey } from '../src/shared/progressTabs'
 import type { MergeSlotInfo, ProgressRun } from '../src/shared/types'
 
 const NOW = new Date(2026, 9, 21, 15, 0, 0).getTime()
@@ -170,6 +170,24 @@ describe('runs by card (HI-1701)', () => {
     // A queue run for no card isn't folded with anything: it is Other's.
     const [other] = runsByCard(runDays([queue(5, 'lint')], NOW)[0])
     expect([other.card, other.items.length, other.items[0].queue]).toEqual([null, 1, undefined])
+  })
+
+  it("the merge queue's titles as it writes them (HR6's round 1): its line names each check once, without the key or revision", () => {
+    const REV1 = 'a4f599825a1484334b778a4e7c846dfd9f2a7e59'
+    const REV2 = '0123e4979f1c2b3a4d5e6f708192a3b4c5d6e7f8'
+    // queueChecks.ts: `${card} · ${label} · ${revision.slice(0, 7)}`, the same check on two revisions (a resubmission).
+    const titled = (min: number, check: string, rev: string, over: Partial<ProgressRun> = {}) => queue(min, check, { card: 7, title: `HI-7 · ${check} · ${rev.slice(0, 7)}`, revision: rev, ...over })
+    const runs = [titled(40, 'lint', REV1), titled(39, 'typecheck', REV1, { state: 'failed' }), titled(20, 'lint', REV2), titled(19, 'typecheck', REV2)]
+    const [c] = runsByCard(runDays(runs, NOW)[0])
+    expect(c.items).toHaveLength(1)
+    expect(queueChecksLabel(c.items[0], (xs) => xs.join(', '), tr, (r) => runTitleIn(r, 'HI-7'))).toBe('lint, typecheck · 1 failed')
+    // Each run's own line, under the queue's: its check alone; its revision is in its hover and details.
+    expect(c.items[0].runs.map((r) => runTitleIn(r, 'HI-7'))).toEqual(['lint', 'typecheck', 'lint', 'typecheck'])
+    // An install's title is its command line: kept, less the key and revision.
+    expect(runTitleIn({ title: `HI-7 · npm ci · ${REV1.slice(0, 7)}`, revision: REV1 }, 'HI-7')).toBe('npm ci')
+    // A revision is left out only where it is the run's own; another commit named in a title stays.
+    expect(runTitleIn({ title: 'cardloop on base c0ffee1', revision: REV1 }, 'HI-7')).toBe('cardloop on base c0ffee1')
+    expect(runTitleIn({ title: 'HI-7 final typecheck' }, 'HI-7')).toBe('final typecheck')
   })
 
   it("a group's look shows a failure: failed when its last failed, retried when one failed before it passed", () => {

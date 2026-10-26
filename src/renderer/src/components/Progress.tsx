@@ -20,7 +20,7 @@ import { MergesList, QueueAnnouncer, QueueLines } from './ProgressQueue'
 import { useLanes } from '../laneSource'
 import { keepShown, useQueuesKept } from '../queueSource'
 import { justMerged, onPulseLine, queuedCount, shownQueues, shownReturns, unseenReturns } from '@shared/progressQueue'
-import { cardLook, cardRunsSummary, groupLook, NO_RUNS_FILTER, PROGRESS_TABS, queueChecksLabel, runAgentKey, runDayLabel, runDays, runGroupLabel, runMatches, runsByCard, tabAt, tabBadges, unresolvedFailures, withoutCardKey, type CardRuns, type ProgressTab, type RunGroup, type RunsFilter, type RunsLook } from '@shared/progressTabs'
+import { cardLook, cardRunsSummary, groupLook, NO_RUNS_FILTER, PROGRESS_TABS, queueChecksLabel, runAgentKey, runDayLabel, runDays, runGroupLabel, runMatches, runsByCard, tabAt, tabBadges, unresolvedFailures, runTitleIn, type CardRuns, type ProgressTab, type RunGroup, type RunsFilter, type RunsLook } from '@shared/progressTabs'
 import { formatDateTime } from '@shared/dates'
 import type { Lane } from '../laneSource'
 import { Icon, IconButton, SearchInput, Tooltip } from './ui'
@@ -510,7 +510,7 @@ function CardGroup({ group: c, running, now, detail, toggle }: { group: CardRuns
  */
 function GroupRow({ group: g, cardKey, now, detail, toggle }: { group: RunGroup; cardKey: string | null; now: number; detail: string | null; toggle: (id: string) => void }) {
   const [open, setOpen] = useState(false)
-  const what = g.queue ? queueChecksLabel(g, (items) => fmt.list(items, 'unit'), tr) : runGroupLabel(g, null, tr, withoutCardKey(g.last.title, cardKey))
+  const what = g.queue ? queueChecksLabel(g, (items) => fmt.list(items, 'unit'), tr, (r) => runTitleIn(r, cardKey)) : runGroupLabel(g, null, tr, runTitleIn(g.last, cardKey))
   const who = runAgentName(g.last, tr)
   const look = groupLook(g)
   const took = g.last.finishedAt !== null ? durationText(g.last.finishedAt - g.last.startedAt, tr) : ''
@@ -761,7 +761,7 @@ const RecentRow = memo(function RecentRow({ run: r, cardKey, now, open, onToggle
       >
         <Tooltip block content={tip}>
           <Icon name={icon} /> <span className="progress-recent-who">{runAgentName(r, tr)}</span>
-          <span className="progress-recent-text">{withoutCardKey(r.title, cardKey)}</span>
+          <span className="progress-recent-text">{runTitleIn(r, cardKey)}</span>
           <span className="faint progress-recent-took">{took}</span>
         </Tooltip>
         <DetailsToggle run={r} open={open} onToggle={onToggle} />
