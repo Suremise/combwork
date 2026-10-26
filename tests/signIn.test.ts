@@ -82,7 +82,8 @@ describe('Codex: a refused sign-in', () => {
     const line = (at: string, type: string, payload: Record<string, unknown> = {}) => JSON.stringify({ timestamp: at, type: 'event_msg', payload: { type, ...payload } })
     const lost = line('2026-10-25T21:40:00.000Z', 'task_complete', { turn_id: 't1', error: { message: 'stream disconnected before completion', codex_error_info: { http_connection_failed: { http_status_code: null } } } })
     const d = rolloutDetails([line('2026-10-25T21:39:00.000Z', 'task_started'), lost].join('\n'))
-    expect([d.turnFailed, d.turnFailedAt, d.signIn]).toEqual(['stream disconnected before completion', '2026-10-25T21:40:00.000Z', undefined])
+    // The turn it names, as Codex's hooks name turns: the failure is that turn's only.
+    expect([d.turnFailed, d.turnFailedAt, d.turnFailedTurn, d.signIn]).toEqual(['stream disconnected before completion', '2026-10-25T21:40:00.000Z', 't1', undefined])
     // No words: failed all the same (the window then says so in its own words).
     expect(rolloutDetails(line('2026-10-25T21:40:00.000Z', 'task_complete', { error: { codex_error_info: 'internal_server_error' } })).turnFailed).toBe('')
     // A refused sign-in is that, and a usage policy's stop a safeguard's (#606), told as themselves.

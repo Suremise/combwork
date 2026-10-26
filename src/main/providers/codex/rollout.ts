@@ -142,9 +142,12 @@ export function rolloutDetails(text: string): LiveDetails {
       if (failed) {
         out.turnFailed = typeof failed.message === 'string' ? failed.message.trim() : ''
         out.turnFailedAt = typeof r.timestamp === 'string' ? r.timestamp : new Date().toISOString()
+        if (typeof p.turn_id === 'string' && p.turn_id) out.turnFailedTurn = p.turn_id
+        else delete out.turnFailedTurn
       } else {
         delete out.turnFailed
         delete out.turnFailedAt
+        delete out.turnFailedTurn
       }
     }
     if (r.type === 'event_msg' && p.type === 'token_count') {

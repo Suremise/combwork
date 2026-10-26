@@ -259,6 +259,8 @@ export interface LiveDetails {
    */
   turnFailed?: string
   turnFailedAt?: string
+  /** The turn it names (its id as the CLI's hooks name turns), when the record names one. */
+  turnFailedTurn?: string
   /**
    * When a turn last ended on an interrupt the CLI sends no hook for (Copilot's `abort`, also when a person cancels its
    * permission dialog), as recorded (ISO): handled as an interrupt hook. One from before this launch is history.
