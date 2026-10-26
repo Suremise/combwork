@@ -124,6 +124,7 @@
   "tasks.history.placed": "Colocada en el puesto {place, selectordinal, other {#.º}} de la columna {column, select, hold {En espera} todo {Pendiente} doing {En curso} review {Revisión} passed {Aprobado} done {Hecho} other {{column}}}",
   "tasks.history.renamed": "Cambió el título a “{title}”",
   "tasks.history.repaired": "Proyecto: {from} → {to} (se cambió el nombre o se movió)",
+  "tasks.history.requestClosed": "{why, select, done {Se cerró una pregunta para ti: la tarjeta está en Hecho} other {Se cerró una pregunta para ti: el agente que preguntó siguió adelante}}",
   "tasks.history.restored": "Devuelta: se restauró el proyecto {project}",
   "tasks.history.returned": "Devuelta a revisión, ronda {round}",
   "tasks.history.reviewCopyLeased": "{agent} revisa en {copy}, en la versión {revision}",

@@ -124,6 +124,7 @@
   "tasks.history.placed": "在“{column, select, hold {搁置} todo {待办} doing {进行中} review {评审} passed {已批准} done {已完成} other {{column}}}”中排第 {place, selectordinal, other {#}} 位",
   "tasks.history.renamed": "重命名为“{title}”",
   "tasks.history.repaired": "项目：{from} → {to}（已重命名或移动）",
+  "tasks.history.requestClosed": "{why, select, done {已关闭一个待你处理的问题：卡片已在已完成中} other {已关闭一个待你处理的问题：提问的智能体已继续工作}}",
   "tasks.history.restored": "已恢复：{project} 已还原",
   "tasks.history.returned": "退回评审，第 {round} 轮",
   "tasks.history.reviewCopyLeased": "{agent} 在 {copy} 中评审修订版本 {revision}",

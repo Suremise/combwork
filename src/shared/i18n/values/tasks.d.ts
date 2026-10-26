@@ -126,6 +126,7 @@ interface HiveMessageValues {
   'tasks.history.placed': { place: number; column: string }
   'tasks.history.renamed': { title: string | number }
   'tasks.history.repaired': { from: string | number; to: string | number }
+  'tasks.history.requestClosed': { why: string }
   'tasks.history.restored': { project: string | number }
   'tasks.history.returned': { round: string | number }
   'tasks.history.reviewCopyLeased': { agent: string | number; copy: string | number; revision: string | number }

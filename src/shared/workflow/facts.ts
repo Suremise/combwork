@@ -149,6 +149,15 @@ export interface AskAction {
 /** At most this many actions on one question. */
 export const ASK_ACTIONS_MAX = 3
 
+/**
+ * The gates of Hive's own requests (§16.8.5): the user's review, the OK before merging, the round limit, a line held up,
+ * the merge queue's (an advance to approve, one stopped part way) and a decision after a merge (asked on a Done card).
+ * A request under any other gate is a question someone asked: an agent, the Assistant (`ask`), or a rule it couldn't
+ * keep. A question settled another way is closed (#1638); Hive's own requests stay until met.
+ */
+const HIVE_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, 'decision'])
+export const askedQuestion = (r: Pick<FactData['ApprovalRequested'], 'gate'>): boolean => !HIVE_GATES.has(r.gate)
+
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds, or an action offered (#1630). */
 export interface AnswerShape {
   outcome: 'approved' | 'declined' | 'answered'
@@ -231,6 +240,11 @@ export interface FactData {
   /** `text` in English (agents, the Agent API); `requestText`, Hive's own request as data for the window (an agent's words have none). */
   /** `entry` and `result`: the queue entry a merge queue's request is about, and its test merge's result (#1351). */
   ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string; checklist?: string[]; entry?: string; result?: string; actions?: AskAction[] }
+  /**
+   * A request closed without an answer (#1638): its card reached Done (`done`), or the agent that asked moved the card
+   * on itself (`carriedOn`: answered some other way, such as in its pane). It leaves For you as an answer does.
+   */
+  RequestClosed: { request: string; why: 'done' | 'carriedOn' }
   /** An answer (§16.8.5): `note` the user's reply; at the round limit, their `choice` and the rounds a carry on adds; `action`, an action the question offered, done (#1630; `note` its reason). */
   Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number; action?: AskActionKind }
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash'; requeue?: 'transient' | 'retry' }
@@ -534,6 +548,9 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         s.step = d.step === 'design' || d.step === 'followUp' ? { step: d.step, id: d.design ?? '', seq: f.seq, at: f.at, until: d.until ?? null, by } : null
         break
       }
+      case 'RequestClosed':
+        s.requests = s.requests.filter((r) => r.request !== (f.data as FactData['RequestClosed']).request)
+        break
       case 'Approval': {
         const d = f.data as FactData['Approval']
         s.approvals.push(d)
