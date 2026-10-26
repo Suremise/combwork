@@ -214,7 +214,7 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
   if (!r.ok) return { wait: refusalText(r.refusal, name) }
   log.info(`Lent ${userText(r.slot.name)} to ${userText(name(builder))} for ${lane ? `lane ${lane}` : `#${card.id}`} (lease ${r.lease.id})`)
   // Its carried lease kept for a card it has left ends now that this start holds its own (HI-1731).
-  await endLeftCarried(ws, projectPath, pool, builder, lane ? { lane } : { card: card.id }, r.lease.id)
+  await endLeftCarriedNow(ws, projectPath, pool, builder, lane ? { lane } : { card: card.id }, r.lease.id)
   return leaseAt(pool, r.lease)
 }
 
@@ -229,59 +229,184 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
  * one) with the same checkout, read again from its ref files (HR4: anything changed keeps it). A refusal changes
  * nothing. The card's work is on its line, which stays; back in Active, its start lends it a slot on that line as for any
  * card. The slot isn't reused or removed while the builder's run still writes there (a slot with a writer isn't free);
- * it drains once that run has moved, then retires as any free slot does.
+ * it drains once that run has moved, then retires as any free slot does. A slot its Resume took, kept for nothing, that
+ * the start couldn't take over just then (HI-1741) ends the same way, with every check but the card's, once it can be
+ * left (`leavable`). Whether it ended, or why not: `busy` (an operation or job on the slot, which the pass's retry waits
+ * out), `kept` (anything else).
  */
-async function endLeftCarried(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, starting: { card: number } | { lane: string }, holding: string): Promise<void> {
+async function endLeftCarried(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, starting: { card: number } | { lane: string }, holding: string): Promise<'ended' | 'busy' | 'kept'> {
   const carried = pool.leasesOf(builder).find((l) => l.kind === 'carried')
-  const kept = carried ? keptFor(ws, carried.id) : null
-  if (!carried || !kept || !('card' in kept) || ('card' in starting && kept.card === starting.card)) return
+  if (!carried) return 'kept'
+  const kept = keptFor(ws, carried.id)
+  // A slot its Resume took, kept for nothing, that the start couldn't take over (HI-1741: busy, or changed, just then):
+  // ended the same way, its line staying. An adopted worktree kept for nothing stays (its branch is on no card's line).
+  const resumed = !kept && pool.resumedCarry(carried)
+  if (!resumed && (!kept || !('card' in kept) || ('card' in starting && kept.card === starting.card))) return 'kept'
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   const slot = pool.slotOf(carried)
-  if (!wf || !slot) return
+  if (!wf || !slot) return 'kept'
+  if (slot.op || slot.job) return 'busy'
   const left = (): boolean => {
+    if (!kept || !('card' in kept)) return true
     const c = cardOf(wf, kept.card)
     return !c || wf.state(c).stage !== 'active'
   }
-  if (!left()) return
-  const d = await G.dirty(slot.folder)
-  if (isUnknown(d) || d.length) return
-  const checkout = G.headSync(slot.folder)
-  if (!checkout) return
+  if (!left()) return 'kept'
+  let checkout: Checkout | null
+  if (resumed) checkout = await leavable(projectPath, slot.folder, slot.target)
+  else {
+    const d = await G.dirty(slot.folder)
+    checkout = isUnknown(d) || d.length ? null : G.headSync(slot.folder)
+  }
+  if (!checkout) return 'kept'
+  const was = checkout
   const still = (): boolean => {
     const k = keptFor(ws, carried.id)
     const now = pool.slotOf(carried)
-    if (!k || !('card' in k) || k.card !== kept.card || !left() || !pool.leasesOf(builder).some((l) => l.id === holding)) return false
+    const same = resumed ? !k : !!k && 'card' in k && !!kept && 'card' in kept && k.card === kept.card
+    if (!same || !left() || !pool.leasesOf(builder).some((l) => l.id === holding)) return false
     if (!now || now.name !== slot.name || !samePlace(now.folder, slot.folder) || now.createdAt !== slot.createdAt || now.op || now.job) return false
-    const at = G.headSync(now.folder)
-    return !!at && at.line === checkout.line && at.head === checkout.head
+    return sameCheckout(now.folder, was)
   }
-  if (await pool.release(carried.id, 'superseded', still)) log.info(`The adopted ${userText(slot.name)}'s carried lease ${carried.id} ended: its builder left #${kept.card} for ${'card' in starting ? `#${starting.card}` : `lane ${starting.lane}`} (lease ${holding})`)
+  const why = kept && 'card' in kept ? `its builder left #${kept.card}` : 'its builder, who resumed there,' // i18n-ignore: a log line
+  if (await pool.release(carried.id, 'superseded', still)) {
+    log.info(`${userText(slot.name)}'s carried lease ${carried.id} ended: ${why} moved on to ${'card' in starting ? `#${starting.card}` : `lane ${starting.lane}`} (lease ${holding})`)
+    return 'ended'
+  }
+  const now = pool.slotOf(carried)
+  return now && (now.op || now.job) && !pool.lease(carried.id)?.to ? 'busy' : 'kept'
 }
 
 /**
- * A builder's own slot a start or a lane can take over (#1441): its carried lease (its adopted worktree, or a slot its
- * Resume took) kept for nothing now, the slot clean and its head in the target (merged). Null: none, or not now.
+ * Carried leases whose retirement waits for an operation or job on their slot to settle (HI-1741), by project: the pass
+ * looked at again after a pause that grows with each try (1 s, doubling, at most a minute), as `ensure` retries, until
+ * it isn't busy any more. One pass waits at a time per project; it goes with the workspace's lifetime (closed or opened
+ * again: dropped, and the opening's own pass looks again).
  */
-async function carriedToHand(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, target: string | null): Promise<{ carried: SlotLease; slot: Slot } | null> {
+interface Retry {
+  tries: number
+  timer: ReturnType<typeof setTimeout> | null
+  /** Its workspace's lifetime, and what drops the retry when it ends. */
+  life: AbortSignal
+  drop: () => void
+}
+const retiring = new Map<string, Retry>()
+const retireKey = (ws: WorkspaceService, projectPath: string): string => `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
+
+/** A retirement found busy: another pass asked for after its pause, unless one already waits. */
+function retireLater(ws: WorkspaceService, projectPath: string): void {
+  if (ended(ws)) return
+  const key = retireKey(ws, projectPath)
+  let r = retiring.get(key)
+  if (r && r.life !== ws.lifetime) forget(key, r)
+  r = retiring.get(key)
+  if (!r) {
+    const made: Retry = { tries: 0, timer: null, life: ws.lifetime, drop: () => forget(key, made) }
+    made.life.addEventListener('abort', made.drop, { once: true })
+    retiring.set(key, made)
+    r = made
+  }
+  if (r.timer) return
+  const life = r.life
+  r.tries++
+  const at = r
+  r.timer = setTimeout(() => {
+    at.timer = null
+    if (!life.aborted) void settleSlotCards(ws, projectPath)
+  }, Math.min(60_000, 1000 * 2 ** (r.tries - 1)))
+  r.timer.unref?.()
+}
+
+/** A retry forgotten: its pass no longer waits, nor its lifetime's listener. */
+function forget(key: string, r: Retry): void {
+  if (r.timer) clearTimeout(r.timer)
+  r.timer = null
+  r.life.removeEventListener('abort', r.drop)
+  if (retiring.get(key) === r) retiring.delete(key)
+}
+
+/** A project's retirement retry as it stands (tests), by its workspace's folder: its tries and whether a pass waits; null: none. */
+export function retireWaitOf(wsPath: string, projectPath: string): { tries: number; waiting: boolean } | null {
+  const r = retiring.get(`${wsPath.toLowerCase()}\n${projectPath.toLowerCase()}`)
+  return r ? { tries: r.tries, waiting: !!r.timer } : null
+}
+
+/** No retirement busy any more (the pass found none): its tries forgotten, a pass still waiting left to run. */
+function retiredNow(ws: WorkspaceService, projectPath: string): void {
+  const key = retireKey(ws, projectPath)
+  const r = retiring.get(key)
+  if (r && !r.timer) forget(key, r)
+}
+
+/** A start's end of its builder's left carried lease (endLeftCarried), its retry asked for when the slot was busy. */
+async function endLeftCarriedNow(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, starting: { card: number } | { lane: string }, holding: string): Promise<void> {
+  if ((await endLeftCarried(ws, projectPath, pool, builder, starting, holding)) === 'busy') retireLater(ws, projectPath)
+}
+
+/** A slot's checkout as a handover or a retirement decided on it (headSync's): its line (null: detached) and commit. */
+type Checkout = NonNullable<ReturnType<typeof G.headSync>>
+
+/**
+ * A builder's own slot a start or a lane can take over (#1441): its carried lease (its adopted worktree, or a slot its
+ * Resume took) kept for nothing now, the slot clean and its head in the target (merged), with its checkout as decided
+ * on (checked again in the handover's write). A slot its Resume took may also be left with its head not merged while a
+ * branch holds it (HI-1741: HB3's, on a line still in review, was left carried and unused while its lane was lent a
+ * second slot, and another builder found none free): `leavable`. Null: none, or not now.
+ */
+async function carriedToHand(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, target: string | null): Promise<{ carried: SlotLease; slot: Slot; checkout: Checkout | null } | null> {
   const carried = pool.leasesOf(builder).find((l) => l.kind === 'carried')
   if (!carried || keptFor(ws, carried.id)) return null
   const slot = pool.slotOf(carried)
-  return slot && (await cleanAndContained(projectPath, slot.folder, target)) ? { carried, slot } : null
+  if (!slot) return null
+  if (pool.resumedCarry(carried)) {
+    const checkout = await leavable(projectPath, slot.folder, target)
+    return checkout ? { carried, slot, checkout } : null
+  }
+  if (!(await cleanAndContained(projectPath, slot.folder, target))) return null
+  return { carried, slot, checkout: G.headSync(slot.folder) }
+}
+
+/**
+ * Whether a slot its agent's Resume took can be left (handed to another line, or freed) without losing work (HI-1741):
+ * no changes not committed, and its head either in the target or held by the branch it is on (a ref Hive keeps: a line
+ * is deleted only once its card is Done and merged, never while checked out). Detached and not merged, a HEAD naming a
+ * ref that is gone, or anything unknown: null (kept). Its checkout as decided on, otherwise.
+ */
+async function leavable(projectPath: string, folder: string, target: string | null): Promise<Checkout | null> {
+  const d = await G.dirty(folder)
+  if (isUnknown(d) || d.length) return null
+  const checkout = G.headSync(folder)
+  if (!checkout) return null
+  if (checkout.line) return checkout
+  return (await cleanAndContained(projectPath, folder, target)) ? checkout : null
+}
+
+/** Whether a slot's checkout is still the one decided on (read again from its ref files; unknown: no). */
+function sameCheckout(folder: string, was: Checkout): boolean {
+  const now = G.headSync(folder)
+  return !!now && now.line === was.line && now.head === was.head
 }
 
 /**
  * The handover (#1441): in one write, the carried lease ended (`handedOff`), the card's or lane's lease begun on the same
  * slot, and its conversations rebound to it (#1434's rebindSession: only the binding changes), so the agent's
  * conversation goes on there. Null when it couldn't be (the slot or lease changed meanwhile): the caller lends another.
+ * In the write, the slot is still the one decided on (its folder and making) with the same checkout (HI-1741).
  */
-async function handOffCarried(ws: WorkspaceService, projectPath: string, pool: SlotPool, own: { carried: SlotLease; slot: Slot }, req: { card?: number; lane?: string; agent: string }, agentName: string): Promise<SlotLease | null> {
+async function handOffCarried(ws: WorkspaceService, projectPath: string, pool: SlotPool, own: { carried: SlotLease; slot: Slot; checkout: Checkout | null }, req: { card?: number; lane?: string; agent: string }, agentName: string): Promise<SlotLease | null> {
   const host = (await ws.sessionScope(projectPath)).scope
   const id = (await ws.projectConfig(projectPath)).id ?? basename(projectPath)
+  const still = (s: Slot): boolean => samePlace(s.folder, own.slot.folder) && s.createdAt === own.slot.createdAt && (!own.checkout || sameCheckout(s.folder, own.checkout))
   const handed = await pool
-    .handOff(own.carried.id, req, (db, lease) => {
-      const bound = db.prepare('SELECT id FROM sessions WHERE host = ? AND lease = ?').all(host, own.carried.id) as { id: string }[] // i18n-ignore: SQL
-      for (const b of bound) rebindSession(db, host, id, b.id, lease.id)
-    })
+    .handOff(
+      own.carried.id,
+      req,
+      (db, lease) => {
+        const bound = db.prepare('SELECT id FROM sessions WHERE host = ? AND lease = ?').all(host, own.carried.id) as { id: string }[] // i18n-ignore: SQL
+        for (const b of bound) rebindSession(db, host, id, b.id, lease.id)
+      },
+      still
+    )
     .catch((e) => (log.warn(`handing ${userText(agentName)}'s slot ${userText(own.slot.name)} over`, e), null))
   if (handed) log.info(`${userText(agentName)}'s slot ${userText(own.slot.name)} handed over to ${req.lane ? `lane ${req.lane}` : `#${req.card}`} (lease ${handed.id})`)
   return handed
@@ -497,6 +622,7 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   if (ended(ws)) return
   const lanes = new Map((await rawLanes(ws)).map((l) => [l.id, l]))
   // 1. Releases, rules on or off: a card's lease its current cycle doesn't use, a lane's whose lane has ended.
+  let busy = false
   for (const l of pool.openLeases()) {
     if (ended(ws)) return
     if (l.kind === 'card' && l.card !== null) {
@@ -515,7 +641,13 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
       // An adopted worktree (#1441) kept for the lane or card in flight at the upgrade: released once that has ended (its
       // lane over, its card Done or put back). One kept for nothing stays (a handoff, or the user, ends it).
       const kept = keptFor(ws, l.id)
-      if (!kept) continue
+      if (!kept) {
+        // A slot its agent's Resume took while that agent builds in another slot (HI-1741: its start couldn't take it
+        // over just then, or a later start reused its lane's lease): ended as a start ends it, once it can be.
+        const other = workflowEnforced() && pool.resumedCarry(l) ? pool.leasesOf(l.agent).find((x) => x.kind !== 'carried' && !x.to && x.slot !== l.slot) : undefined
+        if (other) busy = (await endLeftCarried(ws, projectPath, pool, l.agent, other.lane ? { lane: other.lane } : { card: other.card! }, other.id)) === 'busy' || busy
+        continue
+      }
       const over = (): boolean => {
         if ('lane' in kept) return lanes.get(kept.lane)?.state !== 'active'
         const c = cardOf(wf, kept.card)
@@ -526,6 +658,9 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
       if (await pool.release(l.id, 'lane' in kept ? 'laneEnded' : 'cardEnded', over)) log.info(`The adopted ${userText(l.slot)}'s carried lease ${l.id} ended with ${'lane' in kept ? `lane ${kept.lane}` : `#${kept.card}`}`)
     }
   }
+  // A retirement waiting for its slot's operation or job: looked at again later; none: its tries forgotten.
+  if (busy) retireLater(ws, projectPath)
+  else retiredNow(ws, projectPath)
   if (!workflowEnforced() || ended(ws)) return
   // 2. Each current cycle in a lease: prepared, then its builder placed.
   for (const l of pool.openLeases()) {
@@ -851,7 +986,7 @@ export async function lendLane(ws: WorkspaceService, projectPath: string, lane: 
   if (r.ok) {
     log.info(`Lent ${userText(r.slot.name)} to lane ${lane} (lease ${r.lease.id})`)
     // Its carried lease kept for a card it has left ends now that the lane holds its own (HI-1731).
-    await endLeftCarried(ws, projectPath, pool, builder, { lane }, r.lease.id)
+    await endLeftCarriedNow(ws, projectPath, pool, builder, { lane }, r.lease.id)
     return { slot: r.slot.name }
   }
   return { waiting: refusalText(r.refusal, name) }
@@ -883,7 +1018,7 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
       lease = r.lease
       log.info(`Lent ${userText(r.slot.name)} to lane ${lane.id}, which waited for a slot (lease ${r.lease.id})`)
       // Its carried lease kept for a card it has left ends now that the lane holds its own (HI-1731).
-      await endLeftCarried(ws, projectPath, pool, lane.builder.id, { lane: lane.id }, r.lease.id)
+      await endLeftCarriedNow(ws, projectPath, pool, lane.builder.id, { lane: lane.id }, r.lease.id)
     }
     // Hive quitting once a slot is lent (#1628): the lane keeps it and keeps waiting; the next start's pass starts it.
     if (stopped()) return
