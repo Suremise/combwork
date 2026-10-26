@@ -3722,7 +3722,12 @@ decided again in it):
   reading `worktree` for where an agent works, which is no promise of a way back.
 - **A carried lease's life.** Kept for a lane or card: those finish where they started, its cards' folder the adopted
   worktree on the agent's own branch (the stand-in, §16.19.1), and the pass ends the lease once the lane ends or the card
-  is Done or put back. Kept for nothing: the agent keeps starting and resuming there until its next card or lane under
+  is Done or put back. Kept for a card its agent has **left** (no longer Active: in Review, Approved, On Hold…), it ends
+  (`superseded`) at that agent's next card or lane start, when its folder has no changes not committed: the card's work
+  is on its line, which stays, and the folder retires as any free slot does (HI-1731: HB3's old folder stayed held for
+  a checks-only card in Approved). A carried lease's end never stops an agent with work elsewhere (another open lease, a
+  running lane it builds, or a watch of its own): its run goes on, and the slot drains once it leaves the folder; with
+  nothing else, it is stopped once its turn is over. Kept for nothing: the agent keeps starting and resuming there until its next card or lane under
   slots, which **takes the slot over** when it is clean and its head is in the target: in one write the carried lease
   ends (`handedOff`), the card's or lane's lease begins on the same slot and its conversations are rebound to it, so the
   conversation goes on there and resumes there after a restart. Otherwise the card gets another slot and the carried one

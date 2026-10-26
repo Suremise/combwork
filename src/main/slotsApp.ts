@@ -19,7 +19,7 @@ import { boardRead, boardWrite, boardWriteOp, cardKeyOf } from './boardStore'
 import { config } from './config'
 import { agentReadsInbox, cancelFromSource, createDelivery, deliveriesOf, fromSource, offerNow, onDeliveriesChanged, waitingForRunNow } from './deliveries'
 import { containsPlace } from './fsutil'
-import { getLane } from './lanes'
+import { getLane, rawLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { agentLimit } from './projectAgents'
 import { progress, progressGate } from './progressService'
@@ -295,10 +295,24 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
  *
  * A lane's lease (`laneEnded`, `laneAbandoned`; `at`: its workspace and pool) is ended gently instead (HI-1706,
  * LANES_GENTLE_END on): laneEnd.
+ *
+ * A carried lease's end (#1441: an adopted worktree, kept for a card or lane from the upgrade) never stops an agent
+ * that has work elsewhere (HI-1731: HB3 was stopped mid-lane when the card its old folder was kept for went to Done):
+ * another open lease, a running lane it builds, or a watch of its own. Its run goes on, and the slot drains once it
+ * leaves the folder (its next start elsewhere moves it). With nothing else, it is stopped once its turn is over. That
+ * look is the one await: the promise returned (a carried lease's only) settles once it is made.
  */
-export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Slot, at?: { ws: WorkspaceService; pool: SlotPool }): void {
+export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Slot, at?: { ws: WorkspaceService; pool: SlotPool }): Promise<void> | void {
   const w = slot.writer
   if (!w || w.lease !== lease.id) return
+  if (lease.kind === 'carried' && at) {
+    return workElsewhere(projectPath, w.agent, lease, at)
+      .catch(() => null)
+      .then((work) => {
+        if (work) log.info(`Keeps ${userText(w.agent)}'s session in ${userText(slot.name)} running: its carried lease ${lease.id} ended (${lease.why ?? 'released'}), but it ${work}`)
+        else stopWhenIdle(projectPath, lease, slot, w)
+      })
+  }
   // This Hive's run of it, still (another Hive's run, or one already over, isn't this Hive's to stop).
   const mine = (): { run: string; starting: boolean } | null => {
     const r = sessions.runNow(projectPath, w.agent)
@@ -307,6 +321,32 @@ export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Sl
   if (at && lease.lane && (lease.why === 'laneEnded' || lease.why === 'laneAbandoned') && advanced.get<boolean>(LANES_GENTLE_END) !== false && !mine()?.starting) {
     laneEnd(projectPath, lease, slot.name, w, at)
     return
+  }
+  stopWhenIdle(projectPath, lease, slot, w)
+}
+
+/**
+ * What an agent works on besides a lease that ended (HI-1731), in words for the log, or null: another open lease of its
+ * in the pool, a running lane of the project it builds, or a watch of its own (a card's or a lane's).
+ */
+export async function workElsewhere(projectPath: string, agent: string, lease: SlotLease, at: { ws: WorkspaceService; pool: SlotPool }): Promise<string | null> {
+  const other = at.pool.leasesOf(agent).find((l) => l.id !== lease.id && !l.to)
+  if (other) return `holds lease ${other.id} (${other.lane ? `lane ${other.lane}` : other.card !== null ? `#${other.card}` : other.kind})`
+  const project = basename(projectPath).toLowerCase()
+  const lane = (await rawLanes(at.ws)).find((l) => l.state === 'active' && l.builder.id === agent && l.project.toLowerCase() === project)
+  if (lane) return `builds lane ${lane.id}`
+  // Imported here: watches.ts registers its delivery sources as it loads, which slots' own users needn't.
+  const { watchFor } = await import('./watches')
+  const watch = watchFor(projectPath, agent)
+  if (watch) return `watches (${userText(watch.label)})`
+  return null
+}
+
+/** The lease's run stopped once its turn and its runs have finished; a start still being prepared at once (#1434). */
+function stopWhenIdle(projectPath: string, lease: SlotLease, slot: Slot, w: SlotWriter): void {
+  const mine = (): { run: string; starting: boolean } | null => {
+    const r = sessions.runNow(projectPath, w.agent)
+    return r && r.run === w.run ? r : null
   }
   let off: (() => void) | null = null
   const done = (): void => {

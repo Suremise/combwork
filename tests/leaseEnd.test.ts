@@ -22,6 +22,12 @@ vi.mock('../src/main/sessions', () => ({
   }
 }))
 
+/** The project's lanes as kept, and each agent's watch, as lanes.ts and watches.ts give them. */
+let lanesNow: { id: string; project: string; state: string; builder: { id: string } }[] = []
+const watching = new Map<string, { label: string }>()
+vi.mock('../src/main/lanes', async (orig) => ({ ...(await orig<object>()), rawLanes: async () => lanesNow }))
+vi.mock('../src/main/watches', async (orig) => ({ ...(await orig<object>()), watchFor: (_p: string, agent: string) => watching.get(agent) ?? null }))
+
 const { tellListeners } = await import('../src/main/events')
 const { setAgentBusy } = await import('../src/main/workflow/lineUpdates')
 const { setRunsGoing } = await import('../src/main/workflow/service')
@@ -40,6 +46,8 @@ const AT = { ws: { lifetime: new AbortController().signal }, pool: { slots: () =
 const status = (): void => tellListeners({ type: 'session-status', state: { agentId: 'b1', projectPath: P } as LiveSessionState })
 
 afterEach(() => {
+  lanesNow = []
+  watching.clear()
   runs.clear()
   stopped.length = 0
   setAgentBusy(null)
@@ -132,5 +140,46 @@ describe("a lease's end stops the run writing in its slot under it", () => {
     stopLeaseSession(P, LEASE, slotWith({ run: 'run-9', lease: 'l1' }))
     status()
     expect(stopped).toEqual([])
+  })
+})
+
+describe("a carried lease's end never stops an agent with work elsewhere (HI-1731)", () => {
+  /** HB3's: an adopted worktree's lease kept for a card, ended as that card went to Done. */
+  const CARRIED = { id: 'l1', agent: 'b1', kind: 'carried', why: 'cardEnded', card: null, lane: null, to: new Date().toISOString() } as unknown as Parameters<typeof stopLeaseSession>[1]
+  const at = (open: { id: string; kind: string; card?: number | null; lane?: string | null; to?: string | null }[] = []) => ({ ws: { lifetime: new AbortController().signal }, pool: { slots: () => [slotWith({ run: 'run-1', lease: 'l1' })], leasesOf: () => open.map((l) => ({ card: null, lane: null, to: null, ...l })) } }) as unknown as NonNullable<Parameters<typeof stopLeaseSession>[3]>
+
+  it('building a running lane: its session goes on, at its first idle moment and after', async () => {
+    runs.set('b1', { run: 'run-1', starting: false })
+    lanesNow = [{ id: 'lane-b', project: 'project', state: 'active', builder: { id: 'b1' } }]
+    await stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), at())
+    status()
+    expect(stopped).toEqual([])
+    expect(runs.get('b1')).toEqual({ run: 'run-1', starting: false })
+  })
+
+  it('holding another lease (a card started since), or watching: goes on too', async () => {
+    runs.set('b1', { run: 'run-1', starting: false })
+    await stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), at([{ id: 'l1', kind: 'carried', to: 'x' }, { id: 'l2', kind: 'card', card: 7 }]))
+    watching.set('b1', { label: 'Waiting for HI-9 → Review' })
+    await stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), at())
+    status()
+    expect(stopped).toEqual([])
+  })
+
+  it("a lane of another project, or one it doesn't build, or one ended, isn't work of its: stopped once idle, as before", async () => {
+    runs.set('b1', { run: 'run-1', starting: false })
+    lanesNow = [
+      { id: 'lane-x', project: 'other', state: 'active', builder: { id: 'b1' } },
+      { id: 'lane-y', project: 'project', state: 'active', builder: { id: 'b2' } },
+      { id: 'lane-z', project: 'project', state: 'ended', builder: { id: 'b1' } }
+    ]
+    let busy = true
+    setAgentBusy(() => busy)
+    await stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), at())
+    status()
+    expect(stopped).toEqual([])
+    busy = false
+    status()
+    expect(stopped).toEqual(['b1:run-1'])
   })
 })

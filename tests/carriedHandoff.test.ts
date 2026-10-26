@@ -18,11 +18,12 @@ const base = tempDir('carriedhandoff-')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')
 const { boardFile, boardRead } = await import('../src/main/boardStore')
 const { SlotStore, fileSlotConn } = await import('../src/main/slots')
-const { migrateSlots, startSlotMigration, stopSlotMigration } = await import('../src/main/slotMigration')
+const { keptFor, migrateSlots, startSlotMigration, stopSlotMigration } = await import('../src/main/slotMigration')
 const { leaseForStart } = await import('../src/main/slotCards')
 const { folderAgent, folderFacts } = await import('../src/main/agentFolders')
 const { canResumeNow, resumeHold } = await import('../src/shared/agentFolders')
 const { poolFor } = await import('../src/main/slotsApp')
+const { workflowFor } = await import('../src/main/workflow/service')
 const tasks = await import('../src/main/tasks')
 const { DEFAULT_PROJECT_CONFIG } = await import('../src/shared/defaults')
 
@@ -163,5 +164,50 @@ describe("an adopted worktree handed over to its agent's first card (#1441)", ()
     }
     expect(store.openLeases().filter((l) => l.slot === 'hb3')).toHaveLength(1)
     expect(open('b3')?.kind).toBe('card')
+  })
+})
+
+describe("a carried lease kept for a card its builder has left ends at the builder's next start (HI-1731)", () => {
+  // B2's adopted worktree is kept for its card in flight at the upgrade (From 0.9, Active). HB3's case: that card left
+  // (here, On Hold), the builder starts other work; its old folder must not stay held for a card nobody works on.
+  const kept = (): number | null => {
+    const l = open('b2')
+    const k = l?.kind === 'carried' ? keptFor(ws, l.id) : null
+    return k && 'card' in k ? k.card : null
+  }
+  const lineOf = (folder: string): string => sh(folder, 'rev-parse', '--abbrev-ref', 'HEAD').trim()
+
+  it('kept while that card is Active, or its folder has changes not committed; ended (superseded) once neither, its line kept', async () => {
+    const a = kept()!
+    expect(a).toBeGreaterThan(0)
+    const carried = open('b2')!
+    const line = lineOf(wt('hb2'))
+    const stage = async (): Promise<string> => {
+      const wf = await run(() => workflowFor(ws, project))
+      return wf.state(wf.store.card(a)).stage
+    }
+    expect(await stage()).toBe('active')
+    // Still Active: another start of B2's leaves it carried (that card gets a slot of its own).
+    const b = (await run(() => tasks.createTask({ title: "B2's lane card", project: 'alpha', agent: 'b2' }, { kind: 'user' }))).number
+    await start(b, 'b2', false)
+    expect(store.openLease('hb2')?.id).toBe(carried.id)
+
+    // Left (On Hold), but changes not committed in its folder: still kept.
+    await run(() => tasks.updateTask(a, { column: 'hold' }, { kind: 'user' }))
+    expect(await stage()).not.toBe('active')
+    writeFileSync(join(wt('hb2'), 'a.txt'), 'changed\n')
+    const c = (await run(() => tasks.createTask({ title: "B2's next", project: 'alpha', agent: 'b2' }, { kind: 'user' }))).number
+    await start(c, 'b2', false)
+    expect(store.openLease('hb2')?.id).toBe(carried.id)
+    sh(wt('hb2'), 'checkout', '--', 'a.txt')
+
+    // Clean: B2's next start ends it, and the slot is free to retire; the card's line is still there.
+    const d = (await run(() => tasks.createTask({ title: "B2's last", project: 'alpha', agent: 'b2' }, { kind: 'user' }))).number
+    await start(d, 'b2', false)
+    const ended = boardRead(ws, (db) => db.prepare('SELECT why, ended_at FROM slot_leases WHERE id = ?').get(carried.id) as { why: string; ended_at: string | null })
+    expect(ended).toMatchObject({ why: 'superseded', ended_at: expect.any(String) })
+    expect(store.openLeases().some((l) => l.slot === 'hb2' && l.id === carried.id)).toBe(false)
+    expect(store.openLeases().filter((l) => l.agent === 'b2').every((l) => l.kind === 'card')).toBe(true)
+    expect(sh(project, 'branch', '--list', line).trim()).not.toBe('')
   })
 })
