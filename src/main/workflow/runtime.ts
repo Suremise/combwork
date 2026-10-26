@@ -1565,9 +1565,12 @@ export class Workflow {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
+    // HI-1734: Skip Review only where the card's rules review it (nothing to skip otherwise: it would only be refused).
+    const reviews = this.reviewedRuleset(card, s).options.review !== 'none'
+    const actions = (args.actions ?? []).filter((a) => a.kind !== 'skipReview' || reviews)
     let request = ''
     await this.write(card, s.started ? this.rulesetOf(card, s) : null, actor, (w) => {
-      request = this.askUser(w, args.kind, 'ask', args.text, { asker: agentOf(actor), ...(args.revision ? { revision: args.revision } : {}), ...(args.checklist?.length ? { checklist: args.checklist } : {}), ...(args.actions?.length ? { actions: args.actions } : {}) })
+      request = this.askUser(w, args.kind, 'ask', args.text, { asker: agentOf(actor), ...(args.revision ? { revision: args.revision } : {}), ...(args.checklist?.length ? { checklist: args.checklist } : {}), ...(actions.length ? { actions } : {}) })
     })
     return this.ok(card, s.stage, s.stage, { request })
   }

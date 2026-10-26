@@ -305,6 +305,34 @@ const check = (name, ok, extra = '') => {
     check('…and the builder hears what was chosen', !!(await lib.until(async () => wakes('Maker').some((w) => w.startsWith(`[Hive] ${sKey}`) && w.includes('moved it to Done (already done by #1277)')), HUNG_MS)), JSON.stringify(wakes('Maker')))
     await page.keyboard.press('Escape')
 
+    // HI-1734: a question offering one action (Skip Review): beside Send Reply, "Skip Review With This Reply" does it with
+    // the typed reply as its reason, and answers the question.
+    // Its rules review it (beta's are review-free from the OK step on): reviewed by you for this card, as before after it.
+    const betaOptions = { review: 'none', noSelfReview: false, finish: 'agentMerges', folder: 'slots', okBefore: { mode: 'labels', labels: ['ui'] } }
+    await inv('workflow:setOptions', beta, { preset: null, options: { ...betaOptions, review: 'you', okBefore: { mode: 'never', labels: [] } } })
+    const k = (await inv('tasks:create', { title: 'Checks only', project: 'beta' })).number
+    await inv('tasks:move', k, 'doing', { agent: maker.id })
+    await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${k}`, kind: 'decide', text: 'May we skip review for this checks-only change?', actions: [{ kind: 'skipReview' }] })}`)
+    await openByTitle(page, k)
+    const kDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
+    await kDialog.waitFor({ timeout: HUNG_MS })
+    const kSection = kDialog.locator('[data-section="for-you"]')
+    const agree = kSection.getByRole('button', { name: 'Skip Review With This Reply' })
+    check('one action offered: Skip Review shows, and "Skip Review With This Reply" beside Send Reply', !!(await lib.until(async () => (await kSection.locator('[data-offer="skipReview"]').count()) === 1 && (await agree.count()) === 1, HUNG_MS)), await kSection.innerText().catch(() => ''))
+    check('…disabled until a reply is typed', await agree.isDisabled())
+    await kSection.locator('textarea.for-you-reply').fill('Yes: checks only, nothing to review.')
+    check('…enabled with a reply', !!(await lib.until(async () => !(await agree.isDisabled()), HUNG_MS)))
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await kSection.screenshot({ path: path.join(lib.WORK, `foryou-agree-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await agree.click()
+    const skipped = async () => (await inv('tasks:facts', k)).filter((f) => f.kind === 'ReviewSkipSet').at(-1)?.data
+    check('one click skips its review with the reply as the reason, and answers the question', !!(await lib.until(async () => (await skipped())?.skip === true && (await skipped())?.reason === 'Yes: checks only, nothing to review.' && (await inv('tasks:forYou')).count === 0, HUNG_MS)), JSON.stringify({ skip: (await skipped()) ?? null, waiting: (await inv('tasks:forYou')).items.map((i) => i.text) }))
+    await page.keyboard.press('Escape')
+    await inv('workflow:setOptions', beta, { preset: null, options: betaOptions })
+
     // #1637: an agent's question is Markdown (HB5's HI-1630 design question): rendered as card comments are, never the
     // raw marks, and a long one folded with Show all.
     const m = (await inv('tasks:create', { title: 'Design question', project: 'beta' })).number

@@ -1678,8 +1678,9 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   }
   if (!action) {
     const card = await answerIt()
-    // Not carried out by Hive: the Assistant has it too (HI-1734), when an agent asked.
-    if (req.gate === 'ask' && req.asker && (reply || decision)) await relayToAssistant(ws, card, req, reply ?? decision!, wf)
+    // Not carried out by Hive: the Assistant has it too (HI-1734), when an agent asked: every answer, a bare Approve or
+    // Decline too (HR1's round 1), with how the user answered and what they wrote, each whole.
+    if (req.gate === 'ask' && req.asker) await relayToAssistant(ws, card, req, { outcome, ...(reply ? { reply } : {}), ...(decision ? { decision } : {}) }, wf)
     return card
   }
   return cardBatch(ws, async () => {
@@ -1701,7 +1702,7 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
  * the question offered; an open no-code or review-skip proposal (Hive's own after a pass with nothing to merge too); a
  * card in Passed its agent can't move on (it doesn't merge it); a block. Read from the card's state, never from the answer's text.
  */
-async function relayToAssistant(ws: WorkspaceService, card: TaskCard, req: Request, answer: string, wf: Workflow): Promise<void> {
+async function relayToAssistant(ws: WorkspaceService, card: TaskCard, req: Request, answer: { outcome: 'approved' | 'declined' | 'answered'; reply?: string; decision?: string }, wf: Workflow): Promise<void> {
   const rec = wf.store.card(card.number)
   const s = wf.state(rec)
   const facts = wf.store.facts(card.number)
@@ -1711,7 +1712,7 @@ async function relayToAssistant(ws: WorkspaceService, card: TaskCard, req: Reque
     req.actions?.[0]?.kind ?? (kindProposed(facts) === 'no-code' ? 'noCode' : reviewSkipOf(facts).proposed !== null ? 'skipReview' : card.column === 'passed' && finish !== 'agentMerges' ? 'done' : card.blocked ? 'unblock' : null)
   const asker = ws.path && card.project ? (await ws.projectConfig(join(ws.path, card.project)).then(projectAgents, () => [])).find((x) => x.id === req.asker) : undefined
   const { relayAnswer } = await import('./answerRelay')
-  await relayAnswer(ws, { card: card.number, key: rec.key || card.key || cardRef(card.number), project: card.project, asker: req.asker!, askerName: asker ? `${asker.name} (${card.project})` : req.asker!, request: req.request, question: req.text, answer, need })
+  await relayAnswer(ws, { card: card.number, key: rec.key || card.key || cardRef(card.number), project: card.project, asker: req.asker!, askerName: asker ? `${asker.name} (${card.project})` : req.asker!, request: req.request, question: req.text, ...answer, need })
 }
 
 /** A new card's reads, made before its number is taken (#1216: recorder.ts' NEW_CARD). */

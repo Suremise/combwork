@@ -52,20 +52,27 @@ export interface AnswerToRelay {
   askerName: string
   request: string
   question: string
-  answer: string
+  /** How the user answered (an approval, a decline, or an answer to a question), kept apart from any words with it. */
+  outcome: 'approved' | 'declined' | 'answered'
+  /** The user's reply or decision, whole (a bare Approve or Decline has none). */
+  reply?: string
+  decision?: string
   need: AskActionKind | null
 }
 
-const clip = (s: string, max: number): string => {
-  const one = s.replace(/\s+/g, ' ').trim()
-  return one.length > max ? `${one.slice(0, max - 1)}…` : one
-}
-
-/** The Assistant's line: the answer, and what to do with it. Agent-facing. */
+/**
+ * The Assistant's line: how the user answered (approved, declined, answered) and what they wrote, each whole, never cut
+ * (HR1's round 1: a condition at a reply's end must reach whoever acts on it; a delivery holds 100,000 characters, a
+ * reply at most 20,000), where it stays on the board, and what to do. A decline is never worded as a grant. Agent-facing.
+ */
 export function relayLine(a: AnswerToRelay): string {
-  const said = `the user answered ${a.askerName}'s question on ${a.key} ("${clip(a.question, 200)}"): "${clip(a.answer, 1500)}".`
-  if (a.need) return `This needs you: ${said} ${a.askerName} can't ${NEED_WORDS[a.need]} by itself; do it if the answer agrees, with the answer as the reason (hive_update_task).` // i18n-ignore: agent-facing (the Assistant's inbox)
-  return `For you to check: ${said} If it grants a change ${a.askerName} can't make itself (Done past its rules, no code, skipping its review), make it, with the answer as the reason; otherwise nothing is needed.` // i18n-ignore: agent-facing (the Assistant's inbox)
+  const how = a.outcome === 'approved' ? 'approved' : a.outcome === 'declined' ? 'declined' : 'answered'
+  const words = [a.reply ? `Their reply, whole: <<<${a.reply}>>>` : '', a.decision ? `Recorded as the card's decision, whole: <<<${a.decision}>>>` : ''].filter(Boolean).join(' ')
+  const said = `the user ${how} ${a.askerName}'s question on ${a.key}. The question, whole: <<<${a.question}>>>.${words ? ` ${words}.` : a.outcome === 'answered' ? '' : ' Nothing was written with it.'} (Both stay on the card: hive_read_task ${a.key}.)` // i18n-ignore: agent-facing (the Assistant's inbox)
+  if (a.outcome === 'declined') return `For your information: ${said} The user declined: nothing is to be done for it.` // i18n-ignore: agent-facing (the Assistant's inbox)
+  const agrees = a.outcome === 'approved' ? 'Their approval is a yes, within any conditions its reply sets' : 'Do it only if the answer agrees, within any conditions it sets' // i18n-ignore: agent-facing (the Assistant's inbox)
+  if (a.need) return `This needs you: ${said} ${a.askerName} can't ${NEED_WORDS[a.need]} by itself. ${agrees}, with the answer as the reason (hive_update_task).` // i18n-ignore: agent-facing (the Assistant's inbox)
+  return `For you to check: ${said} If it grants a change ${a.askerName} can't make itself (Done past its rules, no code, skipping its review), make it, within any conditions it sets, with the answer as the reason; otherwise nothing is needed.` // i18n-ignore: agent-facing (the Assistant's inbox)
 }
 
 /**

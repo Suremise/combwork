@@ -533,6 +533,15 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     expect(relayed(w)).toEqual([])
   })
 
+  it("Skip Review isn't offered on a card whose rules don't review it (nothing to skip): dropped from the question's actions, the rest kept", async () => {
+    const { w } = await workspace({ ...allOff('git'), finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Skip its review, or move it to Done?', actions: [{ kind: 'skipReview' }, { kind: 'done' }] }))
+    expect(forYou(w).items[0].actions).toEqual([{ kind: 'done' }])
+  })
+
   it('a reply to a question that offered an action, not done: its asker and the Assistant are told, "This needs you"; nothing is moved', async () => {
     const { w } = await workspace({ ...REVIEWED, finish: 'agentMerges', folder: 'slots' })
     const card = await create(w)
@@ -543,7 +552,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     expect(after.column).toBe('doing')
     const got = relayed(w)
     expect(got).toHaveLength(1)
-    expect(got[0].body).toBe(`This needs you: the user answered Builder (p)'s question on p-${card} ("Nothing to merge: Done?"): "Checks-only card, nothing to merge.". Builder (p) can't move it to Done by itself; do it if the answer agrees, with the answer as the reason (hive_update_task).`)
+    expect(got[0].body).toBe(`This needs you: the user answered Builder (p)'s question on p-${card}. The question, whole: <<<Nothing to merge: Done?>>>. Their reply, whole: <<<Checks-only card, nothing to merge.>>>. (Both stay on the card: hive_read_task p-${card}.) Builder (p) can't move it to Done by itself. Do it only if the answer agrees, within any conditions it sets, with the answer as the reason (hive_update_task).`)
     expect((await inboxOf(w, 'a1')).find((i) => i.kind === 'answer')?.text).toContain('Checks-only card, nothing to merge.')
   })
 
@@ -571,7 +580,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     const after = await answer(w, card, forYou(w).items[0].request, { outcome: 'answered', reply: 'Yes, skip it.' })
     expect(after.column).toBe('doing')
     expect(facts(w, card).filter((f) => f.kind === 'ReviewSkipSet')).toEqual([])
-    expect(relayed(w).map((r) => r.body)).toEqual([`For you to check: the user answered Builder (p)'s question on p-${card} ("May we skip review for this checks-only change?"): "Yes, skip it.". If it grants a change Builder (p) can't make itself (Done past its rules, no code, skipping its review), make it, with the answer as the reason; otherwise nothing is needed.`])
+    expect(relayed(w).map((r) => r.body)).toEqual([`For you to check: the user answered Builder (p)'s question on p-${card}. The question, whole: <<<May we skip review for this checks-only change?>>>. Their reply, whole: <<<Yes, skip it.>>>. (Both stay on the card: hive_read_task p-${card}.) If it grants a change Builder (p) can't make itself (Done past its rules, no code, skipping its review), make it, within any conditions it sets, with the answer as the reason; otherwise nothing is needed.`])
     expect((await inboxOf(w, 'a1')).find((i) => i.kind === 'answer')?.text).toContain('Yes, skip it.')
   })
 
@@ -607,6 +616,58 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     expect((await deliveries.readInbox(w.assistantHome, 'assistant')).items).toEqual([])
     await vi.waitFor(() => expect(relayed(w).map((r) => r.state)).toEqual(['cancelled']), { timeout: 10_000 })
     await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("The Hive Assistant couldn't be told of your answer to Builder (p)'s question: only Builder (p) has it"), { timeout: 10_000 })
+  })
+
+  it("a bare Approve or Decline of a no-action, no-proposal question on a Doing card reaches the Assistant too, saying which, with nothing written (HR1's round 1 finding 1)", async () => {
+    const { w } = await workspace({ ...REVIEWED, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'approve', text: 'May we skip review for this checks-only change?' }))
+    await answer(w, card, forYou(w).items[0].request, { outcome: 'approved' })
+    expect(facts(w, card).filter((f) => f.kind === 'ReviewSkipSet')).toEqual([])
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'approve', text: 'May I push the tag?' }))
+    await answer(w, card, forYou(w).items[0].request, { outcome: 'declined' })
+    const got = relayed(w).map((r) => r.body)
+    expect(got).toHaveLength(2)
+    expect(got[0]).toMatch(/^For you to check: the user approved Builder \(p\)'s question on p-\d+\. The question, whole: <<<May we skip review for this checks-only change\?>>>\. Nothing was written with it\. .*If it grants a change/)
+    expect(got[1]).toMatch(/^For your information: the user declined Builder \(p\)'s question on p-\d+\. The question, whole: <<<May I push the tag\?>>>\. Nothing was written with it\. .*The user declined: nothing is to be done for it\.$/)
+  })
+
+  it('an approval and a decline with the same reply are relayed as what they are: the decline is never worded as a grant (finding 2)', async () => {
+    const { w } = await workspace({ ...REVIEWED, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    // Two actions offered: Approve doesn't carry either out, so both go to the Assistant.
+    const offered = [{ kind: 'done' as const }, { kind: 'noCode' as const }]
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'approve', text: 'Move it to Done?', actions: offered }))
+    await answer(w, card, forYou(w).items[0].request, { outcome: 'approved', reply: 'Yes, after the security audit.' })
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'approve', text: 'Move it to Done?', actions: offered }))
+    await answer(w, card, forYou(w).items[0].request, { outcome: 'declined', reply: 'Yes, after the security audit.' })
+    expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('doing')
+    const [yes, no] = relayed(w).map((r) => r.body)
+    expect(yes).toMatch(/^This needs you: the user approved .*Their reply, whole: <<<Yes, after the security audit\.>>>\. .*can't move it to Done by itself\. Their approval is a yes, within any conditions its reply sets/)
+    expect(no).toMatch(/^For your information: the user declined .*Their reply, whole: <<<Yes, after the security audit\.>>>\. .*The user declined: nothing is to be done for it\.$/)
+    expect(no).not.toMatch(/This needs you|do it|make it/i)
+  })
+
+  it('the question and the reply reach the Assistant whole: a condition past any length is kept (finding 3)', async () => {
+    const { w } = await workspace({ ...REVIEWED, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    const question = `Nothing to merge here. ${'The checks ran on every suite and passed. '.repeat(20)}QUESTION-END: or should I wait for the audit?`
+    const reply = `Yes, here is the background. ${'The audit covers the installer and the update feed. '.repeat(70)}Do not move it to Done until I confirm the audit has passed.`
+    expect(question.length).toBeGreaterThan(800)
+    expect(reply.length).toBeGreaterThan(3000)
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: question, actions: [{ kind: 'done' }] }))
+    await answer(w, card, forYou(w).items[0].request, { outcome: 'answered', reply })
+    const [body] = relayed(w).map((r) => r.body)
+    expect(body).toContain(`<<<${question}>>>`)
+    expect(body).toContain(`<<<${reply}>>>`)
+    expect(body).toContain('Do not move it to Done until I confirm the audit has passed.')
+    expect(body).toContain(`hive_read_task p-${card}`)
   })
 
   it('a code card passing review with nothing to merge (its change already in its target) is proposed no code; one with work to merge is not', async () => {
