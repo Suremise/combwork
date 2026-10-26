@@ -186,7 +186,7 @@ function intentTools(): Tool[] {
     intent(
       'hive_ask_user',
       'ask',
-      'Ask the user something about a card: it shows under For you with the card; no round is counted and it is not a stall. The answer comes to your inbox. When the answer is something only the user can do on the card (move it to Done, make it no code, unblock it), offer it in actions: one click does it.',
+      'Ask the user something about a card: it shows under For you with the card; no round is counted and it is not a stall. The answer comes to your inbox. When the answer is something only the user can do on the card (move it to Done, make it no code, unblock it, skip its review), offer it in actions: one click does it.',
       {
         kind: { type: 'string', enum: ['approve', 'decide', 'test', 'signIn', 'other'] },
         text: { type: 'string', description: 'The question, in full.' },
@@ -194,7 +194,7 @@ function intentTools(): Tool[] {
         checklist: { type: 'array', items: { type: 'string' }, description: 'For test: the steps to try, in order (at most 20).' },
         actions: {
           type: 'array',
-          items: { type: 'object', properties: { kind: { type: 'string', enum: ['done', 'noCode', 'unblock'] }, reason: { type: 'string', description: 'Your suggested reason, recorded with it.' } }, required: ['kind'] },
+          items: { type: 'object', properties: { kind: { type: 'string', enum: ['done', 'noCode', 'unblock', 'skipReview'] }, reason: { type: 'string', description: 'Your suggested reason, recorded with it.' } }, required: ['kind'] },
           description: 'Up to 3, each kind once: buttons under the question. Its answer says which the user chose.'
         }
       },

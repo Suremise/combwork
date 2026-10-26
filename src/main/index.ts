@@ -9,6 +9,8 @@ import { initSkillCopies } from './skillCopies'
 import { offNames } from '../shared/skillDelivery'
 import { initInboxNotices } from './inboxNotices'
 import { initDecisionWakes } from './decisionWakes'
+// The user's answers given to the Assistant too (HI-1734): its delivery source, registered at start.
+import './answerRelay'
 import { initWorkflowNotices } from './workflowNotices'
 import { initDevConsole } from './devConsoleSources'
 import { flightRecorder } from './flightRecorder'

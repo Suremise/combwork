@@ -144,9 +144,10 @@ export const QUEUE_STUCK_GATE = 'queueStuck'
 
 /**
  * What an agent's question may offer the user to do on its card (#1630): move it to Done, make it no code, unblock it,
- * each with the agent's suggested reason. One click does it as the user, with the reason, and answers the question.
+ * skip its review (HI-1734), each with the agent's suggested reason. One click does it as the user, with the reason, and
+ * answers the question.
  */
-export const ASK_ACTIONS = ['done', 'noCode', 'unblock'] as const
+export const ASK_ACTIONS = ['done', 'noCode', 'unblock', 'skipReview'] as const
 export type AskActionKind = (typeof ASK_ACTIONS)[number]
 export interface AskAction {
   kind: AskActionKind

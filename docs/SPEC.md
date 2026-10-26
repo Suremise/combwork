@@ -2395,11 +2395,28 @@ on it an `answer` delivery from the user quoting the reply whole, its question q
 Decision** for a question (each with a tooltip saying what it does), and the four
 ways on (carry on with its rounds) at the round limit. **Actions an agent offers (#1630):** an agent's question may
 offer up to three things only the user can do on its card (`actions`: `done` Move to Done, `noCode` Make It No Code,
-`unblock` Unblock; `skipReview` waits for #1625), each with a suggested reason. Each the card allows now (not Done; a
-code card; blocked) is a button with its reason, editable; one click does what the board does, as the user, with the
+`unblock` Unblock; `skipReview` Skip Review, HI-1734), each with a suggested reason. Each the card allows now (not Done; a
+code card; blocked; Todo or Doing) is a button with its reason, editable; one click does what the board does, as the user, with the
 reason (Move to Done through the card's rules, the rules it skips an `Override` as Move Anyway's; Make It No Code the
-`card.kind` override; Unblock with the reason as the user's comment), then answers the question (`Approval.action`,
-the reason its `note`), and the asker is told which. An action refused, or no longer allowed, leaves the question open. A refused answer (answered or retired meanwhile) is said in a
+`card.kind` override; Skip Review the review skip set as the user's; Unblock with the reason as the user's comment), then
+answers the question (`Approval.action`, the reason its `note`), and the asker is told which. An action refused, or no
+longer allowed, leaves the question open. **An answer that needs someone other than its agent (HI-1734; on 25 Oct
+Darren's answer agreeing to move HI-1449 to Done reached only HB3, which can't, and it sat in Approved for two days):**
+with one action offered, **{Action} With This Reply** does it with the typed reply as its reason, and approving an Approve
+question that offers one does it too (the reply, else the agent's reason); Hive never reads consent into a reply's text.
+Any other answer to an agent's own question (gate `ask`) that Hive didn't carry out, a bare Approve or Decline too, is
+given to the Assistant as well as the asker (`answerRelay.ts`, a `control` delivery, `answer-relay`, once per request),
+saying how the user answered (approved, declined, answered) apart from what they wrote, the question and the reply
+each whole (never cut: a condition at a reply's end reaches it), and where both stay (`hive_read_task`); a decline is
+worded as one ("nothing is to be done for it"), never as a grant; otherwise "This needs you … {asker} can't
+{move it to Done / make it no code / skip its review / unblock it} by itself" where the card shows it (an action offered,
+an open no-code or review-skip proposal, a card in Passed its agent doesn't merge, a block), else "For you to check … if
+it grants a change {asker} can't make itself, make it". It is given only while the Assistant's hive tools are on and
+Settings → Assistant → Control lets it change cards, checked at each offer and hand-out; one it can't be given, or that
+ends unread, says so on the card and in a notice ("… couldn't be told of your answer"). **No code, proposed:** a code
+card that passes review with its change already in its target (nothing to merge) is proposed no code by Hive
+(`KindProposed`, once; the user confirms). Skip Review is dropped from a question's actions on a card whose rules don't
+review it (nothing to skip). A refused answer (answered or retired meanwhile) is said in a
 toast and the board read again; an answer clears the chip at once (`tasks-changed`). **A request settled another way
 is closed (#1638):** in the same write, a question still open once its card is in Done (one an agent or the Assistant
 asked: any request not under Hive's own gates, `askedQuestion`; an agent that asked is told it no longer stands, unless

@@ -73,12 +73,15 @@ export interface ForYouAnswer {
 
 /**
  * Whether the user can do an action a question offers on its card now (#1630): Move to Done unless it is Done, Make It
- * No Code on a code card, Unblock on a blocked one; none on an archived card. The window shows only these; main checks.
+ * No Code on a code card, Unblock on a blocked one, Skip Review before it is in Review; none on an archived card. The
+ * window shows only these; main checks.
  */
 export function askActionAvailable(kind: AskActionKind, card: { column: string; blocked?: string | null; archived?: boolean; kind?: CardKind }): boolean {
   if (card.archived) return false
   if (kind === 'done') return card.column !== 'done'
   if (kind === 'noCode') return (card.kind ?? 'code') === 'code'
+  // Skip its review (HI-1734): before it is in Review (one skipped already is left as it is).
+  if (kind === 'skipReview') return card.column === 'todo' || card.column === 'doing'
   return !!card.blocked
 }
 

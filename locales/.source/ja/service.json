@@ -8,6 +8,7 @@
   "service.advanced.notObject": "advanced.json should hold an object: {example}.",
   "service.advanced.notValues": "advanced.json's \"values\" should be an object of setting → value.",
   "service.advanced.unknown": "No advanced setting \"{id}\".",
+  "service.answerRelay.title": "{card}: nobody else has your answer",
   "service.attachments.badFolder": "Not a session folder name.",
   "service.attachments.badRecord": "{file} is not a record of moved files",
   "service.attachments.notOwn": "{folder} is a link or not a folder of the project's own, so Hive keeps no attachments in it.",

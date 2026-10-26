@@ -85,6 +85,8 @@
   "tasks.error.unknownTask": "Unbekannte Karte {card}",
   "tasks.error.verdictNotYours": "Agent {agent} reviewt {card}: Das Urteil gibt nur dieser Agent ab.",
   "tasks.history.answerTold": "Agent {agent} über deine Antwort informiert",
+  "tasks.history.answerUntold": "Der Hive-Assistent konnte nicht über deine Antwort auf die Frage von {agent} informiert werden: nur {agent} hat sie",
+  "tasks.history.answerUntoldNeed": "{agent} kann {action, select, done {diese Karte nicht selbst nach Erledigt verschieben} noCode {diese Karte nicht selbst ohne Code machen} skipReview {die Review dieser Karte nicht selbst überspringen} other {die Blockierung dieser Karte nicht selbst aufheben}}, und der Hive-Assistent konnte nicht über deine Antwort informiert werden: erledige es selbst, wenn du zugestimmt hast",
   "tasks.history.archived": "Archiviert",
   "tasks.history.archivedDone": "Archiviert nach {days, plural, one {# Tag} other {# Tagen}} in Erledigt",
   "tasks.history.archivedHidden": "Archiviert: {project} wurde ausgeblendet",

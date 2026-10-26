@@ -8,6 +8,7 @@
   "service.advanced.notObject": "advanced.json sollte ein Objekt enthalten: {example}.",
   "service.advanced.notValues": "„values“ in advanced.json sollte ein Objekt aus Einstellung → Wert sein.",
   "service.advanced.unknown": "Es gibt keine erweiterte Einstellung „{id}“.",
+  "service.answerRelay.title": "{card}: niemand sonst hat deine Antwort",
   "service.attachments.badFolder": "Kein Name eines Sitzungsordners.",
   "service.attachments.badRecord": "{file} ist keine Aufzeichnung verschobener Dateien",
   "service.attachments.notOwn": "{folder} ist eine Verknüpfung oder kein eigener Ordner des Projekts, daher speichert Hive dort keine Anhänge.",
