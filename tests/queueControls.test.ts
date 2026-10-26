@@ -12,11 +12,12 @@ import { tempDir } from './tempDir'
 import type { QueueRecent, QueueView } from '../src/shared/workflow/queue'
 import type { KeptReturn } from '../src/shared/progressQueue'
 
-const host = vi.hoisted(() => ({ kicked: [] as string[], changed: [] as string[] }))
+const host = vi.hoisted(() => ({ kicked: [] as string[], changed: [] as string[], stamp: '' }))
 vi.mock('../src/main/workflow/queueHost', () => ({
   kickQueue: async (_ws: unknown, _p: string, target: string) => void host.kicked.push(target),
   queueChanged: (_ws: unknown, _p: string, target: string) => void host.changed.push(target),
   queueLive: () => ({ running: false, now: null, run: null }),
+  queueHostsStamp: () => host.stamp,
   profileName: () => 'test'
 }))
 
@@ -599,5 +600,48 @@ describe("the window's merge queues and badges on a board shaped like a long-use
     }
     console.log('#1629 timings (median of 7, ms):', JSON.stringify(Object.fromEntries(Object.entries(timed).map(([name, v]) => [name, Math.round(v * 10) / 10]))))
     for (const v of Object.values(timed)) expect(v).toBeLessThan(50)
+  })
+})
+
+describe("a project's queue listings, worked out once per state (HI-1683)", () => {
+  it('the same listing while nothing it is made from changed; made again after a board change here or by another process, a change of its host, or its workflow written', async () => {
+    const { tellListeners } = await import('../src/main/events')
+    const { DatabaseSync } = await import('node:sqlite')
+    const { w, wt, repo, ws } = await workspace()
+    const card = await approved(w, wt)
+    const list = () => inWorkspace(w, () => queueViews(w, repo, undefined, true))
+    // Asked twice at once: one listing, shared; asked again with nothing changed: the same one, not read again.
+    const [a, b] = [list(), list()]
+    expect(b).toBe(a)
+    const first = await a
+    expect(first[0].queued.map((q) => q.card)).toEqual([card])
+    expect(await list()).toBe(first)
+    // Made again after each: a board change here (a comment)...
+    await inWorkspace(w, () => tasks.commentTask(card, 'a note', user))
+    const second = await list()
+    expect(second).not.toBe(first)
+    expect(second).toEqual(first)
+    expect(await list()).toBe(second)
+    // ...another process's commit to the board (read before Hive's poll tells it)...
+    const other = new DatabaseSync(store.boardFile(ws), { timeout: 5000 })
+    try {
+      other.prepare("INSERT INTO board_meta (key, value) VALUES ('hi1683-probe', '1')").run()
+    } finally {
+      other.close()
+    }
+    const third = await list()
+    expect(third).not.toBe(second)
+    // ...this Hive's host of the queue starting or stepping...
+    host.stamp = 'running'
+    const fourth = await list()
+    expect(fourth).not.toBe(third)
+    host.stamp = ''
+    // ...and the project's workflow written.
+    const fifth = await list()
+    tellListeners({ type: 'workflow-changed', workspacePath: ws, projectPath: repo })
+    expect(await list()).not.toBe(fifth)
+    // A pause (a board change) shows at once.
+    await inWorkspace(w, () => pauseQueue(w, repo, 'main', 'user'))
+    expect((await list())[0].paused).toMatchObject({ reason: 'user' })
   })
 })
