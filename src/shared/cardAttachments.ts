@@ -25,6 +25,25 @@ export interface CardAttachment {
   missing?: true
 }
 
+/**
+ * The card dialog's drafts carried by one Save or Post (HI-1700): each file (a drop's or pick's path, a paste's bytes)
+ * and the draft its text links it by (`draft-<k>`), in the same order. Nothing is stored before the call.
+ */
+export interface CardDrafts {
+  files: ({ path: string } | { data: Uint8Array; name: string | null })[]
+  keys: string[]
+}
+
+/** A project's card attachments as its Attachments tab lists them: by card, newest card first. */
+export interface CardAttachmentGroup {
+  card: number
+  key: string | null
+  title: string
+  column: string
+  archived: boolean
+  attachments: CardAttachment[]
+}
+
 /** At most this many files in one call (a card's create or change, a comment, the dialog's Save or Post), all its boxes together. */
 export const ATTACH_MAX_FILES = 10
 /** At most this many bytes in one call, in all. */

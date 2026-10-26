@@ -16,14 +16,14 @@ import { basename, join, resolve, sep } from 'path'
 import { tmpdir } from 'os'
 import { ATTACHMENTS_DIR, CARD_ATTACHMENTS_DIR, attachmentKind } from '../shared/attachments'
 import { CARD_ATTACHMENT_MAX_ID } from '../shared/advanced'
-import { ATTACH_MAX_FILES, ATTACH_MAX_TOTAL, type CardAttachment } from '../shared/cardAttachments'
+import { ATTACH_MAX_FILES, ATTACH_MAX_TOTAL, type CardAttachment, type CardAttachmentGroup, type CardDrafts } from '../shared/cardAttachments'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import { formatBytes } from '../shared/units'
 import { legacyWorktree } from '../shared/agentFolders'
 import { advanced } from './advanced'
 import { attachmentName, freeName, ownAttachmentsFolder } from './attachmentsFolder'
-import { afterBoardWrite, boardRead, boardWrite, boardWriteOp, onBoardUndone } from './boardStore'
+import { afterBoardWrite, boardRead, boardWrite, boardWriteOp, cardKeys, onBoardUndone } from './boardStore'
 import { insideReal, realPath } from './fsutil'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
@@ -94,6 +94,19 @@ export async function projectCardAttachments(ws: WorkspaceService, project: stri
   const out = new Map<number, CardAttachment[]>()
   for (const r of rows.sort(newest)) out.set(r.card, [...(out.get(r.card) ?? []), withPath(host, r, !(await exists(join(cardFolder(host, r.card), r.file))))])
   return out
+}
+
+/** A project's cards' attachments by card, as its Attachments tab lists them: newest card first (by its newest file). */
+export async function cardAttachmentGroups(ws: WorkspaceService, projectPath: string): Promise<CardAttachmentGroup[]> {
+  const project = basename(projectPath)
+  const byCard = await projectCardAttachments(ws, project)
+  if (!byCard.size) return []
+  const numbers = [...byCard.keys()]
+  const keys = cardKeys(ws, numbers)
+  const cards = boardRead(ws, (db) => db.prepare('SELECT number, title, col, archived FROM cards WHERE number IN (SELECT value FROM json_each(?))').all(JSON.stringify(numbers)) as { number: number; title: string; col: string; archived: number }[]) // i18n-ignore: SQL
+  return cards
+    .map((c) => ({ card: c.number, key: keys.get(c.number) ?? null, title: c.title, column: c.col, archived: !!c.archived, attachments: byCard.get(c.number)! }))
+    .sort((a, b) => b.attachments[0].at.localeCompare(a.attachments[0].at))
 }
 
 /** Counts of attachments by card (for the board's cards), for the cards given. */
@@ -263,6 +276,25 @@ export async function stage(host: string, card: number | null, sources: AttachSo
     throw e
   }
   return { host, dir, files, dispose }
+}
+
+/**
+ * The card dialog's drafts for one Save or Post (HI-1700): checked as a whole (the count, and the pastes' sizes before
+ * anything is copied), each dropped or picked file read through its real path (the user's own choice), and staged for
+ * the card's host. Null without any.
+ */
+export async function stageDrafts(ws: WorkspaceService, drafts: CardDrafts | undefined | null, project: string | null | undefined): Promise<{ staging: Staging; drafts: string[] } | null> {
+  if (!drafts?.files?.length) return null
+  if (!Array.isArray(drafts.keys) || drafts.keys.length !== drafts.files.length || drafts.keys.some((k) => !/^draft-\d{1,4}$/.test(k))) throw hiveError(M.refused, { path: '' }, { kind: 'invalid' })
+  checkBatch(drafts.files.map((f) => ('data' in f ? { size: f.data?.byteLength ?? 0, name: f.name } : { name: basename(String(f.path)) })))
+  const sources: AttachSource[] = []
+  for (const f of drafts.files) {
+    if ('data' in f) {
+      if (!(f.data instanceof Uint8Array)) throw hiveError(M.refused, { path: f.name ?? '' }, { kind: 'invalid' })
+      sources.push({ data: f.data, name: typeof f.name === 'string' ? f.name : null })
+    } else sources.push({ path: await attachableSource(ws, { kind: 'user' }, f.path), name: basename(f.path) })
+  }
+  return { staging: await stage(cardHost(ws, project), null, sources), drafts: drafts.keys }
 }
 
 // ---------------------------------------------------------------------------

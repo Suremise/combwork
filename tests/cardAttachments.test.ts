@@ -299,3 +299,53 @@ describe("attachment links in a card's text (HI-1700)", () => {
     expect(withAttachmentPaths(stored, [{ id: 'aaaaaaaaaaaa', path: 'C:\\w\\p\\.hive\\attachments\\cards\\1\\s.png' }])).toBe('See ![s](C:\\w\\p\\.hive\\attachments\\cards\\1\\s.png) and [l](attachment removed), again ![s](C:\\w\\p\\.hive\\attachments\\cards\\1\\s.png).')
   })
 })
+
+describe("a card's change with files (HI-1700, s11 §3–4)", () => {
+  it("Post: the comment's drafts get their stored ids, the files the comment they came with", async () => {
+    const { w } = await workspace()
+    const c = await card(w)
+    const drafts = { files: [{ data: new TextEncoder().encode('pic'), name: 'pic.png' }, { data: new TextEncoder().encode('log'), name: 'run.log' }], keys: ['draft-1', 'draft-2'] }
+    const staged = await inWorkspace(w, () => att.stageDrafts(w, drafts, 'p'))
+    const done = await inWorkspace(w, () => tasks.changeWithAttachments(user, staged, 'comment', () => tasks.commentTask(c, 'Seen: ![pic.png](attachment:draft-1) and [run.log](attachment:draft-2)', user)))
+    const said = done.comments.at(-1)!
+    const files = await att.cardAttachments(w, c)
+    expect(files).toHaveLength(2)
+    expect(attachmentRefs(said.text).sort()).toEqual(files.map((f) => f.id).sort())
+    expect(files.every((f) => f.comment === said.id)).toBe(true)
+  })
+
+  it("an agent's files with no draft are linked at the end of the description; the reply says what was stored", async () => {
+    const { w } = await workspace()
+    const shot = file(tempDir('hive-shot2-'), 'shot.png', 'agent shot')
+    const real = await att.attachableSource(w, { kind: 'agent', project: 'p' }, shot)
+    const staging = await att.stage(join(w.path!, 'p'), null, [{ path: real, name: 'shot.png' }])
+    const made = await inWorkspace(w, () => tasks.changeWithAttachments({ kind: 'agent', name: 'B1' }, { staging, drafts: [null] }, 'description', () => tasks.createTask({ title: 'With a shot', project: 'p', description: 'See the screenshot.' }, user)))
+    const [a] = await att.cardAttachments(w, made.number)
+    expect(made.description).toBe(`See the screenshot.\n\n![shot.png](attachment:${a.id})`)
+    expect(made.attached).toEqual([{ name: 'shot.png', path: a.path, added: true }])
+    expect(a.comment).toBe('description')
+    expect(a.by).toBe('B1')
+  })
+
+  it('the same bytes attached twice at once give one row', async () => {
+    const { w } = await workspace()
+    const c = await card(w)
+    const twice = await Promise.all([1, 2].map(() => inWorkspace(w, () => att.attachToCard(w, c, [{ data: new TextEncoder().encode('same'), name: 'same.txt' }], 'You'))))
+    expect(twice[0].attachments[0].id).toBe(twice[1].attachments[0].id)
+    expect(rows(w, c)).toHaveLength(1)
+  })
+
+  it("drafts of the description and a comment together over 100 MB are refused before anything is copied; a later bad draft, nothing changed", async () => {
+    const { w, root } = await workspace()
+    const c = await card(w)
+    await advanced.set(CARD_ATTACHMENT_MAX_ID, 30 * 1024 * 1024)
+    const big = new Uint8Array(26 * 1024 * 1024)
+    const drafts = { files: [1, 2, 3, 4].map((k) => ({ data: big, name: `${k}.bin` })), keys: ['draft-1', 'draft-2', 'draft-3', 'draft-4'] }
+    await expect(inWorkspace(w, () => att.stageDrafts(w, drafts, 'p'))).rejects.toThrow(/At most 10 files and/)
+    expect(inside(join(root, 'p', '.hive', 'attachments', 'cards', '.staging'))).toEqual([])
+    // A folder among them: refused whole.
+    await expect(inWorkspace(w, () => att.stageDrafts(w, { files: [{ data: new TextEncoder().encode('ok'), name: 'ok.txt' }, { path: join(root, 'p') }], keys: ['draft-1', 'draft-2'] }, 'p'))).rejects.toThrow(/not a file/)
+    expect(rows(w, c)).toEqual([])
+    expect(inside(join(root, 'p', '.hive', 'attachments', 'cards', '.staging'))).toEqual([])
+  })
+})
