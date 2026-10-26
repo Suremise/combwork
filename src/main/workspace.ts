@@ -526,7 +526,7 @@ export class WorkspaceService {
     await whenAll([join(h, 'shared', 'handovers'), join(h, 'skills'), join(h, 'mcp'), join(h, 'tasks')].map((d) => mkdir(d, { recursive: true })))
     const hr = join(h, 'shared', 'handovers', 'README.md')
     await whenAll([
-      existsSync(join(h, 'workspace.json')) ? undefined : writeKeptJson(join(h, 'workspace.json'), DEFAULT_WORKSPACE_CONFIG),
+      existsSync(join(h, 'workspace.json')) ? undefined : writeKeptJson(join(h, 'workspace.json'), newWorkspaceConfig()),
       existsSync(join(h, 'README.md')) ? undefined : writeFile(join(h, 'README.md'), WORKSPACE_README),
       // The board's database and what its move from files left (#1017) are this machine's: kept out of git if the workspace is a repository.
       existsSync(join(h, '.gitignore')) ? addUsageIgnore(join(h, '.gitignore')) : writeFile(join(h, '.gitignore'), BOARD_GITIGNORE),
@@ -1455,9 +1455,35 @@ export class WorkspaceService {
     }
     const p = join(this.path, clean)
     if (existsSync(p)) throw hiveError(msg({ id: 'service.workspace.folderExists', defaultMessage: 'A folder named "{name}" already exists', description: 'An error making a project: the workspace already has a folder called {name}.' }), { name: clean })
+    // The workspace it is made in: after each wait, still the one open (HR5, HI-1760 round 1). These calls act on what
+    // the service has open then, so a close, or another workspace opened meanwhile (the same one again too), would have
+    // them read and answer with that one's projects: refused as closed instead.
+    const gen = this.generation
+    const life = this.life.signal
+    const still = (): void => {
+      if (gen !== this.generation || life.aborted) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+    }
     await mkdir(p)
     await this.ensureProject(p)
-    return this.refresh()
+    still()
+    // Its id given before the refresh reads it (HI-1760): given during that read (the refresh's sessions place asks for
+    // ids), its project.json counts as saved after the read, and the refresh returns the list from before, without it.
+    await this.projectIds({ fresh: true })
+    still()
+    const info = await this.refresh()
+    still()
+    if (this.hasProject(info, p)) return info
+    // Another write meanwhile made it hand back the list from before: the refresh that write scheduled reads it afresh.
+    await this.refreshesSettled()
+    still()
+    if (this.cached && this.hasProject(this.cached, p)) return this.cached
+    const again = await this.refresh()
+    still()
+    return again
+  }
+
+  private hasProject(info: WorkspaceInfo, projectPath: string): boolean {
+    return info.projects.some((x) => samePlace(x.path, projectPath))
   }
 
   /** True if the path is inside the open workspace, its worktrees or extraRoots — used to guard file IPC. */
@@ -1504,6 +1530,14 @@ export async function disposeWorkspaceService(w: WorkspaceService): Promise<void
   await w.close()
   services.delete(w)
 }
+
+/** What a new workspace's workspace.json gets beyond the defaults (HI-980: its accounts, from accounts.ts). */
+let newWorkspaceExtras: () => Partial<WorkspaceConfig> = () => ({})
+export function setNewWorkspaceExtras(fn: () => Partial<WorkspaceConfig>): void {
+  newWorkspaceExtras = fn
+}
+/** A new workspace's settings: the defaults and those extras (only when it is made, never when one is opened). */
+const newWorkspaceConfig = (): WorkspaceConfig => ({ ...structuredClone(DEFAULT_WORKSPACE_CONFIG), ...newWorkspaceExtras() })
 
 /** Runs fn with `workspace` standing for w. */
 export function inWorkspace<T>(w: WorkspaceService, fn: () => T): T {

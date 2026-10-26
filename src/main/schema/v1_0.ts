@@ -989,8 +989,43 @@ export const CARD_ATTACHMENTS_STEP: SchemaStep = {
   ]
 }
 
+/** A card's revision raised to the board's next mark, unless it is at the mark already (CARD_REVS_STEP). */
+const bumpRev = (card: string): string =>
+  `UPDATE board_rev SET g = g + 1 WHERE EXISTS (SELECT 1 FROM cards WHERE number = ${card} AND rev < board_rev.g);
+   UPDATE cards SET rev = (SELECT g FROM board_rev) WHERE number = ${card} AND rev < (SELECT g FROM board_rev);`
+
+/** The child tables a window's card is made of (composeCard), each a card's revision follows. */
+const REV_TABLES = ['card_labels', 'card_links', 'card_context', 'card_comments', 'card_history', 'card_decisions', 'card_holds']
+
+/**
+ * A card's revision (HI-1715): `cards.rev`, raised by triggers on every write to the card's row or to a child table the
+ * window's card is made of, by whatever wrote it (another Hive's connection too), and `board_rev.g`, the board's mark,
+ * the highest revision given. The window keeps the mark it last read and asks for the cards at it or above (`>=`): a card
+ * already at the mark keeps it when it changes again (one raise for a card's many rows in a write, not one per row), and
+ * is sent again however often; a card below it is raised above every mark a window holds. A rolled-back write undoes its
+ * raises with it. Its key and project name come from outside these rows (tasks.windowChanges sends the whole board when
+ * they change).
+ */
+export const CARD_REVS_STEP: SchemaStep = {
+  name: 'card revisions',
+  ddl: [
+    'ALTER TABLE cards ADD COLUMN rev INTEGER NOT NULL DEFAULT 0',
+    'CREATE INDEX cards_rev ON cards (rev)',
+    'CREATE TABLE board_rev (id INTEGER PRIMARY KEY CHECK (id = 1), g INTEGER NOT NULL) STRICT',
+    'INSERT INTO board_rev (id, g) VALUES (1, 1)',
+    `CREATE TRIGGER card_rev_ai AFTER INSERT ON cards BEGIN ${bumpRev('NEW.number')} END`,
+    // Not for the triggers' own raise of `rev`.
+    `CREATE TRIGGER card_rev_au AFTER UPDATE ON cards WHEN NEW.rev = OLD.rev BEGIN ${bumpRev('NEW.number')} END`,
+    ...REV_TABLES.flatMap((t) => [
+      `CREATE TRIGGER ${t}_rev_ai AFTER INSERT ON ${t} BEGIN ${bumpRev('NEW.card')} END`,
+      `CREATE TRIGGER ${t}_rev_au AFTER UPDATE ON ${t} BEGIN ${bumpRev('OLD.card')} ${bumpRev('NEW.card')} END`,
+      `CREATE TRIGGER ${t}_rev_ad AFTER DELETE ON ${t} BEGIN ${bumpRev('OLD.card')} END`
+    ])
+  ]
+}
+
 /** The 1.0 group's steps (P3's, then P4's, then P5's, then P7's), in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP, SLOTS_STEP, COPIES_STEP, SKILL_COPIES_STEP, SESSION_LEASES_STEP, CARD_ATTACHMENTS_STEP]
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP, SLOTS_STEP, COPIES_STEP, SKILL_COPIES_STEP, SESSION_LEASES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {

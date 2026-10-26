@@ -373,11 +373,12 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     expect(await titles(first)).toEqual(['From 0.9'])
     await close(first)
     store.boardTestHooks.upgradeAnswer = null
-    // As rc.1–rc.4 left it: upgraded, without the steps that came after (card attachments, HI-1700).
+    // As rc.1–rc.4 left it: upgraded, without the steps that came after (card attachments, HI-1700; card revisions, HI-1715).
     const last = Math.max(...upgradeSteps.map((m) => m.version))
     const later = store.BOARD_MIGRATIONS.find((m) => m.name === 'card attachments')!
     const raw = new DatabaseSync(store.boardFile(ws))
-    raw.exec(`DROP TABLE card_attachments; DELETE FROM schema_version WHERE version >= ${later.version}`)
+    const revTriggers = (raw.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE '%rev_a%'").all() as { name: string }[]).map((r) => `DROP TRIGGER ${r.name};`).join(' ')
+    raw.exec(`DROP TABLE card_attachments; ${revTriggers} DROP INDEX cards_rev; DROP TABLE board_rev; ALTER TABLE cards DROP COLUMN rev; DELETE FROM schema_version WHERE version >= ${later.version}`)
     raw.close()
     expect(fileSchemaVersion(store.boardFile(ws))).toBe(later.version - 1)
     // No answer given: had it been asked, the board would wait read-only for the user.
@@ -385,6 +386,7 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
     expect(fileSchemaVersion(store.boardFile(ws))).toBe(last)
     expect(tables(store.boardFile(ws))).toContain('card_attachments')
+    expect(tables(store.boardFile(ws))).toContain('board_rev')
     await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))
     expect(await titles(w)).toEqual(['After', 'From 0.9'])
     await close(w)

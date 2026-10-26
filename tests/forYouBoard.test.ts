@@ -486,3 +486,207 @@ describe('For you on the board (#1269)', () => {
     expect((await lanes.listLanes(w, { project: 'p' }))[0].state).toBe('active')
   })
 })
+
+describe("an answer that needs someone other than the card's agent (HI-1734)", async () => {
+  const { config } = await import('../src/main/config')
+  const assistant = (): { control?: string } => config.settings.assistant as unknown as { control?: string }
+  /** What the Assistant's inbox was given of the user's answers (the relay's deliveries), oldest first. */
+  const relayed = (w: WS): { body: string; state: string }[] => store.workspaceDb(w.path!).reader.prepare("SELECT body, state FROM deliveries WHERE agent_id = 'assistant' AND source = 'answer-relay' ORDER BY seq").all() as { body: string; state: string }[]
+  const historyOf = async (w: WS, card: number) => (await inWorkspace(w, () => tasks.getTask(card, w))).history.map((h) => h.what)
+  afterEach(() => {
+    assistant().control = 'projects'
+    deliveries.setReadsInboxForTests(null)
+  })
+
+  it("approving an Approve question that offers one action does that action as the user's, with the reply (else the agent's reason) as its reason", async () => {
+    const { w } = await workspace({ ...REVIEWED, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'approve', text: 'Checks only, nothing to merge: move it to Done?', actions: [{ kind: 'done', reason: 'checks only' }] }))
+    const req = forYou(w).items[0]
+    const after = await answer(w, card, req.request, { outcome: 'approved', reply: 'Checks-only card, nothing to merge.' })
+    expect(after.column).toBe('done')
+    expect(facts(w, card).find((f) => f.kind === 'Override')?.data).toMatchObject({ by: 'user', reason: 'Checks-only card, nothing to merge.' })
+    expect(facts(w, card).find((f) => f.kind === 'Approval')?.data).toMatchObject({ request: req.request, answer: 'answered', action: 'done' })
+    // Carried out: nothing for the Assistant.
+    expect(relayed(w)).toEqual([])
+    // Without a reply, the agent's own reason.
+    const second = await create(w)
+    await update(w, second, { column: 'doing', agent: 'a1' })
+    await inWorkspace(w, () => wf.askTheUser(`#${second}`, 'agent:a1', { kind: 'approve', text: 'Move it to Done?', actions: [{ kind: 'done', reason: 'checks only' }] }))
+    expect((await answer(w, second, forYou(w).items[0].request, { outcome: 'approved' })).column).toBe('done')
+    expect(facts(w, second).find((f) => f.kind === 'Override')?.data).toMatchObject({ reason: 'checks only' })
+  })
+
+  it('a Decide question offering Skip Review: the action with the reply as its reason sets the skip, in one change with the answer', async () => {
+    const { w } = await workspace({ ...REVIEWED, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'May we skip review for this checks-only change?', actions: [{ kind: 'skipReview' }] }))
+    const req = forYou(w).items[0]
+    await answer(w, card, req.request, { outcome: 'answered', action: 'skipReview', reason: 'Yes: checks only' })
+    expect(facts(w, card).filter((f) => f.kind === 'ReviewSkipSet').at(-1)?.data).toMatchObject({ skip: true, by: 'user', reason: 'Yes: checks only' })
+    expect(facts(w, card).find((f) => f.kind === 'Approval')?.data).toMatchObject({ action: 'skipReview' })
+    expect(forYou(w).count).toBe(0)
+    expect(relayed(w)).toEqual([])
+  })
+
+  it("Skip Review isn't offered on a card whose rules don't review it (nothing to skip): dropped from the question's actions, the rest kept", async () => {
+    const { w } = await workspace({ ...allOff('git'), finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Skip its review, or move it to Done?', actions: [{ kind: 'skipReview' }, { kind: 'done' }] }))
+    expect(forYou(w).items[0].actions).toEqual([{ kind: 'done' }])
+  })
+
+  it('a reply to a question that offered an action, not done: its asker and the Assistant are told, "This needs you"; nothing is moved', async () => {
+    const { w } = await workspace({ ...REVIEWED, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Nothing to merge: Done?', actions: [{ kind: 'done' }] }))
+    const after = await answer(w, card, forYou(w).items[0].request, { outcome: 'answered', reply: 'Checks-only card, nothing to merge.' })
+    expect(after.column).toBe('doing')
+    const got = relayed(w)
+    expect(got).toHaveLength(1)
+    expect(got[0].body).toBe(`This needs you: the user answered Builder (p)'s question on p-${card}. The question, whole: <<<Nothing to merge: Done?>>>. Their reply, whole: <<<Checks-only card, nothing to merge.>>>. (Both stay on the card: hive_read_task p-${card}.) Builder (p) can't move it to Done by itself. Do it only if the answer agrees, within any conditions it sets, with the answer as the reason (hive_update_task).`)
+    expect((await inboxOf(w, 'a1')).find((i) => i.kind === 'answer')?.text).toContain('Checks-only card, nothing to merge.')
+  })
+
+  it("HI-1449: a question with no actions on a card in Passed that its agent doesn't merge, answered with a reply: the Assistant is told its agent can't move it on", async () => {
+    const { w, wt } = await workspace({ ...REVIEWED, finish: 'hiveMerges', target: 'main', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    commitIn(wt, 'checks.txt')
+    await update(w, card, { column: 'review' }, b1)
+    await update(w, card, { review: 'start' }, r1)
+    expect((await update(w, card, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 1: PASSED.' })).column).toBe('passed')
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Darren agreed to move it to Done?' }))
+    const req = forYou(w).items.find((i) => i.asker === 'a1')!
+    await answer(w, card, req.request, { outcome: 'answered', reply: 'Checks-only card, nothing to merge.' })
+    expect(relayed(w).map((r) => r.body)).toEqual([expect.stringMatching(/^This needs you: .*Builder \(p\) can't move it to Done by itself/)])
+  })
+
+  it("a no-action, no-proposal question on a Doing card asking for a user-only change (HR1's case): the asker and the Assistant both have the answer, worded for it to check; nothing is carried out", async () => {
+    const { w } = await workspace({ ...REVIEWED, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'May we skip review for this checks-only change?' }))
+    const after = await answer(w, card, forYou(w).items[0].request, { outcome: 'answered', reply: 'Yes, skip it.' })
+    expect(after.column).toBe('doing')
+    expect(facts(w, card).filter((f) => f.kind === 'ReviewSkipSet')).toEqual([])
+    expect(relayed(w).map((r) => r.body)).toEqual([`For you to check: the user answered Builder (p)'s question on p-${card}. The question, whole: <<<May we skip review for this checks-only change?>>>. Their reply, whole: <<<Yes, skip it.>>>. (Both stay on the card: hive_read_task p-${card}.) If it grants a change Builder (p) can't make itself (Done past its rules, no code, skipping its review), make it, within any conditions it sets, with the answer as the reason; otherwise nothing is needed.`])
+    expect((await inboxOf(w, 'a1')).find((i) => i.kind === 'answer')?.text).toContain('Yes, skip it.')
+  })
+
+  it('an open no-code proposal on a Doing card: a reply to a no-action question tells the Assistant it needs making no code', async () => {
+    const { w } = await workspace({ ...REVIEWED, finish: 'agentMerges', folder: 'slots' })
+    const card = await inWorkspace(w, async () => (await tasks.createTask({ title: 'A write-up', project: 'p', kind: 'no-code' }, b1)).number)
+    expect(facts(w, card).some((f) => f.kind === 'KindProposed')).toBe(true)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Is a write-up enough here?' }))
+    await answer(w, card, forYou(w).items.find((i) => i.asker === 'a1')!.request, { outcome: 'answered', reply: 'Yes.' })
+    expect(relayed(w).map((r) => r.body)).toEqual([expect.stringMatching(/^This needs you: .*can't make it no code by itself/)])
+  })
+
+  it('the Assistant unable to act: none given it, and the card and a notice say nobody else has the answer; its Control turned down before its delivery is given: cancelled, and the same', async () => {
+    const { w } = await workspace({ ...REVIEWED, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    // Its Control at Look and advise: it can't change cards.
+    assistant().control = 'look'
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Nothing to merge: Done?', actions: [{ kind: 'done' }] }))
+    await answer(w, card, forYou(w).items[0].request, { outcome: 'answered', reply: 'Yes' })
+    expect(relayed(w)).toEqual([])
+    await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("Builder (p) can't move this card to Done by itself, and the Hive Assistant couldn't be told of your answer: do it yourself if you agreed to it"), { timeout: 10_000 })
+    // Allowed when the answer is given, turned down before the Assistant takes it.
+    assistant().control = 'projects'
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Which database?' }))
+    await answer(w, card, forYou(w).items[0].request, { outcome: 'answered', reply: 'SQLite' })
+    expect(relayed(w).map((r) => r.state)).toEqual(['queued'])
+    assistant().control = 'look'
+    // The Assistant reads its inbox: checked as it is handed out, it isn't given, and is cancelled.
+    expect((await deliveries.readInbox(w.assistantHome, 'assistant')).items).toEqual([])
+    await vi.waitFor(() => expect(relayed(w).map((r) => r.state)).toEqual(['cancelled']), { timeout: 10_000 })
+    await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("The Hive Assistant couldn't be told of your answer to Builder (p)'s question: only Builder (p) has it"), { timeout: 10_000 })
+  })
+
+  it("a bare Approve or Decline of a no-action, no-proposal question on a Doing card reaches the Assistant too, saying which, with nothing written (HR1's round 1 finding 1)", async () => {
+    const { w } = await workspace({ ...REVIEWED, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'approve', text: 'May we skip review for this checks-only change?' }))
+    await answer(w, card, forYou(w).items[0].request, { outcome: 'approved' })
+    expect(facts(w, card).filter((f) => f.kind === 'ReviewSkipSet')).toEqual([])
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'approve', text: 'May I push the tag?' }))
+    await answer(w, card, forYou(w).items[0].request, { outcome: 'declined' })
+    const got = relayed(w).map((r) => r.body)
+    expect(got).toHaveLength(2)
+    expect(got[0]).toMatch(/^For you to check: the user approved Builder \(p\)'s question on p-\d+\. The question, whole: <<<May we skip review for this checks-only change\?>>>\. Nothing was written with it\. .*If it grants a change/)
+    expect(got[1]).toMatch(/^For your information: the user declined Builder \(p\)'s question on p-\d+\. The question, whole: <<<May I push the tag\?>>>\. Nothing was written with it\. .*The user declined: nothing is to be done for it\.$/)
+  })
+
+  it('an approval and a decline with the same reply are relayed as what they are: the decline is never worded as a grant (finding 2)', async () => {
+    const { w } = await workspace({ ...REVIEWED, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    // Two actions offered: Approve doesn't carry either out, so both go to the Assistant.
+    const offered = [{ kind: 'done' as const }, { kind: 'noCode' as const }]
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'approve', text: 'Move it to Done?', actions: offered }))
+    await answer(w, card, forYou(w).items[0].request, { outcome: 'approved', reply: 'Yes, after the security audit.' })
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'approve', text: 'Move it to Done?', actions: offered }))
+    await answer(w, card, forYou(w).items[0].request, { outcome: 'declined', reply: 'Yes, after the security audit.' })
+    expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('doing')
+    const [yes, no] = relayed(w).map((r) => r.body)
+    expect(yes).toMatch(/^This needs you: the user approved .*Their reply, whole: <<<Yes, after the security audit\.>>>\. .*can't move it to Done by itself\. Their approval is a yes, within any conditions its reply sets/)
+    expect(no).toMatch(/^For your information: the user declined .*Their reply, whole: <<<Yes, after the security audit\.>>>\. .*The user declined: nothing is to be done for it\.$/)
+    expect(no).not.toMatch(/This needs you|do it|make it/i)
+  })
+
+  it('the question and the reply reach the Assistant whole: a condition past any length is kept (finding 3)', async () => {
+    const { w } = await workspace({ ...REVIEWED, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    const question = `Nothing to merge here. ${'The checks ran on every suite and passed. '.repeat(20)}QUESTION-END: or should I wait for the audit?`
+    const reply = `Yes, here is the background. ${'The audit covers the installer and the update feed. '.repeat(70)}Do not move it to Done until I confirm the audit has passed.`
+    expect(question.length).toBeGreaterThan(800)
+    expect(reply.length).toBeGreaterThan(3000)
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: question, actions: [{ kind: 'done' }] }))
+    await answer(w, card, forYou(w).items[0].request, { outcome: 'answered', reply })
+    const [body] = relayed(w).map((r) => r.body)
+    expect(body).toContain(`<<<${question}>>>`)
+    expect(body).toContain(`<<<${reply}>>>`)
+    expect(body).toContain('Do not move it to Done until I confirm the audit has passed.')
+    expect(body).toContain(`hive_read_task p-${card}`)
+  })
+
+  it('a code card passing review with nothing to merge (its change already in its target) is proposed no code; one with work to merge is not', async () => {
+    const { w, wt } = await workspace({ ...REVIEWED, finish: 'agentMerges', target: 'main', folder: 'slots' })
+    const empty = await create(w)
+    await update(w, empty, { column: 'doing', agent: 'a1' })
+    commitIn(wt, 'checks.txt')
+    await update(w, empty, { column: 'review' }, b1)
+    // Superseded: its commit merged into main by other work before the review passes.
+    git(join(w.path!, 'p'), 'merge', '-q', '--no-edit', 'card')
+    await update(w, empty, { review: 'start' }, r1)
+    await update(w, empty, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 1: PASSED.' })
+    expect(facts(w, empty).filter((f) => f.kind === 'KindProposed').map((f) => f.data)).toEqual([{ kind: 'no-code' }])
+    const real = await create(w)
+    await update(w, real, { column: 'doing', agent: 'a1' })
+    commitIn(wt, `real-${real}.txt`)
+    await update(w, real, { column: 'review' }, b1)
+    await update(w, real, { review: 'start' }, r1)
+    await update(w, real, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 1: PASSED.' })
+    expect(facts(w, real).filter((f) => f.kind === 'KindProposed')).toEqual([])
+  })
+})

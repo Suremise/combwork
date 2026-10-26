@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto'
+import { createHash, randomBytes } from 'crypto'
 import { basename, join } from 'path'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
@@ -12,7 +12,7 @@ import { contextProblems } from './docSections'
 import { providerMessage } from '../shared/providers'
 import type { HiveErrorKind, TaskMoveResult } from '../shared/types'
 import { workflowMessage } from '../shared/workflow/texts'
-import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, UnarchiveResult } from '../shared/types'
+import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskChanges, TaskCursor, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, UnarchiveResult } from '../shared/types'
 import { returnRound } from '../shared/watch'
 import { INTENT_TOOL } from '../shared/toolReplies'
 import { holdsOf, trackHolds } from '../shared/cardCosts'
@@ -27,11 +27,11 @@ import { linkToComment, moveCardFolder, publish, trashCardFolder, type Staging }
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT } from '../shared/workflow/stages'
-import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskActionKind, type RoundChoice, type StageId } from '../shared/workflow/facts'
-import { askActionAvailable, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
+import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskActionKind, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
+import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
-import { afterBoardWrite, archiveBatchDocs, boardSavepoint, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
+import { afterBoardWrite, archiveBatchDocs, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
@@ -258,6 +258,42 @@ export async function windowTasks(ws: WorkspaceService = workspace, full = false
   const live = cardDocs(ws, { archived: false }).map((d) => withoutGone(clean(d.doc, d.number, ids, keys.get(d.number)), (x) => numbers.has(x)))
   const short = archivedSummaryDocs(ws).map((d): TaskCard => ({ ...clean(d.doc, d.number, ids, keys.get(d.number)), summary: true }))
   return sortCards([...live, ...short])
+}
+
+/**
+ * The board as the window keeps it (HI-1715): the cards changed since its cursor, or every card when it has none, its
+ * board's stamp changed or the board keeps no revisions (windowTasks' cards: archived ones in short). The stamp is the
+ * board's opening and what a card shows from outside its rows (its key, its project's name by id): either changing makes
+ * the read whole. The project ids are the only await: the board opened again or the workspace changed meanwhile, the read
+ * is `stale` (the window reads again); everything else is one snapshot (cardChanges).
+ */
+export async function windowChanges(ws: WorkspaceService = workspace, since: TaskCursor | null = null): Promise<TaskChanges> {
+  const path = ws.path
+  if (!path) return { stale: true }
+  const generation = boardGeneration(ws)
+  const ids = await ws.projectIds()
+  if (ws.path !== path) return { stale: true }
+  let read = cardChanges(ws, since ? since.mark : null)
+  if (read.generation !== generation) return { stale: true }
+  let board = boardStamp(read.generation, ids, read.keys)
+  const full = !since || read.mark === null || since.board !== board
+  if (full && since) {
+    read = cardChanges(ws, null)
+    if (read.generation !== generation) return { stale: true }
+    board = boardStamp(read.generation, ids, read.keys)
+  }
+  const numbers = new Set(read.numbers)
+  const live = read.live.map((d) => withoutGone(clean(d.doc, d.number, ids, read.keys.get(d.number)), (x) => numbers.has(x)))
+  const short = read.summaries.map((d): TaskCard => ({ ...clean(d.doc, d.number, ids, read.keys.get(d.number)), summary: true }))
+  return { board, mark: read.mark, full, cards: [...live, ...short], numbers: read.numbers }
+}
+
+/** A board's stamp for a window's cursor: its opening, and a hash of the project names by id and the cards' keys. */
+function boardStamp(generation: number, ids: ProjectIdIndex, keys: Map<number, string>): string {
+  const h = createHash('sha1')
+  h.update(JSON.stringify([...ids.byId]))
+  h.update(JSON.stringify([...keys]))
+  return `${generation}:${h.digest('hex')}`
 }
 
 /** A card's holds, project, agent and reviewer, for costs; its history only when it keeps no holds (holdsFromHistory). */
@@ -1600,7 +1636,8 @@ const ACTION_GONE = msg({ id: 'tasks.error.actionGone', defaultMessage: "{action
 /**
  * Does an action an agent's question offered (#1630), as the user and with their reason, as the board does it: Move to
  * Done through the card's rules, the rules it skips recorded as an override (Move Anyway's); Make It No Code, the
- * `card.kind` override; Unblock, the reason as the user's comment. Throws when it is refused or stops short of Done.
+ * `card.kind` override; Skip Review (HI-1734), set as the user's with the reason; Unblock, the reason as the user's
+ * comment. Throws when it is refused or stops short of Done.
  */
 async function doAskAction(n: number, kind: AskActionKind, reason: string | undefined): Promise<void> {
   const actor: TaskActor = { kind: 'user' }
@@ -1611,6 +1648,8 @@ async function doAskAction(n: number, kind: AskActionKind, reason: string | unde
     if (r.stopped) throw new WorkflowRefusedError(r.stopped)
   } else if (kind === 'noCode') {
     await setKind(n, 'no-code', actor, { confirm: true, ...(reason ? { reason } : {}) })
+  } else if (kind === 'skipReview') {
+    await setReviewSkip(n, true, actor, reason ? { reason } : {})
   } else {
     await updateTask(n, { blocked: null }, actor, reason ? { comment: reason } : {})
   }
@@ -1631,12 +1670,12 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   const actor: TaskActor = { kind: 'user' }
   const bad = (): HiveError => hiveError(BAD_ANSWER, { max: LANE_MAX_ROUNDS }, { kind: 'invalid' })
   if (!a || !['approved', 'declined', 'answered'].includes(a.outcome) || typeof request !== 'string' || !request) throw bad()
-  const reply = typeof a.reply === 'string' && a.reply.trim() ? text(a.reply.trim(), MAX_TEXT, 'comment') : undefined
+  const typed = typeof a.reply === 'string' && a.reply.trim() ? text(a.reply.trim(), MAX_TEXT, 'comment') : undefined
   const decision = typeof a.decision === 'string' && a.decision.trim() ? text(a.decision.trim(), MAX_DECISION, 'decision') : undefined
-  const action = a.action === undefined ? undefined : ASK_ACTIONS.includes(a.action) ? a.action : null
-  if (action === null || (action && reply)) throw bad()
+  const asked = a.action === undefined ? undefined : ASK_ACTIONS.includes(a.action) ? a.action : null
+  if (asked === null || (asked && typed)) throw bad()
   // An action's reason, as an override's (setKind's).
-  const reason = action && typeof a.reason === 'string' && a.reason.trim() ? text(a.reason.trim(), 1000, 'blockedReason') : undefined
+  const given = asked && typeof a.reason === 'string' && a.reason.trim() ? text(a.reason.trim(), 1000, 'blockedReason') : undefined
   const head = ws.path ? cardHeads(ws, [n])[0] : undefined
   if (!head) throw unknownTask(n)
   const { workflowFor } = await import('./workflow/service')
@@ -1650,23 +1689,36 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   })()
   const req = wf && rec ? wf.state(rec).requests.find((r) => r.request === request) : undefined
   if (!wf || !req) throw new WorkflowRefusedError(refusalOf('move.notFromHere', { card: cardRef(n), stage: CATEGORY_STAGE[head.column as TaskColumn] ?? 'todo', move: 'answer', moves: '' }))
+  // HI-1734: approving an Approve question that offers one action is that action, done as the user's own act (the reply,
+  // if any, its reason, else the agent's), in one change with the answer as a click on it is.
+  const one = !asked && req.kind === 'approve' && a.outcome === 'approved' && req.actions?.length === 1 ? req.actions[0] : null
+  const action = asked ?? one?.kind
+  const reason = given ?? (one ? (typed ?? one.reason) : undefined)
+  const reply = one ? undefined : typed
+  const outcome = one ? 'answered' : a.outcome
   // What each kind takes (answerFits): an approval is approved or declined; at the round limit, a choice (a carry on with
   // its rounds); any other question, a reply or a decision. Checked before anything is written.
   const choice = a.choice as RoundChoice | undefined
-  if (!answerFits(req, { outcome: a.outcome, reply: !!reply, decision: !!decision, choice, rounds: a.rounds, ...(action ? { action } : {}) }, LANE_MAX_ROUNDS)) throw bad()
+  if (!answerFits(req, { outcome, reply: !!reply, decision: !!decision, choice, rounds: a.rounds, ...(action ? { action } : {}) }, LANE_MAX_ROUNDS)) throw bad()
   const answerIt = async (): Promise<TaskCard> => {
     const { reply: r } = await runIntent(
       wf,
       n,
       actor,
-      (w) => w.answer(n, request, a.outcome, { ...(reply ? { note: reply } : reason ? { note: reason } : {}), ...(decision ? { decided: true } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}), ...(action ? { action } : {}) }),
+      (w) => w.answer(n, request, outcome, { ...(reply ? { note: reply } : reason ? { note: reason } : {}), ...(decision ? { decided: true } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}), ...(action ? { action } : {}) }),
       // A reply is on the card too, as the user's comment (#1626), so the card shows it and the wake's "in full" is there.
       (_w, first) => ({ patch: first && decision ? { decision } : {}, ...(first && reply ? { opts: { comment: reply } } : {}) })
     )
     if (isRefusal(r)) throw new WorkflowRefusedError(r)
     return getTask(n, ws)
   }
-  if (!action) return answerIt()
+  if (!action) {
+    const card = await answerIt()
+    // Not carried out by Hive: the Assistant has it too (HI-1734), when an agent asked: every answer, a bare Approve or
+    // Decline too (HR1's round 1), with how the user answered and what they wrote, each whole.
+    if (req.gate === 'ask' && req.asker) await relayToAssistant(ws, card, req, { outcome, ...(reply ? { reply } : {}), ...(decision ? { decision } : {}) }, wf)
+    return card
+  }
   return cardBatch(ws, async () => {
     // Under the board's lock: the request still open (answered or retired from another window meanwhile: refused before
     // anything is done) and the action still allowed.
@@ -1678,6 +1730,25 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
     await doAskAction(n, action, reason)
     return getTask(n, ws)
   })
+}
+
+/**
+ * HI-1734: the user's answer to an agent's question that Hive didn't carry out, given to the Assistant too
+ * (answerRelay.ts), with what only someone other than its agent can do on the card as it is now, if anything: an action
+ * the question offered; an open no-code or review-skip proposal (Hive's own after a pass with nothing to merge too); a
+ * card in Passed its agent can't move on (it doesn't merge it); a block. Read from the card's state, never from the answer's text.
+ */
+async function relayToAssistant(ws: WorkspaceService, card: TaskCard, req: Request, answer: { outcome: 'approved' | 'declined' | 'answered'; reply?: string; decision?: string }, wf: Workflow): Promise<void> {
+  const rec = wf.store.card(card.number)
+  const s = wf.state(rec)
+  const facts = wf.store.facts(card.number)
+  // In Passed, an agent moves its card on only by reporting its own merge.
+  const finish = wf.rulesetOf(rec, s).options.finish
+  const need: AskActionKind | null =
+    req.actions?.[0]?.kind ?? (kindProposed(facts) === 'no-code' ? 'noCode' : reviewSkipOf(facts).proposed !== null ? 'skipReview' : card.column === 'passed' && finish !== 'agentMerges' ? 'done' : card.blocked ? 'unblock' : null)
+  const asker = ws.path && card.project ? (await ws.projectConfig(join(ws.path, card.project)).then(projectAgents, () => [])).find((x) => x.id === req.asker) : undefined
+  const { relayAnswer } = await import('./answerRelay')
+  await relayAnswer(ws, { card: card.number, key: rec.key || card.key || cardRef(card.number), project: card.project, asker: req.asker!, askerName: asker ? `${asker.name} (${card.project})` : req.asker!, request: req.request, question: req.text, ...answer, need })
 }
 
 /** A new card's reads, made before its number is taken (#1216: recorder.ts' NEW_CARD). */

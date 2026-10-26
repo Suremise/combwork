@@ -13,6 +13,7 @@
 // branches land in different places (tests/e2esuites.test.ts checks).
 export const SUITES = [
   { name: 'about' },
+  { name: 'accounts' },
   { name: 'activitytab' },
   { name: 'advanced' },
   { name: 'agentapislots' },
@@ -90,6 +91,7 @@ export const SUITES = [
   { name: 'codexoverrides', needs: ['codex'] },
   { name: 'codexownhooks', needs: ['codex'], noHive: "asks codex app-server's hooks/list itself, in a throwaway CODEX_HOME (#1285)" },
   { name: 'codexqueued' },
+  { name: 'commitburst' },
   { name: 'compact', needs: ['claude'], claudeHome: 'own' },
   { name: 'consoletext' },
   { name: 'consolewindow' },
@@ -128,6 +130,7 @@ export const SUITES = [
   { name: 'gitupdate' },
   { name: 'gitview' },
   { name: 'handovernotice' },
+  { name: 'harnessleftovers' },
   { name: 'hivetools' },
   { name: 'hivevcs' },
   { name: 'hookscopilot', needs: ['copilot'] },
@@ -197,6 +200,7 @@ export const SUITES = [
   { name: 'packaged-transcript', needs: ['packaged'] },
   { name: 'pages' },
   { name: 'paneheader' },
+  { name: 'panelroom' },
   { name: 'perfcompare' },
   { name: 'performance' },
   { name: 'perftable' },

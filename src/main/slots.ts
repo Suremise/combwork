@@ -508,9 +508,10 @@ export class SlotStore {
    * session there) moved to it, and `also` (the caller's rebinding of the carried lease's sessions, #1434's
    * `rebindSession`) in the same write, so all of it lands or none. Null when it can't be now: the carried lease not open
    * or another agent's, the slot under an operation or a job, or another agent writing there; an index refusing it (the
-   * agent leased meanwhile) too.
+   * agent leased meanwhile) too. `check` (the caller's, HI-1741: the slot's checkout as it decided on it) runs in the
+   * write once the rest holds, given the slot as it is then: false refuses it, nothing written.
    */
-  async handOff(carried: string, req: { card?: number; lane?: string; agent: string }, also?: (db: DatabaseSync, lease: SlotLease) => void): Promise<SlotLease | null> {
+  async handOff(carried: string, req: { card?: number; lane?: string; agent: string }, also?: (db: DatabaseSync, lease: SlotLease) => void, check?: (slot: Slot) => boolean): Promise<SlotLease | null> {
     if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane')
     try {
       return await this.conn.write((db) => {
@@ -518,6 +519,7 @@ export class SlotStore {
         if (!r || r.agent !== req.agent) return null
         const s = this.slotIn(db, r.slot as string)
         if (!s || s.op || s.job || s.state === 'removing' || (s.writer && s.writer.agent !== req.agent)) return null
+        if (check && !check(s)) return null
         const at = this.iso()
         db.prepare("UPDATE slot_leases SET ended_at = ?, why = 'handedOff' WHERE id = ?").run(at, carried)
         const lease = this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, s.name, req.card !== undefined ? 'card' : 'lane', req, at)
@@ -673,6 +675,18 @@ export class SlotStore {
       const r = db.prepare('SELECT * FROM slot_leases WHERE project = ? AND slot = ? ORDER BY from_at DESC LIMIT 1').get(this.project, slot) as Row | undefined
       return r ? leaseOfRow(r) : null
     })
+  }
+
+  /**
+   * Whether a carried lease is one the agent's Resume took (#1434: a free slot of the pool, on a card's or lane's line), not
+   * an adopted worktree's (#1441: on the agent's 0.9 branch). Its slot had a card's or lane's lease since it was made and
+   * before it (the same millisecond counts); an adopted worktree's carried lease is the first its slot had (the adoption
+   * makes the slot), and history under the same name from before the slot was made doesn't count. Unknown: false (the
+   * adopted worktree's stricter rule).
+   */
+  resumedCarry(lease: SlotLease): boolean {
+    if (lease.kind !== 'carried') return false
+    return this.conn.read((db) => !!db.prepare("SELECT 1 FROM slot_leases l JOIN slots s ON s.project = l.project AND s.name = l.slot WHERE l.project = ? AND l.slot = ? AND l.kind IN ('card', 'lane') AND l.from_at >= s.created_at AND l.from_at <= ? AND l.id <> ? LIMIT 1").get(this.project, lease.slot, lease.from, lease.id))
   }
 
   /**
@@ -1179,12 +1193,17 @@ export class SlotPool {
   }
 
   /** A carried lease handed off to a card or lane of its agent's (#1441), `also` in the same write (SlotStore.handOff). */
-  handOff(carried: string, req: { card?: number; lane?: string; agent: string }, also?: (db: DatabaseSync, lease: SlotLease) => void): Promise<SlotLease | null> {
-    return this.store.handOff(carried, req, also)
+  handOff(carried: string, req: { card?: number; lane?: string; agent: string }, also?: (db: DatabaseSync, lease: SlotLease) => void, check?: (slot: Slot) => boolean): Promise<SlotLease | null> {
+    return this.store.handOff(carried, req, also, check)
   }
 
   lastLease(name: string): SlotLease | null {
     return this.store.lastLease(name)
+  }
+
+  /** Whether a carried lease is one the agent's Resume took, not an adopted worktree's (SlotStore.resumedCarry). */
+  resumedCarry(lease: SlotLease): boolean {
+    return this.store.resumedCarry(lease)
   }
 
   /** The renames under way (#1441), and intents no operation owns cleared (SlotStore's). */

@@ -124,6 +124,9 @@ export interface UpdateRetry {
   notice: ProviderUpdateRetry
 }
 
+/** A home folder's sign-in, as its CLI reports it (HI-980): `ok: false` when it couldn't be told, `error` in English. */
+export type ConnectionStatus = { ok: true; loggedIn: boolean; email?: string; orgId?: string; plan?: string | null } | { ok: false; error: string }
+
 export interface CommandSpec {
   file: string
   args: string[]
@@ -363,6 +366,16 @@ export interface ProviderAdapter {
   /** A known update failure's explanation and explicit retry, if this installer supports one. */
   updateRetry?(executable: string, exitCode: number): UpdateRetry | null
   loginCommand(executable: string): CommandSpec
+  /**
+   * Who a home folder is signed in as (HI-980: an account's folder, given in `env` under the descriptor's
+   * `capabilities.connections.homeEnv`), from the CLI's own status: never a token. `ok: false` when it couldn't be told
+   * (a timeout, output it couldn't read), which isn't signed out.
+   */
+  accountStatus?(executable: string, env: NodeJS.ProcessEnv): Promise<ConnectionStatus>
+  /** Where a shared folder of an account (capabilities.connections.shared) links to: that folder of the CLI's own home. */
+  accountSharedTarget?(name: string): string
+  /** Whether a file in an account's folder is one that changes when the CLI signs in or out there: watched, never read. */
+  accountLoginFile?(name: string): boolean
   /** A one-time setup task (Codex's Windows sandbox), when the provider has one. */
   setupCommand?(executable: string): CommandSpec
   /** The CLI's own home (its sign-in and config) as Hive's sessions get it: what a test copy notes beside the CLI (#368). */

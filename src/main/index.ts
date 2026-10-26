@@ -1,3 +1,5 @@
+// First: the thread pool's size is set before anything uses it (HI-1702).
+import './threadPool'
 import { initWatches, onWatchedCardsMoved, watchKeepsQuitWaiting } from './watches'
 import { initLoopWakes } from './loopWakes'
 import { initLoopCheck } from './loopCheck'
@@ -7,6 +9,8 @@ import { initSkillCopies } from './skillCopies'
 import { offNames } from '../shared/skillDelivery'
 import { initInboxNotices } from './inboxNotices'
 import { initDecisionWakes } from './decisionWakes'
+// The user's answers given to the Assistant too (HI-1734): its delivery source, registered at start.
+import './answerRelay'
 import { initWorkflowNotices } from './workflowNotices'
 import { initDevConsole } from './devConsoleSources'
 import { flightRecorder } from './flightRecorder'
@@ -81,6 +85,7 @@ import { usageHistory } from './usageHistory'
 import { notificationIcon } from './paths'
 import { createTray, destroyTray, resourcesDir, setTrayPendingQuit, showWindow } from './tray'
 import { keepOffScreen, offScreenOrigin, showOsNotification, testQuiet } from './testQuiet'
+import { COMMIT_WATCH_ARG } from '../shared/commitWatch'
 import { pinFollower } from './pin'
 import { closedNotice, focusedHive, routeAppNotice, setFocusedHive, startNoticeResolver } from './notices'
 import { initUpdater, installNow, installsOnQuit } from './updater'
@@ -235,7 +240,9 @@ function createWindow(opts: { workspacePath?: string | null; bounds?: WindowStat
       backgroundThrottling: false,
       // Enables Chromium's built-in PDF viewer for the Files tab preview.
       plugins: true,
-      spellcheck: false
+      spellcheck: false,
+      // A test copy's watch on React's commits (HI-1387): the preload passes it on to the page.
+      additionalArguments: testQuiet() ? [COMMIT_WATCH_ARG] : []
     }
   })
   trackTitleBar(win, titleBarColors())

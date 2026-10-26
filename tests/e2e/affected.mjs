@@ -25,6 +25,10 @@ export const EVERYTHING = [
   'src/main/openingFence.ts',
   'src/main/paths.ts',
   'src/main/logger.ts',
+  // Its thread writes every line hive.log and hooks.log get (HI-1730).
+  'src/main/logWriter.ts',
+  // Every IPC call, database step and slow log write is marked through it (HI-1692).
+  'src/main/stallWork.ts',
   'src/main/ptyHost.ts',
   'src/main/testQuiet.ts',
   // Every IPC call's errors and the Agent API's go through it (#845).
@@ -37,6 +41,10 @@ export const EVERYTHING = [
   'src/preload/',
   'src/renderer/index.html',
   'src/renderer/src/main.tsx',
+  // React's commit watch, in every test copy's window before React DOM (HI-1387).
+  'src/renderer/src/commitWatch.ts',
+  'src/renderer/src/commitLoop.tsx',
+  'src/shared/commitWatch.ts',
   'src/renderer/src/App.tsx',
   'src/renderer/src/store.ts',
   'src/renderer/src/actions.ts',
@@ -99,6 +107,8 @@ export const AREAS = [
   { paths: ['src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/launchGate.ts', 'src/main/ptyHost.ts', 'src/shared/agentProcesses.ts', 'src/main/sessions.ts', 'tests/e2e/fake-claude/linger.cjs'], suites: ['leftovers', 'leftovers-restart', 'unexpectedclose-leftovers'] },
   { paths: ['tests/e2e/fake-claude/devapp/'], suites: ['leftovers-restart'] },
   { paths: ['tests/scenarios/harness.cjs', 'tests/e2e/folderProcesses.cjs', 'tests/e2e/fake-claude/linger.cjs', 'src/main/progressReporters/'], suites: ['scenarioteardown'] },
+  { paths: ['tests/e2e/folderProcesses.cjs', 'tests/e2e/leftCopies.mjs', 'tests/e2e/lanes.mjs'], suites: ['harnessleftovers'] },
+  { paths: ['src/renderer/src/commitWatch.ts', 'src/renderer/src/commitLoop.tsx', 'src/shared/commitWatch.ts'], suites: ['commitburst'] },
   // The real CLIs' background processes (#515): only when what tracks them changes, not with every sessions.ts change.
   { paths: ['src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/launchGate.ts'], suites: ['leftovers-claude', 'leftovers-codex'] },
   // The Agent API for apps that show Hive (#620): viewer tokens, the discovery file, the event stream's events.
@@ -157,6 +167,8 @@ export const AREAS = [
   { paths: ['src/main/workspaceNotes.ts', 'src/shared/workspaceNotes.ts', 'src/renderer/src/components/WorkspaceNotes.tsx', 'src/main/providers/claude/adapter.ts', 'src/main/providers/codex/adapter.ts', 'src/main/providers/copilot/adapter.ts'], suites: ['workspacenotes'] },
   { paths: ['src/main/cardSessions.ts', 'src/renderer/src/components/CardChip.tsx'], suites: ['cardchip', 'sessionorigin'] },
   { paths: ['src/main/cardAttachments.ts', 'src/shared/cardAttachments.ts', 'src/renderer/src/components/CardAttachments.tsx', 'src/renderer/src/cardAttachLinks.ts', 'src/main/attachmentsFolder.ts', 'tests/e2e/cardattach.cjs'], suites: ['cardattach', 'storage', 'files', 'carddialog'] },
+  // Accounts (HI-980): the store, its checks and watches, Settings → Accounts, and the fake's sign-in.
+  { paths: ['src/main/accounts.ts', 'src/shared/accounts.ts', 'src/renderer/src/components/AccountsSettings.tsx', 'tests/e2e/accounts.cjs'], suites: ['accounts'] },
   { paths: ['src/shared/activity.ts', 'src/renderer/src/views/ActivityTab.tsx', 'src/renderer/src/activityView.ts', 'src/main/agentProcesses.ts'], suites: ['activitytab'] },
   { paths: ['src/main/compaction.ts'], suites: ['compact', 'overview', 'paneheader', 'idlestatus'] },
   { paths: ['src/shared/safeguards.ts', 'src/main/providers/claude/safeguards.ts', 'src/main/providers/codex/safeguards.ts', 'src/main/cardSessions.ts'], suites: ['safeguards'] },
@@ -263,7 +275,7 @@ export const AREAS = [
   { paths: ['src/main/lastRun.ts', 'src/shared/unexpectedClose.ts', 'src/main/mergeSlotHost.ts', 'src/main/mergeSlots.ts', 'tests/e2e/unexpectedclose.cjs', 'tests/e2e/unexpectedclose-leftovers.cjs'], suites: ['unexpectedclose', 'unexpectedclose-leftovers', 'restartresume'] },
   { paths: ['src/main/restartResume.ts', 'src/shared/restartResume.ts', 'tests/e2e/restartresume.cjs'], suites: ['restartresume', 'unexpectedclose'] },
   // "The main process was busy" (#1109): sleep isn't a stall, and a stall names what was running.
-  { paths: ['src/main/mainStalls.ts', 'tests/e2e/stalls.cjs'], suites: ['stalls'] },
+  { paths: ['src/main/mainStalls.ts', 'src/main/threadPool.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/stalls.cjs'], suites: ['stalls'] },
   { paths: ['src/main/exitLog.ts', 'src/main/memory.ts', 'src/main/diagnostics.ts', 'src/main/updater.ts', 'src/main/installDir.ts'], suites: ['crashdumps'] },
   // .hive kept out of version control, and its notice (#345).
   { paths: ['src/main/hiveVcs.ts', 'src/shared/hiveVcsText.ts', 'src/renderer/src/components/HiveVcsNotice.tsx'], suites: ['hivevcs', 'gitinit'] },
@@ -279,7 +291,7 @@ export const AREAS = [
   { paths: ['src/shared/shortPath.ts', 'src/renderer/src/components/ItemTable.tsx'], suites: ['agentstable', 'removeall', 'quit', 'startall', 'cardchip', 'pages'] },
   { paths: ['src/shared/uiPrefs.ts', 'src/renderer/src/projectPrefs.ts'], suites: ['skillprefs', 'skills', 'sessiontree'] },
   { paths: ['src/renderer/src/components/Board.tsx', 'src/renderer/src/components/Overlays.tsx', 'src/renderer/src/components/Tips.tsx', 'src/renderer/src/views/SettingsView.tsx'], suites: ['searchclear'] },
-  { paths: ['src/main/taskStart.ts', 'src/main/tasks.ts', 'src/main/boardStore.ts', 'src/main/db.ts', 'src/main/walCheckpoint.ts', 'src/main/walCheckpointWorker.ts','src/shared/tasks.ts', 'src/shared/taskHistory.ts', 'src/renderer/src/components/Board.tsx', 'src/shared/edgeScroll.ts', 'src/main/cardBusy.ts', 'src/main/decisionNotices.ts', 'src/main/decisionWakes.ts', 'src/renderer/src/boardBatches.ts', 'src/main/coalesce.ts', 'src/renderer/src/components/SetAside.tsx', 'src/main/presence.ts', 'src/renderer/src/components/BoardUpgrade.tsx', 'src/main/schema/', 'src/main/workflow/factStore.ts', 'src/main/workflow/actionWorker.ts', 'src/main/workflow/cardWork.ts', 'src/renderer/src/cardWork.ts', 'src/main/workflow/adoption.ts', 'src/main/workflow/upgrade.ts', 'src/main/workflow/recorder.ts', 'src/main/workflow/reconciler.ts', 'src/main/workflow/reconcile.ts'], suites: ['reconcile', 'projectrename', 'setaside', 'board', 'boardupgrade', 'upgradelane', 'boardarchive', 'boardbulk', 'boardfold', 'boardscope', 'boardscroll', 'review', 'donemove', 'doingmove', 'carddialog', 'cardchip', 'taskoverview', 'busy', 'dialogs', 'decisions', 'decisionwake', 'replysize', 'cardcost'] },
+  { paths: ['src/main/taskStart.ts', 'src/main/tasks.ts', 'src/main/boardStore.ts', 'src/main/db.ts', 'src/main/walCheckpoint.ts', 'src/main/walCheckpointWorker.ts','src/shared/tasks.ts', 'src/shared/taskHistory.ts', 'src/shared/boardCopy.ts', 'src/renderer/src/boardReads.ts', 'src/renderer/src/components/Board.tsx', 'src/shared/edgeScroll.ts', 'src/main/cardBusy.ts', 'src/main/decisionNotices.ts', 'src/main/decisionWakes.ts', 'src/renderer/src/boardBatches.ts', 'src/main/coalesce.ts', 'src/renderer/src/components/SetAside.tsx', 'src/main/presence.ts', 'src/renderer/src/components/BoardUpgrade.tsx', 'src/main/schema/', 'src/main/workflow/factStore.ts', 'src/main/workflow/actionWorker.ts', 'src/main/workflow/cardWork.ts', 'src/renderer/src/cardWork.ts', 'src/main/workflow/adoption.ts', 'src/main/workflow/upgrade.ts', 'src/main/workflow/recorder.ts', 'src/main/workflow/reconciler.ts', 'src/main/workflow/reconcile.ts'], suites: ['reconcile', 'projectrename', 'setaside', 'board', 'boardupgrade', 'upgradelane', 'boardarchive', 'boardbulk', 'boardfold', 'boardscope', 'boardscroll', 'review', 'donemove', 'doingmove', 'carddialog', 'cardchip', 'taskoverview', 'busy', 'dialogs', 'decisions', 'decisionwake', 'replysize', 'cardcost'] },
   { paths: ['src/main/watches.ts', 'src/shared/watch.ts', 'src/shared/agentWatch.ts', 'src/main/loopCheck.ts', 'src/main/intentWatch.ts'], suites: ['agentmessage', 'deliveries', 'agentwatch', 'cardloop', 'decisionwake', 'lanewatch', 'loopwakes', 'loopwatch', 'quitwait', 'replysize', 'replytell', 'wakepaste', 'wakeuntaken', 'watchrelease'] },
   { paths: ['src/renderer/src/components/watchLine.ts'], suites: ['agentstable', 'agentwatch', 'cardloop'] },
   // Lane watches (#531), and stalls as cards and lanes tell them.
@@ -311,7 +323,7 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/Board.tsx', 'src/renderer/src/components/CardWork.tsx', 'src/renderer/src/components/Overlays.tsx', 'src/shared/laneBar.ts', 'src/main/tasks.ts', 'src/shared/workflow/workView.ts', 'tests/e2e/boardgates.cjs'], suites: ['boardgates'] },
   { paths: ['src/main/cardIntents.ts', 'tests/e2e/intents.cjs'], suites: ['intents', 'replysize'] },
   { paths: ['src/renderer/src/components/CardKind.tsx', 'src/renderer/src/components/CardReviewSkip.tsx', 'src/renderer/src/components/reviewSkipTip.ts', 'tests/e2e/nocode.cjs'], suites: ['nocode'] },
-  { paths: ['src/renderer/src/components/ForYou.tsx', 'src/renderer/src/forYou.ts', 'src/renderer/src/components/Shell.tsx'], suites: ['foryou'] },
+  { paths: ['src/renderer/src/components/ForYou.tsx', 'src/renderer/src/forYou.ts', 'src/renderer/src/components/Shell.tsx', 'src/main/answerRelay.ts'], suites: ['foryou'] },
   // A request's or a decision's short plain form (#1635): For you's chip, the inbox's rows, a card's decision count.
   { paths: ['src/shared/gist.ts'], suites: ['foryou', 'inbox', 'decisions'] },
   { paths: ['src/main/tasks.ts', 'src/main/lanes.ts', 'src/shared/lanes.ts', 'src/main/workflow/cardWork.ts', 'src/main/workflow/recorder.ts', 'src/main/workflow/runtime.ts', 'src/shared/workflow/workView.ts', 'tests/e2e/foryou.cjs'], suites: ['foryou'] },
@@ -338,7 +350,9 @@ export const AREAS = [
   // Recent workspaces (#144).
   { paths: ['src/main/recentWorkspaces.ts'], suites: ['recent', 'windows'] },
   { paths: ['src/renderer/src/components/Resizer.tsx'], suites: ['resize', 'progress'] },
-  { paths: ['src/renderer/src/components/Sidebar.tsx'], suites: ['agentstable', 'cardchip', 'rail', 'windows', 'contrast'] },
+  { paths: ['src/renderer/src/components/Sidebar.tsx'], suites: ['agentstable', 'cardchip', 'rail', 'windows', 'contrast', 'panelroom'] },
+  // Room for the work beside the side panels (HI-1737).
+  { paths: ['src/renderer/src/layoutRoom.ts'], suites: ['panelroom', 'presetstep', 'rail'] },
   // The session toolbar (#975): Panes | Tiles, the summary chip, + Add ▾.
   { paths: ['src/renderer/src/components/AgentPanes.tsx', 'src/renderer/src/components/AgentTiles.tsx'], suites: ['sessiontoolbar'] },
   // Start and Resume busy while a session starts (#1177).

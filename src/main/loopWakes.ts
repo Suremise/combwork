@@ -249,7 +249,7 @@ function historySince(card: TaskCard, since: TaskHistoryEntry | null): TaskHisto
  * Whether a waiting wake still has something to tell, from the card as it is now and what was done since its handoff:
  * a reviewer's while the card is in Review and nobody has reviewed that round (no review started nor verdict given
  * since: a round reviewed and failed meanwhile is the builder's now, #405 round 2 finding); the user's answer until it is
- * read, while the card is open or its lane runs (HI-1721); a builder's (a verdict, a
+ * read, wherever the card is (HI-1721); a builder's (a verdict, a
  * move into Passed or Done, a request, a note) while the card is still its own and, since the handoff, neither it acted
  * on the card nor another round started; one of a card that is Done, only while a lane running holds it (`inLane`: the
  * next card follows; with its lane over, the lane's end tells the builder, and nothing is left to carry on with, HI-1687).
@@ -260,9 +260,9 @@ function stillDue(p: Wake & { agentId: string }, card: TaskCard | null, inLane: 
   const since = historySince(card, p.since)
   if (p.kind === 'review') return card.column === 'review' && !card.review && !since.some((h) => /^(Started reviewing|Review (passed|failed))$/.test(h.what))
   // The user's answer, to whoever waits on it (the card's agent or the one that asked): due until it reads it (its
-  // receipt ends it), while the card is open or its lane still runs. Not on the agent's acting on the card meanwhile
-  // (HI-1721: HB2 submitted its next round before reading the user's answer on HI-1694, and the answer was dropped).
-  if (p.kind === 'answer') return card.column !== 'done' || inLane
+  // receipt ends it), wherever the card is now (an answer that moved it to Done is told too, #1630). Not on the agent's
+  // acting on the card meanwhile (HI-1721: HB2 submitted its next round before reading the user's answer on HI-1694).
+  if (p.kind === 'answer') return true
   // A builder's loop step (#1382, #1467), to its reviewer: due until the reviewer acts on the card; a design or a
   // follow-up to check, only while one still waits (answered by someone else, or the card moved on: nothing left to check).
   if (toReviewer(p.kind)) return !since.some((h) => same(h.by, p.agentName)) && (p.kind !== 'step' || !!pendingStep(card))

@@ -85,6 +85,8 @@
   "tasks.error.unknownTask": "未知的卡片 {card}",
   "tasks.error.verdictNotYours": "{agent} 正在评审 {card}：结论只能由它给出。",
   "tasks.history.answerTold": "已将你的回答告知 {agent}",
+  "tasks.history.answerUntold": "无法把你对 {agent} 问题的回答告知 Hive 助手：只有 {agent} 收到了",
+  "tasks.history.answerUntoldNeed": "{agent} 无法自行{action, select, done {把这张卡片移到已完成} noCode {把这张卡片改为无代码} skipReview {跳过这张卡片的评审} other {解除这张卡片的受阻}}，且无法把你的回答告知 Hive 助手：如果你已同意，请自己操作",
   "tasks.history.archived": "已归档",
   "tasks.history.archivedDone": "在“已完成”中停留 {days, plural, other {# 天}}后已归档",
   "tasks.history.archivedHidden": "已归档：{project} 已隐藏",

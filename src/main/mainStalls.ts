@@ -5,7 +5,8 @@ import { existsSync } from 'original-fs'
 import { app, powerMonitor } from 'electron'
 import { createLogger } from './logger'
 import { ended, running, stallClock, type Work } from './stallWork'
-import { pausedAlongside, WATCHDOG_SLOTS } from './stallWatchdog'
+import { pausedAlongside, slowProbe, WATCHDOG_SLOTS } from './stallWatchdog'
+import { threadPoolSize } from './threadPool'
 
 export { beginWork, stallClock, timedStep } from './stallWork'
 
@@ -139,6 +140,61 @@ export function stallWatcher(d: StallDeps, t = STALL_TIMING): { tick(): void; po
   }
 }
 
+export interface FileWaitDeps {
+  now(): number
+  /** The watchdog thread's latest slow file call (stallWatchdog.ts): how many so far, its start (on `now`'s clock), how long it took. */
+  slowProbe(): { n: number; start: number; ms: number } | null
+  defer(fn: () => void, ms: number): void
+  warn(line: string): void
+  /** Whether Hive's other threads stopped over [from, to] too (the watchdog's ticks): the whole process paused. */
+  pausedAlongside?(from: number, to: number): boolean
+}
+
+export const FILE_WAIT_TIMING = { every: 1000, settleMs: 3000, quietMs: 60_000 }
+
+/**
+ * Notes in hive.log when a file call took long enough to be felt (HI-1702), at most once a minute. Every asynchronous
+ * file call of main's and its worker threads takes one of the pool's threads (threadPool.ts): with them all held by
+ * slow calls, the next waits, and a step awaiting many in turn (a window's open, a session listing) takes seconds
+ * although no task holds main's thread, so the busy warning above never sees it. The call is the watchdog thread's
+ * stat, every second (stallWatchdog.ts): timed on a thread that only ticks, main's thread being busy meanwhile isn't
+ * in it (HR2's round 1: timed on main, a stall after the probe began was reported as the pool's). What it can't tell
+ * apart is the pool's wait from the disk's, so the line says both. A probe the PC's sleep or a pause of the whole
+ * process covered isn't counted, decided a little later as the busy warning is.
+ */
+export function fileWaitWatcher(d: FileWaitDeps, poolSize: number, t = FILE_WAIT_TIMING): { tick(): void; power(): void } {
+  let seen = 0
+  let logged = -Infinity
+  let unlogged = 0
+  const power: number[] = []
+  return {
+    power(): void {
+      power.push(d.now())
+      if (power.length > 20) power.shift()
+    },
+    tick(): void {
+      const p = d.slowProbe()
+      if (!p || p.n === seen) return
+      seen = p.n
+      const end = p.start + p.ms
+      d.defer(() => {
+        if (power.some((at) => at >= p.start - 1000 && at <= end + t.settleMs)) return
+        if (d.pausedAlongside?.(p.start, end)) return
+        if (d.now() - logged < t.quietMs) {
+          unlogged++
+          return
+        }
+        logged = d.now()
+        const { work, more } = workDuring(p.start, end)
+        const parts = [work.length ? `; during it: ${work.join(', ')}${more ? ` and ${more} more` : ''}` : '']
+        if (unlogged) parts.push(`; ${unlogged} more slow file call(s) since the last warning, not logged`)
+        unlogged = 0
+        d.warn(`A file call took ${Math.round(p.ms)} ms to end (timed off main's thread): it waited for the thread pool, whose ${poolSize} threads main and its worker threads share for file, zlib, crypto and DNS work, or for the disk${parts.join('')}`)
+      }, t.settleMs)
+    }
+  }
+}
+
 /** The watchdog's ticks (stallWatchdog.ts), shared with its thread; null until it starts, or where it can't. */
 let watchdog: Float64Array | null = null
 
@@ -186,4 +242,17 @@ export function watchMainStalls(): void {
   powerMonitor.on('suspend', () => watch.power())
   powerMonitor.on('resume', () => watch.power())
   setInterval(() => watch.tick(), STALL_TIMING.every).unref()
+  const files = fileWaitWatcher({
+    now: () => stallClock.mono(),
+    slowProbe: () => {
+      const p = watchdog ? slowProbe(watchdog) : null
+      return p && { ...p, start: p.start - performance.timeOrigin }
+    },
+    defer: (fn, ms) => setTimeout(fn, ms).unref(),
+    warn: (line) => log.warn(line),
+    pausedAlongside: (from, to) => (watchdog ? pausedAlongside(watchdog, performance.timeOrigin + from, performance.timeOrigin + to) : false)
+  }, threadPoolSize, { ...FILE_WAIT_TIMING, quietMs })
+  powerMonitor.on('suspend', () => files.power())
+  powerMonitor.on('resume', () => files.power())
+  setInterval(() => files.tick(), FILE_WAIT_TIMING.every).unref()
 }

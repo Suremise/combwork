@@ -353,6 +353,24 @@ class ProviderService {
     return key
   }
 
+  /**
+   * Signs an account's folder in (HI-980): the CLI's own login in a terminal of Hive's, with the folder as its home
+   * (`env`), and nothing typed into it: the user signs in through the CLI's flow. One per account: a second start gets
+   * the open one's key. `onExit` once it ends. The CLI's own sign-in state isn't changed by it (that is ~/.claude's).
+   */
+  runAccountLogin(id: ProviderId, accountId: string, env: Record<string, string>, onExit: (code: number) => void): string {
+    const adapter = provider(id)
+    const info = this.info(id)
+    if (!info.path) throw hiveError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: adapter.descriptor.name })
+    const key = `task:${id}:login:${accountId}`
+    if (hasPty(key)) return key
+    const cmd = adapter.loginCommand(info.path)
+    const s = toSpawnable(cmd.file, cmd.args)
+    log.info(`${adapter.descriptor.name} sign-in for account ${accountId}`)
+    spawnPty(key, { file: s.file, args: s.args, cwd: homedir(), env: childEnv(env), onExit })
+    return key
+  }
+
   /** Starts a provider task in a terminal and returns its terminal key. */
   runProviderTask(id: ProviderId, task: ProviderTask, retryUpdate = false): string {
     const adapter = provider(id)

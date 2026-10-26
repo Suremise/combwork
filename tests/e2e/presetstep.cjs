@@ -194,7 +194,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
       }
       await sized(sel, '')
     }
-    // Beside the Assistant's panel, at 100% (at 150% the panel and the sidebar leave the main pane no width at all, HI-1737).
+    // Beside the Assistant's panel, at 100% (the room the panel leaves the work at 150% is panelroom's, HI-1737).
     await page.locator('.assistant-rail').click()
     await lib.until(async () => (await page.locator('.assistant-panel').count()) === 1, HUNG_MS)
     check("French, 900 px beside the Assistant's panel: each banner whole, inside it and apart", !!(await fits()), JSON.stringify(await layouts()))

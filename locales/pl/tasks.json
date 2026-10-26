@@ -85,6 +85,8 @@
   "tasks.error.unknownTask": "Nieznana karta {card}",
   "tasks.error.verdictNotYours": "{agent} recenzuje {card}: werdykt należy do tego recenzenta.",
   "tasks.history.answerTold": "Przekazano agentowi {agent} Twoją odpowiedź",
+  "tasks.history.answerUntold": "Nie udało się przekazać Asystentowi Hive Twojej odpowiedzi na pytanie {agent}: ma ją tylko {agent}",
+  "tasks.history.answerUntoldNeed": "{agent} nie może sam {action, select, done {przenieść tej karty do Gotowe} noCode {zmienić tej karty na kartę bez kodu} skipReview {pominąć recenzji tej karty} other {odblokować tej karty}}, a Asystentowi Hive nie udało się przekazać Twojej odpowiedzi: zrób to sam, jeśli się zgodziłeś",
   "tasks.history.archived": "Zarchiwizowano",
   "tasks.history.archivedDone": "Zarchiwizowano po {days, plural, one {# dniu} few {# dniach} many {# dniach} other {# dnia}} w kolumnie Gotowe",
   "tasks.history.archivedHidden": "Zarchiwizowano: ukryto projekt {project}",

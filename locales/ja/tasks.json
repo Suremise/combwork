@@ -85,6 +85,8 @@
   "tasks.error.unknownTask": "不明なカード{card}",
   "tasks.error.verdictNotYours": "{card}は{agent}がレビュー中です。判定はそのエージェントが出します。",
   "tasks.history.answerTold": "{agent}に回答を伝達",
+  "tasks.history.answerUntold": "{agent}の質問へのあなたの回答をHiveアシスタントに伝えられませんでした。回答を持っているのは{agent}だけです",
+  "tasks.history.answerUntoldNeed": "{agent}は{action, select, done {このカードを自分で完了に移動} noCode {このカードを自分でコードなしに} skipReview {このカードのレビューを自分で省略} other {このカードのブロックを自分で解除}}できず、あなたの回答をHiveアシスタントにも伝えられませんでした。同意したならご自身で行ってください",
   "tasks.history.archived": "アーカイブ",
   "tasks.history.archivedDone": "「完了」に入って{days, plural, other {#日}}後にアーカイブ",
   "tasks.history.archivedHidden": "アーカイブ：{project}が非表示になったため",

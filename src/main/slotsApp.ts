@@ -324,7 +324,7 @@ export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Sl
         const writerNow = (): SlotWriter | null => at.pool.slots().find((s) => s.name === slot.name)?.writer ?? null
         if (go()) stopWhenIdle(projectPath, lease, slot, w, { go, writerNow })
       },
-      (e) => keep(`may work elsewhere (that couldn't be told: ${e instanceof Error ? e.message : String(e)})`)
+      (e) => keep(`may work elsewhere (that couldn't be told: ${e instanceof Error ? e.message : String(e)})`) // i18n-ignore: a log line
     )
   }
   // This Hive's run of it, still (another Hive's run, or one already over, isn't this Hive's to stop).
@@ -349,18 +349,18 @@ export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Sl
 export function workNow(projectPath: string, agent: string, lease: SlotLease, at: { ws: WorkspaceService; pool: SlotPool }, watchKnown: (projectPath: string, agent: string) => { label: string } | null | 'unknown'): string | null {
   try {
     const other = at.pool.leasesOf(agent).find((l) => l.id !== lease.id && !l.to)
-    if (other) return `holds lease ${other.id} (${other.lane ? `lane ${other.lane}` : other.card !== null ? `#${other.card}` : other.kind})`
+    if (other) return `holds lease ${other.id} (${other.lane ? `lane ${other.lane}` : other.card !== null ? `#${other.card}` : other.kind})` // i18n-ignore: a log line
     const project = basename(projectPath)
     const lane = boardRead(at.ws, (db) => db.prepare("SELECT id, builder_id AS builder FROM lanes WHERE state = 'active' AND project = ? COLLATE NOCASE AND (builder_id = ? OR reviewer_id = ?) ORDER BY ord LIMIT 1").get(project, agent, agent) as { id: string; builder: string } | undefined) // i18n-ignore: SQL
-    if (lane) return `${lane.builder === agent ? 'builds' : 'reviews'} lane ${lane.id}`
+    if (lane) return `${lane.builder === agent ? 'builds' : 'reviews'} lane ${lane.id}` // i18n-ignore: a log line
     const card = boardRead(at.ws, (db) => db.prepare("SELECT number FROM cards WHERE archived = 0 AND project = ? COLLATE NOCASE AND (agent = ? OR review_agent = ?) AND coalesce(stage, CASE col WHEN 'todo' THEN 'todo' WHEN 'done' THEN 'done' END, '') NOT IN ('todo', 'done') ORDER BY number LIMIT 1").get(project, agent, agent) as { number: number } | undefined) // i18n-ignore: SQL
-    if (card) return `has #${card.number} in flight`
+    if (card) return `has #${card.number} in flight` // i18n-ignore: a log line
     const watch = watchKnown(projectPath, agent)
-    if (watch === 'unknown') return "may watch something (its watches aren't loaded yet)"
-    if (watch) return `watches (${userText(watch.label)})`
+    if (watch === 'unknown') return "may watch something (its watches aren't loaded yet)" // i18n-ignore: a log line
+    if (watch) return `watches (${userText(watch.label)})` // i18n-ignore: a log line
     return null
   } catch (e) {
-    return `may work elsewhere (that couldn't be told: ${e instanceof Error ? e.message : String(e)})`
+    return `may work elsewhere (that couldn't be told: ${e instanceof Error ? e.message : String(e)})` // i18n-ignore: a log line
   }
 }
 

@@ -595,6 +595,7 @@ _electron.launch = async (...args) => {
     noUpdateChecks(env.HIVE_USER_DATA)
     if (env.HIVE_USER_DATA) packagedLaunches.push({ profile: env.HIVE_USER_DATA, since: new Date().toISOString() })
   }
+  const from = Date.now()
   const app = await launchElectron(...args)
   // An app.evaluate reaches main through Node's inspector, which runs it at once even while main's JS is running: in a
   // V8 interrupt, in the middle of whatever main was doing. A function that calls into Hive (a window event, a setting)
@@ -614,6 +615,7 @@ _electron.launch = async (...args) => {
     )
   apps.add(app)
   app.on('close', () => apps.delete(app))
+  watchCommitBursts(app)
   if (packaged) {
     const shown = await app.evaluate(keepPackagedQuiet).catch((e) => ({ error: e.message }))
     if (!Array.isArray(shown) || shown.length) {
@@ -621,8 +623,94 @@ _electron.launch = async (...args) => {
       throw new Error(`A packaged test Hive (${args[0].executablePath}) couldn't be kept off the screen (#1253): ${Array.isArray(shown) ? `its windows were shown before it was reached (${shown.join(', ')})` : shown.error}`)
     }
   }
+  // Recorded by its pid and when it started (HI-1453), in the folder its runner gave the suite: whatever ends the run, the
+  // runner ends each copy still running once the suite has ended, and the next run's start those an earlier run left.
+  // Its main process's own pid: Playwright starts Electron through `cmd.exe /c` on Windows, so app.process() is that
+  // shell, which ends with a killed suite while Hive runs on outside the suite's job (how one ran 12 h): the shell's
+  // child, by the process tree alone, trusted only while this process holds the shell's handle (it hasn't exited). Looked
+  // up in the background, so the launch returns as it did: only a record, which never fails or holds up the suite. A
+  // copy whose record isn't made (in time, or at all) is never ended by the runner, only listed.
+  if (process.env.HIVE_E2E_DIR) recordMainProcess(WORK, app.process(), from, env.HIVE_USER_DATA ?? null).catch(() => undefined)
   return app
 }
+
+// React's commit bursts in the suite's test copies (HI-1387, step 1: recorded, nothing fails on them yet). Each window
+// of a test copy says each new largest burst on its console (src/shared/commitWatch.ts: `<marker> <n>`, n commits within
+// 250 ms), small ones too; the suite's largest is said once as it exits, for the run's output (run.mjs), and once at the
+// time it first reaches React's nested-update limit, the candidate threshold. Step 2 decides whether to fail a suite
+// there, once a full run shows what normal bursts are (HI-1759).
+const COMMIT_BURST_MARKER = '[hive commit burst]'
+const COMMIT_BURST_LIMIT = 50
+/**
+ * A suite's record of its windows' bursts: each window's own largest, from its console lines and read once from the page
+ * as it is watched (one said before the listener was there isn't said again); the suite's, the largest of them, null
+ * while no window has reported (no watch there, which isn't a burst of 0). onFirst: once, when the first window
+ * reports; onReach(n): once, when the suite's first reaches the limit. Never throws into the suite: only a record.
+ */
+function burstWatcher({ onFirst = () => {}, onReach = () => {} } = {}) {
+  const perWindow = new Map()
+  let largest = null
+  const note = (page, n) => {
+    if (!Number.isInteger(n) || n < 0 || n <= (perWindow.get(page) ?? -1)) return
+    perWindow.set(page, n)
+    const before = largest
+    if (before !== null && n <= before) return
+    largest = n
+    if (before === null) onFirst()
+    if ((before ?? -1) < COMMIT_BURST_LIMIT && n >= COMMIT_BURST_LIMIT) onReach(n)
+  }
+  const fromText = (text) => {
+    const s = String(text)
+    if (!s.startsWith(COMMIT_BURST_MARKER)) return null
+    const n = Number(s.slice(COMMIT_BURST_MARKER.length).trim())
+    return Number.isInteger(n) ? n : null
+  }
+  const watch = (page) => {
+    try {
+      page.on('console', (m) => {
+        try {
+          const n = fromText(m.text())
+          if (n !== null) note(page, n)
+        } catch {
+          // Only a record: never the suite's failure.
+        }
+      })
+    } catch {
+      // As above.
+    }
+    // What the page reached before the listener was there: its own count, read once.
+    try {
+      Promise.resolve(page.evaluate(() => window.__hiveCommitBurst?.().max)).then(
+        (n) => {
+          if (typeof n === 'number') note(page, n)
+        },
+        () => undefined
+      )
+    } catch {
+      // As above.
+    }
+  }
+  return {
+    watch,
+    watchApp(app) {
+      try {
+        for (const page of app.windows()) watch(page)
+        app.on('window', watch)
+      } catch {
+        // As above.
+      }
+    },
+    largest: () => largest,
+    windows: () => [...perWindow.values()]
+  }
+}
+const bursts = burstWatcher({
+  onFirst: () => process.once('exit', () => console.log(`INFO React commit burst: the largest was ${bursts.largest()} commits within 250 ms (recorded only; ${COMMIT_BURST_LIMIT}, React's nested-update limit, is the candidate threshold, HI-1387)`)),
+  onReach: (n) => console.log(`INFO React commit burst: ${n} commits within 250 ms, React's nested-update limit, the candidate threshold: recorded only for now (HI-1387)`)
+})
+/** The suite's largest burst so far (0 while no window has reported). */
+const commitBursts = () => bursts.largest() ?? 0
+const watchCommitBursts = (app) => bursts.watchApp(app)
 
 /** The Hives a suite may never start (#1253): the installed app (the one hosting the agents, with its own profile and app ID). */
 const INSTALLED = [path.join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Hive'), path.join(process.env.PROGRAMFILES ?? 'C:\\Program Files', 'Hive')]
@@ -1237,7 +1325,7 @@ function codexHook(runId) {
 
 // What still runs from a test's own folder after its Hive closed (#542): folderProcesses.cjs.
 // A process by its identity (pid and start time), never by a remembered pid alone (#603).
-const { processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree } = require('./folderProcesses.cjs')
+const { processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, recordMainProcess } = require('./folderProcesses.cjs')
 
 /**
  * Whether process `pid` still runs: false only when Windows says there is no such process (ESRCH). Any other error
@@ -1451,4 +1539,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, typeLine, fakePrompts, skip }
+module.exports = { commitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, typeLine, fakePrompts, skip }

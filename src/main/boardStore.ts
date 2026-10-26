@@ -12,7 +12,7 @@ import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, 
 import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
-import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
+import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { timedStep } from './stallWork'
@@ -299,6 +299,15 @@ export const BOARD_MIGRATIONS: Migration[] = [
     up: (db) => {
       for (const sql of CARD_ATTACHMENTS_STEP.ddl) db.exec(sql)
     }
+  },
+  {
+    // HI-1715: each card's revision and the board's mark, kept by triggers, so the window is sent only what changed.
+    version: 24,
+    name: CARD_REVS_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      for (const sql of CARD_REVS_STEP.ddl) db.exec(sql)
+    }
   }
 ]
 
@@ -342,7 +351,12 @@ interface Board {
   leases: number
   /** Closed while leased (closeBoard): no longer the workspace's board, its connection closed as its last lease ends. */
   detached: boolean
+  /** Which opening of a board this is, in this process (HI-1715): a window's cursor on another opening's marks is void. */
+  generation: number
 }
+
+/** Boards opened so far in this process: each opening's `generation`. */
+let openings = 0
 
 const boards = new Map<string, Board>()
 
@@ -740,6 +754,7 @@ function openBoard(path: string, upgrade: boolean): Board {
       transient: false,
       leases: 0,
       detached: false,
+      generation: ++openings,
       poll: setInterval(() => pollOther(key), POLL_MS),
       presence: setInterval(() => markPresent(hive), HEARTBEAT_MS)
     }
@@ -1370,9 +1385,9 @@ const FIELD_COLUMNS: Record<string, (keyof CardRow)[]> = {
  * Some fields of each card a condition picks (every card without one), each as its document has it (null when it hasn't
  * the field), read from only the columns and child tables they need: nothing else of a card (its description, comments…).
  */
-function cardFields(db: Db['reader'], keys: string[], sel: { where?: string; numbers?: number[]; parts: CardPart[] }): { r: CardRows; fields: Record<string, unknown> }[] {
+function cardFields(db: Db['reader'], keys: string[], sel: { where?: string; args?: (number | string)[]; numbers?: number[]; parts: CardPart[] }): { r: CardRows; fields: Record<string, unknown> }[] {
   const columns = [...new Set(keys.flatMap((k) => FIELD_COLUMNS[k] ?? []))]
-  return readCardRows(db, { where: sel.where, numbers: sel.numbers, parts: sel.parts, columns }).map((r) => ({ r, fields: Object.fromEntries(keys.map((k) => [k, cardField(r, k) ?? null])) }))
+  return readCardRows(db, { where: sel.where, args: sel.args, numbers: sel.numbers, parts: sel.parts, columns }).map((r) => ({ r, fields: Object.fromEntries(keys.map((k) => [k, cardField(r, k) ?? null])) }))
 }
 
 /**
@@ -1402,12 +1417,58 @@ const SUMMARY = ['title', 'project', 'projectId', 'agent', 'agentName', 'column'
  * card's dialog read them in full.
  */
 export function archivedSummaryDocs(ws: WorkspaceService): { number: number; doc: Record<string, unknown> }[] {
+  return readSnapshot(ws, summariesOf)
+}
+
+function summariesOf(b: Board, db: Db['reader']): { number: number; doc: Record<string, unknown> }[] {
+  if (!b.legacy) return cardFields(db, SUMMARY, { where: 'archived = 1', parts: ['labels'] }).map(({ r, fields }) => ({ number: r.card.number, doc: { ...fields, archived: true } }))
+  const field = (k: string): string => `'${k}', doc -> '$.${k}'`
+  const rows = db.prepare(`SELECT number, json_object(${SUMMARY.map(field).join(', ')}, 'archived', json('true')) AS doc FROM cards WHERE archived = 1 ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
+  return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+}
+
+/** What a window's board read takes from one snapshot of the board (HI-1715, cardChanges). */
+export interface CardChanges {
+  /** The board's opening it was read from (Board.generation). */
+  generation: number
+  /** The board's mark in that snapshot; null on a board with no revisions (a 0.9 board waiting for its upgrade). */
+  mark: number | null
+  /** Every card's number. */
+  numbers: number[]
+  keys: Map<number, string>
+  /** The live cards changed (all of them without `since`), in full. */
+  live: { number: number; doc: Record<string, unknown> }[]
+  /** The archived cards changed (all of them without `since`), in short (archivedSummaryDocs). */
+  summaries: { number: number; doc: Record<string, unknown> }[]
+}
+
+/**
+ * The board as a window reads it (HI-1715): every number and key, and the cards at revision `since` or above (every card
+ * when null, or on a board with no revisions), the live ones in full and the archived in short, with the mark, all from one
+ * snapshot. A write committed after it raises what it changes to the mark or above, so the next read from this mark has
+ * it (CARD_REVS_STEP).
+ */
+export function cardChanges(ws: WorkspaceService, since: number | null): CardChanges {
   return readSnapshot(ws, (b, db) => {
-    if (!b.legacy) return cardFields(db, SUMMARY, { where: 'archived = 1', parts: ['labels'] }).map(({ r, fields }) => ({ number: r.card.number, doc: { ...fields, archived: true } }))
-    const field = (k: string): string => `'${k}', doc -> '$.${k}'`
-    const rows = db.prepare(`SELECT number, json_object(${SUMMARY.map(field).join(', ')}, 'archived', json('true')) AS doc FROM cards WHERE archived = 1 ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
-    return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+    const numbers = (db.prepare('SELECT number FROM cards ORDER BY number').all() as { number: number }[]).map((r) => r.number) // i18n-ignore: SQL
+    if (b.legacy) return { generation: b.generation, mark: null, numbers, keys: new Map(), live: docsOf(b, db, { archived: false }), summaries: summariesOf(b, db) }
+    const mark = (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g // i18n-ignore: SQL
+    const changed = since === null ? '' : ' AND rev >= ?' // i18n-ignore: SQL
+    const args = since === null ? [] : [since]
+    return {
+      generation: b.generation,
+      mark,
+      numbers,
+      keys: keysOfCards(db),
+      live: readCardRows(db, { where: `archived = 0${changed}`, args }).map((r) => ({ number: r.card.number, doc: composeCard(r) })),
+      summaries: cardFields(db, SUMMARY, { where: `archived = 1${changed}`, args, parts: ['labels'] }).map(({ r, fields }) => ({ number: r.card.number, doc: { ...fields, archived: true } }))
+    }
   })
+}
+
+/** Which opening of the workspace's board is open now (Board.generation), opening it if it isn't. */
+export function boardGeneration(ws: WorkspaceService): number {
+  return readConn(ws).b.generation
 }
 
 /**

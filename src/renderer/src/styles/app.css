@@ -328,7 +328,8 @@ kbd {
 
 .main-area {
   flex: 1;
-  min-width: 0;
+  /* The work keeps its room while it can (HI-1737): layoutRoom.ts sets the least width the window leaves it. */
+  min-width: var(--main-min, 0px);
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -606,7 +607,10 @@ kbd {
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  min-width: 200px;
+  /* Narrowed for the work only once the side panels have given way (their shrink far outweighs this one), down to its
+     least width (HI-1737); a drag still keeps it 200 px or more. */
+  flex-shrink: 1;
+  min-width: 160px;
   max-width: 600px;
   position: relative;
 }
@@ -4167,6 +4171,65 @@ h2.section#unused-worktrees {
 .setup-detail .hint {
   margin: 0 0 6px;
   line-height: 1.45;
+}
+/* Settings → Accounts (HI-980) */
+.accounts-provider {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.account-row {
+  align-self: stretch;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.account-main {
+  flex: 1 1 360px;
+  min-width: 220px;
+}
+.account-name {
+  font-weight: 600;
+}
+.account-state {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 2px;
+}
+.account-state.state-signedIn .codicon {
+  color: var(--success);
+}
+.account-state.state-changed .codicon,
+.account-state.state-missing .codicon,
+.account-warning .codicon {
+  color: var(--warning);
+}
+.account-warning {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 4px;
+}
+.account-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.account-default {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+.account-signin {
+  align-self: stretch;
+  margin-top: 10px;
 }
 .task-terminal {
   height: 280px;
@@ -8096,8 +8159,10 @@ button.mode-badge.badge:hover {
   position: relative;
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
-  min-width: 300px;
+  /* Gives way first when the window is short of room for the work (HI-1737), down to its least width: 240 px, or less
+     (to 190) once everything else has given way (layoutRoom.ts sets it). */
+  flex-shrink: 1000;
+  min-width: var(--assistant-min, 240px);
   max-width: 70vw;
   background: var(--bg-sidebar);
   border-left: 1px solid var(--border-subtle);
@@ -8162,6 +8227,9 @@ button.mode-badge.badge:hover {
   font: inherit;
   font-size: 11px;
   cursor: pointer;
+  /* Squeezed past its icon and caret (the panel narrowed for the work, HI-1737): cut inside the pill, never drawn over
+     Start beside it. */
+  overflow: hidden;
 }
 .assistant-mode:hover {
   color: var(--fg);
@@ -10982,7 +11050,9 @@ textarea.input.task-blocked-input {
   position: relative;
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
+  /* Gives way after the Assistant's panel and before the sidebar (HI-1737: their shrinks far apart), down to its least
+     width. */
+  flex-shrink: 10;
   min-width: 240px;
   max-width: 50vw;
   background: var(--bg-sidebar);
