@@ -121,6 +121,8 @@ function transcript(sid, turns, startMin) {
     const text = await details.innerText()
     check("a tool call's details show its input", /npm test -- --token/.test(text), text)
     check('…with the secret in it masked, as the log masks it', !text.includes('q'.repeat(40)), text)
+    // Playwright's click scrolled the tree to the call: back to its start, for a screenshot of the whole tree.
+    await page.locator('.activity-tree').evaluate((el) => (el.scrollLeft = 0))
     await page.screenshot({ path: path.join(lib.WORK, 'activitytab-2-details-dark.png') })
 
     // --- Ending one of the agent's processes: its CLI has no End Process; one it left running ends after a confirmation.

@@ -283,6 +283,11 @@ const NodeBox = memo(function NodeBox({ node, x, y, open, selected, onSelect, on
       aria-selected={selected}
       tabIndex={0}
       data-key={node.key}
+      // Focused where it is: the browser's own focus would scroll the tree sideways to show all of a deep node.
+      onMouseDown={(e) => {
+        e.preventDefault()
+        e.currentTarget.focus({ preventScroll: true })
+      }}
       onClick={() => (more ? onMore(node.key) : onSelect(node.key))}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
