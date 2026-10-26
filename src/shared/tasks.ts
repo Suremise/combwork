@@ -291,6 +291,8 @@ export function reviewVerdictWaitReason(card: Pick<TaskCard, 'number' | 'column'
 export interface LaneOrderView {
   builder: string
   reviewer: string | null
+  /** The lane's state (active, paused…), where known: a paused lane's next card isn't stalled (HI-1741). */
+  state?: string
   /** In the lane's order; `movedAt`: when it last came into its column (columnSince), where known. */
   cards: { number: number; column: string; key?: string; movedAt?: string | null }[]
 }

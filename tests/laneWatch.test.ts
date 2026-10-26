@@ -13,7 +13,7 @@ import { taskWaitText } from '../src/shared/toolReplies'
 import { REVIEW_WAIT_STALL_MS } from '../src/shared/tasks'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
-import { RETURN_STALL_MS, returnedWaitReason } from '../src/main/cardStall'
+import { LANE_NEXT_STALL_MS, laneNextWaitReason, RETURN_STALL_MS, returnedWaitReason } from '../src/main/cardStall'
 /** The merge queue's returns as queueReturnOf finds them (HI-1721), by card: none unless a test sets one. */
 const { returns } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>() }))
 vi.mock('../src/main/queueReturn', () => ({ queueReturnOf: async (_ws: unknown, _p: string, n: number) => returns.get(n) ?? null, returnIn: () => null }))
@@ -215,6 +215,33 @@ describe("a card the merge queue returned, waiting for its builder (HI-1721's re
     expect(returnedWaitReason({ ...c, blocked: 'Which icon?' }, back, watching, t + 2 * RETURN_STALL_MS)).toBeNull()
     expect(returnedWaitReason({ ...c, column: 'review' }, back, watching, t + 2 * RETURN_STALL_MS)).toBeNull()
     expect(returnedWaitReason(c, null, watching, t + 2 * RETURN_STALL_MS)).toBeNull()
+  })
+})
+
+describe("a running lane's next card its builder hasn't started (HI-1741's laneNextWaitReason)", () => {
+  const at = '2026-10-26T18:17:05.000Z'
+  const t = Date.parse(at)
+  const lane = { builder: 'hb3', reviewer: 'hr3', state: 'active', cards: [{ number: 1729, key: 'HI-1727', column: 'done', movedAt: at }, { number: 1737, key: 'HI-1735', column: 'todo', movedAt: null }, { number: 1743, key: 'HI-1741', column: 'todo', movedAt: null }] }
+  const c = { number: 1737, key: 'HI-1735', column: 'todo' as const, archived: false, blocked: null }
+  it('stalled once the card before it has been Done 15 min, its builder idle, only watching or not running; not while it works, nor before', () => {
+    expect(laneNextWaitReason(c, lane, { name: 'HB3', status: 'finished' }, t + LANE_NEXT_STALL_MS)).toBe("HI-1735 is the lane's next card: HI-1727 went Done 15 min ago, and HB3 is idle without starting it.")
+    expect(laneNextWaitReason(c, lane, { name: 'HB3', status: 'watching' }, t + LANE_NEXT_STALL_MS + 60_000)).toMatch(/16 min ago, and HB3 is only watching without starting it/)
+    expect(laneNextWaitReason(c, lane, { name: 'HB3', status: null }, t + LANE_NEXT_STALL_MS)).toMatch(/and HB3 isn't running without starting it/)
+    for (const status of ['working', 'starting', 'background', 'waiting']) expect(laneNextWaitReason(c, lane, { name: 'HB3', status }, t + 3 * LANE_NEXT_STALL_MS), status).toBeNull()
+    expect(laneNextWaitReason(c, lane, { name: 'HB3', status: 'finished' }, t + LANE_NEXT_STALL_MS - 1000)).toBeNull()
+  })
+  it('not for a paused lane, a card not next (one before it not Done, or the first), one blocked, started or archived, or no lane', () => {
+    const idle = { name: 'HB3', status: 'finished' }
+    const late = t + 2 * LANE_NEXT_STALL_MS
+    expect(laneNextWaitReason(c, { ...lane, state: 'paused' }, idle, late)).toBeNull()
+    expect(laneNextWaitReason({ ...c, number: 1743, key: 'HI-1741' }, lane, idle, late)).toBeNull()
+    expect(laneNextWaitReason({ ...c, number: 1729, key: 'HI-1727' }, { ...lane, cards: [{ ...lane.cards[0], column: 'todo' }, ...lane.cards.slice(1)] }, idle, late)).toBeNull()
+    expect(laneNextWaitReason({ ...c, blocked: 'Which slot?' }, lane, idle, late)).toBeNull()
+    expect(laneNextWaitReason({ ...c, column: 'doing' }, lane, idle, late)).toBeNull()
+    expect(laneNextWaitReason({ ...c, archived: true }, lane, idle, late)).toBeNull()
+    expect(laneNextWaitReason(c, null, idle, late)).toBeNull()
+    // When the card before it went Done isn't known: no stall.
+    expect(laneNextWaitReason(c, { ...lane, cards: [{ ...lane.cards[0], movedAt: null }, ...lane.cards.slice(1)] }, idle, late)).toBeNull()
   })
 })
 
@@ -707,6 +734,50 @@ describe('lane watches (main/watches.ts, #531)', async () => {
       expect(st.told[0]).toMatch(new RegExp(`#${a} is stalled: ".* came back from the merge queue 16 min ago; B1 is only watching it, not fixing it\\."`))
     } finally {
       returns.delete(a)
+    }
+    await disposeWorkspaceService(w)
+  })
+
+  it("a lane's next card its builder, idle, hasn't started is stalled once the card before it has been Done 15 min; started, it isn't (HI-1741)", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    await rulesOff()
+    const [a] = await newCards(w, 'b1', 1)
+    const b = (await inWorkspace(w, () => tasks.createTask({ title: 'Next', project: 'alpha', agent: 'b1' }, user))).number
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a, b], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => tasks.updateTask(a, { column: 'done' }, user))
+    const done = Date.now()
+    // B1 read its card's Done and ended its turn (HB3, 26 Oct): idle, the lane's next card in Todo.
+    let b1Status = 'finished'
+    Object.assign(sessions, { liveStates: () => [{ projectPath: alpha, agentId: 'b1', agentName: 'B1', status: b1Status }] })
+    await watchAll(w, home, st)
+    await watches.evaluateWatches(w)
+    await watches.settled()
+    expect(st.typed).toEqual([])
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(done + LANE_NEXT_STALL_MS + 60_000)
+      // At work then (its turn not over): no stall.
+      b1Status = 'working'
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      expect(st.typed).toEqual([])
+      b1Status = 'finished'
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+      expect(st.told[0]).toMatch(new RegExp(`#${b} is stalled: "#${b} is the lane's next card: #${a} went Done 16 min ago, and B1 is idle without starting it\\."`))
+      // Told once: looked at again, nothing new.
+      await watchAll(w, home, st)
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      expect(st.told).toHaveLength(1)
+      // B1 starts it: no longer stalled, as the lane's view shows it.
+      await inWorkspace(w, () => tasks.updateTask(b, { column: 'doing' }, agent('b1')))
+      b1Status = 'working'
+      const now = await watches.lanesNowIn(w, {}, new Date(0).toISOString())
+      expect(now.flatMap((l) => l.cards).find((x) => x.number === b)?.stalled).toBeNull()
+    } finally {
+      vi.useRealTimers()
     }
     await disposeWorkspaceService(w)
   })
