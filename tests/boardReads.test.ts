@@ -29,9 +29,9 @@ const delta = (cards: TaskCard[], numbers: number[], mark: number, board = 'b1')
 const now = { ws: 'W', whole: false }
 
 /** One read through to what is shown. */
-async function readOnce(r: ReturnType<typeof boardReader>, o: { ws?: string; whole?: boolean; then?: { ws: string | null; whole: boolean } } = {}) {
+async function readOnce(r: ReturnType<typeof boardReader>, o: { ws?: string; whole?: boolean; after?: { ws: string | null; whole: boolean } } = {}) {
   const read = r.begin(o.ws ?? 'W', o.whole ?? false)
-  return read.take(await read.request, o.then ?? { ws: o.ws ?? 'W', whole: o.whole ?? false })
+  return read.take(await read.request, o.after ?? { ws: o.ws ?? 'W', whole: o.whole ?? false })
 }
 const numbers = (shown: TaskCard[] | 'again' | null): number[] | typeof shown => (Array.isArray(shown) ? shown.map((c) => c.number) : shown)
 
@@ -95,9 +95,9 @@ describe("the window's board reads (HI-1715)", () => {
     m.reply(full([card(1)]))
     await readOnce(r)
     m.reply(delta([card(1, { title: 'late' })], [1], 15))
-    expect(await readOnce(r, { then: { ws: 'Other', whole: false } })).toBeNull()
+    expect(await readOnce(r, { after: { ws: 'Other', whole: false } })).toBeNull()
     m.reply(delta([card(1, { title: 'late' })], [1], 15))
-    expect(await readOnce(r, { then: { ws: 'W', whole: true } })).toBeNull()
+    expect(await readOnce(r, { after: { ws: 'W', whole: true } })).toBeNull()
     // Neither moved the cursor on.
     m.reply(delta([], [1], 15))
     await readOnce(r)
