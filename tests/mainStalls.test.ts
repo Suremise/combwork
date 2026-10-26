@@ -2,9 +2,9 @@
 // overlapped it (IPC calls, Agent API requests, hooks, and HI-1692's synchronous steps: a database's BEGIN or commit) and
 // the main thread's CPU time. A gap the watchdog thread had too is the whole process paused, not a stall (HI-1692).
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { apiLabel, beginWork, hookLabel, stallClock, stallWatcher, timedStep, workDuring, STALL_TIMING } from '../src/main/mainStalls'
+import { apiLabel, beginWork, fileWaitWatcher, hookLabel, stallClock, stallWatcher, timedStep, workDuring, FILE_WAIT_TIMING, STALL_TIMING } from '../src/main/mainStalls'
 import { noteStep } from '../src/main/stallWork'
-import { pausedAlongside, watchdogTick, WATCHDOG_SLOTS } from '../src/main/stallWatchdog'
+import { pausedAlongside, probeEnded, slowProbe, watchdogTick, PROBE_SLOW_MS, WATCHDOG_SLOTS } from '../src/main/stallWatchdog'
 
 let now = 0
 let base = 0
@@ -330,5 +330,102 @@ describe('the steps that can wait, and a whole-process pause (HI-1692)', () => {
     expect(pausedAlongside(ticks, from + 6000, from + 12_000)).toBe(false)
     // After its last tick: it can't say.
     expect(pausedAlongside(ticks, t + 100, t + 500)).toBe(false)
+  })
+})
+
+describe('slow file calls, timed on the watchdog thread (HI-1702)', () => {
+  /** A file-wait watcher on the fake clock, reading a fake watchdog's latest slow probe; its decisions run at settle(). */
+  function files() {
+    let probe: { n: number; start: number; ms: number } | null = null
+    const deferred: (() => void)[] = []
+    const warnings: string[] = []
+    const paused = { value: false }
+    const w = fileWaitWatcher({ now: () => now, slowProbe: () => probe, defer: (fn) => deferred.push(fn), warn: (l) => warnings.push(l), pausedAlongside: () => paused.value }, 16)
+    return {
+      w,
+      warnings,
+      paused,
+      /** The watchdog's probe began now and took `ms`; main ticks once it has ended, then decides. */
+      slow(ms: number) {
+        const start = now
+        now += ms
+        probe = { n: (probe?.n ?? 0) + 1, start, ms }
+        w.tick()
+      },
+      settle() {
+        for (const fn of deferred.splice(0)) fn()
+      }
+    }
+  }
+
+  it('warns for a slow file call, naming the work under way, without saying it was the pool alone', () => {
+    const f = files()
+    const done = beginWork('ipc session:list')
+    f.slow(900)
+    done()
+    f.settle()
+    expect(f.warnings).toEqual(["A file call took 900 ms to end (timed off main's thread): it waited for the thread pool, whose 16 threads main and its worker threads share for file, zlib, crypto and DNS work, or for the disk; during it: ipc session:list (0.9 s)"])
+  })
+
+  it("is the watchdog's probe alone: main's thread held meanwhile isn't a file call's wait (HR2's round 1)", () => {
+    const f = files()
+    // Main blocked for 650 ms (the busy warning's), the watchdog's probe quick: nothing slow recorded, nothing said.
+    f.w.tick()
+    now += 650
+    f.w.tick()
+    f.settle()
+    expect(f.warnings).toEqual([])
+  })
+
+  it('says each slow probe once, however many ticks read it', () => {
+    const f = files()
+    f.slow(400)
+    f.w.tick()
+    f.w.tick()
+    f.settle()
+    expect(f.warnings).toHaveLength(1)
+  })
+
+  it("leaves out a probe the PC's sleep or a pause of the whole process covered", () => {
+    const f = files()
+    f.w.power()
+    f.slow(8000)
+    f.settle()
+    now += FILE_WAIT_TIMING.quietMs
+    f.paused.value = true
+    f.slow(7000)
+    f.settle()
+    expect(f.warnings).toEqual([])
+    f.paused.value = false
+    f.slow(600)
+    f.settle()
+    expect(f.warnings[0]).toMatch(/^A file call took 600 ms to end/)
+  })
+
+  it('warns once a minute, counting the slow calls between', () => {
+    const f = files()
+    f.slow(600)
+    f.settle()
+    f.slow(700)
+    f.settle()
+    f.slow(800)
+    f.settle()
+    now += FILE_WAIT_TIMING.quietMs
+    f.slow(500)
+    f.settle()
+    expect(f.warnings).toHaveLength(2)
+    expect(f.warnings[0]).toMatch(/^A file call took 600 ms/)
+    expect(f.warnings[1]).toMatch(/^A file call took 500 ms .*; 2 more slow file call\(s\) since the last warning, not logged$/)
+  })
+
+  it("the watchdog keeps only its slow probes, the latest with its start and time", () => {
+    const ticks = new Float64Array(WATCHDOG_SLOTS)
+    probeEnded(ticks, 1000, 1000 + PROBE_SLOW_MS)
+    expect(slowProbe(ticks)).toBeNull()
+    probeEnded(ticks, 2000, 2900)
+    probeEnded(ticks, 5000, 5400)
+    expect(slowProbe(ticks)).toEqual({ n: 2, start: 5000, ms: 400 })
+    // Its gaps are untouched by it.
+    expect(pausedAlongside(ticks, 2000, 2900)).toBe(false)
   })
 })

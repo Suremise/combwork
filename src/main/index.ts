@@ -1,3 +1,5 @@
+// First: the thread pool's size is set before anything uses it (HI-1702).
+import './threadPool'
 import { initWatches, onWatchedCardsMoved, watchKeepsQuitWaiting } from './watches'
 import { initLoopWakes } from './loopWakes'
 import { initLoopCheck } from './loopCheck'
