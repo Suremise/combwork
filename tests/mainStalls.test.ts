@@ -2,7 +2,7 @@
 // overlapped it (IPC calls, Agent API requests, hooks, and HI-1692's synchronous steps: a database's BEGIN or commit) and
 // the main thread's CPU time. A gap the watchdog thread had too is the whole process paused, not a stall (HI-1692).
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { apiLabel, beginWork, hookLabel, stallClock, stallWatcher, timedStep, workDuring, STALL_TIMING } from '../src/main/mainStalls'
+import { apiLabel, beginWork, fileWaitWatcher, hookLabel, stallClock, stallWatcher, timedStep, workDuring, FILE_WAIT_TIMING, STALL_TIMING } from '../src/main/mainStalls'
 import { noteStep } from '../src/main/stallWork'
 import { pausedAlongside, watchdogTick, WATCHDOG_SLOTS } from '../src/main/stallWatchdog'
 
@@ -330,5 +330,59 @@ describe('the steps that can wait, and a whole-process pause (HI-1692)', () => {
     expect(pausedAlongside(ticks, from + 6000, from + 12_000)).toBe(false)
     // After its last tick: it can't say.
     expect(pausedAlongside(ticks, t + 100, t + 500)).toBe(false)
+  })
+})
+
+describe("main's file calls waiting for the thread pool (HI-1702)", () => {
+  /** A file-wait watcher on the fake clock: its probe and next-turn callbacks run when the test says. */
+  function files() {
+    const probes: (() => void)[] = []
+    const turns: (() => void)[] = []
+    const warnings: string[] = []
+    const w = fileWaitWatcher({ now: () => now, probe: (done) => probes.push(done), immediate: (fn) => turns.push(fn), warn: (l) => warnings.push(l) }, 16)
+    return {
+      w,
+      warnings,
+      probes,
+      /** One probe: the loop's next turn after `loopMs`, the stat's callback after `ms` in all. */
+      probe(ms: number, loopMs = 0) {
+        w.tick()
+        now += loopMs
+        turns.shift()?.()
+        now += ms - loopMs
+        probes.shift()?.()
+      }
+    }
+  }
+
+  it('warns when a stat waited for the pool, naming the work under way and the pool', () => {
+    const f = files()
+    const done = beginWork('ipc session:list')
+    f.probe(900)
+    done()
+    expect(f.warnings).toEqual(["Main's file calls waited 900 ms for the thread pool (all 16 of its threads busy with file, zlib, crypto or DNS work of main and its worker threads); during it: ipc session:list (0.9 s, still running)"])
+  })
+
+  it("leaves the event loop's own lateness to the busy warning, and says nothing for a quick stat", () => {
+    const f = files()
+    f.probe(900, 880)
+    f.probe(40)
+    expect(f.warnings).toEqual([])
+  })
+
+  it('takes one probe at a time, and warns once a minute, counting the waits between', () => {
+    const f = files()
+    f.w.tick()
+    f.w.tick()
+    expect(f.probes).toHaveLength(1)
+    now += 600
+    f.probes.shift()?.()
+    f.probe(700)
+    f.probe(800)
+    now += FILE_WAIT_TIMING.quietMs
+    f.probe(500)
+    expect(f.warnings).toHaveLength(2)
+    expect(f.warnings[0]).toMatch(/^Main's file calls waited 600 ms/)
+    expect(f.warnings[1]).toMatch(/^Main's file calls waited 500 ms .*; 2 more wait\(s\) since the last warning, not logged$/)
   })
 })

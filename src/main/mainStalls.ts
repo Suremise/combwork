@@ -1,11 +1,12 @@
 import { monitorEventLoopDelay } from 'perf_hooks'
 import { join } from 'path'
 import { Worker } from 'worker_threads'
-import { existsSync } from 'original-fs'
+import { existsSync, stat } from 'original-fs'
 import { app, powerMonitor } from 'electron'
 import { createLogger } from './logger'
 import { ended, running, stallClock, type Work } from './stallWork'
 import { pausedAlongside, WATCHDOG_SLOTS } from './stallWatchdog'
+import { threadPoolSize } from './threadPool'
 
 export { beginWork, stallClock, timedStep } from './stallWork'
 
@@ -139,6 +140,55 @@ export function stallWatcher(d: StallDeps, t = STALL_TIMING): { tick(): void; po
   }
 }
 
+export interface FileWaitDeps {
+  now(): number
+  /** A tiny file call through the thread pool (a stat), calling `done` when it has ended. */
+  probe(done: () => void): void
+  /** Calls `fn` on the event loop's next turn. */
+  immediate(fn: () => void): void
+  warn(line: string): void
+}
+
+export const FILE_WAIT_TIMING = { every: 1000, over: 250, quietMs: 60_000 }
+
+/**
+ * Notes in hive.log when main's file calls waited for the thread pool long enough to be felt (HI-1702), at most once a
+ * minute. Every asynchronous file call of main's and its worker threads takes one of the pool's threads (threadPool.ts):
+ * with them all held by slow calls, the next waits, and a step awaiting many in turn (a window's open, a session
+ * listing) takes seconds although no task holds main's thread, so the busy warning above never sees it. A stat every
+ * second, timed from its call to its callback, less how late the event loop itself was (that is the busy warning's).
+ */
+export function fileWaitWatcher(d: FileWaitDeps, poolSize: number, t = FILE_WAIT_TIMING): { tick(): void } {
+  let pending = false
+  let logged = -Infinity
+  let unlogged = 0
+  return {
+    tick(): void {
+      if (pending) return
+      pending = true
+      const start = d.now()
+      let loop: number | null = null
+      d.immediate(() => (loop = d.now() - start))
+      d.probe(() => {
+        pending = false
+        const end = d.now()
+        const ms = Math.round(end - start - (loop ?? 0))
+        if (ms <= t.over) return
+        if (end - logged < t.quietMs) {
+          unlogged++
+          return
+        }
+        logged = end
+        const { work, more } = workDuring(start, end)
+        const parts = [work.length ? `; during it: ${work.join(', ')}${more ? ` and ${more} more` : ''}` : '']
+        if (unlogged) parts.push(`; ${unlogged} more wait(s) since the last warning, not logged`)
+        unlogged = 0
+        d.warn(`Main's file calls waited ${ms} ms for the thread pool (all ${poolSize} of its threads busy with file, zlib, crypto or DNS work of main and its worker threads)${parts.join('')}`)
+      })
+    }
+  }
+}
+
 /** The watchdog's ticks (stallWatchdog.ts), shared with its thread; null until it starts, or where it can't. */
 let watchdog: Float64Array | null = null
 
@@ -186,4 +236,11 @@ export function watchMainStalls(): void {
   powerMonitor.on('suspend', () => watch.power())
   powerMonitor.on('resume', () => watch.power())
   setInterval(() => watch.tick(), STALL_TIMING.every).unref()
+  const files = fileWaitWatcher({
+    now: () => stallClock.mono(),
+    probe: (done) => stat(process.execPath, () => done()),
+    immediate: (fn) => void setImmediate(fn),
+    warn: (line) => log.warn(line)
+  }, threadPoolSize, { ...FILE_WAIT_TIMING, quietMs })
+  setInterval(() => files.tick(), FILE_WAIT_TIMING.every).unref()
 }
