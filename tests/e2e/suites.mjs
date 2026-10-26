@@ -200,6 +200,7 @@ export const SUITES = [
   { name: 'packaged-transcript', needs: ['packaged'] },
   { name: 'pages' },
   { name: 'paneheader' },
+  { name: 'panelroom' },
   { name: 'perfcompare' },
   { name: 'performance' },
   { name: 'perftable' },

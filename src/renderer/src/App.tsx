@@ -2,7 +2,7 @@ import { PresetsNotice } from './components/WorkflowOptions'
 import { NewProjectsNotice } from './components/PresetStep'
 import { fmt, msg, tr } from '@shared/i18n'
 import { useAntivirusOffer } from './components/Antivirus'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { HiveEvent } from '@shared/types'
 import { call } from './api'
 import { playChime } from './chime'
@@ -47,6 +47,7 @@ import { NoticeBanners, addNotice, resolveNotices } from './components/NoticeBan
 import { chimeAllowed } from '@shared/bursts'
 import { loadAdvanced } from './advanced'
 import { applyProjectPref } from './projectPrefs'
+import { useLayoutRoom } from './layoutRoom'
 // The agent-state mark's test hook (the statemarks suite), until the session page shows the marks itself (#974).
 import './components/StateMark'
 
@@ -334,7 +335,12 @@ export function App() {
   const providers = useStore((s) => s.providers)
   const sidebarVisible = useStore((s) => s.sidebarVisible)
   const sidebarCompact = useStore((s) => s.sidebarCompact)
+  const lastSide = useStore((s) => s.lastSideActivity)
   const setupShown = useRef(false)
+  // Room for the work beside the side panels (HI-1737): the Projects list may fold to its rail for it.
+  const [bench, setBench] = useState<HTMLDivElement | null>(null)
+  const sideView = activity === 'docs' || activity === 'settings' ? lastSide : activity
+  useLayoutRoom(bench, sidebarVisible && !sidebarCompact && sideView === 'projects')
 
   useEffect(() => {
     // What another window changes while this one loads must outlive the older snapshot it loads (#295).
@@ -468,7 +474,7 @@ export function App() {
   return (
     <div className="app">
       <TitleBar />
-      <div className="workbench">
+      <div className="workbench" ref={setBench}>
         <ActivityBar />
         <Sidebar />
         {workspace && assistantLeft && (

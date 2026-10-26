@@ -350,7 +350,9 @@ export const AREAS = [
   // Recent workspaces (#144).
   { paths: ['src/main/recentWorkspaces.ts'], suites: ['recent', 'windows'] },
   { paths: ['src/renderer/src/components/Resizer.tsx'], suites: ['resize', 'progress'] },
-  { paths: ['src/renderer/src/components/Sidebar.tsx'], suites: ['agentstable', 'cardchip', 'rail', 'windows', 'contrast'] },
+  { paths: ['src/renderer/src/components/Sidebar.tsx'], suites: ['agentstable', 'cardchip', 'rail', 'windows', 'contrast', 'panelroom'] },
+  // Room for the work beside the side panels (HI-1737).
+  { paths: ['src/renderer/src/layoutRoom.ts'], suites: ['panelroom', 'presetstep', 'rail'] },
   // The session toolbar (#975): Panes | Tiles, the summary chip, + Add ▾.
   { paths: ['src/renderer/src/components/AgentPanes.tsx', 'src/renderer/src/components/AgentTiles.tsx'], suites: ['sessiontoolbar'] },
   // Start and Resume busy while a session starts (#1177).
