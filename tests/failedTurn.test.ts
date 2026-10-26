@@ -25,13 +25,13 @@ const wsPath = join(base, 'ws')
 const p = join(wsPath, 'alpha')
 /** The launch began before the recorded failure (a failure from before the launch is history). */
 const STARTED = '2026-10-26T04:00:00.000Z'
-type State = { provider: string; runId: string; agentId: string; status: string; unseen?: boolean; statusMessage?: string; failedTurn?: { message: string; since: string } }
+type State = { provider: string; runId: string; agentId: string; status: string; startedAt?: string; unseen?: boolean; statusMessage?: string; failedTurn?: { message: string; since: string } }
 type Live = { state: State; hooksSeen?: number }
 const s = sessions as unknown as {
   live: Map<string, Live>
   runs: Map<string, string>
   notify: (...a: unknown[]) => void
-  applyDetails: (l: unknown, d: Record<string, unknown>, hooks?: number) => void
+  applyDetails: (l: unknown, d: object, hooks?: number) => void
 }
 let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T> | T): Promise<T> => inWorkspace(w, async () => fn())
@@ -58,7 +58,7 @@ const hook = (st: State, body: Record<string, unknown>) => run(() => sessions.ha
 const prompt = (st: State, turn: string) => hook(st, { hook_event_name: 'UserPromptSubmit', prompt: 'go', turn_id: turn })
 const stop = (st: State, turn: string) => hook(st, { hook_event_name: 'Stop', last_assistant_message: 'Working on it', turn_id: turn })
 /** The rollout read, as readDetails passes it on (`hooks`: the launch's hooks when the read began). */
-const read = (st: State, d: Record<string, unknown>, hooks?: number) => run(() => s.applyDetails(launch(st), d, hooks))
+const read = (st: State, d: object, hooks?: number) => run(() => s.applyDetails(launch(st), d, hooks))
 /** Waits for what was queued in hook order before it (a hook handled after it is). */
 const settled = (st: State) => hook(st, { hook_event_name: 'Notification', notification_type: 'agent_idle', message: '' })
 const needs = (st: State) => inbox([{ name: 'alpha', path: p, agents: [{ id: st.agentId, name: st.agentId, live: st, place: { folder: p, is: 'project', name: null, branch: null } }] } as never], null, () => null).needYou.map((i) => `${i.kind}/${i.message ?? ''}`)
