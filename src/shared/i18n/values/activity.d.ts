@@ -23,11 +23,16 @@ interface HiveMessageValues {
   'activity.endedNode': undefined
   'activity.expand': undefined
   'activity.expandAll': undefined
+  'activity.fit': undefined
   'activity.heading': undefined
   'activity.hideFinished': undefined
   'activity.input': undefined
+  'activity.jump': undefined
   'activity.lastAction': undefined
   'activity.lastActive': undefined
+  'activity.levelCollapse': { level: string }
+  'activity.levelExpand': { level: string }
+  'activity.levels': undefined
   'activity.live': undefined
   'activity.liveTip': undefined
   'activity.loadFailed': { error: string | number }
@@ -56,4 +61,8 @@ interface HiveMessageValues {
   'activity.task': { type: string }
   'activity.tools': { n: number }
   'activity.turns': { n: number }
+  'activity.zoomIn': undefined
+  'activity.zoomLabel': undefined
+  'activity.zoomOut': undefined
+  'activity.zoomReset': undefined
 }

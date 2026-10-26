@@ -254,6 +254,61 @@ function transcript(sid, turns, startMin) {
     }
     check('Expand All opens a session whose turns come later, and their tool calls', !!(await lib.until(async () => (await reviewTools()) >= 4, HUNG_MS, 250)), String(await reviewTools()))
     await tree.evaluate((el) => (el.scrollTop = 0))
+
+    // --- HI-1678. Zoom to fit: the tree as shown fits the tab (or is at the smallest zoom, 25%).
+    const zoomValue = head.locator('.activity-zoom-value')
+    await head.getByRole('button', { name: 'Zoom to Fit (F)' }).click()
+    const fits = async () =>
+      page.evaluate(() => {
+        const t = document.querySelector('.activity-tree')
+        const s = document.querySelector('.activity-scaled')
+        return !!t && !!s && ((s.offsetWidth <= t.clientWidth && s.offsetHeight <= t.clientHeight) || /25/.test(document.querySelector('.activity-zoom-value')?.textContent ?? ''))
+      })
+    check('Zoom to Fit scales the tree to the tab', !!(await lib.until(async () => !(await zoomValue.innerText()).trim().startsWith('100') && (await fits()), HUNG_MS, 250)), await zoomValue.innerText())
+    await page.mouse.move(5, 5)
+    await page.screenshot({ path: path.join(lib.WORK, 'activitytab-7-fit-dark.png') })
+    // Levels ▾: every tool call, then every turn, closed at once; turns opened again.
+    const levelsMenu = async (label) => {
+      if (!(await lib.menuEntry(page, label).count())) await head.locator('.activity-levels').click()
+      await lib.menuEntry(page, label).click()
+    }
+    const toolsOpen = async () => page.locator('.activity-node.act-tool[aria-expanded="true"]').count()
+    await levelsMenu('Collapse all tool calls')
+    check('Levels: Collapse all tool calls closes every tool call', !!(await lib.until(async () => (await toolsOpen()) === 0 && (await node('tool').count()) > 0, HUNG_MS, 250)))
+    await page.screenshot({ path: path.join(lib.WORK, 'activitytab-8-levels-dark.png') })
+    await levelsMenu('Collapse all turns')
+    check('…Collapse all turns hides every tool call under them', !!(await lib.until(async () => (await node('tool').count()) === 0 && (await node('turn').count()) > 0, HUNG_MS, 250)))
+    await levelsMenu('Expand all turns')
+    check('…and Expand all turns shows them again', !!(await lib.until(async () => (await node('tool').count()) > 0, HUNG_MS, 250)))
+    await page.keyboard.press('Escape')
+    // Zoom out and in, and 0 back to actual size (a key while the tree has focus).
+    const pct = async () => Number((await zoomValue.innerText()).replace(/[^\d]/g, ''))
+    const was = await pct()
+    await head.getByRole('button', { name: 'Zoom Out (−)' }).click()
+    check('Zoom Out makes it smaller', !!(await lib.until(async () => (await pct()) < was, HUNG_MS, 250)))
+    // From a fitted zoom (between steps), out and in again lands on the next step up, not back on the fit.
+    const smaller = await pct()
+    await head.getByRole('button', { name: 'Zoom In (+)' }).click()
+    check('Zoom In makes it larger', !!(await lib.until(async () => (await pct()) > smaller, HUNG_MS, 250)))
+    await page.locator('.activity-node').first().focus()
+    await page.keyboard.press('0')
+    check('0 goes back to actual size', !!(await lib.until(async () => (await pct()) === 100, HUNG_MS, 250)))
+    // Jump to Selected: a node at the bottom selected, the tree scrolled back to the top; J brings it back in view.
+    await tree.evaluate((el) => (el.scrollTop = el.scrollHeight))
+    const lastNode = page.locator('.activity-node').last()
+    const pickedKey = await lastNode.getAttribute('data-key')
+    await lastNode.click()
+    await tree.evaluate((el) => (el.scrollTop = 0))
+    const inView = async () =>
+      page.evaluate((k) => {
+        const t = document.querySelector('.activity-tree')?.getBoundingClientRect()
+        const n = [...document.querySelectorAll('.activity-node')].find((e) => e.dataset.key === k)?.getBoundingClientRect()
+        return !!t && !!n && n.top >= t.top && n.bottom <= t.bottom
+      }, pickedKey)
+    await lib.until(async () => !(await inView()), HUNG_MS, 100)
+    await head.getByRole('button', { name: 'Jump to Selected (J)' }).click()
+    check('Jump to Selected scrolls the selected node into view', !!(await lib.until(inView, HUNG_MS, 100)), pickedKey)
+    await page.locator('.activity-details').getByRole('button', { name: 'Close details' }).click()
     await page.locator('.activity-head').getByRole('button', { name: 'Collapse All' }).click()
     check('Collapse All closes them all, down to the top-level nodes', !!(await lib.until(async () => (await node('turn').count()) === 0 && (await node('session').count()) === 0 && (await node('card').count()) > 0, HUNG_MS, 250)))
     await page.locator('.tab', { hasText: 'Tasks' }).first().click()

@@ -21,11 +21,16 @@
   "activity.endedNode": "已结束 · 下次刷新时移除",
   "activity.expand": "展开",
   "activity.expandAll": "全部展开",
+  "activity.fit": "缩放以适应 (F)",
   "activity.heading": "活动",
   "activity.hideFinished": "隐藏已结束项",
   "activity.input": "输入",
+  "activity.jump": "跳到所选项 (J)",
   "activity.lastAction": "最后操作",
   "activity.lastActive": "上次活动",
+  "activity.levelCollapse": "{level, select, agent {折叠所有智能体} session {折叠所有会话} subagent {折叠所有子智能体} turn {折叠所有轮次} tool {折叠所有工具调用} other {折叠所有进程}}",
+  "activity.levelExpand": "{level, select, agent {展开所有智能体} session {展开所有会话} subagent {展开所有子智能体} turn {展开所有轮次} tool {展开所有工具调用} other {展开所有进程}}",
+  "activity.levels": "层级",
   "activity.live": "实时",
   "activity.liveTip": "重新实时显示更新。",
   "activity.loadFailed": "无法加载活动：{error}",
@@ -53,5 +58,9 @@
   "activity.statusLabel": "状态",
   "activity.task": "{type, select, subagent {后台子智能体} command {后台命令} monitor {监视器} workflow {工作流程} other {后台任务}}",
   "activity.tools": "{n, plural, =0 {没有工具调用} other {# 次工具调用}}",
-  "activity.turns": "{n, plural, other {# 轮}}"
+  "activity.turns": "{n, plural, other {# 轮}}",
+  "activity.zoomIn": "放大 (+)",
+  "activity.zoomLabel": "缩放",
+  "activity.zoomOut": "缩小 (−)",
+  "activity.zoomReset": "实际大小 (0)"
 }

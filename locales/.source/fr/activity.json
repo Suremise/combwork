@@ -21,11 +21,16 @@
   "activity.endedNode": "Ended · gone at the next refresh",
   "activity.expand": "Expand",
   "activity.expandAll": "Expand All",
+  "activity.fit": "Zoom to Fit (F)",
   "activity.heading": "Activity",
   "activity.hideFinished": "Hide finished",
   "activity.input": "Input",
+  "activity.jump": "Jump to Selected (J)",
   "activity.lastAction": "Last action",
   "activity.lastActive": "Last active",
+  "activity.levelCollapse": "{level, select, agent {Collapse all agents} session {Collapse all sessions} subagent {Collapse all subagents} turn {Collapse all turns} tool {Collapse all tool calls} other {Collapse all processes}}",
+  "activity.levelExpand": "{level, select, agent {Expand all agents} session {Expand all sessions} subagent {Expand all subagents} turn {Expand all turns} tool {Expand all tool calls} other {Expand all processes}}",
+  "activity.levels": "Levels",
   "activity.live": "Live",
   "activity.liveTip": "Show updates as they come again.",
   "activity.loadFailed": "Could not load the activity: {error}",
@@ -53,5 +58,9 @@
   "activity.statusLabel": "Status",
   "activity.task": "{type, select, subagent {Background subagent} command {Background command} monitor {Monitor} workflow {Workflow} other {Background task}}",
   "activity.tools": "{n, plural, =0 {No tool calls} one {# tool call} other {# tool calls}}",
-  "activity.turns": "{n, plural, one {# turn} other {# turns}}"
+  "activity.turns": "{n, plural, one {# turn} other {# turns}}",
+  "activity.zoomIn": "Zoom In (+)",
+  "activity.zoomLabel": "Zoom",
+  "activity.zoomOut": "Zoom Out (−)",
+  "activity.zoomReset": "Actual Size (0)"
 }

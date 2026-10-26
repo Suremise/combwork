@@ -429,3 +429,40 @@ function stateOf(a: ActivityAgent): ActivityState {
   if (a.live.waiting) return 'waiting'
   return a.live.working ? 'working' : 'idle'
 }
+
+/** The levels the tree folds at once (HI-1678), by what a node is: sub-sessions and background tasks are subagents. */
+export const ACTIVITY_LEVELS = ['agent', 'session', 'subagent', 'turn', 'tool', 'process'] as const
+export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number]
+
+/** A node's level for Levels ▾; cards and "n more" have none (they don't fold by level). */
+export function activityLevel(n: ActivityNode): ActivityLevel | null {
+  switch (n.kind) {
+    case 'agent':
+      return 'agent'
+    case 'session':
+      return n.session.sub ? 'subagent' : 'session'
+    case 'task':
+      return 'subagent'
+    case 'turn':
+      return 'turn'
+    case 'tool':
+      return 'tool'
+    case 'process':
+      return 'process'
+    default:
+      return null
+  }
+}
+
+/** The keys of every node at a level, anywhere in the tree. */
+export function keysAtLevel(tree: readonly ActivityNode[], level: ActivityLevel): Set<string> {
+  const out = new Set<string>()
+  const walk = (nodes: readonly ActivityNode[]): void => {
+    for (const n of nodes) {
+      if (activityLevel(n) === level) out.add(n.key)
+      walk(n.children)
+    }
+  }
+  walk(tree)
+  return out
+}
