@@ -847,6 +847,19 @@ export interface SetAsideCard {
 }
 
 /** What the user asked Archive All for (#351): main checks it again on each card as it is when it is archived. */
+/** Where a window's copy of the board stands (HI-1715): the board's stamp and the mark it last read. */
+export interface TaskCursor {
+  board: string
+  mark: number
+}
+
+/**
+ * A window's board read (HI-1715, `tasks:changes`): the cards changed since its cursor (every card when `full`), the live
+ * ones in full and the archived in short (`summary`), with every card's number (a card not among them is gone) and the
+ * cursor to send next. `stale`: the board was opened again, or the workspace changed, while it was read: read again.
+ */
+export type TaskChanges = { stale: true } | { stale?: false; board: string; mark: number | null; full: boolean; cards: TaskCard[]; numbers: number[] }
+
 export interface ArchiveRequest {
   /** What it was, in a few words (ArchiveBatch.label). */
   label: string
