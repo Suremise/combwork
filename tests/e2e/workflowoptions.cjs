@@ -274,6 +274,7 @@ async function theForm(page, app, inv) {
     const push = row('pushTarget').locator('[role="switch"]')
     check('…G18 shown in Merging while Hive merges, off', (await inGroup('merging')).includes('pushTarget') && (await push.getAttribute('aria-checked')) === 'false')
     await push.click()
+    await themes('push', row('pushTarget'))
     await themes('hivemerges', row('mergeChecks'))
     await row('mergeInstall').locator('select').selectOption('always')
     await saveAll()

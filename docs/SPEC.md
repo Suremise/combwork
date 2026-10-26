@@ -2529,8 +2529,9 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    as they are then: G18 is in no ruleset), the same write records that the target's push is owed (store meta
    `queue.pushOwed:<target>`: the result, card and entry), in recovery's `Integrated` after a restart too, so the card
    is Done and the push owed, or neither. Then, and before the queue's next entry (first thing in every run, so after a
-   restart or Resume too), the queue settles it: the option off by then, or the target no longer holding the result
-   (reset since), drops it with no push; else it pushes `refs/heads/<target>` to what the target tracks
+   restart or Resume too), the queue settles it: the option off by then (read again just before the push begins), or
+   the target no longer holding the result (reset since), drops it with no push; a read of the target that fails is
+   never taken for settled: it pauses `pushFailed`, still owed, so no later merge goes ahead of it; else it pushes `refs/heads/<target>` to what the target tracks
    (`branch.<target>.remote` and `.merge`), or with nothing tracked to the only remote or `origin` under the same name,
    never `--force` and never `--set-upstream`, with no prompt (`GIT_TERMINAL_PROMPT=0`, no askpass, the credential
    manager non-interactive) and within the Git view's 5 minutes. Pushed, or up to date already (a retry after a crash

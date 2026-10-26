@@ -1,6 +1,6 @@
 // G18 (#1179): the merge queue pushes its target after each merge, when the project's options say so. On real
 // temporary repositories, each with a bare repository of its own as the remote: never a real remote.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { join } from 'path'
 import { execFileSync } from 'child_process'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
@@ -11,6 +11,7 @@ import { MergeQueue, pushOwedKey, pushOwedOf, type QueueGitOptions, type QueueGi
 import { FactStore } from '../../src/main/workflow/factStore'
 import { Workflow } from '../../src/main/workflow/runtime'
 import { git } from '../../src/main/git'
+import * as G from '../../src/main/platform/git'
 
 let env: Env | null = null
 const extra: FactStore[] = []
@@ -213,6 +214,57 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
     await restarted(e).drain('main')
     expect(remoteMain(bare)).toBe(before)
     expect(owed(e)).toBeNull()
+  })
+
+  for (const read of ['lineHead', 'isAncestor'] as const) {
+    it(`owed, and ${read === 'lineHead' ? 'the target' : 'whether the target has the merge'} can't be read: paused, the next card waits; Resume pushes and goes on (HR2 r1 f1)`, async () => {
+      const { e, bare } = pushing()
+      await queued(e, 'A', 'a.txt')
+      await expect(e.queue({ git: withPush(() => Promise.reject(new Error('crash'))) }).drain('main')).rejects.toThrow('crash')
+      const b = await queued(e, 'B', 'b.txt')
+      const spy = vi.spyOn(G, read).mockResolvedValueOnce({ unknown: true, what: 'a read that failed for now' })
+      try {
+        expect(await e.queue().runOnce('main')).toMatchObject({ outcome: 'paused', reason: 'pushFailed' })
+      } finally {
+        spy.mockRestore()
+      }
+      expect(e.wf.state(b).stage).toBe('merging')
+      expect(owed(e)).not.toBeNull()
+      expect(e.store.queuePause('main')?.message).toContain('a read that failed for now')
+      e.queue().resume('main')
+      expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+      expect(e.wf.state(b).stage).toBe('done')
+      expect(remoteMain(bare)).toBe(localMain(e))
+    })
+  }
+
+  it('turned off while the push is being prepared (its remote read): no push begins, and the queue carries on (HR2 r1 f2)', async () => {
+    const { e, bare } = pushing()
+    const before = remoteMain(bare)
+    await queued(e, 'A', 'a.txt')
+    let switched = false
+    let pushed = false
+    const git1 = withPush(async (run) => {
+      pushed = true
+      return run()
+    })
+    await e
+      .queue({
+        git: async (cwd, args, opts) => {
+          const r = await git1(cwd, args, opts)
+          if (args[0] === 'config' && args.includes('branch.main.remote')) {
+            e.options.pushTarget = false
+            switched = true
+          }
+          return r
+        }
+      })
+      .drain('main')
+    expect(switched).toBe(true)
+    expect(pushed).toBe(false)
+    expect(remoteMain(bare)).toBe(before)
+    expect(owed(e)).toBeNull()
+    expect(e.store.queuePause('main')).toBeNull()
   })
 
   it("a newer merge's owed push is never cleared by an older push's clear", async () => {

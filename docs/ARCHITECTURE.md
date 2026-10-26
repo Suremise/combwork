@@ -573,7 +573,8 @@ submitted revision is pinned by `refs/hive/cards/<key>/<n>` until its card is ar
 the queue's ref. **Push after merging (G18, #1179):** `owePush` writes store meta `queue.pushOwed:<target>` in the
 same transaction as Hive's `Integrated` (the advance's and recovery's), when `wf.cfg.options()` has `pushTarget` then
 (G18 is in no ruleset: `ruleOptions` drops it); `settlePush` runs first in every `runOnce` and after each merge, inside
-`fenced()`: dropped if the option is off or the target no longer holds the result, else `git push` of the target to
+`fenced()`: dropped if the option is off (read again just before the push) or the target no longer holds the result,
+paused `pushFailed` (still owed) if the target can't be read, else `git push` of the target to
 its upstream (or the only remote, or origin) with no prompt and a 5-minute bound, compare-and-cleared on success, and a
 `pushRejected` / `pushFailed` / `pushNoRemote` pause otherwise. `queueHost.openTargets` counts an owed push, so a
 restart runs that queue.

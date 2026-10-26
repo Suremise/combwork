@@ -619,16 +619,22 @@ export class MergeQueue {
       await this.clearOwed(target, owed.result)
       return null
     }
+    // Unreadable now (HR2's #1179 round 1): never taken for settled. Still owed, and the queue pauses saying so, so no
+    // later merge goes ahead of it; Resume reads again.
     const head = await G.lineHead(this.project, target)
-    // Unreadable now: still owed, tried again at the next run.
-    if (isUnknown(head)) return null
+    if (isUnknown(head)) return this.pausePush(target, owed, 'pushFailed', `Hive couldn't read ${target}: ${head.what}`) // i18n-ignore: beside git's own words in the pause, as they are
     const has = head ? await G.isAncestor(this.project, owed.result, head) : false
-    if (isUnknown(has)) return null
+    if (isUnknown(has)) return this.pausePush(target, owed, 'pushFailed', `Hive couldn't read ${target}: ${has.what}`) // i18n-ignore: beside git's own words in the pause, as they are
     if (!has) {
       await this.clearOwed(target, owed.result)
       return null
     }
     const dest = await this.pushDest(target)
+    // The off switch as it is now, just before the push begins (HR2's #1179 round 1: the reads above take time).
+    if (!this.pushes()) {
+      await this.clearOwed(target, owed.result)
+      return null
+    }
     if (!dest) return this.pausePush(target, owed, 'pushNoRemote')
     const r = await this.git(this.project, ['push', '--', dest.remote, `refs/heads/${target}:${dest.ref}`], { env: pushEnv(), timeoutMs: PUSH_MS })
     if (r.ok) {
