@@ -110,8 +110,8 @@ describe('the sentences once built by hand read as before, in English', () => {
   it('the status bar and the taskbar', () => {
     expect(keepAwakeText(1)).toBe('Keeping the PC awake: 1 agent working')
     expect(keepAwakeText(3)).toBe('Keeping the PC awake: 3 agents working')
-    expect(badgeDescription(1)).toBe('1 agent needs you')
-    expect(badgeDescription(2)).toBe('2 agents need you')
+    expect(badgeDescription(1)).toBe('1 needs you')
+    expect(badgeDescription(2)).toBe('2 need you')
     expect(tr(m('workspace.statusBar.running'), { count: 4, working: 1, background: 1, waiting: 0 })).toBe('4 running session(s): 1 working, 1 waiting on background tasks, 0 waiting for you')
     expect(tr(m('workspace.statusBar.running'), { count: 1, working: 1, background: 0, waiting: 0 })).toBe('1 running session(s): 1 working, 0 waiting for you')
   })

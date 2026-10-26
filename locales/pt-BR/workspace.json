@@ -497,7 +497,7 @@
   "workspace.storage.whatGoes": "O que vai para a Lixeira",
   "workspace.storage.workspace": "Espaço de trabalho",
   "workspace.storage.worktree": "Worktree do agente {agent}",
-  "workspace.taskbar.needYou": "{count, plural, one {# agente precisa de você} other {# agentes precisam de você}}",
+  "workspace.taskbar.needYou": "{count, plural, one {# precisa de você} other {# precisam de você}}",
   "workspace.unused.changedFiles": "{count, plural, one {# arquivo alterado} other {# arquivos alterados}}",
   "workspace.unused.commitsNoBranch": "{count, plural, one {# commit} other {# commits}} fora de qualquer branch",
   "workspace.unused.commitsNotOn": "{count, plural, one {# commit} other {# commits}} fora {known, select, yes {de {into}} other {do branch principal}}",

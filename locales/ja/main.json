@@ -224,6 +224,7 @@
   "main.tray.active": "アクティブなプロジェクト",
   "main.tray.cancelQuit": "終了の予約を取り消す",
   "main.tray.counts": "{working}個が作業中、{needYou, plural, other {#個が対応待ち}}",
+  "main.tray.finished": "作業終了",
   "main.tray.more": "ほか{n, plural, other {#件}}",
   "main.tray.needYou": "対応待ち",
   "main.tray.noProjects": "アクティブなプロジェクトはありません",

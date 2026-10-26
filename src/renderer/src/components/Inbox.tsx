@@ -2,48 +2,65 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { msg, tr } from '@shared/i18n'
 import { branchSummary, inboxName, inboxStateText, type InboxItem } from '@shared/inbox'
+import { gist } from '@shared/gist'
+import { cardLabel } from '@shared/projectKeys'
 import type { SessionStatus } from '@shared/types'
-import { openInboxChanges, openInboxItem, openInboxMerge, useInbox } from '../inbox'
+import type { ForYouItem } from '@shared/workflow/workView'
+import { openInboxChanges, openInboxItem, openInboxMerge, openRequest, useNeedsYou } from '../inbox'
 import { set, useLanguage, useStore } from '../store'
 import { useNow } from '../usage'
 import { cx, timeAgo } from '../util'
 import { AssistantMark } from './AssistantMark'
+import { kindText, requestText } from './ForYou'
 import { Icon, Tooltip } from './ui'
 
 /** The status dot an inbox item shows: its agent's for what it needs. */
-const dotOf = (i: InboxItem): SessionStatus => (i.kind === 'review' || i.kind === 'finished' ? 'finished' : i.kind === 'failed' ? 'error' : 'waiting')
+const dotOf = (i: InboxItem): SessionStatus => (i.kind === 'review' || i.kind === 'finished' ? 'finished' : i.kind === 'failed' || i.kind === 'error' ? 'error' : 'waiting')
 
-/** The status bar's "n need you": hidden when nothing needs you and nothing is left to review. */
+/**
+ * The status bar's "n need you" (#1632): exactly what For you lists, the cards' requests and the agents stopped in their
+ * panes; beside it, quieter, the agents finished since you last looked ("3 finished"), never counted as a need. Each
+ * opens the popover. Hidden when nothing needs you, nothing finished unseen and nothing is left to review.
+ */
 export function InboxStatusItem() {
-  const { needYou, toReview } = useInbox()
+  const { count, finished, toReview } = useNeedsYou()
   const open = useStore((s) => s.inboxOpen)
   useLanguage()
-  if (!needYou.length && !toReview.length && !open) return null
+  if (!count && !finished.length && !toReview.length && !open) return null
   const toggle = (): void => set((s) => ({ inboxOpen: !s.inboxOpen }))
-  const tip = needYou.length
-    ? tr(msg({ id: 'board.inbox.needYouTip', defaultMessage: 'Agents waiting for you or finished since you last looked', description: "Tooltip of the status bar's inbox item (\"2 need you\")." }))
-    : tr(msg({ id: 'board.inbox.toReviewTip', defaultMessage: 'Worktree agents with work to review', description: "Tooltip of the status bar's inbox item when only worktree agents' work waits (\"1 to review\")." }))
   return (
-    <Tooltip content={tip}>
-      <div className={cx('status-item', 'inbox-item', needYou.length > 0 && 'caution')} data-inbox-toggle onClick={toggle} role="button" aria-expanded={open}>
-        {needYou.length ? (
-          <>
-            <Icon name="bell-dot" /> {tr(msg({ id: 'board.inbox.needYouCount', defaultMessage: '{n, plural, one {# needs you} other {# need you}}', description: "The status bar's inbox item: how many agents wait for the user or finished unseen (\"2 need you\"). Keep it short." }), { n: needYou.length })}
-          </>
-        ) : (
-          <>
-            <Icon name="git-merge" /> {tr(msg({ id: 'board.inbox.toReviewCount', defaultMessage: '{n, plural, one {# to review} other {# to review}}', description: "The status bar's inbox item: how many worktree agents have work for the user to review (\"1 to review\"). Keep it short." }), { n: toReview.length })}
-          </>
-        )}
-      </div>
-    </Tooltip>
+    <>
+      {(count > 0 || !finished.length) && (
+        <Tooltip content={count ? tr(msg({ id: 'board.inbox.needYouTip', defaultMessage: 'For you: requests on cards and agents stopped in their panes (a prompt, a sign-in, a question, an error). Click to see them.', description: "Tooltip of the status bar's inbox item (\"2 need you\"): what it counts. Glossary: For you." })) : tr(msg({ id: 'board.inbox.toReviewTip', defaultMessage: 'Worktree agents with work to review', description: "Tooltip of the status bar's inbox item when only worktree agents' work waits (\"1 to review\")." }))}>
+          <div className={cx('status-item', 'inbox-item', count > 0 && 'caution')} data-inbox-toggle onClick={toggle} role="button" aria-expanded={open}>
+            {count ? (
+              <>
+                <Icon name="bell-dot" /> {tr(msg({ id: 'board.inbox.needYouCount', defaultMessage: '{n, plural, one {# needs you} other {# need you}}', description: "The status bar's inbox item: how many things wait for the user, requests on cards and agents stopped in their panes (\"2 need you\"). Keep it short." }), { n: count })}
+              </>
+            ) : (
+              <>
+                <Icon name="git-merge" /> {tr(msg({ id: 'board.inbox.toReviewCount', defaultMessage: '{n, plural, one {# to review} other {# to review}}', description: "The status bar's inbox item: how many worktree agents have work for the user to review (\"1 to review\"). Keep it short." }), { n: toReview.length })}
+              </>
+            )}
+          </div>
+        </Tooltip>
+      )}
+      {finished.length > 0 && (
+        <Tooltip content={tr(msg({ id: 'board.inbox.finishedTip', defaultMessage: 'Agents that finished since you last looked at them. Nothing waits for you there: click to see them.', description: "Tooltip of the status bar's quiet item beside \"n need you\": what it counts (agents that finished their turn, not looked at since)." }))}>
+          <div className="status-item inbox-item inbox-finished" data-inbox-toggle data-inbox-finished onClick={toggle} role="button" aria-expanded={open}>
+            <Icon name="check" /> {tr(msg({ id: 'board.inbox.finishedCount', defaultMessage: '{n, plural, one {# finished} other {# finished}}', description: "The status bar's quiet item: how many agents finished their turn since the user last looked (\"3 finished\"). Keep it short." }), { n: finished.length })}
+          </div>
+        </Tooltip>
+      )}
+    </>
   )
 }
 
 /** The inbox popover above the status bar: oldest first; a click goes to the agent. */
 export function InboxPopover() {
   const open = useStore((s) => s.inboxOpen)
-  const { needYou, toReview } = useInbox()
+  const { needYou, requests, count, finished, toReview } = useNeedsYou()
+  const tasks = useStore((s) => s.tasks)
   const ref = useRef<HTMLDivElement>(null)
   useNow(30000)
   useLanguage()
@@ -89,10 +106,40 @@ export function InboxPopover() {
       )}
     </div>
   )
+  // A card's request (For you): the card and what it asks; a click opens the card, where it is answered.
+  const request = (i: ForYouItem) => {
+    const card = tasks.find((c) => c.number === i.card)
+    return (
+      <div key={i.request} className="inbox-row" role="button" data-request={i.request} onClick={() => openRequest(i)}>
+        <Icon name="bell-dot" />
+        <div className="inbox-text">
+          <div className="inbox-name">
+            <strong>{card ? cardLabel(card) : `#${i.card}`}</strong>
+            {card && ` · ${card.title}`}
+          </div>
+          <div className="inbox-state">{`${kindText(i)}: ${gist(requestText(i), 120)}`}</div>
+        </div>
+        <span className="inbox-time">{timeAgo(i.since)}</span>
+      </div>
+    )
+  }
   return createPortal(
-    <div className="inbox-panel" ref={ref} role="dialog" aria-label={tr(msg({ id: 'board.inbox.panel', defaultMessage: 'Agents that need you', description: "The inbox popover's accessible name (above the status bar)." }))}>
-      <div className="inbox-section">{needYou.length ? tr(msg({ id: 'board.inbox.needYouHeading', defaultMessage: 'Need you ({n})', description: 'Heading in the inbox popover above the agents that wait for the user, with how many ({n}).' }), { n: needYou.length }) : tr(msg({ id: 'board.inbox.needYouEmptyHeading', defaultMessage: 'Need you', description: 'Heading in the inbox popover above the agents that wait for the user, when there are none.' }))}</div>
-      {needYou.length ? needYou.map(row) : <div className="inbox-empty faint">{tr(msg({ id: 'board.inbox.nothing', defaultMessage: 'Nothing needs you right now.', description: 'The inbox popover when no agent waits for the user.' }))}</div>}
+    <div className="inbox-panel" ref={ref} role="dialog" aria-label={tr(msg({ id: 'board.inbox.panel', defaultMessage: 'What needs you', description: "The inbox popover's accessible name (above the status bar): requests on cards and agents waiting for the user, and agents that finished." }))}>
+      <div className="inbox-section">{count ? tr(msg({ id: 'board.inbox.needYouHeading', defaultMessage: 'Need you ({n})', description: 'Heading in the inbox popover above what waits for the user (requests on cards, agents stopped in their panes), with how many ({n}).' }), { n: count }) : tr(msg({ id: 'board.inbox.needYouEmptyHeading', defaultMessage: 'Need you', description: 'Heading in the inbox popover above what waits for the user, when nothing does.' }))}</div>
+      {count ? (
+        <>
+          {requests.map(request)}
+          {needYou.map(row)}
+        </>
+      ) : (
+        <div className="inbox-empty faint">{tr(msg({ id: 'board.inbox.nothing', defaultMessage: 'Nothing needs you right now.', description: 'The inbox popover when nothing waits for the user.' }))}</div>
+      )}
+      {finished.length > 0 && (
+        <>
+          <div className="inbox-section">{tr(msg({ id: 'board.inbox.finishedHeading', defaultMessage: 'Finished ({n})', description: 'Heading in the inbox popover above the agents that finished since the user last looked, with how many ({n}). Not something that waits for the user.' }), { n: finished.length })}</div>
+          {finished.map(row)}
+        </>
+      )}
       {toReview.length > 0 && (
         <>
           <div className="inbox-section">{tr(msg({ id: 'board.inbox.toReviewHeading', defaultMessage: 'To review ({n})', description: "Heading in the inbox popover above worktree agents whose work waits for the user's review, with how many ({n})." }), { n: toReview.length })}</div>

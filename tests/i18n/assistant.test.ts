@@ -201,6 +201,11 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(tr(m('assistant.panel.namesTip'), { shown: 'yes' })).toBe("Show only the agents' state marks (names on hover)")
     expect(tr(m('assistant.panel.namesTip'), { shown: 'no' })).toBe("Show the agents' names beside their state marks")
     expect(tr(m('assistant.panel.attention'), { kind: 'question' })).toBe('has a question for you')
+    // Every kind of what needs you says what it is (#1632 round 1: sign-in and errors read "has finished").
+    expect(tr(m('assistant.panel.attention'), { kind: 'signin' })).toBe('needs you to sign in')
+    expect(tr(m('assistant.panel.attention'), { kind: 'error' })).toBe('was stopped by an error')
+    expect(tr(m('assistant.panel.attention'), { kind: 'failed' })).toBe("couldn't start")
+    for (const kind of ['waiting', 'signin', 'question', 'error', 'safeguard', 'failed'] as const) expect(tr(m('assistant.panel.attention'), { kind }), kind).not.toBe('has finished')
     expect(tr(m('assistant.panel.openCard'), { number: 'AM-12', known: 'yes', column: 'Review' })).toBe('Open card AM-12, in Review')
     expect(tr(m('assistant.panel.progress'), { run: 'e2e: 4/12', hasStep: 'yes', step: 'agents' })).toBe('Progress: e2e: 4/12 (agents)')
     expect(tr(m('assistant.sidebar.expandTip'), { hasKey: 'yes', key: 'Ctrl+Alt+B' })).toBe('Expand Sidebar (Ctrl+Alt+B)')

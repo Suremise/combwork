@@ -497,7 +497,7 @@
   "workspace.storage.whatGoes": "Co trafi do Kosza",
   "workspace.storage.workspace": "Obszar roboczy",
   "workspace.storage.worktree": "Worktree agenta {agent}",
-  "workspace.taskbar.needYou": "{count, plural, one {# agent czeka na Ciebie} few {# agentów czeka na Ciebie} many {# agentów czeka na Ciebie} other {# agenta czeka na Ciebie}}",
+  "workspace.taskbar.needYou": "{count, plural, one {# czeka na Ciebie} few {# czekają na Ciebie} many {# czeka na Ciebie} other {# czeka na Ciebie}}",
   "workspace.unused.changedFiles": "{count, plural, one {# zmieniony plik} few {# zmienione pliki} many {# zmienionych plików} other {# zmienionego pliku}}",
   "workspace.unused.commitsNoBranch": "{count, plural, one {# commit} few {# commity} many {# commitów} other {# commita}} bez gałęzi",
   "workspace.unused.commitsNotOn": "{count, plural, one {# commit} few {# commity} many {# commitów} other {# commita}} spoza {known, select, yes {gałęzi {into}} other {głównej gałęzi}}",

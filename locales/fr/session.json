@@ -175,6 +175,7 @@
   "session.status.asksAtStart": "Pose une question avant de démarrer",
   "session.status.asksTrust": "Demande s’il faut faire confiance à ce dossier",
   "session.status.compacting": "Compactage de la conversation…",
+  "session.status.failedTurn": "Le tour s’est terminé sur une erreur",
   "session.status.safeguardAsks": "Un classificateur de sécurité a arrêté une réponse : {provider} demande quoi faire",
   "session.status.safeguardAsksTools": "Un classificateur de sécurité a arrêté une réponse : {provider} demande quoi faire (ses derniers appels d’outils : {tools})",
   "session.status.safeguardIdle": "Inactif après un arrêt de sécurité : relance-le",

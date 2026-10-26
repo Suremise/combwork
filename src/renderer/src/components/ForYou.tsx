@@ -47,7 +47,7 @@ const M = {
 export const requestText = (i: Pick<ForYouItem, 'shown' | 'text'>): string => (i.shown ? (workflowLine(i.shown, (m, values) => tr(m, values)) ?? i.text) : i.text)
 
 /** A request's kind, as the window names it (Approve, Decide, Test, Sign in, Other). */
-const kindText = (i: Pick<ForYouItem, 'kind'>): string => tr(FOR_YOU_KIND, { kind: i.kind })
+export const kindText = (i: Pick<ForYouItem, 'kind'>): string => tr(FOR_YOU_KIND, { kind: i.kind })
 
 /** The requests a chip's tooltip shows; the others are counted. */
 const TIP_REQUESTS = 2

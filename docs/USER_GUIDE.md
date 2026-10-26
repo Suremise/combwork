@@ -1631,17 +1631,18 @@ Hive reads this from Claude Code's and Codex's session records. GitHub Copilot's
 
 ### Agents that need you <a id="agents-that-need-you"></a>
 
-With agents working in several projects, the status bar tells you who is waiting on you: **2 need you**. Click it for the list, oldest first, with how long each has been waiting:
+With agents working in several projects, the status bar tells you what is waiting on you: **2 need you**. It counts exactly what its list shows, so a click always explains the number: first the requests on cards that wait for you (see [For you](#for-you): an approval, a decision, a question an agent asked through Hive; a click opens the card to answer it), then the agents stopped in their own panes, oldest first, with how long each has been waiting:
 
 - **Needs input**: an agent waiting for your answer, such as a permission. It stays in the list until you answer it.
 - **Asks**: an agent that asked you a question but carries on working meanwhile (Codex can). Its pane says **has a question for you**, and it stays in the list until you answer the question in its terminal.
 - **Needs sign-in**: an agent its CLI stopped because the sign-in has expired. It stays in the list until you sign in again (below).
+- **Stopped by an error**: an agent its CLI stopped on an error, such as a lost API connection, with what it said (Claude Code and GitHub Copilot; a Codex agent's error shows in its pane, and the agent as finished). It stays in the list until the agent goes on.
 - **After a safeguard stop**: an agent whose model changed after its CLI's safety classifier stopped a response (see [When a safety classifier stops an agent](#when-a-safety-classifier-stops-an-agent)). It leaves the list once its pane is on screen.
-- **Finished**: an agent that finished while you weren't looking at it: in another project, on another page of agents, on another tab, or while Hive was in the background. It leaves the list once its pane is on screen.
+Agents that only **finished** while you weren't looking at them (in another project, on another page of agents, on another tab, or while Hive was in the background) don't need you, so they aren't counted: a quieter **✓ 3 finished** beside the count tells you, and the list shows them under **Finished**. Each leaves once its pane is on screen.
 
-Click a row to go to that agent (the Assistant's opens its panel). The **Projects** icon in the activity bar shows the same number, and each project in the sidebar shows how many of its agents need you.
+Click a row to go to that agent (the Assistant's opens its panel). The **Projects** icon in the activity bar shows how many agents need you, and each project in the sidebar shows how many of its agents do.
 
-With Hive behind other windows, its **taskbar button** shows the count too: a red badge over the icon, and the number before the window's title (in Alt+Tab and when you hover the button). When an agent comes to ask you something while Hive is in the background, the button flashes until you switch to it. Turn either off in **Settings → Notifications** (turning the flash off also stops one that has started).
+With Hive behind other windows, its **taskbar button** shows the count too (the same number as the status bar's): a red badge over the icon, and the number before the window's title (in Alt+Tab and when you hover the button). When an agent comes to ask you something while Hive is in the background, the button flashes until you switch to it. Turn either off in **Settings → Notifications** (turning the flash off also stops one that has started).
 
 Below them, **To review** lists worktree agents that have stopped or finished with work not merged yet, with a summary such as *3 files, +120 −40 · 2 commits*, and buttons for **Changes** and **Merge…**. They don't add to the count; one leaves the list once its work is merged or it starts working again. When nothing needs you but there is work to review, the status bar says **1 to review**.
 

@@ -6,7 +6,7 @@ import { useStore } from '../store'
 import { basename, cx, formatKeybinding, recentNote, recentTip } from '../util'
 import { Icon, Tooltip, useContextMenu } from './ui'
 import * as actions from '../actions'
-import { useInbox } from '../inbox'
+import { useNeedsYou } from '../inbox'
 import { badgeText, windowTitle } from '@shared/taskbar'
 import { PROJECT_MENU } from '@shared/projectTabs'
 import { appName as nameOf } from '@shared/appName'
@@ -37,9 +37,9 @@ function drawBadge(count: number, scale: number): string {
   return c.toDataURL('image/png').split(',')[1]
 }
 
-/** The window title (Alt+Tab, the taskbar) and the taskbar badge, with how many agents need you in this window. */
+/** The window title (Alt+Tab, the taskbar) and the taskbar badge, with what needs you in this window (For you, #1632). */
 function useTaskbarCount(title: string): void {
-  const needYou = useInbox().needYou.length
+  const needYou = useNeedsYou().count
   const on = useStore((s) => s.settings?.notifications.taskbarCount ?? true)
   const count = on ? needYou : 0
   useEffect(() => {

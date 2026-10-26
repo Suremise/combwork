@@ -177,6 +177,7 @@ interface HiveMessageValues {
   'session.status.asksAtStart': undefined
   'session.status.asksTrust': undefined
   'session.status.compacting': undefined
+  'session.status.failedTurn': undefined
   'session.status.safeguardAsks': { provider: string | number }
   'session.status.safeguardAsksTools': { provider: string | number; tools: string | number }
   'session.status.safeguardIdle': undefined

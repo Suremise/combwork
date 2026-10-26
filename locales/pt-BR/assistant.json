@@ -154,7 +154,7 @@
   "assistant.panel.allConversations": "Todas as conversas…",
   "assistant.panel.appliesNext": "Modelo, esforço, modo e contexto valem na próxima vez que o Assistente iniciar. Um novo modo é informado a ele na hora; um novo provedor o reinicia agora (depois de perguntar).",
   "assistant.panel.asking": "O Assistente está perguntando algo a você",
-  "assistant.panel.attention": "{kind, select, waiting {está esperando por você} question {tem uma pergunta para você} safeguard {trocou de modelo após uma parada de segurança} other {terminou}}",
+  "assistant.panel.attention": "{kind, select, waiting {está esperando por você} signin {precisa que você faça login} question {tem uma pergunta para você} error {parou por um erro} failed {não conseguiu iniciar} safeguard {trocou de modelo após uma parada de segurança} other {terminou}}",
   "assistant.panel.attentionDismiss": "Dispensar: {name} {kind, select, safeguard {trocou de modelo após uma parada de segurança} other {terminou}}",
   "assistant.panel.attentionOpen": "{dismiss, select, yes {Clique para abrir {name} e dispensar} other {Clique para abrir {name}}}",
   "assistant.panel.cancel": "Cancelar",

@@ -703,6 +703,10 @@
     "defaultMessage": "Compacting the conversation…",
     "description": "An agent's status while its CLI summarises the conversation to free up context space."
   },
+  "session.status.failedTurn": {
+    "defaultMessage": "The turn ended on an error",
+    "description": "An agent's status when its CLI ended its turn on an error (an API connection error, say) without saying what."
+  },
   "session.status.safeguardAsks": {
     "defaultMessage": "A safety classifier stopped a response: {provider} asks what to do",
     "description": "An agent's status: its CLI's safety classifier stopped a response, and the CLI asks the user what to do. {provider} is the coding agent's name."

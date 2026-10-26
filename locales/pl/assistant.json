@@ -154,7 +154,7 @@
   "assistant.panel.allConversations": "Wszystkie rozmowy…",
   "assistant.panel.appliesNext": "Model, wysiłek, tryb i kontekst zadziałają przy następnym uruchomieniu Asystenta. O nowym trybie Asystent dowie się od razu; nowy dostawca uruchomi go ponownie teraz (po pytaniu).",
   "assistant.panel.asking": "Asystent ma do Ciebie pytanie",
-  "assistant.panel.attention": "{kind, select, waiting {czeka na Ciebie} question {ma do Ciebie pytanie} safeguard {ma zmieniony model po zatrzymaniu przez zabezpieczenie} other {zgłasza koniec pracy}}",
+  "assistant.panel.attention": "{kind, select, waiting {czeka na Ciebie} signin {wymaga Twojego logowania} question {ma do Ciebie pytanie} error {został zatrzymany przez błąd} failed {nie mógł się uruchomić} safeguard {ma zmieniony model po zatrzymaniu przez zabezpieczenie} other {zgłasza koniec pracy}}",
   "assistant.panel.attentionDismiss": "Odrzuć: {name} {kind, select, safeguard {ma zmieniony model po zatrzymaniu przez zabezpieczenie} other {zgłasza koniec pracy}}",
   "assistant.panel.attentionOpen": "{dismiss, select, yes {Kliknij, aby otworzyć {name} i odrzucić} other {Kliknij, aby otworzyć {name}}}",
   "assistant.panel.cancel": "Anuluj",

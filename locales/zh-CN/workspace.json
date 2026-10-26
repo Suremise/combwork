@@ -497,7 +497,7 @@
   "workspace.storage.whatGoes": "要移到回收站的内容",
   "workspace.storage.workspace": "工作区",
   "workspace.storage.worktree": "{agent} 的工作树",
-  "workspace.taskbar.needYou": "{count, plural, other {# 个智能体需要你处理}}",
+  "workspace.taskbar.needYou": "{count, plural, other {# 个待你处理}}",
   "workspace.unused.changedFiles": "{count, plural, other {# 个已更改的文件}}",
   "workspace.unused.commitsNoBranch": "{count, plural, other {# 个提交}}不在任何分支上",
   "workspace.unused.commitsNotOn": "{count, plural, other {# 个提交}}不在{known, select, yes { {into} } other {主分支}}上",

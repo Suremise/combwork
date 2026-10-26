@@ -497,7 +497,7 @@
   "workspace.storage.whatGoes": "Ce qui va dans la Corbeille",
   "workspace.storage.workspace": "Espace de travail",
   "workspace.storage.worktree": "Worktree de l’agent {agent}",
-  "workspace.taskbar.needYou": "{count, plural, one {# agent a besoin de toi} many {# agents ont besoin de toi} other {# agents ont besoin de toi}}",
+  "workspace.taskbar.needYou": "{count, plural, one {# t’attend} many {# t’attendent} other {# t’attendent}}",
   "workspace.unused.changedFiles": "{count, plural, one {# fichier modifié} many {# fichiers modifiés} other {# fichiers modifiés}}",
   "workspace.unused.commitsNoBranch": "{count, plural, one {# commit} many {# commits} other {# commits}} sur aucune branche",
   "workspace.unused.commitsNotOn": "{count, plural, one {# commit absent} many {# commits absents} other {# commits absents}} de la branche {known, select, yes {{into}} other {principale}}",

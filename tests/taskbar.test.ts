@@ -11,8 +11,8 @@ vi.mock('../src/main/windows', () => ({ windowForPath: (p: string) => (windows.h
 describe('taskbar button', () => {
   it('the badge: nothing at 0, the number, 9+ above 9', () => {
     expect([0, 1, 9, 10, 42].map(badgeText)).toEqual(['', '1', '9', '9+', '9+'])
-    expect(badgeDescription(1)).toBe('1 agent needs you')
-    expect(badgeDescription(3)).toBe('3 agents need you')
+    expect(badgeDescription(1)).toBe('1 needs you')
+    expect(badgeDescription(3)).toBe('3 need you')
   })
 
   it('the title starts with the count when there is one', () => {

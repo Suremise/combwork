@@ -497,7 +497,7 @@
   "workspace.storage.whatGoes": "What goes to the Recycle Bin",
   "workspace.storage.workspace": "Workspace",
   "workspace.storage.worktree": "{agent}'s worktree",
-  "workspace.taskbar.needYou": "{count, plural, one {# agent needs you} other {# agents need you}}",
+  "workspace.taskbar.needYou": "{count, plural, one {# needs you} other {# need you}}",
   "workspace.unused.changedFiles": "{count, plural, one {# changed file} other {# changed files}}",
   "workspace.unused.commitsNoBranch": "{count, plural, one {# commit} other {# commits}} on no branch",
   "workspace.unused.commitsNotOn": "{count, plural, one {# commit} other {# commits}} not on {known, select, yes {{into}} other {the main branch}}",

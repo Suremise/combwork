@@ -1307,6 +1307,14 @@
     "defaultMessage": "{files, plural, one {# file} other {# files}}, +{insertions} −{deletions}",
     "description": "A worktree agent's unmerged changes, in the attention inbox: how many files differ from its base branch, and the lines added (+) and removed (−)."
   },
+  "board.inbox.error": {
+    "defaultMessage": "Stopped by an error",
+    "description": "An agent in the attention inbox stopped because of an error and waits for the user."
+  },
+  "board.inbox.errorWhat": {
+    "defaultMessage": "Stopped by an error: {message}",
+    "description": "An agent in the attention inbox stopped because of an error (an API connection error, say) and waits for the user; {message} is what its CLI said (its own words)."
+  },
   "board.inbox.failed": {
     "defaultMessage": "Couldn't start",
     "description": "An agent in the attention inbox failed to start."
@@ -1319,25 +1327,37 @@
     "defaultMessage": "Finished",
     "description": "An agent in the attention inbox finished its turn and the user has not looked at it since."
   },
+  "board.inbox.finishedCount": {
+    "defaultMessage": "{n, plural, one {# finished} other {# finished}}",
+    "description": "The status bar's quiet item: how many agents finished their turn since the user last looked (\"3 finished\"). Keep it short."
+  },
+  "board.inbox.finishedHeading": {
+    "defaultMessage": "Finished ({n})",
+    "description": "Heading in the inbox popover above the agents that finished since the user last looked, with how many ({n}). Not something that waits for the user."
+  },
+  "board.inbox.finishedTip": {
+    "defaultMessage": "Agents that finished since you last looked at them. Nothing waits for you there: click to see them.",
+    "description": "Tooltip of the status bar's quiet item beside \"n need you\": what it counts (agents that finished their turn, not looked at since)."
+  },
   "board.inbox.merge": {
     "defaultMessage": "Merge…",
     "description": "Button on a worktree agent's row in the inbox: opens the merge dialog for its branch."
   },
   "board.inbox.needYouCount": {
     "defaultMessage": "{n, plural, one {# needs you} other {# need you}}",
-    "description": "The status bar's inbox item: how many agents wait for the user or finished unseen (\"2 need you\"). Keep it short."
+    "description": "The status bar's inbox item: how many things wait for the user, requests on cards and agents stopped in their panes (\"2 need you\"). Keep it short."
   },
   "board.inbox.needYouEmptyHeading": {
     "defaultMessage": "Need you",
-    "description": "Heading in the inbox popover above the agents that wait for the user, when there are none."
+    "description": "Heading in the inbox popover above what waits for the user, when nothing does."
   },
   "board.inbox.needYouHeading": {
     "defaultMessage": "Need you ({n})",
-    "description": "Heading in the inbox popover above the agents that wait for the user, with how many ({n})."
+    "description": "Heading in the inbox popover above what waits for the user (requests on cards, agents stopped in their panes), with how many ({n})."
   },
   "board.inbox.needYouTip": {
-    "defaultMessage": "Agents waiting for you or finished since you last looked",
-    "description": "Tooltip of the status bar's inbox item (\"2 need you\")."
+    "defaultMessage": "For you: requests on cards and agents stopped in their panes (a prompt, a sign-in, a question, an error). Click to see them.",
+    "description": "Tooltip of the status bar's inbox item (\"2 need you\"): what it counts. Glossary: For you."
   },
   "board.inbox.needsInput": {
     "defaultMessage": "Needs input",
@@ -1349,11 +1369,11 @@
   },
   "board.inbox.nothing": {
     "defaultMessage": "Nothing needs you right now.",
-    "description": "The inbox popover when no agent waits for the user."
+    "description": "The inbox popover when nothing waits for the user."
   },
   "board.inbox.panel": {
-    "defaultMessage": "Agents that need you",
-    "description": "The inbox popover's accessible name (above the status bar)."
+    "defaultMessage": "What needs you",
+    "description": "The inbox popover's accessible name (above the status bar): requests on cards and agents waiting for the user, and agents that finished."
   },
   "board.inbox.safeguard": {
     "defaultMessage": "After a safeguard stop",
@@ -1362,6 +1382,10 @@
   "board.inbox.safeguardSwitched": {
     "defaultMessage": "After a safeguard stop: Now runs on {to} instead of {from}",
     "description": "An agent in the attention inbox whose CLI's safety classifier stopped a response, so it moved to another model: {to} and {from} are the models' names."
+  },
+  "board.inbox.signin": {
+    "defaultMessage": "Needs sign-in",
+    "description": "An agent in the attention inbox waits for the user to sign in to its CLI (its sign-in was refused or has expired)."
   },
   "board.inbox.toReview": {
     "defaultMessage": "To review",

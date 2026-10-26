@@ -497,7 +497,7 @@
   "workspace.storage.whatGoes": "ごみ箱に移すもの",
   "workspace.storage.workspace": "ワークスペース",
   "workspace.storage.worktree": "{agent}のワークツリー",
-  "workspace.taskbar.needYou": "{count, plural, other {#個のエージェントが応答を待っています}}",
+  "workspace.taskbar.needYou": "{count, plural, other {対応待ち#件}}",
   "workspace.unused.changedFiles": "{count, plural, other {変更されたファイル#件}}",
   "workspace.unused.commitsNoBranch": "どのブランチにもないコミット{count, plural, other {#件}}",
   "workspace.unused.commitsNotOn": "{known, select, yes {{into}} other {メインブランチ}}にないコミット{count, plural, other {#件}}",

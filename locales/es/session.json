@@ -175,6 +175,7 @@
   "session.status.asksAtStart": "Pregunta algo antes de iniciarse",
   "session.status.asksTrust": "Pregunta si confiar en esta carpeta",
   "session.status.compacting": "Compactando la conversación…",
+  "session.status.failedTurn": "El turno terminó con un error",
   "session.status.safeguardAsks": "Un clasificador de seguridad detuvo una respuesta: {provider} pregunta qué hacer",
   "session.status.safeguardAsksTools": "Un clasificador de seguridad detuvo una respuesta: {provider} pregunta qué hacer (sus últimas llamadas a herramientas: {tools})",
   "session.status.safeguardIdle": "Inactivo tras una parada de seguridad: dale un empujón",

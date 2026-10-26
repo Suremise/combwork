@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import { inbox, type Inbox, type InboxItem } from '@shared/inbox'
+import type { ForYouItem } from '@shared/workflow/workView'
 import { call } from './api'
+import { useForYou } from './forYou'
 import { NO_PROJECTS, agentsOnScreen, findProject, get, projectKey, revealAgent, set, setAssistantOpen, showVersionControl, showView, useStore } from './store'
 
 /** The window's attention inbox (shared/inbox.ts): agents that need you, and worktree agents with work to review. */
@@ -10,6 +12,21 @@ export function useInbox(): Inbox {
   const branches = useStore((s) => s.branchStatus)
   const failures = useStore((s) => s.startFailures)
   return useMemo(() => inbox(projects, assistant, (path, id) => branches[projectKey(path, id)], (path, id) => failures[projectKey(path, id)]), [projects, assistant, branches, failures])
+}
+
+/**
+ * What needs you (#1632): exactly what For you lists, the cards' requests (an approval, a decision, a question) and the
+ * agents stopped in their panes (a prompt, a sign-in, a question, an error, a failed start). Finished agents are apart.
+ */
+export function useNeedsYou(): Inbox & { requests: ForYouItem[]; count: number } {
+  const box = useInbox()
+  const requests = useForYou().summary.items
+  return useMemo(() => ({ ...box, requests, count: requests.length + box.needYou.length }), [box, requests])
+}
+
+/** Opens a card's request (For you) in its dialog. */
+export function openRequest(item: ForYouItem): void {
+  set({ inboxOpen: false, taskOpen: item.card })
 }
 
 /** Goes to an inbox item's agent; the Assistant's opens its panel. */

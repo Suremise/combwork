@@ -175,6 +175,7 @@
   "session.status.asksAtStart": "启动前有问题要问",
   "session.status.asksTrust": "询问是否信任此文件夹",
   "session.status.compacting": "正在压缩对话…",
+  "session.status.failedTurn": "本轮因错误结束",
   "session.status.safeguardAsks": "安全分类器拦截了一条回复：{provider} 在询问如何处理",
   "session.status.safeguardAsksTools": "安全分类器拦截了一条回复：{provider} 在询问如何处理（最近的工具调用：{tools}）",
   "session.status.safeguardIdle": "安全拦截后空闲：提醒它继续",

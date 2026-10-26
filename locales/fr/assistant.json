@@ -154,7 +154,7 @@
   "assistant.panel.allConversations": "Toutes les conversations…",
   "assistant.panel.appliesNext": "Le modèle, l’effort, le mode et le contexte s’appliquent au prochain démarrage de l’Assistant. Un nouveau mode lui est transmis tout de suite ; un nouveau fournisseur le redémarre maintenant (après confirmation).",
   "assistant.panel.asking": "L’Assistant te pose une question",
-  "assistant.panel.attention": "{kind, select, waiting {t’attend} question {a une question pour toi} safeguard {a changé de modèle après un arrêt de sécurité} other {a terminé}}",
+  "assistant.panel.attention": "{kind, select, waiting {t’attend} signin {a besoin que tu te connectes} question {a une question pour toi} error {a été arrêté par une erreur} failed {n’a pas pu démarrer} safeguard {a changé de modèle après un arrêt de sécurité} other {a terminé}}",
   "assistant.panel.attentionDismiss": "Masquer : {name} {kind, select, safeguard {a changé de modèle après un arrêt de sécurité} other {a terminé}}",
   "assistant.panel.attentionOpen": "{dismiss, select, yes {Clique pour ouvrir {name} et masquer cette ligne} other {Clique pour ouvrir {name}}}",
   "assistant.panel.cancel": "Annuler",
