@@ -3,9 +3,9 @@ import { join, resolve } from 'path'
 import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
-import type { Account, AccountObserved, ProviderId, WorkspaceConfig } from '../shared/types'
+import type { Connection, ConnectionObserved, ProviderId, WorkspaceConfig } from '../shared/types'
 import { ACCOUNTS_PREVIEW } from '../shared/advanced'
-import { acceptable, workspaceAccounts, switchedOn, type AccountsView } from '../shared/accounts'
+import { acceptable, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { profileFolder } from '../shared/appName'
 import { isProviderEnabled, providerDescriptor, PROVIDERS } from '../shared/providers'
 import { msg } from '../shared/i18n'
@@ -38,7 +38,7 @@ const log = createLogger('accounts')
 
 /** How long a watched change waits for more before its check (a sign-in writes several files). */
 const DEBOUNCE_MS = 1000
-/** Checks run at once over all accounts: each starts the CLI. */
+/** Checks run at once over all connections: each starts the CLI. */
 const CHECKS_AT_ONCE = 2
 /** A watch that failed is tried again after 1, 2, 4, 8 and 16 s, then every minute while it is wanted. */
 const RETRY_MS = [1000, 2000, 4000, 8000, 16000]
@@ -66,23 +66,23 @@ const samePath = (a: string, b: string): boolean => resolve(a).toLowerCase() ===
 
 export const accountsOn = (): boolean => advanced.get<boolean>(ACCOUNTS_PREVIEW)
 
-function list(): Account[] {
-  return config.get().accounts ?? []
+function list(): Connection[] {
+  return config.get().connections ?? []
 }
 
-export function getAccount(id: string): Account | undefined {
+export function getAccount(id: string): Connection | undefined {
   return list().find((a) => a.id === id)
 }
 
-function changeAccounts(fn: (accounts: Account[]) => void): void {
+function changeAccounts(fn: (connections: Connection[]) => void): void {
   config.update((c) => {
-    c.accounts = [...(c.accounts ?? [])]
-    fn(c.accounts)
+    c.connections = [...(c.connections ?? [])]
+    fn(c.connections)
   })
-  emit({ type: 'accounts-changed' })
+  emit({ type: 'connections-changed' })
 }
 
-function changeAccount(id: string, fn: (a: Account) => void): void {
+function changeAccount(id: string, fn: (a: Connection) => void): void {
   changeAccounts((all) => {
     const i = all.findIndex((a) => a.id === id)
     if (i >= 0) {
@@ -97,14 +97,15 @@ function changeAccount(id: string, fn: (a: Account) => void): void {
 // Refusals, in the user's language.
 // ---------------------------------------------------------------------------
 
-const PREVIEW_OFF = msg({ id: 'main.accounts.previewOff', defaultMessage: 'Accounts are a preview: turn on Settings → Advanced → Accounts (preview) first.', description: 'An error: something about accounts was asked while their preview switch is off. Settings → Advanced → Accounts (preview) names a setting: use its name as Hive shows it.' })
-const NO_ACCOUNT = msg({ id: 'main.accounts.notFound', defaultMessage: 'There is no such account.', description: 'An error: an account named by its id is not in Settings → Accounts (removed meanwhile).' })
+const PREVIEW_OFF = msg({ id: 'main.accounts.previewOff', defaultMessage: 'Connections are a preview: turn on Settings → Advanced → Connections (preview) first.', description: 'An error: something about connections was asked while their preview switch is off. Settings → Advanced → Connections (preview) names a setting: use its name as Hive shows it.' })
+const NO_NAME = msg({ id: 'main.accounts.noName', defaultMessage: 'Give the connection a name.', description: 'An error adding or renaming a connection in Settings → Connections: its name is empty.' })
+const NO_ACCOUNT = msg({ id: 'main.accounts.notFound', defaultMessage: 'There is no such connection.', description: 'An error: a connection named by its id is not in Settings → Connections (removed meanwhile).' })
 
 function assertOn(): void {
   if (!accountsOn()) throw hiveError(PREVIEW_OFF, undefined, { kind: 'forbidden' })
 }
 
-function mustGet(id: string): Account {
+function mustGet(id: string): Connection {
   const a = getAccount(id)
   if (!a) throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
   return a
@@ -112,9 +113,9 @@ function mustGet(id: string): Account {
 
 /** The provider's account support, or a refusal: one without it can't have accounts in Hive. */
 function support(id: ProviderId): { homeEnv: string; shared: readonly string[]; adapter: ReturnType<typeof provider> } {
-  const caps = providerDescriptor(id).capabilities.accounts
+  const caps = providerDescriptor(id).capabilities.connections
   const adapter = provider(id)
-  if (!caps || !adapter.accountStatus || !adapter.accountSharedTarget || !adapter.configHome) throw hiveError(msg({ id: 'main.accounts.noProvider', defaultMessage: "{cli} can't have accounts in Hive yet.", description: 'An error: accounts were asked for a coding agent CLI ({cli}: "Codex") that Hive keeps no accounts for.' }), { cli: providerDescriptor(id).name }, { kind: 'invalid' })
+  if (!caps || !adapter.accountStatus || !adapter.accountSharedTarget || !adapter.configHome) throw hiveError(msg({ id: 'main.accounts.noProvider', defaultMessage: "{cli} can't have sign-in connections in Hive yet.", description: 'An error: connections were asked for a coding agent CLI ({cli}: "Codex") that Hive keeps no connections for.' }), { cli: providerDescriptor(id).name }, { kind: 'invalid' })
   return { homeEnv: caps.homeEnv, shared: caps.shared, adapter }
 }
 
@@ -164,7 +165,7 @@ export function setAccountSessions(fn: (id: string) => boolean): void {
   sessionsOn = fn
 }
 
-const loginKey = (a: Pick<Account, 'id' | 'provider'>): string => `task:${a.provider}:login:${a.id}`
+const loginKey = (a: Pick<Connection, 'id' | 'provider'>): string => `task:${a.provider}:login:${a.id}`
 
 /** Accounts whose sign-in is open (from its start, under the lock, to its end): removal is refused meanwhile. */
 const loginsOpen = new Set<string>()
@@ -200,7 +201,7 @@ function sharedTarget(id: ProviderId, name: string): string {
   const root = resolve(accountsRoot()).toLowerCase()
   const t = target.toLowerCase()
   if (!samePath(resolve(target, '..'), home) || t === root || t.startsWith(root + '\\') || root.startsWith(t + '\\'))
-    throw hiveError(msg({ id: 'main.accounts.badTarget', defaultMessage: "Hive won't link an account to {target}: it isn't one of {cli}'s own folders.", description: "An error adding an account: the folder an account's shared folder would link to ({target}, a path) isn't in the coding agent CLI's ({cli}) own folder." }), { target, cli: providerDescriptor(id).name }, { kind: 'invalid' })
+    throw hiveError(msg({ id: 'main.accounts.badTarget', defaultMessage: "Hive won't link a connection to {target}: it isn't one of {cli}'s own folders.", description: "An error adding a connection: the folder a connection's shared folder would link to ({target}, a path) isn't in the coding agent CLI's ({cli}) own folder." }), { target, cli: providerDescriptor(id).name }, { kind: 'invalid' })
   return target
 }
 
@@ -219,7 +220,7 @@ async function linkState(link: string, target: string): Promise<'absent' | 'ours
 }
 
 /** Makes an account's folder and its junctions (each checked), or throws, having removed what it made. */
-async function makeFolder(a: Account): Promise<void> {
+async function makeFolder(a: Connection): Promise<void> {
   const dir = accountFolder(a.id)
   const { shared } = support(a.provider)
   await mkdir(accountsRoot(), { recursive: true })
@@ -232,7 +233,7 @@ async function makeFolder(a: Account): Promise<void> {
       // its home: refused, rather than made.
       await mkdir(target).catch((e: NodeJS.ErrnoException) => {
         if (e.code === 'EEXIST') return
-        if (e.code === 'ENOENT') throw hiveError(msg({ id: 'main.accounts.noHome', defaultMessage: "{cli}'s folder ({folder}) isn't there yet: run {cli} once, then add the account.", description: "An error adding an account: the coding agent CLI's ({cli}) own folder ({folder}, a path) doesn't exist on this PC." }), { cli: providerDescriptor(a.provider).name, folder: resolve(target, '..') }, { kind: 'conflict' })
+        if (e.code === 'ENOENT') throw hiveError(msg({ id: 'main.accounts.noHome', defaultMessage: "{cli}'s folder ({folder}) isn't there yet: run {cli} once, then add the connection.", description: "An error adding a connection: the coding agent CLI's ({cli}) own folder ({folder}, a path) doesn't exist on this PC." }), { cli: providerDescriptor(a.provider).name, folder: resolve(target, '..') }, { kind: 'conflict' })
         throw e
       })
       const tst = await lstat(target)
@@ -303,13 +304,13 @@ async function deleteTree(dir: string): Promise<void> {
  * it, the folder. Anything unexpected (a real folder where a junction should be, a link elsewhere, the folder itself a
  * link) stops it before anything is deleted. Throws Unsafe or the file system's error; what is left stays.
  */
-async function removeFolder(a: Account): Promise<void> {
+async function removeFolder(a: Connection): Promise<void> {
   const dir = accountFolder(a.id)
   // One renamed aside by an earlier try that stopped: finished first.
   await finishRemoving(removingFolder(a.id))
   if (!(await exists(dir))) return
   await assertRealFolder(dir)
-  const caps = providerDescriptor(a.provider).capabilities.accounts
+  const caps = providerDescriptor(a.provider).capabilities.connections
   for (const name of caps?.shared ?? []) {
     const link = join(dir, name)
     const target = sharedTarget(a.provider, name)
@@ -379,18 +380,18 @@ export async function finishLeftoverRemovals(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /** Adds an account, its folder and junctions made and checked; then the window offers its Sign in. */
-export async function addAccount(id: ProviderId, name: string): Promise<Account> {
+export async function addAccount(id: ProviderId, name: string): Promise<Connection> {
   assertOn()
   support(id)
   const n = name.trim()
-  if (!n) throw hiveError(msg({ id: 'main.accounts.noName', defaultMessage: 'Give the account a name.', description: 'An error adding or renaming an account in Settings → Accounts: its name is empty.' }), undefined, { kind: 'invalid' })
-  const a: Account = { id: `a-${randomBytes(4).toString('hex')}`, provider: id, kind: 'signIn', name: n, createdAt: new Date().toISOString() }
+  if (!n) throw hiveError(NO_NAME, undefined, { kind: 'invalid' })
+  const a: Connection = { id: `a-${randomBytes(4).toString('hex')}`, provider: id, kind: 'signIn', name: n, createdAt: new Date().toISOString() }
   return locked(a.id, async () => {
     try {
       await makeFolder(a)
     } catch (e) {
       log.warn(`account ${a.id} couldn't be made: ${userText(String(e))}`)
-      if (e instanceof Unsafe) throw hiveError(msg({ id: 'main.accounts.makeFailed', defaultMessage: "Couldn't make the account's folder: {error}", description: "An error adding an account: its folder or link couldn't be made. {error} is the reason, in English." }), { error: e.message })
+      if (e instanceof Unsafe) throw hiveError(msg({ id: 'main.accounts.makeFailed', defaultMessage: "Couldn't make the connection's folder: {error}", description: "An error adding a connection: its folder or link couldn't be made. {error} is the reason, in English." }), { error: e.message })
       throw e
     }
     generations.set(a.id, generation(a.id) + 1)
@@ -405,7 +406,7 @@ export function renameAccount(id: string, name: string): void {
   assertOn()
   mustGet(id)
   const n = name.trim()
-  if (!n) throw hiveError(msg({ id: 'main.accounts.noName', defaultMessage: 'Give the account a name.', description: 'An error adding or renaming an account in Settings → Accounts: its name is empty.' }), undefined, { kind: 'invalid' })
+  if (!n) throw hiveError(NO_NAME, undefined, { kind: 'invalid' })
   changeAccount(id, (a) => (a.name = n))
 }
 
@@ -417,7 +418,7 @@ export async function removeAccount(id: string): Promise<void> {
   assertOn()
   const a = mustGet(id)
   const inUse = (): boolean => sessionsOn(id) || (claims.get(id) ?? 0) > 0 || loginsOpen.has(id) || hasPty(loginKey(a))
-  const IN_USE = msg({ id: 'main.accounts.inUse', defaultMessage: '{name} is in use: stop the agents on it and close its sign-in, then remove it.', description: 'An error removing an account ({name}, its name in Settings → Accounts): agents run on it, or its sign-in terminal is open.' })
+  const IN_USE = msg({ id: 'main.accounts.inUse', defaultMessage: '{name} is in use: stop the agents on it and close its sign-in, then remove it.', description: 'An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or its sign-in terminal is open.' })
   if (inUse()) throw hiveError(IN_USE, { name: a.name }, { kind: 'conflict' })
   await locked(id, async () => {
     // Asked again under the lock: a launch or sign-in may have started while it waited.
@@ -432,11 +433,11 @@ export async function removeAccount(id: string): Promise<void> {
       log.warn(`account ${id}'s folder couldn't all be removed: ${userText(why)}`)
       changeAccount(id, (x) => (x.leftover = why))
       syncWatches()
-      throw hiveError(msg({ id: 'main.accounts.removeFailed', defaultMessage: "{name} wasn't removed: {error}. Nothing outside its folder was touched; Remove tries again.", description: "An error removing an account ({name}): its folder couldn't all be deleted. {error} is the reason, in English." }), { name: a.name, error: why }, { kind: 'conflict' })
+      throw hiveError(msg({ id: 'main.accounts.removeFailed', defaultMessage: "{name} wasn't removed: {error}. Nothing outside its folder was touched; Remove tries again.", description: "An error removing a connection ({name}): its folder couldn't all be deleted. {error} is the reason, in English." }), { name: a.name, error: why }, { kind: 'conflict' })
     }
     changeAccounts((all) => all.splice(0, all.length, ...all.filter((x) => x.id !== id)))
     config.update((c) => {
-      for (const [p, v] of Object.entries(c.lastUsedAccount ?? {})) if (v === id) delete c.lastUsedAccount![p as ProviderId]
+      for (const [p, v] of Object.entries(c.lastUsedConnection ?? {})) if (v === id) delete c.lastUsedConnection![p as ProviderId]
     })
     log.info(`account ${id} removed`)
     syncWatches()
@@ -462,18 +463,18 @@ async function slot<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /** Per account: the check under way, and the one queued after it (asked for while it ran). */
-const inFlight = new Map<string, { now: Promise<AccountObserved | null>; next?: Promise<AccountObserved | null> }>()
+const inFlight = new Map<string, { now: Promise<ConnectionObserved | null>; next?: Promise<ConnectionObserved | null> }>()
 /** Per account: how many changes its watch has seen (confirm checks again while it moves). */
 const changes = new Map<string, number>()
 
 /** Reads the folder's sign-in from the CLI, and keeps it as `observed` unless the account was removed meanwhile. */
-async function checkOnce(id: string): Promise<AccountObserved | null> {
+async function checkOnce(id: string): Promise<ConnectionObserved | null> {
   const a = getAccount(id)
   if (!a) return null
   const gen = generation(id)
   const dir = accountFolder(id)
   const at = new Date().toISOString()
-  let observed: AccountObserved
+  let observed: ConnectionObserved
   try {
     await assertRealFolder(dir)
     const { homeEnv, adapter } = support(a.provider)
@@ -495,13 +496,13 @@ async function checkOnce(id: string): Promise<AccountObserved | null> {
 }
 
 /** The last good identity, kept beside a failed check (shown as it was, with "Couldn't check"). */
-const keptIdentity = (o: AccountObserved | undefined): Partial<AccountObserved> => (o && !o.error && !o.missing && o.loggedIn ? { email: o.email, orgId: o.orgId, plan: o.plan } : {})
+const keptIdentity = (o: ConnectionObserved | undefined): Partial<ConnectionObserved> => (o && !o.error && !o.missing && o.loggedIn ? { email: o.email, orgId: o.orgId, plan: o.plan } : {})
 
 /**
  * Checks an account's sign-in, by a check that starts after this call: one under way is joined only by the check queued
  * after it, so a change seen while it ran is always checked again. Null: the account is gone.
  */
-export function checkAccount(id: string): Promise<AccountObserved | null> {
+export function checkAccount(id: string): Promise<ConnectionObserved | null> {
   const f = inFlight.get(id)
   if (!f) return startCheck(id)
   // Started once the one under way ends: it becomes the one under way then (startCheck), for callers after it.
@@ -509,7 +510,7 @@ export function checkAccount(id: string): Promise<AccountObserved | null> {
   return f.next
 }
 
-function startCheck(id: string): Promise<AccountObserved | null> {
+function startCheck(id: string): Promise<ConnectionObserved | null> {
   const now = locked(id, () => checkOnce(id))
   inFlight.set(id, { now })
   void now
@@ -527,8 +528,8 @@ function startCheck(id: string): Promise<AccountObserved | null> {
  * under it (at most CONFIRM_ROUNDS), so a launch never goes ahead on an answer older than the folder. `fresh: false`
  * when it kept changing.
  */
-export async function confirmAccount(id: string): Promise<{ observed: AccountObserved | null; fresh: boolean }> {
-  let observed: AccountObserved | null = null
+export async function confirmAccount(id: string): Promise<{ observed: ConnectionObserved | null; fresh: boolean }> {
+  let observed: ConnectionObserved | null = null
   for (let i = 0; i < CONFIRM_ROUNDS; i++) {
     const seen = changes.get(id) ?? 0
     observed = await checkAccount(id)
@@ -574,13 +575,13 @@ export async function signInAccount(id: string): Promise<string> {
  * Refuses an account that can't be used now: half removed, or its folder not the one Hive made (missing, or replaced by
  * a link). Called under its lock, before anything is started on it.
  */
-async function assertUsable(a: Account): Promise<void> {
-  if (a.leftover) throw hiveError(msg({ id: 'main.accounts.leftover', defaultMessage: '{name} is half removed: remove it again first.', description: "An error signing an account in ({name}): an earlier removal stopped partway, so it can't be used." }), { name: a.name }, { kind: 'conflict' })
+async function assertUsable(a: Connection): Promise<void> {
+  if (a.leftover) throw hiveError(msg({ id: 'main.accounts.leftover', defaultMessage: '{name} is half removed: remove it again first.', description: "An error signing a connection in ({name}): an earlier removal stopped partway, so it can't be used." }), { name: a.name }, { kind: 'conflict' })
   try {
     await assertRealFolder(accountFolder(a.id))
   } catch (e) {
     log.warn(`account ${a.id}'s folder can't be used: ${userText(String((e as Error).message ?? e))}`)
-    throw hiveError(msg({ id: 'main.accounts.folderNotUsable', defaultMessage: "{name}'s folder isn't the one Hive made (it is missing, or was moved or replaced), so nothing was started on it. Remove the account and add it again.", description: "An error signing an account in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made." }), { name: a.name }, { kind: 'conflict' })
+    throw hiveError(msg({ id: 'main.accounts.folderNotUsable', defaultMessage: "{name}'s folder isn't the one Hive made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.", description: "An error signing a connection in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made." }), { name: a.name }, { kind: 'conflict' })
   }
 }
 
@@ -589,7 +590,7 @@ export function keepNewLogin(id: string): void {
   assertOn()
   const a = mustGet(id)
   const ok = acceptable(a.observed)
-  if (!ok) throw hiveError(msg({ id: 'main.accounts.nothingToKeep', defaultMessage: "{name} isn't signed in as anyone Hive could check, so there's no login to keep.", description: "An error: Keep the new login was asked for an account ({name}) whose latest check didn't find it signed in." }), { name: a.name }, { kind: 'conflict' })
+  if (!ok) throw hiveError(msg({ id: 'main.accounts.nothingToKeep', defaultMessage: "{name} isn't signed in as anyone Hive could check, so there's no login to keep.", description: "An error: Keep the new login was asked for a connection ({name}) whose latest check didn't find it signed in." }), { name: a.name }, { kind: 'conflict' })
   changeAccount(id, (x) => (x.accepted = ok))
 }
 
@@ -744,24 +745,24 @@ export function stopAccountWatches(): void {
 // ---------------------------------------------------------------------------
 
 /** What Settings → Accounts shows for the asking window's workspace; each account checked again as it is shown. */
-export function accountsView(check = false): AccountsView {
+export function accountsView(check = false): ConnectionsView {
   const preview = accountsOn()
   const all = list()
   if (check && preview) for (const a of all) void checkAccount(a.id)
-  const providers = PROVIDERS.filter((p) => !!p.capabilities.accounts && isProviderEnabled(config.settings, p.id)).map((p) => p.id)
+  const providers = PROVIDERS.filter((p) => !!p.capabilities.connections && isProviderEnabled(config.settings, p.id)).map((p) => p.id)
   const cfg = workspace.path ? workspace.config : null
-  const ws: AccountsView['workspace'] = {}
+  const ws: ConnectionsView['workspace'] = {}
   for (const p of providers) {
     const w = workspaceAccounts(cfg, p, all)
     if (w) ws[p] = w
   }
-  return { preview, providers, accounts: preview ? all.map((a) => ({ ...a, signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id) })) : [], workspace: ws }
+  return { preview, providers, connections: preview ? all.map((a) => ({ ...a, signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id) })) : [], workspace: ws }
 }
 
 /** Saves the asking window's workspace's accounts for a provider, worked out from how they are when it is written. */
-async function saveChoice(fn: (cfg: WorkspaceConfig) => WorkspaceConfig['accounts']): Promise<void> {
-  await workspace.saveWorkspaceConfigWith((c) => ({ accounts: fn(c) }))
-  emit({ type: 'accounts-changed' })
+async function saveChoice(fn: (cfg: WorkspaceConfig) => WorkspaceConfig['connections']): Promise<void> {
+  await workspace.saveWorkspaceConfigWith((c) => ({ connections: fn(c) }))
+  emit({ type: 'connections-changed' })
   syncWatches()
 }
 
@@ -773,7 +774,7 @@ export async function setAccountOn(id: string, on: boolean): Promise<void> {
   await saveChoice((c) => {
     const next = switchedOn(workspaceAccounts(c, a.provider, list()), id, on, list())
     chosen = next.default
-    return { ...c.accounts, [a.provider]: next }
+    return { ...c.connections, [a.provider]: next }
   })
   if (chosen) noteLastUsed(a.provider, chosen)
 }
@@ -785,31 +786,31 @@ export async function setAccountDefault(id: string): Promise<void> {
   await saveChoice((c) => {
     const cur = workspaceAccounts(c, a.provider, list())
     const on = switchedOn(cur, id, true, list())
-    return { ...c.accounts, [a.provider]: { on: on.on, default: id } }
+    return { ...c.connections, [a.provider]: { on: on.on, default: id } }
   })
   noteLastUsed(a.provider, id)
 }
 
 /** The account a new workspace starts with (Darren, 26 Oct): the last chosen as a default, or launched on (HI-1755). */
 export function noteLastUsed(id: ProviderId, accountId: string): void {
-  if (config.get().lastUsedAccount?.[id] === accountId) return
-  config.update((c) => (c.lastUsedAccount = { ...c.lastUsedAccount, [id]: accountId }))
+  if (config.get().lastUsedConnection?.[id] === accountId) return
+  config.update((c) => (c.lastUsedConnection = { ...c.lastUsedConnection, [id]: accountId }))
 }
 
 /**
  * A new workspace's accounts (only when it is made: opening one never turns an account on): the last used of each
  * provider, on and its default. Undefined with none, or with the preview off.
  */
-export function newWorkspaceAccounts(): WorkspaceConfig['accounts'] | undefined {
+export function newWorkspaceAccounts(): WorkspaceConfig['connections'] | undefined {
   if (!accountsOn()) return undefined
-  const out: NonNullable<WorkspaceConfig['accounts']> = {}
-  for (const [p, id] of Object.entries(config.get().lastUsedAccount ?? {}) as [ProviderId, string][]) if (id && getAccount(id)?.provider === p) out[p] = { on: [id], default: id }
+  const out: NonNullable<WorkspaceConfig['connections']> = {}
+  for (const [p, id] of Object.entries(config.get().lastUsedConnection ?? {}) as [ProviderId, string][]) if (id && getAccount(id)?.provider === p) out[p] = { on: [id], default: id }
   return Object.keys(out).length ? out : undefined
 }
 
 setNewWorkspaceExtras(() => {
-  const accounts = newWorkspaceAccounts()
-  return accounts ? { accounts } : {}
+  const connections = newWorkspaceAccounts()
+  return connections ? { connections } : {}
 })
 
 // Watches follow the open workspaces and their choices.

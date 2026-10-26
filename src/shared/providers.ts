@@ -148,7 +148,7 @@ export interface ProviderCapabilities {
    * an account per folder: `homeEnv` names the variable, `shared` the home's folders each account's folder links to by a
    * junction (the adapter's accountSharedTarget says where). Absent: the CLI has no accounts in Hive.
    */
-  accounts?: { homeEnv: string; shared: readonly string[] }
+  connections?: { homeEnv: string; shared: readonly string[] }
 }
 
 /** What the CLI said about a model, for modeCaveat. */

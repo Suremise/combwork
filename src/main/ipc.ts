@@ -1509,17 +1509,17 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'provider:stopAgents': (id) => sessions.stopProvider(id),
 
-    'accounts:list': (check) => accountsView(check === true),
-    'accounts:add': (id, name) => addAccount(id, name),
-    'accounts:rename': (id, name) => renameAccount(id, name),
-    'accounts:remove': (id) => removeAccount(id),
-    'accounts:signIn': async (id) => {
+    'connections:list': (check) => accountsView(check === true),
+    'connections:add': (id, name) => addAccount(id, name),
+    'connections:rename': (id, name) => renameAccount(id, name),
+    'connections:remove': (id) => removeAccount(id),
+    'connections:signIn': async (id) => {
       await refreshPathBeforeStart()
       return signInAccount(id)
     },
-    'accounts:keepLogin': (id) => keepNewLogin(id),
-    'accounts:setOn': (id, on) => setAccountOn(id, on),
-    'accounts:setDefault': (id) => setAccountDefault(id),
+    'connections:keepLogin': (id) => keepNewLogin(id),
+    'connections:setOn': (id, on) => setAccountOn(id, on),
+    'connections:setDefault': (id) => setAccountDefault(id),
 
     'api:info': () => apiInfo(),
     'api:regenerateToken': async () => {

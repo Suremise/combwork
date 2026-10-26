@@ -1,4 +1,4 @@
-// Settings → Accounts (HI-980, staged behind Settings → Advanced → Accounts (preview)): hidden while the preview is off;
+// Settings → Connections (HI-980: sign-in connections, the section's id still 'accounts'; staged behind Settings → Advanced → Connections (preview)): hidden while the preview is off;
 // Add Account… makes the account's folder (its projects\ a junction to the CLI home's) and opens its sign-in in Hive's
 // terminal, nothing typed into it; once it ends, the row says who it is signed in as. Turned on, it is this workspace's
 // default. A login changed in its folder while Settings is closed (as a /login in a pane would) is found by its watch
@@ -42,8 +42,8 @@ const check = (name, ok, extra = '') => {
     const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     const inv = invOn(page)
     await lib.openWorkspace(inv, page, ws1)
-    const list = () => inv('accounts:list')
-    const wsJson = (w) => JSON.parse(fs.readFileSync(path.join(w, '.hive', 'workspace.json'), 'utf8')).accounts
+    const list = () => inv('connections:list')
+    const wsJson = (w) => JSON.parse(fs.readFileSync(path.join(w, '.hive', 'workspace.json'), 'utf8')).connections
     const shots = async (name) => {
       while ((await page.locator('.toast').count()) > 0) await page.locator('.toast').first().locator('button').last().click()
       await page.mouse.move(5, 5)
@@ -68,27 +68,27 @@ const check = (name, ok, extra = '') => {
 
     // --- Hidden while the preview is off.
     await openSettings()
-    check('Settings → Accounts is hidden while its preview is off', (await nav.count()) === 0)
+    check('Settings → Connections is hidden while its preview is off', (await nav.count()) === 0)
     check('…and nothing about accounts is given out', (await list()).preview === false)
     await inv('advanced:set', 'hive.accounts.preview', true)
-    check('the preview on, Settings → Accounts shows', !!(await lib.until(async () => (await nav.count()) === 1, HUNG_MS)))
+    check('the preview on, Settings → Connections shows', !!(await lib.until(async () => (await nav.count()) === 1, HUNG_MS)))
     await nav.click()
-    check('…with no accounts yet', !!(await lib.until(async () => (await page.getByText('No accounts yet').count()) === 1, HUNG_MS)))
+    check('…with no connections yet', !!(await lib.until(async () => (await page.getByText('No connections yet').count()) === 1, HUNG_MS)))
 
     // --- Add Account…: the folder and junction, then its sign-in in Hive's terminal.
     loginAs('one@example.com')
     await page.locator('[data-add="claude-code"]').click()
     await fillPrompt('Personal')
-    const personal = await lib.until(async () => (await list()).accounts.find((a) => a.name === 'Personal') ?? null, HUNG_MS)
+    const personal = await lib.until(async () => (await list()).connections.find((a) => a.name === 'Personal') ?? null, HUNG_MS)
     check('Add Account… adds it', !!personal)
     const folder = personal ? path.join(accountsRoot, personal.id) : ''
     check('…its folder in the profile’s accounts folder, projects a junction to the CLI home’s', !!personal && fs.lstatSync(path.join(folder, 'projects')).isSymbolicLink() && fs.existsSync(path.join(folder, 'projects', 'C--work-alpha', 'kept.jsonl')))
     check('…and opens its sign-in in a terminal of Hive’s', !!(await lib.until(async () => (await page.locator('.account-signin .task-terminal').count()) === 1, HUNG_MS)))
     const signed = await lib.until(async () => {
-      const a = (await list()).accounts.find((x) => x.id === personal?.id)
+      const a = (await list()).connections.find((x) => x.id === personal?.id)
       return a?.accepted?.email === 'one@example.com' && a.observed?.loggedIn === true ? a : null
     }, HUNG_MS)
-    check('once the sign-in ends, it is signed in as that login, taken on as its own', !!signed, JSON.stringify((await list()).accounts))
+    check('once the sign-in ends, it is signed in as that login, taken on as its own', !!signed, JSON.stringify((await list()).connections))
     check('…and its row says so', !!(await lib.until(async () => /Signed in/.test(await row('Personal').innerText().catch(() => '')) && /one@example\.com · max/.test(await row('Personal').innerText().catch(() => '')), HUNG_MS)))
     await shots('signed-in')
     await page.locator('.account-signin .btn', { hasText: 'Close' }).click().catch(() => undefined)
@@ -101,7 +101,7 @@ const check = (name, ok, extra = '') => {
     // --- Rename: the name only.
     await row('Personal').getByRole('button', { name: 'Rename…' }).click()
     await fillPrompt('Hive overnight')
-    check('Rename… changes its name, not its folder', !!(await lib.until(async () => (await list()).accounts.some((a) => a.id === personal.id && a.name === 'Hive overnight'), HUNG_MS)) && fs.existsSync(folder))
+    check('Rename… changes its name, not its folder', !!(await lib.until(async () => (await list()).connections.some((a) => a.id === personal.id && a.name === 'Hive overnight'), HUNG_MS)) && fs.existsSync(folder))
 
     // --- A login changed with Settings closed (a /login in a pane): its watch finds it.
     await page.keyboard.press('Escape')
@@ -109,7 +109,7 @@ const check = (name, ok, extra = '') => {
     fs.writeFileSync(path.join(folder, 'fake-account.json'), JSON.stringify({ email: 'two@example.com', orgId: 'org-1' }))
     fs.writeFileSync(path.join(folder, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: 'two@example.com' } }))
     const changed = await lib.until(async () => {
-      const a = (await list()).accounts.find((x) => x.id === personal.id)
+      const a = (await list()).connections.find((x) => x.id === personal.id)
       return a?.observed?.email === 'two@example.com' ? a : null
     }, HUNG_MS)
     check('a login changed in its folder with Settings closed is found by itself', !!changed && changed.accepted?.email === 'one@example.com')
@@ -119,13 +119,13 @@ const check = (name, ok, extra = '') => {
     await shots('changed')
     await row('Hive overnight').getByRole('button', { name: 'Keep the New Login' }).click()
     await fillPrompt('Two')
-    check('Keep the New Login takes it on, and offers a rename', !!(await lib.until(async () => (await list()).accounts.some((a) => a.id === personal.id && a.accepted?.email === 'two@example.com' && a.name === 'Two'), HUNG_MS)))
+    check('Keep the New Login takes it on, and offers a rename', !!(await lib.until(async () => (await list()).connections.some((a) => a.id === personal.id && a.accepted?.email === 'two@example.com' && a.name === 'Two'), HUNG_MS)))
 
     // --- A second account on the same login: both flagged.
     loginAs('two@example.com')
     await page.locator('[data-add="claude-code"]').click()
     await fillPrompt('Work')
-    const work = await lib.until(async () => (await list()).accounts.find((a) => a.name === 'Work' && a.observed?.loggedIn) ?? null, HUNG_MS)
+    const work = await lib.until(async () => (await list()).connections.find((a) => a.name === 'Work' && a.observed?.loggedIn) ?? null, HUNG_MS)
     check('a second account signs in', !!work)
     check('two accounts on one login are both flagged', !!(await lib.until(async () => (await page.locator('[data-warning="duplicate"]').count()) === 2, HUNG_MS)))
     await shots('duplicate')
@@ -139,12 +139,12 @@ const check = (name, ok, extra = '') => {
     await lib.openWorkspace(invOn(p2), p2, ws2)
     // A new workspace starts with the last account chosen as a default (Darren, 26 Oct): Personal.
     check('a new workspace starts with the last-used account on, as its default', JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [personal.id], default: personal.id } }), JSON.stringify(wsJson(ws2)))
-    await invOn(p2)('accounts:setOn', personal.id, false)
-    await invOn(p2)('accounts:setOn', work.id, true)
+    await invOn(p2)('connections:setOn', personal.id, false)
+    await invOn(p2)('connections:setOn', work.id, true)
     check('a second window’s workspace has Work on, as its default', !!(await lib.until(async () => JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [work.id], default: work.id } }), HUNG_MS)), JSON.stringify(wsJson(ws2)))
     check('…and the first keeps its own', JSON.stringify(wsJson(ws1)) === JSON.stringify({ 'claude-code': { on: [personal.id], default: personal.id } }), JSON.stringify(wsJson(ws1)))
-    check('…each window lists its own workspace’s choice', JSON.stringify((await list()).workspace) !== JSON.stringify((await invOn(p2)('accounts:list')).workspace))
-    await invOn(p2)('accounts:setOn', work.id, false)
+    check('…each window lists its own workspace’s choice', JSON.stringify((await list()).workspace) !== JSON.stringify((await invOn(p2)('connections:list')).workspace))
+    await invOn(p2)('connections:setOn', work.id, false)
     check('turned all off there, it stays off (no default)', !!(await lib.until(async () => JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [], default: null } }), HUNG_MS)))
     await p2.close()
 
@@ -154,7 +154,7 @@ const check = (name, ok, extra = '') => {
     const ask = page.locator('.dialog', { hasText: 'Remove Work?' })
     check('Remove… asks first, saying its login on this PC goes with it', !!(await lib.until(async () => /deleted for good, with its login on this PC/.test(await ask.innerText().catch(() => '')), HUNG_MS)))
     await ask.locator('.dialog-footer .btn.danger').click()
-    check('…then the account and its folder are gone', !!(await lib.until(async () => !(await list()).accounts.some((a) => a.id === work.id) && !fs.existsSync(workFolder), HUNG_MS)))
+    check('…then the account and its folder are gone', !!(await lib.until(async () => !(await list()).connections.some((a) => a.id === work.id) && !fs.existsSync(workFolder), HUNG_MS)))
     check('…the conversations it linked to untouched', fs.readFileSync(conversation, 'utf8').includes('kept'))
     check('…and the other account no longer flagged', !!(await lib.until(async () => (await page.locator('[data-warning="duplicate"]').count()) === 0, HUNG_MS)))
     await shots('after-remove')

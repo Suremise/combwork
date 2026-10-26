@@ -1,51 +1,51 @@
 {
   "main.accounts.badTarget": {
-    "defaultMessage": "Hive won't link an account to {target}: it isn't one of {cli}'s own folders.",
-    "description": "An error adding an account: the folder an account's shared folder would link to ({target}, a path) isn't in the coding agent CLI's ({cli}) own folder."
+    "defaultMessage": "Hive won't link a connection to {target}: it isn't one of {cli}'s own folders.",
+    "description": "An error adding a connection: the folder a connection's shared folder would link to ({target}, a path) isn't in the coding agent CLI's ({cli}) own folder."
   },
   "main.accounts.folderNotUsable": {
-    "defaultMessage": "{name}'s folder isn't the one Hive made (it is missing, or was moved or replaced), so nothing was started on it. Remove the account and add it again.",
-    "description": "An error signing an account in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made."
+    "defaultMessage": "{name}'s folder isn't the one Hive made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.",
+    "description": "An error signing a connection in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made."
   },
   "main.accounts.inUse": {
     "defaultMessage": "{name} is in use: stop the agents on it and close its sign-in, then remove it.",
-    "description": "An error removing an account ({name}, its name in Settings → Accounts): agents run on it, or its sign-in terminal is open."
+    "description": "An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or its sign-in terminal is open."
   },
   "main.accounts.leftover": {
     "defaultMessage": "{name} is half removed: remove it again first.",
-    "description": "An error signing an account in ({name}): an earlier removal stopped partway, so it can't be used."
+    "description": "An error signing a connection in ({name}): an earlier removal stopped partway, so it can't be used."
   },
   "main.accounts.makeFailed": {
-    "defaultMessage": "Couldn't make the account's folder: {error}",
-    "description": "An error adding an account: its folder or link couldn't be made. {error} is the reason, in English."
+    "defaultMessage": "Couldn't make the connection's folder: {error}",
+    "description": "An error adding a connection: its folder or link couldn't be made. {error} is the reason, in English."
   },
   "main.accounts.noHome": {
-    "defaultMessage": "{cli}'s folder ({folder}) isn't there yet: run {cli} once, then add the account.",
-    "description": "An error adding an account: the coding agent CLI's ({cli}) own folder ({folder}, a path) doesn't exist on this PC."
+    "defaultMessage": "{cli}'s folder ({folder}) isn't there yet: run {cli} once, then add the connection.",
+    "description": "An error adding a connection: the coding agent CLI's ({cli}) own folder ({folder}, a path) doesn't exist on this PC."
   },
   "main.accounts.noName": {
-    "defaultMessage": "Give the account a name.",
-    "description": "An error adding or renaming an account in Settings → Accounts: its name is empty."
+    "defaultMessage": "Give the connection a name.",
+    "description": "An error adding or renaming a connection in Settings → Connections: its name is empty."
   },
   "main.accounts.noProvider": {
-    "defaultMessage": "{cli} can't have accounts in Hive yet.",
-    "description": "An error: accounts were asked for a coding agent CLI ({cli}: \"Codex\") that Hive keeps no accounts for."
+    "defaultMessage": "{cli} can't have sign-in connections in Hive yet.",
+    "description": "An error: connections were asked for a coding agent CLI ({cli}: \"Codex\") that Hive keeps no connections for."
   },
   "main.accounts.notFound": {
-    "defaultMessage": "There is no such account.",
-    "description": "An error: an account named by its id is not in Settings → Accounts (removed meanwhile)."
+    "defaultMessage": "There is no such connection.",
+    "description": "An error: a connection named by its id is not in Settings → Connections (removed meanwhile)."
   },
   "main.accounts.nothingToKeep": {
     "defaultMessage": "{name} isn't signed in as anyone Hive could check, so there's no login to keep.",
-    "description": "An error: Keep the new login was asked for an account ({name}) whose latest check didn't find it signed in."
+    "description": "An error: Keep the new login was asked for a connection ({name}) whose latest check didn't find it signed in."
   },
   "main.accounts.previewOff": {
-    "defaultMessage": "Accounts are a preview: turn on Settings → Advanced → Accounts (preview) first.",
-    "description": "An error: something about accounts was asked while their preview switch is off. Settings → Advanced → Accounts (preview) names a setting: use its name as Hive shows it."
+    "defaultMessage": "Connections are a preview: turn on Settings → Advanced → Connections (preview) first.",
+    "description": "An error: something about connections was asked while their preview switch is off. Settings → Advanced → Connections (preview) names a setting: use its name as Hive shows it."
   },
   "main.accounts.removeFailed": {
     "defaultMessage": "{name} wasn't removed: {error}. Nothing outside its folder was touched; Remove tries again.",
-    "description": "An error removing an account ({name}): its folder couldn't all be deleted. {error} is the reason, in English."
+    "description": "An error removing a connection ({name}): its folder couldn't all be deleted. {error} is the reason, in English."
   },
   "main.antivirus.allExcluded": {
     "defaultMessage": "Every folder Hive may offer is already excluded.",

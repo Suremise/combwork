@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as electron from 'electron'
 import { ACCOUNTS_PREVIEW } from '../src/shared/advanced'
 import { accountState, duplicateLogins, switchedOn, workspaceAccounts } from '../src/shared/accounts'
-import type { Account } from '../src/shared/types'
+import type { Connection } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-accounts-')
@@ -37,7 +37,7 @@ const asked: string[] = []
 
 const projects = join(home, 'projects')
 const keep = join(projects, 'C--work-alpha', 'conversation.jsonl')
-const folderOf = (a: Account): string => accounts.accountFolder(a.id)
+const folderOf = (a: Connection): string => accounts.accountFolder(a.id)
 const outcome = (p: Promise<unknown>): Promise<string> => p.then(() => 'ok', (e: Error) => e.message)
 const aside = (id: string): string => join(base, 'profile', 'accounts', `.removing-${id}`)
 /** Each open sign-in's end, by account: the faked terminal stays open until a test ends it. */
@@ -77,8 +77,8 @@ beforeEach(() => {
 })
 afterEach(async () => {
   accounts.accountTestHooks.beforeDelete = undefined
-  for (const a of [...(config.get().accounts ?? [])]) await accounts.removeAccount(a.id).catch(() => undefined)
-  config.update((c) => (c.accounts = []))
+  for (const a of [...(config.get().connections ?? [])]) await accounts.removeAccount(a.id).catch(() => undefined)
+  config.update((c) => (c.connections = []))
 })
 
 describe('what `claude auth status --json` says (the recorded fixture)', () => {
@@ -116,7 +116,7 @@ describe('an account’s folder and its junction', () => {
     try {
       expect(await outcome(accounts.addAccount('claude-code', 'Nowhere'))).toMatch(/isn't there yet: run Claude Code once/)
       expect(existsSync(join(base, 'no-home'))).toBe(false)
-      expect(config.get().accounts ?? []).toHaveLength(0)
+      expect(config.get().connections ?? []).toHaveLength(0)
     } finally {
       process.env.CLAUDE_CONFIG_DIR = home
     }
@@ -299,8 +299,8 @@ describe('removing an account', () => {
     }
     await accounts.removeAccount(a.id)
     accounts.accountTestHooks.beforeDelete = undefined
-    expect(await outcome(signIn!)).toMatch(/no such account/)
-    expect(await outcome(claim!)).toMatch(/no such account/)
+    expect(await outcome(signIn!)).toMatch(/no such connection/)
+    expect(await outcome(claim!)).toMatch(/no such connection/)
     expect(logins.has(a.id)).toBe(false)
   })
 
@@ -435,7 +435,7 @@ describe('who an account is signed in as', () => {
 
   it('two accounts on the same login are flagged', () => {
     const o = (email: string) => ({ at: '', loggedIn: true, email, orgId: 'org-1' })
-    const list: Account[] = [
+    const list: Connection[] = [
       { id: 'a', provider: 'claude-code', name: 'A', createdAt: '', observed: o('x@example.com') },
       { id: 'b', provider: 'claude-code', name: 'B', createdAt: '', observed: o('X@example.com') },
       { id: 'c', provider: 'claude-code', name: 'C', createdAt: '', observed: o('y@example.com') }
@@ -445,13 +445,13 @@ describe('who an account is signed in as', () => {
 })
 
 describe("a workspace's accounts", () => {
-  const acct = (id: string, cli: Account['provider'] = 'claude-code'): Account => ({ id, provider: cli, name: id, createdAt: '' })
+  const acct = (id: string, cli: Connection['provider'] = 'claude-code'): Connection => ({ id, provider: cli, name: id, createdAt: '' })
   const all = [acct('a1'), acct('a2'), acct('a3'), acct('x1', 'codex')]
 
   it('not set up is undefined; turned all off stays so; unknown or other providers’ ids are dropped', () => {
     expect(workspaceAccounts({}, 'claude-code', all)).toBeUndefined()
-    expect(workspaceAccounts({ accounts: { 'claude-code': { on: [], default: null } } }, 'claude-code', all)).toEqual({ on: [], default: null })
-    expect(workspaceAccounts({ accounts: { 'claude-code': { on: ['gone', 'a2', 'x1'], default: 'gone' } } }, 'claude-code', all)).toEqual({ on: ['a2'], default: 'a2' })
+    expect(workspaceAccounts({ connections: { 'claude-code': { on: [], default: null } } }, 'claude-code', all)).toEqual({ on: [], default: null })
+    expect(workspaceAccounts({ connections: { 'claude-code': { on: ['gone', 'a2', 'x1'], default: 'gone' } } }, 'claude-code', all)).toEqual({ on: ['a2'], default: 'a2' })
   })
 
   it('the first one on becomes the default; the default off is replaced by the first on in list order, never another provider’s', () => {
@@ -481,8 +481,8 @@ describe("a workspace's accounts", () => {
     it('turning one on saves it in workspace.json, as its default, and remembers it for new workspaces', async () => {
       const a = await accounts.addAccount('claude-code', 'Here')
       await run(() => accounts.setAccountOn(a.id, true))
-      expect(JSON.parse(readFileSync(join(wsPath, '.hive', 'workspace.json'), 'utf8')).accounts).toEqual({ 'claude-code': { on: [a.id], default: a.id } })
-      expect(config.get().lastUsedAccount?.['claude-code']).toBe(a.id)
+      expect(JSON.parse(readFileSync(join(wsPath, '.hive', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [a.id], default: a.id } })
+      expect(config.get().lastUsedConnection?.['claude-code']).toBe(a.id)
       expect(accounts.newWorkspaceAccounts()).toEqual({ 'claude-code': { on: [a.id], default: a.id } })
       await run(() => accounts.setAccountOn(a.id, false))
       expect(run(() => accounts.accountsView()).workspace['claude-code']).toEqual({ on: [], default: null })
@@ -517,8 +517,8 @@ describe('the preview switch', () => {
   it('off, every way into accounts is refused and nothing is listed', async () => {
     await advanced.set(ACCOUNTS_PREVIEW, false)
     try {
-      expect(await outcome(accounts.addAccount('claude-code', 'No'))).toMatch(/Accounts are a preview/)
-      expect(accounts.accountsView()).toMatchObject({ preview: false, accounts: [] })
+      expect(await outcome(accounts.addAccount('claude-code', 'No'))).toMatch(/Connections are a preview/)
+      expect(accounts.accountsView()).toMatchObject({ preview: false, connections: [] })
       expect(accounts.newWorkspaceAccounts()).toBeUndefined()
     } finally {
       await advanced.set(ACCOUNTS_PREVIEW, true)

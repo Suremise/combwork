@@ -15,7 +15,7 @@ import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
-import type { AccountStatus, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
+import type { ConnectionStatus, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, settingsScopes } from './autoCompact'
 import { hiveStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
 import { claudeBackgroundTasks } from './background'
@@ -106,7 +106,7 @@ export interface AuthStatusFields {
  * 0 with its answer, or exit 1 with signed-out JSON (how it says signed out); anything else (a timeout, another exit,
  * exit 1 claiming signed in) is a failed check, whatever it printed.
  */
-export function claudeAccountStatus(r: { stdout: string; code: number; ended?: true }, f: AuthStatusFields): AccountStatus {
+export function claudeAccountStatus(r: { stdout: string; code: number; ended?: true }, f: AuthStatusFields): ConnectionStatus {
   if (r.ended) return { ok: false, error: `it didn't finish (exit ${r.code})` } // i18n-ignore: for the log
   const s = parseClaudeAuthStatus(r.stdout, f)
   if (r.code === 0) return s
@@ -114,7 +114,7 @@ export function claudeAccountStatus(r: { stdout: string; code: number; ended?: t
   return { ok: false, error: s.ok ? `it exited ${r.code} saying ${s.loggedIn ? 'signed in' : 'signed out'}` : `${s.error} (exit ${r.code})` } // i18n-ignore: for the log
 }
 
-export function parseClaudeAuthStatus(stdout: string, f: AuthStatusFields): AccountStatus {
+export function parseClaudeAuthStatus(stdout: string, f: AuthStatusFields): ConnectionStatus {
   let j: unknown
   try {
     j = JSON.parse(stdout.trim())
@@ -325,7 +325,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return { file: executable, args: ['auth', 'login'] }
   }
 
-  async accountStatus(executable: string, env: NodeJS.ProcessEnv): Promise<AccountStatus> {
+  async accountStatus(executable: string, env: NodeJS.ProcessEnv): Promise<ConnectionStatus> {
     const r = await run(executable, ['auth', 'status', '--json'], advanced.number('claude-code.accounts.statusSeconds') * 1000, env)
     const fields: AuthStatusFields = {
       loggedIn: advanced.get<string>('claude-code.accounts.loggedInField'),

@@ -772,14 +772,22 @@ The same rules apply to every provider's CLI; the details below are Claude Code'
 - **The name** (#443): the app is displayed as **Hive Desktop** (`productName`; `shared/appName.ts`): the window title and title bar ("Hive Desktop Dev" for dev builds, also their Windows app ID's name), About, the status bar's version and the update items and notifications that name a version, the tray tooltip, native dialog titles, the installer, the Start menu and desktop shortcuts (`shortcutName`), Installed apps (`Hive Desktop <version>`) and the GitHub release title. Sentences and labels where the short name reads naturally say **Hive** ("Hive couldn't…", Quit Hive, Hive Assistant, Hive skills), and so does everything agents and data see: the `hive` MCP server and tools, the Agent API's `app`, `TERM_PROGRAM`, card history's author, metrics exports. Nothing stored moves: the app ID `com.hive.desktop` (taskbar pins, notification settings, the uninstall entry), the profile `%APPDATA%\Hive` (set by main, since Electron would take `productName`), the install folder `%LOCALAPPDATA%\Programs\Hive` and `Hive.exe` (from `executableName`), the installer's file name `Hive-Setup-<version>.exe` and the update feed. An update renames the old shortcuts (electron-builder's installer keeps them under the new name). `tests/appName.test.ts` pins the folders.
 - Releasing: `npm run release` uploads a draft release (installer, `latest.yml`, blockmap) with the `gh` login; it is published by hand on GitHub. See `RELEASING.md`.
 
-### 11.2 Accounts (HI-980)
+### 11.2 Connections (HI-980)
 
-**Staged:** shown only with Settings → Advanced → **Accounts (preview)** on (`hive.accounts.preview`, off by default). Until HI-1755, agents and the Assistant still launch on the CLI's usual home. HI-1755 removes the switch and launches every Claude Code session on a Hive account. From then on Hive runs nothing from `~/.claude`, which stays the user's own for their terminal (Darren, 26 Oct). HI-1756 adds plan usage per account and the account in the pane header and status bar. HI-1757 and HI-1758 do Codex and Copilot, each once its logins are proven separate per home. The decisions are on HI-980.
+**A connection** is a configured CLI plus where it gets its model (Darren, 26 Oct ~22:20). For example "Anthropic · Max 1" is Claude Code, signed in; "DeepSeek" is Claude Code with a base URL and key; "ChatGPT · Work" is Codex, signed in; "Ollama (local)" is a local model.
+- An agent runs on a connection, and switching accounts means picking another connection.
+- Profiles (Work, Personal; HI-1202) sit above, per workspace: which connections are available, plus the Git identity, GitHub host and MCP credentials.
+- "Provider" keeps meaning the CLI.
+- Each connection has a `kind`: `signIn` is built here; base URL + key (DeepSeek) and local come with their own cards.
+
+Below, an **account** is a **sign-in connection**: a login folder of Hive's, signed in through the CLI's own sign-in. Settings shows it as Settings → **Connections**. The code's names follow: the types (`Connection`, `ConnectionIdentity`, `ConnectionObserved`, `WorkspaceConnections`, `ConnectionsView`, `ConnectionStatus`), `config.json`'s `connections` and `lastUsedConnection`, `workspace.json`'s `connections`, the descriptor's `capabilities.connections`, the IPC (`connections:*`) and the event (`connections-changed`). Only private and on-disk names keep `account` (nothing has shipped, so nothing stored is renamed): the modules (`main/accounts.ts`, `shared/accounts.ts`, `AccountsSettings.tsx`) and their function names, the message and advanced-setting ids (`settings.accounts.*`, `hive.accounts.preview`, `claude-code.accounts.*`), Settings' section id, and the folder `<profile>\accounts`.
+
+**Staged:** shown only with Settings → Advanced → **Connections (preview)** on (`hive.accounts.preview`, off by default). Until HI-1755, agents and the Assistant still launch on the CLI's usual home. HI-1755 removes the switch and launches every Claude Code session on a Hive account. From then on Hive runs nothing from `~/.claude`, which stays the user's own for their terminal (Darren, 26 Oct). HI-1756 adds plan usage per account and the account in the pane header and status bar. HI-1757 and HI-1758 do Codex and Copilot, each once its logins are proven separate per home. The decisions are on HI-980.
 
 - **An account is a CLI login in a folder of its own**, `<accounts>\<id>\`. `<accounts>` is `%LOCALAPPDATA%\Hive\accounts` for the installed Hive, `Hive-Dev`'s for a dev build, and `<HIVE_USER_DATA>\accounts` for a test profile.
   - The id is random and stable (`a-3f9c2e1b`). The name is the user's ("Personal", "Hive overnight"), and a rename changes only the name.
-  - The list is in `config.json` (`accounts`), in Settings' order. All accounts are equal: there's no primary.
-  - A provider has accounts when its descriptor has `capabilities.accounts`: `homeEnv` (`CLAUDE_CONFIG_DIR`) and `shared` (`['projects']`). The adapter supplies `accountStatus`, `accountSharedTarget` and `accountLoginFile`. Shared code never tests a provider's id.
+  - The list is in `config.json` (`connections`), in Settings' order. All accounts are equal: there's no primary.
+  - A provider has accounts when its descriptor has `capabilities.connections`: `homeEnv` (`CLAUDE_CONFIG_DIR`) and `shared` (`['projects']`). The adapter supplies `accountStatus`, `accountSharedTarget` and `accountLoginFile`. Shared code never tests a provider's id.
 - **Shared through a junction, nothing else.** The account's `projects\` is a directory junction to the CLI home's `projects\` (`accountSharedTarget`: `claudeHome()\projects`), so every account finds every transcript, its memory and resume.
   - The target is checked first: an absolute path, directly in the adapter's `configHome()`, and not in the accounts folder.
   - A missing `projects\` is made as an empty folder. That is the only thing Hive ever writes in the CLI's home (Darren, 26 Oct). A missing home is refused ("run Claude Code once").
@@ -810,11 +818,11 @@ The same rules apply to every provider's CLI; the details below are Claude Code'
     - Watches close when nothing wants them.
   - After its sign-in ends, and when Settings → Accounts is shown.
   - A check asked for while one runs gets the one started after it. A check that ends after its account was removed is dropped (the account's generation).
-- **A workspace's choice**, in `workspace.json`: `accounts: { [provider]: { on: [ids], default: id|null } }`.
+- **A workspace's choice**, in `workspace.json`: `connections: { [provider]: { on: [ids], default: id|null } }`.
   - No entry means not set up, and nothing is turned on by itself. `{ on: [], default: null }` is the user's own "none on", and is kept.
   - The first account turned on becomes the default. A default turned off or removed is replaced by the first account of the same provider that's on, in the list's order, else none. Never another provider's.
   - Ids no longer in the list are dropped when read.
-  - Choosing a default records `lastUsedAccount[provider]`. A new workspace, made only (never one opened), starts with that account on, as its default.
+  - Choosing a default records `lastUsedConnection[provider]`. A new workspace, made only (never one opened), starts with that account on, as its default.
   - Each window lists its own workspace's choice.
 - **Removing an account** deletes its folder for good, with its login on this PC, not to the Recycle Bin (Darren, 26 Oct). The confirmation says so.
   - **Refused while it is in use:** its sessions (HI-1755 registers them), a launch's claim, or its sign-in open (from its start to its end). The check is made again under the account's lock, which sign-ins and claims take too.

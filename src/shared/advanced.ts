@@ -772,11 +772,11 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: ACCOUNTS_PREVIEW,
     group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.accounts.preview.title', defaultMessage: 'Accounts (preview)', description: "An advanced setting's title (Settings → Advanced), listed under Hive: a switch that shows Settings → Accounts before the feature is finished." }),
+    title: msg({ id: 'settings.advanced.hive.accounts.preview.title', defaultMessage: 'Connections (preview)', description: "An advanced setting's title (Settings → Advanced), listed under Hive: a switch that shows Settings → Connections before the feature is finished." }),
     desc: msg({
       id: 'settings.advanced.hive.accounts.preview.desc',
-      defaultMessage: "Shows Settings → Accounts, where you keep a Claude Code login per account, each signed in through Claude Code's own sign-in. A preview: agents don't run on these accounts yet, and still use your usual Claude Code login.",
-      description: 'What the advanced setting "Accounts (preview)" does (Settings → Advanced, under Hive). Settings → Accounts names a section: use its name as Hive shows it.'
+      defaultMessage: "Shows Settings → Connections, where you keep the ways your agents reach their models: for now, Claude Code sign-ins, each a folder of its own signed in through Claude Code's own sign-in. A preview: agents don't run on these connections yet, and still use your usual Claude Code login.",
+      description: 'What the advanced setting "Connections (preview)" does (Settings → Advanced, under Hive). Settings → Connections names a section: use its name as Hive shows it.'
     }),
     kind: 'boolean',
     default: false,
@@ -1113,8 +1113,8 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.statusSeconds',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.statusSeconds.title', defaultMessage: 'Accounts: sign-in check timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
-    desc: msg({ id: 'settings.advanced.claude-code.accounts.statusSeconds.desc', defaultMessage: "How long Hive gives `claude auth status` to say who an account's folder is signed in as. Past it, the account shows \"Couldn't check\", never signed out.", description: 'What the advanced setting "Accounts: sign-in check timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status` as it is (a command).' }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.statusSeconds.title', defaultMessage: 'Connections: sign-in check timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.statusSeconds.desc', defaultMessage: "How long Hive gives `claude auth status` to say who a connection's folder is signed in as. Past it, the connection shows \"Couldn't check\", never signed out.", description: 'What the advanced setting "Connections: sign-in check timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status` as it is (a command).' }),
     kind: 'number',
     default: 10,
     min: 3,
@@ -1126,8 +1126,8 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.loggedInField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.loggedInField.title', defaultMessage: 'Accounts: signed-in field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
-    desc: msg({ id: 'settings.advanced.claude-code.accounts.loggedInField.desc', defaultMessage: "The field of `claude auth status --json` that says whether an account's folder is signed in. Wrong, Hive can't tell, and its accounts show \"Couldn't check\".", description: 'What the advanced setting "Accounts: signed-in field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command).' }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.loggedInField.title', defaultMessage: 'Connections: signed-in field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.loggedInField.desc', defaultMessage: "The field of `claude auth status --json` that says whether a connection's folder is signed in. Wrong, Hive can't tell, and its sign-in connections show \"Couldn't check\".", description: 'What the advanced setting "Connections: signed-in field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command).' }),
     kind: 'field',
     default: 'loggedIn',
     applies: 'now',
@@ -1139,8 +1139,8 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.emailField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.emailField.title', defaultMessage: 'Accounts: email field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
-    desc: msg({ id: 'settings.advanced.claude-code.accounts.emailField.desc', defaultMessage: "The field of `claude auth status --json` with the email an account's folder is signed in as. Wrong, Hive can't tell who an account is, and can't warn when its login changes.", description: 'What the advanced setting "Accounts: email field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command).' }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.emailField.title', defaultMessage: 'Connections: email field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.emailField.desc', defaultMessage: "The field of `claude auth status --json` with the email a connection's folder is signed in as. Wrong, Hive can't tell who a connection is signed in as, and can't warn when its login changes.", description: 'What the advanced setting "Connections: email field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command).' }),
     kind: 'field',
     default: 'email',
     applies: 'now',
@@ -1149,8 +1149,8 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.orgField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.orgField.title', defaultMessage: 'Accounts: organisation field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
-    desc: msg({ id: 'settings.advanced.claude-code.accounts.orgField.desc', defaultMessage: "The field of `claude auth status --json` with the organisation's id an account's folder is signed in to. With the email, it tells two logins apart. Wrong, Hive can't tell who an account is.", description: 'What the advanced setting "Accounts: organisation field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command).' }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.orgField.title', defaultMessage: 'Connections: organisation field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.orgField.desc', defaultMessage: "The field of `claude auth status --json` with the organisation's id a connection's folder is signed in to. With the email, it tells two logins apart. Wrong, Hive can't tell who a connection is signed in as.", description: 'What the advanced setting "Connections: organisation field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` as it is (a command).' }),
     kind: 'field',
     default: 'orgId',
     applies: 'now',
@@ -1159,8 +1159,8 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.planField',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.planField.title', defaultMessage: 'Accounts: plan field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
-    desc: msg({ id: 'settings.advanced.claude-code.accounts.planField.desc', defaultMessage: "The field of `claude auth status --json` with an account's plan (\"max\"), shown beside its email in Settings → Accounts. Wrong, no plan is shown.", description: 'What the advanced setting "Accounts: plan field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` and "max" as they are.' }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.planField.title', defaultMessage: 'Connections: plan field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.planField.desc', defaultMessage: "The field of `claude auth status --json` with a connection's plan (\"max\"), shown beside its email in Settings → Connections. Wrong, no plan is shown.", description: 'What the advanced setting "Connections: plan field" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` and "max" as they are.' }),
     kind: 'field',
     default: 'subscriptionType',
     applies: 'now',
@@ -1169,8 +1169,8 @@ const SOURCES: readonly AdvancedSource[] = [
   {
     id: 'claude-code.accounts.loginFiles',
     group: 'claude-code',
-    title: msg({ id: 'settings.advanced.claude-code.accounts.loginFiles.title', defaultMessage: 'Accounts: login files', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
-    desc: msg({ id: 'settings.advanced.claude-code.accounts.loginFiles.desc', defaultMessage: "The names of the files in an account's folder that change when Claude Code signs in or out there, as a regular expression. Hive watches them (it never reads them) and checks the account again when one changes. Wrong, a /login or /logout typed in an agent's pane is only found at the account's next check.", description: 'What the advanced setting "Accounts: login files" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep /login and /logout as they are (commands).' }),
+    title: msg({ id: 'settings.advanced.claude-code.accounts.loginFiles.title', defaultMessage: 'Connections: login files', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.accounts.loginFiles.desc', defaultMessage: "The names of the files in a connection's folder that change when Claude Code signs in or out there, as a regular expression. Hive watches them (it never reads them) and checks the connection again when one changes. Wrong, a /login or /logout typed in an agent's pane is only found at the connection's next check.", description: 'What the advanced setting "Connections: login files" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep /login and /logout as they are (commands).' }),
     kind: 'pattern',
     default: String.raw`^\.(claude|credentials)\.json(\.tmp\.|$)`,
     flags: 'i',

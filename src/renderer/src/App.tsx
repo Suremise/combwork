@@ -206,8 +206,8 @@ function handleEvent(e: HiveEvent): void {
     case 'files-changed':
       filesListeners.forEach((l) => l(e.projectPath, e.dirs))
       break
-    case 'accounts-changed':
-      set((st) => ({ accountsChanged: st.accountsChanged + 1 }))
+    case 'connections-changed':
+      set((st) => ({ connectionsChanged: st.connectionsChanged + 1 }))
       break
     case 'plan-usage':
       set((st) => ({ planUsage: { ...st.planUsage, [e.provider]: e.usage } }))
