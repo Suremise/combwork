@@ -1,7 +1,7 @@
 import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AssistantMark } from '../components/AssistantMark'
-import { CardChip, WatchedCardChip } from '../components/CardChip'
-import { oneCardWait } from '../components/watchLine'
+import { CardChip, WatchedCardChip, WatchedCardChips } from '../components/CardChip'
+import { cardsWait } from '../components/watchLine'
 import { KeybindingsEditor } from '../components/Keybindings'
 import type { CompactionEvent, GitDiff, GitStatus, McpServerInfo, MemorySource, PlanLimit, ProjectConfig, ProjectInfo, ProviderId, SessionListItem, SessionUsage, SkillInfo, UnusedWorktree } from '@shared/types'
 import { unpricedModel, unpricedText, usesOwnPrices } from '@shared/prices'
@@ -603,8 +603,8 @@ export function RunningAgent({ project, a, label, onOpen, assistant }: { project
   const cost = live.costUsd ?? usage?.costUsd ?? null
   const estimated = live.costUsd !== undefined ? !!live.costEstimated : !!usage?.costEstimated
   const status = statusText(live)
-  // Waiting on one card (HI-1679): that card's chip, as a working agent's, and the status says what for; its hover the whole.
-  const wait = oneCardWait(live, status)
+  // Waiting on cards (HI-1679): their chips, as a working agent's card, and the status says what for; its hover the whole.
+  const wait = cardsWait(live, status)
   return (
     <div className={cx('running-row', onOpen && 'clickable')} onClick={onOpen} role={onOpen ? 'button' : undefined}>
       {/* The Assistant's own status icon (#399), its status in the tooltip as a dot's is. */}
@@ -623,7 +623,7 @@ export function RunningAgent({ project, a, label, onOpen, assistant }: { project
           <Tooltip content={status}>
             <span className="faint running-status">{wait ? wait.line : status}</span>
           </Tooltip>
-          {wait ? <WatchedCardChip number={wait.card} /> : <CardChip project={project} a={a} />}
+          {!wait ? <CardChip project={project} a={a} /> : wait.cards.length === 1 ? <WatchedCardChip number={wait.cards[0]} /> : <WatchedCardChips cards={wait.cards} status={status} />}
         </div>
         <div className="faint small">
           {[live.modelName ?? usage?.model ?? null, live.permissionMode ? permissionLabel(live.provider, live.permissionMode, tr) : null, live.planMode ? tr(M.plan) : null].filter(Boolean).join(' · ')}

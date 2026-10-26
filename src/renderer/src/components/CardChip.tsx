@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { msg, tr } from '@shared/i18n'
 import type { AgentInfo, ProjectInfo, TaskCard, TaskColumn } from '@shared/types'
 import { agentDoingCards, agentReviewCards, agentRowCards, columnColor, columnName } from '@shared/tasks'
@@ -106,6 +106,49 @@ export function WatchedCardChip({ number, short }: { number: number; short?: boo
   const chip = <TaskChip number={number} column={card?.column ?? null} title={card?.title} blocked={!!card?.blocked} short={short} />
   if (!card) return chip
   return <Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{[cardLine(card), tr(CLICK_TO_OPEN, { card: cardLabel(card) })].join('\n')}</span>}>{chip}</Tooltip>
+}
+
+const N_CARDS = msg({ id: 'panes.running.cards', defaultMessage: '{n, plural, one {# card} other {# cards}}', description: "Instead of their chips, when they don't fit: how many cards a running agent waits for, in the Overview's Running now (its hover names them)." })
+
+/**
+ * The cards a watching agent waits on (HI-1679), a chip each with its key, as many as fit; when they don't all fit, how
+ * many there are ("2 cards"), its hover the whole status. Whether they fit is measured against an unseen copy of the
+ * chips, whose width the box keeps asking for, so what it shows never decides it.
+ */
+export function WatchedCardChips({ cards, status }: { cards: number[]; status: string }) {
+  const box = useRef<HTMLSpanElement>(null)
+  const measure = useRef<HTMLSpanElement>(null)
+  const [room, setRoom] = useState<{ need: number; have: number } | null>(null)
+  const ids = cards.join(',')
+  useLayoutEffect(() => {
+    const b = box.current
+    const m = measure.current
+    if (!b || !m) return
+    const read = (): void => setRoom((r) => (r && r.need === m.scrollWidth && r.have === b.clientWidth ? r : { need: m.scrollWidth, have: b.clientWidth }))
+    read()
+    const seen = new ResizeObserver(read)
+    seen.observe(b)
+    seen.observe(m)
+    return () => seen.disconnect()
+  }, [ids])
+  const fits = !room || room.have >= room.need - 1
+  const chips = cards.map((n) => <WatchedCardChip key={n} number={n} short />)
+  return (
+    <span ref={box} className={cx('running-cards', !fits && 'counted')} style={room ? { flexBasis: room.need } : undefined}>
+      <span ref={measure} className="running-cards-measure" aria-hidden="true" inert>
+        {cards.map((n) => (
+          <TaskChip key={n} number={n} column={null} short />
+        ))}
+      </span>
+      {fits ? (
+        chips
+      ) : (
+        <Tooltip content={status}>
+          <span className="card-chip running-cards-count">{tr(N_CARDS, { n: cards.length })}</span>
+        </Tooltip>
+      )}
+    </span>
+  )
 }
 
 /** The cards an agent's row in the focus view's strip names (agentRowCards), kept up to date with the board. */

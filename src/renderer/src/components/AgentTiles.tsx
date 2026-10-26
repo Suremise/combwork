@@ -21,7 +21,7 @@ import { RowCardChip, useRowCards } from './CardChip'
 import { PaneResizer, usePaneSize } from './Resizer'
 import { StateMark } from './StateMark'
 import { Icon, statusText, Tooltip, useClipped, useContextMenu } from './ui'
-import { oneCardWait } from './watchLine'
+import { cardsWait } from './watchLine'
 
 /**
  * The Session tab's Tiles view (#976; #975's toggle switches to it): a tile per agent, 12 to a page, in the order Settings
@@ -576,8 +576,8 @@ function StripItem({ project, a, state, active, drag }: { project: ProjectInfo; 
   const [nameRef, clipped] = useClipped<HTMLSpanElement>()
   const shown = cards[0]?.card.number
   // Waiting on its own card only (#1021): the chip says which, so the status doesn't repeat its name.
-  const wait = a.live ? oneCardWait(a.live, status) : null
-  const line = wait && wait.card === shown ? wait.line : status
+  const wait = a.live ? cardsWait(a.live, status) : null
+  const line = wait && wait.cards.length === 1 && wait.cards[0] === shown ? wait.line : status
   return (
     <div className={cx('tile-strip-row', drag && 'movable', drag?.dragging && 'dragging', drag?.dropBefore && 'drop-before', drag?.dropAfter && 'drop-after')} data-agent={a.id}>
       <button

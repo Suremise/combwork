@@ -2,7 +2,7 @@
 // workspace-wide number its English `label` may carry, and the short line beside the chip of the one card it waits on.
 import { describe, expect, it } from 'vitest'
 import { namedBy } from '../src/shared/projectKeys'
-import { oneCardWait, watchStatus } from '../src/renderer/src/components/watchLine'
+import { cardsWait, watchStatus } from '../src/renderer/src/components/watchLine'
 import type { TaskWatchInfo } from '../src/shared/types'
 
 // The board's names: HI-1673 is the workspace's #1675, so a number shown is another card's.
@@ -30,19 +30,24 @@ describe("a watching agent's status names its cards by key (HI-1679)", () => {
     namedBy(keyed, () => expect(watchStatus(watch({ cards: [99], column: 'done' }))).toBe('Waiting for #99 → Done'))
   })
 
-  it('waiting on one card, beside its chip: the short line, the card for the chip; anything more, the whole status', () => {
+  it('waiting on cards, beside their chips: the short line and the cards; a lane, agents or more said, the whole status', () => {
     namedBy(keyed, () => {
       const one = watch({ cards: [1168], column: 'passed' })
       const status = watchStatus(one)
-      expect(oneCardWait({ status: 'watching', watch: one }, status)).toEqual({ card: 1168, line: 'Waiting → Approved' })
-      expect(oneCardWait({ status: 'watching', watch: watch({ cards: [1168] }) }, 'Waiting for HI-1168')).toEqual({ card: 1168, line: 'Waiting for its card' })
+      expect(cardsWait({ status: 'watching', watch: one }, status)).toEqual({ cards: [1168], line: 'Waiting → Approved' })
+      expect(cardsWait({ status: 'watching', watch: watch({ cards: [1168] }) }, 'Waiting for HI-1168')).toEqual({ cards: [1168], line: 'Waiting for its card' })
+      // Several (the Assistant on HI-1679: a chip each, never a key cut in the text): the same short line, or "Waiting for".
+      const two = watch({ cards: [1168, 12], column: 'review' })
+      expect(cardsWait({ status: 'watching', watch: two }, watchStatus(two))).toEqual({ cards: [1168, 12], line: 'Waiting → Review' })
+      const both = watch({ cards: [1168, 12] })
+      expect(cardsWait({ status: 'watching', watch: both }, watchStatus(both))).toEqual({ cards: [1168, 12], line: 'Waiting for' })
       // Its status says more (a question it works on beside the watch): the row shows all of it.
-      expect(oneCardWait({ status: 'watching', watch: one }, `${status} · has a question for you`)).toBeNull()
-      const two = watch({ cards: [1168, 12] })
-      expect(oneCardWait({ status: 'watching', watch: two }, watchStatus(two))).toBeNull()
+      expect(cardsWait({ status: 'watching', watch: one }, `${status} · has a question for you`)).toBeNull()
       const lane = watch({ cards: [1168], lanes: ['lane-e1d9ff'] })
-      expect(oneCardWait({ status: 'watching', watch: lane }, watchStatus(lane))).toBeNull()
-      expect(oneCardWait({ status: 'working', watch: one }, 'Working…')).toBeNull()
+      expect(cardsWait({ status: 'watching', watch: lane }, watchStatus(lane))).toBeNull()
+      const agents = watch({ agents: ['HB4'] })
+      expect(cardsWait({ status: 'watching', watch: agents }, watchStatus(agents))).toBeNull()
+      expect(cardsWait({ status: 'working', watch: one }, 'Working…')).toBeNull()
     })
   })
 })

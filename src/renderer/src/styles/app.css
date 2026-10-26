@@ -7390,6 +7390,33 @@ button.agent-place:hover {
 .running-line > .tip-wrap:has(> .card-chip) {
   flex: 0 10000000000 auto;
 }
+/* Several cards (WatchedCardChips): a chip each, keys only, giving way as one chip does; when they don't fit, how many
+   ("2 cards"), whole. The unseen copy measures what the chips need. */
+.running-line > .running-cards {
+  position: relative;
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 10000000000 auto;
+  min-width: 0;
+  margin-left: 6px;
+  overflow: hidden;
+}
+.running-line > .running-cards.counted {
+  min-width: max-content;
+}
+.running-cards-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  gap: 4px;
+  visibility: hidden;
+  white-space: nowrap;
+}
+.running-cards-count {
+  cursor: default;
+  white-space: nowrap;
+}
 /* The chip as a grid here: the title's column (the third) is as wide as the title when there is room and nothing at
    the least, so the chip shrinks down to its icon and key, never past them. */
 .running-line .card-chip {

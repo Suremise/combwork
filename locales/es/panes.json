@@ -134,6 +134,8 @@
   "panes.resume.recache": "caché caducada, se vuelven a leer ~{tokens}",
   "panes.resume.sessionsTab": "Pestaña Sesiones…",
   "panes.resume.tip": "Reanudar “{session}” (última actividad: {when})",
+  "panes.running.cards": "{n, plural, one {# tarjeta} other {# tarjetas}}",
+  "panes.running.waitingFor": "Esperando",
   "panes.runtime.hooksMissing": "Estado desconocido: sin hooks de {provider}",
   "panes.runtime.hooksMissingNote": "Hive no recibe los hooks de {provider}, así que el estado del agente puede ser incorrecto. {why, select, refused {Hive rechazó sus hooks: no llevaban el token de esta sesión.} off {{where} desactiva los hooks (disableAllHooks).} newer {Este {provider} es más reciente que la versión con la que se probó Hive, y una actualización puede haber cambiado sus hooks.} other {{after, select, start {No llegó ninguno desde que se inició.} other {No llegó ninguno tras un prompt con el que empezó a trabajar.}}}} Hasta que lleguen sus hooks, Hive no escribe nada en él. Reinicia la sesión; si vuelve a pasar, actualiza Hive o revisa si la configuración de {provider} desactiva los hooks.",
   "panes.runtime.needsInput": "Necesita tu respuesta",
