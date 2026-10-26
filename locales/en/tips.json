@@ -507,6 +507,14 @@
     "defaultMessage": "Read a compaction where it happened",
     "description": "A tip's title."
   },
+  "tips.conflictHunks.text": {
+    "defaultMessage": "When the merge queue sends a card back for a conflict, its Work section lists the files: click one to see its conflicts, the target's side and the card's under their names, as the queue's test merge had them.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.conflictHunks.title": {
+    "defaultMessage": "See a returned card's conflicts",
+    "description": "A tip's title."
+  },
   "tips.consoleRecording.text": {
     "defaultMessage": "In the developer console, Record writes what an agent's CLI sends Hive to a file, redacted unless you tick text for that recording, and Copy Diagnostics can attach it to a bug report.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

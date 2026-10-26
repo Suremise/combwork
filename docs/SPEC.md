@@ -1332,7 +1332,7 @@ that can't be written fails the change whole.
 | `IntegrationCancelled` | entry id, by, reason | **Remove from queue**, a stale pass, a card moved out by the user, a follow-up posted on the queued card (#1623). |
 | `IntegrationStarted` | entry id, expected target revision, result revision | The queue is about to advance the target (written **before** it does, §16.9.2). |
 | `IntegrationPhase` | entry id, phase (files, ref, rollback) | Before each step of a checked-out target's advance (§16.9.2). |
-| `IntegrationFailed` | entry id, revision, target, reason (conflict, checks, target moved, folder busy, not up to date), files, log, transient (bool) | The queue's test merge or checks fail. |
+| `IntegrationFailed` | entry id, revision, target, reason (conflict, checks, target moved, folder busy, not up to date), files, log, transient (bool), conflicts (HI-1181: a conflict's hunks) | The queue's test merge or checks fail. |
 | `Integrated` | entry id?, revision, target, result revision, method, by (hive, agent, outside), the rules skipped when merged by hand before they passed (the **outside the rules** mark) | The target moved with the change in it (recorded) or containment found it (observed). |
 | `MergedInPart` (observed) | revision (the merge base now in the target), target | Some of an unfinished card's work found in the target: the **merged outside, in part** mark (§16.4.4) [P2: a mark needs a fact]. |
 | `LeftTarget` (observed) | revision, target | A Done card's revision no longer in its target: the **no longer in main** mark (§16.4.4) [P2]. |
@@ -2478,6 +2478,23 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
      with no identity the entry pauses ("set a commit identity for this repository");
    - the repository's hooks run (no `--no-verify`, AGENTS.md); a hook that fails returns the card with the hook's
      output (`IntegrationFailed`, reason `hook`);
+   - **a conflict's hunks** (HI-1181, rc.4; design HI-1181/s8 and s10 checked by HR4): before the test merge, strict's
+     update or the rebase is aborted, `main/workflow/conflictRead.ts` reads each conflicted file (named as git lists them with
+     `diff --name-only -z`, never C-quoted: HR4's round 1) in the queue's own
+     folder, bounded before anything is read (20 files, 256 KB a file, 1 MB in all, each read into a buffer of that size,
+     never whole) and confined to it (a path that is absolute or climbs out, a link anywhere on the way, a parent whose
+     real place is outside, missing, binary or not UTF-8 text: recorded with why, never read; a character cut at the
+     budget is the cut's). `shared/workflow/conflicts.ts` parses each region (markers of 7 or more, a diff3 base, a stray
+     marker as text) with 2 lines of context never shared with a neighbour, at most 8 hunks a file, 40 lines a side (the
+     rest counted), lines cut at 400 characters (counted) and 16,000 characters in all, and says what stopped it
+     (`partial`: read in part, the hunks, the room; an exact `more` only when the file was scanned whole). Kept on
+     `IntegrationFailed` as `conflicts`, with which side git wrote first (`oursIs`: the target in a test merge and a
+     rebase, the card in strict's merge). The card's Work section unfolds each file's hunks whenever they were captured
+     (strict's not-up-to-date return too), read-only, its sides named
+     (the target, the card's key, the common ancestor); "no text conflict" only for a file read whole with no markers,
+     else why or "may have more". The builder's wake names where each file's conflicts are ("a.ts (2 conflicts, lines
+     10 and 40)", "b.png (not read: binary)"), within its note's room. The queue's folder is reset straight after, so
+     there is no diff to open; the Progress panel keeps Show log.
    - with `commit.gpgsign`, signing runs as configured; if it would wait for a passphrase (a pinentry window), the
      entry pauses with "signing waits for you" rather than failing, and a signing error pauses it with git's message.
    **Built [#1350]:**
@@ -4683,7 +4700,7 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 | Branches shown next to their cards and revisions | P6 (in scope). **Built [#1424]:** Branches & remotes shows, on each branch a card's current cycle works on (`WorkBadge.line`), that card (the one in flight, else the latest; how many earlier), its stage (its project's name, its category's colour), in Review the revision under review (`WorkBadge.underReview`, copyable) and, Done, merged with `Integrated`'s result; the cards of a reused branch by when each one's current cycle started (never by a later fact). Worktrees name their agent's card (Doing, else Review, else Passed) the same way, whatever they have checked out |
 | Push the target after Hive merges (an option) | **Built [#1179]:** G18 (§16.6.1, §16.9.1's push after the merge) |
 | Update a branch from its target (merge or rebase) as a user action in the Version Control tab | **Built [HI-1180]** (rc.4): Branches & remotes' Update from <target> (§8) |
-| Conflict help on a returned card (the conflicting files and hunks from the test merge) | On Hold, git-support: #1181 |
+| Conflict help on a returned card (the conflicting files and hunks from the test merge) | **Built [HI-1181]** (rc.4): the Work section's hunks and the wake's places (§16.9.1, Hive's commits) |
 | Submodules and Git LFS in slots and review copies | On Hold, git-support: #1182 |
 | Remote targets: fetch before testing, push after (Team with a shared remote) | On Hold, git-support: #1183 |
 | Rebase and fast-forward as a merge style | **Built [#1184]:** G6's third value (§16.9.1 step 4, linear landing) |

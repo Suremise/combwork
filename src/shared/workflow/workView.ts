@@ -5,6 +5,7 @@
 // Pure: main reads the facts (workflow/cardWork.ts), the window formats revisions through its project's platform
 // descriptor (`revisionShort`), never by switching on a platform's id.
 
+import type { ConflictsRecord } from './conflicts'
 import { askedQuestion, foldCard, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type CheckRanData, type Fact, type FactData, type FileChange, type ForYouKind, type QueueEntry, type RoundChoice, type StageId } from './facts'
 import type { StoredText } from '../types'
 import { baseRulesetId, REVIEW_SKIPPED } from './compile'
@@ -223,6 +224,8 @@ export interface WorkQueueEntry {
   cancelled?: FactData['IntegrationCancelled']['reason']
   /** A return (#1357, the Work section): the files a conflict named, the output kept (a check's, a hook's), whether it was the environment's failure, and when. */
   files?: string[]
+  /** A conflict's hunks, file by file, as the queue's folder had them (HI-1181), bounded. */
+  conflicts?: ConflictsRecord
   log?: string
   transient?: boolean
   at?: string
@@ -439,7 +442,7 @@ function queueEntryOf(entry: QueueEntry, facts: readonly Fact[]): WorkQueueEntry
     revision: entry.revision,
     target: entry.target,
     state: entry.state,
-    ...(f ? { failure: f.reason, transient: f.transient, ...(f.files?.length ? { files: f.files } : {}), ...(f.log ? { log: f.log } : {}) } : {}),
+    ...(f ? { failure: f.reason, transient: f.transient, ...(f.files?.length ? { files: f.files } : {}), ...(f.conflicts ? { conflicts: f.conflicts } : {}), ...(f.log ? { log: f.log } : {}) } : {}),
     ...(entry.cancelled ? { cancelled: entry.cancelled } : {}),
     ...(end ? { at: end.at } : {}),
     ...(entry.requeue ? { requeue: entry.requeue } : {})

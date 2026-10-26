@@ -25,6 +25,14 @@ import { withWriteFence, type CardRecord } from './factStore'
 import { LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
 import { leftWake, returnedWake } from './queueState'
+import { readConflicts } from './conflictRead'
+
+/**
+ * The conflicted files `diff --name-only -z` lists, as they are named (HR4's HI-1181 round 1): split on NUL, never on
+ * lines, as git C-quotes a name with other than ASCII (café.txt) in its line form, and the reader would look for that.
+ */
+const namesOf = (out: string | undefined): string[] => (out ?? '').split('\0').filter(Boolean)
+import type { ConflictsRecord } from '../../shared/workflow/conflicts'
 import { bracketEnd, bracketStart } from './queueChecks'
 import { HIVE_RUNS } from '../progress'
 import type { Workflow, Write } from './runtime'
@@ -810,12 +818,12 @@ export class MergeQueue {
         if (this.wf.rulesetOf(card, s).options.strict && this.wf.rulesetOf(card, s).options.style !== 'rebase') {
           const up = await this.upToDate(card, s, entry, revision, base || (await this.mergeBaseOf(revision, expected)), expected, reads)
           if ('pause' in up) return this.pause(target, card, entry, up.pause, up.files, up.message)
-          if ('fail' in up) return this.returnCard(card, entry, revision, target, up.fail === 'hook' ? 'hook' : 'notUpToDate', false, up.files, up.log)
+          if ('fail' in up) return this.returnCard(card, entry, revision, target, up.fail === 'hook' ? 'hook' : 'notUpToDate', false, up.files, up.log, undefined, undefined, up.conflicts)
           updated = up.updated ?? undefined
         }
         const test = await this.testMerge(card, s, revision, expected, reads, updated, base)
         if ('pause' in test) return this.pause(target, card, entry, test.pause, test.files, test.message)
-        if ('fail' in test) return this.returnCard(card, entry, revision, target, test.fail, false, test.files, test.log)
+        if ('fail' in test) return this.returnCard(card, entry, revision, target, test.fail, false, test.files, test.log, undefined, undefined, test.conflicts)
         result = test.result
         await this.cfg.hooks?.afterTest?.(entry.id)
 
@@ -966,7 +974,7 @@ export class MergeQueue {
    * merge merges it. Up to date already: nothing to do (`updated` null). Always from the reviewed revision, so a retest
    * after the target moved updates afresh, never on an earlier update.
    */
-  private async upToDate(card: CardRecord, s: CardState, entry: QueueEntry, revision: string, base: string, expected: string, reads: EntryReads): Promise<{ updated: string | null } | { fail: 'conflict' | 'notSame' | 'hook'; files?: string[]; log: string } | { pause: PauseReason; files?: string[]; message?: string }> {
+  private async upToDate(card: CardRecord, s: CardState, entry: QueueEntry, revision: string, base: string, expected: string, reads: EntryReads): Promise<{ updated: string | null } | { fail: 'conflict' | 'notSame' | 'hook'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
     const anc = await this.git(this.project, ['merge-base', '--is-ancestor', expected, revision])
     if (anc.code === 0) return { updated: null }
     if (anc.code !== 1) return { pause: 'needsYou', message: anc.err }
@@ -986,11 +994,13 @@ export class MergeQueue {
     // Overridden for this command only; the repository's config is left as it is.
     const u = rebase ? await this.git(f, [...who, '-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', '--onto', expected, base], opts) : await this.git(f, [...who, 'merge', '--no-ff', '--no-edit', '-m', message, expected], opts)
     if (!u.ok) {
-      const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
-      const files = c?.out.split(/\r?\n/).filter(Boolean) ?? []
+      const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
+      const files = namesOf(c?.out)
+      // Its hunks read before the abort (HI-1181): a merge of the target into the card's revision writes the card first.
+      const conflicts = files.length ? await readConflicts(f, files, rebase ? 'target' : 'card') : undefined
       await this.git(f, rebase ? ['rebase', '--abort'] : ['merge', '--abort'])
       await this.folderAt(expected)
-      if (files.length) return { fail: 'conflict', files, log: joined(u.out, readCommitStream(u.err).text) }
+      if (files.length) return { fail: 'conflict', files, log: joined(u.out, readCommitStream(u.err).text), conflicts }
       return commitFailed(u, signs)
     }
     const h = await G.head(f)
@@ -1006,7 +1016,7 @@ export class MergeQueue {
     return { updated: h }
   }
 
-  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string, reads: EntryReads, updated?: string, base = ''): Promise<{ result: string } | { fail: 'conflict' | 'hook' | 'notUpToDate'; files?: string[]; log: string } | { pause: PauseReason; files?: string[]; message?: string }> {
+  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string, reads: EntryReads, updated?: string, base = ''): Promise<{ result: string } | { fail: 'conflict' | 'hook' | 'notUpToDate'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
     const id = await this.identity(reads)
     if (!id) return { pause: 'identity', files: [this.project] }
     const r = this.wf.rulesetOf(card, s)
@@ -1033,10 +1043,12 @@ export class MergeQueue {
     // Its output read with git's own trace in it (commitEnv), so a failure is told by who said what, never by words.
     const m = await this.git(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision], opts)
     if (!m.ok) {
-      const u = m.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
-      const files = u?.out.split(/\r?\n/).filter(Boolean) ?? []
+      const u = m.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
+      const files = namesOf(u?.out)
+      // Its hunks read before the clean (HI-1181): the target is checked out, so its side comes first.
+      const conflicts = files.length ? await readConflicts(f, files, 'target') : undefined
       await clean()
-      if (files.length) return { fail: 'conflict', files, log: joined(m.out, readCommitStream(m.err).text) }
+      if (files.length) return { fail: 'conflict', files, log: joined(m.out, readCommitStream(m.err).text), conflicts }
       return commitFailed(m, signs)
     }
     if (squash) {
@@ -1062,7 +1074,7 @@ export class MergeQueue {
    * linear, and the same change as reviewed, else the card is returned (`notUpToDate`, saying which); a conflict returns
    * it with its files; a read git couldn't answer pauses (never taken for a pass or a mismatch).
    */
-  private async rebaseOnto(card: CardRecord, s: CardState, revision: string, base: string, expected: string, id: { name: string; email: string }, reads: EntryReads): Promise<{ result: string } | { fail: 'conflict' | 'hook' | 'notUpToDate'; files?: string[]; log: string } | { pause: PauseReason; files?: string[]; message?: string }> {
+  private async rebaseOnto(card: CardRecord, s: CardState, revision: string, base: string, expected: string, id: { name: string; email: string }, reads: EntryReads): Promise<{ result: string } | { fail: 'conflict' | 'hook' | 'notUpToDate'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
     const f = this.cfg.folder
     const merges = await this.git(this.project, ['rev-list', '--min-parents=2', `${base}..${revision}`])
     if (!merges.ok) return { pause: 'needsYou', message: merges.err }
@@ -1080,11 +1092,13 @@ export class MergeQueue {
       const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
       const u = await this.git(f, [...who, '-c', 'rebase.rebaseMerges=false', '-c', 'rebase.updateRefs=false', 'rebase', '--no-rebase-merges', '--no-update-refs', '--no-autostash', ...(linear ? [] : ['--force-rebase']), '--onto', expected, base], opts)
       if (!u.ok) {
-        const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
-        const files = c?.out.split(/\r?\n/).filter(Boolean) ?? []
+        const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
+        const files = namesOf(c?.out)
+        // Its hunks read before the abort (HI-1181): rebased onto the target, whose side comes first.
+        const conflicts = files.length ? await readConflicts(f, files, 'target') : undefined
         await this.git(f, ['rebase', '--abort'])
         await this.folderAt(expected)
-        if (files.length) return { fail: 'conflict', files, log: joined(u.out, readCommitStream(u.err).text) }
+        if (files.length) return { fail: 'conflict', files, log: joined(u.out, readCommitStream(u.err).text), conflicts }
         return commitFailed(u, signs)
       }
       const h = await G.head(f)
@@ -1415,14 +1429,14 @@ export class MergeQueue {
   }
 
   /** A conflict, red checks or a hook: `IntegrationFailed`, the card back to its builder with the output (§16.9.1 step 8). */
-  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure, check?: { check: string; logPath?: string }): Promise<QueueOutcome> {
+  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure, check?: { check: string; logPath?: string }, conflicts?: ConflictsRecord): Promise<QueueOutcome> {
     // Removed from the queue (or cancelled by a decision) while its test merge or checks ran: its cancellation stands,
     // the card where that left it (Approved), and the late failure isn't written.
     const wrote = await this.write(card, (w) => {
       if (!this.isOpen(w, entry)) return false
       // Why a transient failure was one, as codes (#1362): its cause, and the network error code that said so.
       const why = transient && cause ? { cause: cause.cause, ...(cause.code ? { code: cause.code } : {}) } : {}
-      const failed: FactData['IntegrationFailed'] = { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: keptLog(log) } : {}), ...check }
+      const failed: FactData['IntegrationFailed'] = { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: keptLog(log) } : {}), ...check, ...(conflicts?.files.length ? { conflicts } : {}) }
       w.fact('IntegrationFailed', failed)
       w.move('active', 'derived')
       // What came back and what to do next (#1354): the files, the check, its log and last lines, bounded.
