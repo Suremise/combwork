@@ -7,7 +7,7 @@
 import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -22,7 +22,7 @@ const { FactStore } = await import('../src/main/workflow/factStore')
 const { forYou } = await import('../src/main/workflow/cardWork')
 const { advanced } = await import('../src/main/advanced')
 const { workflowFor } = await import('../src/main/workflow/service')
-const { repairStages } = await import('../src/main/workflow/stageRepair')
+const { repairStages, stageRepairTestHooks } = await import('../src/main/workflow/stageRepair')
 const { allOff } = await import('../src/shared/workflow/options')
 
 advanced.load(join(base, 'profile'))
@@ -32,6 +32,10 @@ afterAll(async () => {
   advanced.stop()
   for (const w of opened) await disposeWorkspaceService(w)
   store.closeAllBoards()
+})
+afterEach(() => {
+  stageRepairTestHooks.beforeRepair = null
+  stageRepairTestHooks.beforeNote = null
 })
 
 const user = { kind: 'user' } as const
@@ -112,5 +116,57 @@ describe('a move to Done goes through the workflow (HI-1674)', () => {
     expect(history.at(-1)?.what).toBe('Recorded as Done, as the board had it: its workflow still had it in Active')
     // Nothing more to do the next time.
     expect(await inWorkspace(w, () => repairStages(w))).toEqual({ unmarked: 0, repaired: [], failed: 0 })
+  })
+
+  it("a card moved since the repair picked it (the user's move back to Doing) is left as it is now: checked in the repair's own change", async () => {
+    const w = await workspace()
+    const { card } = await startedOld(w)
+    await setRow(w, card, "col = 'done'")
+    // The newer move comes between the repair's pick and its write.
+    stageRepairTestHooks.beforeRepair = async (id) => {
+      if (id === card) await setRow(w, card, "col = 'doing'")
+    }
+    expect(await inWorkspace(w, () => repairStages(w))).toEqual({ unmarked: 0, repaired: [], failed: 0 })
+    expect(row(w, card)).toEqual({ col: 'doing', stage: 'active', pre_workflow: 0 })
+    expect(facts(w, card).some((x) => x.kind === 'Moved' && (x.data as { cause: string }).cause === 'repair')).toBe(false)
+    expect(forYou(w).items.some((i) => i.card === card)).toBe(true)
+  })
+
+  it('a switch to another workspace stops the repair: the board it began on is left for its next open', async () => {
+    const w = await workspace()
+    const first = w.path!
+    const { card } = await startedOld(w)
+    await setRow(w, card, "col = 'done'")
+    const other = join(base, `other-${n}`)
+    mkdirSync(other, { recursive: true })
+    stageRepairTestHooks.beforeRepair = async () => {
+      await w.open(other)
+    }
+    expect(await inWorkspace(w, () => repairStages(w))).toEqual({ unmarked: 0, repaired: [], failed: 0 })
+    await w.open(first)
+    expect(row(w, card)).toEqual({ col: 'done', stage: 'active', pre_workflow: 0 })
+    expect(facts(w, card).some((x) => x.kind === 'Moved' && (x.data as { cause: string }).cause === 'repair')).toBe(false)
+  })
+
+  it('a repair whose history line fails is undone whole (no Moved, its question still For you) and made at the next open', async () => {
+    const w = await workspace()
+    const { card, request } = await startedOld(w)
+    await setRow(w, card, "col = 'done'")
+    const before = facts(w, card).length
+    const lines = (await inWorkspace(w, () => tasks.getTask(card))).history.length
+    stageRepairTestHooks.beforeNote = async () => {
+      throw new Error('the history line failed')
+    }
+    expect(await inWorkspace(w, () => repairStages(w))).toEqual({ unmarked: 0, repaired: [], failed: 1 })
+    expect(row(w, card)).toEqual({ col: 'done', stage: 'active', pre_workflow: 0 })
+    expect(facts(w, card)).toHaveLength(before)
+    expect((await inWorkspace(w, () => tasks.getTask(card))).history).toHaveLength(lines)
+    expect(forYou(w).items.some((i) => i.card === card)).toBe(true)
+    // The next open makes it.
+    stageRepairTestHooks.beforeNote = null
+    expect(await inWorkspace(w, () => repairStages(w))).toEqual({ unmarked: 0, repaired: [card], failed: 0 })
+    expect(row(w, card)).toEqual({ col: 'done', stage: 'done', pre_workflow: 0 })
+    expect(facts(w, card).find((x) => x.kind === 'RequestClosed')?.data).toEqual({ request, why: 'done' })
+    expect((await inWorkspace(w, () => tasks.getTask(card))).history.at(-1)?.what).toBe('Recorded as Done, as the board had it: its workflow still had it in Active')
   })
 })

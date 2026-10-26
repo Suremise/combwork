@@ -536,19 +536,17 @@ export class Workflow {
   /**
    * A card the board has in Done while its stage isn't (HI-1674: a move that reached the column and not the workflow,
    * from before setStage cleared a started card's 1.0 mark): its stage brought into line as a repair (`Moved` to done,
-   * cause `repair`, `why` said), its asked questions closed with it (closeSettled). False when there was nothing to do.
+   * cause `repair`, the stage it had said), its asked questions closed with it (closeSettled). Checked in the write's own
+   * change: a card moved since it was picked (the user's move back to Doing), done meanwhile, or no longer this project's
+   * is left. False when there was nothing to do.
    */
-  async repairToDone(id: number, why: string): Promise<boolean> {
-    let card: CardRecord
-    try {
-      card = this.store.card(id)
-    } catch {
-      return false
-    }
-    if (card.stage === 'done') return false
+  async repairToDone(id: number): Promise<boolean> {
+    const card = this.store.cardByKey(`#${id}`)
+    if (!card) return false
     return this.write(card, null, 'hive', (w) => {
-      if (w.current === 'done') return false
-      w.move('done', 'repair', why)
+      const now = this.store.cardByKey(`#${id}`)
+      if (!now || now.category !== 'done' || w.current === 'done') return false
+      w.move('done', 'repair', `the board had it in Done while its stage was ${w.current}`) // i18n-ignore: a fact's reason, agent-facing English
       return true
     })
   }

@@ -8,6 +8,7 @@ import { boardRead, boardWrite, boardWriteOp } from '../boardStore'
 import { createLogger, userText } from '../logger'
 import { HISTORY, storedText } from '../../shared/taskHistory'
 import type { WorkspaceService } from '../workspace'
+import type { Write } from './runtime'
 
 const log = createLogger('workflow')
 
@@ -18,34 +19,52 @@ export interface StageRepair {
   failed: number
 }
 
+/** For tests: runs before each card's repair (outside its change), and in its change before its history line. */
+export const stageRepairTestHooks: { beforeRepair: ((n: number) => Promise<void>) | null; beforeNote: ((n: number) => Promise<void>) | null } = { beforeRepair: null, beforeNote: null }
+
 /**
  * Clears the 1.0 mark of every card with workflow facts (started since, so a 1.0 card), then brings each card the board
  * has in Done while its stage isn't into line through its project's runtime: a `Moved` to done as a repair, its asked
- * questions closed (closeSettled), a line in its history. Never throws: a card it can't repair is logged and left.
+ * questions closed (closeSettled), a line in its history, all in one change of the board. Only while the workspace it
+ * began on stays open: a close or a switch stops it (the next open goes on). Never throws: a card it can't repair is
+ * logged and left.
  */
 export async function repairStages(ws: WorkspaceService): Promise<StageRepair> {
   const out: StageRepair = { unmarked: 0, repaired: [], failed: 0 }
   const path = ws.path
   if (!path) return out
+  const life = ws.lifetime
+  const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === path
   try {
-    out.unmarked = await boardWrite(ws, async () =>
-      boardWriteOp(ws, (db) => Number(db.prepare('UPDATE cards SET pre_workflow = 0 WHERE pre_workflow = 1 AND EXISTS (SELECT 1 FROM card_facts f WHERE f.card = cards.number)').run().changes)) // i18n-ignore: SQL
+    out.unmarked = await boardWrite(
+      ws,
+      async () => boardWriteOp(ws, (db) => Number(db.prepare('UPDATE cards SET pre_workflow = 0 WHERE pre_workflow = 1 AND EXISTS (SELECT 1 FROM card_facts f WHERE f.card = cards.number)').run().changes)), // i18n-ignore: SQL
+      { alive }
     )
-    const off = boardRead(ws, (db) => db.prepare("SELECT number, project, stage FROM cards WHERE col = 'done' AND stage IS NOT NULL AND stage <> 'done' AND project IS NOT NULL AND project <> '' AND EXISTS (SELECT 1 FROM card_facts f WHERE f.card = cards.number)").all() as { number: number; project: string; stage: string }[]) // i18n-ignore: SQL
+    if (!alive()) return out
+    const off = boardRead(ws, (db) => db.prepare("SELECT number, project FROM cards WHERE col = 'done' AND stage IS NOT NULL AND stage <> 'done' AND project IS NOT NULL AND project <> '' AND EXISTS (SELECT 1 FROM card_facts f WHERE f.card = cards.number)").all() as { number: number; project: string }[]) // i18n-ignore: SQL
     if (!off.length) {
       if (out.unmarked) log.info(`${out.unmarked} started card(s) in ${userText(basename(path))} no longer marked as from before 1.0`)
       return out
     }
     // Imported when needed: the service reaches the board's notices, which reach back here.
     const { workflowFor } = await import('./service')
+    const { alongside } = await import('./runtime')
     const { noteOnCard } = await import('../tasks')
     for (const c of off) {
       try {
+        await stageRepairTestHooks.beforeRepair?.(c.number)
+        if (!alive()) break
         const wf = await workflowFor(ws, join(path, c.project))
-        // i18n-ignore: a fact's reason, agent-facing English
-        if (!wf || !(await wf.repairToDone(c.number, `the board had it in Done while its stage was ${c.stage}`))) continue
-        out.repaired.push(c.number)
-        await noteOnCard(c.number, storedText(HISTORY.stageRepaired, { stage: c.stage }), ws)
+        if (!wf) continue
+        // The history line in the repair's own change (its runtime's lock, the board's change): if it fails, so does the
+        // repair, left whole for the next open. The stage it names is the one the write found.
+        const note = async (w: Write): Promise<void> => {
+          if (w.card.id !== c.number) return
+          await stageRepairTestHooks.beforeNote?.(c.number)
+          await noteOnCard(c.number, storedText(HISTORY.stageRepaired, { stage: w.was }), ws)
+        }
+        if (await alongside({ written: note }, () => wf.repairToDone(c.number))) out.repaired.push(c.number)
       } catch (e) {
         out.failed++
         log.warn(`bringing card ${c.number}'s stage into line with its column`, e)
