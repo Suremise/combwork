@@ -53,8 +53,9 @@ export interface OpenOptions {
    */
   setup?: (db: DatabaseSync, isNew: boolean) => void
   /**
-   * Whether a group's steps may run on a file that has data (a new file takes every step unasked). Refused, the steps
-   * before the group run, and the file opens read-only with `pending` saying what it waits for. Left out: they run.
+   * Whether a group's steps may run on a file that has data (a new file takes every step unasked, and a file in the group
+   * already its later steps: HI-1718). Refused, the steps before the group run, and the file opens read-only with
+   * `pending` saying what it waits for. Left out: they run.
    */
   approve?: (pending: PendingGroup) => boolean
   /** Runs with a group's exclusive lock held, before its copy and steps: throwing refuses the group, changing nothing. */
@@ -219,13 +220,15 @@ function migrate(db: DatabaseSync, file: string, opts: OpenOptions): PendingGrou
     while (end < todo.length && todo[end].group === group) end++
     const steps = todo.slice(i, end)
     const pending: PendingGroup = { group, from: schemaVersion(db), to: steps[steps.length - 1].version }
-    if (opts.approve && !opts.approve(pending)) {
+    const first = Math.min(...opts.migrations.filter((m) => m.group === group).map((m) => m.version))
+    // A file in the group already (asked when it joined, or made in 1.0) takes a later step of it unasked: asked again, a
+    // board an earlier 1.0 upgraded would wait as if from 0.9 (HI-1718).
+    if (pending.from < first && opts.approve && !opts.approve(pending)) {
       told()
       return pending
     }
     // The copy before the group's first step is kept for good (the way back); one before a later step of it (a file in the
     // group already) is an ordinary copy, of the file's own three.
-    const first = Math.min(...opts.migrations.filter((m) => m.group === group).map((m) => m.version))
     runGroup(db, file, opts, pending, pending.from < first ? groupBackupFamily(family, group) : null, family, () => steps.forEach(run), copy)
     // The group's copy is the file before every step after it too.
     copied = true
