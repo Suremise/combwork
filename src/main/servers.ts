@@ -84,7 +84,7 @@ import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
 import { cardFacts, cardKind, cardReviewSkip, factRow } from './workflow/cardWork'
-import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket } from './workflow/runChecks'
+import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
 import { detect, projectPlatform } from './platform/registry'
 import { revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
@@ -3401,16 +3401,35 @@ route('PATCH', '/v1/progress/:id', async ({ params, body }) =>
   })
 )
 
-route('POST', '/v1/progress/:id/finish', async ({ params, body }) =>
-  progressCall<{ ok: true; ignored?: true }>({ ok: true, ignored: true }, (caller) => {
+/** How long a finish waits for its run's record as a check, to say how it counted (#1654): hive-progress waits a little longer. */
+const CHECK_REPLY_MS = 8000
+
+route('POST', '/v1/progress/:id/finish', async ({ params, body }) => {
+  const recording: { check?: Promise<Recorded | null> } = {}
+  const r = await progressCall<{ ok: true; ignored?: true }>({ ok: true, ignored: true }, (caller) => {
     const id = decodeURIComponent(params[0])
     // Ended by Stop in the Progress panel (#1435): stopped, whatever its command's exit says.
     const run = progress.finish(caller, id, takeStopped(id) ? { ...bodyObject(body), ok: false, stopped: true } : bodyObject(body))
     // Recorded as a check first (its copy still at the revision), then its isolated check's copy returned (#1435).
-    void recordCheck(run).then(() => isolatedRunEnded(requireWorkspace(), run.id)).catch((e) => log.warn('returning a check copy', e))
+    recording.check = recordCheck(run)
+    void recording.check.then(() => isolatedRunEnded(requireWorkspace(), run.id)).catch((e) => log.warn('returning a check copy', e))
     return { ok: true }
   })
-)
+  // How it counted as a check, once recorded (within CHECK_REPLY_MS): hive-progress says why one didn't (#1654).
+  const c = recording.check ? await within(recording.check, CHECK_REPLY_MS) : null
+  return c ? { ...r, check: { name: c.name, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), ...(c.changes ? { changes: c.changes } : {}), platform: c.platform } } : r
+})
+
+/** A promise's value, or null once `ms` has passed first. */
+async function within<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const late = new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), ms)))
+  try {
+    return await Promise.race([p, late])
+  } finally {
+    clearTimeout(timer)
+  }
+}
 
 /** An isolated check's lease, held by the link resolve gave out, taken by the run that started with it. */
 async function retakeIsolated(ws: WorkspaceService, projectPath: string, linkId: string, runId: string): Promise<void> {
@@ -3420,12 +3439,14 @@ async function retakeIsolated(ws: WorkspaceService, projectPath: string, linkId:
 }
 
 /** A finished run for a card: its `CheckRan` in the card's facts (#1222), and how it counted on the run's row. */
-async function recordCheck(run: ProgressRun): Promise<void> {
+async function recordCheck(run: ProgressRun): Promise<Recorded | null> {
   try {
     const c = await bracketFinished(run)
     if (c) progress.noteCheck(run.workspacePath, run.id, { name: c.name, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), ...(c.blocks ? { blocks: c.blocks } : {}) })
+    return c
   } catch (e) {
     log.warn(`could not record run ${run.id} as a check of #${run.card}`, e)
+    return null
   }
 }
 

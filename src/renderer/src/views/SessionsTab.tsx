@@ -23,7 +23,7 @@ import { shownText } from '@shared/advanced'
 import { rememberProjectPref } from '../projectPrefs'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import type { CleanupPlan, CleanupSkip } from '@shared/sessionCleanup'
-import { SessionCleanup } from './SessionCleanup'
+import { BulkProgressNote, SessionCleanup } from './SessionCleanup'
 import { PurgeDialog } from '../components/Purge'
 
 /**
@@ -493,6 +493,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
             </span>
           )}
         </div>
+        <BulkProgressNote projectPath={project.path} kind={kind} />
         {listError && <StaleNote what={theList} error={listError} at={loadedAt} onRetry={reload} />}
         {q && searchError && <LoadFailed inline what={tr(msg({ id: 'sessions.search.what', defaultMessage: 'the search results', description: "What could not be loaded, in \"Could not load …\": the Sessions tab's search. Lower case." }))} error={searchError} onRetry={() => setSearchTry((n) => n + 1)} />}
         <div className="pane-body file-tree sessions-tree" tabIndex={0} ref={treeRef} onKeyDown={onKeyDown}>

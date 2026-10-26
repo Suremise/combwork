@@ -1,6 +1,7 @@
 // The board shows stages (#1420, SPEC §16.5.2): a Pair project (Hive merges, queueFixture.cjs) beside a No review Git
 // project (beta) and a None one (notes), with fake Claude Code agents acting by their own tokens and the Assistant off.
 // - a card in the merge queue sits in Merging, a column of its own under Approved's heading, and moves to Done merged;
+// - Merging collapses to a strip in the Approved group and stays collapsed after a reload; both columns fold the group;
 // - Merging takes no drop, and its hover says cards come through the queue;
 // - a No review project shows On Hold, Todo, Active and Done only;
 // - the options changed to No review while a card is in Review: Review stays until the card leaves it;
@@ -109,6 +110,36 @@ const nothingToArchive = (dialog) => {
     const headerTops = await board.locator('.board-column-header').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))
     check("…and every column's header starts at the same height", new Set(headerTops).size === 1, JSON.stringify(headerTops))
     await shoot('merging-en')
+
+    // --- Merging collapses to a strip under Approved's heading, and stays so after a reload (#1662: the saved fold
+    // dropped it, so « did nothing); with Approved collapsed too the whole group folds; both expand again.
+    const collapsed = async (id) => ((await col(id).getAttribute('class')) ?? '').includes('collapsed')
+    await col('merging').getByRole('button', { name: 'Collapse Merging' }).click()
+    check('« collapses Merging to a strip', !!(await until(async () => (await collapsed('merging')) && (await col('merging').locator('.board-column-strip').count()) === 1, HUNG_MS)))
+    check('…still in the Approved group, Approved open beside it', (await approvedGroup.locator('.board-column[data-column="merging"].collapsed').count()) === 1 && !(await collapsed('passed')) && !((await approvedGroup.getAttribute('class')) ?? '').includes('collapsed'))
+    check("…its strip shows its name and its card's count", /Merging/i.test(await col('merging').locator('.board-column-strip').innerText()) && (await col('merging').locator('.board-column-strip .count').innerText()) === '1')
+    // Once its width has moved (the columns' transition): the strip is 34 px and Approved as wide as the other columns.
+    const widths = () => page.evaluate(() => Object.fromEntries([...document.querySelectorAll('.board .board-column')].map((e) => [e.getAttribute('data-column'), Math.round(e.getBoundingClientRect().width)])))
+    check('…a 34 px strip, Approved beside it as wide as the other columns, its header one row', !!(await until(async () => {
+      const w = await widths()
+      return w.merging === 34 && Math.abs(w.passed - w.hold) <= 1 && (await headerRows()).every((r) => r.rows === 1)
+    }, HUNG_MS)), JSON.stringify([await widths(), await headerRows()]))
+    await shoot('merging-collapsed')
+    await page.reload()
+    await lib.appReady(page)
+    await showBoard(null)
+    check('after a reload, Merging is still collapsed', !!(await until(async () => (await col('merging').count()) === 1 && (await collapsed('merging')), HUNG_MS)), await columns())
+    await col('passed').getByRole('button', { name: 'Collapse Approved' }).click()
+    check('with Approved collapsed too, the Approved group folds to its two strips', !!(await until(async () => (await collapsed('passed')) && ((await approvedGroup.getAttribute('class')) ?? '').includes('collapsed'), HUNG_MS)))
+    check('…its strips stay in the group, under its heading', (await approvedGroup.locator('.board-column.collapsed').count()) === 2 && (await approvedGroup.locator('.board-category-head').count()) === 1)
+    check('…two 34 px strips', !!(await until(async () => {
+      const w = await widths()
+      return w.passed === 34 && w.merging === 34
+    }, HUNG_MS)), JSON.stringify(await widths()))
+    await shoot('approved-collapsed')
+    await col('merging').getByRole('button', { name: 'Expand Merging' }).click()
+    await col('passed').getByRole('button', { name: 'Expand Approved' }).click()
+    check('both expand again', !!(await until(async () => !(await collapsed('merging')) && !(await collapsed('passed')) && !((await approvedGroup.getAttribute('class')) ?? '').includes('collapsed'), HUNG_MS)))
 
     // Merging's hover, and no drop.
     await label('merging').hover()

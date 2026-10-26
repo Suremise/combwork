@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { msg, tr } from '@shared/i18n'
 import type { TaskCard } from '@shared/types'
 import { LANE_MAX_ROUNDS } from '@shared/lanes'
@@ -7,9 +7,10 @@ import { FOR_YOU_KIND, ROUND_CHOICE, workflowLine } from '@shared/workflow/texts
 import { gist } from '@shared/gist'
 import { askActionAvailable, type ForYouAnswer, type ForYouItem } from '@shared/workflow/workView'
 import { call, errorMessage } from '../api'
+import { MARKDOWN_CARDS } from '../cardLinks'
 import { loadTasks, notify, prompt, useLanguage, useStore } from '../store'
 import { cx, timeAgo } from '../util'
-import { BusyButton, Icon, Tooltip, useBusy } from './ui'
+import { BusyButton, Icon, Markdown, Tooltip, useBusy } from './ui'
 import { SHOW_QUEUE_WORK } from './CardQueue'
 
 // For you in the window (#1276, SPEC §16.8.5): a card's requests for the user, as a chip on its tile and a section in
@@ -40,6 +41,7 @@ const M = {
   rounds: msg({ id: 'board.forYou.rounds', defaultMessage: 'More rounds', description: "The label of the number box beside Carry on, at a card loop's round limit: how many more review rounds the card gets." }),
   checklist: msg({ id: 'board.forYou.checklist', defaultMessage: 'To try:', description: 'Above the checklist of a Test request (For you): what the user is asked to try.' }),
   answering: msg({ id: 'board.forYou.answering', defaultMessage: 'Answering…', description: "A button while the user's answer to a request is being recorded." }),
+  showAll: msg({ id: 'board.forYou.showAll', defaultMessage: '{all, select, yes {Show less} other {Show all}}', description: "A button under a long request for the user (For you) in the card dialog, shown only partly: shows all of it, or (yes) folds it again." }),
   failed: msg({ id: 'board.forYou.failed', defaultMessage: "Your answer wasn't taken", description: "An error toast's title: the user's answer to a request (For you) was refused, perhaps answered or retired meanwhile (a new submission, the card moved on). Its text says why." })
 }
 
@@ -113,6 +115,40 @@ function showStuck(): void {
   window.dispatchEvent(new Event(SHOW_QUEUE_WORK))
 }
 
+/**
+ * A request's text (#1637): Markdown, as card comments are (sanitized; lists, bold, code, card links), never the raw
+ * marks, its line breaks kept; a long one is folded to about ten lines, with Show all.
+ */
+function RequestText({ text }: { text: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [all, setAll] = useState(false)
+  const [long, setLong] = useState(false)
+  // Measured again whenever the fold or what it holds changes size (HR5's round 1: a narrower window or a zoom wraps a
+  // question that fitted, and its last lines must not be cut off without Show all).
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el || all) return
+    const measure = (): void => setLong(el.scrollHeight > el.clientHeight + 1)
+    measure()
+    const watch = new ResizeObserver(measure)
+    watch.observe(el)
+    if (el.firstElementChild) watch.observe(el.firstElementChild)
+    return () => watch.disconnect()
+  }, [text, all])
+  return (
+    <>
+      <div ref={ref} className={cx('for-you-question', !all && 'folded', !all && long && 'faded')}>
+        <Markdown source={text} cards={MARKDOWN_CARDS} breaks />
+      </div>
+      {long && (
+        <button type="button" className="btn subtle small for-you-more" aria-expanded={all} onClick={() => setAll(!all)}>
+          {tr(M.showAll, { all: all ? 'yes' : 'no' })}
+        </button>
+      )}
+    </>
+  )
+}
+
 function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { card: TaskCard; kind?: CardKind; item: ForYouItem; reply: string; setReply: (text: string) => void; setAnswering: (busy: boolean) => void }) {
   const agents = useStore((s) => s.workspace?.projects.find((p) => p.name.toLowerCase() === card.project.toLowerCase())?.agents)
   const [rounds, setRounds] = useState('1')
@@ -154,8 +190,9 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
   return (
     <div className={cx('for-you-request', item.kind)} data-request={item.request}>
       <div className="for-you-text">
-        <span className="for-you-kind">{kindText(item)}</span> {text}
+        <span className="for-you-kind">{kindText(item)}</span>
       </div>
+      <RequestText text={text} />
       <div className="faint for-you-asked">{tr(M.asked, { who, when: timeAgo(item.since) })}</div>
       {/* A merge stopped part way (#1357, the Assistant's requirement): its files and commands are one click away. */}
       {item.gate === QUEUE_STUCK_GATE && (

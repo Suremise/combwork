@@ -1486,7 +1486,7 @@ function Decisions({
             </div>
           ) : (
             <>
-              <div className="task-decision-text">{d.text}</div>
+              <Markdown className="task-decision-text" source={d.text} cards={MARKDOWN_CARDS} />
               <div className="task-decision-by faint">
                 {/* "You" is how a decision the user recorded names its recorder (stored, English). */}
                 {d.recordedBy && d.recordedBy !== 'You' ? tr(msg({ id: 'board.decision.byRecorded', defaultMessage: 'Decided by you · recorded by {recorder}', description: "Under a decision in the card dialog: the user decided it, and an agent or the Assistant wrote it down ({recorder}, its name)." }), { recorder: d.recordedBy }) : tr(msg({ id: 'board.decision.by', defaultMessage: 'Decided by you', description: 'Under a decision in the card dialog: the user decided it (and recorded it).' }))} · <Tooltip content={formatDateTime(d.at)}><span>{timeAgo(d.at)}</span></Tooltip>

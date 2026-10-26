@@ -9,6 +9,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import type { SessionBulkProgress } from '../src/shared/types'
 
 const base = tempDir('hive-inuse-')
 // The CLIs' homes are the test's (never ~/.claude or ~/.codex).
@@ -30,6 +31,7 @@ const { sessions, SessionInUse } = await import('../src/main/sessions')
 const { usageHistory } = await import('../src/main/usageHistory')
 const { setViewing, whileReading } = await import('../src/main/transcriptReads')
 const { encodeProjectPath } = await import('../src/main/providers/claude/usage')
+const { onHiveEvent } = await import('../src/main/events')
 
 const wsPath = join(base, 'ws')
 const p = join(wsPath, 'proj')
@@ -40,6 +42,8 @@ const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
 let n = 0
 const newId = (): string => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`
 const old = new Date(Date.now() - 3600_000)
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
+const HUNG_MS = 15000
 
 const transcript = (sid: string): string =>
   [
@@ -215,6 +219,80 @@ describe.runIf(process.platform === 'win32')('archiving and deleting sessions in
     const back = await run(() => sessions.bulk(p, 'unarchive', [mine]))
     expect(back.done).toEqual([mine])
     expect(existsSync(backup(mine) + '.gz')).toBe(true)
+  })
+
+  it('a bulk action tells the windows how far it has got, ending with none, works on a few at once, and answers in the order asked (#1659)', async () => {
+    const mine = [await session(), await session(), await session(), await session(), await session(), await session(), await session()]
+    const outside = newId()
+    write(cliFile(outside), transcript(outside))
+    const ids = [mine[0], outside, ...mine.slice(1), '../not-an-id']
+    const seen: SessionBulkProgress[][] = []
+    const off = onHiveEvent((e) => {
+      if (e.type === 'session-bulk' && e.projectPath === p) seen.push(e.runs)
+    })
+    let at = 0
+    let most = 0
+    const archive = sessions.archive.bind(sessions)
+    const counted = vi.spyOn(sessions, 'archive').mockImplementation(async (...a) => {
+      most = Math.max(most, ++at)
+      try {
+        return await archive(...a)
+      } finally {
+        at--
+      }
+    })
+    try {
+      const r = await run(() => sessions.bulk(p, 'archive', ids))
+      expect(r.done).toEqual(mine)
+      expect(r.skipped.map((x) => [x.id, x.reason])).toEqual([
+        [outside, 'external'],
+        ['../not-an-id', 'failed']
+      ])
+    } finally {
+      off()
+      counted.mockRestore()
+    }
+    expect(most).toBeGreaterThan(0)
+    expect(most).toBeLessThanOrEqual(4)
+    expect(seen[0]).toEqual([{ id: expect.any(Number), action: 'archive', done: 0, total: ids.length }])
+    expect(seen.at(-2)).toEqual([{ id: seen[0][0].id, action: 'archive', done: ids.length, total: ids.length }])
+    expect(seen.at(-1)).toEqual([])
+    const counts = seen.slice(0, -1).map((x) => x[0].done)
+    expect(counts).toEqual([...counts].sort((a, b) => a - b))
+  })
+
+  it("a bulk action that ends while another runs on the same host leaves the other's progress shown (#1659)", async () => {
+    const held = [await session(), await session()]
+    const outside = newId()
+    write(cliFile(outside), transcript(outside))
+    const seen: SessionBulkProgress[][] = []
+    const off = onHiveEvent((e) => {
+      if (e.type === 'session-bulk' && e.projectPath === p) seen.push(e.runs)
+    })
+    // The long one's archives wait until released: it is still running when the short one ends.
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const archive = sessions.archive.bind(sessions)
+    const waiting = vi.spyOn(sessions, 'archive').mockImplementation(async (...a) => {
+      await gate
+      return archive(...a)
+    })
+    try {
+      const long = run(() => sessions.bulk(p, 'archive', held))
+      await vi.waitFor(() => expect(seen.at(-1)?.length).toBe(1), { timeout: HUNG_MS })
+      const longId = seen.at(-1)![0].id
+      // A second one, quickly skipped (started outside Hive): it ends first.
+      const short = await run(() => sessions.bulk(p, 'archive', [outside]))
+      expect(short.skipped).toEqual([{ id: outside, reason: 'external' }])
+      expect(seen.at(-1)).toEqual([{ id: longId, action: 'archive', done: 0, total: 2 }])
+      release()
+      expect((await long).done).toEqual(held)
+      expect(seen.at(-1)).toEqual([])
+    } finally {
+      release()
+      off()
+      waiting.mockRestore()
+    }
   })
 
   it('a delete that fails after a copy went to the Recycle Bin puts that copy back, and keeps the record', async () => {

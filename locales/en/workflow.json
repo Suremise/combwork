@@ -871,6 +871,14 @@
     "defaultMessage": "Wait for the reviewer's ok or gaps; if none comes, ask the user.",
     "description": "The next step after going ahead with a follow-up unchecked (#1467). ok and gaps are the reviewer's answers, as agents name them: keep them as they are."
   },
+  "workflow.refused.loop.followUpMerging.message": {
+    "defaultMessage": "{card} is being merged now: a follow-up can no longer take it out of the merge queue.",
+    "description": "A refused follow-up (#1623): a follow-up on a queued card takes it out of the merge queue first, but the queue has already begun merging this one. {card} is a card key."
+  },
+  "workflow.refused.loop.followUpMerging.next": {
+    "defaultMessage": "Wait for the merge; if the follow-up is still needed, put it on a new card.",
+    "description": "The next step after a follow-up refused because the card is being merged now (#1623)."
+  },
   "workflow.refused.loop.noReviewer.message": {
     "defaultMessage": "{card} has no reviewer to check it: it is in no lane with a reviewer, and nobody has reviewed it yet.",
     "description": "A refused design or follow-up posted for a check (#1382, #1467): nobody can be woken to check it. {card} is a card key. A lane: a card loop's record of its builder and reviewer."
@@ -1140,12 +1148,12 @@
     "description": "Where the rule that refused a submit for a missing check is changed."
   },
   "workflow.refused.submit.checksPassed.message": {
-    "defaultMessage": "Review refused: {check} hasn't passed on {revision}.",
-    "description": "A refused submit: a configured check has no passing counted run on the revision. {check} is the check name, {revision} a short revision id."
+    "defaultMessage": "Review refused: {check} hasn't passed on {revision}.{why, select, notCheck { Its last run passed but didn't count: it wasn't the check's configured command.} notContained { Its last run passed but didn't count: what it ran on doesn't contain the revision.} dirty { Its last run passed but didn't count: the folder had uncommitted changes{files, select, none {} other { ({files})}}.} moved { Its last run passed but didn't count: something else was checked out by its end.} changed { Its last run passed but didn't count: files changed in the folder while it ran{files, select, none {} other { ({files})}}.} revisionChanged { Its last run passed but didn't count: the card's files changed while it ran.} other {}}",
+    "description": "A refused submit: a configured check has no passing counted run on the revision. {check} is the check name, {revision} a short revision id. {why} picks why its last run there didn't count (#1654; keep each branch's key as it is; 'other': it didn't run there, or failed, and nothing is added); {files} lists the paths that changed, or is 'none' (keep the key)."
   },
   "workflow.refused.submit.checksPassed.next": {
-    "defaultMessage": "Run {command}, then submit again.",
-    "description": "The next step after a refused submit for a missing check: {command} is the command to run."
+    "defaultMessage": "{why, select, dirty {Commit or remove the uncommitted changes, run {command} again, then submit again.} changed {{copy, select, yes {Run {command} again with nothing else writing in the folder, or add --isolated to run it in a check copy of its own, then submit again.} other {Run {command} again with nothing else writing in the folder, then submit again.}}} notContained {Run {command} in the card's own folder, at its revision, then submit again.} other {Run {command}, then submit again.}}",
+    "description": "The next step after a refused submit for a missing check: {command} is the command to run. {why} picks the remedy for why its last run didn't count (#1654; keep each branch's key as it is); {copy} is 'yes' where a check copy (--isolated, kept as typed) can be used."
   },
   "workflow.refused.submit.clean.change": {
     "defaultMessage": "This rule comes with review and merging in Version Control.",

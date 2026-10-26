@@ -89,6 +89,8 @@ export const columnName = (c: TaskColumn, tr?: Tr): string => (tr && COLUMN_TEXT
 /** The column ids, in order, and as an error message lists them ("hold, todo, doing, review, passed or done"). */
 export const COLUMN_IDS: readonly TaskColumn[] = TASK_COLUMNS.map((c) => c.id)
 export const COLUMN_CHOICES = `${COLUMN_IDS.slice(0, -1).join(', ')} or ${COLUMN_IDS.at(-1)}` // i18n-ignore: agent-facing (the Agent API's errors)
+/** The board's columns in order: the task columns with Merging after Approved (#1420), as a fold keeps them (#1662). */
+export const BOARD_COLUMN_IDS: readonly BoardColumnId[] = COLUMN_IDS.flatMap((c): BoardColumnId[] => (c === 'passed' ? [c, 'merging'] : [c]))
 
 /** Each column's colour (its heading, and a tint on its cards): grey, slate blue, blue, purple, teal and green. */
 export const DEFAULT_COLUMN_COLORS: Record<TaskColumn, string> = { hold: '#8b8f98', todo: '#7a88b8', doing: '#3b82f6', review: '#a371f7', passed: '#14b8a6', done: '#2ea043' }
@@ -138,7 +140,7 @@ export function applyBoardFold(all: Record<string, BoardFold> | undefined, works
     for (const n of cards) if (!known.has(n)) cards.delete(n)
   }
   delete out[key]
-  const kept = COLUMN_IDS.filter((c) => columns.has(c))
+  const kept = BOARD_COLUMN_IDS.filter((c) => columns.has(c))
   const folded = [...cards].slice(-BOARD_FOLD_CARDS)
   if (kept.length || folded.length) out[key] = { ...(kept.length ? { columns: kept } : {}), ...(folded.length ? { cards: folded } : {}) }
   return Object.fromEntries(Object.entries(out).slice(-BOARD_FOLD_WORKSPACES))

@@ -799,7 +799,7 @@ export class Workflow {
   stillAt(w: Write, s: CardState, move: string): GuardRefusal | null {
     const now = w.state()
     if (now.stage === s.stage && now.cycle === s.cycle && (now.latest?.id ?? 0) === (s.latest?.id ?? 0) && now.entries.length === s.entries.length) return null
-    return { rule: 'move.notFromHere', values: { card: w.card.key, stage: now.stage, move, moves: this.movesFrom(now.stage).join(', ') } }
+    return { rule: 'move.notFromHere', values: { card: w.card.key, stage: now.stage, move, moves: this.movesFrom(now.stage, w.ruleset ?? undefined, now).join(', ') } }
   }
 
   /**
@@ -1199,7 +1199,12 @@ export class Workflow {
       }
     }
     inputs.revision = revision
-    if (r.guards.submit.includes('submit.checksPassed') && card.kind === 'code') inputs.checksMissing = o.preChecks.filter((name) => !s.checks.some((c) => c.name === name && c.revision === revision && c.result === 'passed' && c.counted))
+    if (r.guards.submit.includes('submit.checksPassed') && card.kind === 'code') {
+      inputs.checksMissing = o.preChecks.filter((name) => !s.checks.some((c) => c.name === name && c.revision === revision && c.result === 'passed' && c.counted))
+      // The first missing check's newest run on the revision, if it passed and didn't count: the refusal says why (#1654).
+      const last = inputs.checksMissing.length ? s.checks.findLast((c) => c.name === inputs.checksMissing![0] && c.revision === revision) : undefined
+      if (last && last.result === 'passed' && !last.counted && last.whyNot) inputs.checkUncounted = { whyNot: last.whyNot, ...(last.changes?.length ? { changes: last.changes } : {}), isolatable: o.platform === 'git' && !last.isolated }
+    }
     // G13: the builder's own running work, whoever submits (an agent itself; the user's or the Assistant's move: the
     // card's builder). Read again in the write (`runsNow`): work started meanwhile counts.
     const runner = agent ?? (s.started?.builder && s.started.builder !== 'user' ? s.started.builder : null)
@@ -1568,8 +1573,10 @@ export class Workflow {
           if (agent && (side === 'builder' ? agent !== builder : agent !== reviewer || agent === builder)) return { rule: 'loop.stepNotYours', values: { card: card.key, side } } as GuardRefusal
           if (step === 'design' || step === 'followUp') {
             // A design before the work goes to review; a follow-up of work reviewed or under review.
-            const here = step === 'design' ? now.stage === 'active' : now.stage === 'review' || now.stage === 'approved'
+            // (Queued counts as approved: its entry is taken out below, #1623; one the queue is merging now can't be.)
+            const here = step === 'design' ? now.stage === 'active' : now.stage === 'review' || now.stage === 'approved' || now.stage === 'merging'
             if (!here) return { rule: 'loop.stepNotHere', values: { card: card.key, stage: now.stage, step } } as GuardRefusal
+            if (step === 'followUp' && openEntry(now)?.state === 'started') return { rule: 'loop.followUpMerging', values: { card: card.key } } as GuardRefusal
             if (!reviewer || reviewer === builder) return { rule: 'loop.noReviewer', values: { card: card.key } } as GuardRefusal
           } else {
             if (!now.step) return { rule: 'loop.noStep', values: { card: card.key } } as GuardRefusal
@@ -1584,11 +1591,22 @@ export class Workflow {
           posted = { design: `${card.key}/s${now.lastSeq + 1}`, until: new Date(at + opts.waitMinutes * 60_000).toISOString() }
           w.fact('LoopStep', { step, text, ...posted, waitMinutes: opts.waitMinutes })
         } else if (step === 'followUp') {
-          posted = { design: `${card.key}/s${now.lastSeq + 1}` }
+          // A follow-up on a queued card first takes it out of the queue (#1623): the queue mustn't merge the approved
+          // revision while the follow-up changes its line. The reviewer's ok queues it again.
+          const open = openEntry(now)
+          if (open?.state === 'open') {
+            w.fact('IntegrationCancelled', { entry: open.id, reason: 'followUp' }) // i18n-ignore: a fact's kind and codes, not text
+            if (w.current === 'merging') w.move('approved', 'derived')
+          }
+          posted = { design: `${card.key}/s${w.state().lastSeq + 1}` }
           w.fact('LoopStep', { step, text, ...posted })
         } else {
           const about = opts.design ?? now.step?.id
           w.fact('LoopStep', { step, text, ...(about ? { design: about } : {}), ...(now.step ? { of: now.step.step } : {}) })
+          // A follow-up checked on an approved card where Hive merges (#1623): queued again while its pass holds.
+          const r = w.ruleset
+          const after = w.state()
+          if (step === 'ok' && now.step?.step === 'followUp' && r?.options.finish === 'hiveMerges' && w.current === 'approved' && !openEntry(after) && !notApproved(after, r, card.labels)) this.enqueue(w)
         }
         // Its words are the fact's (loopWakes.ts' aboutOf); `why` is the action's own note.
         if (side === 'builder') this.wake(w, reviewer ?? 'reviewers', `${card.key}: ${step}`) // i18n-ignore: a wake, agent-facing
@@ -1942,12 +1960,16 @@ export class Workflow {
     const r = this.rulesetOf(card, s)
     const out = await this.write(card, r, by, (w) => {
       guard?.()
-      // Only for a card the queue returned (Active, its last entry failed), approved and unstale, once per revision.
+      // For a card the queue returned (Active, its last entry failed), once per revision; or one waiting in Approved
+      // where Hive merges with no entry (taken out of the queue, #1623) and no follow-up waiting: approved and unstale.
       const st = w.state()
       const last = st.entries.at(-1)
       const retries = st.entries.filter((x) => x.seq > (st.latest?.id ?? 0) && x.requeue === 'retry').length
-      if (st.stage !== 'active' || last?.state !== 'failed' || st.stale || notApproved(st, r, card.labels) || retries >= 1) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'retry merge', moves: this.movesFrom(st.stage).join(', ') } } as GuardRefusal // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-      w.fact('Override', { rules: ['requeue.allowed'], move: 'retry merge', by, reason }) // i18n-ignore: a fact's kind and codes, not text
+      const returned = st.stage === 'active' && last?.state === 'failed' && retries < 1
+      const waiting = st.stage === 'approved' && r.options.finish === 'hiveMerges' && !openEntry(st) && !st.step
+      if (!(returned || waiting) || st.stale || notApproved(st, r, card.labels)) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'retry merge', moves: this.movesFrom(st.stage, r, st).join(', ') } } as GuardRefusal // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+      // Past a return it skips the requeue rule; from Approved it skips nothing.
+      if (returned) w.fact('Override', { rules: ['requeue.allowed'], move: 'retry merge', by, reason }) // i18n-ignore: a fact's kind and codes, not text
       this.enqueue(w, 'retry')
       return null
     })

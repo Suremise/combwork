@@ -91,6 +91,23 @@ describe('the workflow text in every locale', () => {
     }
   })
 
+  it("renders a submit.checksPassed refusal recorded before its text took the last run's reason, in every locale (HR1's #1654 round 1)", async () => {
+    // A Refused fact's values as they were stored then: no why, files or copy.
+    const before = { card: 'AM-12', check: 'lint', revision: 'a3f2c1d', command: 'hive-progress --check lint --card AM-12' }
+    expect(refusal('submit.checksPassed', before)).toMatchObject({ message: "Review refused: lint hasn't passed on a3f2c1d.", next: 'Run hive-progress --check lint --card AM-12, then submit again.' })
+    for (const code of LOCALES) {
+      setLanguage(code, await loadCatalogue(code), code)
+      const shown = refusalLines('submit.checksPassed', before, WINDOW)
+      for (const line of [shown.message, shown.next]) {
+        expect(line, code).not.toMatch(/[{}]/)
+        expect(line, code).toContain('lint')
+      }
+      expect(shown.next, code).toContain('hive-progress --check lint --card AM-12')
+      // A value it has is kept: the new reason shows.
+      expect(refusalLines('submit.checksPassed', { ...before, why: 'changed', files: 'src/a.ts', copy: 'yes' }, WINDOW).message, code).toContain('src/a.ts')
+    }
+  })
+
   it('shows the names in a refusal through their messages in the window, and intents as they are to agents', async () => {
     const agents = refusal('move.notFromHere', SAMPLE)
     expect(agents.message).toBe("AM-12 is in Approved: start review isn't possible from there.")

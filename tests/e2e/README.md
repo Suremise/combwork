@@ -549,7 +549,8 @@ Everything goes in `%LOCALAPPDATA%\hive-test\e2e` (override with `HIVE_E2E_DIR`)
   (screenshots, notification logs, reports) and its folders of screenshots and reports at any depth (`*shots`, such as
   `restart-shots` or `pshots`; `screenshots`, `artifacts`, `reports`; #284), never a profile, workspace, CLI home or
   sign-in file at any depth (inside a screenshot folder too), and never through a link (a suite folder with a link
-  anywhere on its path isn't read at all). A file over 20 MB, or past 500 files or 200 MB in all, is left out (`keepSuiteFiles` in
+  anywhere on its path isn't read at all). One file of a CLI home is kept: a fake Claude Code home's `fake-exits.jsonl`
+  (how each launch ended, with its code or uncaught error), as `<home>.fake-exits.jsonl` (#1146). A file over 20 MB, or past 500 files or 200 MB in all, is left out (`keepSuiteFiles` in
   `logs.mjs`). The runner says so when the run ends, with anything it left out, so the run folder is the path to cite in
   a card. A suite writing screenshots into a folder of its own names it to match.
 - The work folder itself: suites run on their own (`node tests/e2e/<suite>.cjs`) keep their folders there (each run

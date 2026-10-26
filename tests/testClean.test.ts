@@ -1069,6 +1069,27 @@ describe("a suite's kept files include its screenshot folders (#284)", () => {
     expect(readFileSync(join(run, 'restart', 'shots', 'deeper', 'also-good.png'), 'utf8')).toHaveLength(100)
   })
 
+  it("keeps how a fake Claude Code's launches ended from its home, and nothing else of it (#1146)", () => {
+    const root = temp('hive-keep-exits-')
+    const suite = join(root, 'e2e', 'lanes', '0', 'board')
+    tree(root, {
+      'e2e/lanes/0/board/board-start.png': 0,
+      'e2e/lanes/0/board/board-claude-home/fake-exits.jsonl': 0,
+      'e2e/lanes/0/board/board-claude-home/fake-launches.jsonl': 0,
+      'e2e/lanes/0/board/board-claude-home/.credentials.json': 0,
+      'e2e/lanes/0/board/board-claude-home/projects/x/s.jsonl': 0,
+      'e2e/lanes/0/board/board-profile/fake-exits.jsonl': 0,
+      'e2e/lanes/0/board/shots/other-claude-home/fake-exits.jsonl': 0
+    })
+    const run = newRunDir(join(root, 'e2e', 'logs'), new Date(2026, 9, 26, 2, 0, 0))
+    const kept = keepSuiteFiles(suite, run, 'board')
+    const got = (readdirSync(join(run, 'board'), { recursive: true }) as string[]).map((f) => f.split(/[\\/]/).join('/')).sort()
+    // At the top of the suite's folder only; a profile's file of that name and a home inside a screenshot folder aren't.
+    expect(got).toEqual(['board-claude-home.fake-exits.jsonl', 'board-start.png'])
+    expect(kept.copied).toBe(2)
+    expect(readFileSync(join(run, 'board', 'board-claude-home.fake-exits.jsonl'), 'utf8')).toHaveLength(100)
+  })
+
   it('never through a link to the suite folder or a folder above it', () => {
     const root = temp('hive-keep-rootlink-')
     const outside = temp('hive-keep-rootlink-outside-')

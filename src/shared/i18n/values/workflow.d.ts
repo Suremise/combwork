@@ -219,6 +219,8 @@ interface HiveMessageValues {
   'workflow.refused.lane.oneAtATime.next': { earlier: string | number; card: string | number }
   'workflow.refused.loop.followUpChecked.message': { card: string | number }
   'workflow.refused.loop.followUpChecked.next': undefined
+  'workflow.refused.loop.followUpMerging.message': { card: string | number }
+  'workflow.refused.loop.followUpMerging.next': undefined
   'workflow.refused.loop.noReviewer.message': { card: string | number }
   'workflow.refused.loop.noReviewer.next': undefined
   'workflow.refused.loop.noStep.message': { card: string | number }
@@ -286,8 +288,8 @@ interface HiveMessageValues {
   'workflow.refused.start.slotAvailable.message': { card: string | number }
   'workflow.refused.start.slotAvailable.next': undefined
   'workflow.refused.submit.checksPassed.change': undefined
-  'workflow.refused.submit.checksPassed.message': { check: string | number; revision: string | number }
-  'workflow.refused.submit.checksPassed.next': { command: string | number }
+  'workflow.refused.submit.checksPassed.message': { check: string | number; revision: string | number; why: string; files: string }
+  'workflow.refused.submit.checksPassed.next': { why: string; command: string | number; copy: string }
   'workflow.refused.submit.clean.change': undefined
   'workflow.refused.submit.clean.message': { card: string | number; folder: string | number; files: string | number }
   'workflow.refused.submit.clean.next': undefined

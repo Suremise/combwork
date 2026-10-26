@@ -100,6 +100,13 @@ const CASES: { name: string; file?: string; base: string; next: string; exit: 0 
     ].join('\n'),
     exit: 0
   },
+  {
+    name: "an object's className is class names, never text; a column's header beside it still is (#1655)",
+    base: `export const x = 1`,
+    next: `export const cols = [{ key: 'result', className: 'nowrap git-queue-result', cls: 'wide cell' }, { key: 'when', header: 'Merged at' }]`,
+    exit: 1,
+    sites: ['prose|prop:other|Merged at']
+  },
   { name: 'a file that does not parse fails the check (never skipped)', base: `export const x = 1`, next: `export const row = <span>Save</span><b>Oops</b>`, exit: 1 },
   { name: 'an agent-facing file is exempt', file: 'src/shared/toolReplies.ts', base: `export const x = 1`, next: 'export const reply = (n: number) => ({ text: `Changed ${n} cards: read them with hive_read_task` })', exit: 0 },
   {

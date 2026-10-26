@@ -131,6 +131,8 @@ export function textLeaves(n) {
 
 /** Attributes whose value is never shown. */
 const NON_TEXT_ATTRS = new Set(['className', 'style', 'key', 'id', 'type', 'href', 'src', 'role', 'name', 'value', 'htmlFor', 'target', 'rel', 'lang', 'dir', 'autoComplete', 'inputMode', 'icon', 'codicon', 'kind', 'variant', 'size', 'mode', 'side', 'align', 'tabIndex', 'accept', 'pattern', 'spellCheck', 'testId', 'command', 'view', 'level', 'tone', 'section', 'tab', 'scope', 'for', 'path', 'language', 'provider', 'width', 'height', 'viewBox', 'd', 'fill', 'stroke', 'xmlns', 'transform', 'points', 'cx', 'cy', 'r', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'strokeWidth', 'strokeLinecap', 'strokeLinejoin', 'fillRule', 'clipRule', 'preserveAspectRatio', 'sandbox', 'draggable', 'loading', 'decoding', 'colSpan', 'rowSpan', 'min', 'max', 'step', 'list', 'form', 'method', 'action', 'enterKeyHint', 'shortcut', 'keybinding', 'keys', 'storageKey', 'prefKey', 'cls'])
+/** Properties whose value is CSS class names, never text. */
+const CLASS_KEYS = /^(className|cls)$/
 /** Keys and properties that name shown text. */
 const PROSE_KEYS = /^(label|liveLabel|title|desc|description|tip|tooltip|text|message|body|detail|placeholder|hint|help|heading|subtitle|caption|confirm\w*|cancel\w*|ok\w*|button\w*|empty\w*|note|summary|reason|status\w*|error|warning|prompt|question|explanation|why|what|more|aria-?label|ariaLabel|alt|off|on|action|actionLabel|name)$/i
 // exitBy's caller is a line of hive.log (exitLog.ts, #985).
@@ -197,6 +199,8 @@ function contextOf(p) {
       case 'ObjectMethod': {
         if (child.key === 'key') return { skip: true }
         const k = n.key.type === 'Identifier' ? n.key.name : n.key.type === 'StringLiteral' ? n.key.value : ''
+        // A class list, as in JSX (a table column's `className: 'nowrap git-queue-result'`, #1655).
+        if (CLASS_KEYS.test(k)) return { skip: true }
         return { kind: PROSE_KEYS.test(k) ? 'prop:text' : 'prop:other' }
       }
       case 'MemberExpression':

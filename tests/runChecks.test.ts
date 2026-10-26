@@ -97,7 +97,8 @@ describe('a run as a check on Git (#1222)', () => {
       writeFileSync(join(p, 'a.txt'), 'edited\n')
       writeFileSync(join(p, 'a.txt'), was)
     })
-    expect(c).toMatchObject({ counted: false, whyNot: 'changed' })
+    // What it saw written is kept with it (#1654).
+    expect(c).toMatchObject({ counted: false, whyNot: 'changed', changes: ['a.txt'] })
   })
 
   it('a checkout and back during the run is a change (the HEAD reflog): not counted', async () => {
@@ -109,6 +110,7 @@ describe('a run as a check on Git (#1222)', () => {
       git(p, 'checkout', '-q', 'main')
     })
     expect(c).toMatchObject({ counted: false, whyNot: 'changed' })
+    expect(c.changes).toContain(':reflog')
   })
 
   it('another commit checked out at the end: moved', async () => {
@@ -121,7 +123,7 @@ describe('a run as a check on Git (#1222)', () => {
   it('a folder with uncommitted changes at the start: dirty', async () => {
     await watched()
     writeFileSync(join(p, 'new.txt'), 'untracked\n')
-    expect(await bracket(o, forGit(p))).toMatchObject({ counted: false, whyNot: 'dirty' })
+    expect(await bracket(o, forGit(p))).toMatchObject({ counted: false, whyNot: 'dirty', changes: ['new.txt'] })
   })
 
   it("a check that reported another command than its configured one doesn't count, and its own command is recorded (HR5's round 1 finding 1)", async () => {
@@ -173,7 +175,8 @@ describe('a run as a check on Git (#1222)', () => {
     p = repo()
     o = new Observer()
     expect(await bracket(o, forGit(p))).toMatchObject({ counted: true })
-    expect(await bracket(o, forGit(p), () => writeFileSync(join(p, 'a.txt'), 'a longer text\n'))).toMatchObject({ counted: false })
+    // The edit is left uncommitted: dirty, naming it.
+    expect(await bracket(o, forGit(p), () => writeFileSync(join(p, 'a.txt'), 'a longer text\n'))).toMatchObject({ counted: false, whyNot: 'dirty', changes: ['a.txt'] })
   })
 })
 
@@ -215,7 +218,7 @@ describe('a run as a check on None (#1222)', () => {
 
   it('a write to another deliverable during the run is a change', async () => {
     const r = await folder()
-    expect(await bracket(o, r, () => writeFileSync(join(p, 'other.md'), 'edited\n'))).toMatchObject({ counted: false, whyNot: 'changed' })
+    expect(await bracket(o, r, () => writeFileSync(join(p, 'other.md'), 'edited\n'))).toMatchObject({ counted: false, whyNot: 'changed', changes: ['other.md'] })
   })
 })
 

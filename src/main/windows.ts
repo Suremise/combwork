@@ -93,6 +93,7 @@ function forEvent(e: HiveEvent): BrowserWindow[] {
     case 'assistant-questions':
     case 'agent-added':
     case 'branch-status':
+    case 'session-bulk':
       return wins([windowForPath(e.projectPath)])
     case 'agent-leftovers':
       return wins([windowForPath(e.leftovers.projectPath)])

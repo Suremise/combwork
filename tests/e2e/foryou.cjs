@@ -191,7 +191,7 @@ const check = (name, ok, extra = '') => {
     }
     let qDialog = await openQ()
     const section = qDialog.locator('[data-section="for-you"]')
-    check('the card dialog shows the request: its kind, its words and who asks', !!(await lib.until(async () => /Approve OK to push the release tag\?[\s\S]*Maker asks/.test(await section.innerText().catch(() => '')), HUNG_MS)), await section.innerText().catch(() => ''))
+    check('the card dialog shows the request: its kind, its words and who asks', !!(await lib.until(async () => /Approve\s+OK to push the release tag\?[\s\S]*Maker asks/.test(await section.innerText().catch(() => '')), HUNG_MS)), await section.innerText().catch(() => ''))
     for (const theme of ['dark', 'light']) {
       await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
       await section.screenshot({ path: path.join(lib.WORK, `foryou-dialog-${theme}.png`) })
@@ -303,6 +303,64 @@ const check = (name, ok, extra = '') => {
     const chose = (await inv('tasks:facts', s)).find((f) => f.kind === 'Approval')
     check('…recording the action and its reason', chose?.data.action === 'done' && chose?.data.note === 'already done by #1277', JSON.stringify(chose))
     check('…and the builder hears what was chosen', !!(await lib.until(async () => wakes('Maker').some((w) => w.startsWith(`[Hive] ${sKey}`) && w.includes('moved it to Done (already done by #1277)')), HUNG_MS)), JSON.stringify(wakes('Maker')))
+    await page.keyboard.press('Escape')
+
+    // #1637: an agent's question is Markdown (HB5's HI-1630 design question): rendered as card comments are, never the
+    // raw marks, and a long one folded with Show all.
+    const m = (await inv('tasks:create', { title: 'Design question', project: 'beta' })).number
+    await inv('tasks:move', m, 'doing', { agent: maker.id })
+    const point = (num, label, body) => `${num}. **${label}:** ${body}`
+    const design = [
+      'HI-1630 design: OK to build it this way?',
+      '',
+      point(1, 'Agent side', '`hive_ask_user` gets an optional `actions` list, at most 3: `done`, `noCode`, `unblock`.'),
+      point(2, 'For you', 'each action shows as a button with its reason, which you can edit.'),
+      point(3, 'One click', 'it does what the board does today, as you, with the reason.'),
+      point(4, 'Send Reply and Record as Decision', 'get tooltips that say what each does.'),
+      point(5, 'Agent guidance', 'one sentence in the tool description saying when to offer actions.'),
+      '',
+      ...Array.from({ length: 8 }, (_, i) => `A further paragraph ${i + 1}, so the question is longer than the fold.`)
+    ].join('\n')
+    await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${m}`, kind: 'decide', text: design })}`)
+    await openByTitle(page, m)
+    const mDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
+    await mDialog.waitFor({ timeout: HUNG_MS })
+    const question = mDialog.locator('[data-section="for-you"] .for-you-question')
+    check('an agent’s question renders as Markdown: numbered points', !!(await lib.until(async () => (await question.locator('ol > li').count()) === 5, HUNG_MS)), await question.innerHTML().catch(() => ''))
+    check('…bold labels and code', (await question.locator('strong', { hasText: 'Agent side:' }).count()) === 1 && (await question.locator('code', { hasText: 'hive_ask_user' }).count()) === 1)
+    check('…none of the raw marks', !/\*\*|`/.test(await question.innerText()), await question.innerText())
+    check('…its line breaks kept', (await question.locator('p br').count()) >= 7, await question.innerHTML())
+    const more = mDialog.locator('.for-you-more')
+    check('a long question is folded, with Show all', (await more.count()) === 1 && (await more.innerText()).trim() === 'Show all' && (await question.evaluate((el) => el.scrollHeight > el.clientHeight + 1)), await more.innerText().catch(() => ''))
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await mDialog.locator('[data-section="for-you"]').screenshot({ path: path.join(lib.WORK, `foryou-markdown-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await more.click()
+    check('…Show all shows it whole', !!(await lib.until(async () => (await question.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)) && (await more.innerText()).trim() === 'Show less', HUNG_MS)), await more.innerText().catch(() => ''))
+    await page.keyboard.press('Escape')
+
+    // HR5's round 1 (#1637): a question that fits, then wraps past the fold once the window is zoomed in, is folded
+    // with Show all then, and not once it fits again. Zoomed to 300%: the dialog narrows with the window's width.
+    const f = (await inv('tasks:create', { title: 'Fits at first', project: 'beta' })).number
+    await inv('tasks:move', f, 'doing', { agent: maker.id })
+    const fits = Array.from({ length: 6 }, (_, i) => `Line ${i + 1}: a sentence that fits on one line here, and wraps once the window is zoomed in.`).join('\n')
+    await makerSays(`hive hive_ask_user ${JSON.stringify({ card: `#${f}`, kind: 'decide', text: fits })}`)
+    await openByTitle(page, f)
+    const fDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
+    await fDialog.waitFor({ timeout: HUNG_MS })
+    const fQuestion = fDialog.locator('[data-section="for-you"] .for-you-question')
+    const fMore = fDialog.locator('.for-you-more')
+    check('a question that fits has no Show all', !!(await lib.until(async () => (await fQuestion.locator('p br').count()) === 5, HUNG_MS)) && (await fMore.count()) === 0, await fQuestion.innerHTML().catch(() => ''))
+    const zoom = (factor) => app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), factor)
+    await zoom(3)
+    try {
+      check('…zoomed in, it wraps past the fold: Show all appears', !!(await lib.until(async () => (await fMore.count()) === 1 && (await fQuestion.evaluate((el) => el.scrollHeight > el.clientHeight + 1)), HUNG_MS)), JSON.stringify({ more: await fMore.count(), box: await fQuestion.evaluate((el) => [el.clientWidth, el.clientHeight, el.scrollHeight, window.devicePixelRatio]) }))
+    } finally {
+      await zoom(1)
+    }
+    check('…and goes once it fits again', !!(await lib.until(async () => (await fMore.count()) === 0, HUNG_MS)), String(await fMore.count()))
   } finally {
     await app.close()
   }
