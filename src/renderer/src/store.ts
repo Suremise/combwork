@@ -22,7 +22,7 @@ import type { ProgressFilter } from '@shared/progress'
 import type { TemplateAgent, TemplateRef } from '@shared/templates'
 import type { GitTool } from '@shared/gitTool'
 import type { RunsFilter } from '@shared/progressTabs'
-import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkspaceUsage, RecentWorkspace } from '@shared/types'
+import type { AgentBranchStatus, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkspaceUsage, RecentWorkspace } from '@shared/types'
 import type { PresetId } from '@shared/workflow/options'
 import type {
   AgentApiInfo,
@@ -416,6 +416,11 @@ interface State {
   tasks: TaskCard[]
   /** Whether the board is read-only and why, and its kept 0.9 copy (#1207): read with the board. */
   boardState: BoardState | null
+  /**
+   * Every project's stages for the board's columns (`board:stages`, HI-1682), by path in lower case: read with the
+   * board when what they were read for (`for`, boardStagesFor) has changed, so its columns come with its cards.
+   */
+  boardStages: { for: string; byPath: Record<string, ProjectStages | null> } | null
   /** Each project's key and its old keys (#1221), read with the board (a key change is a board change). */
   projectKeys: ProjectKeys[]
   /** The names moved cards keep in the projects they left (`HI-1` → card), read with the board too (#1221). */
@@ -593,6 +598,7 @@ export const useStore = create<State>(() => ({
 
   tasks: [],
   boardState: null,
+  boardStages: null,
   projectKeys: [],
   movedCardNames: {},
   perfWorkspace: DEFAULT_PERF_FILTERS,
@@ -1286,14 +1292,24 @@ export function loadTasks(): Promise<void> {
 async function readTasks(): Promise<void> {
   const ws = get().workspace?.path
   const mine = ++tasksLoad
-  if (!ws) return set({ tasks: [], boardState: null, projectKeys: [], movedCardNames: {} })
+  if (!ws) return set({ tasks: [], boardState: null, boardStages: null, projectKeys: [], movedCardNames: {} })
   try {
-    const [tasks, boardState, projectKeys, movedCardNames] = await Promise.all([window.hive.invoke('tasks:list', fullArchive > 0), window.hive.invoke('board:state'), window.hive.invoke('project:keys'), window.hive.invoke('project:movedCardNames')])
-    if (mine === tasksLoad && get().workspace?.path === ws) set({ tasks, boardState, projectKeys, movedCardNames })
+    // The stages too when a workflow was written or the projects changed since they were read (HI-1682); a failed read
+    // of them leaves each project's columns as its cards' stages give them.
+    const stagesFor = boardStagesFor(get())
+    const readStages = get().boardStages?.for !== stagesFor
+    const [tasks, boardState, projectKeys, movedCardNames, stages] = await Promise.all([window.hive.invoke('tasks:list', fullArchive > 0), window.hive.invoke('board:state'), window.hive.invoke('project:keys'), window.hive.invoke('project:movedCardNames'), readStages ? window.hive.invoke('board:stages').catch(() => ({})) : null])
+    if (mine === tasksLoad && get().workspace?.path === ws) set({ tasks, boardState, projectKeys, movedCardNames, ...(stages ? { boardStages: { for: stagesFor, byPath: stages } } : {}) })
   } catch {
     // The workspace closed meanwhile.
   }
 }
+
+/**
+ * What the board's stages are read for: the workspace, its projects and their version control, and the workflows
+ * written since the window opened (`workflow-changed`). Stages read for another are read again with the board.
+ */
+export const boardStagesFor = (s: Pick<State, 'workspace' | 'workflowVersion'>): string => `${s.workspace?.path ?? ''}|${s.workflowVersion}|${(s.workspace?.projects ?? []).map((p) => `${p.path}:${p.platform?.id ?? ''}`).join('|')}`
 
 /** A project's key and its old keys, as the board has them (#1221). */
 export type ProjectKeys = { projectPath: string; key: string; aliases: string[] }

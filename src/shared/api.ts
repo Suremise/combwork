@@ -308,6 +308,11 @@ export interface HiveRequests {
    * null for a project whose version control isn't recorded yet. A `workflow-changed` event says when to read it again.
    */
   'workflow:stages': (projectPath: string) => ProjectStages | null
+  /**
+   * Every project's stages (`workflow:stages`) by its path in lower case: read with the board's cards, so its columns
+   * are right in its first paint, never added after it (HI-1682).
+   */
+  'board:stages': () => Record<string, ProjectStages | null>
   /** What switching the project's version control would do (#1419, §16.6.5's warning): why it can't now, what keeps old rules. */
   'workflow:checkPlatform': (projectPath: string, to: PlatformId) => PlatformSwitchCheck
   /**

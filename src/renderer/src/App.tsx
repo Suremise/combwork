@@ -258,7 +258,10 @@ function handleEvent(e: HiveEvent): void {
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) queueChangedEvent(e.projectPath)
       break
     case 'workflow-changed':
-      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set((s) => ({ workflowVersion: s.workflowVersion + 1 }))
+      if (e.workspacePath.toLowerCase() !== get().workspace?.path.toLowerCase()) break
+      set((s) => ({ workflowVersion: s.workflowVersion + 1 }))
+      // A board change: its columns come with its next read (HI-1682).
+      void loadTasks()
       break
     case 'lanes-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) set({ lanes: e.lanes })

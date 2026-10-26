@@ -973,7 +973,9 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
         const open = g.columns.filter((c) => !fold.columns?.includes(c.id)).length
         return (
           <div key={g.category} className={cx('board-category', !open && 'collapsed')} data-category={g.category} style={{ flexGrow: open, ...({ '--stages': g.columns.length, '--folded': g.columns.length - open } as React.CSSProperties), ...(colored ? ({ '--col': columnColor(colors, g.category) } as React.CSSProperties) : {}) }}>
-            <div className="board-category-head">{tr(COLUMN_TEXT[g.category].label)}</div>
+            <div className="board-category-head">
+              <span>{tr(COLUMN_TEXT[g.category].label)}</span>
+            </div>
             <div className="board-category-columns">{g.columns.map(column)}</div>
           </div>
         )

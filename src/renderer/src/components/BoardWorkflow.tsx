@@ -1,17 +1,17 @@
-import { useEffect, useState } from 'react'
-import type { ProjectInfo, ProjectStages, WorkflowForm } from '@shared/types'
+import { useEffect, useRef, useState } from 'react'
+import type { ProjectInfo, WorkflowForm } from '@shared/types'
 import { msg, tr } from '@shared/i18n'
 import { PRESET_TEXT } from '@shared/workflow/optionTexts'
 import { call } from '../api'
-import { NO_PROJECTS, showVersionControl, useLanguage, useStore } from '../store'
+import { boardStagesFor, loadTasks, NO_PROJECTS, showVersionControl, useLanguage, useStore } from '../store'
 import type { BoardProject } from '../boardStages'
 import { M as VC_TEXT, PLATFORM_TEXT, presetState } from '../views/VersionControlHeader'
 import { Icon, Tooltip, useContextMenu } from './ui'
 
 /**
  * The board's link to each shown project's workflow (#1420): "Workflow: Git · Team" for the project shown, a line per
- * project in a menu with several; each opens its Version Control tab at Workflow. And the shown projects' stages
- * (`workflow:stages`), read again when a project's workflow is written (`workflow-changed`).
+ * project in a menu with several; each opens its Version Control tab at Workflow. And the shown projects' stages, for
+ * the board's columns (`board:stages`, read with the board's cards).
  */
 
 /** The projects the board shows: one, or every project of the workspace. */
@@ -20,60 +20,43 @@ function useShown(project: string | null): ProjectInfo[] {
   return project === null ? projects : projects.filter((p) => p.name.toLowerCase() === project.toLowerCase())
 }
 
-/** What was last read for each project (by its path, lower case), kept while the board is closed: opened again, it
- *  draws with them at once, and the new read replaces them (HI-1682: read only after the first paint, the Merging
- *  column and the Approved group's heading came late, moving every column). Each with the workflow it was read for. */
-type Kept<T> = Map<string, { workflow: string; value: T }>
-const STAGES: Kept<ProjectStages | null> = new Map()
-const FORMS: Kept<WorkflowForm> = new Map()
-
-/** A project's workflow as the window knows it: its saved options and platform, and the workflows written since the
- *  window opened (`workflow-changed`, counted while the board is closed too). What was read for another is stale. */
-const workflowOf = (p: ProjectInfo, version: number): string => `${version}|${JSON.stringify(p.config.workflow ?? null)}|${p.platform?.id ?? ''}`
-
-/**
- * Something read for each shown project by its path, again when a workflow is written or the projects change, starting
- * from what `cache` kept from a read for the same workflow. known: every shown project has a value, read now or kept
- * (one whose read failed counts once it was tried).
- */
-function usePerProject<T>(project: string | null, cache: Kept<T>, read: (path: string) => Promise<T>): { values: Map<string, T>; known: boolean } {
+/** Something read for each shown project by its path, again when a workflow is written or the projects change. */
+function usePerProject<T>(project: string | null, read: (path: string) => Promise<T>): Map<string, T> {
   const shown = useShown(project)
   const version = useStore((s) => s.workflowVersion)
   const key = shown.map((p) => `${p.path}|${JSON.stringify(p.config.workflow ?? null)}|${p.platform?.id ?? ''}`).join('\n')
   const [read_, setRead] = useState<{ key: string; values: Map<string, T> } | null>(null)
   useEffect(() => {
     let live = true
-    const asked = new Map(shown.map((p) => [p.path.toLowerCase(), workflowOf(p, version)]))
     void Promise.all(shown.map((p) => read(p.path).then((v) => [p.path.toLowerCase(), v] as const, () => null))).then((all) => {
-      if (!live) return
-      const values = new Map(all.filter((x): x is readonly [string, Awaited<T>] => !!x))
-      for (const [path, value] of values) cache.set(path, { workflow: asked.get(path)!, value })
-      setRead({ key, values })
+      if (live) setRead({ key, values: new Map(all.filter((x): x is readonly [string, Awaited<T>] => !!x)) })
     })
     return () => {
       live = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, version])
-  if (read_?.key === key) return { values: read_.values, known: true }
-  const kept = new Map<string, T>()
-  for (const p of shown) {
-    const path = p.path.toLowerCase()
-    const k = cache.get(path)
-    if (k && k.workflow === workflowOf(p, version)) kept.set(path, k.value)
-  }
-  return { values: kept, known: kept.size === shown.length }
+  return read_?.values ?? new Map()
 }
 
 /**
- * The shown projects with their stages, for the board's columns; null until they are known (read, or kept from the
- * board's last open), so the board never draws a default set of columns that the workflow then changes (HI-1682).
+ * The shown projects with their stages, for the board's columns: from the board's own read (`board:stages`, read with
+ * its cards), so its columns are right in its first paint, never added after it (HI-1682). Null until that read is
+ * there, and when the board opens on stages read for an older workflow or projects (read again meanwhile): it never
+ * draws a set of columns the workflow then changes. Once drawn, a change of the workflow changes them once, when read.
  */
 export function useBoardProjects(project: string | null): BoardProject[] | null {
   const shown = useShown(project)
-  const { values, known } = usePerProject<ProjectStages | null>(project, STAGES, (path) => call('workflow:stages', path))
-  if (!known) return null
-  return shown.map((p) => ({ name: p.name, stages: values.get(p.path.toLowerCase()) ?? null }))
+  const stages = useStore((s) => s.boardStages)
+  const current = useStore(boardStagesFor)
+  const drawn = useRef(false)
+  const fresh = stages?.for === current
+  useEffect(() => {
+    if (!fresh) void loadTasks()
+  }, [fresh, current])
+  if (!stages || (!fresh && !drawn.current)) return null
+  drawn.current = true
+  return shown.map((p) => ({ name: p.name, stages: stages.byPath[p.path.toLowerCase()] ?? null }))
 }
 
 /** "Workflow: Git · Team" for a project, as its Version Control tab says it. */
@@ -88,7 +71,7 @@ const WORKFLOWS = msg({ id: 'board.workflows', defaultMessage: 'Workflows', desc
 export function BoardWorkflowLink({ project }: { project: string | null }) {
   useLanguage()
   const shown = useShown(project).filter((p) => p.platform)
-  const forms = usePerProject<WorkflowForm>(project, FORMS, (path) => call('workflow:form', path)).values
+  const forms = usePerProject<WorkflowForm>(project, (path) => call('workflow:form', path))
   const menu = useContextMenu()
   if (!shown.length) return null
   const open = (p: ProjectInfo): void => showVersionControl(p.path, 'workflow')

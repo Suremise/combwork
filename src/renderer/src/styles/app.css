@@ -8538,6 +8538,9 @@ body.pane-resizing-v .monaco-editor {
   display: flex;
   gap: 10px;
   overflow-x: auto;
+  /* The view's 10 px gap above it is inside it, so a group's heading on its line there (below) is in its scroll box. */
+  margin-top: -10px;
+  padding-top: 10px;
 }
 .board-column {
   flex: 1 1 0;
@@ -8558,8 +8561,7 @@ body.pane-resizing-v .monaco-editor {
   min-width: 34px;
 }
 /* A category with several stages (#1420: Approved with Merging): one heading over its stages' columns, which share its
-   width as the board's columns do; its flex-grow is how many of them are open (inline). The other columns start lower
-   by the heading's height, so every column's header lines up. Its basis is the room inside it that isn't its open
+   width as the board's columns do; its flex-grow is how many of them are open (inline). Its basis is the room inside it that isn't its open
    columns' shares: the gaps between its stages (10 px each), a folded stage's 34 px strip, and each open column's
    borders (2 px: a column's least size, which every column outside a category has as its own basis). So each open
    column gets the same share of the board as the others (#1490: Approved and Merging were 5 px narrower, and Approved's
@@ -8573,14 +8575,44 @@ body.pane-resizing-v .monaco-editor {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  position: relative;
 }
 .board-category.collapsed {
   flex: 0 0 auto;
 }
+/* Its heading is a line over its columns in the 10 px gap above them, its name on the line as a fieldset's legend
+   (HI-1682, Darren's decision): it takes no row of its own, so every column's top is the same with a group or without
+   one. The name, on the view's background, may reach a pixel into the columns' tops. */
 .board-category-head {
-  height: 18px;
-  padding: 0 6px;
-  font-size: 11px;
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  height: 10px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  pointer-events: none;
+}
+/* Folded to its strips, its name has their width only. */
+.board-category.collapsed .board-category-head {
+  padding: 0 2px;
+}
+.board-category-head::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 0;
+  border-top: 2px solid var(--border-subtle);
+}
+.board-category-head > span {
+  position: relative;
+  min-width: 0;
+  padding: 0 4px;
+  background: var(--bg);
+  font-size: 10px;
+  line-height: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -8588,12 +8620,12 @@ body.pane-resizing-v .monaco-editor {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border-bottom: 2px solid var(--border-subtle);
-  margin-bottom: 4px;
 }
-.board.colored .board-category-head {
+.board.colored .board-category-head > span {
   color: color-mix(in srgb, var(--col) var(--board-label), var(--fg-strong));
-  border-bottom-color: var(--col);
+}
+.board.colored .board-category-head::before {
+  border-top-color: var(--col);
 }
 .board-category-columns {
   flex: 1;
@@ -8605,10 +8637,8 @@ body.pane-resizing-v .monaco-editor {
 .board-category-columns > .board-column:not(.collapsed) {
   min-width: 120px;
 }
-/* The heading's height (its 2 px edge inside it) and margin: 22 px, so the headers line up (#1490: 24 was 2 px low). */
+/* Seven columns where six were: each a little narrower at least, so they still fit where six did. */
 .board.grouped > .board-column {
-  margin-top: 22px;
-  /* Seven columns where six were: each a little narrower at least, so they still fit where six did. */
   min-width: 140px;
 }
 .board-column-strip {

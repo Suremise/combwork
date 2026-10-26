@@ -8,7 +8,10 @@
 // - a rename shows on the board (one project), the default name with two projects naming it differently, each card's
 //   hover its own project's name;
 // - "Workflow: Git · …" in the toolbar opens Version Control → Workflow; a line per project with all of them;
-// - a None project beside the Git ones.
+// - a None project beside the Git ones;
+// - every column there on open, with the board's cards, and nothing moving after (HI-1682): the reads held, the first
+//   open, opened again, a workflow changed while the board was closed, groups collapsed and none; Approved's heading
+//   on its line in the gap, the columns starting where they do with no group.
 // Screenshots in both themes, English and Polish. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -332,32 +335,28 @@ const nothingToArchive = (dialog) => {
     fs.writeFileSync(fx.go, 'go')
     await until(async () => (await h.card(second.n))?.column === 'done', HUNG_MS)
 
-    // --- No shift when the workflow arrives (HI-1682): the board's columns, their tops and the toolbar's height are the
-    // same from the first paint on. main's stages and workflow reads are held, to see the board meanwhile: the first
-    // open of a session shows its frame without columns, never a default set (no Merging) the workflow then changes;
-    // opened again, the columns kept from its last open at once. Each layout the board takes is recorded as it is made.
-    // main's answers for alpha with its options now (Hive merges) and with none of Merging (No review, committed), read
-    // before the reads are replaced; the test says which alpha's reads answer (`answer`), as its options change.
-    const read = async (p) => ({ stages: await inv('workflow:stages', p), form: await inv('workflow:form', p) })
+    // --- Every column there on open, nothing moving after (HI-1682, Darren's decision): the board's columns come with its
+    // cards (`board:stages`, in the board's read), and Approved's heading sits on its line in the gap above the columns,
+    // so a grouped board's columns start where a board's with no group do. main's reads of the stages and of the
+    // toolbar's workflow link are held, to see the board meanwhile; each layout the board takes is recorded as it is
+    // made. main's answers for alpha with its options now (Hive merges) and with no Merging (No review, committed) are
+    // read before the reads are replaced; the test says which alpha's answer (`answer`) as its options change.
+    const read = async () => ({ stages: await inv('board:stages'), form: await inv('workflow:form', fx.alpha) })
     const plain = { review: 'none', finish: 'committed', folder: 'project' }
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: plain })
-    const alphaPlain = await read(fx.alpha)
+    const alphaPlain = await read()
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
-    const alphaMerges = await read(fx.alpha)
-    // The same workflow read again, told apart by what it doesn't move: Active named Fresh, the link's preset Pair.
-    const alphaFresh = { stages: { ...alphaMerges.stages, names: { ...alphaMerges.stages.names, active: 'Fresh' } }, form: { ...alphaMerges.form, preset: 'pair' } }
-    const answers = { [beta]: await read(beta), [notes]: await read(notes) }
-    await h.app.evaluate(({ ipcMain }, m) => {
-      globalThis.__hold = { on: false, held: [], answers: m }
-      for (const [channel, part] of [['workflow:stages', 'stages'], ['workflow:form', 'form']]) {
-        ipcMain.removeHandler(channel)
-        ipcMain.handle(channel, (_e, p) => {
-          const v = globalThis.__hold.answers[p]?.[part] ?? null
-          return globalThis.__hold.on ? new Promise((r) => globalThis.__hold.held.push(() => r(v))) : v
-        })
-      }
-    }, { ...answers, [fx.alpha]: alphaMerges })
-    const answer = (a) => h.app.evaluate((_, [p, v]) => void (globalThis.__hold.answers[p] = v), [fx.alpha, a])
+    const alphaMerges = await read()
+    const forms = { [beta]: await inv('workflow:form', beta), [notes]: await inv('workflow:form', notes) }
+    await h.app.evaluate(({ ipcMain }, d) => {
+      globalThis.__hold = { on: false, held: [], alpha: d.alpha, answer: d.answer, forms: d.forms }
+      const reply = (v) => (globalThis.__hold.on ? new Promise((r) => globalThis.__hold.held.push(() => r(v))) : v)
+      ipcMain.removeHandler('board:stages')
+      ipcMain.handle('board:stages', () => reply(globalThis.__hold.answer.stages))
+      ipcMain.removeHandler('workflow:form')
+      ipcMain.handle('workflow:form', (_e, p) => reply(p === globalThis.__hold.alpha ? globalThis.__hold.answer.form : (globalThis.__hold.forms[p] ?? null)))
+    }, { alpha: fx.alpha, answer: alphaMerges, forms })
+    const answer = (a) => h.app.evaluate((_, v) => void (globalThis.__hold.answer = v), a)
     const hold = (on) => h.app.evaluate((_, v) => void (globalThis.__hold.on = v), on)
     const heldReads = () => h.app.evaluate(() => globalThis.__hold.held.length)
     const release = () => h.app.evaluate(() => {
@@ -390,30 +389,29 @@ const nothingToArchive = (dialog) => {
       const drawn = all.filter((l) => l.columns)
       return drawn.length > 0 && new Set(drawn.map((l) => `${l.columns}|${l.tops}`)).size === 1 && !drawn[0].tops.includes(',') && new Set(all.map((l) => l.toolbar)).size === 1
     }
+    const topOf = async () => (await layouts()).filter((l) => l.columns).pop()?.tops
     const topShot = (name) => page.screenshot({ path: path.join(fx.shots, `boardstages-${name}.png`), clip: { x: 0, y: 0, width: 1500, height: 260 } })
-    // Away from the board and back: it is drawn anew.
-    const reopen = async (project) => {
+    const closeBoard = async () => {
       await page.getByRole('button', { name: 'Projects' }).click()
       await until(async () => (await board.count()) === 0, HUNG_MS)
-      await record()
-      await showBoard(project)
     }
-    // The board opened by open() with main's reads held: its frame without columns until they come, then every column
-    // at once with the workflow link (each read's answer applied); nothing moves, comes or goes, and the toolbar keeps
-    // its height.
+    const merges = 'hold todo doing review passed merging done'
+    // The board opened by open() with main's reads held: its frame without columns until its read comes, then every
+    // column at once; the workflow link once its own read is applied. Nothing moves, comes or goes, and the toolbar
+    // keeps its height.
     const heldOpen = async (what, open, expected, shot) => {
       await hold(true)
       await open()
       const waiting = !!(await until(async () => (await heldReads()) > 0 && (await board.count()) === 1, HUNG_MS))
-      check(`${what}: while the workflow is read, the board's frame shows without columns`, waiting && (await board.locator('.board-column').count()) === 0, JSON.stringify(await layouts()))
+      check(`${what}: while the board's read waits, its frame shows without columns`, waiting && (await board.locator('.board-column').count()) === 0, JSON.stringify(await layouts()))
       if (shot) await topShot(`${shot}-before`)
       await release()
       await hold(false)
-      check(`…then its columns, at once: ${expected}`, !!(await until(async () => (await columns()) === expected.replace(/\*/g, '') && (await link.count()) === 1, HUNG_MS)), await columns())
+      check(`…then its columns, at once, and the workflow link: ${expected}`, !!(await until(async () => (await columns()) === expected.replace(/\*/g, '') && (await link.count()) === 1, HUNG_MS)), await columns())
       if (shot) await topShot(`${shot}-after`)
       check('…no column moved, none came or went, the toolbar kept its height', steady(await layouts()), JSON.stringify(await layouts()))
     }
-    // A reload: the session's first open (held before it: the board, shown already, reads its workflows as the window opens).
+    // A reload: the window's first read of the board (held before it: the board, shown already, reads as the window opens).
     const firstOpen = (project, expected, shot) =>
       heldOpen(`${project}, first open`, async () => {
         await page.reload()
@@ -421,34 +419,35 @@ const nothingToArchive = (dialog) => {
         await record()
         await showBoard(project)
       }, expected, shot)
-    const merges = 'hold todo doing review passed merging done'
     await firstOpen('alpha', merges, 'noshift-first')
-    // Opened again with the reads held: drawn as before from the first paint, the workflow link too. The reads then
-    // answer the same workflow told apart (Active named Fresh, the link's preset Pair): once both show, nothing moved.
-    await answer(alphaFresh)
+    const groupedTop = await topOf()
+    // Opened again: every column from the first paint, with no read of the stages (they came with the board); the
+    // workflow link, held, comes after them and moves nothing.
+    await closeBoard()
     await hold(true)
-    await reopen('alpha')
-    check('alpha, opened again: its columns and the workflow link from the first paint', !!(await until(async () => (await columns()) === merges, HUNG_MS)) && (await layouts()).filter((l) => l.columns).every((l) => l.chip), JSON.stringify(await layouts()))
+    await record()
+    await showBoard('alpha')
+    check('alpha, opened again: every column from the first paint', !!(await until(async () => (await columns()) === merges, HUNG_MS)) && (await layouts()).filter((l) => l.columns).every((l) => l.columns.replace(/\*/g, '') === merges), JSON.stringify(await layouts()))
+    check('…the workflow link waits for its read', !!(await until(async () => (await heldReads()) > 0, HUNG_MS)) && (await link.count()) === 0)
     await topShot('noshift-again')
     await release()
     await hold(false)
-    check("…the reads' answers shown: Active named Fresh, the link Pair", !!(await until(async () => (await labelText('doing')) === 'Fresh' && /Pair/.test((await link.textContent().catch(() => '')) ?? ''), HUNG_MS)), `${await labelText('doing')} / ${await link.textContent().catch(() => '')}`)
-    check('…and nothing moved when they came', steady(await layouts()), JSON.stringify(await layouts()))
-    await answer(alphaMerges)
-    // The workflow changed while the board is closed (HR5's round 1): opened again, never the columns kept for the old
-    // one. To No review (no Merging): Merging never shows; and back: Merging comes with the rest, never after them.
-    const changedWhileClosed = (options, expected) =>
-      heldOpen(`alpha, its workflow changed while the board was closed`, async () => {
-        await page.getByRole('button', { name: 'Projects' }).click()
-        await until(async () => (await board.count()) === 0, HUNG_MS)
-        await answer(options === plain ? alphaPlain : alphaMerges)
+    check('…then shows, the columns where they were and the toolbar its height', !!(await until(async () => (await link.count()) === 1, HUNG_MS)) && steady(await layouts()), JSON.stringify(await layouts()))
+    // The workflow changed while the board is closed (HR5's round 1): opened again, never the columns of the old one.
+    // To No review (no Merging): Merging never shows; and back: Merging comes with the rest, never after them.
+    const changedWhileClosed = (options, answered, expected) =>
+      heldOpen('alpha, its workflow changed while the board was closed', async () => {
+        await closeBoard()
+        await answer(answered)
+        // Held from here: the change is a board change, read at once (held), and the board opens on it.
+        await hold(true)
         await inv('workflow:setOptions', fx.alpha, { preset: null, options })
         await record()
         await showBoard('alpha')
       }, expected)
-    await changedWhileClosed(plain, 'hold todo doing done')
+    await changedWhileClosed(plain, alphaPlain, 'hold todo doing done')
     check('…no Merging or Approved at any point', (await layouts()).every((l) => !/passed|merging/.test(l.columns)), JSON.stringify(await layouts()))
-    await changedWhileClosed(q.queueOptions(fx), merges)
+    await changedWhileClosed(q.queueOptions(fx), alphaMerges, merges)
     // Merging collapsed (HI-1662), then the whole Approved group.
     await col('merging').getByRole('button', { name: 'Collapse Merging' }).click()
     await until(async () => (await collapsed('merging')), HUNG_MS)
@@ -458,9 +457,19 @@ const nothingToArchive = (dialog) => {
     await firstOpen('alpha', 'hold todo doing review passed* merging* done', 'noshift-collapsed')
     await col('merging').getByRole('button', { name: 'Expand Merging' }).click()
     await col('passed').getByRole('button', { name: 'Expand Approved' }).click()
-    // No group (beta: no review, no Merging): Merging never flashes in.
+    // No group (beta: no review, no Merging): Merging never flashes in, and the columns start where alpha's do.
     await firstOpen('beta', 'hold todo doing done', 'noshift-nogroup')
     check('beta: no Merging or Approved at any point', (await layouts()).every((l) => !/passed|merging/.test(l.columns)), JSON.stringify(await layouts()))
+    check("the Approved heading takes no row: alpha's columns start where beta's do", (await topOf()) === groupedTop, `${groupedTop} / ${await topOf()}`)
+    // The heading on its line: in the gap between the toolbar and the columns, over Approved and Merging.
+    await showBoard('alpha')
+    await until(async () => (await columns()) === merges, HUNG_MS)
+    const head = await page.evaluate(() => {
+      const r = (sel) => document.querySelector(sel).getBoundingClientRect()
+      const name = r('.board-category-head > span')
+      return { name: { top: name.top, bottom: name.bottom }, toolbar: r('.board-toolbar').bottom, columns: r('.board-column[data-column="passed"]').top, line: r('.board-category-head').width, group: r('.board-category').width }
+    })
+    check("…its name between the toolbar and the columns (a pixel's overlap at most), its line the group's width", head.name.top >= head.toolbar - 1 && head.name.bottom <= head.columns + 3 && Math.abs(head.line - head.group) < 1, JSON.stringify(head))
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
     await h.page.screenshot({ path: path.join(fx.shots, 'boardstages-failed.png') }).catch(() => {})
