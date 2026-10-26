@@ -2159,11 +2159,11 @@ class SessionManager {
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l) return null
     const key = this.key(projectPath, agentId)
-    if (this.delivering.has(key)) return 'Hive is typing into it'
-    if (this.lineBlocked(l)) return "a line Hive typed isn't taken yet"
-    if (this.userMayBeTyping(projectPath, agentId)) return 'the user is typing there'
+    if (this.delivering.has(key)) return 'Hive is typing into it' // i18n-ignore: a reason for the log
+    if (this.lineBlocked(l)) return "a line Hive typed isn't taken yet" // i18n-ignore: a reason for the log
+    if (this.userMayBeTyping(projectPath, agentId)) return 'the user is typing there' // i18n-ignore: a reason for the log
     const u = this.userInput.get(key)
-    if (u && !u.enter) return "the user's draft is in its prompt"
+    if (u && !u.enter) return "the user's draft is in its prompt" // i18n-ignore: a reason for the log
     return null
   }
 
