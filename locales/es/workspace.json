@@ -195,8 +195,6 @@
   "workspace.notes.workspaceNotes.title": "Workspace notes",
   "workspace.opening.adoption": "Adoptando sus tarjetas y proyectos…",
   "workspace.opening.projects": "Leyendo sus proyectos…",
-  "workspace.opening.skills": "Actualizando sus habilidades y modos…",
-  "workspace.opening.skillsCount": "Actualizando sus habilidades y modos ({done, number} de {total, number})…",
   "workspace.opening.slots": "Adoptando los worktrees de sus agentes como slots…",
   "workspace.opening.title": "Abriendo {name}",
   "workspace.opening.upgrade": "Actualizando su tablero. El tablero 0.9 se guarda como copia de seguridad.",

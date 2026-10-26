@@ -195,8 +195,6 @@
   "workspace.notes.workspaceNotes.title": "Workspace notes",
   "workspace.opening.adoption": "カードとプロジェクトを引き継いでいます…",
   "workspace.opening.projects": "プロジェクトを読み込んでいます…",
-  "workspace.opening.skills": "スキルとモードを更新しています…",
-  "workspace.opening.skillsCount": "スキルとモードを更新しています（{total, number} 件中 {done, number} 件）…",
   "workspace.opening.slots": "エージェントのワークツリーをスロットとして引き継いでいます…",
   "workspace.opening.title": "{name} を開いています",
   "workspace.opening.upgrade": "ボードをアップグレードしています。0.9 のボードはバックアップとして保存されます。",

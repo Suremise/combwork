@@ -111,7 +111,12 @@ export interface BundledStatus {
 const manifestPath = (): string => join(workspace.hiveDir, 'bundled.json')
 
 async function readManifest(): Promise<Manifest | null> {
-  const m = await readJson<Partial<Manifest> | null>(manifestPath(), null)
+  return manifestOf(await readJson<unknown>(manifestPath(), null))
+}
+
+/** The manifest as a file holds it (as read), or null. */
+function manifestOf(file: unknown): Manifest | null {
+  const m = file as Partial<Manifest> | null
   if (!m || typeof m !== 'object') return null
   const part = (v: unknown): Manifest['skills'] => (v && typeof v === 'object' ? (v as Manifest['skills']) : {})
   // Until 0.9.3 the modes were personas, and so was their key (#1084).
@@ -150,17 +155,16 @@ function shippedVersion(kind: BundledKind): (old: string, name: string) => Promi
  * just set up). One item that can't be updated (a file in it open) is left as it is until the next time; the others go
  * ahead.
  */
-export async function syncBundled(opts: { fresh?: boolean; step?: (done: number, total: number) => void } = {}): Promise<void> {
+export async function syncBundled(opts: { fresh?: boolean } = {}): Promise<void> {
   const started = performance.now()
   const changed = { skills: 0, modes: 0 }
   await withFileLock(manifestPath(), async () => {
     await moveLegacyModes()
-    const before = await readManifest()
-    const m: Manifest = before ?? { skills: {}, modes: {} }
-    // Every item, for the opening's progress (HI-1694): each one counted as it is done.
+    const file = await readJson<unknown>(manifestPath(), null)
+    const before = manifestOf(file)
+    // A copy: compared with the file when it is written.
+    const m: Manifest = before ? structuredClone(before) : { skills: {}, modes: {} }
     const ids = { skills: await bundledIds('skills'), modes: await bundledIds('modes') }
-    const total = ids.skills.length + ids.modes.length
-    let done = 0
     for (const kind of ['skills', 'modes'] as const) {
       const folder = folderOf(kind)
       // A workspace Hive has just set up has empty folders: nothing in it was deleted.
@@ -198,16 +202,11 @@ export async function syncBundled(opts: { fresh?: boolean; step?: (done: number,
         }
       }
       // A few at once (HI-1694): one after another, a 0.9 workspace's 19 took 20 s on a scanned drive.
-      await atMost(ITEMS_AT_ONCE, ids[kind], async (id) => {
-        try {
-          await syncItem(id)
-        } finally {
-          opts.step?.(++done, total)
-        }
-      })
+      await atMost(ITEMS_AT_ONCE, ids[kind], syncItem)
     }
     await retirePersonas(m)
-    await writeJsonAtomic(manifestPath(), m)
+    // Written only when it changes what the file holds (HI-1705: every open wrote it).
+    if (JSON.stringify(m) !== JSON.stringify(file)) await writeJsonAtomic(manifestPath(), m)
   })
   const ms = performance.now() - started
   if (ms > SLOW_SYNC_MS) log.info(`bringing the bundled skills and modes up to date took ${(ms / 1000).toFixed(1)} s: ${changed.skills} skill(s) and ${changed.modes} mode(s) added or updated`)

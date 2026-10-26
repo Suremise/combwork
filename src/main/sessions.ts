@@ -23,7 +23,7 @@ import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSess
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
 import { coalesced, joined } from '../shared/coalesce'
-import { atMost } from '../shared/atMost'
+import { atMost, whenAll } from '../shared/atMost'
 import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter } from './agentFolders'
 import { slotEnv } from './slots'
 import { copiesDirOf, grantsCopies } from './copies'
@@ -1338,47 +1338,48 @@ class SessionManager {
    */
   async liveInfo(projectPath: string, cfg: ProjectConfig, scope?: object): Promise<{ live: LiveSessionState | null; restartNeeded: boolean; agents: AgentInfo[]; folders: NamedFolder[] }> {
     const reads = scope ? launchReadsOf(scope) : new LaunchReads()
-    const agents: AgentInfo[] = []
-    const records = (await workspace.sessionsFile(projectPath)).sessions
+    // Its sessions, and its slots and leases (#1434: an agent's conversations in its slots, and whether each may resume
+    // now), read at once (HI-1705).
+    const [file, facts] = await whenAll([workspace.sessionsFile(projectPath), folderFacts(projectPath).catch(() => null)])
+    const records = file.sessions
     this.checkSubsOnce(projectPath, records)
     const openIds = new Set(this.projectStates(projectPath).map((s) => s.sessionId).filter(Boolean))
     const ids = new Set(projectAgents(cfg).map((a) => a.id))
-    // The project's slots and leases (#1434): an agent's conversations in its slots, and whether each may resume now.
-    const facts = await folderFacts(projectPath).catch(() => null)
     const slotFolders = facts?.slots.map((s) => s.folder) ?? []
     // Unreadable: no slots or homes, a 0.9 worktree still its agent's (as the contract reads a project not migrated).
     const shownFacts: FolderFacts = facts ?? { projectPath, migrated: false, migratedAgents: [], homes: [], slots: [] }
     // Slots held by an agent's run that is over, its processes not known ended (#1506): its ⋯ offers Release Slot….
     const held = facts?.slots.some((s) => s.writer) ? await heldSlots(projectPath).catch(() => new Map<string, string>()) : new Map<string, string>()
-    for (const a of projectAgents(cfg)) {
-      const l = this.live.get(liveId(projectPath, a.id))
-      let restartNeeded = false
-      if (l && !l.state.settingUp) {
-        try {
-          const eff = await this.effective(projectPath, pinProvider(a, l.state.provider), reads, cfg)
-          restartNeeded = this.signature(eff) !== l.state.launchSignature
-          this.noticeModeSetting(l, eff.permissionMode)
-        } catch {
-          // Settings can't be read right now; don't nag.
+    // Every agent at once (HI-1705: one after another, each one's place waited behind other windows' file work), in order.
+    const agents: AgentInfo[] = await whenAll(projectAgents(cfg).map(async (a): Promise<AgentInfo> => {
+        const l = this.live.get(liveId(projectPath, a.id))
+        let restartNeeded = false
+        if (l && !l.state.settingUp) {
+          try {
+            const eff = await this.effective(projectPath, pinProvider(a, l.state.provider), reads, cfg)
+            restartNeeded = this.signature(eff) !== l.state.launchSignature
+            this.noticeModeSetting(l, eff.permissionMode)
+          } catch {
+            // Settings can't be read right now; don't nag.
+          }
         }
-      }
-      const provider = agentLaunchSettings(a, cfg, config.settings).provider
-      // The Assistant's sessions ran in the workspace folder, not its home.
-      const folder = workspace.isAssistantHome(projectPath) ? (workspaceOf(projectPath).path ?? projectPath) : projectPath
-      const r = l ? null : resumeRecord(folder, a, records.filter((x) => recordProvider(x) === provider), openIds, ids, slotFolders)
-      const hold = r && facts ? resumeHold(facts, folderAgent(a), r) : null
-      // Its last conversation resumes in a retired home (#1441), though a new one starts elsewhere: its pane says so (#1552).
-      const home = r && facts ? resumeHome(facts, r) : null
-      // Its adopted worktree's slot (#1441), while it holds it carried.
-      const carried = facts?.slots.find((s) => s.open?.kind === 'carried' && s.open.agent === a.id)?.name
-      // Where it works now, as the window shows it (#1442).
-      const at = await agentPlace(projectPath, a, l ? { cwd: l.state.cwd } : null, shownFacts).catch(() => null)
-      const legacy = legacyWorktree(a)
-      const shown = at ? shownPlace(shownFacts, folderAgent(a), at.now, at.branch, at.target) : { folder: projectPath, is: 'project' as const, name: null, branch: null }
-      // Its 0.9 worktree's base, also for the slot it was carried into while that slot has no target (#1569).
-      const place = (shown.is === 'legacy' || (shown.is === 'carried' && !shown.base)) && legacy?.base ? { ...shown, base: legacy.base } : shown
-      agents.push({ ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}), ...(home ? { home } : {}) },...(carried ? { carriedSlot: carried } : {}), ...(held.has(a.id) ? { heldSlot: held.get(a.id) } : {}), place })
-    }
+        const provider = agentLaunchSettings(a, cfg, config.settings).provider
+        // The Assistant's sessions ran in the workspace folder, not its home.
+        const folder = workspace.isAssistantHome(projectPath) ? (workspaceOf(projectPath).path ?? projectPath) : projectPath
+        const r = l ? null : resumeRecord(folder, a, records.filter((x) => recordProvider(x) === provider), openIds, ids, slotFolders)
+        const hold = r && facts ? resumeHold(facts, folderAgent(a), r) : null
+        // Its last conversation resumes in a retired home (#1441), though a new one starts elsewhere: its pane says so (#1552).
+        const home = r && facts ? resumeHome(facts, r) : null
+        // Its adopted worktree's slot (#1441), while it holds it carried.
+        const carried = facts?.slots.find((s) => s.open?.kind === 'carried' && s.open.agent === a.id)?.name
+        // Where it works now, as the window shows it (#1442).
+        const at = await agentPlace(projectPath, a, l ? { cwd: l.state.cwd } : null, shownFacts).catch(() => null)
+        const legacy = legacyWorktree(a)
+        const shown = at ? shownPlace(shownFacts, folderAgent(a), at.now, at.branch, at.target) : { folder: projectPath, is: 'project' as const, name: null, branch: null }
+        // Its 0.9 worktree's base, also for the slot it was carried into while that slot has no target (#1569).
+        const place = (shown.is === 'legacy' || (shown.is === 'carried' && !shown.base)) && legacy?.base ? { ...shown, base: legacy.base } : shown
+        return { ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}), ...(home ? { home } : {}) },...(carried ? { carriedSlot: carried } : {}), ...(held.has(a.id) ? { heldSlot: held.get(a.id) } : {}), place }
+    }))
     const primary = agents.find((a) => a.live)
     return { live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, agents, folders: namedFolders(shownFacts) }
   }
@@ -1843,6 +1844,9 @@ class SessionManager {
       }
     }
 
+    // Its workspace's bundled skills and modes, brought up to date after its open (HI-1705), before they are read.
+    await workspaceOf(projectPath).itemsUpToDate()
+    times?.mark('skills up to date')
     const eff = await this.effective(projectPath, pinProvider(agent, state.provider))
     times?.mark('effective')
     // Extra arguments saved before Settings refused a bare "--" (#523) stop the launch before anything changes.

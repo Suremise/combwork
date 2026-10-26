@@ -45,7 +45,7 @@ import { slotBranch } from './mergeSlots'
 import { endLane, listLanes, stampLaneProjects } from './lanes'
 import { laneStartInfo, startLaneFromWindow } from './laneStart'
 import { sweepWorkspaceLeftovers } from './leftovers'
-import { assertNotOpening, claimWindow, openProgress, openStep, releaseWindow, windowClaim } from './openProgress'
+import { AfterOpen, assertNotOpening, claimWindow, openProgress, openStep, releaseWindow, windowClaim } from './openProgress'
 import { boardState, boardWaits, cardHeads, exportBoard, movedNames, onBoardUpgraded, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
@@ -335,80 +335,89 @@ async function authorizedMerge(path: string, branch: string | null | undefined, 
  * no writes, and its tables aren't 1.0's yet: none of the steps runs on it (HI-1694: the stage repair failed against it),
  * and all of them run once it is upgraded (#1621), with no restart; each changes nothing the second time.
  */
-function boardSteps(ws: WorkspaceService, upgraded = false): void {
+function boardSteps(ws: WorkspaceService, upgraded = false, after?: AfterOpen): void {
   if (boardWaits(ws)) return
+  // Each chain timed in the open's "after opening" line (HI-1705), when an open started it.
+  const timed = <T>(what: string, p: Promise<T>): Promise<T> => (after ? after.track(what, p) : p)
   // Just upgraded at the user's word: the adoption and the slots that follow are shown as the open's last steps (HI-1694).
   const path = ws.path
   // The upgrade's claim of the window (board:upgrade), which the adoption and slots carry on and let go; none for an
   // upgrade made another way, so never another operation's.
   const claim = upgraded && openProgress(ws)?.step === 'upgrade' ? windowClaim(ws) : null
   const step = (s: 'adoption' | 'slots'): void => {
-    if (claim && path && ws.path === path) openStep(ws, s, {}, { token: claim })
+    if (claim && path && ws.path === path) openStep(ws, s, { token: claim })
   }
   // Each card, lane and card watch names its project by its stable id (#508), then old Done cards are archived.
-  void tasks
-    .stampCardProjects(ws)
-    .catch((e) => log.warn("giving the cards their projects' ids", e))
-    .then(() => stampLaneProjects(ws).catch((e) => log.warn("giving the lanes their projects' ids", e)))
-    .then(() => stampWatchProjects(ws).catch((e) => log.warn("giving the card watches their projects' ids", e)))
-    // Each project its key (#1219), and once after the upgrade gave them, a quiet notice saying so.
-    .then(() => keyProjects(ws).catch((e) => log.warn('giving the projects their keys', e)))
-    .then(() => sayKeysOnce(ws))
-    .then(() => tasks.archiveOldDone(ws))
-    .catch((e) => log.warn('archiving old Done cards', e))
+  void timed(
+    "projects' ids and keys, old Done cards", // i18n-ignore: a part of a log line's timing
+    tasks
+      .stampCardProjects(ws)
+      .catch((e) => log.warn("giving the cards their projects' ids", e))
+      .then(() => stampLaneProjects(ws).catch((e) => log.warn("giving the lanes their projects' ids", e)))
+      .then(() => stampWatchProjects(ws).catch((e) => log.warn("giving the card watches their projects' ids", e)))
+      // Each project its key (#1219), and once after the upgrade gave them, a quiet notice saying so.
+      .then(() => keyProjects(ws).catch((e) => log.warn('giving the projects their keys', e)))
+      .then(() => sayKeysOnce(ws))
+      .then(() => tasks.archiveOldDone(ws))
+      .catch((e) => log.warn('archiving old Done cards', e))
+  )
   // The cards' actions a crash or a close left pending (#1215, SPEC §16.4.5): run once, in the order written.
-  void runActions(ws)
+  void timed('pending card actions', runActions(ws)) // i18n-ignore: a part of a log line's timing
   // The 1.0 upgrade's adoption (#1218, SPEC §16.17): each project's options and its old cards, until it has run once;
   // then what changed in its projects while it was closed, recorded as observed facts (#1217): the cards adopted too.
   // Then its agents' worktrees become slots (#1441), each project once, before what changed is observed.
   // And G15 saved before P7 settled once (#1445), so a Pair or Team project gets its preset's On.
   // And a card the board has in Done while its stage isn't (HI-1674) brought into line, before what changed is observed.
   step('adoption')
-  void adoptWorkspace(ws)
-    .then(() => settleSlotsUpToDate(ws))
-    .then(() => step('slots'))
-    .then(() => migrateSlots(ws))
-    .then(() => repairStages(ws))
-    // HI-1697: a merge choice the board recorded and a save stopped before writing to project.json, written there now.
-    .then(() => settleMergeChoices(ws))
-    // What an interrupted card attachment operation left (HI-1700), settled from its records against the board.
-    .then(() => recoverCardAttachments(ws))
-    .finally(() => {
-      releaseWindow(ws, claim)
-      return reconcileWorkspace(ws)
-    })
+  void timed(
+    'adoption, slots, repairs and what changed while closed', // i18n-ignore: a part of a log line's timing
+    adoptWorkspace(ws)
+      .then(() => settleSlotsUpToDate(ws))
+      .then(() => step('slots'))
+      .then(() => migrateSlots(ws))
+      .then(() => repairStages(ws))
+      // HI-1697: a merge choice the board recorded and a save stopped before writing to project.json, written there now.
+      .then(() => settleMergeChoices(ws))
+      // What an interrupted card attachment operation left (HI-1700), settled from its records against the board.
+      .then(() => recoverCardAttachments(ws))
+      .finally(() => {
+        releaseWindow(ws, claim)
+        return reconcileWorkspace(ws)
+      })
+  )
   // 0.9's agent templates copied into the 0.9 backup once after the upgrade (#1436), and a quiet notice saying so.
-  void copyV09Templates(ws)
-    .then(() => sayV09TemplatesOnce(ws))
-    .catch((e) => log.warn("copying 0.9's agent templates (tried again at the next open)", e))
+  void timed(
+    "0.9's agent templates", // i18n-ignore: a part of a log line's timing
+    copyV09Templates(ws)
+      .then(() => sayV09TemplatesOnce(ws))
+      .catch((e) => log.warn("copying 0.9's agent templates (tried again at the next open)", e))
+  )
 }
 
 export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info']>, quitControl: QuitControl): void {
   // A board upgraded to 1.0 while its workspace is open: what its opening skipped, now (#1621).
   onBoardUpgraded((ws) => boardSteps(ws, true))
   // Each time a workspace opens: Hive's bundled skills and modes it hasn't got, or has untouched older copies of.
-  WorkspaceService.onOpened = async (fresh) => {
-    const opening = contextWorkspace()!
-    const at = opening.path
-    await syncBundled({ fresh, step: (done, total) => openStep(opening, 'skills', { done, total }, { path: at }) }).catch((e) => log.warn("updating the workspace's bundled skills and modes", e))
-    // The rest of the open (its projects read for the window): a step of its own, timed (HI-1694).
-    openStep(opening, 'projects', {}, { path: at })
+  // After the open, not before it (HI-1705): a launch waits for it.
+  WorkspaceService.bringItemsUpToDate = (fresh) => syncBundled({ fresh })
+  // Each part in the background, timed in the open's "after opening" line (HI-1705).
+  WorkspaceService.onOpened = async (_fresh, after) => {
     const ws = workspace
     // Its usage history imports the sessions it had, the first time (#1106), in the background.
-    void usageHistory.opened(contextWorkspace()!)
+    void after.track('usage history', usageHistory.opened(contextWorkspace()!)) // i18n-ignore: a part of a log line's timing
     // Its board's steps: skipped while the board waits for its upgrade to 1.0, and run again once it is upgraded.
-    boardSteps(contextWorkspace()!)
+    boardSteps(contextWorkspace()!, false, after)
     // Builds of Hive left for it while it was closed (#1534), into the journal once.
-    void pickUpBuilds(ws).catch((e) => log.warn('recording the builds left for Hive', e))
+    void after.track('builds left for it', pickUpBuilds(ws).catch((e) => log.warn('recording the builds left for Hive', e))) // i18n-ignore: a part of a log line's timing
     // What failed or interrupted saves and the project-id migration left in the .hive folders (#1016).
-    void sweepWorkspaceLeftovers(ws).catch((e) => log.warn('removing leftover temp and backup files', e))
+    void after.track('leftovers', sweepWorkspaceLeftovers(ws).catch((e) => log.warn('removing leftover temp and backup files', e))) // i18n-ignore: a part of a log line's timing
     // Moved since it was last opened (#146)? In the background: the window opens meanwhile, and a banner follows.
-    void checkMoved(contextWorkspace()!).catch((e) => log.warn('checking whether the workspace moved', e))
+    void after.track('whether it moved', checkMoved(contextWorkspace()!).catch((e) => log.warn('checking whether the workspace moved', e))) // i18n-ignore: a part of a log line's timing
     // A merge slot an agent held when Hive closed: its merge may be half done (#350).
     // At start, the notice that Hive closed unexpectedly waits for it, and tells its holds (#984).
     // Resumes after a restart wait for it too (HI-1707).
     if (ws.path) {
-      const recovery = recoverMergeSlots(ws.path).catch((e) => log.warn('recovering the merge slots', e))
+      const recovery = after.track('merge slots', recoverMergeSlots(ws.path).catch((e) => log.warn('recovering the merge slots', e))) // i18n-ignore: a part of a log line's timing
       startupStep(recovery)
       workspaceRecovering(ws.path, recovery)
     }

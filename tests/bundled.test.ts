@@ -205,6 +205,28 @@ describe('a workspace', () => {
     }
   })
 
+  it('writes the manifest only when it changes what the file holds (HI-1705: every open wrote it)', async () => {
+    const ws = join(base, 'unchanged')
+    mkdirSync(ws, { recursive: true })
+    const w = await opened(ws)
+    try {
+      await wsMod.inWorkspace(w, () => mod.syncBundled({ fresh: true }))
+      const file = join(ws, '.hive', 'bundled.json')
+      // A mark the sync would overwrite if it wrote the file: still there after one that changes nothing.
+      const text = readFileSync(file, 'utf8')
+      writeFileSync(file, text + ' ')
+      await wsMod.inWorkspace(w, () => mod.syncBundled())
+      expect(readFileSync(file, 'utf8')).toBe(text + ' ')
+      // A manifest from before 0.9.3 (its modes under "personas") is written in today's form, though nothing else changed.
+      const m = JSON.parse(text)
+      writeFileSync(file, JSON.stringify({ skills: m.skills, personas: m.modes }))
+      await wsMod.inWorkspace(w, () => mod.syncBundled())
+      expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual(m)
+    } finally {
+      await wsMod.disposeWorkspaceService(w)
+    }
+  })
+
   it('an older one: untouched copies updated, edited ones and the user’s kept, deleted ones left, new ones added', async () => {
     const ws = join(base, 'older')
     // Hive 0.3's workspace: skills (one untouched old, one edited, one deleted, one a user folder) and no modes folder.

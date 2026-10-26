@@ -182,6 +182,7 @@ export const SUITES = [
   { name: 'nocode' },
   { name: 'numbers' },
   { name: 'openguard' },
+  { name: 'openspeed' },
   { name: 'overview' },
   { name: 'p4lane' },
   { name: 'p5lane' },

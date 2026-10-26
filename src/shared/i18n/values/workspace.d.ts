@@ -197,8 +197,6 @@ interface HiveMessageValues {
   'workspace.notes.workspaceNotes.title': undefined
   'workspace.opening.adoption': undefined
   'workspace.opening.projects': undefined
-  'workspace.opening.skills': undefined
-  'workspace.opening.skillsCount': { done: number; total: number }
   'workspace.opening.slots': undefined
   'workspace.opening.title': { name: string | number }
   'workspace.opening.upgrade': undefined

@@ -195,8 +195,6 @@
   "workspace.notes.workspaceNotes.title": "Workspace notes",
   "workspace.opening.adoption": "Przejmowanie jego kart i projektów…",
   "workspace.opening.projects": "Odczytywanie jego projektów…",
-  "workspace.opening.skills": "Aktualizowanie jego umiejętności i trybów…",
-  "workspace.opening.skillsCount": "Aktualizowanie jego umiejętności i trybów ({done, number} z {total, number})…",
   "workspace.opening.slots": "Przejmowanie worktree jego agentów jako slotów…",
   "workspace.opening.title": "Otwieranie {name}",
   "workspace.opening.upgrade": "Uaktualnianie jego tablicy. Tablica 0.9 zostaje zachowana jako kopia zapasowa.",

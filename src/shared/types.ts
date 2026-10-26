@@ -2888,17 +2888,15 @@ export interface ViewerToken {
 
 /**
  * Where a window's workspace is in opening it (HI-1694), for the steady view the window shows meanwhile: reading its
- * projects, bringing its bundled skills and modes up to date (`done` of `total`), and after the user said yes to its
- * upgrade to 1.0, the upgrade (the 0.9 board kept as a backup), the cards' and projects' adoption, and the agents'
- * worktrees adopted as slots.
+ * projects, and after the user said yes to its upgrade to 1.0, the upgrade (the 0.9 board kept as a backup), the cards'
+ * and projects' adoption, and the agents' worktrees adopted as slots. Its bundled skills and modes are brought up to date
+ * after the open, not in it (HI-1705).
  */
 export interface OpenProgress {
   /** The workspace's folder, and its name as shown. */
   path: string
   name: string
-  step: 'projects' | 'skills' | 'upgrade' | 'adoption' | 'slots'
-  done?: number
-  total?: number
+  step: 'projects' | 'upgrade' | 'adoption' | 'slots'
 }
 
 /** Events pushed from main to renderer. */

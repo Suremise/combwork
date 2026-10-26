@@ -783,14 +783,6 @@
     "defaultMessage": "Reading its projects…",
     "description": "A step of opening a workspace: Hive reads its projects."
   },
-  "workspace.opening.skills": {
-    "defaultMessage": "Updating its skills and modes…",
-    "description": "A step of opening a workspace: Hive brings the workspace's copies of its bundled skills and the Assistant's modes up to date."
-  },
-  "workspace.opening.skillsCount": {
-    "defaultMessage": "Updating its skills and modes ({done, number} of {total, number})…",
-    "description": "A step of opening a workspace: Hive brings the workspace's copies of its bundled skills and the Assistant's modes up to date, {done} of {total} so far."
-  },
   "workspace.opening.slots": {
     "defaultMessage": "Adopting its agents' worktrees as slots…",
     "description": "A step of upgrading a Hive 0.9 workspace to 1.0: each agent's own worktree becomes a slot (a working folder Hive lends to cards)."
