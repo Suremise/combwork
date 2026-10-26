@@ -204,6 +204,8 @@ describe("a card the merge queue returned, waiting for its builder (HI-1721's re
     expect(returnedWaitReason(c, back, { name: 'HB2', status: 'watching', watching: true }, t + RETURN_STALL_MS)).toBe('HI-1694 came back from the merge queue 15 min ago; HB2 is only watching it, not fixing it.')
     expect(returnedWaitReason(c, back, { name: 'HB2', status: 'finished', watching: false }, t + RETURN_STALL_MS + 60_000)).toMatch(/16 min ago; HB2 is idle, not fixing it/)
     expect(returnedWaitReason(c, back, { name: 'HB2', status: 'working', watching: false }, t + 3 * RETURN_STALL_MS)).toBeNull()
+    // In a turn with a watch still kept (a loop wake leaves it running): at work, never "only watching" (HR1's round 1).
+    for (const status of ['working', 'starting', 'background', 'waiting']) expect(returnedWaitReason(c, back, { name: 'HB2', status, watching: true }, t + RETURN_STALL_MS + 2 * 60_000), status).toBeNull()
     expect(returnedWaitReason(c, back, { name: 'HB2', status: 'watching', watching: true }, t + RETURN_STALL_MS - 1000)).toBeNull()
   })
   it('not for a card that changed since, is blocked, out of Doing, or not returned', () => {
@@ -681,8 +683,10 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     const since = new Date().toISOString()
     returns.set(a, { at: since, text: `#${a} came back from the merge queue: a conflict.`, builder: 'b1' })
     try {
-      // B1 watches its card for Done, as HB2 did HI-1694: the card waits for B1 in Doing.
-      Object.assign(sessions, { liveStates: () => [{ projectPath: alpha, agentId: 'b1', agentName: 'B1', status: 'watching', watch: { cards: [a], changes: ['column'], column: 'done', label: '', since, limitAt: '' } }] })
+      // B1 watches its card for Done, as HB2 did HI-1694: the card waits for B1 in Doing. First B1 is at work with
+      // that watch still kept (it read the return and is fixing the conflict): no stall however long it takes.
+      let b1Status = 'working'
+      Object.assign(sessions, { liveStates: () => [{ projectPath: alpha, agentId: 'b1', agentName: 'B1', status: b1Status, watch: { cards: [a], changes: ['column'], column: 'done', label: '', since, limitAt: '' } }] })
       await watchAll(w, home, st)
       await watches.evaluateWatches(w)
       await watches.settled()
@@ -690,6 +694,11 @@ describe('lane watches (main/watches.ts, #531)', async () => {
       vi.useFakeTimers({ toFake: ['Date'] })
       try {
         vi.setSystemTime(Date.parse(since) + RETURN_STALL_MS + 60_000)
+        await watches.evaluateWatches(w)
+        await watches.settled()
+        expect(st.typed).toEqual([])
+        // Its turn over, it only watches: stalled.
+        b1Status = 'watching'
         await watches.evaluateWatches(w)
         await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
       } finally {

@@ -24,12 +24,14 @@ export const RETURN_STALL_MS = 15 * 60_000
 
 /**
  * Why a card the merge queue returned to its builder is stalled (HI-1721), or null: in Doing, not blocked, unchanged for
- * RETURN_STALL_MS since it came back, and its builder not at work on anything (idle, or only watching: HB2 watched
+ * RETURN_STALL_MS since it came back, and its builder not in a turn (idle, or only watching: HB2 watched
  * HI-1694 for Done for three hours while it waited for HB2). A builder not running is stalledReason's. Agent-facing.
  */
 export function returnedWaitReason(c: Pick<TaskCard, 'number' | 'key' | 'column' | 'archived' | 'blocked' | 'updatedAt'>, returned: { at: string } | null | undefined, builder: { name: string; status: string; watching: boolean } | null, now = Date.now()): string | null {
   if (!returned || !builder || c.archived || c.blocked || c.column !== 'doing') return null
-  if (!IDLE.includes(builder.status) && !builder.watching) return null
+  // Its turn's state decides (HR1's round 1): a watch kept while it works (a loop wake leaves it running) is no stall;
+  // the watch only words it.
+  if (!IDLE.includes(builder.status)) return null
   const since = Math.max(Date.parse(returned.at) || 0, Date.parse(c.updatedAt) || 0)
   if (!since || now - since < RETURN_STALL_MS) return null
   const min = Math.round((now - since) / 60_000)
