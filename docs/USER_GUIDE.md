@@ -1685,7 +1685,7 @@ Installing a new version closes Hive: **Restart to Update**, or an installer you
 
 When Hive starts again, it resumes those agents in their conversations **one at a time**, each once the one before it has taken its note: *Hive restarted for an update (1.0.0-rc.4 → 1.0.0-rc.5) at 10:00 UTC; your session was stopped and is resumed now. You were on HI-1673, round 2, in lane 'Lanes from the bottom' (its builder). Carry on: re-arm your card watch if you were waiting.* Meanwhile their lanes don't show them as stalled. One notice then says who was resumed, and who wasn't and why: an agent you removed, one already running or since moved to a newer conversation, one whose working folder (slot) is held for other work (resume it yourself), or one that wasn't ready in time (**Settings → Advanced → Resuming after a restart: ready within**, 90 s), which Hive stops before it starts the next. If the Hive Assistant is set up, it gets a line saying the same.
 
-To decide yourself each time, turn off **Settings → Advanced → Resume agents after an update**: Hive then offers instead, as it does after you quit (see [Quitting](#quitting)).
+To decide yourself each time, turn off **Settings → Advanced → Resume agents after an update**: Hive then offers instead, as it does after you quit (see [Quitting](#quitting)). A workspace can have its own setting (**This workspace** in Settings → Advanced), and so can the time an agent has to be ready. Hive resumes a workspace's agents once that workspace has opened and is read, and if you quit while it is resuming them, the ones it hadn't finished are resumed at the next start.
 
 ## The system tray <a id="the-system-tray"></a>
 

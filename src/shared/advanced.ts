@@ -497,6 +497,7 @@ const SOURCES: readonly AdvancedSource[] = [
     desc: msg({ id: 'settings.advanced.hive.restart.resumeAfterUpdate.desc', defaultMessage: 'When Hive restarts for an update (Restart to Update, or an installer closing it), the agents that were working, watching their cards or in a card loop start again in their conversations, one at a time, each told where it was. Off: Hive offers to resume them instead, as it does after you quit.', description: 'What the advanced setting "Resume agents after an update" does (Settings → Advanced).' }),
     kind: 'boolean',
     default: true,
+    workspace: true,
     applies: 'now'
   },
   {
@@ -509,6 +510,7 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 10,
     max: 600,
     unit: 's',
+    workspace: true,
     applies: 'now'
   },
   {

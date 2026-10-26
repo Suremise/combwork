@@ -223,6 +223,7 @@ interface HiveMessageValues {
   'main.restart.why.held': undefined
   'main.restart.why.movedOn': undefined
   'main.restart.why.notReady': undefined
+  'main.restart.why.notStopped': undefined
   'main.restart.why.removed': undefined
   'main.restart.why.running': undefined
   'main.restart.why.stopped': undefined

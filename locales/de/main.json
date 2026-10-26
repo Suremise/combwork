@@ -221,6 +221,7 @@
   "main.restart.why.held": "sein Arbeitsordner ist für andere Arbeit reserviert (setze ihn von Hand fort)",
   "main.restart.why.movedOn": "er hat eine neuere Unterhaltung",
   "main.restart.why.notReady": "er war nicht rechtzeitig bereit und wurde gestoppt",
+  "main.restart.why.notStopped": "er war nicht rechtzeitig bereit und hat noch nicht gestoppt; die anderen werden fortgesetzt, sobald er es hat",
   "main.restart.why.removed": "er wurde entfernt",
   "main.restart.why.running": "er läuft bereits",
   "main.restart.why.stopped": "er wurde beim Starten gestoppt",

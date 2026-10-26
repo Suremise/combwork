@@ -221,6 +221,7 @@
   "main.restart.why.held": "它的工作文件夹被其他工作占用（请手动恢复）",
   "main.restart.why.movedOn": "它有更新的对话",
   "main.restart.why.notReady": "它未能及时就绪，因此已被停止",
+  "main.restart.why.notStopped": "它未能及时就绪且尚未停止；它停止后，其余智能体才会恢复",
   "main.restart.why.removed": "它已被移除",
   "main.restart.why.running": "它已在运行",
   "main.restart.why.stopped": "它在启动时被停止了",

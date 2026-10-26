@@ -221,6 +221,7 @@
   "main.restart.why.held": "son dossier de travail est réservé à un autre travail (reprenez-le à la main)",
   "main.restart.why.movedOn": "il a une conversation plus récente",
   "main.restart.why.notReady": "il n’était pas prêt à temps, il a donc été arrêté",
+  "main.restart.why.notStopped": "il n’était pas prêt à temps et ne s’est pas encore arrêté ; les autres reprennent dès qu’il l’aura fait",
   "main.restart.why.removed": "il a été supprimé",
   "main.restart.why.running": "il tourne déjà",
   "main.restart.why.stopped": "il a été arrêté pendant son démarrage",

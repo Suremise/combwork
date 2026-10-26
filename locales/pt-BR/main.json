@@ -221,6 +221,7 @@
   "main.restart.why.held": "a pasta de trabalho dele está reservada para outro trabalho (retome-o manualmente)",
   "main.restart.why.movedOn": "ele tem uma conversa mais recente",
   "main.restart.why.notReady": "ele não ficou pronto a tempo, então foi parado",
+  "main.restart.why.notStopped": "ele não ficou pronto a tempo e ainda não parou; os outros são retomados quando ele parar",
   "main.restart.why.removed": "ele foi removido",
   "main.restart.why.running": "ele já está em execução",
   "main.restart.why.stopped": "ele foi parado enquanto iniciava",

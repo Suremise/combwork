@@ -7,14 +7,14 @@ import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { RESTART_READY_SECONDS, RESUME_AFTER_UPDATE } from '../shared/advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { agentKey, atStart, checkRequest, isFinal, mergeSnapshot, parseRecord, recordOpen, REQUEST_FILE, REQUEST_MAX_BYTES, RESTARTING_LINE, resumeNote, STALL_HOLD_MS, ackFile, takenFile, type RestartEntry, type RestartReason, type RestartRecord, type RestartState } from '../shared/restartResume'
-import type { LiveSessionState, TaskCard, ToastAction } from '../shared/types'
+import type { LaneInfo, LiveSessionState, TaskCard, ToastAction } from '../shared/types'
 import type { RunningAgent } from '../shared/unexpectedClose'
 import { advanced } from './advanced'
 import { assistantHome } from './assistantControl'
 import { createDelivery, leaveDelivery, roundOf } from './deliveries'
 import { emit, onHiveEvent } from './events'
-import { samePlace } from './fsutil'
-import { laneOf } from './lanes'
+import { placeKey, samePlace } from './fsutil'
+import { listLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { allTasks } from './tasks'
@@ -32,7 +32,8 @@ const log = createLogger('restart')
 const HIVE = { kind: 'hive', name: 'Hive' } as const // i18n-ignore: the product's name, as a delivery's sender
 const RECORD_FILE = 'restart.json'
 
-const recordFile = (): string => join(app.getPath('userData'), RECORD_FILE)
+let recordFileForTests: string | null = null
+const recordFile = (): string => recordFileForTests ?? join(app.getPath('userData'), RECORD_FILE)
 
 let record: RestartRecord | null = null
 /** One record write at a time, in order. */
@@ -42,12 +43,22 @@ const queue: string[] = []
 const queuedAt = new Map<string, number>()
 let pumping = false
 let stopping = false
+/**
+ * Bumped as Hive starts closing (stopRestartRecovery, recordClosing): an attempt that began before it starts nothing and
+ * changes nothing after it, so the closing snapshot (which put the attempt's entry back to pending) stands.
+ */
+let generation = 0
+/** A launch the queue stopped that hasn't ended: nothing more is admitted while it runs (its runId). */
+let stuckRun: string | null = null
 /** What this run's resumes came to, for the one report once the queue is empty. */
 const done: { resumed: RestartEntry[]; failed: RestartEntry[]; held: RestartEntry[]; skipped: RestartEntry[] } = { resumed: [], failed: [], held: [], skipped: [] }
-/** Starts, set by tests to shorten the readiness wait. */
+/** Tests: the readiness wait and the stop's bound, shortened. */
 let readyMsForTests: number | null = null
-export const setReadyMsForTests = (ms: number | null): void => {
-  readyMsForTests = ms
+let stopMsForTests: number | null = null
+export const setTimingsForTests = (o: { readyMs?: number | null; stopMs?: number | null; recordFile?: string | null }): void => {
+  if (o.readyMs !== undefined) readyMsForTests = o.readyMs
+  if (o.stopMs !== undefined) stopMsForTests = o.stopMs
+  if (o.recordFile !== undefined) recordFileForTests = o.recordFile
 }
 
 /** Reads the record at start (once, before the unexpected-close notice decides what it resumes): open entries only. */
@@ -112,15 +123,15 @@ export const ownsResume = (projectPath: string, agentId: string): boolean => {
 }
 
 /**
- * Whether a lane's "isn't running" stall is held for an agent: it is queued or starting in this run's recovery, queued
- * less than STALL_HOLD_MS ago. Cleared by any outcome.
+ * Whether a lane's "isn't running" stall is held for an agent: it is queued or starting in this run's recovery, or
+ * pending to resume by itself, for at most STALL_HOLD_MS. Cleared by any outcome; an offer the user hasn't accepted
+ * holds nothing.
  */
 export function isResuming(projectPath: string, agentId: string): boolean {
   const key = agentKey({ projectPath, agentId })
   const e = entryOf(key)
   if (!e) return false
-  // Pending and resuming by itself (the queue starts once the window is up): held from when the record was read.
-  const waiting = e.state === 'queued' || e.state === 'starting' || (e.state === 'pending' && auto(e))
+  const waiting = e.state === 'queued' || e.state === 'starting' || (e.state === 'pending' && auto(e, openWorkspaceOf(e)))
   const at = queuedAt.get(key) ?? loadedAt
   return waiting && at !== null && Date.now() - at < STALL_HOLD_MS
 }
@@ -139,15 +150,13 @@ function cardFor(cards: readonly TaskCard[], project: string, agentId: string, l
   return { label: c.key ?? `#${c.number}`, round: roundOf(c) }
 }
 
-/** The agents to record as Hive closes, each with its card, round and lane (each workspace's board read once). */
-export async function snapshotAgents(reason: RestartReason): Promise<RestartEntry[]> {
+/**
+ * Every running agent with a conversation (the Assistant's own session is the Assistant's), from the live states alone:
+ * nothing read or awaited, so the conversations are recorded whatever a read would cost. Narrowed and given their
+ * cards and lanes by `enrich`.
+ */
+export function baseEntries(reason: RestartReason): RestartEntry[] {
   const at = new Date().toISOString()
-  const boards = new Map<string, Promise<TaskCard[]>>()
-  const board = (ws: WorkspaceService): Promise<TaskCard[]> => {
-    const key = (ws.path ?? '').toLowerCase()
-    if (!boards.has(key)) boards.set(key, allTasks(ws, { archived: false }).catch(() => []))
-    return boards.get(key)!
-  }
   const out: RestartEntry[] = []
   for (const s of sessions.liveStates()) {
     let ws: WorkspaceService
@@ -156,47 +165,60 @@ export async function snapshotAgents(reason: RestartReason): Promise<RestartEntr
     } catch {
       continue
     }
-    // The Assistant's own session is the Assistant's (as the running marker has it), and one with no conversation has nothing to resume.
     if (!ws.path || ws.isAssistantHome(s.projectPath) || !s.sessionId) continue
-    const project = basename(s.projectPath)
-    const lane = await inWorkspace(ws, () => laneOf(ws, project, s.agentId)).catch(() => null)
-    if (!BUSY.has(s.status) && !lane) continue
-    const card = cardFor(await board(ws), project, s.agentId, lane?.current ?? null)
-    out.push({
-      workspace: ws.path,
-      projectPath: s.projectPath,
-      project,
-      agentId: s.agentId,
-      agentName: s.agentName ?? s.agentId,
-      provider: s.provider,
-      sessionId: s.sessionId,
-      ...(s.sessionName ? { sessionName: s.sessionName } : {}),
-      status: s.status,
-      ...(card ? { card } : {}),
-      ...(lane ? { lane: { id: lane.id, name: lane.name, role: lane.builder.id === s.agentId ? 'builder' : 'reviewer' } } : {}),
-      reason,
-      from: app.getVersion(),
-      at,
-      state: 'pending',
-      changedAt: at
-    })
+    out.push({ workspace: ws.path, projectPath: s.projectPath, project: basename(s.projectPath), agentId: s.agentId, agentName: s.agentName ?? s.agentId, provider: s.provider, sessionId: s.sessionId, ...(s.sessionName ? { sessionName: s.sessionName } : {}), status: s.status, reason, from: app.getVersion(), at, state: 'pending', changedAt: at })
   }
   return out
 }
 
 /**
- * Hive is closing (quitNow): its agents recorded, before they are stopped. For an update, an install or a restart they
- * are told too, best effort, within `tellMs` (a line in each one's inbox: an idle one is shown it at once, a working
- * one finds it when it is resumed). The snapshot is bounded by `snapshotMs`: one that takes longer records nothing new.
+ * The base entries narrowed to those that were working, watching or in a running lane, each with its card, round and
+ * lane (each workspace's lanes and board read once).
+ */
+export async function enrich(base: readonly RestartEntry[]): Promise<RestartEntry[]> {
+  const lanes = new Map<string, Promise<LaneInfo[]>>()
+  const boards = new Map<string, Promise<TaskCard[]>>()
+  const once = <T>(m: Map<string, Promise<T>>, key: string, read: () => Promise<T>, empty: T): Promise<T> => {
+    if (!m.has(key)) m.set(key, read().catch(() => empty))
+    return m.get(key)!
+  }
+  const out: RestartEntry[] = []
+  for (const e of base) {
+    const ws = workspaceOf(e.projectPath)
+    const key = e.workspace.toLowerCase()
+    const running = (await once(lanes, key, () => inWorkspace(ws, () => listLanes(ws)), [] as LaneInfo[])).filter((l) => (l.state === 'active' || l.state === 'paused') && l.project.toLowerCase() === e.project.toLowerCase())
+    const lane = running.find((l) => l.builder.id === e.agentId) ?? running.find((l) => l.reviewer?.id === e.agentId)
+    if (!BUSY.has(e.status) && !lane) continue
+    const card = cardFor(await once(boards, key, () => allTasks(ws, { archived: false }), [] as TaskCard[]), e.project, e.agentId, lane?.current ?? null)
+    out.push({ ...e, ...(card ? { card } : {}), ...(lane ? { lane: { id: lane.id, name: lane.name, role: lane.builder.id === e.agentId ? 'builder' : 'reviewer' } } : {}) })
+  }
+  return out
+}
+
+/**
+ * Hive is closing (quitNow): its agents recorded, before they are stopped. Every running conversation is written at
+ * once; then, within `snapshotMs`, narrowed to those working, watching or in a lane, with their cards and lanes. One
+ * that takes longer keeps every conversation (an idle agent resumed is a lesser harm than a working one lost). For an
+ * update, an install or a restart they are told too, best effort, within `tellMs` (a line in each one's inbox: an idle
+ * one is shown it at once, a working one finds it when it is resumed).
  */
 export async function recordClosing(reason: RestartReason, o: { snapshotMs?: number; tellMs?: number } = {}): Promise<number> {
   stopping = true
+  generation++
   const bounded = <T>(p: Promise<T>, ms: number, fallback: T): Promise<T> => Promise.race([p, new Promise<T>((r) => setTimeout(() => r(fallback), ms).unref())])
-  const snapshot = await bounded(snapshotAgents(reason).catch((e) => (log.warn('Recording the agents as Hive closes', e), [] as RestartEntry[])), o.snapshotMs ?? 2000, [])
   // This run's queue, unfinished: its entries go back to pending (the next start checks them again).
   for (const e of record?.entries ?? []) if (e.state === 'queued' || e.state === 'starting') setState(e, 'pending')
-  record = mergeSnapshot(record, snapshot)
+  const base = baseEntries(reason)
+  record = mergeSnapshot(record, base)
   await save()
+  const enriched = await bounded(enrich(base).catch((e) => (log.warn('Reading the cards and lanes of the agents as Hive closes', e), null)), o.snapshotMs ?? 2000, null)
+  let snapshot = base
+  if (enriched) {
+    const narrowed = new Set(base.map(agentKey))
+    record = mergeSnapshot({ version: 1, entries: (record?.entries ?? []).filter((e) => !narrowed.has(agentKey(e))) }, enriched)
+    snapshot = enriched
+    await save()
+  } else log.warn(`Reading the cards and lanes of the agents took over ${o.snapshotMs ?? 2000} ms as Hive closed: every running conversation is kept to resume`)
   if (snapshot.length) log.info(`Recorded ${snapshot.length} agent(s) as Hive closes (${reason}): ${snapshot.map((e) => `${userText(e.agentName)} in ${userText(e.project)}`).join(', ')}`) // i18n-ignore: a line of hive.log
   if (reason !== 'quit' && snapshot.length) {
     const tell = Promise.allSettled(snapshot.map((e) => inWorkspace(workspaceOf(e.projectPath), () => createDelivery(e.projectPath, { agentId: e.agentId, agentName: e.agentName, kind: 'control', from: HIVE, body: RESTARTING_LINE }))))
@@ -221,15 +243,21 @@ export function adoptInstalledRun(agents: readonly RunningAgent[], from: string,
 }
 
 // ---------------------------------------------------------------------------
-// At the next start: auto-resume, or offer.
+// At the next start: auto-resume, or offer, as each workspace is ready.
 // ---------------------------------------------------------------------------
 
-/** Whether an entry resumes on its own: closed for an update, an install or a restart, with the switch on. */
-const auto = (e: RestartEntry): boolean => e.reason !== 'quit' && advanced.get<boolean>(RESUME_AFTER_UPDATE) !== false
+/** A workspace's own Advanced values (Settings → Advanced, This workspace), when it is open. */
+const workspaceValues = (ws: WorkspaceService | undefined): Record<string, unknown> | null => ws?.config?.advanced ?? null
 
 /**
- * Once Hive's window is up: each pending entry queued (auto) or offered, the offer told in one notice, and the queue
- * started. Workspaces still opening are waited for by the queue (an entry is started only once its workspace is open).
+ * Whether an entry resumes on its own: closed for an update, an install or a restart, with Resume agents after an
+ * update on for its workspace (its own value, else Hive's).
+ */
+const auto = (e: RestartEntry, ws: WorkspaceService | undefined): boolean => e.reason !== 'quit' && advanced.get<boolean>(RESUME_AFTER_UPDATE, workspaceValues(ws)) !== false
+
+/**
+ * Once Hive's window is up: entries already offered (or held) are offered again in one notice, and the queue started.
+ * Each pending entry is decided once its workspace is ready (pump): queued to resume, or offered.
  */
 export async function startRestartRecovery(): Promise<void> {
   if (!record || recoveryStarted) return
@@ -237,16 +265,8 @@ export async function startRestartRecovery(): Promise<void> {
   stopping = false
   const offer: RestartEntry[] = []
   for (const e of record.entries) {
-    if (e.state === 'pending') {
-      if (auto(e)) enqueue(e)
-      else {
-        setState(e, 'offered')
-        offer.push(e)
-      }
-    } else if (e.state === 'offered' || e.state === 'held') {
-      if (e.state === 'held') setState(e, 'offered')
-      offer.push(e)
-    }
+    if (e.state === 'held') setState(e, 'offered')
+    if (e.state === 'offered') offer.push(e)
   }
   await save()
   if (offer.length) tellOffer(offer)
@@ -297,37 +317,102 @@ export async function dismissOffered(): Promise<number> {
   return offered.length
 }
 
-/** Hive is quitting: no more starts from the queue (what is left stays pending in the record). */
+/** Hive is quitting: no more starts from the queue, and an attempt under way changes nothing (it stays pending). */
 export function stopRestartRecovery(): void {
   stopping = true
+  generation++
 }
 
 // ---------------------------------------------------------------------------
 // The queue: one at a time, each after the last is ready.
 // ---------------------------------------------------------------------------
 
+/** Each workspace's merge-slot recovery as it opens (ipc.ts' onOpened), by its place, and those settled. */
+const recoveries = new Map<string, Promise<unknown>>()
+const recovered = new Set<string>()
+
+/**
+ * A workspace opening (ipc.ts' onOpened): its merge slots' recovery, which a resume waits for, as the unexpected-close
+ * notice does. Its entries are admitted once it has settled and the workspace's first read is done.
+ */
+export function workspaceRecovering(path: string, recovery: Promise<unknown>): void {
+  const key = placeKey(path)
+  recovered.delete(key)
+  const run: Promise<unknown> = recovery
+    .catch(() => undefined)
+    .finally(() => {
+      if (recoveries.get(key) !== run) return
+      recovered.add(key)
+      pump()
+    })
+  recoveries.set(key, run)
+}
+
 /** The workspace an entry belongs to, when it is open in this run. */
 const openWorkspaceOf = (e: RestartEntry): WorkspaceService | undefined => openWorkspaces().find((w) => !!w.path && samePlace(w.path, e.workspace))
 
-/** Works the queue: the first entry whose workspace is open, one at a time, until none is left that can go now. */
+/**
+ * The workspace an entry belongs to once it is ready for a resume: open, read (its info: its projects and agents), and
+ * its merge slots recovered. A path alone isn't ready: a window sets it before its workspace is read.
+ */
+const readyWorkspaceOf = (e: RestartEntry): WorkspaceService | undefined => {
+  const ws = openWorkspaceOf(e)
+  return ws?.path && ws.info() && recovered.has(placeKey(ws.path)) ? ws : undefined
+}
+
+/** Whether a launch is still live (by its runId). */
+const runLive = (runId: string): boolean => sessions.liveStates().some((s) => s.runId === runId)
+
+/**
+ * Decides the pending entries whose workspaces are ready (queued to resume, or offered in one notice), then works the
+ * queue: the first entry whose workspace is ready, one at a time, until none can go now. Nothing is admitted while a
+ * launch it stopped still runs.
+ */
 function pump(): void {
-  if (pumping || stopping) return
+  if (stopping) return
+  // Asked while it works (a workspace ready, a launch ended): it goes round again once it is done, never lost.
+  if (pumping) {
+    pumpAgain = true
+    return
+  }
   pumping = true
+  pumpAgain = false
+  const gen = generation
   void (async () => {
     try {
       for (;;) {
-        if (stopping) return
+        if (stopping || gen !== generation) return
+        const offer: RestartEntry[] = []
+        for (const e of record?.entries ?? []) {
+          if (e.state !== 'pending') continue
+          const ws = readyWorkspaceOf(e)
+          if (!ws) continue
+          if (auto(e, ws)) enqueue(e)
+          else {
+            setState(e, 'offered')
+            offer.push(e)
+          }
+        }
+        if (offer.length) {
+          await save()
+          tellOffer(offer)
+        }
+        if (stuckRun && runLive(stuckRun)) return
+        stuckRun = null
         const key = queue.find((k) => {
           const e = entryOf(k)
-          return !!e && e.state === 'queued' && !!openWorkspaceOf(e)
+          return !!e && e.state === 'queued' && !!readyWorkspaceOf(e)
         })
         if (!key) break
         queue.splice(queue.indexOf(key), 1)
         const e = entryOf(key)!
-        await resumeOne(e).catch((err) => {
+        const outcome = await resumeOne(e, gen).catch((err) => {
+          if (gen !== generation) return 'cancelled' as const
           setState(e, 'failed', err instanceof Error ? err.message : String(err))
           done.failed.push(e)
+          return 'done' as const
         })
+        if (outcome === 'cancelled' || gen !== generation) return
         queuedAt.delete(key)
         await save()
       }
@@ -335,25 +420,27 @@ function pump(): void {
       if (!queue.some((k) => entryOf(k)?.state === 'queued')) report()
     } finally {
       pumping = false
+      if (pumpAgain && gen === generation) pump()
     }
   })()
 }
+let pumpAgain = false
 
-// A workspace opening (a window restoring it, or one opened later) may let queued entries go.
+// A workspace read (a window restoring it, or one opened later), or a launch ending, may let entries go.
 let following = false
 function followWorkspaces(): void {
   if (following) return
   following = true
   onHiveEvent((ev) => {
-    if (ev.type === 'workspace-changed' && queue.length) pump()
+    if (ev.type === 'workspace-changed' || (ev.type === 'session-exit' && stuckRun)) pump()
   })
 }
 
 /** The statuses of an agent that has taken its first prompt (a resume's note). */
 const TOOK_NOTE = new Set(['working', 'finished', 'waiting', 'background'])
 
-/** How long a resumed agent has to be ready (Settings → Advanced). */
-const readyMs = (): number => readyMsForTests ?? Math.max(10, Number(advanced.get<number>(RESTART_READY_SECONDS)) || 90) * 1000
+/** How long a resumed agent has to be ready (Settings → Advanced, its workspace's own value or Hive's). */
+const readyMs = (ws: WorkspaceService): number => readyMsForTests ?? Math.max(10, Number(advanced.get<number>(RESTART_READY_SECONDS, workspaceValues(ws))) || 90) * 1000
 
 /** Waits for a condition, polled, up to `ms`. */
 async function until(fn: () => boolean, ms: number): Promise<boolean> {
@@ -366,41 +453,58 @@ async function until(fn: () => boolean, ms: number): Promise<boolean> {
 }
 
 /**
- * One agent: checked again just before it starts (its workspace open, the agent still there and not running, its
- * conversation still its last, no slot hold), started in its conversation with its note, and waited for until it is
- * ready. Not ready in time: failed, and its launch stopped (and gone) before the next one starts.
+ * One agent: checked again just before it starts (its workspace ready, the agent still there and not running, its
+ * conversation still its last, no slot hold), after every await too; started in its conversation with its note, and
+ * waited for until it is ready. Not ready in time: its launch stopped, and confirmed gone, before the next one starts.
+ * `gen`: the queue's generation; Hive closing meanwhile cancels it ('cancelled': nothing changed), a workspace closing
+ * puts it back to pending.
  */
-async function resumeOne(e: RestartEntry): Promise<void> {
-  const ws = openWorkspaceOf(e)
-  if (!ws) {
+async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancelled'> {
+  const cancelled = (): boolean => gen !== generation || stopping
+  // Its workspace closed (not Hive): back to pending, for when it opens again.
+  const closed = (): 'done' => {
     setState(e, 'pending')
-    return
+    return 'done'
   }
-  const projectInfo = ws.info()?.projects.find((p) => samePlace(p.path, e.projectPath))
-  const agent = projectInfo?.agents.find((a) => a.id === e.agentId)
-  const skip = (why: string): void => {
+  const skip = (why: string): 'done' => {
     setState(e, 'skipped', why)
     done.skipped.push(e)
     log.info(`Not resuming ${userText(e.agentName)} in ${userText(e.project)}: ${why}`)
+    return 'done'
   }
-  if (!agent) return skip('removed')
-  if (sessions.liveFor(e.projectPath, e.agentId)) return skip('running')
-  if (agent.lastSessionId && agent.lastSessionId !== e.sessionId) return skip('movedOn')
+  /** Why it can't start now, from what is so now: null when it may. */
+  const check = (ws: WorkspaceService): string | null => {
+    const agent = ws.info()?.projects.find((p) => samePlace(p.path, e.projectPath))?.agents.find((a) => a.id === e.agentId)
+    if (!agent) return 'removed'
+    if (sessions.liveFor(e.projectPath, e.agentId)) return 'running'
+    if (agent.lastSessionId && agent.lastSessionId !== e.sessionId) return 'movedOn'
+    return null
+  }
+  let ws = readyWorkspaceOf(e)
+  if (!ws) return closed()
+  const first = check(ws)
+  if (first) return skip(first)
   const hold = await inWorkspace(ws, () => sessions.resumeHoldFor(e.projectPath, e.agentId, e.sessionId)).catch(() => null)
+  if (cancelled()) return 'cancelled'
   if (hold) {
     setState(e, 'held', hold.is)
     done.held.push(e)
     log.info(`Left ${userText(e.agentName)} in ${userText(e.project)} to resume by hand (${hold.is})`)
-    return
+    return 'done'
   }
   setState(e, 'starting')
   await save()
-  const ms = readyMs()
+  if (cancelled()) return 'cancelled'
+  // Checked again just before the start, nothing awaited between: what changed while the hold and the save were awaited.
+  ws = readyWorkspaceOf(e)
+  if (!ws) return closed()
+  const again = check(ws)
+  if (again) return skip(again)
+  const ms = readyMs(ws)
   // Ready once it has taken its note (its first prompt): seen working, or past a turn, in any status change of this
   // launch. Not `ready` (a resumed conversation's transcript is there before its CLI is, and Hive's fallback reads that
-  // as ready), nor `watching` (a watch the conversation had shows as it starts).
-  // Everything after the start is about this launch only (its runId): a session the user started meanwhile is never
-  // counted, waited for or stopped as this one.
+  // as ready), nor `watching` (a watch the conversation had shows as it starts). Everything after the start is about
+  // this launch only (its runId): a session the user started meanwhile is never counted, waited for or stopped as it.
   let runId: string | null = null
   let took = false
   const off = onHiveEvent((ev) => {
@@ -413,32 +517,45 @@ async function resumeOne(e: RestartEntry): Promise<void> {
   let ready = false
   try {
     runId = (await inWorkspace(ws, () => sessions.start(e.projectPath, { agentId: e.agentId, resumeId: e.sessionId, auto: true, ...(e.sessionName ? { name: e.sessionName } : {}), prompt: resumeNote(e, app.getVersion()) }))).runId
-    // Its launch ending meanwhile (stopped by the user, or its CLI exited) ends the wait too.
-    ready = await until(() => took || TOOK_NOTE.has(mine()?.status ?? 'stopped') || !mine(), ms)
+    // Its launch ending meanwhile (stopped by the user, or its CLI exited), Hive closing, or its workspace closing end
+    // the wait too.
+    ready = await until(() => took || TOOK_NOTE.has(mine()?.status ?? 'stopped') || !mine() || cancelled() || !openWorkspaceOf(e), ms)
     ready &&= took || TOOK_NOTE.has(mine()?.status ?? 'stopped')
   } finally {
     off()
   }
+  // Hive closing: its sessions stop with it, and the closing snapshot has this agent; nothing here changes the record.
+  if (cancelled()) return 'cancelled'
   if (ready) {
     setState(e, 'resumed')
     done.resumed.push(e)
     log.info(`Resumed ${userText(e.agentName)} in ${userText(e.project)} after Hive restarted (${e.reason})`)
-    return
+    return 'done'
   }
+  if (!openWorkspaceOf(e)) return closed()
   // Its launch ended before it took its note: stopped (by the user, or its CLI exited), not resumed again later.
   if (!mine()) {
     setState(e, 'failed', 'stopped')
     done.failed.push(e)
     log.info(`${userText(e.agentName)} in ${userText(e.project)} was stopped while it was resuming`)
-    return
+    return 'done'
   }
-  // Not ready: stopped, and gone, before the next one starts (never two starting at once).
-  // Checked again just before the stop: still this launch (nothing awaited between the check and the stop).
-  if (mine()) sessions.stop(e.projectPath, e.agentId)
-  await until(() => !mine(), 10_000)
+  // Not ready: this launch stopped (by its runId: never another), ended if it doesn't stop, and confirmed gone before
+  // the next one starts. One that outlives it all is reported, and nothing more is admitted until it has ended.
+  const own = runId
+  await sessions.stopWhereAndWait((s) => (s as LiveSessionState).runId === own, stopMsForTests ?? 10_000)
+  if (cancelled()) return 'cancelled'
+  if (runLive(own)) {
+    stuckRun = own
+    setState(e, 'failed', 'notStopped')
+    done.failed.push(e)
+    log.warn(`${userText(e.agentName)} in ${userText(e.project)} wasn't ready within ${Math.round(ms / 1000)} s of resuming and hasn't stopped: no other agent resumes until it ends`)
+    return 'done'
+  }
   setState(e, 'failed', 'notReady')
   done.failed.push(e)
   log.warn(`${userText(e.agentName)} in ${userText(e.project)} wasn't ready within ${Math.round(ms / 1000)} s of resuming: stopped`)
+  return 'done'
 }
 
 /** Why an entry wasn't resumed, as the notice says it. */
@@ -452,6 +569,8 @@ function whyText(e: RestartEntry): string {
       return tr(msg({ id: 'main.restart.why.movedOn', defaultMessage: 'it has a newer conversation', description: 'Why an agent was not resumed after Hive restarted: it was started in another conversation since.' }))
     case 'notReady':
       return tr(msg({ id: 'main.restart.why.notReady', defaultMessage: "it didn't get ready in time, so it was stopped", description: 'Why an agent was not resumed after Hive restarted: its CLI did not become ready within the time allowed (Settings → Advanced), so Hive stopped it.' }))
+    case 'notStopped':
+      return tr(msg({ id: 'main.restart.why.notStopped', defaultMessage: "it didn't get ready in time and hasn't stopped yet; the others resume once it has", description: 'Why an agent was not resumed after Hive restarted: its CLI did not become ready in time, and it did not end when Hive stopped it; Hive starts no other agent until it has ended.' }))
     case 'stopped':
       return tr(msg({ id: 'main.restart.why.stopped', defaultMessage: 'it was stopped while it started', description: 'Why an agent was not resumed after Hive restarted: its launch ended (the user stopped it, or its CLI exited) before it was ready.' }))
     case 'expired':
@@ -507,7 +626,7 @@ async function tellAssistants(resumed: readonly RestartEntry[], not: readonly Re
 const seen = new Set<string>()
 let watcher: FSWatcher | null = null
 let checking = false
-let again = false
+let checkAgain = false
 
 /**
  * Watches Hive's profile for the installer's request (and checks once now: one left from an earlier process is removed,
@@ -517,7 +636,7 @@ let again = false
 export function watchRestartRequests(onRequest: () => void, dir = app.getPath('userData')): void {
   const check = (): void => {
     if (checking) {
-      again = true
+      checkAgain = true
       return
     }
     checking = true
@@ -525,8 +644,8 @@ export function watchRestartRequests(onRequest: () => void, dir = app.getPath('u
       handleRequest(dir, onRequest)
     } finally {
       checking = false
-      if (again) {
-        again = false
+      if (checkAgain) {
+        checkAgain = false
         check()
       }
     }
@@ -602,7 +721,7 @@ function sweepRequests(dir: string): void {
   for (const n of names) if (/^restart-request\.[0-9a-f-]{36}\.taken$|^restart-ack-[0-9a-f-]{36}\.json(\.tmp)?$/i.test(n)) rmSync(join(dir, n), { force: true })
 }
 
-/** Once at start: the queue follows workspaces opening. */
+/** Once at start: the queue follows workspaces opening and stuck launches ending. */
 export function initRestartRecovery(): void {
   followWorkspaces()
 }

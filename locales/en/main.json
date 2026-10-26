@@ -887,6 +887,10 @@
     "defaultMessage": "it didn't get ready in time, so it was stopped",
     "description": "Why an agent was not resumed after Hive restarted: its CLI did not become ready within the time allowed (Settings → Advanced), so Hive stopped it."
   },
+  "main.restart.why.notStopped": {
+    "defaultMessage": "it didn't get ready in time and hasn't stopped yet; the others resume once it has",
+    "description": "Why an agent was not resumed after Hive restarted: its CLI did not become ready in time, and it did not end when Hive stopped it; Hive starts no other agent until it has ended."
+  },
   "main.restart.why.removed": {
     "defaultMessage": "it was removed",
     "description": "Why an agent was not resumed after Hive restarted: the agent has been removed from its project."

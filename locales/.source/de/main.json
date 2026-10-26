@@ -221,6 +221,7 @@
   "main.restart.why.held": "its working folder is held for other work (resume it by hand)",
   "main.restart.why.movedOn": "it has a newer conversation",
   "main.restart.why.notReady": "it didn't get ready in time, so it was stopped",
+  "main.restart.why.notStopped": "it didn't get ready in time and hasn't stopped yet; the others resume once it has",
   "main.restart.why.removed": "it was removed",
   "main.restart.why.running": "it is running already",
   "main.restart.why.stopped": "it was stopped while it started",

@@ -221,6 +221,7 @@
   "main.restart.why.held": "作業フォルダーが別の作業のために確保されています（手動で再開してください）",
   "main.restart.why.movedOn": "より新しい会話があります",
   "main.restart.why.notReady": "時間内に準備ができなかったため停止しました",
+  "main.restart.why.notStopped": "時間内に準備ができず、まだ停止していません。停止すると、ほかのエージェントを再開します",
   "main.restart.why.removed": "削除されています",
   "main.restart.why.running": "すでに実行中です",
   "main.restart.why.stopped": "起動中に停止されました",
