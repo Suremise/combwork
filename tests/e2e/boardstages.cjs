@@ -140,6 +140,33 @@ const nothingToArchive = (dialog) => {
       return w.passed === 34 && w.merging === 34
     }, HUNG_MS)), JSON.stringify(await widths()))
     await shoot('approved-collapsed')
+
+    // --- The board's own columns fold to 34 px strips on a grouped board too (HI-1724: `.board.grouped > .board-column`
+    // outranked `.collapsed`, so they kept 140 px); open ones keep their 140 px least width. A mix, then all, wide and narrow.
+    const OWN = ['hold', 'todo', 'doing', 'review', 'done']
+    const fold = async (folding) => {
+      for (const id of folding) await col(id).locator('.board-column-header').getByRole('button', { name: /^Collapse / }).click()
+      await until(async () => (await Promise.all(folding.map(collapsed))).every(Boolean), HUNG_MS)
+    }
+    const foldedRight = (folded) => until(async () => {
+      const w = await widths()
+      return OWN.every((id) => (folded.includes(id) ? w[id] === 34 : w[id] >= 140))
+    }, HUNG_MS)
+    await fold(['hold', 'todo', 'review'])
+    check('on a grouped board, folded On Hold, Todo and Review are 34 px strips, Active and Done open (HI-1724)', !!(await foldedRight(['hold', 'todo', 'review'])), JSON.stringify(await widths()))
+    await shoot('grouped-mix')
+    await lib.fitWindow(h.app, page, { width: 900, height: 900 })
+    check('…narrow too', !!(await foldedRight(['hold', 'todo', 'review'])), JSON.stringify(await widths()))
+    await shoot('grouped-mix-narrow')
+    await fold(['doing', 'done'])
+    check('…every column folded: all 34 px strips, narrow', !!(await foldedRight(OWN)), JSON.stringify(await widths()))
+    await shoot('grouped-all-folded-narrow')
+    await lib.fitWindow(h.app, page, { width: 1500, height: 900 })
+    check('…and wide', !!(await foldedRight(OWN)), JSON.stringify(await widths()))
+    await shoot('grouped-all-folded')
+    for (const id of OWN) await col(id).getByRole('button', { name: /^Expand / }).click()
+    check('…they open again, each at least 140 px', !!(await foldedRight([])), JSON.stringify(await widths()))
+
     await col('merging').getByRole('button', { name: 'Expand Merging' }).click()
     await col('passed').getByRole('button', { name: 'Expand Approved' }).click()
     check('both expand again', !!(await until(async () => !(await collapsed('merging')) && !(await collapsed('passed')) && !((await approvedGroup.getAttribute('class')) ?? '').includes('collapsed'), HUNG_MS)))

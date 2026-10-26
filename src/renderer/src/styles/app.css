@@ -8786,8 +8786,9 @@ body.pane-resizing-v .monaco-editor {
 .board-category-columns > .board-column:not(.collapsed) {
   min-width: 120px;
 }
-/* Seven columns where six were: each a little narrower at least, so they still fit where six did. */
-.board.grouped > .board-column {
+/* Seven columns where six were: each a little narrower at least, so they still fit where six did. Open ones only: it
+   outranks `.board-column.collapsed`, so a folded column kept 140 px (HI-1724). */
+.board.grouped > .board-column:not(.collapsed) {
   min-width: 140px;
 }
 .board-column-strip {
