@@ -53,6 +53,8 @@ const M = {
   leftover: msg({ id: 'settings.accounts.leftover', defaultMessage: "Not all removed: {what}. Remove tries again; nothing outside its folder was touched.", description: "A warning on a connection (Settings → Connections) whose removal stopped partway. {what} is what's left, in English." }),
   plan: msg({ id: 'settings.accounts.plan', defaultMessage: '{email} · {plan}', description: "A connection's identity in Settings → Connections: the email it is signed in as, and its plan as the CLI names it (\"max\")." }),
   changedTo: msg({ id: 'settings.accounts.changedTo', defaultMessage: 'Now signed in as {now}, was {was}', description: 'A warning on a connection (Settings → Connections): its login changed (a /login typed in a pane). {now} and {was} are emails.' }),
+  affected: msg({ id: 'settings.accounts.affected', defaultMessage: '{n, plural, one {# running agent runs on another connection than the one chosen for it now.} other {# running agents run on another connection than the one chosen for them now.}}', description: 'Banner in Settings → Connections after a connection was turned off or the default changed (HI-1755): how many running agents are on a connection other than the one chosen now.' }),
+  switchAffected: msg({ id: 'settings.accounts.switchAffected', defaultMessage: 'Switch Them When Their Turn Is Over', description: 'Button on that banner: each of those agents ends once its turn is over and carries on, on the connection chosen now.' }),
   checkedAt: msg({ id: 'settings.accounts.checkedAt', defaultMessage: 'Checked {when}', description: "The tooltip of a connection's state (Settings → Connections): when it was last checked. {when} is how long ago (\"5 min ago\")." })
 }
 
@@ -69,6 +71,7 @@ const STATE_ICON: Record<ConnectionState, string> = { signedIn: 'pass-filled', s
 export function AccountsSettings() {
   const changed = useStore((s) => s.connectionsChanged)
   const wsPath = useStore((s) => s.workspace?.path ?? null)
+  const projects = useStore((s) => s.workspace?.projects)
   const [view, setView] = useState<ConnectionsView | null>(null)
   const [terminal, setTerminal] = useState<{ id: string; key: string; ended: boolean } | null>(null)
   const load = useCallback((check: boolean) => {
@@ -81,6 +84,8 @@ export function AccountsSettings() {
   useEffect(() => load(false), [load, changed])
 
   if (!view) return <div className="faint">{tr(M.loading)}</div>
+  // Agents running on a connection other than the one chosen for them now (HI-1755), not yet waiting to switch.
+  const affected = (projects ?? []).flatMap((p) => p.agents).filter((a) => a.restartNeeded && a.live?.launchedConnection && !a.live.switchPending).length
   const dups = duplicateLogins(view.connections)
   const nameOf = (id: string): string => view.connections.find((a) => a.id === id)?.name ?? id
   const act = async (title: ReturnType<typeof msg>, fn: () => Promise<unknown>): Promise<void> => {
@@ -129,6 +134,14 @@ export function AccountsSettings() {
   return (
     <div className="accounts-settings">
       {!wsPath && <p className="hint">{tr(M.noWorkspace)}</p>}
+      {affected > 0 && (
+        <div className="banner warn" data-switch-affected>
+          <Icon name="refresh" /> {tr(M.affected, { n: affected })}
+          <button className="btn small primary" onClick={() => void act(M.changeFailed, () => call('connections:switchAffected'))}>
+            {tr(M.switchAffected)}
+          </button>
+        </div>
+      )}
       {view.providers.map((p) => {
         const mine = view.connections.filter((a) => a.provider === p)
         const ws = view.workspace[p]

@@ -18,6 +18,7 @@ import { agentProviderOf, bumpUnused, confirm, focusAfterRemoving, notify, proje
 import { msg, tr, tRich } from '@shared/i18n'
 import { confirmDangerousMode } from './PermissionMode'
 import { ProviderIcon } from './ProviderIcon'
+import { ConnectionChoice } from './ConnectionChoice'
 import { cx } from '../util'
 import { formatSize } from '@shared/units'
 import { MergeSlotNote, projectSlots, useMergeSlots } from './MergeSlots'
@@ -243,6 +244,8 @@ export function AddAgentDialog() {
   const [effort, setEffort] = useState('')
   const [permission, setPermission] = useState('')
   const [context, setContext] = useState<ContextChoice>('')
+  // Its connection (HI-1755): '' for the workspace's default.
+  const [connection, setConnection] = useState('')
   const [provider, setProvider] = useState<ProviderId>('')
   // The provider is still the project's default (not one the user picked), and whether that waits on detection (#506).
   const [followDefault, setFollowDefault] = useState(true)
@@ -304,6 +307,7 @@ export function AddAgentDialog() {
     setEffort('')
     setPermission('')
     setContext('')
+    setConnection('')
   }
 
   const add = async (): Promise<void> => {
@@ -317,7 +321,8 @@ export function AddAgentDialog() {
         model: model || undefined,
         effort: (effort || undefined) as EffortLevel | undefined,
         permissionMode: (permission || undefined) as PermissionMode | undefined,
-        use200kContext: contextValue(context) ?? undefined
+        use200kContext: contextValue(context) ?? undefined,
+        ...(connection ? { connection } : {})
       })
       await actions.refreshWorkspace()
       close()
@@ -373,6 +378,9 @@ export function AddAgentDialog() {
       <WorkflowRoleChoice value={workflowRole} onChange={setRoleChosen} />
       <h3 className="agent-dialog-h">{tr(CODING_AGENT)}</h3>
       <ProviderChoice value={provider} onChange={chooseProvider} />
+      <div className="agent-form">
+        <ConnectionChoice id="add-agent-connection" provider={provider} value={connection} onChange={setConnection} />
+      </div>
       {checking && (
         <div className="banner info" data-provider-checking>
           <Icon name="loading" spin />
@@ -422,6 +430,8 @@ interface AgentFields {
   context: ContextChoice
   /** Only these of the project's MCP servers (#537); null: all of them. */
   mcp: string[] | null
+  /** The connection it runs on (HI-1755): an id, '' for the workspace's default. */
+  connection: string
 }
 
 /**
@@ -536,7 +546,7 @@ function AgentSettingsModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey])
   const put = (patch: Partial<AgentFields>): void => setF((x) => ({ ...x, ...patch }))
-  const chooseProvider = (v: ProviderId): void => put(v !== f.provider ? { provider: v, model: '', effort: '', permission: '', context: '' } : { provider: v })
+  const chooseProvider = (v: ProviderId): void => put(v !== f.provider ? { provider: v, model: '', effort: '', permission: '', context: '', connection: '' } : { provider: v })
   const problem = agentNameProblem(f.name, tr) ?? (nameProblem?.(f.name.trim()) ?? null)
   const submit = async (): Promise<void> => {
     if (problem) return
@@ -584,6 +594,9 @@ function AgentSettingsModal({
       <WorkflowRoleChoice value={f.workflowRole} onChange={(workflowRole) => put({ workflowRole })} />
       <h3 className="agent-dialog-h">{tr(CODING_AGENT)}</h3>
       {providerLocked ?? <ProviderChoice value={f.provider} current={initial.provider} onChange={chooseProvider} />}
+      <div className="agent-form">
+        <ConnectionChoice id="agent-connection" provider={f.provider} value={f.connection} onChange={(connection) => put({ connection })} />
+      </div>
       <h3 className="agent-dialog-h">{tr(SETTINGS)}</h3>
       <Overrides
         project={config}
@@ -623,7 +636,7 @@ export function AgentSettingsDialog() {
   const close = (): void => set({ agentSettingsFor: null })
   const own = legacyOf(agent)
   // Its role as it reads now (the guess, for an agent from before 1.0), stored once the user saves (#1430).
-  const initial: AgentFields = { name: agent.name, role: agent.role ?? '', workflowRole: agentWorkflowRole(agent), provider: current, model: agent.model ?? '', effort: agent.effort ?? '', permission: agent.permissionMode ?? '', context: contextChoice(agent.use200kContext), mcp: agent.mcpServers ? [...agent.mcpServers] : null }
+  const initial: AgentFields = { name: agent.name, role: agent.role ?? '', workflowRole: agentWorkflowRole(agent), provider: current, model: agent.model ?? '', effort: agent.effort ?? '', permission: agent.permissionMode ?? '', context: contextChoice(agent.use200kContext), mcp: agent.mcpServers ? [...agent.mcpServers] : null, connection: agent.connection ?? '' }
   return (
     <AgentSettingsModal
       title={tr(msg({ id: 'agents.settings.title', defaultMessage: '{agent} settings', description: 'Title of the Agent Settings dialog. {agent} is the agent.' }), { agent: agent.name })}
@@ -680,7 +693,8 @@ export function AgentSettingsDialog() {
           effort: (f.effort || undefined) as EffortLevel | undefined,
           permissionMode: (f.permission || undefined) as PermissionMode | undefined,
           use200kContext: contextValue(f.context),
-          mcpServers: f.mcp
+          mcpServers: f.mcp,
+          connection: f.connection || null
         })
         await actions.refreshWorkspace()
       }}
@@ -709,7 +723,7 @@ export function TemplateAgentDialog() {
     result.current = null
   }
   const provider = a?.provider ?? projectDefaultProvider(project?.config ?? DEFAULT_PROJECT_CONFIG, settings)
-  const initial: AgentFields = { name: a?.name ?? req.suggestedName, role: a?.note ?? '', workflowRole: a?.role ?? agentWorkflowRole({ name: req.suggestedName }), provider, model: a?.model ?? '', effort: a?.effort ?? '', permission: a?.permissionMode ?? '', context: contextChoice(a?.use200kContext), mcp: a?.mcpServers ? [...a.mcpServers] : null }
+  const initial: AgentFields = { name: a?.name ?? req.suggestedName, role: a?.note ?? '', workflowRole: a?.role ?? agentWorkflowRole({ name: req.suggestedName }), provider, model: a?.model ?? '', effort: a?.effort ?? '', permission: a?.permissionMode ?? '', context: contextChoice(a?.use200kContext), mcp: a?.mcpServers ? [...a.mcpServers] : null, connection: a?.connection ?? '' }
   return (
     <AgentSettingsModal
       title={a ? tr(msg({ id: 'agents.template.title', defaultMessage: '{agent} settings (template)', description: "Title of Agent Settings for an agent of a template ({agent}), from the template editor." }), { agent: a.name }) : tr(msg({ id: 'agents.template.new', defaultMessage: 'New agent (template)', description: 'Title of Agent Settings for a new agent of a template, from the template editor.' }))}
@@ -734,7 +748,8 @@ export function TemplateAgentDialog() {
           ...(f.effort ? { effort: f.effort as EffortLevel } : {}),
           ...(f.permission ? { permissionMode: f.permission as PermissionMode } : {}),
           ...(ctx !== null ? { use200kContext: ctx } : {}),
-          ...(f.mcp ? { mcpServers: f.mcp } : {})
+          ...(f.mcp ? { mcpServers: f.mcp } : {}),
+          ...(f.connection ? { connection: f.connection } : {})
         }
       }}
       onClose={() => close(result.current)}

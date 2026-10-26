@@ -5,6 +5,7 @@ import { unzipSync } from 'fflate'
 import yaml from 'js-yaml'
 import type { ProviderId, SkillAudience, SkillInfo, SkillTarget } from '../shared/types'
 import { allProviders, provider } from './providers'
+import { connectionHomes } from './accounts'
 import { bundledDir, bundledIds, bundledStatus, restoreBundled } from './bundled'
 import { copyDir, COPY_MARKER, isDir, isFile, readDirBounded } from './fsutil'
 import { englishText, withValues, type Text, type TextValues } from '../shared/advanced'
@@ -179,8 +180,10 @@ let machineCache: { at: number; skills: SkillInfo[] } | null = null
 async function machineSkills(): Promise<SkillInfo[]> {
   if (machineCache && Date.now() - machineCache.at < 30_000) return machineCache.skills
   const all: SkillInfo[] = []
-  for (const p of allProviders()) {
-    const roots = p.skillRoots()
+  // Each connection's home on in an open workspace (HI-1755: its own skills and plugins), else the CLI's own home.
+  const homes: [ReturnType<typeof provider>, string | undefined][] = allProviders().flatMap((x) => connectionHomes(x.id)?.map((h): [typeof x, string | undefined] => [x, h.home]) ?? [[x, undefined]])
+  for (const [p, home] of homes) {
+    const roots = p.skillRoots(home)
     const skills: SkillInfo[] = []
     for (const dir of roots.machine) skills.push(...(await findSkills(dir, 'machine', 4)))
     const pluginSkills = roots.plugins ? await findSkills(roots.plugins, 'plugin', 7) : []

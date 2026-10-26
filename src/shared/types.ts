@@ -705,6 +705,8 @@ export interface WorkspaceConfig {
    * on by itself); `{ on: [], default: null }`: the user turned them all off.
    */
   connections?: Partial<Record<ProviderId, WorkspaceConnections>>
+  /** The Assistant's own connection per provider in this workspace (HI-1755: Settings → Assistant); absent or null: the default. */
+  assistantConnection?: Partial<Record<ProviderId, string | null>>
   /** Where the workspace was last opened (#146): a different folder now means it was moved, and Repair… is offered. */
   lastPath?: string
   /** The last project rename (#514, `project-names.json`'s number) its hidden and removed projects follow. */
@@ -1407,10 +1409,15 @@ export interface AgentDef {
    * built-in hive server is given whatever this says.
    */
   mcpServers?: string[]
+  /**
+   * The connection it runs on (HI-1755: a Connection's id), for a provider that has connections; absent: the
+   * workspace's default for its provider. Off in the workspace, the default is used, and the agent says so.
+   */
+  connection?: string
 }
 
 /** A change to an agent's settings: empty values (null for use200kContext and mcpServers) clear an override so it follows the project. */
-export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'model' | 'effort' | 'permissionMode' | 'mode' | 'role'>> & { use200kContext?: boolean | null; mcpServers?: string[] | null; workflowRole?: WorkflowRole | null }
+export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'model' | 'effort' | 'permissionMode' | 'mode' | 'role'>> & { use200kContext?: boolean | null; mcpServers?: string[] | null; workflowRole?: WorkflowRole | null; connection?: string | null }
 
 /** What loading a template into a project would do (#126), and what stops it now. */
 export interface TemplateLoadPlan {
@@ -1491,6 +1498,8 @@ export interface AddAgentOptions {
   workflowRole?: WorkflowRole
   /** Only these of the project's MCP servers (#537); absent: all of them. */
   mcpServers?: string[]
+  /** The connection it runs on (HI-1755), when it is on in the workspace; absent (or not on): the workspace's default. */
+  connection?: string
   /**
    * #456: new-worktree, work in the project's unused worktree on that branch instead when it is merged into the base and
    * clean, brought up to the base; existing-worktree, bring the one chosen up to the base when it is merged and clean.
@@ -1677,6 +1686,8 @@ export interface MergeResult {
 }
 
 export interface SessionRecord {
+  /** The connection its latest run launched on (HI-1755), id and name as then; absent: none (a provider without connections). */
+  connection?: { id: string; name: string }
   id: string
   /** The provider that ran it ("claude-code", "codex"). The field name predates providers. */
   agent: ProviderId
@@ -1915,6 +1926,13 @@ export interface LiveSessionState {
   startedAt: string
   /** Effective settings the session launched with — used to detect "restart to apply". */
   launchSignature: string
+  /**
+   * The connection this run launched on (HI-1755), kept for the run whatever is chosen meanwhile; absent: a provider
+   * without connections (or a test copy on its CLI test home). `note`: why it isn't the one chosen (its choice was off).
+   */
+  launchedConnection?: { id: string; name: string; note?: 'offFallback' | 'unknownLogin' | 'loginChanged' }
+  /** A switch to the connection it would launch on now waits for its turn to be over (HI-1755). */
+  switchPending?: boolean
   /**
    * What it was given at launch (GET /v1/projects/{name}): Hive's guidance revision, the content hash of each Hive skill's
    * copy it reads, and why a skill isn't as asked for (a folder of the user's has its name, an old copy kept while in use).

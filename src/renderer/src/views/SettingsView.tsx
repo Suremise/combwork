@@ -24,8 +24,9 @@ import { HiddenProjectsList } from '../components/ProjectRemoval'
 import { WorkspaceStorageList } from '../components/Storage'
 import { AntivirusPanel } from '../components/Antivirus'
 import { AccountsSettings } from '../components/AccountsSettings'
+import { ConnectionChoice } from '../components/ConnectionChoice'
 import { AdvancedSettings } from '../components/AdvancedSettings'
-import { ACCOUNTS_PREVIEW, ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
+import { ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
 import { choose, confirm, get, notify, set, useLanguage, useStore } from '../store'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
@@ -62,6 +63,7 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'workflow.defaults': () => <WorkflowLevelForm level="global" />,
   'board.colors': () => <ColumnColors />,
   'assistant.provider': () => <AssistantProviderPicker />,
+  'assistant.connection': () => <AssistantConnectionPicker />,
   'assistant.mode': () => <AssistantModePicker />,
   'assistant.journal': () => <JournalSettingsPanel />,
   ...Object.fromEntries(PROVIDERS.map((p) => [`assistant.provider:${p.id}`, () => <AssistantProviderDefaults provider={p.id} />])),
@@ -556,6 +558,21 @@ function ProvidersList() {
   )
 }
 
+/** The open workspace's Assistant's connection, for each CLI that has connections (HI-1755). */
+function AssistantConnectionPicker() {
+  const ws = useStore((s) => s.workspace)
+  const settings = useStore((s) => s.settings)
+  if (!ws) return <div className="faint">{tr(msg({ id: 'settings.assistant.connection.noWorkspace', defaultMessage: 'Open a workspace to choose its Assistant\'s connection.', description: 'Settings → Assistant → Connection with no workspace open.' }))}</div>
+  const providers = enabledProviders(settings).filter((p) => !!p.capabilities.connections)
+  return (
+    <div className="agent-form">
+      {providers.map((p) => (
+        <ConnectionChoice key={p.id} id={`assistant-connection-${p.id}`} provider={p.id} value={ws.config.assistantConnection?.[p.id] ?? ''} onChange={(v) => void call('connections:setAssistant', p.id, v || null).then(() => actions.refreshWorkspace()).catch((e) => notify('error', tr(msg({ id: 'settings.assistant.connection.failed', defaultMessage: "Couldn't change the Assistant's connection", description: "An error's title: saving the Assistant's connection (Settings → Assistant) failed." })), errorMessage(e)))} />
+      ))}
+    </div>
+  )
+}
+
 function AssistantProviderPicker() {
   const settings = useStore((s) => s.settings)
   const on = enabledProviders(settings)
@@ -1011,13 +1028,10 @@ export function SettingsView() {
   const advanced = useStore((s) => s.advanced)
   // Searching matches the text as shown, in the language shown.
   const shownLanguage = useLanguage()
-  const accountsShown = advanced?.values[ACCOUNTS_PREVIEW] === true
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     return SETTINGS.filter((d) => {
-      // Settings → Accounts only with its preview on (HI-980, staged until HI-1755).
-      if (d.section === 'accounts' && !accountsShown) return false
       if (d.id === 'advanced.values' && (q || modifiedOnly)) return advancedMatches(q, modifiedOnly, advanced)
       // Its English matches as well as what it shows: Settings can be searched in either.
       if (q && !`${d.title} ${d.desc} ${d.tip} ${d.key}${shownLanguage !== SOURCE_LANGUAGE ? ` ${Object.values(rowText(d)).join(' ')}` : ''}`.toLowerCase().includes(q)) return false
@@ -1025,7 +1039,7 @@ export function SettingsView() {
       if (!q && !modifiedOnly && d.section !== section) return false
       return true
     })
-  }, [query, section, settings, modifiedOnly, loops, advanced, shownLanguage, accountsShown])
+  }, [query, section, settings, modifiedOnly, loops, advanced, shownLanguage])
 
   if (!settings) return null
   const grouped = SECTIONS.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
@@ -1044,7 +1058,7 @@ export function SettingsView() {
       </div>
       <div className="settings-body">
         <div className="settings-nav">
-          {SECTIONS.filter((s) => s.id !== 'accounts' || accountsShown).map((s) => (
+          {SECTIONS.map((s) => (
             <div key={s.id} className={cx('row', !query && !modifiedOnly && section === s.id && 'selected')} data-section={s.id} onClick={() => {
                 set({ settingsSection: s.id, settingsQuery: '' })
                 setModifiedOnly(false)

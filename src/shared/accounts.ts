@@ -7,13 +7,13 @@ import type { Connection, ProviderId, WorkspaceConnections, WorkspaceConfig } fr
 
 /** What Settings → Accounts shows (accounts:list): the connections, and the asking window's workspace's choice of them. */
 export interface ConnectionsView {
-  /** Settings → Advanced's Accounts (preview): off, the section and everything about connections are hidden. */
-  preview: boolean
   /** The providers that can have connections (capabilities.connections) and are on in Settings. */
   providers: ProviderId[]
   connections: (Connection & { signingIn: boolean; folder: string })[]
   /** Per provider, as it applies (workspaceAccounts); absent: not set up in this workspace. */
   workspace: Partial<Record<ProviderId, WorkspaceConnections>>
+  /** Providers a test copy runs on its CLI test home where nothing is on (the test seam, HI-1755): no setup is asked for. */
+  testHome: ProviderId[]
 }
 
 /**
@@ -87,4 +87,26 @@ export function switchedOn(current: WorkspaceConnections | undefined, id: string
   const ordered = connections.filter((a) => ids.includes(a.id)).map((a) => a.id)
   const keep = was.default && ordered.includes(was.default) ? was.default : null
   return { on: ordered, default: keep ?? (on && !was.default ? id : replacementDefault(ordered, connections)) }
+}
+
+/**
+ * Which connection a launch uses (HI-1755), from what was asked for (an agent's own choice, the Assistant's, or none)
+ * and the workspace's choice:
+ * - asked for and on here: that one;
+ * - asked for but off here: the workspace's default for the provider, noted (`offFallback`); none on: refused;
+ * - asked for but gone, or another provider's: refused, never another in its place;
+ * - nothing asked for: the workspace's default; none: refused (nothing launches from the CLI's own home).
+ */
+export type ConnectionChoice = { ok: true; id: string; note?: 'offFallback' } | { ok: false; why: 'none' | 'offNoDefault' | 'deleted' | 'otherProvider'; wanted?: string }
+
+export function resolveConnection(cfg: Pick<WorkspaceConfig, 'connections'> | null | undefined, provider: ProviderId, wanted: string | null | undefined, connections: readonly Connection[]): ConnectionChoice {
+  const ws = workspaceAccounts(cfg, provider, connections)
+  if (wanted) {
+    const c = connections.find((x) => x.id === wanted)
+    if (!c) return { ok: false, why: 'deleted', wanted }
+    if (c.provider !== provider) return { ok: false, why: 'otherProvider', wanted }
+    if (ws?.on.includes(wanted)) return { ok: true, id: wanted }
+    return ws?.default ? { ok: true, id: ws.default, note: 'offFallback' } : { ok: false, why: 'offNoDefault', wanted }
+  }
+  return ws?.default ? { ok: true, id: ws.default } : { ok: false, why: 'none' }
 }

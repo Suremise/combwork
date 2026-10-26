@@ -423,6 +423,13 @@ const APP_ROWS: Row[] = [
     wide: true
   },
   // Assistant
+  {
+    section: 'assistant',
+    key: 'connection',
+    title: msg({ id: 'settings.assistant.connection.title', defaultMessage: 'Connection (this workspace)', description: "A setting's title (Settings → Assistant): which connection the open workspace's Assistant runs on." }),
+    desc: msg({ id: 'settings.assistant.connection.desc', defaultMessage: "Which connection the Assistant of the open workspace runs on. The workspace's default unless you choose one.", description: 'What the setting "Connection (this workspace)" does, under its title (Settings → Assistant).' }),
+    type: 'custom'
+  },
   { section: 'assistant', key: 'provider', title: msg({ id: 'settings.assistant.provider.title', defaultMessage: 'Provider', description: "A setting's title (Settings → Assistant)." }), desc: msg({ id: 'settings.assistant.provider.desc', defaultMessage: 'The coding agent the Assistant runs, unless a workspace chooses another.', description: 'What the setting "Provider" does, under its title (Settings → Assistant).' }), tip: msg({ id: 'settings.assistant.provider.tip', defaultMessage: 'The Assistant is independent of your project agents: a Codex Assistant can look after Claude Code agents, and the other way round.', description: 'The info tip of the setting "Provider" (Settings → Assistant): more on what it does and when it applies.' }), type: 'custom' },
   {
     section: 'assistant',

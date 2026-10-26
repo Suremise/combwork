@@ -23,6 +23,7 @@ import { appendFile, readFile, stat } from 'original-fs/promises'
 import { Readable } from 'stream'
 import type { AppInfo, McpServerDef, QuitChoice, QuitScope, QuitSession, TaskCard, WindowState } from '../shared/types'
 import { providerService } from './providerService'
+import { initConnections } from './accounts'
 import { checkGit } from './gitTool'
 import { handoverSession, hiveInstructions, withJournal, withLatestHandover, wrapsLongCommands } from '../shared/hiveGuidance'
 import { handoversFor } from './notes'
@@ -1014,6 +1015,8 @@ app.whenReady().then(async () => {
   providerService.setLiveSessionCounter((p) => sessions.liveCount(p))
   // Agents stopped by a refused sign-in can carry on once the CLI is signed in again (#309).
   providerService.onSignedIn((p) => sessions.signedInAgain(p, true))
+  // Connections (HI-980, HI-1755): new workspaces' defaults and the watches on their logins.
+  initConnections()
 
   // Hook auth files of an earlier run of Hive: their tokens died with it (#345).
   await clearHookAuth()

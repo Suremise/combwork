@@ -390,7 +390,8 @@ export interface ProviderAdapter {
   /** Extra lines for Help → Copy Diagnostics (Codex: its Windows sandbox), with no paths or names in them. */
   diagnostics?(): string[]
   /** The CLI's own default model from its settings, if set. */
-  configuredDefaultModel(): string | null
+  /** The CLI's own default model from its settings; `home`: a connection's home (HI-1755) rather than the CLI's own. */
+  configuredDefaultModel(home?: string): string | null
   /** Whether a model seen in a transcript is this provider's (to learn the CLI's default). */
   ownsModel(model: string): boolean
   /** Environment variables to remove from sessions: a parent session's identity when Hive runs inside one. */
@@ -580,10 +581,13 @@ export interface ProviderAdapter {
   exportSubtitle(sessionId: string, project: string): string
 
   // Project files
-  memorySources(projectPath: string): Promise<MemorySource[]>
+  /** `homes`: the connections' homes on in the project's workspace (HI-1755), whose user memory replaces the CLI's own home's. */
+  memorySources(projectPath: string, homes?: readonly { id: string; name: string; home: string }[]): Promise<MemorySource[]>
   /** Files in the CLI's own folder Hive may show and edit (instructions, memory); false for anything else. */
-  fileAllowed(path: string, write: boolean): boolean
-  skillRoots(): SkillRoots
+  /** `homes`: the connections' homes (HI-1755) to allow in place of the CLI's own home. */
+  fileAllowed(path: string, write: boolean, homes?: readonly string[]): boolean
+  /** `home`: a connection's home (HI-1755) rather than the CLI's own. */
+  skillRoots(home?: string): SkillRoots
   /** MCP servers a project defines in the CLI's own config, which Hive leaves off until copied to the workspace. */
   projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>>
 

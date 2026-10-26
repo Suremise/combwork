@@ -62,6 +62,10 @@ import type {
   ToastAction
 } from '../shared/types'
 import { provider as providerAdapter, allProviders } from './providers'
+import { runSwitch, type SwitchOp } from './connectionSwitch'
+import { laneEndHeldNow } from './slotsApp'
+import { checkAccount, connectionForLaunch, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
+import { resolveConnection } from '../shared/accounts'
 import { recacheEstimate } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
@@ -69,7 +73,7 @@ import { priceUsage } from '../shared/usageDays'
 import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchSkill, ProviderAdapter, SkillDelivery } from './providers/types'
 import { providerService } from './providerService'
 import { config } from './config'
-import { emit, emitTo, tellListeners, toast } from './events'
+import { emit, emitTo, onHiveEvent, tellListeners, toast } from './events'
 import { presentWindow, showOsNotification, testNotifyLog, testQuiet } from './testQuiet'
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
@@ -448,6 +452,9 @@ interface LiveSession {
   untakenFor?: readonly string[]
 }
 
+/** Whose sign-in an agent depends on (HI-1755): its provider's, or its provider's and the connection it launched on. */
+export const authScope = (s: Pick<LiveSessionState, 'provider' | 'launchedConnection'>): string => (s.launchedConnection ? `${s.provider}:${s.launchedConnection.id}` : s.provider)
+
 export interface EffectiveSettings {
   provider: ProviderId
   skills: LaunchSkill[]
@@ -461,6 +468,8 @@ export interface EffectiveSettings {
   extraArgs: string[]
   use200kContext: boolean
   chime: boolean
+  /** The connection it would launch on (HI-1755), `!<why>` when none can be used; null for a provider without connections. */
+  connection: string | null
 }
 
 /** Files read once for a whole session list (instead of once per session). */
@@ -892,7 +901,11 @@ class SessionManager {
    * CLIs whose sign-in was refused, until signed in again (#309): the user is told once per CLI and expiry (agents
    * stopping later only show it), and the CLI's own check runs again meanwhile, to notice the sign-in.
    */
-  private signedOut = new Map<ProviderId, { gather?: ReturnType<typeof setTimeout>; recheck?: ReturnType<typeof setInterval> }>()
+  /**
+   * Sign-ins refused, by auth scope (authScope: the provider, or the provider and the connection its agents launched on,
+   * HI-1755): one connection signed out never stops, relabels or clears another's agents.
+   */
+  private signedOut = new Map<string, { gather?: ReturnType<typeof setTimeout>; recheck?: ReturnType<typeof setInterval> }>()
   /** runId → liveId: hooks name their launch, so they reach the right agent even before the session id is known. */
   private runs = new Map<string, string>()
   /** The status each state was last sent with, so statusSince moves only when the status changes. */
@@ -1323,7 +1336,11 @@ class SessionManager {
     const l = agentLaunchSettings(forAgent, pc, s)
     const extraArgs = l.extraArgs.flatMap((a) => splitArgs(a))
     const chime = pc.chime === 'inherit' ? s.notifications.chimeEnabled : pc.chime === 'on'
-    return { provider: l.provider, skills, skillHashes, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode: l.permissionMode, extraArgs, use200kContext: l.use200kContext, chime }
+    // The connection it would launch on (HI-1755): a change of choice asks for a restart.
+    const wanted = assistant ? workspace.config.assistantConnection?.[l.provider] : forAgent?.connection
+    const choice = providerDescriptor(l.provider).capabilities.connections ? resolveConnection(workspace.config, l.provider, wanted, config.get().connections ?? []) : null
+    const connection = choice ? (choice.ok ? choice.id : `!${choice.why}`) : null
+    return { provider: l.provider, skills, skillHashes, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode: l.permissionMode, extraArgs, use200kContext: l.use200kContext, chime, connection }
   }
 
   signature(e: EffectiveSettings): string {
@@ -1456,6 +1473,8 @@ class SessionManager {
   async start(projectPath: string, opts: StartOptions): Promise<LiveSessionState> {
     this.assertStartsAllowed(projectPath)
     projectPath = workspace.assertSessionHost(projectPath)
+    // A start of the user's (not a switch's own resume) replaces a switch of connection waiting for that agent (HI-1755).
+    if (opts.agentId && !this.switchResuming.has(liveId(projectPath, opts.agentId))) this.switches.get(liveId(projectPath, opts.agentId))?.cancel('started by hand')
     if (opts.resumeId !== undefined) assertSessionId(opts.resumeId)
     const agentId = opts.agentId || (await this.soleAgent(projectPath))
     // Again after the await, with nothing awaited before the start is reserved: a fence raised meanwhile holds.
@@ -1808,7 +1827,109 @@ class SessionManager {
   }
 
   /** Starts the agent's CLI for an agent whose live entry already exists. */
+  /**
+   * Launches on the connection it gets (HI-1755, connectionForLaunch: refused, saying why, when there is none to use), held
+   * until the launch has ended either way: by then its live state keeps the connection from being removed.
+   */
   private async launch(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }, times?: StepTimes): Promise<void> {
+    const l = this.live.get(liveId(projectPath, agent.id))!
+    this.followConnections()
+    const ws = workspaceOf(projectPath)
+    const assistant = workspace.isAssistantHome(projectPath)
+    const conn = await connectionForLaunch({ provider: l.adapter.id, workspaceConfig: ws.path ? ws.config : null, wanted: assistant ? ws.config.assistantConnection?.[l.adapter.id] : agent.connection, agentName: agent.name })
+    times?.mark('connection')
+    try {
+      await this.launchOn(projectPath, agent, opts, times, conn)
+    } finally {
+      conn?.release()
+    }
+  }
+
+  /** Switches of connection waiting for their agent's safe point (HI-1755), by liveId: at most one per agent. */
+  private switches = new Map<string, SwitchOp>()
+  /** Agents whose switch is resuming them now: that start is the switch's, not the user's. */
+  private switchResuming = new Set<string>()
+
+  /**
+   * Switches an agent to the connection it would launch on now, at its next safe point (HI-1755, connectionSwitch.ts):
+   * once its turn is over its CLI is ended with its own exit, and once that run has exited its last session is resumed,
+   * once. 'waiting': one already waits (it resumes on the choice as it is then); 'notRunning': nothing to switch.
+   */
+  switchAtSafePoint(projectPath: string, agentId: string): 'queued' | 'waiting' | 'notRunning' {
+    projectPath = workspace.assertSessionHost(projectPath)
+    const id = liveId(projectPath, agentId)
+    if (this.switches.has(id)) return 'waiting'
+    const l = this.live.get(id)
+    if (!l || l.state.status === 'stopped') return 'notRunning'
+    const { runId, sessionId } = l.state
+    const label = userText(this.label(l.state))
+    const open = (): boolean => !this.shuttingDown && !!workspaceFor(projectPath) && !workspaceFor(projectPath)?.closing
+    const running = (): boolean => {
+      const cur = this.live.get(id)
+      return !!cur && cur.state.runId === runId && cur.state.status !== 'stopped'
+    }
+    const op = runSwitch({
+      running,
+      heldNow: () => laneEndHeldNow(projectPath, agentId, runId),
+      quit: () => this.quit(projectPath, agentId, runId, { fenced: open, why: 'a switch of connection', ready: () => laneEndHeldNow(projectPath, agentId, runId) }), // i18n-ignore: for the log
+      resume: async () => {
+        if (!open()) throw new Error('its workspace closed') // i18n-ignore: for the log
+        this.switchResuming.add(id)
+        try {
+          await inWorkspace(workspaceOf(projectPath), () => this.start(projectPath, { agentId, ...(sessionId ? { resumeId: sessionId } : {}) }))
+        } finally {
+          this.switchResuming.delete(id)
+        }
+      },
+      watch: (look) => onHiveEvent((e) => {
+        if ((e.type === 'session-status' && e.state.projectPath === projectPath && e.state.agentId === agentId) || (e.type === 'session-exit' && e.projectPath === projectPath && e.agentId === agentId)) look()
+      }),
+      log: (line) => log.info(`${label}: connection switch: ${line}`)
+    })
+    this.switches.set(id, op)
+    l.state.switchPending = true
+    this.emitState(l.state)
+    void op.done.then(() => {
+      if (this.switches.get(id) === op) this.switches.delete(id)
+      const st = this.live.get(id)?.state
+      if (st?.switchPending) {
+        st.switchPending = undefined
+        this.emitState(st)
+      }
+    })
+    return 'queued'
+  }
+
+  /**
+   * The running agents (and Assistant) of a workspace whose connection isn't the one they would launch on now (HI-1755:
+   * a connection turned off, the default changed, a choice changed), each switched at its next safe point. Returns them.
+   */
+  async switchAffected(workspacePath: string): Promise<{ projectPath: string; agentId: string; result: 'queued' | 'waiting' | 'notRunning' }[]> {
+    const out: { projectPath: string; agentId: string; result: 'queued' | 'waiting' | 'notRunning' }[] = []
+    for (const st of this.liveStates()) {
+      if (!st.launchedConnection || st.status === 'stopped' || workspaceFor(st.projectPath)?.path?.toLowerCase() !== workspacePath.toLowerCase()) continue
+      const host = workspaceOf(st.projectPath)
+      const agent = (await host.projectConfig(st.projectPath).then((pc) => projectAgents(pc).find((a) => a.id === st.agentId)).catch(() => undefined)) ?? undefined
+      const eff = await this.effective(st.projectPath, agent).catch(() => null)
+      if (!eff || eff.connection === st.launchedConnection.id) continue
+      out.push({ projectPath: st.projectPath, agentId: st.agentId, result: this.switchAtSafePoint(st.projectPath, st.agentId) })
+    }
+    return out
+  }
+
+  private connectionsFollowed = false
+  /** Once: connections in use can't be removed, and a connection found signed in again ends its sign-out wait. */
+  private followConnections(): void {
+    if (this.connectionsFollowed) return
+    this.connectionsFollowed = true
+    setAccountSessions((id) => this.liveStates().some((s) => s.launchedConnection?.id === id))
+    onConnectionSignedIn((id) => {
+      const st = this.liveStates().find((s) => s.launchedConnection?.id === id)
+      if (st) this.signedInAgain(authScope(st), true)
+    })
+  }
+
+  private async launchOn(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }, times: StepTimes | undefined, conn: LaunchConnection | null): Promise<void> {
     const id = liveId(projectPath, agent.id)
     const l = this.live.get(id)!
     const { state, adapter } = l
@@ -1926,6 +2047,8 @@ class SessionManager {
         HIVE_PROVIDER: adapter.id,
         // Its slot's name and port block (#1429's slotEnv), while it runs in one.
         ...l.slotEnv,
+        // Its connection's folder as the CLI's home (HI-1755): its login, settings and memory, its transcripts shared.
+        ...(conn ? { [conn.homeEnv]: conn.folder } : {}),
         // Not for the Assistant: it reaches the API through its hive tools, with its own token.
         ...(workspace.isAssistantHome(projectPath) ? {} : this.apiEnv(projectPath, agent.id))
       }), this.binDir)
@@ -1946,6 +2069,9 @@ class SessionManager {
     // Checked after the last await, just before spawning: stopped, its workspace closed or switched, or the
     // provider turned off while this launch was being prepared, it must not start a process.
     if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
+    // Its connection changed meanwhile (another chosen, or removed): this launch is out of date (HI-1755).
+    if (conn && !conn.stillValid()) throw hiveError(M.stoppedBeforeStart)
+    state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}) } : undefined
     if (!isProviderEnabled(config.settings, adapter.id)) throw hiveError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name })
     l.startAllowed?.()
     const cmd = adapter.buildCommand(info.path, ctx)
@@ -1958,7 +2084,7 @@ class SessionManager {
     }
     this.checkFolder(projectPath, ctx.cwd)
     // Where it compacts by itself (#242): for the model it runs as, the choice's (an alias resolved) or the CLI's default.
-    const chosenModel = eff.model || info.defaultModel || ''
+    const chosenModel = eff.model || (conn ? adapter.configuredDefaultModel(conn.folder) : null) || info.defaultModel || ''
     // Once the session reports the model it runs, that model alone: another model's window isn't its own.
     const modelsFor = (running?: string): string[] => (running ? [running] : [chosenModel && resolvedModel(info, chosenModel), chosenModel].filter((m): m is string => !!m))
     l.autoCompactFor = adapter.autoCompact ? (running) => adapter.autoCompact!(ctx, cmd, modelsFor(running)) : undefined
@@ -2105,7 +2231,9 @@ class SessionManager {
       // Where it ran (#1434: always, the project folder too): a conversation resumes only there.
       cwd: state.cwd,
       ...(legacyWorktree(agent) ? { branch: legacyWorktree(agent)!.branch } : {}),
-      ...(l.handedOverFrom ? { handedOverFrom: l.handedOverFrom } : {})
+      ...(l.handedOverFrom ? { handedOverFrom: l.handedOverFrom } : {}),
+      // The connection its latest run launched on (HI-1755), id and name as then: what it actually ran on.
+      ...(state.launchedConnection ? { connection: { id: state.launchedConnection.id, name: state.launchedConnection.name } } : {})
     }, { createdAt: state.sessionCreatedAt })
     // The conversation it was meant for has it: one the CLI moves to later (/clear, /new) wasn't handed over.
     l.handedOverFrom = undefined
@@ -2131,6 +2259,8 @@ class SessionManager {
   stop(projectPath: string, agentId?: string): void {
     const agents = agentId ? [agentId] : this.projectStates(projectPath).map((s) => s.agentId)
     for (const a of agents) {
+      // A switch of connection waiting for it ends with it (HI-1755): a stop is the user's.
+      this.switches.get(liveId(projectPath, a))?.cancel('stopped')
       const l = this.live.get(liveId(projectPath, a))
       if (l) {
         l.stopRequested = true
@@ -4104,25 +4234,36 @@ class SessionManager {
     }, SIZE_REFRESH_DELAY_MS)
   }
 
-  /** A CLI refused an agent's sign-in: told once for this expiry, with every agent it has stopped by then. */
-  private signInLost(provider: ProviderId): void {
-    if (this.signedOut.has(provider)) return
+  /**
+   * A CLI refused an agent's sign-in: told once for this expiry, with every agent of its scope it has stopped by then.
+   * A connection's (HI-1755) is checked again through its own folder (checkAccount), never the CLI's own home.
+   */
+  private signInLost(st: LiveSessionState): void {
+    const scope = authScope(st)
+    if (this.signedOut.has(scope)) return
+    const conn = st.launchedConnection?.id
+    const recheck = (): void => {
+      if (conn) void checkAccount(conn).catch(() => undefined)
+      else void providerService.refresh(st.provider, false).catch(() => undefined)
+    }
     const out: { gather?: ReturnType<typeof setTimeout>; recheck?: ReturnType<typeof setInterval> } = {}
-    this.signedOut.set(provider, out)
-    out.gather = setTimeout(() => this.tellSignedOut(provider), SIGNED_OUT_GATHER_MS)
-    // Agent Setup shows it signed out, and the next check that finds it signed in again ends this (providerService).
-    void providerService.refresh(provider, false).catch(() => undefined)
+    this.signedOut.set(scope, out)
+    out.gather = setTimeout(() => this.tellSignedOut(scope), SIGNED_OUT_GATHER_MS)
+    // Agent Setup (or the connection's row) shows it signed out, and the next check that finds it signed in again ends
+    // this (providerService's, or the connection's: onConnectionSignedIn).
+    recheck()
     out.recheck = setInterval(() => {
       // Kept until it is shown signed in again: only when no agent it stopped runs any more (they exited) is there
       // nothing left to tell or carry on, and it ends quietly. An agent trying again (working) still counts.
-      if (!this.liveStates().some((s) => s.provider === provider && s.signIn)) return void this.endSignedOut(provider)
-      void providerService.refresh(provider, false).catch(() => undefined)
+      if (!this.liveStates().some((s) => authScope(s) === scope && s.signIn)) return void this.endSignedOut(scope)
+      recheck()
     }, SIGN_IN_RECHECK_MS)
   }
 
-  private tellSignedOut(provider: ProviderId): void {
-    const waiting = this.liveStates().filter((s) => s.provider === provider && s.status === 'signin')
+  private tellSignedOut(scope: string): void {
+    const waiting = this.liveStates().filter((s) => authScope(s) === scope && s.status === 'signin')
     if (!waiting.length) return
+    const provider = waiting[0].provider
     const d = providerAdapter(provider).descriptor
     const first = waiting[0]
     const title =
@@ -4133,12 +4274,12 @@ class SessionManager {
     this.notify(first.projectPath, title, withValues(msg({ id: 'session.signIn.expired', defaultMessage: "{provider}'s sign-in has expired. {help}", description: "The notification that a CLI's sign-in has expired. {provider} is the coding agent's name; {help} says how to sign in again (a sentence or two)." }), { provider: d.name, help: d.text?.signInHelp ?? d.signInHelp }), 'waiting', undefined, first.agentId)
   }
 
-  private endSignedOut(provider: ProviderId): boolean {
-    const out = this.signedOut.get(provider)
+  private endSignedOut(scope: string): boolean {
+    const out = this.signedOut.get(scope)
     if (!out) return false
     clearTimeout(out.gather)
     clearInterval(out.recheck)
-    this.signedOut.delete(provider)
+    this.signedOut.delete(scope)
     return true
   }
 
@@ -4146,11 +4287,12 @@ class SessionManager {
    * The CLI is signed in again (an agent of it works, its check says so, its Sign in task ended well): agents it
    * stopped are idle again, and Resume (n) carries them on (they keep LiveSessionState.signIn until they do).
    */
-  signedInAgain(provider: ProviderId, checked = false): void {
-    if (!this.endSignedOut(provider)) return
-    // Agent Setup (and its banner) learn it too, unless its own check is what said so.
-    if (!checked) void providerService.refresh(provider, false).catch(() => undefined)
-    const stopped = this.liveStates().filter((s) => s.provider === provider && s.status === 'signin')
+  signedInAgain(scope: string, checked = false): void {
+    if (!this.endSignedOut(scope)) return
+    const provider = scope.split(':')[0] as ProviderId
+    // Agent Setup (and its banner) learn it too, unless its own check is what said so; a connection's is its own.
+    if (!checked && !scope.includes(':')) void providerService.refresh(provider, false).catch(() => undefined)
+    const stopped = this.liveStates().filter((s) => authScope(s) === scope && s.status === 'signin')
     for (const st of stopped) {
       this.fact(st, { lifecycle: 'running', attention: null })
       st.status = 'ready'
@@ -4955,7 +5097,7 @@ class SessionManager {
     const worked = ev?.kind === 'toolStart' || ev?.kind === 'toolEnd' || (ev?.kind === 'stop' && !ev.failed)
     // An agent a refused sign-in stopped tries again (its own prompt, Resume's) and doesn't get through (interrupted, or
     // failed on something else) while the sign-in is still expired: it needs sign-in again, not told as finished.
-    if (st.signIn && this.signedOut.has(st.provider) && (ev?.kind === 'interrupt' || (ev?.kind === 'stop' && ev.failed)))
+    if (st.signIn && this.signedOut.has(authScope(st)) && (ev?.kind === 'interrupt' || (ev?.kind === 'stop' && ev.failed)))
       step = { ...step, next: 'signin', message: null, actions: step.actions.filter((a) => a !== 'notifyFinished') }
     if (step.open !== undefined) l.open = step.open
     if (step.waitingOn !== undefined) l.waitingOn = step.waitingOn
@@ -5024,7 +5166,7 @@ class SessionManager {
             const hive = said ? null : withValues(msg({ id: 'session.signIn.notSignedIn', defaultMessage: "{provider} isn't signed in.", description: "Why an agent's turn stopped, when its CLI didn't say: its sign-in was refused. {provider} is the coding agent's name." }), { provider: l.adapter.descriptor.name })
             st.signIn = { message: said || englishText(hive!), since: new Date().toISOString(), ...(hive ? { messageText: hive } : {}) }
           }
-          this.signInLost(st.provider)
+          this.signInLost(st)
           break
         case 'turnEnded':
           // Not awaited: a prompt arriving meanwhile must not be overwritten by this older Stop.
@@ -5044,7 +5186,7 @@ class SessionManager {
     // A turn's end is reported even when the status stays (its background task count may have changed).
     if (stepped || step.actions.includes('turnEnded') || carriedOn || facts || guarded) this.emitState(st)
     // The CLI is signed in again, for its other agents too (this one's status is already set).
-    if (worked) this.signedInAgain(st.provider)
+    if (worked) this.signedInAgain(authScope(st))
     // A turn's end types the go-ahead for an Allow given during it; an interrupt (the user stopping it) drops it.
     if (step.actions.includes('turnEnded')) this.sendGoAheads(id, l)
     else if (step.actions.includes('releaseLocks')) this.dropGoAheads(id)

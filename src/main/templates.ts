@@ -599,7 +599,7 @@ export async function loadTemplate(projectPath: string, scope: TemplateScope, fi
     let old: AgentDef[] = []
     try {
       for (const a of plan.create) {
-        const opts = { name: a.name, role: a.note, workflowRole: a.role, provider: a.provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext, mcpServers: a.mcpServers, location: 'project' as const }
+        const opts = { name: a.name, role: a.note, workflowRole: a.role, provider: a.provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext, mcpServers: a.mcpServers, connection: a.connection, location: 'project' as const }
         staged.push(await prepareAgent(projectPath, cfg, opts, a.name, staged.map((s) => s.def), reads))
         await testHooks.staged?.(a.name)
       }
@@ -668,5 +668,5 @@ export async function addAgentFromTemplate(projectPath: string, scope: TemplateS
   // Unique across the workspace (#702): a name any agent of it has gets a number ("Builder 2"), never a prefix.
   const own = (await namesIn(projectPath, t.agents))[index]
   const name = typeof chosen === 'string' && chosen.trim() ? withNames([{ ...a, name: own }], [chosen])[0].name : uniqueName(own, (await workspaceAgents(projectPath)).map((x) => x.name))
-  return addAgent(projectPath, { name, role: a.note, workflowRole: a.role, provider: a.provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext, mcpServers: a.mcpServers, location: 'project' })
+  return addAgent(projectPath, { name, role: a.note, workflowRole: a.role, provider: a.provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext, mcpServers: a.mcpServers, connection: a.connection, location: 'project' })
 }
