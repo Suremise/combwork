@@ -195,8 +195,6 @@
   "workspace.notes.workspaceNotes.title": "Workspace notes",
   "workspace.opening.adoption": "Seine Karten und Projekte werden übernommen…",
   "workspace.opening.projects": "Seine Projekte werden gelesen…",
-  "workspace.opening.skills": "Seine Skills und Modi werden aktualisiert…",
-  "workspace.opening.skillsCount": "Seine Skills und Modi werden aktualisiert ({done, number} von {total, number})…",
   "workspace.opening.slots": "Die Worktrees seiner Agenten werden als Slots übernommen…",
   "workspace.opening.title": "{name} wird geöffnet",
   "workspace.opening.upgrade": "Sein Board wird aktualisiert. Das 0.9-Board wird als Sicherung aufbewahrt.",

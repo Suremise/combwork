@@ -195,8 +195,6 @@
   "workspace.notes.workspaceNotes.title": "Workspace notes",
   "workspace.opening.adoption": "Adopting its cards and projects…",
   "workspace.opening.projects": "Reading its projects…",
-  "workspace.opening.skills": "Updating its skills and modes…",
-  "workspace.opening.skillsCount": "Updating its skills and modes ({done, number} of {total, number})…",
   "workspace.opening.slots": "Adopting its agents' worktrees as slots…",
   "workspace.opening.title": "Opening {name}",
   "workspace.opening.upgrade": "Upgrading its board. The 0.9 board is kept as a backup.",

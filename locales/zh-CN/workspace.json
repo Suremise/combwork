@@ -195,8 +195,6 @@
   "workspace.notes.workspaceNotes.title": "Workspace notes",
   "workspace.opening.adoption": "正在接管其卡片和项目…",
   "workspace.opening.projects": "正在读取其项目…",
-  "workspace.opening.skills": "正在更新其技能和模式…",
-  "workspace.opening.skillsCount": "正在更新其技能和模式（第 {done, number} 个，共 {total, number} 个）…",
   "workspace.opening.slots": "正在将其智能体的工作树接管为槽位…",
   "workspace.opening.title": "正在打开 {name}",
   "workspace.opening.upgrade": "正在升级其看板。0.9 的看板会保留为备份。",

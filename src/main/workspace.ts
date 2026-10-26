@@ -21,6 +21,7 @@ import { config } from './config'
 import { emit, emitTo } from './events'
 import { containsPlace, insideReal, isDir, placeKey, readJson, readKeptJson, removePath, retryWhileSaving, samePlace, withFileLock, writeKeptJson, type KeptReadOptions } from './fsutil'
 import { admit, dismiss, setFenceReason } from './openingFence'
+import { AfterOpen } from './openProgress'
 import { createLogger, userText } from './logger'
 import { changeSessions, exportSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
@@ -152,7 +153,16 @@ export class WorkspaceService {
   private scheduledRuns = new Set<Promise<void>>()
   private static liveProvider: LiveProvider = async (p, cfg) => ({ live: null, restartNeeded: false, agents: projectAgents(cfg).map((a) => ({ ...a, live: null, restartNeeded: false, resume: null, place: { folder: p, is: 'project' as const, name: null, branch: null } })) })
   /** Called each time a workspace opens, in its context; `fresh` when Hive set the folder up just now (it had no .hive). */
-  static onOpened: ((fresh: boolean) => Promise<unknown>) | null = null
+  static onOpened: ((fresh: boolean, after: AfterOpen) => Promise<unknown>) | null = null
+  /** Brings an opening workspace's bundled skills and modes up to date, in its context, after the open (HI-1705: bundled.ts). */
+  static bringItemsUpToDate: ((fresh: boolean) => Promise<void>) | null = null
+  /** Its skills and modes being brought up to date as it opened, until they are (it never fails). */
+  private itemsSynced: Promise<void> = Promise.resolve()
+
+  /** Once the open has brought its bundled skills and modes up to date: what a launch reads of them waits for it. */
+  itemsUpToDate(): Promise<void> {
+    return this.itemsSynced
+  }
   /** Each read of the projects' ids (#514): the workspace's record of their names follows it (projectNames.ts). Never awaited. */
   static onIdsRead: ((ws: WorkspaceService, seen: ProjectSeen[]) => void) | null = null
   /**
@@ -308,6 +318,9 @@ export class WorkspaceService {
   async open(path: string): Promise<WorkspaceInfo> {
     const abs = resolve(path)
     if (!(await isDir(abs))) throw hiveError(msg({ id: 'service.workspace.notFound', defaultMessage: 'Folder not found: {folder}', description: 'An error opening a workspace: the folder {folder} is not there.' }), { folder: abs })
+    // The skills and modes of the workspace this window had, still being brought up to date (HI-1705), first: its close
+    // waits for them, and no other window's open should wait behind that in the admission.
+    await this.itemsSynced
     // One workspace inside another would make its projects belong to both. Windows claim their folders one
     // at a time, so two opening at once can't both pass the check before either has claimed its own.
     const claim = admission.then(async () => {
@@ -364,7 +377,19 @@ export class WorkspaceService {
     // Every window's recent list: this one first, and open here (#144).
     emit({ type: 'recent-changed' })
     done('its .hive folder and settings') // i18n-ignore: a part of a log line's timing
-    for (const p of await this.listProjectPaths()) await this.ensureProject(p).catch((e) => log.warn(`ensureProject ${userText(p)}`, e))
+    // The Assistant's home set up meanwhile (HI-1705): it needs nothing of the projects'.
+    const assistant = (async () => {
+      try {
+        await this.ensureProject(this.assistantHome)
+        // The Assistant's conversations and backups are this machine's: kept out of git if the workspace is a repository.
+        const ignore = join(this.assistantHome, '.gitignore')
+        if (!existsSync(ignore)) await writeFile(ignore, "# Hive Assistant: this machine's sessions (added by Hive)\n*\n")
+      } catch (e) {
+        log.warn('setting up the Assistant', e)
+      }
+    })()
+    // Each project's own folders, all at once (HI-1705).
+    await Promise.all((await this.listProjectPaths()).map((p) => this.ensureProject(p).catch((e) => log.warn(`ensureProject ${userText(p)}`, e))))
     done('its projects') // i18n-ignore: a part of a log line's timing
     // Every project has its id (#508) before the board, lanes and watches are read by it.
     await this.projectIds().catch((e) => log.warn('reading the project ids', e))
@@ -372,34 +397,59 @@ export class WorkspaceService {
     // Before any session starts with them: MCP settings from before #1093 move to its model.
     await this.migrateMcpModel().catch((e) => log.warn('moving the MCP settings to the workspace and project switches', e))
     done('MCP settings') // i18n-ignore: a part of a log line's timing
-    try {
-      await this.ensureProject(this.assistantHome)
-      // The Assistant's conversations and backups are this machine's: kept out of git if the workspace is a repository.
-      const ignore = join(this.assistantHome, '.gitignore')
-      if (!existsSync(ignore)) await writeFile(ignore, "# Hive Assistant: this machine's sessions (added by Hive)\n*\n")
-    } catch (e) {
-      log.warn('setting up the Assistant', e)
-    }
+    await assistant
     done('the Assistant') // i18n-ignore: a part of a log line's timing
-    await inWorkspace(this, async () => WorkspaceService.onOpened?.(fresh)).catch((e) => log.warn('opening the workspace', e))
-    done('its skills and modes, and what opening starts') // i18n-ignore: a part of a log line's timing
-    for (const l of WorkspaceService.openedListeners) {
-      try {
-        l(this)
-      } catch (e) {
-        log.warn('opening the workspace', e)
+    // Its bundled skills and modes brought up to date once the window has the workspace, not before (HI-1705: hashing each
+    // one's copies on every open was most of an ordinary open's file reads, queued behind other windows' work); none if
+    // the open fails. A launch waits for it (itemsUpToDate), and .hive is watched only once it is done: a watched folder
+    // can't be swapped on Windows.
+    const gen = this.generation
+    // What the open starts in the background, each timed, in a line of its own once all have ended (HI-1705).
+    const after = new AfterOpen(basename(abs))
+    let shown!: (ok: boolean) => void
+    let began = 0
+    const items = new Promise<boolean>((r) => (shown = r))
+      .then(async (ok) => {
+        if (!ok || this.generation !== gen || this.path !== abs) return
+        began = performance.now()
+        await inWorkspace(this, async () => WorkspaceService.bringItemsUpToDate?.(fresh)).catch((e) => log.warn("updating the workspace's bundled skills and modes", e))
+        if (this.generation !== gen || this.path !== abs) return
+        this.watchHive()
+        // What the window read of them meanwhile may be older.
+        this.emit({ type: 'skills-changed' })
+        this.emit({ type: 'modes-changed' })
+      })
+      .catch((e) => log.warn("updating the workspace's bundled skills and modes", e))
+    this.itemsSynced = after.track('its bundled skills and modes', items, () => began) // i18n-ignore: a part of a log line's timing
+    let ok = false
+    try {
+      await inWorkspace(this, async () => WorkspaceService.onOpened?.(fresh, after)).catch((e) => log.warn('opening the workspace', e))
+      after.seal()
+      done('what opening starts') // i18n-ignore: a part of a log line's timing
+      for (const l of WorkspaceService.openedListeners) {
+        try {
+          l(this)
+        } catch (e) {
+          log.warn('opening the workspace', e)
+        }
       }
+      this.watchRoot()
+      done('its watchers') // i18n-ignore: a part of a log line's timing
+      log.info(`Opened workspace ${userText(abs)} in ${Math.round(performance.now() - started)} ms: ${parts.join(', ')}`)
+      const read = performance.now()
+      const info = await this.refresh()
+      log.info(`read ${userText(basename(abs))}'s projects for the window in ${Math.round(performance.now() - read)} ms`)
+      ok = true
+      return info
+    } finally {
+      shown(ok)
     }
-    this.startWatching()
-    done('its watchers') // i18n-ignore: a part of a log line's timing
-    log.info(`Opened workspace ${userText(abs)} in ${Math.round(performance.now() - started)} ms: ${parts.join(', ')}`)
-    const read = performance.now()
-    const info = await this.refresh()
-    log.info(`read ${userText(basename(abs))}'s projects for the window in ${Math.round(performance.now() - read)} ms`)
-    return info
   }
 
   async close(): Promise<void> {
+    // Its skills and modes still being brought up to date (HI-1705) finish first: they are written into this workspace's
+    // .hive, by the path this service has until it closes.
+    await this.itemsSynced
     if (this.path) {
       const was = this.path
       for (const t of WorkspaceService.closingTasks) await t(was).catch((e) => log.warn('closing the workspace', e))
@@ -432,7 +482,7 @@ export class WorkspaceService {
     this.rootRetry = null
     this.rootWatcher?.close()
     this.rootWatcher = null
-    // A scheduled refresh already running reads the projects' files until it sees the close (at the next project): closed
+    // A scheduled refresh already running reads the projects' files until its reads end (all at once, HI-1705): closed
     // only once it has, so a project's folder can be moved as soon as its window lets it go (#1341: EPERM renaming it). No
     // new one is scheduled from the abort on (scheduleRefresh).
     while (this.scheduledRuns.size) await Promise.allSettled([...this.scheduledRuns])
@@ -466,16 +516,17 @@ export class WorkspaceService {
 
   private async ensureWorkspaceStructure(): Promise<void> {
     const h = this.hiveDir
-    for (const d of [h, join(h, 'shared'), join(h, 'shared', 'handovers'), join(h, 'skills'), join(h, 'mcp'), join(h, 'tasks')]) {
-      await mkdir(d, { recursive: true })
-    }
-    if (!existsSync(join(h, 'workspace.json'))) await writeKeptJson(join(h, 'workspace.json'), DEFAULT_WORKSPACE_CONFIG)
-    if (!existsSync(join(h, 'README.md'))) await writeFile(join(h, 'README.md'), WORKSPACE_README)
-    // The board's database and what its move from files left (#1017) are this machine's: kept out of git if the workspace is a repository.
-    if (!existsSync(join(h, '.gitignore'))) await writeFile(join(h, '.gitignore'), BOARD_GITIGNORE)
-    else await addUsageIgnore(join(h, '.gitignore'))
+    // The folders, then the files, each all at once (HI-1705: one after another, each waited its turn behind other
+    // windows' file work). Each folder is made with those above it.
+    await Promise.all([join(h, 'shared', 'handovers'), join(h, 'skills'), join(h, 'mcp'), join(h, 'tasks')].map((d) => mkdir(d, { recursive: true })))
     const hr = join(h, 'shared', 'handovers', 'README.md')
-    if (!existsSync(hr)) await writeFile(hr, HANDOVER_README)
+    await Promise.all([
+      existsSync(join(h, 'workspace.json')) ? undefined : writeKeptJson(join(h, 'workspace.json'), DEFAULT_WORKSPACE_CONFIG),
+      existsSync(join(h, 'README.md')) ? undefined : writeFile(join(h, 'README.md'), WORKSPACE_README),
+      // The board's database and what its move from files left (#1017) are this machine's: kept out of git if the workspace is a repository.
+      existsSync(join(h, '.gitignore')) ? addUsageIgnore(join(h, '.gitignore')) : writeFile(join(h, '.gitignore'), BOARD_GITIGNORE),
+      existsSync(hr) ? undefined : writeFile(hr, HANDOVER_README)
+    ])
   }
 
   /** workspace.json saves, one after another, so an older one can't land after a newer one. */
@@ -520,13 +571,14 @@ export class WorkspaceService {
     return run
   }
 
-  private startWatching(): void {
-    if (!this.path) return
-    // Watch only the workspace root (projects appearing/disappearing) and the .hive folder. The root is watched without
-    // listing or stat-ing what is in it: chokidar stats every entry it lists through Electron's fs, which opens and holds
-    // an .asar file (#246). A folder appearing, going or renamed there reads the project list again (a project's own
-    // folder changing reports 'change').
-    this.watchRoot()
+  /**
+   * Watches the .hive folder, once the open has brought its skills and modes up to date (HI-1705). With the workspace root
+   * (watchRoot, from the open), that is all that is watched: the root without listing or stat-ing what is in it, since
+   * chokidar stats every entry it lists through Electron's fs, which opens and holds an .asar file (#246). A folder
+   * appearing, going or renamed there reads the project list again (a project's own folder changing reports 'change').
+   */
+  private watchHive(): void {
+    if (!this.path || this.watcher) return
     const assistantHome = this.assistantHome.toLowerCase()
     const mcpDir = this.mcpDir.toLowerCase() + sep
     const hiveDir = this.hiveDir.toLowerCase() + sep
@@ -621,7 +673,7 @@ export class WorkspaceService {
   private async migrateMcpModel(): Promise<void> {
     if (this.wsConfig.mcp.model === 2) return
     const allProjects = this.wsConfig.mcp.enabled
-    const paths = [...(await this.listProjectPaths()), ...(await this.listProjectPaths({ hidden: true }))]
+    const paths = (await Promise.all([this.listProjectPaths(), this.listProjectPaths({ hidden: true })])).flat()
     const configs = await Promise.all(paths.map((p) => this.projectConfig(p).then((c) => c.mcp, () => null)))
     for (const [i, p] of paths.entries()) {
       const was = configs[i]
@@ -732,7 +784,7 @@ export class WorkspaceService {
     // `fresh`: what is read in the second after that sees the same projects.
     if (this.ids && !opts.fresh && Date.now() - this.ids.at < 1000) return this.ids
     const listing = ++this.idsListed
-    const paths = [...(await this.listProjectPaths()), ...(await this.listProjectPaths({ hidden: true }))]
+    const paths = (await Promise.all([this.listProjectPaths(), this.listProjectPaths({ hidden: true })])).flat()
     // Each folder with its project.json's identity and time: a folder replaced by another of the same name, or two
     // projects that swapped names, read again too.
     const key = (
@@ -771,13 +823,14 @@ export class WorkspaceService {
     const gen = this.generation
     const entries: ProjectIdEntry[] = []
     const cfgs = new Map<string, ProjectConfig>()
-    for (const p of paths) {
-      if (!existsSync(join(p, HIVE_DIR, 'project.json'))) continue
-      const cfg = await this.projectConfig(p).catch(() => null)
-      if (!cfg) continue
+    // Read all at once (HI-1705), kept in the listing's order.
+    const read = await Promise.all(paths.map((p) => (existsSync(join(p, HIVE_DIR, 'project.json')) ? this.projectConfig(p).catch(() => null) : null)))
+    paths.forEach((p, i) => {
+      const cfg = read[i]
+      if (!cfg) return
       entries.push({ path: p, id: cfg.id, lastPath: cfg.lastPath })
       cfgs.set(p.toLowerCase(), cfg)
-    }
+    })
     const { keep, fresh } = settleProjectIds(entries)
     for (const p of fresh) {
       if (gen !== this.generation) break
@@ -973,13 +1026,17 @@ export class WorkspaceService {
   /** Creates <project>/.hive with defaults and excludes it from git. Idempotent. */
   async ensureProject(projectPath: string): Promise<void> {
     const h = join(projectPath, HIVE_DIR)
-    await mkdir(join(h, 'sessions'), { recursive: true })
-    await mkdir(join(h, 'archive'), { recursive: true })
-    // Its platform is recorded as it is made, from what detection finds (SPEC §16.3.5): never switched silently after.
-    if (!existsSync(join(h, 'project.json'))) await writeKeptJson(join(h, 'project.json'), { ...DEFAULT_PROJECT_CONFIG, platform: detect(projectPath).platform })
-    // 0.1's launch folder for Agent 1; every agent now has launch-<id>.
-    if (existsSync(join(h, 'launch'))) await removePath(join(h, 'launch')).catch(() => undefined)
-    await this.ensureGitExclude(projectPath)
+    // Its folders and its exclusion from git at once (HI-1705).
+    await Promise.all([
+      this.ensureGitExclude(projectPath),
+      (async () => {
+        await Promise.all([mkdir(join(h, 'sessions'), { recursive: true }), mkdir(join(h, 'archive'), { recursive: true })])
+        // Its platform is recorded as it is made, from what detection finds (SPEC §16.3.5): never switched silently after.
+        if (!existsSync(join(h, 'project.json'))) await writeKeptJson(join(h, 'project.json'), { ...DEFAULT_PROJECT_CONFIG, platform: detect(projectPath).platform })
+        // 0.1's launch folder for Agent 1; every agent now has launch-<id>.
+        if (existsSync(join(h, 'launch'))) await removePath(join(h, 'launch')).catch(() => undefined)
+      })()
+    ])
   }
 
   private gitDir(projectPath: string): Promise<string | null> {
@@ -1195,7 +1252,8 @@ export class WorkspaceService {
   /** MCP servers the project defines in a provider's own config (.mcp.json…) that aren't deployed to the workspace. */
   async unmanagedMcp(projectPath: string): Promise<string[]> {
     const names = new Set<string>()
-    for (const p of allProviders()) for (const n of Object.keys(await p.projectMcpServers(projectPath).catch(() => ({})))) names.add(n)
+    // Every provider's at once (HI-1705).
+    for (const servers of await Promise.all(allProviders().map((p) => p.projectMcpServers(projectPath).catch(() => ({}))))) for (const n of Object.keys(servers)) names.add(n)
     if (!names.size || !this.path) return []
     const deployed = new Set(
       (await readdir(this.mcpDir).catch(() => [] as string[])).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5))
@@ -1211,15 +1269,14 @@ export class WorkspaceService {
     // Each part's time, logged when the read is slow (HI-1694: a 0.9 workspace's first open waited a minute on reads the
     // log didn't time).
     const parts: [string, number][] = []
-    let mark = performance.now()
-    const started = mark
+    const started = performance.now()
+    // Each part's own time, from when it began (some run at once).
     const took = async <T>(what: string, p: Promise<T>): Promise<T> => {
+      const from = performance.now()
       try {
         return await p
       } finally {
-        const now = performance.now()
-        parts.push([what, now - mark])
-        mark = now
+        parts.push([what, performance.now() - from])
       }
     }
     const active = new Set(this.activeNames())
@@ -1232,21 +1289,28 @@ export class WorkspaceService {
     const { live, restartNeeded, agents, folders } = await took("its agents' sessions and folders", WorkspaceService.liveProvider(projectPath, cfg, scope)) // i18n-ignore: a part of a log line's timing
     // Its slots and homes are roots from this read on (#1442), fenced as its worktrees are (registerRoots' ticket).
     if (!this.isAssistantHome(projectPath)) this.registerRoots(projectPath, cfg, gen, ticket, (folders ?? []).map((f) => f.path))
+    // The rest of the read at once (HI-1705): none of these needs another.
+    const [branch, unmanagedMcp, removed, vcs] = await Promise.all([
+      took('its branch', this.branch(projectPath)), // i18n-ignore: a part of a log line's timing
+      took('its MCP servers', this.unmanagedMcp(projectPath)), // i18n-ignore: a part of a log line's timing
+      took('removed data', removedData(projectPath)), // i18n-ignore: a part of a log line's timing
+      // Ensured at each refresh, so a repository made later (git init) gets it too (#345).
+      this.isAssistantHome(projectPath) ? undefined : took('.hive in git', hiveVcs(projectPath).catch(() => undefined)) // i18n-ignore: a part of a log line's timing
+    ])
     const info: ProjectInfo = {
       name: basename(projectPath),
       path: projectPath,
       active: active.has(basename(projectPath)),
       isGitRepo: existsSync(join(projectPath, '.git')),
-      branch: await took('its branch', this.branch(projectPath)), // i18n-ignore: a part of a log line's timing
+      branch,
       config: cfg,
       live,
       restartNeeded,
       agents,
       ...(folders?.length ? { folders } : {}),
-      unmanagedMcp: await took('its MCP servers', this.unmanagedMcp(projectPath)), // i18n-ignore: a part of a log line's timing
-      removedData: await took('removed data', removedData(projectPath)), // i18n-ignore: a part of a log line's timing
-      // Ensured at each refresh, so a repository made later (git init) gets it too (#345).
-      ...(this.isAssistantHome(projectPath) ? {} : { hiveVcs: await took('.hive in git', hiveVcs(projectPath).catch(() => undefined)), platform: projectPlatform(projectPath, cfg.platform, cfg.platformFound) }) // i18n-ignore: a part of a log line's timing
+      unmanagedMcp,
+      removedData: removed,
+      ...(this.isAssistantHome(projectPath) ? {} : { hiveVcs: vcs, platform: projectPlatform(projectPath, cfg.platform, cfg.platformFound) })
     }
     const ms = performance.now() - started
     if (ms > SLOW_PROJECT_READ_MS) log.info(`reading ${userText(basename(projectPath))} for the window took ${Math.round(ms)} ms: ${parts.map(([w, t]) => `${w} ${Math.round(t)} ms`).join(', ')}`)
@@ -1303,12 +1367,15 @@ export class WorkspaceService {
     const closed = (): boolean => gen !== this.generation || !this.path || life.aborted
     // What the projects' running agents' settings need of the workspace (its skills and servers), read once (#1002).
     const scope = {}
-    for (const p of await this.listProjectPaths()) {
-      if (closed()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
-      projects.push(await this.projectInfo(p, gen, scope))
-    }
+    // The projects and the Assistant's home read at once, in the listing's order (HI-1705: one after another, each read's
+    // file and git calls queued behind other windows' work, an open took seconds under load).
+    const paths = await this.listProjectPaths()
     if (closed()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
-    const assistant = await this.projectInfo(this.assistantHome, gen, scope).catch((e) => (log.warn('the Assistant', e), null))
+    const [read, assistant] = await Promise.all([
+      Promise.all(paths.map((p) => this.projectInfo(p, gen, scope))),
+      this.projectInfo(this.assistantHome, gen, scope).catch((e) => (log.warn('the Assistant', e), null))
+    ])
+    projects.push(...read)
     if (closed()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
     // A refresh begun after this one has reported already (#731): this one read the projects earlier, so what it found
     // is older and changes nothing (it put back an agent list from before a change, and said a shared name twice).

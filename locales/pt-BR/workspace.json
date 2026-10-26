@@ -195,8 +195,6 @@
   "workspace.notes.workspaceNotes.title": "Workspace notes",
   "workspace.opening.adoption": "Adotando os cartões e os projetos…",
   "workspace.opening.projects": "Lendo os projetos…",
-  "workspace.opening.skills": "Atualizando as skills e os modos…",
-  "workspace.opening.skillsCount": "Atualizando as skills e os modos ({done, number} de {total, number})…",
   "workspace.opening.slots": "Adotando os worktrees dos agentes como slots…",
   "workspace.opening.title": "Abrindo {name}",
   "workspace.opening.upgrade": "Atualizando o quadro. O quadro 0.9 é guardado como backup.",

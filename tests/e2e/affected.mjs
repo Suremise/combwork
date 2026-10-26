@@ -234,7 +234,7 @@ export const AREAS = [
   { paths: ['tests/e2e/repairslots.cjs', 'tests/e2e/removeprojectslots.cjs', 'src/main/projectFolders.ts', 'src/shared/projectFolders.ts', 'src/main/projectRemoval.ts', 'src/renderer/src/components/MoveRepair.tsx', 'src/renderer/src/components/ProjectRemoval.tsx', 'src/main/agentWorktree.ts'], suites: ['repairslots', 'removeprojectslots', 'wsmove', 'wtrecreate', 'repairbranches'] },
   { paths: ['tests/e2e/queueupgrade.cjs'], suites: ['queueupgrade'] },
   { paths: ['src/shared/atMost.ts'], suites: ['sessionsize', 'slotsessions', 'skilldelivery', 'skills'] },
-  { paths: ['src/main/openProgress.ts', 'src/renderer/src/components/WorkspaceOpening.tsx', 'tests/e2e/openguard.cjs'], suites: ['openguard', 'queueupgrade'] },
+  { paths: ['src/main/openProgress.ts', 'src/renderer/src/components/WorkspaceOpening.tsx', 'tests/e2e/openguard.cjs', 'tests/e2e/openspeed.cjs'], suites: ['openguard', 'openspeed', 'queueupgrade'] },
   { paths: ['tests/e2e/slotupgrade.cjs', 'src/main/slotMigration.ts', 'src/main/workspaceMove.ts'], suites: ['slotupgrade', 'wsmove', 'repairbranches'] },
   { paths: ['tests/e2e/slotsessions.cjs', 'src/main/agentFolders.ts', 'src/shared/agentFolders.ts', 'src/shared/sessionResume.ts', 'src/shared/resumeAll.ts', 'src/main/sessions.ts'], suites: ['slotsessions', 'legacyworktree'] },
   { paths: ['tests/e2e/legacyworktree.cjs', 'src/main/agentWorktree.ts'], suites: ['legacyworktree', 'slotupgrade'] },

@@ -24,8 +24,6 @@ interface Claim {
   path: string
   name: string
   step: OpenProgress['step'] | null
-  done?: number
-  total?: number
   /** When it began, and when its step did (performance.now()). */
   since: number
   at: number
@@ -38,7 +36,7 @@ const claims = new Map<WorkspaceService, Claim>()
 export function openProgress(ws: WorkspaceService): OpenProgress | null {
   const c = claims.get(ws)
   if (!c?.step) return null
-  return { path: c.path, name: c.name, step: c.step, ...(c.done !== undefined ? { done: c.done } : {}), ...(c.total !== undefined ? { total: c.total } : {}) }
+  return { path: c.path, name: c.name, step: c.step }
 }
 
 /**
@@ -63,16 +61,16 @@ export function windowClaim(ws: WorkspaceService): symbol | null {
 }
 
 /**
- * The window's open is at `step` now, with counts where known: told to its window, and logged with how long the step
- * before took. Only for the claim `token` names (or, without one, an open of `path`): a workspace opened another way (a
- * test, a start) or an operation since replaced changes nothing.
+ * The window's open is at `step` now: told to its window, and logged with how long the step before took. Only for the
+ * claim `token` names (or, without one, an open of `path`): a workspace opened another way (a test, a start) or an
+ * operation since replaced changes nothing.
  */
-export function openStep(ws: WorkspaceService, step: OpenProgress['step'], counts: { done?: number; total?: number } = {}, of: { token?: symbol | null; path?: string | null } = {}): void {
+export function openStep(ws: WorkspaceService, step: OpenProgress['step'], of: { token?: symbol | null; path?: string | null } = {}): void {
   const c = claims.get(ws)
   if (!c?.step || (of.token !== undefined && c.token !== of.token) || (of.path !== undefined && c.path !== of.path)) return
   const now = performance.now()
   if (c.step !== step) log.info(`opening ${userText(c.name)}: ${c.step} took ${Math.round(now - c.at)} ms`)
-  claims.set(ws, { ...c, step, done: counts.done, total: counts.total, at: c.step === step ? c.at : now })
+  claims.set(ws, { ...c, step, at: c.step === step ? c.at : now })
   tell(ws)
 }
 
@@ -89,6 +87,53 @@ export function releaseWindow(ws: WorkspaceService, token: symbol | null): void 
   const now = performance.now()
   log.info(`opening ${userText(c.name)}: ${c.step} took ${Math.round(now - c.at)} ms; ${Math.round(now - c.since)} ms in all`)
   tell(ws)
+}
+
+/**
+ * What an open starts in the background once the window has the workspace (HI-1705: the log said nothing of it), each
+ * part timed from when it began, said in one line once all have ended: `track` each, then `seal` when none is to come.
+ */
+export class AfterOpen {
+  private readonly parts: string[] = []
+  private readonly started = performance.now()
+  private pending = 0
+  private sealed = false
+  private said = false
+
+  constructor(private readonly name: string) {}
+
+  /**
+   * Times `p` as `what` (it fails or not: its time either way), and gives it back. `since`: when its work began, where
+   * that is later than now (work that waits for something first); 0, none ran.
+   */
+  track<T>(what: string, p: Promise<T>, since?: () => number): Promise<T> {
+    const now = performance.now()
+    const from = since ?? (() => now)
+    this.pending++
+    void p.then(
+      () => this.ended(what, from()),
+      () => this.ended(what, from())
+    )
+    return p
+  }
+
+  /** Nothing more is tracked: the line is said once what was has ended. */
+  seal(): void {
+    this.sealed = true
+    this.sayWhenDone()
+  }
+
+  private ended(what: string, from: number): void {
+    if (from) this.parts.push(`${what} ${Math.round(performance.now() - from)} ms`)
+    this.pending--
+    this.sayWhenDone()
+  }
+
+  private sayWhenDone(): void {
+    if (!this.sealed || this.pending || this.said) return
+    this.said = true
+    if (this.parts.length) log.info(`after opening ${userText(this.name)}: ${this.parts.join(', ')}; ${Math.round(performance.now() - this.started)} ms in all`)
+  }
 }
 
 /** Throws the user's reason while the window is claimed: for another open, a new workspace or a close (asked early, and again at the claim). */

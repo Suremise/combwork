@@ -55,6 +55,8 @@ const check = (name, ok, extra = '') => {
   // An existing workspace (it already has .hive) without the earlier bundled skills: the user deleted them, so they stay
   // deleted (listed for Restore); the newer ones are added.
   await lib.openWorkspace(inv, page, oldWs)
+  // Brought up to date just after the open (HI-1705): the newer ones added, then what it did is checked.
+  await becomes(async () => (await inv('skills:workspace')).filter((s) => NEWER.includes(s.name) && s.bundled === 'same').length === NEWER.length)
   let list = await inv('skills:workspace')
   check('existing workspace: skills it had are not brought back', !fs.existsSync(path.join(oldWs, '.hive', 'skills', 'handover')))
   check('existing workspace: they are listed as deleted', EARLIER.every((n) => list.find((s) => s.name === n)?.bundled === 'missing'), JSON.stringify(list.map((s) => [s.name, s.bundled])))
@@ -63,6 +65,8 @@ const check = (name, ok, extra = '') => {
   // A new workspace starts with them.
   await lib.openWorkspace(inv, page, ws)
   const skillsDir = path.join(ws, '.hive', 'skills')
+  // Copied in just after the open (HI-1705).
+  await becomes(() => BUNDLED.every((n) => fs.existsSync(path.join(skillsDir, n, 'SKILL.md'))))
   check('new workspace: every bundled skill is copied', BUNDLED.every((n) => fs.existsSync(path.join(skillsDir, n, 'SKILL.md'))), fs.readdirSync(skillsDir).join(','))
   list = await inv('skills:workspace')
   check('new workspace: all match this version', BUNDLED.every((n) => list.find((s) => s.name === n)?.bundled === 'same'))
