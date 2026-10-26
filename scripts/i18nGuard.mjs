@@ -136,8 +136,9 @@ const NON_TEXT_ATTRS = new Set(['className', 'style', 'key', 'id', 'type', 'href
 const CLASS_KEYS = /^(className|cls)$/
 /** Keys and properties that name shown text. */
 const PROSE_KEYS = /^(label|liveLabel|title|desc|description|tip|tooltip|text|message|body|detail|placeholder|hint|help|heading|subtitle|caption|confirm\w*|cancel\w*|ok\w*|button\w*|empty\w*|note|summary|reason|status\w*|error|warning|prompt|question|explanation|why|what|more|aria-?label|ariaLabel|alt|off|on|action|actionLabel|name)$/i
-// exitBy's caller is a line of hive.log (exitLog.ts, #985).
-const LOG_CALLEE = /^(log|logger|console|journal|hookJournal|trace|debugLog|exitBy)\b/
+// exitBy's caller is a line of hive.log (exitLog.ts, #985); so are the names of work stallWork.ts marks, which only its
+// stall warnings print (HI-1692, HI-1735).
+const LOG_CALLEE = /^(log|logger|console|journal|hookJournal|trace|debugLog|exitBy|beginWork|timedStep|noteStep)\b/
 const NO_TEXT_CALLS = /^(require|import|querySelector|querySelectorAll|getElementById|closest|matches|addEventListener|removeEventListener|on|once|off|emit|emitTo|send|invoke|handle|call|subscribe|getItem|setItem|removeItem|startsWith|endsWith|includes|indexOf|match|matchAll|replace|replaceAll|split|test|exec|RegExp|join|resolve|normalize|basename|dirname|extname|spawn|execFile|exec|fork|setAttribute|getAttribute|hasAttribute|toggle|add|remove|contains|createElement|get|has|delete|Symbol|pattern|advanced|commandKeybinding|runCommand|cmd|run|git|readFile|writeFile|readKeptJson|writeKeptJson|appendFile|mkdir|rm|stat|access|readdir|env|getPath|setPath|createLogger|mark|measure|fetch|encodeURIComponent|decodeURIComponent|atob|btoa|parse|stringify|padStart|padEnd|localeCompare|sort|setProperty|getPropertyValue|scrollIntoView|dispatchEvent|CustomEvent|Event|KeyboardEvent|MouseEvent|keybinding|hasCommand|commandById|isEnabled|feature|cls|clsx|classNames|codicon)$/
 
 function proseLike(s) {
