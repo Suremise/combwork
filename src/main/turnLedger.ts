@@ -316,22 +316,6 @@ export function unheardStop(ledger: TurnLedger, stopEnds: readonly number[]): bo
   return stopEnds.filter((t) => t >= a.startedAt).length > a.stops
 }
 
-/**
- * Which turn a failure the CLI's records report belongs to (#1632, Codex's rollout): the turn it names (`turn`, as its
- * hooks name turns), else, for a CLI whose records name none, the latest turn begun before it was recorded (`at`, ms).
- * `running`/`over`: the latest turn, still running or over; `older`: a turn before it (a newer one has begun, so the
- * failure is history); `unknown`: no turn of it seen yet (its hooks may still come), so nothing can be decided.
- */
-export function failureTurn(ledger: TurnLedger, rec: { turn: string | null; at: number }): TurnState | 'older' | 'unknown' {
-  const a = ledger.active
-  if (!a) return 'unknown'
-  if (rec.turn !== null && a.id !== null) {
-    if (a.id === rec.turn) return a.state
-    return ledger.seen.has(rec.turn) ? 'older' : 'unknown'
-  }
-  return rec.at < a.startedAt ? 'older' : a.state
-}
-
 /** Ends the running turn on other evidence than a hook (`by`: the CLI's records, its screen, the user). */
 export function endRunning(ledger: TurnLedger, by: string): void {
   end(ledger, by)
