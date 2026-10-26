@@ -33,10 +33,28 @@ function append(name: string, line: string): void {
   }
 }
 
+/**
+ * Whether lines go to the console too (an unpackaged build): no more once stdout or stderr is closed (HI-1684). A write
+ * to a closed pipe throws EPIPE, or its stream reports it as an error; uncaught, that error was logged, and its console
+ * write threw again, without end. The file log goes on.
+ */
+let toConsole = !app.isPackaged
+const consoleGone = (): void => {
+  toConsole = false
+}
+if (toConsole) for (const s of [process.stdout, process.stderr]) s?.on?.('error', consoleGone)
+
 function write(level: Level, scope: string, message: string, extra?: unknown): void {
   const detail = extra instanceof Error ? ` ${extra.stack ?? extra.message}` : extra !== undefined ? ` ${safeJson(extra)}` : ''
   const line = `${new Date().toISOString()} [${level.toUpperCase()}] [${scope}] ${message}${detail}\n`
-  if (!app.isPackaged) (level === 'error' ? console.error : console.log)(line.trimEnd())
+  if (toConsole && (process.stdout?.destroyed || process.stderr?.destroyed)) consoleGone()
+  if (toConsole) {
+    try {
+      ;(level === 'error' ? console.error : console.log)(line.trimEnd())
+    } catch {
+      consoleGone()
+    }
+  }
   append('hive.log', line)
 }
 
