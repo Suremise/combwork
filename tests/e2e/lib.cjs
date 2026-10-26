@@ -894,38 +894,65 @@ const pasteOn = (raw) => raw.lastIndexOf('\x1b[?2004h') > raw.lastIndexOf('\x1b[
 
 /**
  * Types a prompt into a CLI's terminal (pty key) and presses Enter until it is submitted: submitted() turns true (the
- * session working, say) within waitMs. Under load a CLI can take the prompt, written at once, as a paste and the Enter
- * right after it as a new line in it, or drop what was typed while it was still drawing (#190): if the text is in the
- * terminal, Enter is pressed again; if not, it is typed again over a cleared line (Ctrl+U). Up to `tries` times; returns
- * the attempt that worked (1 = the first), or 0.
+ * session working, say) within waitMs. Each attempt types as Hive does (sessions.sendPrompt): Ctrl+U as a write of its
+ * own to clear the input (in a write with the text it can become part of it, doubling a retried prompt: #1168, #1547),
+ * then the prompt, then Enter. submitted() is checked before each retry, so a prompt taken late isn't sent twice.
+ * - Pasted (a CLI with bracketed paste on, the prompt not a slash command): an attempt not taken is pasted again whole.
+ *   The paste's end mark keeps its Enter an Enter, so what is left in the input is never the prompt plus a new line,
+ *   and a CLI that emptied its input as a notice came (Claude Code's "You've used N% of your weekly limit" just after
+ *   start, #1148, #1556) gets the prompt again rather than an Enter on nothing.
+ * - Typed: a CLI can take typing read in one go as a paste, and the Enter right after it as a new line in it (#190):
+ *   when this attempt's text was drawn, the next attempt is Enter alone (typed again, the prompt would follow that new
+ *   line); when it wasn't (dropped while the CLI drew), or on the last attempt, it is typed again.
+ * ready(), if given, is waited for (within waitMs) before the first attempt: the CLI able to take a prompt
+ * (hiveToolsConnected); not ready by then, it is typed anyway and said. Up to `tries` times; returns the attempt that
+ * worked (1 = the first), or 0.
  */
-async function sendPrompt(inv, key, text, { submitted, tries = 3, waitMs = 20000 } = {}) {
+async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, waitMs = 20000 } = {}) {
   const raw = async () => (await inv('pty:buffer', key).catch(() => '')) ?? ''
+  if (ready && !(await until(ready, waitMs, 250))) console.log(`INFO sendPrompt: not ready within ${waitMs / 1000} s, typed anyway`)
+  let echoed = false
   for (let attempt = 1; attempt <= tries; attempt++) {
-    // Text seen on screen is taken to be still in the input (an Enter it didn't take is pressed again). The terminal's
-    // output is everything ever drawn, so text a CLI drew and then cleared (redrawing its input as a notice came, #981)
-    // counts as seen too: the last attempt types it again whatever was seen, so no run is left pressing Enter on nothing.
-    const typed = attempt > 1 && attempt < tries && plainText(await raw()).includes(text.slice(0, 30))
+    if (attempt > 1 && (await submitted())) return attempt - 1
+    // A slash command is typed (pasted, it would be sent as a message), as is any prompt to a CLI without it on.
+    const paste = pasteOn(await raw()) && !text.startsWith('/')
+    const enterOnly = !paste && echoed && attempt < tries
     const mark = (await raw()).length
-    if (attempt === 1) await inv('pty:write', key, text)
-    // Ctrl+U and the prompt in one write, the prompt as a bracketed paste while the CLI has bracketed paste on, as Hive
-    // writes it: typed, a long prompt read in one go with the Ctrl+U is a paste to Claude Code 2.1.309, the Ctrl+U in it
-    // an invisible character it takes out, leaving the prompt unsent until Enter again (#1547). However the CLI's reads
-    // split or join the write, the Ctrl+U stays outside the paste (tried with the real CLI). A slash command is still
-    // typed (pasted, it would be sent as a message), as is any prompt to a CLI without bracketed paste on.
-    else if (!typed) await inv('pty:write', key, `\x15${pasteOn(await raw()) && !text.startsWith('/') ? `\x1b[200~${text}\x1b[201~` : text}`)
+    if (!enterOnly) {
+      await inv('pty:write', key, '\x15')
+      await sleep(150)
+      await inv('pty:write', key, paste ? `\x1b[200~${text}\x1b[201~` : text)
+    }
     // Deliberate pause, not a wait for a state: a CLI takes an Enter that comes within its paste window as part of the
     // text (a new line, not a submit), and nothing on screen says when that window ends: Copilot shows the line at once
     // and still takes an Enter right after it as part of the paste (tried in #527). submitted() is the check.
     await sleep(400)
-    // Whether the CLI drew the text after this attempt's write: said for an attempt not taken (#981's evidence).
-    const echoed = plainText((await raw()).slice(mark)).includes(text.slice(0, 30))
+    // Whether the CLI drew the text after this attempt's write (#981's evidence; for a typed prompt, what the next
+    // attempt does), and whether it is on the screen's last input line ("> …") now: read from the output as drawn, so a
+    // guess at the screen, said for an attempt not taken.
+    echoed = !enterOnly && plainText((await raw()).slice(mark)).includes(text.slice(0, 30))
     await inv('pty:write', key, '\r')
     if (await until(submitted, waitMs, 500)) return attempt
-    console.log(`INFO sendPrompt attempt ${attempt} not taken: ${attempt === 1 || !typed ? 'typed' : 'Enter only (its text seen before)'}, echoed ${echoed ? 'yes' : 'no'}; screen ends: ${JSON.stringify(plainText(await raw()).slice(-300))}`)
+    const screen = plainText(await raw())
+    const input = screen.slice(screen.lastIndexOf('> ') + 2)
+    console.log(`INFO sendPrompt attempt ${attempt} not taken: ${enterOnly ? 'Enter only (typed, its text drawn before)' : `${paste ? 'pasted' : 'typed'}, echoed ${echoed ? 'yes' : 'no'}`}, ${input.includes(text.slice(0, 30)) ? 'its text on the last input line' : 'its text not on the last input line'}; screen ends: ${JSON.stringify(screen.slice(-300))}`)
   }
   return 0
 }
+
+/**
+ * Whether Hive's log in a test profile (HIVE_USER_DATA) says an agent's hive tools connected (#865), at or after
+ * `since` (a line count from hiveLogLines, so a relaunch's own connect is waited for): a ready() for sendPrompt into a
+ * just-started Claude Code, as Hive itself types nothing before it (sessions.hiveToolsSettled).
+ */
+const hiveLogLines = (userData) => {
+  try {
+    return fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n')
+  } catch {
+    return []
+  }
+}
+const hiveToolsConnected = (userData, agentId, since = 0) => hiveLogLines(userData).slice(since).some((l) => l.includes(`⁨${agentId}⁩'s hive tools connected`))
 
 /**
  * The longest a fake Claude Code's prompt waits to be taken, or its turn to end: a bound for a hung run, never how long
@@ -1416,4 +1443,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { unkey, KEYED, cardLabel, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, TURN_HUNG_MS, logFakeInput, typeLine, fakePrompts, skip }
+module.exports = { unkey, KEYED, cardLabel, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, typeLine, fakePrompts, skip }
