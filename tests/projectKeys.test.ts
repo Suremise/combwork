@@ -141,6 +141,35 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     await close(w)
   })
 
+  it("New Project…'s reply lists the project it made, which the window opens, even when its project.json is written during the refresh (HI-1760)", async () => {
+    const ws = workspace(['hive'])
+    const w = await open(ws)
+    await keys.keyProjects(w)
+    const info = await keys.createProjectWithKey(w, 'fresh', null)
+    expect(info.projects.map((p) => p.name)).toContain('fresh')
+    // Its id was given before the refresh read it: none is given (written) meanwhile.
+    expect(JSON.parse(readFileSync(join(ws, 'fresh', '.hive', 'project.json'), 'utf8')).id).toMatch(/^p-/)
+    // A write to the new project's project.json after the refresh has read it and before it reports (as the id's was,
+    // since HI-1705's parallel reads): the refresh hands back the list from before (#999), and New Project waits for the
+    // one that write scheduled. Before the fix the reply had no project, and the window stayed on the one shown.
+    const raced = join(ws, 'raced')
+    const svc = w as unknown as { projectInfo: (...a: unknown[]) => Promise<{ path: string }> }
+    const read = svc.projectInfo.bind(w)
+    let wrote = false
+    svc.projectInfo = async (...a) => {
+      const p = await read(...a)
+      if (!wrote && p.path.toLowerCase() === raced.toLowerCase()) {
+        wrote = true
+        await w.mutateProjectConfig(p.path, () => ({}))
+      }
+      return p
+    }
+    const again = await keys.createProjectWithKey(w, 'raced', 'RC')
+    expect(wrote).toBe(true)
+    expect(again.projects.map((p) => p.name)).toEqual(expect.arrayContaining(['hive', 'fresh', 'raced']))
+    await close(w)
+  })
+
   it('a key chosen for a project being made is reserved: a key change or another new project meanwhile is refused it (round 1, finding 2)', async () => {
     const ws = workspace(['hive'])
     const w = await open(ws)

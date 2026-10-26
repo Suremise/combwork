@@ -1457,7 +1457,18 @@ export class WorkspaceService {
     if (existsSync(p)) throw hiveError(msg({ id: 'service.workspace.folderExists', defaultMessage: 'A folder named "{name}" already exists', description: 'An error making a project: the workspace already has a folder called {name}.' }), { name: clean })
     await mkdir(p)
     await this.ensureProject(p)
-    return this.refresh()
+    // Its id given before the refresh reads it (HI-1760): given during that read (the refresh's sessions place asks for
+    // ids), its project.json counts as saved after the read, and the refresh returns the list from before, without it.
+    await this.projectIds({ fresh: true })
+    const info = await this.refresh()
+    if (this.hasProject(info, p)) return info
+    // Another write meanwhile made it hand back the list from before: the refresh that write scheduled reads it afresh.
+    await this.refreshesSettled()
+    return this.cached && this.hasProject(this.cached, p) ? this.cached : this.refresh()
+  }
+
+  private hasProject(info: WorkspaceInfo, projectPath: string): boolean {
+    return info.projects.some((x) => samePlace(x.path, projectPath))
   }
 
   /** True if the path is inside the open workspace, its worktrees or extraRoots — used to guard file IPC. */
