@@ -138,7 +138,8 @@ describe('a group of steps (db.ts)', () => {
     const asked: unknown[] = []
     const db = openDb(f.file, { migrations: [...plain, ...group(), five], hiveVersion: '1.0.1', backupDir: f.backups, approve: (p) => (asked.push(p), true) })
     try {
-      expect(asked).toEqual([{ group: '1.0', from: 4, to: 5 }])
+      // Not asked again (HI-1718): it was when the file joined the group.
+      expect(asked).toEqual([])
       expect(schemaVersion(db.writer)).toBe(5)
     } finally {
       db.close()
@@ -146,6 +147,28 @@ describe('a group of steps (db.ts)', () => {
     const after = readdirSync(f.backups)
     expect(after.filter((x) => x.startsWith('x-before-1.0-'))).toEqual([expect.stringMatching(/^x-before-1\.0-v2-/)])
     expect(after.filter((x) => x.startsWith('x-v4-'))).toHaveLength(1)
+  })
+
+  it('a later step of the group on a file in it already runs even where the group would be refused: the file opens writable, waiting for nothing (HI-1718)', () => {
+    const f = at09()
+    openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups, approve: () => true }).close()
+    const five: Step = { version: 5, name: 'five', group: '1.0', up: (d) => d.exec('CREATE TABLE e (v)') }
+    const db = openDb(f.file, { migrations: [...plain, ...group(), five], hiveVersion: '1.0.1', backupDir: f.backups, approve: () => false })
+    try {
+      expect(db.pending).toBeNull()
+      expect(schemaVersion(db.writer)).toBe(5)
+      db.writer.exec('INSERT INTO e VALUES (1)')
+    } finally {
+      db.close()
+    }
+    // A file before the group is still asked, and refused waits.
+    const g = at09()
+    const before = openDb(g.file, { migrations: [...plain, ...group(), five], hiveVersion: '1.0.1', backupDir: g.backups, approve: () => false })
+    try {
+      expect(before.pending).toEqual({ group: '1.0', from: 2, to: 5 })
+    } finally {
+      before.close()
+    }
   })
 
   it('a file made in 1.0 (every step unasked) gets no copy kept for good when a later step of the group comes', () => {
@@ -317,6 +340,30 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     await close(w)
     // Removed as the workspace closed; the other's left alone.
     expect(readdirSync(dir)).toEqual(['Hive-Dev-12345678.json'])
+  })
+
+  it('a board an earlier 1.0 upgraded takes the group\'s later steps unasked: writable, its cards kept (HI-1718: rc.1–rc.4 boards at v22)', async () => {
+    const ws = await board09()
+    store.boardTestHooks.upgradeAnswer = 'yes'
+    const first = await open(ws)
+    expect(await titles(first)).toEqual(['From 0.9'])
+    await close(first)
+    store.boardTestHooks.upgradeAnswer = null
+    // As rc.1–rc.4 left it: upgraded, without the steps that came after (card attachments, HI-1700).
+    const last = Math.max(...upgradeSteps.map((m) => m.version))
+    const later = store.BOARD_MIGRATIONS.find((m) => m.name === 'card attachments')!
+    const raw = new DatabaseSync(store.boardFile(ws))
+    raw.exec(`DROP TABLE card_attachments; DELETE FROM schema_version WHERE version >= ${later.version}`)
+    raw.close()
+    expect(fileSchemaVersion(store.boardFile(ws))).toBe(later.version - 1)
+    // No answer given: had it been asked, the board would wait read-only for the user.
+    const w = await open(ws)
+    expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
+    expect(fileSchemaVersion(store.boardFile(ws))).toBe(last)
+    expect(tables(store.boardFile(ws))).toContain('card_attachments')
+    await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))
+    expect(await titles(w)).toEqual(['After', 'From 0.9'])
+    await close(w)
   })
 
   it('a test copy can answer before it is asked', async () => {
