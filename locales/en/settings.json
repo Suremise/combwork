@@ -667,6 +667,14 @@
     "defaultMessage": "The Assistant starts with Hive's start view",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. The start view is what Hive tells the Hive Assistant of the workspace's state as it starts."
   },
+  "settings.advanced.hive.cards.attachmentMax.desc": {
+    "defaultMessage": "The largest file Hive keeps with a card, in bytes: pasted or dropped into the card, attached from an agent's pane, or given by an agent or the Assistant. A larger file is refused, saying so. Files already kept stay.",
+    "description": "What the advanced setting \"Card attachments: largest file\" does (Settings → Advanced, under Hive)."
+  },
+  "settings.advanced.hive.cards.attachmentMax.title": {
+    "defaultMessage": "Card attachments: largest file",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in bytes: the largest file Hive keeps with a card (pasted, dropped or attached to it)."
+  },
   "settings.advanced.hive.console.showText.desc": {
     "defaultMessage": "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' hive_console stays redacted, and a recording with text is never attached to Copy Diagnostics.",
     "description": "What the advanced setting \"Developer console: show prompt, reply and command text\" is for, and what goes wrong when it is wrong (Settings → Advanced)."

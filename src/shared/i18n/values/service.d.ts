@@ -36,6 +36,13 @@ interface HiveMessageValues {
   'service.benchmarks.unwritable': undefined
   'service.benchmarks.why': { why: string }
   'service.benchmarks.wrongScope': undefined
+  'service.cardAttach.moveFailed': { project: string | number; why: string | number }
+  'service.cardAttach.moved': undefined
+  'service.cardAttach.noAttachment': undefined
+  'service.cardAttach.noCard': undefined
+  'service.cardAttach.refused': { path: string | number }
+  'service.cardAttach.tooLarge': { name: string | number; max: string | number }
+  'service.cardAttach.tooMuch': { files: number; total: string | number }
   'service.files.badName': { name: string | number }
   'service.files.exists': { name: string | number }
   'service.files.existsIn': { root: string; name: string | number; folder: string | number }

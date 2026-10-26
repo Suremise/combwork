@@ -1,4 +1,9 @@
 {
+  "files.attach.cardArchived": "Archived",
+  "files.attach.cardsHeading": "Cards ({n, number})",
+  "files.attach.cardsKept": "Kept with the card until it is deleted: Clean Up and Purge don't remove them.",
+  "files.attach.openCard": "Open {card}",
+  "files.attach.toCard": "Attach to a card",
   "files.attachments.all": "All",
   "files.attachments.archived": "{host, select, assistant {Archived conversations} other {Archived sessions}}",
   "files.attachments.archivedBadge": "archived",

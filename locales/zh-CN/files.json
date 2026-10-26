@@ -1,4 +1,9 @@
 {
+  "files.attach.cardArchived": "已归档",
+  "files.attach.cardsHeading": "卡片（{n, number}）",
+  "files.attach.cardsKept": "随卡片保留，直到卡片被删除：清理和彻底清除不会移除它们。",
+  "files.attach.openCard": "打开 {card}",
+  "files.attach.toCard": "附加到卡片",
   "files.attachments.all": "全部",
   "files.attachments.archived": "{host, select, assistant {已归档的对话} other {已归档的会话}}",
   "files.attachments.archivedBadge": "已归档",

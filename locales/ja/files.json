@@ -1,4 +1,9 @@
 {
+  "files.attach.cardArchived": "アーカイブ済み",
+  "files.attach.cardsHeading": "カード（{n, number}）",
+  "files.attach.cardsKept": "カードが削除されるまで一緒に保持されます。クリーンアップやパージでは削除されません。",
+  "files.attach.openCard": "{card} を開く",
+  "files.attach.toCard": "カードに添付",
   "files.attachments.all": "すべて",
   "files.attachments.archived": "{host, select, assistant {アーカイブ済みの会話} other {アーカイブ済みのセッション}}",
   "files.attachments.archivedBadge": "アーカイブ済み",

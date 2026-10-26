@@ -1,4 +1,9 @@
 {
+  "files.attach.cardArchived": "Archiviert",
+  "files.attach.cardsHeading": "Karten ({n, number})",
+  "files.attach.cardsKept": "Mit der Karte behalten, bis sie gelöscht wird: Aufräumen und Bereinigen entfernen sie nicht.",
+  "files.attach.openCard": "{card} öffnen",
+  "files.attach.toCard": "An eine Karte anhängen",
   "files.attachments.all": "Alle",
   "files.attachments.archived": "{host, select, assistant {Archivierte Unterhaltungen} other {Archivierte Sitzungen}}",
   "files.attachments.archivedBadge": "archiviert",

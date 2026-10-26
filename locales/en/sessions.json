@@ -143,6 +143,10 @@
     "defaultMessage": "Attached to this prompt",
     "description": "The attachment chips' accessible name, over an agent's terminal: files attached to the prompt being written."
   },
+  "sessions.chips.toCard": {
+    "defaultMessage": "Attach {file} to a card",
+    "description": "An attachment chip's button (its accessible name, HI-1700): copies the file ({file}: its name) to a card, the agent's or another, from a menu."
+  },
   "sessions.cleanup.age": {
     "defaultMessage": "{age, select, day {24 hours ago} week {7 days ago} other {30 days ago}}",
     "description": "An age to pick in Clean Up, after \"Last active more than\": 24 hours, 7 days or 30 days ago."

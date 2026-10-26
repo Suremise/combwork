@@ -1,6 +1,11 @@
 // Generated from locales/en/files.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'files.attach.cardArchived': undefined
+  'files.attach.cardsHeading': { n: number }
+  'files.attach.cardsKept': undefined
+  'files.attach.openCard': { card: string | number }
+  'files.attach.toCard': undefined
   'files.attachments.all': undefined
   'files.attachments.archived': { host: string }
   'files.attachments.archivedBadge': undefined

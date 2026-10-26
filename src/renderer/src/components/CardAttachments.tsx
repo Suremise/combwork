@@ -324,7 +324,7 @@ export function CardAttachmentList({ card, label, list, reload, readOnly }: { ca
   const [busy, setBusy] = useState<string | null>(null)
   const remove = async (a: CardAttachment): Promise<void> => {
     const u = usedIn(card, a.id)
-    const used = u.description || u.comments ? tr(M.where, { description: u.description ? 'yes' : 'no', both: u.description && u.comments ? 'yes' : 'no', comments: u.comments }) : 'none'
+    const used = u.description || u.comments ? tr(M.where, { description: u.description ? 'yes' : 'no', both: u.description && u.comments ? 'yes' : 'no', comments: u.comments }) : 'none' // i18n-ignore: ICU select keys
     if (!(await confirm({ title: tr(M.removeTitle, { name: a.name, card: label }), message: tr(M.removeMessage, { used }), confirmLabel: tr(M.remove), danger: true }))) return
     setBusy(a.id)
     try {

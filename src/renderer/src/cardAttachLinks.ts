@@ -21,7 +21,7 @@ export function withAttachmentUrls(text: string, lookup: AttachmentLookup): stri
   if (!text.includes('](attachment:')) return text
   return text.replace(LINK, (_all, _bang: string, label: string, id: string) => {
     const a = lookup(id)
-    if (!a) return `<span class="attachment-gone">${escapeHtml(tr(REMOVED, { name: label.replace(/\\(.)/g, '$1') }))}</span>`
+    if (!a) return `<span class="attachment-gone">${escapeHtml(tr(REMOVED, { name: label.replace(/\\(.)/g, '$1') }))}</span>` // i18n-ignore: markup around a message
     if (a.kind === 'image' && a.url) return `![${label}](${a.url})`
     return `[${label}](${ATTACHMENT_ANCHOR}${id})`
   })

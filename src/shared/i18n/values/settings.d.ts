@@ -168,6 +168,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.assistant.otherMcpServers.title': undefined
   'settings.advanced.hive.assistant.startView.desc': undefined
   'settings.advanced.hive.assistant.startView.title': undefined
+  'settings.advanced.hive.cards.attachmentMax.desc': undefined
+  'settings.advanced.hive.cards.attachmentMax.title': undefined
   'settings.advanced.hive.console.showText.desc': undefined
   'settings.advanced.hive.console.showText.title': undefined
   'settings.advanced.hive.copies.quietWaitMinutes.desc': undefined

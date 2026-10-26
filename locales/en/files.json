@@ -1,4 +1,24 @@
 {
+  "files.attach.cardArchived": {
+    "defaultMessage": "Archived",
+    "description": "A badge on a card in the Attachments tab's Cards section (HI-1700): the card is archived (its files are kept)."
+  },
+  "files.attach.cardsHeading": {
+    "defaultMessage": "Cards ({n, number})",
+    "description": "A section of a project's Attachments tab (HI-1700): files kept with the project's cards, and how many ({n}); the sessions' attachments follow."
+  },
+  "files.attach.cardsKept": {
+    "defaultMessage": "Kept with the card until it is deleted: Clean Up and Purge don't remove them.",
+    "description": "Under the Cards heading of a project's Attachments tab (HI-1700)."
+  },
+  "files.attach.openCard": {
+    "defaultMessage": "Open {card}",
+    "description": "Hover of a card's name in the Attachments tab's Cards section (HI-1700): opens the card. {card} is its key."
+  },
+  "files.attach.toCard": {
+    "defaultMessage": "Attach to a card",
+    "description": "A session attachment's menu entry in the Attachments tab (HI-1700): opens a menu of the project's cards, to copy the file to one."
+  },
   "files.attachments.all": {
     "defaultMessage": "All",
     "description": "Attachments filter: every kind. Followed by a count."

@@ -1,4 +1,9 @@
 {
+  "files.attach.cardArchived": "Archivée",
+  "files.attach.cardsHeading": "Cartes ({n, number})",
+  "files.attach.cardsKept": "Gardées avec la carte jusqu’à sa suppression : Nettoyer et Purger ne les retirent pas.",
+  "files.attach.openCard": "Ouvrir {card}",
+  "files.attach.toCard": "Joindre à une carte",
   "files.attachments.all": "Toutes",
   "files.attachments.archived": "{host, select, assistant {Conversations archivées} other {Sessions archivées}}",
   "files.attachments.archivedBadge": "archivée",
