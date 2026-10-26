@@ -146,8 +146,8 @@ describe("the work badges' one source", () => {
  */
 const drained = async (reads: Promise<unknown>[]): Promise<void> => {
   await Promise.allSettled(reads)
-  await null
-  await null
+  await Promise.resolve()
+  await Promise.resolve()
 }
 
 describe("a view's reads (#1254 round 3)", () => {
