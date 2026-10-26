@@ -1,5 +1,5 @@
-import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { ACTIVITY_HOURS, ACTIVITY_LEVELS, activityLevel, activityTabs, buildActivityTree, filetimeMs, goneKeys, keepGone, keysAtLevel, newOrder, pruneGone, stableRows, type ActivityAgent, type ActivityCard, type ActivityDetail, type ActivityInput, type ActivityLevel, type ActivityNode, type ActivityNow, type ActivityRow, type ActivityState, type ActivityTabInfo, type ActivityTurns } from '@shared/activity'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { ACTIVITY_HOURS, activityTabs, buildActivityView, commandText, filetimeMs, keepGoneList, type ActivityAgent, type ActivityCard, type ActivityDetail, type ActivityInput, type ActivityNode, type ActivityNow, type ActivityPart, type ActivityState, type ActivityTabInfo, type ActivityTurns } from '@shared/activity'
 import { agentState, type AgentState } from '@shared/agentState'
 import { cardLabel } from '@shared/projectKeys'
 import { durationText } from '@shared/tasks'
@@ -9,7 +9,7 @@ import * as actions from '../actions'
 import { confirm, notify, openInSessionsTab, revealAgent, set, useStore } from '../store'
 import { Icon, IconButton, statusText, useContextMenu, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
-import { loadActivityView, saveActivityView, zoomStep, ZOOM_MAX, ZOOM_MIN, type ActivityView } from '../activityView'
+import { loadActivityView, saveActivityView, type ActivityView } from '../activityView'
 import { cx } from '../util'
 import { boundedQueue, latestOnly } from '@shared/coalesce'
 import { fmt, msg, tr } from '@shared/i18n'
@@ -20,15 +20,6 @@ const TICK_MS = 1000
 const LIST_EVERY = 5
 /** Sessions whose turns are read at once. */
 const TURNS_AT_ONCE = 4
-/** The tree's geometry: a column per depth, a row per node shown. */
-const COL = 256
-const NODE_W = 224
-const ROW = 46
-const NODE_H = 36
-/** Rows drawn beyond the visible ones, so scrolling doesn't show gaps. */
-const OVERSCAN = 12
-/** The tree's padding inside its scrolling box (both sides), left out when it is fitted. */
-const TREE_PAD = 28
 /** Live, how long what ended takes to fade out before it leaves (HI-1743); the CSS fade is as long. */
 const FADE_MS = 1500
 
@@ -43,7 +34,7 @@ const NO_NOW: ActivityNow = { launches: [], tasks: [] }
 const renders: number[] = []
 ;(window as unknown as { __hiveActivityRenders?: number[] }).__hiveActivityRenders = renders
 
-/** What the tree is drawn from: held as it was while the tab is frozen (HI-1743). */
+/** What the tab is drawn from: held as it was while the tab is frozen (HI-1743). */
 interface Reads {
   agents: ActivityAgent[]
   cards: ActivityCard[]
@@ -56,11 +47,12 @@ interface Reads {
 const markOf = (s: ActivityState): AgentState => (s === 'failed' ? 'stalled' : s === 'done' ? 'idle' : s)
 
 /**
- * A project's Activity tab (#1254, HI-1743): what runs now, a tab per running agent, each its current work (its card in
- * progress, else its session) as a tree running left to right: the latest turn and tool call, the background tasks,
- * subagents and processes. Nothing past: the card is the history. It opens frozen, a snapshot taken then: Refresh takes a
- * new one, Play goes live (what ended fades out, then leaves), Pause freezes again, and the reads since are counted in
- * the pill. Nothing is read or drawn while it is hidden; live changes are taken in about once a second.
+ * A project's Activity tab (#1254, HI-1743): what runs now, a tab per running agent, each its current work as a list:
+ * its card in progress as a header, then the turn now (its prompt, the tool call under way, or thinking or writing), its
+ * subagents and background tasks, and the processes it started (its own CLI and Hive's tool server only when asked).
+ * Nothing past: the card is the history. It opens frozen, a snapshot taken then: Refresh takes a new one, Play goes live
+ * (what ended fades out, then leaves), Pause freezes again, and the reads since are counted in the pill. Nothing is read
+ * or drawn while it is hidden; live changes are taken in about once a second.
  */
 export function ActivityTab({ project }: { project: ProjectInfo }) {
   const renderStart = performance.now()
@@ -70,7 +62,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const shown = useStore((s) => s.activity === 'projects' && s.selectedProject === project.path)
   const visible = usePageVisible()
   const active = shown && visible
-  // The view (filters, tab, zoom): the store's, else as this window last left it.
+  // The view (filters, tab, own processes): the store's, else as this window last left it.
   const stored = useStore((s) => s.activityFilters[project.path])
   const [loaded] = useState(() => stored ?? loadActivityView(project.path))
   const view = stored ?? loaded
@@ -90,21 +82,15 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   // The first read of what runs now since the tab opened: the snapshot is taken once it is in.
   const [nowRead, setNowRead] = useState(false)
   const [turns, setTurns] = useState<ReadonlyMap<string, ActivityTurns>>(new Map())
-  // Nodes opened or closed against their default, the node whose details show.
-  const [toggled, setToggled] = useState<ReadonlySet<string>>(new Set())
-  // Expand All and Collapse All set every node's default.
-  const [mode, setMode] = useState<OpenMode>('default')
-  // Levels ▾ (HI-1678): a level folded or opened at once, before each of its nodes' own folds.
-  const [levels, setLevels] = useState<ReadonlyMap<ActivityLevel, boolean>>(new Map())
   const [selected, setSelected] = useState<string | null>(null)
   // Live (HI-1743): a choice, never the default; each opening is frozen.
   const [live, setLive] = useState(false)
-  // The agents as last taken in: live state changes often, the tree follows once a tick, and only when it changed.
+  // The agents as last taken in: live state changes often, the tab follows once a tick, and only when it changed.
   const [tick, setTick] = useState(0)
   const agentsRef = useRef(project.agents)
   agentsRef.current = project.agents
-  // Sessions in the tree, as last drawn: their turns are read, a running one's again each tick.
-  const treeSessionsRef = useRef<{ id: string; live: boolean }[]>([])
+  // Sessions shown, as last drawn: their turns are read, a live one's again each tick.
+  const shownSessionsRef = useRef<{ id: string; live: boolean }[]>([])
   const turnsRef = useRef(turns)
   turnsRef.current = turns
   // Turns read a few sessions at a time, the session list's newest read only; both for while the tab is shown (#1254
@@ -161,8 +147,9 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
       }
       // The session list again when an agent started or stopped, and every few seconds (a session renamed, a subagent).
       if ((changed && ticks > 0) || ++ticks % LIST_EVERY === 0) readList()
-      // Running sessions in the tree: their turns again, only when their transcript changed (null back otherwise).
-      readTurns(treeSessionsRef.current.filter((x) => x.live).map((x) => x.id))
+      // Live sessions shown (the agents' and their running subagents'): their turns again, only when their transcript
+      // changed (null back otherwise).
+      readTurns(shownSessionsRef.current.filter((x) => x.live).map((x) => x.id))
     }
     read()
     const t = setInterval(read, TICK_MS)
@@ -199,14 +186,19 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   // --- Frozen or live (HI-1743): a snapshot taken when the tab opens; Refresh takes another; Play goes live.
   const [held, setHeld] = useState<Reads | null>(null)
   const [pending, setPending] = useState(0)
-  // Bumped by a new snapshot or another tab: the tree is drawn afresh (what ended dropped, compact again).
+  // Bumped by a new snapshot or another tab: what is shown is drawn afresh (what ended dropped).
   const [fresh, setFresh] = useState(0)
   const ready = !!list && nowRead
-  // Each opening (the tab shown, or opened from an agent or a card) takes a new snapshot, frozen.
-  const opening = `${active}:${view.opened ?? 0}`
-  const lastOpening = useRef('')
+  // Each opening takes a new snapshot, frozen: the tab shown again (from another view, the window restored: HR6's round
+  // 1, it stayed live), or opened from an agent or a card.
+  const opening = `${view.opened ?? 0}`
+  const lastOpening = useRef<string | null>(null)
   useEffect(() => {
-    if (!active || lastOpening.current === opening) return
+    if (!active) {
+      lastOpening.current = null
+      return
+    }
+    if (lastOpening.current === opening) return
     lastOpening.current = opening
     setLive(false)
     setHeld(null)
@@ -228,8 +220,8 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     setPending(0)
     setFresh((n) => n + 1)
   }, [reads])
-  // Another tab, or a filter changed, is the user's own doing: the tree is drawn afresh for it.
-  const filterKey = JSON.stringify([view.agents ?? [], view.cards ?? [], view.hideFinished !== false, view.tab ?? ''])
+  // Another tab, or a filter changed, is the user's own doing: drawn afresh for it.
+  const filterKey = JSON.stringify([view.agents ?? [], view.cards ?? [], view.hideFinished !== false, view.tab ?? '', !!view.showOwn])
   const lastFilter = useRef(filterKey)
   useEffect(() => {
     if (lastFilter.current === filterKey) return
@@ -254,121 +246,58 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const input = useMemo<ActivityInput>(() => ({ agents: drawn.agents, cards: drawn.cards, sessions: drawn.list ?? [], turns: drawn.turns, now: drawn.now, at: Date.now() }), [drawn])
   const tabs = useMemo(() => activityTabs(input, view, view.tab), [input, view])
   const tab: ActivityTabInfo | null = tabs.find((t) => t.agentId === view.tab) ?? tabs[0] ?? null
-  const tree = useMemo(() => (tab ? buildActivityTree(input, tab.agentId) : []), [input, tab])
+  const content = useMemo(() => (tab ? buildActivityView(input, tab.agentId, { showOwn: !!view.showOwn }) : { card: null, parts: [] }), [input, tab, view.showOwn])
 
   // Live, what ended fades out where it was, then leaves (HI-1743); frozen, the snapshot doesn't change.
   const goneAt = useRef(new Map<string, number>())
+  const keptRef = useRef<{ fresh: number; lists: Map<string, ActivityNode[]> }>({ fresh: -1, lists: new Map() })
   const [prune, setPrune] = useState(0)
-  const keptRef = useRef<{ fresh: number; tree: ActivityNode[] }>({ fresh: -1, tree: [] })
-  const kept = useMemo(() => {
-    if (keptRef.current.fresh !== fresh) goneAt.current.clear()
+  const parts = useMemo(() => {
+    if (keptRef.current.fresh !== fresh) {
+      keptRef.current = { fresh, lists: new Map() }
+      goneAt.current.clear()
+    }
     const at = Date.now()
-    const merged = keepGone(keptRef.current.fresh === fresh ? keptRef.current.tree : [], tree)
-    const t = pruneGone(merged, (n) => {
-      const since = goneAt.current.get(n.key) ?? at
-      goneAt.current.set(n.key, since)
-      return at - since < FADE_MS
-    })
-    const still = new Set(goneKeys(t))
+    const still = new Set<string>()
+    const keep = (key: string, next: ActivityNode[]): ActivityNode[] => {
+      const out = keepGoneList(keptRef.current.lists.get(key) ?? [], next).filter((n) => {
+        if (!n.gone) return true
+        const since = goneAt.current.get(n.key) ?? at
+        goneAt.current.set(n.key, since)
+        if (at - since >= FADE_MS) return false
+        still.add(n.key)
+        return true
+      })
+      keptRef.current.lists.set(key, out)
+      return out
+    }
+    const out = content.parts.map((p) => ({ ...p, subagents: keep(`${p.agentId}:subagents`, p.subagents), processes: keep(`${p.agentId}:processes`, p.processes) }))
     for (const k of [...goneAt.current.keys()]) if (!still.has(k)) goneAt.current.delete(k)
-    keptRef.current = { fresh, tree: t }
-    return t
+    return out
     // `prune` takes the faded ones out.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tree, fresh, prune])
-  const fading = goneKeys(kept).length > 0
+  }, [content, fresh, prune])
+  const fading = parts.some((p) => [...p.subagents, ...p.processes].some((n) => n.gone))
   useEffect(() => {
     if (!fading) return
     const t = setTimeout(() => setPrune((n) => n + 1), FADE_MS)
     return () => clearTimeout(t)
-  }, [fading, kept])
-  // When each node was first drawn, since the tree was last drawn afresh: nothing drawn moves as work comes and goes.
-  const order = useRef({ fresh, order: newOrder() })
-  if (order.current.fresh !== fresh) order.current = { fresh, order: newOrder() }
+  }, [fading, parts])
 
-  const isOpen = useCallback(
-    (n: ActivityNode): boolean => {
-      const level = activityLevel(n)
-      const asked = level ? levels.get(level) : undefined
-      return toggled.has(n.key) !== (asked === undefined ? openIn(mode, n) : asked && expandable(n))
-    },
-    [toggled, mode, levels]
-  )
-  const rows = useMemo(() => stableRows(kept, isOpen, order.current.order), [kept, isOpen])
-
-  // The turns of each session in the tree: read once there (the tick reads running ones again).
-  const treeSessions = useMemo(() => {
-    const out: { id: string; live: boolean }[] = []
-    const walk = (ns: readonly ActivityNode[]): void => ns.forEach((n) => (n.kind === 'session' && !n.gone && out.push({ id: n.session.id, live: n.live }), walk(n.children)))
-    walk(tree)
-    return out
-  }, [tree])
-  treeSessionsRef.current = treeSessions
-  const unread = treeSessions.filter((x) => !turns.has(x.id)).map((x) => x.id).join(',')
+  // The turns of each session shown: read once there (the tick reads live ones again: HR6's round 1, a running
+  // subagent's too).
+  const shownSessions = useMemo(() => parts.flatMap((p) => [...(p.session ? [{ id: p.session.session.id, live: true }] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' && !n.gone ? [{ id: n.session.id, live: n.live }] : []))]), [parts])
+  shownSessionsRef.current = shownSessions
+  const unread = shownSessions.filter((x) => !turns.has(x.id)).map((x) => x.id).join(',')
   useEffect(() => {
     if (active && unread) readTurns(unread.split(','))
   }, [active, unread, readTurns])
 
-  const toggle = (key: string): void =>
-    setToggled((t) => {
-      const next = new Set(t)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-
-  // Zoom (HI-1678): kept with the view; Fit scales the tree as shown to the tab, never above actual size.
-  const zoom = view.zoom ?? 1
-  const treeApi = useRef<TreeApi | null>(null)
-  const setZoom = useCallback((z: number) => setView({ zoom: Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 100) / 100 }), [setView])
-  const fit = useCallback(() => {
-    const box = treeApi.current?.box()
-    if (!box) return
-    const depth = rows.reduce((m, r) => Math.max(m, r.depth), 0)
-    setZoom(Math.min(1, box.width / ((depth + 1) * COL), box.height / Math.max(1, rows.length * ROW)))
-  }, [rows, setZoom])
-  // Jump to selected: the selected node.
-  const jump = useCallback(() => {
-    const i = selected ? rows.findIndex((r) => r.node.key === selected) : -1
-    if (i >= 0) treeApi.current?.scrollToRow(i, rows[i].depth)
-  }, [rows, selected])
-  const onKey = useCallback(
-    (e: React.KeyboardEvent): void => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return
-      const k = e.key.toLowerCase()
-      if (k === 'f') fit()
-      else if (k === '+' || k === '=') setZoom(zoomStep(zoom, 1))
-      else if (k === '-') setZoom(zoomStep(zoom, -1))
-      else if (k === '0') setZoom(1)
-      else if (k === 'j') jump()
-      else return
-      e.preventDefault()
-    },
-    [fit, setZoom, zoom, jump]
-  )
-  const setLevel = (level: ActivityLevel, open: boolean): void => {
-    setLevels((m) => new Map(m).set(level, open))
-    // Its nodes' own folds go: the whole level is as asked.
-    const atLevel = keysAtLevel(kept, level)
-    setToggled((t) => new Set([...t].filter((k) => !atLevel.has(k))))
-  }
-  const openLevels = (e: React.MouseEvent<HTMLElement>): void => {
-    const r = e.currentTarget.getBoundingClientRect()
-    const show = (): void =>
-      menu.openAt(
-        r.left,
-        r.bottom + 2,
-        ACTIVITY_LEVELS.map((level): MenuEntry => {
-          const folded = levelsRef.current.get(level) === false
-          return { label: tr(folded ? M.levelExpand : M.levelCollapse, { level }), icon: folded ? 'expand-all' : 'collapse-all', onClick: () => (setLevel(level, folded), queueMicrotask(show)) }
-        })
-      )
-    show()
-  }
-  const levelsRef = useRef(levels)
-  levelsRef.current = levels
-
-  const byKey = useMemo(() => new Map(rows.map((r) => [r.node.key, r.node])), [rows])
+  const byKey = useMemo(() => {
+    const m = new Map<string, ActivityNode>()
+    for (const p of parts) for (const n of [p.session, p.turn, p.doing?.kind === 'tool' ? p.doing.tool : null, ...p.subagents, ...p.processes]) if (n) m.set(n.key, n)
+    return m
+  }, [parts])
   const chosen = selected ? (byKey.get(selected) ?? null) : null
   const filtered = !!view.agents?.length || !!view.cards?.length
 
@@ -393,8 +322,9 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     show(what === 'agents' ? (view.agents ?? []) : (view.cards ?? []))
   }
 
-  // Until the session list comes (the first open of a project), the tree has the running agents' sessions.
   const reading = !list && !listError
+  const card = content.card
+  const solo = parts[0]?.session?.session
   return (
     <div className="activity-tab">
       <div className="activity-main">
@@ -421,36 +351,6 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
               <Icon name={live ? 'debug-pause' : 'play'} /> {tr(live ? M.pause : M.live)}
             </button>
             <IconButton icon="refresh" title={tr(M.refresh)} onClick={refresh} />
-            <button className="btn small subtle activity-levels" aria-haspopup="menu" onClick={openLevels}>
-              {tr(M.levels)} <Icon name="chevron-down" />
-            </button>
-            <IconButton icon="target" title={tr(M.jump)} onClick={jump} />
-            <span className="activity-zoom" role="group" aria-label={tr(M.zoomLabel)}>
-              <IconButton icon="zoom-out" title={tr(M.zoomOut)} onClick={() => setZoom(zoomStep(zoom, -1))} disabled={zoom <= ZOOM_MIN} />
-              <button className="btn small subtle activity-zoom-value" title={tr(M.zoomReset)} onClick={() => setZoom(1)}>
-                {fmt.number(zoom, { style: 'percent' })}
-              </button>
-              <IconButton icon="zoom-in" title={tr(M.zoomIn)} onClick={() => setZoom(zoomStep(zoom, 1))} disabled={zoom >= ZOOM_MAX} />
-              <IconButton icon="screen-normal" title={tr(M.fit)} onClick={fit} />
-            </span>
-            <IconButton
-              icon="expand-all"
-              title={tr(M.expandAll)}
-              onClick={() => {
-                setMode('all')
-                setLevels(new Map())
-                setToggled(new Set())
-              }}
-            />
-            <IconButton
-              icon="collapse-all"
-              title={tr(M.collapseAll)}
-              onClick={() => {
-                setMode('none')
-                setLevels(new Map())
-                setToggled(new Set())
-              }}
-            />
           </div>
         </div>
         {tabs.length > 0 && (
@@ -475,10 +375,28 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
             ))}
           </div>
         )}
-        {kept.length === 0 ? (
+        {!parts.length ? (
           <div className="pane-empty">{reading ? null : tr(filtered ? M.emptyFiltered : M.empty)}</div>
         ) : (
-          <TreeView rows={rows} selected={selected} isOpen={isOpen} zoom={zoom} api={treeApi} onKey={onKey} onSelect={setSelected} onToggle={toggle} />
+          <div className="activity-list" role="tabpanel">
+            {/* What the tab is about, in one line (HI-1743): its card, a link to it, else its session. */}
+            {card ? (
+              <div className="activity-card-head">
+                <button className="link activity-card-key" title={tr(M.openCard)} onClick={() => set({ taskOpen: card.number })}>
+                  {card.label}
+                </button>
+                <span className="activity-card-title">{card.title}</span>
+                <span className="faint">· {tr(M.column, { column: card.column })}</span>
+              </div>
+            ) : solo ? (
+              <div className="activity-card-head">
+                <span className="activity-card-title">{solo.title || solo.name || solo.id.slice(0, 8)}</span>
+              </div>
+            ) : null}
+            {parts.map((p) => (
+              <PartView key={p.agentId} project={project} part={p} many={parts.length > 1} selected={selected} onSelect={setSelected} showOwn={!!view.showOwn} onShowOwn={(v) => setView({ showOwn: v })} />
+            ))}
+          </div>
         )}
       </div>
       {chosen && <Details project={project} node={chosen} onClose={() => setSelected(null)} />}
@@ -487,157 +405,126 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   )
 }
 
-/** Whether a node can open: it has children, or it is a session whose turns can be read (not read yet). */
-const expandable = (n: ActivityNode): boolean => n.children.length > 0 || (n.kind === 'session' && !n.turnsLoaded && (!!n.session.hasTranscript || !!n.session.hasBackup))
-
-/** The tree's open state before a node's own toggle: as it starts (all open: it holds only what runs now), or all closed (Collapse All). */
-type OpenMode = 'default' | 'all' | 'none'
-const openIn = (mode: OpenMode, n: ActivityNode): boolean => (mode === 'none' ? false : expandable(n))
-
-/** The tree drawn: rows in view (and a few more) as nodes, each joined to its parent by an elbow. */
-/** What the tab asks of its tree's scrolling box (HI-1678): its size, and a row scrolled into the middle of it. */
-interface TreeApi {
-  box: () => { width: number; height: number }
-  scrollToRow: (row: number, depth: number) => void
-}
-
-function TreeView({ rows, selected, isOpen, zoom, api, onKey, onSelect, onToggle }: { rows: ActivityRow[]; selected: string | null; isOpen: (n: ActivityNode) => boolean; zoom: number; api: React.Ref<TreeApi>; onKey: (e: React.KeyboardEvent) => void; onSelect: (key: string) => void; onToggle: (key: string) => void }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useImperativeHandle(
-    api,
-    () => ({
-      box: () => ({ width: (ref.current?.clientWidth ?? 0) - TREE_PAD, height: (ref.current?.clientHeight ?? 0) - TREE_PAD }),
-      scrollToRow: (row, depth) => {
-        const el = ref.current
-        if (!el) return
-        el.scrollTo({ top: Math.max(0, row * ROW * zoom - (el.clientHeight - NODE_H * zoom) / 2), left: Math.max(0, depth * COL * zoom - (el.clientWidth - NODE_W * zoom) / 2) })
-      }
-    }),
-    [zoom]
-  )
-  const [view, setView] = useState({ top: 0, height: 800 })
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const update = (): void => setView({ top: el.scrollTop, height: el.clientHeight })
-    update()
-    el.addEventListener('scroll', update, { passive: true })
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    return () => {
-      el.removeEventListener('scroll', update)
-      ro.disconnect()
-    }
-  }, [])
-  // The rows in view, at the zoom.
-  const first = Math.max(0, Math.floor(view.top / (ROW * zoom)) - OVERSCAN)
-  const last = Math.min(rows.length, Math.ceil((view.top + view.height) / (ROW * zoom)) + OVERSCAN)
-  const depth = rows.reduce((m, r) => Math.max(m, r.depth), 0)
-  const width = (depth + 1) * COL
-  const height = rows.length * ROW
-  const lines: string[] = []
-  for (let i = first; i < last; i++) {
-    const r = rows[i]
-    if (r.parent < 0) continue
-    const x0 = rows[r.parent].depth * COL + NODE_W
-    const y0 = r.parent * ROW + NODE_H / 2
-    const x1 = r.depth * COL
-    const y1 = i * ROW + NODE_H / 2
-    const mid = x0 + (x1 - x0) / 2
-    lines.push(`M${x0} ${y0}H${mid}V${y1}H${x1}`) // i18n-ignore: an SVG path's commands
-  }
-  // A parent above the drawn rows still joins its first drawn child: its line is drawn from where it is.
+/** One agent's work (HI-1743): Now (its prompt, then what it does), its subagents and background tasks, its processes. */
+function PartView({ project, part: p, many, selected, onSelect, showOwn, onShowOwn }: { project: ProjectInfo; part: ActivityPart; many: boolean; selected: string | null; onSelect: (key: string) => void; showOwn: boolean; onShowOwn: (v: boolean) => void }) {
+  const row = (n: ActivityNode) => <Row key={n.key} node={n} selected={selected === n.key} onSelect={onSelect} />
   return (
-    <div className="activity-tree" ref={ref} role="tree" onKeyDown={onKey}>
-      <div className="activity-scaled" style={{ width: width * zoom, height: height * zoom }}>
-      <div className="activity-canvas" style={{ width, height, transform: zoom === 1 ? undefined : `scale(${zoom})` }}>
-        <svg className="activity-lines" width={width} height={height} aria-hidden>
-          <path d={lines.join('')} />
-        </svg>
-        {rows.slice(first, last).map((r, i) => (
-          <NodeBox key={r.node.key} node={r.node} parent={r.parent >= 0 ? rows[r.parent].node.key : undefined} x={r.depth * COL} y={(first + i) * ROW} open={isOpen(r.node)} selected={selected === r.node.key} onSelect={onSelect} onToggle={onToggle} />
-        ))}
-      </div>
-      </div>
-    </div>
+    <section className="activity-part" data-part={p.agentId}>
+      {many && (
+        <div className="activity-part-head">
+          <StateMark state={markOf(p.state)} />
+          <button className="link" onClick={() => revealAgent(project, p.agentId)}>
+            {p.name}
+          </button>
+          {p.role && <span className="faint">{tr(M.role, { role: p.role })}</span>}
+        </div>
+      )}
+      <h3 className="activity-group" data-group="now">
+        {tr(M.nowHeading)}
+      </h3>
+      {p.turn && row(p.turn)}
+      {p.doing?.kind === 'tool' ? (
+        row(p.doing.tool)
+      ) : p.doing ? (
+        <div className="activity-row act-working" data-doing={p.doing.kind}>
+          <Icon name={p.doing.kind === 'writing' ? 'edit' : 'lightbulb'} />
+          <div className="activity-row-text">
+            <div className="activity-row-title">{tr(p.doing.kind === 'writing' ? M.writing : M.thinking)}</div>
+          </div>
+          <StateMark state="working" decorative className="activity-pulse" />
+        </div>
+      ) : (
+        <div className="activity-row activity-row-plain" data-doing="none">
+          <StateMark state={markOf(p.state)} decorative />
+          <div className="activity-row-text">
+            <div className="activity-row-title">{p.session ? p.line || tr(M.state, { state: p.state }) : tr(M.notRunning)}</div>
+          </div>
+        </div>
+      )}
+      {p.subagents.length > 0 && (
+        <>
+          <h3 className="activity-group" data-group="subagents">
+            {tr(M.subagentsHeading)}
+          </h3>
+          {p.subagents.map(row)}
+        </>
+      )}
+      {(p.processes.length > 0 || p.ownHidden > 0 || showOwn) && (
+        <>
+          <h3 className="activity-group" data-group="processes">
+            {tr(M.processesHeading)}
+            {(p.ownHidden > 0 || showOwn) && (
+              <label className="flex muted activity-own">
+                <input type="checkbox" className="checkbox" checked={showOwn} onChange={(e) => onShowOwn(e.target.checked)} /> {tr(M.showOwn, { n: p.ownHidden })}
+              </label>
+            )}
+          </h3>
+          {p.processes.map(row)}
+        </>
+      )}
+    </section>
   )
 }
 
-const NodeBox = memo(function NodeBox({ node, parent, x, y, open, selected, onSelect, onToggle }: { node: ActivityNode; parent?: string; x: number; y: number; open: boolean; selected: boolean; onSelect: (key: string) => void; onToggle: (key: string) => void }) {
+/** An item as a row: its icon, what it is, a line about it, and a pulse while it works. */
+function Row({ node, selected, onSelect }: { node: ActivityNode; selected: boolean; onSelect: (key: string) => void }) {
   const { icon, title, sub: line, state } = describe(node)
   const sub = node.gone ? tr(M.endedNode) : line
   return (
     <div
-      className={cx('activity-node', `act-${node.kind}`, state && `act-${state}`, node.gone && 'act-gone', selected && 'selected')}
-      style={{ left: x, top: y, width: NODE_W, height: NODE_H }}
-      role="treeitem"
-      aria-expanded={expandable(node) ? open : undefined}
-      aria-selected={selected}
+      className={cx('activity-row', `act-${node.kind}`, state && `act-${state}`, node.gone && 'act-gone', selected && 'selected')}
+      role="button"
       tabIndex={0}
+      aria-pressed={selected}
       data-key={node.key}
-      data-parent={parent}
-      // Focused where it is: the browser's own focus would scroll the tree sideways to show all of a deep node.
-      onMouseDown={(e) => {
-        e.preventDefault()
-        e.currentTarget.focus({ preventScroll: true })
-      }}
       onClick={() => onSelect(node.key)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           onSelect(node.key)
-        } else if ((e.key === 'ArrowRight' && !open) || (e.key === 'ArrowLeft' && open)) {
-          if (expandable(node)) onToggle(node.key)
         }
       }}
     >
-      {expandable(node) ? (
-        <button
-          className="activity-twisty"
-          aria-label={tr(open ? M.collapse : M.expand)}
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggle(node.key)
-          }}
-        >
-          <Icon name={open ? 'chevron-down' : 'chevron-right'} />
-        </button>
-      ) : (
-        <span className="activity-twisty" />
-      )}
       <Icon name={icon} />
-      <div className="activity-node-text">
-        <div className="activity-node-title">{title}</div>
-        {sub && <div className="activity-node-sub faint">{sub}</div>}
+      <div className="activity-row-text">
+        <div className="activity-row-title">{title}</div>
+        {sub && <div className="activity-row-sub faint">{sub}</div>}
       </div>
       {/* Working is a steady pulse, never a spinner (HI-1743): nothing here is loading. */}
       {state === 'working' && !node.gone && <StateMark state="working" decorative className="activity-pulse" />}
     </div>
   )
-})
+}
 
-/** A node's icon, title, second line and state, as drawn. */
+/** How long something has run, from an ISO time or Unix ms; '' when it isn't known. */
+const ranFor = (from: string | number | null | undefined): string => {
+  const t = typeof from === 'number' ? from : Date.parse(from ?? '')
+  return Number.isFinite(t) ? durationText(Date.now() - t, tr) : ''
+}
+
+/** A row's icon, title, second line and state, as drawn. */
 function describe(n: ActivityNode): { icon: string; title: string; sub: string; state: ActivityState | null } {
   switch (n.kind) {
-    case 'card':
-      return { icon: 'project', title: `${n.label} ${n.title}`, sub: tr(M.column, { column: n.column }), state: null }
-    case 'agent':
-      return { icon: 'person', title: n.name, sub: n.line || tr(M.state, { state: n.state }), state: n.state }
-    case 'session':
-      return { icon: n.session.sub ? 'type-hierarchy-sub' : 'comment-discussion', title: n.session.title || n.session.name || n.session.id.slice(0, 8), sub: n.turnsLoaded ? tr(M.turns, { n: n.turnCount }) : fmtWhen(n.session.lastActivity ?? n.session.lastActiveAt), state: n.state }
+    case 'session': {
+      // A subagent: the tool call under way in it, else what it does while it can run, else done.
+      const open = n.last?.tools.at(-1)
+      const doing = n.live && open && !open.done && n.last?.lastKind === 'tool' ? tr(M.toolFor, { summary: `${open.name} ${open.summary}`.trim(), time: ranFor(open.at) }) : n.live ? tr(n.last?.lastKind === 'reply' ? M.writing : M.thinking) : tr(M.state, { state: 'done' })
+      return { icon: 'type-hierarchy-sub', title: n.session.title || n.session.name || n.session.id.slice(0, 8), sub: doing, state: n.state }
+    }
     case 'turn':
-      return { icon: 'comment', title: n.turn.prompt || tr(M.noPrompt), sub: tr(M.tools, { n: n.turn.tools.length }), state: n.state }
+      return { icon: 'comment', title: n.turn.prompt || tr(M.noPrompt), sub: n.turn.at ? tr(M.promptFor, { time: ranFor(n.turn.at) }) : '', state: null }
     case 'tool': {
       // The call under way says how long it has run (HI-1743).
-      const since = n.state === 'working' && n.tool.at ? Date.parse(n.tool.at) : NaN
-      return { icon: 'tools', title: n.tool.name, sub: Number.isFinite(since) ? tr(M.toolFor, { summary: n.tool.summary, time: durationText(Date.now() - since, tr) }) : n.tool.summary, state: n.state }
+      const time = n.state === 'working' ? ranFor(n.tool.at) : ''
+      return { icon: 'tools', title: n.tool.name, sub: time ? tr(M.toolFor, { summary: n.tool.summary, time }) : n.tool.summary, state: n.state }
     }
     case 'task':
       // A plain icon and its name: no pulse, nothing that looks like loading (HI-1743).
       return { icon: 'run-all', title: n.task.description || tr(M.task, { type: n.task.type ?? 'other' }), sub: tr(M.task, { type: n.task.type ?? 'other' }), state: null }
     case 'process': {
       const started = filetimeMs(n.process.created)
-      return { icon: n.cli ? 'terminal' : 'server-process', title: n.process.run ?? n.process.label, sub: n.cli ? tr(M.cliProcess, { pid: n.process.pid }) : started ? tr(M.processFor, { pid: n.process.pid, time: durationText(Date.now() - started, tr) }) : tr(M.process, { pid: n.process.pid }), state: null }
+      // The command as given (HI-1743: a cmd /c wrapper as what it runs); a hive-progress run by its title.
+      return { icon: n.own ? 'terminal' : 'server-process', title: n.process.run ?? commandText(n.process), sub: started ? tr(M.processFor, { pid: n.process.pid, time: ranFor(started) }) : tr(M.process, { pid: n.process.pid }), state: null }
     }
   }
 }
@@ -674,22 +561,6 @@ function Details({ project, node, onClose }: { project: ProjectInfo; node: Activ
   let last: string | null = null
   const buttons: React.ReactNode[] = []
   switch (node.kind) {
-    case 'card':
-      rows.push([tr(M.columnLabel), node.column])
-      buttons.push(
-        <button key="open" className="btn small" onClick={() => set({ taskOpen: node.number })}>
-          {tr(M.openCard)}
-        </button>
-      )
-      break
-    case 'agent':
-      if (node.line) last = node.line
-      buttons.push(
-        <button key="show" className="btn small" onClick={() => revealAgent(project, node.agentId)}>
-          {tr(M.showAgent)}
-        </button>
-      )
-      break
     case 'session':
       rows.push([tr(M.lastActive), fmtWhen(node.session.lastActivity ?? node.session.lastActiveAt)])
       if (node.session.cards?.length) rows.push([tr(M.cardsLabel), fmt.list(node.session.cards.map((c) => `#${c.number}`))])
@@ -719,7 +590,7 @@ function Details({ project, node, onClose }: { project: ProjectInfo; node: Activ
       if (node.process.parent) rows.push([tr(M.parentLabel), String(node.process.parent)])
       if (started) rows.push([tr(M.started), fmt.relative(started - Date.now())])
       input = node.process.command ?? node.process.label
-      if (!node.cli && node.process.created) buttons.push(<EndProcessButton key="end" project={project} agentId={node.agentId} pid={node.process.pid} created={node.process.created} label={node.process.label} />)
+      if (!node.own && node.process.created) buttons.push(<EndProcessButton key="end" project={project} agentId={node.agentId} pid={node.process.pid} created={node.process.created} label={node.process.label} />)
       break
     }
   }
@@ -794,15 +665,15 @@ const M = {
   empty: msg({ id: 'activity.empty', defaultMessage: 'Nothing is running. Start an agent to see what it runs here.', description: 'The Activity tab when no agent of the project runs anything (with Hide finished on, idle agents have no tab).' }),
   emptyFiltered: msg({ id: 'activity.emptyFiltered', defaultMessage: 'Nothing is running for this filter.', description: 'The Activity tab, filtered to agents or cards, when none of them runs anything.' }),
   tabsLabel: msg({ id: 'activity.tabsLabel', defaultMessage: 'Agents', description: "The Activity tab's row of agent tabs (one per running agent), for screen readers." }),
-  levels: msg({ id: 'activity.levels', defaultMessage: 'Levels', description: 'A menu button above the Activity tree: collapses or expands every node at one level at once (all turns, all tool calls…).' }),
-  levelCollapse: msg({ id: 'activity.levelCollapse', defaultMessage: '{level, select, agent {Collapse all agents} session {Collapse all sessions} subagent {Collapse all subagents} turn {Collapse all turns} tool {Collapse all tool calls} other {Collapse all processes}}', description: "An entry of the Activity tab's Levels menu: closes every node at that level." }),
-  levelExpand: msg({ id: 'activity.levelExpand', defaultMessage: '{level, select, agent {Expand all agents} session {Expand all sessions} subagent {Expand all subagents} turn {Expand all turns} tool {Expand all tool calls} other {Expand all processes}}', description: "An entry of the Activity tab's Levels menu: opens every node at that level again." }),
-  jump: msg({ id: 'activity.jump', defaultMessage: 'Jump to Selected (J)', description: "Tooltip of the Activity tab's button that scrolls the selected node into view. J is its key; keep it." }),
-  zoomLabel: msg({ id: 'activity.zoomLabel', defaultMessage: 'Zoom', description: "The Activity tab's zoom buttons, for screen readers." }),
-  zoomIn: msg({ id: 'activity.zoomIn', defaultMessage: 'Zoom In (+)', description: "Tooltip of the Activity tab's zoom in button. + is its key; keep it." }),
-  zoomOut: msg({ id: 'activity.zoomOut', defaultMessage: 'Zoom Out (−)', description: "Tooltip of the Activity tab's zoom out button. − is its key; keep it." }),
-  zoomReset: msg({ id: 'activity.zoomReset', defaultMessage: 'Actual Size (0)', description: "Tooltip of the Activity tab's zoom level (a percentage): clicking it goes back to 100%. 0 is its key; keep it." }),
-  fit: msg({ id: 'activity.fit', defaultMessage: 'Zoom to Fit (F)', description: "Tooltip of the Activity tab's button that scales the tree to fit the tab. F is its key; keep it." }),
+  nowHeading: msg({ id: 'activity.nowHeading', defaultMessage: 'Now', description: "A heading in the Activity tab, over what an agent is doing in its turn now: its prompt, then the tool call under way (or thinking, or writing)." }),
+  subagentsHeading: msg({ id: 'activity.subagentsHeading', defaultMessage: 'Subagents and background tasks', description: "A heading in the Activity tab, over an agent's subagents and the background tasks it left running (a command, a monitor)." }),
+  processesHeading: msg({ id: 'activity.processesHeading', defaultMessage: 'Processes', description: "A heading in the Activity tab, over the processes an agent started (test runs, servers, scripts)." }),
+  showOwn: msg({ id: 'activity.showOwn', defaultMessage: '{n, plural, =0 {Show the agent’s own processes} one {Show the agent’s own process (#)} other {Show the agent’s own processes (#)}}', description: "A checkbox beside the Activity tab's Processes heading: also shows the agent's own processes (its CLI, the terminal hosting it, Hive's tool server for it), hidden by default. {n}: how many are hidden." }),
+  thinking: msg({ id: 'activity.thinking', defaultMessage: 'Thinking…', description: 'In the Activity tab, what an agent is doing when it works with no tool call under way and nothing written yet in its turn.' }),
+  writing: msg({ id: 'activity.writing', defaultMessage: 'Writing…', description: 'In the Activity tab, what an agent is doing when it works with no tool call under way, after it started writing its reply.' }),
+  notRunning: msg({ id: 'activity.notRunning', defaultMessage: 'Not running', description: "In the Activity tab, under Now, for an agent that isn't running." }),
+  role: msg({ id: 'activity.role', defaultMessage: '{role, select, builder {builder} other {reviewer}}', description: "Beside an agent's name in the Activity tab when a card's builder and reviewer are both shown: its role on the card. Lower case." }),
+  promptFor: msg({ id: 'activity.promptFor', defaultMessage: 'Prompt · {time} ago', description: "The line under an agent's prompt in the Activity tab: when it was given, as a duration ({time}: \"4 min\")." }),
   agents: msg({ id: 'activity.agents', defaultMessage: '{n, plural, =0 {All agents} one {# agent} other {# agents}}', description: "A menu button above the Activity tab's agent tabs: which agents have a tab (several can be ticked); with none ticked, all." }),
   cards: msg({ id: 'activity.cards', defaultMessage: '{n, plural, =0 {All cards} one {# card} other {# cards}}', description: 'A menu button above the Activity tab: only the agents working on these cards in progress have a tab (several can be ticked); with none ticked, all.' }),
   all: msg({ id: 'activity.all', defaultMessage: 'All', description: "The first entry of the Activity tab's Agents and Cards menus: no filter, everything." }),
@@ -815,24 +686,16 @@ const M = {
   pillTip: msg({ id: 'activity.pillTip', defaultMessage: 'Take a new snapshot with what came since. It stays frozen.', description: "Tooltip of the Activity tab's updates pill." }),
   refresh: msg({ id: 'activity.refresh', defaultMessage: 'Refresh', description: "Tooltip of the Activity tab's refresh button: takes a new snapshot of what runs now." }),
   endedNode: msg({ id: 'activity.endedNode', defaultMessage: 'Ended', description: "A node's second line in the Activity tab, live, once its process or session ended: it fades out, then leaves." }),
-  expandAll: msg({ id: 'activity.expandAll', defaultMessage: 'Expand All', description: "Tooltip of the Activity tab's button that opens every node." }),
-  collapseAll: msg({ id: 'activity.collapseAll', defaultMessage: 'Collapse All', description: "Tooltip of the Activity tab's button that closes every node." }),
-  expand: msg({ id: 'activity.expand', defaultMessage: 'Expand', description: "A node's open button in the Activity tree (screen readers)." }),
-  collapse: msg({ id: 'activity.collapse', defaultMessage: 'Collapse', description: "A node's close button in the Activity tree (screen readers)." }),
   column: msg({ id: 'activity.column', defaultMessage: '{column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}', description: "A card node's second line in the Activity tree: its board column. Use the board's column names." }),
   state: msg({ id: 'activity.state', defaultMessage: '{state, select, working {Working} waiting {Waiting for you} failed {Failed or stalled} done {Done} other {Idle}}', description: 'A node\'s state in the Activity tree: working, waiting for you, failed (or stalled), done, idle.' }),
-  turns: msg({ id: 'activity.turns', defaultMessage: '{n, plural, one {# turn} other {# turns}}', description: "A session node's second line in the Activity tree: how many turns (a prompt and what followed) it has." }),
-  tools: msg({ id: 'activity.tools', defaultMessage: '{n, plural, =0 {No tool calls} one {# tool call} other {# tool calls}}', description: "A turn node's second line in the Activity tree: how many tool calls it made." }),
   noPrompt: msg({ id: 'activity.noPrompt', defaultMessage: '(no prompt text)', description: 'A turn node in the Activity tree whose prompt has no text (only images, say).' }),
   task: msg({ id: 'activity.task', defaultMessage: '{type, select, subagent {Background subagent} command {Background command} monitor {Monitor} workflow {Workflow} other {Background task}}', description: 'A background task node in the Activity tree: what kind it is.' }),
   process: msg({ id: 'activity.process', defaultMessage: 'Process {pid}', description: 'A process node\'s second line in the Activity tree. {pid} is its process id.' }),
   processFor: msg({ id: 'activity.processFor', defaultMessage: 'Process {pid} · running {time}', description: 'A process node\'s second line in the Activity tab: its process id ({pid}) and how long it has run ({time}: "4 min", "1 h 5 min").' }),
   toolFor: msg({ id: 'activity.toolFor', defaultMessage: '{summary} · {time}', description: 'A tool call node\'s second line in the Activity tab while it runs: what it does ({summary}, from the agent, such as a command) and how long it has run so far ({time}: "40 s", "4 min").' }),
-  cliProcess: msg({ id: 'activity.cliProcess', defaultMessage: "The agent's CLI · process {pid}", description: "A process node in the Activity tree that is the agent's own CLI (or its terminal). {pid} is its process id." }),
   details: msg({ id: 'activity.details', defaultMessage: 'Details', description: "The Activity tab's details panel, for screen readers." }),
   closeDetails: msg({ id: 'activity.closeDetails', defaultMessage: 'Close details', description: "Tooltip of the button closing the Activity tab's details panel." }),
   statusLabel: msg({ id: 'activity.statusLabel', defaultMessage: 'Status', description: "A label in the Activity tab's details: the node's state." }),
-  columnLabel: msg({ id: 'activity.columnLabel', defaultMessage: 'Column', description: "A label in the Activity tab's details: a card's board column." }),
   lastActive: msg({ id: 'activity.lastActive', defaultMessage: 'Last active', description: "A label in the Activity tab's details: when a session was last active." }),
   cardsLabel: msg({ id: 'activity.cardsLabel', defaultMessage: 'Cards', description: "A label in the Activity tab's details: the cards a session worked on." }),
   started: msg({ id: 'activity.started', defaultMessage: 'Started', description: "A label in the Activity tab's details: when a turn, tool call, task or process started." }),

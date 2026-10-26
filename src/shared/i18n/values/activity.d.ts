@@ -5,12 +5,8 @@ interface HiveMessageValues {
   'activity.all': undefined
   'activity.cards': { n: number }
   'activity.cardsLabel': undefined
-  'activity.cliProcess': { pid: string | number }
   'activity.closeDetails': undefined
-  'activity.collapse': undefined
-  'activity.collapseAll': undefined
   'activity.column': { column: string }
-  'activity.columnLabel': undefined
   'activity.details': undefined
   'activity.empty': undefined
   'activity.emptyFiltered': undefined
@@ -21,24 +17,19 @@ interface HiveMessageValues {
   'activity.endTitle': undefined
   'activity.ended': { label: string | number }
   'activity.endedNode': undefined
-  'activity.expand': undefined
-  'activity.expandAll': undefined
-  'activity.fit': undefined
   'activity.heading': undefined
   'activity.hideFinished': undefined
   'activity.input': undefined
-  'activity.jump': undefined
   'activity.lastAction': undefined
   'activity.lastActive': undefined
-  'activity.levelCollapse': { level: string }
-  'activity.levelExpand': { level: string }
-  'activity.levels': undefined
   'activity.live': undefined
   'activity.liveTip': undefined
   'activity.loadFailed': { error: string | number }
   'activity.loading': undefined
   'activity.noPrompt': undefined
   'activity.notEnded': { why: string; label: string | number }
+  'activity.notRunning': undefined
+  'activity.nowHeading': undefined
   'activity.openCard': undefined
   'activity.openSession': undefined
   'activity.parentLabel': undefined
@@ -49,19 +40,20 @@ interface HiveMessageValues {
   'activity.pillTip': undefined
   'activity.process': { pid: string | number }
   'activity.processFor': { pid: string | number; time: string | number }
+  'activity.processesHeading': undefined
+  'activity.promptFor': { time: string | number }
   'activity.reading': undefined
   'activity.refresh': undefined
+  'activity.role': { role: string }
   'activity.showAgent': undefined
+  'activity.showOwn': { n: number }
   'activity.started': undefined
   'activity.state': { state: string }
   'activity.statusLabel': undefined
+  'activity.subagentsHeading': undefined
   'activity.tabsLabel': undefined
   'activity.task': { type: string }
+  'activity.thinking': undefined
   'activity.toolFor': { summary: string | number; time: string | number }
-  'activity.tools': { n: number }
-  'activity.turns': { n: number }
-  'activity.zoomIn': undefined
-  'activity.zoomLabel': undefined
-  'activity.zoomOut': undefined
-  'activity.zoomReset': undefined
+  'activity.writing': undefined
 }

@@ -1010,7 +1010,10 @@ export const cardHasActivity = (c: Pick<TaskCard, 'column' | 'project' | 'archiv
 export function openCardActivity(c: TaskCard): void {
   const p = get().workspace?.projects.find((x) => x.name.toLowerCase() === c.project.toLowerCase())
   if (!p || !cardHasActivity(c)) return
-  const worker = cardWorker({ builder: c.agent, reviewer: c.review?.agent ?? null }, (id) => !!p.agents.find((a) => a.id === id)?.live)
+  // The agent on this card now: a builder gone on to its next card isn't (HR6's round 1).
+  const asActivity = (t: TaskCard) => ({ number: t.number, label: '', title: t.title, column: t.column, builder: t.agent, reviewer: t.review?.agent ?? null })
+  const cards = get().tasks.filter((t) => !t.archived && t.project.toLowerCase() === c.project.toLowerCase()).map(asActivity)
+  const worker = cardWorker(asActivity(c), cards, (id) => !!p.agents.find((a) => a.id === id)?.live)
   openActivity(p.path, { card: c.number, ...(worker ? { agentId: worker } : {}) })
 }
 
