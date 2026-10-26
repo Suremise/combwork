@@ -49,6 +49,7 @@ import { LANG_SUITE, isRealCli, keepLimits, needsDevBuild, packagedStatus, paren
 import { devBuild, ensureBuild } from './build.mjs'
 import { FAILED_KEEP_MS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFor, markRunFailed, newRunDir, omittedLine, pruneRunDirsReleasing } from './logs.mjs'
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from './lanes.mjs'
+import { endLeftCopies } from './leftCopies.mjs'
 import { describeClaim, heavySlots, needsSlot, preMerge, waitForSlot, waitLine } from './slots.mjs'
 import { usesCodexHome, waitForCodexHome } from './codexHomeLock.mjs'
 import { autoClean, holdLane } from './clean.mjs'
@@ -60,7 +61,7 @@ const root = join(here, '..', '..')
 const lib = createRequire(import.meta.url)('./lib.cjs')
 const runContext = createRequire(import.meta.url)('./runContext.cjs')
 const { claimedByRuns, clearDir, evidenceFor, findBoard, finishSuiteDir, freshFolder, recordKept, releaseKept } = createRequire(import.meta.url)('./evidence.cjs')
-const { stopProcessesIn, endChildTree } = createRequire(import.meta.url)('./folderProcesses.cjs')
+const { stopProcessesIn, endChildTree, endCopies } = createRequire(import.meta.url)('./folderProcesses.cjs')
 const { describeExit, windowsCodesIn } = createRequire(import.meta.url)('./windowsExits.cjs')
 
 const args = process.argv.slice(2)
@@ -166,6 +167,16 @@ if (needsSlot({ count: chosen.length, repeat: opts.repeat })) {
 // Before the code's fingerprint and the build (#735): a run that waited tests the source as it is once it has a lane.
 let lane = null
 if (!nested) {
+  // First, the test copies of Hive an earlier run left in lanes no runner holds (HI-1453): one holding a lane's port
+  // kept every later runner off that lane.
+  try {
+    const left = await endLeftCopies(runContext.LANES_DIR, lib.WORK)
+    if (left.ended) console.log(`Ended ${left.ended} process(es) of test copies of Hive an earlier run left running in its lanes (HI-1453).\n`)
+    // Never ended without a record: listed, for a person to look at.
+    if (left.unrecorded.length) console.log(`Still running in lanes no runner holds, with no record of a run starting them (not ended; look at them, HI-1453):\n${left.unrecorded.map((p) => `  ${p.pid}: ${p.commandLine}`).join('\n')}\n`)
+  } catch (e) {
+    console.warn(`Couldn't look for test copies of Hive an earlier run left running (HI-1453): ${e.message}\n`)
+  }
   const queue = slotWaitProgress('e2e', `npm run e2e -- ${args.join(' ')}`.trim(), args, 'a test lane')
   let said = ''
   const got = await waitForLane(runContext.LANES_DIR, {
@@ -302,6 +313,10 @@ const run = (name, port) =>
       const outcome = { ...suiteOutcome({ code, out }), clis: suiteClis(dir), windows }
       // What a suite's agents left running from its folder (a command through hive-progress, a server: #542) would hold
       // the folder and outlive the run: stopped, by command line (its folder, started since the suite did), never by name.
+      // Its test copies of Hive first (HI-1453): those it recorded, as the processes recorded. One not recorded is the
+      // folder's sweep's below (#542), which takes what names the folder and started since the suite did.
+      const copies = dir ? endCopies([dir]).ended : 0
+      if (copies) out += `\n(${copies} process(es) of its test copies of Hive still running after it ended were ended, HI-1453)\n`
       const stopped = dir ? stopProcessesIn(dir, started) : 0
       if (stopped) out += `\n(${stopped} process(es) still running from its folder after it ended were stopped, #542)\n`
       // --keep-files: a passed suite's own files (screenshots, reports) go into the run's log folder before its folder

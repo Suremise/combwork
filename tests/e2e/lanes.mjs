@@ -166,6 +166,22 @@ export async function claimLane(dir, { owner = process.pid, root = '', what = ''
 }
 
 /**
+ * The lanes no running runner holds (HI-1453): no claim, or one whose runner is gone (a day-old claim of a runner still
+ * running is still its, unlike pickLane's). Read under the claims' lock: { lanes, at }, `at` when they were read. What
+ * runs from such a lane's folder and started before `at` was left by a run that ended without ending it; a runner that
+ * claims the lane after `at` starts its own after it.
+ */
+export async function idleLanes(dir, { alive = processAlive, now = () => Date.now() } = {}) {
+  mkdirSync(dir, { recursive: true })
+  return withLock(dir, async () => {
+    const claims = readClaims(dir)
+    const lanes = []
+    for (let k = 0; k < LANES; k++) if (!(Number.isInteger(claims[k]?.pid) && claims[k].pid > 0 && alive(claims[k].pid))) lanes.push(k)
+    return { lanes, at: now() }
+  })
+}
+
+/**
  * Holds the machine's one pool of its own (#1127): every such pool's lanes have OWN_POOL_FIRST's ports, and each pool
  * claims its lanes under a lock of its own, so two at once (two concurrency checks) would hand out the same ports. The
  * hold is dir/own-pool.json with this process's id (a crashed holder's expires, as a lane's claim does); while another
