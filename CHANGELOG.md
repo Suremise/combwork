@@ -123,6 +123,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **Less lag on a big board.** Each change to the board made Hive read every card in full, archived ones included, to find cards newly Done; on a board of 1,600 cards that held up typing and replies for about 200 ms at a time while agents worked. Hive now reads only what it needs, from the board's index (HI-1690).
 - **The Pulse tab's lanes sit at the bottom of the Progress panel again,** growing upwards, with the runs above them: they had followed the runs, leaving empty space under them (HI-1673).
 - **A question's actions line up.** Under For you, the actions an agent's question offers (Move to Done, Make It No Code, Unblock) share one column of buttons as wide as the widest, so their reason boxes start and end together; in a narrow window each button sits over its box.
 - **Watching agents name their cards by key.** An agent waiting on cards shows *Waiting for HI-1168 → Approved*, not the card's workspace-wide number, in its pane, its tile and the Overviews. In **Running now**, an agent waiting on one card shows that card's chip as a working agent does, and a chip's key no longer breaks onto a second line: the title is cut with "…" instead.
