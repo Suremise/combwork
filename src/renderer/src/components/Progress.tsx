@@ -20,7 +20,8 @@ import { MergesList, QueueAnnouncer, QueueLines } from './ProgressQueue'
 import { useLanes } from '../laneSource'
 import { keepShown, useQueuesKept } from '../queueSource'
 import { justMerged, onPulseLine, queuedCount, shownQueues, shownReturns, unseenReturns } from '@shared/progressQueue'
-import { NO_RUNS_FILTER, PROGRESS_TABS, runAgentKey, runDayLabel, runDays, runGroupLabel, runMatches, tabAt, tabBadges, unresolvedFailures, type ProgressTab, type RunGroup, type RunsFilter } from '@shared/progressTabs'
+import { cardLook, cardRunsSummary, groupLook, NO_RUNS_FILTER, PROGRESS_TABS, queueChecksLabel, runAgentKey, runDayLabel, runDays, runGroupLabel, runMatches, runsByCard, tabAt, tabBadges, unresolvedFailures, withoutCardKey, type CardRuns, type ProgressTab, type RunGroup, type RunsFilter, type RunsLook } from '@shared/progressTabs'
+import { formatDateTime } from '@shared/dates'
 import type { Lane } from '../laneSource'
 import { Icon, IconButton, SearchInput, Tooltip } from './ui'
 
@@ -37,6 +38,10 @@ const NO_RUNS: ProgressRun[] = []
 
 const SHOW_THE_AGENT: Msg = msg({ id: 'board.progress.showTheAgent', defaultMessage: 'Show the agent', description: 'Button and tooltip on a Progress panel run: shows the agent that ran it.' })
 const WAITING: Msg = msg({ id: 'board.progress.waiting', defaultMessage: 'waiting', description: "A run's state on its bar (accessible value) and in a list of runs (build (waiting)), lower case: it waits (for a test slot, say)." })
+
+const IN_COPY: Msg = msg({ id: 'board.progress.inCopy', defaultMessage: 'in {copy}', description: "Under a run's agent in the Progress panel, after its card and revision (\"AM-12 · a3f2c1d · in copy-2\"): the run ran in that review or check copy (a folder Hive keeps at exactly the card's revision). {copy} is its name, such as copy-2: keep it as it is." })
+
+const OPEN_CARD: Msg = msg({ id: 'board.progress.openCard', defaultMessage: 'Open {card}', description: "Tooltip of a run's card in the Progress panel (under its agent): opens the card. {card} is the card's reference (#1061)." })
 
 /** A tooltip with the command's shortcut after it, in brackets, when it has one. */
 const withKey = (text: string, kb: string | undefined): string => (kb ? `${text} (${formatKeybinding(kb)})` : text)
@@ -349,7 +354,8 @@ const FIND_RUNS = msg({ id: 'board.runs.search', defaultMessage: 'Find runs', de
 
 /**
  * The Runs tab (#1309): its filters (failures only, a lane, an agent, words to find), what is running now, then every
- * run Hive keeps that ended, by day, a run and its retries the same day folded into one line that opens to each.
+ * run Hive keeps that ended, by day, each day by card (HI-1701), a run and its retries the same day folded into one line
+ * that opens to each.
  */
 function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs: ProgressRun[]; lanes: Lane[]; now: number; detail: string | null; toggle: (id: string) => void; filter: RunsFilter; setFilter: (f: RunsFilter) => void }) {
   const cardName = (n: number): string => cardLabelOf(get(), n)
@@ -365,6 +371,7 @@ function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs
   }, [goneLane, goneAgent, filter, setFilter])
   const matched = runs.filter((r) => runMatches(r, filter, words, lane?.cards ?? null))
   const running = matched.filter(isOpenRun)
+  const runningCards = new Set(running.flatMap((r) => (r.card ? [r.card] : [])))
   const days = runDays(
     matched.filter((r) => !isOpenRun(r)),
     now
@@ -418,7 +425,9 @@ function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs
         {days.map((d) => (
           <section key={d.day} className="progress-runs-day" aria-label={runDayLabel(d, now, tr)}>
             <div className="progress-section">{runDayLabel(d, now, tr)}</div>
-            {d.groups.map((g) => (g.runs.length === 1 ? <RecentRow key={g.key} run={g.last} now={detail === g.last.id ? now : 0} open={detail === g.last.id} onToggle={toggle} /> : <GroupRow key={g.key} group={g} now={now} detail={detail} toggle={toggle} />))}
+            {runsByCard(d).map((c) => (
+              <CardGroup key={c.key} group={c} running={d.day === 0 && c.card !== null && runningCards.has(c.card)} now={now} detail={detail} toggle={toggle} />
+            ))}
           </section>
         ))}
       </div>
@@ -426,23 +435,100 @@ function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs
   )
 }
 
-/** A run tried several times the same day (#1309): one line, "AL-12 cardwork ×4 · 2 failed, then passed"; opened, each run. */
-function GroupRow({ group: g, now, detail, toggle }: { group: RunGroup; now: number; detail: string | null; toggle: (id: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const name = useStore((s) => (g.last.card ? cardLabelOf(s, g.last.card) : null))
-  // Its whole line in its title too: a narrow panel cuts it short.
-  const label = `${runAgentName(g.last, tr)} · ${runGroupLabel(g, name, tr)}` // i18n-ignore: its agent's name before its line, both the window's
-  const icon = g.last.state === 'passed' ? 'pass' : g.last.state === 'failed' ? 'error' : g.last.state === 'stopped' ? 'circle-slash' : 'warning'
+/** A group's icon by how its runs went (HI-1701): a failure shows, a failure before a pass shows as a warning. */
+const LOOK_ICON: Record<RunsLook, string> = { failed: 'error', retried: 'warning', passed: 'pass', stale: 'warning', stopped: 'circle-slash' }
+
+/** Whether the user opened or closed a card's runs (by day and card), kept for the session (HI-1701). */
+const cardsOpened = new Map<string, boolean>()
+
+/**
+ * A card's runs on a day (HI-1701): a heading with its key (it opens the card), title, how many runs and how they went,
+ * and when the last ended; under it a line per run. Open while one of its runs is running or failed, closed once all
+ * passed, unless the user chose; Other holds the runs for no card.
+ */
+function CardGroup({ group: c, running, now, detail, toggle }: { group: CardRuns; running: boolean; now: number; detail: string | null; toggle: (id: string) => void }) {
+  const key = useStore((s) => (c.card ? cardLabelOf(s, c.card) : null))
+  const title = useStore((s) => (c.card ? (s.tasks.find((t) => t.number === c.card)?.title ?? null) : null))
+  const look = cardLook(c)
+  const [chosen, setChosen] = useState(() => cardsOpened.get(c.key))
+  const open = chosen ?? (running || look === 'failed' || look === 'retried')
+  const flip = (): void => {
+    cardsOpened.set(c.key, !open)
+    setChosen(!open)
+  }
+  const name = key ?? tr(msg({ id: 'board.runs.other', defaultMessage: 'Other', description: "The heading of a group in the Progress panel's Runs tab, where runs are grouped by card: the runs for no card (Hive's own, the user's scripts) follow." }))
+  const at = c.last.finishedAt ?? c.last.updatedAt
   return (
-    <div className={cx('progress-run-group', g.last.state, open && 'open')} data-group={g.key}>
-      <button type="button" className={cx('progress-recent', 'progress-group-head', g.last.state)} aria-expanded={open} title={label} onClick={() => setOpen(!open)}>
-        <Icon name={open ? 'chevron-down' : 'chevron-right'} />
-        <Icon name={icon} /> <span className="progress-recent-text">{label}</span>
+    <section className={cx('progress-card-runs', look, open && 'open')} data-card-runs={c.card ?? 'other'} aria-label={name}>
+      <div className="progress-card-head" onClick={flip}>
+        <IconButton
+          icon={open ? 'chevron-down' : 'chevron-right'}
+          className="progress-card-toggle"
+          title={tr(msg({ id: 'board.runs.toggleCard', defaultMessage: '{open, select, yes {Hide the runs of {card}} other {Show the runs of {card}}}', description: "Tooltip of the chevron on a card's heading in the Progress panel's Runs tab: hides or shows the card's runs ({card}: its key, such as HI-12, or Other for the runs for no card). Keep the select keys." }), { open: open ? 'yes' : 'no', card: name })} // i18n-ignore: a select's key, never shown
+          expanded={open}
+          onClick={(e) => {
+            e.stopPropagation()
+            flip()
+          }}
+        />
+        <Icon name={LOOK_ICON[look]} className="progress-card-icon" />
+        {c.card ? (
+          <button
+            type="button"
+            className="progress-card-key"
+            title={tr(OPEN_CARD, { card: name })}
+            onClick={(e) => {
+              e.stopPropagation()
+              set({ taskOpen: c.card! })
+            }}
+          >
+            {name}
+          </button>
+        ) : (
+          <span className="progress-card-key">{name}</span>
+        )}
+        <span className="progress-card-title" title={title ?? undefined}>
+          {title}
+        </span>
+        <span className="faint progress-card-summary">{cardRunsSummary(c, running, tr)}</span>
+        <span className="faint progress-card-when" title={formatDateTime(at)}>
+          {timeAgo(new Date(at).toISOString())}
+        </span>
+      </div>
+      {open && (
+        <div className="progress-card-items">
+          {c.items.map((g) => (g.runs.length === 1 && !g.queue ? <RecentRow key={g.key} run={g.last} cardKey={key} now={detail === g.last.id ? now : 0} open={detail === g.last.id} onToggle={toggle} /> : <GroupRow key={g.key} group={g} cardKey={key} now={now} detail={detail} toggle={toggle} />))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+/**
+ * A run tried several times the same day (#1309), or the merge queue's checks of a card (HI-1701): one line, as a run's,
+ * "B1 cardwork ×4 · 2 failed, then passed" or "Hive (merge queue) lint, typecheck"; opened, each run.
+ */
+function GroupRow({ group: g, cardKey, now, detail, toggle }: { group: RunGroup; cardKey: string | null; now: number; detail: string | null; toggle: (id: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const what = g.queue ? queueChecksLabel(g, (items) => fmt.list(items, 'unit'), tr) : runGroupLabel(g, null, tr, withoutCardKey(g.last.title, cardKey))
+  const who = runAgentName(g.last, tr)
+  const look = groupLook(g)
+  const took = g.last.finishedAt !== null ? durationText(g.last.finishedAt - g.last.startedAt, tr) : ''
+  return (
+    <div className={cx('progress-run-group', look, open && 'open')} data-group={g.key}>
+      {/* Its whole line in its title too: a narrow panel cuts it short. */}
+      <button type="button" className={cx('progress-recent', 'progress-group-head', look)} aria-expanded={open} title={`${who} · ${what}`} /* i18n-ignore: its agent's name before its line, both the window's */ onClick={() => setOpen(!open)}>
+        <span className="progress-recent-line">
+          <Icon name={LOOK_ICON[look]} /> <span className="progress-recent-who">{who}</span>
+          <span className="progress-recent-text">{what}</span>
+          <span className="faint progress-recent-took">{took}</span>
+        </span>
+        <Icon name={open ? 'chevron-up' : 'chevron-down'} className="progress-group-chevron" />
       </button>
       {open && (
         <div className="progress-group-runs">
           {[...g.runs].reverse().map((r) => (
-            <RecentRow key={r.id} run={r} now={detail === r.id ? now : 0} open={detail === r.id} onToggle={toggle} />
+            <RecentRow key={r.id} run={r} cardKey={cardKey} now={detail === r.id ? now : 0} open={detail === r.id} onToggle={toggle} />
           ))}
         </div>
       )}
@@ -574,7 +660,7 @@ function RunFor({ run: r }: { run: ProgressRun }) {
         <button
           type="button"
           className="progress-run-card"
-          title={tr(msg({ id: 'board.progress.openCard', defaultMessage: 'Open {card}', description: "Tooltip of a run's card in the Progress panel (under its agent): opens the card. {card} is the card's reference (#1061)." }), { card })}
+          title={tr(OPEN_CARD, { card })}
           onClick={(e) => {
             e.stopPropagation()
             set({ taskOpen: r.card! })
@@ -605,7 +691,7 @@ function RunFor({ run: r }: { run: ProgressRun }) {
       {r.copy && r.source !== 'hive' && (
         <span className="progress-run-copy">
           {(card || r.revision) && <span aria-hidden="true"> · </span>}
-          {tr(msg({ id: 'board.progress.inCopy', defaultMessage: 'in {copy}', description: "Under a run's agent in the Progress panel, after its card and revision (\"AM-12 · a3f2c1d · in copy-2\"): the run ran in that review or check copy (a folder Hive keeps at exactly the card's revision). {copy} is its name, such as copy-2: keep it as it is." }), { copy: r.copy })}
+          {tr(IN_COPY, { copy: r.copy })}
         </span>
       )}
     </div>
@@ -648,8 +734,9 @@ function RunWho({ run: r, project }: { run: ProgressRun; project: string | null 
  * click on the line, or the chevron (the keyboard's way), opens its details.
  */
 // A closed one's `now` is 0: nothing in it shows the time, so a second passing doesn't draw it again.
-const RecentRow = memo(function RecentRow({ run: r, now, open, onToggle }: { run: ProgressRun; now: number; open: boolean; onToggle: (id: string) => void }) {
+const RecentRow = memo(function RecentRow({ run: r, cardKey, now, open, onToggle }: { run: ProgressRun; cardKey: string | null; now: number; open: boolean; onToggle: (id: string) => void }) {
   useLanguage()
+  const card = useStore((s) => (r.card ? cardLabelOf(s, r.card) : null))
   const item = useRef<HTMLDivElement>(null)
   // Opened in the scrolling box of all of them, its details scroll into view.
   useEffect(() => {
@@ -661,6 +748,9 @@ const RecentRow = memo(function RecentRow({ run: r, now, open, onToggle }: { run
   const hover = took
     ? tr(msg({ id: 'board.progress.recentHoverTook', defaultMessage: '{agent}: {run} {state} ({took})', description: "Tooltip of a run in the Progress panel's Runs tab: its agent, its title ({run}), its state in a few words ({state}: failed, stopped reporting…) and how long it took ({took}: 4 min)." }), { ...values, took })
     : tr(msg({ id: 'board.progress.recentHover', defaultMessage: '{agent}: {run} {state}', description: "Tooltip of a run in the Progress panel's Runs tab: its agent, its title ({run}) and its state in a few words ({state}: failed, stopped reporting…)." }), values)
+  // What it ran for and where, in its hover (HI-1701: one line each, the details have the rest): "AM-12 · a3f2c1d · in copy-2", and its command.
+  const ranFor = [card, r.revision ? shortRevision(r.revision) : null, r.copy && r.source !== 'hive' ? tr(IN_COPY, { copy: r.copy }) : null].filter(Boolean).join(' · ') // i18n-ignore: a list of names and ids, each the window's
+  const tip = [hover, ranFor, r.command, r.summary].filter(Boolean).join('\n')
   return (
     <div ref={item} className={cx('progress-recent-item', r.state, open && 'open')} data-run={r.id}>
       <div
@@ -669,14 +759,13 @@ const RecentRow = memo(function RecentRow({ run: r, now, open, onToggle }: { run
           if (!window.getSelection()?.toString()) onToggle(r.id)
         }}
       >
-        <Tooltip block content={`${hover}${r.summary ? `\n${r.summary}` : ''}`}>
-          <Icon name={icon} /> <span className="progress-recent-text">{runAgentName(r, tr)} · {r.title}</span>
+        <Tooltip block content={tip}>
+          <Icon name={icon} /> <span className="progress-recent-who">{runAgentName(r, tr)}</span>
+          <span className="progress-recent-text">{withoutCardKey(r.title, cardKey)}</span>
           <span className="faint progress-recent-took">{took}</span>
         </Tooltip>
         <DetailsToggle run={r} open={open} onToggle={onToggle} />
       </div>
-      {/* A check in a review or check copy (#1446): what it checked, "AM-12 · a3f2c1d · in copy-2", never the builder's slot. */}
-      {r.copy && r.source !== 'hive' && (r.card || r.revision) && <RunFor run={r} />}
       {open && <RunDetails run={r} now={now} />}
     </div>
   )

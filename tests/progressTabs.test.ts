@@ -2,7 +2,7 @@
 // day with retries folded, a group's line, the Runs tab's filters, the badges and a card's latest run.
 import { describe, expect, it } from 'vitest'
 import { tr } from '../src/shared/i18n'
-import { latestRunOf, NO_RUNS_FILTER, runDayLabel, runDays, runGroupLabel, runMatches, runThing, tabAt, tabBadges, unresolvedFailures } from '../src/shared/progressTabs'
+import { cardLook, cardRunsSummary, groupLook, latestRunOf, NO_RUNS_FILTER, queueChecksLabel, runDayLabel, runDays, runGroupLabel, runMatches, runsByCard, runThing, tabAt, tabBadges, unresolvedFailures, withoutCardKey } from '../src/shared/progressTabs'
 import type { MergeSlotInfo, ProgressRun } from '../src/shared/types'
 
 const NOW = new Date(2026, 9, 21, 15, 0, 0).getTime()
@@ -133,6 +133,72 @@ describe('the Progress panel tabs (#1309)', () => {
     const gone = run({ card: 3, startedAt: NOW, dismissed: true })
     expect(latestRunOf([older, newer, gone, run({ card: 4 })], 3)?.id).toBe(newer.id)
     expect(latestRunOf([older], 5)).toBeNull()
+  })
+})
+
+describe('runs by card (HI-1701)', () => {
+  const at = (min: number, over: Partial<ProgressRun> = {}): ProgressRun => run({ startedAt: NOW - min * 60_000, finishedAt: NOW - min * 60_000 + 1000, ...over })
+  const queue = (min: number, check: string, over: Partial<ProgressRun> = {}): ProgressRun => at(min, { source: 'hive', agentId: undefined, agentName: 'Hive (merge queue)', defaultName: 'mergeQueue', check, title: check, command: `npm run ${check}`, ...over })
+
+  it("groups a day's runs by card, the card with the newest run first and Other last, each card's runs newest first", () => {
+    const a1 = at(50, { card: 1, title: 'unit' })
+    const b1 = at(40, { card: 2, title: 'lint', command: 'npm run lint' })
+    const mine = at(5, { card: undefined, title: 'my script', command: 'node x.cjs', source: 'api', agentId: undefined })
+    const a2 = at(30, { card: 1, title: 'e2e', command: 'npm run e2e' })
+    const b2 = at(10, { card: 2, title: 'typecheck', command: 'npm run typecheck' })
+    const cards = runsByCard(runDays([a1, b1, mine, a2, b2], NOW)[0])
+    expect(cards.map((c) => c.card)).toEqual([2, 1, null])
+    expect(cards[0].items.map((g) => g.last.id)).toEqual([b2.id, b1.id])
+    expect(cards[1].items.map((g) => g.last.id)).toEqual([a2.id, a1.id])
+    expect(cards.map((c) => [c.runs, c.last.id])).toEqual([[2, b2.id], [2, a2.id], [1, mine.id]])
+  })
+
+  it("folds a run's retries as before, and the merge queue's checks of a card into one, with how many failed", () => {
+    const tries = [at(60, { card: 3, state: 'failed' }), at(50, { card: 3, state: 'failed' }), at(40, { card: 3 })]
+    const checks = [queue(20, 'lint', { card: 3 }), queue(19, 'typecheck', { card: 3, state: 'failed' }), queue(10, 'typecheck', { card: 3 })]
+    // A slot's warming is Hive's too, but not the queue's: it stays a run of its own.
+    const warm = at(15, { card: 3, source: 'hive', agentId: undefined, defaultName: 'slot', slot: 'slot-b', title: 'setup', command: 'npm ci' })
+    const [c] = runsByCard(runDays([...tries, ...checks, warm], NOW)[0])
+    expect(c.items.map((g) => [g.runs.length, !!g.queue])).toEqual([[3, true], [1, false], [3, false]])
+    expect(c).toMatchObject({ runs: 7, failed: 3 })
+    expect(queueChecksLabel(c.items[0], (xs) => xs.join(', '), tr)).toBe('lint, typecheck · 1 failed')
+    expect(queueChecksLabel(runsByCard(runDays([checks[0]], NOW)[0])[0].items[0], (xs) => xs.join(', '), tr)).toBe('lint')
+    // A card's check is the same thing whoever runs it: the agent's and the queue's are still lines of their own.
+    const mine = [at(30, { card: 3, check: 'typecheck', title: 'final typecheck' }), at(25, { card: 3, check: 'typecheck', title: 'final typecheck' })]
+    const [mixed] = runsByCard(runDays([...mine, queue(10, 'typecheck', { card: 3 })], NOW)[0])
+    expect(mixed.items.map((g) => [g.runs.map((r) => r.title), !!g.queue])).toEqual([[['typecheck'], true], [['final typecheck', 'final typecheck'], false]])
+    // A queue run for no card isn't folded with anything: it is Other's.
+    const [other] = runsByCard(runDays([queue(5, 'lint')], NOW)[0])
+    expect([other.card, other.items.length, other.items[0].queue]).toEqual([null, 1, undefined])
+  })
+
+  it("a group's look shows a failure: failed when its last failed, retried when one failed before it passed", () => {
+    const g = (states: ProgressRun['state'][]) => runDays(states.map((state, i) => at(10 - i, { card: 4, state })), NOW)[0].groups[0]
+    expect([g(['passed']), g(['failed', 'passed']), g(['passed', 'failed']), g(['stopped']), g(['stale'])].map(groupLook)).toEqual(['passed', 'retried', 'failed', 'stopped', 'stale'])
+    const card = (...runs: ProgressRun[]) => runsByCard(runDays(runs, NOW)[0])[0]
+    expect(cardLook(card(at(9, { card: 4 }), at(8, { card: 4, command: 'b' })))).toBe('passed')
+    expect(cardLook(card(at(9, { card: 4, state: 'failed' }), at(8, { card: 4 }), at(7, { card: 4, command: 'b' })))).toBe('retried')
+    expect(cardLook(card(at(9, { card: 4 }), at(8, { card: 4, command: 'b', state: 'failed' })))).toBe('failed')
+  })
+
+  it("a card's summary: how many runs, how many failed or stopped, else all passed, and running while one runs", () => {
+    const card = (...runs: ProgressRun[]) => runsByCard(runDays(runs, NOW)[0])[0]
+    expect(cardRunsSummary(card(at(9, { card: 5, state: 'failed' }), at(8, { card: 5, command: 'b' })), false, tr)).toBe('2 runs · 1 failed')
+    expect(cardRunsSummary(card(at(9, { card: 5 })), false, tr)).toBe('1 run · all passed')
+    expect(cardRunsSummary(card(at(9, { card: 5, state: 'stopped' }), at(8, { card: 5, command: 'b' })), true, tr)).toBe('2 runs · 1 stopped · running')
+  })
+
+  it("strips the card's key from a run's title under its heading, and only that key, as a whole word", () => {
+    expect(withoutCardKey('HI-1679 final typecheck', 'HI-1679')).toBe('final typecheck')
+    expect(withoutCardKey('Review HI-1679: lint', 'HI-1679')).toBe('Review lint')
+    expect(withoutCardKey('hi-1679 · e2e', 'HI-1679')).toBe('e2e')
+    expect(withoutCardKey('HI-16790 unit', 'HI-1679')).toBe('HI-16790 unit')
+    expect(withoutCardKey('HI-1680 unit', 'HI-1679')).toBe('HI-1680 unit')
+    expect(withoutCardKey('HI-1679', 'HI-1679')).toBe('HI-1679')
+    expect(withoutCardKey('unit', null)).toBe('unit')
+    // A group's line with the key left out.
+    const g = runDays([at(9, { card: 6, title: 'HI-6 final typecheck', state: 'failed' }), at(8, { card: 6, title: 'HI-6 final typecheck' })], NOW)[0].groups[0]
+    expect(runGroupLabel(g, null, tr, withoutCardKey(g.last.title, 'HI-6'))).toBe('final typecheck ×2 · 1 failed, then passed')
   })
 })
 
