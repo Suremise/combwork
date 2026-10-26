@@ -297,6 +297,8 @@
   "git.update.card": "To praca karty {card}.",
   "git.update.confirm": "Aktualizuj",
   "git.update.counts": "{target} ma {behind, plural, one {# commit} few {# commity} many {# commitów} other {# commita}}, których {branch} nie ma; {branch} ma {ahead, plural, one {# własny commit} few {# własne commity} many {# własnych commitów} other {# własnego commita}}.",
+  "git.update.forward": "Przewiń do {target}",
+  "git.update.forwardNote": "{branch} nie ma własnych commitów, więc po prostu przesuwa się do {target}: bez commita scalającego, nic nie jest przepisywane.",
   "git.update.how": "Jak",
   "git.update.merge": "Scal {target}",
   "git.update.mergeNote": "Jeden commit scalający łączy commity {target} z commitami {branch}, które zostają bez zmian.",

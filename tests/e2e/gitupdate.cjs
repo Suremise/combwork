@@ -4,7 +4,8 @@
 // each one's missing commits and an Update button (none on main). Update on feature: its dialog says where it runs and
 // that a conflict is undone; Merge (the default) merges main in there, said in a notice, and the row's count goes.
 // Rebase on loose: rebased in a temporary worktree, which is gone after. Merge on clash: the conflict is undone at once,
-// the dialog naming the file, clash as it was. Screenshots of the dialog in both themes. Dev build, throwaway profile and
+// the dialog naming the file, clash as it was. fresh, checked out in another worktree with nothing of its own (behind
+// only, HR4's round 1): Update, its one choice a fast-forward. Screenshots of the dialog in both themes. Dev build, throwaway profile and
 // workspace; git's global config the suite's own.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
@@ -16,6 +17,7 @@ const HUNG_MS = 15000
 const userData = path.join(lib.WORK, 'gitupdate-profile')
 const ws = path.join(lib.WORK, 'gitupdate-ws')
 const wt = path.join(lib.WORK, 'gitupdate-feature')
+const freshWt = path.join(lib.WORK, 'gitupdate-fresh')
 const claudeHome = path.join(lib.WORK, 'gitupdate-claude-home')
 const globalConfig = path.join(lib.WORK, 'gitupdate-gitconfig')
 const alpha = path.join(ws, 'alpha')
@@ -26,7 +28,7 @@ const check = (name, ok, extra = '') => {
 }
 
 ;(async () => {
-  for (const d of [userData, ws, wt, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [userData, ws, wt, freshWt, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.writeFileSync(globalConfig, '[user]\n\tname = Test User\n\temail = 1+test@users.noreply.github.com\n[init]\n\tdefaultBranch = main\n[core]\n\tautocrlf = false\n')
   const gitEnv = lib.gitEnv({ GIT_CONFIG_GLOBAL: globalConfig })
   const g = (cwd, ...a) => execFileSync('git', a, { cwd, env: gitEnv, encoding: 'utf8' }).trim()
@@ -48,12 +50,14 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(alpha, { recursive: true })
   g(ws, 'init', '-q', '-b', 'main', alpha)
   commitOn('main', 'shared.txt', 'one\n')
-  for (const b of ['feature', 'loose', 'clash']) g(alpha, 'branch', b)
+  // fresh has nothing of its own (behind only), checked out in a worktree: in use, as a card's new line is.
+  for (const b of ['feature', 'loose', 'clash', 'fresh']) g(alpha, 'branch', b)
   commitOn('feature', 'feature.txt', 'feature\n')
   commitOn('loose', 'loose.txt', 'loose\n')
   commitOn('clash', 'shared.txt', 'clash\n')
   commitOn('main', 'shared.txt', 'main\n')
   g(alpha, 'worktree', 'add', '-q', wt, 'feature')
+  g(alpha, 'worktree', 'add', '-q', freshWt, 'fresh')
   const main = g(alpha, 'rev-parse', 'main')
   const clashWas = g(alpha, 'rev-parse', 'clash')
   const claude = lib.fakeClaude(userData, claudeHome, [alpha])
@@ -131,6 +135,16 @@ const check = (name, ok, extra = '') => {
       await cd.screenshot({ path: path.join(lib.WORK, `gitupdate-3-conflict-${t}.png`) })
     }
     await page.keyboard.press('Escape')
+    await lib.until(async () => (await cd.count()) === 0, HUNG_MS)
+
+    // --- fresh, behind only (HR4's round 1, finding 3): Update fast-forwards it, the only choice.
+    await update('fresh').click()
+    const frd = dialog('fresh')
+    await lib.until(async () => (await frd.count()) === 1, HUNG_MS)
+    const choices = await frd.locator('select option').allInnerTexts()
+    check('a branch with nothing of its own has Update, its one choice a fast-forward', JSON.stringify(choices) === JSON.stringify(['Fast-forward to main']) && /fresh has no commits of its own, so it simply moves forward to main/.test(await text(frd)), JSON.stringify({ choices, text: await text(frd) }))
+    await frd.getByRole('button', { name: 'Update', exact: true }).click()
+    check('…fast-forwarded to main', !!(await lib.until(async () => (await page.locator('.toast', { hasText: /Fast-forwarded fresh to main/ }).count()) >= 1, HUNG_MS)) && g(alpha, 'rev-parse', 'fresh') === g(alpha, 'rev-parse', 'refs/heads/main'))
   } finally {
     await app.close()
   }

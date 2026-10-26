@@ -297,6 +297,8 @@
   "git.update.card": "{card}の作業です。",
   "git.update.confirm": "更新",
   "git.update.counts": "{branch}には{target}のコミットが{behind, plural, other {#件}}ありません。{branch}独自のコミットは{ahead, plural, other {#件}}です。",
+  "git.update.forward": "{target}まで早送りする",
+  "git.update.forwardNote": "{branch}には独自のコミットがないため、{target}まで進めるだけです。マージコミットはできず、何も書き換えません。",
   "git.update.how": "方法",
   "git.update.merge": "{target}をマージする",
   "git.update.mergeNote": "マージコミットが1つでき、{target}のコミットを{branch}につなぎます。{branch}のコミットはそのままです。",

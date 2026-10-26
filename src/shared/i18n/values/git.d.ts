@@ -299,6 +299,8 @@ interface HiveMessageValues {
   'git.update.card': { card: string | number }
   'git.update.confirm': undefined
   'git.update.counts': { target: string | number; behind: number; branch: string | number; ahead: number }
+  'git.update.forward': { target: string | number }
+  'git.update.forwardNote': { branch: string | number; target: string | number }
   'git.update.how': undefined
   'git.update.merge': { target: string | number }
   'git.update.mergeNote': { target: string | number; branch: string | number }

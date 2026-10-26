@@ -297,6 +297,8 @@
   "git.update.card": "C’est le travail de {card}.",
   "git.update.confirm": "Mettre à jour",
   "git.update.counts": "{target} a {behind, plural, one {# commit} other {# commits}} que {branch} n’a pas ; {branch} a {ahead, plural, one {# commit} other {# commits}} à elle.",
+  "git.update.forward": "Avancer jusqu’à {target}",
+  "git.update.forwardNote": "{branch} n’a aucun commit à elle, elle avance donc simplement jusqu’à {target} : pas de commit de fusion, rien de réécrit.",
   "git.update.how": "Comment",
   "git.update.merge": "Fusionner {target}",
   "git.update.mergeNote": "Un commit de fusion joint les commits de {target} à ceux de {branch}, qui restent tels quels.",

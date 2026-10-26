@@ -8,6 +8,7 @@ import {
   HISTORY_COMMITS,
   HISTORY_TAGS,
   folderBusyData,
+  gitStateKey,
   identityProblemData,
   parentRepoData,
   redactRemoteUrl,
@@ -301,9 +302,18 @@ async function measure(root: string, target: string, local: GitBranchRow[], remo
   const inTarget = new Set(merged.out.split(/\r?\n/).filter(Boolean))
   const rows = [...local.map((b) => ({ ref: `refs/heads/${b.name}`, row: b as { toTarget?: number | null } })), ...remote.map((r) => ({ ref: `refs/remotes/${r.name}`, row: r as { toTarget?: number | null } }))]
   let counted = 0
+  // Merged branches' counts of what they lack, apart: they never take an unmerged branch's count.
+  let behindCounted = 0
   for (const { ref, row } of rows) {
-    if (inTarget.has(ref)) row.toTarget = 0
-    else if (counted++ < COUNTED) {
+    if (inTarget.has(ref)) {
+      row.toTarget = 0
+      // A local branch with nothing of its own may still lack the target's newest (HR4's HI-1180 round 1: a card's new line
+      // behind its target): Update from <target> fast-forwards it.
+      if (ref.startsWith('refs/heads/') && behindCounted++ < COUNTED) {
+        const n = await git(root, ['rev-list', '--count', `${ref}..refs/heads/${target}`, '--'])
+        ;(row as { fromTarget?: number | null }).fromTarget = n.ok ? Number(n.out.trim()) || 0 : null
+      }
+    } else if (counted++ < COUNTED) {
       // Both ways in one run: the target's commits it hasn't (HI-1180's Update from <target>), and its own.
       const n = await git(root, ['rev-list', '--left-right', '--count', `refs/heads/${target}...${ref}`, '--'])
       const [from, to] = n.ok ? n.out.trim().split(/\s+/).map(Number) : []
@@ -1113,7 +1123,12 @@ const UPDATE = {
   failed: msg({ id: 'service.gitRepo.update.failed', defaultMessage: "Couldn't update {branch} from {target}, so it is as it was: {why}", description: "An error updating a branch from its target that isn't a conflict (a hook refused the commit, signing failed…); Hive undid what git started. {why} is git's own words." }),
   moved: msg({ id: 'service.gitRepo.update.moved', defaultMessage: '{branch} changed while it was being updated, so nothing was changed: try again.', description: 'An error updating a branch from its target: the branch moved to another commit meanwhile (a commit, a push), so Hive left it as it is.' }),
   merged: msg({ id: 'service.gitRepo.update.merged', defaultMessage: 'Merged {target} into {branch} ({commit}).', description: 'After Update from <target> with Merge (HI-1180): the target {target} was merged into the branch {branch}, as the commit {commit} (a short id: keep it as it is).' }),
-  rebased: msg({ id: 'service.gitRepo.update.rebased', defaultMessage: "Rebased {branch}'s {n, plural, one {# commit} other {# commits}} onto {target} ({commit}).", description: 'After Update from <target> with Rebase (HI-1180): the branch {branch} has its {n} commits replayed onto the target {target}; {commit} is its new head (a short id: keep it as it is).' })
+  rebased: msg({ id: 'service.gitRepo.update.rebased', defaultMessage: "Rebased {branch}'s {n, plural, one {# commit} other {# commits}} onto {target} ({commit}).", description: 'After Update from <target> with Rebase (HI-1180): the branch {branch} has its {n} commits replayed onto the target {target}; {commit} is its new head (a short id: keep it as it is).' }),
+  forwarded: msg({ id: 'service.gitRepo.update.forwarded', defaultMessage: 'Fast-forwarded {branch} to {target} ({commit}).', description: 'After Update from <target> on a branch with no commits of its own (HI-1180): it was moved forward to the target {target}; {commit} is its new head (a short id: keep it as it is).' }),
+  notUndone: msg({ id: 'service.gitRepo.update.notUndone', defaultMessage: "Updating {branch} from {target} stopped, and Hive couldn't undo it: {folder} is {state, select, none {left changed} merge {still in the middle of a merge} rebase {still in the middle of a rebase} other {still in the middle of a git operation}}. Finish or abort it there yourself (git status says how), then check {branch}. Git said: {why}", description: "An error updating a branch from its target (HI-1180): git stopped, and Hive's own abort failed, so the folder ({folder}: a slot's name, a folder's name or a path) is left as git left it ({state}: none, merge, rebase or another operation; select: translate each). {why} is git's own words." }),
+  notUndoneTemporary: msg({ id: 'service.gitRepo.update.notUndoneTemporary', defaultMessage: "Updating {branch} from {target} stopped, and Hive couldn't undo it in its temporary folder {folder}, kept as git left it: {branch} itself is as it was. Remove that folder in Unused worktrees once you have looked. Git said: {why}", description: "An error updating a branch from its target (HI-1180) that was checked out nowhere: git stopped in the temporary folder Hive made ({folder}: its path), and Hive's abort failed, so the folder is kept; the branch itself wasn't moved. {state} is unused here. {why} is git's own words." }),
+  temporaryLeft: msg({ id: 'service.gitRepo.update.temporaryLeft', defaultMessage: "Hive couldn't remove its temporary folder {folder}: remove it in Unused worktrees.", description: 'A second line after Update from <target> on a branch checked out nowhere (HI-1180): the temporary folder Hive made for it ({folder}: its path) could not be removed.' }),
+  missed: msg({ id: 'service.gitRepo.update.missed', defaultMessage: '{branch} was changed, but it still lacks commits of {target}: check it in History before going on.', description: "An error after Update from <target> (HI-1180): git said it succeeded, but the branch {branch} still doesn't contain the target {target}'s head." })
 }
 
 /** The sessions' statuses that keep a folder busy, as folderBusyData's. */
@@ -1205,45 +1220,79 @@ async function updateLocked(projectPath: string, branch: string, how: BranchUpda
     const plan = await branchUpdatePlan(projectPath, branch)
     if (plan.blocked) throw new HiveError(linesOf([plan.blocked]))
     if (plan.behind === 0) return tr(UPDATE.upToDate, { branch, target: plan.target })
+    // The target branch's commit, read now (HR4's round 1, finding 2): git is given it, never the name, which a tag of the
+    // same name would take.
+    const at = await git(projectPath, ['rev-parse', '--verify', '-q', `refs/heads/${plan.target}^{commit}`])
+    if (!at.ok) throw refusal(UPDATE.noTarget, { branch })
+    const target = at.out.trim()
     const card = (await lineCard(projectPath, branch))?.key
     // i18n-ignore: a commit message, in English
     const message = ['-m', `Merge ${plan.target} into ${branch}`, ...(card ? ['-m', `Hive-Card: ${card}`] : [])]
+    // Nothing of its own (behind only): brought up by a fast-forward, whichever was asked; a merge commit would hold nothing.
+    const forward = plan.ahead === 0
     // A rebase moves only the branch it rebases (HR4's #1352 round 1: never another ref with `rebase.updateRefs` on).
     const step = (f: string): Promise<GitResult> =>
-      how === 'rebase' ? git(f, ['-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', plan.target]) : git(f, ['merge', '--no-ff', '--no-edit', ...message, plan.target])
-    // What git started is undone at once: a conflict named by its files, any other failure by git's words.
-    const undo = async (f: string, r: GitResult): Promise<never> => {
+      forward
+        ? git(f, ['merge', '--ff-only', target])
+        : how === 'rebase'
+          ? git(f, ['-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', target])
+          : git(f, ['merge', '--no-ff', '--no-edit', ...message, target])
+    const where = folderName(plan, projectPath)
+
+    /**
+     * What git started is undone: aborted, then checked (no operation left, HEAD where it was, nothing changed). Undone,
+     * a conflict is named by its files, any other failure by git's words; not undone (HR4's round 1, finding 1: an abort
+     * that failed), the error says so and how the folder is, and a temporary folder is kept as git left it.
+     */
+    const undo = async (f: string, was: string, r: GitResult, temporary: boolean): Promise<{ error: Error; undone: boolean }> => {
       const u = await git(f, ['diff', '--name-only', '--diff-filter=U'])
       const files = u.ok ? u.out.split(/\r?\n/).filter(Boolean) : []
-      if ((await repoSummary(f)).state) await git(f, how === 'rebase' ? ['rebase', '--abort'] : ['merge', '--abort'])
-      log.info(`Update of ${userText(branch)} from ${userText(plan.target)} undone: ${files.length ? `${files.length} file(s) in conflict` : 'git failed'}`)
-      if (files.length) throw refusal(UPDATE.conflict, { how, branch, target: plan.target, files: listOf(files, 'unit') })
-      throw failed(UPDATE.failed, { branch, target: plan.target }, r)
+      const inProgress = (await repoSummary(f)).state
+      const abort = inProgress ? await git(f, inProgress === 'rebase' ? ['rebase', '--abort'] : ['merge', '--abort']) : null
+      const left = (await repoSummary(f)).state
+      const now = await git(f, ['rev-parse', 'HEAD'])
+      if (!left && now.ok && now.out.trim() === was && !(await dirtyIn(f))) {
+        log.info(`Update of ${userText(branch)} from ${userText(plan.target)} undone: ${files.length ? `${files.length} file(s) in conflict` : 'git failed'}`)
+        return { undone: true, error: files.length ? refusal(UPDATE.conflict, { how: forward ? 'merge' : how, branch, target: plan.target, files: listOf(files, 'unit') }) : failed(UPDATE.failed, { branch, target: plan.target }, r) }
+      }
+      log.warn(`Update of ${userText(branch)} from ${userText(plan.target)} couldn't be undone in ${userText(f)}: ${left ? `still mid-${left}` : 'left changed'}`)
+      const values = { branch, target: plan.target, folder: temporary ? f : where, state: left ? gitStateKey(left) : 'none', why: gitSaid(abort && !abort.ok ? abort : r) }
+      return { undone: false, error: refusal(temporary ? UPDATE.notUndoneTemporary : UPDATE.notUndone, values) }
     }
+
     let head: string
+    let note: string | null = null
     if (plan.folder) {
+      const was = (await git(plan.folder, ['rev-parse', 'HEAD'])).out.trim()
       const r = await step(plan.folder)
-      if (!r.ok) return undo(plan.folder, r)
+      if (!r.ok) throw (await undo(plan.folder, was, r, false)).error
       head = (await git(plan.folder, ['rev-parse', 'HEAD'])).out.trim()
     } else {
-      // Checked out nowhere: a temporary detached worktree beside the merge queue's, removed whatever happens.
+      // Checked out nowhere: a temporary detached worktree beside the merge queue's, removed after (said if it can't be).
       const was = (await git(projectPath, ['rev-parse', `refs/heads/${branch}`])).out.trim()
       const tmp = join(workspaceOf(projectPath).worktreesRoot, basename(projectPath), `update-${randomUUID().slice(0, 8)}`)
       const add = await git(projectPath, ['worktree', 'add', '--detach', tmp, was])
       if (!add.ok) throw failed(UPDATE.failed, { branch, target: plan.target }, add)
-      try {
-        const r = await step(tmp)
-        if (!r.ok) return await undo(tmp, r)
-        head = (await git(tmp, ['rev-parse', 'HEAD'])).out.trim()
-        // Moved only from the commit it was updated from: a branch that moved meanwhile is left as it is.
-        if (!(await git(projectPath, ['update-ref', `refs/heads/${branch}`, head, was])).ok) throw refusal(UPDATE.moved, { branch })
-      } finally {
-        await git(projectPath, ['worktree', 'remove', '--force', tmp])
+      const removed = async (): Promise<string | null> => ((await git(projectPath, ['worktree', 'remove', '--force', tmp])).ok ? null : tr(UPDATE.temporaryLeft, { folder: tmp }))
+      const r = await step(tmp)
+      if (!r.ok) {
+        const { error, undone } = await undo(tmp, was, r, true)
+        // Not undone: kept as git left it, as the error says. Undone: removed, and said if it couldn't be.
+        const left = undone ? await removed() : null
+        throw left ? new HiveError(linesOf([error.message, left])) : error
       }
+      head = (await git(tmp, ['rev-parse', 'HEAD'])).out.trim()
+      // Moved only from the commit it was updated from: a branch that moved meanwhile is left as it is.
+      const moved = (await git(projectPath, ['update-ref', `refs/heads/${branch}`, head, was])).ok
+      note = await removed()
+      if (!moved) throw note ? new HiveError(linesOf([tr(UPDATE.moved, { branch }), note])) : refusal(UPDATE.moved, { branch })
     }
-    log.info(`Updated ${userText(branch)} from ${userText(plan.target)} by ${how} (${plan.where})`)
+    // What it was asked to do, done: the target's commit is in the branch now.
+    if (!(await git(projectPath, ['merge-base', '--is-ancestor', target, head])).ok) throw refusal(UPDATE.missed, { branch, target: plan.target })
+    log.info(`Updated ${userText(branch)} from ${userText(plan.target)} by ${forward ? 'fast-forward' : how} (${plan.where})`)
     await changed(projectPath)
     const commit = head.slice(0, 7)
-    return how === 'rebase' ? tr(UPDATE.rebased, { branch, n: plan.ahead, target: plan.target, commit }) : tr(UPDATE.merged, { target: plan.target, branch, commit })
+    const done = forward ? tr(UPDATE.forwarded, { branch, target: plan.target, commit }) : how === 'rebase' ? tr(UPDATE.rebased, { branch, n: plan.ahead, target: plan.target, commit }) : tr(UPDATE.merged, { target: plan.target, branch, commit })
+    return note ? `${done}\n${note}` : done
   })
 }

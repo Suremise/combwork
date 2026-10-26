@@ -298,6 +298,8 @@
   "git.update.card": "It is {card}'s work.",
   "git.update.confirm": "Update",
   "git.update.counts": "{target} has {behind, plural, one {# commit} other {# commits}} {branch} hasn't; {branch} has {ahead, plural, one {# commit} other {# commits}} of its own.",
+  "git.update.forward": "Fast-forward to {target}",
+  "git.update.forwardNote": "{branch} has no commits of its own, so it simply moves forward to {target}: no merge commit, nothing rewritten.",
   "git.update.how": "How",
   "git.update.merge": "Merge {target} in",
   "git.update.mergeNote": "One merge commit joins {target}'s commits to {branch}'s, which stay as they are.",

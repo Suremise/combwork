@@ -5,7 +5,7 @@
 // project folder, never a worktree; a push is never forced; no password or token in a remote URL is shown or logged.
 // Each test makes its own repositories (`fresh`), so any one runs alone or in any order.
 import { execFileSync } from 'child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { aheadBehindText, folderBusy, gitStatusText, identityProblem, identityWarnings, isNoReplyEmail, parsePushPorcelain, redactRemoteUrl, redactUrlsIn, scrubSecrets, urlSecrets, remoteNameProblem, remoteUrlProblem, type GitRepoSummary } from '../src/shared/gitRepo'
@@ -69,6 +69,8 @@ vi.mock('../src/main/fsutil', async (importOriginal) => {
 let gitDoor: { entered: () => void; open: Promise<void> } | null = null
 /** While set, the next deletion of a branch (#1642: `git update-ref -d`, or a push deleting one) stops before git starts, likewise. */
 let refDoor: { entered: () => void; open: Promise<void> } | null = null
+/** While set, a git command it matches fails as git would, without running (HI-1180: a worktree that can't be removed). */
+let gitFails: ((args: string[]) => boolean) | null = null
 vi.mock('../src/main/git', async (importOriginal) => {
   const real = await importOriginal<typeof import('../src/main/git')>()
   return {
@@ -80,6 +82,7 @@ vi.mock('../src/main/git', async (importOriginal) => {
         door.entered()
         await door.open
       }
+      if (gitFails?.(args[1])) return { ok: false, code: 1, out: '', err: 'error: failed (a test)', buf: Buffer.from('') }
       const atRef = refDoor
       if (atRef && ((args[1][0] === 'update-ref' && args[1][1] === '-d') || args[1][0] === 'push')) {
         refDoor = null
@@ -135,6 +138,7 @@ beforeEach(() => {
   slots = []
   lockDoor = null
   refDoor = null
+  gitFails = null
   asUser.mockClear()
   workTarget = ''
   cardLines = []
@@ -1004,5 +1008,85 @@ describe('Update from <target> (HI-1180)', () => {
     await expect(repo.updateBranch(proj, 'card', 'merge')).rejects.toThrow('stopped at a conflict in x.txt')
     expect(head('card')).toBe(was)
     expect(git(proj, 'worktree', 'list', '--porcelain').split('\n').filter((l) => l.startsWith('worktree ')).length).toBe(1)
+  })
+  /**
+   * A pre-merge-commit hook that leaves git's index lock behind and fails (HR4's round 1): the merge stops part way, and
+   * git can't abort it while the lock is there. Returns how to take the hook away again.
+   */
+  const lockingHook = (): (() => void) => {
+    const hook = join(proj, '.git', 'hooks', 'pre-merge-commit')
+    writeFileSync(hook, '#!/bin/sh\ntouch "$(git rev-parse --git-dir)/index.lock"\nexit 1\n')
+    return () => rmSync(hook, { force: true })
+  }
+  /** Takes away the lock the hook left in `folder`, and aborts what git left there. */
+  const unlock = (folder: string): void => {
+    const dir = git(folder, 'rev-parse', '--absolute-git-dir')
+    rmSync(join(dir, 'index.lock'), { force: true })
+    // As Hive's git left the files (its line endings, not this test's git's).
+    if (existsSync(join(dir, 'MERGE_HEAD'))) execFileSync('git', ['merge', '--abort'], { cwd: folder })
+  }
+  const worktrees = (): string[] => git(proj, 'worktree', 'list', '--porcelain').split('\n').filter((l) => l.startsWith('worktree ')).map((l) => l.slice('worktree '.length))
+
+  it("an abort that fails is said, with how the folder is left: never that it was undone (HR4's round 1, finding 1)", async () => {
+    const wt = cardBranch()
+    const was = head('card')
+    const unhook = lockingHook()
+    try {
+      await expect(repo.updateBranch(proj, 'card', 'merge')).rejects.toThrow(`Updating card from main stopped, and Hive couldn't undo it: ${wt} is still in the middle of a merge. Finish or abort it there yourself (git status says how), then check card.`)
+      expect(existsSync(join(git(wt, 'rev-parse', '--absolute-git-dir'), 'MERGE_HEAD'))).toBe(true)
+      expect(head('card')).toBe(was)
+    } finally {
+      unhook()
+      unlock(wt)
+    }
+  })
+
+  it('…in a temporary worktree, which is then kept as git left it, the branch not moved', async () => {
+    cardBranch({ worktree: false })
+    const was = head('card')
+    const unhook = lockingHook()
+    try {
+      await expect(repo.updateBranch(proj, 'card', 'merge')).rejects.toThrow(/Updating card from main stopped, and Hive couldn't undo it in its temporary folder .+update-[0-9a-f]{8}, kept as git left it: card itself is as it was\./)
+      expect(head('card')).toBe(was)
+      expect(worktrees().length).toBe(2)
+    } finally {
+      unhook()
+      const kept = worktrees().find((w) => /update-[0-9a-f]{8}$/.test(w))
+      if (kept) {
+        unlock(kept)
+        git(proj, 'worktree', 'remove', '--force', kept)
+      }
+    }
+  })
+
+  it("a temporary worktree that can't be removed is said after the update, not left unsaid", async () => {
+    cardBranch({ worktree: false })
+    gitFails = (a) => a[0] === 'worktree' && a[1] === 'remove'
+    const done = await repo.updateBranch(proj, 'card', 'merge')
+    gitFails = null
+    expect(done).toMatch(/^Merged main into card \([0-9a-f]{7}\)\.\nHive couldn't remove its temporary folder .+update-[0-9a-f]{8}: remove it in Unused worktrees\.$/)
+    expect(contains('card', head('main'))).toBe(true)
+    for (const w of worktrees().filter((x) => /update-[0-9a-f]{8}$/.test(x))) git(proj, 'worktree', 'remove', '--force', w)
+  })
+
+  for (const how of ['merge', 'rebase'] as const) {
+    it(`brings in the target branch's commit, never a tag of the same name (${how}; HR4's round 1, finding 2)`, async () => {
+      cardBranch()
+      // A tag main where the card began, beside the branch main one commit on.
+      git(proj, 'tag', 'main', 'refs/heads/main~1')
+      expect(await repo.updateBranch(proj, 'card', how)).toMatch(how === 'rebase' ? /^Rebased card's 1 commit onto main/ : /^Merged main into card/)
+      expect(contains('card', head('refs/heads/main'))).toBe(true)
+      expect((await repo.branchUpdatePlan(proj, 'card')).behind).toBe(0)
+    })
+  }
+
+  it("a branch with nothing of its own, behind the target, is counted, and fast-forwarded whichever way (HR4's round 1, finding 3)", async () => {
+    git(proj, 'branch', 'card')
+    commit(proj, 'later.txt')
+    expect(await repo.branchUpdatePlan(proj, 'card')).toMatchObject({ behind: 1, ahead: 0 })
+    const row = (await repo.repoInfo(proj, 'main')).branches.find((b) => b.name === 'card')
+    expect([row?.toTarget, row?.fromTarget]).toEqual([0, 1])
+    expect(await repo.updateBranch(proj, 'card', 'rebase')).toMatch(/^Fast-forwarded card to main \([0-9a-f]{7}\)\.$/)
+    expect(head('card')).toBe(head('main'))
   })
 })

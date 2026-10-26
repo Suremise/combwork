@@ -1191,6 +1191,14 @@
     "defaultMessage": "{target} has {behind, plural, one {# commit} other {# commits}} {branch} hasn't; {branch} has {ahead, plural, one {# commit} other {# commits}} of its own.",
     "description": "The Update from <target> dialog's first sentence: how many commits of the target {target} the branch {branch} lacks ({behind}), and how many it has that the target hasn't ({ahead})."
   },
+  "git.update.forward": {
+    "defaultMessage": "Fast-forward to {target}",
+    "description": "The one choice in the Update from <target> dialog for a branch with no commits of its own (HI-1180): it is moved forward to the target branch {target}."
+  },
+  "git.update.forwardNote": {
+    "defaultMessage": "{branch} has no commits of its own, so it simply moves forward to {target}: no merge commit, nothing rewritten.",
+    "description": "What Fast-forward does, under the choice in the Update from <target> dialog: the branch {branch} has nothing the target {target} lacks, so it moves to the target."
+  },
   "git.update.how": {
     "defaultMessage": "How",
     "description": "A label in the Update from <target> dialog: the choice of Merge or Rebase."

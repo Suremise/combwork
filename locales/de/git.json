@@ -297,6 +297,8 @@
   "git.update.card": "Das ist die Arbeit von {card}.",
   "git.update.confirm": "Aktualisieren",
   "git.update.counts": "{target} hat {behind, plural, one {# Commit} other {# Commits}}, die {branch} fehlen; {branch} hat {ahead, plural, one {# eigenen Commit} other {# eigene Commits}}.",
+  "git.update.forward": "Auf {target} vorspulen",
+  "git.update.forwardNote": "{branch} hat keine eigenen Commits und rückt einfach auf {target} vor: kein Merge-Commit, nichts wird umgeschrieben.",
   "git.update.how": "Wie",
   "git.update.merge": "{target} hineinmergen",
   "git.update.mergeNote": "Ein Merge-Commit verbindet die Commits von {target} mit denen von {branch}, die bleiben, wie sie sind.",

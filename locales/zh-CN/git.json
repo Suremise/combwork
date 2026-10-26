@@ -297,6 +297,8 @@
   "git.update.card": "这是 {card} 的工作。",
   "git.update.confirm": "更新",
   "git.update.counts": "{branch} 缺少 {target} 的{behind, plural, other {# 个提交}}；{branch} 有{ahead, plural, other {# 个}}自己的提交。",
+  "git.update.forward": "快进到 {target}",
+  "git.update.forwardNote": "{branch} 没有自己的提交，因此只需快进到 {target}：不产生合并提交，也不重写任何内容。",
   "git.update.how": "方式",
   "git.update.merge": "合并 {target}",
   "git.update.mergeNote": "一个合并提交把 {target} 的提交接到 {branch} 上，{branch} 的提交保持不变。",

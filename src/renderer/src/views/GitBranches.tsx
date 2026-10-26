@@ -404,8 +404,10 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
         // Grouped by state against the project's target (#1642); with none known, the list as it was.
         const target = info.target ?? null
         const offer = cleanupOffer(info, busyBranches)
-        // Update from <target> (HI-1180): a branch with its own work that lacks some of the target's (never the target).
-        const updatable = (b: GitBranchRow): boolean => !!target && b.name !== target && !!b.toTarget && !!b.fromTarget
+        // Update from <target> (HI-1180): a branch that lacks some of the target's commits (never the target), with work of
+        // its own, or in use (HR4's round 1: a card's new line behind its target, fast-forwarded); a merged branch nothing
+        // uses is Clean Up's, not to update.
+        const updatable = (b: GitBranchRow): boolean => !!target && b.name !== target && !!b.fromTarget && (!!b.toTarget || !!localUse(b, info, busyBranches))
         const updateFrom = async (b: GitBranchRow): Promise<void> => {
           const plan = await attempt(tr(U.planFailed, { branch: b.name }), () => call('git:updatePlan', project.path, b.name))
           if (plan) setForm({ make: () => updateForm(project, plan) })
@@ -818,6 +820,8 @@ const U = {
   rebase: msg({ id: 'git.update.rebase', defaultMessage: 'Rebase onto {target}', description: "An option in the Update from <target> dialog: replay the branch's own commits on top of the target branch {target}." }),
   mergeNote: msg({ id: 'git.update.mergeNote', defaultMessage: "One merge commit joins {target}'s commits to {branch}'s, which stay as they are.", description: 'What Merge does, under the choice in the Update from <target> dialog: one merge commit; the branch {branch} keeps its own commits as they are.' }),
   rebaseNote: msg({ id: 'git.update.rebaseNote', defaultMessage: "{branch}'s {n, plural, one {commit is} other {# commits are}} replayed on top of {target}, as new commits.{pushed, select, yes { What was pushed of {branch} then differs from it, and Hive never forces a push.} other {}}", description: "What Rebase does, under the choice in the Update from <target> dialog: the branch's {n} commits are rewritten on top of {target}; with pushed yes, it tracks a remote branch, which then no longer matches (pushing it would need a force, which Hive never does)." }),
+  forward: msg({ id: 'git.update.forward', defaultMessage: 'Fast-forward to {target}', description: 'The one choice in the Update from <target> dialog for a branch with no commits of its own (HI-1180): it is moved forward to the target branch {target}.' }),
+  forwardNote: msg({ id: 'git.update.forwardNote', defaultMessage: '{branch} has no commits of its own, so it simply moves forward to {target}: no merge commit, nothing rewritten.', description: 'What Fast-forward does, under the choice in the Update from <target> dialog: the branch {branch} has nothing the target {target} lacks, so it moves to the target.' }),
   confirm: msg({ id: 'git.update.confirm', defaultMessage: 'Update', description: 'The Update from <target> dialog\'s button: updates the branch.' }),
   busy: msg({ id: 'git.update.busy', defaultMessage: 'Updating…', description: 'The Update from <target> dialog\'s button while the branch is being updated.' })
 }
@@ -837,12 +841,13 @@ function updateForm(project: ProjectInfo, p: BranchUpdatePlan): FormSpec {
     title: tr(U.title, { branch: p.branch, target: p.target }),
     icon: 'repo-pull',
     about: lines.join(' '),
-    fields: [{ key: 'how', label: tr(U.how), initial: 'merge', options: [{ label: tr(U.merge, { target: p.target }), value: 'merge' }, { label: tr(U.rebase, { target: p.target }), value: 'rebase' }] }],
+    // Nothing of its own: a fast-forward, the only choice (main does the same whichever it is given).
+    fields: [{ key: 'how', label: tr(U.how), initial: 'merge', options: p.ahead ? [{ label: tr(U.merge, { target: p.target }), value: 'merge' }, { label: tr(U.rebase, { target: p.target }), value: 'rebase' }] : [{ label: tr(U.forward, { target: p.target }), value: 'merge' }] }],
     confirm: tr(U.confirm),
     busyLabel: tr(U.busy),
     // Why it can't run now (an agent in a turn there, uncommitted changes…): shown, and Update off.
     validate: () => p.blocked,
-    note: (v) => (v.how === 'rebase' ? tr(U.rebaseNote, { branch: p.branch, n: p.ahead, target: p.target, pushed: p.pushed ? 'yes' : 'no' }) : tr(U.mergeNote, { target: p.target, branch: p.branch })),
+    note: (v) => (!p.ahead ? tr(U.forwardNote, { branch: p.branch, target: p.target }) : v.how === 'rebase' ? tr(U.rebaseNote, { branch: p.branch, n: p.ahead, target: p.target, pushed: p.pushed ? 'yes' : 'no' }) : tr(U.mergeNote, { target: p.target, branch: p.branch })),
     submit: (v) => call('git:updateBranch', project.path, p.branch, v.how === 'rebase' ? 'rebase' : 'merge')
   }
 }
