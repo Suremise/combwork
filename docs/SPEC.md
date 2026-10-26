@@ -2982,9 +2982,10 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   that moved on the remote is refused there. Each one kept is said, why. What a branch is to the project (the target,
   read from its options again; the folder's branch, the worktrees and slots, the board's open cards) is read for each
   branch right before it goes (HR1's round 1), and the check and the deletion are one hold (round 2's finding): the
-  turn of workflow writes (`workflowWrite`, which every options write takes: a project's, a level's, a setting's tool,
-  a preset, a platform switch), then the repository's lock (slot preparation, merges, branch switches), held through a
-  remote's push. A branch moved by a git outside the lock meanwhile is refused by git and kept (round 3's finding); one
+  repository's lock, across Hives (slot preparation, merges, branch switches, and every workflow options write that can
+  move a Git project's target: a project's, a level's for each Git project it reaches, a setting's tool, a platform
+  switch, through `withRepoLocks`, each repository once in its git folder's order; round 4's finding), then this Hive's
+  turn of workflow writes (`workflowWrite`), held through a remote's push. The same order everywhere. A branch moved by a git outside the lock meanwhile is refused by git and kept (round 3's finding); one
   checked out in a worktree after all is put back at that commit and kept, said as in use. The dialog keeps what it deleted, so Try Again after a remote's
   failure, or a tick changed after one, asks only for what is left. A card's own line is deleted by
   `deleteMergedLine` (#1438) once the card is Done and no worktree has it checked out: in a lane that is when its slot

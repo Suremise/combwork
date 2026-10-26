@@ -10,6 +10,7 @@ import { checkPlatformSwitch, oldRulesLine, setPlatform } from './workflow/platf
 import { englishError, HiveError } from './hiveError'
 import { levelOwn, setLevelOptions } from './workflow/levels'
 import { workflowWrite } from './workflow/writes'
+import { withRepoLocks } from './repoLock'
 import { problemEnglish, WorkflowRefused } from './workflow/optionsForm'
 import type { SettingDetail, SettingRow } from '../shared/toolReplies'
 import { language } from '../shared/i18n'
@@ -228,7 +229,8 @@ export async function applySetting(
         return patch
       })
     // A workflow option is checked against the levels and written in one turn of workflow writes (#1422).
-    const next = e.workflow ? await workflowWrite(write) : await write()
+    // Its repository's lock first, as Project Settings' save takes it (#1642 round 5).
+    const next = e.workflow ? await withRepoLocks([projectPath], () => workflowWrite(write), { quiet: true, project: projectPath }) : await write()
     if (e.workflow) workflowChanged(workspace, projectPath)
     return { old, new: settingValue(e, config.settings, next) }
   }

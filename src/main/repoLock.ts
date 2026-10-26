@@ -82,3 +82,20 @@ export async function withRepoLock<T>(folder: string, fn: () => Promise<T>, opts
     }
   })
 }
+
+/**
+ * Runs fn holding the repository locks of several folders' repositories (#1642 round 5: a workflow options write, which
+ * can change the target of every project it reaches, taken as Clean Up Merged Branches takes it, across Hives): each
+ * repository once, always in the same order (its git folder's path), so no two takers wait on each other. A folder in
+ * no repository takes none. Taken before the turn of workflow writes, as everything that takes both does.
+ */
+export async function withRepoLocks<T>(folders: readonly string[], fn: () => Promise<T>, opts: RepoLockOptions = {}): Promise<T> {
+  const byDir = new Map<string, string>()
+  for (const f of folders) {
+    const dir = await commonGitDir(f).catch(() => null)
+    if (dir && !byDir.has(dir.toLowerCase())) byDir.set(dir.toLowerCase(), f)
+  }
+  const order = [...byDir].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([, f]) => f)
+  const from = (i: number): Promise<T> => (i === order.length ? fn() : withRepoLock(order[i], () => from(i + 1), opts))
+  return from(0)
+}

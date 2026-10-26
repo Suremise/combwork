@@ -770,6 +770,32 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(branchNames(proj)).toContain('hive/hb1')
   }, 120_000)
 
+  it('a second Hive changing the target, with a turn of workflow writes of its own, waits for the delete on the shared repository lock (round 5)', async () => {
+    const at = setUp()
+    const { withRepoLocks } = await import('../src/main/repoLock')
+    // Another Hive's own queue of workflow writes: a second, independently loaded instance of the module.
+    const ours = await import('../src/main/workflow/writes')
+    const otherHive = (await import(/* @vite-ignore */ `../src/main/workflow/writes?another-hive=${Date.now()}`)) as typeof ours
+    expect(otherHive.workflowWrite).not.toBe(ours.workflowWrite)
+    const d = door()
+    refDoor = d.door
+    const deleting = repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }])
+    await d.at
+    // Its target change as Hive writes one: the project's repository lock first, then its own turn.
+    let retargeted = false
+    const retarget = withRepoLocks([proj], () =>
+      otherHive.workflowWrite(async () => {
+        workTarget = 'hive/hb1'
+        retargeted = true
+      })
+    )
+    expect(retargeted).toBe(false)
+    d.open()
+    expect(await deleting).toMatch(/Deleted hive\/hb1\./)
+    await retarget
+    expect(retargeted).toBe(true)
+  }, 120_000)
+
   it('holds the lock through a remote’s push: a slot taking the branch waits until it is deleted there (round 3)', async () => {
     const at = setUp()
     const d = door()

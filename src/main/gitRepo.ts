@@ -1010,14 +1010,13 @@ export async function deleteRemoteBranches(projectPath: string, remote: string, 
 }
 
 /**
- * A clean-up's one hold (#1642 round 3), from each branch's last check through its deletion (a remote's push included):
- * the turn of workflow writes, so no options change (the project's, the workspace's or Hive's, from the window, a
- * setting's tool, a preset) moves the target meanwhile, then the repository's lock, which slot preparation, merges and
- * branch switches take, so no slot or worktree takes a branch meanwhile. Nothing holding the repository's lock waits
- * for a workflow write, so the order can't deadlock.
+ * A clean-up's one hold (#1642 rounds 3 and 5), from each branch's last check through its deletion (a remote's push
+ * included): the repository's lock, across Hives, which slot preparation, merges, branch switches and every workflow
+ * options write that can move the project's target take (`withRepoLocks`: the project's, a level's, a setting's tool,
+ * a platform switch), then this Hive's turn of workflow writes. In that order everywhere, so none waits on another.
  */
 function guarded<T>(projectPath: string, fn: () => Promise<T>): Promise<T> {
-  return workflowWrite(() => withRepoLock(projectPath, fn, { project: projectPath }))
+  return withRepoLock(projectPath, () => workflowWrite(fn), { project: projectPath })
 }
 
 /** The project's target read now, refusing when that branch isn't here (nothing can be measured against it). */

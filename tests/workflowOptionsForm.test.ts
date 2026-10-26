@@ -204,6 +204,31 @@ describe('the Workflow section (#1278)', () => {
     expect(f.presets.find((p) => p.id === 'pair')!.options).toMatchObject({ finish: 'hiveMerges', target: 'main', mergeChecks: ['typecheck', 'lint'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint' } })
   })
 
+  it("writes a Git project's options holding its repository's lock first, so a branch clean-up in this Hive or another never sees its target move (#1642)", async () => {
+    const { w, repo } = await workspace()
+    git(repo, 'branch', 'release')
+    const { withRepoLock } = await import('../src/main/repoLock')
+    const { platform: _p, ...pair } = preset('git', 'pairAgent')
+    let entered!: () => void
+    let release!: () => void
+    const inLock = new Promise<void>((r) => (entered = r))
+    const held = new Promise<void>((r) => (release = r))
+    const holder = withRepoLock(repo, async () => {
+      entered()
+      await held
+    })
+    await inLock
+    let saved = false
+    const saving = form.setWorkflowOptions(w, repo, { preset: null, options: { ...pair, target: 'release' } }).then(() => (saved = true))
+    // Held by the clean-up: nothing written yet.
+    expect(saved).toBe(false)
+    expect((await w.projectConfig(repo)).workflow).toBeUndefined()
+    release()
+    await holder
+    await saving
+    expect((await w.projectConfig(repo)).workflow).toMatchObject({ options: { target: 'release' } })
+  })
+
   it('refuses a contradiction whole, with its reason, and saves the options and the preset they started from', async () => {
     const { w, repo } = await workspace()
     await expect(form.setWorkflowOptions(w, repo, { preset: null, options: { finish: 'committed', folder: 'slots' } })).rejects.toThrow(/Committed is done” needs everyone in the project folder/)
