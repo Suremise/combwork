@@ -220,7 +220,10 @@ describe('the Workflow section (#1278)', () => {
     await inLock
     let saved = false
     const saving = form.setWorkflowOptions(w, repo, { preset: null, options: { ...pair, target: 'release' } }).then(() => (saved = true))
-    // Held by the clean-up: nothing written yet.
+    // A write queued after it: without the lock the save would hold the turn ahead of this one (it is queued when called),
+    // so this one ends only after the save. Holding the lock first, the save isn't in the turn yet and this goes ahead.
+    const { workflowWrite } = await import('../src/main/workflow/writes')
+    await workflowWrite(async () => undefined)
     expect(saved).toBe(false)
     expect((await w.projectConfig(repo)).workflow).toBeUndefined()
     release()
