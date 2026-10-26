@@ -27,6 +27,8 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
+/** A run's or a group's line, "who · what" (HI-1701: two parts of one line). */
+const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-recent-who')?.textContent} · ${el.querySelector('.progress-recent-text')?.textContent}`).catch(() => '')
 
 ;(async () => {
   for (const d of [userData, ws, claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
@@ -179,7 +181,11 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     // --- The failures' line opens Runs on them.
     await attention.click()
     check('the line opens Runs, failures only', !!(await until(async () => (await tab('runs').getAttribute('aria-selected')) === 'true' && (await panel.locator('.progress-runs-failed').getAttribute('aria-pressed')) === 'true', HUNG_MS)))
-    const text = async () => ((await panel.locator('.progress-tab-runs').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+    // Its words with every card's runs open (HI-1701: a card whose runs all passed is closed).
+    const text = async () => {
+      for (const t of await panel.locator('.progress-card-toggle[aria-expanded="false"]').all()) await t.click().catch(() => undefined)
+      return ((await panel.locator('.progress-tab-runs').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+    }
     check('…the nightly build and the lints, nothing that passed', !!(await until(async () => /nightly build/.test(await text()) && /lint/.test(await text()) && !/unit/.test(await text()), HUNG_MS)), await text())
     await panel.locator('.progress-runs-clear').click()
 
@@ -188,9 +194,9 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     check('the runs by day: Today, then Yesterday', !!(await until(async () => JSON.stringify(await days()) === JSON.stringify(['Today', 'Yesterday']), HUNG_MS)), JSON.stringify(await days()))
     check('what runs is on top', (await panel.locator('.progress-tab-runs .progress-runs-body > .progress-run').first().getAttribute('data-run')) === e2e)
     const tc = panel.locator('.progress-runs-day').nth(1).locator('.progress-run-group')
-    check(`yesterday's typecheck, tried three times, is one line: B1 · ${a.key} typecheck ×3 · 2 failed, then passed`, ((await tc.locator('.progress-group-head').textContent()) ?? '').trim() === `B1 · ${a.key} typecheck ×3 · 2 failed, then passed`, await tc.locator('.progress-group-head').textContent().catch(() => ''))
+    check(`yesterday's typecheck, tried three times, is one line under ${a.key}: B1 · typecheck ×3 · 2 failed, then passed`, (await lineOf(tc.locator('.progress-group-head'))) === 'B1 · typecheck ×3 · 2 failed, then passed' && (await panel.locator('.progress-runs-day').nth(1).locator(`.progress-card-runs[data-card-runs="${a.number}"] .progress-card-key`).textContent()) === a.key, await lineOf(tc.locator('.progress-group-head')))
     const lints = panel.locator('.progress-runs-day').first().locator('.progress-run-group')
-    check("today's lint, failed twice, is one line too", ((await lints.locator('.progress-group-head').textContent()) ?? '').trim() === 'Script · lint ×2 · 2 failed', await lints.locator('.progress-group-head').textContent().catch(() => ''))
+    check("today's lint, failed twice, is one line too", (await lineOf(lints.locator('.progress-group-head'))) === 'Script · lint ×2 · 2 failed', await lineOf(lints.locator('.progress-group-head')))
     await tc.locator('.progress-group-head').click()
     check('…opened, each of its runs, newest first', !!(await until(async () => (await tc.locator('.progress-recent-item').count()) === 3, HUNG_MS)) && (await tc.locator('.progress-recent-item').first().getAttribute('data-run')) === 'k-tc-3')
     await setWidth(440)
@@ -263,6 +269,142 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     await panel.locator('.progress-runs-clear').click()
     await api(t1, 'POST', `/v1/progress/${e2e}/finish`, { ok: true })
     await api(t1, 'POST', '/v1/projects/alpha/merge-slot/release', { branch: 'main' })
+  } finally {
+    await app.close().catch(() => undefined)
+  }
+
+  // --- HI-1701: Today by card. A third launch with a busy Today kept, like Darren's (26 Oct): a heading per card, the
+  // card with the newest run first and Other last; closed once all its runs passed, open while one failed, the user's
+  // choice kept; a line per run (who, what, how long), the card's key not repeated, review copies' names only in the
+  // hover, retries folded with a failure-aware icon and the merge queue's checks in one line; the filters filter runs
+  // within cards and hide empty ones.
+  const t0 = Math.max(Date.now() - 50 * 60_000, startOfToday + 60_000)
+  const REV = 'e2d018f4c1b2a3d4e5f60718293a4b5c6d7e8f90'
+  const ran = (id, min, secs, o) => ({
+    id,
+    title: o.title,
+    command: o.command ?? `npm run ${o.title}`,
+    startedAt: t0 + min * 60_000,
+    finishedAt: t0 + min * 60_000 + secs * 1000,
+    updatedAt: t0 + min * 60_000 + secs * 1000,
+    state: o.state ?? 'passed',
+    source: o.source ?? 'agent',
+    agentName: o.agentName ?? 'B1',
+    ...(o.source === 'api' ? {} : { projectPath: alpha }),
+    ...(o.source === 'hive' ? { defaultName: 'mergeQueue' } : o.source === 'api' ? {} : { agentId: o.agentId ?? builder.id, provider: 'claude-code' }),
+    ...(o.card ? { card: o.card, revision: o.revision ?? REV } : {}),
+    ...(o.check ? { check: o.check } : {}),
+    ...(o.copy ? { copy: o.copy } : {})
+  })
+  const R1 = { agentName: 'R1', agentId: reviewer.id }
+  const REV2 = '0123e4979f1c2b3a4d5e6f708192a3b4c5d6e7f8'
+  // The merge queue's runs as queueChecks.ts names them, "<key> · <check> · <revision>", with no check name of their own.
+  const queued = (card, label, revision = REV) => ({ card: card.number, title: `${card.key} · ${label} · ${revision.slice(0, 7)}`, command: `npm run ${label}`, revision, source: 'hive', agentName: 'Hive (merge queue)' })
+  const busy = [
+    ran('b-unit', 1, 40, { card: b.number, title: 'unit', command: 'npm test' }),
+    ran('b-review', 3, 20, { card: b.number, title: 'Review lint', command: 'npm run lint', copy: 'copy-7', ...R1 }),
+    ran('b-q-install', 6, 30, { ...queued(b, 'npm ci'), command: 'npm ci' }),
+    ran('b-q-lint', 7, 9, queued(b, 'lint')),
+    ran('a-unit-1', 2, 50, { card: a.number, title: 'unit: 6 files', command: 'npm test -- tests/a', state: 'failed' }),
+    ran('a-unit-2', 5, 50, { card: a.number, title: 'unit: 6 files', command: 'npm test -- tests/a', state: 'failed' }),
+    ran('a-unit-3', 8, 50, { card: a.number, title: 'unit: 6 files', command: 'npm test -- tests/a' }),
+    ran('nightly', 10, 300, { title: 'nightly build', command: 'npm run build:nightly', source: 'api', agentName: 'Script' }),
+    ran('a-review', 12, 2, { card: a.number, title: 'Review delivery typecheck', command: 'npm run typecheck', copy: 'copy-5', ...R1 }),
+    ran('my-check', 15, 4, { title: 'my check', command: 'node my-check.cjs', source: 'api', agentName: 'Script', state: 'failed' }),
+    ran('a-cardloop', 20, 180, { card: a.number, title: 'cardloop on base c0ffee1', command: 'npm run e2e -- cardloop', state: 'failed' }),
+    ran('a-final-1', 22, 30, { card: a.number, title: `${a.key} final typecheck`, check: 'typecheck' }),
+    ran('a-final-2', 24, 30, { card: a.number, title: `${a.key} final typecheck`, check: 'typecheck' }),
+    // The same check on an earlier revision (a resubmission): named once in the queue's line.
+    ran('a-q-lint-old', 26, 6, queued(a, 'lint', REV2)),
+    ran('a-q-lint', 30, 6, queued(a, 'lint')),
+    ran('a-q-typecheck', 31, 7, queued(a, 'typecheck')),
+    ran('c-e2e', 35, 95, { card: c.number, title: 'e2e: changes', command: 'npm run e2e -- changes' })
+  ]
+  fs.writeFileSync(path.join(historyDir, `${createHash('sha256').update(path.resolve(ws).toLowerCase()).digest('hex').slice(0, 16)}.json`), JSON.stringify({ version: 1, runs: busy }))
+  app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
+  try {
+    const page = await app.firstWindow()
+    page.on('pageerror', (e) => check('no page errors (busy Today)', false, e.message))
+    await lib.fitWindow(app, page, { width: 1400, height: 850 })
+    await lib.appReady(page)
+    const inv = (ch, ...x) => page.evaluate(([ch2, y]) => window.hive.invoke(ch2, ...y), [ch, x])
+    if ((await inv('workspace:get'))?.path?.toLowerCase() !== ws.toLowerCase()) await lib.openWorkspace(inv, page, ws)
+    const panel = page.locator('.progress-panel')
+    if (!(await panel.count())) await page.locator('.progress-rail').click()
+    const tab = (name) => panel.locator(`.progress-tab[data-tab="${name}"]`)
+    const showTab = async (name) => {
+      await tab(name).click()
+      return until(async () => (await panel.locator(`.progress-tab-${name}`).count()) === 1, HUNG_MS)
+    }
+    await until(async () => (await panel.count()) === 1, HUNG_MS)
+    await panel.evaluate((el) => (el.style.width = '440px'))
+    const shoot = async (name) => {
+      for (const theme of ['dark', 'light']) {
+        await inv('settings:update', { appearance: { theme } })
+        await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+        await page.mouse.move(5, 5)
+        await page.screenshot({ path: path.join(shots, `${name}-${theme}.png`) })
+      }
+      await inv('settings:update', { appearance: { theme: 'dark' } })
+    }
+    await showTab('runs')
+    const today = panel.locator('.progress-runs-day').first()
+    const group = (card) => today.locator(`.progress-card-runs[data-card-runs="${card}"]`)
+    const heads = () => today.locator('.progress-card-runs').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-card-runs')}:${e.querySelector('.progress-card-toggle')?.getAttribute('aria-expanded')}`))
+    const want = [`${c.number}:false`, `${a.number}:true`, `${b.number}:false`, 'other:true']
+    check('Today by card: the card with the newest run first, Other last; open while a run failed, closed once all passed', !!(await until(async () => JSON.stringify(await heads()) === JSON.stringify(want), HUNG_MS)), JSON.stringify(await heads()))
+    const head = (card) => group(card).locator('.progress-card-head')
+    const headText = async (card) => (await head(card).evaluate((el) => [...el.querySelectorAll('.progress-card-key, .progress-card-title, .progress-card-summary')].map((x) => x.textContent).join(' | ')).catch(() => ''))
+    check(`${a.key}'s heading: its key, title and 10 runs · 3 failed, with a failure's icon`, (await headText(a.number)) === `${a.key} | Lane data | 10 runs · 3 failed` && (await head(a.number).locator('.progress-card-icon.codicon-error').count()) === 1, await headText(a.number))
+    check(`${b.key}'s: 4 runs · all passed, with a pass's icon`, (await headText(b.number)) === `${b.key} | Lane hover | 4 runs · all passed` && (await head(b.number).locator('.progress-card-icon.codicon-pass').count()) === 1, await headText(b.number))
+    const rows = (card) => group(card).locator('.progress-card-items > .progress-recent-item > .progress-recent, .progress-card-items > .progress-run-group > .progress-group-head')
+    const lines = async (card) => Promise.all((await rows(card).all()).map((h) => lineOf(h)))
+    const aLines = ['Hive (merge queue) · lint, typecheck', 'B1 · final typecheck ×2 · all passed', 'B1 · cardloop on base c0ffee1', 'R1 · Review delivery typecheck', 'B1 · unit: 6 files ×3 · 2 failed, then passed']
+    check(`${a.key}'s runs, a line each, newest first: the merge queue's checks in one, its key left out of a title`, JSON.stringify(await lines(a.number)) === JSON.stringify(aLines), JSON.stringify(await lines(a.number)))
+    // The queue's titles carry the key and revision (HR6's round 1): opened, its runs name only their check.
+    await group(a.number).locator('.progress-run-group').filter({ hasText: 'Hive (merge queue)' }).locator('.progress-group-head').click()
+    const queueRuns = () => group(a.number).locator('.progress-group-runs .progress-recent-text').allTextContents()
+    check("…opened, the queue's runs, newest first, each its check alone", !!(await until(async () => JSON.stringify(await queueRuns()) === JSON.stringify(['typecheck', 'lint', 'lint']), HUNG_MS)), JSON.stringify(await queueRuns()))
+    const itemsText = await group(a.number).locator('.progress-card-items').innerText()
+    check(`…no key nor revision in ${a.key}'s lines`, !itemsText.includes(a.key) && !itemsText.includes(REV.slice(0, 7)) && !itemsText.includes(REV2.slice(0, 7)), itemsText)
+    await group(a.number).locator('.progress-run-group').filter({ hasText: 'Hive (merge queue)' }).locator('.progress-group-head').click()
+    check('…one row shape: no line under a run, no copy name shown', (await group(a.number).locator('.progress-run-for').count()) === 0 && !/copy-5/.test(await group(a.number).innerText()))
+    check('…the retries a warning (failed, then passed), the failed run a failure', (await group(a.number).locator('.progress-run-group').filter({ hasText: 'unit: 6 files' }).locator('.progress-group-head .codicon-warning').count()) === 1 && (await group(a.number).locator('.progress-recent-item[data-run="a-cardloop"] .progress-recent .codicon-error').count()) === 1)
+    const reviewRow = group(a.number).locator('.progress-recent-item[data-run="a-review"] .progress-recent > .tip-wrap').first()
+    const tipText = async () => (await page.locator('body > .tip').allTextContents().catch(() => [])).join(' | ')
+    check('…its card, revision and copy in the hover', !!(await until(async () => {
+      if ((await tipText()).includes(`${a.key} · e2d018f · in copy-5`)) return true
+      await reviewRow.hover()
+      return false
+    }, HUNG_MS)), await tipText())
+    await page.mouse.move(5, 5)
+    await shoot('runs-by-card')
+    // Open and close a card's runs; the choice is kept (here, across tabs).
+    await group(c.number).locator('.progress-card-toggle').click()
+    check(`opening ${c.key} shows its run`, !!(await until(async () => JSON.stringify(await lines(c.number)) === JSON.stringify(['B1 · e2e: changes']), HUNG_MS)), JSON.stringify(await lines(c.number)))
+    await group(a.number).locator('.progress-card-head').click()
+    check(`closing ${a.key} (a click on its heading) hides its runs`, !!(await until(async () => (await rows(a.number).count()) === 0 && (await group(a.number).locator('.progress-card-toggle').getAttribute('aria-expanded')) === 'false', HUNG_MS)))
+    await showTab('pulse')
+    await showTab('runs')
+    check('…both choices kept', !!(await until(async () => JSON.stringify(await heads()) === JSON.stringify([`${c.number}:true`, `${a.number}:false`, `${b.number}:false`, 'other:true']), HUNG_MS)), JSON.stringify(await heads()))
+    await group(a.number).locator('.progress-card-toggle').click()
+    await until(async () => (await rows(a.number).count()) === aLines.length, HUNG_MS)
+    // The filters filter the runs in each card and hide a card with none.
+    await panel.locator('.progress-runs-failed').click()
+    check(`Failed: ${a.key} (its failed runs) and Other, nothing else`, !!(await until(async () => JSON.stringify(await heads()) === JSON.stringify([`${a.number}:true`, 'other:true']), HUNG_MS)) && JSON.stringify(await lines(a.number)) === JSON.stringify(['B1 · cardloop on base c0ffee1', 'B1 · unit: 6 files ×2 · 2 failed']) && JSON.stringify(await lines('other')) === JSON.stringify(['Script · my check']), `${JSON.stringify(await heads())} ${JSON.stringify(await lines(a.number))}`)
+    await shoot('runs-by-card-failed')
+    await panel.locator('.progress-runs-clear').click()
+    await panel.locator('.progress-runs-choices select[aria-label="Agent"]').selectOption({ label: 'R1' })
+    check(`an agent: R1's runs, in ${a.key} and ${b.key}`, !!(await until(async () => JSON.stringify((await heads()).map((h) => h.split(':')[0])) === JSON.stringify([String(a.number), String(b.number)]), HUNG_MS)), JSON.stringify(await heads()))
+    await panel.locator('.progress-runs-clear').click()
+    await panel.locator('.progress-runs-search').fill('nightly')
+    // Other's runs found all passed: it is closed (its open rule holds for what the filters leave).
+    check('words: the nightly build, in Other alone, closed: 1 run, all passed', !!(await until(async () => JSON.stringify(await heads()) === JSON.stringify(['other:false']) && (await headText('other')) === 'Other |  | 1 run · all passed', HUNG_MS)), `${JSON.stringify(await heads())} ${await headText('other')}`)
+    await panel.locator('.progress-runs-clear').click()
+    // A card's key opens the card.
+    await group(b.number).locator('.progress-card-key').click()
+    check(`${b.key}'s key opens the card`, !!(await until(async () => (await page.locator('[role="dialog"]').filter({ hasText: b.key }).count()) > 0, HUNG_MS)))
+    await page.keyboard.press('Escape')
   } finally {
     await app.close().catch(() => undefined)
   }

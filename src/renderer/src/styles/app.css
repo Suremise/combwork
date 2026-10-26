@@ -10901,11 +10901,6 @@ button.progress-run-show:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Under a finished run in a copy (#1446): lined up with its title, after its icon. */
-.progress-recent-item > .progress-run-for {
-  margin-top: 0;
-  padding: 0 12px 3px 32px;
-}
 /* A failed check that blocks its card's Review (#1279). */
 .progress-run-blocks {
   margin-top: 2px;
@@ -11173,7 +11168,67 @@ button.progress-run-show:focus-visible {
 .progress-runs-failed .codicon {
   color: var(--error);
 }
-/* A run and its retries the same day, one line (#1309): it opens to each run. */
+/* A day's runs by card (HI-1701): a heading per card (Other last), its runs under it, a line each. */
+.progress-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 8px 2px 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.progress-card-head:hover {
+  background: var(--bg-hover);
+}
+.progress-card-head > .codicon,
+.progress-card-key,
+.progress-card-summary,
+.progress-card-when {
+  flex-shrink: 0;
+}
+.progress-card-key {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+}
+button.progress-card-key {
+  cursor: pointer;
+}
+button.progress-card-key:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+/* The title gives way first, then the summary keeps its words. */
+.progress-card-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.progress-card-runs.passed > .progress-card-head > .progress-card-icon {
+  color: var(--success);
+}
+.progress-card-runs.failed > .progress-card-head > .progress-card-icon,
+.progress-card-runs.failed .progress-card-summary {
+  color: var(--error);
+}
+.progress-card-runs.retried > .progress-card-head > .progress-card-icon,
+.progress-card-runs.stale > .progress-card-head > .progress-card-icon {
+  color: var(--warning);
+}
+.progress-card-runs.stopped > .progress-card-head > .progress-card-icon {
+  color: var(--fg-muted);
+}
+.progress-card-items {
+  margin-inline-start: 18px;
+  border-inline-start: 1px solid var(--border-subtle);
+}
+/* A run and its retries the same day, or the merge queue's checks of a card, one line (#1309, HI-1701): it opens to each run. */
 .progress-group-head {
   width: 100%;
   border: 0;
@@ -11181,6 +11236,15 @@ button.progress-run-show:focus-visible {
   font: inherit;
   text-align: start;
   cursor: pointer;
+}
+/* As wide and tall as a run's chevron button, so every line is the same height. */
+.progress-group-chevron {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
 }
 .progress-group-runs {
   margin-inline-start: var(--space-4);
@@ -11205,7 +11269,9 @@ button.progress-run-show:focus-visible {
   padding-right: 4px;
 }
 /* The line (its tooltip's), then the chevron after the time (#251): the title gives way first. */
-.progress-recent > .tip-wrap:first-child {
+.progress-recent > .tip-wrap:first-child,
+.progress-recent-line {
+  display: flex;
   flex: 1;
   min-width: 0;
   align-items: center;
@@ -11303,16 +11369,30 @@ button.progress-run-show:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.progress-recent.passed > .tip-wrap > .codicon {
+/* Who ran it, then what (HI-1701): its name keeps its width. */
+.progress-recent-who {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+}
+.progress-recent.passed > .tip-wrap > .codicon,
+.progress-recent.passed > .progress-recent-line > .codicon {
   color: var(--success);
 }
-.progress-recent.failed > .tip-wrap > .codicon {
+.progress-recent.failed > .tip-wrap > .codicon,
+.progress-recent.failed > .progress-recent-line > .codicon {
   color: var(--error);
 }
-.progress-recent.stale > .tip-wrap > .codicon {
+.progress-recent.stale > .tip-wrap > .codicon,
+.progress-recent.stale > .progress-recent-line > .codicon,
+.progress-recent.retried > .progress-recent-line > .codicon {
   color: var(--warning);
 }
-.progress-recent.stopped > .tip-wrap > .codicon {
+.progress-recent.stopped > .tip-wrap > .codicon,
+.progress-recent.stopped > .progress-recent-line > .codicon {
   color: var(--fg-muted);
 }
 .progress-rail {

@@ -3996,7 +3996,16 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   that ended stays a few seconds, then lives in Runs): the merge, the runs going on, a line for the unresolved failures
   (it opens Runs on them), then the lanes, each with a dot for its current card's latest run. Runs: what runs, then
   every kept run by day, the same thing's runs on a day folded into one line ("AL-12 cardwork ×4 · 2 failed, then
-  passed"), with search and filters (failures, a lane's cards, an agent). Merges and Lanes show theirs alone. #1228's
+  passed"), with search and filters (failures, a lane's cards, an agent). Each day is grouped by card (HI-1701, Darren
+  26 Oct): a heading per card, the card with the newest run first and **Other** (runs for no card) last, with its key
+  (it opens the card), title, how many runs and how they went ("7 runs · 1 failed", "all passed", " · running" while
+  one runs) and when the last ended; its icon shows a failure (✗ when a run's last try failed, ⚠ when one failed before
+  it passed). A card is open while one of its runs runs or failed and closed once all passed, unless the user chose,
+  which is kept per card for the session. Under it a line per run: its icon, who, what (the card's key left out of the
+  title) and how long; a run's retries fold as before ("B1 unit ×3 · 2 failed, then passed", the same failure-aware
+  icon), and the merge queue's checks for the card into one line ("Hive (merge queue) lint, typecheck"). The commit,
+  the copy, the command go in the hover, all of it in the details. The filters filter runs within cards and hide a card
+  left with none; what runs stays on top, ungrouped. Merges and Lanes show theirs alone. #1228's
   fold of Recent is gone with Recent. The word stays **Runs** (Darren); `/v1/progress` is unchanged. A run's details
   give times relative, the date and time in full on hover.
 - **P5** [#1121 c]: the merge slot card becomes the queue's summary per target (testing now, queued, just merged,
@@ -4076,7 +4085,8 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     verdict, passed or failed (`LaneInfo.poolReview`, from the cards' facts); a reviewer serving several lanes is in each
     lane's hover, never a lane of its own.
   - **Review copies' runs:** a run in a review or check copy, linked to the copy's card and revision (#1435), reads
-    "AM-12 · a3f2c1d · in copy-2" under it, running or finished, and its details name the copy and the folder it ran in.
+    "AM-12 · a3f2c1d · in copy-2" under it while running, in its hover once finished (HI-1701), and its details name the
+    copy and the folder it ran in.
   - **Slot warming as runs:** Hive's set-up runs are "Hive (slot slot-b)" and "Hive (copy copy-1)" (#1429, #1435), each
     an entry of its own in the Runs tab's Agent filter (`slotRunsKey`, `copyRunsKey`), apart from "Hive (merge queue)".
   - **Waiting reasons:** "waiting for a slot" and "waiting for a check copy" pause the lane (#1438, #1435); "waiting:

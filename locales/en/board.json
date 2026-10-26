@@ -2759,6 +2759,10 @@
     "defaultMessage": "{card} {run}",
     "description": "A run named with its card in the Progress panel's Runs tab: the card's name ({card}: its key, such as AL-12) and the run's title ({run})."
   },
+  "board.runs.cardSummary": {
+    "defaultMessage": "{n, plural, one {# run} other {# runs}} · {failed, plural, =0 {{stopped, plural, =0 {all passed} other {# stopped}}} other {# failed}}{running, select, yes { · running} other {}}",
+    "description": "The summary on a card's heading in the Progress panel's Runs tab, where runs are grouped by card: how many runs it had that day ({n}), how many failed ({failed}), else how many stopped without passing or failing ({stopped}), else all passed; then \" · running\" while one of its runs is still going. Keep the select keys."
+  },
   "board.runs.clear": {
     "defaultMessage": "Clear",
     "description": "A button in the Progress panel's Runs tab: clears its filters and search."
@@ -2783,6 +2787,14 @@
     "defaultMessage": "No runs match.",
     "description": "The Progress panel's Runs tab when no run matches its filters or search."
   },
+  "board.runs.other": {
+    "defaultMessage": "Other",
+    "description": "The heading of a group in the Progress panel's Runs tab, where runs are grouped by card: the runs for no card (Hive's own, the user's scripts) follow."
+  },
+  "board.runs.queueChecks": {
+    "defaultMessage": "{checks}{failed, plural, =0 {} one { · # failed} other { · # failed}}",
+    "description": "A line in the Progress panel's Runs tab folding the merge queue's checks for one card: the checks it ran ({checks}: their names, a list such as \"lint, typecheck\") and how many of its runs failed ({failed}, nothing when none)."
+  },
   "board.runs.search": {
     "defaultMessage": "Find runs",
     "description": "Placeholder and accessible name of the search box in the Progress panel's Runs tab: finds runs by title, command, agent or card."
@@ -2790,6 +2802,10 @@
   "board.runs.today": {
     "defaultMessage": "Today",
     "description": "A heading in the Progress panel's Runs tab: the runs that ended today follow."
+  },
+  "board.runs.toggleCard": {
+    "defaultMessage": "{open, select, yes {Hide the runs of {card}} other {Show the runs of {card}}}",
+    "description": "Tooltip of the chevron on a card's heading in the Progress panel's Runs tab: hides or shows the card's runs ({card}: its key, such as HI-12, or Other for the runs for no card). Keep the select keys."
   },
   "board.runs.yesterday": {
     "defaultMessage": "Yesterday",
