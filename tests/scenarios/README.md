@@ -152,7 +152,10 @@ many). A folder it still can't remove is kept and named in the result (`kept`) r
 that start an agent for the fixture (a builder working, an agent idle) fail the scenario (`setup: …`, with the
 environment problem when the screen shows one) when it doesn't get there, rather than run on a fixture it didn't get.
 So does a setup's move of a card as the user moves it (`userMove`): its reply is checked, and the card must be seen in
-the column (in Review, with a new submission) before the scenario goes on (#1583). Setups change the project's workflow
+the column (in Review, with a new submission) before the scenario goes on (#1583). So does the scenario's own prompt
+never taken (HI-1168): typed as Hive types (`lib.sendPrompt`, on real Claude Code once its hive tools connected) and
+not taken nor refused for the environment, the trial is `setup: the prompt was never taken`, with no checks (incomplete
+in the benchmark), never every check failed as the model's. Setups change the project's workflow
 options through Hive (`workflow:setOptions`, under the project's lock), never by writing `project.json` beside it (a
 write that lost the agents just added, #1588), and make an agent's watch with its own token (`POST /v1/tasks/wait`), as
 its hive tool does, so a model trial gets the same fixture as a fake (#1545).
