@@ -378,6 +378,12 @@
   "git.worktree.slotLease": "{kind, select, card {{slot} : {agent} sur {card}} lane {{slot} : {agent}, couloir {lane}} carried {{slot} : repris pour {agent}} other {{slot} : non prêté}}",
   "git.worktree.unused": "Worktree inutilisé",
   "git.worktrees.changes": "Modifications",
+  "git.worktrees.copiesHeading": "Copies de relecture (de Hive)",
+  "git.worktrees.copiesHint": "Des checkouts propres que Hive garde pour les relecteurs, chacun à la révision vérifiée. Hive les gère : il n’y a rien à supprimer ici.",
+  "git.worktrees.copyRow": "{use, select, review {{copy} : {agent} relit {card} à {revision}} check {{copy} : {agent} vérifie {card} à {revision}} other {{copy} : libre dans le pool}}",
   "git.worktrees.heading": "Worktrees",
+  "git.worktrees.queueHeading": "File de fusion (de Hive)",
+  "git.worktrees.queueHint": "Là où la file de fusion de Hive teste la fusion d’une carte avant qu’elle n’entre. Hive le gère : il n’y a rien à supprimer ici.",
+  "git.worktrees.queueRow": "Le dossier de la file de fusion",
   "git.worktrees.readOnly": "Lecture seule ici : le travail d’un agent arrive dans le dossier du projet par Fusionner."
 }

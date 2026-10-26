@@ -1123,3 +1123,41 @@ describe('progress history (#352): Recent kept across restarts', () => {
     expect(keptRuns({ runs: Array.from({ length: RECENT_KEPT + 50 }, (_, i) => ({ ...good, id: `r${i}` })) }, WS).length).toBe(RECENT_KEPT)
   })
 })
+
+describe("Hive's set-up runs in review copies (HI-1710)", () => {
+  const hive = (extra: Partial<Extract<ProgressCaller, { source: 'hive' }>> = {}): ProgressCaller => ({ source: 'hive', workspacePath: WS, projectPath: alfie.projectPath, ...extra })
+
+  it("are credited to the agent whose lease held the copy, in that copy, else to one 'Hive (review copies)'", () => {
+    const s = store()
+    const held = s.start(hive({ copy: 'copy-1', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })
+    expect(held).toMatchObject({ source: 'hive', agentId: 'r-6', agentName: 'HR6', copy: 'copy-1' })
+    expect(held.defaultName).toBeUndefined()
+    expect(runAgentName(held, tr)).toBe('HR6')
+    expect(runDetailsText(held, 'alpha', now)).toContain('copy-1')
+    const idle = [s.start(hive({ copy: 'copy-1' }), { title: 'npm ci' }), s.start(hive({ copy: 'copy-2' }), { title: 'npm ci' })]
+    expect(idle.map((r) => [r.agentId, r.agentName, r.defaultName, r.copy])).toEqual([[null, 'Hive (review copies)', 'copy', 'copy-1'], [null, 'Hive (review copies)', 'copy', 'copy-2']])
+    expect(idle.map((r) => runAgentName(r, tr))).toEqual(['Hive (review copies)', 'Hive (review copies)'])
+    // A slot's run never takes a reviewer.
+    expect(s.start(hive({ slot: 'slot-b', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })).toMatchObject({ agentId: null, agentName: 'Hive (slot slot-b)', defaultName: 'slot' })
+    // The reviewer's run is still Hive's: the agent can't change or end it.
+    const r6: ProgressCaller = { ...alfie, agentId: 'r-6', agentName: 'HR6' }
+    expect(status(() => s.update(r6, held.id, { step: 1 }))).not.toBeNull()
+    expect(status(() => s.update(hive(), held.id, { step: 1 }))).toBeNull()
+  })
+
+  it('keep their reviewer across a save; older "Hive (copy copy-1)" runs fold into "Hive (review copies)"', () => {
+    const ended = { state: 'passed', startedAt: 1, finishedAt: 2, source: 'hive', projectPath: alfie.projectPath }
+    const records = [
+      { ...ended, id: 'c1', title: 'npm ci', copy: 'copy-1', agentId: 'r-6', agentName: 'HR6' },
+      { ...ended, id: 'c2', title: 'npm ci', copy: 'copy-1', agentName: 'Hive (copy copy-1)', defaultName: 'copy' },
+      // An id on a run of the pool's (an edited file) doesn't make it an agent's.
+      { ...ended, id: 'c3', title: 'npm ci', copy: 'copy-2', agentId: 'r-6', agentName: 'Hive (review copies)', defaultName: 'copy' },
+      { ...ended, id: 'c4', title: 'npm ci', slot: 'slot-b', agentId: 'r-6', agentName: 'HR6' }
+    ]
+    const marks = (runs: ProgressRun[]): unknown[][] => runs.map((r) => [r.id, r.agentId, r.agentName, r.defaultName ?? null])
+    const want = [['c1', 'r-6', 'HR6', null], ['c2', null, 'Hive (review copies)', 'copy'], ['c3', null, 'Hive (review copies)', 'copy'], ['c4', null, 'Hive (slot slot-b)', 'slot']]
+    const once = keptRuns({ runs: records }, WS)
+    expect(marks(once)).toEqual(want)
+    expect(marks(keptRuns(JSON.parse(JSON.stringify({ runs: once })), WS))).toEqual(want)
+  })
+})

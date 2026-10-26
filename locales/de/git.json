@@ -378,6 +378,12 @@
   "git.worktree.slotLease": "{kind, select, card {{slot}: {agent} an {card}} lane {{slot}: {agent}, Lane {lane}} carried {{slot}: übernommen für {agent}} other {{slot}: nicht verliehen}}",
   "git.worktree.unused": "Ungenutzter Worktree",
   "git.worktrees.changes": "Änderungen",
+  "git.worktrees.copiesHeading": "Review-Kopien (von Hive)",
+  "git.worktrees.copiesHint": "Saubere Checkouts, die Hive für Reviewer bereithält, jeweils auf der geprüften Revision. Hive verwaltet sie: Hier gibt es nichts zu entfernen.",
+  "git.worktrees.copyRow": "{use, select, review {{copy}: {agent} prüft {card} auf {revision}} check {{copy}: {agent} führt eine Prüfung von {card} auf {revision} aus} other {{copy}: frei im Pool}}",
   "git.worktrees.heading": "Worktrees",
+  "git.worktrees.queueHeading": "Merge-Warteschlange (von Hive)",
+  "git.worktrees.queueHint": "Hier testet die Merge-Warteschlange von Hive den Merge einer Karte, bevor er übernommen wird. Hive verwaltet ihn: Hier gibt es nichts zu entfernen.",
+  "git.worktrees.queueRow": "Der Ordner der Merge-Warteschlange",
   "git.worktrees.readOnly": "Hier schreibgeschützt: Die Arbeit eines Agenten kommt über „Mergen“ in den Projektordner."
 }

@@ -30,7 +30,7 @@ vi.mock('../src/main/git', async (importOriginal) => {
   return { ...real, git: ((cwd, args, ...rest) => (failing?.(args) ? failed() : real.git(cwd, args, ...rest))) as typeof real.git }
 })
 
-const { PREVIEW_MS, mergeUnused, removalPreview, removeUnusedWorktree, setQueueNeed, unusedBranchStatus, unusedWorktreeCounts, unusedWorktrees } = await import('../src/main/unusedWorktrees')
+const { PREVIEW_MS, hiveWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, setQueueNeed, unusedBranchStatus, unusedWorktreeCounts, unusedWorktrees } = await import('../src/main/unusedWorktrees')
 const { createWorktree } = await import('../src/main/worktrees')
 const { addAgent, reserveForRemoval, worktreeChecks } = await import('../src/main/projectAgents')
 const { gitTestHooks } = await import('../src/main/git')
@@ -306,6 +306,23 @@ describe('listing', () => {
     git(proj, 'worktree', 'add', '-q', '--detach', q)
     expect(await find(copy)).toBeUndefined()
     expect(await find(q)).toMatchObject({ kind: 'queue' })
+  })
+
+  it("Branches & remotes' groups (HI-1710): a review copy is Hive's 'copy', a queue folder its 'queue', anything else no one of Hive's", async () => {
+    const copy = join(root, 'copies', `copy-${++n}`)
+    const q = join(root, `queue-0123456789ab-ef${n}`)
+    const plain = await tree(`plain${n}`)
+    const of = (path: string): Promise<'copy' | 'queue' | null> => run(async () => hiveWorktreeOf(proj, path))
+    expect(await of(copy)).toBe('copy')
+    // As git may list it: another case, the other slash.
+    expect(await of(copy.toUpperCase().replace(/\\/g, '/'))).toBe('copy')
+    expect(await of(q)).toBe('queue')
+    expect(await of(plain.path)).toBeNull()
+    expect(await of(proj)).toBeNull()
+    // Named like one, but not in the project's own folder of Hive's worktrees: not Hive's.
+    expect(await of(join(base, 'elsewhere', 'copies', 'copy-1'))).toBeNull()
+    expect(await of(join(base, 'elsewhere', 'queue-0123456789ab-ef1'))).toBeNull()
+    expect(await of(join(root, 'copies-old', 'copy-1'))).toBeNull()
   })
 
   // Read-only check loops share one operation's reads (#733): the project's worktree list, its main branch (its branches

@@ -1515,9 +1515,33 @@
     "defaultMessage": "Changes",
     "description": "Button on a worktree's row: shows its changes in Git → Changes."
   },
+  "git.worktrees.copiesHeading": {
+    "defaultMessage": "Review copies (Hive’s)",
+    "description": "A heading in Git → Branches & remotes, followed by how many: the worktrees Hive keeps for reviews (review copies: clean checkouts at the revision a reviewer checks). Hive's own, not the user's."
+  },
+  "git.worktrees.copiesHint": {
+    "defaultMessage": "Clean checkouts Hive keeps for reviewers, each at the revision being checked. Hive manages them: there is nothing to remove here.",
+    "description": "Under the Review copies (Hive's) heading in Git → Branches & remotes."
+  },
+  "git.worktrees.copyRow": {
+    "defaultMessage": "{use, select, review {{copy}: {agent} reviewing {card} at {revision}} check {{copy}: {agent} checking {card} at {revision}} other {{copy}: idle in the pool}}",
+    "description": "A review copy's row in Git → Branches & remotes: its name ({copy}, such as copy-1, keep it as it is) and who uses it: a reviewer ({agent}) reviewing a card ({card}: its key) at a revision ({revision}: a short commit id), an agent running a check on it, or no one (idle in Hive's pool of copies). Keep the select keys."
+  },
   "git.worktrees.heading": {
     "defaultMessage": "Worktrees",
     "description": "Heading in Git → Branches & remotes, followed by how many there are."
+  },
+  "git.worktrees.queueHeading": {
+    "defaultMessage": "Merge queue (Hive’s)",
+    "description": "A heading in Git → Branches & remotes, followed by how many: the folder Hive's merge queue tests merges in (glossary: merge queue). Hive's own, not the user's."
+  },
+  "git.worktrees.queueHint": {
+    "defaultMessage": "Where Hive’s merge queue tests a card’s merge before it goes in. Hive manages it: there is nothing to remove here.",
+    "description": "Under the Merge queue (Hive's) heading in Git → Branches & remotes."
+  },
+  "git.worktrees.queueRow": {
+    "defaultMessage": "The merge queue’s folder",
+    "description": "The merge queue's folder's row in Git → Branches & remotes (glossary: merge queue)."
   },
   "git.worktrees.readOnly": {
     "defaultMessage": "Read-only here: an agent's work comes into the project folder through Merge.",

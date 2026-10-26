@@ -378,6 +378,12 @@
   "git.worktree.slotLease": "{kind, select, card {{slot}: {agent} przy karcie {card}} lane {{slot}: {agent}, tor {lane}} carried {{slot}: przejęty dla agenta {agent}} other {{slot}: niewypożyczony}}",
   "git.worktree.unused": "Nieużywany worktree",
   "git.worktrees.changes": "Zmiany",
+  "git.worktrees.copiesHeading": "Kopie do recenzji (Hive)",
+  "git.worktrees.copiesHint": "Czyste checkouty, które Hive trzyma dla recenzentów, każdy na sprawdzanej rewizji. Zarządza nimi Hive: nie ma tu nic do usunięcia.",
+  "git.worktrees.copyRow": "{use, select, review {{copy}: {agent} recenzuje {card} na {revision}} check {{copy}: {agent} sprawdza {card} na {revision}} other {{copy}: wolna w puli}}",
   "git.worktrees.heading": "Worktree",
+  "git.worktrees.queueHeading": "Kolejka scalania (Hive)",
+  "git.worktrees.queueHint": "Tu kolejka scalania Hive testuje scalenie karty, zanim trafi ono dalej. Zarządza nim Hive: nie ma tu nic do usunięcia.",
+  "git.worktrees.queueRow": "Folder kolejki scalania",
   "git.worktrees.readOnly": "Tu tylko do odczytu: praca agenta trafia do folderu projektu przez scalanie (Scal)."
 }

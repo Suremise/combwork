@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ProjectInfo, SlotView } from '@shared/types'
+import type { CopyView, ProjectInfo, SlotView } from '@shared/types'
 import { fmt, msg, tr } from '@shared/i18n'
 import {
   aheadBehindText,
@@ -113,6 +113,12 @@ const M = {
   noRemotes: msg({ id: 'git.remotes.none', defaultMessage: "No remotes: this repository is only on this computer. Add one (a GitHub repository's URL, say) to push to it.", description: 'Git → Branches & remotes of a repository with no remote.' }),
   pushesTo: msg({ id: 'git.remotes.pushesTo', defaultMessage: '(pushes to {url})', description: "After a remote's URL, when it pushes to another URL." }),
   worktrees: msg({ id: 'git.worktrees.heading', defaultMessage: 'Worktrees', description: 'Heading in Git → Branches & remotes, followed by how many there are.' }),
+  copiesHeading: msg({ id: 'git.worktrees.copiesHeading', defaultMessage: 'Review copies (Hive’s)', description: "A heading in Git → Branches & remotes, followed by how many: the worktrees Hive keeps for reviews (review copies: clean checkouts at the revision a reviewer checks). Hive's own, not the user's." }),
+  copiesHint: msg({ id: 'git.worktrees.copiesHint', defaultMessage: 'Clean checkouts Hive keeps for reviewers, each at the revision being checked. Hive manages them: there is nothing to remove here.', description: "Under the Review copies (Hive's) heading in Git → Branches & remotes." }),
+  copyRow: msg({ id: 'git.worktrees.copyRow', defaultMessage: '{use, select, review {{copy}: {agent} reviewing {card} at {revision}} check {{copy}: {agent} checking {card} at {revision}} other {{copy}: idle in the pool}}', description: "A review copy's row in Git → Branches & remotes: its name ({copy}, such as copy-1, keep it as it is) and who uses it: a reviewer ({agent}) reviewing a card ({card}: its key) at a revision ({revision}: a short commit id), an agent running a check on it, or no one (idle in Hive's pool of copies). Keep the select keys." }),
+  queueHeading: msg({ id: 'git.worktrees.queueHeading', defaultMessage: 'Merge queue (Hive’s)', description: "A heading in Git → Branches & remotes, followed by how many: the folder Hive's merge queue tests merges in (glossary: merge queue). Hive's own, not the user's." }),
+  queueHint: msg({ id: 'git.worktrees.queueHint', defaultMessage: 'Where Hive’s merge queue tests a card’s merge before it goes in. Hive manages it: there is nothing to remove here.', description: "Under the Merge queue (Hive's) heading in Git → Branches & remotes." }),
+  queueRow: msg({ id: 'git.worktrees.queueRow', defaultMessage: 'The merge queue’s folder', description: "The merge queue's folder's row in Git → Branches & remotes (glossary: merge queue)." }),
   readOnly: msg({ id: 'git.worktrees.readOnly', defaultMessage: "Read-only here: an agent's work comes into the project folder through Merge.", description: 'Under the Worktrees heading. Merge is the name of the action that brings an agent\'s branch in.' }),
   changes: msg({ id: 'git.worktrees.changes', defaultMessage: 'Changes', description: "Button on a worktree's row: shows its changes in Git → Changes." }),
   identity: msg({ id: 'git.identity.heading', defaultMessage: 'Commit identity', description: 'Heading in Git → Branches & remotes: who commits are made as.' }),
@@ -213,6 +219,8 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
   useNow(60000)
   // The project's slots and their leases (#1450), read with the branches: each slot row names its lease, each line its slot.
   const [slots, setSlots] = useState<SlotView[]>([])
+  // Its review copies and their leases (HI-1710): each copy's row says who uses it.
+  const [copies, setCopies] = useState<CopyView[]>([])
   const lanes = useStore((st) => st.lanes)
   useEffect(() => {
     if (read.loading) return
@@ -220,6 +228,10 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
     void call('slots:list', project.path).then(
       (v) => live && setSlots(v),
       () => live && setSlots([])
+    )
+    void call('copies:list', project.path).then(
+      (v) => live && setCopies(v),
+      () => live && setCopies([])
     )
     return () => {
       live = false
@@ -426,6 +438,16 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
           const card = l && l.card !== null ? cardLabelOf({ tasks }, l.card) : ''
           const lane = l?.lane ? (lanes.find((x) => x.id === l.lane)?.name ?? l.lane) : ''
           return tr(M.slotLease, { kind: l ? (l.kind === 'carried' ? 'carried' : l.card !== null ? 'card' : 'lane') : 'none', slot: v.name, agent, card, lane })
+        }
+        // The worktrees as the user's (agents', slots', unused ones) and Hive's own (HI-1710).
+        const theirs = info.worktrees.filter((w) => !w.hive)
+        const hiveCopies = info.worktrees.filter((w) => w.hive === 'copy')
+        const hiveQueue = info.worktrees.filter((w) => w.hive === 'queue')
+        const copyText = (path: string): string => {
+          const c = copies.find((x) => samePath(x.folder, path))
+          const l = c?.lease && !c.lease.returned ? c.lease : null
+          const agent = l?.agent ? (project.agents.find((a) => a.id === l.agent)?.name ?? l.agent) : ''
+          return tr(M.copyRow, { use: l ? l.kind : 'none', copy: c?.name ?? path.split(/[\\/]/).pop() ?? '', agent, card: l ? cardLabelOf({ tasks }, l.card) : '', revision: c?.revision ? c.revision.slice(0, 7) : '' }) // i18n-ignore: a select's key, never shown
         }
         const cardsOf = (branch: string | null) => (branch ? (onBranch.get(branch) ?? []) : [])
         // A worktree names the card its agent is on, whatever its folder has checked out (HR4's #1424 round 1).
@@ -644,14 +666,14 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
               </div>
             )}
 
-            {info.worktrees.length > 0 && (
+            {theirs.length > 0 && (
               <>
                 <h2 className="section">
-                  {tr(M.worktrees)} <span className="badge">{info.worktrees.length}</span>
+                  {tr(M.worktrees)} <span className="badge">{theirs.length}</span>
                 </h2>
                 <p className="hint">{tr(M.readOnly)}</p>
                 <div className="git-rows">
-                  {info.worktrees.map((w) => {
+                  {theirs.map((w) => {
                     const agent = agentOf(w.path)
                     const slot = slotOf(w.path)
                     return (
@@ -673,6 +695,43 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                       </div>
                     )
                   })}
+                </div>
+              </>
+            )}
+            {/* Hive's own worktrees (HI-1710): its review copies and the merge queue's folder, each its group, nothing to remove. */}
+            {hiveCopies.length > 0 && (
+              <>
+                <h2 className="section" data-worktrees="copies">
+                  {tr(M.copiesHeading)} <span className="badge">{hiveCopies.length}</span>
+                </h2>
+                <p className="hint">{tr(M.copiesHint)}</p>
+                <div className="git-rows">
+                  {hiveCopies.map((w) => (
+                    <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} data-hive="copy">
+                      <Icon name="shield" />
+                      <span className="git-name">{copyText(w.path)}</span>
+                      <span className="faint">{w.branch ?? (w.head ? headText({ branch: null, head: w.head }) : '')}</span>
+                      <span className="git-url faint">{w.path}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {hiveQueue.length > 0 && (
+              <>
+                <h2 className="section" data-worktrees="queue">
+                  {tr(M.queueHeading)} <span className="badge">{hiveQueue.length}</span>
+                </h2>
+                <p className="hint">{tr(M.queueHint)}</p>
+                <div className="git-rows">
+                  {hiveQueue.map((w) => (
+                    <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} data-hive="queue">
+                      <Icon name="git-merge" />
+                      <span className="git-name">{tr(M.queueRow)}</span>
+                      <span className="faint">{w.branch ?? (w.head ? headText({ branch: null, head: w.head }) : '')}</span>
+                      <span className="git-url faint">{w.path}</span>
+                    </div>
+                  ))}
                 </div>
               </>
             )}

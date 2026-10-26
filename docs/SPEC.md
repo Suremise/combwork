@@ -3081,6 +3081,11 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   or a live queue folder is refused, by HR3's round 1), and refuses when what it decides from can't be read (session
   records that can't be read keep every retired home, unlisted, HR3's round 2); right
   before anything is deleted, a session running in the folder keeps it.
+- **Branches & remotes' Worktrees** (HI-1710): Hive's own worktrees are groups of their own, read-only, with no
+  button: **Review copies (Hive's)**, each copy with who uses it ("copy-1: HR6 reviewing HI-12 at a3f2c1d", "… checking
+  …" for an isolated check's lease, or "copy-2: idle in the pool", from `copies:list`), and **Merge queue (Hive's)**, the
+  queue's folders (named as the queue names them). `git:info` marks each row `hive: 'copy' | 'queue'`
+  (`hiveWorktreeOf` in `unusedWorktrees.ts`); the Worktrees list keeps agents', slots' and unused ones, never these.
 - **The Merge dialog for merges outside cards** (OP-13) picks a branch, a card's line (with its slot), a carried slot's
   branch or any other local branch, and a target (any local branch, the project folder's by default), and merges it as
   an agent's merge (`mergeWorktree` with the target, the target's merge slot, #350): committed work only, refused while
@@ -3475,7 +3480,7 @@ and `copy_leases` (the 1.0 group's `copies` step). A copy is `creating`, `free`,
 at most one lease per copy that isn't freed (a partial unique index). Leasing reserves a free copy (or makes `copy-N`
 while under the size: the larger of 2 and the reviewing agents plus one, or `project.json` `copies.size`), then resets
 it to the revision (`git checkout --detach --force`, `git clean -fd`; a new or gone one made with `git worktree add
---detach` and the project's copied files), installing when its lock files changed (Hive's run, "Hive (copy copy-1)").
+--detach` and the project's copied files), installing when its lock files changed (Hive's run, credited to the lease's agent: HI-1710).
 A lease carries the holder Hive's profile, pid and start. **Returning** makes it `returning`; the **quiescence barrier**
 frees it only when, in order, no Progress run has its folder in the copy, its lease's job (an isolated run's processes)
 is settled (#1429's `slotJobs.ts`: ended, journal sealed and read, seen gone), its holder agent isn't in a turn or
@@ -4149,8 +4154,13 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   - **Review copies' runs:** a run in a review or check copy, linked to the copy's card and revision (#1435), reads
     "AM-12 · a3f2c1d · in copy-2" under it while running, in its hover once finished (HI-1701), and its details name the
     copy and the folder it ran in.
-  - **Slot warming as runs:** Hive's set-up runs are "Hive (slot slot-b)" and "Hive (copy copy-1)" (#1429, #1435), each
-    an entry of its own in the Runs tab's Agent filter (`slotRunsKey`, `copyRunsKey`), apart from "Hive (merge queue)".
+  - **Slot warming as runs:** Hive's set-up runs are "Hive (slot slot-b)" (#1429), each an entry of its own in the Runs
+    tab's Agent filter (`slotRunsKey`), apart from "Hive (merge queue)". A review or check copy's (#1435) is credited to
+    the agent whose lease held the copy as it started (HI-1710: the hive caller's `reviewer`, from the lease's agent,
+    named as the project names it then): its `agentId` and name, so the filter lists that reviewer once and Show the
+    agent opens it, its details and hover saying the copy ("in copy-1"); still Hive's run, which no agent can change or
+    end. With no lease's agent, it is one "Hive (review copies)" (`copiesRunsKey`), whichever copy; kept runs from
+    before ("Hive (copy copy-1)") read as that.
   - **Waiting reasons:** "waiting for a slot" and "waiting for a check copy" pause the lane (#1438, #1435); "waiting:
     preparing slot-b" (`preparing`, while its slot is being prepared) doesn't. Each is a link to what it waits for:
     Branches & remotes for a slot, the slot's set-up runs, or the lane's runs for a check copy (the Runs tab, filtered).

@@ -19,7 +19,13 @@ export type ProgressCaller =
    * Hive's own runs (#1349): its merge queue's checks for a project; `noInstall`, nothing was installed before them;
    * `installAsWritten`, an install run as written (no clean form of it).
    */
-  | { source: 'hive'; workspacePath: string; projectPath: string; noInstall?: boolean; installAsWritten?: boolean; slot?: string; copy?: string }
+  | { source: 'hive'; workspacePath: string; projectPath: string; noInstall?: boolean; installAsWritten?: boolean; slot?: string; copy?: string; reviewer?: CopyHolder }
+
+/** The agent whose lease held a review copy as Hive's run in it started (HI-1710): the run is credited to it. */
+export interface CopyHolder {
+  agentId: string
+  agentName: string
+}
 
 /** Whether reports are taken now, and a number that changes every time that setting changes (off, or on again). */
 export interface ProgressGate {
@@ -84,13 +90,19 @@ const key = (p: string): string => p.toLowerCase()
 export const HIVE_RUNS = 'Hive (merge queue)' // i18n-ignore: a run's stored name, which agents read too
 /** The stored name of a slot's warming runs (#1429), "Hive (slot slot-b)"; the window shows it in its language. */
 export const slotRunsName = (slot: string): string => `Hive (slot ${slot})` // i18n-ignore: a run's stored name, which agents read too
-/** The stored name of a review or check copy's warming runs (#1435), "Hive (copy copy-1)". */
-export const copyRunsName = (copy: string): string => `Hive (copy ${copy})` // i18n-ignore: a run's stored name, which agents read too
+/**
+ * The stored name of a review or check copy's warming runs (#1435) when no lease names its agent: one name for the pool
+ * (HI-1710: it was "Hive (copy copy-1)", a filter entry a copy, which the window showed as "copy copy").
+ */
+export const COPIES_RUNS = 'Hive (review copies)' // i18n-ignore: a run's stored name, which agents read too
 /** A copy's name as a kept run may hold it (copies.ts names them so). */
 const COPY_NAME = /^copy-\d{1,4}$/
-/** Hive's own run's stored name and default name: a slot's, a copy's, else the merge queue's. */
-const hiveName = (slot: string | null | undefined, copy: string | null | undefined): Pick<ProgressRun, 'agentName' | 'defaultName' | 'slot' | 'copy'> =>
-  slot ? { agentName: slotRunsName(slot), defaultName: 'slot', slot } : copy ? { agentName: copyRunsName(copy), defaultName: 'copy', copy } : { agentName: HIVE_RUNS, defaultName: 'mergeQueue' }
+/**
+ * Hive's own run's stored name and default name: a slot's; a copy's, credited to the agent whose lease held it
+ * (HI-1710), else the copies'; else the merge queue's.
+ */
+const hiveName = (slot: string | null | undefined, copy: string | null | undefined, holder?: CopyHolder | null): Pick<ProgressRun, 'agentName' | 'defaultName' | 'slot' | 'copy'> =>
+  slot ? { agentName: slotRunsName(slot), defaultName: 'slot', slot } : copy ? (holder ? { agentName: holder.agentName, copy } : { agentName: COPIES_RUNS, defaultName: 'copy', copy }) : { agentName: HIVE_RUNS, defaultName: 'mergeQueue' }
 /** A slot's name as a kept run may hold it (slots.ts names them so). */
 const SLOT_NAME = /^[\w.-]{1,60}$/
 
@@ -141,16 +153,19 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
     const named = keptText(r.agentName, MAX_TITLE)
     const slot = source === 'hive' && typeof r.slot === 'string' && SLOT_NAME.test(r.slot) ? r.slot : null
     const copy = typeof r.copy === 'string' && COPY_NAME.test(r.copy) ? r.copy : null
+    // A copy's warming run credited to its lease's agent (HI-1710): kept with that agent's id and name.
+    const keptHolder = source === 'hive' && copy && !slot ? keptText(r.agentId, 200) : null
+    const holder = keptHolder && named && r.defaultName !== 'copy' && named !== COPIES_RUNS && !named.startsWith('Hive (') ? { agentId: keptHolder, agentName: named } : null
     out.push({
       id,
       workspacePath,
       projectPath: source === 'agent' || source === 'hive' ? keptText(r.projectPath, 1000) : null,
-      agentId: source === 'agent' ? keptText(r.agentId, 200) : null,
-      agentName: source === 'hive' ? hiveName(slot, copy).agentName : (named ?? (source === 'api' ? 'Script' : 'Agent')), // i18n-ignore: a run's stored name for a script, which agents read too
+      agentId: source === 'agent' ? keptText(r.agentId, 200) : (holder?.agentId ?? null),
+      agentName: source === 'hive' ? hiveName(slot, copy, holder).agentName : (named ?? (source === 'api' ? 'Script' : 'Agent')), // i18n-ignore: a run's stored name for a script, which agents read too
       // A script's name is always Hive's (scripts don't name themselves, start()), as is the merge queue's; an agent's
       // only when it has none, or when Hive's "Agent" was saved with its mark (a nameless run kept before: this file is
       // read again after a save).
-      ...(source === 'hive' ? hiveName(slot, copy) : source === 'api' ? (named === null || named === 'Script' ? { defaultName: 'script' as const } : {}) : named === null || (named === 'Agent' && r.defaultName === 'agent') ? { defaultName: 'agent' as const } : {}),
+      ...(source === 'hive' ? hiveName(slot, copy, holder) : source === 'api' ? (named === null || named === 'Script' ? { defaultName: 'script' as const } : {}) : named === null || (named === 'Agent' && r.defaultName === 'agent') ? { defaultName: 'agent' as const } : {}),
       provider: source !== 'hive' && PROVIDERS.some((p) => p.id === r.provider) ? (r.provider as ProviderId) : null,
       source,
       title,
@@ -375,9 +390,9 @@ export class ProgressStore {
       id: randomUUID(),
       workspacePath: caller.workspacePath,
       projectPath: caller.source === 'agent' || caller.source === 'hive' ? caller.projectPath : null,
-      agentId: caller.source === 'agent' ? caller.agentId : null,
-      agentName: caller.source === 'api' ? 'Script' : caller.source === 'hive' ? hiveName(caller.slot, caller.copy).agentName : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
-      ...(caller.source === 'api' ? { defaultName: 'script' as const } : caller.source === 'hive' ? hiveName(caller.slot, caller.copy) : {}),
+      agentId: caller.source === 'agent' ? caller.agentId : caller.source === 'hive' && caller.copy && !caller.slot && caller.reviewer ? caller.reviewer.agentId : null,
+      agentName: caller.source === 'api' ? 'Script' : caller.source === 'hive' ? hiveName(caller.slot, caller.copy, caller.reviewer).agentName : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
+      ...(caller.source === 'api' ? { defaultName: 'script' as const } : caller.source === 'hive' ? hiveName(caller.slot, caller.copy, caller.reviewer) : {}),
       provider: caller.source === 'api' || caller.source === 'hive' ? null : caller.provider,
       source: caller.source as ProgressSource,
       title,

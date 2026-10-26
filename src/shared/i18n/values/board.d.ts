@@ -554,11 +554,11 @@ interface HiveMessageValues {
   'board.progress.blocksReview': { card: string | number }
   'board.progress.cantShow': { agent: string | number }
   'board.progress.copied': { what: string }
+  'board.progress.copiesRun': undefined
   'board.progress.copyCommand': undefined
   'board.progress.copyDetails': undefined
   'board.progress.copyFailed': { what: string }
   'board.progress.copyRevision': { revision: string | number }
-  'board.progress.copyRun': { copy: string | number }
   'board.progress.detailsOf': { run: string | number }
   'board.progress.dismiss': undefined
   'board.progress.empty': undefined

@@ -378,6 +378,12 @@
   "git.worktree.slotLease": "{kind, select, card {{slot}：{agent}が{card}を作業中} lane {{slot}：{agent}、レーン{lane}} carried {{slot}：{agent}用に保持（旧ワークツリー）} other {{slot}：貸し出しなし}}",
   "git.worktree.unused": "未使用のワークツリー",
   "git.worktrees.changes": "変更",
+  "git.worktrees.copiesHeading": "レビュー用コピー（Hive）",
+  "git.worktrees.copiesHint": "Hiveがレビュアーのために保持するクリーンなチェックアウトで、それぞれ確認中のリビジョンにあります。Hiveが管理するため、ここで削除するものはありません。",
+  "git.worktrees.copyRow": "{use, select, review {{copy}：{agent}が{card}を{revision}でレビュー中} check {{copy}：{agent}が{card}を{revision}でチェック中} other {{copy}：プールで待機中}}",
   "git.worktrees.heading": "ワークツリー",
+  "git.worktrees.queueHeading": "マージキュー（Hive）",
+  "git.worktrees.queueHint": "Hiveのマージキューが、カードのマージを取り込む前にテストする場所です。Hiveが管理するため、ここで削除するものはありません。",
+  "git.worktrees.queueRow": "マージキューのフォルダー",
   "git.worktrees.readOnly": "ここでは読み取り専用です。エージェントの作業は「マージ」でプロジェクトのフォルダーに取り込みます。"
 }
