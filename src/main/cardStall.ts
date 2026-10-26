@@ -4,6 +4,7 @@ import { agentRuntime } from '../shared/runtime'
 import { columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, type LaneOrderView } from '../shared/tasks'
 import type { TaskCard } from '../shared/types'
 import { loopStepWaitMinutes } from '../shared/lanes'
+import { isResuming } from './restartResume'
 import { sessions } from './sessions'
 import { workspaceOf, type WorkspaceService } from './workspace'
 
@@ -63,7 +64,8 @@ export async function cardStallIn(ws: WorkspaceService, c: TaskCard, agents = ne
     const key = p.toLowerCase()
     if (!agents.has(key)) agents.set(key, ws.projectConfig(p).then(projectAgents, () => []))
     const def = (await agents.get(key)!).find((a) => a.id === c.agent)
-    now = def ? { name: def.name, running: !!sessions.liveFor(p, c.agent) } : null
+    // An agent queued to resume after a restart (HI-1707) isn't stalled meanwhile.
+    now = def ? { name: def.name, running: !!sessions.liveFor(p, c.agent) || isResuming(p, c.agent) } : null
   }
   return cardStall(c, now, ws.path, lane, await stepWaitOf(ws, c))
 }

@@ -326,6 +326,8 @@
   "tips.recentWorkspaces.title": "Tidy your recent workspaces",
   "tips.removeAll.text": "Remove All in the project header removes all of a project's agents after one question. Worktrees are kept unless you tick the box, which deletes only merged, clean ones.",
   "tips.removeAll.title": "Remove every agent at once",
+  "tips.resumeAfterUpdate.text": "Installing a new version tells the agents that were working or in a card loop, and when Hive starts again it resumes them in their conversations, one at a time, each told its card, round and lane. After you quit, the next start offers to resume them instead.",
+  "tips.resumeAfterUpdate.title": "Updates leave your agents where they were",
   "tips.resumeAll.text": "After a restart, Resume All Agents in the project header resumes every stopped agent's last session in one go.",
   "tips.resumeAll.title": "Resume all agents at once",
   "tips.reviewCopies.text": "A reviewer reviews in a review copy: a folder at exactly the submitted revision, which nothing else writes, so the builder can carry on meanwhile. Its checks there count for that submission. Settings → Advanced turns it off.",

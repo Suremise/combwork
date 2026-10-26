@@ -328,6 +328,8 @@ interface HiveMessageValues {
   'tips.recentWorkspaces.title': undefined
   'tips.removeAll.text': undefined
   'tips.removeAll.title': undefined
+  'tips.resumeAfterUpdate.text': undefined
+  'tips.resumeAfterUpdate.title': undefined
   'tips.resumeAll.text': undefined
   'tips.resumeAll.title': undefined
   'tips.reviewCopies.text': undefined

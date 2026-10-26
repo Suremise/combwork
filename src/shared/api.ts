@@ -169,6 +169,10 @@ export interface HiveRequests {
   'app:resumeAfterClose': () => { resumed: number; failed: number }
   /** The unexpected-close notice's Stop Them (#987): how many processes the agents had started were stopped. */
   'app:stopLeftAfterClose': () => number
+  /** The notice offering to resume the agents that were working when Hive closed (HI-1707): queues them; how many. */
+  'app:resumeRestart': () => number
+  /** That notice's Dismiss: none resumed, and the offer isn't made again; how many it offered. */
+  'app:dismissRestart': () => number
   'update:state': () => UpdateState
   /** A check started by the user; resolves with the result. */
   'update:check': () => UpdateState

@@ -1307,6 +1307,14 @@
     "defaultMessage": "Remove every agent at once",
     "description": "A tip's title."
   },
+  "tips.resumeAfterUpdate.text": {
+    "defaultMessage": "Installing a new version tells the agents that were working or in a card loop, and when Hive starts again it resumes them in their conversations, one at a time, each told its card, round and lane. After you quit, the next start offers to resume them instead.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.resumeAfterUpdate.title": {
+    "defaultMessage": "Updates leave your agents where they were",
+    "description": "A tip's title."
+  },
   "tips.resumeAll.text": {
     "defaultMessage": "After a restart, Resume All Agents in the project header resumes every stopped agent's last session in one go.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

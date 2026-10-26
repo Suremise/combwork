@@ -36,6 +36,7 @@ import { branchMergeStatus, lineCard, lineConfirmed, mergeBranch, mergeBranches 
 import { createLogger, logsDir, userText } from './logger'
 import { diagnostics } from './diagnostics'
 import { resumeAfterClose, startupStep, stopLeftAfterClose } from './lastRun'
+import { dismissOffered, resumeOffered, workspaceRecovering } from './restartResume'
 import { keepAwakeCount } from './power'
 import { progress, progressSeq } from './progressService'
 import { mergeSlots, recoverMergeSlots, workspaceSlots } from './mergeSlotHost'
@@ -403,7 +404,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     void checkMoved(contextWorkspace()!).catch((e) => log.warn('checking whether the workspace moved', e))
     // A merge slot an agent held when Hive closed: its merge may be half done (#350).
     // At start, the notice that Hive closed unexpectedly waits for it, and tells its holds (#984).
-    if (ws.path) startupStep(recoverMergeSlots(ws.path).catch((e) => log.warn('recovering the merge slots', e)))
+    // Resumes after a restart wait for it too (HI-1707).
+    if (ws.path) {
+      const recovery = recoverMergeSlots(ws.path).catch((e) => log.warn('recovering the merge slots', e))
+      startupStep(recovery)
+      workspaceRecovering(ws.path, recovery)
+    }
   }
   // Each read of the projects' ids (#514): their names by id, and what follows a rename, follow it.
   WorkspaceService.onIdsRead = (ws, seen) => {
@@ -446,6 +452,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return { resumed: r.resumed.length, failed: r.failed.length }
     },
     'app:stopLeftAfterClose': () => stopLeftAfterClose(),
+    'app:resumeRestart': () => resumeOffered(),
+    'app:dismissRestart': () => dismissOffered(),
     'update:state': () => updater.updateState(),
     'update:check': () => updater.check(true),
     'update:download': () => updater.download(),

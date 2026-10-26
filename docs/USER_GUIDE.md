@@ -1697,6 +1697,14 @@ What the agents had started can outlive Hive: a test run, a dev server, a copy o
 
 Quitting Hive, restarting it, installing an update or Windows shutting down or signing out never shows the notice. Help → Copy Diagnostics says whether the last run ended without quitting, and the log (**Help → Open Logs**) has the details.
 
+### When Hive restarts for an update <a id="when-hive-restarts-for-an-update"></a>
+
+Installing a new version closes Hive: **Restart to Update**, or an installer you run yourself. Before it closes, Hive notes which agents were working, watching their cards or in a card loop, with each one's card, round and lane, and leaves each a line in its inbox: *Hive is restarting for an update. Your work is saved; you'll be resumed.* (An installer of this version or later asks the running Hive to close first; an older one ends it, and the next start then finds a newer version and treats it the same way.)
+
+When Hive starts again, it resumes those agents in their conversations **one at a time**, each once the one before it has taken its note: *Hive restarted for an update (1.0.0-rc.4 → 1.0.0-rc.5) at 10:00 UTC; your session was stopped and is resumed now. You were on HI-1673, round 2, in lane 'Lanes from the bottom' (its builder). Carry on: re-arm your card watch if you were waiting.* Meanwhile their lanes don't show them as stalled. One notice then says who was resumed, and who wasn't and why: an agent you removed, one already running or since moved to a newer conversation, one whose working folder (slot) is held for other work (resume it yourself), or one that wasn't ready in time (**Settings → Advanced → Resuming after a restart: ready within**, 90 s), which Hive stops before it starts the next. If the Hive Assistant is set up, it gets a line saying the same.
+
+To decide yourself each time, turn off **Settings → Advanced → Resume agents after an update**: Hive then offers instead, as it does after you quit (see [Quitting](#quitting)). A workspace can have its own setting (**This workspace** in Settings → Advanced), and so can the time an agent has to be ready. Hive resumes a workspace's agents once that workspace has opened and is read, and the last way Hive closed decides: if you quit while it is resuming them, the ones it hadn't finished are offered at the next start, and an update after a quit resumes them by itself.
+
 ## The system tray <a id="the-system-tray"></a>
 
 Closing the (last) window keeps Hive running in the tray so sessions continue. The tray icon shows a red dot when an agent needs you. Its menu lists the agents that need you and those with work to review, from every window (click one to go to it), then your active projects, grouped by workspace when several windows are open. Quit from the tray menu or **File → Exit**.
@@ -1714,6 +1722,8 @@ When it asks, you see a table of the agents: each one's project, what it's doing
 If files have unsaved changes (in the Files tab, or a shared note, skill, instruction or memory file, or MCP server you're editing), Hive always asks, lists them at the top, and saves them (**Save and quit**) or discards them, as you choose. A file that changed on disk since you opened it isn't overwritten: Hive stays open so you can decide.
 
 Tick **Don't ask again** to stop the question about sessions, or change it any time in **Settings → General → Confirm before quitting** (*When an agent is working*, *Whenever sessions are running*, or *Never*).
+
+The next time Hive starts, it offers to resume the agents that were working, watching their cards or in a card loop when you quit: one notice, **Resume the 3 agents that were working?**, naming them. **Resume** starts each again in its conversation, one at a time, telling it Hive was quit and started again; **Don't Resume** leaves them stopped and doesn't ask again. Nothing resumes until you choose, and closing the notice (×) without choosing asks again at the next start.
 
 ## Keyboard shortcuts <a id="keyboard-shortcuts"></a>
 

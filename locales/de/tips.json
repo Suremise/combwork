@@ -326,6 +326,8 @@
   "tips.recentWorkspaces.title": "Deine zuletzt geöffneten Arbeitsbereiche aufräumen",
   "tips.removeAll.text": "„Alle entfernen“ im Projektkopf entfernt nach einer Rückfrage alle Agenten eines Projekts. Worktrees bleiben erhalten, außer du hakst das Kästchen an; dann werden nur gemergte, saubere gelöscht.",
   "tips.removeAll.title": "Alle Agenten auf einmal entfernen",
+  "tips.resumeAfterUpdate.text": "Beim Installieren einer neuen Version erfahren es die Agenten, die gearbeitet haben oder in einer Kartenschleife waren, und wenn Hive wieder startet, setzt es sie in ihren Unterhaltungen fort, einen nach dem anderen, und jeder erfährt seine Karte, Runde und Lane. Nach dem Beenden bietet der nächste Start stattdessen an, sie fortzusetzen.",
+  "tips.resumeAfterUpdate.title": "Updates lassen deine Agenten, wo sie waren",
   "tips.resumeAll.text": "Nach einem Neustart setzt „Alle Agenten fortsetzen“ im Projektkopf die letzte Sitzung jedes gestoppten Agenten in einem Schritt fort.",
   "tips.resumeAll.title": "Alle Agenten auf einmal fortsetzen",
   "tips.reviewCopies.text": "Ein Reviewer reviewt in einer Review-Kopie: einem Ordner genau auf der eingereichten Revision, in den sonst nichts schreibt, sodass der Bearbeiter derweil weiterarbeiten kann. Seine Checks dort zählen für diese Einreichung. Einstellungen → Erweitert schaltet es aus.",
