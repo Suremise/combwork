@@ -14,7 +14,7 @@ interface Memo {
 }
 
 /** The error kind of Codex's structured error info: a code ("cyber_policy") or an object keyed by it. */
-function errorKind(info: unknown): string | null {
+export function errorKind(info: unknown): string | null {
   if (typeof info === 'string') return info
   if (info && typeof info === 'object') return Object.keys(info)[0] ?? null
   return null
