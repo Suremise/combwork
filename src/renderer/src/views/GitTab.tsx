@@ -198,7 +198,7 @@ export function HistorySection({ project, summary }: { project: ProjectInfo; sum
       {!h.ref && <option value="">{summary ? headText(summary) : ''}</option>}
       <optgroup label={tr(M.historyLocal)}>
         {h.branches.map((b) => (
-          <option key={b} value={b}>
+          <option key={b} value={`refs/heads/${b}`}>
             {optionText(h, b)}
           </option>
         ))}
@@ -206,7 +206,7 @@ export function HistorySection({ project, summary }: { project: ProjectInfo; sum
       {h.remoteBranches.length > 0 && (
         <optgroup label={tr(M.historyRemote)}>
           {h.remoteBranches.map((b) => (
-            <option key={b} value={b}>
+            <option key={b} value={`refs/remotes/${b}`}>
               {b}
             </option>
           ))}

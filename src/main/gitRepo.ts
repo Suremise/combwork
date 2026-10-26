@@ -345,9 +345,11 @@ export async function repoHistory(root: string, opts: { ref?: string | null; pag
   }
   // By default the project's target (where its work goes: 1.0.0 for hive, not main), else the folder's branch.
   const target = opts.workTarget && branches.includes(opts.workTarget) ? opts.workTarget : null
-  const defaultRef = target ?? summary.branch
-  const ref = opts.ref && (branches.includes(opts.ref) || remoteBranches.includes(opts.ref)) ? opts.ref : defaultRef
-  const spec = !ref ? 'HEAD' : branches.includes(ref) ? `refs/heads/${ref}` : `refs/remotes/${ref}`
+  // Named whole (round 1): a local branch called origin/main never hides the remote's of that name.
+  const defaultRef = target ? `refs/heads/${target}` : summary.branch ? `refs/heads/${summary.branch}` : null
+  const known = (r: string): boolean => (r.startsWith('refs/heads/') && branches.includes(r.slice('refs/heads/'.length))) || (r.startsWith('refs/remotes/') && remoteBranches.includes(r.slice('refs/remotes/'.length)))
+  const ref = opts.ref && known(opts.ref) ? opts.ref : defaultRef
+  const spec = ref ?? 'HEAD'
   const count = await git(root, ['rev-list', '--count', spec, '--'])
   if (!count.ok) throw commandFailed('git rev-list', count) // i18n-ignore: a git command, as it is
   const total = Number(count.out.trim()) || 0

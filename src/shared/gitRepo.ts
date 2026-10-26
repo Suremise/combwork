@@ -189,9 +189,9 @@ export interface GitTagRow {
 export interface GitHistory {
   /** A page of the branch's commits, newest first (HISTORY_COMMITS a page). */
   commits: GitCommitRow[]
-  /** The branch shown (local, or remote as origin/x), null for a detached HEAD (#1643). */
+  /** The branch shown, named whole (refs/heads/x, refs/remotes/origin/x), null for a detached HEAD (#1643). */
   ref: string | null
-  /** What it shows unless another is chosen: the project's target when it is a branch here, else the folder's. */
+  /** What it shows unless another is chosen, named whole: the project's target when it is a branch here, else the folder's. */
   defaultRef: string | null
   /** The project's target when it is a branch here. */
   target: string | null
