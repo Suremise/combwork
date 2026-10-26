@@ -72,6 +72,25 @@ describe("the log's writer thread (HI-1730)", () => {
     }
   })
 
+  it("the logger loads in a worker thread, where there is no `app` (the usage worker loads it through fsutil: since HI-1684 it threw there)", async () => {
+    const { Worker } = await import('worker_threads')
+    const script = join(base, 'logger-in-worker.cjs')
+    const { writeFileSync } = await import('fs')
+    // What `electron` is in a worker of Electron's main process: the npm package's export, a path, with no `app`.
+    const stub = join(base, 'electron-in-worker.cjs')
+    writeFileSync(stub, "module.exports = 'C:\\\\electron\\\\electron.exe'\n")
+    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'logger.ts')], outfile: script, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs', electron: stub }, logLevel: 'silent' })
+    const runner = join(base, 'logger-runner.cjs')
+    writeFileSync(runner, `const { parentPort } = require('worker_threads')\ntry {\n  const l = require(${JSON.stringify(script)})\n  l.createLogger('test').info('from a worker')\n  parentPort.postMessage('loaded')\n} catch (e) {\n  parentPort.postMessage('threw: ' + e.message)\n}\n`)
+    const w = new Worker(runner)
+    const said = await new Promise<string>((resolve) => {
+      w.once('message', (m: string) => resolve(m))
+      w.once('error', (e: Error) => resolve(`error: ${e.message}`))
+    })
+    await w.terminate()
+    expect(said).toBe('loaded')
+  })
+
   it('a batch the writer starts after main said it writes what is left (STOP) is left to main; one under way is waited for', () => {
     const state = new Int32Array(new SharedArrayBuffer(LOG_STATE_SLOTS * 4))
     const f = join(base, 'handshake.log')

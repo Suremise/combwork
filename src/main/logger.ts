@@ -199,7 +199,9 @@ export async function useLogWriter(script: string | null, slowMs = 0): Promise<v
  * closed pipe throws EPIPE, or its stream reports it as an error; uncaught, that error was logged, and its console
  * write threw again, without end. The file log goes on.
  */
-let toConsole = !app.isPackaged
+// Read safely: a worker that loads this module (the usage worker, through fsutil) has no `app`, and reading it there at
+// load threw and ended the worker on every start (HI-1730, since HI-1684 moved this read to the module's top).
+let toConsole = unpackaged() && isMainThread
 /** The errors of a console that was closed (its reader gone): expected, said once. */
 const PIPE_CLOSED = new Set(['EPIPE', 'ERR_STREAM_DESTROYED', 'ERR_STREAM_WRITE_AFTER_END'])
 
