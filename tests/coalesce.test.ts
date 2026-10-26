@@ -5,6 +5,9 @@ import { boundedQueue, coalesced, latestOnly } from '../src/shared/coalesce'
 import { makeBadgeSource } from '../src/shared/workflow/badgeSource'
 import type { WorkBadge } from '../src/shared/workflow/workView'
 
+/** A bound for a hung run only: the waits are for promises the test settles itself. */
+const HUNG_MS = 10_000
+
 /** A call the test settles: each one made, with what it was for. */
 function held<T>() {
   const calls: { for: string; resolve: (v: T) => void; reject: (e: Error) => void }[] = []
@@ -207,7 +210,7 @@ describe("a view's reads (#1254 round 3)", () => {
     expect(applied).toEqual([])
     // Shown again: the queue takes new reads.
     q.add('s3', () => (started.push('s3'), Promise.resolve('three')), (v) => applied.push(v))
-    await vi.waitFor(() => expect(applied).toEqual(['three']))
+    await vi.waitFor(() => expect(applied).toEqual(['three']), { timeout: HUNG_MS })
   })
 
   it('boundedQueue: a read that finishes starts the next waiting one, and applies its result', async () => {
@@ -217,8 +220,8 @@ describe("a view's reads (#1254 round 3)", () => {
     for (const id of ['a', 'b']) q.add(id, () => h.fetch(id), (v) => applied.push(v))
     expect(h.calls.map((c) => c.for)).toEqual(['a'])
     h.calls[0].resolve('A')
-    await vi.waitFor(() => expect(h.calls.map((c) => c.for)).toEqual(['a', 'b']))
+    await vi.waitFor(() => expect(h.calls.map((c) => c.for)).toEqual(['a', 'b']), { timeout: HUNG_MS })
     h.calls[1].resolve('B')
-    await vi.waitFor(() => expect(applied).toEqual(['A', 'B']))
+    await vi.waitFor(() => expect(applied).toEqual(['A', 'B']), { timeout: HUNG_MS })
   })
 })
