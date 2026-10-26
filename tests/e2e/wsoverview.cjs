@@ -115,7 +115,8 @@ const check = (name, ok, extra = '') => {
     if (!!side !== (await assistantOpen())) await page.keyboard.press('Control+Alt+I')
     await until(async () => !!side === (await assistantOpen()), HUNG_MS)
   }
-  for (const [width, zoom, theme, side] of [[620, 1, 'dark', null], [760, 1.25, 'dark', null], [620, 1.25, 'dark', null], [620, 1.25, 'light', null], [820, 1, 'dark', 'right'], [820, 1, 'light', 'left']]) {
+  // HI-1696: and the narrowest window (900 px) at 150%, which leaves 600 px of window in all.
+  for (const [width, zoom, theme, side] of [[620, 1, 'dark', null], [760, 1.25, 'dark', null], [620, 1.25, 'dark', null], [620, 1.25, 'light', null], [900, 1.5, 'dark', null], [820, 1, 'dark', 'right'], [820, 1, 'light', 'left']]) {
     await inv('settings:update', { appearance: { theme } })
     await setAssistant(side)
     await app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), zoom)
