@@ -11,7 +11,7 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
 import { agentActor, agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, loopStepSide, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
-import { awaitsAgentMerge, compile, hasStage, type Ruleset } from '../../shared/workflow/compile'
+import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
 import { reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
@@ -31,7 +31,7 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
 
-import { ownRuleset } from '../../shared/workflow/workView'
+import { ownRuleset, reviewSkipOf } from '../../shared/workflow/workView'
 
 export { APPLY_OPTIONS } from '../../shared/workflow/workView'
 
@@ -387,16 +387,35 @@ export class Workflow {
    * the lane started), else the current one.
    */
   rulesetOf(card: CardRecord, s: CardState = this.state(card)): Ruleset {
+    const facts = this.store.facts(card.id)
+    const base = this.baseRulesetOf(card, s, facts)
+    // A card that skips review (#1625) runs under its rules with no review, whenever the skip was set.
+    if (!reviewSkipOf(facts).skip) return base
+    const skipped = skipReviewOf(base)
+    if (skipped !== base) this.skippedBases.set(skipped.id, base)
+    return skipped
+  }
+
+  /** Each ruleset with review skipped that `rulesetOf` gave, by id, and its base: a write stores both (#1625). */
+  private readonly skippedBases = new Map<string, Ruleset>()
+
+  /** The rules a card keeps (§16.5.4) or starts under, before its review skip (#1625) is applied. */
+  private baseRulesetOf(card: CardRecord, s: CardState, facts: Fact[]): Ruleset {
     // A card back in Todo (put back, or a Done card reopened) starts its next cycle under the rules then (§16.5.4,
     // HR2's #1290 round 1): its last cycle's ruleset isn't its own any more.
-    const own = s.started && s.stage !== 'todo' ? ownRuleset(this.store.facts(card.id), s) : null
-    if (own) return this.store.ruleset(own)
+    const own = s.started && s.stage !== 'todo' ? ownRuleset(facts, s) : null
+    if (own) return this.store.ruleset(baseRulesetId(own))
     if (card.lane) {
       const lane = this.lane(card.lane)
       if (lane && !lane.ended && lane.ruleset) return this.store.ruleset(lane.ruleset)
     }
     // Not stored here (a read): a write naming it stores it in its own transaction (write()).
     return this.currentRuleset(false)
+  }
+
+  /** The rules a card's review skip (#1625) would leave out of: its base rules, as `rulesetOf` reads them. */
+  reviewedRuleset(card: CardRecord, s: CardState = this.state(card)): Ruleset {
+    return this.baseRulesetOf(card, s, this.store.facts(card.id))
   }
 
   /** The card's folder on disk: its own, or the project folder. */
@@ -468,6 +487,9 @@ export class Workflow {
       const r = this.store.tx((tx) => {
         // The ruleset its facts name, stored with them.
         if (ruleset) tx.saveRuleset(ruleset)
+        // Its base too (#1625): the rules it is found again by once its review skip is undone.
+        const base = ruleset && this.skippedBases.get(ruleset.id)
+        if (base) tx.saveRuleset(base)
         w = new Write(tx, tx.card(card.id), ruleset, actor, tx.card(card.id).stage)
         return fn(w, prepared)
       })

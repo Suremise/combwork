@@ -2023,6 +2023,10 @@
     "defaultMessage": "retired home, no conversation left",
     "description": "What an unused worktree is (#1450): an agent's old folder kept so its conversations could resume (a reviewer's old worktree, say), none of which can now. Lower case: a badge after its name."
   },
+  "workspace.unused.kind.queue": {
+    "defaultMessage": "merge queue's old folder, not needed now",
+    "description": "What an unused worktree is (#1644): a folder the merge queue tested merges in, kept after its last merge, which no merge waiting or card in progress needs now (the queue makes a new one when it does). Lower case: a badge after its name. Glossary: merge queue."
+  },
   "workspace.unused.kind.slot": {
     "defaultMessage": "free slot beyond the pool",
     "description": "What an unused worktree is (#1450): one of Hive's slots, free and set up, beyond the number the project needs now. Lower case: a badge after its name."

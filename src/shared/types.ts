@@ -1516,7 +1516,8 @@ export interface UnusedWorktree {
   /**
    * What it is to Hive's pools (#1450): a free slot beyond the pool's size (`slot`), a slot left with changes and no
    * lease (`dirtySlot`), a carried folder whose lease ended (`carried`), or a retired home no conversation resumes in
-   * any more (`home`). Absent: a worktree no agent works in, as before. A slot's kinds are removed only through the
+   * any more (`home`), or a merge queue's folder its queue no longer needs, or one named as the queue names them that it
+   * has no record of (`queue`, #1644; one its queue uses is never listed). Absent: a worktree no agent works in, as before. A slot's kinds are removed only through the
    * pool's guarded clean-up (never Remove anyway), and aren't given to an agent.
    */
   kind?: UnusedWorktreeKind
@@ -1524,7 +1525,7 @@ export interface UnusedWorktree {
   slot?: string
 }
 
-export type UnusedWorktreeKind = 'slot' | 'dirtySlot' | 'carried' | 'home'
+export type UnusedWorktreeKind = 'slot' | 'dirtySlot' | 'carried' | 'home' | 'queue'
 
 /**
  * A branch the Merge dialog can merge outside cards (#1450, OP-13): a card's line, a carried slot's branch, or any

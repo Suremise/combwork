@@ -505,6 +505,7 @@
   "workspace.unused.kind.carried": "worktree antiguo de un agente, liberado",
   "workspace.unused.kind.dirtySlot": "slot con cambios, sin prestar",
   "workspace.unused.kind.home": "carpeta antigua, sin conversaciones",
+  "workspace.unused.kind.queue": "carpeta antigua de la cola de fusión, ya no necesaria",
   "workspace.unused.kind.slot": "slot libre de más",
   "workspace.unused.lostCommits": "{count, plural, one {# commit en {branch} que no está} many {# commits en {branch} que no están} other {# commits en {branch} que no están}} en {known, select, yes {{into}} other {ninguna otra rama}}",
   "workspace.unused.lostDetached": "{count, plural, one {# commit sin rama (solo lo tiene su HEAD desacoplado)} many {# commits sin rama (solo los tiene su HEAD desacoplado)} other {# commits sin rama (solo los tiene su HEAD desacoplado)}}",

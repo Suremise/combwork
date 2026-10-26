@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { WorkBadge, WorkView } from '@shared/workflow/workView'
+import { makeBadgeSource, NO_BADGES } from '@shared/workflow/badgeSource'
 import { useScopedLoad } from './scopedLoad'
 import { useStore } from './store'
 
@@ -23,7 +24,10 @@ export function useCardWork(n: number | null): { view: WorkView | null; error: s
   return { view: data, error, loaded: at > 0, retry: () => setAgain((x) => x + 1) }
 }
 
-/** Every live card's badges, by number; empty while loading. */
+/**
+ * Every live card's badges, by number; empty while loading. One source for the window however many views show them
+ * (makeBadgeSource, #1629), read again when the board, a project's workflow or the projects change.
+ */
 export function useWorkBadges(): Map<number, WorkBadge> {
   const ws = useStore((s) => s.workspace?.path ?? '')
   const tasks = useStore((s) => s.tasks)
@@ -31,9 +35,12 @@ export function useWorkBadges(): Map<number, WorkBadge> {
   // marks may have changed (#1421).
   const workflow = useStore((s) => s.workflowVersion)
   const projects = useStore((s) => s.workspace?.projects)
-  const { data, load } = useScopedLoad<WorkBadge[]>(ws)
   useEffect(() => {
-    if (ws) load(ws, () => window.hive.invoke('tasks:workBadges'))
-  }, [ws, tasks, workflow, projects, load])
-  return useMemo(() => new Map((data ?? []).map((b) => [b.card, b])), [data])
+    if (ws) badgeSource.ask(ws, [tasks, workflow, projects])
+  }, [ws, tasks, workflow, projects])
+  const shown = useSyncExternalStore(badgeSource.subscribe, badgeSource.get)
+  return shown.ws === ws ? shown.badges : NO_BADGES
 }
+
+/** The window's work badges (useWorkBadges). */
+export const badgeSource = makeBadgeSource(() => window.hive.invoke('tasks:workBadges'))

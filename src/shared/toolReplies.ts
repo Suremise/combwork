@@ -136,6 +136,8 @@ export interface IntentDone {
   warnings?: string[]
   /** What comes next on the card under its rules (#1530, shared/workflow/nextStep.ts). */
   next?: NextStep
+  /** The card watch Hive armed for the agent after its submission or failed verdict in a lane (#1639, main/intentWatch.ts). */
+  watch?: string
 }
 
 /** What a reply says comes next (#1530): an agent follows it rather than infer the step from a column. */
@@ -173,7 +175,7 @@ export function intentText(d: IntentDone): string {
   const facts = Object.entries(d.data ?? {})
     .filter(([, v]) => v !== undefined && v !== null && v !== '')
     .map(([k, v]) => `${k}: ${value(v)}`)
-  return [`${d.card}: ${where}.${facts.length ? ` ${facts.join('; ')}` : ''}${d.next ? ` ${nextText(d.next)}` : ''}`, ...(d.warnings ?? []).map((w) => `Warning: ${w}`)].join('\n')
+  return [`${d.card}: ${where}.${facts.length ? ` ${facts.join('; ')}` : ''}${d.next ? ` ${nextText(d.next)}` : ''}${d.watch ? ` ${d.watch}` : ''}`, ...(d.warnings ?? []).map((w) => `Warning: ${w}`)].join('\n')
 }
 
 /** One of the Assistant's changes as GET /v1/assistant/changes lists it (#1282). */

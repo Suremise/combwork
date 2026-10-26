@@ -8671,17 +8671,43 @@ body.pane-resizing-v .monaco-editor {
 /* A folded card: one line with its number, title (cut short), markers and agent. */
 .task-card.folded {
   padding: 4px 9px;
+  container: folded-card / inline-size;
+}
+.task-card-top .task-number,
+.task-card-line .task-number {
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Its markers keep their size (#1634): with no room beside the title they go onto another line, never past the card's
+   edge or over each other. The title keeps a few letters, so its tooltip can be reached. */
+.task-card-line > .tip-wrap:has(> .task-for-you) {
+  flex: none;
+}
+/* In a narrow column (#1634) its For you chip is its bell alone (its words and the requests in its tooltip and
+   accessible name), and the title has a line of its own under the number and markers. */
+@container folded-card (max-width: 219px) {
+  .task-card-line .task-for-you .task-chip-label {
+    display: none;
+  }
+  .task-card-line > .tip-wrap:has(> .task-title) {
+    order: 1;
+    flex-basis: 100%;
+  }
 }
 .task-card-line {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 2px 6px;
   min-width: 0;
   font-size: 12px;
 }
 .task-card-line > .tip-wrap:has(> .task-title) {
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 0;
+  min-width: min(4em, 100%);
 }
 .task-card-line .task-title {
   flex: 1;
@@ -8785,8 +8811,39 @@ body.pane-resizing-v .monaco-editor {
   font-size: 11px;
   white-space: nowrap;
 }
+/* A card's chips never run past its edge in a narrow column (#1634): each shrinks to the card, its label cut with "…"
+   and its icon kept; the whole in its tooltip. */
+.task-for-you-row > .tip-wrap,
+.task-card-top > .tip-wrap:has(> .task-project) {
+  min-width: 0;
+  max-width: 100%;
+}
+.task-kind,
+.task-for-you {
+  min-width: 0;
+  max-width: 100%;
+}
+.task-kind > .codicon,
+.task-for-you > .codicon {
+  flex: none;
+}
+.task-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .task-kind.proposed {
   border-style: dashed;
+}
+/* Review: Skip (#1625): the New Card dialog's tick box and its note, side by side. */
+.review-skip-new {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.review-skip-new .input {
+  flex: 1;
+  min-width: 160px;
 }
 .kind-field {
   gap: 6px;
@@ -8822,6 +8879,15 @@ body.pane-resizing-v .monaco-editor {
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
+}
+/* Its tooltip (#1635): each request's asker in bold over the start of what it asks, then where to answer. */
+.for-you-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.for-you-tip-asks {
+  font-weight: 600;
 }
 .task-card.folded .task-for-you {
   margin-inline-start: 4px;
@@ -8929,9 +8995,19 @@ textarea.input.task-blocked-input {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Its status stays on one line beside the name, which gives way first. */
-.task-agent > .faint {
+/* Its status stays on one line beside the name, which gives way first; in a narrow column the status is cut with "…"
+   too (#1634), the whole in the line's tooltip. */
+.task-agent > .dot {
   flex: none;
+}
+.task-agent > .task-agent-name {
+  flex-shrink: 1000;
+  min-width: 2ch;
+}
+.task-agent > .faint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .task-drop {
@@ -9354,39 +9430,60 @@ textarea.input.task-blocked-input {
 .git-queue-history-h {
   font-weight: 600;
 }
+/* Its history (#1641): a data table as the archived cards' one, a line a row. The title takes the room left and is
+   ellipsised (its tooltip has it whole); the other columns never wrap, and a table narrower than them scrolls sideways
+   in its .table-wrap. */
 .git-queue-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
+  container-type: inline-size;
 }
-.git-queue-table th {
-  text-align: start;
-  color: var(--fg-muted);
-  font-weight: normal;
-  border-bottom: 1px solid var(--border);
-  padding: 4px 6px;
+/* A long history scrolls in its own box under headings and filters that stay in view (sticky needs the scrolling box
+   to be the table's own: .table-wrap already scrolls sideways). */
+.git-queue-table .table-wrap {
+  max-height: max(240px, 55vh);
+  overflow: auto;
+}
+/* Separate borders: a sticky thead in a collapsed table lets the rows show between its own (Chromium). */
+.git-queue-table .table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.git-queue-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
+}
+.git-queue-table thead th {
+  background: var(--bg);
+}
+.git-queue-table thead tr:last-child th {
+  box-shadow: inset 0 -1px 0 var(--border);
 }
 .git-queue-table td {
-  padding: 4px 6px;
-  border-bottom: 1px solid var(--border-subtle);
-  vertical-align: top;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
-.git-queue-table .link {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--info);
-  cursor: pointer;
+.git-queue-table td.git-queue-title-cell {
+  width: 100%;
+  max-width: 0;
+  min-width: 80px;
 }
-.git-queue-table tr[data-outcome='merged'] .codicon {
-  color: var(--success);
-}
-.git-queue-table tr[data-outcome='returned'] .codicon {
-  color: var(--error);
+/* Narrow (the window at its narrowest): the merge commit is left to the outcome's tooltip, so When stays in view. */
+@container (max-width: 620px) {
+  .git-queue-table .git-queue-result {
+    display: none;
+  }
 }
 .git-queue-title {
-  overflow-wrap: anywhere;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg-strong);
+}
+.git-queue-outcome[data-outcome='merged'] .codicon {
+  color: var(--success);
+}
+.git-queue-outcome[data-outcome='returned'] .codicon {
+  color: var(--error);
 }
 /* The Merge dialog for merges outside cards (#1450): the branch and its target side by side, each as wide as it can be. */
 .branch-merge-pick {
@@ -11330,7 +11427,6 @@ button.progress-run-show:focus-visible {
 }
 .progress-lane.ended .lane-seg,
 .progress-lane.abandoned .lane-seg {
-  animation: none;
   filter: saturate(0.45);
 }
 .progress-lane-top {
@@ -11484,7 +11580,6 @@ button.progress-lane-why:focus-visible,
 .lanes-legend-swatch.lane-seg {
   flex: 0 0 22px;
   cursor: default;
-  animation: none;
 }
 .lanes-legend-name {
   flex-shrink: 0;
@@ -11552,16 +11647,37 @@ button.progress-lane-why:focus-visible,
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-.lane-seg.doing {
-  box-shadow: none;
+.lane-seg.doing,
+.lane-seg.doing::before {
   background: repeating-linear-gradient(-45deg, var(--info) 0 4px, color-mix(in srgb, var(--info) 55%, var(--bg)) 4px 8px);
   background-size: 11.3px 12px;
+}
+.lane-seg.doing {
+  box-shadow: none;
+  overflow: hidden;
+}
+/* The stripes move by a transform of a copy one stripe wider, which the compositor does alone: moving the background
+   itself repainted the panel on every frame while a lane worked (#1629). */
+.lane-seg.doing::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: -11.3px;
+  width: calc(100% + 11.3px);
+  pointer-events: none;
   animation: lane-stripes 1s linear infinite;
 }
 @keyframes lane-stripes {
   to {
-    background-position: 11.3px 0;
+    transform: translateX(11.3px);
   }
+}
+/* Still: a legend's or a branch's swatch, and an ended or abandoned lane (after the animation, which they override). */
+.lanes-legend-swatch.lane-seg::before,
+.git-branch-card-swatch.lane-seg::before,
+.progress-lane.ended .lane-seg::before,
+.progress-lane.abandoned .lane-seg::before {
+  animation: none;
 }
 .lane-seg.review {
   background: color-mix(in srgb, var(--warning) 22%, var(--bg));
@@ -11677,7 +11793,7 @@ button.progress-lane-why:focus-visible,
   color: var(--fg-muted);
 }
 @media (prefers-reduced-motion: reduce) {
-  .lane-seg.doing {
+  .lane-seg.doing::before {
     animation: none;
   }
 }
@@ -12095,7 +12211,6 @@ button.progress-lane-why:focus-visible,
   flex: 0 0 14px;
   width: 14px;
   height: 10px;
-  animation: none;
   cursor: default;
 }
 .git-branch-card-review {

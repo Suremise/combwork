@@ -314,6 +314,7 @@
   "main.unused.why.notUnused": "agora não é um dos worktrees sem uso do projeto (a conversa de um agente, uma cópia de revisão ou a fila de merge pode estar usando)",
   "main.unused.why.otherProject": "ele é outro projeto do espaço de trabalho",
   "main.unused.why.owned": "um agente trabalha nele agora",
+  "main.unused.why.queueBusy": "a fila de merge está usando",
   "main.unused.why.session": "há uma sessão rodando nele",
   "main.unused.why.slotGuarded": "é um slot, que o Hive só remove quando está limpo e o trabalho dele está mesclado",
   "main.unused.why.slotInUse": "é um slot em uso",

@@ -316,6 +316,7 @@ interface HiveMessageValues {
   'main.unused.why.notUnused': undefined
   'main.unused.why.otherProject': undefined
   'main.unused.why.owned': undefined
+  'main.unused.why.queueBusy': undefined
   'main.unused.why.session': undefined
   'main.unused.why.slotGuarded': undefined
   'main.unused.why.slotInUse': undefined

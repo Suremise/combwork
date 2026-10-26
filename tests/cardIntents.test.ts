@@ -37,6 +37,8 @@ const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { INTENT_ROUTES } = await import('../src/main/servers')
 const { intentText } = await import('../src/shared/toolReplies')
+const { armIntentWatch } = await import('../src/main/intentWatch')
+const watches = await import('../src/main/watches')
 const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, HIVE_TOOLS, INTENT_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
 
 advanced.load(join(base, 'profile'))
@@ -259,6 +261,47 @@ describe('a card by intent (#1267)', () => {
   const wakesOf = (w: WS, card: number): string[] => store.boardRead(w, (db) => db.prepare("SELECT payload FROM card_actions WHERE card = ? AND kind = 'wake'").all(card) as { payload: string }[]).map((r) => (JSON.parse(r.payload) as { agent: string }).agent)
   const design = (text: string) => ({ kind: 'loopStep', step: 'design', text }) as const
   const answer = (step: 'ok' | 'gaps' | 'proceed', id: string | undefined, text = 'x') => ({ kind: 'loopStep', step, text, ...(id ? { design: id } : {}) }) as const
+
+  it("a lane's handoff arms its agent's watch (#1639): the builder's submission for the review, the reviewer's fail for the next round", async () => {
+    const { w, repo, wt } = await workspace()
+    const card = await inLane(w)
+    commit(wt, 'w.txt')
+    const submitted = await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    const armed = await armIntentWatch(w, 'a1', submitted.card, { submit: true, failed: false })
+    expect(armed).toMatch(/^Hive watches \S+.* for its review .*, up to .+: end your turn, and it wakes you\.$/)
+    expect(watches.watchFor(repo, 'a1')).toMatchObject({ cards: [card], column: 'passed', changes: ['verdict', 'column', 'comment'] })
+    // Its reply says so.
+    expect(intentText({ ...submitted.done, watch: armed! })).toContain(armed!)
+    // Submitting again with that watch in place keeps it.
+    expect(await armIntentWatch(w, 'a1', submitted.card, { submit: true, failed: false })).toMatch(/^You already watch /)
+    await act(w, card, reviewer, { kind: 'startReview' })
+    const failed = await act(w, card, reviewer, { kind: 'verdict', pass: false, comment: 'Round 1: FAILED. 1. Add a test.' })
+    expect(await armIntentWatch(w, 'a2', failed.card, { submit: false, failed: true })).toMatch(/for its next round in Review/)
+    expect(watches.watchFor(repo, 'a2')).toMatchObject({ cards: [card], column: 'review' })
+    // Another watch of its own stays: it isn't replaced.
+    await watches.cancelWatch(w, repo, 'a1')
+    const elsewhere = await create(w, 'Other')
+    await watches.registerWatch(w, repo, 'a1', { cards: [elsewhere], changes: ['comment'] })
+    commit(wt, 'x.txt')
+    const again = await act(w, card, builder, { kind: 'submit', summary: 'Round 2' })
+    expect(await armIntentWatch(w, 'a1', again.card, { submit: true, failed: false })).toMatch(/^Your watch .* stays/)
+    expect(watches.watchFor(repo, 'a1')?.cards).toEqual([elsewhere])
+    for (const a of ['a1', 'a2']) await watches.cancelWatch(w, repo, a)
+  })
+
+  it('no lane, or not its part in it: nothing armed (#1639)', async () => {
+    const { w, repo, wt } = await workspace()
+    const card = await create(w)
+    await act(w, card, builder, { kind: 'start' })
+    commit(wt, 'y.txt')
+    const submitted = await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    expect(await armIntentWatch(w, 'a1', submitted.card, { submit: true, failed: false })).toBeNull()
+    // A lane's card submitted by someone else than its builder, or a pass: none either.
+    await lanes.startLane(w, { project: 'p', builder: 'a3', reviewer: 'a2', cards: [card], by: 'Other (p)' })
+    expect(await armIntentWatch(w, 'a1', submitted.card, { submit: true, failed: false })).toBeNull()
+    expect(await armIntentWatch(w, 'a2', submitted.card, { submit: false, failed: false })).toBeNull()
+    expect(watches.watchFor(repo, 'a1')).toBeNull()
+  })
 
   it("a card loop's design step (#1382): named and due, it wakes the reviewer; the reviewer's answer to it wakes the builder", async () => {
     const { w } = await workspace()

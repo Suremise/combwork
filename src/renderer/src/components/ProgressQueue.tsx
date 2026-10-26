@@ -198,21 +198,26 @@ function CardButton({ keyOf }: { keyOf: string }) {
   )
 }
 
-/** A queued card's approved revision, short; a click copies the whole commit id. */
-function RevisionButton({ revision }: { revision: string }) {
+/**
+ * A revision, short; a click copies the whole commit id (a queued card's approved revision; the Version Control tab's
+ * queue history, #1641, with the project's short form). The click stays its own (it doesn't open a row it is in).
+ */
+export function RevisionButton({ revision, short = shortRevision }: { revision: string; short?: (id: string) => string }) {
+  const s = short(revision)
   return (
     <button
       type="button"
       className="progress-run-revision"
-      title={tr(msg({ id: 'board.progress.copyRevision', defaultMessage: 'Copy revision {revision}', description: "Tooltip of a run's revision in the Progress panel (under its agent): copies the whole commit id. {revision} is its short form (a3f2c1d)." }), { revision: shortRevision(revision) })}
-      onClick={() =>
+      title={tr(msg({ id: 'board.progress.copyRevision', defaultMessage: 'Copy revision {revision}', description: "Tooltip of a run's revision in the Progress panel (under its agent): copies the whole commit id. {revision} is its short form (a3f2c1d)." }), { revision: s })}
+      onClick={(e) => {
+        e.stopPropagation()
         void navigator.clipboard.writeText(revision).then(
-          () => notify('success', tr(msg({ id: 'board.progress.revisionCopied', defaultMessage: 'Revision {revision} copied', description: "A notification after copying a run's revision (a commit id) from the Progress panel. {revision} is its short form (a3f2c1d)." }), { revision: shortRevision(revision) })),
+          () => notify('success', tr(msg({ id: 'board.progress.revisionCopied', defaultMessage: 'Revision {revision} copied', description: "A notification after copying a run's revision (a commit id) from the Progress panel. {revision} is its short form (a3f2c1d)." }), { revision: s })),
           () => notify('error', tr(msg({ id: 'board.progress.revisionCopyFailed', defaultMessage: 'Could not copy the revision', description: "A notification: copying a run's revision (a commit id) from the Progress panel failed." })))
         )
-      }
+      }}
     >
-      <code>{shortRevision(revision)}</code>
+      <code>{s}</code>
     </button>
   )
 }

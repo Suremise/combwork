@@ -39,6 +39,14 @@
     "defaultMessage": "A card is code or no-code, not {kind}.",
     "description": "An error: a card's kind was given as {kind}; it is code (work in commits, the default) or no-code (a decision, a write-up, a trial). Keep code and no-code as they are (they are values)."
   },
+  "tasks.error.badReviewSkip": {
+    "defaultMessage": "skipReview is the user's reason the card skips review (text), or false to review it after all.",
+    "description": "An error: a card's skipReview was given as something else than a reason (text) or false. Keep skipReview and false as they are (a field's name and a value)."
+  },
+  "tasks.error.badReviewSkipNew": {
+    "defaultMessage": "A new card reviews as its rules say: give skipReview the user's reason to skip it, or leave it out.",
+    "description": "An error: a card was made with skipReview false. Keep skipReview as it is (a field's name)."
+  },
   "tasks.error.batchGone": {
     "defaultMessage": "That batch is no longer kept: unarchive its cards from Archived.",
     "description": "An error: the Archive All batch to bring back is no longer kept (Hive keeps the latest 50); its cards can still be brought back one by one from the board's Archived list."
@@ -250,6 +258,30 @@
   "tasks.error.reviewOnItsOwn": {
     "defaultMessage": "Start a review on its own: the card stays where it is, with its agent.",
     "description": "An error: a call started a review and also moved the card or gave it to an agent; a review starts on its own."
+  },
+  "tasks.error.reviewSkipInReview": {
+    "defaultMessage": "#{n} is in Review: whether it skips review is decided before it is submitted. To take it past its review now, the user moves it on (an override, with their reason).",
+    "description": "An error: a card's review skip was to change while the card is in Review. The way past its review is the user's override of the move (dragging it on, or the Assistant moving it with the user's reason). {n} is the card's number."
+  },
+  "tasks.error.reviewSkipNeedsReason": {
+    "defaultMessage": "A card skips review only with the user's reason: pass skipReview with it, in the user's words.",
+    "description": "An error said to the Hive Assistant (or an agent proposing it): it asked for a card to skip its review without a reason. Keep skipReview as it is (a field's name)."
+  },
+  "tasks.error.reviewSkipNotAgents": {
+    "defaultMessage": "Agents can't make a card skip review: propose it when you make the card (skipReview, with your reason), and the user or the Assistant decides.",
+    "description": "An error: an agent tried to make a card skip its review, or to answer a proposal that it skip review, after the card was made; only the user or the Hive Assistant can. Keep skipReview as it is (a field's name)."
+  },
+  "tasks.error.reviewSkipNothing": {
+    "defaultMessage": "#{n}'s rules don't review it: there is no review to skip.",
+    "description": "An error: a card was to skip its review, but its project's workflow has no review (Solo, or no workflow). {n} is the card's number."
+  },
+  "tasks.error.reviewSkipNothingNew": {
+    "defaultMessage": "This card's rules don't review it: there is no review to skip.",
+    "description": "An error making a card: it was to skip its review, but its project's workflow has no review (Solo, or no workflow)."
+  },
+  "tasks.error.reviewSkipPast": {
+    "defaultMessage": "{stage, select, done {#{n} is Done: it has no review left to skip.} other {#{n} is past its review already: there is nothing left to skip.}}",
+    "description": "An error: a card's review skip was to change once the card was past Review (approved, being merged, or Done). {n} is the card's number; {stage} its stage (select: done, or another)."
   },
   "tasks.error.reviewTaken": {
     "defaultMessage": "{agent} is already reviewing #{n} (since {since} UTC).",
@@ -494,6 +526,10 @@
   "tasks.history.reviewPassed": {
     "defaultMessage": "Review passed",
     "description": "A line in a card's history: the reviewer (named beside it) passed the card's review."
+  },
+  "tasks.history.reviewSkip": {
+    "defaultMessage": "{how, select, set {Set to skip review} proposed {Proposed to skip review} confirmed {Confirmed to skip review} kept {Kept with its review} other {Set to be reviewed}}",
+    "description": "A line in a card's history (#1625): whether the card skips its review: it was set to skip review (by the user, or the Assistant with the user's reason), an agent proposed that, the user or the Assistant confirmed it or kept the review, or it was set back to be reviewed. Select keys: translate each sentence."
   },
   "tasks.history.reviewStarted": {
     "defaultMessage": "Started reviewing",

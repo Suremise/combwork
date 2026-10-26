@@ -11,6 +11,8 @@ interface HiveMessageValues {
   'tasks.error.archived': { n: string | number }
   'tasks.error.badAnswer': { max: string | number }
   'tasks.error.badKind': { kind: string | number }
+  'tasks.error.badReviewSkip': undefined
+  'tasks.error.badReviewSkipNew': undefined
   'tasks.error.batchGone': undefined
   'tasks.error.beforeArchived': { before: string | number; column: string; n: string | number }
   'tasks.error.beforeElsewhere': { before: string | number; other: string; column: string; n: string | number }
@@ -64,6 +66,12 @@ interface HiveMessageValues {
   'tasks.error.reviewAgentsOnly': undefined
   'tasks.error.reviewNotInReview': { n: string | number; column: string }
   'tasks.error.reviewOnItsOwn': undefined
+  'tasks.error.reviewSkipInReview': { n: string | number }
+  'tasks.error.reviewSkipNeedsReason': undefined
+  'tasks.error.reviewSkipNotAgents': undefined
+  'tasks.error.reviewSkipNothing': { n: string | number }
+  'tasks.error.reviewSkipNothingNew': undefined
+  'tasks.error.reviewSkipPast': { stage: string; n: string | number }
   'tasks.error.reviewTaken': { agent: string | number; n: string | number; since: string | number }
   'tasks.error.setAsideGone': undefined
   'tasks.error.staysInProject': { project: string | number }
@@ -125,6 +133,7 @@ interface HiveMessageValues {
   'tasks.history.reviewEnded': { agent: string | number; why: string }
   'tasks.history.reviewFailed': undefined
   'tasks.history.reviewPassed': undefined
+  'tasks.history.reviewSkip': { how: string }
   'tasks.history.reviewStarted': undefined
   'tasks.history.reviewStopped': { agent: string | number }
   'tasks.history.reviewerRequest': { text: string | number }

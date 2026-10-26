@@ -72,7 +72,8 @@ export async function queueViews(ws: WorkspaceService, projectPath: string, targ
  */
 async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope> {
   const inFlight = new Map<string, number[]>()
-  for (const card of wf.store.cards()) {
+  // Only the cards past Todo and not Done are read (#1629: the window polls this, and a board keeps every card it had).
+  for (const card of wf.store.cardsInFlight()) {
     const s = wf.state(card)
     if (!s.started || s.stage === 'todo' || s.stage === 'done') continue
     const o = wf.rulesetOf(card, s).options
@@ -261,7 +262,7 @@ export async function queueHistory(ws: WorkspaceService, projectPath: string, ta
 export async function branchQueueCard(ws: WorkspaceService, projectPath: string, branch: string): Promise<BranchQueueCard | null> {
   const wf = await workflowFor(ws, projectPath)
   if (!wf || !workflowEnforced() || !branch) return null
-  for (const card of wf.store.cards()) {
+  for (const card of wf.store.cardsInFlight()) {
     const s = wf.state(card)
     if (!s.started || s.started.line !== branch || s.stage === 'todo' || s.stage === 'done') continue
     const o = wf.rulesetOf(card, s).options

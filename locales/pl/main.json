@@ -314,6 +314,7 @@
   "main.unused.why.notUnused": "nie jest teraz jednym z nieużywanych worktree projektu (może go używać rozmowa agenta, kopia do recenzji albo kolejka scalania)",
   "main.unused.why.otherProject": "to inny projekt obszaru roboczego",
   "main.unused.why.owned": "pracuje w nim teraz agent",
+  "main.unused.why.queueBusy": "kolejka scalania go używa",
   "main.unused.why.session": "działa w nim sesja",
   "main.unused.why.slotGuarded": "to slot, który Hive usuwa tylko wtedy, gdy jest czysty, a jego praca scalona",
   "main.unused.why.slotInUse": "to slot w użyciu",

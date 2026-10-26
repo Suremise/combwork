@@ -1267,6 +1267,14 @@
     "defaultMessage": "Reviewers test exactly what was submitted",
     "description": "A tip's title."
   },
+  "tips.reviewSkip.text": {
+    "defaultMessage": "Building an installer or a quick trial needs no reviewer? Tick Skip review in the New Card dialog: submitting the card finishes it, and a code card still goes on to its merge, with its merge checks.",
+    "description": "A tip (#1625). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Skip review is the New Card dialog's tick box)."
+  },
+  "tips.reviewSkip.title": {
+    "defaultMessage": "Cards that don't need a review",
+    "description": "A tip's title (#1625): a card can skip its review."
+  },
   "tips.reviewerPool.text": {
     "defaultMessage": "With the workflow option Reviewers set to A shared pool, Start Lane offers the reviewer pool: each card submitted goes to the next free reviewer, oldest first, never to its own builder.",
     "description": "A tip. Reviewers and A shared pool are a workflow option and its value; Start Lane is a dialog: keep them as Hive shows them. Glossary: reviewer pool, builder."

@@ -374,7 +374,7 @@ describe("the lanes section's height (#569)", () => {
 
 describe("a segment's hover: what the card's facts say (#1225)", () => {
   const short = (id: string): string => id.slice(0, 7)
-  const badge = (over: Partial<WorkBadge> = {}): WorkBadge => ({ card: 7, stage: 'review', preWorkflow: false, adopted: false, revision: 'a3f2c1d9e8', verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, decisionSince: false, oldRules: false, stages: null, line: null, underReview: null, startedAt: null, lastSeq: 3, ...over })
+  const badge = (over: Partial<WorkBadge> = {}): WorkBadge => ({ card: 7, stage: 'review', preWorkflow: false, adopted: false, revision: 'a3f2c1d9e8', verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, reviewSkip: null, reviewSkipProposed: null, decisionSince: false, oldRules: false, stages: null, line: null, underReview: null, startedAt: null, lastSeq: 3, ...over })
 
   it('the revision under review, the last verdict on its revision, and the checks on it', () => {
     expect(workNotes(badge({ verdict: { pass: false, revision: 'b71e09a4cc', current: true }, checks: { passed: 2, failed: 1, notCounted: 4 } }), 'review', null, short, tr)).toEqual(['Under review: a3f2c1d', 'Last verdict: failed on b71e09a', 'Checks on it: 2 passed, 1 failed'])
@@ -578,7 +578,7 @@ describe('stages in a lane (#1421): names over the categories, the divider, the 
     expect(laneOldRulesNote(false, tr)).toMatch(/Workflow rules aren’t enforced now/)
     const seg = cardSegment(7, card(7, 'doing'))
     const names = { list: (items: string[]) => items.join(', '), ruleName: (id: string) => id }
-    const b: WorkBadge = { card: 7, stage: 'active', preWorkflow: false, adopted: false, revision: null, verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, decisionSince: false, oldRules: true, stages: null, line: null, underReview: null, startedAt: null, lastSeq: 3 }
+    const b: WorkBadge = { card: 7, stage: 'active', preWorkflow: false, adopted: false, revision: null, verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, stalePass: null, noCode: false, refused: null, overridden: false, override: null, outsideRules: false, mergedInPart: false, leftTarget: false, accepted: false, merged: null, forYou: 0, kind: 'code', kindProposed: null, reviewSkip: null, reviewSkipProposed: null, decisionSince: false, oldRules: true, stages: null, line: null, underReview: null, startedAt: null, lastSeq: 3 }
     expect(segmentMarks({ frozen: null }, b, seg, (x) => x, tr, names).oldRules).toBe(cardOldRulesNote(true, tr))
     expect(segmentMarks({ frozen: null }, b, seg, (x) => x, tr, names, false).oldRules).toMatch(/aren’t enforced now/)
     // An ended lane's segments have no marks; nor a card without it.

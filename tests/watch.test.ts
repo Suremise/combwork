@@ -13,6 +13,7 @@ import { alreadyThere, changesBetween, decodeSince, encodeSince, limitLine, mark
 import { taskWaitText } from '../src/shared/toolReplies'
 import { hookStep } from '../src/main/hookStatus'
 import type { TaskCard } from '../src/shared/types'
+import type { WatchCondition } from '../src/shared/watch'
 import { tempDir } from './tempDir'
 import { putStoreDocs, storeDocs, storeMeta } from './storeDocs'
 import { follow, toldOf } from './followDoorbell'
@@ -675,6 +676,27 @@ describe('watches (main/watches.ts)', async () => {
     const r2 = await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['column'], column: 'doing' })
     expect(r2).toMatchObject({ already: { number: c.number, column: 'doing' } })
     expect(watches.watchFor(alpha, 'a1')).toBeNull()
+    await disposeWorkspaceService(w)
+  })
+
+  it('started from a card as an intent left it (#1639): a change made before the watch was in place fires it', async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha', agent: 'a1', column: 'review' }, user))
+    // The card as the builder's submission left it, and then the reviewer's verdict before Hive armed the watch.
+    const submitted = await inWorkspace(w, () => tasks.getTask(c.number, w))
+    await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'doing' }, { kind: 'agent', name: 'Reviewer (alpha)' }, { comment: 'Round 1: FAILED\n1. Add a test.' }))
+    const cond = (): WatchCondition => ({ cards: [c.number], changes: ['verdict', 'column', 'comment'], column: 'passed', moveInto: true })
+    const r = await watches.registerWatch(w, alpha, 'a1', cond(), 360, { card: submitted, at: submitted.updatedAt })
+    expect(r).toMatchObject({ watching: { label: expect.any(String) } })
+    await evaluated(w)
+    expect(st.typed).toHaveLength(1)
+    expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] #${c.number} is in Doing; latest comment by Reviewer \\(alpha\\): "Round 1: FAILED"`))
+    // Without it, the same watch starts from the card as it is now: nothing to tell.
+    await watches.registerWatch(w, alpha, 'a1', cond(), 360)
+    await evaluated(w)
+    expect(st.typed).toHaveLength(1)
+    await watches.cancelWatch(w, alpha, 'a1')
     await disposeWorkspaceService(w)
   })
 

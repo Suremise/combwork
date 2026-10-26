@@ -2064,6 +2064,23 @@ needs `override.reason`; either records one `Override` (`card.kind`); agents nev
 card shows **No code** on its tile and in its dialog's **Kind** (with **Make It Code…** / **Make It No Code…**); the
 Agent API's card adds `kind` and, while one is open, `kindProposed` after its document's fields, just before `stage`.
 
+**Review: Skip (#1625; Darren, 25 Oct).** Any card, code or no code, can skip its review, decided when it is made or
+before it is submitted: not a project option, and Pair and Team still review everything else. Set, the card runs under
+its rules with no review (`skipReviewOf`: its ruleset compiled with `review: none`, its id the base's with
+`~skipReview`, so the base is found again and *old rules* compares the base), whenever the skip was set: its submission
+finishes it. A no-code card is Done; a code card goes on as its finish says (Hive merges: straight to the merge queue,
+whose merge checks and `done.contained` still hold; G10's OK before merging still applies, as it isn't a review). Who:
+the user (the New Card dialog's **Skip review**, with an optional note; the card dialog's **Review**: **Skip Review…** /
+**Review It**), and the Assistant only with the user's reason (`skipReview` on `POST /v1/tasks`, `PATCH /v1/tasks/{n}`,
+`hive_create_task` and `hive_update_task`; `false` sets it back). A project agent's (or the workspace token's)
+`skipReview` at creation is only **proposed** (a `ReviewSkipProposed` fact with its reason; the tile shows *Skip
+review?*, the dialog **Skip Review** / **Keep Review**), answered by the user or the Assistant, the Assistant with the
+user's reason, never the agent's (kept in the fact as `proposed`, for history); agents never set or answer it (`403`).
+Each decision is a `ReviewSkipSet` fact (`skip`, `by`, `reason`). Refused where the card's rules have no review
+(nothing to skip), and once a submission waits for review or later (in Review: the way past it is the user's override
+of the move; approved, merging or Done: nothing left to skip). The tile and the dialog show **Review skipped** with who
+set it and why; the Agent API's card adds `reviewSkipped: { by, reason }` and `reviewSkipProposed` when there is one.
+
 #### 16.7.4 Other moves
 
 [P1, answering HB3's round 1 finding 15]
@@ -2142,6 +2159,18 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
 
 #### 16.8.2 Card loops on intents
 
+- **Hive arms the watch at a lane's handoff** (#1639, built). On 25 Oct two builders submitted their lane's card and
+  ended their turn with no card watch, and their lanes showed as stalled (#376's check) until the Assistant asked each to
+  watch: card-loop's "watch, then submit" was missed. The step is Hive's now (`main/intentWatch.ts`): an agent's
+  `hive_submit` of a card in its running lane (active or paused) where it is the builder, leaving the card in Review,
+  arms its card watch for the review (`changes: verdict, column, comment`, `column: passed`), and its failing
+  `hive_verdict` as the lane's reviewer arms one for the next round (`column: review`, `fresh`), each for the lane's wait
+  (at most a watch's longest). The watch starts from the card as the intent left it (`registerWatch`'s `start`), so a
+  verdict given before it is armed still fires it. An agent with a watch of its own keeps it: one that includes the card
+  is said so, one on other cards (or an agent or lane watch) isn't replaced, since it isn't stalled and the loop wake
+  tells it of the verdict. The intent's reply says what was armed (`watch`: "Hive watches HI-12 for you, for its review
+  …: end your turn, and it wakes you."); card-loop says to end the turn on it, and to start the watch itself only where
+  the reply says none was armed. Not for the pool's reviewers (no lane of theirs) or the Assistant.
 - The builder's watch wakes on a verdict, a `Moved` into Approved or Done, a `ReviewerRequest`, a `Decision`, and the
   user's pane reply when relayed (#922) [#1120 c].
 
@@ -2321,8 +2350,11 @@ no loop: it reaches an agent working on its own, with no lane or reviewer (*"…
 asked"*), and the card's history says so (*Told B1 (hive) of your answer*), as long as the project's loop wakes are on. Each request records whom it is for
 (`for: 'user'`). The window lists what waits with `tasks:forYou` (a project's or the workspace's: each request's card,
 kind, gate, English text and Hive's message for it, when it was asked and who asked; a count), read again on
-`tasks-changed`. **In the window (#1276):** a card with requests shows a **For you** chip (a bell, the kind, each
-request in its tooltip and accessible name; the accent colour, pill-shaped) on its tile, folded or not; the Task Board
+`tasks-changed`. **In the window (#1276):** a card with requests shows a **For you** chip (a bell, the kind; the accent colour,
+pill-shaped). Its tooltip is short (#1635): for each of the first two requests who asks for what ("HB5 asks you to
+decide") over its first sentence or two as plain text (Markdown's marks taken out), a count of any more, and where to
+answer (a click opens the card, whose For you section has each in full); its accessible name gives each request's kind
+and start. The chip sits on its tile, folded or not; the Task Board
 icon on the activity bar counts the cards (its accessible name "3 cards wait for you"; Review's count stays in the board
 sidebar's Waiting for review); the board's toolbar has a **For you** filter (remembered per board view, composing with
 the search); the card dialog's **For you** section lists each request (its kind, its text in the window's language or
@@ -2814,7 +2846,9 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   read (the Assistant's requirement).
 - **The Git tab's Merge queue section** (`GitQueueSection.tsx`, a section of its own for P6 to move): per target, the
   Progress panel's queue card (reused) and its history (`queue:history`: the latest 50 outcomes, each with its card,
-  revision, the result or why, and when). A target shows by #1356's rule, or while it has a history. The panel's
+  revision, the result or why, and when), a `DataTable` as the archived cards' (#1641): a line a row, the title
+  ellipsised, the outcome a short label with the result or why as its tooltip, the merge commit its own column
+  (left to the tooltip when narrow), the headings and filters sticky over a box of its own that scrolls. A target shows by #1356's rule, or while it has a history. The panel's
   *Queue in Version Control* opens it.
 - **The Merge dialog** (OP-13): for an agent's worktree branch whose card in flight has Hive merge it under its own
   ruleset, with the rules enforced (`worktrees:branchCards`), it says so and where the card stands (not queued yet,
@@ -2930,7 +2964,13 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   (with Open: the Changes tab shows a detached slot's changes too); free `ready` slots beyond the pool's size, least
   recently used first; a slot whose newest lease is an ended `carried` one; a retired home once no session record of an
   agent the project still has is in it. Never a lent slot, one with an open carried lease, one with an operation, an
-  unsettled job or a writer, anything in the project's `copies` folder, or a queue folder with a living lease. A slot
+  unsettled job or a writer, anything in the project's `copies` folder, or a queue folder its queue uses (#1644: by its record, a living lease, or
+  `queueFolderNeeded` on the project's workflow, the folder a released runner keeps warm; not known, used). A recorded
+  queue folder its queue no longer needs, and one named as the queue names them with no record, are listed as
+  `queue` ("merge queue's old folder, not needed now"); while the records can't be read, neither is. Right before a
+  queue folder is deleted, removal claims it in one board write, the lock runners take their lease and record their
+  folder under: refused ("the merge queue is using it") while a living runner holds its target's lease or its lease
+  has processes not seen gone, else its record is dropped so no runner takes it after (HR4's round 1). A slot
   row's Remove is `SlotPool.remove` (the archive command first; kept with the guard's reason, worded in the window's
   language), its verdict shown before as `SlotPool.check` (the same guards without the rename probe); never Remove
   anyway (its preview is refused). No row offers Give to an agent any more (#1555). "Remove all merged" takes the same rows. Every removal and
@@ -3640,7 +3680,9 @@ first; `lanes:end`).
   and the marks' writes are as the look read them, under its lock, else it looks again, so
   marks never move back to an older look, a restart tells what it hadn't yet and two Hives tell each event once (the
   toast best effort, as §16.4.5 says; each notice a line in its card's history, the lane's own on its current card); a lane running when
-  Hive first followed the board's lanes starts from then. A card's request for the user (For you) is a notice too, the
+  Hive first followed the board's lanes starts from then. A card a running lane holds is that lane's alone (#1645): an
+  ended or abandoned lane that once listed it tells nothing of it (watches.ts' `lanesIn`, for notices and lane watches
+  alike), so on 25 Oct a lane started on HI-1633 by mistake and abandoned no longer named its failed review. A card's request for the user (For you) is a notice too, the
   runtime's `notify` action. Neither comes for a project whose **Card loops → Wake reviewers and builders** is off
   (`loopWakes`), like its wakes; turning off workflow rules doesn't stop them. A paused lane's reason comes with #1270's
   data.

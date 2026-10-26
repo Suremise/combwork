@@ -161,7 +161,7 @@ function intentTools(): Tool[] {
     intent(
       'hive_submit',
       'submit',
-      'Submit a card in Doing for review: it moves on (to Review, or past it where its project has no review). Writes summary as a comment. A revision already reviewed needs note (what is different). Replies with warnings (files outside its paths, other agents\' changes in a shared folder).',
+      'Submit a card in Doing for review: it moves on (to Review, or past it where its project has no review). Writes summary as a comment. A revision already reviewed needs note (what is different). As a lane\'s builder, Hive then watches it for you, for its review. Replies with warnings (files outside its paths, other agents\' changes in a shared folder) and the watch.',
       { summary: { type: 'string', description: 'What was done, a line first.' }, revision, note: { type: 'string', description: 'For a revision already reviewed: what this submission adds (an explanation).' }, paths: { type: 'array', items: { type: 'string' }, description: 'The files the work changed, relative to the project, for a project with no version control.' } },
       ['summary'],
       (a) => ({ summary: a.summary, revision: a.revision, note: a.note, paths: a.paths })
@@ -171,7 +171,7 @@ function intentTools(): Tool[] {
     intent(
       'hive_verdict',
       'verdict',
-      "Give your verdict on the card you review: comment is written on it. A pass moves it on (to Passed, or to its merge) once its reviews are in; a fail sends it back to Doing for its builder, a round counted.",
+      "Give your verdict on the card you review: comment is written on it. A pass moves it on (to Passed, or to its merge) once its reviews are in; a fail sends it back to Doing for its builder, a round counted, and as a lane's reviewer Hive then watches it for you, for its next round.",
       { pass: { type: 'boolean' }, comment: { type: 'string', description: 'The verdict, a line first; findings numbered.' }, failKind: { type: 'string', enum: ['content', 'explanation'], description: 'A fail: the work itself (content) or only how it was explained (explanation).' }, submission },
       ['pass', 'comment'],
       (a) => ({ pass: a.pass, comment: a.comment, failKind: a.failKind, submission: a.submission })
@@ -698,11 +698,12 @@ const tools: Tool[] = [
         blockedBy: cardsArg('Cards that have to be done first.'),
         links: cardsArg('Related cards.'),
         context: contextArg,
-        kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? 'no-code: work with no commits (a decision, a write-up, a trial), submitted with a summary. Default code.' : 'no-code proposes work with no commits (a decision, a write-up, a trial); the user confirms it. Default code.' }
+        kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? 'no-code: work with no commits (a decision, a write-up, a trial), submitted with a summary. Default code.' : 'no-code proposes work with no commits (a decision, a write-up, a trial); the user confirms it. Default code.' },
+        skipReview: { type: 'string', description: ASSISTANT ? "The user's reason it skips review, in their words: submitting it then finishes it (a code card goes on to its merge, merge checks kept). Only where its rules review." : 'Proposes it skip review, with your reason; the user confirms it. Only where its rules review.' }
       },
       required: ['title']
     },
-    run: async (a) => createdText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), reply: 'short' })) as TaskChange)
+    run: async (a) => createdText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), reply: 'short' })) as TaskChange)
   },
   {
     name: 'hive_update_task',
@@ -733,7 +734,8 @@ const tools: Tool[] = [
           ? {
               override: overrideArg,
               kind: { type: 'string', enum: ['code', 'no-code'], description: "Changes its kind after it was made: an exception to its rules, only with override (the user's reason)." },
-              confirmKind: { type: 'boolean', description: 'Answers an agent proposing no-code (kindProposed): true makes it no-code, false keeps it code. Only as the user says.' }
+              confirmKind: { type: 'boolean', description: 'Answers an agent proposing no-code (kindProposed): true makes it no-code, false keeps it code. Only as the user says.' },
+              skipReview: { type: ['string', 'boolean'], description: "The user's reason it skips review, in their words (answers an agent's reviewSkipProposed too), or false to review it after all. Only before it is submitted." }
             }
           : { review: { type: 'string', enum: ['start', 'passed', 'failed'] } })
       },
@@ -741,7 +743,7 @@ const tools: Tool[] = [
     },
     run: async (a) => {
       const body: Record<string, unknown> = { reply: 'short' }
-      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind']) if (a[k] !== undefined) body[k] = a[k]
+      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview']) if (a[k] !== undefined) body[k] = a[k]
       const text = changedText((await api('PATCH', `/v1/tasks/${enc(String(a.number))}`, body)) as TaskChange)
       // #1346 item 8: an Assistant with its journal on recorded six decisions and wrote none of them down.
       return ASSISTANT && JOURNAL && typeof a.decision === 'string' && a.decision.trim() ? `${text}\nNote it in your journal (hive_journal_write).` : text

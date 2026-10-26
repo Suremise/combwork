@@ -505,6 +505,7 @@
   "workspace.unused.kind.carried": "stary worktree agenta, porzucony",
   "workspace.unused.kind.dirtySlot": "slot ze zmianami, niewypożyczony",
   "workspace.unused.kind.home": "dawny dom, brak rozmów",
+  "workspace.unused.kind.queue": "dawny folder kolejki scalania, już niepotrzebny",
   "workspace.unused.kind.slot": "wolny slot ponad pulę",
   "workspace.unused.lostCommits": "{count, plural, one {# commit} few {# commity} many {# commitów} other {# commita}} na gałęzi {branch} spoza {known, select, yes {gałęzi {into}} other {wszystkich innych gałęzi}}",
   "workspace.unused.lostDetached": "{count, plural, one {# commit bez gałęzi (ma go tylko jego detached HEAD)} few {# commity bez gałęzi (ma je tylko jego detached HEAD)} many {# commitów bez gałęzi (ma je tylko jego detached HEAD)} other {# commita bez gałęzi (ma go tylko jego detached HEAD)}}",

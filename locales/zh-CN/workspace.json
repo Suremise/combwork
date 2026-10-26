@@ -505,6 +505,7 @@
   "workspace.unused.kind.carried": "智能体的旧工作树，已放弃",
   "workspace.unused.kind.dirtySlot": "有更改的槽位，未借出",
   "workspace.unused.kind.home": "已退役的主目录，无对话",
+  "workspace.unused.kind.queue": "合并队列的旧文件夹，现已不需要",
   "workspace.unused.kind.slot": "超出池容量的空闲槽位",
   "workspace.unused.lostCommits": "{branch} 上有 {count, plural, other {# 个提交}}不在{known, select, yes { {into} } other {任何其他分支}}上",
   "workspace.unused.lostDetached": "{count, plural, other {# 个不在任何分支上的提交（只有它的 detached HEAD 有）}}",
