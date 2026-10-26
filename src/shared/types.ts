@@ -2880,9 +2880,26 @@ export interface ViewerToken {
   createdAt: string
 }
 
+/**
+ * Where a window's workspace is in opening it (HI-1694), for the steady view the window shows meanwhile: reading its
+ * projects, bringing its bundled skills and modes up to date (`done` of `total`), and after the user said yes to its
+ * upgrade to 1.0, the upgrade (the 0.9 board kept as a backup), the cards' and projects' adoption, and the agents'
+ * worktrees adopted as slots.
+ */
+export interface OpenProgress {
+  /** The workspace's folder, and its name as shown. */
+  path: string
+  name: string
+  step: 'projects' | 'skills' | 'upgrade' | 'adoption' | 'slots'
+  done?: number
+  total?: number
+}
+
 /** Events pushed from main to renderer. */
 export type HiveEvent =
   | { type: 'workspace-changed'; workspace: WorkspaceInfo | null }
+  /** The window's workspace opening (HI-1694): its step now, or null once it is done. */
+  | { type: 'workspace-progress'; progress: OpenProgress | null }
   /** The recent workspaces changed (opened, removed, cleared): each window asks for its own view of them (#144). */
   | { type: 'recent-changed' }
   | { type: 'session-status'; state: LiveSessionState }

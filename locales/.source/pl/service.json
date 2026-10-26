@@ -241,5 +241,7 @@
   "service.workspace.platformTitle": "Version control changed in {project}",
   "service.workspace.renameAgent": "Rename {project}'s {agent}…",
   "service.workspace.sharedNames": "Agent names are unique across the workspace now, so each agent can be told apart. {shared}: they keep working, but rename one of each, e.g. {project}'s {agent} to {suggestion}.",
+  "service.workspace.stillClosing": "{name} is still closing: wait for it to finish, then try again.",
+  "service.workspace.stillOpening": "{name} is still opening: wait for it to finish, then try again.",
   "service.workspace.twoCalled": "Two agents are called {name}"
 }

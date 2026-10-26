@@ -44,7 +44,8 @@ import { slotBranch } from './mergeSlots'
 import { endLane, listLanes, stampLaneProjects } from './lanes'
 import { laneStartInfo, startLaneFromWindow } from './laneStart'
 import { sweepWorkspaceLeftovers } from './leftovers'
-import { boardState, cardHeads, exportBoard, movedNames, onBoardUpgraded, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
+import { assertNotOpening, claimWindow, openProgress, openStep, releaseWindow, windowClaim } from './openProgress'
+import { boardState, boardWaits, cardHeads, exportBoard, movedNames, onBoardUpgraded, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
@@ -288,10 +289,14 @@ function workspaceLive(ws: WorkspaceService): boolean {
 /** Opens a workspace in this window. Its old workspace's agents were stopped for it: starts are allowed again either way. */
 async function openHere(path: string): ReturnType<WorkspaceService['open']> {
   const ws = contextWorkspace()!
+  // The window claimed here, where the open begins to change it, after any folder picker or agents' stop a second
+  // request may have outlasted (HI-1694): refused while another holds it. Its steps shown as they go, until it is open.
+  const claim = claimWindow(ws, path, 'projects')
   try {
     return await workspace.open(path)
   } finally {
     ws.closing = false
+    releaseWindow(ws, claim)
   }
 }
 
@@ -326,10 +331,19 @@ async function authorizedMerge(path: string, branch: string | null | undefined, 
 }
 /**
  * What a workspace's opening does with its board, each step in the background. A 0.9 board waiting for its upgrade takes
- * no writes, so the steps that write skip it quietly, and all of them run again once it is upgraded (#1621), with no
- * restart; each changes nothing the second time.
+ * no writes, and its tables aren't 1.0's yet: none of the steps runs on it (HI-1694: the stage repair failed against it),
+ * and all of them run once it is upgraded (#1621), with no restart; each changes nothing the second time.
  */
-function boardSteps(ws: WorkspaceService): void {
+function boardSteps(ws: WorkspaceService, upgraded = false): void {
+  if (boardWaits(ws)) return
+  // Just upgraded at the user's word: the adoption and the slots that follow are shown as the open's last steps (HI-1694).
+  const path = ws.path
+  // The upgrade's claim of the window (board:upgrade), which the adoption and slots carry on and let go; none for an
+  // upgrade made another way, so never another operation's.
+  const claim = upgraded && openProgress(ws)?.step === 'upgrade' ? windowClaim(ws) : null
+  const step = (s: 'adoption' | 'slots'): void => {
+    if (claim && path && ws.path === path) openStep(ws, s, {}, { token: claim })
+  }
   // Each card, lane and card watch names its project by its stable id (#508), then old Done cards are archived.
   void tasks
     .stampCardProjects(ws)
@@ -348,13 +362,18 @@ function boardSteps(ws: WorkspaceService): void {
   // Then its agents' worktrees become slots (#1441), each project once, before what changed is observed.
   // And G15 saved before P7 settled once (#1445), so a Pair or Team project gets its preset's On.
   // And a card the board has in Done while its stage isn't (HI-1674) brought into line, before what changed is observed.
+  step('adoption')
   void adoptWorkspace(ws)
     .then(() => settleSlotsUpToDate(ws))
+    .then(() => step('slots'))
     .then(() => migrateSlots(ws))
     .then(() => repairStages(ws))
     // What an interrupted card attachment operation left (HI-1700), settled from its records against the board.
     .then(() => recoverCardAttachments(ws))
-    .finally(() => reconcileWorkspace(ws))
+    .finally(() => {
+      releaseWindow(ws, claim)
+      return reconcileWorkspace(ws)
+    })
   // 0.9's agent templates copied into the 0.9 backup once after the upgrade (#1436), and a quiet notice saying so.
   void copyV09Templates(ws)
     .then(() => sayV09TemplatesOnce(ws))
@@ -363,10 +382,14 @@ function boardSteps(ws: WorkspaceService): void {
 
 export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info']>, quitControl: QuitControl): void {
   // A board upgraded to 1.0 while its workspace is open: what its opening skipped, now (#1621).
-  onBoardUpgraded(boardSteps)
+  onBoardUpgraded((ws) => boardSteps(ws, true))
   // Each time a workspace opens: Hive's bundled skills and modes it hasn't got, or has untouched older copies of.
   WorkspaceService.onOpened = async (fresh) => {
-    await syncBundled({ fresh }).catch((e) => log.warn("updating the workspace's bundled skills and modes", e))
+    const opening = contextWorkspace()!
+    const at = opening.path
+    await syncBundled({ fresh, step: (done, total) => openStep(opening, 'skills', { done, total }, { path: at }) }).catch((e) => log.warn("updating the workspace's bundled skills and modes", e))
+    // The rest of the open (its projects read for the window): a step of its own, timed (HI-1694).
+    openStep(opening, 'projects', {}, { path: at })
     const ws = workspace
     // Its usage history imports the sessions it had, the first time (#1106), in the background.
     void usageHistory.opened(contextWorkspace()!)
@@ -558,6 +581,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
 
     'workspace:get': () => workspace.info(),
     'workspace:open': async (path) => {
+      // Never a second open in this window while one is under way (HI-1694: in the middle of an upgrade, say).
+      assertNotOpening(contextWorkspace()!)
       let target = path
       if (!target) {
         const r = await dialog.showOpenDialog(win(), { title: tr(M.openWorkspace), properties: ['openDirectory'], buttonLabel: tr(M.openWorkspace) })
@@ -576,6 +601,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return openHere(target)
     },
     'workspace:create': async () => {
+      assertNotOpening(contextWorkspace()!)
       const r = await dialog.showOpenDialog(win(), {
         title: tr(M.createWorkspaceTitle),
         properties: ['openDirectory', 'createDirectory', 'promptToCreate'],
@@ -591,12 +617,16 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return openHere(r.filePaths[0])
     },
     'workspace:close': async () => {
+      assertNotOpening(contextWorkspace()!)
       if (workspaceLive(contextWorkspace()!) && !(await quitControl.stopWorkspaceAgents(win(), 'workspace'))) return false
       const ws = contextWorkspace()!
+      // Claimed after the agents' stop, which an open may have outlasted (HI-1694): refused while one holds the window.
+      const claim = claimWindow(ws, ws.path ?? '', null)
       try {
         await workspace.close()
       } finally {
         ws.closing = false
+        releaseWindow(ws, claim)
       }
       emitTo(win(), { type: 'workspace-changed', workspace: null })
       // Other windows' lists no longer say it is open here.
@@ -694,9 +724,18 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'board:state': () => boardState(currentWorkspace()),
     'board:upgrade': async () => {
       const ws = currentWorkspace()
+      // Shown as the open's steps (HI-1694): the upgrade, then the adoption and slots, until they are done.
+      // The window claimed, shown as the open's steps (HI-1694): the upgrade, then the adoption and slots, which carry the
+      // claim on and let it go (boardSteps).
+      const claim = claimWindow(ws, ws.path ?? '', 'upgrade')
       // Then what the workspace's opening skipped (boardSteps, through onBoardUpgraded): the adoption (#1218), its
       // agents' worktrees adopted as slots (#1441), 0.9's templates copied aside (#1436), the cards' ids and keys.
-      return upgradeBoard(ws)
+      try {
+        return await upgradeBoard(ws)
+      } finally {
+        // Refused, or upgraded already (nothing pending): no steps after it carry the claim on.
+        if (openProgress(ws)?.step === 'upgrade') releaseWindow(ws, claim)
+      }
     },
     'board:restore09': () => {
       const ws = currentWorkspace()

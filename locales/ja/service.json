@@ -241,5 +241,7 @@
   "service.workspace.platformTitle": "{project}のバージョン管理が変わりました",
   "service.workspace.renameAgent": "{project}の{agent}の名前を変更…",
   "service.workspace.sharedNames": "エージェント名はワークスペース全体で一意になり、各エージェントを区別できるようになりました。{shared}：引き続き動作しますが、それぞれどちらかの名前を変更してください（例：{project}の{agent}を{suggestion}に）。",
+  "service.workspace.stillClosing": "{name} はまだ閉じている途中です。完了するまで待ってから、もう一度お試しください。",
+  "service.workspace.stillOpening": "{name} はまだ開いている途中です。完了するまで待ってから、もう一度お試しください。",
   "service.workspace.twoCalled": "2個のエージェントが{name}という名前です"
 }

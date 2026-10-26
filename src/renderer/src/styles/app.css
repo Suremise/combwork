@@ -2802,6 +2802,13 @@ p.hint {
 .markdown li { margin: 3px 0; }
 
 /* ---------- Overlays: dialogs, palette, toasts ---------- */
+/* A workspace opening (HI-1694): over every other dialog (an upgrade's question is busy beneath it). */
+.overlay.workspace-opening {
+  z-index: 2100;
+}
+.workspace-opening-step {
+  margin: 0 0 8px;
+}
 .overlay {
   position: fixed;
   inset: 0;

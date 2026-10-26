@@ -775,6 +775,42 @@
     "defaultMessage": "Workspace notes",
     "description": "The title of the shared note Hive gives every agent when it starts (notes about this machine), over its editor. Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told."
   },
+  "workspace.opening.adoption": {
+    "defaultMessage": "Adopting its cards and projects…",
+    "description": "A step of upgrading a Hive 0.9 workspace to 1.0: its projects get their workflow options and its cards are taken on by 1.0's workflow (or marked as from before 1.0)."
+  },
+  "workspace.opening.projects": {
+    "defaultMessage": "Reading its projects…",
+    "description": "A step of opening a workspace: Hive reads its projects."
+  },
+  "workspace.opening.skills": {
+    "defaultMessage": "Updating its skills and modes…",
+    "description": "A step of opening a workspace: Hive brings the workspace's copies of its bundled skills and the Assistant's modes up to date."
+  },
+  "workspace.opening.skillsCount": {
+    "defaultMessage": "Updating its skills and modes ({done, number} of {total, number})…",
+    "description": "A step of opening a workspace: Hive brings the workspace's copies of its bundled skills and the Assistant's modes up to date, {done} of {total} so far."
+  },
+  "workspace.opening.slots": {
+    "defaultMessage": "Adopting its agents' worktrees as slots…",
+    "description": "A step of upgrading a Hive 0.9 workspace to 1.0: each agent's own worktree becomes a slot (a working folder Hive lends to cards)."
+  },
+  "workspace.opening.title": {
+    "defaultMessage": "Opening {name}",
+    "description": "The heading of the view Hive shows while it opens a workspace ({name}: the workspace's folder name)."
+  },
+  "workspace.opening.upgrade": {
+    "defaultMessage": "Upgrading its board. The 0.9 board is kept as a backup.",
+    "description": "A step of upgrading a Hive 0.9 workspace to 1.0: its task board is converted to 1.0's format, after a copy of it as it was is kept."
+  },
+  "workspace.opening.upgradingTitle": {
+    "defaultMessage": "Upgrading {name} to Hive 1.0",
+    "description": "The heading of the view Hive shows while it upgrades a workspace made by Hive 0.9 ({name}: its folder name), after the user said yes to the upgrade."
+  },
+  "workspace.opening.wait": {
+    "defaultMessage": "Another workspace can be opened in this window once this is done.",
+    "description": "Under the steps of opening a workspace: why the window takes no other workspace meanwhile."
+  },
   "workspace.overview.agentLabel": {
     "defaultMessage": "<in>{project} · </in>{agent}",
     "description": "A running agent in the Workspace Overview: its project and name. <in>…</in> holds the project part (keep the tags around it, with its separator): in a narrow row it is dropped first, so the agent’s name stays whole."

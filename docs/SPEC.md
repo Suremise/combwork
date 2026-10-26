@@ -125,7 +125,7 @@ Primary platform is Windows 11. Code avoids Windows-only assumptions where cheap
     attachments/cards/<card number>/<time>_<name>  # files kept with a card (HI-1700); never a session's: Clean Up and Purge pass them by
     removed/              # only after Remove from Hive (§6.7): manifest.json, cards.json, handovers/
     project.json.bak      # last good copy (see §2)
-    launch-<agent id>/    # Claude Code agents: regenerated on every launch — do not edit
+    launch-<agent id>/    # Claude Code agents: regenerated on every launch, its skills' copies kept while unchanged (HI-1694) — do not edit
       plugin/.claude-plugin/plugin.json
       plugin/skills/<skill>/...     # copies of enabled Hive skills
       mcp.json
@@ -4362,7 +4362,16 @@ deliveries keep their in-memory store (published after each transaction), the ta
   board (the merge queues, the cards', lanes' and watches' project ids, the projects' keys, archiving old Done cards,
   ending the reviews of sessions that ended, sweeping idle skill copies, the adoption) skip it quietly, logging nothing,
   and **run once the upgrade completes**, in the same session (`onBoardUpgraded`) [#1621: the merge queues had failed
-  with "no such table: card_facts" and started only after a restart]. **When the file is replaced
+  with "no such table: card_facts" and started only after a restart]. **Nothing else runs against it either** (HI-1694,
+  `boardWaits()`): the line updater passes over a workspace whose board waits (it had failed with "no such table: lanes"
+  on every agent's change in another window), metrics keep what they observe unsaved ("attempt to write a readonly
+  database"), and the opening's board steps (the stage repair too) wait for the upgrade. **The opening shows its steps**
+  (HI-1694): from the click until the window shows the workspace, and from Upgrade until the adoption and the slots are
+  done, a steady view over the window names the workspace and the step (reading its projects; updating its skills and
+  modes, n of m; upgrading its board, the 0.9 board kept as a backup; adopting its cards and projects; adopting its agents'
+  worktrees as slots), and the window opens, makes or closes no other workspace meanwhile (refused, saying why). The log
+  says when the board waits for the question, times each schema step and the copy before them, the upgrade, and each
+  step of the opening. **When the file is replaced
   under the services** (the upgrade, Restore) [HR1's round 2 finding]: what they keep from it in memory (deliveries,
   card watches, metrics, lanes' and sessions' "moved in" marks) was read before, and a 0.9 Hive may have written since
   (while the upgrade waited), so each reads it again from the file as it is then; the workspace database's

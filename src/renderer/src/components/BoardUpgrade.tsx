@@ -3,7 +3,7 @@ import { fmt, msg, tr } from '@shared/i18n'
 import type { BoardState } from '@shared/types'
 import { BOARD_UPGRADE_GUIDE } from '@shared/userGuide'
 import { call, errorMessage } from '../api'
-import { confirm, get, loadTasks, notify, useStore } from '../store'
+import { confirm, get, loadTasks, notify, set, useStore } from '../store'
 import { openGuideAt } from '../tips'
 import { Icon } from './ui'
 
@@ -43,6 +43,10 @@ export async function askBoardUpgrade(): Promise<void> {
     cancelLabel: tr(M.notNow),
     busyLabel: tr(M.upgrading),
     run: async () => {
+      // Shown at once as the workspace's opening step (HI-1694): main is busy with it until it is done, so its own word of
+      // the step would come only after; the steps after it, and the end, come from main.
+      const path = get().workspace?.path
+      if (path) set({ openProgress: { path, name: path.split(/[\\/]/).filter(Boolean).pop() ?? path, step: 'upgrade' } })
       await call('board:upgrade')
       await loadTasks()
     }
