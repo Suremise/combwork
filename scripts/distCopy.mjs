@@ -9,6 +9,7 @@ import { execFileSync } from 'child_process'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { fingerprint } from '../tests/e2e/record.mjs'
+import { writeAppIdentity } from './appIdentity.mjs'
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
 const same = (a, b) => resolve(a).toLowerCase() === resolve(b).toLowerCase()
@@ -204,12 +205,14 @@ export function clearDistInfo(dist) {
  * under the worktree's build lock); packages the installer; then finishDist. run(cmd) runs a command and exits on
  * failure. Returns finishDist's lines.
  */
-export function makeDist({ root, here = false, replace = false, run, buildStamped, identity = buildIdentity, clear = clearDistInfo, finish = finishDist, warn = console.warn }) {
+export function makeDist({ root, here = false, replace = false, run, buildStamped, identity = buildIdentity, clear = clearDistInfo, finish = finishDist, warn = console.warn, stampApp = writeAppIdentity }) {
   // What the build is made from, before and after: an edit or a commit while it runs leaves its code unknown.
   const before = identity(root)
   clear(join(root, 'dist'))
   const { stamped } = buildStamped({ root, runBuild: () => run('npm run build') })
   if (!stamped) warn("\nThe source changed while it was building: out/ isn't stamped as this source's (npm run e2e -- --build rebuilds it).\n")
+  // A local build says so (#1647): the app's identity file and its installer's wait for another Hive installer.
+  stampApp(root, { version: before.version, commit: before.head, local: true })
   run('npx electron-builder --win --publish never')
   return finish({ root, before, after: identity(root), here, replace })
 }

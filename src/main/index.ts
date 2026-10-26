@@ -83,7 +83,7 @@ import { createTray, destroyTray, resourcesDir, setTrayPendingQuit, showWindow }
 import { keepOffScreen, offScreenOrigin, showOsNotification, testQuiet } from './testQuiet'
 import { pinFollower } from './pin'
 import { closedNotice, focusedHive, routeAppNotice, setFocusedHive, startNoticeResolver } from './notices'
-import { initUpdater, installNow } from './updater'
+import { initUpdater, installNow, installsOnQuit } from './updater'
 import { flushMetrics } from './metrics'
 import { watchMainStalls } from './mainStalls'
 import { createWorkspaceService, disposeWorkspaceService, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
@@ -621,7 +621,9 @@ async function quitNow(tellUser: boolean): Promise<void> {
   await config.flush()
   // Apps that find Hive by its discovery file stop looking for this one (#620).
   await clearDiscovery()
-  if (installOnQuit) installNow()
+  // A downloaded update installs here, at the end of the quit, never for one cancelled (#1647: only over an older copy).
+  if (installOnQuit) installNow(true)
+  else if (installsOnQuit()) installNow(relaunchOnQuit)
   else {
     if (relaunchOnQuit) relaunch()
     exitBy('app.quit', relaunchOnQuit ? 'quitting to restart' : 'quitting', () => app.quit())

@@ -714,14 +714,15 @@ describe('whether the dev build is from this source (build.mjs)', () => {
       identity: () => (done.push('identity'), 'id'),
       clear: (d: string) => void done.push(`clear ${d.replace(/\\/g, '/')}`),
       finish: (o: { here: boolean; before: string; after: string }) => (done.push(`finish here=${o.here} ${o.before}->${o.after}`), ['done']),
-      warn: (m: string) => void done.push(`warn ${m.trim()}`)
+      warn: (m: string) => void done.push(`warn ${m.trim()}`),
+      stampApp: (r: string, o: { local: boolean }) => void done.push(`stamp ${r} local=${o.local}`)
     })
     return { done, lines }
   }
 
   it('npm run dist drops the earlier build records before it builds, builds out/ stamped, then packages and finishes', () => {
     const { done, lines } = distSteps()
-    expect(done).toEqual(['identity', 'clear R/dist', 'buildStamped R', 'run npm run build', 'run npx electron-builder --win --publish never', 'identity', 'finish here=true id->id'])
+    expect(done).toEqual(['identity', 'clear R/dist', 'buildStamped R', 'run npm run build', 'stamp R local=true', 'run npx electron-builder --win --publish never', 'identity', 'finish here=true id->id'])
     expect(lines).toEqual(['done'])
   })
 

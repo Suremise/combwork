@@ -113,6 +113,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **An update never replaces a build you made yourself with the same or an older version:** Hive reads the copy installed on disk when it would install, and installs only a newer version, comparing versions with prereleases (1.0.0-rc.2 is older than 1.0.0). A local build (`npm run dist`) says so in Settings → Updates, is offered a published release of its own version (Open Release Page) rather than given it, and its installer waits for an update's installer to finish before it installs. Before, a downloaded release could be installed as Hive quit over a newer local build (#1647).
 - **A lane's notice names the right lane:** a card's failed review could be told under a lane that once listed the card and was abandoned (one started on it by mistake), rather than the lane it is in now (#1645).
 - **A lane's notice is shown once:** once a lane ended, Hive told its card's failed review again on every look at the lanes, stacking identical notices and filling the card's history with them (#1631).
 - **Typing no longer lags while agents stream output.** Every frame a terminal drew made Hive measure the window's corner again and restyle the whole window, using a full CPU core with a dozen agents at work; the Progress panel's working lanes now animate without repainting, and the board's work badges are read once for each change (not once for each view showing them), and only the cards that change are worked out again (#1629).

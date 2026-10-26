@@ -575,14 +575,19 @@ interface HiveMessageValues {
   'workspace.updates.itemReady': { version: string | number }
   'workspace.updates.later': undefined
   'workspace.updates.latest': { app: string | number; version: string | number }
+  'workspace.updates.localBuild': { version: string | number; hasCommit: string; commit: string | number }
   'workspace.updates.mb': { mb: number }
   'workspace.updates.noNotes': undefined
   'workspace.updates.notChecked': undefined
+  'workspace.updates.notInstalledNotNewer': { version: string | number }
+  'workspace.updates.notInstalledUnreadable': { version: string | number }
   'workspace.updates.off': undefined
   'workspace.updates.ok': undefined
   'workspace.updates.onGitHub': undefined
+  'workspace.updates.openReleasePage': undefined
   'workspace.updates.perSecond': { size: string | number }
   'workspace.updates.progress': { percent: number; done: string | number; total: string | number }
+  'workspace.updates.published': { version: string | number }
   'workspace.updates.ready': { version: string | number }
   'workspace.updates.readyNote': { auto: string; busy: string }
   'workspace.updates.released': { date: string | number }

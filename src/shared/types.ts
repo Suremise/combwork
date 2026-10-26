@@ -2778,6 +2778,12 @@ export interface UpdateState {
   manual?: boolean
   /** The version found is one the user skipped. */
   skipped?: boolean
+  /** The running build is a local one (#1647: `npm run dist`), with the commit it was built from. */
+  local?: { commit: string | null }
+  /** A published release of the running local build's own version (#1647): offered, never installed by itself. */
+  published?: string
+  /** Why the downloaded update wasn't installed (#1647): the copy on disk couldn't be read, or isn't older. */
+  notInstalled?: 'unreadable' | 'notNewer'
 }
 
 export interface ToastMessage {
