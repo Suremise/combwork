@@ -80,9 +80,9 @@ const check = (name, ok, extra = '') => {
   // The reviewer waits for Builder's card to arrive in Review; the card is given to Other.
   const c1 = await newCard('First')
   // Wakes name a card by its key with the number the tools take (#1219): its own key, from the board.
-  const named = async (n) => `${(await card(n)).key} (#${n})`
+  const named = async (n) => `${(await card(n)).key}`
   const n1 = await named(c1)
-  check('the card has a key of its project', /^[A-Z]{2,4}-\d+ \(#\d+\)$/.test(n1), n1)
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(n1), n1)
   await say(reviewer.id, watch([c1], { column: 'review' }))
   check('the reviewer watches the card', !!(await until(async () => (await live(reviewer.id))?.status === 'watching', 15000)))
   await inv('tasks:update', c1, { agent: other.id })

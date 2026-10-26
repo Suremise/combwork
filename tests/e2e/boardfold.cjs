@@ -177,7 +177,7 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
     if (await discard.count()) await discard.getByRole('button', { name: 'Discard' }).click()
   }
   await tile(n.t1).click()
-  const dialog = page.locator('.dialog', { hasText: `#${n.t1}` })
+  const dialog = lib.cardDialog(page, await lib.cardLabel(inv, n.t1))
   check('clicking a folded card still opens it', !!(await until(async () => (await dialog.count()) === 1, 5000)))
   await page.keyboard.press('Escape')
   check('…and Escape closes it, asking nothing', !!(await until(async () => (await dialog.count()) === 0, 5000)) && (await discard.count()) === 0)

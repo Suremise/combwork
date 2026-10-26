@@ -3751,6 +3751,17 @@ first; `lanes:end`).
   reference the Agent API and the hive tools take accepts a key string too; replies, wakes, the inbox and the doorbell
   name cards "HI-1230 (#1240)" (a project agent: its own project's cards; another's by number, as it sees them); one quiet
   notice after the upgrade lists the keys.
+- **Keys only, rc.3** [HI-1661; Darren, 26 Oct: "We should reference cards only by key"]: the key and the workspace
+  number had drifted apart (HI-1660 is `#1662`), so a number quoted found another card. Every text that names a card
+  names it by its key alone, never "HI-1230 (#1240)": the hive tools' replies, wakes, the inbox, lane rebriefs, task
+  prompts, review-copy notices, refusals, errors, history lines, the Assistant's activity and start view, notifications
+  and the window. One formatter (`nameWithKey`/`cardName`/`cardRef`, `shared/projectKeys.ts`) holds the rule; main names
+  cards by key in its window's work too, not only in agents' requests. `#N` is left only for a card with no key (a
+  workspace card, a project with no key yet) and for another project's card in a confined agent's text (as before).
+  History lines stored before keep the `#N` they were written with. The tools' descriptions ask for the key; the tools
+  that take `number` still take a bare number as the old number, silently; the intents still refuse an agent's plain
+  number, their hint naming only the key. The skills, the agents' contract ("each named by its key") and AGENTS.md say
+  to name cards by key.
 - **The window, built in P3** [#1221]: one label everywhere a card is named (`cardLabel`: its key, `#12` for a card with
   none), on the board, the card dialog, card chips, agent panes, the Assistant, lane segments, the Progress panel,
   Performance, stall reasons and notifications; history lines and main's errors keep `#N` (agents read them, until P8).
@@ -3758,7 +3769,9 @@ first; `lanes:end`).
   suggestion; Project Settings → Agents & Worktrees → Project key changes it (the old one listed as an alias). The compact
   sidebar's tiles show the key, 3–4 letters smaller. The board's search, Archive All and the command palette find `AM-12`,
   `am-12`, `AM-` (the project's cards) and old keys (`#N` as before); a key form no project has (`re-`) is searched as
-  words. Card references link in a card's description and comments (rendered Markdown, never in code) and in
+  words. **Changed in rc.3** [HI-1661]: a bare number (`12`) finds the cards whose key has those digits, in every
+  project (AM-12, HI-12), never the workspace number; `#12` still finds the card with that old number, and a card with
+  no key by its number either way. Card references link in a card's description and comments (rendered Markdown, never in code) and in
   terminals (keys in capitals only) beside `#N`; `#N` stays the old global number. A moved card's names in the projects
   it left (`card_aliases`, read with the board) find it in links, search and Depends on/Related. A key chosen in New
   Project… is reserved until the project has it: a key change or another new project meanwhile is refused it.

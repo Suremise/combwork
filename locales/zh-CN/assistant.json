@@ -425,7 +425,7 @@
   "assistant.skills.shipped.triageReport": "以 Hive Assistant 的身份把报告的问题变成附有证据的卡片：先找原因，再查重复。用于用户报告问题时。",
   "assistant.skills.shipped.tuneSettings": "以 Hive Assistant 的身份解释和建议 Hive 的设置；只有用户同意时才更改。用于被问到某个设置的作用、如何让 Hive 换一种行为，或某个设置能解决你看到的问题时。",
   "assistant.skills.shipped.useHiveApi": "从脚本或工具调用 Hive 的本地 HTTP API，或用它调试某个 hive 工具。仅用于通过 HTTP 自动化 Hive：日常的看板、笔记和交接工作用 hive 工具就够了。",
-  "assistant.skills.shipped.workOnCard": "推进 Hive 任务看板上的一张卡片，从“进行中”做到“评审”并附上总结。用于被交给一张卡片去做时（“处理 #12”、Hive 让你开始的卡片、从“评审”退回需要继续做的卡片）。不用于评审卡片，也不用于卡片循环（card-loop）。",
+  "assistant.skills.shipped.workOnCard": "推进 Hive 任务看板上的一张卡片，从“进行中”做到“评审”并附上总结。用于被交给一张卡片去做时（“处理 AM-12”、Hive 让你开始的卡片、从“评审”退回需要继续做的卡片）。不用于评审卡片，也不用于卡片循环（card-loop）。",
   "assistant.skills.shipped.workspaceNote": "在工作区的共享笔记中记录长期有效的决定、约定或易错点。用于被要求记住或记录某事以备后用，或其他智能体会需要你学到的东西时。不用于进行中的工作。",
   "assistant.skills.stillLocal": "在你删除本地副本之前，{known, select, yes {此处的 {provider} 智能体} other {此处的智能体}}仍会加载它。",
   "assistant.skills.tipHive": "Hive 技能存放在工作区中（.hive/skills）。每个技能按其 SKILL.md 中的 audience 提供给项目智能体（所有项目中、所有提供方的每个智能体）、Hive Assistant 或两者（未指定时提供给项目智能体）。Hive 在每个会话启动时为其复制技能，因此编辑会在新会话中生效。在“技能”视图中添加、编辑和删除它们。",

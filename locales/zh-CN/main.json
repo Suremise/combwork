@@ -301,7 +301,7 @@
   "main.unused.slot.dirty": "其中有 {files, plural, other {# 个文件}}未提交",
   "main.unused.slot.editedSkillCopy": "{copies, plural, other {其技能文件夹 {names} 不是 Hive 未经改动的副本}}",
   "main.unused.slot.gitRefused": "git 未移除它（{detail}）",
-  "main.unused.slot.inFlight": "曾在其中的卡片 #{card} 仍在合并中",
+  "main.unused.slot.inFlight": "曾在其中的卡片 {card} 仍在合并中",
   "main.unused.slot.leased": "它已借给 {agent}",
   "main.unused.slot.process": "仍有进程在使用它",
   "main.unused.slot.session": "有会话在其中运行（{detail}）",

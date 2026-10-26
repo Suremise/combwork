@@ -76,8 +76,8 @@ const check = (name, ok, extra = '') => {
   const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
   const card = (await inv('tasks:create', { title: 'Pick the icon', project: 'alpha', agent: builder.id })).number
   // Wakes name a card by its key with the number the tools take (#1219): its own key, from the board.
-  const named = `${(await inv('tasks:list')).find((c) => c.number === card).key} (#${card})`
-  check('the card has a key of its project', /^[A-Z]{2,4}-\d+ \(#\d+\)$/.test(named), named)
+  const named = `${(await inv('tasks:list')).find((c) => c.number === card).key}`
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(named), named)
   await inv('tasks:update', card, { column: 'doing', agent: builder.id })
   await inv('session:start', alpha, { agentId: builder.id })
   await inv('session:start', home, { agentId: 'assistant' })

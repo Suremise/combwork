@@ -195,7 +195,7 @@ interface HiveMessageValues {
   'workflow.refused.approval.given.message': { card: string | number }
   'workflow.refused.approval.given.next': undefined
   'workflow.refused.card.plainNumber.message': undefined
-  'workflow.refused.card.plainNumber.next': { key: string | number; alias: string | number }
+  'workflow.refused.card.plainNumber.next': { key: string | number }
   'workflow.refused.check.revisionMismatch.message': { revision: string | number }
   'workflow.refused.check.revisionMismatch.next': { revision: string | number }
   'workflow.refused.done.contained.change': undefined

@@ -18,6 +18,7 @@ import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
 import { hiveName, safeWord } from '../shared/devConsole'
 import { addLeftMerge } from './lastRun'
 import { fmt, msg, tr } from '../shared/i18n'
+import { cardRef } from '../shared/projectKeys'
 
 const M = {
   leftTitle: msg({ id: 'main.mergeSlot.leftTitle', defaultMessage: '{agent} was merging when Hive closed', description: "A notice's title as a workspace opens: the agent {agent} (its name) held the merge slot when Hive last closed, so its merge may be half done." }),
@@ -211,7 +212,7 @@ export async function recoverMergeSlots(workspacePath: string): Promise<void> {
     const folder = h.cwd ?? at ?? h.projectPath
     // After an unexpected close, told in that notice (lastRun.ts).
     if (at && addLeftMerge({ agentName: h.agentName, branch: h.branch, cards: h.cards, folder })) continue
-    const values = { branch: h.branch, hasCards: h.cards.length ? 'yes' : 'no', cards: fmt.list(h.cards.map((n) => `#${n}`), 'unit'), folder }
+    const values = { branch: h.branch, hasCards: h.cards.length ? 'yes' : 'no', cards: fmt.list(h.cards.map(cardRef), 'unit'), folder }
     const body = at ? tr(M.leftBody, values) : tr(M.leftBodyGone, { ...values, project: basename(h.projectPath) })
     toast('warning', tr(M.leftTitle, { agent: h.agentName }), body, undefined, at ?? workspacePath)
   }

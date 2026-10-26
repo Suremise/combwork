@@ -110,6 +110,7 @@ import { revisionOf } from './revisions'
 import { metricsHandle, recordLaunch } from './metrics'
 import { headerOf } from './revisions'
 import { utf8Bytes } from '../shared/metrics'
+import { cardNamesOf, scopeOfHost } from './projectKeys'
 import { inWorkspace, workspace, workspaceFor, workspaceOf, type SessionsFile } from './workspace'
 import { usageHistory, type StoredUsage } from './usageHistory'
 import { journalSettingsOf } from './journalService'
@@ -160,12 +161,12 @@ function setStatus(st: LiveSessionState, text: TextPart | null): void {
 }
 
 /** An agent's place at the merge slot as the window shows it (LiveSessionState.mergeSlotText); `mergeSlot` is its English (shared/mergeSlot.ts). */
-function slotNoteText(note: SlotNote): Text {
+function slotNoteText(note: SlotNote, named: (n: number) => string): Text {
   if ('holding' in note) return withValues(msg({ id: 'session.mergeSlot.holding', defaultMessage: 'Merging into {branch} (merge slot)', description: "An agent's status while it holds the project's merge slot. {branch} is the branch it merges into." }), { branch: note.holding })
   const h = note.waitingFor
   if (!h) return msg({ id: 'session.mergeSlot.waiting', defaultMessage: 'Waiting for the merge slot', description: "An agent's status while it waits for the project's merge slot." })
   if (h.kind === 'user') return msg({ id: 'session.mergeSlot.waitingForYou', defaultMessage: 'Waiting for the merge slot (you are merging)', description: "An agent's status while it waits for the merge slot the user holds (merging from Hive's Merge dialog)." })
-  const cards = h.cards.map((n) => `#${n}`).join(', ')
+  const cards = h.cards.map(named).join(', ')
   if (h.taken)
     return cards
       ? withValues(msg({ id: 'session.mergeSlot.waitingMergingCards', defaultMessage: 'Waiting for the merge slot ({agent} is merging {cards})', description: "An agent's status while it waits for the merge slot another agent holds. {agent} is that agent's name, {cards} the cards it merges (\"#305, #306\")." }), { agent: h.name, cards })
@@ -1079,7 +1080,7 @@ class SessionManager {
     const st = this.live.get(liveId(projectPath, agentId))?.state
     if (!st) return
     const label = this.label(st)
-    const which = cards.map((n) => `#${n}`).join(', ')
+    const which = cards.map(cardNamesOf(workspaceOf(projectPath), scopeOfHost(projectPath))).join(', ')
     this.notify(
       projectPath,
       withValues(msg({ id: 'session.notice.notWatching', defaultMessage: "{agent} isn't watching {cards}", description: "A notification's title: an agent working through cards in a loop ended its turn without watching them. {agent} is the agent; {cards} the cards (\"#12, #13\")." }), { agent: label, cards: which }),
@@ -1108,7 +1109,7 @@ class SessionManager {
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l || l.state.runId !== runId || (l.state.mergeSlot ?? null) === text) return
     l.state.mergeSlot = text ?? undefined
-    l.state.mergeSlotText = text !== null && about ? slotNoteText(about) : undefined
+    l.state.mergeSlotText = text !== null && about ? slotNoteText(about, cardNamesOf(workspaceOf(projectPath), scopeOfHost(projectPath))) : undefined
     this.emitState(l.state)
   }
 

@@ -158,7 +158,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   ),
   'card.plainNumber': r(
     msg({ id: 'workflow.refused.card.plainNumber.message', defaultMessage: 'A plain number is not a card reference.', description: 'A refused intent: the card was named by a bare number.' }),
-    msg({ id: 'workflow.refused.card.plainNumber.next', defaultMessage: 'Name the card as {key} or {alias}.', description: 'The forms a card reference takes: {key} like AM-12, {alias} like #1061.' })
+    msg({ id: 'workflow.refused.card.plainNumber.next', defaultMessage: 'Name the card by its key: {key}.', description: 'How to name a card instead of a bare number: by its key, {key} (such as AM-12).' })
   ),
   'paths.excluded': r(
     msg({ id: 'workflow.refused.paths.excluded.message', defaultMessage: "{card}: {path} is in {folder}, which a project without version control leaves out of its work.", description: "A refused declaration of a card's paths (#1511): in a project without version control (None), a card's paths are the files of its work; {path} is under {folder} (node_modules, .venv, .git, .hive or a folder the project excludes), which never counts as work. {card} is a card key like AM-12." }),

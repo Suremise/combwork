@@ -1245,17 +1245,25 @@ function pathWithoutStoreAliases(parent = process.env) {
 
 /** A real PNG (a w×h gradient) for image previews, pastes and drops. */
 /**
- * Text agents read with its cards named as before keys (#1219): "AL-1 (#1)" becomes "#1", so a suite's checks of card
- * numbers stay as they were; each suite checks the keyed form itself (KEYED).
+ * Text agents read with its cards named by number, as before keys (#1219): "AL-1" becomes "#1", so a suite's checks of
+ * card numbers stay as they were; each suite checks the keyed form itself (KEYED). Only for a suite whose cards are all
+ * one project's, made in order, so a key's digits are its card's number (HI-1661: texts name cards by key alone); a
+ * suite where they differ fails its checks, never passes them wrongly. A branch's key (hive/AL/AL-1-…) stays as it is.
  */
-const unkey = (text) => (typeof text === 'string' ? text.replace(/\b[A-Z]{2,4}-\d+ \((#\d+)\)/g, '$1') : text)
+const unkey = (text) => (typeof text === 'string' ? text.replace(/(?<![\w/-])[A-Z]{2,4}-(\d+)\b(?!-)/g, '#$1') : text)
 /** A card as the window names it (#1221): its key, else #n (a workspace card, or one the board doesn't have). */
 async function cardLabel(inv, n) {
   const c = (await inv('tasks:list')).find((x) => x.number === n)
   return c?.key || `#${n}`
 }
-/** A card named by key with the number the tools take, in agents' text: "AL-1 (#1)". */
-const KEYED = /\b[A-Z]{2,4}-\d+ \(#\d+\)/
+/**
+ * The card dialog of the card named `label` (its key, else #n: cardLabel), its title naming it alone (HI-1661). Its
+ * text runs on from the title ("AL-1Login form"), so only another digit after it, or a key's letter or digit before
+ * it, makes another card's name.
+ */
+const cardDialog = (page, label) => page.locator('.dialog', { hasText: new RegExp(`(?<![A-Z0-9#-])${label.replace(/[#-]/g, '\\$&')}(?!\\d)`) })
+/** A card named by its key alone in agents' text (HI-1661): "AL-1", never "AL-1 (#1)". */
+const KEYED = /\b[A-Z]{2,4}-\d+\b(?! \(#\d)/
 
 function samplePng(w = 64, h = 40) {
   const zlib = require('zlib')
@@ -1416,4 +1424,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { unkey, KEYED, cardLabel, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, TURN_HUNG_MS, logFakeInput, typeLine, fakePrompts, skip }
+module.exports = { unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, TURN_HUNG_MS, logFakeInput, typeLine, fakePrompts, skip }

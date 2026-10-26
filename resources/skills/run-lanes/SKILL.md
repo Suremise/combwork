@@ -30,7 +30,7 @@ The project's Reviewers option decides:
 Each agent reads only what you send it, and each lane starts in a new conversation (coordinate-agents, A new lane). The rules themselves (where to work, what a submission needs, who merges, when a card is Done) are Hive's: each card's start, each reply and each refusal say them, so a brief doesn't repeat them. With workflow rules off nothing refuses, and the agents' own skills (card-loop) carry the steps. A builder's brief, to adapt:
 
 ```
-Use card-loop as the builder. Lane "<name>": cards, in order, #12, #15. Your reviewer is R1.
+Use card-loop as the builder. Lane "<name>": cards, in order, AM-12, AM-15. Your reviewer is R1.
 Follow-ups go to Todo as new cards.
 ```
 

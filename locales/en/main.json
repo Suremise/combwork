@@ -1208,7 +1208,7 @@
     "description": "Why Hive didn't remove a slot listed in Unused worktrees: git worktree remove refused ({detail}: git's message). A clause."
   },
   "main.unused.slot.inFlight": {
-    "defaultMessage": "card #{card}, which it held, is still being merged",
+    "defaultMessage": "card {card}, which it held, is still being merged",
     "description": "Why Hive won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its number) that worked in it. A clause."
   },
   "main.unused.slot.leased": {

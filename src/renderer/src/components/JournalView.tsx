@@ -454,7 +454,7 @@ function SourceMark({ source }: { source: JournalSource }) {
 function CardLink({ refText, short }: { refText: string; short?: boolean }) {
   const n = Number(refText)
   const card = useStore((s) => (Number.isInteger(n) ? s.tasks.find((c) => c.number === n) : undefined))
-  if (!Number.isInteger(n)) return <span className="badge">#{refText}</span>
+  if (!Number.isInteger(n)) return <span className="badge">{refText}</span>
   return <TaskChip number={n} column={card?.column ?? null} title={card?.title} short={short} blocked={!!card?.blocked} />
 }
 

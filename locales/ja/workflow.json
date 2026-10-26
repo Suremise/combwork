@@ -193,7 +193,7 @@
   "workflow.refused.approval.given.message": "{card}はマージ前の承認を待っています。",
   "workflow.refused.approval.given.next": "承認を待ってください。承認はカードまたは「要対応」で行います。",
   "workflow.refused.card.plainNumber.message": "数字だけではカードを指定できません。",
-  "workflow.refused.card.plainNumber.next": "カードは{key}または{alias}の形で指定してください。",
+  "workflow.refused.card.plainNumber.next": "カードはキーで指定してください：{key}。",
   "workflow.refused.check.revisionMismatch.message": "{revision}は、ここでチェックアウトされているリビジョンではありません。",
   "workflow.refused.check.revisionMismatch.next": "{revision}がチェックアウトされている場所でチェックを実行するか、リビジョンを指定せずに実行してください。",
   "workflow.refused.done.contained.change": "このルールは「バージョン管理」→「マージする人」で設定します。",

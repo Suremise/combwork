@@ -124,7 +124,7 @@
   "service.hiveVcs.exitCode": "kod wyjścia {code}",
   "service.hiveVcs.noRepo": "Ten projekt nie jest w żadnym repozytorium git.",
   "service.hiveVcs.rmFailed": "git rm --cached nie powiodło się: {why}",
-  "service.intent.noWorkflow": "#{n} nie ma przepływu pracy: to karta obszaru roboczego albo jej projekt nie ma jeszcze wybranej kontroli wersji. Przenieś ją zamiast tego na tablicy.",
+  "service.intent.noWorkflow": "{card} nie ma przepływu pracy: to karta obszaru roboczego albo jej projekt nie ma jeszcze wybranej kontroli wersji. Przenieś ją zamiast tego na tablicy.",
   "service.intent.queueNotAgents": "Tylko użytkownik albo Hive Assistant w granicach Ustawienia → Asystent → Kontrola może usunąć kartę z kolejki scalania lub ponowić jej scalanie.",
   "service.keys.closed": "Obszar roboczy został zamknięty albo okno otworzyło inny, zanim klucz został zmieniony: nic się nie zmieniło.",
   "service.keys.form": "Klucz projektu to od 2 do 4 liter, od A do Z.",

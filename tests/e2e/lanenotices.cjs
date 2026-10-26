@@ -143,7 +143,7 @@ const check = (name, ok, extra = '') => {
     // notification. The card whose review failed says so, in its dialog's History.
     await showBoard(page)
     await openByTitle(page, a)
-    const dialog = page.locator('.dialog', { hasText: `(#${a})` })
+    const dialog = lib.cardDialog(page, await lib.cardLabel(inv, a))
     await dialog.waitFor({ timeout: HUNG_MS })
     await dialog.getByText(/History \(\d+\)/).first().click()
     const noted = dialog.locator('.task-history', { hasText: 'Notified you that its review failed' })

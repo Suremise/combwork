@@ -193,7 +193,7 @@
   "workflow.refused.approval.given.message": "O cartão {card} aguarda a aprovação antes do merge.",
   "workflow.refused.approval.given.next": "Aguarde a aprovação, dada no cartão ou em Para você.",
   "workflow.refused.card.plainNumber.message": "Um número sozinho não é uma referência de cartão.",
-  "workflow.refused.card.plainNumber.next": "Indique o cartão como {key} ou {alias}.",
+  "workflow.refused.card.plainNumber.next": "Indique o cartão pela chave: {key}.",
   "workflow.refused.check.revisionMismatch.message": "A versão {revision} não é a que está em checkout aqui.",
   "workflow.refused.check.revisionMismatch.next": "Execute a verificação onde a versão {revision} está em checkout, ou sem indicar uma versão.",
   "workflow.refused.done.contained.change": "Esta regra é definida em Controle de versão → Quem faz o merge.",

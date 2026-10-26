@@ -2407,11 +2407,11 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   }
   const was = await tasks.getTask(n).catch(() => null)
   const given = typeof patch.agent === 'string' ? await knownAgent(was?.project, patch.agent) : was ? await cardAgent(was) : undefined
-  return assistantChange('agents', `change #${n} on the board`, { kind: 'update-task', card: n, ...(patch.column ? { column: patch.column } : {}), ...(was?.project ? { project: was.project } : {}), ...(given ? { agent: given } : {}) }, async (commit) => {
+  return assistantChange('agents', `change ${cardRef(n)} on the board`, { kind: 'update-task', card: n, ...(patch.column ? { column: patch.column } : {}), ...(was?.project ? { project: was.project } : {}), ...(given ? { agent: given } : {}) }, async (commit) => {
     const before = await tasks.getTask(n)
     const placed = (patch.before !== undefined && patch.before !== null) || patch.position !== undefined
     const c = await apply(commit)
-    const at = patch.position ? `at the ${patch.position}` : placed ? `before #${patch.before}` : ''
+    const at = patch.position ? `at the ${patch.position}` : placed ? `before ${typeof patch.before === 'number' ? cardRef(patch.before) : patch.before}` : ''
     const what = [
       patch.column && patch.column !== before.column
         ? `moved it to ${columnLabel(patch.column)}${at ? `, ${at}` : ''}`
@@ -2549,7 +2549,7 @@ route('POST', '/v1/tasks/:n/comments', async ({ params, body }) => {
   const actor = await taskActor()
   const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, ['Commented']) : taskView(c))
   if (actor.kind !== 'assistant') return reply(await tasks.commentTask(n, text, actor))
-  return assistantChange('agents', `comment on #${n}`, { kind: 'comment-task', card: n }, async () => ({ done: `Commented on ${cardRef(n)}`, result: await reply(await tasks.commentTask(n, text, actor)) }))
+  return assistantChange('agents', `comment on ${cardRef(n)}`, { kind: 'comment-task', card: n }, async () => ({ done: `Commented on ${cardRef(n)}`, result: await reply(await tasks.commentTask(n, text, actor)) }))
 })
 
 /** Bounded waits running now, per caller (an agent, the Assistant, a script): at most WAITS_PER_CALLER at a time. */
@@ -2934,7 +2934,7 @@ route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
     : { kind: 'new-agent', name: body?.name ? String(body.name) : undefined, provider: body?.provider && isKnownProvider(String(body.provider)) ? (String(body.provider) as ProviderId) : undefined }
   // The agent it is started on, when it exists (a new one is named once added).
   const named = target.kind === 'agent' ? await knownAgent(card.project, target.agentId) : undefined
-  return assistantChange('agents', `start #${n} ${target.kind === 'agent' ? `on ${named?.name ?? 'an agent'}` : 'on a new agent'}${card.project ? ` in ${card.project}` : ''}`, { kind: 'start-task', card: n, ...(card.project ? { project: card.project } : {}), ...(named ? { agent: named } : {}) }, async () => {
+  return assistantChange('agents', `start ${cardRef(n)} ${target.kind === 'agent' ? `on ${named?.name ?? 'an agent'}` : 'on a new agent'}${card.project ? ` in ${card.project}` : ''}`, { kind: 'start-task', card: n, ...(card.project ? { project: card.project } : {}), ...(named ? { agent: named } : {}) }, async () => {
     if (target.kind === 'new-agent' && body?.provider && !isKnownProvider(String(body.provider))) throw new HttpError(400, `Unknown provider "${body.provider}". hive_list_providers lists them.`)
     const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined)
     return {

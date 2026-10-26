@@ -2,7 +2,7 @@
 // in their project and carry their key, and every place a card is named takes its key (any case), an old key after a
 // change, a moved card's key in its old project, or #N: reading and changing a card, blockedBy and before, a batch (a key
 // no card has refused as that card, the rest changed), a reorder, a bounded wait and a progress run's card. A key no
-// card has is 404. Replies name cards "AL-1 (#1)", the hive tools' too: hive_lane's start, join, list and end, through
+// card has is 404. Replies name cards by key alone, "AL-1" (HI-1661), the hive tools' too: hive_lane's start, join, list and end, through
 // the real hive MCP server.
 // Dev build, throwaway profile and workspace; no CLI is started.
 const lib = require('./lib.cjs')
@@ -86,10 +86,10 @@ const check = (name, ok, extra = '') => {
     const mixed = await call('POST', '/v1/tasks/batch', { numbers: [`#${a1?.number}`, '#999', 'AL-98'], addLabels: ['mixed'], reply: 'short' })
     check('a missing #N is refused as that card, as a missing key is, and the card beside them changes', mixed.status === 200 && mixed.body?.changed?.length === 1 && mixed.body?.refused?.length === 2 && mixed.body.refused.some((r) => r.number === 999) && mixed.body.refused.some((r) => r.ref === 'AL-98'), JSON.stringify(mixed))
     const reordered = await call('POST', '/v1/tasks/reorder', { column: 'todo', cards: ['AL-1', 'AL-2'], reply: 'short' })
-    check('a reorder takes keys, and names them in its reply', reordered.status === 200 && JSON.stringify(reordered.body?.top) === JSON.stringify([a1?.number, a2?.number]) && reordered.body?.names?.[String(a1?.number)] === `AL-1 (#${a1?.number})`, JSON.stringify(reordered))
+    check('a reorder takes keys, and names them in its reply', reordered.status === 200 && JSON.stringify(reordered.body?.top) === JSON.stringify([a1?.number, a2?.number]) && reordered.body?.names?.[String(a1?.number)] === 'AL-1', JSON.stringify(reordered))
     const waited = await call('POST', '/v1/tasks/wait', { cards: ['AL-1'], column: 'todo' })
     // Already in Todo: it answers at once, with the card, named by key for the hive tools' words.
-    check('a wait takes a key', waited.status === 200 && [waited.body?.already, ...(waited.body?.changes ?? [])].some((c) => c?.number === a1?.number) && waited.body?.names?.[String(a1?.number)] === `AL-1 (#${a1?.number})`, JSON.stringify(waited))
+    check('a wait takes a key', waited.status === 200 && [waited.body?.already, ...(waited.body?.changes ?? [])].some((c) => c?.number === a1?.number) && waited.body?.names?.[String(a1?.number)] === 'AL-1', JSON.stringify(waited))
 
     // --- hive_lane through the real hive MCP server (#1219 round 2, finding 1): its replies name the cards by key.
     const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
@@ -103,9 +103,10 @@ const check = (name, ok, extra = '') => {
       const r = JSON.parse(out.split('\n')[0]).result
       return { text: r.content[0].text, isError: !!r.isError }
     }
-    const keyed2 = `AL-2 (#${a2?.number})`
+    // By key alone (HI-1661), never with the number beside it.
+    const keyed2 = 'AL-2'
     const started = tool(builder.id, 'hive_lane', { action: 'start', cards: ['AL-2'], name: 'keyed' })
-    check("hive_lane start's reply names its cards by key", !started.isError && started.text.startsWith('Lane started: ') && started.text.includes(keyed2), started.text)
+    check("hive_lane start's reply names its cards by key", !started.isError && started.text.startsWith('Lane started: ') && started.text.includes(keyed2) && !started.text.includes(`#${a2?.number}`), started.text)
     const joined = tool(reviewer.id, 'hive_lane', { action: 'join', builder: 'Builder' })
     check("…join's", !joined.isError && joined.text.startsWith('Joined the lane: ') && joined.text.includes(keyed2), joined.text)
     const listed = tool(builder.id, 'hive_lane', { action: 'list' })
@@ -129,7 +130,8 @@ const check = (name, ok, extra = '') => {
 
     // --- A progress run's card by key (#1220 deferred it to this card).
     const resolved = await call('POST', '/v1/progress/resolve', { card: 'be-2' })
-    check("a progress run's card takes a key", resolved.status === 200 && resolved.body?.card === `#${a1?.number}`, JSON.stringify(resolved))
+    // Named by its key now (HI-1661), as everything names it.
+    check("a progress run's card takes a key, and names it by key", resolved.status === 200 && resolved.body?.card === 'BE-2', JSON.stringify(resolved))
     const resolvedUnknown = await call('POST', '/v1/progress/resolve', { card: 'BE-9' })
     check('…and a key no card has is refused in the words used', resolvedUnknown.status === 400 && /Unknown card BE-9/.test(resolvedUnknown.body?.error ?? ''), JSON.stringify(resolvedUnknown))
   } finally {

@@ -86,7 +86,7 @@ function seed(cards) {
     const rows = view.locator('.journal-row')
     check('Journal → Timeline shows every entry', !!(await lib.until(async () => (await rows.count()) === 7, HUNG_MS)), String(await rows.count()))
     const summaries = async () => rows.locator('.journal-summary').allInnerTexts()
-    check("newest first, by day (Today first): Hive's fact, then the Assistant's", /^#\d+ "Journal browser" is Done/.test((await summaries())[0]) && (await summaries())[1] === 'Ship the journal browser under the Assistant view' && (await view.locator('.journal-day-head').first().innerText()).toLowerCase() === 'today', JSON.stringify(await summaries()))
+    check("newest first, by day (Today first): Hive's fact, then the Assistant's", /^[A-Z]{2,4}-\d+ "Journal browser" is Done/.test((await summaries())[0]) && (await summaries())[1] === 'Ship the journal browser under the Assistant view' && (await view.locator('.journal-day-head').first().innerText()).toLowerCase() === 'today', JSON.stringify(await summaries()))
     const top = rows.filter({ hasText: 'Ship the journal browser' })
     check('a row has its kind mark, project, source and card chip', (await top.locator('.journal-kind-mark').count()) === 1 && /alpha/.test(await top.innerText()) && (await top.locator('.journal-source-mark').count()) === 1 && (await top.locator(`.card-chip[data-task="${first.number}"]`).count()) === 1)
     check('important entries are marked', (await top.locator('.journal-important').count()) === 1)
@@ -111,7 +111,7 @@ function seed(cards) {
 
     // A card chip opens the card.
     await top.locator(`.card-chip[data-task="${first.number}"]`).click()
-    const cardDialog = page.locator('.dialog', { hasText: `#${first.number}` })
+    const cardDialog = lib.cardDialog(page, await lib.cardLabel(inv, first.number))
     check('a card chip opens its card', !!(await lib.until(async () => (await cardDialog.count()) >= 1, HUNG_MS)))
     await page.keyboard.press('Escape')
     await lib.until(async () => (await cardDialog.count()) === 0, HUNG_MS)

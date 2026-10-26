@@ -6,6 +6,7 @@ import { ChangeRefused } from './assistantControl'
 import * as tasks from './tasks'
 import { recordingChanges } from './assistantChanges'
 import { cardAgent, knownAgent } from './activityTargets'
+import { cardRef } from '../shared/projectKeys'
 
 /**
  * The fields a batch takes besides its card numbers and reply. A title, comment, decision or link is one card's: a batch
@@ -76,11 +77,11 @@ export async function assistantBatch(ws: string, token: string, numbers: number[
   for (const i of items) {
     if (i.card) {
       const agent = await cardAgent(i.card)
-      assistant.record(ws, { kind: 'update-tasks', card: i.number, column: i.card.column, ...(i.card.project ? { project: i.card.project } : {}), ...(agent ? { agent } : {}) }, `#${i.number} ${clip(i.card.title, 60)}: ${i.said.join(', ') || 'no change'}`)
+      assistant.record(ws, { kind: 'update-tasks', card: i.number, column: i.card.column, ...(i.card.project ? { project: i.card.project } : {}), ...(agent ? { agent } : {}) }, `${cardRef(i.number)} ${clip(i.card.title, 60)}: ${i.said.join(', ') || 'no change'}`)
     } else {
       const was = await tasks.getTask(i.number).catch(() => null)
       const agent = typeof patch.agent === 'string' ? await knownAgent(was?.project, patch.agent) : undefined
-      assistant.record(ws, { kind: 'update-tasks', card: i.number, ...column, ...(was?.project ? { project: was.project } : {}), ...(agent ? { agent } : {}) }, `#${i.number}: change`, i.error ?? 'refused', { reason: 'Refused' })
+      assistant.record(ws, { kind: 'update-tasks', card: i.number, ...column, ...(was?.project ? { project: was.project } : {}), ...(agent ? { agent } : {}) }, `${cardRef(i.number)}: change`, i.error ?? 'refused', { reason: 'Refused' })
     }
   }
   return items

@@ -295,7 +295,7 @@ export async function keptText(projectPath: string, k: SlotKept): Promise<string
     case 'process':
       return tr(msg({ id: 'main.unused.slot.process', defaultMessage: 'a process still has it open', description: "Why Hive won't remove a slot listed in Unused worktrees: a program still uses its folder. A clause." }))
     case 'inFlight':
-      return tr(msg({ id: 'main.unused.slot.inFlight', defaultMessage: 'card #{card}, which it held, is still being merged', description: "Why Hive won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its number) that worked in it. A clause." }), { card: k.card })
+      return tr(msg({ id: 'main.unused.slot.inFlight', defaultMessage: 'card {card}, which it held, is still being merged', description: "Why Hive won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its number) that worked in it. A clause." }), { card: k.card })
     case 'dirty':
       return tr(msg({ id: 'main.unused.slot.dirty', defaultMessage: "{files, plural, one {# file in it isn't committed} other {# files in it aren't committed}}", description: "Why Hive won't remove a slot listed in Unused worktrees: it has uncommitted or untracked files ({files}: how many). A clause." }), { files: k.files })
     case 'unmerged':

@@ -261,7 +261,7 @@ const check = (name, ok, extra = '') => {
   const tint = await chips.first().evaluate((el) => ({ colored: el.classList.contains('colored'), column: el.dataset.column, col: el.style.getPropertyValue('--col') }))
   check('…tinted with its column’s colour', tint.colored && tint.column === 'todo' && !!tint.col, JSON.stringify(tint))
   await status().locator('.card-chip', { hasText: L2 }).click()
-  const dialog = page.locator('.dialog', { hasText: '#2' })
+  const dialog = lib.cardDialog(page, await lib.cardLabel(inv, 2))
   check('…that opens its card', !!(await lib.until(async () => (await dialog.count()) === 1, 5000)))
   await page.keyboard.press('Escape')
   await lib.until(async () => (await page.locator('.dialog').count()) === 0, HUNG_MS)
