@@ -1725,6 +1725,7 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G15 | **Slots are brought up to date before each card** | On / Off (and "install when the lock file changed") | `prepareSlot` [note §5] |
 | G16 | **Warn when a commit includes another agent's files** | On / Off | Shared folder only; a warning on submit, never a refusal [#1112 down] |
 | G17 | **Reviewers** | One per lane · A shared pool | §16.10.5 |
+| G18 | **Push the target branch after merging** | On / Off (default Off) | The merge queue (§16.9.1), Hive merges only. Not a rule: in no ruleset, read as the options are when the queue pushes (#1179). |
 | — | Rounds, wait, loop wakes | Today's Card loops settings, shown here with a link | Owner stays Card loops [§5]. |
 
 An option the platform's capabilities can't support isn't shown (None has no G5–G9, G11, G15). Every option shows
@@ -1756,6 +1757,7 @@ afterwards makes it **Custom** (the header says which preset it started from). T
 | G15 slots up to date | — | On | On | **Built [#1445]:** On in Pair, Team and Pair (the agent merges) since P7 (#1355 had it Off while agent worktrees stood in); a value saved before P7 is settled once (§16.6.6). |
 | G16 shared-folder warning | On | — | — | Only matters in a shared folder. |
 | G17 reviewers | — | One per lane | One per lane | A pool is the 6+pool template's choice (§16.10.6). |
+| G18 push after merging | — | Off | Off | Pushing reaches your remote and its sign-in: it stays yours unless you turn it on (#1179). |
 
 None's presets fill every option: Solo = N1 No one, N2 —, N3 none, N4 the whole folder except `.hive`, `node_modules` and `.venv`, N5 default names, N6 On, N7 as set; Pair = N1 A reviewer agent, N2 On, N3 the quick checks, the rest as Solo; Team = N1 A reviewer agent, then you, N2 On, N3 quick checks + tests, the rest as Solo. (N7 is shown, not set: its owner is Settings → Agents & Worktrees.)
 
@@ -2523,6 +2525,21 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    **3** such retests in a row the entry pauses ("main moves faster than its checks: retest or merge by hand") [HB3's
    round 1 finding 19].
 7. Record `Integrated` (the result revision, method), move the card to Done, release its slot, end the lane if done.
+   **Push after merging (G18, built [#1179]):** with *Push the target branch after merging* on (the project's options
+   as they are then: G18 is in no ruleset), the same write records that the target's push is owed (store meta
+   `queue.pushOwed:<target>`: the result, card and entry), in recovery's `Integrated` after a restart too, so the card
+   is Done and the push owed, or neither. Then, and before the queue's next entry (first thing in every run, so after a
+   restart or Resume too), the queue settles it: the option off by then (read again just before the push begins), or
+   the target no longer holding the result (reset since), drops it with no push; a read of the target that fails is
+   never taken for settled: it pauses `pushUnreadable` (Hive's own words, translated), still owed, so no later merge goes ahead of it; else it pushes `refs/heads/<target>` to what the target tracks
+   (`branch.<target>.remote` and `.merge`), or with nothing tracked to the only remote or `origin` under the same name,
+   never `--force` and never `--set-upstream`, with no prompt (`GIT_TERMINAL_PROMPT=0`, no askpass, the credential
+   manager non-interactive) and within the Git view's 5 minutes. Pushed, or up to date already (a retry after a crash
+   before the clear), it is cleared, only if still the same result (a newer merge's stays owed). Refused (the remote
+   has commits the target lacks), failed (git's message: a sign-in, the network, the bound) or with no remote: the
+   queue pauses (`pushRejected`, `pushFailed`, `pushNoRemote`, naming the merged card, which stays Done), the next entry
+   waits, and the pause says what to do: pull (or fix it) and Resume, or turn G18 off and Resume to keep merging
+   locally. Hive never pulls by itself, and agents never push.
 8. **Conflict or red checks:** `IntegrationFailed` with the files or the check output and log, `transient` when the
    failure was the environment (a check that failed to start, a network error, a timeout) rather than a result; the
    card goes to Active, back to its builder. A conflict, red checks or a hook failure need a new revision (review
@@ -4610,7 +4627,7 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 | Patch-id sameness, squash containment, refs watcher | P3 (in scope) |
 | `mergeWorktree` returns the merge commit, takes a target, no auto-commit; cross-process merge lock | P5 (in scope) |
 | Branches shown next to their cards and revisions | P6 (in scope). **Built [#1424]:** Branches & remotes shows, on each branch a card's current cycle works on (`WorkBadge.line`), that card (the one in flight, else the latest; how many earlier), its stage (its project's name, its category's colour), in Review the revision under review (`WorkBadge.underReview`, copyable) and, Done, merged with `Integrated`'s result; the cards of a reused branch by when each one's current cycle started (never by a later fact). Worktrees name their agent's card (Doing, else Review, else Passed) the same way, whatever they have checked out |
-| Push the target after Hive merges (an option) | On Hold, git-support: #1179 |
+| Push the target after Hive merges (an option) | **Built [#1179]:** G18 (§16.6.1, §16.9.1's push after the merge) |
 | Update a branch from its target (merge or rebase) as a user action in the Version Control tab | On Hold, git-support: #1180 |
 | Conflict help on a returned card (the conflicting files and hunks from the test merge) | On Hold, git-support: #1181 |
 | Submodules and Git LFS in slots and review copies | On Hold, git-support: #1182 |

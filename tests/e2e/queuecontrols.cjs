@@ -154,6 +154,28 @@ const TARGET = 'integration'
     const noReason = await api(assistant, 'POST', '/v1/queue/retry', { card: `#${three.n}` })
     check("its Retry merge needs a reason (400)", noReason.status === 400, JSON.stringify(noReason.body))
     await h.inv('session:stop', home, 'assistant')
+
+    // --- G18 (#1179): Push the target branch after merging, on, in a repository with no remote: the card merges, then
+    // the queue pauses saying why (the Merges tab, both themes); turned off and resumed, nothing is owed and it goes on.
+    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { pushTarget: true }) })
+    q.steer(fx, 'pass')
+    const pushed = await q.approve(fx, h, reviewer, 'Pushed', { 'pushed.txt': 'pushed\n' })
+    check('G18: a card approved with push after merging on is merged', await done(pushed.n), JSON.stringify(await h.kinds(pushed.n)))
+    const noRemote = await until(async () => ((await view())?.paused?.reason === 'pushNoRemote' ? await view() : null), HUNG_MS)
+    check('…no remote to push to: the queue pauses, saying so', !!noRemote, JSON.stringify(await view()))
+    const merges = await q.mergesTab(h)
+    const said = await until(async () => ((await merges.text(TARGET)).includes('has no remote to push to') ? merges.text(TARGET) : null), HUNG_MS)
+    check('…the Merges tab says why, and to turn the option off to keep merging locally', !!said && said.includes('Push the target branch after merging'), await merges.text(TARGET))
+    await q.folderHelpers(fx).themes(h.page, merges.card(TARGET), 'queuecontrols-push-paused')
+    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
+    const resumedPush = await h.inv('queue:resume', fx.alpha, TARGET)
+    check('…turned off and resumed: resumed, not paused', resumedPush?.resumed === true && resumedPush.view.paused === null, JSON.stringify(resumedPush))
+    // The queue's run after the Resume drops the owed push (the option is off) and pauses for nothing.
+    const unpaused = await until(async () => {
+      const v = await view()
+      return idle(v) ? v : null
+    }, HUNG_MS)
+    check('…and its run after it leaves the queue unpaused', !!unpaused && unpaused.paused === null, JSON.stringify(unpaused))
     headAtClose = q.head(fx)
   } catch (e) {
     check('no exception', false, e.stack)

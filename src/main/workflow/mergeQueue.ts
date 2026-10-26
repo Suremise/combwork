@@ -198,8 +198,46 @@ export interface QueueStepInfo {
  * `identity`: no commit identity for the repository (its folder in the pause). `user`: Pause queue (the user's, or the
  * Assistant's within Control: #1353). `approval`: an entry ready to advance into a checked-out target waits for the
  * user's Approve (Ask each time, #1351). `checkedOut`: a pause from before #1351, which Hive no longer makes.
+ * `pushRejected`, `pushFailed`, `pushNoRemote` (G18, #1179): the push of the target after a merge was refused (the
+ * remote has commits it lacks), failed (git's message: a sign-in, the network, the bound), or had no remote to go to;
+ * `pushUnreadable`: owed, and the target (or whether it still has the merge) couldn't be read to settle it.
  */
-export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget'
+export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget' | 'pushRejected' | 'pushFailed' | 'pushNoRemote' | 'pushUnreadable'
+
+/**
+ * G18 (#1179): the push of a target Hive owes after merging into it, as store meta per target: the merge's result, its
+ * card and entry. Written in the same transaction as the merge's `Integrated` (the card Done and the push owed, or
+ * neither); cleared only for the result that was pushed (compare-and-clear), never a newer one.
+ */
+interface PushOwed {
+  result: string
+  card: string
+  entry: string
+}
+
+export const pushOwedKey = (target: string): string => `queue.pushOwed:${target}`
+
+/** The push Hive owes for a target, if any (an unreadable value counts as none). */
+export function pushOwedOf(value: string | null): PushOwed | null {
+  if (!value) return null
+  try {
+    const v = JSON.parse(value) as Partial<PushOwed>
+    return typeof v.result === 'string' && typeof v.card === 'string' && typeof v.entry === 'string' ? { result: v.result, card: v.card, entry: v.entry } : null
+  } catch {
+    return null
+  }
+}
+
+/** A push reaches the remote and can wait on a sign-in window: as the Git view's, long but never forever. */
+const PUSH_MS = 5 * 60_000
+
+/** A push never waits on a prompt nobody sees: no terminal prompt, no askpass, a credential manager kept non-interactive. */
+function pushEnv(): NodeJS.ProcessEnv {
+  return { ...process.env, GIT_TERMINAL_PROMPT: '0', SSH_ASKPASS_REQUIRE: 'never', GCM_INTERACTIVE: 'never' }
+}
+
+/** git's words when a remote refuses a push that isn't a fast-forward (the Git view's test). */
+const PUSH_REJECTED = /\[rejected\]|non-fast-forward|fetch first/i
 
 /** What an entry's steps read of the repository's config once (#1386): the identity Hive commits as, and signing. */
 interface EntryReads {
@@ -530,11 +568,107 @@ export class MergeQueue {
   /** Takes the next entry for the target and takes it as far as it goes. Null when there's none or the queue is paused. */
   async runOnce(target: string): Promise<QueueOutcome | null> {
     const p = this.paused(target)
-    if (p?.reason === 'approval') return this.fenced(target, () => this.answered(target, p.card)).catch(lostIsNull)
+    if (p?.reason === 'approval') return this.fenced(target, async () => this.thenPush(target, await this.answered(target, p.card))).catch(lostIsNull)
     if (p) return null
-    const next = this.entries(target)[0]
-    if (!next) return null
-    return this.fenced(target, () => this.process(next.card, next.entry)).catch(lostIsNull)
+    return this.fenced(target, async () => {
+      // A push owed by an earlier merge goes first (G18: after a restart or a Resume), and the next entry waits for it.
+      const owed = await this.settlePush(target)
+      if (owed) return owed
+      const next = this.entries(target)[0]
+      if (!next) return null
+      return this.thenPush(target, await this.process(next.card, next.entry))
+    }).catch(lostIsNull)
+  }
+
+  /** After an entry's merge, the push of its target it owes (G18), before the next entry; its outcome stays the merge's. */
+  private async thenPush(target: string, o: QueueOutcome | null): Promise<QueueOutcome | null> {
+    if (o?.outcome === 'integrated') await this.settlePush(target)
+    return o
+  }
+
+  /** Whether the project's options push the target after merging, as they are now (G18 isn't a rule: never a ruleset's). */
+  private pushes(): boolean {
+    const o = this.wf.cfg.options()
+    return o.platform === 'git' && o.finish === 'hiveMerges' && o.pushTarget === true
+  }
+
+  /** In a merge's `Integrated` write: the push of its target owed, when the options push it (G18). */
+  private owePush(w: Write, entry: string, target: string, result: string): void {
+    if (this.pushes()) w.tx.setMeta(pushOwedKey(target), JSON.stringify({ result, card: w.card.key, entry } satisfies PushOwed))
+  }
+
+  /** Clears the owed push of a target, only if it is still the one for `result` (a newer merge's is kept). */
+  private clearOwed(target: string, result: string): Promise<void> {
+    return this.wf.locked(() =>
+      this.wf.store.tx((tx) => {
+        if (pushOwedOf(tx.meta(pushOwedKey(target)))?.result === result) tx.setMeta(pushOwedKey(target), '')
+      })
+    )
+  }
+
+  /**
+   * Settles the push a target is owed (G18, #1179): none owed, nothing. The options no longer push, or the target no
+   * longer has the merge (reset since): cleared, nothing pushed. Else the target is pushed to the remote it tracks (or
+   * the only remote, or origin, under its own name), never forced and never changing what it tracks, with no prompt and
+   * within PUSH_MS; pushed (or up to date already: a retry after a crash before the clear), cleared. Refused, failed or
+   * with nowhere to go: the queue pauses, naming the merged card (Done already), and the next entry waits.
+   */
+  private async settlePush(target: string): Promise<QueueOutcome | null> {
+    const owed = pushOwedOf(this.wf.store.meta(pushOwedKey(target)))
+    if (!owed) return null
+    if (!this.pushes()) {
+      await this.clearOwed(target, owed.result)
+      return null
+    }
+    // Unreadable now (HR2's #1179 round 1): never taken for settled. Still owed, and the queue pauses saying so in its
+    // own words (`pushUnreadable`, a message the window translates: HR2's round 2), so no later merge goes ahead of it;
+    // Resume reads again.
+    const head = await G.lineHead(this.project, target)
+    if (isUnknown(head)) return this.pausePush(target, owed, 'pushUnreadable')
+    const has = head ? await G.isAncestor(this.project, owed.result, head) : false
+    if (isUnknown(has)) return this.pausePush(target, owed, 'pushUnreadable')
+    if (!has) {
+      await this.clearOwed(target, owed.result)
+      return null
+    }
+    const dest = await this.pushDest(target)
+    // The off switch as it is now, just before the push begins (HR2's #1179 round 1: the reads above take time).
+    if (!this.pushes()) {
+      await this.clearOwed(target, owed.result)
+      return null
+    }
+    if (!dest) return this.pausePush(target, owed, 'pushNoRemote')
+    const r = await this.git(this.project, ['push', '--', dest.remote, `refs/heads/${target}:${dest.ref}`], { env: pushEnv(), timeoutMs: PUSH_MS })
+    if (r.ok) {
+      await this.clearOwed(target, owed.result)
+      return null
+    }
+    const said = `${r.err}\n${r.out}`.trim()
+    return this.pausePush(target, owed, !r.timedOut && PUSH_REJECTED.test(said) ? 'pushRejected' : 'pushFailed', said)
+  }
+
+  /** Where a target is pushed: its upstream (`branch.<target>.remote` and `.merge`), else the only remote or origin. */
+  private async pushDest(target: string): Promise<{ remote: string; ref: string } | null> {
+    const get = async (key: string): Promise<string> => {
+      const r = await this.git(this.project, ['config', '--get', key])
+      return r.ok ? r.out.trim() : ''
+    }
+    const remote = await get(`branch.${target}.remote`)
+    if (remote && remote !== '.') {
+      const merge = await get(`branch.${target}.merge`)
+      return { remote, ref: merge.startsWith('refs/heads/') ? merge : `refs/heads/${target}` }
+    }
+    const list = await this.git(this.project, ['remote'])
+    const remotes = list.ok ? list.out.split(/\r?\n/).map((x) => x.trim()).filter(Boolean) : []
+    const only = remotes.length === 1 ? remotes[0] : remotes.includes('origin') ? 'origin' : null
+    return only ? { remote: only, ref: `refs/heads/${target}` } : null
+  }
+
+  /** Pauses the target's queue for its owed push (never in place of a pause saved meanwhile), naming the merged card. */
+  private async pausePush(target: string, owed: PushOwed, reason: PauseReason, message?: string): Promise<QueueOutcome> {
+    const m = message?.trim().slice(0, 4000) || undefined
+    await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: owed.card, ...(m ? { message: m } : {}) }, true))
+    return { card: owed.card, entry: owed.entry, outcome: 'paused', reason, ...(m ? { message: m } : {}) }
   }
 
   /**
@@ -1213,6 +1347,7 @@ export class MergeQueue {
       w.move('done', 'derived')
       w.action('releaseSlot', {})
       w.action('endLaneIfDone', {})
+      if (by === 'hive') this.owePush(w, entry.id, target, result)
       if (this.wf.store.facts(card.id).some((x) => x.kind === 'Decision' && x.seq > startedAt)) this.wf.askUser(w, 'decide', 'decision', workflowText(FOR_YOU.decidedAfterMerge, { card: card.key }))
     })
   }
@@ -1264,6 +1399,8 @@ export class MergeQueue {
           w.move('done', 'derived')
           w.action('releaseSlot', {})
           w.action('endLaneIfDone', {})
+          // Hive's own merge, found done after a restart: its push owed as an advance's is (G18).
+          this.owePush(w, e.id, e.target, result)
         })
       }
       // The target frozen (HR4's #1351 round 1): a needs-you pause naming a card is the terminal state, or an advance Hive

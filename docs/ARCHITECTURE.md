@@ -570,7 +570,14 @@ the queue (never `merge --ff-only`, which has no expected value). The repository
 dir, #1347) is held only for the
 advance, never across the test merge (hooks, signing) or the merge checks, and never while an entry is paused. Every
 submitted revision is pinned by `refs/hive/cards/<key>/<n>` until its card is archived; strict updates live only on
-the queue's ref.
+the queue's ref. **Push after merging (G18, #1179):** `owePush` writes store meta `queue.pushOwed:<target>` in the
+same transaction as Hive's `Integrated` (the advance's and recovery's), when `wf.cfg.options()` has `pushTarget` then
+(G18 is in no ruleset: `ruleOptions` drops it); `settlePush` runs first in every `runOnce` and after each merge, inside
+`fenced()`: dropped if the option is off (read again just before the push) or the target no longer holds the result,
+paused `pushUnreadable` (still owed; no message stored: the window words it) if the target can't be read, else `git push` of the target to
+its upstream (or the only remote, or origin) with no prompt and a 5-minute bound, compare-and-cleared on success, and a
+`pushRejected` / `pushFailed` / `pushNoRemote` pause otherwise. `queueHost.openTargets` counts an owed push, so a
+restart runs that queue.
 
 **Checks.** A run records its tested checkout and counts for a card's submission under SPEC §16.13's rules (the
 checkout contains the card's revision; nothing written in the tracked tree during the run). `hive-progress --check
