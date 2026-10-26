@@ -1817,6 +1817,7 @@ export interface LiveSessionState {
    * error), with what the CLI said and when: it needs you until its next turn starts. Its status stays as the turn's
    * end made it (finished), so Hive still prompts and wakes it as an idle agent.
    */
+  /** `message`: the CLI's words, '' when it said none (the window says the turn ended on an error). */
   failedTurn?: { message: string; since: string }
   pid?: number
   startedAt: string

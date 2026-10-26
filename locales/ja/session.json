@@ -175,6 +175,7 @@
   "session.status.asksAtStart": "起動前に質問しています",
   "session.status.asksTrust": "このフォルダーを信頼するか確認しています",
   "session.status.compacting": "会話をコンパクト化しています…",
+  "session.status.failedTurn": "エラーでターンが終了しました",
   "session.status.safeguardAsks": "安全性分類器が応答を止めました：{provider}が対応を確認しています",
   "session.status.safeguardAsksTools": "安全性分類器が応答を止めました：{provider}が対応を確認しています（直近のツール呼び出し：{tools}）",
   "session.status.safeguardIdle": "安全機能による停止後に待機中：声をかけてください",

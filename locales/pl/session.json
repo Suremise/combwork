@@ -175,6 +175,7 @@
   "session.status.asksAtStart": "Pyta o coś przed startem",
   "session.status.asksTrust": "Pyta, czy ufać temu folderowi",
   "session.status.compacting": "Kompaktowanie rozmowy…",
+  "session.status.failedTurn": "Tura zakończyła się błędem",
   "session.status.safeguardAsks": "Klasyfikator bezpieczeństwa zatrzymał odpowiedź: {provider} pyta, co dalej",
   "session.status.safeguardAsksTools": "Klasyfikator bezpieczeństwa zatrzymał odpowiedź: {provider} pyta, co dalej (ostatnie wywołania narzędzi: {tools})",
   "session.status.safeguardIdle": "Bezczynny po zatrzymaniu przez zabezpieczenie: wyślij mu prompt",

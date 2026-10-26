@@ -179,6 +179,7 @@
   "session.status.asksAtStart": "Asks something before it starts",
   "session.status.asksTrust": "Asks whether to trust this folder",
   "session.status.compacting": "Compacting the conversation…",
+  "session.status.failedTurn": "The turn ended on an error",
   "session.status.safeguardAsks": "A safety classifier stopped a response: {provider} asks what to do",
   "session.status.safeguardAsksTools": "A safety classifier stopped a response: {provider} asks what to do (its last tool calls: {tools})",
   "session.status.safeguardIdle": "Idle after a safeguard stop: give it a nudge",

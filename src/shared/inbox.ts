@@ -107,7 +107,11 @@ export function inbox(
       }
       // Stopped by an error (#1632: its turn ended on an API connection error, say): it does nothing until someone
       // looks, and leaves once its next turn starts.
-      else if (live?.failedTurn) needYou.push({ ...item('error'), since: live.failedTurn.since, message: live.failedTurn.message })
+      else if (live?.failedTurn) {
+        // The CLI's words, or none (Hive's own status message isn't them: the row then says only that it stopped).
+        const { message: _status, ...plain } = item('error')
+        needYou.push({ ...plain, since: live.failedTurn.since, ...(live.failedTurn.message ? { message: live.failedTurn.message } : {}) })
+      }
       else if (live?.status === 'error') needYou.push(item('error'))
       else if (finishedUnseen(live)) finished.push(item('finished'))
       else if (hasWork(branch) && idle(live)) toReview.push(item('review'))

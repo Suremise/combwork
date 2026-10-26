@@ -96,8 +96,20 @@ describe('attention inbox', () => {
     expect(st.failedTurn).toBeUndefined()
     expect(at(st).finished.map((i) => i.kind)).toEqual(['finished'])
     step(st, { hook_event_name: 'UserPromptSubmit', prompt: 'again' })
-    step(st, { hook_event_name: 'StopFailure', error: 'server_error' })
-    expect(at(st).needYou.map((i) => `${i.kind}/${i.message}`)).toEqual(['error/The turn ended on an error'])
+    // No words from the CLI (round 2 finding 2): English for agents, the window's language in the window.
+    const { setLanguage, pseudoText } = await import('../src/shared/i18n')
+    const { PSEUDO_LANGUAGE } = await import('../src/shared/i18n/languages')
+    const { shownStatusMessage } = await import('../src/shared/runtime')
+    setLanguage(PSEUDO_LANGUAGE, {})
+    try {
+      step(st, { hook_event_name: 'StopFailure', error: 'server_error' })
+      expect(st.statusMessage).toBe('The turn ended on an error')
+      expect(shownStatusMessage(st)).toContain(pseudoText('The turn ended on an error'))
+      expect(at(st).needYou.map((i) => `${i.kind}/${i.message ?? ''}`)).toEqual(['error/'])
+      expect(inboxStateText(at(st).needYou[0])).toContain(pseudoText('Stopped by an error'))
+    } finally {
+      setLanguage('en', {})
+    }
   })
 
   it('lists them across projects and the Assistant, oldest first', () => {

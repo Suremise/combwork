@@ -175,6 +175,7 @@
   "session.status.asksAtStart": "Fragt vor dem Start etwas",
   "session.status.asksTrust": "Fragt, ob diesem Ordner vertraut werden soll",
   "session.status.compacting": "Unterhaltung wird komprimiert…",
+  "session.status.failedTurn": "Der Durchgang endete mit einem Fehler",
   "session.status.safeguardAsks": "Ein Sicherheitsklassifikator hat eine Antwort gestoppt: {provider} fragt, was zu tun ist",
   "session.status.safeguardAsksTools": "Ein Sicherheitsklassifikator hat eine Antwort gestoppt: {provider} fragt, was zu tun ist (letzte Tool-Aufrufe: {tools})",
   "session.status.safeguardIdle": "Leerlauf nach einem Sicherheitsstopp: Gib dem Agenten einen Anstoß",
