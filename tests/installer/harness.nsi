@@ -31,6 +31,12 @@ Function .onInit
   !ifmacrodef preInit
     !insertmacro preInit
   !endif
+  ; installer.nsh's request to a running Hive to close (HI-1707), as the template inserts it after initMultiUser: here
+  ; the stand-in install folder (C:\stand\Hive), where run.ps1 starts a stand-in Hive for its cases, or none.
+  StrCpy $INSTDIR "C:\stand\Hive"
+  !ifmacrodef customInit
+    !insertmacro customInit
+  !endif
   System::Call 'kernel32::CreateMutexW(i 0, i 1, w "${APP_GUID}") i.r5 ?e'
   Pop $6
   ${If} $6 = 183

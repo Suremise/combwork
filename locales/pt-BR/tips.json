@@ -324,6 +324,8 @@
   "tips.recentWorkspaces.title": "Organize seus espaços de trabalho recentes",
   "tips.removeAll.text": "Remover todos, no cabeçalho do projeto, remove todos os agentes de um projeto depois de uma pergunta. Os worktrees são mantidos, a menos que você marque a caixa, que exclui só os mesclados e limpos.",
   "tips.removeAll.title": "Remova todos os agentes de uma vez",
+  "tips.resumeAfterUpdate.text": "Instalar uma nova versão avisa os agentes que estavam trabalhando ou em um ciclo de cartões, e quando o Hive inicia de novo ele os retoma nas suas conversas, um de cada vez, cada um informado do seu cartão, rodada e raia. Depois que você o encerra, o próximo início oferece retomá-los.",
+  "tips.resumeAfterUpdate.title": "As atualizações deixam seus agentes onde estavam",
   "tips.resumeAll.text": "Depois de reiniciar, Retomar todos os agentes, no cabeçalho do projeto, retoma de uma vez a última sessão de cada agente parado.",
   "tips.resumeAll.title": "Retome todos os agentes de uma vez",
   "tips.reviewCopies.text": "Um revisor revisa numa cópia de revisão: uma pasta exatamente na versão enviada, onde nada mais escreve, então o executor pode continuar enquanto isso. As verificações dele ali contam para esse envio. Configurações → Avançado desativa isso.",

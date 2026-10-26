@@ -324,6 +324,8 @@
   "tips.recentWorkspaces.title": "Faire le tri dans tes espaces de travail récents",
   "tips.removeAll.text": "Tout retirer, dans l’en-tête du projet, retire tous les agents du projet après une seule question. Les worktrees sont conservés sauf si tu coches la case, qui ne supprime que ceux qui sont fusionnés et propres.",
   "tips.removeAll.title": "Retirer tous les agents d’un coup",
+  "tips.resumeAfterUpdate.text": "Installer une nouvelle version prévient les agents qui travaillaient ou étaient dans une boucle de cartes, et quand Hive redémarre il les reprend dans leurs conversations, l’un après l’autre, chacun informé de sa carte, de son tour et de son couloir. Après que vous l’avez quitté, le démarrage suivant propose de les reprendre.",
+  "tips.resumeAfterUpdate.title": "Les mises à jour laissent vos agents là où ils en étaient",
   "tips.resumeAll.text": "Après un redémarrage, Reprendre tous les agents, dans l’en-tête du projet, reprend d’un coup la dernière session de chaque agent arrêté.",
   "tips.resumeAll.title": "Reprendre tous les agents d’un coup",
   "tips.reviewCopies.text": "Un relecteur relit dans une copie de relecture : un dossier exactement à la révision soumise, où rien d’autre n’écrit, si bien que l’auteur peut continuer pendant ce temps. Ses vérifications y comptent pour cette soumission. Paramètres → Avancé le désactive.",

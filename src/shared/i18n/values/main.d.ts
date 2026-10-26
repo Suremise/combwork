@@ -210,6 +210,22 @@ interface HiveMessageValues {
   'main.removal.why.notListed': undefined
   'main.removal.why.otherProject': undefined
   'main.removal.wontRemove': { worktrees: string | number }
+  'main.restart.dismiss': undefined
+  'main.restart.notResumedLine': { agent: string | number; project: string | number; why: string | number }
+  'main.restart.offerQuit': { names: string | number }
+  'main.restart.offerTitle': { n: number }
+  'main.restart.offerUpdate': { names: string | number }
+  'main.restart.reportResume': { n: number }
+  'main.restart.reportUpdate': { n: number }
+  'main.restart.resume': undefined
+  'main.restart.resumedLine': { names: string | number }
+  'main.restart.why.expired': undefined
+  'main.restart.why.held': undefined
+  'main.restart.why.movedOn': undefined
+  'main.restart.why.notReady': undefined
+  'main.restart.why.removed': undefined
+  'main.restart.why.running': undefined
+  'main.restart.why.stopped': undefined
   'main.storage.claimed': undefined
   'main.storage.noLonger': { path: string | number }
   'main.storage.purgeChanged': undefined

@@ -60,6 +60,7 @@ import * as lanes from './lanes'
 import { laneCards, laneName, laneNumber } from '../shared/lanes'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
 import { writePty } from './ptyHost'
+import { isResuming } from './restartResume'
 import { sessions } from './sessions'
 import { agentPlace, folderFacts } from './agentFolders'
 import { releasableSlots, releaseSlot, SlotReleaseRefused, type HeldRow } from './slotRelease'
@@ -2173,7 +2174,7 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
       const def = (await agents.get(key)!).find((a) => a.id === c.agent)
       const st = sessions.liveFor(p, c.agent)
       agent = { id: c.agent, name: def?.name ?? c.agentName ?? c.agent, status: def ? (st?.status ?? 'stopped') : 'removed', backgroundTasks: st?.backgroundTasks ?? 0 }
-      now = def ? { name: def.name, running: !!st } : null
+      now = def ? { name: def.name, running: !!st || isResuming(p, c.agent) } : null
     } catch {
       agent = { id: c.agent, name: c.agentName ?? c.agent, status: 'removed', backgroundTasks: 0 }
     }
@@ -2205,7 +2206,7 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
       const key = p.toLowerCase()
       if (!agents.has(key)) agents.set(key, workspace.projectConfig(p).then(projectAgents))
       const def = (await agents.get(key)!).find((a) => a.id === c.review!.agent)
-      const why = reviewStalled(c, def ? { name: def.name, running: !!sessions.liveFor(p, def.id) } : null)
+      const why = reviewStalled(c, def ? { name: def.name, running: !!sessions.liveFor(p, def.id) || isResuming(p, def.id) } : null)
       if (why) view.reviewStalled = why
     } catch {
       view.reviewStalled = `${c.review.agentName} was removed.`

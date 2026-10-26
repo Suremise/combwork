@@ -234,6 +234,7 @@ export const SUITES = [
   { name: 'repolock' },
   { name: 'resize' },
   { name: 'restart' },
+  { name: 'restartresume' },
   { name: 'resume' },
   { name: 'resumeall' },
   { name: 'review' },

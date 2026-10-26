@@ -931,6 +931,22 @@
     "defaultMessage": "Flight recorder: capture a CLI version change",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive. The flight recorder saves the developer console's recent events when something rare happens."
   },
+  "settings.advanced.hive.restart.resumeAfterUpdate.desc": {
+    "defaultMessage": "When Hive restarts for an update (Restart to Update, or an installer closing it), the agents that were working, watching their cards or in a card loop start again in their conversations, one at a time, each told where it was. Off: Hive offers to resume them instead, as it does after you quit.",
+    "description": "What the advanced setting \"Resume agents after an update\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.restart.resumeAfterUpdate.title": {
+    "defaultMessage": "Resume agents after an update",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.hive.restart.resumeReadySeconds.desc": {
+    "defaultMessage": "How long an agent Hive resumes after a restart has to be ready. One that isn't is stopped and listed as not resumed, and the next one starts.",
+    "description": "What the advanced setting \"Resuming after a restart: ready within\" does (Settings → Advanced)."
+  },
+  "settings.advanced.hive.restart.resumeReadySeconds.title": {
+    "defaultMessage": "Resuming after a restart: ready within",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"90 s\")."
+  },
   "settings.advanced.hive.showDeveloperFeatures.desc": {
     "defaultMessage": "Show Help → Developer Console (Ctrl+Alt+J): what each CLI sends Hive, next to what Hive made of it.",
     "description": "What the advanced setting \"Show developer features\" is for, and what goes wrong when it is wrong (Settings → Advanced)."

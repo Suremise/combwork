@@ -36,6 +36,7 @@ import { branchMergeStatus, lineCard, lineConfirmed, mergeBranch, mergeBranches 
 import { createLogger, logsDir, userText } from './logger'
 import { diagnostics } from './diagnostics'
 import { resumeAfterClose, startupStep, stopLeftAfterClose } from './lastRun'
+import { dismissOffered, resumeOffered } from './restartResume'
 import { keepAwakeCount } from './power'
 import { progress, progressSeq } from './progressService'
 import { mergeSlots, recoverMergeSlots, workspaceSlots } from './mergeSlotHost'
@@ -417,6 +418,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return { resumed: r.resumed.length, failed: r.failed.length }
     },
     'app:stopLeftAfterClose': () => stopLeftAfterClose(),
+    'app:resumeRestart': () => resumeOffered(),
+    'app:dismissRestart': () => dismissOffered(),
     'update:state': () => updater.updateState(),
     'update:check': () => updater.check(true),
     'update:download': () => updater.download(),

@@ -169,6 +169,11 @@ export const HARDWARE_ACCELERATION_OFF = 'hive.disableHardwareAcceleration'
 /** Hive writes a heap snapshot as its main process nears its memory limit (#1005): read from advanced.json at start (main/memory.ts). */
 export const HEAP_SNAPSHOT_NEAR_LIMIT = 'hive.heapSnapshotNearLimit'
 
+/** Agents resume by themselves after Hive restarts for an update (HI-1707): read by main's restartResume. */
+export const RESUME_AFTER_UPDATE = 'hive.restart.resumeAfterUpdate'
+/** How long an agent resumed after a restart has to be ready, in seconds (HI-1707): read by main's restartResume. */
+export const RESTART_READY_SECONDS = 'hive.restart.resumeReadySeconds'
+
 /** The longest one of the merge queue's checks or installs runs, in minutes (#1349): read by main's queueChecks. */
 export const QUEUE_CHECK_MINUTES = 'hive.queue.checkMinutes'
 /** The network error codes that make a failed merge check temporary (#1362): read by queueChecksApp.ts. */
@@ -484,6 +489,27 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 3540,
     unit: 's',
     applies: 'sessions'
+  },
+  {
+    id: RESUME_AFTER_UPDATE,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.restart.resumeAfterUpdate.title', defaultMessage: 'Resume agents after an update', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.hive.restart.resumeAfterUpdate.desc', defaultMessage: 'When Hive restarts for an update (Restart to Update, or an installer closing it), the agents that were working, watching their cards or in a card loop start again in their conversations, one at a time, each told where it was. Off: Hive offers to resume them instead, as it does after you quit.', description: 'What the advanced setting "Resume agents after an update" does (Settings → Advanced).' }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
+  {
+    id: RESTART_READY_SECONDS,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.restart.resumeReadySeconds.title', defaultMessage: 'Resuming after a restart: ready within', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"90 s\")." }),
+    desc: msg({ id: 'settings.advanced.hive.restart.resumeReadySeconds.desc', defaultMessage: "How long an agent Hive resumes after a restart has to be ready. One that isn't is stopped and listed as not resumed, and the next one starts.", description: 'What the advanced setting "Resuming after a restart: ready within" does (Settings → Advanced).' }),
+    kind: 'number',
+    default: 90,
+    min: 10,
+    max: 600,
+    unit: 's',
+    applies: 'now'
   },
   {
     id: 'hive.progress.lanesShown',
