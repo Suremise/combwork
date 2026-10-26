@@ -10,7 +10,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.hiveMerges' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.hiveMerges' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -54,7 +54,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   ),
   'submit.clean': r(
     msg({ id: 'workflow.refused.submit.clean.message', defaultMessage: "{card} can't go to review: {folder} has uncommitted changes ({files}).", description: 'A refused submit: the working folder has uncommitted changes. {folder} is a folder path, {files} a list of file paths.' }),
-    msg({ id: 'workflow.refused.submit.clean.next', defaultMessage: 'Commit your changes (or remove them), then submit again.', description: 'The next step after a refused submit with uncommitted changes.' }),
+    msg({ id: 'workflow.refused.submit.clean.next', defaultMessage: "Commit your changes (or remove them), then submit for review again. If the user didn't ask you to commit, ask them.", description: "The next step after a refused submit for review with uncommitted changes, addressed to the agent: committing is the user's call (HI-1618)." }),
     msg({ id: 'workflow.refused.submit.clean.change', defaultMessage: 'This rule comes with review and merging in Version Control.', description: 'Where the rule that refused a submit with uncommitted changes comes from.' })
   ),
   'submit.trailer': r(
@@ -213,9 +213,16 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.review.noSubmission.message', defaultMessage: '{card} has nothing submitted to review.', description: 'A refused review: the card has no submission.' }),
     msg({ id: 'workflow.refused.review.noSubmission.next', defaultMessage: 'Wait for its builder to submit it.', description: 'The next step when there is nothing to review.' })
   ),
+  // Submitting is "submit for review": it hands committed work to review and never commits it (HI-1618, Darren's
+  // decision): what is missing is said in git's words, and committing stays the user's call.
   'submit.empty': r(
-    msg({ id: 'workflow.refused.submit.empty.message', defaultMessage: '{card} has no change to review.', description: 'A refused submit: the change from the base is empty.' }),
-    msg({ id: 'workflow.refused.submit.empty.next', defaultMessage: 'Commit the work, then submit.', description: 'The next step after submitting an empty change.' })
+    msg({ id: 'workflow.refused.submit.empty.message', defaultMessage: '{card}: nothing committed to review.', description: "A refused submit for review: the card's line has no commit since it started (git's words: nothing committed). {card} is a card key." }),
+    msg({ id: 'workflow.refused.submit.empty.next', defaultMessage: "Commit the card's work, then submit for review. If the user didn't ask you to commit, ask them.", description: "The next step after a refused submit for review with nothing committed, addressed to the agent: committing is the user's call." })
+  ),
+  // A project with no version control: nothing is committed there, only the card's files changed or not.
+  'submit.unchanged': r(
+    msg({ id: 'workflow.refused.submit.unchanged.message', defaultMessage: "{card}: its files haven't changed since it started.", description: 'A refused submit for review in a project with no version control: none of the card\'s files changed. {card} is a card key.' }),
+    msg({ id: 'workflow.refused.submit.unchanged.next', defaultMessage: "Change the card's files, then submit it for review.", description: 'The next step after a refused submit for review in a project with no version control, nothing changed.' })
   ),
   'submit.sameRevisionNote': r(
     msg({ id: 'workflow.refused.submit.sameRevisionNote.message', defaultMessage: '{revision} was already reviewed.', description: 'A refused submit: the same revision again without a note.' }),

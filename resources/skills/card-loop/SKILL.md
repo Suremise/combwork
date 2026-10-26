@@ -7,7 +7,7 @@ metadata:
 
 # Card loop
 
-Two agents take the same cards in turn: the **builder** does each card and submits it; the **reviewer** reviews it and fails it with findings, or passes it. This skill is one side of that loop. Waiting for the other side costs nothing: you end your turn and Hive wakes you. Each step is a tool (work-on-card); what a step needs first is the project's rules, which Hive checks, and a refusal says what to do next.
+Two agents take the same cards in turn: the **builder** does each card, commits it and submits it for review; the **reviewer** reviews it and fails it with findings, or passes it. This skill is one side of that loop. Waiting for the other side costs nothing: you end your turn and Hive wakes you. Each step is a tool (work-on-card); what a step needs first is the project's rules, which Hive checks, and a refusal says what to do next.
 
 ## Inputs
 

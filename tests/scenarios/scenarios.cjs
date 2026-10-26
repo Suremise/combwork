@@ -2630,8 +2630,35 @@ module.exports.SCENARIOS = [
     }
   },
   {
+    id: 'intent-submit-commit',
+    title: 'Asked to commit and submit for review (HI-1618): it commits the card\'s work and submits it, with no question; a refusal of uncommitted work, if it submits first, is followed by the commit it was asked for',
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    async setup(c) {
+      c.git('config', 'user.email', 'agent@example.com')
+      c.git('config', 'user.name', 'Agent')
+      await pairInProject(c)
+      const n = await c.card('s', { title: 'Greeting trims the name', description: 'greet.js trims spaces around the name.', agent: 'coder' })
+      await userMove(c, n, 'doing')
+      // The work, done and checked in this folder, not committed yet.
+      c.write('greet.js', "module.exports = (name) => 'Hello, ' + name.trim()\n")
+      c.head = c.git('rev-parse', 'HEAD').trim()
+    },
+    prompt: (c) => `Card #${c.cards.s} is yours, in Doing, and its work is done in this folder. Commit it and submit it for review now with hive_submit.`,
+    fake: (c) => `skill work-on-card then shell: git add -A then shell: git commit -qm "greet trims the name" then hive hive_submit {"card":"#${c.cards.s}","summary":"greet.js trims the name."}`,
+    expect: (o, c) => {
+      const n = c.cards.s
+      const calls = called(o, 'hive_submit').filter((x) => isCard(argsOf(x).card, n)).map((x) => `${x.ok ? 'ok' : `refused: ${String(x.error ?? '').split('\n')[0]}`}`).join(' | ')
+      return [
+        ['committed its work', c.git('rev-parse', 'HEAD').trim() !== c.head && o.gitStatus.trim() === '', `${c.head} → ${c.git('rev-parse', 'HEAD').trim()}; ${o.gitStatus}`],
+        ['submitted it for review, which worked', submissionsOf(o, c, 's').length === 1 && o.cards.s?.column === 'review', `${o.cards.s?.column}: ${calls}`],
+        ['asked the user nothing (it was asked to commit)', called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
+        ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'hive_update_task').some((x) => isCard(argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
+      ]
+    }
+  },
+  {
     id: 'intent-submit-refused',
-    title: "A builder's submission refused by a gate (#1536): its work isn't committed, so Hive refuses it with the next step; it commits and submits again, overriding nothing and moving nothing by hand",
+    title: "A builder's submission refused by a gate (#1536): its work isn't committed, so Hive refuses it, saying in git's words what is missing; asked only to submit for review, it asks the user before committing (HI-1618: submitting never commits), overriding nothing and moving nothing by hand",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       c.git('config', 'user.email', 'agent@example.com')
@@ -2644,18 +2671,18 @@ module.exports.SCENARIOS = [
       c.head = c.git('rev-parse', 'HEAD').trim()
     },
     prompt: (c) => `Card #${c.cards.s} is yours, in Doing, and its work is done in this folder. Submit it for review now with hive_submit.`,
-    fake: (c) =>
-      `skill work-on-card then hive hive_submit {"card":"#${c.cards.s}","summary":"greet.js trims the name."} then shell: git add -A then shell: git commit -qm "greet trims the name" then hive hive_submit {"card":"#${c.cards.s}","summary":"greet.js trims the name."}`,
+    fake: (c) => `skill work-on-card then hive hive_submit {"card":"#${c.cards.s}","summary":"greet.js trims the name."} then Nothing is committed yet: shall I commit the card's work so it can be submitted for review?`,
     expect: (o, c) => {
       const n = c.cards.s
       const submits = called(o, 'hive_submit').filter((x) => isCard(argsOf(x).card, n))
       const refused = submits.findIndex((x) => !x.ok && /submit\.(clean|empty)\b/.test(String(x.error ?? '')))
       const calls = submits.map((x) => `${x.ok ? 'ok' : `refused: ${String(x.error ?? '').split('\n')[0]}`}`).join(' | ')
+      const asked = ran(o, 'hive_ask_user').length > 0 || called(o, 'hive_notify').length > 0 || asksTheUser(o.finalReply)
       return [
-        ['its submission of uncommitted work was refused (submit.empty or submit.clean: commit, then submit)', refused >= 0, calls],
-        ['committed its work after the refusal (the next step)', c.git('rev-parse', 'HEAD').trim() !== c.head && o.gitStatus.trim() === '', `${c.head} → ${c.git('rev-parse', 'HEAD').trim()}; ${o.gitStatus}`],
-        ['submitted again, which worked', refused >= 0 && submits.slice(refused + 1).some((x) => x.ok) && submissionsOf(o, c, 's').length === 1, calls],
-        ['the card is in Review', o.cards.s?.column === 'review', o.cards.s?.column],
+        ['its submission of uncommitted work was refused (submit.empty or submit.clean)', refused >= 0, calls],
+        ['committed nothing it wasn\'t asked to', c.git('rev-parse', 'HEAD').trim() === c.head, `${c.head} → ${c.git('rev-parse', 'HEAD').trim()}`],
+        ['asked the user whether to commit', asked, (o.finalReply ?? '').slice(0, 300)],
+        ['the card stays in Doing', o.cards.s?.column === 'doing', o.cards.s?.column],
         ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'hive_update_task').some((x) => isCard(argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
       ]
     }

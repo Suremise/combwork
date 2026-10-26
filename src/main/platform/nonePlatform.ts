@@ -72,7 +72,7 @@ export class NonePlatform implements PlatformAdapter {
     if (isUnknown(rev)) return { ok: false, refusal: { rule: 'platform.unknown', values: { card: card.key, what: rev.whatText ?? rev.what, rule: 'submit' } } }
     // A starting manifest recorded before #1511 may hold a path now left out: left out of the change too.
     const files = NoneAdapter.diff(this.hashing.covering(s.started!.manifest ?? {}), rev.manifest)
-    if (!files.length && rev.revision === s.started!.base) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key } } }
+    if (!files.length && rev.revision === s.started!.base) return { ok: false, refusal: { rule: 'submit.unchanged', values: { card: card.key } } }
     // Paths stored from before #1511 under an excluded folder: left out of the revision, and said so.
     const left = this.hashing.leftOut(paths)
     const warnings = left.length ? [`left out of ${card.key}'s revision: ${left.join(', ')} (under .hive, .git or a folder the project excludes, never part of a card's work); declare its paths again without them`] : [] // i18n-ignore: agent-facing warning in the submit's reply

@@ -318,6 +318,8 @@ interface HiveMessageValues {
   'workflow.refused.submit.trailer.change': undefined
   'workflow.refused.submit.trailer.message': { card: string | number; commit: string | number }
   'workflow.refused.submit.trailer.next': { command: string | number }
+  'workflow.refused.submit.unchanged.message': { card: string | number }
+  'workflow.refused.submit.unchanged.next': undefined
   'workflow.refused.verdict.currentSubmission.message': { submission: string | number; card: string | number }
   'workflow.refused.verdict.currentSubmission.next': { latest: string | number }
   'workflow.refused.verdict.reviewing.message': { card: string | number; submission: string | number }
