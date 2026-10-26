@@ -218,19 +218,25 @@ function listed(files: string[], room: number): string {
   return shown.length ? `${shown.join(', ')} and ${files.length - shown.length} more` : `${files.length} files`
 }
 
+/**
+ * A conflict's files in `room` characters, each with where its conflicts are (HI-1181) when they all fit, else the files
+ * alone (`listed`).
+ */
+function placedFiles(f: FactData['IntegrationFailed'], room: number): string {
+  const files = f.files ?? []
+  const placed = files.map((x) => {
+    const c = f.conflicts?.files.find((y) => y.file === x)
+    return c ? `${x} (${conflictPlaces(c)})` : x
+  })
+  return placed.length <= FILES_NAMED && placed.join(', ').length <= room ? placed.join(', ') : listed(files, room)
+}
+
 /** What came back, in a few words: the reason, and the files (in `room` characters) or the check. Names already clipped. */
 function failureText(f: FactData['IntegrationFailed'], room: number): string {
   switch (f.reason) {
     case 'conflict': {
       const head = `a conflict with ${f.target}`
-      if (!f.files?.length) return head
-      const fits = room - head.length - ' in '.length
-      // Where each file's conflicts are (HI-1181), when they all fit; else the files alone, as before.
-      const placed = f.files.map((x) => {
-        const c = f.conflicts?.files.find((y) => y.file === x)
-        return c ? `${x} (${conflictPlaces(c)})` : x
-      })
-      return `${head} in ${placed.length <= FILES_NAMED && placed.join(', ').length <= fits ? placed.join(', ') : listed(f.files, fits)}`
+      return f.files?.length ? `${head} in ${placedFiles(f, room - head.length - ' in '.length)}` : head
     }
     case 'checks': {
       const what = f.check === 'install' ? 'the install before the merge checks' : f.check ? `the merge check ${f.check}` : 'a merge check'
@@ -242,8 +248,13 @@ function failureText(f: FactData['IntegrationFailed'], room: number): string {
       return `${f.target} moved while it was being merged`
     case 'folderBusy':
       return `the folder ${f.target} is checked out in was busy`
-    case 'notUpToDate':
-      return `it isn't up to date with ${f.target}`
+    case 'notUpToDate': {
+      // Strict's update conflicted (HI-1181 round 1): its files and where, as a conflict's are; else as before.
+      const head = `it isn't up to date with ${f.target}`
+      if (!f.files?.length) return head
+      const lead = `${head}: a conflict in `
+      return `${lead}${placedFiles(f, room - lead.length)}`
+    }
   }
 }
 

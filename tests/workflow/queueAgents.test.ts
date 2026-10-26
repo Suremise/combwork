@@ -197,6 +197,10 @@ describe('wakes at each queue outcome (what came back and what to do)', () => {
     const many: FactData['IntegrationFailed'] = { ...f, files: Array.from({ length: 10 }, (_, i) => `f${i}.ts`), conflicts: { oursIs: 'target', files: Array.from({ length: 10 }, (_, i) => ({ file: `f${i}.ts`, hunks: [hunk(1)] })) } }
     expect(returnedText('AM-1', many)).toContain('in f0.ts, f1.ts, f2.ts, f3.ts, f4.ts, f5.ts, f6.ts, f7.ts and 2 more.')
     expect(returnedText('AM-1', many).length).toBeLessThanOrEqual(WAKE_NOTE_MAX)
+    // Strict's update conflicting (not up to date, HR4's round 1): its files and where too; without files, as before.
+    const strict: FactData['IntegrationFailed'] = { ...f, reason: 'notUpToDate', files: ['a.ts'], conflicts: { oursIs: 'card', files: [{ file: 'a.ts', hunks: [hunk(10)] }] } }
+    expect(returnedText('AM-1', strict)).toContain("it isn't up to date with main: a conflict in a.ts (1 conflict, line 10).")
+    expect(returnedText('AM-1', { ...strict, files: undefined, conflicts: undefined })).toContain("it isn't up to date with main.")
   })
 
   it('a long log: its end kept, the next step always there, the whole within the wake note', () => {

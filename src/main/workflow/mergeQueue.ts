@@ -26,6 +26,12 @@ import { LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
 import { leftWake, returnedWake } from './queueState'
 import { readConflicts } from './conflictRead'
+
+/**
+ * The conflicted files `diff --name-only -z` lists, as they are named (HR4's HI-1181 round 1): split on NUL, never on
+ * lines, as git C-quotes a name with other than ASCII (café.txt) in its line form, and the reader would look for that.
+ */
+const namesOf = (out: string | undefined): string[] => (out ?? '').split('\0').filter(Boolean)
 import type { ConflictsRecord } from '../../shared/workflow/conflicts'
 import { bracketEnd, bracketStart } from './queueChecks'
 import { HIVE_RUNS } from '../progress'
@@ -988,8 +994,8 @@ export class MergeQueue {
     // Overridden for this command only; the repository's config is left as it is.
     const u = rebase ? await this.git(f, [...who, '-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', '--onto', expected, base], opts) : await this.git(f, [...who, 'merge', '--no-ff', '--no-edit', '-m', message, expected], opts)
     if (!u.ok) {
-      const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
-      const files = c?.out.split(/\r?\n/).filter(Boolean) ?? []
+      const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
+      const files = namesOf(c?.out)
       // Its hunks read before the abort (HI-1181): a merge of the target into the card's revision writes the card first.
       const conflicts = files.length ? await readConflicts(f, files, rebase ? 'target' : 'card') : undefined
       await this.git(f, rebase ? ['rebase', '--abort'] : ['merge', '--abort'])
@@ -1037,8 +1043,8 @@ export class MergeQueue {
     // Its output read with git's own trace in it (commitEnv), so a failure is told by who said what, never by words.
     const m = await this.git(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision], opts)
     if (!m.ok) {
-      const u = m.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
-      const files = u?.out.split(/\r?\n/).filter(Boolean) ?? []
+      const u = m.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
+      const files = namesOf(u?.out)
       // Its hunks read before the clean (HI-1181): the target is checked out, so its side comes first.
       const conflicts = files.length ? await readConflicts(f, files, 'target') : undefined
       await clean()
@@ -1086,8 +1092,8 @@ export class MergeQueue {
       const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
       const u = await this.git(f, [...who, '-c', 'rebase.rebaseMerges=false', '-c', 'rebase.updateRefs=false', 'rebase', '--no-rebase-merges', '--no-update-refs', '--no-autostash', ...(linear ? [] : ['--force-rebase']), '--onto', expected, base], opts)
       if (!u.ok) {
-        const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
-        const files = c?.out.split(/\r?\n/).filter(Boolean) ?? []
+        const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
+        const files = namesOf(c?.out)
         // Its hunks read before the abort (HI-1181): rebased onto the target, whose side comes first.
         const conflicts = files.length ? await readConflicts(f, files, 'target') : undefined
         await this.git(f, ['rebase', '--abort'])

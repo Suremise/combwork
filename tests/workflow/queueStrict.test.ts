@@ -127,6 +127,8 @@ describe('strict (G8): the queue brings the reviewed revision up to date', () =>
     expect(f).toMatchObject({ reason: 'notUpToDate', files: ['src/a.txt'] })
     // Its hunks (HI-1181): strict merges the target into the card's revision, so the card's side comes first.
     expect(f.conflicts).toMatchObject({ oursIs: 'card', files: [{ file: 'src/a.txt', hunks: [{ ours: ['the card'], theirs: ['someone else'] }] }] })
+    // …and its builder is told where (HR4's round 1): the file and its line, not only that it isn't up to date.
+    expect(e.wakes.some((w) => w.why.includes("it isn't up to date with main: a conflict in src/a.txt (1 conflict, line 1)"))).toBe(true)
     expect(e.wf.state(card).stage).toBe('active')
     expect(sh(e.project, 'rev-parse', 'main')).toBe(atConflict)
     expect(lineState(e, folder, line)).toEqual(before)

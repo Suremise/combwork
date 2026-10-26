@@ -65,6 +65,17 @@ describe('the merge queue', () => {
     expect(e.wakes.some((w) => w.agent === 'B1' && w.why.includes('src/x.txt (1 conflict, line 1)'))).toBe(true)
   })
 
+  it("HI-1181 round 1: a name git would quote (café.txt) is read as it is named, its hunk recorded", async () => {
+    const e = team()
+    const { card } = await queued(e, 'Accent', { 'src/café.txt': 'card\n' })
+    commit(e.project, { 'src/café.txt': 'target\n' }, 'the target adds the same file')
+    const [o] = await e.queue().drain('main')
+    expect(o).toMatchObject({ outcome: 'returned', reason: 'conflict' })
+    const f = e.wf.state(card).entries.at(-1)?.failure
+    expect(f?.files).toEqual(['src/café.txt'])
+    expect(f?.conflicts?.files).toEqual([{ file: 'src/café.txt', hunks: [expect.objectContaining({ ours: ['target'], theirs: ['card'] })] }])
+  })
+
   it('S4: red merge checks on the combination → the target doesn\'t move; IntegrationFailed; back to its builder with the output', async () => {
     const e = team()
     const { card } = await queued(e)

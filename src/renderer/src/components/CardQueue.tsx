@@ -189,7 +189,8 @@ function Returned({ card, q, queue, short, runs }: { card: TaskCard; q: NonNulla
       <div className="card-work-queue-line">
         <Icon name="error" /> <span title={q.at ? formatDateTime(q.at) : undefined}>{tr(M.returned, { when: q.at ? timeAgo(q.at) : '', why })}</span>
       </div>
-      {q.failure === 'conflict' && q.files?.length ? (
+      {/* A conflict's files, also strict's update's (not up to date, HI-1181 round 1): by what was captured. */}
+      {(q.failure === 'conflict' || q.conflicts) && q.files?.length ? (
         <>
           <div className="faint">{tr(M.conflictFiles)}</div>
           {q.conflicts ? (
