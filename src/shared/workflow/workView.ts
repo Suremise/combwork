@@ -6,7 +6,7 @@
 // descriptor (`revisionShort`), never by switching on a platform's id.
 
 import type { ConflictsRecord } from './conflicts'
-import { askedQuestion, foldCard, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type CheckRanData, type Fact, type FactData, type FileChange, type ForYouKind, type QueueEntry, type RoundChoice, type StageId } from './facts'
+import { askedQuestion, foldCard, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type CheckRanData, type Fact, type FactData, type LoopAsk, type FileChange, type ForYouKind, type QueueEntry, type RoundChoice, type StageId } from './facts'
 import type { StoredText } from '../types'
 import { baseRulesetId, REVIEW_SKIPPED } from './compile'
 
@@ -282,6 +282,13 @@ export interface WorkView {
   rounds: number
   /** Open requests to the user (For you). */
   forYou: number
+  /**
+   * A card loop's step waiting for its reviewer (a design, or a follow-up of reviewed work), null when none: until it is
+   * answered, Retry merge is refused (HI-1667), so the window doesn't offer it.
+   */
+  loopStep: LoopAsk | null
+  /** Retry merge was used since its latest submission: after a return, it isn't allowed again for it (HI-1667). */
+  retried: boolean
   /** The newest fact's seq: a view is newer than another when this is higher. */
   lastSeq: number
   /** The ruleset it keeps while in flight (`ownRuleset`); null in Todo, before its start, or none recorded. */
@@ -427,6 +434,8 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     decisions: { generation: s.generation, received: s.received },
     rounds: s.rounds,
     forYou: s.requests.length,
+    loopStep: s.step?.step ?? null,
+    retried: s.entries.some((x) => x.seq > (latest ?? 0) && x.requeue === 'retry'),
     lastSeq: s.lastSeq,
     ruleset: ownRuleset(facts, s),
     startedAt: s.cycle ? (at.get(s.cycle) ?? null) : null

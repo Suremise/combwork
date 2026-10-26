@@ -55,10 +55,11 @@ export function canonical(v: unknown): string {
  * The options a ruleset is made of: all but the names (N5), which apply at once and never make "old rules" (#1417). G17
  * as one reviewer per lane is left out too (#1443): it is what a ruleset without it means, so every ruleset compiled
  * before P7 keeps its id. G18, pushing the target after a merge (#1179), isn't a rule: the queue reads it as the options
- * are when it pushes, so it is left out whatever its value (a ruleset's options have it off).
+ * are when it pushes, so it is left out whatever its value (a ruleset's options have it off). G19, the merge's commit
+ * message (HI-1697), likewise: read as the options are when the queue merges.
  */
 export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
-  const { stageNames: _names, reviewerMode, pushTarget: _push, ...rules } = o
+  const { stageNames: _names, reviewerMode, pushTarget: _push, commitMessage: _message, ...rules } = o
   return (reviewerMode === 'pool' ? { ...rules, reviewerMode } : rules) as WorkflowOptions
 }
 

@@ -246,6 +246,8 @@ interface HiveMessageValues {
   'tips.memorySnapshot.title': undefined
   'tips.mergeBranch.text': undefined
   'tips.mergeBranch.title': undefined
+  'tips.mergeMessage.text': undefined
+  'tips.mergeMessage.title': undefined
   'tips.mergePush.text': undefined
   'tips.mergePush.title': undefined
   'tips.mergeQueueFolder.text': undefined
@@ -328,6 +330,8 @@ interface HiveMessageValues {
   'tips.recentWorkspaces.title': undefined
   'tips.removeAll.text': undefined
   'tips.removeAll.title': undefined
+  'tips.resumeAfterUpdate.text': undefined
+  'tips.resumeAfterUpdate.title': undefined
   'tips.resumeAll.text': undefined
   'tips.resumeAll.title': undefined
   'tips.reviewCopies.text': undefined

@@ -107,9 +107,9 @@ const check = (name, ok, extra = '') => {
   await say(reviewer.id, `${lane({ action: 'join', builder: 'Builder', cards: [c1, c2] })} then ${wait(c1, { column: 'review' })}`)
   const watching = await until(async () => (await live(reviewer.id))?.status === 'watching', HUNG_MS)
   const st = await live(reviewer.id)
-  check('the reviewer is watching: status watching, with what for', !!watching && st?.watch?.label === `Waiting for #${c1} → Review`, JSON.stringify({ status: st?.status, watch: st?.watch }))
+  check('the reviewer is watching: status watching, with what for', !!watching && st?.watch?.label === `Waiting for ${first.key} → Review`, JSON.stringify({ status: st?.status, watch: st?.watch }))
   // The window words the watch itself (HI-1679): the card by its key, where the Agent API's label above has its number.
-  check('its header says so', !!(await until(async () => (await page.locator('.pane-status.watching', { hasText: `Waiting for ${first.key ?? `#${c1}`} → Review` }).count()) >= 1, 5000)))
+  check('its header says so', !!(await until(async () => (await page.locator('.pane-status.watching', { hasText: `Waiting for ${first.key} → Review` }).count()) >= 1, 5000)))
   await page.screenshot({ path: path.join(lib.WORK, 'cardloop-watching.png') })
   /** Whether the watching header's ⋯ (Cancel Card Watch is in its menu, #977) is on screen where a click lands on it (not clipped or covered). */
   const cancelHit = (agentName) =>
@@ -131,9 +131,10 @@ const check = (name, ok, extra = '') => {
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.sleep(500)
   const activity = await api('GET', `/v1/projects/alpha/agents/Reviewer/activity`)
-  check('the Agent API reports it watching, with the cards', activity.body?.status === 'watching' && activity.body?.watching?.cards?.[0] === c1 && activity.body?.statusMessage === `Waiting for #${c1} → Review`, JSON.stringify(activity.body).slice(0, 200))
+  check('the Agent API reports it watching, with the cards', activity.body?.status === 'watching' && activity.body?.watching?.cards?.[0] === c1 && activity.body?.statusMessage === `Waiting for ${first.key} → Review`, JSON.stringify(activity.body).slice(0, 200))
   // Every status reply says what it waits for: project status, the project list and its short rows.
-  const label = `Waiting for #${c1} → Review`
+  // By its key everywhere (HI-1688): the Agent API's status, the project list and its short rows.
+  const label = `Waiting for ${first.key} → Review`
   const status = (await api('GET', '/v1/projects/alpha')).body?.agents?.find((a) => a.name === 'Reviewer')
   check('project status: watching, statusMessage and the watch', status?.status === 'watching' && status?.statusMessage === label && status?.watching?.cards?.[0] === c1 && status?.watching?.column === 'review', JSON.stringify(status))
   const listed = (await api('GET', '/v1/projects')).body?.find((p) => p.name === 'alpha')?.agents?.find((a) => a.name === 'Reviewer')
@@ -152,7 +153,7 @@ const check = (name, ok, extra = '') => {
     return r
   }
   const dormant = await quitDialog()
-  check('quit dialog: the watcher names its card; no waiting for a card nobody works on', dormant.rows.includes(`#${c1}`) && !dormant.waitOffered, JSON.stringify(dormant))
+  check('quit dialog: the watcher names its card; no waiting for a card nobody works on', dormant.rows.includes(`${first.key}`) && !dormant.waitOffered, JSON.stringify(dormant))
   await inv('tasks:update', c1, { column: 'doing', agent: builder.id })
   check('a card with another agent in Doing keeps quitting waiting', !!(await until(async () => (await quitDialog()).waitOffered, 8000)))
   let closed = false

@@ -236,6 +236,10 @@ interface HiveMessageValues {
   'settings.advanced.hive.recorder.unknown.title': undefined
   'settings.advanced.hive.recorder.version.desc': undefined
   'settings.advanced.hive.recorder.version.title': undefined
+  'settings.advanced.hive.restart.resumeAfterUpdate.desc': undefined
+  'settings.advanced.hive.restart.resumeAfterUpdate.title': undefined
+  'settings.advanced.hive.restart.resumeReadySeconds.desc': undefined
+  'settings.advanced.hive.restart.resumeReadySeconds.title': undefined
   'settings.advanced.hive.showDeveloperFeatures.desc': undefined
   'settings.advanced.hive.showDeveloperFeatures.title': undefined
   'settings.advanced.hive.skills.removeIdleCopies.desc': undefined

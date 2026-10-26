@@ -44,6 +44,9 @@ const M = {
   retry: msg({ id: 'board.workQueue.retry', defaultMessage: 'Retry merge…', description: "A button in the card dialog's Work section on a card the merge queue returned: queues its approved revision again, unchanged (asks first)." }),
   retryTitle: msg({ id: 'board.workQueue.retryTitle', defaultMessage: 'Retry {card}’s merge?', description: "Title of the confirmation before Retry merge ({card}: the card's key)." }),
   retryMessage: msg({ id: 'board.workQueue.retryMessage', defaultMessage: 'This queues {revision} again, unchanged: the revision that was approved, not a new one. Once per revision.', description: "The confirmation before Retry merge: the same approved revision ({revision}, a short commit id) goes back into the merge queue; it can be done once per revision. Glossary: revision." }),
+  retryApprovedMessage: msg({ id: 'board.workQueue.retryApprovedMessage', defaultMessage: 'This queues {revision} again, unchanged: the revision that was approved, not a new one.', description: "The confirmation before Retry merge on a card taken out of the merge queue and still approved (in Approved): the same approved revision ({revision}, a short commit id) goes back into the queue. Unlike after a return, there's no once-per-revision limit here. Glossary: revision." }),
+  retryWaits: msg({ id: 'board.workQueue.retryWaits', defaultMessage: '{step, select, followUp {Retry merge comes back once its reviewer has checked the follow-up.} other {Retry merge comes back once its reviewer has checked the design.}}', description: "The card dialog's Work section, on a card taken out of the merge queue while a card loop's step waits for its reviewer (a follow-up of reviewed work, or a design): Retry merge isn't offered until the reviewer answers it. Keep the select keys. Glossary: follow-up, design." }),
+  retryUsed: msg({ id: 'board.workQueue.retryUsed', defaultMessage: 'Retry merge was used for this revision: a new revision goes to the queue once it is submitted and passes review.', description: "The card dialog's Work section, on a card the merge queue returned after a Retry merge: Retry merge works once per revision, so it isn't offered again; the next way back into the queue is a new revision through review. Glossary: revision." }),
   retryConfirm: msg({ id: 'board.workQueue.retryConfirm', defaultMessage: 'Retry merge', description: 'The button confirming Retry merge. Keep it short.' }),
   retryFailed: msg({ id: 'board.workQueue.retryFailed', defaultMessage: "Couldn't retry the merge", description: "An error's title: Retry merge failed (the card dialog); its message says why." }),
   retried: msg({ id: 'board.workQueue.retried', defaultMessage: 'Queued again by Retry merge.', description: "The card dialog's Work section: the card's revision was queued again, unchanged, by the user's Retry merge." }),
@@ -157,16 +160,23 @@ export function CardQueue({ card, view: w, projectPath, short, reveal = 0 }: { c
         </dl>
       )}
       {q?.requeue === 'retry' && open && <div className="faint card-work-queue-line">{tr(M.retried)}</div>}
-      {q && q.state === 'failed' && <Returned card={card} q={q} queue={queue} short={short} runs={runs} />}
+      {q && q.state === 'failed' && <Returned card={card} q={q} queue={queue} short={short} runs={runs} stage={w.stage} retried={w.retried} />}
       {q && q.state === 'cancelled' && (
         <div className="card-work-queue-line faint">
           <Icon name="circle-slash" /> <span>{tr(M.cancelled, { reason: q.cancelled ?? 'other' /* i18n-ignore: a select's key, never shown */ })}</span>
         </div>
       )}
-      {/* Taken out and still approved, in Approved (#1623): Retry merge queues it again; a stale one is submitted again (its mark says so). */}
+      {/* Taken out and still approved, in Approved (#1623): Retry merge queues it again; a stale one is submitted again (its mark says so). While a
+          loop step waits for its reviewer the runtime refuses it (HI-1667): not offered, and why. */}
       {q && q.state === 'cancelled' && w.stage === 'approved' && !w.marks.stale && (
         <div className="card-work-queue-actions">
-          <RetryButton card={card} revision={short(q.revision)} />
+          {w.loopStep ? (
+            <div className="faint card-work-queue-line" data-retry-waits={w.loopStep}>
+              {tr(M.retryWaits, { step: w.loopStep })}
+            </div>
+          ) : (
+            <RetryButton card={card} revision={short(q.revision)} context="approved" />
+          )}
         </div>
       )}
       {advance && <Advance card={card} request={advance.request} target={q?.target ?? target ?? ''} />}
@@ -177,7 +187,7 @@ export function CardQueue({ card, view: w, projectPath, short, reveal = 0 }: { c
 }
 
 /** A return: why (the files for a conflict, the check by name), the output's last lines and Show log, Retry merge. */
-function Returned({ card, q, queue, short, runs }: { card: TaskCard; q: NonNullable<WorkView['queue']>; queue: QueueView | null; short: (id: string) => string; runs: readonly ProgressRun[] }) {
+function Returned({ card, q, queue, short, runs, stage, retried }: { card: TaskCard; q: NonNullable<WorkView['queue']>; queue: QueueView | null; short: (id: string) => string; runs: readonly ProgressRun[]; stage: WorkView['stage']; retried: boolean }) {
   const [all, setAll] = useState(false)
   const recent: QueueRecent = { card: card.number, key: card.key ?? '', title: card.title, entry: q.entry, outcome: 'returned', at: q.at ?? '', ...(q.failure ? { reason: q.failure } : {}), ...(q.transient ? { transient: true } : {}), ...(q.files ? { files: q.files } : {}) }
   const run = queue ? returnRun(queue, recent, runs) : null
@@ -223,8 +233,10 @@ function Returned({ card, q, queue, short, runs }: { card: TaskCard; q: NonNulla
             <Icon name="output" /> {all && !run?.logPath ? tr(M.hideLog) : tr(M.showLog)}
           </button>
         )}
-        {card.column !== 'done' && <RetryButton card={card} revision={short(q.revision)} />}
+        {/* Once per revision, from Active (HI-1667: as the runtime allows it): not offered again once used since its submission. */}
+        {stage === 'active' && !retried && <RetryButton card={card} revision={short(q.revision)} context="returned" />}
       </div>
+      {stage === 'active' && retried && <div className="faint card-work-queue-line" data-retry-used="">{tr(M.retryUsed)}</div>}
     </div>
   )
 }
@@ -330,10 +342,13 @@ function HunkSide({ name, lines, cut }: { name: string; lines: string[]; cut?: n
   )
 }
 
-/** Retry merge (asks first): queues the approved revision again, unchanged. */
-function RetryButton({ card, revision }: { card: TaskCard; revision: string }) {
+/**
+ * Retry merge (asks first): queues the approved revision again, unchanged. Its confirmation says what the runtime allows
+ * (HI-1667): after a return, once per revision; in Approved, taken out of the queue, as often as it is taken out.
+ */
+function RetryButton({ card, revision, context }: { card: TaskCard; revision: string; context: 'returned' | 'approved' }) {
   const retry = async (): Promise<void> => {
-    const ok = await confirm({ title: tr(M.retryTitle, { card: card.key ?? `#${card.number}` }), message: tr(M.retryMessage, { revision }), confirmLabel: tr(M.retryConfirm) })
+    const ok = await confirm({ title: tr(M.retryTitle, { card: card.key ?? `#${card.number}` }), message: tr(context === 'returned' ? M.retryMessage : M.retryApprovedMessage, { revision }), confirmLabel: tr(M.retryConfirm) })
     if (ok) await attempt(tr(M.retryFailed), () => call('queue:retry', card.number, ''))
   }
   return (

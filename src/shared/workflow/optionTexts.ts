@@ -63,6 +63,10 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
     title: msg({ id: 'workflow.option.pushTarget.title', defaultMessage: 'Push the target branch after merging', description: 'A workflow option (glossary 2.6, G18): after Hive’s merge queue merges a card, it pushes the target branch to its remote.' }),
     desc: msg({ id: 'workflow.option.pushTarget.desc', defaultMessage: 'After each merge, the merge queue pushes the target branch to the remote it tracks (or the only remote, or origin), never forced, and pauses, saying why, when the push is refused or fails.', description: 'What the workflow option “Push the target branch after merging” does (glossary 2.1: merge queue). Origin is git’s usual name for a remote: keep it.' })
   },
+  commitMessage: {
+    title: msg({ id: 'workflow.option.commitMessage.title', defaultMessage: 'Commit message', description: 'A workflow option (glossary 2.6, G19): the message of the commit Hive’s merge queue makes when it merges a card (a merge commit, or a squash’s one commit).' }),
+    desc: msg({ id: 'workflow.option.commitMessage.desc', defaultMessage: 'The message of the commit the merge queue makes: Hive’s names the card’s key and title and adds Hive’s trailers, and the branch’s own uses the message its commits have, with no card key or trailers, while Hive still knows which card it merged.', description: 'What the workflow option “Commit message” does (glossary 2.1: merge queue). Trailers are git’s name for the “Key: value” lines at the end of a commit message: keep the word if your language’s git terms do.' })
+  },
   mergeInstall: {
     title: msg({ id: 'workflow.option.mergeInstall.title', defaultMessage: 'Install dependencies from scratch', description: 'A workflow option (G9’s install): when the merge queue installs the project’s dependencies afresh before the merge checks.' }),
     desc: msg({ id: 'workflow.option.mergeInstall.desc', defaultMessage: 'Before the checks on the merged result, the merge queue installs the dependencies afresh, and always does when the lock file or manifests changed.', description: 'What the workflow option “Install dependencies from scratch” does. Lock file: as in the glossary (G15 value).' })
@@ -138,6 +142,10 @@ export const VALUE_TEXT = {
     squash: msg({ id: 'workflow.value.style.squash', defaultMessage: 'Squash', description: 'A value of the workflow option “Merge style” (glossary 2.6, G6).' }),
     rebase: msg({ id: 'workflow.value.style.rebase', defaultMessage: 'Rebase and fast-forward', description: 'A value of the workflow option “Merge style” (glossary 2.6, G6; #1184): Hive’s merge queue rebases the card’s commits onto the target branch and moves the branch forward to them, so the history stays linear, with no merge commit.' })
   },
+  commitMessage: {
+    hive: msg({ id: 'workflow.value.commitMessage.hive', defaultMessage: 'Hive’s: the card’s key and title, with trailers', description: 'A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Hive’s trailers (Hive-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end.' }),
+    branch: msg({ id: 'workflow.value.commitMessage.branch', defaultMessage: 'The branch’s own, with no card key or trailers', description: 'A value of the workflow option “Commit message” (glossary 2.6, G19): the commit takes the message the branch’s commits have (with several, the first one’s subject and each one’s message), never the card’s key or Hive’s trailers. Trailers: git’s “Key: value” lines at a message’s end.' })
+  },
   mergeInstall: {
     onManifestChange: msg({ id: 'workflow.value.mergeInstall.onManifestChange', defaultMessage: 'When the lock file or manifests change', description: 'A value of the workflow option “Install dependencies from scratch”: only when the project’s lock file or package manifests changed (glossary: lock file, as in the G15 value).' }),
     always: msg({ id: 'workflow.value.mergeInstall.always', defaultMessage: 'Before every merge', description: 'A value of the workflow option “Install dependencies from scratch”: before each card’s merge checks.' })
@@ -193,6 +201,13 @@ export const GROUP_TEXT: Record<FormGroupId, Msg> = {
   elsewhere: msg({ id: 'workflow.group.elsewhere', defaultMessage: 'Shown here, set elsewhere', description: 'A heading of the Workflow section: settings shown for reference, each changed where its link leads.' })
 }
 
+/**
+ * The user's answer to the merge queue's question before an upgraded project's first merge (HI-1697), kept on the card
+ * as their comment, in their language (HI-1733): the two options by the names and values Version Control → Workflow
+ * shows. Nothing reads its words: the choice is the board's record and the project's options.
+ */
+export const MERGE_ANSWER = msg({ id: 'workflow.mergeChoice.answer', defaultMessage: '{styleTitle}: {style}. {messageTitle}: {message}.', description: "The user's answer to the merge queue's question before an upgraded project's first merge, kept on the card as the user's own comment: the two workflow options they chose, each its name ({styleTitle}: Merge style; {messageTitle}: Commit message) and the value chosen ({style}: Squash, say; {message}: a value of Commit message). The names and values are the workflow options' own texts, already translated: arrange them as your language writes such a list." })
+
 /** Why the presets set each option as they do (§16.6.3's Why column), one sentence each, shown in a preset's preview. */
 export const OPTION_WHY: Partial<Record<OptionKey, Msg>> = {
   review: msg({ id: 'workflow.why.review', defaultMessage: 'A pair exists to review: a second agent catches what the builder missed, while working solo you read the card’s work yourself.', description: 'Why the presets set “Work is reviewed before it’s merged” as they do (Solo: no review; Pair and Team: a reviewer agent).' }),
@@ -205,6 +220,7 @@ export const OPTION_WHY: Partial<Record<OptionKey, Msg>> = {
   target: msg({ id: 'workflow.why.target', defaultMessage: 'Finished work goes to the repository’s default branch; working solo, to the branch the project is on.', description: 'Why the presets set “Work merges into” as they do.' }),
   strict: msg({ id: 'workflow.why.strict', defaultMessage: 'The merge queue tests the merged result anyway, so this mostly changes the history’s shape.', description: 'Why the presets leave “Work is up to date with its target branch before it merges” off.' }),
   pushTarget: msg({ id: 'workflow.why.pushTarget', defaultMessage: 'Pushing reaches your remote and its sign-in, so it stays yours unless you turn it on.', description: 'Why the presets leave “Push the target branch after merging” off.' }),
+  commitMessage: msg({ id: 'workflow.why.commitMessage', defaultMessage: 'The card’s key in the history links each merge to its card; a project that keeps card numbers out of its history uses the branch’s own.', description: 'Why the presets set “Commit message” to Hive’s (the card’s key and title, with trailers).' }),
   mergeChecks: msg({ id: 'workflow.why.mergeChecks', defaultMessage: 'The checks run on the work as it will be once merged, not only as it was built.', description: 'Why the presets set “Checks pass on the merged result” when Hive merges.' }),
   mergeInstall: msg({ id: 'workflow.why.mergeInstall', defaultMessage: 'A clean install before every merge catches a dependency that only worked on the builder’s machine.', description: 'Why Team installs dependencies from scratch before every merge.' }),
   okBefore: msg({ id: 'workflow.why.okBefore', defaultMessage: 'Some work needs your eyes before it ships, such as screenshots and release steps.', description: 'Why Team asks for your OK on cards labelled ui or release.' }),

@@ -8,7 +8,7 @@ import { BROWSE_LIMITS, ENTRY_LIMITS, JOURNAL_KINDS, KEPT_IMPORTANCE, LINK_TYPES
 import { openDb, transaction, type Db, type Migration } from './db'
 import { realPath } from './fsutil'
 import { createLogger, userText } from './logger'
-import { checkpointWhenIdle } from './walCheckpoint'
+import { checkpointWhenIdle, checkpointsReleased } from './walCheckpoint'
 import { assertPlaceAdmitted, isAdmitted, ownerOf, refusedOpen } from './openingFence'
 import { trash } from './trash'
 
@@ -653,6 +653,8 @@ export async function deleteJournal(home: string): Promise<void> {
   deleting.add(key)
   try {
     closeJournal(home, at.owner ?? undefined)
+    // Moved to the Recycle Bin once the checkpoints' worker lets go of it (HI-1691).
+    await checkpointsReleased(file)
     for (const f of [file, `${file}-wal`, `${file}-shm`]) if (existsSync(f)) await trash(f)
   } finally {
     deleting.delete(key)

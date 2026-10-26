@@ -36,6 +36,7 @@ import { branchMergeStatus, lineCard, lineConfirmed, mergeBranch, mergeBranches 
 import { createLogger, logsDir, userText } from './logger'
 import { diagnostics } from './diagnostics'
 import { resumeAfterClose, startupStep, stopLeftAfterClose } from './lastRun'
+import { dismissOffered, resumeOffered, workspaceRecovering } from './restartResume'
 import { keepAwakeCount } from './power'
 import { progress, progressSeq } from './progressService'
 import { mergeSlots, recoverMergeSlots, workspaceSlots } from './mergeSlotHost'
@@ -112,7 +113,7 @@ import { settleSlotsUpToDate } from './workflow/slotsUpToDateStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
 import { heldWriter, releaseHeldWriter } from './agentFolders'
 import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
-import { checkWorkflowChange, presetsNotice, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
+import { checkWorkflowChange, chooseMerge, presetsNotice, settleMergeChoices, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
 import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
@@ -375,6 +376,8 @@ function boardSteps(ws: WorkspaceService, upgraded = false, after?: AfterOpen): 
       .then(() => step('slots'))
       .then(() => migrateSlots(ws))
       .then(() => repairStages(ws))
+      // HI-1697: a merge choice the board recorded and a save stopped before writing to project.json, written there now.
+      .then(() => settleMergeChoices(ws))
       // What an interrupted card attachment operation left (HI-1700), settled from its records against the board.
       .then(() => recoverCardAttachments(ws))
       .finally(() => {
@@ -412,7 +415,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     void after.track('whether it moved', checkMoved(contextWorkspace()!).catch((e) => log.warn('checking whether the workspace moved', e))) // i18n-ignore: a part of a log line's timing
     // A merge slot an agent held when Hive closed: its merge may be half done (#350).
     // At start, the notice that Hive closed unexpectedly waits for it, and tells its holds (#984).
-    if (ws.path) startupStep(after.track('merge slots', recoverMergeSlots(ws.path).catch((e) => log.warn('recovering the merge slots', e)))) // i18n-ignore: a part of a log line's timing
+    // Resumes after a restart wait for it too (HI-1707).
+    if (ws.path) {
+      const recovery = after.track('merge slots', recoverMergeSlots(ws.path).catch((e) => log.warn('recovering the merge slots', e))) // i18n-ignore: a part of a log line's timing
+      startupStep(recovery)
+      workspaceRecovering(ws.path, recovery)
+    }
   }
   // Each read of the projects' ids (#514): their names by id, and what follows a rename, follow it.
   WorkspaceService.onIdsRead = (ws, seen) => {
@@ -455,6 +463,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return { resumed: r.resumed.length, failed: r.failed.length }
     },
     'app:stopLeftAfterClose': () => stopLeftAfterClose(),
+    'app:resumeRestart': () => resumeOffered(),
+    'app:dismissRestart': () => dismissOffered(),
     'update:state': () => updater.updateState(),
     'update:check': () => updater.check(true),
     'update:download': () => updater.download(),
@@ -875,6 +885,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workflow:check': (p, change) => checkWorkflowChange(workspace, workspace.assertProject(p), change),
     'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [] }),
     'workflow:stages': (p) => projectStages(workspace, workspace.assertProject(p)),
+    'workflow:chooseMerge': (p, choice) => chooseMerge(workspace, workspace.assertProject(p), choice),
     'board:stages': async () => Object.fromEntries(await Promise.all((workspace.info()?.projects ?? []).map(async (p) => [p.path.toLowerCase(), await projectStages(workspace, p.path).catch(() => null)] as const))),
     'workflow:checkPlatform': (p, to) => checkPlatformSwitch(workspace, workspace.assertProject(p), to),
     'workflow:setPlatform': (p, to, opts) => setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected }),

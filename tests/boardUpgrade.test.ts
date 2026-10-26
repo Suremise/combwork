@@ -11,6 +11,20 @@ import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
 import { as09 } from './boardDb'
 
+// The checkpoints' worker letting go of a file (HI-1691), held by a test: `gate` set, checkpointsReleased waits for it,
+// telling `reached` as it starts to.
+const held = vi.hoisted(() => ({ gate: null as Promise<void> | null, reached: null as (() => void) | null }))
+vi.mock('../src/main/walCheckpoint', async (original) => {
+  const real = await original<typeof import('../src/main/walCheckpoint')>()
+  return {
+    ...real,
+    checkpointsReleased: (file: string) => {
+      held.reached?.()
+      return held.gate ?? real.checkpointsReleased(file)
+    }
+  }
+})
+
 const base = tempDir('hive-board-upgrade-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -35,7 +49,17 @@ afterAll(async () => {
 afterEach(() => {
   store.boardTestHooks.upgradeAnswer = null
   store.boardTestHooks.whileUpgrading = null
+  held.gate = null
+  held.reached = null
 })
+
+/** Holds checkpointsReleased (HI-1691): resolves once the code under test waits there; `release` lets it go on. */
+function holdRelease(): { waiting: Promise<void>; release: () => void } {
+  let release = (): void => undefined
+  held.gate = new Promise<void>((r) => (release = r))
+  const waiting = new Promise<void>((r) => (held.reached = r))
+  return { waiting, release }
+}
 
 const fileIn = (): { file: string; backups: string } => {
   const dir = join(base, `db-${++n}`)
@@ -138,7 +162,8 @@ describe('a group of steps (db.ts)', () => {
     const asked: unknown[] = []
     const db = openDb(f.file, { migrations: [...plain, ...group(), five], hiveVersion: '1.0.1', backupDir: f.backups, approve: (p) => (asked.push(p), true) })
     try {
-      expect(asked).toEqual([{ group: '1.0', from: 4, to: 5 }])
+      // Not asked again (HI-1718): it was when the file joined the group.
+      expect(asked).toEqual([])
       expect(schemaVersion(db.writer)).toBe(5)
     } finally {
       db.close()
@@ -146,6 +171,28 @@ describe('a group of steps (db.ts)', () => {
     const after = readdirSync(f.backups)
     expect(after.filter((x) => x.startsWith('x-before-1.0-'))).toEqual([expect.stringMatching(/^x-before-1\.0-v2-/)])
     expect(after.filter((x) => x.startsWith('x-v4-'))).toHaveLength(1)
+  })
+
+  it('a later step of the group on a file in it already runs even where the group would be refused: the file opens writable, waiting for nothing (HI-1718)', () => {
+    const f = at09()
+    openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups, approve: () => true }).close()
+    const five: Step = { version: 5, name: 'five', group: '1.0', up: (d) => d.exec('CREATE TABLE e (v)') }
+    const db = openDb(f.file, { migrations: [...plain, ...group(), five], hiveVersion: '1.0.1', backupDir: f.backups, approve: () => false })
+    try {
+      expect(db.pending).toBeNull()
+      expect(schemaVersion(db.writer)).toBe(5)
+      db.writer.exec('INSERT INTO e VALUES (1)')
+    } finally {
+      db.close()
+    }
+    // A file before the group is still asked, and refused waits.
+    const g = at09()
+    const before = openDb(g.file, { migrations: [...plain, ...group(), five], hiveVersion: '1.0.1', backupDir: g.backups, approve: () => false })
+    try {
+      expect(before.pending).toEqual({ group: '1.0', from: 2, to: 5 })
+    } finally {
+      before.close()
+    }
   })
 
   it('a file made in 1.0 (every step unasked) gets no copy kept for good when a later step of the group comes', () => {
@@ -319,6 +366,30 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     expect(readdirSync(dir)).toEqual(['Hive-Dev-12345678.json'])
   })
 
+  it('a board an earlier 1.0 upgraded takes the group\'s later steps unasked: writable, its cards kept (HI-1718: rc.1–rc.4 boards at v22)', async () => {
+    const ws = await board09()
+    store.boardTestHooks.upgradeAnswer = 'yes'
+    const first = await open(ws)
+    expect(await titles(first)).toEqual(['From 0.9'])
+    await close(first)
+    store.boardTestHooks.upgradeAnswer = null
+    // As rc.1–rc.4 left it: upgraded, without the steps that came after (card attachments, HI-1700).
+    const last = Math.max(...upgradeSteps.map((m) => m.version))
+    const later = store.BOARD_MIGRATIONS.find((m) => m.name === 'card attachments')!
+    const raw = new DatabaseSync(store.boardFile(ws))
+    raw.exec(`DROP TABLE card_attachments; DELETE FROM schema_version WHERE version >= ${later.version}`)
+    raw.close()
+    expect(fileSchemaVersion(store.boardFile(ws))).toBe(later.version - 1)
+    // No answer given: had it been asked, the board would wait read-only for the user.
+    const w = await open(ws)
+    expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
+    expect(fileSchemaVersion(store.boardFile(ws))).toBe(last)
+    expect(tables(store.boardFile(ws))).toContain('card_attachments')
+    await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))
+    expect(await titles(w)).toEqual(['After', 'From 0.9'])
+    await close(w)
+  })
+
   it('a test copy can answer before it is asked', async () => {
     const ws = await board09()
     store.boardTestHooks.upgradeAnswer = 'yes'
@@ -349,6 +420,36 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     await inWorkspace(w, () => store.upgradeBoard(w))
     expect(await titles(w)).toEqual(['From 0.9'])
     await close(w)
+  })
+
+  it("the workspace closing while Restore or the upgrade waits for the checkpoints' worker: refused, the file and its copies as they were (HI-1691, HR6's round 3)", async () => {
+    // Restore: the 1.0 board, upgraded from 0.9, kept as it is.
+    const ws = await board09()
+    const w = await open(ws)
+    await inWorkspace(w, () => store.upgradeBoard(w))
+    const backups = join(hiveOf(ws), 'backups')
+    const copies = readdirSync(backups).sort()
+    const version = fileSchemaVersion(store.boardFile(ws))
+    let hold = holdRelease()
+    const restoring = inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
+    restoring.catch(() => undefined)
+    await hold.waiting
+    await close(w)
+    hold.release()
+    await expect(restoring).rejects.toThrow()
+    expect(fileSchemaVersion(store.boardFile(ws))).toBe(version)
+    expect(readdirSync(backups).sort()).toEqual(copies)
+    // The upgrade: a 0.9 board, left waiting for it.
+    const ws2 = await board09()
+    const w2 = await open(ws2)
+    hold = holdRelease()
+    const upgrading = inWorkspace(w2, () => store.upgradeBoard(w2))
+    upgrading.catch(() => undefined)
+    await hold.waiting
+    await close(w2)
+    hold.release()
+    await expect(upgrading).rejects.toThrow()
+    expect(fileSchemaVersion(store.boardFile(ws2))).toBe(2)
   })
 
   it('Restore is refused while another Hive has the file open, the 1.0 board left as it was', async () => {

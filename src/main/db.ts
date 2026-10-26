@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync, readdirSync, rmSync } from 'original-fs'
 import { basename, dirname, join } from 'path'
+import { timedStep } from './stallWork'
 
 /**
  * Hive's SQLite layer (#990, #1017): every database Hive keeps (the workspace's board in `.hive/hive.db`; later its metrics,
@@ -53,8 +54,9 @@ export interface OpenOptions {
    */
   setup?: (db: DatabaseSync, isNew: boolean) => void
   /**
-   * Whether a group's steps may run on a file that has data (a new file takes every step unasked). Refused, the steps
-   * before the group run, and the file opens read-only with `pending` saying what it waits for. Left out: they run.
+   * Whether a group's steps may run on a file that has data (a new file takes every step unasked, and a file in the group
+   * already its later steps: HI-1718). Refused, the steps before the group run, and the file opens read-only with
+   * `pending` saying what it waits for. Left out: they run.
    */
   approve?: (pending: PendingGroup) => boolean
   /** Runs with a group's exclusive lock held, before its copy and steps: throwing refuses the group, changing nothing. */
@@ -162,16 +164,22 @@ export function backupTo(db: DatabaseSync, dir: string, family: string, version:
 
 /** Runs `fn` in a transaction on `db` (BEGIN IMMEDIATE: the write lock at once), committed when it returns, undone when it throws. */
 export function transaction<T>(db: DatabaseSync, fn: () => T): T {
-  db.exec('BEGIN IMMEDIATE')
-  try {
-    const out = fn()
-    db.exec('COMMIT')
-    return out
-  } catch (e) {
-    if (db.isTransaction) db.exec('ROLLBACK')
-    throw e
-  }
+  // Marked (HI-1692): a busy wait for the write lock, or a commit held by the disk, names it in a stall's warning.
+  return timedStep(`db transaction ${fileNames.get(db) ?? 'a database'}`, () => {
+    db.exec('BEGIN IMMEDIATE')
+    try {
+      const out = fn()
+      db.exec('COMMIT')
+      return out
+    } catch (e) {
+      if (db.isTransaction) db.exec('ROLLBACK')
+      throw e
+    }
+  })
 }
+
+/** Each connection openDb made, by its file's own name, for the steps marked on it (HI-1692). */
+const fileNames = new WeakMap<DatabaseSync, string>()
 
 /** How long a group waits for another connection to let go of the file before it says the file is in use. */
 const GROUP_LOCK_WAIT_MS = 1000
@@ -219,13 +227,15 @@ function migrate(db: DatabaseSync, file: string, opts: OpenOptions): PendingGrou
     while (end < todo.length && todo[end].group === group) end++
     const steps = todo.slice(i, end)
     const pending: PendingGroup = { group, from: schemaVersion(db), to: steps[steps.length - 1].version }
-    if (opts.approve && !opts.approve(pending)) {
+    const first = Math.min(...opts.migrations.filter((m) => m.group === group).map((m) => m.version))
+    // A file in the group already (asked when it joined, or made in 1.0) takes a later step of it unasked: asked again, a
+    // board an earlier 1.0 upgraded would wait as if from 0.9 (HI-1718).
+    if (pending.from < first && opts.approve && !opts.approve(pending)) {
       told()
       return pending
     }
     // The copy before the group's first step is kept for good (the way back); one before a later step of it (a file in the
     // group already) is an ordinary copy, of the file's own three.
-    const first = Math.min(...opts.migrations.filter((m) => m.group === group).map((m) => m.version))
     runGroup(db, file, opts, pending, pending.from < first ? groupBackupFamily(family, group) : null, family, () => steps.forEach(run), copy)
     // The group's copy is the file before every step after it too.
     copied = true
@@ -324,6 +334,11 @@ export function soleCopy(file: string, dir: string, family: string, version: num
  * connection on the file throws DbInUseError, the file as it was.
  */
 export function openDb(file: string, opts: OpenOptions): Db {
+  // Marked (HI-1692): an open runs its migrations, and waits for another connection's lock.
+  return timedStep(`db open ${basename(file)}`, () => openDbNow(file, opts))
+}
+
+function openDbNow(file: string, opts: OpenOptions): Db {
   mkdirSync(dirname(file), { recursive: true })
   const writer = new DatabaseSync(file, { timeout: 5000 })
   let reader: DatabaseSync | null = null
@@ -336,6 +351,8 @@ export function openDb(file: string, opts: OpenOptions): Db {
     const pending = newer === null ? migrate(writer, file, opts) : null
     if (newer !== null || pending) writer.exec('PRAGMA query_only = ON')
     reader = new DatabaseSync(file, { timeout: 5000 })
+    fileNames.set(writer, basename(file))
+    fileNames.set(reader, basename(file))
     configure(reader)
     opts.setup?.(reader, false)
     reader.exec('PRAGMA query_only = ON')

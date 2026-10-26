@@ -127,14 +127,18 @@ export function storeValue(db: Writer | ReturnType<typeof workspaceDb>['reader']
 /** A typed table's side of a store's move in (openTable): how many entries a scope has, and the writing of a file's. */
 export interface StoreTable<T> {
   count(db: Writer, scope: string): number
-  /** In the move's transaction: writes the file's entries (those not of Hive's form kept aside); returns how many it wrote. */
+  /**
+   * In the move's transaction: writes the file's entries (those not of Hive's form kept aside), keeping any the table has
+   * already (by id); returns how many it wrote.
+   */
   put(db: Writer, scope: string, got: T): number
 }
 
 /**
  * openStore for a store kept in a typed table of its own (#1211): its file moved in the first time (and, `whenEmpty`,
  * when found while the scope has none), in one transaction marked `imported` and checked there (the table has what was
- * written), the file then kept as a backup; a file found after that kept so, unread. Nothing while the workspace's
+ * written, beside what it had: a save that landed while its file couldn't be moved in, its workspace closed (HI-1713)),
+ * the file then kept as a backup; a file found after that kept so, unread. Nothing while the workspace's
  * upgrade to 1.0 waits. The caller reads the table after. `db`: the connection to use throughout, a save's lease's
  * (#1381), so a workspace closed while the file is read doesn't take it away (else the workspace's, as it is then).
  * `refuse`: the file must stay where it is now (a removed project's, #1161): asked under the board's lock, after the file
@@ -157,9 +161,10 @@ export async function openTable<T>(workspacePath: string, store: StoreName, scop
     if (first && toMove(db)) {
       let written = 0
       transaction(db, () => {
+        const had = table.count(db, scope)
         written = got ? table.put(db, scope, got) : 0
         const now = table.count(db, scope)
-        if (now !== written) throw new Error(`${now} ${store} entries in the database, ${written} moved in: nothing was moved in`) // i18n-ignore: an internal check's error, logged
+        if (now !== had + written) throw new Error(`${now} ${store} entries in the database, ${had} before and ${written} moved in: nothing was moved in`) // i18n-ignore: an internal check's error, logged
         setMeta(db, store, scope, 'imported', JSON.stringify({ at: new Date().toISOString(), rows: written, file: got ? file : null }))
       })
       if (got) log.info(`moved ${written} ${store} entr${written === 1 ? 'y' : 'ies'} from ${userText(file)} into the workspace database`)

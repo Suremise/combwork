@@ -238,6 +238,7 @@ export const SUITES = [
   { name: 'repolocktyping' },
   { name: 'resize' },
   { name: 'restart' },
+  { name: 'restartresume' },
   { name: 'resume' },
   { name: 'resumeall' },
   { name: 'review' },

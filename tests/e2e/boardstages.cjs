@@ -140,6 +140,69 @@ const nothingToArchive = (dialog) => {
       return w.passed === 34 && w.merging === 34
     }, HUNG_MS)), JSON.stringify(await widths()))
     await shoot('approved-collapsed')
+
+    // --- The board's own columns fold to 34 px strips on a grouped board too (HI-1724: `.board.grouped > .board-column`
+    // outranked `.collapsed`, so they kept 140 px); open ones keep their 140 px least width. A mix, then all, wide and narrow.
+    const OWN = ['hold', 'todo', 'doing', 'review', 'done']
+    const fold = async (folding) => {
+      for (const id of folding) await col(id).locator('.board-column-header').getByRole('button', { name: /^Collapse / }).click()
+      await until(async () => (await Promise.all(folding.map(collapsed))).every(Boolean), HUNG_MS)
+    }
+    const foldedRight = (folded) => until(async () => {
+      const w = await widths()
+      return OWN.every((id) => (folded.includes(id) ? w[id] === 34 : w[id] >= 140))
+    }, HUNG_MS)
+    await fold(['hold', 'todo', 'review'])
+    check('on a grouped board, folded On Hold, Todo and Review are 34 px strips, Active and Done open (HI-1724)', !!(await foldedRight(['hold', 'todo', 'review'])), JSON.stringify(await widths()))
+    await shoot('grouped-mix')
+    await lib.fitWindow(h.app, page, { width: 900, height: 900 })
+    check('…narrow too', !!(await foldedRight(['hold', 'todo', 'review'])), JSON.stringify(await widths()))
+    await shoot('grouped-mix-narrow')
+    // The toolbar in a narrow window (HI-1725: the search box was a sliver showing "S", Workflows cut to "V"): the row
+    // wraps, the search box keeps its least width, and no control is cut or past the toolbar's edge.
+    const toolbarRow = () => page.evaluate(() => {
+      const bar = document.querySelector('.board-view .board-toolbar')
+      const edge = bar.getBoundingClientRect()
+      // The workflow button and, where it has a tooltip, its wrapper (then the toolbar's item) both: either could be cut.
+      const workflow = bar.querySelector('.board-workflow')
+      const wrap = workflow?.parentElement?.matches('.tip-wrap') ? workflow.parentElement : null
+      const items = [['search', bar.querySelector('.board-search')], ...[...bar.querySelectorAll(':scope > label')].map((e, i) => [`check${i}`, e]), ['workflow', workflow], ...(wrap ? [['workflow-wrap', wrap]] : []), ['new', bar.querySelector('.btn.primary')], ['more', bar.querySelector('.board-more')]]
+      const controls = items.map(([name, e]) => {
+        if (!e) return { name, missing: true }
+        const r = e.getBoundingClientRect()
+        return { name, top: Math.round(r.top), bottom: Math.round(r.bottom), mid: Math.round((r.top + r.bottom) / 2), left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width), cut: e.scrollWidth > e.clientWidth + 1 }
+      })
+      return { left: Math.round(edge.left), right: Math.round(edge.right), controls }
+    })
+    // Every control there, whole, inside the toolbar, and none over another (the button inside its own wrapper aside).
+    const toolbarWhole = (t) => {
+      const c = t.controls
+      if (c.some((x) => x.missing) || c.find((x) => x.name === 'search').width < 160) return false
+      if (!c.every((x) => !x.cut && x.left >= t.left - 1 && x.right <= t.right + 1)) return false
+      const apart = c.filter((x) => x.name !== 'workflow')
+      return apart.every((a, i) => apart.slice(i + 1).every((b) => a.right <= b.left + 1 || b.right <= a.left + 1 || a.bottom <= b.top + 1 || b.bottom <= a.top + 1))
+    }
+    // One row: every control's middle within a few pixels of the others' (align-items: center; their heights differ).
+    const oneRow = (t) => Math.max(...t.controls.map((x) => x.mid)) - Math.min(...t.controls.map((x) => x.mid)) <= 3
+    check('narrow: the toolbar wraps, its search box at least 160 px, every control whole, inside it and apart (HI-1725)', !!(await until(async () => {
+      const t = await toolbarRow()
+      return toolbarWhole(t) && !oneRow(t)
+    }, HUNG_MS)), JSON.stringify(await toolbarRow()))
+    await shoot('toolbar-narrow')
+    await fold(['doing', 'done'])
+    check('…every column folded: all 34 px strips, narrow', !!(await foldedRight(OWN)), JSON.stringify(await widths()))
+    await shoot('grouped-all-folded-narrow')
+    await lib.fitWindow(h.app, page, { width: 1500, height: 900 })
+    check('…and wide', !!(await foldedRight(OWN)), JSON.stringify(await widths()))
+    await shoot('grouped-all-folded')
+    check('wide: the toolbar is one row, every control whole (HI-1725)', !!(await until(async () => {
+      const t = await toolbarRow()
+      return toolbarWhole(t) && oneRow(t)
+    }, HUNG_MS)), JSON.stringify(await toolbarRow()))
+    await shoot('toolbar-wide')
+    for (const id of OWN) await col(id).getByRole('button', { name: /^Expand / }).click()
+    check('…they open again, each at least 140 px', !!(await foldedRight([])), JSON.stringify(await widths()))
+
     await col('merging').getByRole('button', { name: 'Expand Merging' }).click()
     await col('passed').getByRole('button', { name: 'Expand Approved' }).click()
     check('both expand again', !!(await until(async () => !(await collapsed('merging')) && !(await collapsed('passed')) && !((await approvedGroup.getAttribute('class')) ?? '').includes('collapsed'), HUNG_MS)))
@@ -326,6 +389,11 @@ const nothingToArchive = (dialog) => {
     const rows = await headerRows()
     check('Polish: wrapped headers read the name over "count … ⋯", ⋯ at the end', rows.some((r) => r.rows === 2) && rows.every((r) => r.tidy), JSON.stringify(rows))
     await shoot('merging-pl')
+    // The toolbar's longer Polish labels in a narrow window (HI-1725).
+    await lib.fitWindow(h.app, page, { width: 900, height: 900 })
+    check('Polish, narrow: the toolbar wraps, every control whole, inside it and apart (HI-1725)', !!(await until(async () => toolbarWhole(await toolbarRow()), HUNG_MS)), JSON.stringify(await toolbarRow()))
+    await shoot('toolbar-narrow-pl')
+    await lib.fitWindow(h.app, page, { width: 1500, height: 900 })
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: { ...q.queueOptions(fx), stageNames: { active: 'W'.repeat(24) } } })
     await showBoard('alpha', 'Tablica zadań')
     check('a 24-letter name with no space stays inside its column', !!(await until(async () => (await labelText('doing')) === 'W'.repeat(24) && (await outside()).length === 0, HUNG_MS)), JSON.stringify(await outside()))

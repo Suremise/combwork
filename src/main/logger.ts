@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { appendFileSync, existsSync, mkdirSync, renameSync, statSync } from 'original-fs'
 import { join } from 'path'
+import { noteStep, stallClock } from './stallWork'
 
 type Level = 'debug' | 'info' | 'warn' | 'error'
 
@@ -22,8 +23,16 @@ function file(name: string): string {
   return f
 }
 
-/** Adds a line to a log file in the logs folder, which is kept to MAX_BYTES and one older copy (<name>.1.log). */
+/** A log write this slow is noted as a step (HI-1692), so a stall it caused names it. */
+const SLOW_WRITE_MS = 50
+
+/**
+ * Adds a line to a log file in the logs folder, which is kept to MAX_BYTES and one older copy (<name>.1.log). Written at
+ * once, on this thread: a write held by the disk holds it (HI-1692: a System Restore point freezes writes to the profile's
+ * drive for seconds), and one that slow is noted, so a stall's warning names it.
+ */
 function append(name: string, line: string): void {
+  const start = stallClock.mono()
   try {
     const f = file(name)
     if (existsSync(f) && statSync(f).size > MAX_BYTES) renameSync(f, f.replace(/\.log$/, '.1.log'))
@@ -31,6 +40,7 @@ function append(name: string, line: string): void {
   } catch {
     // Logging must never crash the app.
   }
+  if (stallClock.mono() - start >= SLOW_WRITE_MS) noteStep(`log write ${name}`, start)
 }
 
 /**
@@ -54,8 +64,8 @@ function consoleFailed(where: 'stdout' | 'stderr', e: unknown): void {
   toConsole = false
   if (closed && !wasOn) return
   const at = new Date().toISOString()
-  if (closed) append('hive.log', `${at} [INFO] [logger] The console's ${where} is closed (${code}): log lines go to this file only from now\n`)
-  else append('hive.log', `${at} [ERROR] [logger] The console's ${where} failed, so log lines go to this file only from now: ${e instanceof Error ? (e.stack ?? e.message) : safeJson(e)}\n`)
+  if (closed) append('hive.log', `${at} [INFO] [logger] The console's ${where} is closed (${code}): log lines go to this file only from now\n`) // i18n-ignore: a line of hive.log
+  else append('hive.log', `${at} [ERROR] [logger] The console's ${where} failed, so log lines go to this file only from now: ${e instanceof Error ? (e.stack ?? e.message) : safeJson(e)}\n`) // i18n-ignore: a line of hive.log
 }
 if (toConsole) {
   process.stdout?.on?.('error', (e: unknown) => consoleFailed('stdout', e))

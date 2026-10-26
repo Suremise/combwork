@@ -350,6 +350,7 @@ interface HiveMessageValues {
   'board.forYou.offerTip': { action: string }
   'board.forYou.reply': undefined
   'board.forYou.rounds': undefined
+  'board.forYou.saveAndMerge': undefined
   'board.forYou.send': undefined
   'board.forYou.sendTip': undefined
   'board.forYou.showAll': { all: string }
@@ -357,6 +358,7 @@ interface HiveMessageValues {
   'board.forYou.tipAsks': { kind: string; who: string | number }
   'board.forYou.tipMore': { n: number }
   'board.forYou.tipOpen': undefined
+  'board.forYou.todayValue': { today: string; value: string | number }
   'board.inbox.asks': undefined
   'board.inbox.asksWhat': { message: string | number }
   'board.inbox.assistant': undefined
@@ -617,6 +619,7 @@ interface HiveMessageValues {
   'board.queue.pause.folderBusy': { target: string | number }
   'board.queue.pause.hookTimedOut': undefined
   'board.queue.pause.identity': undefined
+  'board.queue.pause.mergeChoice': { card: string | number }
   'board.queue.pause.needsYou': undefined
   'board.queue.pause.other': { reason: string | number }
   'board.queue.pause.pushFailed': { card: string | number; target: string | number }
@@ -902,10 +905,13 @@ interface HiveMessageValues {
   'board.workQueue.result': undefined
   'board.workQueue.retried': undefined
   'board.workQueue.retry': undefined
+  'board.workQueue.retryApprovedMessage': { revision: string | number }
   'board.workQueue.retryConfirm': undefined
   'board.workQueue.retryFailed': undefined
   'board.workQueue.retryMessage': { revision: string | number }
   'board.workQueue.retryTitle': { card: string | number }
+  'board.workQueue.retryUsed': undefined
+  'board.workQueue.retryWaits': { step: string }
   'board.workQueue.returned': { when: string | number; why: string | number }
   'board.workQueue.showRun': undefined
   'board.workQueue.side': { side: string }

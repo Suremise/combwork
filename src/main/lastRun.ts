@@ -17,6 +17,7 @@ import { crashDumps, type CrashDump } from './exitLog'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
+import { adoptInstalledRun, ownsResume } from './restartResume'
 import { inWorkspace, openWorkspaces, workspaceOf } from './workspace'
 
 /**
@@ -95,7 +96,11 @@ export function checkLastRun(file = markerFile()): UnexpectedClose | null {
   const since = m ? Date.parse(m.startedAt) : NaN
   const dump = crashDumps().find((d) => Number.isNaN(since) || d.at >= since) ?? null
   found = { lastSeen: m?.lastSeen ?? at, startedAt: m?.startedAt ?? null, agents: m?.agents ?? [], workspaces: m?.workspaces ?? [], dump, merges: [], processes: m?.processes ?? [] }
-  toResume = found.agents
+  // Ended by an installer that couldn't ask it to close first (HI-1707): a newer version starting now. Its agents are an
+  // install's, resumed by the restart queue as the switch says, not left to this notice.
+  if (m && m.hive && m.hive !== app.getVersion() && found.agents.length) adoptInstalledRun(found.agents, m.hive, found.lastSeen)
+  // The agents a restart's record has (restartResume.ts owns their resume): not resumed from here too.
+  toResume = found.agents.filter((a) => !ownsResume(a.projectPath, a.agentId))
   log.warn(`The last run of Hive ended without quitting: last seen ${found.lastSeen}${m ? ` (Hive ${m.hive}, started ${m.startedAt})` : ' (its marker could not be read)'}; ${found.agents.length} agent(s) were running${found.agents.length ? `: ${found.agents.map((a) => `${userText(a.agentName)} in ${userText(a.project)}`).join(', ')}` : ''}${dump ? `; a crash dump from ${new Date(dump.at).toISOString()}` : '; no crash dump'}`) // i18n-ignore: a line of hive.log
   return found
 }
@@ -302,7 +307,8 @@ export async function tellUnexpectedClose(): Promise<void> {
   // can be resumed in them. However long they take: the notice waits for them, not for a time.
   await startupDone()
   const auto = config.settings.sessions.resumeAfterUnexpectedClose === true
-  const r = auto && c.agents.length ? await resumeAgents(c.agents) : null
+  const mine = c.agents.filter((a) => !ownsResume(a.projectPath, a.agentId))
+  const r = auto && mine.length ? await resumeAgents(mine) : null
   if (r) toResume = []
   // What the agents had started that still runs as the same processes (#987): listed, never stopped unasked.
   const kept = c.processes.flatMap((l) => l.processes)
@@ -311,7 +317,7 @@ export async function tellUnexpectedClose(): Promise<void> {
   if (kept.length) log.info(`Of ${kept.length} process(es) the agents had started, ${leftRunning.length} still run${leftRunning.length ? `: ${userText(leftRunning.map((p) => p.label).join('; '))}` : ''}`) // i18n-ignore: a line of hive.log
   told = true
   const actions: ToastAction[] = []
-  if (!r && c.agents.length) actions.push({ label: tr(msg({ id: 'main.unexpectedClose.resumeAll', defaultMessage: 'Resume All', description: 'A button in the notice that Hive closed unexpectedly: resumes the agents that were running.' })), command: 'session.resumeAfterClose' })
+  if (!r && mine.length) actions.push({ label: tr(msg({ id: 'main.unexpectedClose.resumeAll', defaultMessage: 'Resume All', description: 'A button in the notice that Hive closed unexpectedly: resumes the agents that were running.' })), command: 'session.resumeAfterClose' })
   if (leftRunning.length) actions.push({ label: tr(msg({ id: 'main.unexpectedClose.stopThem', defaultMessage: 'Stop Them', description: 'A button in the notice that Hive closed unexpectedly: ends the processes the agents had started that are still running (only those, checked to be the same processes).' })), command: 'session.stopLeftAfterClose' })
   actions.push({ label: tr(msg({ id: 'main.unexpectedClose.overview', defaultMessage: 'Show Overview', description: "A button in the notice that Hive closed unexpectedly: shows the Workspace Overview, with every project's agents." })), command: 'view.overview' })
   // It stays up for two minutes (a notice with buttons goes after 15 s), and in the Notifications panel after.
