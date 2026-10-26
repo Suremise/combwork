@@ -979,6 +979,14 @@
     "defaultMessage": "Watch the merge queue",
     "description": "A tip's title (glossary 2.5: merge queue)."
   },
+  "tips.mergeRebase.text": {
+    "defaultMessage": "With Hive merging, set Merge style to Rebase and fast-forward in Version Control → Workflow: the merge queue rebases each card onto the target, tests exactly that, and moves the target forward to it.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands, and the option's value: keep them as Hive shows them. Glossary: merge queue."
+  },
+  "tips.mergeRebase.title": {
+    "defaultMessage": "A linear history, with no merge commits",
+    "description": "A tip's title (G6): the merge style Rebase and fast-forward."
+  },
   "tips.mergeSlot.text": {
     "defaultMessage": "When several agents finish at once, each claims the project's merge slot before it merges main in, checks and merges, so nobody's checks have to run twice. Who holds it and who waits shows in the Overview and the Progress panel.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

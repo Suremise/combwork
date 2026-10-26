@@ -456,6 +456,7 @@ interface HiveMessageValues {
   'workflow.value.sameness.change': undefined
   'workflow.value.sameness.exact': undefined
   'workflow.value.style.merge': undefined
+  'workflow.value.style.rebase': undefined
   'workflow.value.style.squash': undefined
   'workflow.why.dependenciesDone': undefined
   'workflow.why.excluded': undefined

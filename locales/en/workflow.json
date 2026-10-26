@@ -1819,6 +1819,10 @@
     "defaultMessage": "Merge commit",
     "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
   },
+  "workflow.value.style.rebase": {
+    "defaultMessage": "Rebase and fast-forward",
+    "description": "A value of the workflow option “Merge style” (glossary 2.6, G6; #1184): Hive’s merge queue rebases the card’s commits onto the target branch and moves the branch forward to them, so the history stays linear, with no merge commit."
+  },
   "workflow.value.style.squash": {
     "defaultMessage": "Squash",
     "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."

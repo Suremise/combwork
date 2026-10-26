@@ -454,6 +454,7 @@
   "workflow.value.sameness.change": "相同的变更",
   "workflow.value.sameness.exact": "仅限完全相同的修订版本",
   "workflow.value.style.merge": "合并提交",
+  "workflow.value.style.rebase": "变基并快进",
   "workflow.value.style.squash": "压缩合并",
   "workflow.why.dependenciesDone": "成本很低，而且不会有卡片建立在尚未并入的工作之上。",
   "workflow.why.excluded": "依赖和构建输出不属于卡片交付的内容。",

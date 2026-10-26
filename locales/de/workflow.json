@@ -454,6 +454,7 @@
   "workflow.value.sameness.change": "Dieselbe Änderung",
   "workflow.value.sameness.exact": "Nur exakt dieselbe Revision",
   "workflow.value.style.merge": "Merge-Commit",
+  "workflow.value.style.rebase": "Rebase und Fast-Forward",
   "workflow.value.style.squash": "Squash",
   "workflow.why.dependenciesDone": "Es kostet wenig, und keine Karte baut auf Arbeit auf, die noch nicht drin ist.",
   "workflow.why.excluded": "Abhängigkeiten und Build-Ausgaben gehören nicht zu dem, was eine Karte liefert.",

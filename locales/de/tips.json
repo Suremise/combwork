@@ -244,6 +244,8 @@
   "tips.mergeQueueFolder.title": "In den Ordner mergen, in dem du arbeitest",
   "tips.mergeQueuePanel.text": "Der Tab „Merges“ im Fortschrittspanel zeigt jede Merge-Warteschlange: die Karte, die sie gerade testet, und wie lange ihre Checks meist dauern, die wartenden Karten und eine Karte, die sie zurückgegeben hat, bis du sie gesehen hast. „Warteschlange anhalten“ und „Warteschlange fortsetzen“ sind auch dort.",
   "tips.mergeQueuePanel.title": "Die Merge-Warteschlange im Blick",
+  "tips.mergeRebase.text": "Wenn Hive mergt, stelle in Versionsverwaltung → Workflow die Merge-Art auf Rebase und Fast-Forward: Die Merge-Warteschlange rebased jede Karte auf das Ziel, testet genau das und bewegt das Ziel dorthin vor.",
+  "tips.mergeRebase.title": "Eine lineare Historie, ohne Merge-Commits",
   "tips.mergeSlot.text": "Werden mehrere Agenten gleichzeitig fertig, holt sich jeder den Merge-Slot des Projekts, bevor er main hineinmergt, prüft und mergt, sodass niemandes Prüfungen zweimal laufen müssen. Wer ihn hat und wer wartet, zeigen die Übersicht und das Fortschrittspanel.",
   "tips.mergeSlot.title": "Agenten mergen der Reihe nach",
   "tips.mergeStrict.text": "Wenn Hive mergt, kann Versionsverwaltung → Workflow verlangen, dass die Arbeit vor dem Merge auf dem Stand ihres Ziels ist: Die Merge-Warteschlange aktualisiert eine Karte in ihrem eigenen Ordner, nie auf dem Branch des Bearbeiters, und das Review zählt weiter, wenn es dieselbe Änderung ist.",
