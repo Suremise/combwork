@@ -55,7 +55,7 @@ import { carriedOf, keptFor, keptGoing } from './slotMigration'
 import { getTask } from './tasks'
 import { onAction } from './workflow/actionWorker'
 import { agentBusy } from './workflow/lineUpdates'
-import type { CardRecord } from './workflow/factStore'
+import { withoutWriteFence, type CardRecord } from './workflow/factStore'
 import type { SlotForStart, Workflow } from './workflow/runtime'
 import { agentRunsGoing, setSlotStarts, workflowEnforced, workflowFor, ENFORCE } from './workflow/service'
 import { listWorktreesOrNull } from './worktrees'
@@ -394,7 +394,12 @@ function failedStep(what: string, e: unknown): void {
   else log.warn(what, e)
 }
 
-/** Asks for a project's pass (coalesced): resolves when no pass of it runs. Never throws. */
+/**
+ * Asks for a project's pass (coalesced): resolves when no pass of it runs. Never throws. The pass is its own course, run
+ * outside any write fence (HI-1685): asked for from a fenced write's context (the merge queue's merge freeing a slot,
+ * its commit's listeners), it would otherwise carry the queue's lease check into every write it makes, its later rounds
+ * and retries too, and fail them all with LeaseLost once that runner let its lease go.
+ */
 export function settleSlotCards(ws: WorkspaceService, projectPath: string): Promise<void> {
   if (quitting) return Promise.resolve()
   const key = `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
@@ -404,7 +409,7 @@ export function settleSlotCards(ws: WorkspaceService, projectPath: string): Prom
     return running.done
   }
   const pass = { again: false, done: Promise.resolve() }
-  pass.done = (async () => {
+  pass.done = withoutWriteFence(async () => {
     try {
       do {
         pass.again = false
@@ -413,7 +418,7 @@ export function settleSlotCards(ws: WorkspaceService, projectPath: string): Prom
     } finally {
       passes.delete(key)
     }
-  })()
+  })
   passes.set(key, pass)
   return pass.done
 }

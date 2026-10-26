@@ -128,6 +128,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **A card started just after a merge gets its slot.** When the merge queue merged a card and freed its slot, Hive's next pass over the slots could fail every write with "the merge queue … is run by another Hive now", so a card started then waited, its slot never prepared. That pass now runs on its own (HI-1685).
 - **Retry merge is offered only when it can run.** A card waiting for its reviewer to check a follow-up no longer shows a Retry merge that is then refused, and a card already retried for its revision says a new revision is the way back. The confirmation only mentions "once per revision" after a return, where that limit applies (HI-1667).
 - **Hive's log names what held it up.** A pause's line in hive.log now names a database step or log write that waited for the disk, and a pause of all of Hive (the PC or the process paused) is no longer counted as busy (HI-1692).
 - **Saving the board's database no longer holds Hive up.** Copying its log into the file (a checkpoint) now runs in a thread of its own; on a busy disk it held typing and replies for up to most of a second (HI-1691).
