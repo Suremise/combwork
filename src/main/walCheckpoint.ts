@@ -265,7 +265,7 @@ class CheckpointThread {
       if (!call) return
       this.calls.delete(m.id)
       this.landed(call.key)
-      call.answer(m.ok ? m.value : { error: m.error }, ' in its worker')
+      call.answer(m.ok ? m.value : { error: m.error }, ' in its worker') // i18n-ignore: for the log
     })
     const gone = (why: string): void => {
       if (this.worker !== w) return
