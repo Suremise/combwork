@@ -348,8 +348,8 @@ interface State {
   windowCount: number
   /** Working agents keeping the PC awake (0: none). */
   keepAwake: number
-  /** Bulk actions under way on hosts' sessions, by host path lower-cased (#1659). */
-  sessionBulk: Record<string, SessionBulkProgress>
+  /** Bulk actions under way on hosts' sessions, by host path lower-cased (#1659): none, no entry. */
+  sessionBulk: Record<string, SessionBulkProgress[]>
   /** The agent whose Compact dialog is open. */
   compactFor: AgentRef | null
   /** Project whose Add Agent dialog is open. */

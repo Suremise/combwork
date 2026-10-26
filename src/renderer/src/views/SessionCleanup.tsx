@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { SessionBulkResult, SessionListItem } from '@shared/types'
+import type { SessionBulkProgress, SessionBulkResult, SessionListItem } from '@shared/types'
 import { CLEANUP_AGES, cleanupPlan, type CleanupAction, type CleanupAge, type CleanupPlan, type CleanupSkip } from '@shared/sessionCleanup'
 import { countText } from '@shared/sessionTree'
 import { call } from '../api'
@@ -110,18 +110,23 @@ export function SessionCleanup({
 }
 
 /**
- * How far a bulk action on a host's sessions has got (#1659: 300 can take a minute), from main's session-bulk events,
- * in every window showing the host; nothing when none runs.
+ * How far each bulk action on a host's sessions has got (#1659: 300 can take a minute), from main's session-bulk events,
+ * in the window showing the host; nothing when none runs.
  */
 export function BulkProgressNote({ projectPath, kind }: { projectPath: string; kind: 'session' | 'conversation' }) {
-  const p = useStore((s) => s.sessionBulk[projectPath.toLowerCase()] ?? null)
-  if (!p) return null
+  const runs = useStore((s) => s.sessionBulk[projectPath.toLowerCase()] ?? NO_RUNS)
   return (
-    <p className="hint sessions-bulk-progress" role="status">
-      <Icon name="loading" spin /> {tr(M.progress, { action: p.action, kind, done: p.done, total: p.total })}
-    </p>
+    <>
+      {runs.map((p) => (
+        <p key={p.id} className="hint sessions-bulk-progress" role="status">
+          <Icon name="loading" spin /> {tr(M.progress, { action: p.action, kind, done: p.done, total: p.total })}
+        </p>
+      ))}
+    </>
   )
 }
+
+const NO_RUNS: SessionBulkProgress[] = []
 
 const ACTIONS: { id: CleanupAction; icon: string; label: Msg; summary: Msg }[] = [
   {

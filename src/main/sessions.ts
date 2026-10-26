@@ -537,20 +537,35 @@ const BULK_AT_ONCE = 4
 /** A bulk action's progress is sent to the windows at most this often, and when it ends (#1659). */
 const BULK_PROGRESS_MS = 250
 
-/** Tells the windows how far a bulk action on a host's sessions has got (#1659): at the start, as it goes, and once it ends. */
+/** The bulk actions running on each host's sessions, by host path lower-cased, each by its id (#1659). Removed as they end. */
+const bulkRuns = new Map<string, Map<number, SessionBulkProgress>>()
+let bulkRunIds = 0
+
+/**
+ * Tells the windows how far a bulk action on a host's sessions has got (#1659): at the start, as it goes, and once it
+ * ends. Each event lists every run on the host, so one that ends leaves the others shown.
+ */
 function bulkProgress(projectPath: string, action: SessionBulkAction, total: number): { step: () => void; end: () => void } {
-  let done = 0
+  const key = projectPath.toLowerCase()
+  const runs = bulkRuns.get(key) ?? new Map<number, SessionBulkProgress>()
+  bulkRuns.set(key, runs)
+  const run: SessionBulkProgress = { id: ++bulkRunIds, action, done: 0, total }
+  runs.set(run.id, run)
   let sent = Date.now()
-  const send = (progress: SessionBulkProgress | null): void => emit({ type: 'session-bulk', projectPath, progress })
-  send({ action, done, total })
+  const send = (): void => emit({ type: 'session-bulk', projectPath, runs: [...runs.values()].map((r) => ({ ...r })) })
+  send()
   return {
     step() {
-      done++
-      if (Date.now() - sent < BULK_PROGRESS_MS && done < total) return
+      run.done++
+      if (Date.now() - sent < BULK_PROGRESS_MS && run.done < total) return
       sent = Date.now()
-      send({ action, done, total })
+      send()
     },
-    end: () => send(null)
+    end() {
+      runs.delete(run.id)
+      if (!runs.size) bulkRuns.delete(key)
+      send()
+    }
   }
 }
 

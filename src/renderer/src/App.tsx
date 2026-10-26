@@ -240,11 +240,11 @@ function handleEvent(e: HiveEvent): void {
       set((s) => (s.workspaceUsage && s.workspaceUsage.workspacePath.toLowerCase() === e.workspacePath.toLowerCase() ? { workspaceUsage: { ...s.workspaceUsage, history: e.progress } } : {}))
       break
     case 'session-bulk': {
-      // A bulk action on a host's sessions (#1659): its Sessions tab shows how far it has got, in every window.
+      // Bulk actions on a host's sessions (#1659): its Sessions tab shows how far each has got.
       const k = e.projectPath.toLowerCase()
       set((s) => {
         const { [k]: _ended, ...rest } = s.sessionBulk
-        return { sessionBulk: e.progress ? { ...rest, [k]: e.progress } : rest }
+        return { sessionBulk: e.runs.length ? { ...rest, [k]: e.runs } : rest }
       })
       break
     }
