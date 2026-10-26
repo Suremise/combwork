@@ -159,6 +159,10 @@ function transcript(sid, startMin) {
     check('…and its next tool call as its transcript grows, read again live', !!(await lib.until(async () => /Read/.test(await subRow.innerText().catch(() => '')), HUNG_MS, 250)), await subRow.innerText().catch(() => ''))
     await page.mouse.move(5, 5)
     await shoot('2-live-subagent-dark')
+    // HR6's round 2: its state is its own. It replies and is done, no pulse, while HB1 and its background subagent go on.
+    subLine({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_sub2', content: 'read', is_error: false }] } })
+    subLine({ type: 'assistant', requestId: 'sr3', message: { model: 'claude-opus-5-5', content: [{ type: 'text', text: 'The race is in src/race.ts.' }], usage: { input_tokens: 10, output_tokens: 5 } } })
+    check('a subagent that replied is Done, no pulse, while its parent goes on', !!(await lib.until(async () => /Done/.test(await subRow.innerText().catch(() => '')) && (await subRow.locator('.activity-pulse').count()) === 0, HUNG_MS, 250)) && (await node('task').count()) === 1, await subRow.innerText().catch(() => ''))
     // HR6's round 1: shown again after another view, it is a new opening: frozen, though it was live.
     await page.locator('.activity-btn[aria-label="Settings"]').click()
     await lib.until(async () => !(await list.isVisible().catch(() => false)), HUNG_MS, 100)

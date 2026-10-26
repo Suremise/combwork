@@ -506,9 +506,10 @@ const ranFor = (from: string | number | null | undefined): string => {
 function describe(n: ActivityNode): { icon: string; title: string; sub: string; state: ActivityState | null } {
   switch (n.kind) {
     case 'session': {
-      // A subagent: the tool call under way in it, else what it does while it can run, else done.
+      // A subagent, by its own transcript (HR6's round 2): the tool call under way in it, else thinking while it works;
+      // done once it replied; not read yet, nothing said.
       const open = n.last?.tools.at(-1)
-      const doing = n.live && open && !open.done && n.last?.lastKind === 'tool' ? tr(M.toolFor, { summary: `${open.name} ${open.summary}`.trim(), time: ranFor(open.at) }) : n.live ? tr(n.last?.lastKind === 'reply' ? M.writing : M.thinking) : tr(M.state, { state: 'done' })
+      const doing = n.state !== 'working' ? (n.turnsLoaded ? tr(M.state, { state: n.state }) : '') : open && !open.done && n.last?.lastKind === 'tool' ? tr(M.toolFor, { summary: `${open.name} ${open.summary}`.trim(), time: ranFor(open.at) }) : tr(M.thinking)
       return { icon: 'type-hierarchy-sub', title: n.session.title || n.session.name || n.session.id.slice(0, 8), sub: doing, state: n.state }
     }
     case 'turn':

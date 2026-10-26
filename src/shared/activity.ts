@@ -324,7 +324,11 @@ export function buildActivityView(input: ActivityInput, agentId: string, opts: {
       .filter((sub) => Date.parse(sub.lastActivity ?? sub.lastActiveAt ?? '') >= since)
       .map((sub) => {
         const t = input.turns.get(sub.id)
-        return { kind: 'session', key: `s:${sub.id}`, agentId: sub.agentId ?? null, session: sub, live: subActive, state: subActive ? 'working' : 'done', turnsLoaded: !!t, turnCount: t?.total ?? 0, last: t?.turns.at(-1) ?? null }
+        // Working on its own evidence (HR6's round 2), never its parent's: a tool call of its open, or nothing written since
+        // its prompt or its last tool call; its reply is its end. Read again while it can run.
+        const subLast = t?.turns.at(-1) ?? null
+        const busy = subActive && !!t && subLast?.lastKind !== 'reply'
+        return { kind: 'session', key: `s:${sub.id}`, agentId: sub.agentId ?? null, session: sub, live: subActive, state: busy ? 'working' : t ? 'done' : 'idle', turnsLoaded: !!t, turnCount: t?.total ?? 0, last: subLast }
       })
     for (const task of tasks) subagents.push({ kind: 'task', key: `task:${s.id}:${task.id}`, task })
     const launches = input.now.launches.filter((l) => l.agentId === a.id)

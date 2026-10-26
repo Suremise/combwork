@@ -227,6 +227,24 @@ describe("a tab's content: what runs now (HI-1743)", () => {
     expect(sub(input)).toMatchObject({ live: false, state: 'done' })
   })
 
+  it("HR6's round 2: each subagent's state is its own: one that replied is done while its parent and another child go on", () => {
+    const input = withTurns(base())
+    input.sessions = [...input.sessions, session('sub2', 'hb1', 20, { sub: { parentId: 's1', kind: 'sub-agent' } })]
+    input.turns = new Map([...input.turns, turnsOf('sub1', [user(1, 15, 'look'), tool(2, 16, 'Grep'), reply(3, 17, 'Found it in race.ts')]), turnsOf('sub2', [user(1, 20, 'test'), tool(2, 21, 'Bash', { result: null })])])
+    const subs = (): Extract<ActivityNode, { kind: 'session' }>[] => buildActivityView(input, 'hb1').parts[0].subagents.filter((n): n is Extract<ActivityNode, { kind: 'session' }> => n.kind === 'session')
+    // The parent works and a background subagent runs: both are read again, but sub1, which replied, is done.
+    expect(subs().map((n) => [n.key, n.live, n.state])).toEqual([
+      ['s:sub1', true, 'done'],
+      ['s:sub2', true, 'working']
+    ])
+    // Between sub2's tool calls (its result in, nothing since): still working, thinking.
+    input.turns = new Map([...input.turns, turnsOf('sub2', [user(1, 20, 'test'), tool(2, 21, 'Bash')])])
+    expect(subs().find((n) => n.key === 's:sub2')?.state).toBe('working')
+    // Not read yet: nothing claimed.
+    input.turns = new Map([...input.turns].filter(([id]) => id !== 'sub2'))
+    expect(subs().find((n) => n.key === 's:sub2')?.state).toBe('idle')
+  })
+
   it('an agent with no card: its work alone, no header card (a solo agent, most users); one not running: nothing under it; one not in the project: nothing', () => {
     expect(buildActivityView(base(), 'solo')).toMatchObject({ card: null, parts: [{ agentId: 'solo', role: null, doing: null }] })
     const input = base()
