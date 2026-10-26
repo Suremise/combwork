@@ -13,6 +13,8 @@ export interface Work {
   label: string | (() => string)
   start: number
   end: number | null
+  /** A synchronous step (timedStep, noteStep): it held the thread itself, where a call may only have waited behind it. */
+  step?: true
 }
 
 /** Work under way, and the latest ended (enough to cover a burst of calls during a stall). */
@@ -21,8 +23,8 @@ export const ended: Work[] = []
 const ENDED_KEPT = 200
 
 /** Marks work as begun (a fixed name, never the user's text); call what it returns when it has ended. */
-export function beginWork(label: Work['label']): () => void {
-  const w: Work = { label, start: stallClock.mono(), end: null }
+export function beginWork(label: Work['label'], step = false): () => void {
+  const w: Work = { label, start: stallClock.mono(), end: null, ...(step ? { step: true as const } : {}) }
   running.add(w)
   return () => {
     if (w.end !== null) return
@@ -38,13 +40,13 @@ export function beginWork(label: Work['label']): () => void {
  * (a log line), noted only when slow, so a stall they caused still names them.
  */
 export function noteStep(label: string, start: number): void {
-  ended.push({ label, start, end: stallClock.mono() })
+  ended.push({ label, start, end: stallClock.mono(), step: true })
   if (ended.length > ENDED_KEPT) ended.shift()
 }
 
 /** Runs a synchronous step that can wait (the disk, a lock), marked as work by its fixed name (HI-1692). */
 export function timedStep<T>(label: string, fn: () => T): T {
-  const done = beginWork(label)
+  const done = beginWork(label, true)
   try {
     return fn()
   } finally {

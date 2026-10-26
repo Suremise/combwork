@@ -264,6 +264,27 @@ describe('the steps that can wait, and a whole-process pause (HI-1692)', () => {
     expect(s.warnings[0]).toContain('db commit hive.db (0.9 s)')
   })
 
+  it("names the step first when five calls waited behind it, beyond the five named (HR6's round 1)", () => {
+    const s = watcher()
+    s.tick()
+    // A burst of calls begins, then a step blocks the thread; the tick runs only once the step has returned.
+    const calls = [0, 1, 2, 3, 4].map((i) => {
+      now += 1
+      return beginWork(`ipc waiting-${i}`)
+    })
+    timedStep('db begin hive.db', () => {
+      now += 4000
+    })
+    now += 10
+    s.stall(0, 2)
+    for (const done of calls) done()
+    // The loop's delay as the tick measured it: the step's whole block.
+    s.settle()
+    const line = s.warnings[0] ?? ''
+    expect(line).toMatch(/during it: db begin hive\.db \(4\.0 s\), ipc waiting-/)
+    expect(line).toMatch(/ and 1 more$/)
+  })
+
   it("names a log write noted only because it was slow: a restore point freezing the profile's drive held hooks.log", () => {
     const s = watcher()
     s.tick()

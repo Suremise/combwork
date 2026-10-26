@@ -59,12 +59,14 @@ const labelOf = (w: Work): string => (typeof w.label === 'string' ? w.label : w.
 /**
  * The work that overlapped [from, to] (with `held`, found earlier), the most overlap first, however long it has run (a
  * handler can wake from an await, block, and await again), but for the requests that wait by design (Darren's choice,
- * 20 Oct: the line is evidence to read, not a verdict).
+ * 20 Oct: the line is evidence to read, not a verdict). Synchronous steps come first (HR6's round 1 of HI-1692): one held
+ * the thread itself, and the calls overlapping it, often many, may only have waited behind it, so it is never left among
+ * the ones counted.
  */
 function overlapping(from: number, to: number, held: Work[] = []): Work[] {
   const now = stallClock.mono()
   const o = (w: Work): number => overlapOf(w, from, to, now)
-  return [...new Set([...held, ...running, ...ended])].filter((w) => o(w) > 0 && !IDLE.has(labelOf(w))).sort((a, b) => o(b) - o(a) || b.start - a.start)
+  return [...new Set([...held, ...running, ...ended])].filter((w) => o(w) > 0 && !IDLE.has(labelOf(w))).sort((a, b) => Number(!!b.step) - Number(!!a.step) || o(b) - o(a) || b.start - a.start)
 }
 
 /** The work that overlapped [from, to], the most overlap first: at most `max` described, and how many more. */
