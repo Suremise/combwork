@@ -455,8 +455,8 @@ async function stillAsked(ws: WorkspaceService, project: { path: string }, a: Me
 /** The request answered as the user (For you's path: its refusal propagated), its words kept on the card. */
 async function answerIt(a: MergeAnswer): Promise<void> {
   const { answerTask } = await import('../tasks')
-  const style = a.style === 'merge' ? 'merge commit' : a.style === 'squash' ? 'squash' : 'rebase and fast-forward' // i18n-ignore: words of the answer below, read by agents (English)
-  const message = a.commitMessage === 'branch' ? "the branch's own" : "Hive's" // i18n-ignore: words of the answer below, read by agents (English)
+  const style = a.style === 'merge' ? 'merge commit' : a.style === 'squash' ? 'squash' : 'rebase and fast-forward'
+  const message = a.commitMessage === 'branch' ? "the branch's own" : "Hive's"
   await answerTask(a.card, a.request, { outcome: 'answered', reply: `Merge style: ${style}; commit message: ${message}.` }) // i18n-ignore: the answer's words, kept on the card as the user's comment and read by agents (English)
 }
 
