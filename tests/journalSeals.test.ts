@@ -11,6 +11,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
 import { clearJournal, journalPath, LeaseJob, leaseJobGone, queueHost, retireSeal, sealJournal, sweepSeals } from '../src/main/workflow/queueJobs'
+import type { JobHost } from '../src/main/processSupervisor'
 
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 
@@ -186,6 +187,17 @@ describe('what a seal needs before it goes', () => {
     const seal2 = await settled(root, dir, 'slot-q')
     expect(await retireSeal(root, 'slot-q', dir, async () => (writeFileSync(join(seal2, 'late'), 'x'), true))).toBe(false)
     expect(existsSync(join(seal2, 'late'))).toBe(true)
+  })
+
+  it("a job is gone only on the supervisor's \"nojob\": exists, unknown, no answer or a failure all keep the seal", async () => {
+    const host = (answer: unknown) => ({ request: async () => (answer instanceof Error ? Promise.reject(answer) : answer) }) as unknown as JobHost
+    expect(await leaseJobGone(host('nojob'), 'slot-a')).toBe(true)
+    for (const answer of ['exists', 'unknown: 5', 'unknown: 6', null, 'ended', new Error('no supervisor')]) {
+      const { root, dir } = folders()
+      const seal = await settled(root, dir, 'slot-a')
+      expect(await retireSeal(root, 'slot-a', dir, (l) => leaseJobGone(host(answer), l))).toBe(false)
+      expect(existsSync(seal)).toBe(true)
+    }
   })
 
   it('a missing journals folder sweeps nothing', async () => {
