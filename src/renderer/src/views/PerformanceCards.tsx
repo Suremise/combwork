@@ -71,7 +71,7 @@ const cardColumns = (withProject: boolean): DataColumn<CardCost>[] => [
       </span>
     ),
     sortValue: (c) => c.number,
-    filter: { kind: 'text', value: (c) => `${cardLabelOf(get(), c.number)} #${c.number} ${c.title}` }
+    filter: { kind: 'text', value: (c) => `${cardLabelOf(get(), c.number)} ${c.title}` }
   },
   ...(withProject ? [{ key: 'project', header: tr(M.project), cell: (c: CardCost) => c.project || '—', sortValue: (c: CardCost) => c.project.toLowerCase(), filter: { kind: 'choice' as const, value: (c: CardCost) => c.project } }] : []),
   { key: 'column', header: tr(M.column), cell: (c) => columnName(c.column, tr), sortValue: (c) => c.column, filter: { kind: 'choice', value: (c) => c.column }, choiceLabel: (v) => columnName(v as CardCost['column'], tr) },

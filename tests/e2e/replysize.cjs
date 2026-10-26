@@ -147,6 +147,9 @@ const prose = (seed, n) => {
   }
   const todo = numbers.slice(0, 50)
   const target = numbers[3]
+  // Each card's name as replies give it (HI-1661: its key alone); its cards are in several projects, so read from the board.
+  const keyOf = new Map((await inv('tasks:list')).map((c) => [c.number, c.key || `#${c.number}`]))
+  const K = (n) => keyOf.get(n) ?? `#${n}`
 
   console.log('\n--- hive tools (as an agent)')
   const projects = measure('hive_list_projects', tool('hive_list_projects', {}), 1000)
@@ -202,8 +205,8 @@ const prose = (seed, n) => {
   // The Assistant's inbox (#647; these calls use the workspace token, not an agent's): nothing new; an ack of an id that isn't its own says so, and nothing about it.
   check('the inbox with nothing new says so', measure('hive_inbox', tool('hive_inbox', {}, 'assistant'), 200) === 'Nothing new.', texts.hive_inbox)
   check("an ack of an id that isn't its own", measure('hive_inbox (ack)', tool('hive_inbox', { ack: ['m99'] }, 'assistant'), 100) === 'Nothing acked. Not in your inbox: m99.', texts['hive_inbox (ack)'])
-  // A card's line: its key with its number (#1219: "AL-12 (#77) …"), or its number for a card with no key.
-  const CARD = '([A-Z]{2,4}-\\d+ \\(#\\d+\\)|#\\d+)'
+  // A card's line: its key alone (#1219, HI-1661: "AL-12 …"), or its number for a card with no key.
+  const CARD = '([A-Z]{2,4}-\\d+|#\\d+)'
   const isCardLine = (l) => new RegExp(`^${CARD} `).test(l)
   const all = measure('hive_list_tasks (all)', tool('hive_list_tasks', {}), 76 * 200)
   check('the board: a line a card, no descriptions', all.split('\n').filter(isCardLine).length === 76 && !all.includes('## Why'), all.slice(0, 300))
@@ -226,23 +229,23 @@ const prose = (seed, n) => {
   const created = measure('hive_create_task', tool('hive_create_task', { title: 'Measured card', description: prose(500, 1800), labels: ['bug'] }), 400)
   check('a new card: its key, number and place', new RegExp(`^${CARD} created in Todo \\(51st of 51\\) for alpha: Measured card$`).test(created) && /^[A-Z]{2,4}-\d+ /.test(created), created)
   const commented = measure('hive_update_task (comment)', tool('hive_update_task', { number: target, comment: 'Looked at it.' }), 400)
-  check('a comment is confirmed with where the card is', new RegExp(`^([A-Z]{2,4}-\\d+ \\(#${target}\\)|#${target}) .+: Commented\\. Now in Todo \\(\\d+\\w\\w of 51\\), \\w+\\.$`).test(commented), commented)
+  check('a comment is confirmed with where the card is', new RegExp(`^(${lib.KEYED.source}|#${target}) .+: Commented\\. Now in Todo \\(\\d+\\w\\w of 51\\), \\w+\\.$`).test(commented), commented)
   const top = measure('hive_update_task (to top)', tool('hive_update_task', { number: target, position: 'top' }), 400)
   check('a move says where to', /: Moved to the top of Todo\. Now in Todo \(1st of 51\), \w+\.$/.test(top), top)
   const review = measure('hive_update_task (to review)', tool('hive_update_task', { number: target, column: 'review', comment: 'Done: see the branch.' }), 400)
   check('a move to Review and a comment, both said', /: Moved to Review; Commented\. Now in Review \(11th of 11\)/.test(review), review)
   const reordered = measure('hive_reorder_tasks (3 cards)', tool('hive_reorder_tasks', { column: 'todo', cards: [todo[10], todo[5], todo[7]] }), 300)
-  check('a reorder confirms the new top, its cards by key (#1219)', lib.unkey(reordered) === `Todo now starts #${todo[10]}, #${todo[5]}, #${todo[7]}; its other 47 cards keep their order below.` && lib.KEYED.test(reordered), reordered)
+  check('a reorder confirms the new top, its cards by key (#1219)', reordered === `Todo now starts ${K(todo[10])}, ${K(todo[5])}, ${K(todo[7])}; its other 47 cards keep their order below.` && lib.KEYED.test(reordered), reordered)
   const batched = measure('hive_update_tasks (3 cards)', tool('hive_update_tasks', { numbers: [todo[20], todo[21], todo[22]], labels: ['perf'] }), 400)
   const batchLines = batched.split('\n')
-  check('a batch confirms each card and its change', batchLines[0] === '3 cards changed:' && batchLines.length === 4 && batchLines.slice(1).every((l) => /^([A-Z]{2,4}-\d+ \(#\d+\)|#\d+) .+: Labels: perf\. Now in Todo \(\d+\w+ of \d+\)(, [^,]+)?\.$/.test(l)), batched)
+  check('a batch confirms each card and its change', batchLines[0] === '3 cards changed:' && batchLines.length === 4 && batchLines.slice(1).every((l) => /^([A-Z]{2,4}-\d+|#\d+) .+: Labels: perf\. Now in Todo \(\d+\w+ of \d+\)(, [^,]+)?\.$/.test(l)), batched)
   // #1131: tagging says only the label added, not each card's labels.
   const tagged = measure('hive_update_tasks (3 cards, addLabels)', tool('hive_update_tasks', { numbers: [todo[20], todo[21], todo[22]], addLabels: ['0.9.4'] }), 400)
   const tagLines = tagged.split('\n')
-  check('tagging says only the label added', tagLines[0] === '3 cards changed:' && tagLines.length === 4 && tagLines.slice(1).every((l) => /^([A-Z]{2,4}-\d+ \(#\d+\)|#\d+) .+: Labels: added 0\.9\.4\. Now in Todo \(\d+\w+ of \d+\)(, [^,]+)?\.$/.test(l)), tagged)
+  check('tagging says only the label added', tagLines[0] === '3 cards changed:' && tagLines.length === 4 && tagLines.slice(1).every((l) => /^([A-Z]{2,4}-\d+|#\d+) .+: Labels: added 0\.9\.4\. Now in Todo \(\d+\w+ of \d+\)(, [^,]+)?\.$/.test(l)), tagged)
   // Lanes (#483): a start, a join (a lane made for a builder that hasn't registered yet), the listing and an end.
   const laneStarted = measure('hive_lane (start)', tool('hive_lane', { action: 'start', cards: [todo[0], todo[1], todo[2]], reviewer: 'Tester', rounds: 10, waitMinutes: 360, name: 'measured lane' }), 400)
-  check('a lane start: its pair, state, cards (by key, #1219) and id', /^Lane started: Coder \/ Tester \(alpha\) measured lane: active, on [A-Z]{2,4}-\d+ \(#\d+\); .+; rounds 10, wait 6 h\. lane-[0-9a-f]+$/.test(laneStarted), laneStarted)
+  check('a lane start: its pair, state, cards (by key, #1219) and id', /^Lane started: Coder \/ Tester \(alpha\) measured lane: active, on [A-Z]{2,4}-\d+; .+; rounds 10, wait 6 h\. lane-[0-9a-f]+$/.test(laneStarted), laneStarted)
   const laneId = laneStarted.match(/lane-[0-9a-f]+$/)?.[0]
   measure('hive_lane (join)', tool('hive_lane', { action: 'join', builder: 'Tester', cards: [todo[3]] }), 400)
   const laneList = measure('hive_lane (list)', tool('hive_lane', { action: 'list' }), 600)
@@ -275,9 +278,9 @@ const prose = (seed, n) => {
   const waited = measure('hive_wait_for_tasks (no change)', tool('hive_wait_for_tasks', { cards: [target], timeoutSeconds: 1 }), 300)
   check('a wait with no change: no change, with its since', /^No change\.\nsince: @[0-9a-z]+;/.test(waited), waited)
   const met = measure('hive_wait_for_tasks (already in the column)', tool('hive_wait_for_tasks', { cards: [target], column: 'review' }), 400)
-  check('a column already reached answers at once, the card by key (#1219)', lib.unkey(met).startsWith(`#${target} is in Review (column`) && lib.KEYED.test(met), met)
+  check('a column already reached answers at once, the card by key (#1219)', met.startsWith(`${K(target)} is in Review (column`) && lib.KEYED.test(met), met)
   const watchingNow = measure('hive_wait_for_tasks (wake)', tool('hive_wait_for_tasks', { cards: [todo[0]], wake: true }, 'assistant'), 300)
-  check('a watch begun: what it waits for, and to end the turn', lib.unkey(watchingNow).startsWith(`Waiting for #${todo[0]}. End your turn now`), watchingNow)
+  check('a watch begun: what it waits for, and to end the turn', watchingNow.startsWith(`Waiting for ${K(todo[0])}. End your turn now`), watchingNow)
   check('cancel ends it', measure('hive_wait_for_tasks (cancel)', tool('hive_wait_for_tasks', { cancel: true }, 'assistant'), 100) === 'Cancelled your card watch.', texts['hive_wait_for_tasks (cancel)'])
   const page2 = measure('hive_list_tasks (offset 70)', tool('hive_list_tasks', { offset: 70 }), 10 * 200)
   check('offset carries on where a page stopped', /^Cards 71–\d+ of \d+\.$/m.test(page2) && page2.split('\n').filter(isCardLine).length === all.split('\n').filter(isCardLine).length + 1 - 70, page2.slice(0, 200))
@@ -388,6 +391,10 @@ const prose = (seed, n) => {
   check('turned off meanwhile, a call is refused, saying the entries are kept', whileOff.isError && /journal is off .*entries are kept/.test(whileOff.text), whileOff.text)
   await inv('journal:set', { enabled: true })
   check('on again, every entry is there', tool('hive_journal_recall', { limit: 50 }, 'assistant').text.split('\n').length >= 31)
+  // A card link by key (HI-1661: as the tool asks) is kept as its card: recall by its key or its old number finds it.
+  const keyLinked = tool('hive_journal_write', { kind: 'plan', summary: 'Linked to its card by key', links: [{ type: 'card', ref: K(target) }] }, 'assistant')
+  const linkedIds = (ref) => tool('hive_journal_recall', { link: { type: 'card', ref } }, 'assistant').text.split('\n').filter((l) => l.includes('Linked to its card by key')).length
+  check('a card link by key is found by the key and by the old number', !keyLinked.isError && linkedIds(K(target)) === 1 && linkedIds(`#${target}`) === 1 && linkedIds(String(target)) === 1, keyLinked.text)
   // A long last turn in Coder's transcript (as Claude Code writes one): a 5,000-character task, 12 tool calls with long
   // summaries and a 7,000-character reply, longer than either form of the reply gives.
   const coderSession = (await live(alpha, coder.id)).sessionId
@@ -442,7 +449,7 @@ const prose = (seed, n) => {
   check("…and its turn for the message is over", !!(await until(async () => (await helper())?.status === 'finished', HUNG_MS)), (await helper())?.status)
   measure('hive_stop_agent', tool('hive_stop_agent', { project: 'beta', agent: 'Helper' }, 'assistant'), 300)
   const startedCard = measure('hive_start_task', tool('hive_start_task', { number: todo[20], name: 'Starter' }, 'assistant'), 600)
-  check('a started card: who has it', new RegExp(`^Started #${todo[20]} .+ on a new agent, Starter in \\w+; the card is in Doing\\.`).test(lib.unkey(startedCard)), startedCard)
+  check('a started card: who has it', new RegExp(`^Started ${K(todo[20])} .+ on a new agent, Starter in \\w+; the card is in Doing\\.`).test(startedCard), startedCard)
   measure('hive_list_tasks (as Assistant, all)', tool('hive_list_tasks', {}, 'assistant'), 80 * 200)
   measure('hive_create_task (as Assistant)', tool('hive_create_task', { title: 'Assistant card', project: 'alpha', description: prose(600, 1800) }, 'assistant'), 400)
   measure('hive_update_task (as Assistant)', tool('hive_update_task', { number: todo[30], comment: 'Noted.' }, 'assistant'), 400)
@@ -620,7 +627,7 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   const putBack = measure('hive_put_back', intent('hive_put_back', { card: `#${todo[40]}`, why: 'Not yet.' }), 200)
   check('put back names the start as next', putBack.endsWith(' Next on it: hive_start_card.'), putBack)
   const plainRefused = intent('hive_put_back', { card: String(todo[40]), why: 'Not yet.' })
-  check("an intent refuses the coder's plain number, naming the card's forms", plainRefused.isError && plainRefused.text.includes(`#${todo[40]}`) && plainRefused.text.length <= 600, plainRefused.text)
+  check("an intent refuses the coder's plain number, naming the card by its key", plainRefused.isError && plainRefused.text.includes(`Name the card by its key: ${K(todo[40])}.`) && plainRefused.text.length <= 600, plainRefused.text)
   check('metrics: a project agent has no role or mode', g?.roleBytes === 0 && g?.modeBytes === 0, JSON.stringify(g))
   const reported = (after.providers ?? []).find((x) => x.provider === 'claude-code' && x.role === 'agent')
   check("metrics: the providers' own reported usage for sessions in the range", reported?.sessions >= 1 && reported.inputTokens > 0, JSON.stringify(after.providers))

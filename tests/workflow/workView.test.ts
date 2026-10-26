@@ -174,6 +174,10 @@ describe("a card's work view (#1223)", () => {
     // #1357: a return's details for the Work section: the files, the output, whether temporary, when.
     expect(failed.queue).toEqual({ entry: 'e1', revision: 'rev2222bbbb', target: 'main', state: 'failed', failure: 'conflict', transient: false, files: ['tasks.ts', 'b.ts'], log: 'CONFLICT (content): Merge conflict in tasks.ts', at: failed.queue!.at })
     expect(failed.queue!.at).toMatch(/^2026-10-20T10:00:/)
+    // HI-1181: a conflict's hunks go to the Work section as they were recorded.
+    const conflicts = { oursIs: 'target' as const, files: [{ file: 'tasks.ts', hunks: [{ line: 3, before: [], ours: ['a'], theirs: ['b'], after: [] }] }] }
+    const withHunks = workView(card, [...queued, fact('IntegrationFailed', { entry: 'e1', revision: 'rev2222bbbb', target: 'main', reason: 'conflict', transient: false, files: ['tasks.ts'], conflicts })])
+    expect(withHunks.queue!.conflicts).toEqual(conflicts)
     // A red check's return, then the user's Retry merge: the new entry, queued again unchanged.
     const red = [...queued.slice(0, -1), fact('IntegrationFailed', { entry: 'e1', revision: 'rev2222bbbb', target: 'main', reason: 'checks', transient: true, log: 'unit\nfailed: 2' })]
     expect(workView(card, red).queue).toMatchObject({ state: 'failed', failure: 'checks', transient: true, log: 'unit\nfailed: 2' })

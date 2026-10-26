@@ -59,6 +59,10 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
     title: msg({ id: 'workflow.option.strict.title', defaultMessage: 'Work is up to date with its target branch before it merges', description: 'A workflow option (glossary 2.6, G8, strict): a card’s work must contain the target branch’s latest commit before it is merged; Hive’s merge queue brings it up to date itself.' }),
     desc: msg({ id: 'workflow.option.strict.desc', defaultMessage: 'When the target branch has moved on since the review, the merge queue brings the work up to date in its own folder first, and returns the card if that conflicts or makes a different change.', description: 'What the workflow option “Work is up to date with its target branch before it merges” does (glossary 2.1: merge queue; Squash is the merge style’s value).' })
   },
+  pushTarget: {
+    title: msg({ id: 'workflow.option.pushTarget.title', defaultMessage: 'Push the target branch after merging', description: 'A workflow option (glossary 2.6, G18): after Hive’s merge queue merges a card, it pushes the target branch to its remote.' }),
+    desc: msg({ id: 'workflow.option.pushTarget.desc', defaultMessage: 'After each merge, the merge queue pushes the target branch to the remote it tracks (or the only remote, or origin), never forced, and pauses, saying why, when the push is refused or fails.', description: 'What the workflow option “Push the target branch after merging” does (glossary 2.1: merge queue). Origin is git’s usual name for a remote: keep it.' })
+  },
   mergeInstall: {
     title: msg({ id: 'workflow.option.mergeInstall.title', defaultMessage: 'Install dependencies from scratch', description: 'A workflow option (G9’s install): when the merge queue installs the project’s dependencies afresh before the merge checks.' }),
     desc: msg({ id: 'workflow.option.mergeInstall.desc', defaultMessage: 'Before the checks on the merged result, the merge queue installs the dependencies afresh, and always does when the lock file or manifests changed.', description: 'What the workflow option “Install dependencies from scratch” does. Lock file: as in the glossary (G15 value).' })
@@ -131,7 +135,8 @@ export const VALUE_TEXT = {
   },
   style: {
     merge: msg({ id: 'workflow.value.style.merge', defaultMessage: 'Merge commit', description: 'A value of the workflow option “Merge style” (glossary 2.6, G6).' }),
-    squash: msg({ id: 'workflow.value.style.squash', defaultMessage: 'Squash', description: 'A value of the workflow option “Merge style” (glossary 2.6, G6).' })
+    squash: msg({ id: 'workflow.value.style.squash', defaultMessage: 'Squash', description: 'A value of the workflow option “Merge style” (glossary 2.6, G6).' }),
+    rebase: msg({ id: 'workflow.value.style.rebase', defaultMessage: 'Rebase and fast-forward', description: 'A value of the workflow option “Merge style” (glossary 2.6, G6; #1184): Hive’s merge queue rebases the card’s commits onto the target branch and moves the branch forward to them, so the history stays linear, with no merge commit.' })
   },
   mergeInstall: {
     onManifestChange: msg({ id: 'workflow.value.mergeInstall.onManifestChange', defaultMessage: 'When the lock file or manifests change', description: 'A value of the workflow option “Install dependencies from scratch”: only when the project’s lock file or package manifests changed (glossary: lock file, as in the G15 value).' }),
@@ -199,6 +204,7 @@ export const OPTION_WHY: Partial<Record<OptionKey, Msg>> = {
   style: msg({ id: 'workflow.why.style', defaultMessage: 'A merge commit keeps each card’s own commits, as Hive has always merged.', description: 'Why the presets set “Merge style” to Merge commit.' }),
   target: msg({ id: 'workflow.why.target', defaultMessage: 'Finished work goes to the repository’s default branch; working solo, to the branch the project is on.', description: 'Why the presets set “Work merges into” as they do.' }),
   strict: msg({ id: 'workflow.why.strict', defaultMessage: 'The merge queue tests the merged result anyway, so this mostly changes the history’s shape.', description: 'Why the presets leave “Work is up to date with its target branch before it merges” off.' }),
+  pushTarget: msg({ id: 'workflow.why.pushTarget', defaultMessage: 'Pushing reaches your remote and its sign-in, so it stays yours unless you turn it on.', description: 'Why the presets leave “Push the target branch after merging” off.' }),
   mergeChecks: msg({ id: 'workflow.why.mergeChecks', defaultMessage: 'The checks run on the work as it will be once merged, not only as it was built.', description: 'Why the presets set “Checks pass on the merged result” when Hive merges.' }),
   mergeInstall: msg({ id: 'workflow.why.mergeInstall', defaultMessage: 'A clean install before every merge catches a dependency that only worked on the builder’s machine.', description: 'Why Team installs dependencies from scratch before every merge.' }),
   okBefore: msg({ id: 'workflow.why.okBefore', defaultMessage: 'Some work needs your eyes before it ships, such as screenshots and release steps.', description: 'Why Team asks for your OK on cards labelled ui or release.' }),

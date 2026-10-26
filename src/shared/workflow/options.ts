@@ -39,7 +39,7 @@ export interface WorkflowOptions {
   /** G5 (Git); None is always `accept`. */
   finish: Finisher
   /** G6. */
-  style: 'merge' | 'squash'
+  style: 'merge' | 'squash' | 'rebase'
   /** G7: the target line; empty means the repository's default branch. */
   target: string
   /**
@@ -50,6 +50,12 @@ export interface WorkflowOptions {
   targetOwn?: true
   /** G8. */
   strict: boolean
+  /**
+   * G18 (#1179): the merge queue pushes its target to the target's remote after each merge (Hive merges only), never
+   * forced. Not a rule: left out of every ruleset (`ruleOptions`), so the queue reads it from the project's options as
+   * they are when it pushes, and turning it off takes effect at once.
+   */
+  pushTarget: boolean
   /** G9: named checks on the merged result (Hive merges only). */
   mergeChecks: string[]
   /**
@@ -124,6 +130,7 @@ const BASE: Omit<WorkflowOptions, 'platform'> = {
   style: 'merge',
   target: '',
   strict: false,
+  pushTarget: false,
   mergeChecks: [],
   mergeInstall: 'onManifestChange',
   okBefore: { mode: 'never', labels: [] },
@@ -327,10 +334,11 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   preChecks: strings,
   sameness: oneOf<WorkflowOptions['sameness']>(['change', 'exact']),
   finish: oneOf<Finisher>(['hiveMerges', 'agentMerges', 'committed', 'notChecked', 'accept']),
-  style: oneOf<WorkflowOptions['style']>(['merge', 'squash']),
+  style: oneOf<WorkflowOptions['style']>(['merge', 'squash', 'rebase']),
   target: (v) => typeof v === 'string',
   targetOwn: (v) => v === true,
   strict: bool,
+  pushTarget: bool,
   mergeChecks: strings,
   mergeInstall: oneOf<MergeInstall>(['onManifestChange', 'always']),
   okBefore: (v) => isRecord(v) && oneOf<OkBefore['mode']>(['never', 'labels', 'every'])(v.mode) && strings(v.labels),
@@ -366,7 +374,7 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
   git: [
     { id: 'review', options: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'] },
     { id: 'checks', options: ['preChecks', 'mergeChecks', 'mergeInstall'] },
-    { id: 'merging', options: ['finish', 'style', 'target', 'strict', 'dependenciesDone'] },
+    { id: 'merging', options: ['finish', 'style', 'target', 'strict', 'pushTarget', 'dependenciesDone'] },
     { id: 'where', options: ['folder', 'slotsUpToDate', 'identity', 'stopOwnRuns', 'sharedFolderWarning'] },
     { id: 'stages', options: ['stageNames'] },
     { id: 'elsewhere', options: [] }
@@ -399,6 +407,8 @@ export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
   if (key === 'mergeInstall') return o.finish === 'hiveMerges' && o.mergeChecks.length > 0
   // G8 strict (#1352): the merge queue brings work up to date, so only when Hive merges.
   if (key === 'strict') return o.finish === 'hiveMerges'
+  // G18 (#1179): only the merge queue pushes.
+  if (key === 'pushTarget') return o.finish === 'hiveMerges'
   if (key === 'sharedFolderWarning') return o.folder === 'project'
   // G15 depends on G11 alone: only with each card in a slot. G17 whenever a reviewer agent reviews, whatever G11 is
   // (with everyone in the project folder the pool's reviewers read in review copies, #1439).

@@ -27,7 +27,7 @@ import { presentWindow } from './testQuiet'
 import { insideArchive, insideReal, isFile, samePlace, writeTextAtomic, writeTextUnlessChanged } from './fsutil'
 import { gitDiff, gitStatus } from './git'
 import { initCheck, initRepo } from './gitInit'
-import { addRemote, branchDrops, createBranch, createTag, deleteBranches, deleteRemoteBranches, fetchAll, pull, push, pushToRemote, remoteTracking, removeRemote, renameRemote, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch, workTargetOf } from './gitRepo'
+import { addRemote, branchDrops, branchUpdatePlan, createBranch, createTag, deleteBranches, deleteRemoteBranches, fetchAll, pull, push, pushToRemote, remoteTracking, removeRemote, renameRemote, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch, updateBranch, workTargetOf } from './gitRepo'
 import { checkGit, gitTool } from './gitTool'
 import { refreshPath, refreshPathBeforeStart } from './freshPath'
 import { openExternalTerminal } from './externalTerminal'
@@ -1386,6 +1386,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return repoHistory(p, { ref: typeof ref === 'string' ? ref : null, page: Number(page) || 1, workTarget: await workTargetOf(p) })
     },
     'git:switch': (p, branch) => switchBranch(p, String(branch ?? '')),
+    // Update from <target> (HI-1180): what it would do, for its dialog, and the update itself.
+    'git:updatePlan': (p, branch) => branchUpdatePlan(p, String(branch ?? '')),
+    'git:updateBranch': (p, branch, how) => updateBranch(p, String(branch ?? ''), how === 'rebase' ? 'rebase' : 'merge'),
     'git:createBranch': (p, name, stay) => createBranch(p, String(name ?? ''), !!stay),
     'git:addRemote': (p, name, url) => addRemote(p, String(name ?? ''), String(url ?? '')),
     'git:setRemoteUrl': (p, name, url) => setRemoteUrl(p, String(name ?? ''), String(url ?? '')),

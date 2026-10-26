@@ -190,7 +190,7 @@ const check = (name, ok, extra = '') => {
   const c3 = (await api('POST', '/v1/tasks', { title: 'Old title', project: 'beta' })).body.number
   await until(async () => (await tile(c3).count()) === 1, 5000)
   await tile(c3).click()
-  const edit = page.locator('.dialog', { hasText: `#${c3}` })
+  const edit = lib.cardDialog(page, await lib.cardLabel(inv, c3))
   await edit.waitFor({ timeout: 5000 })
   await api('PATCH', `/v1/tasks/${c3}`, { column: 'review' })
   await lib.sleep(500)
@@ -205,7 +205,7 @@ const check = (name, ok, extra = '') => {
 
   // Start #1 on a new agent: it gets the card as its prompt, and the card goes to Doing.
   await tile(1).click()
-  const open = page.locator('.dialog', { hasText: '#1' })
+  const open = lib.cardDialog(page, await lib.cardLabel(inv, 1))
   await open.waitFor({ timeout: 5000 })
   await page.screenshot({ path: path.join(lib.WORK, 'board-card.png') })
   await open.getByRole('button', { name: 'Start…' }).click()
@@ -223,7 +223,7 @@ const check = (name, ok, extra = '') => {
   check('the card is in Doing, given to the agent', c1b.column === 'doing' && c1b.agent === agent.id, JSON.stringify({ column: c1b.column, agent: c1b.agent }))
   const tr = fs.readdirSync(path.join(claudeHome, 'projects'), { recursive: true }).filter((f) => String(f).endsWith('.jsonl'))
   const text = tr.map((f) => fs.readFileSync(path.join(claudeHome, 'projects', String(f)), 'utf8')).join('\n')
-  check('the agent got the card as its prompt, named by key (#1219)', /Work on task [A-Z]{2,4}-1 \(#1\) from the Hive task board: Add a greeting/.test(text) && text.includes('hello()'), text.slice(0, 200))
+  check('the agent got the card as its prompt, named by key alone (#1219, HI-1661)', /Work on task [A-Z]{2,4}-1 from the Hive task board: Add a greeting/.test(text) && text.includes('hello()'), text.slice(0, 200))
   check('its tile shows the agent finished', !!(await until(async () => ((await tile(1).getAttribute('class')) ?? '').includes('finished') && /Finished/.test(await tile(1).innerText()), 8000)), await tile(1).innerText())
   await page.screenshot({ path: path.join(lib.WORK, 'board.png') })
 

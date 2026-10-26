@@ -6,8 +6,8 @@ import { isSessionId } from '../../../shared/defaults'
 import { NOTICE_TEXT, firstLine, noticeOf, shortPath, toolLabel, type NewItem } from '../conversation'
 import type { ConversationParserLike, ImageLocation, LiveDetails } from '../types'
 import { advancedValues as advanced } from '../../advancedValues'
-import { countSafeguards } from '../../../shared/safeguards'
-import { codexSafeguards } from './safeguards'
+import { countSafeguards, SAFEGUARD_DEFAULTS } from '../../../shared/safeguards'
+import { codexSafeguards, errorKind } from './safeguards'
 
 /**
  * Codex's rollout files (~/.codex/sessions/YYYY/MM/DD/rollout-<time>-<id>.jsonl): one JSON record per
@@ -134,6 +134,20 @@ export function rolloutDetails(text: string): LiveDetails {
       } else {
         delete out.signIn
         delete out.signInAt
+      }
+      // A turn that ended on another error (#1632: a lost connection, a server error): it needs the user until the next.
+      // A usage policy's stop is a safeguard's (#606, codexSafeguards), told as one.
+      const policy = p.type === 'task_complete' && (SAFEGUARD_DEFAULTS.codexStop as readonly string[]).includes(errorKind(p.error?.codex_error_info) ?? '')
+      const failed = p.type === 'task_complete' && !refused && !policy && p.error && typeof p.error === 'object' ? p.error : null
+      if (failed) {
+        out.turnFailed = typeof failed.message === 'string' ? failed.message.trim() : ''
+        out.turnFailedAt = typeof r.timestamp === 'string' ? r.timestamp : new Date().toISOString()
+        if (typeof p.turn_id === 'string' && p.turn_id) out.turnFailedTurn = p.turn_id
+        else delete out.turnFailedTurn
+      } else {
+        delete out.turnFailed
+        delete out.turnFailedAt
+        delete out.turnFailedTurn
       }
     }
     if (r.type === 'event_msg' && p.type === 'token_count') {

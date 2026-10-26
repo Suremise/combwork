@@ -184,13 +184,13 @@ const check = (name, ok, extra = '') => {
   check('a message tied to its round is queued, saying the round', !tied.isError && !!tiedId && lib.unkey(tied.text).startsWith(`Queued for Builder (${tiedId}, for #${c3} round 1, working)`), tied.text)
   // Its reply names the card by key and number however it was given (#1219): its number, its key, or a key it had.
   const key3 = (await inv('tasks:list')).find((c) => c.number === c3)?.key
-  const byNumber = `${key3} (#${c3})`
+  const byNumber = `${key3}`
   check('…naming the card by key and number when given its number (#1219)', tied.text.includes(`, for ${byNumber} round 1, working)`), tied.text)
   const byKey = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'Round 1: by key.', card: key3.toLowerCase() })
   check('…and when given its key, in any case', !byKey.isError && byKey.text.includes(`, for ${byNumber} round 1, working)`), byKey.text)
   const renamed = await inv('project:setKey', alpha, 'ALX')
   const byAlias = tool('hive_message_agent', { project: 'alpha', agent: 'Builder', text: 'Round 1: by its old key.', card: key3 })
-  check('…and when given the key its project had: by the key it has now', renamed === 'ALX' && !byAlias.isError && byAlias.text.includes(`, for ALX-${key3.split('-')[1]} (#${c3}) round 1, working)`), byAlias.text)
+  check('…and when given the key its project had: by the key it has now', renamed === 'ALX' && !byAlias.isError && byAlias.text.includes(`, for ALX-${key3.split('-')[1]} round 1, working)`), byAlias.text)
   await inv('tasks:update', c3, { column: 'passed' })
   const tiedDelivery = () => activity('Builder').inbox?.deliveries?.find((d) => d.id === tiedId) ?? null
   check('…the card passes before it is read: stale, saying why', !!(await until(() => tiedDelivery()?.state === 'stale' && lib.unkey(tiedDelivery()?.detail) === `#${c3} passed review`, 15000)), JSON.stringify(tiedDelivery()))
@@ -211,7 +211,7 @@ const check = (name, ok, extra = '') => {
   check('a message for it is queued', tool('hive_message_agent', { project: 'alpha', agent: 'Reviewer', text: 'Use the revised review scope.' }).text.startsWith('Queued for Reviewer (m'))
   await inv('tasks:update', c2, { column: 'review' })
   check('its watch wake and the message ring together, read in one go, the message first', !!(await until(async () => wakes('Reviewer').length > before4, 30000)) && /^\[Hive\] New in your inbox: 1 message and 1 card event \(#\d+\) \(m\d+, m\d+\)\./.test(bells('Reviewer')[before4]) && /^Use the revised review scope\. \[Hive\] #\d+ \(Builder's card\) is in Review/.test(wakes('Reviewer')[before4]), JSON.stringify(wakeLog('Reviewer').slice(before4)))
-  check('its wakes name cards by key, with the number the tools take (#1219)', wakeLog('Reviewer').some((w) => lib.KEYED.test(w.text ?? '')), JSON.stringify(wakeLog('Reviewer').slice(-1)))
+  check('its wakes name cards by key alone (#1219, HI-1661)', wakeLog('Reviewer').some((w) => lib.KEYED.test(w.text ?? '')), JSON.stringify(wakeLog('Reviewer').slice(-1)))
   await until(() => idle(reviewer.id), 15000)
   check('…and only once, received as it read it', wakes('Reviewer').filter((t) => t.includes('Use the revised review scope.')).length === 1 && !!(await until(() => activity('Reviewer').inbox?.deliveries?.filter((d) => d.text.startsWith('Use the revised review scope.')).every((d) => d.state === 'received'), 10000)), JSON.stringify(wakes('Reviewer').slice(before4)))
 

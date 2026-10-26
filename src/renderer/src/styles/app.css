@@ -9589,6 +9589,33 @@ textarea.input.task-blocked-input {
   flex-wrap: wrap;
   gap: 4px;
 }
+/* A returned card's conflicts (HI-1181): each file unfolds its hunks, read-only; context lines muted, each side under its
+   name (the target, the card, a diff3 base), lines left out said apart from the text. */
+.card-work-conflicts > li > .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.card-work-hunk {
+  margin-block: 4px;
+}
+.card-work-hunk-text .hunk-context {
+  color: var(--fg-faint);
+}
+.card-work-hunk-text .hunk-side {
+  display: block;
+  border-inline-start: 2px solid var(--merge);
+  padding-inline-start: 6px;
+  margin-block: 2px;
+}
+.card-work-hunk-text .hunk-side-name {
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.card-work-hunk-text .hunk-cut {
+  font-style: italic;
+  color: var(--fg-faint);
+}
 .card-work-queue-why {
   white-space: pre-line;
   overflow-wrap: anywhere;

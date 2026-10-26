@@ -168,9 +168,9 @@ describe('a card by intent (#1267)', () => {
       r = (e as { refusal: { rule: string; message: string } }).refusal
     }
     expect(r?.rule).toBe('card.plainNumber')
-    // Its own forms: its key and #N.
+    // Its key alone (HI-1661: never its number beside it).
     const key = (await inWorkspace(w, () => tasks.getTask(card, w))).key
-    expect((r as unknown as { next: string }).next).toBe(`Name the card as ${key ?? `#${card}`} or #${card}.`)
+    expect((r as unknown as { next: string }).next).toBe(`Name the card by its key: ${key ?? `#${card}`}.`)
     expect((await act(w, card, builder, { kind: 'start' })).card.column).toBe('doing')
   })
 

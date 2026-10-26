@@ -114,6 +114,17 @@ interface HiveMessageValues {
   'board.columns.mergingTip': undefined
   'board.columns.more': { column: string | number }
   'board.columns.startLane': undefined
+  'board.conflicts.base': undefined
+  'board.conflicts.clipped': { n: number }
+  'board.conflicts.count': { n: number }
+  'board.conflicts.cut': { n: number }
+  'board.conflicts.filesLeft': { n: number }
+  'board.conflicts.line': { line: number }
+  'board.conflicts.mayHaveMore': undefined
+  'board.conflicts.more': { n: number }
+  'board.conflicts.noText': undefined
+  'board.conflicts.notRead': { why: string }
+  'board.conflicts.readInPart': undefined
   'board.context.close': undefined
   'board.context.loading': undefined
   'board.context.open': undefined
@@ -587,6 +598,10 @@ interface HiveMessageValues {
   'board.queue.pause.identity': undefined
   'board.queue.pause.needsYou': undefined
   'board.queue.pause.other': { reason: string | number }
+  'board.queue.pause.pushFailed': { card: string | number; target: string | number }
+  'board.queue.pause.pushNoRemote': { card: string | number; target: string | number }
+  'board.queue.pause.pushRejected': { card: string | number; target: string | number }
+  'board.queue.pause.pushUnreadable': { card: string | number; target: string | number }
   'board.queue.pause.rulesOff': undefined
   'board.queue.pause.signing': undefined
   'board.queue.pause.signingWaits': undefined

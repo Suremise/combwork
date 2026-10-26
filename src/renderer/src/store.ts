@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import { useMemo, type ReactNode } from 'react'
 import type { Period } from '@shared/usageTotals'
 import type { StartFailure } from '@shared/startFailure'
-import { cardLabel } from '@shared/projectKeys'
+import { cardLabel, setCardNaming } from '@shared/projectKeys'
 import type { AdvancedState } from '@shared/advanced'
 import type { StageId } from '@shared/workflow/facts'
 import type { AgentLeftovers } from '@shared/agentProcesses'
@@ -1309,6 +1309,9 @@ export const cardLabelOf = (s: Pick<State, 'tasks'>, n: number): string => {
   const c = s.tasks.find((t) => t.number === n)
   return c ? cardLabel(c) : `#${n}`
 }
+
+// Shared code the window runs names a card by its number with cardRef: by the board's key here too (HI-1661 round 1).
+setCardNaming(() => (n) => cardLabelOf(get(), n))
 
 /** Stable empty list for selectors — a fresh [] on every call makes zustand re-render forever. */
 export const NO_PROJECTS: ProjectInfo[] = []

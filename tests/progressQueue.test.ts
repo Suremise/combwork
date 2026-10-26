@@ -2,7 +2,9 @@
 // what a queue's card says (testing with its step and the estimate, queued, just merged, returned until seen, paused),
 // Pulse's line, the badge, what is announced, and the Runs tab's "Hive (merge queue)".
 import { describe, expect, it } from 'vitest'
-import { fmt, tr } from '../src/shared/i18n'
+import { readdirSync, readFileSync } from 'fs'
+import { join } from 'path'
+import { fmt, setLanguage, tr } from '../src/shared/i18n'
 import { ESTIMATE_OF, JUST_MERGED_MS, RETURN_SEEN_SHOWN_MS, justMerged, keptLive, nextFold, queueKey, withKept, type KeptReturn, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
 import { copyRunsKey, HIVE_RUNS, NO_RUNS_FILTER, runAgentKey, runMatches, runThing, slotRunsKey, tabBadges } from '../src/shared/progressTabs'
 import type { ProgressRun } from '../src/shared/types'
@@ -205,6 +207,25 @@ describe('what a queue card says', () => {
     expect(pauseText({ reason: 'approval', card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list)).toMatch(/^HI-61 is ready to merge into main/)
     expect(pauseText({ reason: 'somethingNew', card: null, files: [], by: null, at: null }, 'main', tr, list)).toBe('Paused (somethingNew).')
     for (const reason of ['targetMovesFast', 'folderBusy', 'wrongBranch', 'staged', 'identity', 'needsYou', 'uncounted', 'checkedOut', 'rulesOff', 'signingWaits', 'hookTimedOut']) expect(pauseText({ reason, card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list)).not.toMatch(/^Paused \(/)
+  })
+
+  it('the push pauses after a merge (G18, #1179), each in its own words, in the window’s language: git’s message alone kept as git said it', () => {
+    const push = ['pushRejected', 'pushFailed', 'pushNoRemote', 'pushUnreadable']
+    const english = push.map((reason) => pauseText({ reason, card: 'HI-61', files: [], by: null, at: null }, 'main', tr, list))
+    for (const t of english) expect(t).toMatch(/^HI-61 is merged/)
+    expect(english[3]).toBe('HI-61 is merged, and main still has to be pushed, but Hive couldn’t read main to do it. Resume to try again; or turn off “Push the target branch after merging” and resume to keep merging locally.')
+    const DE = join(__dirname, '..', 'locales', 'de')
+    setLanguage('de', Object.assign({}, ...readdirSync(DE).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(DE, f), 'utf8')))))
+    try {
+      const german = push.map((reason) => pauseText({ reason, card: 'HI-61', files: [], by: null, at: null, ...(reason === 'pushFailed' ? { message: 'fatal: unable to access remote' } : {}) }, 'main', tr, list))
+      for (const [i, t] of german.entries()) {
+        expect(t, push[i]).toMatch(/^HI-61 ist gemergt/)
+        expect(t, push[i]).not.toContain('is merged')
+      }
+      expect(german[1].split('\n')[1]).toBe('fatal: unable to access remote')
+    } finally {
+      setLanguage('en', {})
+    }
   })
 
   it("Pulse's line: only a queue testing or paused, with how many wait", () => {

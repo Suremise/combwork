@@ -115,7 +115,7 @@ const check = (name, ok, extra = '') => {
   await say(alpha, reviewer.id, `boardreview ${a} failed`)
   const failedLine = () => wakes().slice(before).find((t) => t.startsWith('[Hive] Lane Builder / Reviewer (greetings):'))
   check('a failed review wakes it: one line with the lane and the card', !!(await until(async () => !!failedLine(), 20000)) && failedLine().includes(`#${a} failed review (Reviewer (alpha))`) && failedLine().includes('Your lane watch has ended'), JSON.stringify(wakes().slice(before)))
-  check('its wakes name cards by key, with the number the tools take (#1219)', rawWakes().some((t) => lib.KEYED.test(t)), JSON.stringify(rawWakes().slice(-2)))
+  check('its wakes name cards by key alone (#1219, HI-1661)', rawWakes().some((t) => lib.KEYED.test(t)), JSON.stringify(rawWakes().slice(-2)))
 
   // (c) Builder2, on the release card, shows a permission prompt: the same watch wakes, naming it and its card.
   await watchAgain()

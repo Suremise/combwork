@@ -16,6 +16,7 @@ import { gitProblem } from './gitTool'
 import { createLogger, userText } from './logger'
 import { checkProject } from './branchWatch'
 import { mergeInProject, reserveForRemoval } from './projectAgents'
+import { cardNamesOf } from './projectKeys'
 import { workspace, workspaceOf, type WorkspaceService } from './workspace'
 import * as wt from './worktrees'
 import { boardWrite } from './boardStore'
@@ -295,7 +296,7 @@ export async function keptText(projectPath: string, k: SlotKept): Promise<string
     case 'process':
       return tr(msg({ id: 'main.unused.slot.process', defaultMessage: 'a process still has it open', description: "Why Hive won't remove a slot listed in Unused worktrees: a program still uses its folder. A clause." }))
     case 'inFlight':
-      return tr(msg({ id: 'main.unused.slot.inFlight', defaultMessage: 'card #{card}, which it held, is still being merged', description: "Why Hive won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its number) that worked in it. A clause." }), { card: k.card })
+      return tr(msg({ id: 'main.unused.slot.inFlight', defaultMessage: 'card {card}, which it held, is still being merged', description: "Why Hive won't remove a slot listed in Unused worktrees: the merge queue still merges a card ({card}: its key, such as HI-12) that worked in it. A clause." }), { card: cardNamesOf(workspaceOf(projectPath))(k.card) })
     case 'dirty':
       return tr(msg({ id: 'main.unused.slot.dirty', defaultMessage: "{files, plural, one {# file in it isn't committed} other {# files in it aren't committed}}", description: "Why Hive won't remove a slot listed in Unused worktrees: it has uncommitted or untracked files ({files}: how many). A clause." }), { files: k.files })
     case 'unmerged':

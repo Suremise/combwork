@@ -107,7 +107,11 @@ const check = (name, ok, extra = '') => {
     check('the board’s search finds a card by key', await finds('WB-2', [c2.number]), JSON.stringify(await shown()))
     check('…in any case', await finds('wb-1', [c1.number]), JSON.stringify(await shown()))
     check('…every card of a project by its key alone (WB-)', await finds('WB-', [c1.number, c2.number]), JSON.stringify(await shown()))
-    check('…and by number, as before', await finds(`#${h1.number}`, [h1.number]), JSON.stringify(await shown()))
+    check('…and by its old number, as before', await finds(`#${h1.number}`, [h1.number]), JSON.stringify(await shown()))
+    // A bare number is a key's digits, in every project (HI-1661): 1 is WB-1 and HI-1, never card #1 whatever its key.
+    check('…by the digits of its key, in every project', await finds('1', [c1.number, h1.number].sort((a, b) => a - b)), JSON.stringify(await shown()))
+    const stray = [h1.number, c2.number].find((n) => n > 2)
+    if (stray) check('…never by the workspace number', await finds(String(stray), []), JSON.stringify({ stray, shown: await shown() }))
     await search.fill('')
     // A prompt opened from a box behind it takes the focus (round 3): typed into the search, Ctrl+Alt+N (New Project),
     // then typed again without a click, the text goes into the dialog's name, the search keeping only its own.
@@ -149,8 +153,9 @@ const check = (name, ok, extra = '') => {
     check('the palette lists a card by its key, first', !!(await lib.until(async () => (await item.count()) === 1 && (await page.locator('.palette-item').first().innerText()).includes('WBA-1 Login form'), HUNG_MS)), await page.locator('.palette-list').innerText().catch(() => ''))
     await themes('palette', page.locator('.palette'))
     await item.click()
-    const cardDialog = page.locator('.dialog', { hasText: `WBA-1 (#${c1.number})` })
-    check('…and choosing it opens the card, its title its key and number', !!(await lib.until(async () => (await cardDialog.count()) === 1, HUNG_MS)))
+    const cardDialog = page.locator('.dialog', { hasText: 'WBA-1' })
+    // Its title is its key alone (HI-1661), never with the workspace number.
+    check('…and choosing it opens the card, its title its key alone', !!(await lib.until(async () => (await cardDialog.count()) === 1, HUNG_MS)) && !(await cardDialog.innerText()).includes(`(#${c1.number})`), await cardDialog.innerText().catch(() => ''))
     // Depends on takes a key, the old one too.
     await cardDialog.getByPlaceholder('Cards to finish first, e.g. AM-3 AM-5').fill('WB-2')
     await cardDialog.getByRole('button', { name: 'Save', exact: true }).click()
@@ -178,7 +183,7 @@ const check = (name, ok, extra = '') => {
     // Card links in Markdown (round 1, finding 3): a comment naming it by an old name and by #N links both; code doesn't.
     await inv('tasks:comment', c2.number, `Waits for WB-1 and #${c1.number}; not \`WBA-1\` in code, nor ZZ-9.`)
     await tile(c2.number).click()
-    const c2Dialog = page.locator('.dialog', { hasText: `WBA-2 (#${c2.number})` })
+    const c2Dialog = page.locator('.dialog', { hasText: 'WBA-2' })
     await c2Dialog.waitFor({ timeout: HUNG_MS })
     const refs = c2Dialog.locator('.markdown a.card-ref')
     check('a comment links the cards it names: an old key and #N, not in code or a key no card has', !!(await lib.until(async () => JSON.stringify(await refs.allInnerTexts()) === JSON.stringify(['WB-1', `#${c1.number}`]), HUNG_MS)) && (await c2Dialog.locator('.markdown code a').count()) === 0, JSON.stringify(await refs.allInnerTexts()))
@@ -193,7 +198,7 @@ const check = (name, ok, extra = '') => {
     await tile(c2.number).click()
     await c2Dialog.waitFor({ timeout: HUNG_MS })
     await c2Dialog.locator('.markdown a.card-ref').first().click()
-    check('a click on a card link opens that card', !!(await lib.until(async () => (await page.locator('.dialog', { hasText: `${movedKey} (#${c1.number})` }).count()) === 1, HUNG_MS)))
+    check('a click on a card link opens that card', !!(await lib.until(async () => (await lib.cardDialog(page, movedKey).count()) === 1, HUNG_MS)))
     await page.keyboard.press('Escape')
     await page.keyboard.press('Escape')
   } finally {

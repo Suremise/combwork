@@ -1,6 +1,6 @@
 ---
 name: work-on-card
-description: "Carry a card from Hive's task board through its work, from Doing to Review with a summary. Use when given a card to work on (\"work on #12\", a card Hive started you on, more work on one back from Review). Not for reviewing one, nor a card loop (card-loop)."
+description: "Carry a card from Hive's task board through its work, from Doing to Review with a summary. Use when given a card to work on (\"work on AM-12\", a card Hive started you on, more work on one back from Review). Not for reviewing one, nor a card loop (card-loop)."
 metadata:
   audience: agents
 ---

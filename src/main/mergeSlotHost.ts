@@ -17,7 +17,9 @@ import { NO_PROJECT_IDS, type ProjectIdIndex } from '../shared/projectIds'
 import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
 import { hiveName, safeWord } from '../shared/devConsole'
 import { addLeftMerge } from './lastRun'
+import { cardNamesOf } from './projectKeys'
 import { fmt, msg, tr } from '../shared/i18n'
+import { cardRef } from '../shared/projectKeys'
 
 const M = {
   leftTitle: msg({ id: 'main.mergeSlot.leftTitle', defaultMessage: '{agent} was merging when Hive closed', description: "A notice's title as a workspace opens: the agent {agent} (its name) held the merge slot when Hive last closed, so its merge may be half done." }),
@@ -205,13 +207,15 @@ export async function recoverMergeSlots(workspacePath: string): Promise<void> {
   const from = last && !existsSync(join(last, '.hive')) && !workspaceFor(last) ? last : null
   const place = (h: SlotRecord): Promise<string | null> => (ws ? placeHold(ws, ids, from, h) : Promise.resolve(h.projectPath))
   const gone = [...(await orphansIn(recordFile(workspacePath), workspacePath, place)), ...(from ? await orphansIn(recordFile(from), null, place) : [])]
+  // Each hold's cards as this workspace names them (HI-1661: by key); this runs outside any workspace's work.
+  const named = ws ? cardNamesOf(ws) : cardRef
   for (const { hold: h, at } of gone) {
     log.info(`Merge slot: Hive closed while ${userText(h.agentName)} held it for ${userText(h.branch)}`)
     // The folder the merge was in (#984): the agent's own (its worktree), else the project's main checkout.
     const folder = h.cwd ?? at ?? h.projectPath
     // After an unexpected close, told in that notice (lastRun.ts).
-    if (at && addLeftMerge({ agentName: h.agentName, branch: h.branch, cards: h.cards, folder })) continue
-    const values = { branch: h.branch, hasCards: h.cards.length ? 'yes' : 'no', cards: fmt.list(h.cards.map((n) => `#${n}`), 'unit'), folder }
+    if (at && addLeftMerge({ agentName: h.agentName, branch: h.branch, cards: h.cards, cardNames: h.cards.map(named), folder })) continue
+    const values = { branch: h.branch, hasCards: h.cards.length ? 'yes' : 'no', cards: fmt.list(h.cards.map(named), 'unit'), folder }
     const body = at ? tr(M.leftBody, values) : tr(M.leftBodyGone, { ...values, project: basename(h.projectPath) })
     toast('warning', tr(M.leftTitle, { agent: h.agentName }), body, undefined, at ?? workspacePath)
   }

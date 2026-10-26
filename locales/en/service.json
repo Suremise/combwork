@@ -463,6 +463,74 @@
     "defaultMessage": "{branch} is up to date with {upstream}.",
     "description": "After pulling in the Git view: the branch {branch} has every commit of the remote branch {upstream} already."
   },
+  "service.gitRepo.update.agentBusy": {
+    "defaultMessage": "{agent} {status, select, starting {is starting} working {is working} waiting {is waiting for your answer} background {is waiting on background tasks it started} watching {is waiting for cards to change (a card watch)} other {stopped in the middle of a task when its sign-in expired}} in {folder}: update {branch} once it has finished.",
+    "description": "Why updating a branch from its target is refused now: an agent works in the folder the branch is checked out in ({folder}: a slot's name, such as slot-a, or a folder's name or path). {agent} is the agent's name; {status} what it is doing (select: translate each); {branch} the branch."
+  },
+  "service.gitRepo.update.conflict": {
+    "defaultMessage": "{how, select, rebase {Rebasing} other {Merging}} {branch} with {target} stopped at a conflict in {files}, so it was undone: {branch} is as it was. Update it by hand, or ask its builder to.",
+    "description": "An error updating a branch from its target: git stopped at a conflict, and Hive aborted it, leaving the branch and its folder as they were. {how}: merge or rebase (select: translate each); {branch} the branch, {target} the target; {files} the files in conflict, joined (src/a.ts and src/b.ts)."
+  },
+  "service.gitRepo.update.dirty": {
+    "defaultMessage": "{folder} has uncommitted changes: commit them, or set them aside, before updating {branch}.",
+    "description": "Why updating a branch from its target is refused: the folder it is checked out in ({folder}: a slot's name, a folder's name or a path) has changes not committed. {branch} is the branch."
+  },
+  "service.gitRepo.update.failed": {
+    "defaultMessage": "Couldn't update {branch} from {target}, so it is as it was: {why}",
+    "description": "An error updating a branch from its target that isn't a conflict (a hook refused the commit, signing failed…); Hive undid what git started. {why} is git's own words."
+  },
+  "service.gitRepo.update.forwarded": {
+    "defaultMessage": "Fast-forwarded {branch} to {target} ({commit}).",
+    "description": "After Update from <target> on a branch with no commits of its own (HI-1180): it was moved forward to the target {target}; {commit} is its new head (a short id: keep it as it is)."
+  },
+  "service.gitRepo.update.isTarget": {
+    "defaultMessage": "{branch} is the target itself.",
+    "description": "An error updating a branch from its target: the branch picked ({branch}) is the target."
+  },
+  "service.gitRepo.update.merged": {
+    "defaultMessage": "Merged {target} into {branch} ({commit}).",
+    "description": "After Update from <target> with Merge (HI-1180): the target {target} was merged into the branch {branch}, as the commit {commit} (a short id: keep it as it is)."
+  },
+  "service.gitRepo.update.midOperation": {
+    "defaultMessage": "Git is in the middle of a {state} in {folder}: finish or abort it first.",
+    "description": "Why updating a branch from its target is refused: a git operation ({state}: merge, rebase…, as git names it) is under way in the folder the branch is checked out in ({folder}: a slot's name, a folder's name or a path)."
+  },
+  "service.gitRepo.update.missed": {
+    "defaultMessage": "{branch} was changed, but it still lacks commits of {target}: check it in History before going on.",
+    "description": "An error after Update from <target> (HI-1180): git said it succeeded, but the branch {branch} still doesn't contain the target {target}'s head."
+  },
+  "service.gitRepo.update.moved": {
+    "defaultMessage": "{branch} changed while it was being updated, so nothing was changed: try again.",
+    "description": "An error updating a branch from its target: the branch moved to another commit meanwhile (a commit, a push), so Hive left it as it is."
+  },
+  "service.gitRepo.update.noTarget": {
+    "defaultMessage": "The project has no target branch here, so there is nothing to update {branch} from.",
+    "description": "An error updating a branch from its target (Version Control → Branches, HI-1180): the project's workflow target (or the repository's default branch) doesn't exist in this repository. {branch} is the branch."
+  },
+  "service.gitRepo.update.notUndone": {
+    "defaultMessage": "Updating {branch} from {target} stopped, and Hive couldn't undo it: {folder} is {state, select, none {left changed} merge {still in the middle of a merge} rebase {still in the middle of a rebase} other {still in the middle of a git operation}}. Finish or abort it there yourself (git status says how), then check {branch}. Git said: {why}",
+    "description": "An error updating a branch from its target (HI-1180): git stopped, and Hive's own abort failed, so the folder ({folder}: a slot's name, a folder's name or a path) is left as git left it ({state}: none, merge, rebase or another operation; select: translate each). {why} is git's own words."
+  },
+  "service.gitRepo.update.notUndoneTemporary": {
+    "defaultMessage": "Updating {branch} from {target} stopped, and Hive couldn't undo it in its temporary folder {folder}, kept as git left it: {branch} itself is as it was. Remove that folder in Unused worktrees once you have looked. Git said: {why}",
+    "description": "An error updating a branch from its target (HI-1180) that was checked out nowhere: git stopped in the temporary folder Hive made ({folder}: its path), and Hive's abort failed, so the folder is kept; the branch itself wasn't moved. {state} is unused here. {why} is git's own words."
+  },
+  "service.gitRepo.update.queued": {
+    "defaultMessage": "{card} is in the merge queue, which brings it up to date itself: take it out of the queue first to update {branch} here.",
+    "description": "Why updating a branch from its target is refused: the branch is the line of a card ({card}: its key, such as HI-12) that Hive's merge queue is merging now. {branch} is the branch."
+  },
+  "service.gitRepo.update.rebased": {
+    "defaultMessage": "Rebased {branch}'s {n, plural, one {# commit} other {# commits}} onto {target} ({commit}).",
+    "description": "After Update from <target> with Rebase (HI-1180): the branch {branch} has its {n} commits replayed onto the target {target}; {commit} is its new head (a short id: keep it as it is)."
+  },
+  "service.gitRepo.update.temporaryLeft": {
+    "defaultMessage": "Hive couldn't remove its temporary folder {folder}: remove it in Unused worktrees.",
+    "description": "A second line after Update from <target> on a branch checked out nowhere (HI-1180): the temporary folder Hive made for it ({folder}: its path) could not be removed."
+  },
+  "service.gitRepo.update.upToDate": {
+    "defaultMessage": "{branch} already has everything in {target}.",
+    "description": "After Update from <target> (HI-1180): the branch {branch} already contains every commit of the target {target}; nothing was done."
+  },
   "service.gitRepo.upstreamGone": {
     "defaultMessage": "{upstream} is gone from the remote.",
     "description": "An error pulling in the Git view: the remote branch {upstream} the branch follows was deleted there."
@@ -500,8 +568,8 @@
     "description": "An error untracking the project's .hive folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run."
   },
   "service.intent.noWorkflow": {
-    "defaultMessage": "#{n} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.",
-    "description": "An error: an intent (a card's start, submission, verdict…) was asked for a card that has no workflow, because it belongs to no project or its project's version control (Git or None) isn't chosen yet. {n} is the card's number."
+    "defaultMessage": "{card} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.",
+    "description": "An error: an intent (a card's start, submission, verdict…) was asked for a card that has no workflow, because it belongs to no project or its project's version control (Git or None) isn't chosen yet. {card} is the card's key (HI-12)."
   },
   "service.intent.queueNotAgents": {
     "defaultMessage": "Only the user, or the Hive Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.",

@@ -863,7 +863,7 @@ A light theme uses the same accent with VS Code Light neutrals.
 - **Sleep** (`main/power.ts`, `shared/keepAwake.ts`): while any agent in any window (the Assistant too) is **working** or **waiting on background tasks**, Hive holds `powerSaveBlocker.start('prevent-app-suspension')` (the screen may still turn off and lock) and releases it as soon as none is. **Settings → General → Keep the PC awake while agents work**: *When plugged in* (default; not on battery, `powerMonitor.isOnBatteryPower()`, re-checked on `on-ac` / `on-battery`), *Always, on battery too*, or *Never*. While it's held the status bar shows **Keeping the PC awake: n agents working** (click: Settings → General).
 - **Windows shutting down** (shutdown, restart or sign-out): Windows' callbacks (a window's `query-session-end`, then `session-end`; `powerMonitor` `shutdown` elsewhere) don't wait for anything asynchronous, so Hive backs up every running session's transcript before the callback returns: the transcript's bytes only (appended to the backup, or copied whole), no reading of usage or cost. It has 2 s at `query-session-end` and 1 s at `session-end` (which catches up with what was written since), well inside the ~5 s after which Windows offers to end an app, and never cancels the shutdown. It copies 1 MB at a time and starts nothing once its time is up; a step under way can't be cut short, so it can run over by about one disk write. Out of time, a whole copy is dropped (the backup stays as it was) and an append stops where it got to (a shorter backup that is still the transcript's start); sessions after it aren't tried. Every window gets these notices: one save covers them all. A shutdown another app cancels leaves nothing to undo. Best effort: a session whose transcript Hive hasn't found yet keeps its last ordinary backup, and the log counts what was saved, incomplete, not tried or failed. An ordinary backup under way at the time doesn't undo it: appends write each byte at its own offset, and a whole copy is put in place only if the backup hasn't changed since it began, checked and renamed in one synchronous step (retries too), so no rename is left pending across the shutdown copy.
 - **Waking up** (`powerMonitor` `resume`): each running session's transcript is read again (usage, background tasks and their time limit, plan usage from it) and its state reported; the workspaces refresh. Logged.
-- **Attention inbox**: one list of the window's agents that need you, across its projects and the Assistant: agents **waiting** for input (a permission prompt), **needing sign-in**, with a **pending question** they work on beside (Codex's async question; *Asks: …*), all until answered, looked at or not (`asksYou()`), and agents **stopped by an error** until their next turn starts: a turn that ended on one (`LiveSessionState.failedTurn`, with what the CLI said, from a failed stop: Claude Code's `StopFailure` other than a refused sign-in, Copilot's unrecoverable `ErrorOccurred`. Codex's Stop says nothing of a failure, so a Codex turn that ended on an error is a quiet finish, its error in its pane (its rollout's `task_complete` error, by the turn it names, is HI-1658); with no words from the CLI the window says *The turn ended on an error* in its own language, agents read it in English), the agent's status staying the turn's end (`finished`) so it is prompted and woken as any idle agent. Apart from them and never counted as a need (#1632: a count that includes finished agents trains you to ignore it), agents **finished, unseen** (`finishedUnseen()`). An agent is seen once its pane is on screen in a focused window: the selected project's panes on its Session tab (the page shown), or the Assistant's open panel. A finish on screen is seen as it happens; one in another project, on another page or tab, or while the window is unfocused or minimised stays unseen until its pane is shown. Main marks every finish and wait unseen and the window marks what it shows seen (`session:markSeen` with the agents' ids, from `agentsOnScreen()`), so main never needs to know what is on screen. Each agent's state records when it last changed (`statusSince`), and the list is oldest first, saying how long ago. Below it, **To review** (not counted): worktree agents that are stopped, ready or finished and have unmerged commits or uncommitted files, with a summary (*3 files, +120 −40 · 2 commits, 1 uncommitted file*; the diff from where the branch left the project folder's branch, tracked files only) and **Changes** and **Merge…**; one leaves once nothing is left to merge or when it starts working again. The list is worked out from each agent's live state and branch status (`shared/inbox.ts`), not tracked separately.
+- **Attention inbox**: one list of the window's agents that need you, across its projects and the Assistant: agents **waiting** for input (a permission prompt), **needing sign-in**, with a **pending question** they work on beside (Codex's async question; *Asks: …*), all until answered, looked at or not (`asksYou()`), and agents **stopped by an error** until their next turn starts: a turn that ended on one (`LiveSessionState.failedTurn`, with what the CLI said, from a failed stop: Claude Code's `StopFailure` other than a refused sign-in, Copilot's unrecoverable `ErrorOccurred`. Codex's Stop says nothing of a failure, so its rollout's `task_complete` with an error that is neither a refused sign-in nor a usage policy's stop (a safeguard's, #606) is read as one (#1658, `LiveDetails.turnFailed*`), and settled by the turn it names (`turn_id`, `failureTurn` against the turn ledger) and that turn's current run (one recorded before Hive continued its Stop, or a new tool call reopened it, ended the work it went on from: it neither marks nor, by its record of the end, ends the continued work), never whichever turn is current, in order with the hooks: that turn over, marked; running, ended failed by its Stop or by the transcript's record of its end; a newer turn begun, dropped; not heard of yet, kept; consumed only once applied or dropped, never one from before the launch; and a turn marked failed keeps it through its own late Stop (only its next start clears it: a new turn, or Hive continuing it); with no words from the CLI the window says *The turn ended on an error* in its own language, agents read it in English), the agent's status staying the turn's end (`finished`) so it is prompted and woken as any idle agent. Apart from them and never counted as a need (#1632: a count that includes finished agents trains you to ignore it), agents **finished, unseen** (`finishedUnseen()`). An agent is seen once its pane is on screen in a focused window: the selected project's panes on its Session tab (the page shown), or the Assistant's open panel. A finish on screen is seen as it happens; one in another project, on another page or tab, or while the window is unfocused or minimised stays unseen until its pane is shown. Main marks every finish and wait unseen and the window marks what it shows seen (`session:markSeen` with the agents' ids, from `agentsOnScreen()`), so main never needs to know what is on screen. Each agent's state records when it last changed (`statusSince`), and the list is oldest first, saying how long ago. Below it, **To review** (not counted): worktree agents that are stopped, ready or finished and have unmerged commits or uncommitted files, with a summary (*3 files, +120 −40 · 2 commits, 1 uncommitted file*; the diff from where the branch left the project folder's branch, tracked files only) and **Changes** and **Merge…**; one leaves once nothing is left to merge or when it starts working again. The list is worked out from each agent's live state and branch status (`shared/inbox.ts`), not tracked separately.
   - **Status bar** (#1632): **n need you** (with a bell, darker) counts exactly what For you lists: the cards' open requests (§16.8.5, `tasks:forYou`) and the agents that need you, and opens the popover above the status bar: **Need you (n)**, the cards' requests first (the card and what it asks; a click opens the card) then the agents, then **Finished (n)**, then **To review (n)**. Beside it, quieter, **✓ n finished** (the agents finished unseen; it opens the same popover); with nothing that needs you but work to review, **n to review**; hidden when all are empty. Each says what it counts on hover. An agent's row goes to its agent (the Assistant's opens its panel). Escape or a click outside closes it.
   - **Projects** in the activity bar shows the agents' count as a badge, and each project in the sidebar shows how many of its agents need you (a bell and the number; a badge on the compact rail's tile).
   - The **Notifications** bell (bottom of the activity bar; Hive's own messages, not the inbox) shows its dot and the accent (`--accent-on-activity`: the accent in dark, the stronger accent in light, at least 3:1 against the bar, kept on hover and focus) while any are unread, and tells assistive technology how many ("3 unread"); opening the panel (or Show Notifications) reads them, and only new ones light it again. The status bar is unaffected.
@@ -1327,12 +1327,13 @@ that can't be written fails the change whole.
 | `CommitAttributed` (observed) | commit, card (or none), how (trailer, only card, unattributed, assigned by the user) | A new commit on a shared folder's line (§16.3.2). |
 | `Stale` | approved revision, current revision, why (another change; a decision since; exact-only) | A newer revision that isn't the same change appears after a pass, or a decision is recorded after it (§16.4.6). |
 | `ApprovalRequested` | request id, kind (approve, decide, test, sign-in, other), gate, revision?, text | The ask-the-user intent, or a rule waiting on the user. |
+| `RequestClosed` | request id, why (`done`, `carriedOn`) | A request closed unanswered (#1638): its card reached Done, or the agent that asked moved the card on itself. |
 | `Approval` | request id, user, gate, submission?, answer (approved / declined / answered), note, decision generation | The user answers the request (in the card, the For you list, or a pane reply counted under #922). An answer is never a `Decision` (§16.4.6). |
 | `IntegrationRequested` | **entry id**, revision, candidate key, target, style | The card enters the merge queue (again, after a failure, with a new entry id). |
 | `IntegrationCancelled` | entry id, by, reason | **Remove from queue**, a stale pass, a card moved out by the user, a follow-up posted on the queued card (#1623). |
 | `IntegrationStarted` | entry id, expected target revision, result revision | The queue is about to advance the target (written **before** it does, §16.9.2). |
 | `IntegrationPhase` | entry id, phase (files, ref, rollback) | Before each step of a checked-out target's advance (§16.9.2). |
-| `IntegrationFailed` | entry id, revision, target, reason (conflict, checks, target moved, folder busy, not up to date), files, log, transient (bool) | The queue's test merge or checks fail. |
+| `IntegrationFailed` | entry id, revision, target, reason (conflict, checks, target moved, folder busy, not up to date), files, log, transient (bool), conflicts (HI-1181: a conflict's hunks) | The queue's test merge or checks fail. |
 | `Integrated` | entry id?, revision, target, result revision, method, by (hive, agent, outside), the rules skipped when merged by hand before they passed (the **outside the rules** mark) | The target moved with the change in it (recorded) or containment found it (observed). |
 | `MergedInPart` (observed) | revision (the merge base now in the target), target | Some of an unfinished card's work found in the target: the **merged outside, in part** mark (§16.4.4) [P2: a mark needs a fact]. |
 | `LeftTarget` (observed) | revision, target | A Done card's revision no longer in its target: the **no longer in main** mark (§16.4.4) [P2]. |
@@ -1714,7 +1715,7 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G3 | **Checks pass before review** | Named commands | `submit.checksPassed` |
 | G4 | **A pass survives a clean rebase** | Same change (default) · Exact revision only | Sameness [#1112 B]. "Pass" for a reviewer's verdict, "approval" only for your OK [HB3's round 1 finding 18]; a user's approval carries over the same way. |
 | G5 | **Who merges** | Hive merges (queue) · The agent merges, Hive checks · Committed is done (no merge) · Not checked | `done.contained`, the queue (§16.9). "Committed is done": the target is the branch the folder works on, so the card is Done once its rules pass (review, approval). "Not checked": Done isn't checked against the target. Hive merges and the agent merges need G11 = slots; Committed is done needs G11 = project folder (§16.7.2). |
-| G6 | **Merge style** | Merge commit · Squash | Owned here, not by the Merge dialog (OP-13). |
+| G6 | **Merge style** | Merge commit · Squash · Rebase and fast-forward | Owned here, not by the Merge dialog (OP-13). The merge queue's: where the agent merges, G6 isn't read. Rebase and fast-forward (#1184) lands a linear history (§16.9.1 step 4). |
 | G7 | **Work merges into** (target) | A branch, default the repository's default branch (`main`) | Per-card target allowed (OP-12). |
 | G8 | **Work is up to date with <target> before it merges** (strict) | On / Off | `integrate.upToDate` |
 | G9 | **Checks pass on the merged result** | Named commands | `integrate.checksPassed` (Hive merges only) |
@@ -1726,6 +1727,7 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G15 | **Slots are brought up to date before each card** | On / Off (and "install when the lock file changed") | `prepareSlot` [note §5] |
 | G16 | **Warn when a commit includes another agent's files** | On / Off | Shared folder only; a warning on submit, never a refusal [#1112 down] |
 | G17 | **Reviewers** | One per lane · A shared pool | §16.10.5 |
+| G18 | **Push the target branch after merging** | On / Off (default Off) | The merge queue (§16.9.1), Hive merges only. Not a rule: in no ruleset, read as the options are when the queue pushes (#1179). |
 | — | Rounds, wait, loop wakes | Today's Card loops settings, shown here with a link | Owner stays Card loops [§5]. |
 
 An option the platform's capabilities can't support isn't shown (None has no G5–G9, G11, G15). Every option shows
@@ -1757,6 +1759,7 @@ afterwards makes it **Custom** (the header says which preset it started from). T
 | G15 slots up to date | — | On | On | **Built [#1445]:** On in Pair, Team and Pair (the agent merges) since P7 (#1355 had it Off while agent worktrees stood in); a value saved before P7 is settled once (§16.6.6). |
 | G16 shared-folder warning | On | — | — | Only matters in a shared folder. |
 | G17 reviewers | — | One per lane | One per lane | A pool is the 6+pool template's choice (§16.10.6). |
+| G18 push after merging | — | Off | Off | Pushing reaches your remote and its sign-in: it stays yours unless you turn it on (#1179). |
 
 None's presets fill every option: Solo = N1 No one, N2 —, N3 none, N4 the whole folder except `.hive`, `node_modules` and `.venv`, N5 default names, N6 On, N7 as set; Pair = N1 A reviewer agent, N2 On, N3 the quick checks, the rest as Solo; Team = N1 A reviewer agent, then you, N2 On, N3 quick checks + tests, the rest as Solo. (N7 is shown, not set: its owner is Settings → Agents & Worktrees.)
 
@@ -2381,7 +2384,13 @@ code card; blocked) is a button with its reason, editable; one click does what t
 reason (Move to Done through the card's rules, the rules it skips an `Override` as Move Anyway's; Make It No Code the
 `card.kind` override; Unblock with the reason as the user's comment), then answers the question (`Approval.action`,
 the reason its `note`), and the asker is told which. An action refused, or no longer allowed, leaves the question open. A refused answer (answered or retired meanwhile) is said in a
-toast and the board read again; an answer clears the chip at once (`tasks-changed`).
+toast and the board read again; an answer clears the chip at once (`tasks-changed`). **A request settled another way
+is closed (#1638):** in the same write, a question still open once its card is in Done (one an agent or the Assistant
+asked: any request not under Hive's own gates, `askedQuestion`; an agent that asked is told it no longer stands, unless
+it made the move), and an agent's own questions once it moves the card on itself (a submit, a put
+back: answered some other way, such as in its pane), each `RequestClosed` and a line in the card's history; For you lists
+no question on a card in Done however it got there (Hive's own requests stay: a merge stopped part way, a decision after the merge), and a
+lane no longer waits for the user on a closed request.
 
 #### 16.8.6 A refused commit (#907)
 
@@ -2445,11 +2454,48 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
 4. **Test merge** in the queue's own worktree (a merge slot, kept warm like other slots): `git worktree add --detach`
    at the target's head (the **expected** revision); `git merge --no-ff <rev>` (or `merge --squash` + commit) with the
    message `AM-12: <title>` and trailers `Hive-Card: AM-12`, `Hive-Revision: <rev>`, `Hive-Reviewed-By: <reviewer>`;
-   the result on a temporary ref `refs/hive/queue/<entry>` [P1]. **Hive's commits** [HB3's round 1 finding 11]:
+   the result on a temporary ref `refs/hive/queue/<entry>` [P1].
+   **Rebase and fast-forward (G6, built [#1184]):** the test merge is a rebase, under the **linear landing** policy:
+   every commit the advance adds to the target (`expected..result`) has exactly one parent, and `expected` is an
+   ancestor of `result`. In the queue's worktree, detached at the reviewed revision, `git rebase --onto <expected>
+   <base>` with Hive's identity and `commitEnv` (no prompt, signing bounded), merge preservation always off
+   (`-c rebase.rebaseMerges=false --no-rebase-merges`, overriding the repository's setting for this command only;
+   `--force-rebase` whenever the reviewed suffix `base..revision` holds a merge, which git would otherwise take as up to
+   date and keep) and no other ref moved (`-c rebase.updateRefs=false --no-update-refs`, as strict's update). A linear
+   suffix already on top of the target lands as it is, with no rewrite. Before the merge checks the result is checked:
+   on top of the target, no commit with two parents in `expected..result`, and `sameChange` with the reviewed change;
+   failing one, the card is returned (`notUpToDate`, its log saying which: a merge resolution that changed the work
+   can't survive flattening); a conflict returns it with its files; a read git couldn't answer pauses (never taken for a
+   pass or a mismatch). The checks then run on exactly that result, and the advance (§16.9.2, unchanged) moves the
+   target from `expected` to it: a fast-forward, recorded as `Integrated` with method `fastForward` (by recovery after
+   a restart too, from the style the entry was queued with, as for the other styles). The queue's worktree is set at the
+   reviewed revision first even when nothing is rewritten, so the merge checks always run on exactly the result. G8 (strict) needs
+   no separate update with it. The rebased commits keep their own messages, authors and dates, with Hive as committer:
+   there is no merge commit, so no `Hive-Card`, `Hive-Revision` or `Hive-Reviewed-By` trailers, the price of a linear
+   history; the reviewed revision stays pinned (§16.9.3), and containment finds the change spread over several commits.
+   No preset sets it.
+   **Hive's commits** [HB3's round 1 finding 11]:
    - authored and committed with the project's identity (G12's, else git's configured identity for the repository);
      with no identity the entry pauses ("set a commit identity for this repository");
    - the repository's hooks run (no `--no-verify`, AGENTS.md); a hook that fails returns the card with the hook's
      output (`IntegrationFailed`, reason `hook`);
+   - **a conflict's hunks** (HI-1181, rc.4; design HI-1181/s8 and s10 checked by HR4): before the test merge, strict's
+     update or the rebase is aborted, `main/workflow/conflictRead.ts` reads each conflicted file (named as git lists them with
+     `diff --name-only -z`, never C-quoted: HR4's round 1) in the queue's own
+     folder, bounded before anything is read (20 files, 256 KB a file, 1 MB in all, each read into a buffer of that size,
+     never whole) and confined to it (a path that is absolute or climbs out, a link anywhere on the way, a parent whose
+     real place is outside, missing, binary or not UTF-8 text: recorded with why, never read; a character cut at the
+     budget is the cut's). `shared/workflow/conflicts.ts` parses each region (markers of 7 or more, a diff3 base, a stray
+     marker as text) with 2 lines of context never shared with a neighbour, at most 8 hunks a file, 40 lines a side (the
+     rest counted), lines cut at 400 characters (counted) and 16,000 characters in all, and says what stopped it
+     (`partial`: read in part, the hunks, the room; an exact `more` only when the file was scanned whole). Kept on
+     `IntegrationFailed` as `conflicts`, with which side git wrote first (`oursIs`: the target in a test merge and a
+     rebase, the card in strict's merge). The card's Work section unfolds each file's hunks whenever they were captured
+     (strict's not-up-to-date return too), read-only, its sides named
+     (the target, the card's key, the common ancestor); "no text conflict" only for a file read whole with no markers,
+     else why or "may have more". The builder's wake names where each file's conflicts are ("a.ts (2 conflicts, lines
+     10 and 40)", "b.png (not read: binary)"), within its note's room. The queue's folder is reset straight after, so
+     there is no diff to open; the Progress panel keeps Show log.
    - with `commit.gpgsign`, signing runs as configured; if it would wait for a passphrase (a pinentry window), the
      entry pauses with "signing waits for you" rather than failing, and a signing error pauses it with git's message.
    **Built [#1350]:**
@@ -2524,6 +2570,21 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    **3** such retests in a row the entry pauses ("main moves faster than its checks: retest or merge by hand") [HB3's
    round 1 finding 19].
 7. Record `Integrated` (the result revision, method), move the card to Done, release its slot, end the lane if done.
+   **Push after merging (G18, built [#1179]):** with *Push the target branch after merging* on (the project's options
+   as they are then: G18 is in no ruleset), the same write records that the target's push is owed (store meta
+   `queue.pushOwed:<target>`: the result, card and entry), in recovery's `Integrated` after a restart too, so the card
+   is Done and the push owed, or neither. Then, and before the queue's next entry (first thing in every run, so after a
+   restart or Resume too), the queue settles it: the option off by then (read again just before the push begins), or
+   the target no longer holding the result (reset since), drops it with no push; a read of the target that fails is
+   never taken for settled: it pauses `pushUnreadable` (Hive's own words, translated), still owed, so no later merge goes ahead of it; else it pushes `refs/heads/<target>` to what the target tracks
+   (`branch.<target>.remote` and `.merge`), or with nothing tracked to the only remote or `origin` under the same name,
+   never `--force` and never `--set-upstream`, with no prompt (`GIT_TERMINAL_PROMPT=0`, no askpass, the credential
+   manager non-interactive) and within the Git view's 5 minutes. Pushed, or up to date already (a retry after a crash
+   before the clear), it is cleared, only if still the same result (a newer merge's stays owed). Refused (the remote
+   has commits the target lacks), failed (git's message: a sign-in, the network, the bound) or with no remote: the
+   queue pauses (`pushRejected`, `pushFailed`, `pushNoRemote`, naming the merged card, which stays Done), the next entry
+   waits, and the pause says what to do: pull (or fix it) and Resume, or turn G18 off and Resume to keep merging
+   locally. Hive never pulls by itself, and agents never push.
 8. **Conflict or red checks:** `IntegrationFailed` with the files or the check output and log, `transient` when the
    failure was the environment (a check that failed to start, a network error, a timeout) rather than a result; the
    card goes to Active, back to its builder. A conflict, red checks or a hook failure need a new revision (review
@@ -3004,6 +3065,33 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
 - **Branches & remotes** reads `slots:list`: a slot's row names its lease (card or lane, its agent; carried for whom; not
   lent), a branch checked out in a slot shows the slot's name, and a folder's agent is its slot lease's, else the agent
   whose session runs there (#1424's worktree badge becomes the slot's).
+- **Update from <target>** (HI-1180, rc.4; the design checked by HR4, the conflict rule from Darren's OK via the
+  Assistant): a local branch that lacks some of the target's commits (`git:info` counts both ways, `rev-list
+  --left-right --count`, as `toTarget` and `fromTarget`; for a branch merged into the target, what it lacks on a
+  count of its own) shows how many it lacks and an **Update** action when it has commits of its own, or none but is in
+  use (a card's line, a slot's or a worktree's: HR4's round 1). A merged branch nothing uses is Clean Up's, not offered.
+  `git:updatePlan` says what it would do: the counts; where it runs (the project folder, the slot or worktree it is
+  checked out in, or a temporary detached worktree in the project's worktrees folder, `update-<id>`, when it is checked
+  out nowhere); the card whose line it is; the agents working there; for a Passed card whether its pass carries over
+  (the project's `sameness`); and why it can't run now. It can't run while an agent there is in a turn, the folder has
+  uncommitted changes to tracked files, git is mid-operation there, or the card is in the merge queue (which brings it
+  up to date itself, G8). The dialog (`GitForm`) offers **Merge <target> in** (the default: `merge --no-ff`, "Merge
+  <target> into <branch>", with `Hive-Card: <key>` for a card's line) or **Rebase onto <target>** (`--no-update-refs
+  --no-autostash`, `rebase.updateRefs=false`; it says the commits are rewritten, and that a pushed copy then differs);
+  for a branch with no commits of its own, only **Fast-forward to <target>** (`merge --ff-only`, whichever main is
+  given). Git is given the target branch's commit, `refs/heads/<target>` read under the locks, never its name (a tag
+  of that name would win), and the branch is checked to contain it afterwards.
+  `git:updateBranch` runs it as switch and pull do: one action at a time, the branch's merge slot held as the user's, the
+  repository locked, the folder fenced (#646), the plan checked again under them. It commits as the repository's own
+  identity, hooks and signing. A conflict, or any failure, is aborted at once (`merge --abort` / `rebase --abort`) and
+  then checked: no operation left, HEAD where it was, no tracked change. Only then does the error say the branch is as
+  it was (naming the conflicting files, or git's words). An abort that fails (HR4's round 1: a hook that left
+  `index.lock`) is said as it is: the folder named, still mid-merge or mid-rebase or left changed, with how to finish it
+  there; never "as it was". In a temporary worktree the branch is moved only from the commit it was updated from
+  (`update-ref <ref> <new> <old>`); the worktree is removed after, except when its abort failed (kept as git left it,
+  the branch not moved, the error naming its path to look at and remove in Unused worktrees), and one that can't be
+  removed is said (the reply's second line, or after the error). A card's pass then follows §16.4.4's reconcile (carried over or stale). A user
+  action only: no Agent API route or hive tool.
 - **Branches by state, and Clean Up Merged Branches** (#1642; Darren's decision: the list stays a list, its rows as they
   were). `git:info` measures each branch against the project's target (its options' `target`, else the default branch;
   none counted when that branch doesn't exist): merged into it (`for-each-ref --merged`), else how many commits it has
@@ -3760,6 +3848,17 @@ first; `lanes:end`).
   reference the Agent API and the hive tools take accepts a key string too; replies, wakes, the inbox and the doorbell
   name cards "HI-1230 (#1240)" (a project agent: its own project's cards; another's by number, as it sees them); one quiet
   notice after the upgrade lists the keys.
+- **Keys only, rc.3** [HI-1661; Darren, 26 Oct: "We should reference cards only by key"]: the key and the workspace
+  number had drifted apart (HI-1660 is `#1662`), so a number quoted found another card. Every text that names a card
+  names it by its key alone, never "HI-1230 (#1240)": the hive tools' replies, wakes, the inbox, lane rebriefs, task
+  prompts, review-copy notices, refusals, errors, history lines, the Assistant's activity and start view, notifications
+  and the window. One formatter (`nameWithKey`/`cardName`/`cardRef`, `shared/projectKeys.ts`) holds the rule; main names
+  cards by key in its window's work too, not only in agents' requests. `#N` is left only for a card with no key (a
+  workspace card, a project with no key yet) and for another project's card in a confined agent's text (as before).
+  History lines stored before keep the `#N` they were written with. The tools' descriptions ask for the key; the tools
+  that take `number` still take a bare number as the old number, silently; the intents still refuse an agent's plain
+  number, their hint naming only the key. The skills, the agents' contract ("each named by its key") and AGENTS.md say
+  to name cards by key.
 - **The window, built in P3** [#1221]: one label everywhere a card is named (`cardLabel`: its key, `#12` for a card with
   none), on the board, the card dialog, card chips, agent panes, the Assistant, lane segments, the Progress panel,
   Performance, stall reasons and notifications; history lines and main's errors keep `#N` (agents read them, until P8).
@@ -3767,7 +3866,9 @@ first; `lanes:end`).
   suggestion; Project Settings → Agents & Worktrees → Project key changes it (the old one listed as an alias). The compact
   sidebar's tiles show the key, 3–4 letters smaller. The board's search, Archive All and the command palette find `AM-12`,
   `am-12`, `AM-` (the project's cards) and old keys (`#N` as before); a key form no project has (`re-`) is searched as
-  words. Card references link in a card's description and comments (rendered Markdown, never in code) and in
+  words. **Changed in rc.3** [HI-1661]: a bare number (`12`) finds the cards whose key has those digits, in every
+  project (AM-12, HI-12), never the workspace number; `#12` still finds the card with that old number, and a card with
+  no key by its number either way. Card references link in a card's description and comments (rendered Markdown, never in code) and in
   terminals (keys in capitals only) beside `#N`; `#N` stays the old global number. A moved card's names in the projects
   it left (`card_aliases`, read with the board) find it in links, search and Depends on/Related. A key chosen in New
   Project… is reserved until the project has it: a key change or another new project meanwhile is refused it.
@@ -4598,11 +4699,11 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 | Patch-id sameness, squash containment, refs watcher | P3 (in scope) |
 | `mergeWorktree` returns the merge commit, takes a target, no auto-commit; cross-process merge lock | P5 (in scope) |
 | Branches shown next to their cards and revisions | P6 (in scope). **Built [#1424]:** Branches & remotes shows, on each branch a card's current cycle works on (`WorkBadge.line`), that card (the one in flight, else the latest; how many earlier), its stage (its project's name, its category's colour), in Review the revision under review (`WorkBadge.underReview`, copyable) and, Done, merged with `Integrated`'s result; the cards of a reused branch by when each one's current cycle started (never by a later fact). Worktrees name their agent's card (Doing, else Review, else Passed) the same way, whatever they have checked out |
-| Push the target after Hive merges (an option) | On Hold, git-support: #1179 |
-| Update a branch from its target (merge or rebase) as a user action in the Version Control tab | On Hold, git-support: #1180 |
-| Conflict help on a returned card (the conflicting files and hunks from the test merge) | On Hold, git-support: #1181 |
+| Push the target after Hive merges (an option) | **Built [#1179]:** G18 (§16.6.1, §16.9.1's push after the merge) |
+| Update a branch from its target (merge or rebase) as a user action in the Version Control tab | **Built [HI-1180]** (rc.4): Branches & remotes' Update from <target> (§8) |
+| Conflict help on a returned card (the conflicting files and hunks from the test merge) | **Built [HI-1181]** (rc.4): the Work section's hunks and the wake's places (§16.9.1, Hive's commits) |
 | Submodules and Git LFS in slots and review copies | On Hold, git-support: #1182 |
 | Remote targets: fetch before testing, push after (Team with a shared remote) | On Hold, git-support: #1183 |
-| Rebase and fast-forward as a merge style | On Hold, git-support: #1184 |
+| Rebase and fast-forward as a merge style | **Built [#1184]:** G6's third value (§16.9.1 step 4, linear landing) |
 | Signed queue commits without a prompt | On Hold, git-support: #1185 |
 | Pin refs for submitted revisions; hooks and signing pauses in the queue; Hive's commit identity | P5 (in scope, §16.9) |

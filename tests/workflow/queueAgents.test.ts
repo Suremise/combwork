@@ -190,6 +190,19 @@ describe('wakes at each queue outcome (what came back and what to do)', () => {
     expect(returnedText('AM-1', f)).toBe('AM-1 came back from the merge queue: a conflict with main in f0.ts, f1.ts, f2.ts, f3.ts, f4.ts, f5.ts, f6.ts, f7.ts and 2 more. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).')
   })
 
+  it("a conflict's hunks (HI-1181): where each file's are, or why it wasn't read; the files alone when that doesn't fit", () => {
+    const hunk = (line: number) => ({ line, before: [], ours: ['o'], theirs: ['t'], after: [] })
+    const f: FactData['IntegrationFailed'] = { entry: 'AM-1/e1', revision: 'a', target: 'main', reason: 'conflict', transient: false, files: ['a.ts', 'b.png'], conflicts: { oursIs: 'target', files: [{ file: 'a.ts', hunks: [hunk(10), hunk(40)] }, { file: 'b.png', notRead: 'binary', hunks: [] }] } }
+    expect(returnedText('AM-1', f)).toContain('a conflict with main in a.ts (2 conflicts, lines 10 and 40), b.png (not read: binary).')
+    const many: FactData['IntegrationFailed'] = { ...f, files: Array.from({ length: 10 }, (_, i) => `f${i}.ts`), conflicts: { oursIs: 'target', files: Array.from({ length: 10 }, (_, i) => ({ file: `f${i}.ts`, hunks: [hunk(1)] })) } }
+    expect(returnedText('AM-1', many)).toContain('in f0.ts, f1.ts, f2.ts, f3.ts, f4.ts, f5.ts, f6.ts, f7.ts and 2 more.')
+    expect(returnedText('AM-1', many).length).toBeLessThanOrEqual(WAKE_NOTE_MAX)
+    // Strict's update conflicting (not up to date, HR4's round 1): its files and where too; without files, as before.
+    const strict: FactData['IntegrationFailed'] = { ...f, reason: 'notUpToDate', files: ['a.ts'], conflicts: { oursIs: 'card', files: [{ file: 'a.ts', hunks: [hunk(10)] }] } }
+    expect(returnedText('AM-1', strict)).toContain("it isn't up to date with main: a conflict in a.ts (1 conflict, line 10).")
+    expect(returnedText('AM-1', { ...strict, files: undefined, conflicts: undefined })).toContain("it isn't up to date with main.")
+  })
+
   it('a long log: its end kept, the next step always there, the whole within the wake note', () => {
     const f: FactData['IntegrationFailed'] = { entry: 'AM-1/e1', revision: 'a', target: 'main', reason: 'checks', transient: false, check: 'tests', logPath: 'C:\\l.log', log: Array.from({ length: 50 }, (_, i) => `line ${i} ${'x'.repeat(150)}`).join('\n') }
     const t = returnedText('AM-1', f)

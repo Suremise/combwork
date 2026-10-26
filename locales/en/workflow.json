@@ -627,6 +627,14 @@
     "defaultMessage": "Checks pass before review",
     "description": "A workflow option (glossary 2.6, G3 and N3): named commands that must pass before a card goes to review."
   },
+  "workflow.option.pushTarget.desc": {
+    "defaultMessage": "After each merge, the merge queue pushes the target branch to the remote it tracks (or the only remote, or origin), never forced, and pauses, saying why, when the push is refused or fails.",
+    "description": "What the workflow option “Push the target branch after merging” does (glossary 2.1: merge queue). Origin is git’s usual name for a remote: keep it."
+  },
+  "workflow.option.pushTarget.title": {
+    "defaultMessage": "Push the target branch after merging",
+    "description": "A workflow option (glossary 2.6, G18): after Hive’s merge queue merges a card, it pushes the target branch to its remote."
+  },
   "workflow.option.review.desc": {
     "defaultMessage": "A card goes to Review when its builder submits it and moves on only once it passes, waiting for your OK after the reviewer when you check too.",
     "description": "What the workflow option “Work is reviewed before it’s merged” does."
@@ -776,8 +784,8 @@
     "description": "A refused intent: the card was named by a bare number."
   },
   "workflow.refused.card.plainNumber.next": {
-    "defaultMessage": "Name the card as {key} or {alias}.",
-    "description": "The forms a card reference takes: {key} like AM-12, {alias} like #1061."
+    "defaultMessage": "Name the card by its key: {key}.",
+    "description": "How to name a card instead of a bare number: by its key, {key} (such as AM-12)."
   },
   "workflow.refused.check.revisionMismatch.message": {
     "defaultMessage": "{revision} isn't what's checked out here.",
@@ -1811,6 +1819,10 @@
     "defaultMessage": "Merge commit",
     "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
   },
+  "workflow.value.style.rebase": {
+    "defaultMessage": "Rebase and fast-forward",
+    "description": "A value of the workflow option “Merge style” (glossary 2.6, G6; #1184): Hive’s merge queue rebases the card’s commits onto the target branch and moves the branch forward to them, so the history stays linear, with no merge commit."
+  },
   "workflow.value.style.squash": {
     "defaultMessage": "Squash",
     "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
@@ -1854,6 +1866,10 @@
   "workflow.why.preChecks": {
     "defaultMessage": "Cheap checks before review catch most of the rounds that would be lost, and a team adds its tests.",
     "description": "Why the presets set “Checks pass before review” as they do (Pair: the quick checks; Team: the tests too)."
+  },
+  "workflow.why.pushTarget": {
+    "defaultMessage": "Pushing reaches your remote and its sign-in, so it stays yours unless you turn it on.",
+    "description": "Why the presets leave “Push the target branch after merging” off."
   },
   "workflow.why.review": {
     "defaultMessage": "A pair exists to review: a second agent catches what the builder missed, while working solo you read the card’s work yourself.",

@@ -25,6 +25,14 @@ import { withWriteFence, type CardRecord } from './factStore'
 import { LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
 import { leftWake, returnedWake } from './queueState'
+import { readConflicts } from './conflictRead'
+
+/**
+ * The conflicted files `diff --name-only -z` lists, as they are named (HR4's HI-1181 round 1): split on NUL, never on
+ * lines, as git C-quotes a name with other than ASCII (café.txt) in its line form, and the reader would look for that.
+ */
+const namesOf = (out: string | undefined): string[] => (out ?? '').split('\0').filter(Boolean)
+import type { ConflictsRecord } from '../../shared/workflow/conflicts'
 import { bracketEnd, bracketStart } from './queueChecks'
 import { HIVE_RUNS } from '../progress'
 import type { Workflow, Write } from './runtime'
@@ -198,8 +206,55 @@ export interface QueueStepInfo {
  * `identity`: no commit identity for the repository (its folder in the pause). `user`: Pause queue (the user's, or the
  * Assistant's within Control: #1353). `approval`: an entry ready to advance into a checked-out target waits for the
  * user's Approve (Ask each time, #1351). `checkedOut`: a pause from before #1351, which Hive no longer makes.
+ * `pushRejected`, `pushFailed`, `pushNoRemote` (G18, #1179): the push of the target after a merge was refused (the
+ * remote has commits it lacks), failed (git's message: a sign-in, the network, the bound), or had no remote to go to;
+ * `pushUnreadable`: owed, and the target (or whether it still has the merge) couldn't be read to settle it.
  */
-export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget'
+export type PauseReason = 'user' | 'targetMovesFast' | 'folderBusy' | 'wrongBranch' | 'staged' | 'unstagedChanges' | 'identity' | 'needsYou' | 'uncounted' | 'checkedOut' | 'rulesOff' | 'signingWaits' | 'signing' | 'hookTimedOut' | 'approval' | 'subfolderTarget' | 'pushRejected' | 'pushFailed' | 'pushNoRemote' | 'pushUnreadable'
+
+/**
+ * G18 (#1179): the push of a target Hive owes after merging into it, as store meta per target: the merge's result, its
+ * card and entry. Written in the same transaction as the merge's `Integrated` (the card Done and the push owed, or
+ * neither); cleared only for the result that was pushed (compare-and-clear), never a newer one.
+ */
+interface PushOwed {
+  result: string
+  card: string
+  entry: string
+}
+
+export const pushOwedKey = (target: string): string => `queue.pushOwed:${target}`
+
+/** The push Hive owes for a target, if any (an unreadable value counts as none). */
+export function pushOwedOf(value: string | null): PushOwed | null {
+  if (!value) return null
+  try {
+    const v = JSON.parse(value) as Partial<PushOwed>
+    return typeof v.result === 'string' && typeof v.card === 'string' && typeof v.entry === 'string' ? { result: v.result, card: v.card, entry: v.entry } : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * How an entry of a merge style lands, as its `Integrated` says (an advance, or recovery after a restart): Rebase and
+ * fast-forward moves the target forward (#1184); a squash into the card's own target is a squash; else a merge commit.
+ */
+function methodOf(style: FactData['IntegrationRequested']['style'], cardTarget: string | null | undefined, target: string): 'merge' | 'squash' | 'fastForward' {
+  if (style === 'rebase') return 'fastForward'
+  return cardTarget === target && style === 'squash' ? 'squash' : 'merge'
+}
+
+/** A push reaches the remote and can wait on a sign-in window: as the Git view's, long but never forever. */
+const PUSH_MS = 5 * 60_000
+
+/** A push never waits on a prompt nobody sees: no terminal prompt, no askpass, a credential manager kept non-interactive. */
+function pushEnv(): NodeJS.ProcessEnv {
+  return { ...process.env, GIT_TERMINAL_PROMPT: '0', SSH_ASKPASS_REQUIRE: 'never', GCM_INTERACTIVE: 'never' }
+}
+
+/** git's words when a remote refuses a push that isn't a fast-forward (the Git view's test). */
+const PUSH_REJECTED = /\[rejected\]|non-fast-forward|fetch first/i
 
 /** What an entry's steps read of the repository's config once (#1386): the identity Hive commits as, and signing. */
 interface EntryReads {
@@ -530,11 +585,107 @@ export class MergeQueue {
   /** Takes the next entry for the target and takes it as far as it goes. Null when there's none or the queue is paused. */
   async runOnce(target: string): Promise<QueueOutcome | null> {
     const p = this.paused(target)
-    if (p?.reason === 'approval') return this.fenced(target, () => this.answered(target, p.card)).catch(lostIsNull)
+    if (p?.reason === 'approval') return this.fenced(target, async () => this.thenPush(target, await this.answered(target, p.card))).catch(lostIsNull)
     if (p) return null
-    const next = this.entries(target)[0]
-    if (!next) return null
-    return this.fenced(target, () => this.process(next.card, next.entry)).catch(lostIsNull)
+    return this.fenced(target, async () => {
+      // A push owed by an earlier merge goes first (G18: after a restart or a Resume), and the next entry waits for it.
+      const owed = await this.settlePush(target)
+      if (owed) return owed
+      const next = this.entries(target)[0]
+      if (!next) return null
+      return this.thenPush(target, await this.process(next.card, next.entry))
+    }).catch(lostIsNull)
+  }
+
+  /** After an entry's merge, the push of its target it owes (G18), before the next entry; its outcome stays the merge's. */
+  private async thenPush(target: string, o: QueueOutcome | null): Promise<QueueOutcome | null> {
+    if (o?.outcome === 'integrated') await this.settlePush(target)
+    return o
+  }
+
+  /** Whether the project's options push the target after merging, as they are now (G18 isn't a rule: never a ruleset's). */
+  private pushes(): boolean {
+    const o = this.wf.cfg.options()
+    return o.platform === 'git' && o.finish === 'hiveMerges' && o.pushTarget === true
+  }
+
+  /** In a merge's `Integrated` write: the push of its target owed, when the options push it (G18). */
+  private owePush(w: Write, entry: string, target: string, result: string): void {
+    if (this.pushes()) w.tx.setMeta(pushOwedKey(target), JSON.stringify({ result, card: w.card.key, entry } satisfies PushOwed))
+  }
+
+  /** Clears the owed push of a target, only if it is still the one for `result` (a newer merge's is kept). */
+  private clearOwed(target: string, result: string): Promise<void> {
+    return this.wf.locked(() =>
+      this.wf.store.tx((tx) => {
+        if (pushOwedOf(tx.meta(pushOwedKey(target)))?.result === result) tx.setMeta(pushOwedKey(target), '')
+      })
+    )
+  }
+
+  /**
+   * Settles the push a target is owed (G18, #1179): none owed, nothing. The options no longer push, or the target no
+   * longer has the merge (reset since): cleared, nothing pushed. Else the target is pushed to the remote it tracks (or
+   * the only remote, or origin, under its own name), never forced and never changing what it tracks, with no prompt and
+   * within PUSH_MS; pushed (or up to date already: a retry after a crash before the clear), cleared. Refused, failed or
+   * with nowhere to go: the queue pauses, naming the merged card (Done already), and the next entry waits.
+   */
+  private async settlePush(target: string): Promise<QueueOutcome | null> {
+    const owed = pushOwedOf(this.wf.store.meta(pushOwedKey(target)))
+    if (!owed) return null
+    if (!this.pushes()) {
+      await this.clearOwed(target, owed.result)
+      return null
+    }
+    // Unreadable now (HR2's #1179 round 1): never taken for settled. Still owed, and the queue pauses saying so in its
+    // own words (`pushUnreadable`, a message the window translates: HR2's round 2), so no later merge goes ahead of it;
+    // Resume reads again.
+    const head = await G.lineHead(this.project, target)
+    if (isUnknown(head)) return this.pausePush(target, owed, 'pushUnreadable')
+    const has = head ? await G.isAncestor(this.project, owed.result, head) : false
+    if (isUnknown(has)) return this.pausePush(target, owed, 'pushUnreadable')
+    if (!has) {
+      await this.clearOwed(target, owed.result)
+      return null
+    }
+    const dest = await this.pushDest(target)
+    // The off switch as it is now, just before the push begins (HR2's #1179 round 1: the reads above take time).
+    if (!this.pushes()) {
+      await this.clearOwed(target, owed.result)
+      return null
+    }
+    if (!dest) return this.pausePush(target, owed, 'pushNoRemote')
+    const r = await this.git(this.project, ['push', '--', dest.remote, `refs/heads/${target}:${dest.ref}`], { env: pushEnv(), timeoutMs: PUSH_MS })
+    if (r.ok) {
+      await this.clearOwed(target, owed.result)
+      return null
+    }
+    const said = `${r.err}\n${r.out}`.trim()
+    return this.pausePush(target, owed, !r.timedOut && PUSH_REJECTED.test(said) ? 'pushRejected' : 'pushFailed', said)
+  }
+
+  /** Where a target is pushed: its upstream (`branch.<target>.remote` and `.merge`), else the only remote or origin. */
+  private async pushDest(target: string): Promise<{ remote: string; ref: string } | null> {
+    const get = async (key: string): Promise<string> => {
+      const r = await this.git(this.project, ['config', '--get', key])
+      return r.ok ? r.out.trim() : ''
+    }
+    const remote = await get(`branch.${target}.remote`)
+    if (remote && remote !== '.') {
+      const merge = await get(`branch.${target}.merge`)
+      return { remote, ref: merge.startsWith('refs/heads/') ? merge : `refs/heads/${target}` }
+    }
+    const list = await this.git(this.project, ['remote'])
+    const remotes = list.ok ? list.out.split(/\r?\n/).map((x) => x.trim()).filter(Boolean) : []
+    const only = remotes.length === 1 ? remotes[0] : remotes.includes('origin') ? 'origin' : null
+    return only ? { remote: only, ref: `refs/heads/${target}` } : null
+  }
+
+  /** Pauses the target's queue for its owed push (never in place of a pause saved meanwhile), naming the merged card. */
+  private async pausePush(target: string, owed: PushOwed, reason: PauseReason, message?: string): Promise<QueueOutcome> {
+    const m = message?.trim().slice(0, 4000) || undefined
+    await this.wf.locked(() => this.wf.store.setQueuePause(target, { reason, card: owed.card, ...(m ? { message: m } : {}) }, true))
+    return { card: owed.card, entry: owed.entry, outcome: 'paused', reason, ...(m ? { message: m } : {}) }
   }
 
   /**
@@ -663,15 +814,16 @@ export class MergeQueue {
         // brought up to date with it there first (#1352), the card's line untouched.
         step('testMerge', expected)
         let updated: string | undefined
-        if (this.wf.rulesetOf(card, s).options.strict) {
+        // Rebase and fast-forward (#1184) puts the change on top of the target in the test merge itself: no update first.
+        if (this.wf.rulesetOf(card, s).options.strict && this.wf.rulesetOf(card, s).options.style !== 'rebase') {
           const up = await this.upToDate(card, s, entry, revision, base || (await this.mergeBaseOf(revision, expected)), expected, reads)
           if ('pause' in up) return this.pause(target, card, entry, up.pause, up.files, up.message)
-          if ('fail' in up) return this.returnCard(card, entry, revision, target, up.fail === 'hook' ? 'hook' : 'notUpToDate', false, up.files, up.log)
+          if ('fail' in up) return this.returnCard(card, entry, revision, target, up.fail === 'hook' ? 'hook' : 'notUpToDate', false, up.files, up.log, undefined, undefined, up.conflicts)
           updated = up.updated ?? undefined
         }
-        const test = await this.testMerge(card, s, revision, expected, reads, updated)
+        const test = await this.testMerge(card, s, revision, expected, reads, updated, base)
         if ('pause' in test) return this.pause(target, card, entry, test.pause, test.files, test.message)
-        if ('fail' in test) return this.returnCard(card, entry, revision, target, test.fail, false, test.files, test.log)
+        if ('fail' in test) return this.returnCard(card, entry, revision, target, test.fail, false, test.files, test.log, undefined, undefined, test.conflicts)
         result = test.result
         await this.cfg.hooks?.afterTest?.(entry.id)
 
@@ -710,7 +862,7 @@ export class MergeQueue {
       // Ask each time (OP-40): the user approves updating the folder, bound to this entry and its test merge. An early-out
       // only: decided again in IntegrationStarted's write, in the lock.
       if (folder && this.cfg.checkedOutTarget?.() === 'ask' && !advanceApprovedIn(this.wf.state(card), entry.id, expected, result)) return this.askAdvance(card, entry, target, expected, result, folder)
-      const method = s.started?.target === target && this.wf.rulesetOf(card, s).options.style === 'squash' ? 'squash' : 'merge'
+      const method = methodOf(this.wf.rulesetOf(card, s).options.style, s.started?.target, target)
       const integrate = (): Promise<void> => this.integrated(card, entry, revision, target, result, method, 'hive')
       const adv = folder ? await this.advanceCheckedOut(card, entry, target, expected, result, folder, integrate) : await this.advanceRef(card, entry, target, expected, result)
       // Settled in the lock: a pause, the terminal state, the ask.
@@ -822,7 +974,7 @@ export class MergeQueue {
    * merge merges it. Up to date already: nothing to do (`updated` null). Always from the reviewed revision, so a retest
    * after the target moved updates afresh, never on an earlier update.
    */
-  private async upToDate(card: CardRecord, s: CardState, entry: QueueEntry, revision: string, base: string, expected: string, reads: EntryReads): Promise<{ updated: string | null } | { fail: 'conflict' | 'notSame' | 'hook'; files?: string[]; log: string } | { pause: PauseReason; files?: string[]; message?: string }> {
+  private async upToDate(card: CardRecord, s: CardState, entry: QueueEntry, revision: string, base: string, expected: string, reads: EntryReads): Promise<{ updated: string | null } | { fail: 'conflict' | 'notSame' | 'hook'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
     const anc = await this.git(this.project, ['merge-base', '--is-ancestor', expected, revision])
     if (anc.code === 0) return { updated: null }
     if (anc.code !== 1) return { pause: 'needsYou', message: anc.err }
@@ -842,11 +994,13 @@ export class MergeQueue {
     // Overridden for this command only; the repository's config is left as it is.
     const u = rebase ? await this.git(f, [...who, '-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', '--onto', expected, base], opts) : await this.git(f, [...who, 'merge', '--no-ff', '--no-edit', '-m', message, expected], opts)
     if (!u.ok) {
-      const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
-      const files = c?.out.split(/\r?\n/).filter(Boolean) ?? []
+      const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
+      const files = namesOf(c?.out)
+      // Its hunks read before the abort (HI-1181): a merge of the target into the card's revision writes the card first.
+      const conflicts = files.length ? await readConflicts(f, files, rebase ? 'target' : 'card') : undefined
       await this.git(f, rebase ? ['rebase', '--abort'] : ['merge', '--abort'])
       await this.folderAt(expected)
-      if (files.length) return { fail: 'conflict', files, log: joined(u.out, readCommitStream(u.err).text) }
+      if (files.length) return { fail: 'conflict', files, log: joined(u.out, readCommitStream(u.err).text), conflicts }
       return commitFailed(u, signs)
     }
     const h = await G.head(f)
@@ -862,13 +1016,14 @@ export class MergeQueue {
     return { updated: h }
   }
 
-  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string, reads: EntryReads, updated?: string): Promise<{ result: string } | { fail: 'conflict' | 'hook'; files?: string[]; log: string } | { pause: PauseReason; files?: string[]; message?: string }> {
+  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string, reads: EntryReads, updated?: string, base = ''): Promise<{ result: string } | { fail: 'conflict' | 'hook' | 'notUpToDate'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
     const id = await this.identity(reads)
     if (!id) return { pause: 'identity', files: [this.project] }
+    const r = this.wf.rulesetOf(card, s)
+    if (r.options.style === 'rebase') return this.rebaseOnto(card, s, revision, base || (await this.mergeBaseOf(revision, expected)), expected, id, reads)
     const f = this.cfg.folder
     const at = await this.folderAt(expected)
     if (at) return at
-    const r = this.wf.rulesetOf(card, s)
     // The reviewers whose passes count for what is merged: the latest submission, at the current generation.
     const reviewers = [...new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest?.id && v.generation === s.generation).map((v) => v.reviewer))].join(', ')
     // The reviewed revision, and the queue's update of it when strict brought it up to date (#1352).
@@ -888,10 +1043,12 @@ export class MergeQueue {
     // Its output read with git's own trace in it (commitEnv), so a failure is told by who said what, never by words.
     const m = await this.git(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision], opts)
     if (!m.ok) {
-      const u = m.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U'])
-      const files = u?.out.split(/\r?\n/).filter(Boolean) ?? []
+      const u = m.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
+      const files = namesOf(u?.out)
+      // Its hunks read before the clean (HI-1181): the target is checked out, so its side comes first.
+      const conflicts = files.length ? await readConflicts(f, files, 'target') : undefined
       await clean()
-      if (files.length) return { fail: 'conflict', files, log: joined(m.out, readCommitStream(m.err).text) }
+      if (files.length) return { fail: 'conflict', files, log: joined(m.out, readCommitStream(m.err).text), conflicts }
       return commitFailed(m, signs)
     }
     if (squash) {
@@ -905,6 +1062,59 @@ export class MergeQueue {
     if (isUnknown(h)) return { pause: 'needsYou' }
     await this.git(this.project, ['update-ref', `refs/hive/queue/${refSafe(card.key)}`, h])
     return { result: h }
+  }
+
+  /**
+   * Rebase and fast-forward's test merge (G6, #1184), under its "linear landing" policy: every commit the advance adds
+   * to the target (`expected..result`) has exactly one parent, and `expected` is an ancestor of `result`. The reviewed
+   * suffix (`base..revision`) is rebased onto the target's head in the queue's worktree, with merge preservation always
+   * off (`rebase.rebaseMerges` overridden for this command, `--no-rebase-merges`; `--force-rebase` when the suffix holds
+   * a merge, which git would otherwise take as up to date) and no other ref moved (`rebase.updateRefs`, as strict's
+   * update). A linear suffix already on the target lands as it is. Then, before the merge checks: on top of the target,
+   * linear, and the same change as reviewed, else the card is returned (`notUpToDate`, saying which); a conflict returns
+   * it with its files; a read git couldn't answer pauses (never taken for a pass or a mismatch).
+   */
+  private async rebaseOnto(card: CardRecord, s: CardState, revision: string, base: string, expected: string, id: { name: string; email: string }, reads: EntryReads): Promise<{ result: string } | { fail: 'conflict' | 'hook' | 'notUpToDate'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
+    const f = this.cfg.folder
+    const merges = await this.git(this.project, ['rev-list', '--min-parents=2', `${base}..${revision}`])
+    if (!merges.ok) return { pause: 'needsYou', message: merges.err }
+    const linear = !merges.out.trim()
+    const onTop = await this.git(this.project, ['merge-base', '--is-ancestor', expected, revision])
+    if (onTop.code !== 0 && onTop.code !== 1) return { pause: 'needsYou', message: onTop.err }
+    // The queue's worktree at the reviewed revision whatever follows (HR2's #1184 round 1): a linear card already on top
+    // lands as it is, and its merge checks still run there, on exactly that revision.
+    const at = await this.folderAt(revision)
+    if (at) return at
+    let result = revision
+    if (!linear || onTop.code !== 0) {
+      const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
+      const signs = await this.signs(reads, f)
+      const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
+      const u = await this.git(f, [...who, '-c', 'rebase.rebaseMerges=false', '-c', 'rebase.updateRefs=false', 'rebase', '--no-rebase-merges', '--no-update-refs', '--no-autostash', ...(linear ? [] : ['--force-rebase']), '--onto', expected, base], opts)
+      if (!u.ok) {
+        const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
+        const files = namesOf(c?.out)
+        // Its hunks read before the abort (HI-1181): rebased onto the target, whose side comes first.
+        const conflicts = files.length ? await readConflicts(f, files, 'target') : undefined
+        await this.git(f, ['rebase', '--abort'])
+        await this.folderAt(expected)
+        if (files.length) return { fail: 'conflict', files, log: joined(u.out, readCommitStream(u.err).text), conflicts }
+        return commitFailed(u, signs)
+      }
+      const h = await G.head(f)
+      if (isUnknown(h)) return { pause: 'needsYou' }
+      result = h
+    }
+    const said = (why: string): { fail: 'notUpToDate'; log: string } => ({ fail: 'notUpToDate', log: `${card.key}: ${revision.slice(0, 7)} rebased onto ${expected.slice(0, 7)} ${why}: rebase it onto the target yourself and submit it again.` }) // i18n-ignore: the card's log, agent-facing
+    const anc = await this.git(this.project, ['merge-base', '--is-ancestor', expected, result])
+    if (anc.code === 1) return said("isn't on top of the target") // i18n-ignore: the card's log, agent-facing
+    if (anc.code !== 0) return { pause: 'needsYou', message: anc.err }
+    const twoParents = await this.git(this.project, ['rev-list', '--min-parents=2', `${expected}..${result}`])
+    if (!twoParents.ok) return { pause: 'needsYou', message: twoParents.err }
+    if (twoParents.out.trim()) return said('would land a merge commit (Rebase and fast-forward lands a linear history)') // i18n-ignore: the card's log, agent-facing
+    if (!(await G.sameChange(this.project, { base, revision, key: s.latest?.key }, { base: expected, revision: result }))) return said("isn't the same change as reviewed") // i18n-ignore: the card's log, agent-facing
+    await this.git(this.project, ['update-ref', `refs/hive/queue/${refSafe(card.key)}`, result])
+    return { result }
   }
 
 
@@ -1202,7 +1412,7 @@ export class MergeQueue {
   }
 
   /** `Integrated` → Done; the slot released, the lane ended if done; a decision recorded after the advance began → For you. */
-  private async integrated(card: CardRecord, entry: QueueEntry, revision: string, target: string, result: string, method: 'merge' | 'squash', by: 'hive' | 'outside'): Promise<void> {
+  private async integrated(card: CardRecord, entry: QueueEntry, revision: string, target: string, result: string, method: 'merge' | 'squash' | 'fastForward', by: 'hive' | 'outside'): Promise<void> {
     await this.write(card, (w) => {
       // One Integrated per cycle, whoever writes it (the queue, or another Hive's recovery or observation).
       const st = w.state()
@@ -1213,19 +1423,20 @@ export class MergeQueue {
       w.move('done', 'derived')
       w.action('releaseSlot', {})
       w.action('endLaneIfDone', {})
+      if (by === 'hive') this.owePush(w, entry.id, target, result)
       if (this.wf.store.facts(card.id).some((x) => x.kind === 'Decision' && x.seq > startedAt)) this.wf.askUser(w, 'decide', 'decision', workflowText(FOR_YOU.decidedAfterMerge, { card: card.key }))
     })
   }
 
   /** A conflict, red checks or a hook: `IntegrationFailed`, the card back to its builder with the output (§16.9.1 step 8). */
-  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure, check?: { check: string; logPath?: string }): Promise<QueueOutcome> {
+  private async returnCard(card: CardRecord, entry: QueueEntry, revision: string, target: string, reason: FactData['IntegrationFailed']['reason'], transient: boolean, files?: string[], log?: string, cause?: TransientFailure, check?: { check: string; logPath?: string }, conflicts?: ConflictsRecord): Promise<QueueOutcome> {
     // Removed from the queue (or cancelled by a decision) while its test merge or checks ran: its cancellation stands,
     // the card where that left it (Approved), and the late failure isn't written.
     const wrote = await this.write(card, (w) => {
       if (!this.isOpen(w, entry)) return false
       // Why a transient failure was one, as codes (#1362): its cause, and the network error code that said so.
       const why = transient && cause ? { cause: cause.cause, ...(cause.code ? { code: cause.code } : {}) } : {}
-      const failed: FactData['IntegrationFailed'] = { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: keptLog(log) } : {}), ...check }
+      const failed: FactData['IntegrationFailed'] = { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: keptLog(log) } : {}), ...check, ...(conflicts?.files.length ? { conflicts } : {}) }
       w.fact('IntegrationFailed', failed)
       w.move('active', 'derived')
       // What came back and what to do next (#1354): the files, the check, its log and last lines, bounded.
@@ -1259,11 +1470,16 @@ export class MergeQueue {
       const { expected, result, checkedOut } = e.started
       const done = async () => {
         await this.write(card, (w) => {
-          const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { entry: e.id, revision: e.revision, target: e.target, result, method: 'merge', by: 'hive' } }) // i18n-ignore: a fact's kind and codes, not text
+          // How it landed, as an advance records it, by the style its entry was queued with (HR2's #1184 round 1).
+          const requested = this.wf.store.facts(card.id).find((x) => x.kind === 'IntegrationRequested' && (x.data as FactData['IntegrationRequested']).entry === e.id)?.data as FactData['IntegrationRequested'] | undefined
+          const method = methodOf(requested?.style ?? this.wf.rulesetOf(card, s).options.style, s.started?.target, e.target)
+          const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { entry: e.id, revision: e.revision, target: e.target, result, method, by: 'hive' } }) // i18n-ignore: a fact's kind and codes, not text
           if (!f) return
           w.move('done', 'derived')
           w.action('releaseSlot', {})
           w.action('endLaneIfDone', {})
+          // Hive's own merge, found done after a restart: its push owed as an advance's is (G18).
+          this.owePush(w, e.id, e.target, result)
         })
       }
       // The target frozen (HR4's #1351 round 1): a needs-you pause naming a card is the terminal state, or an advance Hive

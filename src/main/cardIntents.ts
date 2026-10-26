@@ -12,6 +12,7 @@ import { hiveError } from './hiveError'
 import { msg } from '../shared/i18n'
 import { loopStepWaitMinutes } from '../shared/lanes'
 import { loopReviewerOf } from './loopReviewer'
+import { cardRef } from '../shared/projectKeys'
 
 /**
  * Agents act by intent (#1267, SPEC §16.8.1): start, put back, submit, declare paths, start review, verdict, report
@@ -44,7 +45,7 @@ export type CardIntent =
 
 const M = {
   queueNotAgents: msg({ id: 'service.intent.queueNotAgents', defaultMessage: 'Only the user, or the Hive Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.', description: "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Hive Assistant (within its Control setting, a setting name: use it as Hive shows it) can do." }),
-  noWorkflow: msg({ id: 'service.intent.noWorkflow', defaultMessage: '#{n} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.', description: "An error: an intent (a card's start, submission, verdict…) was asked for a card that has no workflow, because it belongs to no project or its project's version control (Git or None) isn't chosen yet. {n} is the card's number." })
+  noWorkflow: msg({ id: 'service.intent.noWorkflow', defaultMessage: '{card} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.', description: "An error: an intent (a card's start, submission, verdict…) was asked for a card that has no workflow, because it belongs to no project or its project's version control (Git or None) isn't chosen yet. {card} is the card's key (HI-12)." })
 }
 
 /** For unit tests (#1382): a pause before a card loop step's write, and inside it, before its reviewer is read. */
@@ -68,7 +69,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   const ws = workspace
   const before = await readTask(ref.n, actor)
   const wf = ws.path && before.project ? await workflowFor(ws, join(ws.path, before.project)) : null
-  if (!wf) throw hiveError(M.noWorkflow, { n: ref.n }, { kind: 'conflict' })
+  if (!wf) throw hiveError(M.noWorkflow, { card: cardRef(ref.n) }, { kind: 'conflict' })
   const who = actorOf(actor)
   // How long a design waits for its check (#1382): the project's Card loops → Design check wait, read before the write.
   const cfg = (intent.kind === 'loopStep' || intent.kind === 'start') && ws.path ? await ws.projectConfig(join(ws.path, before.project)).catch(() => null) : null
@@ -82,7 +83,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   }
   const self = actor.kind === 'agent' ? actor.self : undefined
   // An agent's plain number is refused, naming this card's own forms (S48, §16.12); a key or #N, and anyone else's number, aren't.
-  if (ref.plain && self) throw new WorkflowRefusedError(refusal('card.plainNumber', { key: before.key ?? `#${ref.n}`, alias: `#${ref.n}` }, null))
+  if (ref.plain && self) throw new WorkflowRefusedError(refusal('card.plainNumber', { key: before.key ?? `#${ref.n}` }, null))
   const named = `#${ref.n}`
   if ((intent.kind === 'removeFromQueue' || intent.kind === 'retryMerge') && who !== 'user' && who !== 'assistant') throw hiveError(M.queueNotAgents, undefined, { kind: 'forbidden' })
   const by = who === 'assistant' ? 'assistant' : 'user'

@@ -117,6 +117,23 @@ interface HiveMessageValues {
   'service.gitRepo.tracking': { pushed: string; branch: string | number; upstream: string | number }
   'service.gitRepo.untracked': { branch: string | number; upstream: string | number }
   'service.gitRepo.upToDate': { branch: string | number; upstream: string | number }
+  'service.gitRepo.update.agentBusy': { agent: string | number; status: string; folder: string | number; branch: string | number }
+  'service.gitRepo.update.conflict': { how: string; branch: string | number; target: string | number; files: string | number }
+  'service.gitRepo.update.dirty': { folder: string | number; branch: string | number }
+  'service.gitRepo.update.failed': { branch: string | number; target: string | number; why: string | number }
+  'service.gitRepo.update.forwarded': { branch: string | number; target: string | number; commit: string | number }
+  'service.gitRepo.update.isTarget': { branch: string | number }
+  'service.gitRepo.update.merged': { target: string | number; branch: string | number; commit: string | number }
+  'service.gitRepo.update.midOperation': { state: string | number; folder: string | number }
+  'service.gitRepo.update.missed': { branch: string | number; target: string | number }
+  'service.gitRepo.update.moved': { branch: string | number }
+  'service.gitRepo.update.noTarget': { branch: string | number }
+  'service.gitRepo.update.notUndone': { branch: string | number; target: string | number; folder: string | number; state: string; why: string | number }
+  'service.gitRepo.update.notUndoneTemporary': { branch: string | number; target: string | number; folder: string | number; why: string | number }
+  'service.gitRepo.update.queued': { card: string | number; branch: string | number }
+  'service.gitRepo.update.rebased': { branch: string | number; n: number; target: string | number; commit: string | number }
+  'service.gitRepo.update.temporaryLeft': { folder: string | number }
+  'service.gitRepo.update.upToDate': { branch: string | number; target: string | number }
   'service.gitRepo.upstreamGone': { upstream: string | number }
   'service.gitRepo.urlChanged': { remote: string | number }
   'service.gitRepo.urlFailed': { remote: string | number; why: string | number }
@@ -126,7 +143,7 @@ interface HiveMessageValues {
   'service.hiveVcs.exitCode': { code: string | number }
   'service.hiveVcs.noRepo': undefined
   'service.hiveVcs.rmFailed': { why: string | number }
-  'service.intent.noWorkflow': { n: string | number }
+  'service.intent.noWorkflow': { card: string | number }
   'service.intent.queueNotAgents': undefined
   'service.keys.closed': undefined
   'service.keys.form': undefined

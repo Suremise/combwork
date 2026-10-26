@@ -270,10 +270,10 @@ const check = (name, ok, extra = '') => {
   check('without asking the user', (await page.locator('.assistant-question').count()) === 0)
   check('its history says the Assistant did it', moved.body?.history?.at(-1)?.by === 'Assistant' && moved.body.history.at(-1).what === 'Moved to Done', JSON.stringify(moved.body?.history?.at(-1)))
 
-  // The list names cards by key with the number the tools take (#1219): each card's own key, from the board.
-  const named = async (n) => `${(await inv('tasks:list')).find((c) => c.number === n)?.key} (#${n})`
+  // The list names cards by key alone (#1219, HI-1661): each card's own key, from the board.
+  const named = async (n) => `${(await inv('tasks:list')).find((c) => c.number === n)?.key}`
   const cardName = await named(cardNo)
-  check('the board changes are listed, the card by its key', /^[A-Z]{2,4}-\d+ /.test(cardName) && (await inv('assistant:actions')).some((x) => x.ok && x.text.startsWith(`Started ${cardName} on a new agent, Writer`)), cardName)
+  check('the board changes are listed, the card by its key', /^[A-Z]{2,4}-\d+$/.test(cardName) && (await inv('assistant:actions')).some((x) => x.ok && x.text.startsWith(`Started ${cardName} on a new agent, Writer`)), cardName)
   // Putting cards in order: listed in Done by the Assistant; the order of Done is the user's, refused without asking.
   const o1 = (await api('POST', '/v1/tasks', { title: 'Order one', project: 'alpha' })).body.number
   const o2 = (await api('POST', '/v1/tasks', { title: 'Order two', project: 'alpha' })).body.number

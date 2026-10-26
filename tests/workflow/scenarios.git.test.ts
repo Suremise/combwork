@@ -628,7 +628,7 @@ describe('workflow scenarios, Git', () => {
     const e = pair()
     e.wf.createCard({ title: 'Any' })
     const r = refusedBy(await e.wf.start(1061, B1), 'card.plainNumber')
-    expect(r.next).toBe('Name the card as AM-12 or #1061.')
+    expect(r.next).toBe('Name the card by its key: AM-12.')
     refusedBy(await e.wf.start('1061', B1), 'card.plainNumber')
     moved(await e.wf.start('#1', B1))
   })

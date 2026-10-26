@@ -141,7 +141,7 @@ const check = (name, ok, extra = '') => {
   await inv('tasks:update', c1, { column: 'review' })
   const reason = `Reviewer hasn't taken the wake Hive typed for #${c1}: it waits in its prompt.`
   check('a wake never taken: after the grace, the card is stalled, saying who and why', !!(await until(async () => (await stalledOf(c1)) === reason, 30000)), String(await stalledOf(c1)))
-  check('…naming the card by key, with the number the tools take (#1219)', lib.KEYED.test(String(await rawStalled(c1))), String(await rawStalled(c1)))
+  check('…naming the card by key alone (#1219, HI-1661)', lib.KEYED.test(String(await rawStalled(c1))), String(await rawStalled(c1)))
   check('…the line was never sent, and Hive says so', !!(await until(async () => /still wasn't taken/.test(hiveLog()), 8000)) && wakes('Reviewer').length === 1)
   check('…the reviewer shows idle, with the card it left', ['ready', 'finished'].includes((await live(reviewer.id))?.status) && JSON.stringify((await live(reviewer.id))?.notWatching) === JSON.stringify([c1]), JSON.stringify(await live(reviewer.id)))
   await page.getByRole('button', { name: 'Task Board' }).click()

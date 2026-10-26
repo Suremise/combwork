@@ -51,6 +51,7 @@ import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
 import { copyIgnored, listWorktrees } from './worktrees'
+import { cardRef } from '../shared/projectKeys'
 import type { ProjectConfig } from '../shared/types'
 
 const log = createLogger('slots')
@@ -166,7 +167,7 @@ export type SlotKept =
   | { why: 'editedSkillCopy'; copies: string[] }
 
 /** A refusal in English, for agents and the log (the window words its own from the same fields). */
-export function refusalText(r: SlotRefusal, name: (agent: string) => string = (a) => a, card: (n: number) => string = (n) => `#${n}`): string {
+export function refusalText(r: SlotRefusal, name: (agent: string) => string = (a) => a, card: (n: number) => string = cardRef): string {
   const what = (c: number | null, l: string | null): string => (c !== null ? card(c) : `lane ${l}`)
   switch (r.why) {
     case 'noSlot':

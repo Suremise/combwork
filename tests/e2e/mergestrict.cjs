@@ -103,6 +103,22 @@ const who = ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.ident
     const failure = await waitHung(async () => (await facts(two.n, 'IntegrationFailed'))[0])
     check('a conflict with the moved target returns it: notUpToDate, naming a.txt, back in Doing', failure?.data?.reason === 'notUpToDate' && JSON.stringify(failure.data.files) === '["a.txt"]' && (await column(two.n)) === 'doing', JSON.stringify(failure))
     check("…nothing merged, the card's slot untouched", q.head(fx) === atTwo && untouched(two) && (await facts(two.n, 'Updated')).length === 0)
+    // HI-1181 round 1: strict's conflict shows its hunks too (it isn't up to date, not a conflict, as its reason), the
+    // card's side first (strict merges the target into it).
+    await q.showBoard(h.page)
+    await q.openByTitle(h.page, two.n)
+    const twoDialog = h.page.locator('.dialog').filter({ has: h.page.locator('.task-title-input') })
+    await twoDialog.waitFor({ timeout: HUNG_MS })
+    const fileRow = twoDialog.locator('[data-conflict-file="a.txt"]')
+    check("…its Work section lists a.txt with its one conflict", !!(await waitHung(async () => /a\.txt\s+1 conflict/.test(await fileRow.innerText().catch(() => '')))), await twoDialog.innerText().catch(() => ''))
+    await fileRow.locator('button').click()
+    const twoKey = (await h.card(two.n)).key
+    const ordered = (t) => {
+      const at = [twoKey, 'two by the builder', 'integration', 'TWO by someone'].map((x) => t.indexOf(x))
+      return at.every((x, i) => x >= 0 && (i === 0 || x > at[i - 1]))
+    }
+    check('…unfolded: the card’s side first, then integration’s', !!(await waitHung(async () => ordered(await fileRow.locator('.card-work-hunk-text').innerText().catch(() => '')))), await fileRow.innerText().catch(() => ''))
+    await h.page.keyboard.press('Escape')
     // The builder brings its line up to date in its card's slot (its side of the conflict kept), and submits again.
     lib.git(two.folder, [...who, 'merge', '-q', '-X', 'ours', '-m', 'integration in', 'integration'])
     const again = await q.intent(h, two.builder, two.n, 'submit', { summary: 'Two: up to date' })

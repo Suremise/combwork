@@ -89,8 +89,14 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     // The pool is the project's builders (#1438): a third, never started, so step 6 has slot-a, hb1 and slot-b.
     await lib.addAgent(inv, alpha, { name: 'B3', workflowRole: 'builder' })
 
+    // #12 is a real card (HI-1661 round 1, finding 1): a card about the workspace takes a number first, so alpha's card's
+    // key has other digits than its workspace number, and Start Fresh must name it by key (below).
+    await inv('tasks:create', { title: 'About the workspace' })
+    const inFlight = await inv('tasks:create', { title: 'Still in flight', project: 'alpha' })
+    check("a card whose key's digits aren't its number", !!inFlight.key && !inFlight.key.endsWith(`-${inFlight.number}`), JSON.stringify({ key: inFlight.key, number: inFlight.number }))
+
     // --- 1. #12's lease on slot-a: B1's new conversation there, with its environment, bound; stopped at the lease's end.
-    const l12 = await op({ op: 'lend', agent: b1.id, card: 12 })
+    const l12 = await op({ op: 'lend', agent: b1.id, card: inFlight.number })
     const folderA = l12.slot?.folder
     check('#12 is lent slot-a for B1', l12.ok && l12.slot.name === 'slot-a' && same(folderA, path.join(root, 'slot-a')), JSON.stringify(l12))
     await inv('session:start', alpha, { agentId: b1.id })
@@ -106,6 +112,12 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     await inv('session:start', alpha, { agentId: r1.id })
     const sr = await until(async () => ((await idle(r1.id)) ? live(r1.id) : null), HUNG_MS)
     check("R1 (a reviewer) starts in the project folder, never a slot", same(sr?.cwd, alpha) && !sr?.slot, JSON.stringify(sr))
+    // Start Fresh (Idle Agents): R1 would start fresh, B1 is left, its slot's card named by key (cancelled here).
+    await lib.agentsMenuRun(h.page, 'Start Fresh (Idle Agents)…')
+    const question = h.page.locator('.modal, [role="dialog"]').filter({ hasText: 'B1:' }).first()
+    check(`Start Fresh lists B1 with its slot's card by key: "${inFlight.key} is still in flight"`, !!(await until(async () => (await question.innerText().catch(() => '')).includes(`B1: ${inFlight.key} is still in flight`), HUNG_MS)) && !(await question.innerText()).includes(`#${inFlight.number}`), await question.innerText().catch(() => ''))
+    await h.page.keyboard.press('Escape')
+    await until(async () => (await question.count()) === 0, HUNG_MS)
     check('…R1 stopped', await stop(r1.id))
     await say(b1.id, 'holduntil lease-go')
     check('B1 is in a turn', !!(await until(async () => (await live(b1.id))?.status === 'working', HUNG_MS)))

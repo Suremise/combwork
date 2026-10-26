@@ -129,7 +129,7 @@ import type { TipsChange, TipsState } from './tips'
 import type { AdvancedState } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
-import type { BranchAt, BranchDrops, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
+import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -846,6 +846,9 @@ export interface HiveRequests {
   'git:history': (projectPath: string, ref?: string | null, page?: number) => GitHistory
   /** Each action replies with what it did, in a sentence. Switching (and creating a branch to switch to) or pulling is refused while an agent works in the folder or its merge slot is held (`folderBusy`). */
   'git:switch': (projectPath: string, branch: string) => string
+  /** Update from <target> (HI-1180): what it would do to a branch (its dialog), and the update, merge or rebase, saying what it did. */
+  'git:updatePlan': (projectPath: string, branch: string) => BranchUpdatePlan
+  'git:updateBranch': (projectPath: string, branch: string, how: BranchUpdateHow) => string
   'git:createBranch': (projectPath: string, name: string, stay?: boolean) => string
   'git:addRemote': (projectPath: string, name: string, url: string) => string
   'git:setRemoteUrl': (projectPath: string, name: string, url: string) => string
