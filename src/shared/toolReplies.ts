@@ -376,6 +376,16 @@ export function projectListText(rows: ProjectRow[]): string {
   return `${rows.map((r) => projectRowText(r, many)).join('\n')}\n\nhive_project_status gives one project in full (its agents' ids and sessions, its settings).`
 }
 
+/**
+ * hive_project_status: GET /v1/projects/{id} without what its settings only repeat or keep for Hive's own bookkeeping
+ * (HI-1712): `lastPath` (its `path`), the file's `version` and `stepsDone` (one-time steps already taken).
+ */
+export function projectStatusReply(p: unknown): unknown {
+  if (!p || typeof p !== 'object' || !('settings' in p) || !p.settings || typeof p.settings !== 'object') return p
+  const { lastPath: _path, version: _version, stepsDone: _steps, ...settings } = p.settings as Record<string, unknown>
+  return { ...p, settings }
+}
+
 /** The shared notes as a flat list of files (newest last-modified shown), not the folder tree. */
 export interface NoteEntry {
   relPath: string
@@ -537,13 +547,18 @@ export interface SettingRow {
 
 /**
  * hive_list_settings: one line a setting, read-only ones marked; what each does only when a query narrowed them (a
- * title is enough to choose from among them all); hive_read_setting has the rest.
+ * title is enough to choose from among them all); hive_read_setting has the rest. Those set to inherit (most of a
+ * project's own, HI-1712) come last under one line saying so, each without its value.
  */
 export function settingListText(rows: SettingRow[], opts: { query?: string; offset?: number } = {}): string {
   if (!rows.length) return opts.query ? `No setting matches "${opts.query}".` : 'No settings.'
   const offset = Math.max(0, opts.offset ?? 0)
   const shown = rows.slice(offset, offset + MAX_ROWS)
-  const lines = shown.map((r) => `${r.id} = ${r.value}${r.default !== undefined ? ` (default ${r.default})` : ''}${r.readOnly ? ' [read-only]' : ''} · ${r.title}${opts.query ? `: ${r.desc}` : ''}`)
+  const name = (r: SettingRow): string => ` · ${r.title}${opts.query ? `: ${r.desc}` : ''}`
+  const inherits = (r: SettingRow): boolean => r.value === 'inherit' && r.default === undefined && !r.readOnly
+  const lines = shown.filter((r) => !inherits(r)).map((r) => `${r.id} = ${r.value}${r.default !== undefined ? ` (default ${r.default})` : ''}${r.readOnly ? ' [read-only]' : ''}${name(r)}`)
+  const inheriting = shown.filter(inherits)
+  if (inheriting.length) lines.push('Set to inherit:', ...inheriting.map((r) => `${r.id}${name(r)}`))
   const more = rows.length - offset - shown.length
   if (more > 0) lines.push(`… ${more} more: offset ${offset + shown.length} carries on.`)
   return lines.join('\n')
