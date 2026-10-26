@@ -277,23 +277,45 @@ function recordCopy(dir, copy) {
   fs.appendFileSync(path.join(dir, COPIES_FILE), `${JSON.stringify(copy)}\n`)
 }
 
+/** The processes, as processes() lists them, without blocking main's thread of the suite (the launch has returned). */
+const listProcesses = () =>
+  new Promise((resolve, reject) => execFile('powershell.exe', ['-NoProfile', '-Command', PROCESS_LIST], { encoding: 'utf8', env: baseEnv(), maxBuffer: 64 * 1024 * 1024, windowsHide: true }, (e, stdout) => (e ? reject(e) : resolve(parseProcesses(stdout)))))
+
+/** Whether a ChildProcess has exited, as Node knows it (it sets these before its 'exit' event). */
+const exitedChild = (c) => c.exitCode != null || c.signalCode != null
+
 /**
- * Records the copy of Hive that `launcher` (the pid Playwright started, `from`: ms before it did) is, by the identity it
- * has (pid and start time), from the process tree alone: no command line is read. Playwright starts Electron through
- * `cmd.exe /c` on Windows, so `launcher` is that shell and the copy its child (launchedCopy). Lists the processes without
- * blocking (the launch has returned meanwhile). Off Windows, nothing.
+ * Records the copy of Hive that `launcher` (the ChildProcess Playwright started, `from`: ms before it did) is, by the
+ * identity it has (pid and start time), from the process tree alone: no command line is read. Playwright starts
+ * Electron through `cmd.exe /c` on Windows, so `launcher` is that shell and the copy its child (launchedCopy).
+ * The identity rests on the handle this process holds (HR5's round 3): Windows never gives a pid to another process
+ * while a handle to its process is open, and Node holds the launcher's until its exit callback, where it sets exitCode
+ * or signalCode before 'exit' runs. So a launcher that hasn't exited once the listing has returned was the process with
+ * that pid for the whole listing, and its child there is its own. Checked with no await between that check and the
+ * record; a launcher missing or exited, or a listing that fails, records nothing (the copy is then only listed, never
+ * ended). The whole ChildProcess is needed: a pid alone can't tell. Off Windows, nothing.
  */
-async function recordMainProcess(dir, launcher, from, profile = null) {
-  if (process.platform !== 'win32' || !launcher) return
-  const out = await new Promise((resolve, reject) => execFile('powershell.exe', ['-NoProfile', '-Command', PROCESS_LIST], { encoding: 'utf8', env: baseEnv(), maxBuffer: 64 * 1024 * 1024, windowsHide: true }, (e, stdout) => (e ? reject(e) : resolve(stdout))))
-  const main = launchedCopy(parseProcesses(out), launcher, from)
-  if (main) recordCopy(dir, { pid: main.pid, started: main.started, profile })
+async function recordMainProcess(dir, launcher, from, profile = null, list = listProcesses) {
+  if (process.platform !== 'win32' || !launcher?.pid || exitedChild(launcher)) return
+  let sawExit = false
+  const onExit = () => {
+    sawExit = true
+  }
+  launcher.once('exit', onExit)
+  try {
+    const now = await list()
+    if (sawExit || exitedChild(launcher)) return
+    const main = launchedCopy(now, launcher.pid, from)
+    if (main) recordCopy(dir, { pid: main.pid, started: main.started, profile })
+  } finally {
+    launcher.removeListener('exit', onExit)
+  }
 }
 
 /**
- * Of `list`, the copy of Hive `launcher` started: `launcher` must itself have started at or after `from` (else its pid
- * is another process's by now); then its child that started since (the shell's Electron), or, with none, `launcher`
- * itself. null when `launcher` is gone, or isn't the process started then.
+ * Of `list`, the copy of Hive the launcher with pid `launcher` started (recordMainProcess checks that pid is still its):
+ * its child that started since (the shell's Electron), or, with none, the launcher itself. null when the launcher isn't
+ * in the list, or started before `from` (a sanity check: not the process started then).
  */
 function launchedCopy(list, launcher, from) {
   const self = list.find((p) => p.pid === launcher)

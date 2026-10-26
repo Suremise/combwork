@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'child_process'
+import { EventEmitter } from 'events'
 import { createRequire } from 'module'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -337,6 +338,86 @@ describe("a suite's test copies of Hive (HI-1453)", () => {
     // The launcher's pid naming a process older than the launch (it ended, the pid was reused): nothing recorded.
     expect(launchedCopy([{ pid: 5, parent: 1, commandLine: '', started: 500 }, { pid: 8, parent: 5, commandLine: '', started: 1020 }], 5, 1000)).toBeNull()
     expect(launchedCopy([], 5, 1000)).toBeNull()
+  })
+
+  // HR5's round 3: the launcher (Playwright's shell) exiting and its pid going to another process before the background
+  // listing returns. Trusted only while Node shows no exit of the launcher, checked after the listing (round 4's design).
+  describe('recorded only while the launcher is still the process Node holds (recordMainProcess)', () => {
+    const { recordMainProcess } = req('./e2e/folderProcesses.cjs') as {
+      recordMainProcess: (dir: string, launcher: unknown, from: number, profile: string | null, list: () => Promise<Proc[]>) => Promise<void>
+    }
+    type Launcher = EventEmitter & { pid: number; exitCode: number | null; signalCode: string | null }
+    const launcherOf = (pid: number): Launcher => Object.assign(new EventEmitter(), { pid, exitCode: null, signalCode: null })
+    /** Node's exit as it comes: exitCode set first, then 'exit'. */
+    const exit = (l: Launcher) => {
+      l.exitCode = 0
+      l.emit('exit', 0, null)
+    }
+    const deferred = () => {
+      let resolve!: (list: Proc[]) => void
+      let reject!: (e: Error) => void
+      const promise = new Promise<Proc[]>((res, rej) => ((resolve = res), (reject = rej)))
+      return { promise, resolve, reject }
+    }
+    const recorded = (dir: string) => (existsSync(join(dir, COPIES_FILE)) ? readFileSync(join(dir, COPIES_FILE), 'utf8') : '')
+    // The shell (pid 42, started 1000) and its Electron (8, started 1020).
+    const shellNow: Proc[] = [
+      { pid: 42, parent: 1, commandLine: '', started: 1000 },
+      { pid: 8, parent: 42, commandLine: '', started: 1020 }
+    ]
+    // The shell has exited and its pid went to another program (started 2500), which has a child of its own.
+    const reused: Proc[] = [
+      { pid: 42, parent: 1, commandLine: 'user-app.exe', started: 2500 },
+      { pid: 77, parent: 42, commandLine: 'user-app-helper.exe', started: 2600 }
+    ]
+
+    it.runIf(process.platform === 'win32')("the launcher's child, by its pid and start time, while the launcher runs; the exit listener removed", async () => {
+      const dir = tempDir('hive-record-')
+      const l = launcherOf(42)
+      const d = deferred()
+      const done = recordMainProcess(dir, l, 1000, 'p', () => d.promise)
+      expect(l.listenerCount('exit')).toBe(1)
+      d.resolve(shellNow)
+      await done
+      expect(recorded(dir)).toBe(`${JSON.stringify({ pid: 8, started: 1020, profile: 'p' })}\n`)
+      expect(l.listenerCount('exit')).toBe(0)
+    })
+
+    it.runIf(process.platform === 'win32')('nothing, when the launcher exits while the listing is under way, its pid now a later process with a child', async () => {
+      const dir = tempDir('hive-record-')
+      const l = launcherOf(42)
+      const d = deferred()
+      const done = recordMainProcess(dir, l, 1000, 'p', () => d.promise)
+      exit(l)
+      d.resolve(reused)
+      await done
+      expect(recorded(dir)).toBe('')
+      expect(l.listenerCount('exit')).toBe(0)
+      // Its 'exit' alone, before Node's exitCode is seen, is enough too.
+      const l2 = launcherOf(42)
+      const d2 = deferred()
+      const done2 = recordMainProcess(dir, l2, 1000, 'p', () => d2.promise)
+      l2.emit('exit', 0, null)
+      d2.resolve(reused)
+      await done2
+      expect(recorded(dir)).toBe('')
+    })
+
+    it.runIf(process.platform === 'win32')('nothing, when the launcher had exited already, is missing, or the listing fails', async () => {
+      const dir = tempDir('hive-record-')
+      let listed = 0
+      const list = async () => (listed++, shellNow)
+      const gone = launcherOf(42)
+      gone.exitCode = 1
+      await recordMainProcess(dir, gone, 1000, 'p', list)
+      await recordMainProcess(dir, null, 1000, 'p', list)
+      await recordMainProcess(dir, { pid: undefined }, 1000, 'p', list)
+      expect(listed).toBe(0)
+      const l = launcherOf(42)
+      await expect(recordMainProcess(dir, l, 1000, 'p', async () => Promise.reject(new Error('powershell failed')))).rejects.toThrow('powershell failed')
+      expect(l.listenerCount('exit')).toBe(0)
+      expect(recorded(dir)).toBe('')
+    })
   })
 
   it('what only looks like a copy in a folder (for the report, never ended) has a profile flag and names the folder', () => {

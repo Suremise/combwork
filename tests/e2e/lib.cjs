@@ -626,9 +626,10 @@ _electron.launch = async (...args) => {
   // runner ends each copy still running once the suite has ended, and the next run's start those an earlier run left.
   // Its main process's own pid: Playwright starts Electron through `cmd.exe /c` on Windows, so app.process() is that
   // shell, which ends with a killed suite while Hive runs on outside the suite's job (how one ran 12 h): the shell's
-  // child, by the process tree alone. Looked up in the background, so the launch returns as it did: only a record, which
-  // never fails or holds up the suite. A copy whose record isn't made in time is never ended by the runner, only listed.
-  if (process.env.HIVE_E2E_DIR) recordMainProcess(WORK, app.process()?.pid, from, env.HIVE_USER_DATA ?? null).catch(() => undefined)
+  // child, by the process tree alone, trusted only while this process holds the shell's handle (it hasn't exited). Looked
+  // up in the background, so the launch returns as it did: only a record, which never fails or holds up the suite. A
+  // copy whose record isn't made (in time, or at all) is never ended by the runner, only listed.
+  if (process.env.HIVE_E2E_DIR) recordMainProcess(WORK, app.process(), from, env.HIVE_USER_DATA ?? null).catch(() => undefined)
   return app
 }
 
