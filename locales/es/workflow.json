@@ -217,6 +217,8 @@
   "workflow.refused.lane.oneAtATime.next": "Termina primero {earlier}: cuando esté en Hecho, el carril sigue con {card}.",
   "workflow.refused.loop.followUpChecked.message": "Tarjeta {card}: un seguimiento espera la comprobación de su revisor, y no se sigue sin ella.",
   "workflow.refused.loop.followUpChecked.next": "Espera el ok o gaps del revisor; si no llega, pregunta al usuario.",
+  "workflow.refused.loop.followUpMerging.message": "La tarjeta {card} se está fusionando ahora: un seguimiento ya no puede sacarla de la cola de fusión.",
+  "workflow.refused.loop.followUpMerging.next": "Espera a la fusión; si el seguimiento sigue haciendo falta, ponlo en una tarjeta nueva.",
   "workflow.refused.loop.noReviewer.message": "La tarjeta {card} no tiene revisor que la compruebe: no está en ningún carril con revisor y nadie la ha revisado todavía.",
   "workflow.refused.loop.noReviewer.next": "Inicia un carril para la tarjeta con un revisor, o escríbelo en un comentario.",
   "workflow.refused.loop.noStep.message": "La tarjeta {card} no tiene ningún diseño ni seguimiento esperando su comprobación.",

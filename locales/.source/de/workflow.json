@@ -225,6 +225,8 @@
   "workflow.refused.lane.oneAtATime.next": "Finish {earlier} first: once it is Done, the lane goes on to {card}.",
   "workflow.refused.loop.followUpChecked.message": "{card}: a follow-up waits for its reviewer's check, with no going ahead without it.",
   "workflow.refused.loop.followUpChecked.next": "Wait for the reviewer's ok or gaps; if none comes, ask the user.",
+  "workflow.refused.loop.followUpMerging.message": "{card} is being merged now: a follow-up can no longer take it out of the merge queue.",
+  "workflow.refused.loop.followUpMerging.next": "Wait for the merge; if the follow-up is still needed, put it on a new card.",
   "workflow.refused.loop.noReviewer.message": "{card} has no reviewer to check it: it is in no lane with a reviewer, and nobody has reviewed it yet.",
   "workflow.refused.loop.noReviewer.next": "Start a lane for the card with a reviewer, or say it in a comment instead.",
   "workflow.refused.loop.noStep.message": "{card} has no design or follow-up waiting for its check.",

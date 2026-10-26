@@ -3171,6 +3171,10 @@
     "defaultMessage": "Adopted at the upgrade, from {column}: its work starts from what its folder showed then.",
     "description": "The card dialog's Work section for a card Hive took on at the upgrade to 1.0 from what could be read. {column} is the board column it was in (Doing, Review, Passed)."
   },
+  "board.work.backAtApproved": {
+    "defaultMessage": "Its branch came back to {revision}, the revision that passed: the pass counts again.",
+    "description": "A mark in the card dialog's Work section: the card's branch changed after its pass (which made the pass stale), then came back to exactly the revision that passed ({revision}, a short commit id), so the pass counts again. Glossary: pass, revision."
+  },
   "board.work.badgeOutside": {
     "defaultMessage": "Merged outside the rules",
     "description": "Tooltip and accessible name of a mark on a board card: the card was merged by hand before its rules passed. Glossary: rule."
@@ -3303,6 +3307,10 @@
     "defaultMessage": "Stale: a decision was recorded since the pass.",
     "description": "A mark in the card dialog's Work section: the card's pass no longer counts because the user recorded a decision on the card after it. Glossary: stale, pass."
   },
+  "board.work.staleNext": {
+    "defaultMessage": "To move it on, its builder submits it again, or puts its branch back at {approved}: until then it isn’t merged.",
+    "description": "A mark in the card dialog's Work section under a stale pass, in Approved (Passed): what moves the card on. Its builder submits its work again (for a new review), or puts its branch back at the revision that passed ({approved}, a short commit id), which makes the pass count again. Glossary: stale, pass."
+  },
   "board.work.target": {
     "defaultMessage": "Target",
     "description": "A label in the card dialog's Work section: where the card's work goes once approved follows (the target branch, main). Glossary: target branch."
@@ -3336,8 +3344,8 @@
     "description": "A label in the card dialog's Work section's merge queue part: the revision that was approved and is merged follows (a short commit id). Glossary: revision."
   },
   "board.workQueue.cancelled": {
-    "defaultMessage": "{reason, select, removed {Taken out of the queue (Remove from queue).} stale {Taken out of the queue: its pass no longer counts.} hold {Taken out of the queue: the card went On Hold.} decision {Taken out of the queue: a decision was recorded.} integratedOutside {Taken out of the queue: it was merged outside Hive.} other {Taken out of the queue.}}",
-    "description": "The card dialog's Work section: the card's merge queue entry was cancelled, and why. Keep the select keys. Glossary: merge queue, On Hold, decision, outside Hive."
+    "defaultMessage": "{reason, select, removed {Taken out of the queue (Remove from queue).} stale {Taken out of the queue: its pass no longer counts.} hold {Taken out of the queue: the card went On Hold.} decision {Taken out of the queue: a decision was recorded.} integratedOutside {Taken out of the queue: it was merged outside Hive.} followUp {Taken out of the queue for a follow-up: queued again once its reviewer checks it.} other {Taken out of the queue.}}",
+    "description": "The card dialog's Work section: the card's merge queue entry was cancelled, and why. Keep the select keys. Glossary: merge queue, On Hold, decision, outside Hive, follow-up."
   },
   "board.workQueue.command": {
     "defaultMessage": "{purpose, select, finish {To finish it} other {To undo it}}, in {folder}",

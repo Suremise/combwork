@@ -217,6 +217,8 @@
   "workflow.refused.lane.oneAtATime.next": "先に{earlier}を仕上げてください。完了するとレーンは{card}に進みます。",
   "workflow.refused.loop.followUpChecked.message": "{card}：フォローアップはレビュアーの確認を待っており、確認なしには進めません。",
   "workflow.refused.loop.followUpChecked.next": "レビュアーのokかgapsを待ってください。回答がなければユーザーに尋ねてください。",
+  "workflow.refused.loop.followUpMerging.message": "{card}は現在マージ中です。フォローアップでマージキューから外すことはできません。",
+  "workflow.refused.loop.followUpMerging.next": "マージを待ってください。フォローアップがまだ必要なら、新しいカードにしてください。",
   "workflow.refused.loop.noReviewer.message": "{card}には確認するレビュアーがいません。レビュアーのいるレーンに入っておらず、まだ誰もレビューしていません。",
   "workflow.refused.loop.noReviewer.next": "レビュアーのいるレーンをこのカードで開始するか、代わりにコメントに書いてください。",
   "workflow.refused.loop.noStep.message": "{card}には確認待ちの設計もフォローアップもありません。",

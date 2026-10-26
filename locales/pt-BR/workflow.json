@@ -217,6 +217,8 @@
   "workflow.refused.lane.oneAtATime.next": "Termine {earlier} primeiro: quando estiver concluído, a raia segue para {card}.",
   "workflow.refused.loop.followUpChecked.message": "Cartão {card}: um acompanhamento espera a verificação do revisor, e não dá para seguir sem ela.",
   "workflow.refused.loop.followUpChecked.next": "Aguarde o ok ou gaps do revisor; se não vier, pergunte ao usuário.",
+  "workflow.refused.loop.followUpMerging.message": "O cartão {card} está sendo mesclado agora: um acompanhamento não consegue mais tirá-lo da fila de mesclagem.",
+  "workflow.refused.loop.followUpMerging.next": "Aguarde a mesclagem; se o acompanhamento ainda for necessário, coloque-o em um cartão novo.",
   "workflow.refused.loop.noReviewer.message": "O cartão {card} não tem revisor para verificar isso: não está em nenhuma raia com revisor, e ninguém o revisou ainda.",
   "workflow.refused.loop.noReviewer.next": "Inicie uma raia para o cartão com um revisor, ou escreva isso em um comentário.",
   "workflow.refused.loop.noStep.message": "O cartão {card} não tem nenhum design nem acompanhamento esperando verificação.",

@@ -518,7 +518,10 @@ every move's guards (`idsOf`) and `skippedRules`.
 apart from that, in the same write, whenever `reconcileActs` is on and it isn't applied yet: an integration
 (`integratedOutside`) until the card is Done; a stale pass (`staleEffects`) once per `Stale` fact, its builder's wake
 written for that fact (`card_actions.fact`, read with `hasAction`) as the record that it was applied. So an observation
-recorded while the rules were off is acted on at the next run once they're on, and repeated runs add nothing.
+recorded while the rules were off is acted on at the next run once they're on, and repeated runs add nothing. A stale
+pass whose line is back at exactly the approved revision is observed as a `CarriedOver` (how `sameRevision`, once per
+`Stale`), which the fold reads as the stale pass cleared; `holdsAgain` then queues it again or wakes its builder
+(#1623). That check comes before applying a stale pass's effects, so a pass that holds again never wakes for them.
 
 **Reconciliation in the app (#1217, P3; acting since #1263).** `workflow/reconciler.ts` follows the open workspaces' projects (as
 `platform/watching.ts` does) and subscribes to the watcher for each: a line or a folder's head moved, or a write,

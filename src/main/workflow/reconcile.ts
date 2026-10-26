@@ -15,6 +15,7 @@ import { statSync } from 'original-fs'
 import { join } from 'path'
 import { foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, hasStage } from '../../shared/workflow/compile'
+import { notApproved } from '../../shared/workflow/guards'
 import * as G from '../platform/git'
 import { isUnknown, type Maybe } from '../platform/types'
 import { samePath } from '../../shared/movePaths'
@@ -289,9 +290,22 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
       const c = await G.contains(project, target, approved)
       if (!isUnknown(c) && c) return integratedOutside(wf, card, s, approved.revision, c.method, [])
     }
+    // A stale pass whose line is back at exactly the approved revision (#1623): the reviewer passed that commit, so the
+    // pass holds again (observed once per Stale fact), before any effects of the stale pass not applied yet.
+    if (wf.ownLine(s) && s.stale && s.head === approved.revision && s.stale.approved === approved.revision) {
+      const at = staleFact(wf.store.facts(card.id), s.cycle)?.seq ?? 0
+      const from = s.stale.current ?? approved.revision
+      await wf.write(card, r, 'hive', (w) => {
+        if (!sameCycle(w, s) || !w.state().stale) return
+        if (!observed(w, 'CarriedOver', `back:${s.cycle}:${at}`, { from, to: approved.revision, toBase: approved.base, how: 'sameRevision' })) return
+        // What follows from it, with the rules enforced (P3 records only).
+        if (wf.cfg.reconcileActs) holdsAgain(wf, w)
+      })
+      return
+    }
     // A stale pass whose effects weren't applied (recorded while the rules weren't enforced): applied now, once.
     if (s.stale && wf.cfg.reconcileActs && !staleApplied(wf, card, s)) {
-      await wf.write(card, r, 'outside', (w) => sameCycle(w, s) && staleEffects(w, back, `${card.key}: stale, submit again`)) // i18n-ignore: a wake, agent-facing
+      await wf.write(card, r, 'outside', (w) => sameCycle(w, s) && staleEffects(w, back, `${card.key}: stale, submit again (or put its branch back at ${approved.revision.slice(0, 7)})`)) // i18n-ignore: a wake, agent-facing
       return
     }
     // A new revision after a pass: the same change carries over, another goes stale (§16.4.4).
@@ -309,7 +323,7 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
         }
         observed(w, 'Stale', `stale:${s.cycle}:${head}`, { approved: approved.revision, current: head, why: o.sameness === 'exact' ? 'exact' : 'change' }) // i18n-ignore: a fact's kind and codes, not text
         // What follows from it, once, with the rules enforced (P3 records only).
-        if (wf.cfg.reconcileActs) staleEffects(w, back, `${card.key}: stale, submit again`) // i18n-ignore: a wake, agent-facing
+        if (wf.cfg.reconcileActs) staleEffects(w, back, `${card.key}: stale, submit again (or put its branch back at ${approved.revision.slice(0, 7)})`) // i18n-ignore: a wake, agent-facing
       })
     }
     return
@@ -449,6 +463,26 @@ function staleEffects(w: Write, back: StageId | null, why: string): void {
   if (open) w.fact('IntegrationCancelled', { entry: open.id, reason: 'stale' }) // i18n-ignore: a fact's kind and codes, not text
   if (back) w.move(back, 'derived')
   if (builder) w.action('wake', { agent: builder, why }, f.seq)
+}
+
+/**
+ * What follows a pass that holds again (#1623), in the write's transaction: where Hive merges, an Approved card with no
+ * queue entry is queued again (or the OK before merging it still waits for is asked again); its builder is told it
+ * needn't submit again. While a follow-up waits for its reviewer's check, it isn't queued: the check's ok queues it.
+ */
+function holdsAgain(wf: Workflow, w: Write): void {
+  const s = w.state()
+  const r = w.ruleset
+  const key = w.card.key
+  if (!r) return
+  const o = r.options
+  if (o.finish === 'hiveMerges' && w.current === 'approved' && !openEntry(s) && !s.step && !notApproved(s, r, w.card.labels)) {
+    wf.enqueue(w)
+    return wf.wake(w, s.started?.builder, `${key}: back at its approved revision, so its pass holds again and it is queued again; don't submit it again`) // i18n-ignore: a wake, agent-facing
+  }
+  if (!s.step) wf.reask(w)
+  const next = s.step ? 'it waits for the reviewer to check your follow-up' : openEntry(s) ? 'it stays in the merge queue' : o.finish === 'agentMerges' || o.finish === 'notChecked' ? 'merge it and report the merge' : "it waits for the user's OK" // i18n-ignore: a wake, agent-facing
+  wf.wake(w, s.started?.builder, `${key}: back at its approved revision, so its pass holds again; ${next}`) // i18n-ignore: a wake, agent-facing
 }
 
 /**

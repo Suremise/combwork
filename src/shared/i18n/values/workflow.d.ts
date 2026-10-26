@@ -219,6 +219,8 @@ interface HiveMessageValues {
   'workflow.refused.lane.oneAtATime.next': { earlier: string | number; card: string | number }
   'workflow.refused.loop.followUpChecked.message': { card: string | number }
   'workflow.refused.loop.followUpChecked.next': undefined
+  'workflow.refused.loop.followUpMerging.message': { card: string | number }
+  'workflow.refused.loop.followUpMerging.next': undefined
   'workflow.refused.loop.noReviewer.message': { card: string | number }
   'workflow.refused.loop.noReviewer.next': undefined
   'workflow.refused.loop.noStep.message': { card: string | number }
