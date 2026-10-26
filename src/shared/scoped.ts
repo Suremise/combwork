@@ -20,15 +20,15 @@ export function settle<T>(prev: Scoped<T>, scope: string, r: { data: T } | { err
 }
 
 /**
- * A view's numbered loads (useScopedLoad's, apart from React): `load(scope, fetch, early)` starts one for `scope`. A load
+ * A view's numbered loads (useScopedLoad's, apart from React): `load(scope, loader, early)` starts one for `scope`. A load
  * that finishes after a newer one started, or after the view moved to another scope (`current()`), is dropped. `early`
  * (HI-1681): part of the results, shown while the load runs (Hive's own sessions before the rest): taken only until the
  * load has finished and while it is the newest, and its failure is ignored, so the load alone says how it ended, its
  * time limit included.
  */
-export function scopedLoads<T>(set: (next: (prev: Scoped<T>) => Scoped<T>) => void, current: () => string, now: () => number = Date.now): (asked: string, fetch: () => Promise<T>, early?: Promise<T>) => void {
+export function scopedLoads<T>(set: (next: (prev: Scoped<T>) => Scoped<T>) => void, current: () => string, now: () => number = Date.now): (asked: string, loader: () => Promise<T>, early?: Promise<T>) => void {
   let loads = 0
-  return (asked, fetch, early) => {
+  return (asked, loader, early) => {
     const n = ++loads
     let finished = false
     const mine = (): boolean => n === loads && asked === current()
@@ -44,7 +44,7 @@ export function scopedLoads<T>(set: (next: (prev: Scoped<T>) => Scoped<T>) => vo
     )
     let p: Promise<T>
     try {
-      p = fetch()
+      p = loader()
     } catch (e) {
       p = Promise.reject(e)
     }
