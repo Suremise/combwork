@@ -27,7 +27,7 @@ const { storeValue, storeTestHooks } = await import('../src/main/storeRows')
 const { sessions } = await import('../src/main/sessions')
 const removal = await import('../src/main/projectRemoval')
 const { workspaceDb } = await import('../src/main/boardStore')
-const { readSessions, sessionRows, sessionsOf } = await import('../src/main/sessionStore')
+const { changeSessions, readSessions, sessionRows, sessionsOf } = await import('../src/main/sessionStore')
 type SessionsPlace = import('../src/main/sessionStore').SessionsPlace
 
 const at = '2026-10-19T10:00:00.000Z'
@@ -327,6 +327,36 @@ describe('following the project', () => {
     }
     await run(() => removal.restoreProject('unread-id'))
     expect((await run(() => workspace.sessionsFile(p))).sessions.map((x) => x.id)).toEqual(['u1'])
+  })
+
+  it("a change landing after its workspace was replaced or closed leaves a removed project's file in the folder (#1161)", async () => {
+    const ws2 = join(base, 'closing-ws')
+    const p2 = join(ws2, 'gone')
+    mkdirSync(join(p2, '.hive'), { recursive: true })
+    const file = join(p2, '.hive', 'sessions.json')
+    const s2 = createWorkspaceService()
+    let place: SessionsPlace
+    try {
+      await s2.open(ws2)
+      const in2 = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(s2, fn)
+      await in2(() => workspace.ensureProject(p2))
+      await in2(() => workspace.projectIds({ fresh: true }))
+      await in2(() => workspace.upsertSession(p2, { id: 'kept' }))
+      await in2(() => removal.removeProject(p2, 'remove'))
+      place = await in2(() => (s2 as unknown as { sessionsPlace: (pp: string) => Promise<SessionsPlace> }).sessionsPlace(p2))
+      expect(await place.removed!()).toBe(true)
+      // The service opens another workspace: a late change still finds the project removed.
+      const ws3 = join(base, 'next-ws')
+      mkdirSync(ws3, { recursive: true })
+      await s2.open(ws3)
+      expect(await changeSessions(place, (f) => f.sessions.map((x) => x.id))).toEqual([])
+      expect(existsSync(file)).toBe(true)
+    } finally {
+      await disposeWorkspaceService(s2)
+    }
+    // Closed: a save landing late, through a lease of its own.
+    expect(await changeSessions(place, (f) => f.sessions.map((x) => x.id))).toEqual([])
+    expect(existsSync(file)).toBe(true)
   })
 
   it('a project renamed keeps its records (they are under its id)', async () => {

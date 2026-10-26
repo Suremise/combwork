@@ -1072,8 +1072,17 @@ export class WorkspaceService {
     if (basename(h).toLowerCase() === ASSISTANT_DIR.toLowerCase() && basename(parent).toLowerCase() === HIVE_DIR) return { workspace: dirname(parent), scope: 'assistant', file }
     const known = this.path ? (await this.projectIds().catch(() => null))?.byPath.get(h.toLowerCase()) : undefined
     const saved = known ?? (await readJson<{ id?: unknown } | null>(join(h, HIVE_DIR, 'project.json'), null).catch(() => null))?.id
-    // As the workspace has it when a file would be moved in (#1161), not now: a change may wait for its turn meanwhile.
-    const removed = (): boolean => !!this.path && samePlace(parent, this.path) && (this.wsConfig.hiddenProjects ?? []).some((x) => x.mode === 'removed' && x.name.toLowerCase() === basename(h).toLowerCase())
+    // As its workspace has it when a file would be moved in (#1161), not now: a change may wait for its turn meanwhile. While
+    // this service has that workspace open, as it holds it; closed or replaced since (a save landing late), as its
+    // workspace.json says, or as last known if that can't be read.
+    const listed = (c: { hiddenProjects?: { name: string; mode?: string }[] } | null | undefined): boolean => (c?.hiddenProjects ?? []).some((x) => x.mode === 'removed' && x.name.toLowerCase() === basename(h).toLowerCase())
+    const open = (): boolean => !!this.path && samePlace(parent, this.path)
+    let lastKnown = open() && listed(this.wsConfig)
+    const removed = async (): Promise<boolean> => {
+      if (open()) return (lastKnown = listed(this.wsConfig))
+      const onDisk = await readJson<WorkspaceConfig | null>(join(parent, HIVE_DIR, 'workspace.json'), null)
+      return onDisk ? listed(onDisk) : lastKnown
+    }
     return { workspace: parent, scope: typeof saved === 'string' && saved ? saved : `folder:${basename(h).toLowerCase()}`, file, removed }
   }
 

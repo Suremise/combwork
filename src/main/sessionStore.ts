@@ -35,9 +35,10 @@ export interface SessionsPlace {
   file: string
   /**
    * Removed from Hive (hidden as removed in its workspace): records it took away in its folder stay there (#1061). Asked
-   * when a file would be moved in, not when the place was worked out (#1161): a change can wait for its turn meanwhile.
+   * when a file would be moved in, not when the place was worked out (#1161): a change can wait for its turn meanwhile,
+   * and land after its workspace closed.
    */
-  removed?: () => boolean
+  removed?: () => Promise<boolean>
 }
 
 type Row = { key: string; doc: string; ord?: number }
@@ -186,7 +187,7 @@ async function opening(place: SessionsPlace, db?: Db): Promise<void> {
   if (opened.has(k) || (db ? !!db.pending : upgradeWaiting(place.workspace))) return
   // A removed host's folder keeps its file, whatever scope it is read under (#1161: its id unreadable for a moment gives
   // its folder's, which has no `exported` mark). Not marked opened: asked again at each read until the project is back.
-  if (place.removed?.() || removing.has(k)) return
+  if (removing.has(k) || (await place.removed?.())) return
   const exported = storeValue((db ?? workspaceDb(resolve(place.workspace))).writer, 'sessions', place.scope, 'exported') !== null
   // Its workspace's place resolved as it enters, before anything is awaited (#1456).
   const at = placeKey(place.workspace)
@@ -301,7 +302,7 @@ export function releaseSessions(place: SessionsPlace): void {
 async function moveBack(place: SessionsPlace): Promise<boolean> {
   const moved = await withStoreLock(place.workspace, 'sessions', place.scope, async (db) => {
     // Removed again while this waited for the lock (#1161): the file stays.
-    if (place.removed?.() || removing.has(openedKey(place))) return false
+    if (removing.has(openedKey(place)) || (await place.removed?.())) return false
     if (storeValue(db, 'sessions', place.scope, 'exported') === null) return true
     const f = await readOldFile(place.file)
     transaction(db, () => {
