@@ -156,8 +156,12 @@ async function refusesStart(h, when) {
   check(`${when}, the agent is refused a start, saying why`, /upgrade it to 1\.0 before starting agents/.test(why ?? ''), why ?? 'started')
   check(`…none runs (${when})`, (await live(h)).length === 0)
   // The 0.9 board has none (the one run in step 5 is in the 1.0 board, kept aside by the restore).
-  const records = await h.inv('session:list', alpha)
+  const records = await h.inv('session:list', alpha, { own: true })
   check(`…and none was recorded (${when})`, records.length === 0, JSON.stringify(records.map((r) => r.id)))
+  // Its CLI's transcript is still in the project's folder (HI-1727): the full listing may show it, as a session started
+  // outside Hive (HI-1681), never as Hive's.
+  const all = await h.inv('session:list', alpha)
+  check(`…any other session listed is the CLI's, not Hive's (${when})`, all.every((r) => r.source === 'external'), JSON.stringify(all.map((r) => [r.id, r.source])))
 }
 const ASK = "Upgrade this workspace's board to 1.0?"
 
