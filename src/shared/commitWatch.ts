@@ -10,10 +10,8 @@
 export const COMMIT_WATCH_ARG = '--hive-commit-watch'
 /** The window a burst is counted in (ms): React's nested-update limit is reached that fast in a loop. */
 export const COMMIT_BURST_WINDOW_MS = 250
-/** React's own nested-update limit: a burst this big is a loop (what step 2 will fail a suite on). */
+/** React's own nested-update limit: the candidate threshold step 2 may fail a suite at, once a full run shows normal bursts. */
 export const COMMIT_BURST_LIMIT = 50
-/** The smallest burst said on the console: smaller ones are every screen's normal work. */
-export const COMMIT_BURST_SAID = 10
 /** The console line's start: `<marker> <n>`, n the largest burst so far. */
 export const COMMIT_BURST_MARKER = '[hive commit burst]' // i18n-ignore: a test copy's console marker, read by the e2e harness
 

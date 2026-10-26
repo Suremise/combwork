@@ -636,28 +636,41 @@ _electron.launch = async (...args) => {
 
 // React's commit bursts in the suite's test copies (HI-1387, step 1: recorded, nothing fails on them yet). Each window
 // of a test copy says each new largest burst on its console (src/shared/commitWatch.ts: `<marker> <n>`, n commits within
-// 250 ms); the suite's largest is said once as it exits, for the run's output (run.mjs), and once at the time it first
-// reaches React's nested-update limit (a loop). Step 2 fails a suite on that, once a full run shows normal bursts well under it.
+// 250 ms), small ones too; the suite's largest is said once as it exits, for the run's output (run.mjs), and once at the
+// time it first reaches React's nested-update limit, the candidate threshold. Step 2 decides whether to fail a suite
+// there, once a full run shows what normal bursts are (HI-1759).
 const COMMIT_BURST_MARKER = '[hive commit burst]'
 const COMMIT_BURST_LIMIT = 50
-let largestBurst = 0
-const commitBursts = () => largestBurst
-function noteBurst(text) {
-  if (!String(text).startsWith(COMMIT_BURST_MARKER)) return
-  const n = Number(String(text).slice(COMMIT_BURST_MARKER.length).trim())
-  if (!Number.isInteger(n) || n <= largestBurst) return
-  const first = !largestBurst
-  const reached = largestBurst < COMMIT_BURST_LIMIT && n >= COMMIT_BURST_LIMIT
-  largestBurst = n
-  if (reached) console.log(`INFO React commit burst: ${n} commits within 250 ms, React's nested-update limit (a render loop?): recorded only for now (HI-1387)`)
-  if (first) process.once('exit', () => console.log(`INFO React commit burst: the largest was ${largestBurst} commits within 250 ms (recorded only; ${COMMIT_BURST_LIMIT} is a loop, HI-1387)`))
-}
-function watchCommitBursts(app) {
+/**
+ * A suite's record of its windows' bursts: each window's own largest, from its console lines and read once from the page
+ * as it is watched (one said before the listener was there isn't said again); the suite's, the largest of them, null
+ * while no window has reported (no watch there, which isn't a burst of 0). onFirst: once, when the first window
+ * reports; onReach(n): once, when the suite's first reaches the limit. Never throws into the suite: only a record.
+ */
+function burstWatcher({ onFirst = () => {}, onReach = () => {} } = {}) {
+  const perWindow = new Map()
+  let largest = null
+  const note = (page, n) => {
+    if (!Number.isInteger(n) || n < 0 || n <= (perWindow.get(page) ?? -1)) return
+    perWindow.set(page, n)
+    const before = largest
+    if (before !== null && n <= before) return
+    largest = n
+    if (before === null) onFirst()
+    if ((before ?? -1) < COMMIT_BURST_LIMIT && n >= COMMIT_BURST_LIMIT) onReach(n)
+  }
+  const fromText = (text) => {
+    const s = String(text)
+    if (!s.startsWith(COMMIT_BURST_MARKER)) return null
+    const n = Number(s.slice(COMMIT_BURST_MARKER.length).trim())
+    return Number.isInteger(n) ? n : null
+  }
   const watch = (page) => {
     try {
       page.on('console', (m) => {
         try {
-          noteBurst(m.text())
+          const n = fromText(m.text())
+          if (n !== null) note(page, n)
         } catch {
           // Only a record: never the suite's failure.
         }
@@ -665,14 +678,39 @@ function watchCommitBursts(app) {
     } catch {
       // As above.
     }
+    // What the page reached before the listener was there: its own count, read once.
+    try {
+      Promise.resolve(page.evaluate(() => window.__hiveCommitBurst?.().max)).then(
+        (n) => {
+          if (typeof n === 'number') note(page, n)
+        },
+        () => undefined
+      )
+    } catch {
+      // As above.
+    }
   }
-  try {
-    for (const page of app.windows()) watch(page)
-    app.on('window', watch)
-  } catch {
-    // As above.
+  return {
+    watch,
+    watchApp(app) {
+      try {
+        for (const page of app.windows()) watch(page)
+        app.on('window', watch)
+      } catch {
+        // As above.
+      }
+    },
+    largest: () => largest,
+    windows: () => [...perWindow.values()]
   }
 }
+const bursts = burstWatcher({
+  onFirst: () => process.once('exit', () => console.log(`INFO React commit burst: the largest was ${bursts.largest()} commits within 250 ms (recorded only; ${COMMIT_BURST_LIMIT}, React's nested-update limit, is the candidate threshold, HI-1387)`)),
+  onReach: (n) => console.log(`INFO React commit burst: ${n} commits within 250 ms, React's nested-update limit, the candidate threshold: recorded only for now (HI-1387)`)
+})
+/** The suite's largest burst so far (0 while no window has reported). */
+const commitBursts = () => bursts.largest() ?? 0
+const watchCommitBursts = (app) => bursts.watchApp(app)
 
 /** The Hives a suite may never start (#1253): the installed app (the one hosting the agents, with its own profile and app ID). */
 const INSTALLED = [path.join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Hive'), path.join(process.env.PROGRAMFILES ?? 'C:\\Program Files', 'Hive')]
@@ -1501,4 +1539,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { commitBursts, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, typeLine, fakePrompts, skip }
+module.exports = { commitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, typeLine, fakePrompts, skip }

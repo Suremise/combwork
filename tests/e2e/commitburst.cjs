@@ -1,9 +1,9 @@
 // React's commit bursts in a test copy (HI-1387, step 1: recorded, nothing fails on them yet). A production build says
 // nothing of a render loop until it throws (#185), so a test copy's window watches React's commits through a DevTools
 // hook (src/renderer/src/commitWatch.ts) and says each new largest burst on its console, which lib.cjs collects. A
-// deliberate loop (a setState per commit in a useEffect, as #1366's was, renderer commitLoop.tsx) is caught: its burst
-// reaches React's nested-update limit, seen by the page and by lib.cjs, without throwing. Dev build, throwaway profile,
-// quiet.
+// window's ordinary count is recorded, not judged (calibration for step 2, HI-1759). A deliberate loop (a setState per
+// commit in a useEffect, as #1366's was, renderer commitLoop.tsx) is caught: its burst reaches React's nested-update
+// limit, the candidate threshold, seen by the page and by lib.cjs, without throwing. Dev build, throwaway profile, quiet.
 const lib = require('./lib.cjs')
 const path = require('path')
 
@@ -25,13 +25,16 @@ const check = (name, ok, extra = '') => {
     await lib.appReady(h.page)
     const largest = () => h.page.evaluate(() => window.__hiveCommitBurst?.().max ?? null)
     check("a test copy's window watches React's commits", await h.page.evaluate(() => window.hive.commitWatch === true && typeof window.__hiveCommitBurst === 'function'))
+    // Opening the window is calibration data for step 2 (HI-1759), not judged here: only that it was counted.
     const opening = await largest()
     console.log(`INFO opening the window: ${opening} commits at most within 250 ms`)
-    check('…opening the window is no loop', typeof opening === 'number' && opening > 0 && opening < LIMIT, String(opening))
+    check('…opening the window is counted', typeof opening === 'number' && opening > 0, String(opening))
+    check("…and lib.cjs has the window's count, small as it is", !!(await lib.until(() => lib.commitBursts() >= opening, HUNG_MS, 100)), `${lib.commitBursts()} of ${opening}`)
+    // The fixture: a loop of 80 commits, one per useEffect, all within the window.
     await h.page.evaluate((n) => window.__hiveTestCommitLoop(n), 80)
     const after = await largest()
-    check('a deliberate loop (a setState per commit in a useEffect) is caught: its burst reaches the limit', after >= LIMIT, String(after))
-    check('…and lib.cjs has it from the console', !!(await lib.until(() => lib.commitBursts() >= LIMIT, HUNG_MS, 100)), String(lib.commitBursts()))
+    check('a deliberate loop (a setState per commit in a useEffect) is caught: its burst reaches the candidate threshold', after >= LIMIT, String(after))
+    check('…and lib.cjs has it from the console', !!(await lib.until(() => lib.commitBursts() >= after, HUNG_MS, 100)), `${lib.commitBursts()} of ${after}`)
     check('…which records it only: no page error (it never throws)', errors.length === 0, errors.join('; '))
   } catch (e) {
     check('no exception', false, e?.stack ?? String(e))
