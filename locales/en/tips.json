@@ -627,6 +627,14 @@
     "defaultMessage": "Answer what waits for you",
     "description": "A tip's title (glossary: For you)."
   },
+  "tips.forYouActions.text": {
+    "defaultMessage": "When an agent's question is about something only you can do on its card, it can offer it as a button under the question: Move to Done, Make It No Code or Unblock, with its suggested reason, which you can change. One click does it and answers the agent.",
+    "description": "A tip (#1630). Done is a board column. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: For you, no-code card."
+  },
+  "tips.forYouActions.title": {
+    "defaultMessage": "Answer with one click",
+    "description": "A tip's title (#1630)."
+  },
   "tips.gitCheck.text": {
     "defaultMessage": "Help → Agent Setup… shows the git Hive found and its version. Worktree agents, merging and the Version Control tab’s Git sections need Git for Windows 2.38 or later.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

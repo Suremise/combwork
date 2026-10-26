@@ -2049,7 +2049,7 @@ export function TaskDialog() {
         )}
         {card && !card.archived && <KindProposal card={card} b={badge} readOnly={ro} />}
         {card && !card.archived && <ReviewSkipProposal card={card} b={badge} readOnly={ro} />}
-        {card && !card.archived && <ForYouSection card={card} items={forYouItems} drafts={answerDrafts} setDraft={(request, text) => setAnswerDrafts((d) => ({ ...d, [request]: text }))} setAnswering={setAnswering} />}
+        {card && !card.archived && <ForYouSection card={card} kind={badge?.kind ?? undefined} items={forYouItems} drafts={answerDrafts} setDraft={(request, text) => setAnswerDrafts((d) => ({ ...d, [request]: text }))} setAnswering={setAnswering} />}
         <input ref={titleRef} className="input task-title-input" placeholder={tr(msg({ id: 'board.dialog.titlePlaceholder', defaultMessage: 'Title', description: "Placeholder of the card dialog's title box." }))} value={title} maxLength={200} readOnly={ro} onChange={(e) => setTitle(e.target.value)} />
         <div className="agent-form task-form">
           <label>{tr(msg({ id: 'board.dialog.project', defaultMessage: 'Project', description: "A field label in the card dialog: the card's project." }))}</label>

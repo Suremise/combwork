@@ -128,23 +128,38 @@ export const QUEUE_ADVANCE_GATE = 'queueAdvance'
 /** The gate of Hive's notice that an advance into a checked-out target stopped part way (§16.9.2's terminal state, #1351). */
 export const QUEUE_STUCK_GATE = 'queueStuck'
 
-/** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds. */
+/**
+ * What an agent's question may offer the user to do on its card (#1630): move it to Done, make it no code, unblock it,
+ * each with the agent's suggested reason. One click does it as the user, with the reason, and answers the question.
+ */
+export const ASK_ACTIONS = ['done', 'noCode', 'unblock'] as const
+export type AskActionKind = (typeof ASK_ACTIONS)[number]
+export interface AskAction {
+  kind: AskActionKind
+  reason?: string
+}
+/** At most this many actions on one question. */
+export const ASK_ACTIONS_MAX = 3
+
+/** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds, or an action offered (#1630). */
 export interface AnswerShape {
   outcome: 'approved' | 'declined' | 'answered'
   reply?: boolean
   decision?: boolean
   choice?: RoundChoice
   rounds?: number
+  action?: AskActionKind
 }
 
 /**
  * Whether an answer fits its request (§16.8.5, #1269): at the round limit, a choice (a carry on with 1 to `maxRounds`
  * more rounds), nothing else; an approval (kind Approve), approved or declined (a reply may say why), never a decision;
- * any other question, answered with a reply or a decision.
+ * any other question, answered with a reply or a decision, or with one of the actions it offers (#1630), never both.
  */
-export function answerFits(req: Pick<FactData['ApprovalRequested'], 'kind' | 'gate'>, a: AnswerShape, maxRounds: number): boolean {
-  if (req.gate === ROUND_LIMIT_GATE) return a.outcome === 'answered' && !!a.choice && ROUND_CHOICES.includes(a.choice) && !a.decision && (a.choice !== 'carryOn' || (Number.isInteger(a.rounds) && a.rounds! >= 1 && a.rounds! <= maxRounds))
+export function answerFits(req: Pick<FactData['ApprovalRequested'], 'kind' | 'gate' | 'actions'>, a: AnswerShape, maxRounds: number): boolean {
+  if (req.gate === ROUND_LIMIT_GATE) return a.outcome === 'answered' && !!a.choice && ROUND_CHOICES.includes(a.choice) && !a.decision && !a.action && (a.choice !== 'carryOn' || (Number.isInteger(a.rounds) && a.rounds! >= 1 && a.rounds! <= maxRounds))
   if (a.choice !== undefined) return false
+  if (a.action !== undefined) return a.outcome === 'answered' && !a.decision && !!req.actions?.some((x) => x.kind === a.action)
   if (req.kind === 'approve') return (a.outcome === 'approved' || a.outcome === 'declined') && !a.decision
   return a.outcome === 'answered' && (!!a.reply || !!a.decision)
 }
@@ -207,9 +222,9 @@ export interface FactData {
   Stale: { approved: string | null; current: string | null; why: 'change' | 'decision' | 'exact' }
   /** `text` in English (agents, the Agent API); `requestText`, Hive's own request as data for the window (an agent's words have none). */
   /** `entry` and `result`: the queue entry a merge queue's request is about, and its test merge's result (#1351). */
-  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string; checklist?: string[]; entry?: string; result?: string }
-  /** An answer (§16.8.5): `note` the user's reply; at the round limit, their `choice` and the rounds a carry on adds. */
-  Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number }
+  ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string; checklist?: string[]; entry?: string; result?: string; actions?: AskAction[] }
+  /** An answer (§16.8.5): `note` the user's reply; at the round limit, their `choice` and the rounds a carry on adds; `action`, an action the question offered, done (#1630; `note` its reason). */
+  Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number; action?: AskActionKind }
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash'; requeue?: 'transient' | 'retry' }
   IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' }
   IntegrationStarted: { entry: string; expected: string; result: string; files?: string[]; checkedOut?: string | null }

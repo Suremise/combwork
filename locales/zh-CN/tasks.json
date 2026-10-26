@@ -2,6 +2,7 @@
   "tasks.by.assistant": "助手",
   "tasks.by.repair": "修复",
   "tasks.by.you": "你",
+  "tasks.error.actionGone": "{action, select, done {#{n} 已在已完成中。} noCode {#{n} 已是无代码卡片。} other {#{n} 没有受阻。}}请改为输入回答来回答问题。",
   "tasks.error.addOwnOnly": "你只能向自己的项目（{project}）添加卡片。",
   "tasks.error.archiveNone": "cards：请列出要归档的卡片。",
   "tasks.error.archiveNumbers": "cards：只能填写卡片编号。",

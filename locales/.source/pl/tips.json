@@ -156,6 +156,8 @@
   "tips.followUpCheck.title": "Have a follow-up checked without a new round",
   "tips.forYou.text": "A card with a For you chip waits for you: an approval, a decision or a question. The Task Board icon counts them, and For you on the board shows only those. Open the card to approve, decline or answer: the agent waiting on it hears at once.",
   "tips.forYou.title": "Answer what waits for you",
+  "tips.forYouActions.text": "When an agent's question is about something only you can do on its card, it can offer it as a button under the question: Move to Done, Make It No Code or Unblock, with its suggested reason, which you can change. One click does it and answers the agent.",
+  "tips.forYouActions.title": "Answer with one click",
   "tips.gitCheck.text": "Help → Agent Setup… shows the git Hive found and its version. Worktree agents, merging and the Version Control tab’s Git sections need Git for Windows 2.38 or later.",
   "tips.gitCheck.title": "Is git ready for worktrees?",
   "tips.gitInit.text": "A project without git? Its Version Control tab's Initialise repository… makes it one on main, keeps .hive out, adds a starter .gitignore if you like and makes the first commit, so agents can work in worktrees at once.",

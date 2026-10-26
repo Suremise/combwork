@@ -11,6 +11,10 @@
     "defaultMessage": "You",
     "description": "Who made a change or wrote a comment on a card (beside a history line or a comment): the user. Short."
   },
+  "tasks.error.actionGone": {
+    "defaultMessage": "{action, select, done {#{n} is already in Done.} noCode {#{n} is already no code.} other {#{n} isn't blocked.}} Answer the question with a reply instead.",
+    "description": "An error when the user clicks an action an agent's question offered on its card (For you): the card has changed so the action no longer applies. {n} is the card's number; keep the select keys as they are. Answer with a reply: type an answer in the box instead."
+  },
   "tasks.error.addOwnOnly": {
     "defaultMessage": "You can add cards only to your project ({project}).",
     "description": "An error: an agent tried to add a card to another project, or to the whole workspace; it adds cards only to its own project ({project}, its folder name)."

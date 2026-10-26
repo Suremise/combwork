@@ -2,6 +2,7 @@
   "tasks.by.assistant": "Assistente",
   "tasks.by.repair": "Reparo",
   "tasks.by.you": "Você",
+  "tasks.error.actionGone": "{action, select, done {#{n} já está em Concluído.} noCode {#{n} já é um cartão sem código.} other {#{n} não está bloqueado.}} Responda a pergunta com uma resposta em vez disso.",
   "tasks.error.addOwnOnly": "Você só pode adicionar cartões ao seu projeto ({project}).",
   "tasks.error.archiveNone": "cards: liste os cartões a arquivar.",
   "tasks.error.archiveNumbers": "cards: só números de cartão.",

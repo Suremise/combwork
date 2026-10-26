@@ -2,6 +2,7 @@
   "tasks.by.assistant": "Assistent",
   "tasks.by.repair": "Reparatur",
   "tasks.by.you": "Du",
+  "tasks.error.actionGone": "{action, select, done {#{n} ist schon in Erledigt.} noCode {#{n} ist schon eine Karte ohne Code.} other {#{n} ist nicht blockiert.}} Beantworte die Frage stattdessen mit einer Antwort.",
   "tasks.error.addOwnOnly": "Du kannst Karten nur zu deinem Projekt ({project}) hinzufügen.",
   "tasks.error.archiveNone": "cards: Gib die zu archivierenden Karten an.",
   "tasks.error.archiveNumbers": "cards: nur Kartennummern.",

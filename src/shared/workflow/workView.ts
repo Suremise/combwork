@@ -5,7 +5,7 @@
 // Pure: main reads the facts (workflow/cardWork.ts), the window formats revisions through its project's platform
 // descriptor (`revisionShort`), never by switching on a platform's id.
 
-import { foldCard, type Actor, type CardKind, type CardState, type CheckRanData, type Fact, type FactData, type FileChange, type ForYouKind, type QueueEntry, type RoundChoice, type StageId } from './facts'
+import { foldCard, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type CheckRanData, type Fact, type FactData, type FileChange, type ForYouKind, type QueueEntry, type RoundChoice, type StageId } from './facts'
 import type { StoredText } from '../types'
 import { baseRulesetId, REVIEW_SKIPPED } from './compile'
 
@@ -45,6 +45,8 @@ export interface ForYouItem {
   for: 'user'
   /** A Test request's checklist: what to try (#1267). */
   checklist?: string[]
+  /** What an agent's question offers the user to do on its card (#1630), with its suggested reasons. */
+  actions?: AskAction[]
 }
 
 /** What waits for the user, in a workspace or one project: each request, oldest first, and their count. */
@@ -63,6 +65,20 @@ export interface ForYouAnswer {
   decision?: string
   choice?: RoundChoice
   rounds?: number
+  /** An action the question offers (#1630), done as the user with `reason`. */
+  action?: AskActionKind
+  reason?: string
+}
+
+/**
+ * Whether the user can do an action a question offers on its card now (#1630): Move to Done unless it is Done, Make It
+ * No Code on a code card, Unblock on a blocked one; none on an archived card. The window shows only these; main checks.
+ */
+export function askActionAvailable(kind: AskActionKind, card: { column: string; blocked?: string | null; archived?: boolean; kind?: CardKind }): boolean {
+  if (card.archived) return false
+  if (kind === 'done') return card.column !== 'done'
+  if (kind === 'noCode') return (card.kind ?? 'code') === 'code'
+  return !!card.blocked
 }
 
 /** A card's requests for the user, oldest first: from its facts folded (its open requests). */
@@ -78,7 +94,8 @@ export function forYouItems(card: { card: number; project: string; stage: StageI
     since: r.at,
     asker: r.asker ?? null,
     for: r.for ?? 'user',
-    ...(r.checklist?.length ? { checklist: r.checklist } : {})
+    ...(r.checklist?.length ? { checklist: r.checklist } : {}),
+    ...(r.actions?.length ? { actions: r.actions } : {})
   }))
 }
 

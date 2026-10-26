@@ -25,8 +25,8 @@ import type { CardKind } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
 import { hasStage, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT } from '../shared/workflow/stages'
-import { answerFits, CATEGORY_STAGE, STAGE_CATEGORY, type RoundChoice, type StageId } from '../shared/workflow/facts'
-import { reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
+import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, STAGE_CATEGORY, type AskActionKind, type RoundChoice, type StageId } from '../shared/workflow/facts'
+import { askActionAvailable, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
 import { afterBoardWrite, archiveBatchDocs, boardSavepoint, movedNames, boardRead, boardReadOnly, cardHeads, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, hasCard, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, type CardQuery } from './boardStore'
@@ -1574,13 +1574,37 @@ export async function setReviewSkip(n: number, skip: boolean, actor: TaskActor, 
 /** An answer the window sent that can't be one (the request's kind decides which fields it takes). */
 const BAD_ANSWER = msg({ id: 'tasks.error.badAnswer', defaultMessage: "That answer doesn't fit the request: approve or decline an approval, answer a question with a reply or a decision, and choose a way on at the round limit (a carry on with 1 to {max} more rounds).", description: "An error answering a request for the user (For you): what was sent doesn't fit the request's kind. {max} is the most rounds a carry on can add (a number)." })
 
+/** An action a question offered that the card no longer allows (#1630: Done already, no code already, not blocked). */
+const ACTION_GONE = msg({ id: 'tasks.error.actionGone', defaultMessage: "{action, select, done {#{n} is already in Done.} noCode {#{n} is already no code.} other {#{n} isn't blocked.}} Answer the question with a reply instead.", description: "An error when the user clicks an action an agent's question offered on its card (For you): the card has changed so the action no longer applies. {n} is the card's number; keep the select keys as they are. Answer with a reply: type an answer in the box instead." })
+
+/**
+ * Does an action an agent's question offered (#1630), as the user and with their reason, as the board does it: Move to
+ * Done through the card's rules, the rules it skips recorded as an override (Move Anyway's); Make It No Code, the
+ * `card.kind` override; Unblock, the reason as the user's comment. Throws when it is refused or stops short of Done.
+ */
+async function doAskAction(n: number, kind: AskActionKind, reason: string | undefined): Promise<void> {
+  const actor: TaskActor = { kind: 'user' }
+  if (kind === 'done') {
+    const r = await moveTask(n, 'done', { confirm: true, ...(reason ? { reason } : {}) })
+    if ('refused' in r) throw new WorkflowRefusedError(r.refused)
+    if ('ask' in r) throw new WorkflowRefusedError(refusalOf('move.needsOverride', { card: `#${n}`, stage: 'done', rules: r.ask.join(', ') }, 'the user')) // i18n-ignore: who can override, agent-facing (§16.8.3)
+    if (r.stopped) throw new WorkflowRefusedError(r.stopped)
+  } else if (kind === 'noCode') {
+    await setKind(n, 'no-code', actor, { confirm: true, ...(reason ? { reason } : {}) })
+  } else {
+    await updateTask(n, { blocked: null }, actor, reason ? { comment: reason } : {})
+  }
+}
+
 /**
  * The user answers a card's request (IPC `tasks:answer`, #1269, SPEC §16.8.5): only the user (Darren's point 7: never
  * an agent or the Assistant). On the intent path (`runIntent`), so the answer, what it moves and the card's 0.9 fields
  * are one transaction, checked there (the request still open, the card where it was asked, its generation current). A
  * decision (a Decide answer) is the card's, added with the answer's write: a new generation, its agents told (#1266). A
  * reply is kept with the answer, added to the card as the user's comment and relayed to the waiting agent. Refused with the rule's text when the request was
- * answered or retired meanwhile.
+ * answered or retired meanwhile. An action the question offered (#1630) and the answer are one change of the board
+ * (HR5's round 1): the request still open and the action still allowed, checked under its lock, then the action, then
+ * the answer; any of them refused, none of it is kept and the question stays open.
  */
 export async function answerTask(n: number, request: string, a: ForYouAnswer): Promise<TaskCard> {
   const ws = workspace
@@ -1589,6 +1613,10 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   if (!a || !['approved', 'declined', 'answered'].includes(a.outcome) || typeof request !== 'string' || !request) throw bad()
   const reply = typeof a.reply === 'string' && a.reply.trim() ? text(a.reply.trim(), MAX_TEXT, 'comment') : undefined
   const decision = typeof a.decision === 'string' && a.decision.trim() ? text(a.decision.trim(), MAX_DECISION, 'decision') : undefined
+  const action = a.action === undefined ? undefined : ASK_ACTIONS.includes(a.action) ? a.action : null
+  if (action === null || (action && reply)) throw bad()
+  // An action's reason, as an override's (setKind's).
+  const reason = action && typeof a.reason === 'string' && a.reason.trim() ? text(a.reason.trim(), 1000, 'blockedReason') : undefined
   const head = ws.path ? cardHeads(ws, [n])[0] : undefined
   if (!head) throw unknownTask(n)
   const { workflowFor } = await import('./workflow/service')
@@ -1605,17 +1633,29 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   // What each kind takes (answerFits): an approval is approved or declined; at the round limit, a choice (a carry on with
   // its rounds); any other question, a reply or a decision. Checked before anything is written.
   const choice = a.choice as RoundChoice | undefined
-  if (!answerFits(req, { outcome: a.outcome, reply: !!reply, decision: !!decision, choice, rounds: a.rounds }, LANE_MAX_ROUNDS)) throw bad()
-  const { reply: r } = await runIntent(
-    wf,
-    n,
-    actor,
-    (w) => w.answer(n, request, a.outcome, { ...(reply ? { note: reply } : {}), ...(decision ? { decided: true } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}) }),
-    // A reply is on the card too, as the user's comment (#1626), so the card shows it and the wake's "in full" is there.
-    (_w, first) => ({ patch: first && decision ? { decision } : {}, ...(first && reply ? { opts: { comment: reply } } : {}) })
-  )
-  if (isRefusal(r)) throw new WorkflowRefusedError(r)
-  return getTask(n, ws)
+  if (!answerFits(req, { outcome: a.outcome, reply: !!reply, decision: !!decision, choice, rounds: a.rounds, ...(action ? { action } : {}) }, LANE_MAX_ROUNDS)) throw bad()
+  const answerIt = async (): Promise<TaskCard> => {
+    const { reply: r } = await runIntent(
+      wf,
+      n,
+      actor,
+      (w) => w.answer(n, request, a.outcome, { ...(reply ? { note: reply } : reason ? { note: reason } : {}), ...(decision ? { decided: true } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}), ...(action ? { action } : {}) }),
+      // A reply is on the card too, as the user's comment (#1626), so the card shows it and the wake's "in full" is there.
+      (_w, first) => ({ patch: first && decision ? { decision } : {}, ...(first && reply ? { opts: { comment: reply } } : {}) })
+    )
+    if (isRefusal(r)) throw new WorkflowRefusedError(r)
+    return getTask(n, ws)
+  }
+  if (!action) return answerIt()
+  return cardBatch(ws, async () => {
+    // Under the board's lock: the request still open (answered or retired from another window meanwhile: refused before
+    // anything is done) and the action still allowed.
+    if (!wf.state(wf.store.card(n)).requests.some((x) => x.request === request)) throw new WorkflowRefusedError(refusalOf('move.notFromHere', { card: `#${n}`, stage: CATEGORY_STAGE[head.column as TaskColumn] ?? 'todo', move: 'answer', moves: '' }))
+    if (!askActionAvailable(action, { ...(await getTask(n, ws)), kind: wf.store.card(n).kind })) throw hiveError(ACTION_GONE, { action, n }, { kind: 'conflict' })
+    await doAskAction(n, action, reason)
+    // A refused answer throws: the action is undone with it.
+    return answerIt()
+  })
 }
 
 /** A new card's reads, made before its number is taken (#1216: recorder.ts' NEW_CARD). */

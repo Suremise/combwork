@@ -156,6 +156,8 @@
   "tips.followUpCheck.title": "Ein Follow-up ohne neue Runde prüfen lassen",
   "tips.forYou.text": "Eine Karte mit dem Chip „Für dich“ wartet auf dich: eine Zustimmung, eine Entscheidung oder eine Frage. Das Symbol „Aufgabenboard“ zählt sie, und „Für dich“ auf dem Board zeigt nur diese. Öffne die Karte, um zuzustimmen, abzulehnen oder zu antworten: Der wartende Agent erfährt es sofort.",
   "tips.forYou.title": "Beantworte, was auf dich wartet",
+  "tips.forYouActions.text": "Geht es bei der Frage eines Agenten um etwas, das nur du auf seiner Karte tun kannst, kann er es als Schaltfläche unter der Frage anbieten: Nach Erledigt verschieben, Ohne Code machen oder Blockierung aufheben, mit seiner vorgeschlagenen Begründung, die du ändern kannst. Ein Klick erledigt es und beantwortet dem Agenten die Frage.",
+  "tips.forYouActions.title": "Mit einem Klick antworten",
   "tips.gitCheck.text": "Hilfe → Agent-Einrichtung… zeigt, welches Git Hive gefunden hat, und dessen Version. Worktree-Agenten, Mergen und die Git-Bereiche des Tabs „Versionsverwaltung“ brauchen Git for Windows 2.38 oder neuer.",
   "tips.gitCheck.title": "Ist Git bereit für Worktrees?",
   "tips.gitInit.text": "Ein Projekt ohne Git? „Repository initialisieren…“ im Tab „Versionsverwaltung“ macht daraus ein Repository auf main, hält .hive heraus, legt auf Wunsch eine erste .gitignore an und erstellt den ersten Commit, damit Agenten sofort in Worktrees arbeiten können.",

@@ -2361,8 +2361,14 @@ the search); the card dialog's **For you** section lists each request (its kind,
 the agent's words, who asked and when, a Test request's checklist) with its answers: **Approve** / **Decline…** (a
 reason, required) for an approval, a reply (**Send Reply**: the user's comment on the card, and to the agent waiting
 on it an `answer` delivery from the user quoting the reply whole, its question quoted short, #1626) or **Record as
-Decision** for a question, and the four
-ways on (carry on with its rounds) at the round limit. A refused answer (answered or retired meanwhile) is said in a
+Decision** for a question (each with a tooltip saying what it does), and the four
+ways on (carry on with its rounds) at the round limit. **Actions an agent offers (#1630):** an agent's question may
+offer up to three things only the user can do on its card (`actions`: `done` Move to Done, `noCode` Make It No Code,
+`unblock` Unblock; `skipReview` waits for #1625), each with a suggested reason. Each the card allows now (not Done; a
+code card; blocked) is a button with its reason, editable; one click does what the board does, as the user, with the
+reason (Move to Done through the card's rules, the rules it skips an `Override` as Move Anyway's; Make It No Code the
+`card.kind` override; Unblock with the reason as the user's comment), then answers the question (`Approval.action`,
+the reason its `note`), and the asker is told which. An action refused, or no longer allowed, leaves the question open. A refused answer (answered or retired meanwhile) is said in a
 toast and the board read again; an answer clears the chip at once (`tasks-changed`).
 
 #### 16.8.6 A refused commit (#907)

@@ -7,7 +7,7 @@
 import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -227,6 +227,109 @@ describe('For you on the board (#1269)', () => {
     expect(asker[0]).toMatchObject({ kind: 'answer', card })
     expect(asker[0].text).toContain(': Yes, the user guide too')
     expect((await inboxOf(w, 'a1')).filter((i) => i.text.includes('Yes, the user guide too'))).toEqual([])
+  })
+
+  it("an agent's question offering Move to Done: one click moves its code card with no change to Done, the override and reason recorded, the asker told (#1630)", async () => {
+    // Done needs a review and a merge: a move past them is an override.
+    const { w } = await workspace({ ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    // HB1's HI-1624: already done by another card, so nothing to submit.
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'This was already done by #1277: how do I close it?', actions: [{ kind: 'done', reason: 'already done by #1277' }, { kind: 'noCode' }] }))
+    const req = forYou(w).items[0]
+    expect(req.actions).toEqual([{ kind: 'done', reason: 'already done by #1277' }, { kind: 'noCode' }])
+    // Only an action it offers, and never with a reply.
+    await expect(answer(w, card, req.request, { outcome: 'answered', action: 'unblock' })).rejects.toThrow(/doesn't fit the request/)
+    await expect(answer(w, card, req.request, { outcome: 'answered', action: 'done', reply: 'Done it' })).rejects.toThrow(/doesn't fit the request/)
+    const after = await answer(w, card, req.request, { outcome: 'answered', action: 'done', reason: 'already done by #1277' })
+    expect(after.column).toBe('done')
+    expect(facts(w, card).find((f) => f.kind === 'Override')?.data).toMatchObject({ by: 'user', reason: 'already done by #1277', move: expect.stringContaining('done') })
+    expect(facts(w, card).find((f) => f.kind === 'Approval')?.data).toMatchObject({ request: req.request, answer: 'answered', action: 'done', note: 'already done by #1277' })
+    expect(forYou(w).count).toBe(0)
+    const items = await inboxOf(w, 'a1')
+    expect(items.filter((i) => i.kind === 'answer')).toHaveLength(1)
+    expect(items.find((i) => i.kind === 'answer')?.text).toContain('moved it to Done (already done by #1277)')
+  })
+
+  it("an offered action the card no longer allows is refused and the question stays open; Make It No Code and Unblock do what the board does (#1630)", async () => {
+    const { w } = await workspace({ ...allOff('git'), review: 'agent', finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Unblock it?', actions: [{ kind: 'unblock' }] }))
+    const unblock = forYou(w).items[0]
+    // Not blocked: nothing to unblock, and the question is still there.
+    await expect(answer(w, card, unblock.request, { outcome: 'answered', action: 'unblock' })).rejects.toThrow(/isn't blocked/)
+    expect(forYou(w).items.map((i) => i.request)).toEqual([unblock.request])
+    await update(w, card, { blocked: 'Waiting for the key' }, b1)
+    const unblocked = await answer(w, card, unblock.request, { outcome: 'answered', action: 'unblock', reason: 'The key is in the vault' })
+    expect(unblocked.blocked).toBeNull()
+    expect(unblocked.comments.at(-1)).toMatchObject({ by: 'You', text: 'The key is in the vault' })
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'A write-up only?', actions: [{ kind: 'noCode', reason: 'a write-up' }] }))
+    const noCode = forYou(w).items[0]
+    await answer(w, card, noCode.request, { outcome: 'answered', action: 'noCode', reason: 'a write-up' })
+    expect(FactStore.forBoard(w, { project: 'p', key: 'p' }).card(card).kind).toBe('no-code')
+    expect(facts(w, card).find((f) => f.kind === 'Override')?.data).toMatchObject({ rules: ['card.kind'], reason: 'a write-up' })
+    expect(forYou(w).count).toBe(0)
+  })
+
+  it("an offered action and its answer are one change: another window's answer meanwhile waits and is refused; a refused answer undoes the action (#1630 round 1)", async () => {
+    const { w } = await workspace({ ...allOff('git'), review: 'agent', finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    const kind = () => FactStore.forBoard(w, { project: 'p', key: 'p' }).card(card).kind
+    const of = (k: string) => facts(w, card).filter((f) => f.kind === k)
+    const ask = async (text: string) => {
+      await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text, actions: [{ kind: 'noCode', reason: 'a write-up' }] }))
+      return forYou(w).items.find((i) => i.text === text)!.request
+    }
+    // The runtime's answer, wherever the intent path calls it from.
+    const proto = Object.getPrototypeOf(wf) as typeof wf
+    const real = proto.answer
+    // HR5's probe: the second window's reply starts after the action is written, before its answer is.
+    const first = await ask('A write-up only?')
+    let other: Promise<unknown> | null = null
+    // What another connection (another window's Hive) sees of the card while the answer is being written.
+    let seenOutside: string | null = null
+    const spy = vi.spyOn(proto, 'answer').mockImplementation(function (this: typeof wf, ...args: Parameters<typeof wf.answer>) {
+      if (!other) {
+        const own = FactStore.open(store.boardFile(w.path!), { project: 'p', key: 'p' })
+        try {
+          seenOutside = own.card(card).kind
+        } finally {
+          own.close()
+        }
+      }
+      if (!other) other = answer(w, card, first, { outcome: 'answered', reply: 'Keep it as code; I will finish it' }).then(() => 'answered', (e: unknown) => (e instanceof tasks.WorkflowRefusedError ? 'refused' : String(e)))
+      return real.apply(this, args)
+    })
+    try {
+      await answer(w, card, first, { outcome: 'answered', action: 'noCode', reason: 'a write-up' })
+      expect(await other).toBe('refused')
+      // The action isn't committed before its answer: nobody else sees the card changed and the question still open.
+      expect(seenOutside).toBe('code')
+    } finally {
+      spy.mockRestore()
+    }
+    expect(kind()).toBe('no-code')
+    expect(of('Approval').map((f) => f.data)).toEqual([expect.objectContaining({ request: first, action: 'noCode', note: 'a write-up' })])
+    // Back to code, asked again: its answer refused after the action, the action is undone with it and the question stays.
+    await inWorkspace(w, () => tasks.setKind(card, 'code', user, { confirm: true }))
+    const second = await ask('A write-up after all?')
+    const overrides = of('Override').length
+    const refuse = vi.spyOn(proto, 'answer').mockImplementation(async () => {
+      throw new Error('the answer was refused')
+    })
+    try {
+      await expect(answer(w, card, second, { outcome: 'answered', action: 'noCode', reason: 'a write-up' })).rejects.toThrow(/refused/)
+    } finally {
+      refuse.mockRestore()
+    }
+    expect(kind()).toBe('code')
+    expect(of('Override')).toHaveLength(overrides)
+    expect(forYou(w).items.map((i) => i.request)).toEqual([second])
   })
 
   it("an agent's question: a decision as its answer is recorded on the card (a new generation), the asker told", async () => {

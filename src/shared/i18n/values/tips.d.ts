@@ -158,6 +158,8 @@ interface HiveMessageValues {
   'tips.followUpCheck.title': undefined
   'tips.forYou.text': undefined
   'tips.forYou.title': undefined
+  'tips.forYouActions.text': undefined
+  'tips.forYouActions.title': undefined
   'tips.gitCheck.text': undefined
   'tips.gitCheck.title': undefined
   'tips.gitInit.text': undefined
