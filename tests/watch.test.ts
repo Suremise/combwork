@@ -652,6 +652,30 @@ describe('watches (main/watches.ts)', async () => {
     }
   })
 
+  it("a watch's label names its card by key, read outside any request too (HI-1688)", async () => {
+    const path = join(base, `ws-${++n}`)
+    for (const p of ['alpha', 'beta']) {
+      mkdirSync(join(path, p, '.hive'), { recursive: true })
+      writeFileSync(join(path, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }] }))
+    }
+    const w = createWorkspaceService()
+    await w.open(path)
+    const { keyProjects } = await import('../src/main/projectKeys')
+    await inWorkspace(w, () => keyProjects(w))
+    const alpha = join(path, 'alpha')
+    fake(alpha)
+    const mine = await inWorkspace(w, () => tasks.createTask({ title: 'Mine', project: 'alpha' }, user))
+    expect(mine.key).toMatch(/^[A-Z]{2,4}-\d+$/)
+    const r = await watches.registerWatch(w, alpha, 'a1', { cards: [mine.number], changes: ['column'], column: 'review' })
+    const label = `Waiting for ${mine.key} → Review`
+    expect(r).toMatchObject({ watching: { label } })
+    // As the Agent API's status, the project list and the inbox's offer line read it: outside any request, no names of
+    // their own (before HI-1688 it said "#N" there).
+    expect(watches.watchFor(alpha, 'a1')?.label).toBe(label)
+    await watches.settled()
+    await disposeWorkspaceService(w)
+  })
+
   it('fires once when a watched card changes, waking an idle agent; a column already reached answers at once', async () => {
     const { w, alpha } = await open()
     const st = fake(alpha)

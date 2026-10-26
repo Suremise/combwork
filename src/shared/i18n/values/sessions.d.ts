@@ -37,6 +37,7 @@ interface HiveMessageValues {
   'sessions.cards.workedOn': undefined
   'sessions.chips.dismiss': { file: string | number }
   'sessions.chips.label': undefined
+  'sessions.chips.toCard': { file: string | number }
   'sessions.cleanup.age': { age: string }
   'sessions.cleanup.archive': undefined
   'sessions.cleanup.archiveSummary': undefined

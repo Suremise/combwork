@@ -34,6 +34,14 @@
   "service.benchmarks.unwritable": "Hive 写入的已保存对比列表无法正确读回，因此拒绝写入：未做任何更改。",
   "service.benchmarks.why": "{why, select, missing {已保存对比的列表丢失} damaged {已保存对比的列表已损坏} entry {已保存对比的列表中有一项已损坏} other {已保存对比的列表条目过多}}",
   "service.benchmarks.wrongScope": "该对比文件与其范围不符：请删除后重新导入。",
+  "service.cardAttach.moveFailed": "无法将卡片的附件复制到 {project}，因此卡片未移动：{why}",
+  "service.cardAttach.moved": "在此期间卡片已移到其他项目：请重新附加。",
+  "service.cardAttach.noAttachment": "卡片没有该附件。",
+  "service.cardAttach.noCard": "没有这张卡片。",
+  "service.cardAttach.noProject": "{project} 不是工作区中的项目。未附加任何内容。",
+  "service.cardAttach.refused": "{path} 不是可在此附加的文件：请提供你自己项目（其文件夹、其 slot）或临时文件夹中文件的路径。未附加任何内容。",
+  "service.cardAttach.tooLarge": "{name} 超过 {max}，即卡片单个文件可保留的上限（“设置”→“高级”→“卡片附件：最大文件”）。未附加任何内容。",
+  "service.cardAttach.tooMuch": "一次最多可附加 {files, number} 个文件、{total}。未附加任何内容。",
   "service.files.badName": "“{name}”不是有效的名称",
   "service.files.exists": "“{name}”已存在",
   "service.files.existsIn": "{root, select, yes {项目根目录中已存在“{name}”} other {{folder} 中已存在“{name}”}}",
@@ -233,5 +241,7 @@
   "service.workspace.platformTitle": "{project} 的版本控制已变化",
   "service.workspace.renameAgent": "重命名 {project} 的 {agent}…",
   "service.workspace.sharedNames": "智能体名称现在在整个工作区中唯一，以便区分每个智能体。{shared}：它们仍可正常工作，但请在每组同名智能体中重命名一个，例如将 {project} 的 {agent} 改为 {suggestion}。",
+  "service.workspace.stillClosing": "{name} 仍在关闭中：请等它完成后再试。",
+  "service.workspace.stillOpening": "{name} 仍在打开中：请等它完成后再试。",
   "service.workspace.twoCalled": "有两个智能体都叫 {name}"
 }

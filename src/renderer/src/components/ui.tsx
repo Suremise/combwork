@@ -977,11 +977,22 @@ function linkCards(html: string, cards: MarkdownCards): string {
  * Markdown, sanitized. `cards`: card references (AM-12, #1061) link to their cards, as in a card's description and comments.
  * `breaks`: a single line break is kept (#1637: an agent's question written line by line), not run into its paragraph.
  */
-export function Markdown({ source, className, onLink, cards, breaks }: { source: string; className?: string; onLink?: (href: string) => boolean; cards?: MarkdownCards; breaks?: boolean }) {
+export function Markdown({ source, className, onLink, cards, breaks, images }: { source: string; className?: string; onLink?: (href: string) => boolean; cards?: MarkdownCards; breaks?: boolean; images?: (src: string) => string | null }) {
   const clean = DOMPurify.sanitize(marked.parse(source, { async: false, ...(breaks ? { breaks: true } : {}) }) as string)
   const html = cards ? linkCards(clean, cards) : clean
+  // Images the caller gives a source of its own once shown (HI-1700: a card's attachments, by a relative placeholder the
+  // sanitiser keeps; their hive-img: and blob: URLs it wouldn't).
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (!images || !ref.current) return
+    for (const img of ref.current.querySelectorAll('img')) {
+      const to = images(img.getAttribute('src') ?? '')
+      if (to) img.setAttribute('src', to)
+    }
+  }, [html, images])
   return (
     <div
+      ref={ref}
       className={cx('markdown', className)}
       onClick={(e) => {
         const a = (e.target as HTMLElement).closest('a')

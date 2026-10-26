@@ -67,7 +67,14 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const b = await op({ op: 'lend', agent: b2.id, card: 102 })
     check('B2 is lent slot-b', b.ok && b.slot.name === 'slot-b', JSON.stringify(b))
     // Ended at once (its go-ahead is there already): under Recent, by its slot's name.
-    check('…its setup shown as "Hive (slot slot-b)"', !!(await until(async () => (await runOf('slot-b'))?.state === 'passed' && (await panel.locator('.progress-tab-runs').innerText()).includes('Hive (slot slot-b)'), HUNG_MS)), await panel.innerText().catch(() => ''))
+    // In its card's runs (HI-1701), opened: closed once they all passed.
+    const openRuns = async () => {
+      for (const t of await panel.locator('.progress-tab-runs .progress-card-toggle[aria-expanded="false"]').all()) await t.click().catch(() => undefined)
+    }
+    check('…its setup shown as "Hive (slot slot-b)"', !!(await until(async () => {
+      await openRuns()
+      return (await runOf('slot-b'))?.state === 'passed' && (await panel.locator('.progress-tab-runs').innerText()).includes('Hive (slot slot-b)')
+    }, HUNG_MS)), await panel.innerText().catch(() => ''))
     await panel.screenshot({ path: path.join(fx.shots, 'slotpool-2-two-slots.png') })
     check('a third card has no slot: the pool is two', (await op({ op: 'lend', agent: 'someone', card: 103 })).refusal?.why === 'noSlot')
 

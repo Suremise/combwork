@@ -66,6 +66,11 @@ export interface OpenOptions {
    * called once the file is open and writable, with its writer; returns what stops it, called first when it closes.
    */
   checkpointer?: (file: string, writer: DatabaseSync) => () => void
+  /**
+   * Told once the steps that ran as the file opened are committed (HI-1694): each one's time, and the copy's made before
+   * them (null: none), so a slow upgrade says which step took it.
+   */
+  onSteps?: (steps: { version: number; name: string; ms: number }[], copyMs: number | null) => void
 }
 
 /** An open database: a writer and a reader connection to one file. */
@@ -185,14 +190,26 @@ function migrate(db: DatabaseSync, file: string, opts: OpenOptions): PendingGrou
   let copied = false
   transaction(db, () => db.exec('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL, hive_version TEXT NOT NULL) STRICT'))
   const record = db.prepare('INSERT INTO schema_version (version, name, applied_at, hive_version) VALUES (?, ?, ?, ?)')
+  const timed: { version: number; name: string; ms: number }[] = []
+  let copyMs: number | null = null
+  const copy = (make: () => void): void => {
+    const t = performance.now()
+    make()
+    copyMs = (copyMs ?? 0) + performance.now() - t
+  }
   const run = (m: Migration): void => {
+    const t = performance.now()
     m.up(db)
     record.run(m.version, m.name, new Date().toISOString(), opts.hiveVersion)
+    timed.push({ version: m.version, name: m.name, ms: performance.now() - t })
+  }
+  const told = (): void => {
+    if (timed.length) opts.onSteps?.(timed, copyMs)
   }
   for (let i = 0; i < todo.length; ) {
     const group = existing ? todo[i].group : undefined
     if (!group) {
-      if (!copied && existing && opts.backupDir) backupTo(db, opts.backupDir, family, schemaVersion(db))
+      if (!copied && existing && opts.backupDir) copy(() => backupTo(db, opts.backupDir!, family, schemaVersion(db)))
       copied = true
       transaction(db, () => run(todo[i]))
       i++
@@ -202,15 +219,19 @@ function migrate(db: DatabaseSync, file: string, opts: OpenOptions): PendingGrou
     while (end < todo.length && todo[end].group === group) end++
     const steps = todo.slice(i, end)
     const pending: PendingGroup = { group, from: schemaVersion(db), to: steps[steps.length - 1].version }
-    if (opts.approve && !opts.approve(pending)) return pending
+    if (opts.approve && !opts.approve(pending)) {
+      told()
+      return pending
+    }
     // The copy before the group's first step is kept for good (the way back); one before a later step of it (a file in the
     // group already) is an ordinary copy, of the file's own three.
     const first = Math.min(...opts.migrations.filter((m) => m.group === group).map((m) => m.version))
-    runGroup(db, file, opts, pending, pending.from < first ? groupBackupFamily(family, group) : null, family, () => steps.forEach(run))
+    runGroup(db, file, opts, pending, pending.from < first ? groupBackupFamily(family, group) : null, family, () => steps.forEach(run), copy)
     // The group's copy is the file before every step after it too.
     copied = true
     i = end
   }
+  told()
   return null
 }
 
@@ -220,7 +241,7 @@ function migrate(db: DatabaseSync, file: string, opts: OpenOptions): PendingGrou
  * check, a copy kept for good, then every step in one transaction (a failure or a crash leaves the file before the group).
  * The lock goes back to NORMAL after, whatever happened. Another connection holding the file: DbInUseError, nothing changed.
  */
-function runGroup(db: DatabaseSync, file: string, opts: OpenOptions, pending: PendingGroup, keptFamily: string | null, family: string, steps: () => void): void {
+function runGroup(db: DatabaseSync, file: string, opts: OpenOptions, pending: PendingGroup, keptFamily: string | null, family: string, steps: () => void, copy: (make: () => void) => void): void {
   db.exec('PRAGMA locking_mode = EXCLUSIVE')
   try {
     db.exec(`PRAGMA busy_timeout = ${GROUP_LOCK_WAIT_MS}`)
@@ -236,7 +257,7 @@ function runGroup(db: DatabaseSync, file: string, opts: OpenOptions, pending: Pe
       db.exec('PRAGMA busy_timeout = 5000')
     }
     opts.beforeGroup?.(pending)
-    if (opts.backupDir) backupTo(db, opts.backupDir, keptFamily ?? family, pending.from, new Date(), !!keptFamily)
+    if (opts.backupDir) copy(() => backupTo(db, opts.backupDir!, keptFamily ?? family, pending.from, new Date(), !!keptFamily))
     transaction(db, steps)
     opts.whileGroupLocked?.()
   } finally {

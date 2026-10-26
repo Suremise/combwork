@@ -97,6 +97,8 @@
   "tips.branchCards.title": "Zobacz, do której karty należy gałąź",
   "tips.branchCleanup.text": "Kontrola wersji → Gałęzie i zdalne repozytoria grupuje gałęzie jako W użyciu, Scalone i Nie scalone. Uporządkuj scalone gałęzie… usuwa scalone, których nic nie używa, a scalone na twoich zdalnych repozytoriach proponuje osobno, nigdy nie zaznaczone za ciebie.",
   "tips.branchCleanup.title": "Uporządkuj scalone gałęzie",
+  "tips.cardAttachments.text": "Wklej lub upuść pliki w opisie albo komentarzu karty: zostaną przy karcie po zapisaniu lub opublikowaniu, są w niej pokazane i wymienione agentowi, który ją rozpoczyna. Pinezka na chipie załącznika w panelu kopiuje plik na kartę agenta.",
+  "tips.cardAttachments.title": "Zachowaj zrzut ekranu przy jego karcie",
   "tips.cardCost.text": "Panel karty pokazuje, ile zużyli jej agenci, gdy nad nią pracowali: „{example}”, a po najechaniu kursorem części wykonawcy i recenzenta oraz tokeny. Wydajność pokazuje koszt każdej karty, a dymek toru w panelu Postęp – jego narzut.",
   "tips.cardCost.title": "Ile kosztowała karta",
   "tips.cardDecisions.text": "Decyzje karty, nad jej komentarzami, zawierają to, co postanowiono: agenci sprawdzają z nimi swoją pracę przed Recenzją, a recenzenci odrzucają pracę, która którąś pomija. Powiedz Asystentowi o decyzji, a zapisze ją tam; agent czekający na Twoją odpowiedź dostanie informację.",

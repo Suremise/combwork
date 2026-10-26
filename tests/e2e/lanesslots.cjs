@@ -158,10 +158,18 @@ const lines = (file) => {
         const choices = await agentChoices()
         return ['Hive (slot slot-a)', 'Hive (copy copy-1)', 'R1'].every((x) => choices.includes(x))
       }, HUNG_MS)), JSON.stringify(await agentChoices()))
-    const runRow = panel.locator(`[data-run="${checkRun?.id}"]`)
-    const forText = async () => ((await runRow.locator('.progress-run-for').first().textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ').trim()
-    check(`its row reads "${key1} · ${rev.slice(0, 7)} · in copy-1"`, !!(await until(async () => (await forText()) === `${key1} · ${rev.slice(0, 7)} · in copy-1`, HUNG_MS)), await forText())
-    await runRow.click()
+    const runRow = panel.locator(`.progress-tab-runs [data-run="${checkRun?.id}"]`)
+    // In its card's runs (HI-1701), opened: closed once they all passed. What it ran for and where is in its hover.
+    await until(async () => {
+      if ((await runRow.count()) === 1) return true
+      for (const t of await panel.locator('.progress-tab-runs .progress-card-toggle[aria-expanded="false"], .progress-tab-runs .progress-group-head[aria-expanded="false"]').all()) await t.click().catch(() => undefined)
+      return false
+    }, HUNG_MS)
+    const forLine = `${key1} · ${rev.slice(0, 7)} · in copy-1`
+    const forTip = await lib.hoverTip(page, runRow.locator('.progress-recent > .tip-wrap').first(), (t) => t.includes(forLine), HUNG_MS)
+    check(`its hover reads "${forLine}"`, forTip.includes(forLine), forTip)
+    await page.mouse.move(5, 5)
+    await runRow.locator('.progress-recent').click()
     const details = runRow.locator('.progress-details')
     const detailsText = async () => ((await details.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ')
     check('…its details name the copy and the folder it ran in', !!(await until(async () => (await detailsText()).includes('Copycopy-1') && (await detailsText()).includes(copy), HUNG_MS)), await detailsText())
@@ -222,8 +230,17 @@ const lines = (file) => {
       await shots2(ja.page, ja.inv, 'ja', 'lane-hover', null, hover)
       await panel.locator('.progress-tab[data-tab="runs"]').click()
       // Its copy's check, kept from the first start.
-      const row = panel.locator('.progress-recent-item', { hasText: jaPieces('board.progress.inCopy', { copy: 'copy-1' }).join('') })
-      check('ja: the copy’s run is listed, "in copy-1" in Japanese', !!(await until(async () => (await row.count()) === 1, HUNG_MS)), JSON.stringify({ shown: await panel.locator('.progress-runs-body').innerText().catch(() => ''), kept: (await ja.inv('progress:snapshot')).runs.map((r) => [r.title, r.copy, r.state]) }))
+      // In its card's runs (HI-1701), opened; "in copy-1" in its hover.
+      const row = panel.locator(`.progress-tab-runs .progress-recent-item[data-run="${runId}"]`)
+      const listed = await until(async () => {
+        if ((await row.count()) === 1) return true
+        for (const t of await panel.locator('.progress-tab-runs .progress-card-toggle[aria-expanded="false"], .progress-tab-runs .progress-group-head[aria-expanded="false"]').all()) await t.click().catch(() => undefined)
+        return false
+      }, HUNG_MS)
+      const inCopy = jaPieces('board.progress.inCopy', { copy: 'copy-1' }).join('')
+      const jaTip = listed ? await lib.hoverTip(ja.page, row.locator('.progress-recent > .tip-wrap').first(), (t) => t.includes(inCopy), HUNG_MS) : ''
+      check('ja: the copy’s run is listed, "in copy-1" in Japanese in its hover', !!listed && jaTip.includes(inCopy), JSON.stringify({ tip: jaTip, shown: await panel.locator('.progress-runs-body').innerText().catch(() => ''), kept: (await ja.inv('progress:snapshot')).runs.map((r) => [r.title, r.copy, r.state]) }))
+      await ja.page.mouse.move(5, 5)
       await row.locator('.progress-recent').click()
       await shots2(ja.page, ja.inv, 'ja', 'runs', panel)
     } catch (err) {

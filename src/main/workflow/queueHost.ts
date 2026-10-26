@@ -172,6 +172,17 @@ export function queueLive(ws: WorkspaceService, projectPath: string, target: str
   return { running: !!h.running, now: h.now, run: h.run }
 }
 
+/**
+ * What this Hive's hosts of a project's queues are doing now, as a token (HI-1683): the same token, the same `queueLive`
+ * for each of its targets, so a queue view made then is still current as far as they go.
+ */
+export function queueHostsStamp(ws: WorkspaceService, projectPath: string): string {
+  if (!ws.path) return ''
+  const out: unknown[] = []
+  for (const h of hosts.values()) if (alive(h) && h.wsPath.toLowerCase() === ws.path.toLowerCase() && h.projectPath.toLowerCase() === projectPath.toLowerCase()) out.push([h.target, !!h.running, h.now, h.run])
+  return JSON.stringify(out)
+}
+
 async function runHost(h: Host): Promise<void> {
   let runner: QueueRunner | null = null
   try {

@@ -33,8 +33,10 @@ import { launchOverrides } from '../../advancedValues'
 const log = createLogger('claude-code')
 /** Transcripts whose sub-agent check is remembered (by path and mtime). */
 const SUB_CACHE = 2000
-/** Transcripts looked at at once while listing a folder's sessions (HI-1681): each waits on the disk, one after another was slow under load. */
+/** Transcripts looked at at once while listing a folder's sessions (HI-1681), and skills copied at once for a launch (HI-1694): each waits on the disk, one after another was slow under load. */
 const LIST_AT_ONCE = 8
+/** A launch's preparation this slow is logged with where its time went (HI-1694). */
+const SLOW_PREPARE_MS = 500
 /**
  * How many of the screen's last written lines a safeguard prompt is looked for in: its dialog is drawn last, at the
  * bottom, its choices within about a dozen lines of the end (more when a narrow pane wraps their descriptions).
@@ -312,11 +314,20 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   }
 
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {
+    const started = performance.now()
     // A --settings of the user's is read first: one Hive can't read stops the launch before anything changes (#330).
     const theirs = await userSettings(ctx.extraArgs, ctx.cwd)
     const dir = this.launchDir(ctx.projectPath, ctx.agentId)
-    await removePath(dir)
     const pluginDir = join(dir, 'plugin')
+    const skillsDir = join(pluginDir, 'skills')
+    // The last launch's skill copies are kept while each is still its source's content, so a launch copies only what
+    // changed (HI-1694: copying every skill again took 6 s on a drive a virus scanner watches); everything else in the
+    // folder is written again, and a skill no longer given goes.
+    const last = await readJson<{ hashes?: Record<string, string> } | null>(join(dir, 'sync.json'), null)
+    const wanted = new Set(ctx.skills.map((s) => s.name))
+    for (const [folder, keep] of [[dir, 'plugin'], [pluginDir, 'skills']] as const) for (const f of await readdir(folder).catch(() => [] as string[])) if (f !== keep) await removePath(join(folder, f))
+    for (const f of await readdir(skillsDir).catch(() => [] as string[])) if (!wanted.has(f)) await removePath(join(skillsDir, f))
+    const cleared = performance.now()
     await mkdir(join(pluginDir, '.claude-plugin'), { recursive: true })
     await writeJsonAtomic(join(pluginDir, '.claude-plugin', 'plugin.json'), {
       name: 'hive',
@@ -326,8 +337,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const hashes: Record<string, string> = {}
     // Each agent's own copies: what it gets is what was copied here (its revision read back from the copy).
     const delivered: Record<string, SkillDelivery> = {}
-    for (const skill of ctx.skills) {
-      const dest = join(pluginDir, 'skills', skill.name)
+    let copied = 0
+    // A few skills at once: each waits on the disk.
+    await atMost(LIST_AT_ONCE, ctx.skills, async (skill) => {
+      const dest = join(skillsDir, skill.name)
       // A skill over the hashing limits isn't copied (the launch folder starts empty, so the session has no copy of it).
       // Checked on the source first, which reads no more than the limits, and on the copy, which may have grown since.
       // One skill's failure is its own: the launch folder started empty, so a skill not copied is one the session
@@ -336,11 +349,17 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
         await removePath(dest).catch(() => undefined)
         delivered[skill.name] = e instanceof ContentTooLarge ? { revision: null, problem: tooBigToDeliver(e), lasting: true } : { revision: null, problem: sourceProblem(e, skill.sourcePath) }
       }
+      let source: string
       try {
-        hashes[`skill:${skill.name}`] = await contentHash(skill.sourcePath)
+        source = hashes[`skill:${skill.name}`] = await contentHash(skill.sourcePath)
       } catch (e) {
         await fail(e)
-        continue
+        return
+      }
+      // The last launch's copy, still the source's content (read back, as a copy is): kept.
+      if (last?.hashes?.[`skill:${skill.name}`] === source && (await contentHash(dest).catch(() => null)) === source) {
+        delivered[skill.name] = { revision: source }
+        return
       }
       // Links stay links, to the same place, so the copy is the same content as the workspace's skill. A link it can't
       // make (Windows needs a privilege for a link to a file) is left out, with every other file of the skill copied.
@@ -349,14 +368,17 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       let skipped: string[]
       let revision: string
       try {
+        await removePath(dest)
         skipped = await copySkillTree(skill.sourcePath, dest)
         revision = await contentHash(dest)
+        copied++
       } catch (e) {
         await fail(e)
-        continue
+        return
       }
       delivered[skill.name] = skipped.length ? { revision, problem: linksNotCopied(skipped), lasting: true } : { revision }
-    }
+    })
+    const skillsDone = performance.now()
     // The MCP config and settings may hold secrets (servers' own env and headers, a user's --settings): they go in the
     // launch's private folder, outside the project (#345).
     await writeJsonAtomic(join(ctx.privateDir, 'mcp.json'), { mcpServers: ctx.mcpServers })
@@ -399,6 +421,12 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       join(dir, 'README.txt'),
       'This folder is generated by Hive each time a session starts. Edits here are overwritten.\n'
     )
+    // Where a slow launch's preparation went (HI-1694).
+    const ms = performance.now() - started
+    if (ms > SLOW_PREPARE_MS) {
+      const s = (a: number, b: number): string => `${Math.round(b - a)} ms`
+      log.info(`preparing ${userText(ctx.agentId)}'s launch took ${s(0, ms)}: clearing the last one's ${s(started, cleared)}, ${ctx.skills.length} skill(s) ${s(cleared, skillsDone)} (${copied} copied, ${ctx.skills.length - copied} kept), its settings ${s(skillsDone, started + ms)}`)
+    }
     return delivered
   }
 

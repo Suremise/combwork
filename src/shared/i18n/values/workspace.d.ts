@@ -195,6 +195,15 @@ interface HiveMessageValues {
   'workspace.notes.workspaceNotes.off': undefined
   'workspace.notes.workspaceNotes.template': undefined
   'workspace.notes.workspaceNotes.title': undefined
+  'workspace.opening.adoption': undefined
+  'workspace.opening.projects': undefined
+  'workspace.opening.skills': undefined
+  'workspace.opening.skillsCount': { done: number; total: number }
+  'workspace.opening.slots': undefined
+  'workspace.opening.title': { name: string | number }
+  'workspace.opening.upgrade': undefined
+  'workspace.opening.upgradingTitle': { name: string | number }
+  'workspace.opening.wait': undefined
   'workspace.overview.agentLabel': { project: string | number; agent: string | number }
   'workspace.overview.apiCost': undefined
   'workspace.overview.asReported': undefined
@@ -449,6 +458,7 @@ interface HiveMessageValues {
   'workspace.storage.backups': undefined
   'workspace.storage.beforeCompression': { size: string | number }
   'workspace.storage.cancel': undefined
+  'workspace.storage.cardAttachments': undefined
   'workspace.storage.cleanUp': undefined
   'workspace.storage.copies': undefined
   'workspace.storage.deletedSession': { id: string | number }

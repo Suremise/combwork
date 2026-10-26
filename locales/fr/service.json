@@ -34,6 +34,14 @@
   "service.benchmarks.unwritable": "Hive a refusé d’écrire une liste de comparaisons conservées qu’il ne pourrait pas relire : rien n’a été modifié.",
   "service.benchmarks.why": "{why, select, missing {la liste des comparaisons conservées était manquante} damaged {la liste des comparaisons conservées était endommagée} entry {une entrée de la liste des comparaisons conservées était endommagée} other {la liste des comparaisons conservées avait trop d’entrées}}",
   "service.benchmarks.wrongScope": "Le fichier de cette comparaison ne correspond pas à sa portée : retire-la et importe-la à nouveau.",
+  "service.cardAttach.moveFailed": "Les pièces jointes de la carte n’ont pas pu être copiées vers {project}, elle n’a donc pas été déplacée : {why}",
+  "service.cardAttach.moved": "La carte est passée dans un autre projet entre-temps : joignez à nouveau.",
+  "service.cardAttach.noAttachment": "La carte n’a pas cette pièce jointe.",
+  "service.cardAttach.noCard": "Cette carte n’existe pas.",
+  "service.cardAttach.noProject": "{project} n’est pas un projet de l’espace de travail. Rien n’a été joint.",
+  "service.cardAttach.refused": "{path} n’est pas un fichier qui peut être joint ici : donnez le chemin d’un fichier de votre propre projet (son dossier, ses slots) ou du dossier temporaire. Rien n’a été joint.",
+  "service.cardAttach.tooLarge": "{name} dépasse {max}, le maximum qu’une carte garde dans un fichier (Paramètres → Avancé → Pièces jointes des cartes : plus gros fichier). Rien n’a été joint.",
+  "service.cardAttach.tooMuch": "Au plus {files, number} fichiers et {total} peuvent être joints à la fois. Rien n’a été joint.",
   "service.files.badName": "« {name} » n’est pas un nom valide",
   "service.files.exists": "« {name} » existe déjà",
   "service.files.existsIn": "{root, select, yes {« {name} » existe déjà à la racine du projet} other {« {name} » existe déjà dans {folder}}}",
@@ -233,5 +241,7 @@
   "service.workspace.platformTitle": "La gestion de versions a changé dans {project}",
   "service.workspace.renameAgent": "Renommer l’agent {agent} du projet {project}…",
   "service.workspace.sharedNames": "Les noms d’agents sont désormais uniques dans l’espace de travail, pour qu’on puisse distinguer chaque agent. {shared} : ils continuent de fonctionner, mais renomme l’un d’eux à chaque fois, par exemple l’agent {agent} du projet {project} en {suggestion}.",
+  "service.workspace.stillClosing": "{name} est encore en cours de fermeture : attends la fin, puis réessaie.",
+  "service.workspace.stillOpening": "{name} est encore en cours d’ouverture : attends la fin, puis réessaie.",
   "service.workspace.twoCalled": "Deux agents s’appellent {name}"
 }

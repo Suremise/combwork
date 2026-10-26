@@ -36,6 +36,14 @@ interface HiveMessageValues {
   'service.benchmarks.unwritable': undefined
   'service.benchmarks.why': { why: string }
   'service.benchmarks.wrongScope': undefined
+  'service.cardAttach.moveFailed': { project: string | number; why: string | number }
+  'service.cardAttach.moved': undefined
+  'service.cardAttach.noAttachment': undefined
+  'service.cardAttach.noCard': undefined
+  'service.cardAttach.noProject': { project: string | number }
+  'service.cardAttach.refused': { path: string | number }
+  'service.cardAttach.tooLarge': { name: string | number; max: string | number }
+  'service.cardAttach.tooMuch': { files: number; total: string | number }
   'service.files.badName': { name: string | number }
   'service.files.exists': { name: string | number }
   'service.files.existsIn': { root: string; name: string | number; folder: string | number }
@@ -235,5 +243,7 @@ interface HiveMessageValues {
   'service.workspace.platformTitle': { project: string | number }
   'service.workspace.renameAgent': { project: string | number; agent: string | number }
   'service.workspace.sharedNames': { shared: string | number; project: string | number; agent: string | number; suggestion: string | number }
+  'service.workspace.stillClosing': { name: string | number }
+  'service.workspace.stillOpening': { name: string | number }
   'service.workspace.twoCalled': { name: string | number }
 }

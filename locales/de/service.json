@@ -34,6 +34,14 @@
   "service.benchmarks.unwritable": "Hive hat eine Liste gespeicherter Vergleiche, die es nicht zurücklesen konnte, nicht geschrieben: Es wurde nichts geändert.",
   "service.benchmarks.why": "{why, select, missing {die Liste der gespeicherten Vergleiche fehlte} damaged {die Liste der gespeicherten Vergleiche war beschädigt} entry {ein Eintrag in der Liste der gespeicherten Vergleiche war beschädigt} other {die Liste der gespeicherten Vergleiche hatte zu viele Einträge}}",
   "service.benchmarks.wrongScope": "Diese Vergleichsdatei passt nicht zu ihrem Geltungsbereich: Entferne sie und importiere sie erneut.",
+  "service.cardAttach.moveFailed": "Die Anhänge der Karte konnten nicht nach {project} kopiert werden, daher wurde sie nicht verschoben: {why}",
+  "service.cardAttach.moved": "Die Karte wurde inzwischen in ein anderes Projekt verschoben: Hänge erneut an.",
+  "service.cardAttach.noAttachment": "Die Karte hat diesen Anhang nicht.",
+  "service.cardAttach.noCard": "Diese Karte gibt es nicht.",
+  "service.cardAttach.noProject": "{project} ist kein Projekt des Arbeitsbereichs. Nichts wurde angehängt.",
+  "service.cardAttach.refused": "{path} ist keine Datei, die hier angehängt werden kann: Gib den Pfad einer Datei deines eigenen Projekts (seines Ordners, seiner Slots) oder des Temp-Ordners an. Nichts wurde angehängt.",
+  "service.cardAttach.tooLarge": "{name} ist größer als {max}, das Höchste, was eine Karte in einer Datei behält (Einstellungen → Erweitert → Karten-Anhänge: größte Datei). Nichts wurde angehängt.",
+  "service.cardAttach.tooMuch": "Höchstens {files, number} Dateien und {total} können auf einmal angehängt werden. Nichts wurde angehängt.",
   "service.files.badName": "„{name}“ ist kein gültiger Name",
   "service.files.exists": "„{name}“ existiert bereits",
   "service.files.existsIn": "{root, select, yes {„{name}“ existiert bereits im Stammordner des Projekts} other {„{name}“ existiert bereits in {folder}}}",
@@ -233,5 +241,7 @@
   "service.workspace.platformTitle": "Versionsverwaltung in {project} geändert",
   "service.workspace.renameAgent": "Agent {agent} von {project} umbenennen…",
   "service.workspace.sharedNames": "Agentennamen sind jetzt im ganzen Arbeitsbereich eindeutig, damit jeder Agent unterscheidbar ist. {shared}: Sie arbeiten weiter, aber benenne jeweils einen um, z. B. Agent {agent} von {project} in {suggestion}.",
+  "service.workspace.stillClosing": "{name} wird noch geschlossen: warte, bis das fertig ist, und versuche es dann erneut.",
+  "service.workspace.stillOpening": "{name} wird noch geöffnet: warte, bis das fertig ist, und versuche es dann erneut.",
   "service.workspace.twoCalled": "Zwei Agenten heißen {name}"
 }

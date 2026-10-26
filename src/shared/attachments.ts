@@ -10,6 +10,14 @@ export type AttachmentKind = 'image' | 'pdf' | 'text' | 'file'
 
 /** Where a session host keeps its attachments: `.hive/attachments/<session id>` (or `run-<launch>` until it has one). */
 export const ATTACHMENTS_DIR = 'attachments'
+/**
+ * Cards' attachments (HI-1700): `<host>/.hive/attachments/cards/<card number>`, beside the sessions' folders. Never a
+ * session's: the sessions' listings, Clean Up and Purge pass it by (isSessionFolder), so nothing of a session's removes it.
+ */
+export const CARD_ATTACHMENTS_DIR = 'cards'
+/** Whether a folder in a host's attachments folder is a session's (any but the cards' folder). */
+export const isSessionFolder = (name: string): boolean => name.toLowerCase() !== CARD_ATTACHMENTS_DIR
+
 /** The folder's name before #387: Hive moves it to ATTACHMENTS_DIR, and old paths into it still lead to the moved files. */
 export const OLD_ATTACHMENTS_DIR = 'images'
 

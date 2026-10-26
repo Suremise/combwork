@@ -13,7 +13,9 @@
 import { app } from 'electron'
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
+import { boardRevision } from '../boardStore'
 import { runCardIntent } from '../cardIntents'
+import { onHiveEvent } from '../events'
 import { git } from '../git'
 import type { TaskActor } from '../tasks'
 import type { TaskCard } from '../../shared/types'
@@ -23,7 +25,7 @@ import { isUnknown } from '../platform/types'
 import { processAlive } from '../progressService'
 import type { WorkspaceService } from '../workspace'
 import { MergeQueue } from './mergeQueue'
-import { kickQueue, queueChanged, queueLive } from './queueHost'
+import { kickQueue, queueChanged, queueHostsStamp, queueLive } from './queueHost'
 import { queueOrder } from './queueState'
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
@@ -57,7 +59,59 @@ interface QueueScope {
  * window's listing (#1356), which also lists the targets that only have cards in flight under Hive merges, or are the
  * current options' target, so the panel can decide which show.
  */
-export async function queueViews(ws: WorkspaceService, projectPath: string, target?: string, window = false): Promise<QueueView[]> {
+export function queueViews(ws: WorkspaceService, projectPath: string, target?: string, window = false): Promise<QueueView[]> {
+  const stamp = viewsStamp(ws, projectPath)
+  if (stamp === null) return makeViews(ws, projectPath, target, window)
+  const key = [ws.path!.toLowerCase(), projectPath.toLowerCase(), target ?? '', window ? 'window' : ''].join('\n') // i18n-ignore: a key, never shown
+  const now = Date.now()
+  for (const [k, e] of viewsKept) if (e.until <= now) viewsKept.delete(k)
+  const had = viewsKept.get(key)
+  if (had && had.stamp === stamp) return had.views
+  const entry: KeptViews = { stamp, until: now + VIEWS_KEPT_MS, views: makeViews(ws, projectPath, target, window) }
+  viewsKept.set(key, entry)
+  entry.views.then(
+    // A return seen leaves the listing RETURN_SEEN_SHOWN_MS after it was seen (recentOutcomes): kept until the first does.
+    (views) => (entry.until = Math.min(entry.until, ...views.flatMap((v) => v.returns.flatMap((r) => (r.seen ? [Date.parse(r.seen) + RETURN_SEEN_SHOWN_MS] : []))))),
+    () => void (viewsKept.get(key) === entry && viewsKept.delete(key))
+  )
+  return entry.views
+}
+
+/**
+ * Queue listings worked out once per state (HI-1683): the window reads them as the board changes, in bursts (each
+ * project's, the Version Control tab's, a card's), and each listing read the board's facts on main. A listing is kept,
+ * and one being made shared, while what it was made from is unchanged (viewsStamp); until its first seen return folds;
+ * and at most VIEWS_KEPT_MS, since its default branch is read from git.
+ */
+interface KeptViews {
+  stamp: string
+  until: number
+  views: Promise<QueueView[]>
+}
+const viewsKept = new Map<string, KeptViews>()
+const VIEWS_KEPT_MS = 5000
+
+/** Bumped as a project's workflow is written (its options: which queues show, and its target). */
+let optionsWritten = 0
+onHiveEvent((e) => {
+  if (e.type === 'workflow-changed' || e.type === 'workspace-changed') optionsWritten++
+})
+
+/**
+ * What a project's queue listings are made from, as a token: the board's revision (its facts, pauses, leases and seen
+ * returns, committed here or by another process), this Hive's hosts of the project's queues, its options written, the
+ * rules switch and the test seam. Null when the board can't say (no listing is kept then).
+ */
+function viewsStamp(ws: WorkspaceService, projectPath: string): string | null {
+  if (!ws.path) return null
+  try {
+    return [boardRevision(ws), queueHostsStamp(ws, projectPath), optionsWritten, workflowEnforced(), process.env.HIVE_TEST_QUEUE_RETURNS ?? ''].join('\n')
+  } catch {
+    return null
+  }
+}
+
+async function makeViews(ws: WorkspaceService, projectPath: string, target: string | undefined, window: boolean): Promise<QueueView[]> {
   const wf = await workflowFor(ws, projectPath)
   if (!wf) return []
   const scope = window ? await queueScope(wf, projectPath) : undefined

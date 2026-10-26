@@ -12,7 +12,7 @@ import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, 
 import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
-import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
+import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
@@ -288,6 +288,15 @@ export const BOARD_MIGRATIONS: Migration[] = [
     group: UPGRADE_GROUP_ID,
     up: (db) => {
       for (const sql of SESSION_LEASES_STEP.ddl) db.exec(sql)
+    }
+  },
+  {
+    // HI-1700: files kept with a card (cardAttachments.ts).
+    version: 23,
+    name: CARD_ATTACHMENTS_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      for (const sql of CARD_ATTACHMENTS_STEP.ddl) db.exec(sql)
     }
   }
 ]
@@ -707,9 +716,17 @@ function openBoard(path: string, upgrade: boolean): Board {
         if (othersPresent(hive, presenceId()).length) throw new OtherHiveError()
       },
       whileGroupLocked: boardTestHooks.whileUpgrading ?? holdForTest,
-      checkpointer: checkpointWhenIdle
+      checkpointer: checkpointWhenIdle,
+      // Each step's time (HI-1694: an upgrade that took a minute said only that it had finished).
+      onSteps: (steps, copyMs) => {
+        const ms = (x: number): string => `${Math.round(x)} ms`
+        const total = steps.reduce((n, x) => n + x.ms, copyMs ?? 0)
+        log.info(`the board of ${userText(path)} took ${steps.length} schema step(s) in ${ms(total)}${copyMs === null ? '' : `, its copy before them ${ms(copyMs)}`}: ${steps.map((x) => `${x.version} ${x.name} ${ms(x.ms)}`).join(', ')}`)
+      }
     })
     const w = db.writer
+    // Read-only until the user says yes in the window's question (HI-1694: the log said nothing of the wait for it).
+    if (db.pending) log.info(`the board of ${userText(path)} waits for its upgrade to 1.0 (from v${db.pending.from}): read-only until the window's question is answered`)
     const b: Board = {
       path,
       place: real.toLowerCase(),
@@ -907,6 +924,8 @@ interface WriteState {
   open: boolean
   changed: boolean
   after: (() => void)[]
+  /** What to put back on disk if the change (or the savepoint it was asked in) is undone (onBoardUndone), newest first. */
+  undone: (() => Promise<void>)[]
   /** SQLite undid its transaction part way (a full disk, an I/O error, #1017 round 1): nothing more is written, and the change fails. */
   lost: Error | null
 }
@@ -944,7 +963,7 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>, 
     const b = boardOf(path)
     if (b.db.newer !== null) throw hiveError(M.newer, undefined, { kind: 'conflict' })
     if (b.db.pending) throw hiveError(M.upgradeFirst, undefined, { kind: 'conflict' })
-    const state: WriteState = { key, open: true, changed: false, after: [], lost: null }
+    const state: WriteState = { key, open: true, changed: false, after: [], undone: [], lost: null }
     const db = b.db.writer
     let committed = false
     db.exec('BEGIN IMMEDIATE')
@@ -965,6 +984,7 @@ export async function boardWrite<T>(ws: WorkspaceService, fn: () => Promise<T>, 
       } catch {
         // Closed meanwhile (the workspace closed): nothing was committed.
       }
+      await undoOnDisk(state.undone.splice(0))
       // Undone part way by SQLite: said so, whichever error the change passed on (a batch's storage error, #1216).
       throw state.lost ?? e
     } finally {
@@ -1014,6 +1034,26 @@ export function afterBoardWrite(ws: WorkspaceService, fn: () => void): void {
   const w = writing.getStore()
   if (ws.path && w && w.open && w.key === keyOf(ws.path)) w.after.push(fn)
   else writing.exit(fn)
+}
+
+/**
+ * Asks the board change running here to put something on disk back if it is undone (HI-1700: files renamed into place
+ * with rows that are then rolled back): run, newest first, when the change rolls back, or the savepoint it was asked in.
+ * Never run once it commits. Outside a change of `ws`'s board there is nothing to undo with: nothing is kept.
+ */
+export function onBoardUndone(ws: WorkspaceService, fn: () => Promise<void>): void {
+  const w = writing.getStore()
+  if (ws.path && w && w.open && w.key === keyOf(ws.path)) w.undone.push(fn)
+}
+
+async function undoOnDisk(fns: (() => Promise<void>)[]): Promise<void> {
+  for (const fn of fns.reverse()) {
+    try {
+      await fn()
+    } catch (e) {
+      log.warn('putting back what an undone board change did on disk', e)
+    }
+  }
 }
 
 /** Marks the write running here as a change (told after it commits); outside a write, tells the board now. */
@@ -1131,6 +1171,7 @@ export async function boardSavepoint<T>(ws: WorkspaceService, fn: () => Promise<
   const db = boardOf(path).db.writer
   const name = `part${++savepoints}`
   const after = state.after.length
+  const undone = state.undone.length
   const changed = state.changed
   db.exec(`SAVEPOINT ${name}`)
   try {
@@ -1144,6 +1185,7 @@ export async function boardSavepoint<T>(ws: WorkspaceService, fn: () => Promise<
         db.exec(`ROLLBACK TO ${name}`)
         state.after.length = after
         state.changed = changed
+        await undoOnDisk(state.undone.splice(undone))
       }
       db.exec(`RELEASE ${name}`)
     }
@@ -1393,6 +1435,24 @@ export function cardPlaces(ws: WorkspaceService): { number: number; raw: { colum
     if (!b.legacy) return cardFields(db, ['column', 'order', 'project', 'projectId'], { parts: [] }).map(({ r, fields }) => ({ number: r.card.number, raw: { column: fields.column, order: r.card.ord, archived: r.card.archived === 1, project: fields.project, projectId: fields.projectId } }))
     const rows = db.prepare('SELECT number, col, ord, archived, project, project_id FROM cards').all() as { number: number; col: unknown; ord: unknown; archived: number; project: unknown; project_id: unknown }[] // i18n-ignore: SQL
     return rows.map((r) => ({ number: r.number, raw: { column: r.col, order: r.ord, archived: r.archived === 1, project: r.project, projectId: r.project_id } }))
+  })
+}
+
+/** A card's head (HI-1690): whose it is, where it is (its column and order there), who works on it and who reviews it. */
+const HEAD_FIELDS = ['title', 'project', 'projectId', 'column', 'order', 'archived', 'agent', 'agentName', 'review']
+
+/**
+ * The live cards' heads (HI-1690: what readers run for each board change need of the board), or with `done` the live Done
+ * cards' alone: HEAD_FIELDS from their columns, nothing else of a card (its description, comments, history) and no
+ * archived card. In number order.
+ */
+export function cardHeadDocs(ws: WorkspaceService, o: { done?: boolean } = {}): { number: number; doc: Record<string, unknown> }[] {
+  const where = o.done ? "col = 'done' AND archived = 0" : 'archived = 0' // i18n-ignore: SQL
+  return readSnapshot(ws, (b, db) => {
+    if (!b.legacy) return cardFields(db, HEAD_FIELDS, { where, parts: [] }).map(({ r, fields }) => ({ number: r.card.number, doc: fields }))
+    const field = (k: string): string => `'${k}', doc -> '$.${k}'`
+    const rows = db.prepare(`SELECT number, json_object(${HEAD_FIELDS.map(field).join(', ')}) AS doc FROM cards WHERE ${where} ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
+    return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
   })
 }
 
@@ -1696,6 +1756,20 @@ export function upgradeWaiting(workspacePath: string): boolean {
   }
 }
 
+/**
+ * Whether a workspace's board waits for its upgrade to 1.0 (HI-1694): its tables are still 0.9's and it takes no writes,
+ * so background work for the workspace (the line updater, metrics, the opening's board steps) waits for it too, and runs
+ * once it is upgraded. False for a workspace no window holds (its work stops on that anyway) or with no board.
+ */
+export function boardWaits(ws: WorkspaceService): boolean {
+  if (!ws.path) return false
+  try {
+    return upgradeWaiting(ws.path)
+  } catch {
+    return false
+  }
+}
+
 /** Throws the user's reason when the workspace's upgrade to 1.0 waits: for what can't run without hive.db (an agent's start). */
 export function assertUpgraded(workspacePath: string): void {
   if (upgradeWaiting(workspacePath)) throw hiveError(M.upgradeFirstStart, undefined, { kind: 'conflict' })
@@ -1727,6 +1801,7 @@ export function onBoardUpgraded(fn: (ws: WorkspaceService) => void): () => void 
 export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: string | null }> {
   const path = pathOf(ws)
   const key = keyOf(path)
+  const started = performance.now()
   let upgraded = false
   const out = await withFileLock(boardLock(path), async () => {
     const pending = boardOf(path).db.pending
@@ -1751,7 +1826,7 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
     }
     // A 0.9 board's copy is the one kept for good; a 1.0 board taking a later step of the group gets an ordinary one.
     const kept = from09 ? copy09(path) : undefined
-    log.info(`upgraded the board of ${userText(path)} to 1.0 (from v${pending.from}); ${kept ? `the 0.9 board is kept as ${basename(kept.file)}` : 'it was a 1.0 board already'}`)
+    log.info(`upgraded the board of ${userText(path)} to 1.0 (from v${pending.from}) in ${Math.round(performance.now() - started)} ms; ${kept ? `the 0.9 board is kept as ${basename(kept.file)}` : 'it was a 1.0 board already'}`)
     replaced(path)
     upgraded = true
     return { backup: kept?.file ?? null }

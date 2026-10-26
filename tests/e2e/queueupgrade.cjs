@@ -2,7 +2,8 @@
 // read-only and asked first. Opening it, the steps that need a board taking writes (the merge queues, the cards' and
 // projects' ids and keys, ending reviews, archiving) skip it quietly: the log has no "no such table" nor "This board is
 // from Hive 0.9" from them. The user says Upgrade; then, with no restart, a card approved under "Hive merges" is merged
-// by the queue (Done, Integrated by Hive, the target at it).
+// by the queue (Done, Integrated by Hive, the target at it). HI-1694: the window shows the upgrade and the steps after it
+// as they go, nothing runs against the board meanwhile ("no such table", "readonly"), and the log times each step.
 // The first merge waits for the merge style and commit message, which the upgrade left to the user (HI-1697): asked under
 // For you, answered there (Squash, the branch's own message); then by a Workflow save; then through a crash after the
 // board records the choice and one inside its change, each started again (HIVE_TEST_MERGE_CHOICE_CRASH); then a card with
@@ -100,13 +101,34 @@ const log = () => {
     check('the 0.9 board opens read-only, asked first', !!(await until(async () => (await ask.count()) === 1, HUNG_MS)) && (await h.inv('board:state')).readOnly === 'upgrade')
     // The opening's steps have begun by the time its line is logged (they start before it, in the background).
     check('…the workspace opened', !!(await until(() => log().includes('[workspace] Opened workspace'), HUNG_MS)))
+    check('…and the log says the board waits for the question (HI-1694)', /the board of .* waits for its upgrade to 1\.0 \(from v2\): read-only until the window's question is answered/.test(log()))
 
+    // The opening view, from the click until the adoption and the slots are done (HI-1694), each text it shows.
+    const view = h.page.locator('.workspace-opening')
+    const shown = []
+    const watching = { on: true }
+    const watch = (async () => {
+      while (watching.on) {
+        const t = (await view.innerText().catch(() => '')).replace(/\s+/g, ' ')
+        if (t && shown.at(-1) !== t) shown.push(t)
+        await lib.sleep(20)
+      }
+    })()
     await ask.getByRole('button', { name: 'Upgrade', exact: true }).click()
     check('Upgrade upgrades it', !!(await until(async () => (await h.inv('board:state')).readOnly === null, HUNG_MS)))
     // The adoption runs once after the upgrade, in the background: the project's options are set after it.
     check('…then the adoption, once', !!(await until(() => rows("SELECT value FROM board_meta WHERE key = 'adoption'").length === 1, HUNG_MS)))
-    const skipped = log().split(/\r?\n/).filter((l) => /\[WARN\]/.test(l) && /no such table|This board is from Hive 0\.9/.test(l))
-    check('while it waited, nothing failed on the read-only board (no "no such table", no "This board is from Hive 0.9")', skipped.length === 0, skipped.join(' | '))
+    check('…and the opening view goes once its steps are done', !!(await until(async () => (await view.count()) === 0, HUNG_MS)))
+    watching.on = false
+    await watch
+    // The upgrade's own step can't be seen from here: Playwright reaches the window through main, busy with the upgrade
+    // while it runs (the window, a process of its own, shows it meanwhile). The steps after it are seen.
+    const name = path.basename(fx.ws)
+    check("…having shown the steps after the upgrade, with the workspace's name", shown.length > 0 && shown.every((t) => t.includes(`Upgrading ${name} to Hive 1.0`)) && shown.some((t) => /Adopting its cards and projects…|Adopting its agents' worktrees as slots…/.test(t)), shown.join(' | '))
+    const skipped = log().split(/\r?\n/).filter((l) => /\[(WARN|ERROR)\]/.test(l) && /no such table|This board is from Hive 0\.9|readonly database|Could not save the performance metrics|bringing builders/.test(l))
+    check('while it waited, nothing failed on the read-only board (no "no such table", "readonly", nor "This board is from Hive 0.9")', skipped.length === 0, skipped.join(' | '))
+    const timed = log().split(/\r?\n/).filter((l) => /schema step|\[workspace\] opening |upgraded the board/.test(l))
+    check("the log times the upgrade's steps and the opening's (HI-1694)", timed.some((l) => /took \d+ schema step\(s\) in \d+ ms, its copy before them \d+ ms: .*sessions and deliveries in tables \d+ ms/.test(l)) && timed.some((l) => /upgraded the board of .* to 1\.0 \(from v2\) in \d+ ms/.test(l)) && timed.some((l) => /opening .*: slots took \d+ ms; \d+ ms in all/.test(l)), timed.join(' | '))
 
     // No restart: "Hive merges" into integration, and a card approved now goes to the queue. The upgrade left the merge
     // style and commit message unchosen (HI-1697): the queue asks under For you before it merges, and merges as answered.
