@@ -206,9 +206,16 @@ export async function recordClosing(reason: RestartReason, o: { snapshotMs?: num
   stopping = true
   generation++
   const bounded = <T>(p: Promise<T>, ms: number, fallback: T): Promise<T> => Promise.race([p, new Promise<T>((r) => setTimeout(() => r(fallback), ms).unref())])
-  // This run's queue, unfinished: its entries go back to pending (the next start checks them again).
-  for (const e of record?.entries ?? []) if (e.state === 'queued' || e.state === 'starting') setState(e, 'pending')
-  const base = baseEntries(reason)
+  // This run's queue, unfinished: its entries go back to pending (the next start checks them again). One being resumed
+  // keeps its own entry (its reason, card and lane), never replaced by its live launch, which is still starting and
+  // in no lane, so narrowing would drop it.
+  const inFlight = new Set<string>()
+  for (const e of record?.entries ?? [])
+    if (e.state === 'queued' || e.state === 'starting') {
+      setState(e, 'pending')
+      inFlight.add(agentKey(e))
+    }
+  const base = baseEntries(reason).filter((e) => !inFlight.has(agentKey(e)))
   record = mergeSnapshot(record, base)
   await save()
   const enriched = await bounded(enrich(base).catch((e) => (log.warn('Reading the cards and lanes of the agents as Hive closes', e), null)), o.snapshotMs ?? 2000, null)
@@ -420,11 +427,15 @@ function pump(): void {
       if (!queue.some((k) => entryOf(k)?.state === 'queued')) report()
     } finally {
       pumping = false
+      queuePasses++
       if (pumpAgain && gen === generation) pump()
     }
   })()
 }
 let pumpAgain = false
+/** Tests: the queue's passes finished, and whether one is under way (a barrier: what a pass decided is final). */
+let queuePasses = 0
+export const queueForTests = (): { passes: number; pumping: boolean } => ({ passes: queuePasses, pumping })
 
 // A workspace read (a window restoring it, or one opened later), or a launch ending, may let entries go.
 let following = false

@@ -73,12 +73,12 @@ let m: typeof import('../src/main/restartResume')
 let events: typeof import('../src/main/events')
 
 /** A fresh module with a record of these entries, read as a start reads it. */
-async function startWith(entries: unknown[]) {
+async function startWith(entries: unknown[], o: { readyMs?: number } = {}) {
   vi.resetModules()
   m = await import('../src/main/restartResume')
   events = await import('../src/main/events')
   const file = join(dir, 'restart.json')
-  m.setTimingsForTests({ recordFile: file, readyMs: 300, stopMs: 50 })
+  m.setTimingsForTests({ recordFile: file, readyMs: o.readyMs ?? 300, stopMs: 50 })
   const { writeFileSync } = await import('fs')
   writeFileSync(file, JSON.stringify({ version: 1, entries }))
   m.loadRestartRecord(file)
@@ -90,6 +90,22 @@ const saved = (): { entries: { agentId: string; state: string; why?: string }[] 
   } catch {
     return null
   }
+}
+/**
+ * Does what may move the queue, then waits until a pass of it has finished since, with none under way (one asked for
+ * meanwhile goes round again first): what the queue decided is then final, so a check that nothing started is sound.
+ */
+async function queueSettles(step: () => unknown): Promise<void> {
+  const before = m.queueForTests().passes
+  await step()
+  await vi.waitFor(
+    () => {
+      const q = m.queueForTests()
+      expect(q.passes).toBeGreaterThan(before)
+      expect(q.pumping).toBe(false)
+    },
+    { timeout: HUNG_MS }
+  )
 }
 /** The agent's launch takes its note: a turn begins (a status event of its own launch). */
 function takesNote(agentId: string): void {
@@ -117,9 +133,9 @@ describe('the restart queue (HI-1707)', () => {
     await m.startRestartRecovery()
     await vi.waitFor(() => expect(h.holdAsked).toBe(1), { timeout: HUNG_MS })
     await m.recordClosing('quit', { snapshotMs: 50, tellMs: 50 })
-    release()
+    // The cancelled attempt's pass has finished: it started nothing.
+    await queueSettles(release)
     await m.restartRecordSaved()
-    await new Promise((r) => setImmediate(r))
     expect(h.starts).toEqual([])
     expect(saved()?.entries.map((e) => [e.agentId, e.state])).toEqual([['a1', 'pending']])
   })
@@ -133,8 +149,7 @@ describe('the restart queue (HI-1707)', () => {
     m.workspaceRecovering(ws.path, new Promise<void>((r) => (recover = r)))
     // Read, but its slots not recovered yet: nothing starts, nothing is skipped as removed.
     ws.read = true
-    events.emit({ type: 'workspace-changed', workspace: null })
-    await new Promise((r) => setTimeout(r, 50)) // a quiet period: what is checked is that nothing starts, which has no event to wait for
+    await queueSettles(() => events.emit({ type: 'workspace-changed', workspace: null }))
     expect(h.starts).toEqual([])
     // Undecided until its workspace is ready (whether it resumes by itself is that workspace's setting).
     expect(m.restartRecord()?.entries[0].state).toBe('pending')
@@ -151,8 +166,7 @@ describe('the restart queue (HI-1707)', () => {
     await m.startRestartRecovery()
     await vi.waitFor(() => expect(m.restartRecord()?.entries.find((e) => e.agentId === 'a1')?.why).toBe('notStopped'), { timeout: HUNG_MS })
     // a1's launch still runs: a2 waits.
-    events.emit({ type: 'workspace-changed', workspace: null })
-    await new Promise((r) => setTimeout(r, 50)) // a quiet period: what is checked is that a2 doesn't start, which has no event to wait for
+    await queueSettles(() => events.emit({ type: 'workspace-changed', workspace: null }))
     expect(h.starts).toEqual(['a1'])
     // It ends at last: a2 goes, and takes its note.
     h.lives = h.lives.filter((s) => s.agentId !== 'a1')
@@ -160,6 +174,22 @@ describe('the restart queue (HI-1707)', () => {
     await vi.waitFor(() => expect(h.starts).toEqual(['a1', 'a2']), { timeout: HUNG_MS })
     takesNote('a2')
     await vi.waitFor(() => expect(m.restartRecord()?.entries.find((e) => e.agentId === 'a2')?.state ?? 'gone').toMatch(/resumed|gone/), { timeout: HUNG_MS })
+  })
+
+  it('Hive quitting while a resumed agent is still starting: its own entry is kept, with its reason, card and lane, for the next start', async () => {
+    const ws = workspace(join(dir, 'ws'), ['a1'])
+    h.workspaces = [ws]
+    const lane = { id: 'l1', name: 'Lane', role: 'builder' }
+    await startWith([entry(ws.path, 'a1', { card: { label: 'HI-1', round: 2 }, lane })], { readyMs: HUNG_MS })
+    m.workspaceRecovering(ws.path, Promise.resolve())
+    await m.startRestartRecovery()
+    // Launched, and still starting (its note not taken): an idle-looking agent in no lane.
+    await vi.waitFor(() => expect(h.starts).toEqual(['a1']), { timeout: HUNG_MS })
+    expect(h.lives[0].status).toBe('starting')
+    await queueSettles(() => m.recordClosing('quit', { snapshotMs: 1000, tellMs: 50 }))
+    await m.restartRecordSaved()
+    const e = saved()?.entries.find((x) => x.agentId === 'a1') as Record<string, unknown> | undefined
+    expect(e).toMatchObject({ state: 'pending', reason: 'install', card: { label: 'HI-1', round: 2 }, lane })
   })
 
   it("a launch that doesn't take its note but stops: notReady, confirmed gone before the next starts", async () => {
