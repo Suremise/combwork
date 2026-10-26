@@ -210,8 +210,9 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   check(`#1647: a published ${own} offered to the local ${own}, never downloaded`, await waitFor(async () => (await inv('update:state')).published === own, HUNG_MS) && downloads === downloadsBefore)
   const offer = page.locator('.toast', { hasText: `A published Hive Desktop ${own} is available` })
   check('#1647: …by a notice whose button opens its release page', await waitFor(async () => (await offer.count()) === 1, HUNG_MS) && (await offer.locator('button', { hasText: 'Open Release Page' }).count()) === 1)
-  await page.keyboard.press('Control+,'); await sleep(600)
-  await page.locator('.settings-nav .row', { hasText: 'Updates' }).click()
+  await page.keyboard.press('Control+,')
+  // The click waits for Settings' navigation to be there (Playwright's own wait, bounded).
+  await page.locator('.settings-nav .row', { hasText: 'Updates' }).click({ timeout: HUNG_MS })
   check('#1647: Settings → Updates says it is a local build, with its commit', await waitFor(async () => (await page.locator('.settings').innerText()).includes(`Local build ${own} (abc1234)`), HUNG_MS))
   await page.screenshot({ path: path.join(scratch, 'upd-8-local-build.png') })
   await app.close()

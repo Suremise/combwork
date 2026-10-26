@@ -7,7 +7,7 @@ import type { UpdateState } from '../shared/types'
 import { APP_NAME } from '../shared/appName'
 import { config } from './config'
 import { emit, toast } from './events'
-import { createLogger } from './logger'
+import { createLogger, userText } from './logger'
 import { exitBy } from './exitLog'
 import { testQuiet } from './testQuiet'
 import { installedCopy, runningIdentity } from './buildIdentity'
@@ -110,8 +110,12 @@ export async function check(manual: boolean): Promise<UpdateState> {
   }
   if (state.status === 'checking' || state.status === 'downloading') return state
   if (state.status === 'ready') {
-    // Already downloaded; a manual check just shows it again.
-    if (manual) emit({ type: 'update-state', state })
+    // Already downloaded; a manual check shows it again, with the installed copy read again (#1647: one unreadable a
+    // moment ago, as another installer replaced it, may be readable and older now, and the update installable again).
+    if (manual) {
+      if (state.notInstalled) mayInstall()
+      emit({ type: 'update-state', state })
+    }
     return state
   }
   manualCheck = manual
@@ -168,8 +172,13 @@ export function skip(version: string): void {
 function mayInstall(): boolean {
   const copy = installedCopy(resourcesDir())
   const d = installDecision(copy, state.version ?? '')
-  if (d.install) return true
-  const why = copy.kind === 'unreadable' ? `the installed copy couldn't be read (${copy.why})` : `the installed copy is ${copy.identity.version}${copy.identity.local ? ', a local build' : ''}` // i18n-ignore: the log line
+  if (d.install) {
+    // A refusal earlier (a copy unreadable then) no longer holds.
+    if (state.notInstalled) set({ notInstalled: undefined })
+    return true
+  }
+  // What the read said quotes the install folder's path (a folder the user chose): their text, left out of diagnostics.
+  const why = copy.kind === 'unreadable' ? `the installed copy couldn't be read (${userText(copy.why)})` : `the installed copy is ${copy.identity.version}${copy.identity.local ? ', a local build' : ''}` // i18n-ignore: the log line
   log.warn(`Not installing ${state.version}: ${why}`)
   set({ notInstalled: d.why })
   return false
@@ -257,6 +266,8 @@ export function initUpdater(opts: { restart: () => void }): void {
   })
   autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
     set({ status: 'ready', version: info.version, progress: undefined })
+    // Not "ready to install" over a copy it won't replace (#1647): the state says why instead.
+    if (!mayInstall()) return
     const auto = config.settings.updates.install === 'auto'
     toast(
       'info',

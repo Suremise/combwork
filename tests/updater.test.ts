@@ -9,6 +9,7 @@ import { tempDir } from './tempDir'
 const st = vi.hoisted(() => ({
   checks: 0,
   logged: [] as string[],
+  warned: [] as string[],
   handlers: {} as Record<string, (info: unknown) => void>,
   found: { isUpdateAvailable: false } as Record<string, unknown>,
   installs: [] as [boolean, boolean][],
@@ -33,7 +34,7 @@ vi.mock('../src/main/config', () => ({
   }
 }))
 vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: (level: string, title: string, _message: string, actions?: never) => void st.toasts.push({ level, title, actions }) }))
-vi.mock('../src/main/logger', () => ({ createLogger: () => ({ info: (m: string) => st.logged.push(m), warn: () => undefined, error: () => undefined }) }))
+vi.mock('../src/main/logger', async (original) => ({ ...(await original<typeof import('../src/main/logger')>()), createLogger: () => ({ info: (m: string) => st.logged.push(m), warn: (m: string) => st.warned.push(m), error: () => undefined }) }))
 
 const saved = { quiet: process.env.HIVE_TEST_QUIET, delay: process.env.HIVE_UPDATE_DELAY }
 beforeEach(async () => {
@@ -41,6 +42,7 @@ beforeEach(async () => {
   vi.useFakeTimers()
   st.checks = 0
   st.logged = []
+  st.warned = []
   st.handlers = {}
   st.found = { isUpdateAvailable: false }
   st.installs = []
@@ -111,6 +113,7 @@ describe('installing a downloaded update (#1647)', () => {
   it('over an older copy: the quit installs it (no restart), Restart and Update too (with one)', async () => {
     const { updater, restarts } = await start({ version: '9.1.0' })
     downloaded(updater)
+    expect(st.toasts.map((t) => t.title)).toEqual(['Hive Desktop 9.1.1 is ready'])
     expect(updater.installsOnQuit()).toBe(true)
     updater.installNow(false)
     expect(st.installs).toEqual([[true, false]])
@@ -121,6 +124,9 @@ describe('installing a downloaded update (#1647)', () => {
   it('over a local build of its own version: neither the quit nor Restart and Update installs it, and Hive says why', async () => {
     const { updater, quits, restarts } = await start({ version: '9.1.1', identity: { version: '9.1.1', commit: 'abc1234', local: true } })
     downloaded(updater)
+    // Never told it is ready to install: the state says why not, from the download on.
+    expect(st.toasts).toEqual([])
+    expect(updater.updateState().notInstalled).toBe('notNewer')
     expect(updater.installsOnQuit()).toBe(false)
     expect(updater.updateState().notInstalled).toBe('notNewer')
     updater.restartAndInstall()
@@ -132,11 +138,39 @@ describe('installing a downloaded update (#1647)', () => {
     expect(quits.n).toBe(1)
   })
 
-  it('over a copy that can\'t be read: never installed', async () => {
-    const { updater } = await start({ identity: { version: '9.1.0', local: false } })
+  it("over a copy that can't be read: never installed, and its path is left out of diagnostics", async () => {
+    const { updater, resources } = await start({ identity: { version: '9.1.0', local: false } })
     downloaded(updater)
     expect(updater.installsOnQuit()).toBe(false)
     expect(updater.updateState().notInstalled).toBe('unreadable')
+    // The read's error quotes the install folder (one the user chose, outside home and workspaces): Help → Copy
+    // Diagnostics leaves it out.
+    const line = st.warned.find((w) => w.startsWith('Not installing 9.1.1'))!
+    expect(line).toContain(resources)
+    const { redactLog } = await import('../src/shared/redact')
+    expect(redactLog(`2026-10-26T00:00:00.000Z [WARN] [updates] ${line}`, { home: 'C:\\Users\\nobody', folders: [], names: [] })).not.toContain(resources)
+  })
+
+  it('a refusal for a copy unreadable then is lifted once it reads older: Check Now and Restart and Update go on; the same or newer still refuse', async () => {
+    const { updater, resources, restarts } = await start({ identity: { version: '9.1.0', local: false } })
+    downloaded(updater)
+    updater.restartAndInstall()
+    expect(restarts.n).toBe(0)
+    expect(updater.updateState().notInstalled).toBe('unreadable')
+    // The other installer finished: an older copy, readable.
+    fakeInstall(resources, { version: '9.1.0', identity: { version: '9.1.0', commit: null, local: false } })
+    await updater.check(true)
+    expect(updater.updateState()).toMatchObject({ status: 'ready', notInstalled: undefined })
+    updater.restartAndInstall()
+    expect(restarts.n).toBe(1)
+    // A local build of its version, or newer, installed instead: refused again, on the check and on Restart and Update.
+    for (const version of ['9.1.1', '9.2.0']) {
+      fakeInstall(resources, { version, identity: { version, commit: 'abc1234', local: true } })
+      await updater.check(true)
+      updater.restartAndInstall()
+      expect(updater.updateState().notInstalled, version).toBe('notNewer')
+      expect(restarts.n).toBe(1)
+    }
   })
 
   it('the copy read when it installs, not when it was downloaded: a local build installed meanwhile stays', async () => {

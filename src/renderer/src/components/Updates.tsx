@@ -110,7 +110,8 @@ export function UpdateStatusItem() {
   if (!info) return null
   const label = `${appName(info.isPackaged)} ${info.version}`
   const open = (): void => set({ updateOpen: true })
-  if (u && !u.skipped && (u.status === 'available' || u.status === 'downloading' || u.status === 'ready')) {
+  // A downloaded update Hive won't install (#1647: the installed copy isn't older, or unreadable) isn't offered here.
+  if (u && !u.skipped && (u.status === 'available' || u.status === 'downloading' || (u.status === 'ready' && !u.notInstalled))) {
     const version = u.version ?? ''
     const text = u.status === 'available' ? tr(M.itemAvailable, { app: APP_NAME, version }) : u.status === 'downloading' ? tr(M.itemDownloading, { app: APP_NAME, version, percent: Math.round(u.progress?.percent ?? 0) / 100 }) : tr(M.itemReady, { version })
     const tip = u.status === 'ready' ? tr(M.tipReady, { app: APP_NAME, version }) : tr(M.tipHave, { app: APP_NAME, version: info.version })
@@ -275,7 +276,7 @@ export function UpdateDialog() {
               <Icon name="cloud-download" /> {tr(M.download)}
             </button>
           )}
-          {u.status === 'ready' && !u.notInstalled && (
+          {u.status === 'ready' && (
             <button
               className="btn primary"
               onClick={() => {
@@ -304,7 +305,7 @@ export function UpdateStatusRow() {
   return (
     <div className="flex update-status-row" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
       {u?.local && <span className="faint">{tr(M.localBuild, { version: u.current, hasCommit: u.local.commit ? 'yes' : 'no', commit: u.local.commit?.slice(0, 7) ?? '' })}</span>}
-      <span className={cx('badge', u?.status === 'ready' || u?.status === 'available' ? 'accent' : u?.status === 'up-to-date' ? 'success' : u?.status === 'error' ? 'error' : '')}>{updateSummary(u)}</span>
+      <span className={cx('badge', u?.status === 'ready' || u?.status === 'available' ? 'accent' : u?.status === 'up-to-date' && !u.published ? 'success' : u?.status === 'error' ? 'error' : '')}>{updateSummary(u)}</span>
       {(u?.status === 'available' || u?.status === 'downloading' || u?.status === 'ready') && (
         <button className="btn small primary" onClick={() => set({ updateOpen: true })}>
           {tr(M.details)}
