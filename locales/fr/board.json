@@ -224,7 +224,7 @@
   "board.details.transient": "{cause, select, spawn {Elle n’a pas pu démarrer} notFound {Son programme est introuvable} timeout {Elle a dépassé son temps} killed {Elle a été arrêtée de l’extérieur} exit75 {Elle s’est terminée avec le code 75, qui signifie pour le projet «échec temporaire, réessaie »} other {Une erreur réseau dans ses dernières lignes ({code})}} : la carte a été renvoyée à son auteur, qui peut soumettre de nouveau la même révision (deux fois de suite au plus) au lieu d’une nouvelle.",
   "board.details.waitingSince": "En attente depuis {since} : {waiting}",
   "board.dialog.activity": "Activité",
-  "board.dialog.activityTip": "Afficher les agents, sessions, tours et processus de cette carte dans l’onglet Activité de son projet.",
+  "board.dialog.activityTip": "Voir ce qui s’exécute maintenant sur cette carte : le tour, les appels d’outils, les tâches en arrière-plan, les sous-agents et les processus de l’agent qui y travaille.",
   "board.dialog.addCard": "Ajouter la carte",
   "board.dialog.added": "{who, select, you {Ajoutée par toi} assistant {Ajoutée par l’Assistant} repair {Ajoutée par la réparation} other {Ajoutée par l’agent {by}}} {added} · modifiée {changed}",
   "board.dialog.addedUnknown": "Ajoutée par : inconnu ({added}) · modifiée {changed}",

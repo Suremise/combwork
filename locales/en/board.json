@@ -897,11 +897,11 @@
   },
   "board.dialog.activity": {
     "defaultMessage": "Activity",
-    "description": "Button in the card dialog: opens its project's Activity tab showing this card's work."
+    "description": "A button in the card dialog and an item of a card's right-click menu, for a card in Doing or Review: opens its project's Activity tab on the agent working on it, showing what runs on it now."
   },
   "board.dialog.activityTip": {
-    "defaultMessage": "Show this card's agents, sessions, turns and processes in its project's Activity tab.",
-    "description": "Tooltip on the card dialog's Activity button."
+    "defaultMessage": "See what runs on this card now: the turn, tool calls, background tasks, subagents and processes of the agent working on it.",
+    "description": "Tooltip of the card dialog's Activity button, and the detail of the card menu's Activity item."
   },
   "board.dialog.addCard": {
     "defaultMessage": "Add Card",

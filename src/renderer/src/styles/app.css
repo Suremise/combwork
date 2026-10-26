@@ -7161,24 +7161,63 @@ button.agent-place:hover {
 .activity-node.act-done {
   border-left-color: var(--success);
 }
-.activity-node.act-more {
-  border-style: dashed;
-  background: transparent;
-  color: var(--fg-muted);
-}
 .activity-node.act-card {
   border-left-color: var(--info);
 }
-/* Finished work dims where it is; what ended (or left the range) dims more, until a refresh (HI-1677). */
+/* Finished work dims where it is; live, what ended fades out where it was, then leaves (HI-1743: FADE_MS). */
 .activity-node.act-done {
   opacity: 0.72;
 }
 .activity-node.act-gone {
-  opacity: 0.45;
   border-style: dashed;
+  animation: activity-fade 1.5s ease-in forwards;
 }
-.activity-range button {
-  padding: 2px 8px;
+@keyframes activity-fade {
+  from { opacity: 0.6; }
+  to { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .activity-node.act-gone { animation: none; opacity: 0.45; }
+}
+/* A tab per agent (HI-1743), scrolling sideways when they don't fit, as the Progress panel's tabs. */
+.activity-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.activity-agent-tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.activity-agent-tab:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+.activity-agent-tab.active {
+  color: var(--fg-strong);
+  border-bottom-color: var(--accent);
+}
+.activity-agent-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.activity-agent-tab-card {
+  font-variant-numeric: tabular-nums;
 }
 .activity-pick.on,
 .activity-live.on {
@@ -7195,9 +7234,6 @@ button.agent-place:hover {
   color: var(--accent-ink);
   background: var(--accent-soft);
   border-color: var(--accent);
-}
-.activity-paused {
-  font-size: 12px;
 }
 .activity-twisty {
   flex: none;
@@ -7230,9 +7266,8 @@ button.agent-place:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.activity-spin {
+.activity-pulse {
   flex: none;
-  color: var(--accent);
 }
 .activity-details {
   flex: none;

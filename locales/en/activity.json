@@ -1,7 +1,7 @@
 {
   "activity.agents": {
     "defaultMessage": "{n, plural, =0 {All agents} one {# agent} other {# agents}}",
-    "description": "A menu button above the Activity tree: which agents it shows (several can be ticked); with none ticked, all."
+    "description": "A menu button above the Activity tab's agent tabs: which agents have a tab (several can be ticked); with none ticked, all."
   },
   "activity.all": {
     "defaultMessage": "All",
@@ -9,7 +9,7 @@
   },
   "activity.cards": {
     "defaultMessage": "{n, plural, =0 {All cards} one {# card} other {# cards}}",
-    "description": "A menu button above the Activity tree: which cards it shows (several can be ticked); with none ticked, all."
+    "description": "A menu button above the Activity tab: only the agents working on these cards in progress have a tab (several can be ticked); with none ticked, all."
   },
   "activity.cardsLabel": {
     "defaultMessage": "Cards",
@@ -44,12 +44,12 @@
     "description": "The Activity tab's details panel, for screen readers."
   },
   "activity.empty": {
-    "defaultMessage": "Nothing ran in the last 24 hours. Start an agent to see its work here.",
-    "description": "The Activity tab when no agent runs and no session was active in the last 24 hours."
+    "defaultMessage": "Nothing is running. Start an agent to see what it runs here.",
+    "description": "The Activity tab when no agent of the project runs anything (with Hide finished on, idle agents have no tab)."
   },
   "activity.emptyFiltered": {
-    "defaultMessage": "Nothing for this filter in the last 24 hours.",
-    "description": "The Activity tab, filtered to an agent or a card, when it has nothing to show."
+    "defaultMessage": "Nothing is running for this filter.",
+    "description": "The Activity tab, filtered to agents or cards, when none of them runs anything."
   },
   "activity.endButton": {
     "defaultMessage": "End Process…",
@@ -76,8 +76,8 @@
     "description": "A notification: the process ({label}: what it ran) was ended from the Activity tab."
   },
   "activity.endedNode": {
-    "defaultMessage": "Ended · gone at the next refresh",
-    "description": "A node's second line in the Activity tree once its work ended or left the range: it stays in place, dimmed, until a refresh."
+    "defaultMessage": "Ended",
+    "description": "A node's second line in the Activity tab, live, once its process or session ended: it fades out, then leaves."
   },
   "activity.expand": {
     "defaultMessage": "Expand",
@@ -93,11 +93,11 @@
   },
   "activity.heading": {
     "defaultMessage": "Activity",
-    "description": "The Activity tab's heading: the project's live work as a tree."
+    "description": "The Activity tab's heading: what the project's agents are running now, a tab per agent."
   },
   "activity.hideFinished": {
     "defaultMessage": "Hide finished",
-    "description": "A checkbox above the Activity tree: shows only running work."
+    "description": "A checkbox above the Activity tab (on by default): agents with nothing running (not running, or idle with no process or background task) have no tab."
   },
   "activity.input": {
     "defaultMessage": "Input",
@@ -105,7 +105,7 @@
   },
   "activity.jump": {
     "defaultMessage": "Jump to Selected (J)",
-    "description": "Tooltip of the Activity tab's button that scrolls the selected node (or the agent or card it was opened for) into view. J is its key; keep it."
+    "description": "Tooltip of the Activity tab's button that scrolls the selected node into view. J is its key; keep it."
   },
   "activity.lastAction": {
     "defaultMessage": "Last action",
@@ -128,12 +128,12 @@
     "description": "A menu button above the Activity tree: collapses or expands every node at one level at once (all turns, all tool calls…)."
   },
   "activity.live": {
-    "defaultMessage": "Live",
-    "description": "A button above the Activity tree while it is paused by hand: shows updates as they come again."
+    "defaultMessage": "Play",
+    "description": "A button above the Activity tab while it is frozen (as it always opens): goes live, showing updates as they come."
   },
   "activity.liveTip": {
-    "defaultMessage": "Show updates as they come again.",
-    "description": "Tooltip of the Activity tab's Live button (shown while paused by hand)."
+    "defaultMessage": "Go live: show what runs as it changes. The tab opens frozen, a snapshot of when you opened it.",
+    "description": "Tooltip of the Activity tab's Play button (shown while frozen)."
   },
   "activity.loadFailed": {
     "defaultMessage": "Could not load the activity: {error}",
@@ -142,10 +142,6 @@
   "activity.loading": {
     "defaultMessage": "Loading…",
     "description": "The Activity tab, or a detail in it, while it loads."
-  },
-  "activity.more": {
-    "defaultMessage": "{n, plural, one {# more session} other {# more sessions}}",
-    "description": "A node in the Activity tree standing for older sessions not shown; clicking it shows them."
   },
   "activity.noPrompt": {
     "defaultMessage": "(no prompt text)",
@@ -169,15 +165,11 @@
   },
   "activity.pause": {
     "defaultMessage": "Pause",
-    "description": "A button above the Activity tree: holds it as it is (updates wait, counted in the pill) until Live."
+    "description": "A button above the Activity tab while it is live: freezes it as it is (updates wait, counted in the pill)."
   },
   "activity.pauseTip": {
-    "defaultMessage": "Hold the tree as it is: updates wait until you refresh or go live. It also holds by itself while the pointer is over it, while it scrolls and while a node is selected.",
-    "description": "Tooltip of the Activity tab's Pause button."
-  },
-  "activity.pausedAuto": {
-    "defaultMessage": "Held while you look",
-    "description": "Above the Activity tree while it holds by itself (the pointer over it, a scroll, a node selected) and no update is waiting yet."
+    "defaultMessage": "Freeze it as it is: updates wait until you refresh or play.",
+    "description": "Tooltip of the Activity tab's Pause button (shown while live)."
   },
   "activity.pidLabel": {
     "defaultMessage": "Process id",
@@ -185,23 +177,19 @@
   },
   "activity.pill": {
     "defaultMessage": "{n, plural, one {# update · Refresh} other {# updates · Refresh}}",
-    "description": "A pill above the Activity tree while it is paused: how many updates are waiting; clicking it shows them. Keep \"Refresh\" as the action."
+    "description": "A pill above the Activity tab while it is frozen: how many updates came since its snapshot; clicking it takes a new one. Keep \"Refresh\" as the action."
   },
   "activity.pillTip": {
-    "defaultMessage": "Show the updates that came while it was paused. It stays paused if you paused it.",
+    "defaultMessage": "Take a new snapshot with what came since. It stays frozen.",
     "description": "Tooltip of the Activity tab's updates pill."
   },
   "activity.process": {
     "defaultMessage": "Process {pid}",
     "description": "A process node's second line in the Activity tree. {pid} is its process id."
   },
-  "activity.range": {
-    "defaultMessage": "{range, select, live {Live} 15m {15 min} 1h {1 h} 6h {6 h} other {24 h}}",
-    "description": "A time range button above the Activity tree: Live (running work only), or what was active in the last 15 minutes, 1, 6 or 24 hours. Keep them short."
-  },
-  "activity.rangeLabel": {
-    "defaultMessage": "Time range",
-    "description": "The Activity tab's time range buttons, for screen readers."
+  "activity.processFor": {
+    "defaultMessage": "Process {pid} · running {time}",
+    "description": "A process node's second line in the Activity tab: its process id ({pid}) and how long it has run ({time}: \"4 min\", \"1 h 5 min\")."
   },
   "activity.reading": {
     "defaultMessage": "Reading the sessions…",
@@ -209,7 +197,7 @@
   },
   "activity.refresh": {
     "defaultMessage": "Refresh",
-    "description": "Tooltip of the Activity tab's refresh button: shows what came since, drops what ended, and measures the time range from now."
+    "description": "Tooltip of the Activity tab's refresh button: takes a new snapshot of what runs now."
   },
   "activity.showAgent": {
     "defaultMessage": "Show Agent",
@@ -227,9 +215,17 @@
     "defaultMessage": "Status",
     "description": "A label in the Activity tab's details: the node's state."
   },
+  "activity.tabsLabel": {
+    "defaultMessage": "Agents",
+    "description": "The Activity tab's row of agent tabs (one per running agent), for screen readers."
+  },
   "activity.task": {
     "defaultMessage": "{type, select, subagent {Background subagent} command {Background command} monitor {Monitor} workflow {Workflow} other {Background task}}",
     "description": "A background task node in the Activity tree: what kind it is."
+  },
+  "activity.toolFor": {
+    "defaultMessage": "{summary} · {time}",
+    "description": "A tool call node's second line in the Activity tab while it runs: what it does ({summary}, from the agent, such as a command) and how long it has run so far ({time}: \"40 s\", \"4 min\")."
   },
   "activity.tools": {
     "defaultMessage": "{n, plural, =0 {No tool calls} one {# tool call} other {# tool calls}}",

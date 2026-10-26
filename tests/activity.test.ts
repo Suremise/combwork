@@ -1,8 +1,9 @@
-// The Activity tab's model (#1254, shared/activity.ts): a transcript's turns and tool calls, masked and cut short; each
-// process under the one tool call open when it started, else under its session; and the tree, card → agent → session →
-// turn → tool call, with subagents and processes, filtered to an agent or a card, recent sessions only.
+// The Activity tab's model (#1254, HI-1743, shared/activity.ts): a transcript's turns and tool calls, masked and cut
+// short; each process under the one tool call open when it started, else under its session; a tab per agent, filtered,
+// Hide finished on by default; and each agent's tree of what runs now: its card in progress with the card's builder and
+// reviewer, else its session, the latest turn, tool calls, background tasks, subagents and processes. Nothing past.
 import { describe, expect, it } from 'vitest'
-import { ACTIVITY_LEVELS, activityLevel, activityTurns, buildActivityTree, keysAtLevel, filetimeMs, keepGone, newOrder, placeProcesses, stableRows, ACTIVITY_SESSIONS, type ActivityFilter, type ActivityInput, type ActivityNode, type ActivityOrder, type ActivityTurns } from '../src/shared/activity'
+import { ACTIVITY_LEVELS, activityLevel, activityTabs, activityTurns, buildActivityTree, cardWorker, currentCard, goneKeys, keysAtLevel, filetimeMs, keepGone, newOrder, placeProcesses, pruneGone, stableRows, type ActivityInput, type ActivityNode, type ActivityOrder, type ActivityTurns } from '../src/shared/activity'
 import type { AgentProcess } from '../src/shared/agentProcesses'
 import type { SessionListItem, TranscriptItem } from '../src/shared/types'
 
@@ -69,108 +70,143 @@ describe('where a process goes', () => {
 const session = (id: string, agentId: string, s: number, more: Partial<SessionListItem> = {}): SessionListItem => ({ id, provider: 'claude-code', source: 'hive', agentId, name: id, lastActivity: iso(s), lastActiveAt: iso(s), hasTranscript: true, hasBackup: false, usage: null, recache: null, title: null, ...more }) as SessionListItem
 const keys = (nodes: ActivityNode[]): unknown[] => nodes.map((n) => (n.children.length ? [n.key, keys(n.children)] : n.key))
 
-describe('the tree', () => {
+describe('the tabs (HI-1743)', () => {
+  const card = (number: number, column: string, builder: string | null, reviewer: string | null = null) => ({ number, label: `HI-${number}`, title: `${number}`, column, builder, reviewer })
+  const live = (sessionId: string, more: Partial<NonNullable<ActivityInput['agents'][number]['live']>> = {}) => ({ sessionId, status: 'working' as const, text: '', working: true, waiting: false, failed: false, ...more })
+  const base = (): ActivityInput => ({
+    agents: [
+      { id: 'hb1', name: 'HB1', live: live('s1') },
+      { id: 'hr1', name: 'HR1', live: live('r1', { working: false, status: 'ready' }) },
+      { id: 'hb2', name: 'HB2', live: null },
+      { id: 'solo', name: 'Agent 1', live: live('x1', { working: false, waiting: true, status: 'waiting' }) }
+    ],
+    cards: [card(7, 'doing', 'hb1', 'hr1'), card(3, 'done', 'hb1', 'hr1'), card(8, 'review', 'hb2', 'hr1')],
+    sessions: [],
+    turns: new Map(),
+    now: { launches: [], tasks: [] },
+    at: T0
+  })
+
+  it("a card in progress is an agent's current work: one it builds in Doing, else one it reviews, else one of its in Review; never a finished one", () => {
+    const { cards } = base()
+    expect(currentCard('hb1', cards)?.number).toBe(7)
+    expect(currentCard('hr1', cards)?.number).toBe(8)
+    expect(currentCard('hb2', cards)?.number).toBe(8)
+    expect(currentCard('solo', cards)).toBeNull()
+    expect(currentCard('hb1', [card(3, 'done', 'hb1')])).toBeNull()
+  })
+
+  it('one per agent in pane order, each with its state and card; Hide finished (on by default) leaves out agents with nothing running', () => {
+    const tabs = activityTabs(base())
+    expect(tabs.map((t) => [t.agentId, t.state, t.card?.label ?? null])).toEqual([
+      ['hb1', 'working', 'HI-7'],
+      ['solo', 'waiting', null]
+    ])
+    // Shown, the finished ones: HR1 idle with nothing running, HB2 not running.
+    expect(activityTabs(base(), { hideFinished: false }).map((t) => [t.agentId, t.finished])).toEqual([
+      ['hb1', false],
+      ['hr1', true],
+      ['hb2', true],
+      ['solo', false]
+    ])
+    // Idle, but a process of its own runs (a dev server), or a background task: not finished.
+    const input = base()
+    input.now = { launches: [{ agentId: 'hr1', runId: 'r', cli: [10], processes: [proc(10, 0), proc(11, 1, 10)], more: 0 }], tasks: [] }
+    expect(activityTabs(input).map((t) => t.agentId)).toEqual(['hb1', 'hr1', 'solo'])
+    input.now = { launches: [{ agentId: 'hr1', runId: 'r', cli: [10], processes: [proc(10, 0)], more: 0 }], tasks: [{ agentId: 'hb2', sessionId: 'z', id: 't', at: T0 }] }
+    // Its CLI alone isn't something running; HB2 isn't running at all, whatever is listed for it.
+    expect(activityTabs(input).map((t) => t.agentId)).toEqual(['hb1', 'solo'])
+  })
+
+  it('filtered to agents, or to cards (an agent by its current card); the tab shown keeps its tab when finished', () => {
+    expect(activityTabs(base(), { agents: ['solo'] }).map((t) => t.agentId)).toEqual(['solo'])
+    expect(activityTabs(base(), { cards: [8], hideFinished: false }).map((t) => t.agentId)).toEqual(['hr1', 'hb2'])
+    expect(activityTabs(base(), { cards: [7] }).map((t) => t.agentId)).toEqual(['hb1'])
+    // Opened for HR1, idle: its tab shows, Hide finished or not; another filter still leaves it out.
+    expect(activityTabs(base(), { agents: ['hr1'] }, 'hr1').map((t) => t.agentId)).toEqual(['hr1'])
+    expect(activityTabs(base(), {}, 'hr1').map((t) => t.agentId)).toEqual(['hb1', 'hr1', 'solo'])
+    expect(activityTabs(base(), { agents: ['solo'] }, 'hr1').map((t) => t.agentId)).toEqual(['solo'])
+  })
+
+  it("a card's Activity opens on its builder while it runs, else its reviewer, else either", () => {
+    const runs = (ids: string[]) => (id: string) => ids.includes(id)
+    expect(cardWorker({ builder: 'hb1', reviewer: 'hr1' }, runs(['hb1', 'hr1']))).toBe('hb1')
+    expect(cardWorker({ builder: 'hb1', reviewer: 'hr1' }, runs(['hr1']))).toBe('hr1')
+    expect(cardWorker({ builder: 'hb1', reviewer: 'hr1' }, runs([]))).toBe('hb1')
+    expect(cardWorker({ builder: null, reviewer: 'hr1' }, runs([]))).toBe('hr1')
+    expect(cardWorker({ builder: null, reviewer: null }, runs([]))).toBeNull()
+  })
+})
+
+
+describe("an agent's tree: what runs now (HI-1743)", () => {
   const base = (): ActivityInput => ({
     agents: [
       { id: 'hb1', name: 'HB1', live: { sessionId: 's1', status: 'working', text: 'Running tests', working: true, waiting: false, failed: false } },
-      { id: 'hr1', name: 'HR1', live: null }
+      { id: 'hr1', name: 'HR1', live: null },
+      { id: 'solo', name: 'Agent 1', live: { sessionId: 'x1', status: 'ready', text: '', working: false, waiting: false, failed: false } }
     ],
-    cards: [{ number: 7, label: 'HI-7', title: 'Seven', column: 'doing', agents: ['hb1', 'hr1'] }],
-    sessions: [session('s1', 'hb1', 0, { cards: [{ number: 7, title: 'Seven' }] }), session('r1', 'hr1', -60, { cards: [{ number: 7, title: 'Seven', review: true }] }), session('old', 'hr1', -25 * 3600), session('loose', 'hr1', -120), session('sub1', 'hb1', -5, { sub: { parentId: 's1', kind: 'sub-agent' } })],
+    cards: [
+      { number: 7, label: 'HI-7', title: 'Seven', column: 'doing', builder: 'hb1', reviewer: 'hr1' },
+      { number: 3, label: 'HI-3', title: 'Three', column: 'done', builder: 'hb1', reviewer: 'hr1' }
+    ],
+    sessions: [session('s1', 'hb1', 0, { cards: [{ number: 7, title: 'Seven' }] }), session('old', 'hb1', -3600, { cards: [{ number: 3, title: 'Three' }] }), session('r1', 'hr1', -60), session('sub1', 'hb1', 15, { sub: { parentId: 's1', kind: 'sub-agent' } }), session('sub0', 'hb1', -30, { sub: { parentId: 's1', kind: 'sub-agent' } })],
     turns: new Map(),
     now: { launches: [{ agentId: 'hb1', runId: 'run1', cli: [10, 11], processes: [proc(10, -100), proc(11, -99, 10), proc(20, 15, 11)], more: 0 }], tasks: [{ agentId: 'hb1', sessionId: 's1', id: 'bg1', type: 'subagent', description: 'Explore', at: T0 }] },
     at: T0 + 60_000
   })
+  const withTurns = (input: ActivityInput): ActivityInput => ({ ...input, turns: new Map([['s1', { sessionId: 's1', version: 'v', ...activityTurns([user(1, -50, 'first'), tool(2, -40, 'Read'), user(3, 0, 'go'), tool(4, 10, 'Bash', { result: null })]) } satisfies ActivityTurns]]) })
 
-  it('files sessions under their card and agent, sub-sessions under their parent; loose ones under the agent; older than 24 h left out', () => {
-    expect(keys(buildActivityTree(base()))).toEqual([
-      ['c:7', [['c:7:a:hr1', ['s:r1']], ['c:7:a:hb1', [['s:s1', ['task:s1:bg1', 'p:10:' + ft(-100), 'p:11:' + ft(-99), 'p:20:' + ft(15), 's:sub1']]]]]],
-      ['a:hr1', ['s:loose']]
-    ])
+  it("a builder's tab: its card in progress, the builder's running session with what runs in it; the reviewer only while it runs; never a past card or session", () => {
+    expect(keys(buildActivityTree(base(), 'hb1'))).toEqual([['c:7', [['a:hb1', [['s:s1', ['task:s1:bg1', 'p:10:' + ft(-100), 'p:11:' + ft(-99), 'p:20:' + ft(15), 's:sub1', 's:sub0']]]]]]])
+    const input = base()
+    input.agents[1].live = { sessionId: 'r1', status: 'ready', text: '', working: false, waiting: false, failed: false }
+    expect(buildActivityTree(input, 'hb1')[0].children.map((n) => n.key)).toEqual(['a:hb1', 'a:hr1'])
+    // In Review, the reviewer's own tab shows the card they share, the builder first, the reviewer itself even before it runs.
+    const review = base()
+    review.cards[0].column = 'review'
+    expect(keys(buildActivityTree(review, 'hr1')).map((k) => (k as unknown[])[0])).toEqual(['c:7'])
+    expect(buildActivityTree(review, 'hr1')[0].children.map((n) => n.key)).toEqual(['a:hb1', 'a:hr1'])
+    // In Doing, the card isn't the reviewer's work yet: its tab has the agent alone.
+    expect(keys(buildActivityTree(base(), 'hr1'))).toEqual(['a:hr1'])
   })
 
-  it("puts a running session's turns, tool calls and the processes they started in place, the CLI's at the session", () => {
-    const input = base()
-    const t: ActivityTurns = { sessionId: 's1', version: 'v', ...activityTurns([user(1, 0, 'go'), tool(2, 10, 'Bash', { result: null })]) }
-    input.turns = new Map([['s1', t]])
-    const s1 = buildActivityTree(input)[0].children.find((n) => n.key === 'c:7:a:hb1')!.children[0] as Extract<ActivityNode, { kind: 'session' }>
-    expect(s1).toMatchObject({ live: true, state: 'working', turnsLoaded: true, turnCount: 1 })
-    expect(keys(s1.children)).toEqual([['turn:s1:1', [['tool:s1:2', ['p:20:' + ft(15)]]]], 'task:s1:bg1', 'p:10:' + ft(-100), 'p:11:' + ft(-99), 's:sub1'])
+  it('only the latest turn, its tool call working and the processes it started under it; the CLI\'s and the rest at the session; subagents of that turn', () => {
+    const s1 = buildActivityTree(withTurns(base()), 'hb1')[0].children[0].children[0] as Extract<ActivityNode, { kind: 'session' }>
+    expect(s1).toMatchObject({ live: true, state: 'working', turnsLoaded: true, turnCount: 2 })
+    // sub0 ran before this turn's prompt: past work, left out.
+    expect(keys(s1.children)).toEqual([['turn:s1:3', [['tool:s1:4', ['p:20:' + ft(15)]]]], 'task:s1:bg1', 'p:10:' + ft(-100), 'p:11:' + ft(-99), 's:sub1'])
     const turn = s1.children[0] as Extract<ActivityNode, { kind: 'turn' }>
     expect(turn.state).toBe('working')
     expect((turn.children[0] as Extract<ActivityNode, { kind: 'tool' }>).state).toBe('working')
-    const cli = s1.children.filter((n) => n.kind === 'process' && n.cli).map((n) => n.key)
-    expect(cli).toEqual(['p:10:' + ft(-100), 'p:11:' + ft(-99)])
   })
 
-  it('each node has a level for Levels ▾ (HI-1678): sub-sessions and background tasks are subagents; cards fold on their own', () => {
+  it('an agent with no card: its session alone (a solo agent, most users); one not running: the agent alone; one not in the project: nothing', () => {
+    expect(keys(buildActivityTree(base(), 'solo'))).toEqual([['a:solo', ['s:x1']]])
     const input = base()
-    input.turns = new Map([['s1', { sessionId: 's1', version: 'v', ...activityTurns([user(1, 0, 'go'), tool(2, 10, 'Bash', { result: null })]) }]])
-    const tree = buildActivityTree(input)
-    const levels: Record<string, string | null> = {}
-    const walk = (ns: ActivityNode[]): void => ns.forEach((n) => ((levels[n.key] = activityLevel(n)), walk(n.children)))
-    walk(tree)
-    expect(levels).toMatchObject({ 'c:7': null, 'c:7:a:hb1': 'agent', 's:s1': 'session', 's:sub1': 'subagent', 'task:s1:bg1': 'subagent', 'turn:s1:1': 'turn', 'tool:s1:2': 'tool', ['p:20:' + ft(15)]: 'process', 'a:hr1': 'agent', 's:loose': 'session' })
-    expect([...keysAtLevel(tree, 'subagent')].sort()).toEqual(['s:sub1', 'task:s1:bg1'])
-    expect([...keysAtLevel(tree, 'tool')]).toEqual(['tool:s1:2'])
-    expect(ACTIVITY_LEVELS).toEqual(['agent', 'session', 'subagent', 'turn', 'tool', 'process'])
+    input.cards = []
+    expect(keys(buildActivityTree(input, 'hr1'))).toEqual(['a:hr1'])
+    expect(buildActivityTree(base(), 'nobody')).toEqual([])
   })
 
-  it("draws a running agent's session the list doesn't have yet, with its processes, in the tree's own order (no re-sorting by what runs, HI-1677)", () => {
+  it("a running session the list doesn't have yet is drawn from its live state", () => {
     const input = base()
-    // HB1 started a new session since the list was read: on no card yet, so its agent's node holds it.
     input.agents[0].live = { ...input.agents[0].live!, sessionId: 'new', sessionName: 'Fresh' }
     input.now = { ...input.now, tasks: [] }
-    const tree = buildActivityTree(input)
-    const hb1 = tree.find((n) => n.key === 'a:hb1')!
-    const fresh = hb1.children[0] as Extract<ActivityNode, { kind: 'session' }>
+    const fresh = buildActivityTree(input, 'hb1')[0].children[0].children[0] as Extract<ActivityNode, { kind: 'session' }>
     expect(fresh).toMatchObject({ key: 's:new', live: true })
     expect(fresh.session.name).toBe('Fresh')
     expect(fresh.children.filter((n) => n.kind === 'process').length).toBe(3)
-    // Cards first, then agents' loose work, the newest last: running work isn't moved to the top.
-    expect(tree.map((n) => n.key)).toEqual(['c:7', 'a:hr1', 'a:hb1'])
   })
 
-  it("filtered to agents shows only their work; to cards, only theirs; both combine (HI-1677)", () => {
-    expect(keys(buildActivityTree({ ...base(), filter: { agents: ['hr1'] } }))).toEqual([['c:7', [['c:7:a:hr1', ['s:r1']]]], ['a:hr1', ['s:loose']]])
-    expect(keys(buildActivityTree({ ...base(), filter: { cards: [7] } })).map((k) => (k as unknown[])[0])).toEqual(['c:7'])
-    expect(keys(buildActivityTree({ ...base(), filter: { cards: [7], agents: ['hb1'] } })).map((k) => (k as unknown[])[0])).toEqual(['c:7'])
-    expect(buildActivityTree({ ...base(), filter: { cards: [7], agents: ['hb1'] } })[0].children.map((n) => n.key)).toEqual(['c:7:a:hb1'])
-    expect(buildActivityTree({ ...base(), filter: { agents: ['hb1', 'hr1'] } }).length).toBe(2)
-  })
-
-  it(`shows an agent's ${ACTIVITY_SESSIONS} newest sessions, oldest first, with "n more" for the older ones before them; all once opened`, () => {
-    const input = base()
-    input.sessions = Array.from({ length: ACTIVITY_SESSIONS + 3 }, (_, i) => session(`x${i}`, 'hr1', -i * 60))
-    const agent = buildActivityTree(input).find((n) => n.key === 'a:hr1')!
-    expect(agent.children.length).toBe(ACTIVITY_SESSIONS + 1)
-    expect(agent.children[0]).toMatchObject({ kind: 'more', count: 3 })
-    // The newest last.
-    expect(agent.children.at(-1)!.key).toBe('s:x0')
-    expect(agent.children[1].key).toBe(`s:x${ACTIVITY_SESSIONS - 1}`)
-    const all = buildActivityTree({ ...input, showAll: new Set(['a:hr1']) }).find((n) => n.key === 'a:hr1')!
-    expect(all.children.length).toBe(ACTIVITY_SESSIONS + 3)
-  })
-
-  it('a range keeps what was active within it before the last refresh (Live: running work only); Hide finished keeps only running work (HI-1677)', () => {
-    const input = base()
-    const min = 60
-    input.sessions = [session('s1', 'hb1', 0, { cards: [{ number: 7, title: 'Seven' }] }), session('m10', 'hr1', -10 * min), session('m50', 'hr1', -50 * min), session('h3', 'hr1', -3 * 3600), session('h20', 'hr1', -20 * 3600)]
-    const ids = (range?: ActivityFilter['range'], hideFinished?: boolean): string[] => {
-      const out: string[] = []
-      const walk = (ns: ActivityNode[]): void => ns.forEach((n) => (n.kind === 'session' ? out.push(n.session.id) : walk(n.children)))
-      walk(buildActivityTree({ ...input, filter: { range, hideFinished } }))
-      return out.sort()
-    }
-    expect(ids('live')).toEqual(['s1'])
-    expect(ids('15m')).toEqual(['m10', 's1'])
-    expect(ids('1h')).toEqual(['m10', 'm50', 's1'])
-    expect(ids('6h')).toEqual(['h3', 'm10', 'm50', 's1'])
-    expect(ids('24h')).toEqual(['h20', 'h3', 'm10', 'm50', 's1'])
-    expect(ids(undefined)).toEqual(['h20', 'h3', 'm10', 'm50', 's1'])
-    expect(ids('24h', true)).toEqual(['s1'])
-    // Measured from the tree's time (the last refresh), not the clock: a session doesn't age out while it is looked at.
-    expect(buildActivityTree({ ...input, at: input.at + 10 * min * 1000, filter: { range: '15m' } }).some((n) => JSON.stringify(n.key) && n.children.some((c) => c.children.some((s) => s.key === 's:m10')))).toBe(false)
+  it('each node has a level for Levels ▾ (HI-1678): sub-sessions and background tasks are subagents; cards fold on their own', () => {
+    const tree = buildActivityTree(withTurns(base()), 'hb1')
+    const levels: Record<string, string | null> = {}
+    const walk = (ns: ActivityNode[]): void => ns.forEach((n) => ((levels[n.key] = activityLevel(n)), walk(n.children)))
+    walk(tree)
+    expect(levels).toMatchObject({ 'c:7': null, 'a:hb1': 'agent', 's:s1': 'session', 's:sub1': 'subagent', 'task:s1:bg1': 'subagent', 'turn:s1:3': 'turn', 'tool:s1:4': 'tool', ['p:20:' + ft(15)]: 'process' })
+    expect([...keysAtLevel(tree, 'subagent')].sort()).toEqual(['s:sub1', 'task:s1:bg1'])
+    expect(ACTIVITY_LEVELS).toEqual(['agent', 'session', 'subagent', 'turn', 'tool', 'process'])
   })
 })
 
@@ -256,19 +292,6 @@ describe('a layout that stays put (HI-1677)', () => {
     expect(r).toEqual(['a:x(gone)', 's:9', 'c:7', 'c:7:a:x'])
   })
 
-  it('"n more" whose sessions left stays as a placeholder: no row below it moves (HR6 round 1)', () => {
-    const sess = (i: number): ActivityNode => ({ kind: 'agent', key: `s:${i}`, agentId: `s${i}`, name: `s${i}`, state: 'idle', status: null, line: '', children: [] })
-    const shown = [7, 6, 5, 4, 3, 2, 1, 0].map(sess)
-    const before = [agent('a', [{ kind: 'more', key: 'more:a', count: 1, children: [] }, ...shown])]
-    // The hidden ninth crossed the 24 hours: no "n more" in the newest tree.
-    const after = [agent('a', shown)]
-    const order = newOrder()
-    const was = rows(before, order)
-    const now = rows(keepGone(before, after), order)
-    expect(now).toEqual(was)
-    expect(keepGone(before, after)[0].children.find((n) => n.key === 'more:a')).toMatchObject({ gone: true })
-  })
-
   it('a refresh draws the tree compact again: a fresh order puts children back under their parents', () => {
     const order = newOrder()
     const first = [card(1, [agent('a1', [proc1(1)])]), card(2, [agent('a2', [])])]
@@ -276,5 +299,19 @@ describe('a layout that stays put (HI-1677)', () => {
     const later = [card(1, [agent('a1', [proc1(1), proc1(3)])]), card(2, [agent('a2', [])])]
     expect(rows(later, order)).toEqual(['c:1', 'a1', 'p:1', 'c:2', 'a2', 'p:3'])
     expect(rows(later, newOrder())).toEqual(['c:1', 'a1', 'p:1', 'p:3', 'c:2', 'a2'])
+  })
+})
+
+describe('live, what ended fades out, then leaves (HI-1743)', () => {
+  const agent = (key: string, kids: ActivityNode[]): ActivityNode => ({ kind: 'agent', key, agentId: key, name: key, state: 'working', status: null, line: '', children: kids })
+  const proc1 = (pid: number): ActivityNode => ({ kind: 'process', key: `p:${pid}`, agentId: 'a', process: { pid, name: 'n', label: 'l' }, cli: false, children: [] })
+
+  it('a process that ended stays, gone, while it fades; once let go it leaves, and what still runs stays', () => {
+    const kept = keepGone([agent('a', [proc1(1), proc1(2)])], [agent('a', [proc1(2)])])
+    expect(goneKeys(kept)).toEqual(['p:1'])
+    expect(keys(pruneGone(kept, () => true))).toEqual([['a', ['p:2', 'p:1']]])
+    expect(keys(pruneGone(kept, () => false))).toEqual([['a', ['p:2']]])
+    // Never what still runs, whatever is let go.
+    expect(keys(pruneGone([agent('a', [proc1(2)])], () => false))).toEqual([['a', ['p:2']]])
   })
 })

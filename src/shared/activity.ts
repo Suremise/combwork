@@ -1,16 +1,15 @@
-// The Activity tab (#1254): a project's live work as a tree, card → agent → session → turn → tool call, with subagents
-// and processes, from what Hive already has: the board, the session records, the agents' live state, a session's
-// transcript parse (its turns, read when it is opened in the tree) and the processes Stop's tracking lists.
+// The Activity tab (#1254, HI-1743): what runs now in a project, a tab per running agent, each its current work (its
+// card in progress with the card's builder and reviewer, else its session) → the latest turn → tool call, with the
+// background tasks, subagents and processes running. Nothing past: "the card is the history". From what Hive already has:
+// the board, the session records, the agents' live state, a session's transcript parse and Stop's tracking's processes.
 import type { AgentProcess } from './agentProcesses'
 import type { BackgroundTaskType, SessionListItem, SessionStatus, TranscriptItem } from './types'
 import { maskText } from './redact'
 
-/** How far back the tab shows sessions that no longer run: older work is the Sessions tab's. */
+/** How far back the session list is read: a running session and its subagents' are within it. */
 export const ACTIVITY_HOURS = 24
-/** A session's turns read for the tree: its latest ones. */
+/** A session's turns read for the tree: its latest ones (the tree shows the last). */
 export const ACTIVITY_TURNS = 50
-/** Sessions shown under one agent (or card) before "n more". */
-export const ACTIVITY_SESSIONS = 8
 /** A prompt or reply shown in a node, cut to this many characters (the details show more). */
 const LINE = 160
 /** A prompt, input or reply shown in the details, cut to this many characters. */
@@ -158,193 +157,192 @@ export function placeProcesses(processes: readonly AgentProcess[], turns: readon
 export type ActivityState = 'working' | 'waiting' | 'failed' | 'done' | 'idle'
 
 /**
- * A node of the tree. `gone`: drawn before and missing from the newest tree (a process that ended, a session out of the
- * range): kept in its row, dimmed, until a refresh (HI-1677).
+ * A node of the tree. `gone`: drawn before and missing from the newest tree (a process that ended): live, it fades out
+ * where it is and then leaves (HI-1743).
  */
 export type ActivityNode = (
   | { kind: 'card'; key: string; number: number; label: string; title: string; column: string; children: ActivityNode[] }
   | { kind: 'agent'; key: string; agentId: string; name: string; state: ActivityState; status: SessionStatus | null; line: string; children: ActivityNode[] }
   | { kind: 'session'; key: string; agentId: string | null; session: SessionListItem; live: boolean; state: ActivityState; turnsLoaded: boolean; turnCount: number; children: ActivityNode[] }
-  | { kind: 'more'; key: string; count: number; children: ActivityNode[] }
   | { kind: 'turn'; key: string; sessionId: string; turn: ActivityTurn; state: ActivityState; children: ActivityNode[] }
   | { kind: 'tool'; key: string; sessionId: string; tool: ActivityTool; state: ActivityState; children: ActivityNode[] }
   | { kind: 'task'; key: string; task: ActivityTask; children: ActivityNode[] }
   | { kind: 'process'; key: string; agentId: string; process: ActivityProcess; cli: boolean; children: ActivityNode[] }
 ) & { gone?: boolean }
 
-/** The time range the tree shows (HI-1677): running work only, or what was active within it, up to the data's 24 hours. */
-export const ACTIVITY_RANGES = ['live', '15m', '1h', '6h', '24h'] as const
-export type ActivityRange = (typeof ACTIVITY_RANGES)[number]
-const RANGE_MINUTES: Record<ActivityRange, number> = { live: 0, '15m': 15, '1h': 60, '6h': 360, '24h': ACTIVITY_HOURS * 60 }
-
-/** What the tree is narrowed to (HI-1677): agents and cards (none: all), the range, and only running work. */
+/** Which tabs show (HI-1743): agents and cards (none: all), and Hide finished (on unless turned off). */
 export interface ActivityFilter {
   agents?: string[]
   cards?: number[]
-  range?: ActivityRange
   hideFinished?: boolean
 }
 
-/** An agent as the tree needs it: its id, name and live state (none: not running). */
+/** An agent as the tab needs it: its id, name and live state (none: not running). */
 export interface ActivityAgent {
   id: string
   name: string
   live: { sessionId: string; sessionName?: string; startedAt?: string; status: SessionStatus; text: string; working: boolean; waiting: boolean; failed: boolean } | null
 }
 
-/** A card as the tree needs it. */
+/** A card as the tab needs it: its builder's and reviewer's agent ids, in this project. */
 export interface ActivityCard {
   number: number
   label: string
   title: string
   column: string
-  /** Its builder's and reviewer's agent ids, in this project. */
-  agents: string[]
+  builder: string | null
+  reviewer: string | null
 }
 
 export interface ActivityInput {
+  /** The project's agents, in pane order. */
   agents: ActivityAgent[]
   cards: ActivityCard[]
-  /** The project's sessions (session:list). */
+  /** The project's sessions (session:list), for a running session's name and its subagents. */
   sessions: readonly SessionListItem[]
   /** Turns read so far, by session id. */
   turns: ReadonlyMap<string, ActivityTurns>
   now: ActivityNow
   /** Unix ms: now, for open tool calls. */
   at: number
-  /** Unix ms: when the range is measured from (the last refresh, so nothing ages out while it is looked at); default `at`. */
-  rangeFrom?: number
-  filter?: ActivityFilter
-  /** Groups showing all their sessions (the "n more" opened), by key. */
-  showAll?: ReadonlySet<string>
 }
 
-/** A session in the range: running, or (not hiding finished work) active within its minutes before `at`. */
-function inRange(s: SessionListItem, live: ReadonlySet<string>, at: number, f: ActivityFilter): boolean {
-  if (live.has(s.id)) return true
-  const minutes = RANGE_MINUTES[f.range ?? '24h']
-  if (f.hideFinished || !minutes || s.archived || s.deleted) return false
-  const last = Date.parse(s.lastActivity ?? s.lastActiveAt ?? '')
-  return Number.isFinite(last) && at - last <= minutes * 60_000
+/** A tab (HI-1743): a project agent, its state, and the card it works on now (none: its session is its work). */
+export interface ActivityTabInfo {
+  agentId: string
+  name: string
+  state: ActivityState
+  card: ActivityCard | null
+  /** Nothing running: not running, or idle with no process or background task of its own (Hide finished hides it). */
+  finished: boolean
 }
 
-/** The card a session is filed under: the last it worked on that is listed, else none. */
-const cardOf = (s: SessionListItem, cards: ReadonlyMap<number, ActivityCard>): number | null => [...(s.cards ?? [])].reverse().find((c) => cards.has(c.number))?.number ?? null
+/** A card in progress as an agent's current work: one it builds in Doing, else one it reviews, else one of its in Review. */
+export function currentCard(agentId: string, cards: readonly ActivityCard[]): ActivityCard | null {
+  return cards.find((c) => c.builder === agentId && c.column === 'doing') ?? cards.find((c) => c.reviewer === agentId && c.column === 'review') ?? cards.find((c) => c.builder === agentId && c.column === 'review') ?? null
+}
 
-/** The tree (#1254): cards with their agents and sessions, then agents' sessions on no card; filtered as asked. */
-export function buildActivityTree(input: ActivityInput): ActivityNode[] {
+/** The agent working on a card now, for the card's Activity: its builder while it runs, else its reviewer, else either. */
+export function cardWorker(card: Pick<ActivityCard, 'builder' | 'reviewer'>, runs: (id: string) => boolean): string | null {
+  return [card.builder, card.reviewer].find((id) => !!id && runs(id)) ?? card.builder ?? card.reviewer ?? null
+}
+
+/** An agent's state, for its tab's dot and its nodes' colour. */
+function stateOf(a: ActivityAgent): ActivityState {
+  if (!a.live) return 'idle'
+  if (a.live.failed) return 'failed'
+  if (a.live.waiting) return 'waiting'
+  return a.live.working ? 'working' : 'idle'
+}
+
+/** Whether something of the agent's own runs: a process of its launch besides its CLI, or a background task. */
+function running(id: string, now: ActivityNow): boolean {
+  return now.tasks.some((t) => t.agentId === id) || now.launches.some((l) => l.agentId === id && l.processes.some((p) => !l.cli.includes(p.pid)))
+}
+
+/**
+ * The tabs (HI-1743): the project's agents in pane order, narrowed to the agents and cards asked for (an agent by its
+ * current card); Hide finished, on by default, leaves out those with nothing running, except `keep` (the tab shown:
+ * opened for that agent, or chosen).
+ */
+export function activityTabs(input: ActivityInput, filter: ActivityFilter = {}, keep?: string | null): ActivityTabInfo[] {
+  const hide = filter.hideFinished !== false
+  return input.agents.flatMap((a): ActivityTabInfo[] => {
+    const card = currentCard(a.id, input.cards)
+    const state = stateOf(a)
+    const finished = !a.live || (state === 'idle' && !running(a.id, input.now))
+    const tab = { agentId: a.id, name: a.name, state, card, finished }
+    if (filter.agents?.length && !filter.agents.includes(a.id)) return []
+    if (filter.cards?.length && !(card && filter.cards.includes(card.number))) return []
+    return hide && finished && a.id !== keep ? [] : [tab]
+  })
+}
+
+/**
+ * One agent's tree (HI-1743): its current card, with the card's builder and reviewer under it (the agent itself always,
+ * the other while it runs), else the agent alone. Under each agent its running session: the latest turn with its tool
+ * calls and the processes they started, the background tasks, the processes, and the subagents of that turn.
+ */
+export function buildActivityTree(input: ActivityInput, agentId: string): ActivityNode[] {
   const { at } = input
-  const f = input.filter ?? {}
-  const wantAgent = (id: string): boolean => !f.agents?.length || f.agents.includes(id)
-  const wantCard = (n: number): boolean => !f.cards?.length || f.cards.includes(n)
-  const liveIds = new Set(input.agents.flatMap((a) => (a.live ? [a.live.sessionId] : [])))
   const agents = new Map(input.agents.map((a) => [a.id, a]))
-  const cards = new Map(input.cards.map((c) => [c.number, c]))
+  const me = agents.get(agentId)
+  if (!me) return []
+  const listed = new Map(input.sessions.map((s) => [s.id, s]))
   const subs = new Map<string, SessionListItem[]>()
-  const tops: SessionListItem[] = []
-  // A running agent's session the list doesn't have yet (just started; the list is read again later): drawn from its live state.
-  const listed = new Set(input.sessions.map((s) => s.id))
-  const started = input.agents.flatMap((a): SessionListItem[] =>
-    a.live && !listed.has(a.live.sessionId) ? [{ id: a.live.sessionId, agentId: a.id, agentName: a.name, name: a.live.sessionName ?? a.name, source: 'hive', lastActivity: a.live.startedAt ?? new Date(at).toISOString(), hasTranscript: true, hasBackup: false, title: null, usage: null, recache: null } as SessionListItem] : []
-  )
-  for (const s of [...input.sessions, ...started]) {
-    if (!inRange(s, liveIds, input.rangeFrom ?? at, f)) continue
-    if (s.sub?.parentId) subs.set(s.sub.parentId, [...(subs.get(s.sub.parentId) ?? []), s])
-    else tops.push(s)
-  }
-  // Oldest first, the newest last (HI-1677): new work comes at the end, as the tab draws it.
-  const oldest = (a: SessionListItem, b: SessionListItem): number => (a.lastActivity ?? a.lastActiveAt ?? '').localeCompare(b.lastActivity ?? b.lastActiveAt ?? '')
-  tops.sort(oldest)
+  for (const s of input.sessions) if (s.sub?.parentId) subs.set(s.sub.parentId, [...(subs.get(s.sub.parentId) ?? []), s])
   const launches = new Map<string, ActivityLaunch[]>()
   for (const l of input.now.launches) launches.set(l.agentId, [...(launches.get(l.agentId) ?? []), l])
 
-  const sessionNode = (s: SessionListItem, depth = 0): ActivityNode => {
-    const agent = s.agentId ? agents.get(s.agentId) : undefined
-    const live = !!agent?.live && agent.live.sessionId === s.id
+  const turnNode = (sessionId: string, agent: string | null, t: ActivityTurn, working: boolean, placed: Map<number, AgentProcess[]>): ActivityNode => {
+    const tools = t.tools.map((tool): ActivityNode => {
+      const state: ActivityState = tool.failed ? 'failed' : !tool.done && working ? 'working' : 'done'
+      const ps = (placed.get(tool.itemId) ?? []).map((p): ActivityNode => ({ kind: 'process', key: `p:${p.pid}:${p.created ?? ''}`, agentId: agent!, process: p, cli: false, children: [] }))
+      return { kind: 'tool', key: `tool:${sessionId}:${tool.itemId}`, sessionId, tool, state, children: ps }
+    })
+    const state: ActivityState = working ? 'working' : t.tools.some((x) => x.failed) ? 'failed' : 'done'
+    return { kind: 'turn', key: `turn:${sessionId}:${t.itemId}`, sessionId, turn: t, state, children: tools }
+  }
+
+  /** A subagent's session: its latest turn, once read. */
+  const subNode = (s: SessionListItem): ActivityNode => {
     const turns = input.turns.get(s.id)
-    const children: ActivityNode[] = []
-    const procs = live ? (launches.get(s.agentId!) ?? []) : []
+    const last = turns?.turns.at(-1)
+    return { kind: 'session', key: `s:${s.id}`, agentId: s.agentId ?? null, session: s, live: false, state: 'done', turnsLoaded: !!turns, turnCount: turns?.total ?? 0, children: last ? [turnNode(s.id, s.agentId ?? null, last, false, new Map())] : [] }
+  }
+
+  /** A running agent's session, with what runs in it now. */
+  const sessionNode = (a: ActivityAgent): ActivityNode => {
+    const live = a.live!
+    // Its session the list doesn't have yet (just started; the list is read again later): drawn from its live state.
+    const s = listed.get(live.sessionId) ?? ({ id: live.sessionId, agentId: a.id, agentName: a.name, name: live.sessionName ?? a.name, source: 'hive', lastActivity: live.startedAt ?? new Date(at).toISOString(), hasTranscript: true, hasBackup: false, title: null, usage: null, recache: null } as SessionListItem)
+    const turns = input.turns.get(s.id)
+    const last = turns?.turns.at(-1)
+    const procs = launches.get(a.id) ?? []
     const cli = new Set(procs.flatMap((l) => l.cli))
     const all = procs.flatMap((l) => l.processes)
     const placed = placeProcesses(
       all.filter((p) => !cli.has(p.pid)),
-      turns?.turns ?? [],
+      last ? [last] : [],
       at
     )
-    const lastTurn = turns?.turns.at(-1)
-    for (const t of turns?.turns ?? []) {
-      const working = live && agent!.live!.working && t === lastTurn
-      const tools = t.tools.map((tool): ActivityNode => {
-        const state: ActivityState = tool.failed ? 'failed' : !tool.done && working ? 'working' : 'done'
-        const ps = (placed.byTool.get(tool.itemId) ?? []).map((p): ActivityNode => ({ kind: 'process', key: `p:${p.pid}:${p.created ?? ''}`, agentId: s.agentId!, process: p, cli: false, children: [] }))
-        return { kind: 'tool', key: `tool:${s.id}:${tool.itemId}`, sessionId: s.id, tool, state, children: ps }
-      })
-      const state: ActivityState = working ? 'working' : t.tools.some((x) => x.failed) ? 'failed' : 'done'
-      children.push({ kind: 'turn', key: `turn:${s.id}:${t.itemId}`, sessionId: s.id, turn: t, state, children: tools })
-    }
-    if (live) {
-      for (const task of input.now.tasks.filter((x) => x.sessionId === s.id)) children.push({ kind: 'task', key: `task:${s.id}:${task.id}`, task, children: [] })
-      const cliProcs = all.filter((p) => cli.has(p.pid))
-      for (const p of [...cliProcs, ...placed.rest]) children.push({ kind: 'process', key: `p:${p.pid}:${p.created ?? ''}`, agentId: s.agentId!, process: p, cli: cli.has(p.pid), children: [] })
-    }
-    if (depth < 4) for (const sub of (subs.get(s.id) ?? []).sort(oldest)) children.push(sessionNode(sub, depth + 1))
-    const state: ActivityState = live ? stateOf(agent!) : 'done'
-    return { kind: 'session', key: `s:${s.id}`, agentId: s.agentId ?? null, session: s, live, state, turnsLoaded: !!turns, turnCount: turns?.total ?? 0, children }
+    const children: ActivityNode[] = []
+    if (last) children.push(turnNode(s.id, a.id, last, live.working, placed.byTool))
+    for (const task of input.now.tasks.filter((x) => x.sessionId === s.id)) children.push({ kind: 'task', key: `task:${s.id}:${task.id}`, task, children: [] })
+    for (const p of [...all.filter((x) => cli.has(x.pid)), ...placed.rest]) children.push({ kind: 'process', key: `p:${p.pid}:${p.created ?? ''}`, agentId: a.id, process: p, cli: cli.has(p.pid), children: [] })
+    // Its subagents in this turn (since its prompt; all of them before its turns are read).
+    const since = last?.at ? Date.parse(last.at) : -Infinity
+    for (const sub of subs.get(s.id) ?? []) if (Date.parse(sub.lastActivity ?? sub.lastActiveAt ?? '') >= since) children.push(subNode(sub))
+    return { kind: 'session', key: `s:${s.id}`, agentId: a.id, session: s, live: true, state: stateOf(a), turnsLoaded: !!turns, turnCount: turns?.total ?? 0, children }
   }
 
-  /** Sessions of a group, oldest first: the newest ACTIVITY_SESSIONS, the older ones behind "n more" before them (running ones always shown). */
-  const group = (key: string, list: SessionListItem[]): ActivityNode[] => {
-    const shown = input.showAll?.has(key) ? list : list.filter((s, i) => i >= list.length - ACTIVITY_SESSIONS || liveIds.has(s.id))
-    const hidden = list.length - shown.length
-    return [...(hidden > 0 ? [{ kind: 'more' as const, key: `more:${key}`, count: hidden, children: [] }] : []), ...shown.map((s) => sessionNode(s))]
-  }
+  const agentNode = (a: ActivityAgent): ActivityNode => ({ kind: 'agent', key: `a:${a.id}`, agentId: a.id, name: a.name, state: stateOf(a), status: a.live?.status ?? null, line: a.live?.text ?? '', children: a.live ? [sessionNode(a)] : [] })
 
-  const agentNode = (id: string, key: string, list: SessionListItem[]): ActivityNode => {
-    const a = agents.get(id)
-    return { kind: 'agent', key, agentId: id, name: a?.name ?? list.find((s) => s.agentName)?.agentName ?? id, state: a ? stateOf(a) : 'idle', status: a?.live?.status ?? null, line: a?.live?.text ?? '', children: group(key, list) }
-  }
+  const card = currentCard(agentId, input.cards)
+  if (!card) return [agentNode(me)]
+  const pair = [card.builder, card.reviewer].flatMap((id) => {
+    const a = id ? agents.get(id) : undefined
+    return a && (a.id === agentId || a.live) ? [a] : []
+  })
+  return [{ kind: 'card', key: `c:${card.number}`, number: card.number, label: card.label, title: card.title, column: card.column, children: [...new Set(pair)].map(agentNode) }]
+}
 
-  const out: ActivityNode[] = []
-  const underCards = new Set<string>()
-  const filed = new Map<number, SessionListItem[]>()
-  const loose: SessionListItem[] = []
-  for (const s of tops) {
-    const c = cardOf(s, cards)
-    if (c === null) loose.push(s)
-    else filed.set(c, [...(filed.get(c) ?? []), s])
-  }
-  for (const c of input.cards) {
-    if (!wantCard(c.number)) continue
-    const list = filed.get(c.number) ?? []
-    // Its agents: those with sessions on it here, and its builder and reviewer while they run.
-    const ids = [...new Set([...list.map((s) => s.agentId ?? ''), ...c.agents.filter((id) => agents.get(id)?.live)])].filter(Boolean)
-    const children = ids.filter(wantAgent).map((id) => agentNode(id, `c:${c.number}:a:${id}`, list.filter((s) => s.agentId === id)))
-    if (!children.length) continue
-    for (const id of ids) underCards.add(id)
-    out.push({ kind: 'card', key: `c:${c.number}`, number: c.number, label: c.label, title: c.title, column: c.column, children })
-  }
-  if (!f.cards?.length) {
-    const byAgent = new Map<string, SessionListItem[]>()
-    for (const s of loose) byAgent.set(s.agentId ?? '', [...(byAgent.get(s.agentId ?? '') ?? []), s])
-    // A running agent shown nowhere else (no session in the window yet) still has its node.
-    for (const a of input.agents) if (a.live && !byAgent.has(a.id) && !underCards.has(a.id)) byAgent.set(a.id, [])
-    for (const [id, list] of byAgent) {
-      if (!id || !wantAgent(id)) continue
-      // Hiding finished work, an agent with nothing running isn't shown.
-      if (f.hideFinished && !list.length) continue
-      out.push(agentNode(id, `a:${id}`, list))
-    }
-  }
-  return out
+/** The tree without the gone nodes `keep` lets go (HI-1743: live, an ended process fades out, then leaves). */
+export function pruneGone(tree: readonly ActivityNode[], keep: (n: ActivityNode) => boolean): ActivityNode[] {
+  return tree.flatMap((n) => (n.gone && !keep(n) ? [] : [{ ...n, children: pruneGone(n.children, keep) }]))
+}
+
+/** The keys of the gone nodes anywhere in the tree. */
+export function goneKeys(tree: readonly ActivityNode[]): string[] {
+  return tree.flatMap((n) => [...(n.gone ? [n.key] : []), ...goneKeys(n.children)])
 }
 
 /**
  * The newest tree, reconciled with what was drawn before (HI-1677), so nothing drawn moves until a refresh (`prev`
  * empty draws it afresh). Across the whole tree, each key is one node:
- * - one drawn before and now under another parent (a process found to be a tool call's, a session filed under a card
- *   since) stays under the parent it was drawn under;
- * - one missing now (a process that ended, a session out of the range, an "n more" whose sessions left) stays where it
- *   was, marked `gone`, with what it held.
+ * - one drawn before and now under another parent (a process found to be a tool call's) stays under the parent it was
+ *   drawn under;
+ * - one missing now (a process that ended, a session that stopped) stays where it was, marked `gone`, with what it held.
  */
 export function keepGone(prev: readonly ActivityNode[], next: readonly ActivityNode[]): ActivityNode[] {
   if (!prev.length) return [...next]
@@ -422,19 +420,11 @@ export function stableRows(tree: readonly ActivityNode[], isOpen: (n: ActivityNo
   return shown.map((r) => ({ node: r.node, depth: r.depth, parent: r.parentKey === null ? -1 : (at.get(r.parentKey) ?? -1) }))
 }
 
-/** An agent's state, for its nodes' colour. */
-function stateOf(a: ActivityAgent): ActivityState {
-  if (!a.live) return 'idle'
-  if (a.live.failed) return 'failed'
-  if (a.live.waiting) return 'waiting'
-  return a.live.working ? 'working' : 'idle'
-}
-
 /** The levels the tree folds at once (HI-1678), by what a node is: sub-sessions and background tasks are subagents. */
 export const ACTIVITY_LEVELS = ['agent', 'session', 'subagent', 'turn', 'tool', 'process'] as const
 export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number]
 
-/** A node's level for Levels ▾; cards and "n more" have none (they don't fold by level). */
+/** A node's level for Levels ▾; cards have none (they don't fold by level). */
 export function activityLevel(n: ActivityNode): ActivityLevel | null {
   switch (n.kind) {
     case 'agent':

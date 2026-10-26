@@ -37,7 +37,6 @@ interface HiveMessageValues {
   'activity.liveTip': undefined
   'activity.loadFailed': { error: string | number }
   'activity.loading': undefined
-  'activity.more': { n: number }
   'activity.noPrompt': undefined
   'activity.notEnded': { why: string; label: string | number }
   'activity.openCard': undefined
@@ -45,20 +44,20 @@ interface HiveMessageValues {
   'activity.parentLabel': undefined
   'activity.pause': undefined
   'activity.pauseTip': undefined
-  'activity.pausedAuto': undefined
   'activity.pidLabel': undefined
   'activity.pill': { n: number }
   'activity.pillTip': undefined
   'activity.process': { pid: string | number }
-  'activity.range': { range: string }
-  'activity.rangeLabel': undefined
+  'activity.processFor': { pid: string | number; time: string | number }
   'activity.reading': undefined
   'activity.refresh': undefined
   'activity.showAgent': undefined
   'activity.started': undefined
   'activity.state': { state: string }
   'activity.statusLabel': undefined
+  'activity.tabsLabel': undefined
   'activity.task': { type: string }
+  'activity.toolFor': { summary: string | number; time: string | number }
   'activity.tools': { n: number }
   'activity.turns': { n: number }
   'activity.zoomIn': undefined
