@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentActor, agentOf, answerFits, approvedByUser, atRoundLimit, foldCard, LINE_GATE, loopStepSide, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, atRoundLimit, foldCard, LINE_GATE, loopStepSide, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
@@ -509,10 +509,10 @@ export class Workflow {
   }
 
   /**
-   * Requests a write settled without an answer (#1638), closed in the same write: an agent's question still open once
-   * the card is in Done (its asker told, unless it made the move), and an agent's own questions once it moves the card
-   * on itself (a submit, a put back: it went on, answered some other way). Hive's own requests stay: a merge stopped part
-   * way still needs the user on a Done card.
+   * Requests a write settled without an answer (#1638), closed in the same write: a question still open once the card is
+   * in Done (an agent's or the Assistant's, askedQuestion; an agent that asked is told, unless it made the move), and an
+   * agent's own questions once it moves the card on itself (a submit, a put back: it went on, answered some other way).
+   * Hive's own requests stay: a merge stopped part way still needs the user on a Done card.
    */
   private closeSettled(w: Write): void {
     if (!w.written.length) return
@@ -521,7 +521,7 @@ export class Workflow {
     const movedOn = !!agent && w.written.some((f) => f.kind === 'Moved')
     if (!done && !movedOn) return
     for (const r of w.state().requests) {
-      if (!r.asker) continue
+      if (!askedQuestion(r)) continue
       const own = movedOn && r.gate === 'ask' && r.asker === agent
       if (!done && !own) continue
       w.fact('RequestClosed', { request: r.request, why: done ? 'done' : 'carriedOn' }) // i18n-ignore: a fact's kind and codes, not text

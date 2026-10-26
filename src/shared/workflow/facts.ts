@@ -141,6 +141,15 @@ export interface AskAction {
 /** At most this many actions on one question. */
 export const ASK_ACTIONS_MAX = 3
 
+/**
+ * The gates of Hive's own requests (§16.8.5): the user's review, the OK before merging, the round limit, a line held up,
+ * the merge queue's (an advance to approve, one stopped part way) and a decision after a merge (asked on a Done card).
+ * A request under any other gate is a question someone asked: an agent, the Assistant (`ask`), or a rule it couldn't
+ * keep. A question settled another way is closed (#1638); Hive's own requests stay until met.
+ */
+const HIVE_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, 'decision'])
+export const askedQuestion = (r: Pick<FactData['ApprovalRequested'], 'gate'>): boolean => !HIVE_GATES.has(r.gate)
+
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds, or an action offered (#1630). */
 export interface AnswerShape {
   outcome: 'approved' | 'declined' | 'answered'

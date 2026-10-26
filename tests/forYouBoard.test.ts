@@ -358,6 +358,18 @@ describe('For you on the board (#1269)', () => {
     expect((await inboxOf(w, 'a1')).some((i) => i.text.includes('no longer stands: the card is in Done'))).toBe(true)
   })
 
+  it("#1638 round 1: the Assistant's question (no agent asked it) is closed too when the card reaches Done", async () => {
+    const { w } = await workspace({ ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'assistant', { kind: 'decide', text: 'How should this card be closed?' }))
+    expect(forYou(w).items.map((i) => ({ asker: i.asker, gate: i.gate }))).toEqual([{ asker: null, gate: 'ask' }])
+    await inWorkspace(w, () => tasks.moveTask(card, 'done', { confirm: true, reason: 'Already done elsewhere' }))
+    expect(forYou(w).count).toBe(0)
+    expect(facts(w, card).find((f) => f.kind === 'RequestClosed')?.data).toMatchObject({ why: 'done' })
+  })
+
   it("#1638: an agent that carries on (moves its card on itself) closes its own question, not another agent's", async () => {
     const { w } = await workspace({ ...allOff('git'), review: 'agent', finish: 'agentMerges', folder: 'slots' })
     const card = await create(w)

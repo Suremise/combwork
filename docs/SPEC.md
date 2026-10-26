@@ -2377,10 +2377,11 @@ reason (Move to Done through the card's rules, the rules it skips an `Override` 
 `card.kind` override; Unblock with the reason as the user's comment), then answers the question (`Approval.action`,
 the reason its `note`), and the asker is told which. An action refused, or no longer allowed, leaves the question open. A refused answer (answered or retired meanwhile) is said in a
 toast and the board read again; an answer clears the chip at once (`tasks-changed`). **A request settled another way
-is closed (#1638):** in the same write, an agent's question still open once its card is in Done (the asker told it no
-longer stands, unless it made the move), and an agent's own questions once it moves the card on itself (a submit, a put
+is closed (#1638):** in the same write, a question still open once its card is in Done (one an agent or the Assistant
+asked: any request not under Hive's own gates, `askedQuestion`; an agent that asked is told it no longer stands, unless
+it made the move), and an agent's own questions once it moves the card on itself (a submit, a put
 back: answered some other way, such as in its pane), each `RequestClosed` and a line in the card's history; For you lists
-no agent's question on a card in Done however it got there (Hive's own requests stay: a merge stopped part way), and a
+no question on a card in Done however it got there (Hive's own requests stay: a merge stopped part way, a decision after the merge), and a
 lane no longer waits for the user on a closed request.
 
 #### 16.8.6 A refused commit (#907)

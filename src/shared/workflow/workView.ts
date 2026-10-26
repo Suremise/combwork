@@ -5,7 +5,7 @@
 // Pure: main reads the facts (workflow/cardWork.ts), the window formats revisions through its project's platform
 // descriptor (`revisionShort`), never by switching on a platform's id.
 
-import { foldCard, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type CheckRanData, type Fact, type FactData, type FileChange, type ForYouKind, type QueueEntry, type RoundChoice, type StageId } from './facts'
+import { askedQuestion, foldCard, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type CheckRanData, type Fact, type FactData, type FileChange, type ForYouKind, type QueueEntry, type RoundChoice, type StageId } from './facts'
 import type { StoredText } from '../types'
 import { baseRulesetId, REVIEW_SKIPPED } from './compile'
 
@@ -82,12 +82,13 @@ export function askActionAvailable(kind: AskActionKind, card: { column: string; 
 }
 
 /**
- * A card's requests for the user, oldest first: from its facts folded (its open requests). On a card in Done, an agent's
- * question is settled however the card got there (#1638): only Hive's own requests are listed (a merge stopped part way).
+ * A card's requests for the user, oldest first: from its facts folded (its open requests). On a card in Done, a question
+ * (an agent's or the Assistant's) is settled however the card got there (#1638): only Hive's own requests are listed (a
+ * merge stopped part way, a decision after the merge).
  */
 export function forYouItems(card: { card: number; project: string; stage: StageId }, facts: readonly Fact[]): ForYouItem[] {
   const open = foldCard(facts, card.stage).requests
-  return (card.stage === 'done' ? open.filter((r) => !r.asker) : open).map((r) => ({
+  return (card.stage === 'done' ? open.filter((r) => !askedQuestion(r)) : open).map((r) => ({
     card: card.card,
     project: card.project,
     request: r.request,
