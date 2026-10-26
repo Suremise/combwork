@@ -7,7 +7,7 @@
 // - Leasing (`leaseCopy`) reserves a free copy (the most recently used), or a new one while the pool is under its size
 //   (the larger of 2 and the agents that review plus one, OP-32, or the project's own), with its lease and an operation
 //   in one write. The operation then makes it if new (a detached worktree, the project's copied files, its setup as one
-//   of Hive's runs, "Hive (copy copy-1)"), recreates it if gone, resets it to the revision (`git checkout --detach
+//   of Hive's runs, credited to the lease's agent: HI-1710), recreates it if gone, resets it to the revision (`git checkout --detach
 //   --force`, then `git clean` of what isn't ignored) and installs again when its lock files changed; then the copy is
 //   `leased`. With none free it refuses `noCopy` (the callers' "waiting for a check copy"), or `stillInUse` once a
 //   returning copy has been held back past Settings → Advanced's bound.
@@ -571,7 +571,7 @@ export class CopyPool {
       if (needed) {
         const command = opts.setup.trim() || (hash !== null && existsSync(join(copy.folder, 'package-lock.json')) ? 'npm ci' : '')
         if (command) {
-          const end = await this.run(name, token, { slot: name, of: 'copy', what: made ? 'setup' : 'install', command, folder: copy.folder, env: {} })
+          const end = await this.run(name, token, { slot: name, of: 'copy', holder: lease.agent, what: made ? 'setup' : 'install', command, folder: copy.folder, env: {} })
           if (!end.settled) return await fail('processes its setup started could not be ended', end.logPath)
           if (!end.ok) return await fail(end.error ?? (end.timedOut ? 'its setup ran out of time' : end.spawnError ? `its setup couldn't start: ${command}` : `its setup exited with code ${end.exitCode}`), end.logPath)
         }
@@ -595,7 +595,7 @@ export class CopyPool {
   }
 
   /** A command of an operation's, in a job recorded on the copy first and cleared once settled (as slots' runs). */
-  private async run(name: string, token: string, r: { slot: string; of: 'copy'; what: 'setup' | 'install'; command: string; folder: string; env: Record<string, string> }): Promise<SlotRunEnd> {
+  private async run(name: string, token: string, r: { slot: string; of: 'copy'; holder: string | null; what: 'setup' | 'install'; command: string; folder: string; env: Record<string, string> }): Promise<SlotRunEnd> {
     const job = newJob()
     await this.store.fenced(name, token, (db) => db.prepare('UPDATE copies SET job = ? WHERE project = ? AND name = ?').run(job, this.store.project, name))
     const end = await this.deps.runner({ ...r, job, signal: this.life.signal })

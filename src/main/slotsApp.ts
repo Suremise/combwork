@@ -109,7 +109,10 @@ export function appRunner(ws: WorkspaceService, projectPath: string, root: strin
     if ('problem' in opened) return { ok: false, exitCode: null, spawnError: true, error: `its job couldn't be made: ${opened.problem}`, logPath: null, settled: true } // i18n-ignore: agent-facing and the log
     const job = opened
     const workspacePath = ws.path ?? ''
-    const caller = { source: 'hive' as const, workspacePath, projectPath, ...(r.of === 'copy' ? { copy: r.slot } : { slot: r.slot }) }
+    // A copy's run is credited to the agent whose lease holds it (HI-1710), named as the project names it now.
+    const holder = r.of === 'copy' && r.holder ? r.holder : null
+    const reviewer = holder ? { agentId: holder, agentName: (await ws.projectConfig(projectPath).then((c) => projectAgents(c).find((a) => a.id === holder)?.name, () => undefined)) ?? holder } : null
+    const caller = { source: 'hive' as const, workspacePath, projectPath, ...(r.of === 'copy' ? { copy: r.slot, ...(reviewer ? { reviewer } : {}) } : { slot: r.slot }) }
     let id: string | null = null
     if (workspacePath && progressGate.on()) {
       try {

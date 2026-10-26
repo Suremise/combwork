@@ -378,6 +378,12 @@
   "git.worktree.slotLease": "{kind, select, card {{slot}: {agent} em {card}} lane {{slot}: {agent}, raia {lane}} carried {{slot}: mantido para o agente {agent}} other {{slot}: não emprestado}}",
   "git.worktree.unused": "Worktree não usado",
   "git.worktrees.changes": "Alterações",
+  "git.worktrees.copiesHeading": "Cópias de revisão (do Hive)",
+  "git.worktrees.copiesHint": "Checkouts limpos que o Hive mantém para os revisores, cada um na revisão sendo verificada. O Hive os gerencia: não há nada para remover aqui.",
+  "git.worktrees.copyRow": "{use, select, review {{copy}: {agent} revisando {card} em {revision}} check {{copy}: {agent} verificando {card} em {revision}} other {{copy}: livre no pool}}",
   "git.worktrees.heading": "Worktrees",
+  "git.worktrees.queueHeading": "Fila de merge (do Hive)",
+  "git.worktrees.queueHint": "Onde a fila de merge do Hive testa o merge de um cartão antes de ele entrar. O Hive a gerencia: não há nada para remover aqui.",
+  "git.worktrees.queueRow": "A pasta da fila de merge",
   "git.worktrees.readOnly": "Somente leitura aqui: o trabalho de um agente chega à pasta do projeto pelo comando Fazer merge."
 }

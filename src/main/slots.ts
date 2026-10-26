@@ -840,6 +840,8 @@ export interface SlotRun {
   /** The slot's name (or the copy's, with `of: 'copy'`: #1435's copies run theirs the same way). */
   slot: string
   of?: 'copy'
+  /** A copy's: the agent (its id) whose lease holds it as the run starts, which the run is credited to (HI-1710). */
+  holder?: string | null
   what: 'setup' | 'install' | 'archive'
   command: string
   folder: string

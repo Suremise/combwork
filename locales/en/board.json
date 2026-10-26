@@ -2211,6 +2211,10 @@
     "defaultMessage": "{what, select, command {Command copied} other {Details copied}}",
     "description": "A notification after copying a run's command or its details from the Progress panel."
   },
+  "board.progress.copiesRun": {
+    "defaultMessage": "Hive (review copies)",
+    "description": "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's review or check copies (folders at one revision where a reviewer reads a card's work, or an isolated check runs) and no agent's lease held the copy: its setup command or a dependency install. Also an entry of the panel's Agent filter."
+  },
   "board.progress.copyCommand": {
     "defaultMessage": "Copy command",
     "description": "Button in a run's details (Progress panel): copies the command it ran."
@@ -2226,10 +2230,6 @@
   "board.progress.copyRevision": {
     "defaultMessage": "Copy revision {revision}",
     "description": "Tooltip of a run's revision in the Progress panel (under its agent): copies the whole commit id. {revision} is its short form (a3f2c1d)."
-  },
-  "board.progress.copyRun": {
-    "defaultMessage": "Hive (copy {copy})",
-    "description": "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's review or check copies (a folder at one revision where a reviewer reads a card's work, or an isolated check runs): its setup command or a dependency install, not an agent. {copy} is the copy's name, such as copy-1: keep it as it is."
   },
   "board.progress.detailsOf": {
     "defaultMessage": "Details of {run}",

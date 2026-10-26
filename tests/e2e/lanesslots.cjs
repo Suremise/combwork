@@ -154,9 +154,12 @@ const lines = (file) => {
     const checkRun = await until(async () => (await inv('progress:snapshot')).runs.find((r) => r.check === 'quick' && r.card === c1 && r.copy === 'copy-1' && r.state !== 'running'), HUNG_MS)
     check("the check ran in copy-1, linked to the card and its revision", !!checkRun && checkRun.revision === rev && same(lines(checkLog).at(-1), copy), JSON.stringify({ checkRun, ran: lines(checkLog) }))
     await tab('runs').click()
-    check('the Runs tab’s Agent filter has "Hive (slot slot-a)" and "Hive (copy copy-1)", each its own', !!(await until(async () => {
+    // HI-1710: copy-1's set-up run is R1's (its lease held the copy), never "Hive (copy copy-1)".
+    const copyWarm = (await inv('progress:snapshot')).runs.find((r) => r.source === 'hive' && r.copy === 'copy-1')
+    check("copy-1's set-up run is credited to R1, in copy-1", !!copyWarm && copyWarm.agentId === r1.id && copyWarm.agentName === 'R1' && !copyWarm.defaultName, JSON.stringify(copyWarm))
+    check('the Runs tab’s Agent filter has "Hive (slot slot-a)" and R1 once, and no "Hive (copy …)"', !!(await until(async () => {
         const choices = await agentChoices()
-        return ['Hive (slot slot-a)', 'Hive (copy copy-1)', 'R1'].every((x) => choices.includes(x))
+        return ['Hive (slot slot-a)', 'R1'].every((x) => choices.includes(x)) && choices.filter((x) => x === 'R1').length === 1 && !choices.some((x) => x.startsWith('Hive (copy'))
       }, HUNG_MS)), JSON.stringify(await agentChoices()))
     const runRow = panel.locator(`.progress-tab-runs [data-run="${checkRun?.id}"]`)
     // In its card's runs (HI-1701), opened: closed once they all passed. What it ran for and where is in its hover.
@@ -176,6 +179,16 @@ const lines = (file) => {
     runId = checkRun?.id ?? null
     await shoot('runs', panel)
 
+    // HI-1710: Branches & remotes lists copy-1 as Hive's, in its group, saying R1 reviews the card there; never unused.
+    await page.getByText('alpha', { exact: true }).first().click()
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    await page.locator('[role="tab"][data-section="branches"]').click()
+    const copyRow = page.locator('.git-worktree[data-hive="copy"]')
+    const copyLine = `copy-1: R1 reviewing ${key1} at ${rev.slice(0, 7)}`
+    check(`Branches & remotes lists copy-1 under "Review copies (Hive’s)": "${copyLine}"`, !!(await until(async () => (await page.locator('[data-worktrees="copies"]').count()) === 1 && ((await copyRow.textContent().catch(() => '')) ?? '').includes(copyLine), HUNG_MS)), await copyRow.allInnerTexts().catch(() => []))
+    check('…with no button, and not among the worktrees', (await copyRow.locator('button').count()) === 0 && (await page.locator('.git-worktree:not([data-hive])', { hasText: 'copy-1' }).count()) === 0)
+    await shoot('branches-copies', page.locator('.git-branches'))
+
     // --- 3. R1 fails it: the lane's hover names R1's verdict.
     check('R1 fails it', (await intent(tr1, c1, 'verdict', { pass: false, comment: 'Slot row: one thing to fix' })).status === 200)
     await tab('lanes').click()
@@ -191,6 +204,13 @@ const lines = (file) => {
     check('…its row says "waiting for a slot"', !!(await until(async () => ((await why.textContent().catch(() => '')) ?? '') === 'waiting for a slot', HUNG_MS)), await why.textContent().catch(() => ''))
     await why.click()
     check('…which opens Branches & remotes, slot-a listed', !!(await until(async () => (await page.locator('button[role="tab"][data-section="branches"][aria-selected="true"]').count()) === 1 && (await page.locator('[data-slot="slot-a"]').count()) > 0, HUNG_MS)))
+    // R1's verdict handed copy-1 back: read again, it is idle in the pool.
+    check('…copy-1, handed back, idle in the pool', !!(await until(async () => {
+      if (((await page.locator('.git-worktree[data-hive="copy"]').textContent().catch(() => '')) ?? '').includes('copy-1: idle in the pool')) return true
+      await page.locator('[data-action="reload-branches"]').click().catch(() => undefined)
+      return false
+    }, HUNG_MS)), await page.locator('.git-worktree[data-hive="copy"]').allInnerTexts().catch(() => []))
+    await shoot('branches-idle', page.locator('.git-branches'))
 
     /** Screenshots in both themes (English): `target` (null: the window, its hover made again by `show`). */
     async function shoot(name, target, show) {

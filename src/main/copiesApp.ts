@@ -1,5 +1,5 @@
 // Review and check copies in the app (#1435, copies.ts): one pool per open workspace and project, on the workspace's
-// board, keyed by the project's id. Its warming runs are Hive's own, "Hive (copy copy-1)", in jobs on the process
+// board, keyed by the project's id. Its warming runs are Hive's own, credited to the lease's agent (HI-1710), in jobs on the process
 // supervisor as slots' are (slotsApp.ts); its leases carry this Hive's profile, pid and start.
 //
 // Isolated checks (`hive-progress --check <name> --isolated`, SPEC §16.13): the Agent API's resolve leases a check copy

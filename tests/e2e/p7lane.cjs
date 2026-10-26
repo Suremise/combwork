@@ -384,12 +384,13 @@ function helpers(h) {
     }, HUNG_MS)), await tip())
     await h.page.mouse.move(5, 5)
     const agentChoices = () => x.panel.locator('select[aria-label="Agent"] option').allInnerTexts().catch(() => [])
-    const hives = ['Hive (slot slot-a)', 'Hive (slot slot-b)', `Hive (copy ${path.basename(copy)})`]
+    // HI-1710: the copy's set-up run is its reviewer's (no "Hive (copy …)" entry), and no entry is listed twice.
+    const hives = ['Hive (slot slot-a)', 'Hive (slot slot-b)']
     const hivesNamed = async () => {
       const now = await agentChoices()
-      return hives.every((c) => now.includes(c))
+      return hives.every((c) => now.includes(c)) && !now.some((c) => c.startsWith('Hive (copy')) && new Set(now).size === now.length
     }
-    check("the Runs tab's Agent filter names the slots' and the copy's runs as Hive's", !!(await until(hivesNamed, HUNG_MS)), JSON.stringify(await agentChoices()))
+    check("the Runs tab's Agent filter names the slots' runs as Hive's, and the copy's as its reviewer's", !!(await until(hivesNamed, HUNG_MS)), JSON.stringify(await agentChoices()))
     await x.shoot('runs', x.panel)
 
     // --- Passed: the queue merges it into main, checked out in the project folder, while the reviewer is idle there (S42).

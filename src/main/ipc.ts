@@ -31,7 +31,7 @@ import { addRemote, branchDrops, branchUpdatePlan, createBranch, createTag, dele
 import { checkGit, gitTool } from './gitTool'
 import { refreshPath, refreshPathBeforeStart } from './freshPath'
 import { openExternalTerminal } from './externalTerminal'
-import { mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchOf, unusedBranchStatus, unusedWorktrees } from './unusedWorktrees'
+import { hiveWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchOf, unusedBranchStatus, unusedWorktrees } from './unusedWorktrees'
 import { branchMergeStatus, lineCard, lineConfirmed, mergeBranch, mergeBranches } from './branchMerge'
 import { createLogger, logsDir, userText } from './logger'
 import { diagnostics } from './diagnostics'
@@ -1457,7 +1457,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'git:summary': (p) => repoSummary(workspace.assertProject(p)),
     'git:info': async (p) => {
       p = workspace.assertProject(p)
-      return repoInfo(p, await workTargetOf(p))
+      const info = await repoInfo(p, await workTargetOf(p))
+      // Hive's own worktrees said as such (HI-1710): its review copies and the merge queue's folder.
+      return { ...info, worktrees: info.worktrees.map((w) => {
+        const hive = hiveWorktreeOf(p, w.path)
+        return hive ? { ...w, hive } : w
+      }) }
     },
     'git:deleteBranches': (p, items, unmerged) => deleteBranches(p, Array.isArray(items) ? items : [], !!unmerged),
     'git:deleteRemoteBranches': (p, remote, items) => deleteRemoteBranches(p, String(remote ?? ''), Array.isArray(items) ? items : []),

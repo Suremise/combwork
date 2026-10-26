@@ -378,6 +378,12 @@
   "git.worktree.slotLease": "{kind, select, card {{slot}: {agent} en {card}} lane {{slot}: {agent}, carril {lane}} carried {{slot}: reservado para {agent}} other {{slot}: sin prestar}}",
   "git.worktree.unused": "Worktree sin usar",
   "git.worktrees.changes": "Cambios",
+  "git.worktrees.copiesHeading": "Copias de revisión (de Hive)",
+  "git.worktrees.copiesHint": "Checkouts limpios que Hive mantiene para los revisores, cada uno en la revisión que se comprueba. Hive los gestiona: aquí no hay nada que quitar.",
+  "git.worktrees.copyRow": "{use, select, review {{copy}: {agent} revisa {card} en {revision}} check {{copy}: {agent} comprueba {card} en {revision}} other {{copy}: libre en el grupo}}",
   "git.worktrees.heading": "Worktrees",
+  "git.worktrees.queueHeading": "Cola de fusión (de Hive)",
+  "git.worktrees.queueHint": "Donde la cola de fusión de Hive prueba la fusión de una tarjeta antes de que entre. Hive la gestiona: aquí no hay nada que quitar.",
+  "git.worktrees.queueRow": "La carpeta de la cola de fusión",
   "git.worktrees.readOnly": "Solo lectura aquí: el trabajo de un agente llega a la carpeta del proyecto mediante Fusionar."
 }

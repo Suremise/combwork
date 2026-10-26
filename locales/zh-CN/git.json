@@ -378,6 +378,12 @@
   "git.worktree.slotLease": "{kind, select, card {{slot}：{agent} 处理 {card}} lane {{slot}：{agent}，通道 {lane}} carried {{slot}：为 {agent} 保留} other {{slot}：未借出}}",
   "git.worktree.unused": "未使用的工作树",
   "git.worktrees.changes": "更改",
+  "git.worktrees.copiesHeading": "评审副本（Hive 的）",
+  "git.worktrees.copiesHint": "Hive 为评审者保留的干净检出，每个都位于正在检查的修订版本。由 Hive 管理：这里没有可移除的内容。",
+  "git.worktrees.copyRow": "{use, select, review {{copy}：{agent} 正在 {revision} 评审 {card}} check {{copy}：{agent} 正在 {revision} 检查 {card}} other {{copy}：在池中空闲}}",
   "git.worktrees.heading": "工作树",
+  "git.worktrees.queueHeading": "合并队列（Hive 的）",
+  "git.worktrees.queueHint": "Hive 的合并队列在卡片的合并进入之前测试它的地方。由 Hive 管理：这里没有可移除的内容。",
+  "git.worktrees.queueRow": "合并队列的文件夹",
   "git.worktrees.readOnly": "此处只读：智能体的工作通过“合并”进入项目文件夹。"
 }

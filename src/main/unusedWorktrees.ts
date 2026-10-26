@@ -38,6 +38,19 @@ const key = placeKey
 /** Whether `a` is `b` or a folder containing it, by real paths (#389). */
 const contains = containsPlace
 
+/**
+ * Which of Hive's own pools a worktree folder is in (HI-1710): a review copy (the project's copies folder), the merge
+ * queue's folder (named as the queue names them, beside the slots), else null. Branches & remotes lists them as Hive's,
+ * never as unused worktrees.
+ */
+export function hiveWorktreeOf(projectPath: string, path: string): 'copy' | 'queue' | null {
+  const ws = workspaceOf(projectPath)
+  if (!ws.path) return null
+  const root = join(ws.worktreesRoot, basename(projectPath))
+  if (contains(join(root, COPIES_DIR), path)) return 'copy'
+  return isQueueFolder(root, path) ? 'queue' : null
+}
+
 /** Why Hive won't touch a listed worktree folder (null: it may), whoever uses it. */
 async function unsafe(projectPath: string, path: string): Promise<string | null> {
   const ws = workspaceOf(projectPath)

@@ -52,7 +52,8 @@ type StoreState = Parameters<typeof findProject>[0]
 function whyNotShown(s: StoreState, r: ProgressRun): string | null {
   if (r.source === 'assistant') return s.workspace?.assistant ? null : tr(msg({ id: 'board.progress.noAssistant', defaultMessage: 'The Assistant is not in this workspace.', description: "Why a Progress panel run's agent can't be shown: the run is the Hive Assistant's, and this workspace has none." }))
   if (r.source === 'api') return tr(msg({ id: 'board.progress.scriptRun', defaultMessage: 'A script reported it, not an agent: there is no agent to show.', description: "Why a Progress panel run's agent can't be shown: a script reported the run." }))
-  if (r.source === 'hive') return tr(msg({ id: 'board.progress.hiveRun', defaultMessage: 'Hive’s merge queue ran it, not an agent: there is no agent to show.', description: "Why a Progress panel run's agent can't be shown: Hive's merge queue ran the run itself (a merge check on a card's merged result; glossary 2.5: merge queue)." }))
+  // Hive's setup run in a review copy names the agent whose lease held it (HI-1710): shown as that agent's.
+  if (r.source === 'hive' && !r.agentId) return tr(msg({ id: 'board.progress.hiveRun', defaultMessage: 'Hive’s merge queue ran it, not an agent: there is no agent to show.', description: "Why a Progress panel run's agent can't be shown: Hive's merge queue ran the run itself (a merge check on a card's merged result; glossary 2.5: merge queue)." }))
   const p = r.projectPath ? findProject(s, r.projectPath) : null
   if (!p) return tr(msg({ id: 'board.progress.projectGone', defaultMessage: 'Its project is no longer in this workspace.', description: "Why a Progress panel run's agent can't be shown: its project was removed from the workspace." }))
   if (!r.agentId || !p.agents.some((a) => a.id === r.agentId)) return tr(msg({ id: 'board.progress.agentGone', defaultMessage: '{agent} has been removed from {project}.', description: "Why a Progress panel run's agent can't be shown: the agent ({agent}) was removed from its project ({project})." }), { agent: runAgentName(r, tr), project: p.name })
@@ -688,7 +689,7 @@ function RunFor({ run: r }: { run: ProgressRun }) {
         </button>
       )}
       {/* A review or check copy's run (#1435, #1446): a check of that revision, in the copy, never the builder's slot. */}
-      {r.copy && r.source !== 'hive' && (
+      {r.copy && (
         <span className="progress-run-copy">
           {(card || r.revision) && <span aria-hidden="true"> · </span>}
           {tr(IN_COPY, { copy: r.copy })}
@@ -749,7 +750,7 @@ const RecentRow = memo(function RecentRow({ run: r, cardKey, now, open, onToggle
     ? tr(msg({ id: 'board.progress.recentHoverTook', defaultMessage: '{agent}: {run} {state} ({took})', description: "Tooltip of a run in the Progress panel's Runs tab: its agent, its title ({run}), its state in a few words ({state}: failed, stopped reporting…) and how long it took ({took}: 4 min)." }), { ...values, took })
     : tr(msg({ id: 'board.progress.recentHover', defaultMessage: '{agent}: {run} {state}', description: "Tooltip of a run in the Progress panel's Runs tab: its agent, its title ({run}) and its state in a few words ({state}: failed, stopped reporting…)." }), values)
   // What it ran for and where, in its hover (HI-1701: one line each, the details have the rest): "AM-12 · a3f2c1d · in copy-2", and its command.
-  const ranFor = [card, r.revision ? shortRevision(r.revision) : null, r.copy && r.source !== 'hive' ? tr(IN_COPY, { copy: r.copy }) : null].filter(Boolean).join(' · ') // i18n-ignore: a list of names and ids, each the window's
+  const ranFor = [card, r.revision ? shortRevision(r.revision) : null, r.copy ? tr(IN_COPY, { copy: r.copy }) : null].filter(Boolean).join(' · ') // i18n-ignore: a list of names and ids, each the window's
   const tip = [hover, ranFor, r.command, r.summary].filter(Boolean).join('\n')
   return (
     <div ref={item} className={cx('progress-recent-item', r.state, open && 'open')} data-run={r.id}>

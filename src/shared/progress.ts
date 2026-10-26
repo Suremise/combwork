@@ -388,8 +388,9 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
   if (r.testedCheckout && r.testedCheckout !== r.revision) out.push({ label: tr(msg({ id: 'board.details.testedOn', defaultMessage: 'Tested on', description: "A label in a run's details (Progress panel), shown when it differs from the card's revision: the commit that was checked out where the run ran follows (a commit id)." })), text: r.testedCheckout, code: true })
   // The folder it ran in, as its reporter said (#1446): the run's own, never where its agent works now.
   if (r.folder) out.push({ label: tr(msg({ id: 'board.details.folder', defaultMessage: 'Folder', description: "A label in a run's details (Progress panel): the folder it ran in follows (a path), as it was when it ran." })), text: r.folder, code: true })
-  // The review or check copy it ran in (#1435): an isolated check's, or a reviewer's, at exactly that revision.
-  if (r.copy && r.source !== 'hive') out.push({ label: tr(msg({ id: 'board.details.copy', defaultMessage: 'Copy', description: "A label in a run's details (Progress panel): the name of the review or check copy it ran in follows (copy-1): a folder Hive keeps at exactly the card's revision, which nothing else writes." })), text: r.copy })
+  // The review or check copy it ran in (#1435): an isolated check's, or a reviewer's, at exactly that revision; Hive's
+  // setup run in one too (HI-1710), credited to the agent whose lease held it.
+  if (r.copy) out.push({ label: tr(msg({ id: 'board.details.copy', defaultMessage: 'Copy', description: "A label in a run's details (Progress panel): the name of the review or check copy it ran in follows (copy-1): a folder Hive keeps at exactly the card's revision, which nothing else writes." })), text: r.copy })
   // How it counted as a check of its card's revision (#1222, SPEC §16.13), once it finished.
   if (r.counts) {
     const text = r.counts.counted
@@ -446,7 +447,7 @@ export function runAgentName(r: Pick<ProgressRun, 'agentName' | 'defaultName' | 
   if (r.defaultName === 'agent') return tr(msg({ id: 'board.progress.anAgent', defaultMessage: 'Agent', description: "Who ran a run in the Progress panel when Hive doesn't have the agent's name (an older record)." }))
   if (r.defaultName === 'mergeQueue') return tr(msg({ id: 'board.progress.mergeQueue', defaultMessage: 'Hive (merge queue)', description: "Who ran a run in the Progress panel when Hive's merge queue ran it itself: a merge check or install on a card's merged result, not an agent (glossary 2.5: merge queue)." }))
   if (r.defaultName === 'slot' && r.slot) return tr(msg({ id: 'board.progress.slotRun', defaultMessage: 'Hive (slot {slot})', description: "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's slots (a worktree Hive lends to a card or a lane: its setup command, a dependency install or its archive command), not an agent. {slot} is the slot's name, such as slot-b: keep it as it is." }), { slot: r.slot })
-  if (r.defaultName === 'copy' && r.copy) return tr(msg({ id: 'board.progress.copyRun', defaultMessage: 'Hive (copy {copy})', description: "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's review or check copies (a folder at one revision where a reviewer reads a card's work, or an isolated check runs): its setup command or a dependency install, not an agent. {copy} is the copy's name, such as copy-1: keep it as it is." }), { copy: r.copy })
+  if (r.defaultName === 'copy') return tr(msg({ id: 'board.progress.copiesRun', defaultMessage: 'Hive (review copies)', description: "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's review or check copies (folders at one revision where a reviewer reads a card's work, or an isolated check runs) and no agent's lease held the copy: its setup command or a dependency install. Also an entry of the panel's Agent filter." }))
   return r.agentName
 }
 

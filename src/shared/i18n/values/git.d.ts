@@ -380,6 +380,12 @@ interface HiveMessageValues {
   'git.worktree.slotLease': { kind: string; slot: string | number; agent: string | number; card: string | number; lane: string | number }
   'git.worktree.unused': undefined
   'git.worktrees.changes': undefined
+  'git.worktrees.copiesHeading': undefined
+  'git.worktrees.copiesHint': undefined
+  'git.worktrees.copyRow': { use: string; copy: string | number; agent: string | number; card: string | number; revision: string | number }
   'git.worktrees.heading': undefined
+  'git.worktrees.queueHeading': undefined
+  'git.worktrees.queueHint': undefined
+  'git.worktrees.queueRow': undefined
   'git.worktrees.readOnly': undefined
 }
