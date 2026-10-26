@@ -22,6 +22,8 @@ import { createLogger, userText } from '../logger'
 import * as G from '../platform/git'
 import { englishText, linesOf, withValues, type Text } from '../../shared/advanced'
 import { msg } from '../../shared/i18n/msg'
+import { tr } from '../../shared/i18n'
+import { MERGE_ANSWER, OPTION_TEXT, VALUE_TEXT } from '../../shared/workflow/optionTexts'
 import { allOff, NAME_OPTIONS, PRESETS, preset, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
 import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
@@ -452,12 +454,13 @@ async function stillAsked(ws: WorkspaceService, project: { path: string }, a: Me
   return entry.target
 }
 
-/** The request answered as the user (For you's path: its refusal propagated), its words kept on the card. */
+/** The request answered as the user (For you's path: its refusal propagated), its words kept on the card as their comment. */
 async function answerIt(a: MergeAnswer): Promise<void> {
   const { answerTask } = await import('../tasks')
-  const style = a.style === 'merge' ? 'merge commit' : a.style === 'squash' ? 'squash' : 'rebase and fast-forward' // i18n-ignore: the answer's words, read by agents (English)
-  const message = a.commitMessage === 'branch' ? "the branch's own" : "Hive's" // i18n-ignore: the answer's words, read by agents (English)
-  await answerTask(a.card, a.request, { outcome: 'answered', reply: `Merge style: ${style}; commit message: ${message}.` }) // i18n-ignore: the answer's words, kept on the card as the user's comment and read by agents (English)
+  // In the user's language (HI-1733), as Version Control → Workflow names the options and their values: the comment is
+  // theirs, and nothing reads its words (the choice is the board's record and the project's options).
+  const reply = tr(MERGE_ANSWER, { styleTitle: tr(OPTION_TEXT.style!.title), style: tr(VALUE_TEXT.style[a.style]), messageTitle: tr(OPTION_TEXT.commitMessage!.title), message: tr(VALUE_TEXT.commitMessage[a.commitMessage]) })
+  await answerTask(a.card, a.request, { outcome: 'answered', reply })
 }
 
 /** A save chose them: each open merge question of the project closed, with the save. */

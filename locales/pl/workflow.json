@@ -122,6 +122,7 @@
   "workflow.group.stages": "Etapy",
   "workflow.group.where": "Gdzie powstają karty",
   "workflow.group.work": "Praca",
+  "workflow.mergeChoice.answer": "{styleTitle}: {style}. {messageTitle}: {message}.",
   "workflow.move.answer": "Odpowiedz",
   "workflow.move.declarePaths": "Ustaw ścieżki karty",
   "workflow.move.loopStep": "Krok pętli kart",

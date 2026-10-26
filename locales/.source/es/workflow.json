@@ -128,6 +128,7 @@
   "workflow.group.stages": "Stages",
   "workflow.group.where": "Where cards are built",
   "workflow.group.work": "The work",
+  "workflow.mergeChoice.answer": "{styleTitle}: {style}. {messageTitle}: {message}.",
   "workflow.move.answer": "Answer",
   "workflow.move.declarePaths": "Set the card's paths",
   "workflow.move.loopStep": "Card loop step",

@@ -122,6 +122,7 @@
   "workflow.group.stages": "Etapas",
   "workflow.group.where": "Dónde se trabaja cada tarjeta",
   "workflow.group.work": "El trabajo",
+  "workflow.mergeChoice.answer": "{styleTitle}: {style}. {messageTitle}: {message}.",
   "workflow.move.answer": "Responder",
   "workflow.move.declarePaths": "Indicar las rutas de la tarjeta",
   "workflow.move.loopStep": "Paso del ciclo de tarjetas",

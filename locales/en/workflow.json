@@ -491,6 +491,10 @@
     "defaultMessage": "The work",
     "description": "A heading of the Workflow section for a project without version control: what a card’s work is, and when cards start."
   },
+  "workflow.mergeChoice.answer": {
+    "defaultMessage": "{styleTitle}: {style}. {messageTitle}: {message}.",
+    "description": "The user's answer to the merge queue's question before an upgraded project's first merge, kept on the card as the user's own comment: the two workflow options they chose, each its name ({styleTitle}: Merge style; {messageTitle}: Commit message) and the value chosen ({style}: Squash, say; {message}: a value of Commit message). The names and values are the workflow options' own texts, already translated: arrange them as your language writes such a list."
+  },
   "workflow.move.answer": {
     "defaultMessage": "Answer",
     "description": "A move on a card, named in a refused move: the user's answer to a For you request (Approve, Decline, a reply)."
