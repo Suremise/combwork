@@ -22,26 +22,32 @@ function useShown(project: string | null): ProjectInfo[] {
 
 /** What was last read for each project (by its path, lower case), kept while the board is closed: opened again, it
  *  draws with them at once, and the new read replaces them (HI-1682: read only after the first paint, the Merging
- *  column and the Approved group's heading came late, moving every column). */
-const STAGES = new Map<string, ProjectStages | null>()
-const FORMS = new Map<string, WorkflowForm>()
+ *  column and the Approved group's heading came late, moving every column). Each with the workflow it was read for. */
+type Kept<T> = Map<string, { workflow: string; value: T }>
+const STAGES: Kept<ProjectStages | null> = new Map()
+const FORMS: Kept<WorkflowForm> = new Map()
+
+/** A project's workflow as the window knows it: its saved options and platform, and the workflows written since the
+ *  window opened (`workflow-changed`, counted while the board is closed too). What was read for another is stale. */
+const workflowOf = (p: ProjectInfo, version: number): string => `${version}|${JSON.stringify(p.config.workflow ?? null)}|${p.platform?.id ?? ''}`
 
 /**
  * Something read for each shown project by its path, again when a workflow is written or the projects change, starting
- * from what `cache` kept from the last read. known: every shown project has a value, read now or kept (one whose read
- * failed counts once it was tried).
+ * from what `cache` kept from a read for the same workflow. known: every shown project has a value, read now or kept
+ * (one whose read failed counts once it was tried).
  */
-function usePerProject<T>(project: string | null, cache: Map<string, T>, read: (path: string) => Promise<T>): { values: Map<string, T>; known: boolean } {
+function usePerProject<T>(project: string | null, cache: Kept<T>, read: (path: string) => Promise<T>): { values: Map<string, T>; known: boolean } {
   const shown = useShown(project)
   const version = useStore((s) => s.workflowVersion)
   const key = shown.map((p) => `${p.path}|${JSON.stringify(p.config.workflow ?? null)}|${p.platform?.id ?? ''}`).join('\n')
   const [read_, setRead] = useState<{ key: string; values: Map<string, T> } | null>(null)
   useEffect(() => {
     let live = true
+    const asked = new Map(shown.map((p) => [p.path.toLowerCase(), workflowOf(p, version)]))
     void Promise.all(shown.map((p) => read(p.path).then((v) => [p.path.toLowerCase(), v] as const, () => null))).then((all) => {
       if (!live) return
       const values = new Map(all.filter((x): x is readonly [string, Awaited<T>] => !!x))
-      for (const [path, v] of values) cache.set(path, v)
+      for (const [path, value] of values) cache.set(path, { workflow: asked.get(path)!, value })
       setRead({ key, values })
     })
     return () => {
@@ -50,11 +56,11 @@ function usePerProject<T>(project: string | null, cache: Map<string, T>, read: (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, version])
   if (read_?.key === key) return { values: read_.values, known: true }
-  // Every read is kept too, so what is kept stands in for an older read as well.
   const kept = new Map<string, T>()
   for (const p of shown) {
     const path = p.path.toLowerCase()
-    if (cache.has(path)) kept.set(path, cache.get(path) as T)
+    const k = cache.get(path)
+    if (k && k.workflow === workflowOf(p, version)) kept.set(path, k.value)
   }
   return { values: kept, known: kept.size === shown.length }
 }
