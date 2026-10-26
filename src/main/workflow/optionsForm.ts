@@ -19,18 +19,18 @@ import { createLogger, userText } from '../logger'
 import * as G from '../platform/git'
 import { englishText, linesOf, withValues, type Text } from '../../shared/advanced'
 import { msg } from '../../shared/i18n/msg'
-import { allOff, NAME_OPTIONS, PRESETS, preset, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, NAME_OPTIONS, PRESETS, preset, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
 import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
 import type { PlatformId } from '../../shared/platform/descriptors'
-import type { ProjectStages, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
+import type { ProjectStages, ProjectWorkflow, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
 import { compile, mustCompile } from '../../shared/workflow/compile'
 import type { WorkspaceService } from '../workspace'
 import { FactStore } from './factStore'
 import { checkOptions, problemText, problemShownOf, resolvedOf, resolveOptions, workflowChanged, type OptionLevels } from './rulesets'
 import { workflowEnforced, workflowFor } from './service'
 import { APPLY_OPTIONS } from './runtime'
-import { queueChanged } from './queueHost'
+import { kickQueue, queueChanged } from './queueHost'
 import { isUnknown } from '../platform/types'
 import { workflowWrite } from './writes'
 import { withRepoLocks } from '../repoLock'
@@ -237,17 +237,18 @@ export class WorkflowRefused extends HiveError {
  * recorded with an Override naming what changed (OP-38: the user only, per change, the cards listed first). Returns the
  * form as it is now.
  */
-export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[] } = {}): Promise<WorkflowForm> {
+export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answering?: boolean } = {}): Promise<WorkflowForm> {
   // Checked against the levels as they are now and written in the same turn of workflow writes (#1422), holding the
   // project's repository lock first (#1642 round 5): its target can't move while a clean-up checks a branch against it,
   // from this Hive or another.
   return withRepoLocks([projectPath], () => workflowWrite(() => saveWorkflowOptions(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
 }
 
-async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[] }): Promise<WorkflowForm> {
+async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answering?: boolean }): Promise<WorkflowForm> {
   const project = projectOf(ws, projectPath)
   const change = shapeOf(raw)
   let changed: (keyof WorkflowOptions)[] = []
+  let chosen = false
   await ws.mutateProjectConfig(project.path, (cfg) => {
     // Its version control switched since the form was read (#1419): these options are the other platform's, refused.
     const now = projectPlatform(project.path, cfg.platform).id
@@ -259,7 +260,15 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
     changed = c.changed
     const options = Object.fromEntries(Object.entries(change.options).filter(([k, v]) => k !== 'platform' && v !== undefined))
     // Saved from the Workflow section: the answer to "How do you work?" for this platform is given (#1423).
-    return { workflow: setPresetAsked(writeWorkflow(cfg.workflow, { platform: project.platform, preset: change.preset, options }), project.platform, 'chosen') }
+    const workflow = setPresetAsked(writeWorkflow(cfg.workflow, { platform: project.platform, preset: change.preset, options }), project.platform, 'chosen')
+    // HI-1697: a change to the merge style or the commit message chooses them: the upgrade's question is answered.
+    // As they resolve (an option left out inherits), before and after.
+    if (workflow.mergeAsk) {
+      const was = resolvedOf(ws, project.path, project.platform, cfg).options
+      const now = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow }).options
+      chosen = was.style !== now.style || was.commitMessage !== now.commitMessage
+    }
+    return { workflow: chosen ? withoutMergeAsk(workflow) : workflow }
   })
   log.info(`the workflow options of ${userText(project.name)} changed: ${changed.join(', ') || 'none'}`)
   workflowChanged(ws, project.path)
@@ -272,8 +281,38 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
   if (changed.length) {
     const t = change.options.target || (await G.defaultBranch(project.path).catch(() => null))
     queueChanged(ws, project.path, t && !isUnknown(t) ? t : '')
+    // The queue waiting for them (paused `mergeChoice`) carries on; with its question's answer, once that is recorded.
+    if (chosen && !o.answering && t && !isUnknown(t)) void kickQueue(ws, project.path, t)
   }
   return workflowForm(ws, project.path)
+}
+
+const withoutMergeAsk = (w: ProjectWorkflow): ProjectWorkflow => {
+  const { mergeAsk: _asked, ...rest } = w
+  return rest
+}
+
+/**
+ * The user's answer to the merge queue's question before an upgraded project's first merge (HI-1697, For you): the
+ * merge style and commit message saved as the project's own options (checked and saved as the Workflow section saves
+ * them), the question cleared, and the request answered, which wakes the queue.
+ */
+export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw: unknown): Promise<void> {
+  const project = projectOf(ws, projectPath)
+  const a = raw as { card?: unknown; request?: unknown; style?: unknown; commitMessage?: unknown } | null
+  if (!a || !Number.isInteger(a.card) || typeof a.request !== 'string' || !takesOption('style', a.style) || !takesOption('commitMessage', a.commitMessage)) throw new HiveError({ lines: ['A merge choice is { card, request, style, commitMessage }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  const style = a.style as WorkflowOptions['style']
+  const message = a.commitMessage as CommitMessage
+  const cfg = await ws.projectConfig(project.path)
+  // The answer is how Hive merges the project's cards: those in flight work under it from now (the card waiting in the
+  // queue too, whose ruleset has the merge style it was approved under), as the Workflow section's "apply" does.
+  const inFlight = (await cardsInFlight(ws, project)).map((c) => c.number)
+  await setWorkflowOptions(ws, project.path, { preset: cfg.workflow?.platform === project.platform ? cfg.workflow.preset : null, options: { ...ownOf(cfg, project.platform), style, commitMessage: message } }, { applyTo: inFlight, answering: true })
+  await ws.mutateProjectConfig(project.path, (c) => (c.workflow?.mergeAsk ? { workflow: withoutMergeAsk(c.workflow) } : {}))
+  log.info(`${userText(project.name)}'s merge style and commit message chosen: ${style}, ${message}`)
+  const wf = await workflowFor(ws, project.path)
+  // i18n-ignore: the answer's words, for agents (English)
+  if (wf) await wf.answer(a.card, a.request, 'answered', { note: `${style === 'merge' ? 'merge commit' : style === 'squash' ? 'squash' : 'rebase and fast-forward'}, ${message === 'branch' ? "the branch's own message" : "Hive's message"}` })
 }
 
 /** The user applies the options now in force to cards in flight: an Override on each that is still in flight. */

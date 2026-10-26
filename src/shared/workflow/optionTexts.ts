@@ -65,7 +65,7 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   commitMessage: {
     title: msg({ id: 'workflow.option.commitMessage.title', defaultMessage: 'Commit message', description: 'A workflow option (glossary 2.6, G19): the message of the commit Hive’s merge queue makes when it merges a card (a merge commit, or a squash’s one commit).' }),
-    desc: msg({ id: 'workflow.option.commitMessage.desc', defaultMessage: 'The message of the commit the merge queue makes: Hive’s names the card’s key and title and adds Hive’s trailers; the branch’s own uses the message its commits have, with no card key or trailers. Either way, Hive knows which card it merged.', description: 'What the workflow option “Commit message” does (glossary 2.1: merge queue). Trailers are git’s name for the “Key: value” lines at the end of a commit message: keep the word if your language’s git terms do.' })
+    desc: msg({ id: 'workflow.option.commitMessage.desc', defaultMessage: 'The message of the commit the merge queue makes: Hive’s names the card’s key and title and adds Hive’s trailers, and the branch’s own uses the message its commits have, with no card key or trailers, while Hive still knows which card it merged.', description: 'What the workflow option “Commit message” does (glossary 2.1: merge queue). Trailers are git’s name for the “Key: value” lines at the end of a commit message: keep the word if your language’s git terms do.' })
   },
   mergeInstall: {
     title: msg({ id: 'workflow.option.mergeInstall.title', defaultMessage: 'Install dependencies from scratch', description: 'A workflow option (G9’s install): when the merge queue installs the project’s dependencies afresh before the merge checks.' }),

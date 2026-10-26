@@ -31,7 +31,7 @@ const { OPTION_TEXT, OPTION_WHY, optionTitle, PRESET_SUMMARY } = await import('.
 const { englishText } = await import('../src/shared/advanced')
 const { cardLabel } = await import('../src/shared/projectKeys')
 const projectKeys = await import('../src/main/projectKeys')
-const { agentActor } = await import('../src/shared/workflow/facts')
+const { agentActor, MERGE_CHOICE_GATE } = await import('../src/shared/workflow/facts')
 const { compile } = await import('../src/shared/workflow/compile')
 
 /** The bound for a hung run: a start's facts are recorded within it. */
@@ -420,6 +420,51 @@ describe("the Version Control tab's Workflow section (#1418)", () => {
     await form.setWorkflowOptions(w, repo, { preset: 'team', options: { ...pair, okBefore: { mode: 'labels', labels: ['ui'] } } })
     expect(await fields()).toEqual(want)
     expect((await w.projectConfig(repo)).workflow).toMatchObject({ preset: 'team', options: { okBefore: { mode: 'labels' } } })
+  })
+})
+
+describe("the upgrade's merge question (HI-1697)", () => {
+  const asks = async (w: WS, repo: string): Promise<unknown> => ((await w.projectConfig(repo)).workflow as unknown as Record<string, unknown>).mergeAsk
+  const marked = async (w: WS, repo: string): Promise<void> => {
+    await w.mutateProjectConfig(repo, (cfg) => ({ workflow: { ...cfg.workflow!, mergeAsk: true } }))
+  }
+
+  it('a save keeps the question unless it changes the merge style or the commit message', async () => {
+    const { platform: _p, ...pair } = preset('git', 'pair')
+    const { w, repo } = await workspace({ project: pair, preset: 'pair' })
+    await marked(w, repo)
+    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true } })
+    expect(await asks(w, repo)).toBe(true)
+    // Left out, it inherits the same value: not a choice either.
+    const { commitMessage: _m, style: _s, ...inheriting } = pair
+    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...inheriting, strict: true } })
+    expect(await asks(w, repo)).toBe(true)
+    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true, commitMessage: 'branch' } })
+    expect(await asks(w, repo)).toBeUndefined()
+    await marked(w, repo)
+    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true, commitMessage: 'branch', style: 'squash' } })
+    expect(await asks(w, repo)).toBeUndefined()
+  })
+
+  it("the answer saves the project's merge style and commit message, applies them to its cards in flight and answers the request", async () => {
+    const { platform: _p, ...pair } = preset('git', 'pair')
+    const { w, repo } = await workspace({ project: pair, preset: 'pair' })
+    await marked(w, repo)
+    const card = await inWorkspace(w, () => tasks.createTask({ title: 'Waits in the queue', project: 'p' }, user))
+    const wf = (await workflowFor(w, repo))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${card.number}`, agentActor('b1')))).toMatchObject({ ok: true })
+    const rec = wf.store.card(card.number)
+    const request = await store.boardWrite(w, async () => wf.write(rec, wf.rulesetOf(rec), 'hive', (x) => wf.askUser(x, 'decide', MERGE_CHOICE_GATE, 'How should Hive merge?', { unbound: true })))
+    await form.chooseMerge(w, repo, { card: card.number, request, style: 'squash', commitMessage: 'branch' })
+    expect((await w.projectConfig(repo)).workflow).toMatchObject({ preset: 'pair', options: { style: 'squash', commitMessage: 'branch' } })
+    expect(await asks(w, repo)).toBeUndefined()
+    const wf2 = (await workflowFor(w, repo))!
+    const s = wf2.state(wf2.store.card(card.number))
+    expect(s.requests).toEqual([])
+    expect(s.approvals).toEqual([expect.objectContaining({ request, answer: 'answered', note: "squash, the branch's own message" })])
+    // The card waiting works under them from now (its ruleset has the merge style it was approved under).
+    expect(wf2.rulesetOf(wf2.store.card(card.number)).options.style).toBe('squash')
+    await expect(form.chooseMerge(w, repo, { card: card.number, request, style: 'sideways', commitMessage: 'branch' })).rejects.toThrow(/card, request, style, commitMessage/)
   })
 })
 

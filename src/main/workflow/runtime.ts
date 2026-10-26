@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, atRoundLimit, foldCard, LINE_GATE, loopStepSide, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, atRoundLimit, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
@@ -1428,6 +1428,11 @@ export class Workflow {
         // stuck advance is looked at again, as Resume does).
         const e = st.entries.find((x) => x.id === req.entry)
         if (e) w.action('enqueue', { target: e.target, ...(req.gate === QUEUE_STUCK_GATE ? { recheck: true } : {}) })
+      }
+      if (req.gate === MERGE_CHOICE_GATE) {
+        // HI-1697: the merge style and commit message are saved with the answer (chooseMerge); its queue looks again now.
+        const e = st.entries.find((x) => x.id === req.entry)
+        if (e) w.action('enqueue', { target: e.target })
       }
       if (req.gate !== 'review' && req.gate !== 'okBefore') {
         // A question an agent asked (or Hive's own, after a merge): recorded, and the asker told; nothing moves.

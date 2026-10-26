@@ -4472,6 +4472,16 @@ when a role or name says *review*.
 - **[#1423]** Only projects from before 1.0 get the upgrade's options: those whose project.json records no platform
   (Hive records it as it makes a project.json, which no Hive before 1.0 did), whatever the board (an upgraded board
   with no cards included). A project made by 1.0 gets none, and asks "How do you work?" (§16.3.5) instead.
+- **[HI-1697] The merge style and commit message are asked, never set silently.** A Git project given the upgrade's
+  options is marked `mergeAsk` in project.json's `workflow`. Its first card to reach the merge queue (once the project
+  has Hive merge it, a preset or a save later) pauses the queue (`mergeChoice`) with a Decide on the card in For you:
+  "How should Hive merge <project>'s cards into <target>?", with G6 (Merge commit, as until now; Squash; Rebase and
+  fast-forward) and G19 (Hive's, as until now; the branch's own; not shown with Rebase) and **Save and Carry On
+  Merging** (`workflow:chooseMerge`): both saved as the project's own options (checked and saved as the Workflow
+  section saves them, and applied to its cards in flight, the waiting one included), the mark cleared, the request
+  answered, and the queue goes on. A save in Version Control → Workflow that changes G6 or G19 clears the mark too: the
+  queue then lifts its pause and closes the question. Answered in words with the mark still set, the queue asks again.
+  A project marked with no card in the queue is never interrupted. Projects upgraded before HI-1697 have no mark.
 
 **Agents' old moves, for one transition** [HB3's finding 7]: from P4 until P8 rewrites the skills, an agent's
 `hive_update_task` column move is translated into the matching intent instead of refused: `review` → submit, `passed`

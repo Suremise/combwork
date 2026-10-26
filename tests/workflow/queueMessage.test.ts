@@ -1,11 +1,13 @@
 // G19 (HI-1697): the message of the commit Hive's merge queue makes. Hive's names the card with its trailers; the
 // branch's own is the branch's commits' messages, with no card key and no trailer, and the card is still the merge's
-// (its `Integrated` names the commit). The message builder alone, then the queue on real temporary repositories.
+// (its `Integrated` names the commit). The message builder alone, then the queue on real temporary repositories; and
+// an upgraded project's first merge, which waits for the user to choose them.
 import { afterEach, describe, expect, it } from 'vitest'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { formShows, preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { ruleOptions } from '../../src/shared/workflow/compile'
 import { branchMessage, mergeMessage, updateMessage } from '../../src/main/workflow/mergeMessage'
+import { MERGE_CHOICE_GATE } from '../../src/shared/workflow/facts'
 
 let env: Env | null = null
 afterEach(() => {
@@ -109,5 +111,61 @@ describe('the merge queue writes the message the project chose (G19)', () => {
     e.options.commitMessage = 'branch'
     expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
     expect(body(e)).toBe('Its message')
+  })
+})
+
+describe("an upgraded project's first merge waits for its merge style and commit message (HI-1697)", () => {
+  const asking = (e: Env, c: { id: number }) => e.wf.state(e.store.card(c.id)).requests.filter((r) => r.gate === MERGE_CHOICE_GATE)
+
+  it('pauses with one Decide in For you, and merges as chosen once answered', async () => {
+    const e = merging({ style: 'merge' })
+    let ask = true
+    const q = e.queue({ mergeAsk: async () => ask })
+    const c = await approved(e, 'First since the upgrade', [['The first change', 'f.txt']])
+    expect((await q.drain('main')).map((o) => o.outcome)).toEqual(['paused'])
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'mergeChoice', card: c.key })
+    expect(asking(e, c)).toEqual([expect.objectContaining({ kind: 'decide', for: 'user' })])
+    // Run again while it waits: nothing merges, and it is asked once.
+    expect(await q.drain('main')).toEqual([])
+    expect(asking(e, c)).toHaveLength(1)
+    // The answer (chooseMerge saves the options, clears the question, then answers): the queue carries on as chosen.
+    e.options.commitMessage = 'branch'
+    ask = false
+    moved(await e.wf.answer(c.key, asking(e, c)[0].request, 'answered', { note: "merge commit, the branch's own message" }))
+    expect((await q.drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+    expect(e.store.queuePause('main')).toBeNull()
+    expect(e.wf.state(e.store.card(c.id)).stage).toBe('done')
+    expect(body(e)).toBe('The first change')
+  })
+
+  it('chosen in the Workflow section instead: the pause lifts and the question closes, unanswered', async () => {
+    const e = merging({ style: 'merge' })
+    let ask = true
+    const q = e.queue({ mergeAsk: async () => ask })
+    const c = await approved(e, 'Chosen elsewhere', [['Its change', 'g.txt']])
+    expect((await q.drain('main')).map((o) => o.outcome)).toEqual(['paused'])
+    ask = false
+    expect((await q.drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+    expect(asking(e, c)).toEqual([])
+    expect(e.store.queuePause('main')).toBeNull()
+  })
+
+  it('answered in words, with the choice still to make: asked again, never left paused with no question', async () => {
+    const e = merging({ style: 'merge' })
+    const q = e.queue({ mergeAsk: async () => true })
+    const c = await approved(e, 'Answered in words', [['Words', 'h.txt']])
+    await q.drain('main')
+    const first = asking(e, c)[0].request
+    moved(await e.wf.answer(c.key, first, 'answered', { note: 'whatever you think' }))
+    expect((await q.drain('main')).map((o) => o.outcome)).toEqual(['paused'])
+    expect(asking(e, c).map((r) => r.request)).not.toContain(first)
+    expect(asking(e, c)).toHaveLength(1)
+  })
+
+  it('a project not marked by the upgrade merges without asking', async () => {
+    const e = merging({ style: 'merge' })
+    const c = await approved(e, 'Never asked', [['Change', 'i.txt']])
+    expect((await e.queue({ mergeAsk: async () => false }).drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+    expect(asking(e, c)).toEqual([])
   })
 })

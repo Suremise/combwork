@@ -16,6 +16,7 @@ interface HiveMessageValues {
   'workflow.forYou.lineRefused': { line: string | number; target: string | number; reason: string | number; next: string | number }
   'workflow.forYou.lineUnfinished': { line: string | number; to: string | number; target: string | number; next: string | number }
   'workflow.forYou.lineWork': { line: string | number; target: string | number; commits: string | number; next: string | number }
+  'workflow.forYou.mergeChoice': { project: string | number; target: string | number }
   'workflow.forYou.newDecision': { card: string | number }
   'workflow.forYou.okBefore': { card: string | number }
   'workflow.forYou.passedReview': { card: string | number }

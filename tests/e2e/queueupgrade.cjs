@@ -3,6 +3,8 @@
 // projects' ids and keys, ending reviews, archiving) skip it quietly: the log has no "no such table" nor "This board is
 // from Hive 0.9" from them. The user says Upgrade; then, with no restart, a card approved under "Hive merges" is merged
 // by the queue (Done, Integrated by Hive, the target at it).
+// The first merge waits for the merge style and commit message, which the upgrade left to the user (HI-1697): asked under
+// For you, answered there (Squash, the branch's own message), then a second card with Hive's message.
 // The 0.9 board is written here as 0.9.3's schema steps made it (v1 `cards`, v2 `store_rows`: 0.9 is released, so they
 // are fixed), so no packaged 0.9 is needed. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -82,6 +84,10 @@ const log = () => {
 ;(async () => {
   q.prepare(fx)
   board09()
+  // The project as 0.9 left it: a project.json with no platform recorded (1.0 records it as it makes one), so the
+  // upgrade gives it its options, and leaves its merge style and commit message to be asked (HI-1697).
+  fs.mkdirSync(path.join(fx.alpha, '.hive'), { recursive: true })
+  fs.writeFileSync(path.join(fx.alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   // Opened as the user opens it: the ask shows, nothing is pre-answered (no HIVE_TEST_BOARD_UPGRADE), options kept for after.
   const h = await q.startHive(fx, { port: PORT, keepOptions: true })
   try {
@@ -98,25 +104,45 @@ const log = () => {
     const skipped = log().split(/\r?\n/).filter((l) => /\[WARN\]/.test(l) && /no such table|This board is from Hive 0\.9/.test(l))
     check('while it waited, nothing failed on the read-only board (no "no such table", no "This board is from Hive 0.9")', skipped.length === 0, skipped.join(' | '))
 
-    // No restart: "Hive merges" into integration, and a card approved now is merged by the queue.
+    // No restart: "Hive merges" into integration, and a card approved now goes to the queue. The upgrade left the merge
+    // style and commit message unchosen (HI-1697): the queue asks under For you before it merges, and merges as answered.
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
+    const projectJson = () => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.hive', 'project.json'), 'utf8'))
+    check('the upgrade marked the project: its merge style and commit message are to be asked (a save keeping them keeps it)', projectJson().workflow?.mergeAsk === true, JSON.stringify(projectJson().workflow))
     const reviewer = await q.agent(fx, h, 'R1')
     check('the reviewer has its token', !!reviewer.token)
     q.steer(fx, 'pass')
+    const before = q.head(fx)
     const one = await q.approve(fx, h, reviewer, 'After the upgrade', { 'one.txt': 'one\n' })
     check('a card is approved after the upgrade (start, submit, review, pass)', Object.values(one.steps).every((s) => s.status === 200), JSON.stringify(one.steps))
+    const asked = async () => (await h.facts(one.n)).find((f) => f.kind === 'ApprovalRequested' && f.data?.gate === 'mergeChoice')
+    check('the queue asks before its first merge: a Decide on the card, for the user', !!(await until(async () => (await asked())?.data?.kind === 'decide', HUNG_MS)), JSON.stringify(await h.kinds(one.n)))
+    check('…the queue paused for it, nothing merged', q.head(fx) === before && (await h.card(one.n))?.column !== 'done', JSON.stringify(await h.kinds(one.n)))
+    const helpers = q.folderHelpers(fx)
+    const { dialog, section } = await helpers.forYouSection(h, one.n)
+    const choice = section.locator('[data-merge-choice]')
+    check('…shown in For you with the two options, as until now by default', !!(await until(async () => (await choice.count()) === 1, HUNG_MS)) && (await choice.locator('[data-option="style"]').inputValue()) === 'merge' && (await choice.locator('[data-option="commitMessage"]').inputValue()) === 'hive')
+    await helpers.themes(h.page, section, 'queueupgrade-merge-choice')
+    await choice.locator('[data-option="style"]').selectOption('squash')
+    await choice.locator('[data-option="commitMessage"]').selectOption('branch')
+    await choice.getByRole('button', { name: 'Save and Carry On Merging' }).click()
     const done = await until(async () => (await h.card(one.n))?.column === 'done', HUNG_MS)
-    check('the queue merges it with no restart: Done', !!done, JSON.stringify(await h.kinds(one.n)))
+    check('answered: the queue merges it with no restart: Done', !!done, JSON.stringify(await h.kinds(one.n)))
+    await h.page.keyboard.press('Escape')
+    await until(async () => (await dialog.count()) === 0, HUNG_MS)
     const integrated = (await h.facts(one.n)).find((f) => f.kind === 'Integrated')
-    const inTarget = () => {
-      try {
-        lib.git(fx.alpha, ['merge-base', '--is-ancestor', one.revision, 'integration'])
-        return true
-      } catch {
-        return false
-      }
-    }
-    check("…Integrated by Hive, the target at its result, the builder's revision in it", integrated?.data?.by === 'hive' && integrated.data.result === q.head(fx) && inTarget(), JSON.stringify(integrated))
+    const msgOf = (ref = 'integration') => lib.git(fx.alpha, ['log', '-1', '--format=%B', ref]).trim()
+    const parents = (ref = 'integration') => lib.git(fx.alpha, ['log', '-1', '--format=%P', ref]).trim().split(' ').length
+    check("…Integrated by Hive, the target at its result, one squashed commit with the branch's own message: no key, no trailer", integrated?.data?.by === 'hive' && integrated.data.result === q.head(fx) && parents() === 1 && msgOf() === 'After the upgrade', `${JSON.stringify(integrated)} / ${msgOf()}`)
+    const wfNow = projectJson().workflow
+    check("…saved as the project's options, the question cleared", wfNow?.options?.style === 'squash' && wfNow.options.commitMessage === 'branch' && wfNow.mergeAsk === undefined, JSON.stringify(wfNow))
+    const request = (await asked())?.data?.request
+    check('…and the question answered as the user', (await h.facts(one.n)).some((f) => f.kind === 'Approval' && f.data?.request === request && f.actor === 'user'), JSON.stringify(await h.kinds(one.n)))
+    // Hive's message again (the other option), still squashing: the next card lands as "KEY: title" with its trailers.
+    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { style: 'squash', commitMessage: 'hive' }) })
+    const two = await q.approve(fx, h, reviewer, 'With the key', { 'two.txt': 'two\n' })
+    check('a second card is approved', Object.values(two.steps).every((s) => s.status === 200), JSON.stringify(two.steps))
+    check("…merged with no question: Hive's message, its key and trailers", !!(await until(async () => (await h.card(two.n))?.column === 'done', HUNG_MS)) && /^[A-Z][A-Z0-9]*-\d+: With the key\n\nHive-Card: [A-Z][A-Z0-9]*-\d+\nHive-Revision: /.test(msgOf()) && parents() === 1, msgOf())
     const queueWarnings = log().split(/\r?\n/).filter((l) => /\[WARN\] \[queue\]/.test(l))
     check('…and the queue warned of nothing', queueWarnings.length === 0, queueWarnings.join(' | '))
   } catch (e) {

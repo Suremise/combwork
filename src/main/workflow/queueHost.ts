@@ -274,6 +274,8 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
   const cfg: QueueConfig = {
     folder: runner.folder(),
     subfolder: () => !!detect(h.projectPath).subfolder,
+    // HI-1697: an upgraded project's merge style and commit message, still to be chosen (project.json, read each time).
+    mergeAsk: async () => !!(await h.ws.projectConfig(h.projectPath)).workflow?.mergeAsk,
     holds: () => runner.holds(),
     git: (cwd, args, opts) => runner.git(cwd, args, 'testMerge', opts),
     signTimeoutMs: Math.max(1, Number(advanced.get(QUEUE_SIGN_SECONDS)) || 60) * 1000,

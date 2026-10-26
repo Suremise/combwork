@@ -329,6 +329,7 @@ interface HiveMessageValues {
   'board.forYou.offerTip': { action: string }
   'board.forYou.reply': undefined
   'board.forYou.rounds': undefined
+  'board.forYou.saveAndMerge': undefined
   'board.forYou.send': undefined
   'board.forYou.sendTip': undefined
   'board.forYou.showAll': { all: string }
@@ -336,6 +337,7 @@ interface HiveMessageValues {
   'board.forYou.tipAsks': { kind: string; who: string | number }
   'board.forYou.tipMore': { n: number }
   'board.forYou.tipOpen': undefined
+  'board.forYou.todayValue': { today: string; value: string | number }
   'board.inbox.asks': undefined
   'board.inbox.asksWhat': { message: string | number }
   'board.inbox.assistant': undefined
@@ -596,6 +598,7 @@ interface HiveMessageValues {
   'board.queue.pause.folderBusy': { target: string | number }
   'board.queue.pause.hookTimedOut': undefined
   'board.queue.pause.identity': undefined
+  'board.queue.pause.mergeChoice': { card: string | number }
   'board.queue.pause.needsYou': undefined
   'board.queue.pause.other': { reason: string | number }
   'board.queue.pause.pushFailed': { card: string | number; target: string | number }

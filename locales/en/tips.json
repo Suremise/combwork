@@ -971,6 +971,14 @@
     "defaultMessage": "Merge a branch by hand",
     "description": "A tip's title (#1450): merging any branch outside cards."
   },
+  "tips.mergeMessage.text": {
+    "defaultMessage": "With Hive merging, Version Control → Workflow sets the merge’s commit message: Hive’s names the card, the branch’s own keeps card keys out of your history. With Squash, each card then lands as one commit with its builder’s message.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Squash is a merge style's name: use the word Hive shows for it."
+  },
+  "tips.mergeMessage.title": {
+    "defaultMessage": "Merges with your own commit messages",
+    "description": "A tip's title (G19): the workflow option that sets the message of the commit Hive's merge queue makes."
+  },
   "tips.mergePush.text": {
     "defaultMessage": "With Hive merging, Version Control → Workflow can push the target branch after each merge, never forced. If the remote refuses it, the queue pauses and says why: pull and resume, or turn it off and resume.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: merge queue."

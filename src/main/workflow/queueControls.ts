@@ -220,7 +220,7 @@ export async function pauseQueue(ws: WorkspaceService, projectPath: string, targ
 export async function resumeQueue(ws: WorkspaceService, projectPath: string, target: string, guard?: () => void): Promise<QueueResumed> {
   const wf = await needWorkflow(ws, projectPath)
   const p = wf.store.queuePause(target)
-  const still = p ? await stillPaused(wf, projectPath, target, p) : null
+  const still = p ? await stillPaused(ws, wf, projectPath, target, p) : null
   await wf.locked(() => {
     // The caller's authority as it is now, in the write: refused, nothing is cleared and the queue isn't run.
     guard?.()
@@ -311,7 +311,7 @@ async function needWorkflow(ws: WorkspaceService, projectPath: string): Promise<
  * files named now), or null when it is gone or Hive can't tell (Pause queue, targetMovesFast…: the user's word). A
  * `checkedOut` pause is from before #1351: Hive merges into a checked-out target now.
  */
-async function stillPaused(wf: Workflow, projectPath: string, target: string, p: QueuePause): Promise<Partial<QueuePause> | null> {
+async function stillPaused(ws: WorkspaceService, wf: Workflow, projectPath: string, target: string, p: QueuePause): Promise<Partial<QueuePause> | null> {
   switch (p.reason) {
     case 'rulesOff':
       return workflowEnforced() ? null : {}
@@ -319,6 +319,9 @@ async function stillPaused(wf: Workflow, projectPath: string, target: string, p:
       const card = p.card ? wf.store.cardByKey(p.card) : null
       return card && wf.state(card).requests.some((r) => r.gate === QUEUE_ADVANCE_GATE) ? {} : null
     }
+    // HI-1697: the merge style and commit message still to be chosen (the For you answer, or a save of the options).
+    case 'mergeChoice':
+      return (await ws.projectConfig(projectPath).catch(() => null))?.workflow?.mergeAsk ? {} : null
     case 'wrongBranch':
     case 'staged':
     case 'unstagedChanges': {

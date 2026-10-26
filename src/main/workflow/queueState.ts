@@ -125,6 +125,7 @@ export type PauseWait = 'resume' | 'answer' | 'fix' | 'folder' | 'rules'
 export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
   switch (reason) {
     case 'approval':
+    case 'mergeChoice':
       return 'answer'
     case 'needsYou':
       return stuck ? 'answer' : 'fix'
@@ -151,7 +152,7 @@ export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
 function pausedWaits(q: Extract<QueueState, { state: 'paused' }>): string {
   switch (pauseWait(q.reason, q.stuck)) {
     case 'answer':
-      return q.reason === 'approval' ? `it moves on once the user answers, in For you, whether to update ${q.target} now` : 'it moves on once the user settles its interrupted advance (their answer in For you, or Resume)'
+      return q.reason === 'approval' ? `it moves on once the user answers, in For you, whether to update ${q.target} now` : q.reason === 'mergeChoice' ? 'it moves on once the user chooses, in For you, how Hive merges this project (merge style and commit message)' : 'it moves on once the user settles its interrupted advance (their answer in For you, or Resume)'
     case 'fix':
       return 'it moves on once the user fixes what stopped it and resumes it'
     case 'folder':

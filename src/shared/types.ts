@@ -1020,6 +1020,11 @@ export interface ProjectWorkflow {
   kept?: Partial<Record<PlatformId, { preset: PresetId | null; options: Partial<WorkflowOptions>; presetAsked?: PresetAsked }>>
   /** The answer to "How do you work?" for the platform in force (#1423), written with `setPresetAsked`. */
   presetAsked?: PresetAsked
+  /**
+   * HI-1697: set by the 1.0 upgrade on a Git project from 0.9, whose merge style and commit message (G6, G19) nobody
+   * chose: the merge queue asks before its first merge (For you), and the answer, or a save that changes either, clears it.
+   */
+  mergeAsk?: true
 }
 
 /** The answer to "How do you work? Solo / Pair / Team" (#1423): a preset was chosen, or Not now. */
