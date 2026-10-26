@@ -230,6 +230,11 @@ const isIn = (dir, rev, ref) => {
     const handed = await until(async () => (await slots(solo)).find((s) => s.name === 'me' && s.lease?.kind === 'card'), HUNG_MS)
     check('…its slot handed over to the card', handed?.lease?.card === cMe && handed.lease.agent === 'me', JSON.stringify(await slots(solo)))
     check('…the same conversation going on', (await live(solo, 'me'))?.sessionId === meOld.sessionId && (await sessionOf(solo, meOld.sessionId))?.lease === handed?.lease?.id)
+    // Hive gives Me the card there once Me is quiet (slotCards.ts's placement, recorded as BuilderPlaced after the start's
+    // reply). Waited for before the close: one cut short is owed at the restart, where Hive starts Me itself with the
+    // card's prompt and races Resume All (HI-1732).
+    const placed = await until(async () => (await inv('tasks:facts', cMe)).find((f) => f.kind === 'BuilderPlaced'), HUNG_MS)
+    check('…Hive gives Me the card there, typed into that conversation', placed?.data?.how === 'typed' && (await live(solo, 'me'))?.sessionId === meOld.sessionId, JSON.stringify(placed))
     await close()
 
     // --- 3. A restart: Resume All resumes Me there, on its card's lease.
