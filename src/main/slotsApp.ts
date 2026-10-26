@@ -411,11 +411,11 @@ const LANE_END_RECHECK_MS = 5000
  * merged), and that its session ends once its turn does. Agent-facing: English. At most NOTE_CARDS cards named.
  */
 export function laneEndNote(lane: string, abandoned: boolean, cards: readonly { key: string; merged: string | null }[]): string {
-  const named = cards.slice(0, NOTE_CARDS).map((c) => `${c.key} ${c.merged ? `merged at ${c.merged.slice(0, 12)}` : 'not merged'}`)
-  const more = cards.length > NOTE_CARDS ? [`and ${cards.length - NOTE_CARDS} more`] : []
+  const named = cards.slice(0, NOTE_CARDS).map((c) => `${c.key} ${c.merged ? `merged at ${c.merged.slice(0, 12)}` : 'not merged'}`) // i18n-ignore: typed to the builder
+  const more = cards.length > NOTE_CARDS ? [`and ${cards.length - NOTE_CARDS} more`] : [] // i18n-ignore: typed to the builder
   const list = [...named, ...more].join('; ')
-  const head = abandoned ? `Lane ${lane} was abandoned` : `Lane ${lane} is finished`
-  const text = `${head}${list ? `: ${list}` : ''}. Your session ends once this turn does; Hive resumes it for your next lane. Close the lane's work in your reply, then end your turn.`
+  const head = abandoned ? `Lane ${lane} was abandoned` : `Lane ${lane} is finished` // i18n-ignore: typed to the builder
+  const text = `${head}${list ? `: ${list}` : ''}. Your session ends once this turn does; Hive resumes it for your next lane. Close the lane's work in your reply, then end your turn.` // i18n-ignore: typed to the builder
   return text.length > NOTE_MAX_CHARS ? `${text.slice(0, NOTE_MAX_CHARS - 1)}…` : text
 }
 
@@ -427,13 +427,13 @@ export function laneEndNote(lane: string, abandoned: boolean, cards: readonly { 
  * so the answer is never older than the look that acts on it; sessions.quit asks it again at each key and before Enter.
  */
 export function laneEndHeldNow(projectPath: string, agent: string, run: string): string | null {
-  if (agentBusy(projectPath, agent)) return 'it is in a turn'
-  if (sessions.turnOpen(projectPath, agent, run)) return 'its turn is still open'
+  if (agentBusy(projectPath, agent)) return 'it is in a turn' // i18n-ignore: a reason for the log
+  if (sessions.turnOpen(projectPath, agent, run)) return 'its turn is still open' // i18n-ignore: a reason for the log
   const going = agentRunsGoing(projectPath, agent)
-  if (going.length) return `its runs are going (${going.join(', ')})`
-  if (sessions.lineWaiting(projectPath, agent)) return "a line typed into it isn't taken yet"
+  if (going.length) return `its runs are going (${going.join(', ')})` // i18n-ignore: a reason for the log
+  if (sessions.lineWaiting(projectPath, agent)) return "a line typed into it isn't taken yet" // i18n-ignore: a reason for the log
   const waiting = waitingForRunNow(projectPath, agent, run, sessions.liveFor(projectPath, agent)?.sessionId || null)
-  if (waiting.length) return `deliveries still to reach it (${waiting.map((r) => r.id).join(', ')})`
+  if (waiting.length) return `deliveries still to reach it (${waiting.map((r) => r.id).join(', ')})` // i18n-ignore: a reason for the log
   return null
 }
 
@@ -499,7 +499,7 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
   }
   const lost = (): void => {
     if (over) return
-    finish('the run or its lease is gone: nothing ended')
+    finish('the run or its lease is gone: nothing ended') // i18n-ignore: for the log
     void d.retire('its lane end lost its run').catch(() => undefined) // i18n-ignore: for the log
   }
   /** The one quit at a time. */
@@ -517,12 +517,12 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
       if (quitting) await quitting.catch(() => 'held')
       if (over) return
       if (!d.fenced()) return lost()
-      const r = await quitOnce(`its lane ended and it didn't finish its turn in time (${lastWhy ?? 'unknown'})`, true)
+      const r = await quitOnce(`its lane ended and it didn't finish its turn in time (${lastWhy ?? 'unknown'})`, true) // i18n-ignore: a reason for the log
       if (over) return
       if (r === 'gone') return lost()
       // 'held': input arrived while it typed; the next recheck forces it again.
       if (r === 'held') return
-      finish('ended past the deadline')
+      finish('ended past the deadline') // i18n-ignore: for the log
       await d.retire('its run ended').catch(() => undefined) // i18n-ignore: for the log
     } finally {
       forcing = false
@@ -552,11 +552,11 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
       lastWhy = why
       return
     }
-    const r = await quitOnce('its lane ended and its turn is over', false)
+    const r = await quitOnce('its lane ended and its turn is over', false) // i18n-ignore: a reason for the log
     if (dropped()) return
     if (r === 'held') return
     if (r === 'gone') return lost()
-    finish('ended once its turn was over')
+    finish('ended once its turn was over') // i18n-ignore: for the log
   }
   const look = (): void => {
     if (over) return
@@ -608,7 +608,7 @@ function laneEnd(projectPath: string, lease: SlotLease, slotName: string, w: Slo
   if (laneEnds.has(lease.id)) return
   const { ws, pool } = at
   const life = ws.lifetime
-  const label = `${userText(w.agent)} in ${userText(slotName)}`
+  const label = `${userText(w.agent)} in ${userText(slotName)}` // i18n-ignore: for the log
   const ended = Date.parse(lease.to ?? '') || Date.now()
   const fenced = (): boolean => {
     if (life.aborted) return false
