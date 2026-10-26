@@ -623,7 +623,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
           {tab === 'files' && <FilesTab project={project} />}
           {tab === 'images' && <AttachmentsTab project={project} />}
           {tab === 'changes' && <VersionControl project={project} />}
-          {tab === 'activity' && <ActivityTab project={project} />}
+          {tab === 'activity' && <ActivityTab key={project.path} project={project} />}
           {tab === 'memory' && <MemoryTab project={project} />}
           {tab === 'skills' && <ProjectSkillsTab project={project} />}
           {tab === 'templates' && <ProjectTemplatesTab project={project} />}

@@ -8,6 +8,7 @@ import * as actions from '../actions'
 import { confirm, notify, openInSessionsTab, revealAgent, set, useStore } from '../store'
 import { Icon, IconButton, statusText } from '../components/ui'
 import { cx } from '../util'
+import { boundedQueue, latestOnly } from '@shared/coalesce'
 import { fmt, msg, tr } from '@shared/i18n'
 
 /** How often what runs now is read, and live changes are drawn, while the tab is shown (#1254: batched, about once a second). */
@@ -69,42 +70,38 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const openRef = useRef<{ id: string; live: boolean }[]>([])
   const turnsRef = useRef(turns)
   turnsRef.current = turns
-  // Turns read a few sessions at a time (Expand All can open many); one asked for while it is read waits for that read.
-  const queue = useRef<{ ids: string[]; running: Set<string> }>({ ids: [], running: new Set() })
+  // Turns read a few sessions at a time (Expand All can open many), the session list's newest read only; both for while
+  // the tab is shown (#1254 round 3): hidden or gone, what waits is dropped and what still runs applies nothing.
+  const turnReads = useRef(boundedQueue(TURNS_AT_ONCE))
+  const listReads = useRef(latestOnly())
   const readTurns = useCallback(
     (ids: string[]): void => {
-      const q = queue.current
-      for (const id of ids) if (!q.ids.includes(id) && !q.running.has(id)) q.ids.push(id)
-      const next = (): void => {
-        while (q.running.size < TURNS_AT_ONCE && q.ids.length) {
-          const id = q.ids.shift()!
-          q.running.add(id)
-          void call('activity:turns', project.path, id, turnsRef.current.get(id)?.version)
-            .then((t) => t && setTurns((m) => new Map(m).set(id, t)))
-            .catch(() => undefined)
-            .finally(() => {
-              q.running.delete(id)
-              next()
-            })
-        }
-      }
-      next()
+      for (const id of ids)
+        turnReads.current.add(
+          id,
+          () => call('activity:turns', project.path, id, turnsRef.current.get(id)?.version).catch(() => null),
+          (t) => t && setTurns((m) => new Map(m).set(id, t))
+        )
     },
     [project.path]
   )
   const readList = useCallback(() => {
-    void call('activity:sessions', project.path, ACTIVITY_HOURS)
-      .then((l) => {
+    listReads.current.run(
+      call('activity:sessions', project.path, ACTIVITY_HOURS),
+      (l) => {
         lastLists.set(project.path, l)
         setList(l)
         setListError(null)
-      })
-      .catch((e) => setListError(errorMessage(e)))
+      },
+      (e) => setListError(errorMessage(e))
+    )
   }, [project.path])
 
   useEffect(() => {
     if (!active) return
     let stop = false
+    const turnQueue = turnReads.current
+    const listQueue = listReads.current
     let lastNow = ''
     let lastLive = ''
     let ticks = 0
@@ -134,6 +131,9 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     return () => {
       stop = true
       clearInterval(t)
+      // Hidden, gone or another project: nothing more is read for this showing, and nothing read late is applied.
+      turnQueue.cancel()
+      listQueue.cancel()
     }
   }, [active, project.path, readTurns, readList])
 
