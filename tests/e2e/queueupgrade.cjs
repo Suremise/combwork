@@ -9,6 +9,8 @@
 // Hive's message.
 // The 0.9 board is written here as 0.9.3's schema steps made it (v1 `cards`, v2 `store_rows`: 0.9 is released, so they
 // are fixed), so no packaged 0.9 is needed. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// Dev build only (HI-1697): its crash cases end Hive at a merge choice's seam (HIVE_TEST_MERGE_CHOICE_CRASH), which a
+// packaged build ignores.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
