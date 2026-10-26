@@ -264,7 +264,7 @@ function transcript(sid, turns, startMin) {
         const s = document.querySelector('.activity-scaled')
         return !!t && !!s && ((s.offsetWidth <= t.clientWidth && s.offsetHeight <= t.clientHeight) || /25/.test(document.querySelector('.activity-zoom-value')?.textContent ?? ''))
       })
-    check('Zoom to Fit scales the tree to the tab', !!(await lib.until(async () => !/^100/.test((await zoomValue.innerText()).trim()) && (await fits()), HUNG_MS, 250)), await zoomValue.innerText())
+    check('Zoom to Fit scales the tree to the tab', !!(await lib.until(async () => !(await zoomValue.innerText()).trim().startsWith('100') && (await fits()), HUNG_MS, 250)), await zoomValue.innerText())
     await page.mouse.move(5, 5)
     await page.screenshot({ path: path.join(lib.WORK, 'activitytab-7-fit-dark.png') })
     // Levels ▾: every tool call, then every turn, closed at once; turns opened again.
