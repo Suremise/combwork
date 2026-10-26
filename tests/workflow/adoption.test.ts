@@ -135,6 +135,9 @@ describe("the upgrade's adoption (#1218)", () => {
     // Options as it works today: Git with a reviewer agent and worktrees; None with neither. The platform recorded too.
     expect(config(ws, 'p')).toMatchObject({ platform: 'git', workflow: { platform: 'git', preset: null, options: { review: 'agent', noSelfReview: true, folder: 'slots' } } })
     expect(config(ws, 'n')).toMatchObject({ platform: 'none', workflow: { platform: 'none', preset: null, options: { review: 'none', folder: 'project' } } })
+    // HI-1697: Git's merge style and commit message weren't chosen: the merge queue asks before the first merge. None merges nothing.
+    expect((config(ws, 'p').workflow as Record<string, unknown>).mergeAsk).toBe(true)
+    expect((config(ws, 'n').workflow as Record<string, unknown>).mergeAsk).toBeUndefined()
     const rulesets = store.boardRead(w, (db) => (db.prepare('SELECT COUNT(*) AS n FROM rulesets').get() as { n: number }).n)
     expect(rulesets).toBe(2)
     // The card's work view (#1223) reads them so: adopted from its column, its submission adopted; a Todo card from before 1.0.

@@ -16,6 +16,7 @@ interface HiveMessageValues {
   'workflow.forYou.lineRefused': { line: string | number; target: string | number; reason: string | number; next: string | number }
   'workflow.forYou.lineUnfinished': { line: string | number; to: string | number; target: string | number; next: string | number }
   'workflow.forYou.lineWork': { line: string | number; target: string | number; commits: string | number; next: string | number }
+  'workflow.forYou.mergeChoice': { project: string | number; target: string | number }
   'workflow.forYou.newDecision': { card: string | number }
   'workflow.forYou.okBefore': { card: string | number }
   'workflow.forYou.passedReview': { card: string | number }
@@ -137,6 +138,8 @@ interface HiveMessageValues {
   'workflow.move.verdict': undefined
   'workflow.option.commands.desc': undefined
   'workflow.option.commands.title': undefined
+  'workflow.option.commitMessage.desc': undefined
+  'workflow.option.commitMessage.title': undefined
   'workflow.option.dependenciesDone.desc': undefined
   'workflow.option.dependenciesDone.none': undefined
   'workflow.option.dependenciesDone.title': undefined
@@ -435,6 +438,8 @@ interface HiveMessageValues {
   'workflow.unreadable.uncommitted': { folder: string | number }
   'workflow.unreadable.worktrees': { folder: string | number }
   'workflow.unreadable.writes': { folder: string | number }
+  'workflow.value.commitMessage.branch': undefined
+  'workflow.value.commitMessage.hive': undefined
   'workflow.value.finish.agentMerges': undefined
   'workflow.value.finish.committed': undefined
   'workflow.value.finish.hiveMerges': undefined
@@ -458,6 +463,7 @@ interface HiveMessageValues {
   'workflow.value.style.merge': undefined
   'workflow.value.style.rebase': undefined
   'workflow.value.style.squash': undefined
+  'workflow.why.commitMessage': undefined
   'workflow.why.dependenciesDone': undefined
   'workflow.why.excluded': undefined
   'workflow.why.finish': undefined

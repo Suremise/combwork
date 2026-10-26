@@ -244,6 +244,8 @@
   "tips.memorySnapshot.title": "¿Hive se cerró por quedarse sin memoria?",
   "tips.mergeBranch.text": "⑂ junto a una rama en Control de versiones → Ramas y remotos la fusiona en la rama que elijas, una fusión cada vez. La rama de una tarjeta que no está en Hecho pregunta antes, y la tarjeta queda marcada como fusionada fuera de las reglas.",
   "tips.mergeBranch.title": "Fusiona una rama a mano",
+  "tips.mergeMessage.text": "Si Hive fusiona, Control de versiones → Flujo de trabajo fija el mensaje del commit de la fusión: el de Hive nombra la tarjeta y el propio de la rama mantiene las claves de tarjeta fuera de tu historial. Con Squash, cada tarjeta entra entonces como un solo commit con el mensaje de su autor.",
+  "tips.mergeMessage.title": "Fusiones con tus propios mensajes de commit",
   "tips.mergePush.text": "Si Hive fusiona, Control de versiones → Flujo de trabajo puede hacer push de la rama de destino después de cada fusión, nunca forzado. Si el remoto lo rechaza, la cola se pausa y explica por qué: haz pull y reanuda, o desactívalo y reanuda.",
   "tips.mergePush.title": "Haz push de cada fusión a tu remoto",
   "tips.mergeQueueFolder.text": "Cuando la cola de fusión fusiona en una rama activa en una carpeta (main en la carpeta del proyecto), también actualiza la carpeta, pero se pausa en vez de tocar un archivo que estás cambiando. En Configuración → Avanzado puedes hacer que antes te pregunte en Para ti.",

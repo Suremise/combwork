@@ -244,6 +244,8 @@
   "tips.memorySnapshot.title": "Hive s’est fermé faute de mémoire ?",
   "tips.mergeBranch.text": "⑂ à côté d’une branche dans Gestion de versions → Branches et dépôts distants la fusionne dans la branche de ton choix, une fusion à la fois. La branche d’une carte qui n’est pas terminée demande d’abord, et la carte est marquée fusionnée hors des règles.",
   "tips.mergeBranch.title": "Fusionner une branche à la main",
+  "tips.mergeMessage.text": "Quand Hive fusionne, Gestion de versions → Flux de travail règle le message du commit de la fusion : celui de Hive nomme la carte, celui de la branche garde les clés de carte hors de ton historique. Avec Squash, chaque carte arrive alors en un seul commit avec le message de son auteur.",
+  "tips.mergeMessage.title": "Des fusions avec tes propres messages de commit",
   "tips.mergePush.text": "Quand Hive fusionne, Gestion de versions → Flux de travail peut pousser la branche cible après chaque fusion, jamais en force. Si le dépôt distant refuse, la file se met en pause et dit pourquoi : fais un pull et reprends, ou désactive l’option et reprends.",
   "tips.mergePush.title": "Pousser chaque fusion vers ton dépôt distant",
   "tips.mergeQueueFolder.text": "Quand la file de fusion fusionne dans une branche extraite dans un dossier (main dans le dossier du projet), elle met aussi le dossier à jour, mais se suspend plutôt que de toucher un fichier que tu modifies. Paramètres → Avancé peut la faire te demander d’abord dans Pour toi.",

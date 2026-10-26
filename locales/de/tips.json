@@ -244,6 +244,8 @@
   "tips.memorySnapshot.title": "Wurde Hive geschlossen, weil der Speicher ausging?",
   "tips.mergeBranch.text": "⑂ neben einem Branch unter Versionsverwaltung → Branches & Remotes mergt ihn in den Branch, den du wählst, ein Merge nach dem anderen. Der Branch einer Karte, die nicht erledigt ist, fragt zuerst, und die Karte wird als außerhalb der Regeln gemergt markiert.",
   "tips.mergeBranch.title": "Einen Branch von Hand mergen",
+  "tips.mergeMessage.text": "Wenn Hive mergt, legt Versionsverwaltung → Workflow die Commit-Nachricht des Merges fest: Die von Hive nennt die Karte, die eigene des Branches hält Kartenschlüssel aus deiner Historie heraus. Mit „Squash“ landet jede Karte dann als ein Commit mit der Nachricht ihres Bearbeiters.",
+  "tips.mergeMessage.title": "Merges mit deinen eigenen Commit-Nachrichten",
   "tips.mergePush.text": "Wenn Hive mergt, kann Versionsverwaltung → Workflow den Zielbranch nach jedem Merge pushen, nie erzwungen. Lehnt das Remote ab, hält die Warteschlange an und sagt warum: Pulle und setze fort, oder schalte es aus und setze fort.",
   "tips.mergePush.title": "Jeden Merge zu deinem Remote pushen",
   "tips.mergeQueueFolder.text": "Wenn die Merge-Warteschlange in einen Branch mergt, der in einem Ordner ausgecheckt ist (etwa main im Projektordner), aktualisiert sie auch den Ordner, hält aber an, statt eine Datei anzufassen, die du gerade änderst. Unter Einstellungen → Erweitert kannst du sie vorher unter „Für dich“ fragen lassen.",

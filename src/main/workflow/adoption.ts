@@ -182,7 +182,8 @@ async function projectOptions(ws: WorkspaceService, folder: string, hasLane: boo
     const platform = projectPlatform(folder, c.platform).id
     const agents = c.agents ?? []
     const options = upgradeOptions(platform, { reviewers: hasLane || agents.some((a) => reviewsWork(agentWorkflowRole(a))), worktrees: agents.some((a) => !!legacyWorktree(a)) })
-    return { platform: c.platform ?? platform, workflow: { platform, preset: null, options } }
+    // HI-1697: the merge style and commit message are asked when the queue first merges, never set silently.
+    return { platform: c.platform ?? platform, workflow: { platform, preset: null, options, ...(platform === 'git' ? { mergeAsk: true as const } : {}) } }
   })
   if (made || !cfg.workflow) return MADE_BY_1_0
   return { cfg, platform: cfg.workflow.platform, configured }

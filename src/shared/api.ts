@@ -123,6 +123,7 @@ import type {
 import type { PlatformId } from './platform/descriptors'
 import type { MetricsQuery, MetricsReport } from './metrics'
 import type { Fact } from './workflow/facts'
+import type { CommitMessage, WorkflowOptions } from './workflow/options'
 import type { Artifact, CompareScope, ImportResult, KeptEntry } from './benchmark'
 import type { AgentTemplate, TemplateDest, TemplateEntry, TemplateRef, TemplateScope } from './templates'
 import type { ProjectPref, ProjectPrefValue } from './uiPrefs'
@@ -308,6 +309,8 @@ export interface HiveRequests {
   'workflow:check': (projectPath: string, change: WorkflowChange) => WorkflowCheck
   /** Saves the project's workflow options, checked again (refused, with every reason); `applyTo`: cards in flight to work under them from now (OP-38). */
   'workflow:setOptions': (projectPath: string, change: WorkflowChange, opts?: { applyTo?: number[] }) => WorkflowForm
+  /** The user's answer to the merge queue's question before an upgraded project's first merge (HI-1697, For you): its merge style and commit message saved, the request answered. */
+  'workflow:chooseMerge': (projectPath: string, choice: { card: number; request: string; style: WorkflowOptions['style']; commitMessage: CommitMessage }) => void
   /**
    * The project's stages as its current options produce them, in board order, and its own names for them (N5, #1417);
    * null for a project whose version control isn't recorded yet. A `workflow-changed` event says when to read it again.
