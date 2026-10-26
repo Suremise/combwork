@@ -2,7 +2,7 @@
 // rounds), the hover text, folding a long lane's finished cards, and the header's numbers; an ended lane's segments as it
 // left them, the card being worked, and the panel's order of lanes (#512).
 import { describe, expect, it } from 'vitest'
-import { cardSegment as segmentIn, chosenLaneRows, currentCard, DEFAULT_LANE_ROWS, draggedLaneRows, droppedLaneOrder, failedVerdictGist, fitSegments as fitIn, frozenSegment as frozenIn, keptLaneOrder, keyedLaneRows, LANE_ORDER_MAX, laneCards as laneCardsIn, laneRowsNow, laneRunning, lanesShown, laneSummary, maxLaneRows, mergedLaneOrder, nudgedLaneOrder, panelOrder, reviewRounds, SEGMENT_NOTE_MAX, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, workNotes, type CardSegment, type SegmentState } from '../src/shared/laneBar'
+import { cardSegment as segmentIn, chosenLaneRows, laneRowsRange, MORE_LANE_ROWS, currentCard, DEFAULT_LANE_ROWS, draggedLaneRows, droppedLaneOrder, failedVerdictGist, fitSegments as fitIn, frozenSegment as frozenIn, keptLaneOrder, keyedLaneRows, LANE_ORDER_MAX, laneCards as laneCardsIn, laneRowsNow, laneRunning, lanesShown, laneSummary, maxLaneRows, mergedLaneOrder, nudgedLaneOrder, panelOrder, reviewRounds, SEGMENT_NOTE_MAX, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, workNotes, type CardSegment, type SegmentState } from '../src/shared/laneBar'
 import type { WorkBadge } from '../src/shared/workflow/workView'
 import { cardOldRulesNote, laneOldRulesNote, pulseLanes } from '../src/shared/laneBar'
 import { laneLegend, legendSources, segmentStage } from '../src/shared/laneStages'
@@ -317,10 +317,15 @@ describe("the lanes section's height (#569)", () => {
     expect(lanesShown(null, 7)).toBe(6)
   })
 
-  it('a kept choice wins, as whole lanes, at least one, never more than there are', () => {
-    expect(lanesShown(6, 9)).toBe(6)
+  it('a kept choice wins within the range: never fewer than the lanes there are up to six, nor more than ten (HI-1673)', () => {
+    expect(lanesShown(8, 9)).toBe(8)
     expect(lanesShown(6, 3)).toBe(3)
-    expect(lanesShown(1, 5)).toBe(1)
+    // Dragged (or kept from before) below the floor: every lane up to six still shows.
+    expect(lanesShown(1, 5)).toBe(5)
+    expect(lanesShown(1, 9)).toBe(6)
+    // No more than four over the floor, nor than there are.
+    expect(lanesShown(20, 30)).toBe(10)
+    expect(lanesShown(20, 8)).toBe(8)
     expect(chosenLaneRows(2.6)).toBe(3)
     expect(chosenLaneRows(0)).toBe(1)
     expect(chosenLaneRows(-4)).toBe(1)
@@ -350,15 +355,44 @@ describe("the lanes section's height (#569)", () => {
     expect(draggedLaneRows(4, -1000, 61, 7)).toBe(7)
   })
 
-  it('a panel too short for the choice shows the whole lanes that fit, and keeps the choice', () => {
-    // Seven chosen, room for two (61 px a lane): two show, two is the most, seven is still the choice.
-    expect(laneRowsNow(7, 7, 130, 61)).toEqual({ chosen: 7, shown: 2, max: 2 })
+  it('the range: the floor is every lane up to six, the most four more, ten at most (HI-1673)', () => {
+    expect(MORE_LANE_ROWS).toBe(4)
+    expect([1, 2, 6, 7, 9, 10, 15].map((n) => laneRowsRange(n))).toEqual([
+      { min: 1, top: 1 },
+      { min: 2, top: 2 },
+      { min: 6, top: 6 },
+      { min: 6, top: 7 },
+      { min: 6, top: 9 },
+      { min: 6, top: 10 },
+      { min: 6, top: 10 }
+    ])
+    // A workspace's own lanes shown moves the floor, and the most with it.
+    expect(laneRowsRange(9, 3)).toEqual({ min: 3, top: 7 })
+  })
+
+  it('the lanes take priority: the floor shows however short the panel; more than it only as far as they fit, and the choice is kept', () => {
+    // Darren's two lanes: both show, whatever was chosen, and the range is only those two (no drag hides one).
+    expect(laneRowsNow(1, 2, 300, 61)).toEqual({ chosen: 2, shown: 2, min: 2, max: 2 })
+    expect(laneRowsNow(undefined, 2, 30, 61)).toEqual({ chosen: 2, shown: 2, min: 2, max: 2 })
+    // Ten chosen of twelve, room for seven (61 px a lane): seven show, seven is the most, ten is still the choice.
+    expect(laneRowsNow(10, 12, 430, 61)).toEqual({ chosen: 10, shown: 7, min: 6, max: 7 })
     // Room again: the choice shows.
-    expect(laneRowsNow(7, 7, 1000, 61)).toEqual({ chosen: 7, shown: 7, max: 7 })
-    // Not measured yet: the choice, up to the lanes there are.
-    expect(laneRowsNow(undefined, 9, null, 61)).toEqual({ chosen: 6, shown: 6, max: 9 })
-    // However short, one lane.
-    expect(laneRowsNow(5, 6, -40, 61)).toEqual({ chosen: 5, shown: 1, max: 1 })
+    expect(laneRowsNow(10, 12, 1000, 61)).toEqual({ chosen: 10, shown: 10, min: 6, max: 10 })
+    // Short of room for the floor with the runs keeping theirs: the floor all the same, the runs giving way (behind it).
+    expect(laneRowsNow(10, 12, 250, 61)).toEqual({ chosen: 10, shown: 6, min: 6, max: 6 })
+    // Too short even with the runs given up: the whole lanes that fit, the rest scrolling.
+    expect(laneRowsNow(10, 12, 30, 61)).toEqual({ chosen: 10, shown: 2, min: 2, max: 2 })
+    // Not measured yet: the choice, up to the most.
+    expect(laneRowsNow(undefined, 9, null, 61)).toEqual({ chosen: 6, shown: 6, min: 6, max: 9 })
+  })
+
+  it('a drag and the keys stay within the range: never below the floor, never past the most', () => {
+    // Nine lanes, six shown: dragged down by two lanes, still six; up by two, eight.
+    expect(draggedLaneRows(6, 122, 61, 9, 6)).toBe(6)
+    expect(draggedLaneRows(6, -122, 61, 9, 6)).toBe(8)
+    expect(keyedLaneRows(6, 'ArrowDown', 9, 6)).toBe(6)
+    expect(keyedLaneRows(8, 'Home', 9, 6)).toBe(6)
+    expect(keyedLaneRows(6, 'End', 9, 6)).toBe(9)
   })
 
   it('keys: Up a lane more, Down one fewer, Home one, End the most; others are not its', () => {
