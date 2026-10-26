@@ -3004,8 +3004,10 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   lent), a branch checked out in a slot shows the slot's name, and a folder's agent is its slot lease's, else the agent
   whose session runs there (#1424's worktree badge becomes the slot's).
 - **Update from <target>** (HI-1180, rc.4; the design checked by HR4, the conflict rule from Darren's OK via the
-  Assistant): a local branch with its own commits that lacks some of the target's (`git:info` counts both ways,
-  `rev-list --left-right --count`, as `toTarget` and `fromTarget`) shows how many it lacks and an **Update** action.
+  Assistant): a local branch that lacks some of the target's commits (`git:info` counts both ways, `rev-list
+  --left-right --count`, as `toTarget` and `fromTarget`; for a branch merged into the target, what it lacks on a
+  count of its own) shows how many it lacks and an **Update** action when it has commits of its own, or none but is in
+  use (a card's line, a slot's or a worktree's: HR4's round 1). A merged branch nothing uses is Clean Up's, not offered.
   `git:updatePlan` says what it would do: the counts; where it runs (the project folder, the slot or worktree it is
   checked out in, or a temporary detached worktree in the project's worktrees folder, `update-<id>`, when it is checked
   out nowhere); the card whose line it is; the agents working there; for a Passed card whether its pass carries over
@@ -3013,13 +3015,20 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   uncommitted changes to tracked files, git is mid-operation there, or the card is in the merge queue (which brings it
   up to date itself, G8). The dialog (`GitForm`) offers **Merge <target> in** (the default: `merge --no-ff`, "Merge
   <target> into <branch>", with `Hive-Card: <key>` for a card's line) or **Rebase onto <target>** (`--no-update-refs
-  --no-autostash`, `rebase.updateRefs=false`; it says the commits are rewritten, and that a pushed copy then differs).
+  --no-autostash`, `rebase.updateRefs=false`; it says the commits are rewritten, and that a pushed copy then differs);
+  for a branch with no commits of its own, only **Fast-forward to <target>** (`merge --ff-only`, whichever main is
+  given). Git is given the target branch's commit, `refs/heads/<target>` read under the locks, never its name (a tag
+  of that name would win), and the branch is checked to contain it afterwards.
   `git:updateBranch` runs it as switch and pull do: one action at a time, the branch's merge slot held as the user's, the
   repository locked, the folder fenced (#646), the plan checked again under them. It commits as the repository's own
-  identity, hooks and signing. A conflict, or any failure, is aborted at once (`merge --abort` / `rebase --abort`), the
-  branch and folder as they were, the error naming the conflicting files: nothing is left half done. In a temporary
-  worktree the branch is moved only from the commit it was updated from (`update-ref <ref> <new> <old>`), and the
-  worktree is removed whatever happens. A card's pass then follows §16.4.4's reconcile (carried over or stale). A user
+  identity, hooks and signing. A conflict, or any failure, is aborted at once (`merge --abort` / `rebase --abort`) and
+  then checked: no operation left, HEAD where it was, no tracked change. Only then does the error say the branch is as
+  it was (naming the conflicting files, or git's words). An abort that fails (HR4's round 1: a hook that left
+  `index.lock`) is said as it is: the folder named, still mid-merge or mid-rebase or left changed, with how to finish it
+  there; never "as it was". In a temporary worktree the branch is moved only from the commit it was updated from
+  (`update-ref <ref> <new> <old>`); the worktree is removed after, except when its abort failed (kept as git left it,
+  the branch not moved, the error naming its path to look at and remove in Unused worktrees), and one that can't be
+  removed is said (the reply's second line, or after the error). A card's pass then follows §16.4.4's reconcile (carried over or stale). A user
   action only: no Agent API route or hive tool.
 - **Branches by state, and Clean Up Merged Branches** (#1642; Darren's decision: the list stays a list, its rows as they
   were). `git:info` measures each branch against the project's target (its options' `target`, else the default branch;
