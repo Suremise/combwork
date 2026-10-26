@@ -238,6 +238,8 @@
   "tips.memorySnapshot.title": "Hive s’est fermé faute de mémoire ?",
   "tips.mergeBranch.text": "⑂ à côté d’une branche dans Gestion de versions → Branches et dépôts distants la fusionne dans la branche de ton choix, une fusion à la fois. La branche d’une carte qui n’est pas terminée demande d’abord, et la carte est marquée fusionnée hors des règles.",
   "tips.mergeBranch.title": "Fusionner une branche à la main",
+  "tips.mergePush.text": "Quand Hive fusionne, Gestion de versions → Flux de travail peut pousser la branche cible après chaque fusion, jamais en force. Si le dépôt distant refuse, la file se met en pause et dit pourquoi : fais un pull et reprends, ou désactive l’option et reprends.",
+  "tips.mergePush.title": "Pousser chaque fusion vers ton dépôt distant",
   "tips.mergeQueueFolder.text": "Quand la file de fusion fusionne dans une branche extraite dans un dossier (main dans le dossier du projet), elle met aussi le dossier à jour, mais se suspend plutôt que de toucher un fichier que tu modifies. Paramètres → Avancé peut la faire te demander d’abord dans Pour toi.",
   "tips.mergeQueueFolder.title": "Fusionner dans le dossier où tu travailles",
   "tips.mergeQueuePanel.text": "L’onglet Fusions du panneau Progression montre chaque file de fusion : la carte qu’elle teste et la durée habituelle de ses vérifications, les cartes qui attendent, et une carte qu’elle a renvoyée, jusqu’à ce que tu l’aies vue. Suspendre la file et Reprendre la file y sont aussi.",

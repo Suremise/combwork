@@ -2335,6 +2335,18 @@
     "defaultMessage": "Paused ({reason}).",
     "description": "Why a merge queue is paused, on its card in the Progress panel, for a reason this window has no words for ({reason}: Hive's code for it)."
   },
+  "board.queue.pause.pushFailed": {
+    "defaultMessage": "{card} is merged, but pushing {target} failed (git’s message follows). Fix it, then resume; or turn off “Push the target branch after merging” and resume to keep merging locally.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), pushing the target ({target}: a branch) failed, for a sign-in, the network or a time limit; git's own message follows. “Push the target branch after merging” is a workflow option's name: use its words."
+  },
+  "board.queue.pause.pushNoRemote": {
+    "defaultMessage": "{card} is merged, but {target} has no remote to push to: it tracks none, and the repository has no origin or only remote. Add one or set what {target} tracks, then resume; or turn off “Push the target branch after merging” and resume.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), the target ({target}: a branch) had nowhere to be pushed. Origin is git's usual name for a remote: keep it. “Push the target branch after merging” is a workflow option's name: use its words."
+  },
+  "board.queue.pause.pushRejected": {
+    "defaultMessage": "{card} is merged, but its remote refused the push of {target}: it has commits {target} hasn’t (Hive never forces a push). Pull them into {target}, then resume; or turn off “Push the target branch after merging” and resume to keep merging locally.",
+    "description": "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), pushing the target ({target}: a branch) was refused because the remote has newer commits. “Push the target branch after merging” is a workflow option's name: use its words."
+  },
   "board.queue.pause.rulesOff": {
     "defaultMessage": "The workflow's rules are off (Settings → Advanced), so the queue doesn't merge.",
     "description": "Why a merge queue is paused, on its card in the Progress panel: the workflow rules are turned off in Settings → Advanced."

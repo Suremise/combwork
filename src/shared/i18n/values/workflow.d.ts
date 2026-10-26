@@ -158,6 +158,8 @@ interface HiveMessageValues {
   'workflow.option.okBefore.title': undefined
   'workflow.option.preChecks.desc': undefined
   'workflow.option.preChecks.title': undefined
+  'workflow.option.pushTarget.desc': undefined
+  'workflow.option.pushTarget.title': undefined
   'workflow.option.review.desc': undefined
   'workflow.option.review.none': undefined
   'workflow.option.review.shared': undefined
@@ -465,6 +467,7 @@ interface HiveMessageValues {
   'workflow.why.noSelfReview': undefined
   'workflow.why.okBefore': undefined
   'workflow.why.preChecks': undefined
+  'workflow.why.pushTarget': undefined
   'workflow.why.review': undefined
   'workflow.why.reviewerMode': undefined
   'workflow.why.reviewers': undefined

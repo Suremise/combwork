@@ -514,6 +514,7 @@ function WorkflowEditor({ source, project }: { source: FormSource; project: Proj
       case 'stopOwnRuns':
       case 'slotsUpToDate':
       case 'strict':
+      case 'pushTarget':
       case 'dependenciesDone':
       case 'sharedFolderWarning':
         return <Switch checked={effective[key]} onChange={(v) => set(key, v)} />

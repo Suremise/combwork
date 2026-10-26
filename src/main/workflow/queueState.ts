@@ -128,6 +128,10 @@ export function pauseWait(reason: PauseReason, stuck = false): PauseWait {
     case 'needsYou':
       return stuck ? 'answer' : 'fix'
     case 'subfolderTarget':
+    // G18 (#1179): the push after a merge, put right (a pull, a sign-in, a remote) or the option turned off, then Resume.
+    case 'pushRejected':
+    case 'pushFailed':
+    case 'pushNoRemote':
       return 'fix'
     case 'wrongBranch':
     case 'staged':
