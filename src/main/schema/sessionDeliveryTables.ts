@@ -144,11 +144,13 @@ export function writeSessionRecords(db: Db, host: string, next: SessionsChange):
 
 /**
  * Adds a host's records from a file (the move in, the move back of Remove from Hive's export) beside those it has: one
- * whose id it has already is left out (the table's wins: it is newer), one not of Hive's form kept aside. Returns how many
- * records it added.
+ * whose id it has already is left out (the table's wins: it is newer), one the host's deleted list holds too (HI-1736: a
+ * session deleted while the file waited to move in, its workspace closed, never comes back), one not of Hive's form kept
+ * aside. Returns how many records it added.
  */
 export function addSessionRecords(db: Db, host: string, f: { sessions?: unknown[]; deleted?: unknown[]; deletedUsage?: unknown[] }): number {
-  const had = new Set((db.prepare('SELECT id FROM sessions WHERE host = ?').all(host) as { id: string }[]).map((r) => r.id)) // i18n-ignore: SQL
+  // Deleted here already: as good as had, so never written back (openTable's check, no session both kept and deleted, holds).
+  const had = new Set([...(db.prepare('SELECT id FROM sessions WHERE host = ?').all(host) as { id: string }[]).map((r) => r.id), ...readDeleted(db, host)]) // i18n-ignore: SQL
   let ord = ((db.prepare('SELECT max(ord) AS m FROM sessions WHERE host = ?').get(host) as { m: number | null }).m ?? -1) + 1 // i18n-ignore: SQL
   const aside: unknown[] = []
   let added = 0
