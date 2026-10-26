@@ -76,8 +76,8 @@ const check = (name, ok, extra = '') => {
   const agent = await lib.addAgent(inv, alpha, { name: 'Watcher' })
   const card = (await inv('tasks:create', { title: 'Watched', project: 'alpha' })).number
   // Wakes name a card by its key with the number the tools take (#1219): its own key, from the board.
-  const named = `${(await inv('tasks:list')).find((c) => c.number === card).key} (#${card})`
-  check('the card has a key of its project', /^[A-Z]{2,4}-\d+ \(#\d+\)$/.test(named), named)
+  const named = `${(await inv('tasks:list')).find((c) => c.number === card).key}`
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(named), named)
   await inv('session:start', alpha, { agentId: agent.id })
   check('the agent starts', !!(await until(() => idle(agent.id), HUNG_MS)))
   const watch = async () => {

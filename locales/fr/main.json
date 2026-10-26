@@ -301,7 +301,7 @@
   "main.unused.slot.dirty": "{files, plural, one {# fichier n’y est pas commité} many {# fichiers n’y sont pas commités} other {# fichiers n’y sont pas commités}}",
   "main.unused.slot.editedSkillCopy": "{copies, plural, one {son dossier de compétence {names} n’est pas une copie inchangée de Hive} many {ses dossiers de compétences {names} ne sont pas des copies inchangées de Hive} other {ses dossiers de compétences {names} ne sont pas des copies inchangées de Hive}}",
   "main.unused.slot.gitRefused": "git ne l’a pas retiré ({detail})",
-  "main.unused.slot.inFlight": "la carte #{card}, qui l’occupait, est encore en cours de fusion",
+  "main.unused.slot.inFlight": "la carte {card}, qui l’occupait, est encore en cours de fusion",
   "main.unused.slot.leased": "il est prêté à l’agent {agent}",
   "main.unused.slot.process": "un processus l’utilise encore",
   "main.unused.slot.session": "une session y tourne ({detail})",

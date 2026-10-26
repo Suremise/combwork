@@ -36,7 +36,7 @@ export const wrapsLongCommands = (general: { progressPanel?: boolean; progressCo
 export function boardSkillsLine(off: ReadonlySet<string> = new Set()): string {
   const on = (skill: string): boolean => !off.has(skill)
   const routes = [
-    on('work-on-card') && 'Given a card (#n) to work on, fix or continue, use the work-on-card skill',
+    on('work-on-card') && 'Given a card to work on, fix or continue, use the work-on-card skill',
     on('review-agent-work') && `asked to review or check ${on('work-on-card') ? 'one' : 'a card'}, use review-agent-work`,
     on('card-loop') && "as a loop's builder or reviewer (one card or several, with rounds), use card-loop"
   ].filter((r): r is string => !!r)
@@ -54,7 +54,7 @@ export function boardSkillsLine(off: ReadonlySet<string> = new Set()): string {
     .map(([, what]) => what)
   const list = others.length > 1 ? `${others.slice(0, -1).join(', ')} and ${others[others.length - 1]}` : others[0]
   const route = routes.length ? ` ${routes[0].charAt(0).toUpperCase()}${routes[0].slice(1)}${routes.slice(1).map((r) => `; ${r}`).join('')}.` : ''
-  return `The board shows your project's cards.${route}${list ? ` Hive's ${routes.length ? 'other ' : ''}skills cover ${list}.` : ''}`
+  return `The board shows your project's cards, each named by its key (AM-12).${route}${list ? ` Hive's ${routes.length ? 'other ' : ''}skills cover ${list}.` : ''}`
 }
 
 /** The inbox: read, act, then ack (#903), for every role and CLI; an item not acked shows as overdue (deliveries.ts). */

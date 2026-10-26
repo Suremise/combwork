@@ -1704,8 +1704,8 @@
     "description": "What a skill that ships with Hive (use-hive-api) is for: under its name in the Skills view and a project's Skills tab. Keep HTTP and API; hive tools are the tools Hive gives agents (hive_…), keep hive in lower case."
   },
   "assistant.skills.shipped.workOnCard": {
-    "defaultMessage": "Carry a card from Hive's task board through its work, from Doing to Review with a summary. Use when given a card to work on (\"work on #12\", a card Hive started you on, more work on one back from Review). Not for reviewing one, nor a card loop (card-loop).",
-    "description": "What a skill that ships with Hive (work-on-card) is for: under its name in the Skills view and a project's Skills tab. card-loop is another skill's name: keep it. Doing and Review are columns of the task board: use their names as the board shows them. \"work on #12\" is what you would ask an agent: translate it."
+    "defaultMessage": "Carry a card from Hive's task board through its work, from Doing to Review with a summary. Use when given a card to work on (\"work on AM-12\", a card Hive started you on, more work on one back from Review). Not for reviewing one, nor a card loop (card-loop).",
+    "description": "What a skill that ships with Hive (work-on-card) is for: under its name in the Skills view and a project's Skills tab. card-loop is another skill's name: keep it. Doing and Review are columns of the task board: use their names as the board shows them. \"work on AM-12\" is what you would ask an agent: translate it."
   },
   "assistant.skills.shipped.workspaceNote": {
     "defaultMessage": "Record a lasting decision, convention or gotcha in the workspace's shared notes. Use when asked to remember or document something for later, or when other agents will need what you learned. Not for work in progress.",

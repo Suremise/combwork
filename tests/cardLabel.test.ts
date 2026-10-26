@@ -2,7 +2,7 @@
 // none), and the board's search by key (AM-12, am-12, AM- for a project's cards, an old key; a key form no project has
 // is searched as words).
 import { describe, expect, it } from 'vitest'
-import { cardLabel } from '../src/shared/projectKeys'
+import { cardLabel, nameWithKey } from '../src/shared/projectKeys'
 import { cardMatches } from '../src/shared/tasks'
 
 const card = (number: number, key: string | undefined, title = 'A card') => ({ number, ...(key ? { key } : {}), title, description: '', project: 'alpha', agentName: undefined, labels: [] as string[] })
@@ -14,6 +14,8 @@ const keys = [
 describe('cardLabel: a card as the window names it', () => {
   it('its key, else #N', () => {
     expect(cardLabel({ number: 40, key: 'HI-12' })).toBe('HI-12')
+    expect(nameWithKey(40, 'HI-12')).toBe('HI-12')
+    expect(nameWithKey(40, null)).toBe('#40')
     expect(cardLabel({ number: 40 })).toBe('#40')
     expect(cardLabel({ number: 40, key: '' })).toBe('#40')
   })
@@ -35,11 +37,22 @@ describe("the board's search by key", () => {
     expect(find('AM-99')).toEqual([])
   })
 
-  it('#N and N as before; a key form no project has is words', () => {
+  it('#N is the old number; a key form no project has is words', () => {
     expect(find('#5')).toEqual(['#5'])
-    expect(find('40')).toEqual(['AM-12'])
+    expect(find('#40')).toEqual(['AM-12'])
     expect(find('re-')).toEqual(['AM-3'])
     expect(find('ZZ-1')).toEqual([])
+  })
+
+  it("a bare number is a key's digits, in every project, never the workspace number (HI-1661)", () => {
+    // HI-1660 is #1662: searching 1662 found HI-1660, not the card someone named 1662.
+    expect(find('12')).toEqual(['AM-12', 'HI-12'])
+    expect(find('012')).toEqual(['AM-12', 'HI-12'])
+    expect(find('3')).toEqual(['AM-3'])
+    expect(find('40')).toEqual([])
+    expect(find('41')).toEqual([])
+    // A card with no key is named by its number, and found by it.
+    expect(find('5')).toEqual(['#5'])
   })
 
   it('a moved card by the name it kept in the project it left (round 1, finding 1)', () => {

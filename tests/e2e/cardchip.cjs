@@ -102,7 +102,7 @@ const check = (name, ok, extra = '') => {
 
   // Clicking opens the card.
   await header.locator('.card-chip').click()
-  const dialog = page.locator('.dialog', { hasText: `#${card.number}` })
+  const dialog = lib.cardDialog(page, await lib.cardLabel(inv, card.number))
   check('clicking the chip opens the card', !!(await until(async () => (await dialog.count()) === 1, 5000)))
   await page.screenshot({ path: path.join(lib.WORK, 'cardchip-2-dialog.png') })
   await page.keyboard.press('Escape')

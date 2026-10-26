@@ -518,7 +518,14 @@ every move's guards (`idsOf`) and `skippedRules`.
 apart from that, in the same write, whenever `reconcileActs` is on and it isn't applied yet: an integration
 (`integratedOutside`) until the card is Done; a stale pass (`staleEffects`) once per `Stale` fact, its builder's wake
 written for that fact (`card_actions.fact`, read with `hasAction`) as the record that it was applied. So an observation
-recorded while the rules were off is acted on at the next run once they're on, and repeated runs add nothing.
+recorded while the rules were off is acted on at the next run once they're on, and repeated runs add nothing. A stale
+pass whose line is back at exactly the approved revision is observed as a `CarriedOver` (how `sameRevision`, once per
+head observation), which the fold reads as the stale pass cleared (#1623). What is done about a pass is decided from the
+newest observed head, not by replaying transitions: at the approved revision, a card the queue let go of for a stale
+pass is queued again (`requeueable`, `ensureQueued`: idempotent, so a return recorded with the rules off is acted on
+once they're on, from the head as it is then); elsewhere it is carried over or stale. Each of these writes checks under
+its lock that the head observation it read is still the newest (`newest`): a newer one wins and the next run decides.
+The return comes before applying a stale pass's effects, so a pass that holds again never wakes for them.
 
 **Reconciliation in the app (#1217, P3; acting since #1263).** `workflow/reconciler.ts` follows the open workspaces' projects (as
 `platform/watching.ts` does) and subscribes to the watcher for each: a line or a folder's head moved, or a write,
@@ -530,8 +537,8 @@ MergedInPart, Stale, CarriedOver, CommitAttributed, LeftTarget, Gone), and the t
 actions and wakes run only with `reconcileActs`, the switch `hive.workflow.enforce` (on by default; off, P3's
 record-only). It
 reconciles the project's unfinished cards, a card asked for, and Done cards whose target line moved. Every observed
-fact has a dedupe key (`prev:`, `cycle:`, `commit:`, `part:`, `left:`, `gone:`; `stale:` and `carried:` per cycle and
-revision), so two Hives write each once, and a writer that lost the race reads again and writes what is true now
+fact has a dedupe key (`prev:`, `cycle:`, `commit:`, `part:`, `left:`, `gone:`; `stale:`, `carried:` and `back:` per cycle and
+head observation, `HeadMoved`'s seq: a line that returns to a revision is observed again, #1623), so two Hives write each once, and a writer that lost the race reads again and writes what is true now
 (`observeHead`). Every delayed observation is written only in the cycle it was read in (`sameCycle`, checked under the
 write's lock; a `HeadMoved` also after the very fact it was read after), so a head read before a card started again
 never lands in its new cycle; shared-folder attribution, immutable once written, waits for the next run when the
@@ -563,7 +570,14 @@ the queue (never `merge --ff-only`, which has no expected value). The repository
 dir, #1347) is held only for the
 advance, never across the test merge (hooks, signing) or the merge checks, and never while an entry is paused. Every
 submitted revision is pinned by `refs/hive/cards/<key>/<n>` until its card is archived; strict updates live only on
-the queue's ref.
+the queue's ref. **Push after merging (G18, #1179):** `owePush` writes store meta `queue.pushOwed:<target>` in the
+same transaction as Hive's `Integrated` (the advance's and recovery's), when `wf.cfg.options()` has `pushTarget` then
+(G18 is in no ruleset: `ruleOptions` drops it); `settlePush` runs first in every `runOnce` and after each merge, inside
+`fenced()`: dropped if the option is off (read again just before the push) or the target no longer holds the result,
+paused `pushUnreadable` (still owed; no message stored: the window words it) if the target can't be read, else `git push` of the target to
+its upstream (or the only remote, or origin) with no prompt and a 5-minute bound, compare-and-cleared on success, and a
+`pushRejected` / `pushFailed` / `pushNoRemote` pause otherwise. `queueHost.openTargets` counts an owed push, so a
+restart runs that queue.
 
 **Checks.** A run records its tested checkout and counts for a card's submission under SPEC §16.13's rules (the
 checkout contains the card's revision; nothing written in the tracked tree during the run). `hive-progress --check

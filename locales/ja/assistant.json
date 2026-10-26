@@ -425,7 +425,7 @@
   "assistant.skills.shipped.triageReport": "Hive Assistantとして、報告された問題を根拠付きのカードにします：まず原因、次に重複。ユーザーが問題を報告したときに使います。",
   "assistant.skills.shipped.tuneSettings": "Hive AssistantとしてHiveの設定を説明・提案し、変更はユーザーが同意したときだけ行います。設定の働きやHiveの動作を変える方法を聞かれたとき、または設定で目の前の問題が直るときに使います。",
   "assistant.skills.shipped.useHiveApi": "スクリプトやツールからHiveのローカルHTTP APIを呼び出す、またはそれに対してhiveツールをデバッグします。HTTPでHiveを自動化するときだけ使います。通常のボード、ノート、引き継ぎの作業にはhiveツールで十分です。",
-  "assistant.skills.shipped.workOnCard": "Hiveのタスクボードのカードを、「進行中」から要約付きで「レビュー」まで作業して進めます。取り組むカードを渡されたとき（「#12に取り組んで」、Hiveが割り当てたカード、「レビュー」から戻ったカードの追加作業）に使います。レビューやカードループ（card-loop）には使いません。",
+  "assistant.skills.shipped.workOnCard": "Hiveのタスクボードのカードを、「進行中」から要約付きで「レビュー」まで作業して進めます。取り組むカードを渡されたとき（「AM-12に取り組んで」、Hiveが割り当てたカード、「レビュー」から戻ったカードの追加作業）に使います。レビューやカードループ（card-loop）には使いません。",
   "assistant.skills.shipped.workspaceNote": "長く残る決定、慣習、注意点をワークスペースの共有ノートに記録します。後のために覚えておく、文書にするよう頼まれたとき、または学んだことをほかのエージェントが必要とするときに使います。進行中の作業には使いません。",
   "assistant.skills.stillLocal": "ここの{known, select, yes {{provider}のエージェント} other {エージェント}}は、ローカルのコピーを削除するまでそちらも読み込みます。",
   "assistant.skills.tipHive": "Hiveスキルはワークスペース（.hive/skills）にあります。各スキルは、SKILL.mdのaudienceに従って、プロジェクトのエージェント（すべてのプロジェクトの、すべてのプロバイダーの全エージェント）、Hive Assistant、またはその両方に渡されます（指定がなければプロジェクトのエージェント）。Hiveはセッションの開始時にスキルをコピーするため、編集は新しいセッションから反映されます。追加、編集、削除は「スキル」ビューで行います。",

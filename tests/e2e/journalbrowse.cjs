@@ -25,7 +25,7 @@ const check = (name, ok, extra = '') => {
 }
 
 /** Entries as the Assistant writes them, into the journal Hive made (its triggers index them). */
-function seed(cards) {
+function seed(cards, secondKey) {
   const db = new DatabaseSync(dbFile)
   try {
     db.function('journal_text', { deterministic: true, varargs: true }, (detail) => (typeof detail === 'string' ? detail : ''))
@@ -45,7 +45,7 @@ function seed(cards) {
     const tag = db.prepare('INSERT INTO tags (entry_id, tag) VALUES (?, ?)')
     const rows = [
       [today(0.6), 'decision', 'alpha', 'Ship the journal browser under the Assistant view', 'Darren chose a small browser of its own, under the Assistant in the activity bar.\n\n- search and filters\n- edit and delete', 'No need for an external SQLite tool', 2, null, [['card', String(cards[0])], ['commit', '9e52d43e']], ['journal', 'ui']],
-      [today(0.3), 'plan', 'alpha', 'Build the timeline first, then the entry pane', null, null, 1, null, [['card', String(cards[1])]], []],
+      [today(0.3), 'plan', 'alpha', 'Build the timeline first, then the entry pane', null, null, 1, null, [['card', secondKey]], []],
       [day(1, 17), 'incident', null, 'The orange tabby knocked the build over', 'A flaky e2e run while the machine was loaded.', 'Runs under load need conditions, not sleeps', 1, null, [], ['flake']],
       [day(1, 11), 'insight', 'beta', 'Orange markers read better than red in both themes', null, null, 0, null, [], []],
       [day(2, 10), 'decision', 'beta', 'Old decision about orange themes', null, null, 1, null, [], []],
@@ -78,7 +78,8 @@ function seed(cards) {
     await inv('tasks:update', second.number, { column: 'doing' })
     await inv('tasks:update', first.number, { column: 'done' })
     check("Hive's fact made the journal", !!(await lib.until(async () => (await inv('journal:status')).entries === 1, HUNG_MS)))
-    seed([first.number, second.number])
+    // The plan links its card by key (HI-1661: as hive_journal_write's link asks), the decision by number (written before).
+    seed([first.number, second.number], second.key)
 
     await page.locator('.activity-btn[aria-label="Hive Assistant"]').click()
     await page.locator('.row[data-section="journal"]').click()
@@ -86,10 +87,12 @@ function seed(cards) {
     const rows = view.locator('.journal-row')
     check('Journal → Timeline shows every entry', !!(await lib.until(async () => (await rows.count()) === 7, HUNG_MS)), String(await rows.count()))
     const summaries = async () => rows.locator('.journal-summary').allInnerTexts()
-    check("newest first, by day (Today first): Hive's fact, then the Assistant's", /^#\d+ "Journal browser" is Done/.test((await summaries())[0]) && (await summaries())[1] === 'Ship the journal browser under the Assistant view' && (await view.locator('.journal-day-head').first().innerText()).toLowerCase() === 'today', JSON.stringify(await summaries()))
+    check("newest first, by day (Today first): Hive's fact, then the Assistant's", /^[A-Z]{2,4}-\d+ "Journal browser" is Done/.test((await summaries())[0]) && (await summaries())[1] === 'Ship the journal browser under the Assistant view' && (await view.locator('.journal-day-head').first().innerText()).toLowerCase() === 'today', JSON.stringify(await summaries()))
     const top = rows.filter({ hasText: 'Ship the journal browser' })
     check('a row has its kind mark, project, source and card chip', (await top.locator('.journal-kind-mark').count()) === 1 && /alpha/.test(await top.innerText()) && (await top.locator('.journal-source-mark').count()) === 1 && (await top.locator(`.card-chip[data-task="${first.number}"]`).count()) === 1)
     check('important entries are marked', (await top.locator('.journal-important').count()) === 1)
+    const plan = rows.filter({ hasText: 'Build the timeline first' })
+    check('a card linked by its key is its card chip too (HI-1661)', (await plan.locator(`.card-chip[data-task="${second.number}"]`).count()) === 1, await plan.innerHTML())
     check('a superseded entry is marked', (await view.locator('.journal-row.superseded').count()) === 1)
     check("Hive's fact is there, by Hive", (await view.locator('.journal-row', { hasText: '"Journal browser" is Done' }).locator('.journal-source-mark[aria-label="Hive"]').count()) === 1, await view.locator('.journal-row').last().innerHTML())
     /** The notices in the corner closed, so a screenshot shows the browser. */
@@ -111,7 +114,7 @@ function seed(cards) {
 
     // A card chip opens the card.
     await top.locator(`.card-chip[data-task="${first.number}"]`).click()
-    const cardDialog = page.locator('.dialog', { hasText: `#${first.number}` })
+    const cardDialog = lib.cardDialog(page, await lib.cardLabel(inv, first.number))
     check('a card chip opens its card', !!(await lib.until(async () => (await cardDialog.count()) >= 1, HUNG_MS)))
     await page.keyboard.press('Escape')
     await lib.until(async () => (await cardDialog.count()) === 0, HUNG_MS)

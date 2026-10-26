@@ -92,7 +92,7 @@ const until = async (fn, ms = 10000) => {
   check('every move is in its history', JSON.stringify((await moves(1)).slice(-2)) === JSON.stringify(['Mover (alpha): Moved to Done', 'Mover (alpha): Moved to Doing']), JSON.stringify(await moves(1)))
   // The card dialog says the window's column names (#1458): Active, where agents' English says Doing.
   await tile.click()
-  const dialog = page.locator('.dialog', { hasText: '(#1)' })
+  const dialog = lib.cardDialog(page, await lib.cardLabel(inv, 1))
   await dialog.waitFor({ timeout: 5000 })
   await dialog.locator('.task-section-h[data-section="history"]').click()
   const history = dialog.locator('.task-history')
@@ -106,8 +106,8 @@ const until = async (fn, ms = 10000) => {
   await inv('tasks:start', n, { kind: 'agent', agentId: agent.id })
   check('Start puts the card in Doing', !!(await until(async () => (await card(n)).column === 'doing', 10000)))
   // The prompt names the card by its key with the number the tools take (#1219): its own key, from the board.
-  const nName = `${(await card(n)).key} (#${n})`
-  check('the card has a key of its project', /^[A-Z]{2,4}-\d+ \(#\d+\)$/.test(nName), nName)
+  const nName = `${(await card(n)).key}`
+  check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(nName), nName)
   const transcript = path.join(claudeHome, 'projects', alpha.replace(/[^a-zA-Z0-9]/g, '-'), `${(await live()).sessionId}.jsonl`)
   const prompt = await until(async () => {
     const lines = fs.existsSync(transcript) ? fs.readFileSync(transcript, 'utf8').split('\n').filter((l) => l.includes(`task ${nName} `)) : []

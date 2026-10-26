@@ -14,7 +14,8 @@
 import { statSync } from 'original-fs'
 import { join } from 'path'
 import { foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
-import { awaitsAgentMerge, hasStage } from '../../shared/workflow/compile'
+import { awaitsAgentMerge, hasStage, type Ruleset } from '../../shared/workflow/compile'
+import { notApproved } from '../../shared/workflow/guards'
 import * as G from '../platform/git'
 import { isUnknown, type Maybe } from '../platform/types'
 import { samePath } from '../../shared/movePaths'
@@ -289,9 +290,31 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
       const c = await G.contains(project, target, approved)
       if (!isUnknown(c) && c) return integratedOutside(wf, card, s, approved.revision, c.method, [])
     }
+    // The pass follows the newest observed head (#1623, the Assistant's call after HR2's round 2): at exactly the approved
+    // revision it holds; elsewhere it is the same change (carried over) or stale. Facts record each transition, as
+    // history; what is done is decided from the head as it is now. Each write checks under its lock that the head
+    // observation it read is still the newest: a newer one wins, and the next run decides from it.
+    const newest = (w: Write): boolean => sameCycle(w, s) && w.state().lastHeadFact === s.lastHeadFact && w.state().head === s.head
+    if (wf.ownLine(s) && s.head === approved.revision && s.stale) {
+      // Back at exactly the approved revision: the reviewer passed that commit. The return is recorded once per head
+      // observation (it clears the stale pass), before any effects of the stale pass not applied yet.
+      const from = s.stale.current ?? approved.revision
+      await wf.write(card, r, 'hive', (w) => {
+        if (!newest(w) || !w.state().stale) return
+        // What follows from it, with the rules enforced (P3 records only).
+        if (observed(w, 'CarriedOver', `back:${s.cycle}:${s.lastHeadFact}`, { from, to: approved.revision, toBase: approved.base, how: 'sameRevision' }) && wf.cfg.reconcileActs) holdsAgain(wf, w)
+      })
+      return
+    }
+    // At the approved revision with its pass holding, a card the queue let go of for a stale pass is queued again:
+    // idempotent, so a return recorded while the rules were off is acted on once they're on, from the head as it is then.
+    if (wf.ownLine(s) && s.head === approved.revision && !s.stale && wf.cfg.reconcileActs && requeueable(s, r, card.stage, card.labels)) {
+      await wf.write(card, r, 'hive', (w) => newest(w) && ensureQueued(wf, w))
+      return
+    }
     // A stale pass whose effects weren't applied (recorded while the rules weren't enforced): applied now, once.
     if (s.stale && wf.cfg.reconcileActs && !staleApplied(wf, card, s)) {
-      await wf.write(card, r, 'outside', (w) => sameCycle(w, s) && staleEffects(w, back, `${card.key}: stale, submit again`)) // i18n-ignore: a wake, agent-facing
+      await wf.write(card, r, 'outside', (w) => sameCycle(w, s) && staleEffects(w, back, `${card.key}: stale, submit again (or put its branch back at ${approved.revision.slice(0, 7)})`)) // i18n-ignore: a wake, agent-facing
       return
     }
     // A new revision after a pass: the same change carries over, another goes stale (§16.4.4).
@@ -301,15 +324,17 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
       const same = o.sameness === 'change' && !!b2 && !isUnknown(b2) && (await G.sameChange(project, approved, { base: b2, revision: s.head }))
       const head = s.head
       await wf.write(card, r, 'hive', (w) => {
-        if (!sameCycle(w, s)) return
-        // Observed once per cycle and revision (§16.17): two Hives seeing the same new revision write one fact.
+        // Only while the head observation it follows is still the newest (a newer one is read by the next run).
+        if (!sameCycle(w, s) || w.state().lastHeadFact !== s.lastHeadFact) return
+        // Observed once per head observation (§16.17): two Hives seeing the same new revision write one fact, and a line
+        // that comes back to a revision it had before (#1623: away, back, away again) is observed each time.
         if (same) {
-          observed(w, 'CarriedOver', `carried:${s.cycle}:${head}`, { from: approved.revision, to: head, toBase: b2 as string, how: 'replay' })
+          observed(w, 'CarriedOver', `carried:${s.cycle}:${s.lastHeadFact}`, { from: approved.revision, to: head, toBase: b2 as string, how: 'replay' })
           return
         }
-        observed(w, 'Stale', `stale:${s.cycle}:${head}`, { approved: approved.revision, current: head, why: o.sameness === 'exact' ? 'exact' : 'change' }) // i18n-ignore: a fact's kind and codes, not text
+        observed(w, 'Stale', `stale:${s.cycle}:${s.lastHeadFact}`, { approved: approved.revision, current: head, why: o.sameness === 'exact' ? 'exact' : 'change' }) // i18n-ignore: a fact's kind and codes, not text
         // What follows from it, once, with the rules enforced (P3 records only).
-        if (wf.cfg.reconcileActs) staleEffects(w, back, `${card.key}: stale, submit again`) // i18n-ignore: a wake, agent-facing
+        if (wf.cfg.reconcileActs) staleEffects(w, back, `${card.key}: stale, submit again (or put its branch back at ${approved.revision.slice(0, 7)})`) // i18n-ignore: a wake, agent-facing
       })
     }
     return
@@ -449,6 +474,40 @@ function staleEffects(w: Write, back: StageId | null, why: string): void {
   if (open) w.fact('IntegrationCancelled', { entry: open.id, reason: 'stale' }) // i18n-ignore: a fact's kind and codes, not text
   if (back) w.move(back, 'derived')
   if (builder) w.action('wake', { agent: builder, why }, f.seq)
+}
+
+/**
+ * Where Hive merges, an Approved card the queue let go of because its pass went stale (its newest entry cancelled so),
+ * with no follow-up waiting and approved now: one to queue again (#1623). One taken out otherwise (Remove from queue, a
+ * follow-up, On Hold) is left for what took it out.
+ */
+function requeueable(s: CardState, r: Ruleset | null, stage: StageId, labels: string[]): boolean {
+  const last = s.entries.at(-1)
+  return !!r && r.options.finish === 'hiveMerges' && stage === 'approved' && last?.state === 'cancelled' && last.cancelled === 'stale' && !s.step && !notApproved(s, r, labels)
+}
+
+/** Queues a requeueable card again, in the write's transaction, and tells its builder it needn't submit again. */
+function ensureQueued(wf: Workflow, w: Write): boolean {
+  const s = w.state()
+  if (s.stale || !requeueable(s, w.ruleset, w.current, w.card.labels)) return false
+  wf.enqueue(w)
+  wf.wake(w, s.started?.builder, `${w.card.key}: back at its approved revision, so its pass holds again; it is queued again; don't submit it again`) // i18n-ignore: a wake, agent-facing
+  return true
+}
+
+/**
+ * What follows a return to the approved revision (#1623), in its write: queued again where it can be (`ensureQueued`);
+ * else the OK it still waits for asked again, and its builder told what comes next. While a follow-up waits for its
+ * reviewer's check, it isn't queued: the check's ok queues it.
+ */
+function holdsAgain(wf: Workflow, w: Write): void {
+  const r = w.ruleset
+  if (!r || ensureQueued(wf, w)) return
+  const s = w.state()
+  if (!s.step) wf.reask(w)
+  const o = r.options
+  const next = s.step ? 'it waits for the reviewer to check your follow-up' : openEntry(s) ? 'it stays in the merge queue' : o.finish === 'agentMerges' || o.finish === 'notChecked' ? 'merge it and report the merge' : "it waits for the user's OK" // i18n-ignore: a wake, agent-facing
+  wf.wake(w, s.started?.builder, `${w.card.key}: back at its approved revision, so its pass holds again; ${next}`) // i18n-ignore: a wake, agent-facing
 }
 
 /**

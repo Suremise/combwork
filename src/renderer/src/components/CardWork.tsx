@@ -51,6 +51,8 @@ const M = {
   accepted: msg({ id: 'board.work.accepted', defaultMessage: 'Accepted {when}.', description: "The card dialog's Work section: the card's work was accepted (a project without version control, or a no-code card) at {when}, a date and time." }),
   staleChange: msg({ id: 'board.work.staleChange', defaultMessage: 'Stale: the pass was for {approved}; the card is now at {current}.', description: "A mark in the card dialog's Work section: the card's pass is for an older revision ({approved}, a short commit id) that isn't the same change as its revision now ({current}). Glossary: stale, pass." }),
   staleDecision: msg({ id: 'board.work.staleDecision', defaultMessage: 'Stale: a decision was recorded since the pass.', description: "A mark in the card dialog's Work section: the card's pass no longer counts because the user recorded a decision on the card after it. Glossary: stale, pass." }),
+  staleNext: msg({ id: 'board.work.staleNext', defaultMessage: 'To move it on, its builder submits it again, or puts its branch back at {approved}: until then it isn’t merged.', description: "A mark in the card dialog's Work section under a stale pass, in Approved (Passed): what moves the card on. Its builder submits its work again (for a new review), or puts its branch back at the revision that passed ({approved}, a short commit id), which makes the pass count again. Glossary: stale, pass." }),
+  backAtApproved: msg({ id: 'board.work.backAtApproved', defaultMessage: 'Its branch came back to {revision}, the revision that passed: the pass counts again.', description: "A mark in the card dialog's Work section: the card's branch changed after its pass (which made the pass stale), then came back to exactly the revision that passed ({revision}, a short commit id), so the pass counts again. Glossary: pass, revision." }),
   carriedOver: msg({ id: 'board.work.carriedOver', defaultMessage: 'The pass for {from} carries over to {to}: the same change.', description: "A mark in the card dialog's Work section: a pass for an earlier revision ({from}) still counts for a later one ({to}) with exactly the same changes. Glossary: carries over, same change." }),
   outsideRules: msg({ id: 'board.work.outsideRules', defaultMessage: 'Merged outside the rules: {rules}.', description: "A mark in the card dialog's Work section: the card was merged by hand before these rules passed ({rules}, the rules' names, joined). Glossary: rule." }),
   mergedInPart: msg({ id: 'board.work.mergedInPart', defaultMessage: 'Merged in part: some of its work is already in {target}.', description: "A mark in the card dialog's Work section: part of the unfinished card's work was found in its target ({target}, a branch such as main)." }),
@@ -216,7 +218,9 @@ function workMarks(v: WorkView, short: (id: string) => string): string[] {
   const out: string[] = []
   const st = v.marks.stale
   if (st) out.push(st.why === 'decision' || !st.approved || !st.current ? tr(M.staleDecision) : tr(M.staleChange, { approved: short(st.approved), current: short(st.current) }))
-  for (const c of v.marks.carriedOver) out.push(tr(M.carriedOver, { from: short(c.from), to: short(c.to) }))
+  // What moves a stale pass on (#1623): nothing queues it until then.
+  if (st?.approved && st.why !== 'decision' && v.stage === 'approved' && v.line) out.push(tr(M.staleNext, { approved: short(st.approved) }))
+  for (const c of v.marks.carriedOver) out.push(c.how === 'sameRevision' ? tr(M.backAtApproved, { revision: short(c.to) }) : tr(M.carriedOver, { from: short(c.from), to: short(c.to) }))
   if (v.marks.outsideRules.length) out.push(tr(M.outsideRules, { rules: fmt.list(v.marks.outsideRules) }))
   if (v.marks.mergedInPart) out.push(tr(M.mergedInPart, { target: v.marks.mergedInPart.target }))
   if (v.marks.leftTarget) out.push(tr(M.leftTarget, { target: v.marks.leftTarget.target, revision: short(v.marks.leftTarget.revision) }))

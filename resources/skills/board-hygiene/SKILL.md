@@ -15,7 +15,7 @@ Keep it light for a solo user or a pair. When asked to tidy the board, sweep it 
 
 - The same symptom, test or file in two cards (the same flake filed twice, say) is one problem.
 - Keep the card with the best evidence (the reproduction, the cause, the most recent run), and link them both ways (`links`).
-- Comment on each other one "Duplicate of #n: the user can archive it", and say so to the user. Archiving and deleting are the user's: never do either.
+- Comment on each other one "Duplicate of AM-3: the user can archive it", and say so to the user. Archiving and deleting are the user's: never do either.
 - Two cards about the same file that ask for different things aren't duplicates.
 
 ## Decisions

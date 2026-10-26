@@ -126,7 +126,7 @@ interface HiveMessageValues {
   'service.hiveVcs.exitCode': { code: string | number }
   'service.hiveVcs.noRepo': undefined
   'service.hiveVcs.rmFailed': { why: string | number }
-  'service.intent.noWorkflow': { n: string | number }
+  'service.intent.noWorkflow': { card: string | number }
   'service.intent.queueNotAgents': undefined
   'service.keys.closed': undefined
   'service.keys.form': undefined

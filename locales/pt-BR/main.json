@@ -301,7 +301,7 @@
   "main.unused.slot.dirty": "{files, plural, one {# arquivo nele não tem commit} other {# arquivos nele não têm commit}}",
   "main.unused.slot.editedSkillCopy": "{copies, plural, one {sua pasta de skill {names} não é uma cópia inalterada do Hive} many {suas pastas de skills {names} não são cópias inalteradas do Hive} other {suas pastas de skills {names} não são cópias inalteradas do Hive}}",
   "main.unused.slot.gitRefused": "o git não o removeu ({detail})",
-  "main.unused.slot.inFlight": "o cartão #{card}, que estava nele, ainda está sendo mesclado",
+  "main.unused.slot.inFlight": "o cartão {card}, que estava nele, ainda está sendo mesclado",
   "main.unused.slot.leased": "está emprestado para {agent}",
   "main.unused.slot.process": "um processo ainda está com ele aberto",
   "main.unused.slot.session": "há uma sessão rodando nele ({detail})",

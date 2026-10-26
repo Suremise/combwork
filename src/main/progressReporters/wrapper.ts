@@ -59,7 +59,7 @@ export function parseArgs(argv: string[]): WrapperArgs {
     const v = VALUED.exec(a)
     if (v) {
       const name = v[1] as 'title' | 'card' | 'revision' | 'check'
-      if (v[2] === undefined && i + 1 >= argv.length) return { error: name === 'card' ? '--card needs a value: quote it, as in --card "#1061" (a shell takes an unquoted # for the start of a comment).' : `--${name} needs a value.` }
+      if (v[2] === undefined && i + 1 >= argv.length) return { error: name === 'card' ? '--card needs a value: the card\'s key, as in --card HI-12 (an old --card "#1061" needs its quotes: a shell takes an unquoted # for the start of a comment).' : `--${name} needs a value.` }
       opts[name] = v[2] ?? argv[++i]
     } else if (a === '--isolated') opts.isolated = true
     else if (a.startsWith('-')) return { error: `Unknown option ${a}.` }
@@ -340,10 +340,41 @@ class WrappedRun {
     this.run.update({ ...(late !== undefined ? { total: late, step: this.step ?? 0 } : {}), ...(u.step !== undefined ? { step: this.step } : {}), ...(u.name !== undefined ? { stepName: u.name } : {}) })
   }
 
-  async finish(ok: boolean, summary: string | undefined, exitCode: number, stopped = false): Promise<void> {
+  /** Hive's answer to the finish (null: none in `waitMs`). */
+  finish(ok: boolean, summary: string | undefined, exitCode: number, stopped = false, waitMs?: number): Promise<unknown> {
     this.begin()
-    await this.run!.finish(ok, summary, undefined, { exitCode, ...(this.log ? { logPath: this.log } : {}), ...(stopped ? { stopped: true } : {}) })
+    return this.run!.finish(ok, summary, waitMs, { exitCode, ...(this.log ? { logPath: this.log } : {}), ...(stopped ? { stopped: true } : {}) })
   }
+}
+
+/** How long a check's finish waits for Hive to say how it counted (Hive answers within 8 s: servers.ts CHECK_REPLY_MS). */
+const CHECK_FINISH_WAIT_MS = 9000
+
+/** What's done about each reason a check run didn't count (#1654): what happened, then what to do. */
+const UNCOUNTED: Record<string, (more: { name: string; changes: string; isolate: boolean }) => string> = {
+  notCheck: (m) => `Hive didn't see the check's configured command run. Run it again with hive-progress --check ${m.name}`,
+  notContained: () => "what is checked out here doesn't contain the card's revision. Run it in the card's own folder, at its revision",
+  dirty: (m) => `the folder had uncommitted changes${m.changes}. Commit or remove them, then run it again`,
+  moved: () => 'something else was checked out by the time it ended. Run it again',
+  changed: (m) => `files changed in the folder while it ran${m.changes}. Run it again with nothing else writing in the folder${m.isolate ? ', or with --isolated (a check copy of its own)' : ''}`,
+  revisionChanged: () => "the card's declared files changed while it ran. Run it again"
+}
+
+/** Names for what a write log records that isn't a file. */
+const MARKS: Record<string, string> = { ':reflog': 'a commit or checkout', ':edit': "an agent's edit" }
+
+/**
+ * The line hive-progress prints when Hive says a check's run didn't count (#1654), or null (it counted, or Hive didn't
+ * say): why, and what to do, so an agent isn't left running the same command again for a submit that keeps refusing.
+ */
+export function uncountedLine(answer: unknown, isolated: boolean): string | null {
+  const c = answer && typeof answer === 'object' ? (answer as { check?: unknown }).check : null
+  if (!c || typeof c !== 'object') return null
+  const { name, counted, whyNot, changes, platform } = c as Record<string, unknown>
+  if (counted !== false || typeof name !== 'string' || typeof whyNot !== 'string' || !UNCOUNTED[whyNot]) return null
+  const listed = Array.isArray(changes) ? changes.filter((x): x is string => typeof x === 'string').map((x) => MARKS[x] ?? x) : []
+  const why = UNCOUNTED[whyNot]({ name, changes: listed.length ? ` (${listed.join(', ')})` : '', isolate: !isolated && platform === 'git' })
+  return `not counted as check ${name}: ${why}.`
 }
 
 /**
@@ -570,7 +601,10 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
   const passed = code === 0 && !stopped
   // The time it usually takes: from runs that passed only, leaving out the time it waited (a queue, a lock).
   if (passed && timings) recordTiming(timings, key, Math.max(0, Date.now() - started - report.waitedMs()))
-  await report.finish(passed, passed ? undefined : stopped ? 'interrupted' : `exit code ${code}`, code, stopped)
+  const answer = await report.finish(passed, passed ? undefined : stopped ? 'interrupted' : `exit code ${code}`, code, stopped, link?.check ? CHECK_FINISH_WAIT_MS : undefined)
+  // A check that didn't count says why (#1654); its exit code is the command's all the same.
+  const uncounted = link?.check ? uncountedLine(answer, !!link.isolated) : null
+  if (uncounted) io.stderr.write(`hive-progress: ${uncounted}\n`)
   return code
 }
 

@@ -46,7 +46,7 @@ const M = {
   retryConfirm: msg({ id: 'board.workQueue.retryConfirm', defaultMessage: 'Retry merge', description: 'The button confirming Retry merge. Keep it short.' }),
   retryFailed: msg({ id: 'board.workQueue.retryFailed', defaultMessage: "Couldn't retry the merge", description: "An error's title: Retry merge failed (the card dialog); its message says why." }),
   retried: msg({ id: 'board.workQueue.retried', defaultMessage: 'Queued again by Retry merge.', description: "The card dialog's Work section: the card's revision was queued again, unchanged, by the user's Retry merge." }),
-  cancelled: msg({ id: 'board.workQueue.cancelled', defaultMessage: '{reason, select, removed {Taken out of the queue (Remove from queue).} stale {Taken out of the queue: its pass no longer counts.} hold {Taken out of the queue: the card went On Hold.} decision {Taken out of the queue: a decision was recorded.} integratedOutside {Taken out of the queue: it was merged outside Hive.} other {Taken out of the queue.}}', description: "The card dialog's Work section: the card's merge queue entry was cancelled, and why. Keep the select keys. Glossary: merge queue, On Hold, decision, outside Hive." }),
+  cancelled: msg({ id: 'board.workQueue.cancelled', defaultMessage: '{reason, select, removed {Taken out of the queue (Remove from queue).} stale {Taken out of the queue: its pass no longer counts.} hold {Taken out of the queue: the card went On Hold.} decision {Taken out of the queue: a decision was recorded.} integratedOutside {Taken out of the queue: it was merged outside Hive.} followUp {Taken out of the queue for a follow-up: queued again once its reviewer checks it.} other {Taken out of the queue.}}', description: "The card dialog's Work section: the card's merge queue entry was cancelled, and why. Keep the select keys. Glossary: merge queue, On Hold, decision, outside Hive, follow-up." }),
   paused: msg({ id: 'board.workQueue.paused', defaultMessage: 'The queue for {target} is paused', description: "A heading line in the card dialog's Work section: the merge queue for the branch {target} is paused (why follows)." }),
   resume: msg({ id: 'board.queue.resume', defaultMessage: 'Resume queue', description: "A button on a paused merge queue's card in the Progress panel: clears the pause once its cause is fixed. Glossary 2.5: Resume queue." }),
   resumeFailed: msg({ id: 'board.queue.resumeFailed', defaultMessage: "Couldn't resume the merge queue", description: "An error's title: Resume queue failed (Progress panel)." }),
@@ -162,6 +162,12 @@ export function CardQueue({ card, view: w, projectPath, short, reveal = 0 }: { c
           <Icon name="circle-slash" /> <span>{tr(M.cancelled, { reason: q.cancelled ?? 'other' /* i18n-ignore: a select's key, never shown */ })}</span>
         </div>
       )}
+      {/* Taken out and still approved, in Approved (#1623): Retry merge queues it again; a stale one is submitted again (its mark says so). */}
+      {q && q.state === 'cancelled' && w.stage === 'approved' && !w.marks.stale && (
+        <div className="card-work-queue-actions">
+          <RetryButton card={card} revision={short(q.revision)} />
+        </div>
+      )}
       {advance && <Advance card={card} request={advance.request} target={q?.target ?? target ?? ''} />}
       {queue?.paused && open && !stuck && <Paused queue={queue} projectPath={projectPath!} />}
       {stuck && <Stuck stuck={stuck} target={queue!.target} short={short} projectPath={projectPath ?? ''} />}
@@ -177,10 +183,6 @@ function Returned({ card, q, queue, short, runs }: { card: TaskCard; q: NonNulla
   const why = returnWhy(recent, run ? runCheckName(run) : null, q.target, tr, list)
   const lines = (q.log ?? '').replace(/\s+$/, '').split(/\r?\n/)
   const tail = lines.slice(-TAIL_LINES)
-  const retry = async (): Promise<void> => {
-    const ok = await confirm({ title: tr(M.retryTitle, { card: card.key ?? `#${card.number}` }), message: tr(M.retryMessage, { revision: short(q.revision) }), confirmLabel: tr(M.retryConfirm) })
-    if (ok) await attempt(tr(M.retryFailed), () => call('queue:retry', card.number, ''))
-  }
   return (
     <div className="card-work-queue-returned">
       <div className="card-work-queue-line">
@@ -215,13 +217,22 @@ function Returned({ card, q, queue, short, runs }: { card: TaskCard; q: NonNulla
             <Icon name="output" /> {all && !run?.logPath ? tr(M.hideLog) : tr(M.showLog)}
           </button>
         )}
-        {card.column !== 'done' && (
-          <button type="button" className="btn small" data-action="retry" onClick={() => void retry()}>
-            <Icon name="refresh" /> {tr(M.retry)}
-          </button>
-        )}
+        {card.column !== 'done' && <RetryButton card={card} revision={short(q.revision)} />}
       </div>
     </div>
+  )
+}
+
+/** Retry merge (asks first): queues the approved revision again, unchanged. */
+function RetryButton({ card, revision }: { card: TaskCard; revision: string }) {
+  const retry = async (): Promise<void> => {
+    const ok = await confirm({ title: tr(M.retryTitle, { card: card.key ?? `#${card.number}` }), message: tr(M.retryMessage, { revision }), confirmLabel: tr(M.retryConfirm) })
+    if (ok) await attempt(tr(M.retryFailed), () => call('queue:retry', card.number, ''))
+  }
+  return (
+    <button type="button" className="btn small" data-action="retry" onClick={() => void retry()}>
+      <Icon name="refresh" /> {tr(M.retry)}
+    </button>
   )
 }
 

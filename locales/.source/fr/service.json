@@ -124,7 +124,7 @@
   "service.hiveVcs.exitCode": "exit code {code}",
   "service.hiveVcs.noRepo": "No git repository holds this project.",
   "service.hiveVcs.rmFailed": "git rm --cached failed: {why}",
-  "service.intent.noWorkflow": "#{n} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.",
+  "service.intent.noWorkflow": "{card} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.",
   "service.intent.queueNotAgents": "Only the user, or the Hive Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.",
   "service.keys.closed": "The workspace was closed, or the window opened another, before the key was changed: nothing changed.",
   "service.keys.form": "A project key is 2 to 4 letters, A to Z.",

@@ -20,7 +20,7 @@ A handover is read cold by someone with none of this conversation. Write it so t
 Use these headings. Keep each short and concrete:
 
 - **Goal**: what the work is for, in a sentence or two.
-- **Done**: what was completed, with commits and card numbers.
+- **Done**: what was completed, with commits and card keys.
 - **Current state**: branch, uncommitted changes, and what passes and fails (the key error line, not the log).
 - **Decisions**: choices made and why, especially ones that look odd without context, and what was tried and rejected.
 - **Next steps**: in order, the first small enough to start at once.

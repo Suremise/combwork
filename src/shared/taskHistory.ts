@@ -15,8 +15,8 @@ export const HISTORY = {
   moved: msg({ id: 'tasks.history.moved', defaultMessage: 'Moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}', description: "A line in a card's history: the card was moved to this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each." }),
   movedTop: msg({ id: 'tasks.history.movedTop', defaultMessage: 'Moved to the top of {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}', description: "A line in a card's history: the card was put first in this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each." }),
   movedBottom: msg({ id: 'tasks.history.movedBottom', defaultMessage: 'Moved to the bottom of {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}', description: "A line in a card's history: the card was put last in this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each." }),
-  movedBefore: msg({ id: 'tasks.history.movedBefore', defaultMessage: 'Moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}, before #{before}', description: "A line in a card's history: the card was moved to this column, just above card #{before} (a number). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each." }),
-  movedBeforeIn: msg({ id: 'tasks.history.movedBeforeIn', defaultMessage: 'Moved before #{before} in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}', description: "A line in a card's history: within its column, the card was moved just above card #{before} (a number). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each." }),
+  movedBefore: msg({ id: 'tasks.history.movedBefore', defaultMessage: 'Moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}, before {before}', description: "A line in a card's history: the card was moved to this column, just above card {before} (its key, such as HI-12; #12 in lines from before keys). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each." }),
+  movedBeforeIn: msg({ id: 'tasks.history.movedBeforeIn', defaultMessage: 'Moved before {before} in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}', description: "A line in a card's history: within its column, the card was moved just above card {before} (its key, such as HI-12; #12 in lines from before keys). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each." }),
   placed: msg({ id: 'tasks.history.placed', defaultMessage: 'Placed {place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}', description: "A line in a card's history: an agent put the column's cards in order, and this card is now at place {place} (an ordinal: 2nd, 3rd). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each." }),
   returned: msg({ id: 'tasks.history.returned', defaultMessage: 'Returned for review, round {round}', description: "A line in a card's history: after a failed review, the card was sent back for its next review; {round} is the round's number." }),
   renamed: msg({ id: 'tasks.history.renamed', defaultMessage: 'Renamed to "{title}"', description: "A line in a card's history: the card's title was changed to {title}." }),
@@ -47,9 +47,9 @@ export const HISTORY = {
   labelsAddedTakenOff: msg({ id: 'tasks.history.labelsAddedTakenOff', defaultMessage: 'Labels: added {added}; removed {removed}', description: "A line in a card's history: in one change, the labels {added} were added to the card and the labels {removed} taken off, its other labels kept (each: the user's labels, separated by commas)." }),
   blocked: msg({ id: 'tasks.history.blocked', defaultMessage: 'Blocked: {reason}', description: "A line in a card's history: the card was marked blocked, with this reason ({reason}, written by whoever blocked it)." }),
   unblocked: msg({ id: 'tasks.history.unblocked', defaultMessage: 'No longer blocked', description: "A line in a card's history: the card's blocked reason was cleared." }),
-  dependsOn: msg({ id: 'tasks.history.dependsOn', defaultMessage: 'Depends on {cards}', description: "A line in a card's history: the cards that have to be done first were set to these ({cards}: card numbers such as \"#3, #4\")." }),
+  dependsOn: msg({ id: 'tasks.history.dependsOn', defaultMessage: 'Depends on {cards}', description: "A line in a card's history: the cards that have to be done first were set to these ({cards}: card keys such as \"HI-3, HI-4\")." }),
   noDependencies: msg({ id: 'tasks.history.noDependencies', defaultMessage: 'No longer depends on other cards', description: "A line in a card's history: the list of cards that had to be done first was cleared." }),
-  linked: msg({ id: 'tasks.history.linked', defaultMessage: 'Linked to {cards}', description: "A line in a card's history: the card's related cards were set to these ({cards}: card numbers such as \"#3, #4\")." }),
+  linked: msg({ id: 'tasks.history.linked', defaultMessage: 'Linked to {cards}', description: "A line in a card's history: the card's related cards were set to these ({cards}: card keys such as \"HI-3, HI-4\")." }),
   context: msg({ id: 'tasks.history.context', defaultMessage: 'Read first: {refs}', description: "A line in a card's history: the doc sections the agent reads first were set to these ({refs}: references such as \"docs/PLAN.md#setup\", separated by commas; keep them as they are)." }),
   contextRemoved: msg({ id: 'tasks.history.contextRemoved', defaultMessage: 'Removed the doc sections to read first', description: "A line in a card's history: the card's list of doc sections the agent reads first was cleared." }),
   linksRemoved: msg({ id: 'tasks.history.linksRemoved', defaultMessage: 'Removed the links', description: "A line in a card's history: the card's links to related cards were all removed." }),
@@ -99,6 +99,12 @@ const BY_ID = new Map<string, Msg>(Object.values(HISTORY).map((m) => [m.id, m]))
 /** The message a stored line names, by its id: null for an id this Hive doesn't know (a record from a newer one). */
 export const storedMessage = (s: StoredText | undefined): Msg | null => (s ? (BY_ID.get(s.id) ?? null) : null)
 
+/**
+ * The lines whose value names a card, stored as its key since HI-1661 and as its number before it: a number there is the
+ * old `#N` it showed then.
+ */
+const CARD_VALUES: Record<string, string> = { 'tasks.history.movedBefore': 'before', 'tasks.history.movedBeforeIn': 'before' }
+
 /** How deep messages within a stored line's values go: Hive nests one (a CLI's sentence); more is a damaged file. */
 const MAX_NESTED = 3
 
@@ -117,7 +123,8 @@ export function storedLineText(s: unknown, format: (m: Msg, values?: Record<stri
   if (!isRecord(s.values)) return null
   const values: Record<string, string | number> = {}
   for (const [k, v] of Object.entries(s.values)) {
-    if (typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v))) values[k] = v
+    if (typeof v === 'number' && Number.isFinite(v) && CARD_VALUES[s.id] === k) values[k] = `#${v}`
+    else if (typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v))) values[k] = v
     else {
       const t = storedLineText(v, format, more, depth + 1)
       if (t === null) return null

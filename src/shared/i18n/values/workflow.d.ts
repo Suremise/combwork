@@ -158,6 +158,8 @@ interface HiveMessageValues {
   'workflow.option.okBefore.title': undefined
   'workflow.option.preChecks.desc': undefined
   'workflow.option.preChecks.title': undefined
+  'workflow.option.pushTarget.desc': undefined
+  'workflow.option.pushTarget.title': undefined
   'workflow.option.review.desc': undefined
   'workflow.option.review.none': undefined
   'workflow.option.review.shared': undefined
@@ -195,7 +197,7 @@ interface HiveMessageValues {
   'workflow.refused.approval.given.message': { card: string | number }
   'workflow.refused.approval.given.next': undefined
   'workflow.refused.card.plainNumber.message': undefined
-  'workflow.refused.card.plainNumber.next': { key: string | number; alias: string | number }
+  'workflow.refused.card.plainNumber.next': { key: string | number }
   'workflow.refused.check.revisionMismatch.message': { revision: string | number }
   'workflow.refused.check.revisionMismatch.next': { revision: string | number }
   'workflow.refused.done.contained.change': undefined
@@ -219,6 +221,8 @@ interface HiveMessageValues {
   'workflow.refused.lane.oneAtATime.next': { earlier: string | number; card: string | number }
   'workflow.refused.loop.followUpChecked.message': { card: string | number }
   'workflow.refused.loop.followUpChecked.next': undefined
+  'workflow.refused.loop.followUpMerging.message': { card: string | number }
+  'workflow.refused.loop.followUpMerging.next': undefined
   'workflow.refused.loop.noReviewer.message': { card: string | number }
   'workflow.refused.loop.noReviewer.next': undefined
   'workflow.refused.loop.noStep.message': { card: string | number }
@@ -286,8 +290,8 @@ interface HiveMessageValues {
   'workflow.refused.start.slotAvailable.message': { card: string | number }
   'workflow.refused.start.slotAvailable.next': undefined
   'workflow.refused.submit.checksPassed.change': undefined
-  'workflow.refused.submit.checksPassed.message': { check: string | number; revision: string | number }
-  'workflow.refused.submit.checksPassed.next': { command: string | number }
+  'workflow.refused.submit.checksPassed.message': { check: string | number; revision: string | number; why: string; files: string }
+  'workflow.refused.submit.checksPassed.next': { why: string; command: string | number; copy: string }
   'workflow.refused.submit.clean.change': undefined
   'workflow.refused.submit.clean.message': { card: string | number; folder: string | number; files: string | number }
   'workflow.refused.submit.clean.next': undefined
@@ -463,6 +467,7 @@ interface HiveMessageValues {
   'workflow.why.noSelfReview': undefined
   'workflow.why.okBefore': undefined
   'workflow.why.preChecks': undefined
+  'workflow.why.pushTarget': undefined
   'workflow.why.review': undefined
   'workflow.why.reviewerMode': undefined
   'workflow.why.reviewers': undefined

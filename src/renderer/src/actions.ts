@@ -1,7 +1,7 @@
 import { basename } from './util'
 import { call, errorMessage } from './api'
 import { agentLimit } from './advanced'
-import { agentOf, agentProviderOf, choose, openVersionControl, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
+import { agentOf, agentProviderOf, cardLabelOf, choose, openVersionControl, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
 import { MANY_AGENTS, agentLimitText, chosenLayout, layoutColumns, layoutPanes, moveAgentTo, projectLayout, projectSessionView, sessionInAgentFolder, swapAgentsIn } from '@shared/defaults'
 import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@shared/paneCells'
 import { defaultProviderPending, isProviderEnabled, projectDefaultProvider, providerName } from '@shared/providers'
@@ -31,7 +31,7 @@ import { McpProjectPicker } from './components/McpProjectPicker'
 import { AgentsDetail, batchAgentsData, projectAgentsData, tableText } from './components/AgentsTable'
 import { clearEditorDraft, clearEditorDraftsUnder } from './editorDrafts'
 import { keyProblemText, keysHeld } from './projectKeys'
-import { cardLabel, cardRef, normalKey, suggestKey } from '@shared/projectKeys'
+import { cardLabel, normalKey, suggestKey } from '@shared/projectKeys'
 
 /** Runs an async action and shows a toast if it fails. */
 /**
@@ -815,7 +815,7 @@ function freshWhyText(r: FreshRow): string {
     case 'pending':
       return tr(msg({ id: 'actions.startFresh.why.pending', defaultMessage: 'a prompt not taken yet: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): Hive typed a prompt this agent's CLI hasn't taken yet, so it keeps its conversation." }))
     case 'lease':
-      return tr(msg({ id: 'actions.startFresh.why.lease', defaultMessage: '{card, select, none {its lane is still in flight} other {{card} is still in flight}}: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): this agent holds a slot for a card ({card}: \"AM-12\") or a lane (none) whose work isn't finished, so it keeps its conversation." }), { card: r.card ? cardRef(r.card) : 'none' })
+      return tr(msg({ id: 'actions.startFresh.why.lease', defaultMessage: '{card, select, none {its lane is still in flight} other {{card} is still in flight}}: left as it is', description: "Start Fresh (Idle Agents)' list (#1437): this agent holds a slot for a card ({card}: \"AM-12\") or a lane (none) whose work isn't finished, so it keeps its conversation." }), { card: r.card ? cardLabelOf(get(), r.card) : 'none' })
     default:
       return tr(msg({ id: 'actions.startFresh.why.fresh', defaultMessage: 'idle: starts fresh', description: "Start Fresh (Idle Agents)' list (#1437): this agent is idle and gets a new conversation." }))
   }

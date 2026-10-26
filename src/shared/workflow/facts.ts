@@ -104,8 +104,16 @@ export interface CheckRanData {
   by: string
   counted: boolean
   whyNot?: 'notCheck' | 'notContained' | 'dirty' | 'changed' | 'moved' | 'revisionChanged'
+  /**
+   * What made it `changed` (what the watcher saw written: folder-relative paths, ':reflog', ':edit') or `dirty` (the
+   * uncommitted files), at most CHANGES_KEPT (#1654); left out where it isn't known (a stat snapshot's fallback).
+   */
+  changes?: string[]
   isolated?: boolean
 }
+
+/** The paths a `CheckRan` keeps of what stopped it counting (#1654). */
+export const CHANGES_KEPT = 5
 
 export type ForYouKind = 'approve' | 'decide' | 'test' | 'signIn' | 'other'
 
@@ -240,7 +248,8 @@ export interface FactData {
   /** An answer (§16.8.5): `note` the user's reply; at the round limit, their `choice` and the rounds a carry on adds; `action`, an action the question offered, done (#1630; `note` its reason). */
   Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number; action?: AskActionKind }
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash'; requeue?: 'transient' | 'retry' }
-  IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' }
+  /** `followUp`: a follow-up posted on the queued card (#1623), so the queue can't merge the revision while its line changes. */
+  IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' | 'followUp' }
   IntegrationStarted: { entry: string; expected: string; result: string; files?: string[]; checkedOut?: string | null }
   IntegrationPhase: { entry: string; phase: 'files' | 'ref' | 'rollback' }
   /** `cause` and `code`: why a transient failure was one (#1362), as codes; `code` is the network error code found. */
@@ -356,7 +365,7 @@ export interface CardState {
   received: Record<string, number>
   /** The revision the latest submission's passes now cover (moved by carry-overs and the queue's updates), and its base. */
   approved: { revision: string | null; base: string | null } | null
-  /** A content-stale pass (a new revision that isn't the same change), until the builder submits again. */
+  /** A content-stale pass (a new revision that isn't the same change), until the builder submits again or its line returns to the approved revision. */
   stale: FactData['Stale'] | null
   /** Open requests to the user: For you, each with when it was asked. */
   requests: Request[]
@@ -504,6 +513,8 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'CarriedOver': {
         const d = f.data as FactData['CarriedOver']
         s.approved = { revision: d.to, base: d.toBase }
+        // Its line back at exactly the revision a stale pass was for (#1623): the reviewer passed that commit, so it holds.
+        if (d.how === 'sameRevision' && s.stale?.approved === d.to) s.stale = null
         break
       }
       case 'Updated': {

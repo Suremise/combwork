@@ -55,7 +55,7 @@ export function e2eProgress(names: string[], argv: string[] = process.argv): { s
       if (ok) recordTiming(timings(), `e2e:${name}`, ms)
     },
     /** logPath: the run's record or logs, for its details in the panel. */
-    finish: (ok: boolean, summary?: string, logPath?: string) => run.finish(ok, summary, undefined, logPath ? { logPath } : {})
+    finish: (ok: boolean, summary?: string, logPath?: string) => run.finish(ok, summary, undefined, logPath ? { logPath } : {}).then(() => undefined)
   }
 }
 
@@ -96,7 +96,7 @@ export function scenariosProgress(names: string[], provider: string, argv: strin
       counts[outcome]++
       if (outcome === 'ok') recordTiming(timings(), key(id), ms)
     },
-    finish: (ok: boolean, summary?: string, logPath?: string) => run.finish(ok, summary, undefined, logPath ? { logPath } : {})
+    finish: (ok: boolean, summary?: string, logPath?: string) => run.finish(ok, summary, undefined, logPath ? { logPath } : {}).then(() => undefined)
   }
 }
 

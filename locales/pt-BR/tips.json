@@ -238,6 +238,8 @@
   "tips.memorySnapshot.title": "O Hive fechou por falta de memória?",
   "tips.mergeBranch.text": "⑂ ao lado de um branch em Controle de versão → Branches e remotes faz o merge dele no branch que você escolher, um merge por vez. O branch de um cartão que não está concluído pergunta antes, e o cartão fica marcado como mesclado fora das regras.",
   "tips.mergeBranch.title": "Fazer merge de um branch à mão",
+  "tips.mergePush.text": "Quando o Hive faz o merge, Controle de versão → Fluxo de trabalho pode fazer push do branch de destino depois de cada merge, nunca forçado. Se o remote recusar, a fila pausa e diz por quê: faça pull e retome, ou desative e retome.",
+  "tips.mergePush.title": "Faça push de cada merge para o seu remote",
   "tips.mergeQueueFolder.text": "Quando a fila de merge faz o merge em um branch em checkout numa pasta (o main na pasta do projeto), ela também atualiza a pasta, mas pausa em vez de mexer num arquivo que você está mudando. Em Configurações → Avançado ela pode perguntar antes em Para você.",
   "tips.mergeQueueFolder.title": "Merge na pasta em que você trabalha",
   "tips.mergeQueuePanel.text": "A aba Merges do painel Progresso mostra cada fila de merge: o cartão que ela está testando e quanto tempo suas verificações costumam levar, os cartões aguardando e um cartão que ela devolveu, até você vê-lo. Pausar a fila e Retomar a fila também estão lá.",

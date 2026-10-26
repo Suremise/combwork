@@ -107,7 +107,7 @@ const commit = (dir, file, text, message) => {
 
   // --- The Work section in the card dialog.
   await tile.click()
-  const dialog = page.locator('.dialog', { hasText: `(#${g})` })
+  const dialog = lib.cardDialog(page, await lib.cardLabel(inv, g))
   await dialog.waitFor({ timeout: HUNG_MS })
   const section = dialog.locator('.card-work[data-work="recorded"]')
   await section.waitFor({ timeout: HUNG_MS })
@@ -141,7 +141,7 @@ const commit = (dir, file, text, message) => {
     await closeDialogs()
     await showBoard(page)
     await openByTitle(page, n)
-    const d = page.locator('.dialog', { hasText: `(#${n})` })
+    const d = lib.cardDialog(page, await lib.cardLabel(inv, n))
     await d.waitFor({ timeout: HUNG_MS })
     return d
   }
@@ -255,7 +255,7 @@ const commit = (dir, file, text, message) => {
   }, HUNG_MS)
   await showBoard(page)
   await openByTitle(page, nn)
-  const noneDialog = page.locator('.dialog', { hasText: `(#${nn})` })
+  const noneDialog = lib.cardDialog(page, await lib.cardLabel(inv, nn))
   await noneDialog.waitFor({ timeout: HUNG_MS })
   const noneSection = noneDialog.locator('.card-work[data-work="recorded"]')
   const noneText = async () => (await noneSection.innerText().catch(() => '')).replace(/\s+/g, ' ')
@@ -284,7 +284,7 @@ const commit = (dir, file, text, message) => {
     await lib.until(async () => (await inv('workspace:get'))?.path?.toLowerCase() === ws.toLowerCase(), HUNG_MS)
     await showBoard(page)
     await openByTitle(page, old)
-    const oldSection = page.locator('.dialog', { hasText: `(#${old})` }).locator('.card-work[data-work="before-1.0"]')
+    const oldSection = lib.cardDialog(page, await lib.cardLabel(inv, old)).locator('.card-work[data-work="before-1.0"]')
     check('a card from before 1.0 says it has no work record', !!(await lib.until(async () => (await oldSection.innerText().catch(() => '')).includes('Before 1.0: this card has no work record.'), HUNG_MS)), await oldSection.innerText().catch(() => ''))
   } finally {
     await app.close()

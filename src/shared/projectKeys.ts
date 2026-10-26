@@ -70,19 +70,18 @@ export function suggestKey(name: string, projectId: string, held: readonly KeyHe
 export const cardKey = (projectKey: string, projectNumber: number): string => `${projectKey}-${projectNumber}`
 
 /**
- * A card as agents read it until P8 switches the tools to keys (#1119, Darren 20 Oct): its key with the number the tools
- * take, "HI-1230 (#1240)"; `#1240` for a card with no key (a workspace card, a project with no key yet).
+ * A card as everything names it (HI-1661, Darren 26 Oct: "reference cards only by key"): its key, `HI-1230`, never the
+ * workspace-wide number beside it; `#1240` only for a card with no key (a workspace card, a project with no key yet, a
+ * number no card has). The one rule for agents' texts and the window alike.
  */
-export const nameWithKey = (n: number, key: string | undefined | null): string => (key ? `${key} (#${n})` : `#${n}`)
-export const cardName = (c: { number: number; key?: string }): string => (c.key ? nameWithKey(c.number, c.key) : cardRef(c.number))
+export const nameWithKey = (n: number, key: string | undefined | null): string => key || `#${n}`
+/** A card in a text agents read: its key, else as cardRef names its number. */
+export const cardName = (c: { number: number; key?: string }): string => c.key || cardRef(c.number)
 
-/**
- * A card as the window names it (#1221, #704: "the ID is the ID"): its key, `AM-12`; `#12` for a card with none (a
- * workspace card, a project with no key yet, a number no card on the board has). One form wherever a card is named.
- */
-export const cardLabel = (c: { number: number; key?: string }): string => c.key || `#${c.number}`
+/** A card as the window names it (#1221, #704: "the ID is the ID"): nameWithKey's form. */
+export const cardLabel = (c: { number: number; key?: string }): string => nameWithKey(c.number, c.key)
 
-/** How a text names a card by its number: "HI-1230 (#1240)" where its workspace is known, `#1240` where it isn't. */
+/** How a text names a card by its number: its key (`HI-1230`) where its workspace is known, `#1240` where it isn't. */
 export type CardNames = (n: number) => string
 const plain: CardNames = (n) => `#${n}`
 let naming: () => CardNames | null = () => null

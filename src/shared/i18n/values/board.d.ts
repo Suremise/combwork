@@ -585,6 +585,10 @@ interface HiveMessageValues {
   'board.queue.pause.identity': undefined
   'board.queue.pause.needsYou': undefined
   'board.queue.pause.other': { reason: string | number }
+  'board.queue.pause.pushFailed': { card: string | number; target: string | number }
+  'board.queue.pause.pushNoRemote': { card: string | number; target: string | number }
+  'board.queue.pause.pushRejected': { card: string | number; target: string | number }
+  'board.queue.pause.pushUnreadable': { card: string | number; target: string | number }
   'board.queue.pause.rulesOff': undefined
   'board.queue.pause.signing': undefined
   'board.queue.pause.signingWaits': undefined
@@ -795,6 +799,7 @@ interface HiveMessageValues {
   'board.view.workspaceCards': undefined
   'board.work.accepted': { when: string | number }
   'board.work.adopted': { column: string | number }
+  'board.work.backAtApproved': { revision: string | number }
   'board.work.badgeOutside': undefined
   'board.work.badgeOverride': { by: string; rules: string | number; hasReason: string; reason: string | number }
   'board.work.badgeStale': undefined
@@ -828,6 +833,7 @@ interface HiveMessageValues {
   'board.work.round': { round: number }
   'board.work.staleChange': { approved: string | number; current: string | number }
   'board.work.staleDecision': undefined
+  'board.work.staleNext': { approved: string | number }
   'board.work.target': undefined
   'board.work.title': undefined
   'board.work.verdict': { reviewer: string | number; pass: string; current: string }
