@@ -134,7 +134,7 @@ describe('the restart queue (HI-1707)', () => {
     // Read, but its slots not recovered yet: nothing starts, nothing is skipped as removed.
     ws.read = true
     events.emit({ type: 'workspace-changed', workspace: null })
-    await new Promise((r) => setTimeout(r, 50))
+    await new Promise((r) => setTimeout(r, 50)) // a quiet period: what is checked is that nothing starts, which has no event to wait for
     expect(h.starts).toEqual([])
     // Undecided until its workspace is ready (whether it resumes by itself is that workspace's setting).
     expect(m.restartRecord()?.entries[0].state).toBe('pending')
@@ -152,7 +152,7 @@ describe('the restart queue (HI-1707)', () => {
     await vi.waitFor(() => expect(m.restartRecord()?.entries.find((e) => e.agentId === 'a1')?.why).toBe('notStopped'), { timeout: HUNG_MS })
     // a1's launch still runs: a2 waits.
     events.emit({ type: 'workspace-changed', workspace: null })
-    await new Promise((r) => setTimeout(r, 50))
+    await new Promise((r) => setTimeout(r, 50)) // a quiet period: what is checked is that a2 doesn't start, which has no event to wait for
     expect(h.starts).toEqual(['a1'])
     // It ends at last: a2 goes, and takes its note.
     h.lives = h.lives.filter((s) => s.agentId !== 'a1')
