@@ -18,7 +18,7 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, agentWatchText, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, agentWatchText, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import type { QueuePublic } from '../../shared/workflow/queue'
 import { LOOP_STEPS } from '../../shared/workflow/facts'
@@ -268,7 +268,7 @@ const tools: Tool[] = [
     name: 'hive_project_status',
     description: "One project's status and settings, its workflow options in force (workflow: which the project, the workspace or Hive's settings set), and its agents (each with its folder: a slot, the project folder or a retired home; and its workflowRole: builder, reviewer or either) with their ids, branches and running sessions, and pairs: its builder and reviewer pairs (each running lane's, then by name, byName), as JSON.",
     inputSchema: { type: 'object', properties: { project: projectArg } },
-    run: (a) => api('GET', `/v1/projects/${proj(a)}`)
+    run: async (a) => projectStatusReply(await api('GET', `/v1/projects/${proj(a)}`))
   },
   {
     name: 'hive_session_usage',
@@ -827,7 +827,7 @@ const tools: Tool[] = [
   {
     name: 'hive_list_settings',
     description:
-      "Hive's settings, a line each: id = value (and its default when it differs), [read-only] for those only the user changes, and its name; with query, only those matching every word (\"compact\", \"notifications\"), each with what it does. scope narrows them to app, provider or project; project adds that project's own settings (Project Settings, ids project.…). At most 200 lines: offset carries on. hive_read_setting explains one.",
+      "Hive's settings, a line each: id = value (and its default when it differs), [read-only] for those only the user changes, and its name, those set to inherit last under one line saying so; with query, only those matching every word (\"compact\", \"notifications\"), each with what it does. scope narrows them to app, provider or project; project adds that project's own settings (Project Settings, ids project.…). At most 200 lines: offset carries on. hive_read_setting explains one.",
     inputSchema: {
       type: 'object',
       properties: {

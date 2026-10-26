@@ -340,7 +340,8 @@ const prose = (seed, n) => {
   // 3,100 since #1417's project.workflow.stageNames (one line, about 50 characters); 3,200 since #1382's
   // project.loopStepWaitMinutes (one line, about 70 characters).
   const projectList = measure('hive_list_settings (a project)', tool('hive_list_settings', { project: 'alpha', scope: 'project' }, 'assistant'), 3200)
-  check("a project's own settings, inheriting", /^project\.transcriptWarnMB = inherit · Warn when a transcript is over$/m.test(projectList), projectList.slice(0, 300))
+  // Those set to inherit come last under one line (HI-1712: most of a project's own, about 350 characters less).
+  check("a project's own settings, inheriting", /^Set to inherit:$[\s\S]*^project\.transcriptWarnMB · Warn when a transcript is over$/m.test(projectList) && !/= inherit · /.test(projectList.replace(/.*\[read-only\].*/g, '')), projectList.slice(0, 300))
   const one = measure('hive_read_setting', tool('hive_read_setting', { id: 'sessions.transcriptWarnMB' }, 'assistant'), 1500)
   check('a setting in full: where, what it takes, when it helps', one.includes('Where: Settings → Sessions → Warn when a transcript is over.') && /When it helps: /.test(one), one)
   // An unknown tool is a JSON-RPC error (no result at all).

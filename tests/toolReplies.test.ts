@@ -10,8 +10,10 @@ import {
   notesListText,
   progressLabel,
   projectListText,
+  projectStatusReply,
   releaseText,
   reorderText,
+  settingListText,
   taskListText,
   taskRow,
   withoutHistory,
@@ -147,6 +149,24 @@ describe('projects and notes', () => {
 
   it('projects from several workspaces name their workspace', () => {
     expect(projectListText([{ name: 'a', workspace: 'one', active: true, branch: null, agents: [] }, { name: 'b', workspace: 'two', active: true, branch: null, agents: [] }])).toMatch(/^one\/a \(on\): no agents\ntwo\/b/)
+  })
+
+  it("a project's status leaves out what its settings only repeat or keep for Hive (HI-1712)", () => {
+    const status = { name: 'alpha', path: 'C:\\ws\\alpha', settings: { version: 2, chime: 'inherit', id: 'p-1', lastPath: 'C:\\ws\\alpha', stepsDone: ['a step'] } }
+    expect(projectStatusReply(status)).toEqual({ name: 'alpha', path: 'C:\\ws\\alpha', settings: { chime: 'inherit', id: 'p-1' } })
+    expect(projectStatusReply({ name: 'alpha' })).toEqual({ name: 'alpha' })
+  })
+
+  it('settings set to inherit come last under one line, without their value (HI-1712)', () => {
+    const rows = [
+      { id: 'project.chime', value: 'inherit', title: 'Completion chime', desc: 'Plays a sound.' },
+      { id: 'project.loopWakes', value: 'on', title: 'Wake reviewers and builders', desc: 'Wakes them.' },
+      { id: 'project.codex.permissionMode', value: 'inherit', readOnly: true as const, title: 'Permission mode', desc: 'How it asks.' },
+      { id: 'project.fileLocks', value: 'inherit', title: 'File locks', desc: 'Locks files.' }
+    ]
+    expect(settingListText(rows)).toBe('project.loopWakes = on · Wake reviewers and builders\nproject.codex.permissionMode = inherit [read-only] · Permission mode\nSet to inherit:\nproject.chime · Completion chime\nproject.fileLocks · File locks')
+    expect(settingListText(rows.slice(0, 2), { query: 'wake' })).toBe('project.loopWakes = on · Wake reviewers and builders: Wakes them.\nSet to inherit:\nproject.chime · Completion chime: Plays a sound.')
+    expect(settingListText([rows[1]])).not.toContain('inherit')
   })
 
   it('notes: a flat list of paths with dates', () => {
