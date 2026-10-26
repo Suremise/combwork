@@ -132,6 +132,9 @@ describe('loop wakes from the facts (#1266)', () => {
     const { w, alpha } = await open()
     const st = fake(alpha)
     const c = await inReview(w)
+    // A card after it, so the lane runs on once this one is Done (with its lane over, a Done card's step is dropped: HI-1687).
+    const next = await newCard(w)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c, next], by: 'B1 (alpha)' })
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 1: PASSED.' }))
     // Its verdict (the reviewer's arrival wake was dropped: it started reviewing first).
     await typedUntil(st, 1)
