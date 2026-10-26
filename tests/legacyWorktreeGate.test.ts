@@ -19,6 +19,7 @@ const ROOT = resolve(__dirname, '..')
 
 /** Each file's receivers whose `.worktree` isn't an agent's, with what it is. */
 const ALLOWED: Record<string, Record<string, string>> = {
+  'src/shared/branchCleanup.ts': { b: "a branch row's checkout (GitBranchRow.worktree): a branch in use isn't cleaned up" },
   'src/shared/agentFolders.ts': { raw: "legacyWorktree's own read", was: "carryLegacyAgentFields' stored agent", keep: 'the fields it carries' },
   'src/main/branchWatch.ts': { found: "findAgent's answer: an agent's 0.9 worktree, from legacyWorktree" },
   'src/main/gitRepo.ts': { local: "a local branch's checkout (GitBranch.worktree)" },
