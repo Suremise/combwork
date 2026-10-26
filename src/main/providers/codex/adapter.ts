@@ -13,7 +13,7 @@ import { CODEX, CODEX_DESCRIPTOR, CODEX_MODE_FLAGS, CODEX_PERMISSION_MODES } fro
 import { providerSettings } from '../../../shared/providers'
 import { HIVE_TOOLS } from '../../../shared/assistantTools'
 import { config } from '../../config'
-import { placeMatcher } from '../../fsutil'
+import { isFile, placeMatcher } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { hiveError } from '../../hiveError'
 import { plainHttpsJson } from '../../plainHttpsJson'
@@ -1050,9 +1050,10 @@ export class CodexAdapter implements ProviderAdapter {
 
   async transcriptPath(_folder: string, sessionId: string, recorded?: string): Promise<string | null> {
     assertSessionId(sessionId)
-    if (recorded && existsSync(recorded)) return recorded
+    // Checked off main's thread: a session list asks for each of a project's hundreds of sessions (#1649).
+    if (recorded && (await isFile(recorded))) return recorded
     const cached = this.paths.get(sessionId)
-    if (cached && existsSync(cached)) return cached
+    if (cached && (await isFile(cached))) return cached
     if (Date.now() - (this.misses.get(sessionId) ?? 0) < 60_000) return null
     for (const p of await this.rollouts()) {
       const id = idFromFile(p)

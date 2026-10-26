@@ -10,7 +10,7 @@ import { CLAUDE_CODE, CLAUDE_DESCRIPTOR, CLAUDE_FOOTER_MODES, baseModel, canSwit
 import { providerSettings } from '../../../shared/providers'
 import { samePath } from '../../../shared/movePaths'
 import { config } from '../../config'
-import { claudeFileAllowed, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
+import { claudeFileAllowed, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, hookForwardCommand, exportSubtitleText, hookIds, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
@@ -635,16 +635,30 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
    */
   private async transcriptDirs(folder: string): Promise<string[]> {
     const root = join(claudeHome(), 'projects')
-    let names: string[]
-    try {
-      names = await readdir(root)
-    } catch {
-      return []
-    }
+    const names = await this.projectFolders(root)
+    if (!names) return []
     const byName = new Map(names.map((d) => [d.toLowerCase(), d]))
     const wanted = new Set([claudeSpelling(folder), folder, realPath(folder)].map((p) => encodeProjectPath(p).toLowerCase()))
     const exact = [...wanted].flatMap((w) => (byName.has(w) ? [join(root, byName.get(w)!)] : []))
     return [...exact, ...(await this.shortNamed(root, names.filter((n) => !wanted.has(n.toLowerCase())), folder))]
+  }
+
+  /**
+   * The folders of ~/.claude/projects, read again only when it changed (#1649): a session list looks up each session's
+   * transcript, and reading 500 folders' names for each of 400 sessions took most of a second. A folder's time changes
+   * when one is added, removed or renamed in it. Null when it can't be read.
+   */
+  private projectNames: { root: string; mtime: number; names: string[] } | null = null
+  private async projectFolders(root: string): Promise<string[] | null> {
+    try {
+      const mtime = (await stat(root)).mtimeMs
+      if (this.projectNames?.root === root && this.projectNames.mtime === mtime) return this.projectNames.names
+      const names = await readdir(root)
+      this.projectNames = { root, mtime, names }
+      return names
+    } catch {
+      return null
+    }
   }
 
   /**
@@ -691,7 +705,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
 
   async transcriptPath(folder: string, sessionId: string): Promise<string | null> {
     const file = `${assertSessionId(sessionId)}.jsonl`
-    for (const dir of await this.transcriptDirs(folder)) if (existsSync(join(dir, file))) return join(dir, file)
+    for (const dir of await this.transcriptDirs(folder)) if (await isFile(join(dir, file))) return join(dir, file)
     return null
   }
 

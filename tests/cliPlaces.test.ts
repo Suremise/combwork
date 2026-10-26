@@ -94,6 +94,22 @@ describe("Claude Code's transcript folder (#493)", () => {
     expect((await claude.listSessions(p.real)).map((s) => s.id)).toEqual([ID])
   })
 
+  it("finds a folder's first session once Claude Code makes its folder, on the same adapter (#1649)", async () => {
+    const p = place()
+    process.env.CLAUDE_CONFIG_DIR = join(p.base, 'claude-home')
+    const projects = join(process.env.CLAUDE_CONFIG_DIR, 'projects')
+    mkdirSync(join(projects, encodeProjectPath(join(p.base, 'Other'))), { recursive: true })
+    const claude = new ClaudeCodeAdapter()
+    // Looked up before it has any: the projects folder's names are kept while it is unchanged.
+    expect(await claude.transcriptPath(p.real, ID)).toBeNull()
+    expect(await claude.transcriptPath(p.real, ID)).toBeNull()
+    const dir = join(projects, encodeProjectPath(p.real))
+    mkdirSync(dir)
+    writeFileSync(join(dir, `${ID}.jsonl`), '{"type":"user"}\n')
+    expect(await claude.transcriptPath(p.real, ID)).toBe(join(dir, `${ID}.jsonl`))
+    expect((await claude.listSessions(p.via)).map((s) => s.id)).toEqual([ID])
+  })
+
   it("copies a moved folder's data from every folder it is kept under, the first one winning", async () => {
     const p = place()
     process.env.CLAUDE_CONFIG_DIR = join(p.base, 'claude-home')
