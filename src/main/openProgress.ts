@@ -1,6 +1,7 @@
 // Where a window is in opening its workspace (HI-1694): a 0.9 workspace took 88 s to open with nothing on screen saying
-// what it was doing, and the window let the user open another meanwhile. Each step is sent to the window, which shows it
-// as a steady view; while one is under way, the window opens, makes or closes no other workspace.
+// what it was doing, and the window let the user open another meanwhile. A window's open, close or upgrade claims the
+// window (one at a time: another is refused, saying why), each step is sent to the window, which shows it as a steady
+// view, and only the operation holding the claim moves its steps on or lets it go.
 
 import { basename } from 'path'
 import type { OpenProgress } from '../shared/types'
@@ -13,38 +14,65 @@ import type { WorkspaceService } from './workspace'
 const log = createLogger('workspace')
 
 const M = {
-  busy: msg({ id: 'service.workspace.stillOpening', defaultMessage: '{name} is still opening: wait for it to finish, then try again.', description: "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to Hive 1.0)." })
+  busy: msg({ id: 'service.workspace.stillOpening', defaultMessage: '{name} is still opening: wait for it to finish, then try again.', description: "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to Hive 1.0)." }),
+  closing: msg({ id: 'service.workspace.stillClosing', defaultMessage: '{name} is still closing: wait for it to finish, then try again.', description: 'An error opening, making or closing a workspace while this window is still closing its workspace {name}.' })
 }
 
-/** Each window's open under way, by its workspace service. */
-const under = new Map<WorkspaceService, OpenProgress & { since: number; at: number }>()
+/** What holds a window: its token, the workspace it is about, and its step when shown (a close shows none). */
+interface Claim {
+  token: symbol
+  path: string
+  name: string
+  step: OpenProgress['step'] | null
+  done?: number
+  total?: number
+  /** When it began, and when its step did (performance.now()). */
+  since: number
+  at: number
+}
 
-/** The window's open now, or null. */
+/** Each window's claim, by its workspace service. */
+const claims = new Map<WorkspaceService, Claim>()
+
+/** The window's open now, as the window shows it, or null. */
 export function openProgress(ws: WorkspaceService): OpenProgress | null {
-  const p = under.get(ws)
-  if (!p) return null
-  const { since: _since, at: _at, ...progress } = p
-  return progress
-}
-
-/** The window begins opening `path` (its name shown as the folder's), at `step`: told to its window. */
-export function openStart(ws: WorkspaceService, path: string, step: OpenProgress['step']): void {
-  under.delete(ws)
-  const now = performance.now()
-  under.set(ws, { path, name: basename(path), step, since: now, at: now })
-  tell(ws)
+  const c = claims.get(ws)
+  if (!c?.step) return null
+  return { path: c.path, name: c.name, step: c.step, ...(c.done !== undefined ? { done: c.done } : {}), ...(c.total !== undefined ? { total: c.total } : {}) }
 }
 
 /**
- * The window's open under way is at `step` now, with counts where known: told to its window, and logged with how long
- * the step before took. Nothing when no open is under way (a workspace opened another way: a test, a start).
+ * Claims the window for an operation on `path` (an open at `step`, or a close with none shown), checked and taken at once
+ * where the operation begins to change the window: after its folder picker or the agents' stop, which a second request
+ * may outlast (HR2's round 1 finding). Throws the user's reason while another holds it. Returns the claim's token.
  */
-export function openStep(ws: WorkspaceService, step: OpenProgress['step'], counts: { done?: number; total?: number } = {}): void {
-  const was = under.get(ws)
-  if (!was) return
+export function claimWindow(ws: WorkspaceService, path: string, step: OpenProgress['step'] | null): symbol {
+  assertNotOpening(ws)
   const now = performance.now()
-  if (was.step !== step) log.info(`opening ${userText(basename(was.path))}: ${was.step} took ${Math.round(now - was.at)} ms`)
-  under.set(ws, { path: was.path, name: was.name, step, ...counts, since: was.since, at: was.step === step ? was.at : now })
+  const token = Symbol('claim')
+  claims.set(ws, { token, path, name: basename(path), step, since: now, at: now })
+  // The window's request, as main takes it (HI-1694: the log said nothing until "Opened workspace").
+  log.info(`${step ? 'opening' : 'closing'} ${userText(basename(path))}: asked by the window`)
+  if (step) tell(ws)
+  return token
+}
+
+/** The token of the window's claim now, or null: for what carries an operation on after its call returns (an upgrade's adoption). */
+export function windowClaim(ws: WorkspaceService): symbol | null {
+  return claims.get(ws)?.token ?? null
+}
+
+/**
+ * The window's open is at `step` now, with counts where known: told to its window, and logged with how long the step
+ * before took. Only for the claim `token` names (or, without one, an open of `path`): a workspace opened another way (a
+ * test, a start) or an operation since replaced changes nothing.
+ */
+export function openStep(ws: WorkspaceService, step: OpenProgress['step'], counts: { done?: number; total?: number } = {}, of: { token?: symbol | null; path?: string | null } = {}): void {
+  const c = claims.get(ws)
+  if (!c?.step || (of.token !== undefined && c.token !== of.token) || (of.path !== undefined && c.path !== of.path)) return
+  const now = performance.now()
+  if (c.step !== step) log.info(`opening ${userText(c.name)}: ${c.step} took ${Math.round(now - c.at)} ms`)
+  claims.set(ws, { ...c, step, done: counts.done, total: counts.total, at: c.step === step ? c.at : now })
   tell(ws)
 }
 
@@ -52,18 +80,19 @@ function tell(ws: WorkspaceService): void {
   if (ws.window && !ws.window.isDestroyed()) emitTo(ws.window, { type: 'workspace-progress', progress: openProgress(ws) })
 }
 
-/** The window's open is done (or failed): its view goes, and how long it took is logged. */
-export function openDone(ws: WorkspaceService): void {
-  const p = under.get(ws)
-  if (!p) return
-  under.delete(ws)
+/** Lets the window go, when `token` still holds it (a claim taken since stays): its view goes, and how long it took is logged. */
+export function releaseWindow(ws: WorkspaceService, token: symbol | null): void {
+  const c = claims.get(ws)
+  if (!c || !token || c.token !== token) return
+  claims.delete(ws)
+  if (!c.step) return
   const now = performance.now()
-  log.info(`opening ${userText(basename(p.path))}: ${p.step} took ${Math.round(now - p.at)} ms; ${Math.round(now - p.since)} ms in all`)
+  log.info(`opening ${userText(c.name)}: ${c.step} took ${Math.round(now - c.at)} ms; ${Math.round(now - c.since)} ms in all`)
   tell(ws)
 }
 
-/** Throws the user's reason when the window is still opening its workspace: for another open, a new workspace or a close. */
+/** Throws the user's reason while the window is claimed: for another open, a new workspace or a close (asked early, and again at the claim). */
 export function assertNotOpening(ws: WorkspaceService): void {
-  const p = under.get(ws)
-  if (p) throw hiveError(M.busy, { name: p.name }, { kind: 'conflict' })
+  const c = claims.get(ws)
+  if (c) throw hiveError(c.step ? M.busy : M.closing, { name: c.name }, { kind: 'conflict' })
 }

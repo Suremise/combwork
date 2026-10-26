@@ -233,6 +233,7 @@
   "service.workspace.platformTitle": "{project} 的版本控制已变化",
   "service.workspace.renameAgent": "重命名 {project} 的 {agent}…",
   "service.workspace.sharedNames": "智能体名称现在在整个工作区中唯一，以便区分每个智能体。{shared}：它们仍可正常工作，但请在每组同名智能体中重命名一个，例如将 {project} 的 {agent} 改为 {suggestion}。",
+  "service.workspace.stillClosing": "{name} 仍在关闭中：请等它完成后再试。",
   "service.workspace.stillOpening": "{name} 仍在打开中：请等它完成后再试。",
   "service.workspace.twoCalled": "有两个智能体都叫 {name}"
 }

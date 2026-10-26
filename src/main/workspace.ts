@@ -33,6 +33,8 @@ import { duplicateAgentNames, suggestAgentName } from '../shared/agentNames'
 import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, type ProjectIdIndex } from '../shared/projectIds'
 
 const log = createLogger('workspace')
+/** A project's read for the window this slow is logged with its parts' times (HI-1694). */
+const SLOW_PROJECT_READ_MS = 1000
 /** What the board keeps in .hive (#1017): its database and the files beside it, the cards' old folders, backups and the deleted cards' staging. */
 const BOARD_FILES = /^(hive\.db(-wal|-shm|-journal)?|tasks|tasks\..+|backups|deleted-cards)$/
 /** How often a workspace root whose folder went is tried again (#964). */
@@ -331,6 +333,16 @@ export class WorkspaceService {
 
   /** The rest of open, once the window holds the folder. */
   private async opened(abs: string): Promise<WorkspaceInfo> {
+    // Each part's time, in the line saying it opened (HI-1694: an ordinary open of a workspace took 4–11 s, the log silent
+    // between the board's open and "Opened workspace").
+    const parts: string[] = []
+    let mark = performance.now()
+    const started = mark
+    const done = (what: string): void => {
+      const now = performance.now()
+      parts.push(`${what} ${Math.round(now - mark)} ms`)
+      mark = now
+    }
     const fresh = !existsSync(join(abs, HIVE_DIR))
     await this.ensureWorkspaceStructure()
     this.wsConfig = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), withoutSkillSwitches(await readKeptJson(join(this.hiveDir, 'workspace.json'), {})))
@@ -343,11 +355,15 @@ export class WorkspaceService {
     })
     // Every window's recent list: this one first, and open here (#144).
     emit({ type: 'recent-changed' })
+    done('its .hive folder and settings')
     for (const p of await this.listProjectPaths()) await this.ensureProject(p).catch((e) => log.warn(`ensureProject ${userText(p)}`, e))
+    done('its projects')
     // Every project has its id (#508) before the board, lanes and watches are read by it.
     await this.projectIds().catch((e) => log.warn('reading the project ids', e))
+    done('their ids')
     // Before any session starts with them: MCP settings from before #1093 move to its model.
     await this.migrateMcpModel().catch((e) => log.warn('moving the MCP settings to the workspace and project switches', e))
+    done('MCP settings')
     try {
       await this.ensureProject(this.assistantHome)
       // The Assistant's conversations and backups are this machine's: kept out of git if the workspace is a repository.
@@ -356,7 +372,9 @@ export class WorkspaceService {
     } catch (e) {
       log.warn('setting up the Assistant', e)
     }
+    done('the Assistant')
     await inWorkspace(this, async () => WorkspaceService.onOpened?.(fresh)).catch((e) => log.warn('opening the workspace', e))
+    done('its skills and modes, and what opening starts')
     for (const l of WorkspaceService.openedListeners) {
       try {
         l(this)
@@ -365,8 +383,12 @@ export class WorkspaceService {
       }
     }
     this.startWatching()
-    log.info(`Opened workspace ${userText(abs)}`)
-    return this.refresh()
+    done('its watchers')
+    log.info(`Opened workspace ${userText(abs)} in ${Math.round(performance.now() - started)} ms: ${parts.join(', ')}`)
+    const read = performance.now()
+    const info = await this.refresh()
+    log.info(`read ${userText(basename(abs))}'s projects for the window in ${Math.round(performance.now() - read)} ms`)
+    return info
   }
 
   async close(): Promise<void> {
@@ -1169,14 +1191,28 @@ export class WorkspaceService {
    * `scope`: the refresh it is part of (#1002), whose projects share one read of what their running agents' settings need.
    */
   async projectInfo(projectPath: string, gen = this.generation, scope?: object): Promise<ProjectInfo> {
+    // Each part's time, logged when the read is slow (HI-1694: a 0.9 workspace's first open waited a minute on reads the
+    // log didn't time).
+    const parts: [string, number][] = []
+    let mark = performance.now()
+    const started = mark
+    const took = async <T>(what: string, p: Promise<T>): Promise<T> => {
+      try {
+        return await p
+      } finally {
+        const now = performance.now()
+        parts.push([what, now - mark])
+        mark = now
+      }
+    }
     const active = new Set(this.activeNames())
     const ticket = ++this.rootTickets
     // A folder found since the workspace opened is made a project as opening makes one (#1423): its platform recorded
     // with its project.json, so it counts as made by 1.0 (it asks "How do you work?"), not as one from before.
     if (!this.isAssistantHome(projectPath) && !existsSync(join(projectPath, HIVE_DIR, 'project.json'))) await this.ensureProject(projectPath).catch((e) => log.warn(`ensureProject ${userText(projectPath)}`, e))
-    const cfg = await this.projectConfig(projectPath)
+    const cfg = await took('its settings', this.projectConfig(projectPath))
     this.registerRoots(projectPath, cfg, gen, ticket)
-    const { live, restartNeeded, agents, folders } = await WorkspaceService.liveProvider(projectPath, cfg, scope)
+    const { live, restartNeeded, agents, folders } = await took("its agents' sessions and folders", WorkspaceService.liveProvider(projectPath, cfg, scope))
     // Its slots and homes are roots from this read on (#1442), fenced as its worktrees are (registerRoots' ticket).
     if (!this.isAssistantHome(projectPath)) this.registerRoots(projectPath, cfg, gen, ticket, (folders ?? []).map((f) => f.path))
     const info: ProjectInfo = {
@@ -1184,17 +1220,19 @@ export class WorkspaceService {
       path: projectPath,
       active: active.has(basename(projectPath)),
       isGitRepo: existsSync(join(projectPath, '.git')),
-      branch: await this.branch(projectPath),
+      branch: await took('its branch', this.branch(projectPath)),
       config: cfg,
       live,
       restartNeeded,
       agents,
       ...(folders?.length ? { folders } : {}),
-      unmanagedMcp: await this.unmanagedMcp(projectPath),
-      removedData: await removedData(projectPath),
+      unmanagedMcp: await took('its MCP servers', this.unmanagedMcp(projectPath)),
+      removedData: await took('removed data', removedData(projectPath)),
       // Ensured at each refresh, so a repository made later (git init) gets it too (#345).
-      ...(this.isAssistantHome(projectPath) ? {} : { hiveVcs: await hiveVcs(projectPath).catch(() => undefined), platform: projectPlatform(projectPath, cfg.platform, cfg.platformFound) })
+      ...(this.isAssistantHome(projectPath) ? {} : { hiveVcs: await took('.hive in git', hiveVcs(projectPath).catch(() => undefined)), platform: projectPlatform(projectPath, cfg.platform, cfg.platformFound) })
     }
+    const ms = performance.now() - started
+    if (ms > SLOW_PROJECT_READ_MS) log.info(`reading ${userText(basename(projectPath))} for the window took ${Math.round(ms)} ms: ${parts.map(([w, t]) => `${w} ${Math.round(t)} ms`).join(', ')}`)
     this.readAt.set(info, ticket)
     // Said only in the lifetime the read is for: a read begun before a close or a switch is another workspace's.
     if (info.platform && gen === this.generation && this.path) this.sayPlatform(projectPath, info.platform)

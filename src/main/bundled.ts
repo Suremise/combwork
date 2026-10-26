@@ -29,6 +29,8 @@ const log = createLogger('bundled')
 const ITEMS_AT_ONCE = 4
 /** A sync this slow is logged with how long it took and what it changed (HI-1694). */
 const SLOW_SYNC_MS = 1000
+/** A bundled item's update this slow says its time (HI-1694). */
+const SLOW_ITEM_MS = 500
 
 export type BundledKind = 'skills' | 'modes'
 
@@ -166,6 +168,7 @@ export async function syncBundled(opts: { fresh?: boolean; step?: (done: number,
       // What a crash in a swap left: an old copy that isn't a shipped version (the user's) is kept, renamed beside it.
       await cleanSwaps(folder, shippedVersion(kind))
       const syncItem = async (id: string): Promise<void> => {
+        const t0 = performance.now()
         const dest = itemPath(folder, kind, id)
         const shipped = await contentHash(itemPath(bundledDir(kind), kind, id))
         // A dangling link is still the user's (lstat, not existsSync); a copy that can't be read counts as edited.
@@ -178,7 +181,9 @@ export async function syncBundled(opts: { fresh?: boolean; step?: (done: number,
             await install(kind, id, copy)
             m[kind][id] = { from: shipped }
             changed[kind]++
-            log.info(`${action === 'add' ? 'Added' : 'Updated'} the bundled ${kind === 'skills' ? 'skill' : 'mode'} ${userText(id)}`)
+            // Its time when slow (HI-1694: 1.3 s each on a 0.9 workspace's first open, where the files take milliseconds).
+            const ms = performance.now() - t0
+            log.info(`${action === 'add' ? 'Added' : 'Updated'} the bundled ${kind === 'skills' ? 'skill' : 'mode'} ${userText(id)}${ms > SLOW_ITEM_MS ? ` (${Math.round(ms)} ms)` : ''}`)
           } else if (action === 'deleted') m[kind][id] ??= { from: null }
           else if (copy === shipped) m[kind][id] = { from: shipped }
           // A changed copy keeps the version it came from; one Hive never gave (a same-name folder of the user's) has none.
