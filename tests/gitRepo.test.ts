@@ -67,7 +67,7 @@ vi.mock('../src/main/fsutil', async (importOriginal) => {
 
 /** While set, a `git checkout` or `git merge` (a switch, a create, a pull) stops before git starts: `entered`, then `open` (#646). */
 let gitDoor: { entered: () => void; open: Promise<void> } | null = null
-/** While set, the next deletion of a branch (#1642: `git branch -D`, or a push deleting one) stops before git starts, likewise. */
+/** While set, the next deletion of a branch (#1642: `git update-ref -d`, or a push deleting one) stops before git starts, likewise. */
 let refDoor: { entered: () => void; open: Promise<void> } | null = null
 vi.mock('../src/main/git', async (importOriginal) => {
   const real = await importOriginal<typeof import('../src/main/git')>()
@@ -81,7 +81,7 @@ vi.mock('../src/main/git', async (importOriginal) => {
         await door.open
       }
       const atRef = refDoor
-      if (atRef && ((args[1][0] === 'branch' && args[1][1] === '-D') || args[1][0] === 'push')) {
+      if (atRef && ((args[1][0] === 'update-ref' && args[1][1] === '-d') || args[1][0] === 'push')) {
         refDoor = null
         atRef.entered()
         await atRef.open
@@ -739,7 +739,23 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(retargeted).toBe(true)
   }, 120_000)
 
-  it('leaves git the last word: a branch checked out at the last moment is kept, said in use (round 3)', async () => {
+  it('deletes only at the commit it checked: a branch moved at the last moment by git outside Hive stays, with its commit (round 4)', async () => {
+    const at = setUp()
+    const d = door()
+    refDoor = d.door
+    const deleting = repo.deleteBranches(proj, [{ name: 'hive/hb1', sha: at['hive/hb1'] }, { name: 'hive/hb2', sha: at['hive/hb2'] }])
+    await d.at
+    // A plain git, which knows nothing of Hive's lock, moves hive/hb1 to a commit only it has.
+    const unseen = git(proj, 'commit-tree', '-p', at['hive/hb1'], '-m', 'unseen work', `${at['hive/hb1']}^{tree}`)
+    git(proj, 'update-ref', 'refs/heads/hive/hb1', unseen)
+    d.open()
+    const said = await deleting
+    expect(said).toContain('hive/hb1 has moved since you were shown it: kept.')
+    expect(said).toMatch(/Deleted hive\/hb2\./)
+    expect(git(proj, 'rev-parse', 'hive/hb1')).toBe(unseen)
+  }, 120_000)
+
+  it('leaves no checked-out branch deleted: one checked out at the last moment is put back and kept, said in use (round 3)', async () => {
     const at = setUp()
     const d = door()
     refDoor = d.door

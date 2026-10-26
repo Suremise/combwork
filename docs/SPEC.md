@@ -2975,7 +2975,8 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   the offer: merged local branches nothing uses, ticked; apart, under a warning, merged remote branches whose local
   branch isn't in use, none ticked (outward-facing, the Assistant's requirement; one whose local branch is ticked says
   so). Main checks each again: `git:deleteBranches` under the repository's lock (where slots are made), at the commit
-  the window was shown (checked, then `git branch -D`; never `-d`, which measures against HEAD, not the target),
+  the window was shown (`update-ref -d <ref> <sha>`, compare-and-delete; never `branch -D`, nor `-d`, which measures
+  against HEAD, not the target),
   merged unless it is one unmerged branch the user confirmed with the commits
   it drops (`git:branchDrops`); `git:deleteRemoteBranches` with `push --force-with-lease=<ref>:<sha> :<ref>`, so one
   that moved on the remote is refused there. Each one kept is said, why. What a branch is to the project (the target,
@@ -2983,8 +2984,8 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   branch right before it goes (HR1's round 1), and the check and the deletion are one hold (round 2's finding): the
   turn of workflow writes (`workflowWrite`, which every options write takes: a project's, a level's, a setting's tool,
   a preset, a platform switch), then the repository's lock (slot preparation, merges, branch switches), held through a
-  remote's push. Local branches go with `git branch -D` after the commit is checked, so git's refusal of a branch
-  checked out in any worktree is the last line, said as in use. The dialog keeps what it deleted, so Try Again after a remote's
+  remote's push. A branch moved by a git outside the lock meanwhile is refused by git and kept (round 3's finding); one
+  checked out in a worktree after all is put back at that commit and kept, said as in use. The dialog keeps what it deleted, so Try Again after a remote's
   failure, or a tick changed after one, asks only for what is left. A card's own line is deleted by
   `deleteMergedLine` (#1438) once the card is Done and no worktree has it checked out: in a lane that is when its slot
   moves to the next card's line, so until then it shows In use.

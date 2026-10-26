@@ -861,9 +861,6 @@ function cardLines(projectPath: string): Set<string> {
 
 const kept = (why: string, branch: string, target = ''): Text => withValues(B.kept, { why, branch, target })
 
-/** git's refusal to delete a branch checked out in a worktree ("used by worktree at", older "checked out at"). */
-const CHECKED_OUT = /used by worktree|checked out at/i
-
 const branchNameOk = async (projectPath: string, name: string): Promise<boolean> => !!name && !name.startsWith('-') && (await refFormatOk(projectPath, ['--branch', name]))
 
 /**
@@ -871,9 +868,10 @@ const branchNameOk = async (projectPath: string, name: string): Promise<boolean>
  * (unless `unmerged`, one branch the user confirmed with the commits it drops), and never one in use (the target, the
  * default branch, the folder's, a worktree's or slot's, an open card's). Each branch's check and its deletion happen in
  * one hold of the repository's lock, which slot preparation, merges, branch switches and a target change take too
- * (round 3), so none of them lands between the two; git refusing a branch checked out in any worktree is the last line
- * (`git branch -D`, after the commit is checked: measured against the target, never `-d`'s HEAD). What is kept is said,
- * why.
+ * (round 3), so none of them lands between the two. The ref is removed only at the commit checked (`update-ref -d <ref>
+ * <sha>`, atomic: a git outside the lock moving it makes git refuse; never `branch -D`, which takes whatever it points
+ * at, nor `-d`, which measures against HEAD), and put back if a worktree has it checked out after all (round 4). What is
+ * kept is said, why.
  */
 export async function deleteBranches(projectPath: string, items: BranchAt[], unmerged = false): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
@@ -914,13 +912,22 @@ export async function deleteBranches(projectPath: string, items: BranchAt[], unm
             notes.push(kept('unmerged', branch, now.target))
             continue
           }
-          // git as the last line (round 3): it refuses a branch checked out in any worktree, whoever took it. Under the
-          // lock nothing else moves the branch, so the commit checked above is the one deleted (and its config with it).
-          const r = await git(projectPath, ['branch', '-D', branch])
+          // Removed only at the commit checked (round 4): a git outside Hive's lock that moved it meanwhile makes git
+          // refuse, and its new commits stay. Then checked out anywhere after all (taken around the lock): put back at
+          // that commit, kept. Its config goes only once it is gone for good.
+          const r = await git(projectPath, ['update-ref', '-d', `refs/heads/${branch}`, sha])
           if (!r.ok) {
-            notes.push(CHECKED_OUT.test(r.err) ? kept('worktree', branch) : withValues(B.deleteFailed, { branch, why: gitSaid(r) }))
+            const moved = await git(projectPath, ['rev-parse', '--verify', '-q', `refs/heads/${branch}^{commit}`])
+            notes.push(moved.ok && moved.out.trim() !== sha ? kept('moved', branch) : withValues(B.deleteFailed, { branch, why: gitSaid(r) }))
             continue
           }
+          const after = await git(projectPath, ['worktree', 'list', '--porcelain'])
+          if (!after.ok || parseWorktrees(after.out).some((w) => w.branch === branch)) {
+            const back = await git(projectPath, ['update-ref', `refs/heads/${branch}`, sha, ''])
+            notes.push(back.ok ? kept('worktree', branch) : withValues(B.deleteFailed, { branch, why: gitSaid(back) }))
+            continue
+          }
+          await git(projectPath, ['config', '--remove-section', `branch.${branch}`])
           deleted.push(branch)
         }
         if (deleted.length) log.info(`Deleted ${deleted.length} branch(es) of ${userText(projectPath)}: ${userText(deleted.join(', '))}${unmerged ? ' (unmerged, confirmed)' : ''}`)
