@@ -204,12 +204,13 @@ const lines = (file) => {
     check('…its row says "waiting for a slot"', !!(await until(async () => ((await why.textContent().catch(() => '')) ?? '') === 'waiting for a slot', HUNG_MS)), await why.textContent().catch(() => ''))
     await why.click()
     check('…which opens Branches & remotes, slot-a listed', !!(await until(async () => (await page.locator('button[role="tab"][data-section="branches"][aria-selected="true"]').count()) === 1 && (await page.locator('[data-slot="slot-a"]').count()) > 0, HUNG_MS)))
-    // R1's verdict handed copy-1 back: read again, it is idle in the pool.
-    check('…copy-1, handed back, idle in the pool', !!(await until(async () => {
-      if (((await page.locator('.git-worktree[data-hive="copy"]').textContent().catch(() => '')) ?? '').includes('copy-1: idle in the pool')) return true
-      await page.locator('[data-action="reload-branches"]').click().catch(() => undefined)
-      return false
-    }, HUNG_MS)), await page.locator('.git-worktree[data-hive="copy"]').allInnerTexts().catch(() => []))
+    // R1's verdict handed copy-1 back: read again once it is, it is idle in the pool.
+    const handedBack = await until(async () => (await inv('copies:list', alpha)).find((c) => c.name === 'copy-1' && (!c.lease || c.lease.returned)), HUNG_MS)
+    check('…R1’s verdict hands copy-1 back', !!handedBack, JSON.stringify(await inv('copies:list', alpha)))
+    const reread = page.locator('[data-action="reload-branches"]')
+    await until(async () => !(await reread.locator('.spin, [class*="spin"]').count()), HUNG_MS)
+    await reread.click()
+    check('…copy-1, read again, idle in the pool', !!(await until(async () => ((await page.locator('.git-worktree[data-hive="copy"]').textContent().catch(() => '')) ?? '').includes('copy-1: idle in the pool'), HUNG_MS)), await page.locator('.git-worktree[data-hive="copy"]').allInnerTexts().catch(() => []))
     await shoot('branches-idle', page.locator('.git-branches'))
 
     /** Screenshots in both themes (English): `target` (null: the window, its hover made again by `show`). */
