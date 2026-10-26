@@ -45,6 +45,7 @@ import type {
   QuitSession,
   ToastMessage,
   Notice,
+  OpenProgress,
   WorkspaceInfo
 } from '@shared/types'
 import type { QueueView } from '@shared/workflow/queue'
@@ -196,6 +197,8 @@ interface State {
   workspace: WorkspaceInfo | null
   /** The recent workspaces as this window sees them (#144). */
   recent: RecentWorkspace[]
+  /** This window's workspace opening, its step now (HI-1694), or null. */
+  openProgress: OpenProgress | null
   /** Each provider's installed CLI (install state, version, sign-in, readiness). */
   providers: Record<ProviderId, AgentInstallInfo>
   /** Whether git itself runs (#346); null until asked. */
@@ -472,6 +475,7 @@ export const useStore = create<State>(() => ({
   advanced: null,
   workspace: null,
   recent: [],
+  openProgress: null,
   providers: {},
   gitTool: null,
   planUsage: {},

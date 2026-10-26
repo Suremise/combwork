@@ -6,7 +6,7 @@ import { placeKey } from './fsutil'
 import { createLogger, userText } from './logger'
 import { keepAsBackup } from './storeBackup'
 import { readTable, saveTable } from './storeTables'
-import { dbGeneration, onDbReplaced } from './boardStore'
+import { dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { englishText } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { hiveError } from './hiveError'
@@ -571,8 +571,20 @@ class Store {
     return this.saving
   }
 
+  /**
+   * Whether the workspace's board waits for its upgrade to 1.0 (HI-1694): it takes no writes ("attempt to write a readonly
+   * database"), so nothing is saved meanwhile; the upgrade replaces the database, and what is observed after it is saved.
+   */
+  private waiting(): boolean {
+    try {
+      return upgradeWaiting(this.workspace)
+    } catch {
+      return false
+    }
+  }
+
   private async write(): Promise<void> {
-    if (!this.dirty || this.unreadable) return
+    if (!this.dirty || this.unreadable || this.waiting()) return
     this.dirty = false
     this.roll(clock.now())
     try {

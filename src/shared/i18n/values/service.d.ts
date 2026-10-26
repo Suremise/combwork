@@ -235,5 +235,6 @@ interface HiveMessageValues {
   'service.workspace.platformTitle': { project: string | number }
   'service.workspace.renameAgent': { project: string | number; agent: string | number }
   'service.workspace.sharedNames': { shared: string | number; project: string | number; agent: string | number; suggestion: string | number }
+  'service.workspace.stillOpening': { name: string | number }
   'service.workspace.twoCalled': { name: string | number }
 }

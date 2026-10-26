@@ -11,6 +11,7 @@ import { AboutDialog, AgentSetupDialog, DiagnosticsDialog, CommandPalette, Compa
 import { AddAgentDialog, AgentSettingsDialog, HandOverDialog, MergeDialog, TemplateAgentDialog } from './components/AgentDialogs'
 import { BranchMergeDialog } from './components/BranchMerge'
 import { BoardUpgradeAsk, BoardUpgradeBanner } from './components/BoardUpgrade'
+import { WorkspaceOpening } from './components/WorkspaceOpening'
 import { ArchiveAllDialog, BoardView, MoveToDoingDialog, TaskDialog, TaskStartDialog } from './components/Board'
 import { LaneStartDialog } from './components/LaneStartDialog'
 import { WorkspaceOverviewView } from './views/WorkspaceOverview'
@@ -82,6 +83,9 @@ let chimesPlayed = 0
 
 function handleEvent(e: HiveEvent): void {
   switch (e.type) {
+    case 'workspace-progress':
+      set({ openProgress: e.progress })
+      break
     case 'recent-changed':
       // Opened, removed or cleared (in any window): this window's view of the list, asked for again (#144).
       void call('workspace:recent').then((recent) => set({ recent })).catch(() => undefined)
@@ -506,6 +510,7 @@ export function App() {
       <MoveRepairDialog />
       <SetAsideDialog />
       <BoardUpgradeAsk />
+      <WorkspaceOpening />
       <AddAgentDialog />
       <AgentSettingsDialog />
       <TemplateAgentDialog />

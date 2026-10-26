@@ -233,5 +233,6 @@
   "service.workspace.platformTitle": "O controle de versão mudou em {project}",
   "service.workspace.renameAgent": "Renomear o agente {agent} do projeto {project}…",
   "service.workspace.sharedNames": "Os nomes de agente agora são únicos em todo o espaço de trabalho, para que cada agente possa ser identificado. {shared}: eles continuam funcionando, mas renomeie um de cada, por exemplo, o agente {agent} do projeto {project} para {suggestion}.",
+  "service.workspace.stillOpening": "{name} ainda está abrindo: espere terminar e tente de novo.",
   "service.workspace.twoCalled": "Dois agentes se chamam {name}"
 }

@@ -935,6 +935,10 @@
     "defaultMessage": "Agent names are unique across the workspace now, so each agent can be told apart. {shared}: they keep working, but rename one of each, e.g. {project}'s {agent} to {suggestion}.",
     "description": "A notice: agents of several projects share names from before names were unique. {shared} says which (\"R1 is in alpha and beta\"); {suggestion} is a free name for the agent {agent} of the project {project}."
   },
+  "service.workspace.stillOpening": {
+    "defaultMessage": "{name} is still opening: wait for it to finish, then try again.",
+    "description": "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to Hive 1.0)."
+  },
   "service.workspace.twoCalled": {
     "defaultMessage": "Two agents are called {name}",
     "description": "A notice's title: agents of two projects share the name {name}."

@@ -707,9 +707,17 @@ function openBoard(path: string, upgrade: boolean): Board {
         if (othersPresent(hive, presenceId()).length) throw new OtherHiveError()
       },
       whileGroupLocked: boardTestHooks.whileUpgrading ?? holdForTest,
-      checkpointer: checkpointWhenIdle
+      checkpointer: checkpointWhenIdle,
+      // Each step's time (HI-1694: an upgrade that took a minute said only that it had finished).
+      onSteps: (steps, copyMs) => {
+        const ms = (x: number): string => `${Math.round(x)} ms`
+        const total = steps.reduce((n, x) => n + x.ms, copyMs ?? 0)
+        log.info(`the board of ${userText(path)} took ${steps.length} schema step(s) in ${ms(total)}${copyMs === null ? '' : `, its copy before them ${ms(copyMs)}`}: ${steps.map((x) => `${x.version} ${x.name} ${ms(x.ms)}`).join(', ')}`)
+      }
     })
     const w = db.writer
+    // Read-only until the user says yes in the window's question (HI-1694: the log said nothing of the wait for it).
+    if (db.pending) log.info(`the board of ${userText(path)} waits for its upgrade to 1.0 (from v${db.pending.from}): read-only until the window's question is answered`)
     const b: Board = {
       path,
       place: real.toLowerCase(),
@@ -1696,6 +1704,20 @@ export function upgradeWaiting(workspacePath: string): boolean {
   }
 }
 
+/**
+ * Whether a workspace's board waits for its upgrade to 1.0 (HI-1694): its tables are still 0.9's and it takes no writes,
+ * so background work for the workspace (the line updater, metrics, the opening's board steps) waits for it too, and runs
+ * once it is upgraded. False for a workspace no window holds (its work stops on that anyway) or with no board.
+ */
+export function boardWaits(ws: WorkspaceService): boolean {
+  if (!ws.path) return false
+  try {
+    return upgradeWaiting(ws.path)
+  } catch {
+    return false
+  }
+}
+
 /** Throws the user's reason when the workspace's upgrade to 1.0 waits: for what can't run without hive.db (an agent's start). */
 export function assertUpgraded(workspacePath: string): void {
   if (upgradeWaiting(workspacePath)) throw hiveError(M.upgradeFirstStart, undefined, { kind: 'conflict' })
@@ -1727,6 +1749,7 @@ export function onBoardUpgraded(fn: (ws: WorkspaceService) => void): () => void 
 export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: string | null }> {
   const path = pathOf(ws)
   const key = keyOf(path)
+  const started = performance.now()
   let upgraded = false
   const out = await withFileLock(boardLock(path), async () => {
     const pending = boardOf(path).db.pending
@@ -1751,7 +1774,7 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
     }
     // A 0.9 board's copy is the one kept for good; a 1.0 board taking a later step of the group gets an ordinary one.
     const kept = from09 ? copy09(path) : undefined
-    log.info(`upgraded the board of ${userText(path)} to 1.0 (from v${pending.from}); ${kept ? `the 0.9 board is kept as ${basename(kept.file)}` : 'it was a 1.0 board already'}`)
+    log.info(`upgraded the board of ${userText(path)} to 1.0 (from v${pending.from}) in ${Math.round(performance.now() - started)} ms; ${kept ? `the 0.9 board is kept as ${basename(kept.file)}` : 'it was a 1.0 board already'}`)
     replaced(path)
     upgraded = true
     return { backup: kept?.file ?? null }

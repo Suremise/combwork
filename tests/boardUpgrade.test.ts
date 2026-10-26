@@ -439,6 +439,38 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     await close(w)
   })
 
+  it('background work waits while the board waits for its upgrade: no "no such table" or "readonly" errors; it runs once upgraded (HI-1694)', async () => {
+    const { updateLines } = await import('../src/main/workflow/lineUpdates')
+    const metrics = await import('../src/main/metrics')
+    const { readTable } = await import('../src/main/storeTables')
+    const ws = await board09()
+    const w = await open(ws)
+    // What Hive logs meanwhile (to the console in an unpackaged build, as the tests are).
+    const lines: string[] = []
+    const keep = (...a: unknown[]): void => void lines.push(a.map(String).join(' '))
+    const spies = [vi.spyOn(console, 'log').mockImplementation(keep), vi.spyOn(console, 'error').mockImplementation(keep)]
+    try {
+      expect(store.boardWaits(w)).toBe(true)
+      // The line updater (a pass came with every agent's change in another window) and a metrics save, on the 0.9 board.
+      await inWorkspace(w, () => updateLines(w))
+      metrics.recordApi(metrics.metricsHandle(w), null, { route: '/v1/tasks', method: 'GET', role: 'agent', outcome: 'ok', requestBytes: 1, responseBytes: 1, ms: 1 })
+      await metrics.metricsHandle(w)!.store.save()
+      expect(lines.filter((l) => /no such table|readonly database|Could not save the performance metrics|bringing builders/i.test(l))).toEqual([])
+      expect(readTable(ws, 'metrics').docs).toEqual([])
+      await inWorkspace(w, () => store.upgradeBoard(w))
+      expect(store.boardWaits(w)).toBe(false)
+      // Upgraded: they run, and metrics observed since are saved.
+      await inWorkspace(w, () => updateLines(w))
+      metrics.recordApi(metrics.metricsHandle(w), null, { route: '/v1/tasks', method: 'GET', role: 'agent', outcome: 'ok', requestBytes: 1, responseBytes: 1, ms: 1 })
+      await metrics.metricsHandle(w)!.store.save()
+      expect(lines.filter((l) => /\[(WARN|ERROR)\]/.test(l))).toEqual([])
+      expect(readTable(ws, 'metrics').docs.length).toBeGreaterThan(0)
+    } finally {
+      for (const s of spies) s.mockRestore()
+    }
+    await close(w)
+  })
+
   it('Restore is refused while agents of the workspace run or start, nothing changed', async () => {
     const ws = await board09()
     store.boardTestHooks.upgradeAnswer = 'yes'
