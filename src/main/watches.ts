@@ -722,6 +722,22 @@ const storeFor = (projectPath: string): Store | undefined => {
   return store && store.ws === ws && alive(store) ? store : undefined
 }
 
+/**
+ * An agent's watch as kept, or `unknown` while its workspace's watches aren't loaded yet (they load now): never taken for
+ * none (HI-1731: whether a carried lease's end may stop it). A watch whose wake its CLI never took counts as one.
+ */
+export function watchKnown(projectPath: string, agentId: string): TaskWatchInfo | null | 'unknown' {
+  const ws = workspaceFor(projectPath)
+  if (!ws?.path) return 'unknown'
+  const store = storeFor(projectPath)
+  if (!store) {
+    inBackground('loading watches', load(ws))
+    return 'unknown'
+  }
+  const r = recordOf(store, projectPath, agentId)
+  return r ? infoOf(r) : null
+}
+
 /** An agent's watch as its state shows it (null: none, or its workspace's watches aren't loaded yet; they load now). */
 export function watchFor(projectPath: string, agentId: string): TaskWatchInfo | null {
   const ws = workspaceFor(projectPath)

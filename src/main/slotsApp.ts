@@ -295,10 +295,35 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
  *
  * A lane's lease (`laneEnded`, `laneAbandoned`; `at`: its workspace and pool) is ended gently instead (HI-1706,
  * LANES_GENTLE_END on): laneEnd.
+ *
+ * A carried lease's end (#1441: an adopted worktree, kept for a card or lane from the upgrade) never stops an agent
+ * that has work elsewhere (HI-1731: HB3 was stopped mid-lane when the card its old folder was kept for went to Done):
+ * workNow, conservative (what can't be told counts as work). Its run goes on, and the slot drains once it leaves the
+ * folder (its next start elsewhere moves it); nothing reuses or removes a slot while it has a writer. With nothing else,
+ * it is stopped once its turn is over: workNow, the run, its idleness and the slot's writer read again at that moment,
+ * with nothing awaited between that look and the stop (HR4's design review: work arriving during an await is never
+ * missed). The promise returned (a carried lease's only) settles once the first look is made.
  */
-export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Slot, at?: { ws: WorkspaceService; pool: SlotPool }): void {
+export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Slot, at?: { ws: WorkspaceService; pool: SlotPool }): Promise<void> | void {
   const w = slot.writer
   if (!w || w.lease !== lease.id) return
+  if (lease.kind === 'carried' && at) {
+    const keep = (work: string): void => log.info(`Keeps ${userText(w.agent)}'s session in ${userText(slot.name)} running: its carried lease ${lease.id} ended (${lease.why ?? 'released'}), but it ${work}`)
+    // Its one await first (watches.ts, imported here: it registers its delivery sources as it loads, which slots' own
+    // users needn't); every look after it is synchronous.
+    return import('./watches').then(
+      (watches) => {
+        const go = (): boolean => {
+          const work = workNow(projectPath, w.agent, lease, at, watches.watchKnown)
+          if (work) keep(work)
+          return !work
+        }
+        const writerNow = (): SlotWriter | null => at.pool.slots().find((s) => s.name === slot.name)?.writer ?? null
+        if (go()) stopWhenIdle(projectPath, lease, slot, w, { go, writerNow })
+      },
+      (e) => keep(`may work elsewhere (that couldn't be told: ${e instanceof Error ? e.message : String(e)})`)
+    )
+  }
   // This Hive's run of it, still (another Hive's run, or one already over, isn't this Hive's to stop).
   const mine = (): { run: string; starting: boolean } | null => {
     const r = sessions.runNow(projectPath, w.agent)
@@ -307,6 +332,44 @@ export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Sl
   if (at && lease.lane && (lease.why === 'laneEnded' || lease.why === 'laneAbandoned') && advanced.get<boolean>(LANES_GENTLE_END) !== false && !mine()?.starting) {
     laneEnd(projectPath, lease, slot.name, w, at)
     return
+  }
+  stopWhenIdle(projectPath, lease, slot, w)
+}
+
+/**
+ * What an agent works on besides a lease that ended (HI-1731), in words for the log, or null when nothing: another open
+ * lease of its in the pool; a running lane of the project it builds or reviews; a card of the project in flight (past
+ * Todo, not Done) it builds or reviews, with or without a lease yet; a watch of its own. All read now, synchronously
+ * (the pool's leases, the lanes' and cards' tables, the watches kept): nothing can arrive between its reads and what is
+ * done with its answer. Conservative: watches not loaded yet, or anything that can't be read, count as work.
+ */
+export function workNow(projectPath: string, agent: string, lease: SlotLease, at: { ws: WorkspaceService; pool: SlotPool }, watchKnown: (projectPath: string, agent: string) => { label: string } | null | 'unknown'): string | null {
+  try {
+    const other = at.pool.leasesOf(agent).find((l) => l.id !== lease.id && !l.to)
+    if (other) return `holds lease ${other.id} (${other.lane ? `lane ${other.lane}` : other.card !== null ? `#${other.card}` : other.kind})`
+    const project = basename(projectPath)
+    const lane = boardRead(at.ws, (db) => db.prepare("SELECT id, builder_id AS builder FROM lanes WHERE state = 'active' AND project = ? COLLATE NOCASE AND (builder_id = ? OR reviewer_id = ?) ORDER BY ord LIMIT 1").get(project, agent, agent) as { id: string; builder: string } | undefined) // i18n-ignore: SQL
+    if (lane) return `${lane.builder === agent ? 'builds' : 'reviews'} lane ${lane.id}`
+    const card = boardRead(at.ws, (db) => db.prepare("SELECT number FROM cards WHERE archived = 0 AND project = ? COLLATE NOCASE AND (agent = ? OR review_agent = ?) AND coalesce(stage, CASE col WHEN 'todo' THEN 'todo' WHEN 'done' THEN 'done' END, '') NOT IN ('todo', 'done') ORDER BY number LIMIT 1").get(project, agent, agent) as { number: number } | undefined) // i18n-ignore: SQL
+    if (card) return `has #${card.number} in flight`
+    const watch = watchKnown(projectPath, agent)
+    if (watch === 'unknown') return "may watch something (its watches aren't loaded yet)"
+    if (watch) return `watches (${userText(watch.label)})`
+    return null
+  } catch (e) {
+    return `may work elsewhere (that couldn't be told: ${e instanceof Error ? e.message : String(e)})`
+  }
+}
+
+/**
+ * The lease's run stopped once its turn and its runs have finished; a start still being prepared at once (#1434).
+ * `check` (a carried lease's, HI-1731): at that moment, with nothing awaited, `go` (false: it has work, kept running),
+ * then the run still the slot's writer under this lease (`writerNow`).
+ */
+function stopWhenIdle(projectPath: string, lease: SlotLease, slot: Slot, w: SlotWriter, check?: { go: () => boolean; writerNow: () => SlotWriter | null }): void {
+  const mine = (): { run: string; starting: boolean } | null => {
+    const r = sessions.runNow(projectPath, w.agent)
+    return r && r.run === w.run ? r : null
   }
   let off: (() => void) | null = null
   const done = (): void => {
@@ -317,6 +380,11 @@ export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Sl
     const r = mine()
     if (!r) return done()
     if (!r.starting && (agentBusy(projectPath, w.agent) || agentRunsGoing(projectPath, w.agent).length)) return
+    if (check) {
+      if (!check.go()) return done()
+      const writer = check.writerNow()
+      if (!writer || writer.run !== w.run || writer.lease !== lease.id) return done()
+    }
     done()
     log.info(`Stopping ${userText(w.agent)}'s ${r.starting ? 'start' : 'session'} in ${userText(slot.name)}: its lease ${lease.id} ended (${lease.why ?? 'released'})`)
     sessions.stop(projectPath, w.agent)
