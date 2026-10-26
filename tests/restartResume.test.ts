@@ -3,10 +3,18 @@
 // the request: taken once, acknowledged, never acted on when it is someone else's.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { app } from 'electron'
 import { atStart, checkRequest, mergeSnapshot, parseRecord, resumeNote, REQUEST_FILE, type RestartEntry, type RestartRecord, type RequestTarget } from '../src/shared/restartResume'
+import { dropLoggerListenersAfterEach, loggerListenerCounts } from './loggerListeners'
 import { tempDir } from './tempDir'
+
+// A test that loads restartResume again (vi.resetModules) loads the logger again: what it listens to is taken off after it (HI-1728).
+dropLoggerListenersAfterEach()
+const listenersAtStart = loggerListenerCounts()
+afterAll(() => {
+  expect(loggerListenerCounts()).toEqual(listenersAtStart)
+})
 
 const HUNG_MS = 15_000
 const NONCE = '0f8fad5b-d9cb-469f-a165-70867728950e'
