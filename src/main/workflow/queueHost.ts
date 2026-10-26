@@ -33,7 +33,7 @@ import { withRepoLock } from '../repoLock'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import { onAction } from './actionWorker'
 import { withoutWriteFence } from './factStore'
-import { MergeQueue, type QueueConfig, type QueueHook, type QueueHooks, type QueueStepInfo } from './mergeQueue'
+import { MergeQueue, pushOwedKey, pushOwedOf, type QueueConfig, type QueueHook, type QueueHooks, type QueueStepInfo } from './mergeQueue'
 import { changingFolder, inFolder } from '../folderFence'
 import { sessions } from '../sessions'
 import { progress } from '../progressService'
@@ -372,11 +372,15 @@ export async function prunePins(wf: Workflow, projectPath: string): Promise<void
 /** The targets with open entries (or begun, unfinished ones) of a project, from its facts. */
 function openTargets(wf: Workflow): string[] {
   const out = new Set<string>()
+  const seen = new Set<string>()
   for (const f of wf.store.factsOfKind('IntegrationRequested')) {
     const d = f.data as FactData['IntegrationRequested']
+    seen.add(d.target)
     const e = openEntry(wf.state(f.card))
     if (e && e.id === d.entry) out.add(d.target)
   }
+  // A target whose push an earlier merge still owes (G18, #1179: Hive stopped before it, or it was refused) runs too.
+  for (const t of seen) if (pushOwedOf(wf.store.meta(pushOwedKey(t)))) out.add(t)
   return [...out]
 }
 

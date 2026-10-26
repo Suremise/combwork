@@ -955,6 +955,14 @@
     "defaultMessage": "Merge a branch by hand",
     "description": "A tip's title (#1450): merging any branch outside cards."
   },
+  "tips.mergePush.text": {
+    "defaultMessage": "With Hive merging, Version Control → Workflow can push the target branch after each merge, never forced. If the remote refuses it, the queue pauses and says why: pull and resume, or turn it off and resume.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: merge queue."
+  },
+  "tips.mergePush.title": {
+    "defaultMessage": "Push each merge to your remote",
+    "description": "A tip's title (G18): the workflow option that has Hive's merge queue push the target branch after each merge."
+  },
   "tips.mergeQueueFolder.text": {
     "defaultMessage": "When the merge queue merges into a branch checked out in a folder (main in the project folder), it updates the folder too, but pauses rather than touch a file you are changing. Settings → Advanced can have it ask you under For you first.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. For you is the board's list of what waits for the user."
