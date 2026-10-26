@@ -149,6 +149,46 @@ describe('the delivery service (#647)', async () => {
     deliveries.setFileBudgetForTests(4 * 1024 * 1024)
   })
 
+  it("what is still to reach a run (HI-1706: a lane's end waits for it): queued (given yet or not), offered or uncertain, for its conversation and run; never another's, nor what ended", async () => {
+    st.status = 'working'
+    await make({ from: hive, kind: 'control', body: 'Lane x is finished.', source: 'lane-end', ref: 'l1', forRun: 'r1' })
+    await make({ from: hive, kind: 'control', body: 'For another launch.', forRun: 'r0' })
+    await make({ from: hive, kind: 'card-event', card: 7, body: 'is in Done', conversation: 's0' })
+    await make({ from: hive, kind: 'card-event', card: 8, body: 'is in Done', conversation: null })
+    const ids = async () => (await deliveries.waitingForRun(alpha, 'b1', 'r1', 's1')).map((r) => r.id)
+    expect(await ids()).toEqual(['m1', 'm4'])
+    // Read: no longer waiting. Cancelled: neither.
+    await deliveries.readInbox(alpha, 'b1')
+    expect(await ids()).toEqual([])
+    await make({ from: hive, kind: 'control', body: 'Later.', source: 'lane-end', ref: 'l2', forRun: 'r1' })
+    expect(await ids()).toEqual(['m5'])
+    expect(await deliveries.cancelFromSource(alpha, 'lane-end', 'l2', 'its lane end lost its run')).toBe(1)
+    expect(await ids()).toEqual([])
+  })
+
+  it('tells its listeners of the agents whose deliveries changed once the change is saved, never of a save that failed (HI-1706)', async () => {
+    const told: string[] = []
+    const off = deliveries.onDeliveriesChanged((host, agents) => {
+      if (host === alpha) told.push([...agents].join())
+    })
+    try {
+      await make()
+      await vi.waitFor(() => expect(told).toEqual(['b1']), { timeout: HUNG_MS })
+      deliveries.setBeforeSaveForTests(() => {
+        throw new Error('EIO: i/o error')
+      })
+      try {
+        await expect(make({ agentId: 'b2' })).rejects.toThrow(/couldn't save/)
+      } finally {
+        deliveries.setBeforeSaveForTests(null)
+      }
+      await make({ agentId: 'b3' })
+      await vi.waitFor(() => expect(told).toEqual(['b1', 'b3']), { timeout: HUNG_MS })
+    } finally {
+      off()
+    }
+  })
+
   it('saved as made, with short ids that go on across a restart', async () => {
     expect((await make()).id).toBe('m1')
     expect((await make({ body: 'Then #520.' })).id).toBe('m2')

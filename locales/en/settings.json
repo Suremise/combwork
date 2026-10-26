@@ -1,4 +1,20 @@
 {
+  "settings.advanced.claude-code.exit.command.desc": {
+    "defaultMessage": "What Hive types into Claude Code, then Enter, to end it once its lane has ended and its turn is over, so it exits by itself rather than being killed. Wrong, Claude Code isn't ended by it and is killed after the exit grace.",
+    "description": "What the advanced setting \"Lane's end: exit command\" is for, and what goes wrong when it is wrong (Settings → Advanced). A lane is a card loop."
+  },
+  "settings.advanced.claude-code.exit.command.title": {
+    "defaultMessage": "Lane's end: exit command",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.claude-code.exit.graceSeconds.desc": {
+    "defaultMessage": "How long Hive gives Claude Code to exit by itself after typing its exit command at a lane's end, before killing it. It took {took, plural, one {# second} other {# seconds}} when recorded.",
+    "description": "What the advanced setting \"Lane's end: exit grace\" is for (Settings → Advanced). {took} is how long Claude Code took to exit when recorded, in seconds (1.9)."
+  },
+  "settings.advanced.claude-code.exit.graceSeconds.title": {
+    "defaultMessage": "Lane's end: exit grace",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.claude-code.hooks.knownEvents.desc": {
     "defaultMessage": "The hook events Hive knows Claude Code sends. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook named outside this list saves a capture of the agent's recent events.",
     "description": "What the advanced setting \"Hooks: known events\" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting's title: use it as Settings shows it."
@@ -190,6 +206,22 @@
   "settings.advanced.claudeFooter.title": {
     "defaultMessage": "Footer: {mode}",
     "description": "An advanced setting's title (Settings → Advanced, under Claude Code): the footer Claude Code shows in a permission mode. {mode} is the mode's name."
+  },
+  "settings.advanced.codex.exit.command.desc": {
+    "defaultMessage": "What Hive types into Codex, then Enter, to end it once its lane has ended and its turn is over, so it exits by itself rather than being killed. Wrong, Codex isn't ended by it and is killed after the exit grace.",
+    "description": "What the advanced setting \"Lane's end: exit command\" is for, and what goes wrong when it is wrong (Settings → Advanced). A lane is a card loop."
+  },
+  "settings.advanced.codex.exit.command.title": {
+    "defaultMessage": "Lane's end: exit command",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
+  "settings.advanced.codex.exit.graceSeconds.desc": {
+    "defaultMessage": "How long Hive gives Codex to exit by itself after typing its exit command at a lane's end, before killing it. It took {took, plural, one {# second} other {# seconds}} when recorded.",
+    "description": "What the advanced setting \"Lane's end: exit grace\" is for (Settings → Advanced). {took} is how long Codex took to exit when recorded, in seconds (1.4)."
+  },
+  "settings.advanced.codex.exit.graceSeconds.title": {
+    "defaultMessage": "Lane's end: exit grace",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.codex.fullAccess.answerSeconds.desc": {
     "defaultMessage": "How long Hive's switch to Full Access waits for you to answer Codex's own warning in its terminal. Meanwhile Hive types nothing into the agent; once it passes, Hive says Codex didn't confirm the switch, and still notices it later if you answer Yes.",
@@ -762,6 +794,22 @@
   "settings.advanced.hive.journal.builds.title": {
     "defaultMessage": "Record builds in the journal",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. The journal is the Hive Assistant's record of decisions and events; builds are installers made from Hive's own source code."
+  },
+  "settings.advanced.hive.lanes.endWaitMinutes.desc": {
+    "defaultMessage": "How long, from a lane's end, Hive waits for its builder to finish its turn and read that the lane is finished. Past it, Hive ends the builder's CLI anyway: with its exit command, or killed when that can't be typed (your draft is in its prompt) or doesn't end it.",
+    "description": "What the advanced setting \"Lanes: longest a lane's end waits for its builder\" does (Settings → Advanced, under Hive). A lane is a card loop."
+  },
+  "settings.advanced.hive.lanes.endWaitMinutes.title": {
+    "defaultMessage": "Lanes: longest a lane's end waits for its builder",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"10 min\"). A lane is a card loop: a builder and a reviewer taking cards in turn."
+  },
+  "settings.advanced.hive.lanes.gentleEnd.desc": {
+    "defaultMessage": "When a lane's last card merges (or the lane is abandoned), Hive waits for its builder's turn to end, tells it the lane is finished with each card's merge commit, then ends its CLI with the CLI's own exit command, killing it only if it doesn't exit. Its slot stays its until then. Turned off, Hive stops the builder's session as soon as it is first idle, as before.",
+    "description": "What the advanced setting \"Lanes: let the builder finish when its lane ends\" does (Settings → Advanced, under Hive). A lane is a card loop; a slot is a worktree Hive lends to a card or a lane."
+  },
+  "settings.advanced.hive.lanes.gentleEnd.title": {
+    "defaultMessage": "Lanes: let the builder finish when its lane ends",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. A lane is a card loop: a builder and a reviewer taking cards in turn."
   },
   "settings.advanced.hive.mcp.connectSeconds.desc": {
     "defaultMessage": "How long Hive waits, once an agent is ready, for its CLI to connect Hive's tools before it tells the agent of new work anyway. A resumed session can be ready before its tools are, and a message then is a turn spent without them (#865). Lower it if messages reach agents late when their CLI doesn't connect Hive's tools.",

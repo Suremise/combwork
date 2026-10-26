@@ -1,6 +1,10 @@
 // Generated from locales/en/settings.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
+  'settings.advanced.claude-code.exit.command.desc': undefined
+  'settings.advanced.claude-code.exit.command.title': undefined
+  'settings.advanced.claude-code.exit.graceSeconds.desc': { took: number }
+  'settings.advanced.claude-code.exit.graceSeconds.title': undefined
   'settings.advanced.claude-code.hooks.knownEvents.desc': undefined
   'settings.advanced.claude-code.hooks.knownEvents.title': undefined
   'settings.advanced.claude-code.hooks.knownFields.desc': undefined
@@ -49,6 +53,10 @@ interface HiveMessageValues {
   'settings.advanced.claude-code.turnScreen.done.title': undefined
   'settings.advanced.claudeFooter.desc': { mode: string | number; footer: string | number }
   'settings.advanced.claudeFooter.title': { mode: string | number }
+  'settings.advanced.codex.exit.command.desc': undefined
+  'settings.advanced.codex.exit.command.title': undefined
+  'settings.advanced.codex.exit.graceSeconds.desc': { took: number }
+  'settings.advanced.codex.exit.graceSeconds.title': undefined
   'settings.advanced.codex.fullAccess.answerSeconds.desc': undefined
   'settings.advanced.codex.fullAccess.answerSeconds.title': undefined
   'settings.advanced.codex.fullAccess.warning.desc': undefined
@@ -192,6 +200,10 @@ interface HiveMessageValues {
   'settings.advanced.hive.inbox.stopContinuation.title': undefined
   'settings.advanced.hive.journal.builds.desc': undefined
   'settings.advanced.hive.journal.builds.title': undefined
+  'settings.advanced.hive.lanes.endWaitMinutes.desc': undefined
+  'settings.advanced.hive.lanes.endWaitMinutes.title': undefined
+  'settings.advanced.hive.lanes.gentleEnd.desc': undefined
+  'settings.advanced.hive.lanes.gentleEnd.title': undefined
   'settings.advanced.hive.mcp.connectSeconds.desc': undefined
   'settings.advanced.hive.mcp.connectSeconds.title': undefined
   'settings.advanced.hive.mcp.replySeconds.desc': undefined

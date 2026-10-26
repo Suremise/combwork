@@ -1,0 +1,11 @@
+{
+  "about": "Codex's own exit on the line Hive types at a lane's end (HI-1706): started in a 120x40 pty in a new folder (the Codex test home, a new git init folder trusted there, --no-daemon), no prompt sent; at its prompt the line typed a key at a time, then Enter. exitCode null: it hadn't exited 20 s after the Enter (then killed).",
+  "cli": "Codex",
+  "version": "0.164.0",
+  "sent": "/quit",
+  "enter": "\\r",
+  "exitCode": 0,
+  "exitedAfterMs": 1433,
+  "promptScreenTail": "› Ask Codex to do anything\n\n  GPT-6.1-Sol default · C:\\work\\alpha\n  ? for shortcuts",
+  "lastScreenTail": "Session ID: 00000000-0000-4000-8000-000000000001"
+}

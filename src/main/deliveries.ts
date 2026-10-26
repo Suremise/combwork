@@ -277,6 +277,41 @@ export function registerSource(name: string, s: DeliverySource): void {
   sources.set(name, s)
 }
 
+/** Told of the agents whose deliveries a transaction changed (HI-1706: a lane's end looking again), once it is saved. */
+const changeListeners = new Set<(host: string, agents: ReadonlySet<string>) => void>()
+/**
+ * Listens for saved changes to deliveries: the host and the agents whose deliveries changed, after the transaction is
+ * saved and published, outside the host's lock (a rolled-back plan tells nothing). Returns the unsubscribe.
+ */
+export function onDeliveriesChanged(fn: (host: string, agents: ReadonlySet<string>) => void): () => void {
+  changeListeners.add(fn)
+  return () => changeListeners.delete(fn)
+}
+function tellChanged(host: string, agents: ReadonlySet<string>): void {
+  for (const fn of [...changeListeners]) {
+    try {
+      fn(host, agents)
+    } catch (e) {
+      log.warn('telling of changed deliveries', e)
+    }
+  }
+}
+
+/**
+ * The deliveries still to reach an agent's run (HI-1706: its lane's end waits for them): queued, offered or uncertain,
+ * not expired, for its conversation (or none) and for that run (or any), whether or not the gate gives them yet.
+ */
+export async function waitingForRun(host: string, agentId: string, run: string, conversation: string | null): Promise<DeliveryRecord[]> {
+  await load(host)
+  return waitingForRunNow(host, agentId, run, conversation)
+}
+
+/** waitingForRun from what this Hive has read now, with nothing awaited (the host's deliveries loaded, else none). */
+export function waitingForRunNow(host: string, agentId: string, run: string, conversation: string | null): DeliveryRecord[] {
+  const now = clock()
+  return (stores.get(keyOf(host))?.records ?? []).filter((r) => r.agentId === agentId && (r.state === 'queued' || r.state === 'offered' || r.state === 'uncertain') && Date.parse(r.expires) > now && (!r.conversation || !conversation || r.conversation === conversation) && (!r.forRun || r.forRun === run))
+}
+
 /** Runs fn after the host's transactions before it (and before later ones). */
 function locked<T>(store: Store, fn: () => Promise<T>): Promise<T> {
   const run = store.lock.then(fn)
@@ -326,10 +361,15 @@ function transactAfter<P, T>(store: Store, read: () => Promise<P>, plan: (d: Dra
         }
         throw new NotSaved(`Hive couldn't save the deliveries (${(e as Error).message}): nothing changed.`, { cause: e })
       }
+      const was = new Set(store.records)
       store.records = d.records
       store.next = d.next
       store.invalid = d.invalid
       for (const f of d.after) f()
+      if (changeListeners.size) {
+        const agents = new Set(d.records.filter((r) => !was.has(r)).map((r) => r.agentId))
+        if (agents.size) queueMicrotask(() => tellChanged(store.host, agents))
+      }
       return planned
     }
   }).finally(() => running--)

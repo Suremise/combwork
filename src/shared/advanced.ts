@@ -197,6 +197,15 @@ export const SLOTS_DELETE_MERGED = 'hive.slots.deleteMergedLines'
 /** The longest a slot's setup, install or archive command runs, in minutes (#1429): read by main's slotsApp. */
 export const SLOTS_SETUP_MINUTES = 'hive.slots.setupMinutes'
 
+/**
+ * Whether a lane's end lets its builder finish its turn, tells it, and ends its CLI with the CLI's own exit (HI-1706):
+ * read by main's slotsApp. Off, its session is stopped at its first idle moment, as before.
+ */
+export const LANES_GENTLE_END = 'hive.lanes.gentleEnd'
+
+/** The longest a lane's end waits for its builder's turn to end, in minutes (HI-1706): read by main's slotsApp. */
+export const LANES_END_WAIT_MINUTES = 'hive.lanes.endWaitMinutes'
+
 /** Whether reviewers review in review copies (#1435, SPEC §16.10.5): read by main's copiesApp. */
 export const COPIES_REVIEW = 'hive.copies.review'
 
@@ -724,6 +733,36 @@ const SOURCES: readonly AdvancedSource[] = [
     unit: 'min',
     applies: 'now'
   },
+  // A lane's end (HI-1706, SPEC §16.10.2): its builder finishes its turn, is told, and its CLI exits by itself.
+  {
+    id: LANES_GENTLE_END,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.lanes.gentleEnd.title', defaultMessage: "Lanes: let the builder finish when its lane ends", description: "An advanced setting's title (Settings → Advanced), listed under Hive. A lane is a card loop: a builder and a reviewer taking cards in turn." }),
+    desc: msg({
+      id: 'settings.advanced.hive.lanes.gentleEnd.desc',
+      defaultMessage: "When a lane's last card merges (or the lane is abandoned), Hive waits for its builder's turn to end, tells it the lane is finished with each card's merge commit, then ends its CLI with the CLI's own exit command, killing it only if it doesn't exit. Its slot stays its until then. Turned off, Hive stops the builder's session as soon as it is first idle, as before.",
+      description: 'What the advanced setting "Lanes: let the builder finish when its lane ends" does (Settings → Advanced, under Hive). A lane is a card loop; a slot is a worktree Hive lends to a card or a lane.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
+  {
+    id: LANES_END_WAIT_MINUTES,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.lanes.endWaitMinutes.title', defaultMessage: "Lanes: longest a lane's end waits for its builder", description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"10 min\"). A lane is a card loop: a builder and a reviewer taking cards in turn." }),
+    desc: msg({
+      id: 'settings.advanced.hive.lanes.endWaitMinutes.desc',
+      defaultMessage: "How long, from a lane's end, Hive waits for its builder to finish its turn and read that the lane is finished. Past it, Hive ends the builder's CLI anyway: with its exit command, or killed when that can't be typed (your draft is in its prompt) or doesn't end it.",
+      description: 'What the advanced setting "Lanes: longest a lane\'s end waits for its builder" does (Settings → Advanced, under Hive). A lane is a card loop.'
+    }),
+    kind: 'number',
+    default: 10,
+    min: 1,
+    max: 120,
+    unit: 'min',
+    applies: 'now'
+  },
   // Review and check copies (#1435, SPEC §16.10.5, §16.13): reviewers read and run commands in a copy at the exact revision.
   {
     id: COPIES_REVIEW,
@@ -1026,6 +1065,30 @@ const SOURCES: readonly AdvancedSource[] = [
     default: 'authentication_failed',
     applies: 'now',
     samples: [{ from: `${FIX}/signin-claude-2.1.291.json`, version: '2.1.291', text: 'authentication_failed' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  // A lane's end (HI-1706): the command Hive types to end Claude Code as a person would, and how long it waits for the exit.
+  {
+    id: 'claude-code.exit.command',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.exit.command.title', defaultMessage: "Lane's end: exit command", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.claude-code.exit.command.desc', defaultMessage: "What Hive types into Claude Code, then Enter, to end it once its lane has ended and its turn is over, so it exits by itself rather than being killed. Wrong, Claude Code isn't ended by it and is killed after the exit grace.", description: 'What the advanced setting "Lane\'s end: exit command" is for, and what goes wrong when it is wrong (Settings → Advanced). A lane is a card loop.' }),
+    kind: 'text',
+    default: '/exit',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/exit-claude-2.1.310.json`, version: '2.1.310', text: '"sent": "/exit"', shows: 'Claude Code exiting by itself (exit code 0) on /exit and Enter at its prompt' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'claude-code.exit.graceSeconds',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.exit.graceSeconds.title', defaultMessage: "Lane's end: exit grace", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: withValues(msg({ id: 'settings.advanced.claude-code.exit.graceSeconds.desc', defaultMessage: "How long Hive gives Claude Code to exit by itself after typing its exit command at a lane's end, before killing it. It took {took, plural, one {# second} other {# seconds}} when recorded.", description: 'What the advanced setting "Lane\'s end: exit grace" is for (Settings → Advanced). {took} is how long Claude Code took to exit when recorded, in seconds (1.9).' }), { took: 1.9 }),
+    kind: 'number',
+    default: 10,
+    min: 3,
+    max: 60,
+    unit: 's',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/exit-claude-2.1.310.json`, version: '2.1.310', text: '"exitCode": 0', shows: 'Claude Code exiting by itself 1.9 s after /exit and Enter' }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'claude-code.statusLine.rateLimits',
@@ -1439,6 +1502,30 @@ const SOURCES: readonly AdvancedSource[] = [
     flags: 'i',
     applies: 'now',
     samples: [{ from: `${FIX}/screen-codex-0.162.1-working.txt`, version: '0.162.1', text: 'tab to queue message' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  // A lane's end (HI-1706): the command Hive types to end Codex as a person would, and how long it waits for the exit.
+  {
+    id: 'codex.exit.command',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.exit.command.title', defaultMessage: "Lane's end: exit command", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.codex.exit.command.desc', defaultMessage: "What Hive types into Codex, then Enter, to end it once its lane has ended and its turn is over, so it exits by itself rather than being killed. Wrong, Codex isn't ended by it and is killed after the exit grace.", description: 'What the advanced setting "Lane\'s end: exit command" is for, and what goes wrong when it is wrong (Settings → Advanced). A lane is a card loop.' }),
+    kind: 'text',
+    default: '/quit',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/exit-codex-0.164.0.json`, version: '0.164.0', text: '"sent": "/quit"', shows: 'Codex exiting by itself (exit code 0) on /quit and Enter at its prompt' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'codex.exit.graceSeconds',
+    group: 'codex',
+    title: msg({ id: 'settings.advanced.codex.exit.graceSeconds.title', defaultMessage: "Lane's end: exit grace", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: withValues(msg({ id: 'settings.advanced.codex.exit.graceSeconds.desc', defaultMessage: "How long Hive gives Codex to exit by itself after typing its exit command at a lane's end, before killing it. It took {took, plural, one {# second} other {# seconds}} when recorded.", description: 'What the advanced setting "Lane\'s end: exit grace" is for (Settings → Advanced). {took} is how long Codex took to exit when recorded, in seconds (1.4).' }), { took: 1.4 }),
+    kind: 'number',
+    default: 10,
+    min: 3,
+    max: 60,
+    unit: 's',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/exit-codex-0.164.0.json`, version: '0.164.0', text: '"exitCode": 0', shows: 'Codex exiting by itself 1.4 s after /quit and Enter' }] // i18n-ignore: a CLI's recorded text (#367)
   },
   ...(
     [
