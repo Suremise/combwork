@@ -122,6 +122,7 @@
   "workflow.group.stages": "Phasen",
   "workflow.group.where": "Wo Karten bearbeitet werden",
   "workflow.group.work": "Die Arbeit",
+  "workflow.mergeChoice.answer": "{styleTitle}: {style}. {messageTitle}: {message}.",
   "workflow.move.answer": "Antworten",
   "workflow.move.declarePaths": "Pfade der Karte festlegen",
   "workflow.move.loopStep": "Schritt der Kartenschleife",

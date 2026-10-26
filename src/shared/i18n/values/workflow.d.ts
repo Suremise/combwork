@@ -124,6 +124,7 @@ interface HiveMessageValues {
   'workflow.group.stages': undefined
   'workflow.group.where': undefined
   'workflow.group.work': undefined
+  'workflow.mergeChoice.answer': { styleTitle: string | number; style: string | number; messageTitle: string | number; message: string | number }
   'workflow.move.answer': undefined
   'workflow.move.declarePaths': undefined
   'workflow.move.loopStep': undefined

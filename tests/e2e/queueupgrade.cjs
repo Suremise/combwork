@@ -238,11 +238,25 @@ const log = () => {
     void h.inv('workflow:chooseMerge', fx.alpha, { card: five.n, request: five.request, style: 'squash', commitMessage: 'branch' }).catch(() => {})
     check('crash inside the board: Hive ended at the seam', !!(await until(() => ended, HUNG_MS)))
     await h.app.close().catch(() => {})
-    await startAgain()
+    // Started again in German (HI-1733): the answer kept on the card as the user's comment is in their language.
+    await startAgain({ HIVE_LANG: 'de' })
     const open = async () => !(await h.facts(five.n)).some((f) => (f.kind === 'Approval' || f.kind === 'RequestClosed') && f.data?.request === five.request)
     check('…nothing kept: no choice recorded, project.json as it was, the question still open, nothing merged', recorded() === null && projectJson().workflow?.options?.style === 'merge' && unrelated() && (await open()) && (await h.card(five.n))?.column !== 'done', `${JSON.stringify(recorded())} / ${JSON.stringify(projectJson().workflow?.options)}`)
     await h.inv('workflow:chooseMerge', fx.alpha, { card: five.n, request: five.request, style: 'squash', commitMessage: 'branch' })
     await landed(five.n, 'Crash inside the board', 'answered after the restart')
+    const de = JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', 'de', 'workflow.json'), 'utf8'))
+    const german = `${de['workflow.option.style.title']}: ${de['workflow.value.style.squash']}. ${de['workflow.option.commitMessage.title']}: ${de['workflow.value.commitMessage.branch']}.`
+    const answer = (await h.facts(five.n)).find((x) => x.kind === 'Approval' && x.data?.request === five.request)
+    check("…the answer, in German, as Version Control → Workflow names the options (HI-1733)", answer?.data?.note === german, JSON.stringify(answer?.data))
+    // The board by its command, as the menu runs it (its button's name is German now).
+    if (!(await h.page.locator('.board').isVisible())) await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: 'view.board', args: [] })
+    await until(async () => (await h.page.locator(`.task-card[data-task="${five.n}"]`).count()) === 1, HUNG_MS)
+    await q.openByTitle(h.page, five.n)
+    const comment = h.page.locator('.task-comment', { hasText: de['workflow.value.style.squash'] }).last()
+    check('…kept on the card as the user’s comment', !!(await until(async () => (await comment.count()) === 1 && (await comment.innerText()).includes(german), HUNG_MS)), await comment.innerText().catch(() => ''))
+    await comment.scrollIntoViewIfNeeded()
+    await comment.screenshot({ path: path.join(fx.shots, 'queueupgrade-answer-de.png') })
+    await h.page.keyboard.press('Escape')
 
     // Hive's message again (the other option), still squashing: the next card lands as "KEY: title" with its trailers.
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { style: 'squash', commitMessage: 'hive' }) })

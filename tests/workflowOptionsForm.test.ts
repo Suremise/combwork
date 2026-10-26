@@ -30,6 +30,7 @@ const { slotOptionsOf } = await import('../src/main/slots')
 const { OPTION_TEXT, OPTION_WHY, optionTitle, PRESET_SUMMARY } = await import('../src/shared/workflow/optionTexts')
 const { englishText } = await import('../src/shared/advanced')
 const { cardLabel } = await import('../src/shared/projectKeys')
+const { setLanguage } = await import('../src/shared/i18n')
 const projectKeys = await import('../src/main/projectKeys')
 const { agentActor, MERGE_CHOICE_GATE } = await import('../src/shared/workflow/facts')
 const { compile } = await import('../src/shared/workflow/compile')
@@ -491,13 +492,29 @@ describe("the upgrade's merge question (HI-1697)", () => {
     expect(await options()).toMatchObject({ style: 'squash', commitMessage: 'branch', strict: true })
     const s = await state()
     expect(s.requests).toEqual([])
-    expect(s.approvals).toEqual([expect.objectContaining({ request, answer: 'answered', note: "Merge style: squash; commit message: the branch's own." })])
+    expect(s.approvals).toEqual([expect.objectContaining({ request, answer: 'answered', note: 'Merge style: Squash. Commit message: The branch’s own, with no card key or trailers.' })])
     expect(await styleOf()).toBe('squash')
     // Answered: the same request again (a stale dialog) is refused, and changes nothing.
     await expect(choose(request, 'rebase', 'hive')).rejects.toThrow()
     expect(await options()).toMatchObject({ style: 'squash', commitMessage: 'branch' })
     await expect(choose(request, 'sideways', 'branch')).rejects.toThrow(/card, request, style, commitMessage/)
     expect(card.number).toBeGreaterThan(0)
+  })
+
+  it("the answer kept on the card is the user's, in their language (HI-1733): the options' names and values as Version Control → Workflow shows them", async () => {
+    const { ask, choose, state } = await asked()
+    const request = await ask(MERGE_CHOICE_GATE, 'e1')
+    const de = JSON.parse(readFileSync(join(__dirname, '..', 'locales', 'de', 'workflow.json'), 'utf8')) as Record<string, string>
+    setLanguage('de', de, 'de-DE')
+    try {
+      await choose(request, 'squash', 'branch')
+    } finally {
+      setLanguage('en', {})
+    }
+    const note = (await state()).approvals.at(-1)?.note
+    const expected = `${de['workflow.option.style.title']}: ${de['workflow.value.style.squash']}. ${de['workflow.option.commitMessage.title']}: ${de['workflow.value.commitMessage.branch']}.`
+    expect(note).toBe(expected)
+    expect(note).not.toMatch(/Merge style|Commit message/)
   })
 
   it('refuses an answer that is not to an open question of this card, its queue entry open, before changing anything', async () => {

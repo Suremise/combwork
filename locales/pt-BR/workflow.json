@@ -122,6 +122,7 @@
   "workflow.group.stages": "Etapas",
   "workflow.group.where": "Onde os cartões são feitos",
   "workflow.group.work": "O trabalho",
+  "workflow.mergeChoice.answer": "{styleTitle}: {style}. {messageTitle}: {message}.",
   "workflow.move.answer": "Responder",
   "workflow.move.declarePaths": "Definir os caminhos do cartão",
   "workflow.move.loopStep": "Etapa do ciclo de cartões",

@@ -122,6 +122,7 @@
   "workflow.group.stages": "ステージ",
   "workflow.group.where": "カードの作業場所",
   "workflow.group.work": "作業",
+  "workflow.mergeChoice.answer": "{styleTitle}：{style}。{messageTitle}：{message}。",
   "workflow.move.answer": "回答",
   "workflow.move.declarePaths": "カードのパスを設定",
   "workflow.move.loopStep": "カードループのステップ",

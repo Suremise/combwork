@@ -122,6 +122,7 @@
   "workflow.group.stages": "阶段",
   "workflow.group.where": "卡片在哪里完成",
   "workflow.group.work": "工作",
+  "workflow.mergeChoice.answer": "{styleTitle}：{style}。{messageTitle}：{message}。",
   "workflow.move.answer": "回答",
   "workflow.move.declarePaths": "设置卡片的路径",
   "workflow.move.loopStep": "卡片循环步骤",

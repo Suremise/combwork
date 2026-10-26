@@ -201,6 +201,13 @@ export const GROUP_TEXT: Record<FormGroupId, Msg> = {
   elsewhere: msg({ id: 'workflow.group.elsewhere', defaultMessage: 'Shown here, set elsewhere', description: 'A heading of the Workflow section: settings shown for reference, each changed where its link leads.' })
 }
 
+/**
+ * The user's answer to the merge queue's question before an upgraded project's first merge (HI-1697), kept on the card
+ * as their comment, in their language (HI-1733): the two options by the names and values Version Control → Workflow
+ * shows. Nothing reads its words: the choice is the board's record and the project's options.
+ */
+export const MERGE_ANSWER = msg({ id: 'workflow.mergeChoice.answer', defaultMessage: '{styleTitle}: {style}. {messageTitle}: {message}.', description: "The user's answer to the merge queue's question before an upgraded project's first merge, kept on the card as the user's own comment: the two workflow options they chose, each its name ({styleTitle}: Merge style; {messageTitle}: Commit message) and the value chosen ({style}: Squash, say; {message}: a value of Commit message). The names and values are the workflow options' own texts, already translated: arrange them as your language writes such a list." })
+
 /** Why the presets set each option as they do (§16.6.3's Why column), one sentence each, shown in a preset's preview. */
 export const OPTION_WHY: Partial<Record<OptionKey, Msg>> = {
   review: msg({ id: 'workflow.why.review', defaultMessage: 'A pair exists to review: a second agent catches what the builder missed, while working solo you read the card’s work yourself.', description: 'Why the presets set “Work is reviewed before it’s merged” as they do (Solo: no review; Pair and Team: a reviewer agent).' }),
